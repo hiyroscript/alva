@@ -41,7 +41,7 @@ export class Arena {
     this.reducedMotion = reducedMotion;
     this.fxTime = 0;
     // How far a mode has closed the Void in (0-1, see setVoidPressure):
-    // never, unless a mode says so (Quick Battle's overtime).
+    // never, unless a mode says so (a Battle's overtime).
     this.voidPressure = 0;
     // The camera keeps the map's own bounds, whatever the Void in force.
     this.camera = new Camera();
@@ -231,7 +231,7 @@ export class Arena {
   // force, `stage.void` (see StageCollision.closeVoid), so the black edge
   // is exactly where a fighter is taken. The tuning is
   // CONFIG.battle.overtimeVoid. Only a mode that closes the Void calls it
-  // (Quick Battle's overtime); 0 also brings the waves back to their
+  // (a Battle's overtime); 0 also brings the waves back to their
   // normal speed and phase.
   setVoidPressure(progress) {
     this.voidPressure = Math.min(1, Math.max(0, Number(progress) || 0));

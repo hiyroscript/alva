@@ -18,7 +18,7 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   400–420 below the stage's top and 760–800 above it (clear of any jump from
   the highest footing, so only a launch reaches it). A fighter whose centre
   leaves the Void in force (`StageCollision.inVoid`, which tests
-  `stage.void`: this rectangle, except through Quick Battle's overtime) is taken by it: out
+  `stage.void`: this rectangle, except through a battle's overtime) is taken by it: out
   of play at once (not drawn, hit, targeted or framed), and back at its own
   spawn 2 seconds later (`CONFIG.battle.respawnSeconds`, on the simulation
   clock), fresh. In Quick Battle each fall is also a point for the opponent,
@@ -33,7 +33,7 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   only: they waver around the kill line, never move it. The Shield's circle
   (see Shield) shares this look, black with a red line, on the same kind of
   slow waves.
-- **Overtime's closing Void** (Quick Battle only, see
+- **Overtime's closing Void** (Quick Battle and Watch Mode, see
   [Quick Battle](battle.md)): through its 60 seconds the Void's left and
   right edges close in to 120 units past each ledge and its bottom rises
   to 140 below the main stage's top, linearly, from each stage's own

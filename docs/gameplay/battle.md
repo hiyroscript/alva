@@ -7,7 +7,7 @@ and §7.3.
 **Flow:** Splash → Home → Play → Select Mode → Select Difficulty → Select
 Fighter → Select Stage → Battle.
 
-**Scoring.** 7 minutes (`CONFIG.battle.quickBattleSeconds`, 420 s; the
+**Scoring.** 7 minutes (`CONFIG.battle.matchSeconds`, 420 s; the
 HUD starts at `7:00`), first to 3 points (`CONFIG.battle.pointsToWin`).
 Each time a fighter falls into the Void its opponent scores a point at
 once; the one that fell is out of play for 2 seconds
@@ -60,11 +60,9 @@ Level on both (within 1e-6) is a draw: no dialog, and a fresh battle
 starts. Restart and Rematch clear overtime: 0–0, `7:00`, the stage's own
 Void and normal waves.
 
-**Watch Mode keeps its own clock.** The same `Battle` runs Watch Mode, but
-its clock stays at 5 minutes (`CONFIG.battle.roundSeconds`) with no
-overtime: level on points when it runs out, the lower Launch Point wins at
-once (see [Watch Mode](watch-mode.md)). Each mode's clock is in
-`BATTLE_MODES` (`js/game/battle.js`).
+**Watch Mode plays the same.** The same `Battle` runs
+[Watch Mode](watch-mode.md), with the same 7-minute clock, overtime,
+closing Void and results: there is one match clock for every Battle.
 
 **The Void's burst.** Whenever the Void takes a fighter, in any mode, a
 short burst plays where it went in, in the fighter's own colours (see

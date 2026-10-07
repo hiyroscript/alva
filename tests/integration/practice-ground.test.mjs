@@ -2257,12 +2257,12 @@ test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two
   assert.equal(battle.secondary, battle.p2);
   assert.equal(battle.phase, 'intro');
   assert.equal(battle.round, 1);
-  assert.equal(CONFIG.battle.quickBattleSeconds, 420, '7 minutes');
-  assert.equal(battle.timeLeft, CONFIG.battle.quickBattleSeconds);
+  assert.equal(CONFIG.battle.matchSeconds, 420, '7 minutes');
+  assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds);
   assert.equal(battle.p1.inputLocked, true, 'locked through the intro');
   for (let i = 0; i < Math.ceil(CONFIG.battle.introSeconds * 60) + 60; i++) battle.update(DT);
   assert.equal(battle.phase, 'fight');
-  assert.ok(battle.timeLeft < CONFIG.battle.quickBattleSeconds);
+  assert.ok(battle.timeLeft < CONFIG.battle.matchSeconds);
   // None of Practice Ground's rules: no damage numbers (its respawns are
   // Quick Battle's own, after a point; see match-score.test.mjs).
   assert.ok(!(battle instanceof PracticeSession));

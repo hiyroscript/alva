@@ -1,6 +1,6 @@
 // Run with node --test tests/integration/overtime.test.mjs (no dependencies).
-// Quick Battle's match clock and overtime, and the fighter-coloured burst
-// the Void leaves: the 7-minute clock (Watch Mode keeping its 5), time-up
+// The match clock and overtime, the same in Quick Battle and Watch Mode,
+// and the fighter-coloured burst the Void leaves: the 7-minute clock, time-up
 // with the points apart or level, overtime as the same live fight played on
 // (score, Launch Points and everything in play kept), its results, the Void
 // closing in from the sides and bottom (collision and the drawn Void alike)
@@ -96,17 +96,19 @@ const near = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-6, `${what}: ${a} vs
 
 // ---- The clocks --------------------------------------------------------------------
 
-test('config: Quick Battle 7:00 and 60 s of overtime; the Void closes to 120 past each ledge and 140 below the top; waves to 4x', () => {
-  assert.equal(CONFIG.battle.quickBattleSeconds, 420);
-  assert.equal(CONFIG.battle.roundSeconds, 300, 'Watch Mode keeps its 5 minutes');
+test('config: 7:00 and 60 s of overtime for every Battle; the Void closes to 120 past each ledge and 140 below the top; waves to 4x', () => {
+  assert.equal(CONFIG.battle.matchSeconds, 420);
+  assert.equal('roundSeconds' in CONFIG.battle, false, 'no second, shorter clock');
+  assert.equal('quickBattleSeconds' in CONFIG.battle, false);
   assert.equal(OT, 60);
   assert.deepEqual({ sideEndGap, bottomEndGap, maxWaveSpeedMultiplier }, { sideEndGap: 120, bottomEndGap: 140, maxWaveSpeedMultiplier: 4 });
   assert.equal(CONFIG.battle.pointsToWin, 3, 'still first to 3');
-  assert.deepEqual([BATTLE_MODES['quick-battle'].seconds, BATTLE_MODES['quick-battle'].overtime], [420, true]);
-  assert.deepEqual([BATTLE_MODES.watch.seconds, BATTLE_MODES.watch.overtime], [300, false]);
+  for (const mode of Object.keys(BATTLE_MODES)) {
+    assert.equal('seconds' in BATTLE_MODES[mode], false, `${mode}: no clock of its own`);
+  }
 });
 
-test('Quick Battle starts at exactly 420 s, Watch Mode at its 300; both in the normal period on the map\'s own Void', () => {
+test('Quick Battle and Watch Mode both start at exactly 420 s, in the normal period on the map\'s own Void', () => {
   const quick = match();
   assert.equal(quick.battle.mode, 'quick-battle');
   quick.battle.restart();
@@ -115,8 +117,10 @@ test('Quick Battle starts at exactly 420 s, Watch Mode at its 300; both in the n
   assert.equal(quick.battle.overtimeSeconds, 60);
   const watch = match({ mode: 'watch' });
   watch.battle.restart();
-  assert.equal(watch.battle.timeLeft, 300);
-  assert.equal(watch.battle.overtimeSeconds, 0, 'no overtime in Watch Mode');
+  assert.equal(watch.battle.mode, 'watch');
+  assert.equal(watch.battle.timeLeft, 420);
+  assert.equal(watch.battle.roundSeconds, 420);
+  assert.equal(watch.battle.overtimeSeconds, 60, 'Watch Mode has overtime too');
   for (const { battle } of [quick, watch]) {
     assert.equal(battle.period, PERIODS.regulation);
     assert.equal(battle.overtime, false);
@@ -211,15 +215,33 @@ test('time-up with the points level: overtime, the same live fight; its clock st
   assert.equal(p2.combat.launchPoint, 0, 'a normal respawn');
 });
 
-test('Watch Mode keeps its old rule: 5:00 level on points goes straight to the Launch Point, never to overtime', () => {
+test('Watch Mode plays the same overtime: level at 7:00 it goes on 60 s under the closing Void, then points, then the lower Launch Point', () => {
   const { battle, run, toTimeUp } = match({ mode: 'watch' });
   battle.p1.combat.launchPoint = 20;
   battle.p2.combat.launchPoint = 50;
   toTimeUp();
+  assert.equal(battle.phase, 'fight', 'no time-up: overtime');
+  assert.equal(battle.overtime, true);
+  near(battle.timeLeft, OT, 'its clock');
+  assert.deepEqual([battle.p1.inputLocked, battle.p2.inputLocked], [false, false], 'both CPUs play on');
+  run(Math.round(OT / 2 / DT));
+  assert.ok(battle.stage.void.left > battle.map.voidBounds.left, 'the Void closes in here too');
+  assert.equal(battle.stage.void.top, battle.map.voidBounds.top);
+  assert.ok(battle.voidWaveSpeed > 1);
+  battle.timeLeft = DT / 2;
+  run();
   assert.equal(battle.phase, 'timeup');
-  assert.equal(battle.overtime, false);
   run(Math.ceil(CONFIG.battle.timeUpSeconds / DT) + 1);
-  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'time' });
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'overtimeLaunchPoint' });
+  // Ahead on points at 7:00: no overtime, as in Quick Battle.
+  const ahead = match({ mode: 'watch' });
+  ahead.battle.score.p2 = 1;
+  ahead.toTimeUp();
+  assert.equal(ahead.battle.phase, 'timeup');
+  assert.equal(ahead.battle.overtime, false);
+  // A rematch clears it.
+  battle.restart();
+  assert.deepEqual([battle.overtime, battle.timeLeft, battle.stage.void], [false, 420, battle.stage.baseVoid]);
 });
 
 // ---- Overtime --------------------------------------------------------------------------

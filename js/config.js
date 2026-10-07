@@ -52,14 +52,13 @@ export const CONFIG = Object.freeze({
   },
 
   battle: {
-    // The normal match clock, by mode (see BATTLE_MODES in
-    // js/game/battle.js); 0 disables it. Quick Battle plays 7 minutes;
-    // roundSeconds is every other Battle's (Watch Mode's 5 minutes).
-    quickBattleSeconds: 420,
-    roundSeconds: 300,
-    // Quick Battle only: the normal clock running out with the points
-    // level starts this much overtime, the same match played on (scores,
-    // Launch Points and everything in play kept) under a closing Void.
+    // The normal match clock of every Battle (Quick Battle and Watch Mode
+    // alike): 7 minutes; 0 disables it.
+    matchSeconds: 420,
+    // The normal clock running out with the points level starts this much
+    // overtime, the same match played on (scores, Launch Points and
+    // everything in play kept) under a closing Void. 0: none, the Launch
+    // Point decides at once.
     overtimeSeconds: 60,
     // How the Void closes in through overtime, linearly over its whole
     // length: its left and right edges in to `sideEndGap` world units past

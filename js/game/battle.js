@@ -3,10 +3,9 @@
 // it is Player 1 against the combat AI (js/game/ai/combat-ai.js) at the chosen
 // difficulty; in Watch Mode both fighters are the combat AI, each with its
 // own controller, at the one chosen difficulty (see BATTLE_MODES). Every
-// rule below is the same in both but the clock: Quick Battle's is 7
-// minutes and has overtime, Watch Mode's 5 minutes and none. The Arena owns
-// the fixed-timestep world and its Canvas 2D rendering; DOM concerns (HUD,
-// pause, overlays) live in the battle screen.
+// rule below is the same in both, the 7-minute clock and overtime
+// included. The Arena owns the fixed-timestep world and its Canvas 2D
+// rendering; DOM concerns (HUD, pause, overlays) live in the battle screen.
 //
 // First to CONFIG.battle.pointsToWin (3) points wins. A fighter scores a
 // point each time its opponent falls into the Void (see onVoid); the one
@@ -14,11 +13,10 @@
 // at its spawn, fresh, while the fight (and the clock) carries on. The
 // point that reaches 3 ends the match instead, overtime included: no
 // respawn, the KO beat, then the result. If the clock runs out first, more
-// points wins. Level on points, Watch Mode goes to the lower Launch Point
-// (equal on both is a draw); Quick Battle goes to overtime (startOvertime):
-// the same fight played on for CONFIG.battle.overtimeSeconds under a
-// closing Void, then more points, then the lower Launch Point, equal on
-// both a draw.
+// points wins. Level on points, the match goes to overtime
+// (startOvertime): the same fight played on for
+// CONFIG.battle.overtimeSeconds under a closing Void, then more points,
+// then the lower Launch Point, equal on both a draw.
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
@@ -32,26 +30,19 @@ import { mulberry32, deriveSeed } from '../core/utils.js';
 // markers, results). `stream` picks a CPU's randomness from the battle's
 // seed (see deriveSeed): each CPU has its own, so two CPUs never share one
 // sequence, not even in a mirror match, and Quick Battle's CPU keeps the
-// seed itself. `seconds` is the mode's normal match clock and `overtime`
-// whether points level when it runs out go to overtime (Quick Battle) or
-// straight to the Launch Point (Watch Mode).
+// seed itself.
 export const BATTLE_MODES = Object.freeze({
   'quick-battle': Object.freeze({
     p1: Object.freeze({ cpu: false, label: 'P1' }),
     p2: Object.freeze({ cpu: true, label: 'CPU', stream: 0 }),
-    seconds: CONFIG.battle.quickBattleSeconds,
-    overtime: true,
   }),
   watch: Object.freeze({
     p1: Object.freeze({ cpu: true, label: 'CPU 1', stream: 1 }),
     p2: Object.freeze({ cpu: true, label: 'CPU 2', stream: 0 }),
-    seconds: CONFIG.battle.roundSeconds,
-    overtime: false,
   }),
 });
 
-// The match's periods: the normal clock, then (Quick Battle, points level)
-// overtime.
+// The match's periods: the normal clock, then (points level) overtime.
 export const PERIODS = Object.freeze({ regulation: 'regulation', overtime: 'overtime' });
 
 export class Battle extends Arena {
@@ -95,10 +86,10 @@ export class Battle extends Arena {
     // The match's own: never on a fighter or its character.
     this.pointsToWin = CONFIG.battle.pointsToWin;
     this.score = { p1: 0, p2: 0 };
-    // The mode's clocks: its normal match length, and its overtime's (0:
-    // none, Watch Mode).
-    this.roundSeconds = sides.seconds;
-    this.overtimeSeconds = sides.overtime ? CONFIG.battle.overtimeSeconds : 0;
+    // The match's clocks, the same in every mode: its normal length, and
+    // its overtime's.
+    this.roundSeconds = CONFIG.battle.matchSeconds;
+    this.overtimeSeconds = CONFIG.battle.overtimeSeconds;
 
     this.restart();
   }
@@ -141,8 +132,8 @@ export class Battle extends Arena {
 
   // ---- Loop -------------------------------------------------------------------
 
-  // Whether the match is in overtime (Quick Battle, points level when the
-  // normal clock ran out). Play goes on in the `fight` phase all through
+  // Whether the match is in overtime (points level when the normal clock
+  // ran out). Play goes on in the `fight` phase all through
   // it.
   get overtime() {
     return this.period === PERIODS.overtime;
@@ -188,8 +179,8 @@ export class Battle extends Arena {
     super.update(dt);
   }
 
-  // Whether the normal clock running out now starts overtime: in a mode
-  // that has it, with the points level.
+  // Whether the normal clock running out now starts overtime: with the
+  // points level, unless overtime is off (CONFIG.battle.overtimeSeconds 0).
   get goesToOvertime() {
     return !this.overtime && this.overtimeSeconds > 0 && this.score.p1 === this.score.p2;
   }
@@ -239,9 +230,9 @@ export class Battle extends Arena {
   // The winner: whoever reached pointsToWin ('void': it took the last point
   // from a fall, in overtime too), else, on time, whoever has more points
   // ('points' when the normal clock ran out, 'overtimePoints' when
-  // overtime did), else whoever has the lower Launch Point ('time', Watch
-  // Mode's normal clock; 'overtimeLaunchPoint', the end of Quick Battle's
-  // overtime; a fighter still out counts with the Launch Point it fell
+  // overtime did), else whoever has the lower Launch Point
+  // ('overtimeLaunchPoint' at the end of overtime; 'time' only with
+  // overtime off; a fighter still out counts with the Launch Point it fell
   // with). Equal on both is a draw.
   get result() {
     const { p1, p2 } = this.score;

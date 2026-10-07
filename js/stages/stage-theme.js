@@ -84,7 +84,7 @@ export class StageTheme {
   }
 
   // Runs the Void's waves on by `dt` seconds at `speed` times their normal
-  // rate (the Arena's voidWaveSpeed: 1 normally, faster through Quick
+  // rate (the Arena's voidWaveSpeed: 1 normally, faster through a
   // Battle's overtime). Their shape, amplitude and colours never change.
   advanceVoid(dt, speed = 1) {
     this.voidSurge += dt * Math.max(0, speed - 1);

@@ -39,8 +39,8 @@ const OVERTIME_BANNER_SECONDS = 1.4;
 
 // Result dialog kicker and line keys for each way a match ends
 // (Battle.result): the winning point from a fall, or on time by points, then
-// by Launch Point, when the normal clock ran out or when Quick Battle's
-// overtime did. The K.O. line names who fell ({loser}).
+// by Launch Point, when the normal clock ran out or when overtime did. The
+// K.O. line names who fell ({loser}).
 const RESULT_TEXT = {
   void: { kicker: 'result.kickerKo', sub: 'result.void' },
   points: { kicker: 'result.kickerTime', sub: 'result.points' },

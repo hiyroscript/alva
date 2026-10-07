@@ -714,7 +714,8 @@ test('a Watch Mode Battle: the combat AI on both sides at the chosen level, each
     assert.equal(battle.p2.opponent, battle.p1);
     // The normal match rules.
     assert.equal(battle.pointsToWin, CONFIG.battle.pointsToWin);
-    assert.equal(battle.timeLeft, CONFIG.battle.roundSeconds);
+    assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds, 'the same 7:00 as Quick Battle');
+    assert.equal(battle.overtimeSeconds, CONFIG.battle.overtimeSeconds, 'and the same overtime');
     assert.equal(battle.phase, 'intro');
   }
   for (const bad of [undefined, 'nightmare']) {
@@ -838,11 +839,12 @@ test('spectating: nothing reads gameplay input, and held buttons change nothing 
   assert.ok(quick.samples > 0);
 });
 
-test('a full seeded Watch match plays out under the normal rules: first to 3 or time, then the usual winner', () => {
+test('a full seeded Watch match plays out under the normal rules: first to 3 or time (overtime included), then the usual winner', () => {
   const battle = makeBattle({ seed: 9, difficulty: 'brutal', p1Def: DEF_9999, p2Def: DEF_0001 });
   battle.setPhase('fight');
   let steps = 0;
-  while (battle.phase !== 'result' && steps++ < Math.ceil((CONFIG.battle.roundSeconds + 10) / DT)) battle.update(DT);
+  const limit = CONFIG.battle.matchSeconds + CONFIG.battle.overtimeSeconds + 10;
+  while (battle.phase !== 'result' && steps++ < Math.ceil(limit / DT)) battle.update(DT);
   assert.equal(battle.phase, 'result', 'the match ends');
   const { outcome, reason } = battle.result;
   const { p1, p2 } = battle.score;
@@ -872,7 +874,7 @@ test('entering Watch Mode loads each fighter once and builds the Battle, HUD and
   assert.equal(hud.left.score.getAttribute('aria-label'), 'CPU 1: 0 of 3 points');
   assert.equal(hud.right.score.getAttribute('aria-label'), 'CPU 2: 0 of 3 points');
   assert.equal(hud.left.dots.length, CONFIG.battle.pointsToWin, 'the normal score dots');
-  assert.equal(hud.timer.textContent, '5:00', 'the normal timer');
+  assert.equal(hud.timer.textContent, '7:00', 'the normal timer: the same 7 minutes as Quick Battle');
   assert.equal(canvas.getAttribute('aria-label'), 'Watch Mode battle: CPU 1, #9999, against CPU 2, Test A');
   assert.equal(canvas.getAttribute('role'), 'img');
   screens.battle.exit();

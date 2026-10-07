@@ -22,11 +22,9 @@ retraces them to Home, landing on each choice.
   Shields, summons and techniques, clones, projectiles, stage physics,
   camera and hit effects (the Void's fighter-coloured burst included) are
   all unchanged.
-- **Its own clock.** Watch Mode keeps the 5-minute timer
-  (`CONFIG.battle.roundSeconds`) and the original time rule: when it runs
-  out, more points wins, then the lower Launch Point, equal on both a draw.
-  Quick Battle's 7-minute clock and its overtime (with the closing Void)
-  are Quick Battle's only ([Quick Battle](battle.md)). The HUD
+- **The same clock and overtime.** 7 minutes, then, with the points level,
+  60 seconds of overtime under the closing Void, then the lower Launch
+  Point, exactly as in [Quick Battle](battle.md). The HUD
   and the results name the sides **CPU 1** and **CPU 2** ("CPU 1 Wins",
   "CPU 2 fell into the Void for the final point.").
 - **Its own choices.** Watch Mode keeps them in `app.selection.watch`

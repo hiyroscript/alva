@@ -47,7 +47,7 @@ export class StageCollision {
     // The kill boundary (see inVoid): `baseVoid` is the map's own rectangle,
     // copied once and never changed (map.voidBounds is never written);
     // `void` is the one in force, the same rectangle unless a mode closes
-    // it in (closeVoid, Quick Battle's overtime). Each is frozen: a change
+    // it in (closeVoid, a Battle's overtime). Each is frozen: a change
     // replaces it whole, so whatever reads `void` (inVoid, projectiles, the
     // drawn Void, the debug overlay) always sees one consistent rectangle.
     this.baseVoid = Object.freeze({ ...map.voidBounds });

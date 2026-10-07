@@ -281,9 +281,8 @@ Battle (overtime over, level on points and Launch Point: a draw) → a fresh bat
 ```
 
 A Watch Mode battle follows the same Battle lines (pause, points, K.O.,
-result, draw) but its own clock: 5:00, no overtime, and level on points
-when it runs out the lower Launch Point wins at once (equal on both, a
-draw); its Change Stage returns to Watch Mode's Select Stage.
+7:00, overtime and its closing Void, result, draw); its Change Stage
+returns to Watch Mode's Select Stage.
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
@@ -505,9 +504,8 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   `CombatAIController` on each side and no `PlayerController`; everything
   else, points, Void scoring, respawns, Launch Point, Energy, Shields,
   summons and techniques, clones, projectiles, stage physics, camera, hit effects,
-  results, rematch and restart, is unchanged, but the clock: Watch Mode
-  keeps a 5-minute timer (`CONFIG.battle.roundSeconds`) with no overtime
-  (7.2.8). Both fighters' sprites load
+  the 7-minute clock and overtime with its closing Void, results, rematch
+  and restart, is unchanged (7.2.8). Both fighters' sprites load
   through the usual loading overlay (once for a mirror match); a failure of
   either uses the usual error with Retry and Back (to Select Stage).
 - **Spectator only.** No gameplay input is read and the touch controls are
@@ -998,8 +996,8 @@ French, concise game terms).
 - Collision comes only from map data, never from art.
 - **The Void:** a fighter whose centre leaves the Void in force
   (`StageCollision.inVoid`, testing `stage.void`: the map's `voidBounds`,
-  copied once as `baseVoid` and never written; only Quick Battle's
-  overtime closes it in, below) is taken by it: it leaves play at once
+  copied once as `baseVoid` and never written; only a battle's overtime,
+  Quick Battle's or Watch Mode's, closes it in, below) is taken by it: it leaves play at once
   (frozen and no longer updated, drawn, collided, hit, targeted, pushed or
   framed; its Energy bar, name tag and cooldown rings go with it, its HUD card
   stays), and anything aiming at it lets go. Every fighter taken
@@ -1026,7 +1024,7 @@ French, concise game terms).
   draws the black around the very rectangle collision tests, handed to it
   by the Arena each frame (`drawVoid(ctx, view, stage.void)`); it keeps no
   copy of its own and never decides the boundary.
-- **Overtime's closing Void** (Quick Battle only, 7.2.8): through
+- **Overtime's closing Void** (Quick Battle and Watch Mode, 7.2.8): through
   overtime's 60 seconds the Void closes in, linearly over the whole period
   (`StageCollision.closeVoid`, driven by `Battle.overtimeProgress`, 0 to 1,
   from overtime's own clock): its left and right edges from the stage's
@@ -2082,11 +2080,11 @@ attack or a button.
   for its effects) and `energyCost` (the Shield's cost on a block, 0 on a
   hit or a perfect block). Launch Point
   never disables a fighter (`canAct()` never reads it) and never takes one
-  out: only the Void does. At the end of Quick Battle's overtime (and when
-  Watch Mode's clock runs out), level on points, the fighter with the lower
-  Launch Point wins (a fighter still waiting to respawn counts the Launch
-  Point it fell with); equal is a draw. Quick Battle's normal 7:00 never
-  goes to the Launch Point: level on points there is overtime (7.2.8).
+  out: only the Void does. At the end of overtime (Quick Battle and Watch
+  Mode alike), level on points, the fighter with the lower Launch Point
+  wins (a fighter still waiting to respawn counts the Launch Point it fell
+  with); equal is a draw. The normal 7:00 never goes to the Launch Point:
+  level on points there is overtime (7.2.8).
 - **Launch** (`js/data/launch.js`): how a hit sends its target flying.
   Every hit (an attack's, a projectile's, a
   technique's) declares its own `baseLaunch` and `directionalLaunch` beside
@@ -2215,7 +2213,7 @@ attack or a button.
 
 #### 7.2.8 Matches and the combat AI
 
-- Quick Battle: 7 minutes (`CONFIG.battle.quickBattleSeconds`, 420
+- Quick Battle: 7 minutes (`CONFIG.battle.matchSeconds`, 420
   seconds; the HUD starts at `7:00`), then, with the points level, 60
   seconds of overtime (`CONFIG.battle.overtimeSeconds`, below),
   first to `CONFIG.battle.pointsToWin` (3) points, against a CPU that uses the same fighter definition and fights with
@@ -2235,10 +2233,8 @@ attack or a button.
   is reproducible and the two never share one sequence, not even in a mirror
   match; unseeded, the seed comes from the clock. Restart and rematch keep
   both controllers and reset their plans. Every rule below is the same as in
-  Quick Battle but the clock: Watch Mode plays 5 minutes
-  (`CONFIG.battle.roundSeconds`, 300 seconds) and has no overtime, so level
-  on points when it runs out the lower Launch Point wins at once. Each
-  mode's clock is in `BATTLE_MODES` (`seconds`, `overtime`).
+  Quick Battle, the 7-minute clock (`CONFIG.battle.matchSeconds`, one
+  clock for every Battle) and overtime included.
   - **Input only.** Like `PlayerController`, it only returns the standard
     input snapshot (`runLeft`, `runRight`, `down`, `jump`, `shield`,
     `extra_attack`, `transform`, `attack1` to `attack5` and their `…Pressed` edges, each edge true
@@ -2313,11 +2309,12 @@ attack or a button.
   K.O. beat) and then the result. Once time is up or the match is won, a
   fall scores nothing and nobody respawns. The result: 3 points wins
   (`reason: 'void'`, in overtime too); when the normal clock runs out, more
-  points wins (`'points'`), then, in Watch Mode, the lower Launch Point
-  (`'time'`), else a draw. Restart and rematch reset both scores
+  points wins (`'points'`); level on points, overtime (below). (With
+  overtime turned off, `CONFIG.battle.overtimeSeconds` 0, the lower Launch
+  Point would decide at once, `'time'`.) Restart and rematch reset both scores
   to 0 and cancel any respawn wait.
-- **Overtime** (Quick Battle only, `Battle.period`: `'regulation'`, then
-  `'overtime'`; `Battle.overtime`). When Quick Battle's normal clock runs
+- **Overtime** (Quick Battle and Watch Mode alike, `Battle.period`:
+  `'regulation'`, then `'overtime'`; `Battle.overtime`). When the normal clock runs
   out with the points level, the Launch Point decides nothing yet: the
   match goes straight on into 60 seconds of overtime
   (`CONFIG.battle.overtimeSeconds`). It is the same match, never a reset
@@ -2494,9 +2491,7 @@ Adding one is described in
   Mode" in Watch Mode; no stage name), "Paused", green **Resume** (default), **Restart Battle** and
   **Return to Home**, nothing else. `Esc` / Back resumes.
 - Time over: the fighter with more points wins ("Time ran out. More points
-  wins the match."); level on points, Quick Battle goes to overtime, while
-  Watch Mode gives it to the one with the lower Launch Point ("Time ran
-  out with the points level. Lower Launch Point wins."). Overtime over, under
+  wins the match."); level on points, the match goes to overtime. Overtime over, under
   the kicker "End of overtime": more points wins ("Overtime ran out. More
   points wins the match."); level on points, the lower Launch Point
   ("Overtime ran out with the points still level. The lower Launch Point

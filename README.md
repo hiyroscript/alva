@@ -46,7 +46,7 @@ use.
   while the Void closes in from the sides and below, then the lower Launch
   Point.
 - **Watch Mode**: CPU against CPU, any two fighters, mirror matches
-  included.
+  included, under the same clock and overtime.
 - **Practice Ground**: a training room with a stand-still dummy, damage
   numbers and fighter swaps.
 - **Two stages**, Desert and City, plus the training room: open ledges,

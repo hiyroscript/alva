@@ -782,24 +782,39 @@ test('Quick Battle\'s HUD starts at 7:00; at a level 0:00 it turns to OVERTIME a
   }
 });
 
-test('Watch Mode\'s HUD keeps 5:00 and never shows OVERTIME', () => {
+test('Watch Mode shows the same 7:00, OVERTIME banner and label, and overtime result, naming CPU 1 and CPU 2', () => {
   const { app, screen } = setup();
   const sprites = fakeSprites();
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'watch', p1Def: DEF_0001, p2Def: DEF_0001,
     p1Sprites: sprites, p2Sprites: sprites, input: app.input, seed: 1,
   });
-  screen.hud.bind(battle.p1, battle.p2);
-  screen.hud.update(battle);
-  assert.equal(screen.hud.timer.textContent, '5:00');
-  battle.setPhase('fight');
   battle.p1.controller = null;
   battle.p2.controller = null;
-  battle.timeLeft = 0.01;
-  battle.update(DT);
+  screen.battle = battle;
+  screen.mode = 'watch';
+  screen.needsResize = false;
+  screen.hud.bind(battle.p1, battle.p2);
   screen.hud.update(battle);
-  assert.equal(battle.phase, 'timeup');
-  assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+  assert.equal(screen.hud.timer.textContent, '7:00');
+  assert.deepEqual([screen.hud.left.tag.textContent, screen.hud.right.tag.textContent], ['CPU 1', 'CPU 2']);
+  battle.setPhase('fight');
+  battle.phaseTime = 5;
+  battle.timeLeft = 0.01;
+  screen.update(DT + 1e-9);
+  assert.equal(battle.overtime, true);
+  assert.equal(battle.phase, 'fight');
+  assert.equal(screen.hud.timer.textContent, '1:00');
+  assert.equal(screen.hud.roundLabel.textContent, 'OVERTIME');
+  assert.equal(screen.bannerState, 'overtime');
+  assert.equal(screen.bannerMain.textContent, 'OVERTIME');
+  battle.p1.combat.launchPoint = 70;
+  battle.p2.combat.launchPoint = 15;
+  battle.timeLeft = 0.01;
+  playUntil(screen, () => !screen.resultOverlay.hidden, 200);
+  assert.equal(screen.resultKicker.textContent, 'End of overtime');
+  assert.equal(screen.resultTitle.textContent, 'CPU 2 Wins');
+  assert.equal(screen.resultSub.textContent, 'Overtime ran out with the points still level. The lower Launch Point decides it.');
 });
 
 test('overtime results say overtime decided it: more points, or level on points the lower Launch Point', () => {
