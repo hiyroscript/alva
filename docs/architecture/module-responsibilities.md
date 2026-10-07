@@ -65,7 +65,7 @@ There are no import cycles (checked over every module).
 | `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/combat-ai.js` |
 | `fighters/fighter-controller.js` | `PlayerController` (the one kind that may carry Combat Assist), `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
 | `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation, melee or ranged (`isMeleeAttack`, `isRangedAttack`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
-| `combat/combat-assist.js` | Combat Assist's measurements: `meleeGap`, `approachDistance`, `approachClear`, `assistRange`, `ASSIST_MARGIN`. | `fighters/fighter.js` |
+| `combat/combat-assist.js` | Combat Assist's rules of measure: `assistsAttack`, `meleeGap`, `approachDistance`, `approachClear`, `assistRange`, `assistSpeed`, `ASSIST_MARGIN`. | `fighters/fighter.js` |
 | `combat/hit-effects.js` | The shared hit effects (`unblockable`, `paralyze`, `blockPush`) and their validation. | `combat/attacks.js`, `combat/projectile.js`, `combat/technique.js` |
 | `combat/pull.js` | Pulls: attacks and projectiles drawing opponents in, each step. | `arena.js` |
 | `combat/defense.js` | The defense schema (the Shield, on the ground; air Shield fields refused). | `fighters/fighter.js` |
