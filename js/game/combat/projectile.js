@@ -18,22 +18,24 @@
 //     attack2_object: {
 //       animation: 'attack2_object', speed: 900, lifetime: 0.34,
 //       hitbox: { x: -16, y: -16, w: 32, h: 32 },
-//       damage: 4, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.36, blockstun: 0.16, hitstop: 0.08,
+//       damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.36, blockstun: 0.16, hitstop: 0.08,
 //       blockPush: 520, repel: true,
 //     },
 //   },
 //
-// `baseLaunch` and `directionalLaunch` are the projectile's own Base Launch
-// and Directional Launch (see js/data/launch.js), validated here exactly
-// like an attack's, and so are the shared hit effects (`unblockable`,
+// `damage` (one of the tiers 1, 3, 5 or 10, required), `baseLaunch` and
+// `directionalLaunch` are the projectile's own damage, Base Launch and
+// Directional Launch (see js/data/launch.js), validated here exactly like
+// an attack's, and so are the shared hit effects (`unblockable`,
 // `paralyze`, `blockPush`; see js/game/combat/hit-effects.js). A
 // horizontal launch travels along the projectile's own direction. A
 // projectile with Base Launch 0 or no direction never launches.
 //
 // A piercing projectile (`pierce: { hits, interval }`) strikes up to `hits`
 // times instead, at least `interval` seconds apart, staying in play between
-// them; its last strike resolves as its `finisher` (a hit of its own: its
-// `damage`, `baseLaunch` and `directionalLaunch`, its stuns, freeze and hit
+// them; every strike before the last deals the projectile's own `damage`,
+// and its last resolves as its `finisher` (a hit of its own: its `damage`,
+// a tier too and required, `baseLaunch` and `directionalLaunch`, its stuns, freeze and hit
 // effects defaulting to the projectile's). With `carry` (see
 // js/game/combat/attacks.js) each strike that launches nothing drags the
 // target along with it, `lift` upward: #0002's whirlwind takes its target
@@ -92,7 +94,7 @@
 // body included; one-way platforms never stop it. Its hitbox is centred on
 // its position and mirrors with its direction.
 
-import { resolveHitLaunch } from '../../data/launch.js';
+import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolvePull } from './attacks.js';
 import { resolveHitEffects } from './hit-effects.js';
 
@@ -126,7 +128,10 @@ const TIME_EPSILON = 1e-6;
 export function createProjectileDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Projectile definitions need an id');
   const owner = `Projectile "${spec.id}"`;
-  const def = { ...PROJECTILE_DEFAULTS, ...spec, ...resolveHitLaunch(spec, owner), ...resolveHitEffects(spec, owner) };
+  const def = {
+    ...PROJECTILE_DEFAULTS, ...spec,
+    damage: resolveHitDamage(spec.damage, owner), ...resolveHitLaunch(spec, owner), ...resolveHitEffects(spec, owner),
+  };
   def.pull = resolvePull(spec.pull, owner);
   def.repel = !!def.repel;
   def.erase = !!def.erase;
@@ -141,7 +146,7 @@ export function createProjectileDefinition(spec) {
       const f = def.finisher;
       const inherited = Object.fromEntries(FINISHER_INHERITS.map((field) => [field, f[field] ?? def[field]]));
       def.finisher = Object.freeze({
-        id: spec.id, damage: f.damage ?? 0, ...inherited, carry: null,
+        id: spec.id, damage: resolveHitDamage(f.damage, `${owner} finisher`), ...inherited, carry: null,
         ...resolveHitLaunch(f, `${owner} finisher`), ...resolveHitEffects(inherited, `${owner} finisher`),
       });
     }

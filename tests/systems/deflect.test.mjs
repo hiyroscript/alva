@@ -20,6 +20,7 @@ import { Fighter } from '../../js/game/fighters/fighter.js';
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { mulberry32 } from '../../js/core/utils.js';
+import { DEFLECT_ENERGY_COST, resolveEnergy } from '../../js/game/combat/combat-state.js';
 import { DT, duel, fakeSpritesOf, makeFighter, stageMap, steps } from '../helpers/fighter-harness.mjs';
 
 const DEF_0001 = getCharacter('0001');
@@ -76,7 +77,7 @@ test('every Deflect strikes for exactly 3 at Base Launch 2: the shared rule, whi
 });
 
 test('turning projectiles back is an explicit capability: no other attack of either fighter has it, and none has it by default', () => {
-  assert.equal(createAttackDefinition({ id: 'plain', hitbox: { x: 0, y: -60, w: 30, h: 20 } }).deflectProjectiles, false);
+  assert.equal(createAttackDefinition({ id: 'plain', damage: 1, hitbox: { x: 0, y: -60, w: 30, h: 20 } }).deflectProjectiles, false);
   assert.throws(() => createAttackDefinition({ id: 'boxless', hitbox: null, deflectProjectiles: true }), /no hitbox/);
   for (const c of FIGHTERS) {
     const { fighter } = makeFighter({ character: c });
@@ -130,8 +131,9 @@ for (const c of FIGHTERS) {
   });
 }
 
-test('a Deflect needs a fresh press each time, and waits out its own cooldown; a press it cannot use is never kept for later', () => {
-  const { fighter: f, step } = makeFighter();
+test('a Deflect needs a fresh press each time, and waits out its own cooldown, if it has one; a press it cannot use is never kept for later', () => {
+  // #0002's Deflect cools down for three steps.
+  const { fighter: f, step } = makeFighter({ character: DEF_0002 });
   aloft(f, 100);
   step(PRESS);
   while (f.combat.attack) step({});
@@ -143,6 +145,14 @@ test('a Deflect needs a fresh press each time, and waits out its own cooldown; a
   assert.equal(f.combat.attack, null, '...and never later from that press');
   step(PRESS);
   assert.equal(f.combat.attack?.def.id, 'deflect', 'a fresh press once it is over');
+  // #0001's has none: a fresh press the step after one ends starts the next.
+  const free = makeFighter();
+  aloft(free.fighter, 100);
+  free.step(PRESS);
+  while (free.fighter.combat.attack) free.step({});
+  assert.equal(free.fighter.combat.cooldowns.has('deflect'), false, 'no cooldown');
+  free.step(PRESS);
+  assert.equal(free.fighter.combat.attack?.def.id, 'deflect', 'at once');
 });
 
 test('a Deflect never starts stunned, paralyzed, mid-attack, mid-Deflect, air dashing, in free fall or without its art', () => {
@@ -194,9 +204,10 @@ test('a Deflect may cut short an attack that hit, as any attack may (the reposit
   d.tick(ATTACK1);
   d.until(() => d.events.length > 0);
   while (d.attacker.combat.hitstop > 0 || !d.attacker.combat.cancellable) d.tick();
+  const energy = d.attacker.combat.energy;
   d.tick(PRESS);
   assert.equal(d.attacker.combat.attack?.def.id, 'deflect');
-  assert.ok(d.attacker.combat.cooldowns.has('midair_attack1'), 'the cut attack\'s cooldown');
+  assert.equal(d.attacker.combat.energy, energy - DEFLECT_ENERGY_COST, 'cutting short costs the same 15');
   // Pressed with an attack button on the same step: the Deflect, and the
   // attack press is not kept for afterwards.
   const { fighter: f, step } = makeFighter();
@@ -211,14 +222,20 @@ test('a Deflect may cut short an attack that hit, as any attack may (the reposit
 // ---- Not a Shield ------------------------------------------------------------------
 
 for (const c of FIGHTERS) {
-  test(`#${c.id}: the Deflect strikes for 3 at Base Launch 2 through the one combat system, and costs no Energy`, () => {
+  test(`#${c.id}: the Deflect strikes for 3 at Base Launch 2 through the one combat system, and costs exactly 15 as it starts`, () => {
+    const regen = resolveEnergy(c.energy).regen * DT;
     for (const lp of [0, 40]) {
       const d = duel({ attackerCharacter: c, gap: 30 });
       aloft(d.attacker, 500);
       aloft(d.target, 500, d.target.body.x);
       d.target.combat.launchPoint = lp;
       d.tick(PRESS);
-      d.until(() => d.events.length > 0);
+      assert.equal(d.attacker.combat.energy, 100 - DEFLECT_ENERGY_COST, 'paid as it starts, no refill on that step');
+      let n = 0;
+      while (!d.events.length) {
+        d.tick();
+        n++;
+      }
       const [e] = d.events;
       assert.equal(e.type, 'hit');
       assert.equal(e.move, 'deflect');
@@ -228,7 +245,8 @@ for (const c of FIGHTERS) {
       assert.equal(e.directionalLaunch, c.deflect.directionalLaunch);
       assert.equal(e.launchPointAfter, lp + 3);
       assert.equal(e.launchStrength, 2 * (lp + 3));
-      assert.equal(d.attacker.combat.energy, 100, 'nothing spent');
+      assert.ok(Math.abs(d.attacker.combat.energy - (100 - DEFLECT_ENERGY_COST + n * regen)) < 1e-9,
+        'the hit neither costs more nor gives any back: the refill alone');
       assert.equal(d.attacker.combat.shielding, false);
     }
   });
@@ -243,7 +261,13 @@ test('a Deflect protects nothing: hit while it plays, the blow lands in full: no
     aloft(d.target, 470, d.target.body.x);
     d.tick(ATTACK1, PRESS);
     assert.equal(d.target.combat.attack?.def.id, 'deflect');
-    d.until(() => d.events.length > 0);
+    assert.equal(d.target.combat.energy, 100 - DEFLECT_ENERGY_COST, 'its own price, as it started');
+    const regen = resolveEnergy(c.energy).regen * DT;
+    let n = 0;
+    while (!d.events.length) {
+      d.tick();
+      n++;
+    }
     const [e] = d.events;
     assert.equal(e.type, 'hit', `#${c.id}: not blocked`);
     assert.equal(e.target, d.target);
@@ -251,7 +275,7 @@ test('a Deflect protects nothing: hit while it plays, the blow lands in full: no
     assert.equal(e.energyCost, 0, 'no Shield paid');
     assert.equal(e.stall, 0, 'no stall');
     assert.equal(e.damage, DEF_0001.attacks.midair_attack1.damage);
-    assert.equal(d.target.combat.energy, 100);
+    assert.ok(Math.abs(d.target.combat.energy - (100 - DEFLECT_ENERGY_COST + n * regen)) < 1e-9, 'nothing more for the blow');
     assert.equal(d.target.combat.shieldStun, 0, 'no blockstun');
     assert.ok(d.target.combat.stun > 0, 'hitstun instead');
     assert.equal(d.attacker.combat.hitstop, DEF_0001.attacks.midair_attack1.hitstop, 'the attacker freezes only for its own hit');

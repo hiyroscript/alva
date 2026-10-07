@@ -30,7 +30,9 @@
 // While it is up (CombatState.shielding, see Fighter.update) any hit that
 // reaches the fighter's own hurtboxes, from either side, is blocked: it adds
 // no Launch Point and launches nothing, and the fighter pays
-// energy.shieldHitCost for that one hit instead. The Shield holds through
+// BLOCK_ENERGY_COST (15, the same for every fighter and every block, a
+// perfect one's included: see js/game/combat/combat-state.js) for that one
+// hit instead. The Shield holds through
 // the hit's hitstop and blockstun (CombatState.shieldStun), never a hurt
 // pose. Holding it costs nothing; it cannot rise or stay up while the
 // fighter is exhausted (CombatState.canShield), nor once it is off the
@@ -41,7 +43,9 @@ const SHIELD_DEFAULTS = Object.freeze({
   groundStartAnimation: null,
   groundReleaseAnimation: null,
   // A hit that lands within perfectWindow seconds of the Shield going up is
-  // a perfect block: free, with no blockstun. Only a Shield raised after
+  // a perfect block: no blockstun, so its fighter can answer at once. It
+  // costs the same Energy as any block (no discount, nothing given back).
+  // Only a Shield raised after
   // being down for perfectRearm seconds has that window, so tapping `shield`
   // over and over never keeps one open. 0 is none.
   perfectWindow: 0,

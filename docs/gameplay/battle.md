@@ -102,8 +102,10 @@ spacing error, motion lookahead, and weights for defense, punishing, the
 summons and techniques (`specials`), Dash, planning, aggression, stage sense
 and Energy care. Every trait
 is ordered from Easy to Brutal. None of it touches a fighter: damage, launch,
-speed, jumps, Dash, Shield, Energy, cooldowns, hitboxes, respawns and scoring
-are the character's and the match's own, identical on every level.
+stun, timing, speed, jumps, gravity, Dash, Shield, Energy and what anything
+costs in it, cooldowns, hitboxes, respawns and scoring are the character's
+and the match's own, identical on every level (and the same hit resolves
+exactly as a player's would).
 
 How the CPU plays: [combat AI](../systems/ai.md).
 

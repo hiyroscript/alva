@@ -148,8 +148,9 @@ export class CombatSystem {
     //   paralysis, stall, projectile, summon, technique }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
-    // `energyCost` what the target's Shield paid for it: shieldHitCost, or
-    // whatever was left when that was less (0 on a hit).
+    // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
+    // a perfect block's included, or whatever was left when that was less
+    // (0 on a hit).
     // `baseLaunch` is the hit's Base Launch (0-3) and `directionalLaunch` its
     // direction; `launchStrength` is baseLaunch x launchPointAfter (0 on a
     // block), and `finalLaunch` the world-space velocity { x, y } the target
@@ -313,10 +314,11 @@ export class CombatSystem {
   // A target whose Shield is up blocks the hit, whichever side it comes
   // from: no Launch Point, no launch and no hitstun, only the hit's hitstop
   // and its blockstun, held in the Shield. The Shield pays
-  // energy.shieldHitCost for it, once, or all that is left when that is
-  // less: a block that empties the bar exhausts the fighter and drops the
-  // Shield straight away, so a later hit, even on this same step, lands in
-  // full. The block itself stands.
+  // BLOCK_ENERGY_COST (energy.shieldHitCost, the same for every fighter) for
+  // it, once, or all that is left when that is less, a perfect block
+  // exactly as any other: a block that empties the bar exhausts the fighter
+  // and drops the Shield straight away, so a later hit, even on this same
+  // step, lands in full. The block itself stands.
   //
   // Otherwise the damage is added to the target's Launch Point first, so
   // the hit that raises it already launches from the new total. The launch
@@ -345,11 +347,11 @@ export class CombatSystem {
     const tc = target.combat;
     const blocked = tc.shielding && !def.unblockable;
     // A perfect Shield (raised just in time, see Fighter.perfectShield)
-    // blocks for free: no Energy and no blockstun, so its fighter can answer
-    // at once.
+    // blocks with no blockstun, so its fighter can answer at once; it pays
+    // for the block like any other (no discount, nothing given back).
     const perfect = blocked && !!target.perfectShield;
     let energyCost = 0;
-    if (blocked && !perfect) {
+    if (blocked) {
       energyCost = Math.min(tc.energySpec.shieldHitCost, tc.energy);
       tc.spendEnergy(tc.energySpec.shieldHitCost);
       if (!tc.canShield()) tc.shielding = false;

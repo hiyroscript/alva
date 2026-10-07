@@ -309,7 +309,7 @@ export const FR = {
   'settings.customized': 'Disposition personnalisée',
   'settings.combat': 'Combat',
   'settings.combatAssist': 'Assistance au combat',
-  'settings.combatAssistDesc': 'Comble automatiquement un court écart avant une attaque au corps à corps. Consomme de l’Énergie et n’agit jamais sur les attaques à distance.',
+  'settings.combatAssistDesc': 'Comble automatiquement un court écart avant une attaque au corps à corps. Ne consomme jamais d’Énergie et n’agit jamais sur les attaques à distance.',
   'settings.combatAssistOn': 'Activée',
   'settings.combatAssistOff': 'Désactivée',
 

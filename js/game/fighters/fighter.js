@@ -132,9 +132,10 @@ export class Fighter {
     this.shieldReleaseDuration = sprites.duration(this.defense?.groundReleaseAnimation);
     // Shield clips already reported missing, so a held Shield warns once.
     this.missingShieldArt = new Set();
-    // Energy settings (js/game/combat/combat-state.js resolveEnergy): the maximum, the
-    // refill rate, what a Dash costs and what each blocked hit costs.
-    this.energyDef = resolveEnergy(def.energy);
+    // Energy settings (js/game/combat/combat-state.js resolveEnergy): the
+    // universal maximum and costs (a Dash, a Deflect, each blocked hit) and
+    // the fighter's own refill rate.
+    this.energyDef = resolveEnergy(def.energy, `Character "${def.id}"`);
     // How it responds to being launched (resolveLaunchReaction in
     // js/game/combat/combat.js): longer stun for
     // a harder launch, tumbling past a speed, and how far it may steer one.
@@ -251,10 +252,12 @@ export class Fighter {
     // opponent it closes on, the way it faces, whether it is the air's
     // (straight at its target, any way) or the ground's (straight across),
     // its clip, the move it still has to make ({ dx, dy, length }, see
-    // approachMove), how far it has gone and for how long. Its Energy is paid
-    // once, as it starts; `assistPaidAt` is that step (no refill on it).
+    // approachMove), how far it has gone and for how long. It costs no
+    // Energy at all.
     this.combatAssist = null;
-    this.assistPaidAt = -1;
+    // The last step this fighter paid Energy on (a Dash, an air dash or a
+    // Deflect, see payEnergy): no refill on that step.
+    this.energyPaidAt = -1;
     // Seconds the Shield has been up (from the step it went up) and down;
     // and whether this raise may block perfectly (see perfectShield).
     this.shieldUpTime = 0;
@@ -480,8 +483,9 @@ export class Fighter {
     // step it can; so is one in the air that no air dash answers, which is
     // the Dash if the fighter lands in time. One refused on the ground for
     // any other reason (no Energy, the Shield held, no art) is used up:
-    // nothing is kept. Energy spent this step (on a Dash, or on Combat
-    // Assist's approach) means no refill this step (see the end of update).
+    // nothing is kept. Energy paid this step (for a Dash, an air dash or a
+    // Deflect: see payEnergy) means no refill this step (see the end of
+    // update).
     //
     // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
     // (the Joystick touch layout's single-tap mouvement buttons, see
@@ -491,7 +495,6 @@ export class Fighter {
     // first tap waiting, so it never pairs with one, and this step's own
     // direction press (if any) is not counted as one either. Both at once
     // ask for nothing.
-    let spent = false;
     if (dashDirection) this.bufferedDash = { direction: dashDirection, age: 0 };
     const wantedDash = this.bufferedDash;
     if (wantedDash) {
@@ -500,7 +503,6 @@ export class Fighter {
       // Dash.
       const busy = !this.canFollowUp() || !!this.dash || (!body.grounded && this.dashDuration > 0);
       if (this.tryMouvment(wantedDash.direction, input)) {
-        spent = true;
         this.bufferedDash = null;
       } else if (!busy) {
         this.bufferedDash = null;
@@ -776,9 +778,11 @@ export class Fighter {
     }
 
     // ---- Energy refill -----------------------------------------------------
-    // Every step no Dash or Combat Assist was paid for, a held Shield
-    // included, at the one passive rate: nothing held ever makes it faster.
-    if (!spent && this.assistPaidAt !== this.steps) combat.updateEnergy(dt);
+    // Every step no Energy was paid on (see payEnergy), a held Shield, a
+    // block, a Deflect's strike or Combat Assist's approach included, at the
+    // one passive rate: nothing held or done ever makes it faster, and no
+    // defense, however well timed, gives any back.
+    if (this.energyPaidAt !== this.steps) combat.updateEnergy(dt);
 
     // A burst is over once the speed is back to top speed or less.
     if (this.burst && !this.dash && Math.abs(body.vx) <= mv.maxSpeed + TIME_EPSILON) this.burst = false;
@@ -904,8 +908,8 @@ export class Fighter {
 
   // A hit landing now would meet a perfect Shield: one raised no more than
   // defense.perfectWindow seconds ago, after being down for at least
-  // perfectRearm. It blocks for free, with no blockstun (see
-  // CombatSystem.applyHit).
+  // perfectRearm. It blocks with no blockstun, for the same Energy as any
+  // block (see CombatSystem.applyHit).
   get perfectShield() {
     const spec = this.defense;
     return !!spec && this.combat.shielding && this.shieldPerfectReady && spec.perfectWindow > 0 &&
@@ -985,9 +989,9 @@ export class Fighter {
   // running) or in an attack that hit and may be cut short (see
   // CombatState.cancellable: a Dash chases what it sent flying), grounded,
   // not shielding or holding `shield` for a Shield it may raise, and not
-  // exhausted, paying dashCost, or dashCancelCost for one that cuts an
-  // attack short (all that is left, emptying the bar, when that is less):
-  // the extra is what keeps a hit-Dash-hit chase from looping. Down held
+  // exhausted, paying DASH_ENERGY_COST (energy.dashCost; dashCancelCost, the
+  // same, for one that cuts an attack short), or all that is left, emptying
+  // the bar, when that is less (see payEnergy). Down held
   // never matters. The fighter faces the Dash at once, and carries a burst
   // (see `burst`) from it. False, with nothing spent and the attack left as
   // it is, if it cannot start (a missing dash clip is logged). `input` is
@@ -1004,7 +1008,7 @@ export class Fighter {
       return false;
     }
     const cutting = !!this.combat.attack;
-    if (!this.combat.spendEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
+    if (!this.payEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
     this.cutAttack();
     const burst = this.dashSpeedToward(direction, speed);
     this.dash = { direction, time: 0, duration: this.dashDuration, speed: burst, air: false, animation: 'mouvment' };
@@ -1026,7 +1030,7 @@ export class Fighter {
   // invulnerability, Shield or Deflect. airDashUses per airtime (see
   // airDashUses), never chained further. The same rules as a Dash
   // otherwise: free to act or in an attack that may be cut short, not
-  // exhausted, paying dashCost (dashCancelCost for a cut), never while
+  // exhausted, paying DASH_ENERGY_COST (a cut included), never while
   // stunned, paralyzed or already dashing; and, as an attack's own motion,
   // never while still flying from a launch (see Fighter.launch: it would
   // wipe the launch out) or in free fall. False, with nothing spent, if it
@@ -1041,7 +1045,7 @@ export class Fighter {
       return false;
     }
     const cutting = !!this.combat.attack;
-    if (!this.combat.spendEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
+    if (!this.payEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
     this.cutAttack();
     this.airDashes--;
     const burst = this.dashSpeedToward(direction, speed);
@@ -1052,6 +1056,17 @@ export class Fighter {
     this.body.vx = direction * burst;
     this.body.vy = 0;
     this.animator.play('midair_mouvment', { restart: true });
+    return true;
+  }
+
+  // Pays `cost` Energy for something the fighter starts now (a Dash, an air
+  // dash, a Deflect), if it is not exhausted (CombatState.spendEnergy: all
+  // that is left when that is less). True when paid; the step it was paid
+  // on gets no refill (see the end of update). Nothing else the fighter
+  // does pays Energy: Combat Assist's approach never does.
+  payEnergy(cost) {
+    if (!this.combat.spendEnergy(cost)) return false;
+    this.energyPaidAt = this.steps;
     return true;
   }
 
@@ -1093,12 +1108,13 @@ export class Fighter {
   // down, up or across, at airDashSpeed (gravity held off throughout), its
   // midair_mouvment clip, and it uses up an air dash of the airtime
   // (airDashUses), so never with none left, in free fall or still flying
-  // from a launch. Either pays dashCost
-  // (as a Dash does: never while exhausted), faces the opponent, carries a
-  // burst (see `burst`) and plays its clip from the first frame. Anything
-  // else (in reach already, too far, no art, no Energy, no air dash left)
-  // is false with nothing spent, and the attack starts where the fighter
-  // is, as ever.
+  // from a launch. It moves the way a Dash or an air dash does but is
+  // neither: it costs no Energy at all, so it starts as well with a full
+  // bar, a part of one or an exhausted one, and never holds back the
+  // refill. It faces the opponent, carries a burst (see `burst`) and plays
+  // its clip from the first frame. Anything else (in reach already, too
+  // far, no art, no air dash left) is false, and the attack starts where
+  // the fighter is, as ever.
   tryCombatAssist(action, atk) {
     if (!this.combatAssistOn || !assistsAttack(atk) || !this.canAct() || this.combat.shielding) return false;
     const foe = this.opponent;
@@ -1111,9 +1127,7 @@ export class Fighter {
     const direction = Math.sign(foe.body.x - this.body.x) || this.facing;
     const move = approachMove(this, atk, foe, direction, range, air, true);
     if (!move || move === REACHED || !approachClear(this, this.stage, direction, move, air)) return false;
-    if (!this.combat.spendEnergy(this.energyDef.dashCost)) return false;
     this.combatAssist = { action, attack: atk, target: foe, direction, air, animation, move, travelled: 0, time: 0 };
-    this.assistPaidAt = this.steps;
     if (air) {
       this.airDashes--;
       this.highJump = null;
@@ -1135,7 +1149,7 @@ export class Fighter {
   //     press is its Deflect, as ever.
   //   - else the first combat button pressed: a melee attack an approach
   //     may serve (assistsAttack), for where it runs (the ground's, or the
-  //     air's), replaces the attack it ends in (no new cost), unless it
+  //     air's), replaces the attack it ends in, unless it
   //     cannot start (its cooldown, no art, its starts for the airtime used
   //     up), which cancels the approach with nothing in its place, never
   //     the older attack; any other move (a projectile attack, a pending
@@ -1227,9 +1241,9 @@ export class Fighter {
   // started, never kept in the combat buffer. A jump, a Dash, the Shield,
   // a Deflect or another move; a hit or a paralysis; the ground lost (or,
   // in the air, met) or a wall; its target gone; a reset, a respawn or the
-  // arena going. The
-  // Energy it paid is not given back, and the fighter keeps whatever speed
-  // it has, as after a Dash.
+  // arena going. It
+  // paid no Energy, so there is none to give back; the fighter keeps
+  // whatever speed it has, as after a Dash.
   cancelCombatAssist() {
     if (!this.combatAssist) return;
     this.combatAssist = null;
@@ -1245,7 +1259,10 @@ export class Fighter {
   // cutting short another attack that may not be), never into itself, never
   // while its cooldown runs or the airtime rules out an attack (free fall,
   // its `airUses`), and only with its art (missing art is reported once and
-  // refused). True when it started.
+  // refused). It pays DEFLECT_ENERGY_COST (energy.deflectCost) as it starts,
+  // whatever it then meets (see payEnergy): never while the fighter is
+  // exhausted, and nothing it strikes or turns back gives any back. True
+  // when it started; false with nothing paid.
   tryDeflect(dir = 0) {
     const atk = this.deflect;
     const combat = this.combat;
@@ -1256,6 +1273,7 @@ export class Fighter {
       this.missingDeflectArt = true;
       return false;
     }
+    if (!this.payEnergy(this.energyDef.deflectCost)) return false;
     combat.lastIntent = 'shield';
     this.startAttack(atk, dir);
     return true;

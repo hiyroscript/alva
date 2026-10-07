@@ -21,7 +21,7 @@ motion included.
 | Layer | Where | What it decides |
 | --- | --- | --- |
 | **Shared systems** | `js/game/`, `js/data/movement.js`, `js/data/loadout.js`, `js/data/launch.js` | The rules: how movement, attacks, hits, launches, the Shield, Energy, summons, techniques, the CPU, input and rendering work. The same for every fighter, and so are movement's numbers. |
-| **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, Energy, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage, launch and motion. Never its movement. |
+| **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, its Energy refill rate, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage (one of the tiers 1, 3, 5, 10), launch and motion. Never its movement, its Energy maximum or costs, or a repeat cooldown over 0.05 s. |
 | **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense` (the Shield, on the ground), a `deflect` (the Shield button in the air), the art for the universal Dash (a `mouvment` clip) and air dash (a `midair_mouvment` clip), projectiles (spinning ones with a `rotationSpeed`), summons, techniques, an extra attack, attack mechanics such as `motion`, `hits` or `deflectProjectiles`. A shared system checks for the capability, never for the fighter. |
 
 So "#0001's Maximum Blue drags its target in" is a capability (a `pull`
@@ -46,10 +46,13 @@ definitions (`CHARACTERS`) and the lookups everything else uses:
 | `framePath`, `frames` | The art path convention (from `js/data/characters/helpers.js`). |
 
 Every definition is validated as the registry loads: against the
-loadout rules (`assertLoadout`) and for movement of its own
+loadout rules (`assertLoadout`), for movement of its own
 (`assertUniversalMovement`: a `movement` profile, `powers` or any
-universal movement field is refused); one that breaks a rule is refused
-with every problem named.
+universal movement field is refused) and against the combat rules
+(`assertCombatRules`: every hit's damage one of 1, 3, 5 or 10, every
+attack's repeat cooldown at most 0.05 s, the Deflect's fixed strike, and
+no Energy maximum or cost of its own); one that breaks a rule is refused
+with the problem named.
 
 ## What a definition holds
 
@@ -59,7 +62,7 @@ with every problem named.
 | `sourceFacing`, `animations`, `projectileAnimations`, `effectAnimations`, `animationFallbacks`, `visual` | sprite normalization, Fighter, renderers, roster | `animations` (with the states it needs) and `visual` |
 | `collider`, `pushbox`, `hurtboxes` | physics, combat, the AI | yes |
 | `movement`, `powers` | nobody: refused ([movement](../systems/movement.md)) | never (movement is universal) |
-| `energy` | [Energy](../systems/energy.md) | no (defaults) |
+| `energy` | [Energy](../systems/energy.md) | no: only its `regen` is its own (default 12); the bar and every cost are universal |
 | `launchReaction`, `launchBounce` | [launch](../systems/launch.md) | no (defaults) |
 | `defense` | [defense](../systems/defense.md) | no (none: the Shield button does nothing on the ground) |
 | `deflect` | [defense: the Deflect](../systems/defense.md#the-deflect) | no (none: the Shield button does nothing in the air) |

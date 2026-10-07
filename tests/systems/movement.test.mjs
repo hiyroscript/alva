@@ -13,6 +13,7 @@ import { CONFIG } from '../../js/config.js';
 import {
   def, DT, MOVEMENT, makeFighter, fakeSprites, stageMap, stepUntil, duel, STAGE,
 } from '../helpers/fighter-harness.mjs';
+import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 
 const mv = MOVEMENT;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
@@ -291,7 +292,7 @@ test('after a Dash its burst runs on: held on, it eases back into the run; let g
     step({ ...RIGHT, runRightPressed: true });
     assert.ok(fighter.dash);
     const energy = fighter.combat.energy;
-    assert.equal(energy, 100 - def.energy.dashCost, 'its Energy, once');
+    assert.equal(energy, 100 - DASH_ENERGY_COST, 'its Energy, once');
     while (fighter.dash) step(hold ? RIGHT : {});
     // The step it ends on already runs on from the Dash's own speed: nothing
     // reset.

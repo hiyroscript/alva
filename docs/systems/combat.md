@@ -47,7 +47,7 @@ definition that breaks one is refused, every problem named):
   - a technique, `{ type: 'technique', id: 'attackN' }` (`techniques.attackN`).
 - `attack1` and `attack2` are always ordinary; `attack3` to `attack5` may
   be any kind. A summon or technique is keyed by its own button, is
-  ground-only, has no mid-air version and has its own cooldown.
+  ground-only, has no mid-air version and may have a cooldown of its own.
 - Whatever an attack creates is named after it: a projectile
   `<attack>_object` (a technique's included), a summon's cloud
   `<attack>_object...`, a technique's own poses `<attack>_...`.
@@ -75,10 +75,10 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `animation` | — | The fighter clip it plays; real frames are required (an attack without them is refused and logged, never faked). |
 | `startup` / `active` / `recovery` | 0.08 / 0.06 / 0.18 s | Phases, normally whole frames of the clip. The hitbox exists only in `active`. |
 | `hitbox` | `{ x: 0, y: -60, w: 30, h: 20 }` | Facing right from the fighter's origin (bottom-centre), mirrored with facing. `null` for a projectile attack. |
-| `damage` | 0 | Added to the target's Launch Point. |
+| `damage` | — | Added to the target's Launch Point: 1, 3, 5 or 10 and nothing else (below). Required for an attack with a hitbox; one with none (a throw) may not declare it. |
 | `baseLaunch` / `directionalLaunch` | 0 / `null` | The hit's launch ([launch](launch.md)). |
 | `hitstun` / `blockstun` / `hitstop` | 0.2 / 0.12 / 0.06 s | |
-| `cooldown` | 0 | A short recovery cooldown after it ends or is cut short. |
+| `cooldown` | 0 | Its repeat cooldown, after it ends or is cut short: 0 (none) to `MAX_ATTACK_COOLDOWN` (0.05 s); a longer one is refused (below). |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
 | `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): by default it keeps all the speed it starts with (a Dash's burst included), unsteered, under the normal friction. |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
@@ -201,8 +201,9 @@ techniques (a burst due on its release step). Every hit goes through one
 attack or technique it is resolving:
 
 1. A target whose Shield is up blocks it (from any side) unless the hit is
-   `unblockable`: a perfect Shield blocks for free with no blockstun,
-   otherwise the Shield pays `energy.shieldHitCost`; a hit with
+   `unblockable`: the Shield pays 15 Energy for it (`BLOCK_ENERGY_COST`),
+   a perfect one exactly the same (its only difference is no blockstun);
+   a hit with
    `blockPush` shoves it back, and a Shield with a `stall` freezes a melee
    attacker for that long ([defense](defense.md)).
 2. Otherwise the hit's `damage` is added to the target's Launch Point,
@@ -315,14 +316,45 @@ invalid data, and the press does nothing (logged, no cooldown). Losing
 the ground or a hit on the fighter end it: whatever it had not released
 yet never is, and what it already let go stays.
 
+## Damage
+
+Every hit deals exactly 1, 3, 5 or 10 (`ALLOWED_DAMAGE_VALUES` in
+[`js/data/launch.js`](../../js/data/launch.js)): 1 a light hit (a chip, a
+tick of a multi-hit string), 3 a solid one, 5 a heavy hit or a major
+launcher, 10 an exceptional, ultimate-level one. `resolveHitDamage`
+checks it once, as each hit's definition is built, for every kind of hit:
+an attack with a hitbox, each strike of a multi-hit attack (`hits`), the
+Deflect (always 3), a projectile and its `finisher` (so every strike of a
+piercing one), a technique's `burst.hit`, and so a summon's clone, which
+performs one of these attacks. Anything else (0, 2, 4, 6 to 9, 11 and up,
+a fraction, a negative, none at all) is refused with the hit named, as
+the registry loads (`assertCombatRules` in
+[`js/data/characters.js`](../../js/data/characters.js)): a future move
+written with `damage: 2` never reaches a match. A multi-hit attack's own
+`damage` is the sum of its strikes, derived, and need not be a tier; a
+blocked hit's event reports `damage: 0` because it dealt none. Difficulty
+never touches any of it ([AI](ai.md)).
+
 ## Cooldowns
 
-Ordinary attacks have short recovery cooldowns (`CombatState.cooldowns`).
-Summons and techniques have their own (`CombatState.abilityCooldowns`, a
-`CooldownTimers` keyed by the button: #0001's `attack4` and `attack5`),
-started the moment the move is accepted, recovering in real time whatever
-the fighter does, and drawn under the fighter as rings labelled by the
-button (A4, A5) while they run
+An ordinary attack's `cooldown` (`CombatState.cooldowns`) is its repeat
+delay: after it ends or is cut short, the same attack waits that long,
+and it may cut itself short into itself only once it has been
+cancellable that long (`CombatState.cancellableFor`). It is 0 (none) to
+`MAX_ATTACK_COOLDOWN`, 0.05 s (three steps), for every fighter, the
+Deflect included; `createAttackDefinition` refuses a longer one. So what
+holds an attack back is its own phases (startup, active, recovery,
+hit-cancel), never a timer: #0001's attacks and Deflect have no cooldown
+at all, #0002's 0.05 s. No attack restarts on the step it hit: its
+freeze holds it.
+
+Summons and techniques have their own, separate and optional
+(`CombatState.abilityCooldowns`, a `CooldownTimers` keyed by the button),
+the fighter's choice: 0, the default, starts none (#0001's Unlimited Void
+and Hollow Purple have none: their cast and release are what hold them
+back). One a fighter declares starts the moment the move is accepted,
+recovers in real time whatever the fighter does, and is drawn under the
+fighter as a ring labelled by the button (A4, A5) while it runs
 ([rendering](rendering.md#fighter-status)). None of them costs Energy.
 
 ## Combat Assist
@@ -361,9 +393,11 @@ starts the very attack asked for. The rules are
   ground footing where it stops, in the air nothing to land on). The move
   (`reachVector`) is across only on the ground; in the air it also goes up
   or down to bring the strike well into the target's body, unless the
-  attack's motion passes through its middle. Then it pays `dashCost` (`spendEnergy`: never while
-  exhausted), in the air takes the air dash (`airDashes`), and sets
-  `fighter.combatAssist` (`air` says which kind). Otherwise the attack
+  attack's motion passes through its middle. Then, paying no Energy at
+  all (full, partly spent or exhausted alike, and the refill runs on as
+  ever: it moves like a Dash but is none), it takes the air dash in the
+  air (`airDashes`) and sets `fighter.combatAssist` (`air` says which
+  kind). Otherwise the attack
   starts where the fighter is, as ever.
 - **Each step.** While `fighter.combatAssist` is set, `Fighter.update`
   hands the step's presses to `assistIntents` instead of the ordinary
@@ -406,6 +440,9 @@ starts the very attack asked for. The rules are
   over the loadout matrix
   ([`tests/fighters/fixtures/loadout-fighters.mjs`](../../tests/fighters/fixtures/loadout-fighters.mjs)),
   every rule broken on purpose.
+- [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs):
+  the shared rules over every fighter and every kind of hit: the damage
+  tiers, the cooldowns, Energy, difficulty and movement.
 - [`tests/systems/combo.test.mjs`](../../tests/systems/combo.test.mjs),
   [`fighter-stats.test.mjs`](../../tests/systems/fighter-stats.test.mjs),
   [`codenames.test.mjs`](../../tests/systems/codenames.test.mjs),
@@ -413,7 +450,8 @@ starts the very attack asked for. The rules are
   (a fighter that is not #0001, with different moves on the same
   codenames).
 - [`tests/systems/combat-assist.test.mjs`](../../tests/systems/combat-assist.test.mjs):
-  Combat Assist for every fighter's melee buttons, its Energy, the newest
+  Combat Assist for every fighter's melee buttons, that it costs no
+  Energy at any level of the bar, the newest
   press winning, every cancellation, the stage, and that no CPU ever has
   it.
 - The shared capabilities on bespoke data:

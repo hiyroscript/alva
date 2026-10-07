@@ -18,6 +18,8 @@ import {
 } from '../../js/game/rendering/fighter-status.js';
 import { specialAttacks } from '../../js/data/loadout.js';
 import { def, DT, fakeSprites, makeFighter, duel } from '../helpers/fighter-harness.mjs';
+import { BLOCK_ENERGY_COST, DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
+import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
 
 globalThis.Path2D ??= class {
   constructor() {
@@ -100,11 +102,17 @@ test('the rings read the real cooldowns: empty as one starts, half way at half, 
 });
 
 test('real attack4 then attack5: A4 appears at once, A5 joins it, the shorter A5 goes first, the last one leaves nothing', () => {
-  const d = duel({ gap: 600 });
+  // A fighter whose techniques have cooldowns (#0001's have none: using
+  // them shows nothing at all).
+  const plain = duel({ gap: 600 });
+  plain.tick({ attack4: true, attack4Pressed: true });
+  assert.equal(plain.attacker.state, 'technique');
+  assert.deepEqual(labels(plain.attacker), [], '#0001: no ring, ever');
+  const d = duel({ gap: 600, attackerCharacter: COOLING_CASTER });
   const f = d.attacker;
   const cd = f.combat.abilityCooldowns;
-  const A4 = def.techniques.attack4.cooldown;
-  const A5 = def.techniques.attack5.cooldown;
+  const A4 = COOLING_CASTER.techniques.attack4.cooldown;
+  const A5 = COOLING_CASTER.techniques.attack5.cooldown;
   assert.ok(A5 + 1 < A4, 'Hollow Purple recovers sooner, even started a cast later');
   d.tick({});
   assert.deepEqual(labels(f), []);
@@ -273,7 +281,7 @@ test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at o
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block');
   for (const [label, fighter, step] of [['Dash', dashed.fighter, dashed.step], ['block', d.target, (held) => d.tick({}, held)]]) {
-    const spent = label === 'Dash' ? def.energy.dashCost : def.energy.shieldHitCost;
+    const spent = label === 'Dash' ? DASH_ENERGY_COST : BLOCK_ENERGY_COST;
     assert.equal(fighter.combat.energy, 100 - spent, `${label} spent ${spent}`);
     const bar = energyBarState(fighter);
     assert.deepEqual([bar.visible, bar.exhausted, bar.color], [true, false, ENERGY_STYLE.fill], label);

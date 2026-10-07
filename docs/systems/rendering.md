@@ -91,8 +91,8 @@ whose art it is, whoever owns it now.
 Over each fighter in play whose body is on screen: a thin bright purple
 **Energy bar** above its name tag, only while Energy is below full (gray
 through an exhaustion's refill), and under its feet one ring per summon or
-technique button cooling down, labelled by the button (**A4** / **A5** for
-#0001's techniques),
+technique button cooling down, labelled by the button (**A4** / **A5**;
+#0001's techniques have no cooldown, so it never shows one),
 filling clockwise with the seconds left. Nothing is drawn while all are
 ready.
 

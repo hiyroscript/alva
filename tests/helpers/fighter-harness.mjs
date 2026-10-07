@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { getCharacter } from '../../js/data/characters.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
+import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../../js/game/combat/summon.js';
 import { applyPulls } from '../../js/game/combat/pull.js';
@@ -23,6 +24,16 @@ import { BASE_FIGHTER_MOVEMENT } from '../../js/data/movement.js';
 // duel, or use harnessFor below), so it never passes only because one
 // fighter happens to have particular values.
 export const DEFAULT_CHARACTER = getCharacter('0001');
+
+// A bare hit for CombatSystem.applyHit that is no authored content: a probe
+// of the launch, stun and hit-effect math that deals `damage` (0 by
+// default, so only the target's preset Launch Point counts). No authored
+// hit may deal 0 (or anything but 1, 3, 5 or 10: resolveHitDamage), so it
+// goes through createAttackDefinition with a legal damage, every other
+// field validated as ever, and only then has its damage set.
+export function probeHit({ damage = 0, ...spec }) {
+  return Object.freeze({ ...createAttackDefinition({ ...spec, damage: 1 }), damage });
+}
 // The default's definition, under the name the older tests import it by.
 export const def = DEFAULT_CHARACTER;
 export const DT = CONFIG.sim.step;
@@ -229,6 +240,7 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
       log.get(f).push({
         ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
         state: f.state, grounded: f.grounded, frame: frameName(f), cooling: [...f.combat.abilityCooldowns.entries.keys()],
+        technique: f.technique?.def.id ?? null,
       });
       // Back on stage at once if the Void takes one: the fight goes on.
       if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);

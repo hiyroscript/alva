@@ -179,8 +179,9 @@ through the same `Fighter.tryDash` (in the air the same requests are the
 air dash). It needs the fighter free to act (or in an attack that hit and
 may be cut short: a Dash cancel), grounded, not shielding, not exhausted
 and real `mouvment` frames (refused and logged otherwise, never faked
-with the run). It costs `energy.dashCost` (`dashCancelCost` for a Dash
-cancel; see [Energy](energy.md)). It is movement only: no hitbox, damage,
+with the run). It costs 25 Energy (`DASH_ENERGY_COST`, the same for every
+fighter, a Dash cancel included; see [Energy](energy.md)); running,
+jumps, air jumps, turning, air control and the fast fall cost none. It is movement only: no hitbox, damage,
 launch or invulnerability. Leaving the ground or meeting a solid ends it.
 
 **The air dash.** The same requests in the air: straight across at
@@ -189,8 +190,8 @@ across it, facing the way it goes at once; its vertical speed is zeroed
 as it starts and gravity is held off throughout (no fall, no fast fall).
 `airDashUses` per airtime, given back on landing and by a hit; an air
 jump gives none back. The same rules as a Dash otherwise, and never while
-still flying from a launch or in free fall. Meeting a solid or the ground
-ends it.
+still flying from a launch or in free fall, and for the same 25 Energy.
+Meeting a solid or the ground ends it.
 
 **Flowing out of them.** Both commit to `dashCancelTime` of themselves;
 from then on an attack, a Deflect or a jump (an air jump in the air) may
@@ -212,7 +213,8 @@ the Dash's own numbers on the ground and the air dash's in the air: at
 most one Dash's (or air dash's) travel (`assistRange` in
 [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js)),
 at up to `dashSpeed` (or `airDashSpeed`), its `mouvment` (or
-`midair_mouvment`) clip played at that movement's rate, for `dashCost`.
+`midair_mouvment`) clip played at that movement's rate, for no Energy at
+all (it moves like a Dash but is none).
 In the air it goes straight at the target, down, up or across, with no
 fall, and uses up the airtime's air dash. It is not a Dash (`fighter.combatAssist`, never
 `fighter.dash`): it covers only the distance the attack needs, ends by
@@ -264,6 +266,12 @@ into attacks and jumps. The old values are kept in
   playable fighter measured field by field (identical), identical input
   traces giving #0001 and #0002 identical trajectories, and the triple
   jump for each fighter.
+- [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs):
+  every registered and test fighter built on the very same
+  `BASE_FIGHTER_MOVEMENT` object (run, acceleration, turning, air
+  control, the jumps, gravity scale, fall limits, Dash and air dash, the
+  buffers), every movement field refused in a definition, one world
+  gravity; and that running, jumps and the fast fall cost no Energy.
 - [`tests/systems/momentum.test.mjs`](../../tests/systems/momentum.test.mjs):
   momentum through run → jump, Dash → jump, Dash → attack, attack → jump,
   attack → Dash, the air jump, air dash → aerial, landing, the impact

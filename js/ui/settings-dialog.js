@@ -12,8 +12,8 @@
 //   Combat    Combat Assist, On (the default) or Off, a single choice
 //             (radio buttons, in the Language section's style) with the
 //             line that says what it does: the player's melee attacks (on
-//             the ground or in the air) close a short gap first, for
-//             Energy, never a ranged one (see
+//             the ground or in the air) close a short gap first, free
+//             (it never costs Energy), never a ranged one (see
 //             Fighter.tryCombatAssist). Read as each Quick Battle or
 //             Practice Ground session starts; no CPU ever has it.
 //

@@ -10,15 +10,21 @@
 // CombatSystem resolves its strike like any melee hit, so it trades, is
 // interrupted and is punished exactly as an attack is. It is never a
 // Shield: CombatState.shielding stays false throughout, so nothing it does
-// is blocked, perfect, paid for in Energy, held in blockstun, stalled or
-// drawn as a Shield. What it adds is the attacks' `deflectProjectiles`
-// capability (see CombatSystem.deflectProjectiles in
-// js/game/combat/combat.js): while its strike is live its box turns back
-// the other fighters' projectiles it meets.
+// is blocked, perfect, held in blockstun, stalled or drawn as a Shield.
+// What it adds is the attacks' `deflectProjectiles` capability (see
+// CombatSystem.deflectProjectiles in js/game/combat/combat.js): while its
+// strike is live its box turns back the other fighters' projectiles it
+// meets.
+//
+// It costs Energy, the same for every fighter: DEFLECT_ENERGY_COST (15, see
+// js/game/combat/combat-state.js), paid once as it starts (Fighter.tryDeflect),
+// whether it then strikes, turns a projectile back or meets nothing, and
+// never while the fighter is exhausted. Nothing it does gives any back.
 //
 // Its strike is the same for every fighter: DEFLECT_DAMAGE (3) Launch
 // Points at Base Launch DEFLECT_BASE_LAUNCH (2). A fighter authors the rest
-// (its clip, timing, box, stuns, freeze, direction, cooldown, movement),
+// (its clip, timing, box, stuns, freeze, direction, cooldown up to
+// MAX_ATTACK_COOLDOWN, movement),
 // and may leave damage and baseLaunch out; any other value for either is
 // refused, so no fighter's Deflect can drift from the rule:
 //
@@ -27,7 +33,7 @@
 //     startup: 1 / 15, active: 2 / 15, recovery: 2 / 15,
 //     hitbox: { x: 6, y: -118, w: 44, h: 98 },
 //     directionalLaunch: 'vertical', hitstun: 0.32, blockstun: 0.14, hitstop: 0.06,
-//     cooldown: 0.3, airMomentum: 0.7, airControl: 0.3,
+//     cooldown: 0, airMomentum: 0.7, airControl: 0.3,
 //     deflectProjectiles: true,
 //   }
 //
@@ -37,8 +43,8 @@
 
 import { createAttackDefinition } from './attacks.js';
 
-// Every Deflect's strike: its damage (the Launch Point it adds) and its
-// Base Launch (see js/data/launch.js).
+// Every Deflect's strike: its damage (the Launch Point it adds, the solid
+// tier of ALLOWED_DAMAGE_VALUES) and its Base Launch (see js/data/launch.js).
 export const DEFLECT_DAMAGE = 3;
 export const DEFLECT_BASE_LAUNCH = 2;
 

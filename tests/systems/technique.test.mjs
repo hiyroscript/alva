@@ -36,7 +36,7 @@ const CASTER = {
     attack4: {
       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 3,
       projectile: { id: 'attack4_object', offset: { x: 50, y: -40 } },
-      burst: { hitbox: { x: -100, y: -100, w: 200, h: 100 }, hit: { damage: 2, hitstun: 0.3, hitstop: 0.05 } },
+      burst: { hitbox: { x: -100, y: -100, w: 200, h: 100 }, hit: { damage: 3, hitstun: 0.3, hitstop: 0.05 } },
     },
   },
 };
@@ -50,13 +50,13 @@ test('a technique is data: its clips, its cooldown and what it releases, frozen 
   const t = createTechniqueDefinition({ id: 'attack4', ...CASTER.techniques.attack4 });
   assert.ok(Object.isFrozen(t) && Object.isFrozen(t.projectile) && Object.isFrozen(t.burst) && Object.isFrozen(t.burst.hit));
   assert.deepEqual(t.projectile, { id: 'attack4_object', offset: { x: 50, y: -40 } });
-  assert.equal(t.burst.hit.damage, 2);
+  assert.equal(t.burst.hit.damage, 3);
   assert.equal(t.burst.hit.blockstun, 0.12, 'a hit\'s own defaults');
   assert.equal(t.burst.hit.unblockable, false, 'and the shared hit effects');
   assert.deepEqual([...TECHNIQUE_CLIPS], ['castAnimation', 'releaseAnimation']);
   assert.deepEqual(createTechniqueDefinition({ id: 'x', projectile: { id: 'o' } }).projectile.offset, { x: 0, y: 0 });
   assert.throws(() => createTechniqueDefinition({}), /need an id/);
-  assert.throws(() => createTechniqueDefinition({ id: 'x', burst: { hitbox: { x: 0, y: 0, w: 1, h: 1 }, hit: { paralyze: -1 } } }), /Hit "x.burst"'s paralyze/);
+  assert.throws(() => createTechniqueDefinition({ id: 'x', burst: { hitbox: { x: 0, y: 0, w: 1, h: 1 }, hit: { damage: 1, paralyze: -1 } } }), /Hit "x.burst"'s paralyze/);
   // The runtime is one form: nothing of a fighter, a button or another form.
   const code = readFileSync(new URL('../../js/game/combat/technique.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(code, /000\d|'attack\d'|dash|rush|sphere|tick|bind|explosion/i);
@@ -69,7 +69,7 @@ test('a technique that cannot be shown or releases nothing is refused before it 
   assert.match(techniqueProblem(fighter, t({ castAnimation: 'nope' })), /fighter clip "nope" has no animation frames/);
   assert.match(techniqueProblem(fighter, t({ projectile: null, burst: null })), /releases nothing/);
   assert.match(techniqueProblem(fighter, t({ projectile: { id: 'attack9_object' } })), /projectile "attack9_object" is not defined/);
-  assert.match(techniqueProblem(fighter, t({ burst: { hitbox: { x: 0, y: 0, w: 0, h: 10 }, hit: {} } })), /burst has no hitbox/);
+  assert.match(techniqueProblem(fighter, t({ burst: { hitbox: { x: 0, y: 0, w: 0, h: 10 }, hit: { damage: 1 } } })), /burst has no hitbox/);
 });
 
 // ---- The cast ------------------------------------------------------------------------
@@ -131,7 +131,7 @@ test('its burst strikes every opponent its box meets, in front or behind, once, 
     d.until(() => d.events.some((e) => e.technique), steps(CAST) + 5);
     const burst = d.events.filter((e) => e.technique);
     assert.equal(burst.length, 1, 'once');
-    assert.equal(burst[0].damage, 2);
+    assert.equal(burst[0].damage, 3);
     assert.equal(burst[0].target, d.target);
     assert.equal(burst[0].technique.action, 'attack4');
     assert.equal(d.attacker.combat.hitstop, 0, 'detached: the caster never freezes');

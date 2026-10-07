@@ -19,6 +19,7 @@ import { readMoveset } from '../../js/game/ai/moveset.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { DT, MOVEMENT, duel, fakeSpritesOf, makeFighter, stageMap, steps } from '../helpers/fighter-harness.mjs';
+import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const DEF_0001 = getCharacter('0001');
@@ -77,7 +78,7 @@ for (const c of FIGHTERS) {
     assert.equal(f.facing, -1, 'facing the way it dashes at once');
     assert.equal(f.body.vx, -MOVEMENT.airDashSpeed, 'the universal speed');
     assert.equal(f.body.vy, 0);
-    assert.equal(f.combat.energy, energy - c.energy.dashCost, 'the Dash\'s cost');
+    assert.equal(f.combat.energy, energy - DASH_ENERGY_COST, 'the Dash\'s cost');
     let n = 1;
     while (f.dash) {
       assert.equal(f.body.y, y, `step ${n}: flat across the air, no fall`);

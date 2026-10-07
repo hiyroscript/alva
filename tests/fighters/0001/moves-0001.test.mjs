@@ -42,16 +42,16 @@ const tickUntil = (d, pred, held = {}, targetHeld = {}, limit = 240) => {
 
 // ---- The Jab ------------------------------------------------------------------------
 
-test('the Jab lands on its third frame for 2, pushing the target away (Base Launch 1 sideways)', () => {
+test('the Jab lands on its third frame for 3, pushing the target away (Base Launch 1 sideways)', () => {
   const d = versus({ gap: 40 });
-  d.target.combat.launchPoint = 30;
+  d.target.combat.launchPoint = 29;
   d.tick(P('attack1'));
   let n = 1;
   while (!d.events.length && n < 30) { d.tick(); n++; }
   assert.equal(n, steps(A.attack1.startup) + 1, 'out after its two wind-up frames');
   const [e] = d.events;
   assert.equal(e.move, 'attack1');
-  assert.equal(e.damage, 2);
+  assert.equal(e.damage, 3);
   assert.deepEqual({ ...e.finalLaunch }, { x: 32 * U, y: 0 });
 });
 
@@ -114,9 +114,9 @@ test('the Floating Straight stands on the air while it strikes: no fall, twice p
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1', 'landing gives them back');
 });
 
-test('the High Kick: a leap in, then 4 and Base Launch 2 straight up; in the air it stands on the air, once', () => {
+test('the High Kick: a leap in, then 5 and Base Launch 2 straight up; in the air it stands on the air, once', () => {
   const d = versus({ gap: 50 });
-  d.target.combat.launchPoint = 25;
+  d.target.combat.launchPoint = 24;
   d.tick(P('extra_attack'));
   let leap = 0;
   for (let i = 0; i < 20 && !d.events.length; i++) {
@@ -126,7 +126,7 @@ test('the High Kick: a leap in, then 4 and Base Launch 2 straight up; in the air
   // Raised to the step's speed on frame 2, braking from there.
   assert.ok(leap > A.extra_attack.step.speed * 0.8 && leap <= A.extra_attack.step.speed, `the leap in on frame 2 (${leap})`);
   const [e] = d.events;
-  assert.equal(e.damage, 4);
+  assert.equal(e.damage, 5);
   assert.deepEqual({ ...e.finalLaunch }, { x: 0, y: -58 * U });
   const { fighter, step } = solo();
   airborne(step);
@@ -153,14 +153,14 @@ test('Red leaves the palms on frame 4 and flies 600 units/s for about 300 units'
   assert.ok(Math.abs(orb.speed * orb.lifetime - 300) < 1);
 });
 
-test('Red pushes its target away: 2 and Base Launch 1 along its flight', () => {
+test('Red pushes its target away: 3 and Base Launch 1 along its flight', () => {
   const d = versus({ gap: 200 });
-  d.target.combat.launchPoint = 46;
+  d.target.combat.launchPoint = 45;
   d.tick(P('attack2'));
   tickUntil(d, () => d.events.length > 0, {}, {}, 60);
   const [e] = d.events;
   assert.equal(e.move, 'attack2_object');
-  assert.equal(e.damage, 2);
+  assert.equal(e.damage, 3);
   assert.deepEqual({ ...e.finalLaunch }, { x: 48 * U, y: 0 });
 });
 
@@ -239,7 +239,7 @@ test('Maximum Blue drags a target into itself and grinds it: three strikes 0.25 
     if (d.events.length > before) at.push(n);
   }
   const hits = d.events.filter((e) => e.projectile === orb);
-  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 2]);
+  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 3]);
   assert.deepEqual(at.slice(1).map((n, i) => n - at[i]), [15, 15], '0.25 s apart');
   assert.ok(hits.slice(0, 2).every((e) => e.launchSpeed === 0), 'the grinding launches nothing');
   assert.ok(hits[2].finalLaunch.y < 0 && hits[2].finalLaunch.x === 0, 'the collapse pops it upward');
@@ -273,7 +273,7 @@ test('Blue yanks an opponent in to its palm and strikes it upward, standing on t
   tickUntil(d, () => d.events.length > 0, {}, {}, 20);
   const [e] = d.events;
   assert.equal(e.move, 'midair_attack3');
-  assert.equal(e.damage, 2);
+  assert.equal(e.damage, 3);
   assert.ok(e.finalLaunch.y < 0 && e.finalLaunch.x === 0, 'up');
   // Out of the pull's reach: nothing.
   const far = versus({ gap: 320 });
@@ -306,7 +306,10 @@ test('Unlimited Void: half a second of cast, then a sure hit round #0001 that no
   // while longer.
   tickUntil(d, () => !d.attacker.technique, {}, {}, 60);
   assert.ok(d.target.combat.paralysis > 1.2, `still held (${d.target.combat.paralysis.toFixed(2)} s)`);
-  assert.ok(d.attacker.combat.abilityCooldowns.remaining('attack4') > 12, 'a long cooldown');
+  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), false, 'no cooldown at all');
+  assert.equal(d.attacker.combat.abilityCooldowns.size, 0);
+  d.tick(P('attack4'));
+  assert.equal(d.attacker.technique?.action, 'attack4', 'cast again the moment #0001 is free');
 });
 
 test('the domain reaches 250 units either side and well over #0001\'s head, and no further', () => {
@@ -346,10 +349,10 @@ test('a paralyzed opponent can be hit freely; the first hit that launches it set
 
 // ---- Hollow Purple ----------------------------------------------------------------------------
 
-test('Hollow Purple: a five-sixths of a second chant, then the sphere through any Shield for 12 and Base Launch 3, flying on through', () => {
+test('Hollow Purple: a five-sixths of a second chant, then the sphere through any Shield for 10 and Base Launch 3, flying on through', () => {
   const d = versus({ gap: 400 });
   raise(d);
-  d.target.combat.launchPoint = 20;
+  d.target.combat.launchPoint = 22;
   d.tick(P('attack5'), HOLD);
   const t = d.attacker.technique;
   assert.equal(t?.action, 'attack5');
@@ -361,7 +364,7 @@ test('Hollow Purple: a five-sixths of a second chant, then the sphere through an
   const [e] = d.events;
   assert.equal(e.type, 'hit', 'no Shield stops it');
   assert.equal(e.move, 'attack5_object');
-  assert.equal(e.damage, 12);
+  assert.equal(e.damage, 10, 'the top damage tier');
   assert.deepEqual({ ...e.finalLaunch }, { x: 3 * 32 * U, y: 0 });
   assert.equal(e.projectile.alive, true, 'it flies on through');
   for (let i = 0; i < 30; i++) d.tick();
@@ -388,7 +391,9 @@ test('Hollow Purple erases the projectiles it meets; a hit during the chant brea
   assert.equal(t.released, false);
   for (let i = 0; i < steps(1.5); i++) b.tick();
   assert.ok(b.projectiles.every((p) => p.def.id !== 'attack5_object'), 'no sphere');
-  assert.ok(b.attacker.combat.abilityCooldowns.active('attack5'), 'and the cooldown spent');
+  assert.equal(b.attacker.combat.abilityCooldowns.active('attack5'), false, 'and no cooldown to spend');
+  b.tick(P('attack5'));
+  assert.equal(b.attacker.technique?.action, 'attack5', 'the chant may start again at once');
 });
 
 // ---- Infinity -------------------------------------------------------------------------------

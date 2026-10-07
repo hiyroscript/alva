@@ -16,6 +16,7 @@ import { HELD_CONTROLS, blankInput } from '../../js/game/fighters/fighter-contro
 import {
   def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel,
 } from '../helpers/fighter-harness.mjs';
+import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
 
 const DOWN = { down: true };
 const JUMP = { jump: true, jumpPressed: true };
@@ -187,8 +188,9 @@ test('holding Down never refills Energy faster: one passive rate, whatever is he
 
 test('holding Down never speeds up a cooldown: Attack 4 and Attack 5 recover in real time either way', () => {
   for (const button of ['attack4', 'attack5']) {
+    // A fighter whose techniques have cooldowns (#0001's have none).
     const recover = (held) => {
-      const d = duel({ gap: 600 });
+      const d = duel({ gap: 600, attackerCharacter: COOLING_CASTER });
       d.tick(P(button));
       d.until(() => d.attacker.combat.abilityCooldowns.active(button), 1);
       const cd = d.attacker.combat.abilityCooldowns;
@@ -201,7 +203,7 @@ test('holding Down never speeds up a cooldown: Attack 4 and Attack 5 recover in 
     };
     const plain = recover({});
     assert.deepEqual(recover(DOWN), plain, button);
-    assert.ok(Math.abs(plain.at(-1) - (def.techniques[button].cooldown - 1)) < 1e-6, `${button}: 1 s of cooldown per second`);
+    assert.ok(Math.abs(plain.at(-1) - (COOLING_CASTER.techniques[button].cooldown - 1)) < 1e-6, `${button}: 1 s of cooldown per second`);
   }
 });
 
@@ -252,7 +254,7 @@ test('the fighter has no state or pose of Down\'s own: only its directional effe
   assert.ok(Object.keys(def.animations).every((k) => !k.startsWith('down')));
   assert.deepEqual(Object.keys(def.animationFallbacks).sort(), ['fall', 'hurt', 'jump', 'land', 'midair_hurt']);
   assert.equal(def.stats, undefined, 'no stat block of a stance');
-  assert.deepEqual(Object.keys(def.energy).sort(), ['dashCancelCost', 'dashCost', 'max', 'regen', 'shieldHitCost']);
+  assert.deepEqual(Object.keys(def.energy), ['regen'], 'its refill rate, and nothing of a stance');
 });
 
 // ---- In the air, and as a hit lands -----------------------------------------------------

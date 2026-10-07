@@ -19,11 +19,11 @@
 //
 //   techniques: {
 //     attack5: {
-//       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 12,
+//       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 0,
 //       projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
 //     },
 //     attack4: {
-//       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 14,
+//       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 0,
 //       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, unblockable: true, paralyze: 1.8 } },
 //     },
 //   },
@@ -58,15 +58,20 @@
 // one step), so the pose on screen and the release always agree.
 //
 // The burst's hit is resolved by applyHit like an attack's, with its own
-// `damage`, `baseLaunch` and `directionalLaunch` (see js/data/launch.js) and
-// hit effects (js/game/combat/hit-effects.js), validated here exactly like
-// an attack's. A horizontal launch travels along the technique's facing.
+// `damage` (one of the tiers 1, 3, 5 or 10, required), `baseLaunch` and
+// `directionalLaunch` (see js/data/launch.js) and hit effects
+// (js/game/combat/hit-effects.js), validated here exactly like an attack's.
+//
+// A technique's `cooldown` (seconds, from its start) is its fighter's own
+// choice: 0, the default, is none, and then using it starts no cooldown at
+// all (CombatState.abilityCooldowns stays empty for it); the technique is
+// held back only by its own phases, a cast and a release that must play
+// out before the fighter is free. A horizontal launch travels along the technique's facing.
 
-import { resolveHitLaunch } from '../../data/launch.js';
+import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolveHitEffects } from './hit-effects.js';
 
 const HIT_DEFAULTS = {
-  damage: 0,
   baseLaunch: 0,
   directionalLaunch: null,
   hitstun: 0.2,
@@ -78,7 +83,7 @@ const TECHNIQUE_DEFAULTS = {
   castAnimation: null,
   releaseAnimation: null,
   // Seconds before the technique can be used again, from its start (see
-  // Fighter.tryTechnique): spent whether it lands or not.
+  // Fighter.tryTechnique): spent whether it lands or not. 0 is none.
   cooldown: 0,
   // { id, offset }: the projectile it releases (see above), or null.
   projectile: null,
@@ -93,7 +98,10 @@ const TIME_EPSILON = 1e-6;
 function createHit(id, spec) {
   if (!spec) return null;
   const owner = `Hit "${id}"`;
-  return Object.freeze({ ...HIT_DEFAULTS, ...spec, id, ...resolveHitLaunch(spec, owner), ...resolveHitEffects(spec, owner) });
+  return Object.freeze({
+    ...HIT_DEFAULTS, ...spec, id,
+    damage: resolveHitDamage(spec.damage, owner), ...resolveHitLaunch(spec, owner), ...resolveHitEffects(spec, owner),
+  });
 }
 
 export function createTechniqueDefinition(spec) {

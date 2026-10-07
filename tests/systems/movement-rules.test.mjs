@@ -131,19 +131,19 @@ test('`control` scales steering and the speed it steers toward', () => {
 // ---- Attacks ------------------------------------------------------------------------
 
 test('attack momentum: an attack keeps its share of the speed, never capped at top speed', () => {
-  const atk = createAttackDefinition({ id: 'fixture', animation: 'x', momentum: 0.5, airMomentum: 0.25 });
+  const atk = createAttackDefinition({ id: 'fixture', animation: 'x', damage: 1, momentum: 0.5, airMomentum: 0.25 });
   assert.equal(attackStartSpeed(atk, 300, true), 150);
   assert.equal(attackStartSpeed(atk, 1200, true), 600, 'a Dash\'s burst carries on: no cap');
   assert.equal(attackStartSpeed(atk, -1200, true), -600);
   assert.equal(attackStartSpeed(atk, 900, false), 225, 'in the air: airMomentum');
-  const whole = createAttackDefinition({ id: 'whole', animation: 'x' });
+  const whole = createAttackDefinition({ id: 'whole', animation: 'x', damage: 1 });
   assert.equal(attackStartSpeed(whole, 1250, true), 1250, 'by default: all of it');
   assert.equal(attackStartSpeed(whole, -1250, false), -1250);
-  const free = createAttackDefinition({ id: 'free', animation: 'x', lockMovement: false });
+  const free = createAttackDefinition({ id: 'free', animation: 'x', damage: 1, lockMovement: false });
   assert.equal(attackStartSpeed(free, 900, true), 900, 'normal locomotion kept: all of it');
   // Its step-in raises the forward speed once its time reaches `at`, never
   // lowers it, then its own control steers.
-  const stepping = createAttackDefinition({ id: 's', animation: 'x', step: { at: 0.05, speed: 250 }, control: 0 });
+  const stepping = createAttackDefinition({ id: 's', animation: 'x', damage: 1, step: { at: 0.05, speed: 250 }, control: 0 });
   const record = { def: stepping, time: 0, stepped: false };
   const b = body();
   steerAttack(b, VALUES, -1, record, 0, DT);

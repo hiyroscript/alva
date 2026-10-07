@@ -976,7 +976,7 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
     assert.equal(section.getAttribute('data-settings-section'), 'combat');
     assert.equal(section.querySelector('.settings-subtitle').textContent, 'Combat Assist');
     const desc = section.querySelector('.settings-group-note');
-    assert.equal(desc.textContent, 'Automatically closes a short gap before a melee attack. Uses Energy and never affects ranged attacks.');
+    assert.equal(desc.textContent, 'Automatically closes a short gap before a melee attack. Never uses Energy and never affects ranged attacks.');
     // Its line says it is melee only and costs Energy.
     assert.match(desc.textContent, /melee/);
     assert.match(desc.textContent, /Energy/);
@@ -1019,7 +1019,7 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
     assert.equal(section.querySelector('.settings-group-title').textContent, 'Combat');
     assert.equal(section.querySelector('.settings-subtitle').textContent, 'Assistance au combat');
     assert.equal(desc.textContent,
-      'Comble automatiquement un court écart avant une attaque au corps à corps. Consomme de l’Énergie et n’agit jamais sur les attaques à distance.');
+      'Comble automatiquement un court écart avant une attaque au corps à corps. Ne consomme jamais d’Énergie et n’agit jamais sur les attaques à distance.');
     assert.match(on.textContent, /^Activée/);
     assert.match(on.textContent, /Par défaut/);
     assert.match(off.textContent, /^Désactivée/);

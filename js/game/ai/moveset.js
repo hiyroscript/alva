@@ -130,10 +130,12 @@ export function readMoveset(f) {
     def, sprites, melee, ranged, specials,
     groundShield: !!guard && sprites.has(guard),
     // Pressed on `shield` in the air, an aerial strike like any other, that
-    // may also turn projectiles back while it is live.
+    // may also turn projectiles back while it is live, and that costs
+    // Energy as it starts (`cost`).
     deflect: deflect ? {
       action: 'shield', air: true, id: deflect.id, atk: deflect, reach: attackReach(deflect),
       motion: deflect.motion?.type ?? null, deflect: true, catches: deflect.deflectProjectiles,
+      cost: f.energyDef.deflectCost,
     } : null,
     // A Dash: how far it goes, and how far with its run-on (`reach`).
     dash: dashDistance > 0 && sprites.has('mouvment')

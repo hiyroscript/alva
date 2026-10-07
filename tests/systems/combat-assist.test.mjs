@@ -1,12 +1,12 @@
 // Run with node --test tests/systems/combat-assist.test.mjs (no dependencies).
 // Combat Assist (Home › Settings › Combat): a human player's melee press made
 // just out of reach closes the gap first with the fighter's mouvment clip,
-// for one dashCost of Energy, then starts the very attack asked for; in the
+// free (it never costs Energy), then starts the very attack asked for; in the
 // air the same, flat across as an air dash, with midair_mouvment. Covered
 // here: which presses get it (melee by the attack's own data, within one
 // Dash's or air dash's travel, unless the attack's own reach already covers
 // its target; never a ranged attack, a pending one, a summon, a technique or
-// the Deflect), its Energy (and the air dash it uses), the newest melee
+// the Deflect), that it costs no Energy (and the air dash it uses), the newest melee
 // press winning, everything that cancels it, who has it (the player's
 // controller with the setting on; never a CPU, in any mode) and what the
 // stage does to it. Shared rules: driven from each fighter's own data or a
@@ -20,6 +20,7 @@ import { PlayerController, TrainingAIController, blankInput } from '../../js/gam
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
+import { DEFLECT_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 import { isMeleeAttack, isRangedAttack, attackReach } from '../../js/game/combat/attacks.js';
 import { assistsAttack, assistRange, meleeGap, ASSIST_MARGIN } from '../../js/game/combat/combat-assist.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
@@ -211,7 +212,7 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
       assert.equal(player.animator.anim.key, 'mouvment', `${why}: the Dash's own clip`);
       assert.equal(frameName(player), `${c.id}_mouvment_1.png`, `${why}: from its first frame`);
       assert.equal(player.facing, 1, `${why}: facing its target`);
-      assert.equal(player.combat.energy, max - player.energyDef.dashCost, `${why}: one dashCost, and no refill on its step`);
+      assert.equal(player.combat.energy, max, `${why}: free, nothing paid`);
       assert.ok(Math.abs(player.body.vx - MV.dashSpeed) < EPS, `${why}: at the Dash's speed`);
       // Closing in step by step: never faster than the Dash, never a jump.
       let last = player.body.x;
@@ -239,8 +240,8 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
       assert.ok(gap < 0 && gap >= -ASSIST_MARGIN - EPS, `${why}: in reach at ${gap}`);
       assert.ok(Math.abs(player.body.x - x0 - (60 + ASSIST_MARGIN)) < 1e-3, `${why}: 61 units covered`);
       assert.ok(started <= Math.ceil((60 + ASSIST_MARGIN) / (MV.dashSpeed * DT)) + 1, why);
-      // Paid once, refilling since.
-      assert.ok(player.combat.energy > max - player.energyDef.dashCost, why);
+      // Nothing paid at any point.
+      assert.equal(player.combat.energy, max, why);
     }
   }
 });
@@ -427,7 +428,7 @@ test('the Deflect never gets it: on the ground the button is the Shield, in the 
     r.tick(press('shield'));
     assert.equal(r.player.combatAssist, null, `#${c.id}: no approach`);
     assert.equal(r.player.combat.attack?.def, r.player.deflect, `#${c.id}: the Deflect, where it is`);
-    assert.equal(r.player.combat.energy, energy);
+    assert.equal(r.player.combat.energy, energy - DEFLECT_ENERGY_COST, `#${c.id}: the Deflect's own price, nothing more`);
   }
 });
 
@@ -470,7 +471,7 @@ test('in the air, a melee press out of reach closes in straight at the target, f
         assert.equal(player.state, 'assist');
         assert.equal(player.animator.anim.key, 'midair_mouvment', `${why}: the air dash's own clip`);
         assert.equal(frameName(player), `${c.id}_midair_mouvment_1.png`, `${why}: from its first frame`);
-        assert.equal(player.combat.energy, max - player.energyDef.dashCost, `${why}: one dashCost, no refill on its step`);
+        assert.equal(player.combat.energy, max, `${why}: free, nothing paid`);
         assert.equal(player.airDashes, airDashes - 1, `${why}: it uses the airtime's air dash`);
         while (player.combatAssist) {
           const step = Math.hypot(player.body.x - player.body.prevX, player.body.y - player.body.prevY);
@@ -623,15 +624,16 @@ test('in the air it takes the airtime\'s air dash: with none left there is no ap
   for (let i = 0; i < 20; i++) used.tick();
   used.tick({ mouvementRightPressed: true });
   assert.equal(used.player.dash, null, 'no second burst in the same airtime');
-  // Exhausted, the same: no approach, the attack where it is.
+  // Exhausted, it is the airtime's air dash that counts, never Energy: the
+  // approach starts all the same, and costs none.
   const tired = rig();
   airborne(tired);
   tired.player.combat.setEnergy(0);
   placeFoe(tired, tired.player.attacks.midair_attack1, 30);
   tired.tick(press('attack1'));
-  assert.equal(tired.player.combatAssist, null);
-  assert.equal(tired.player.combat.attack?.def.id, 'midair_attack1');
-  assert.equal(tired.player.airDashes, 1, 'its air dash kept');
+  assert.ok(tired.player.combatAssist, 'exhausted, it still closes in');
+  assert.equal(tired.player.airDashes, 0, 'with the airtime\'s air dash');
+  assert.ok(Math.abs(tired.player.combat.energy - tired.player.energyDef.regen * DT) < 1e-9, 'nothing paid, the refill goes on');
 });
 
 test('in the air the newest melee press wins too, and an air jump, the Deflect, a Dash request or another move cancels it', () => {
@@ -762,44 +764,48 @@ test('what an attack reaches is its own data: a longer box stops the approach so
 
 // ---- Energy ---------------------------------------------------------------------------
 
-test('Energy: one dashCost as the approach starts, none for a replacement, none back on a cancel, and no refill on its step', () => {
-  const r = rig({ gap: 240 });
-  const { player } = r;
-  const { dashCost, regen } = player.energyDef;
-  const max = player.combat.maxEnergy;
-  r.tick(press('attack1'));
-  assert.equal(player.combat.energy, max - dashCost, 'paid at once, nothing refilled on that step');
-  r.tick();
-  assert.ok(Math.abs(player.combat.energy - (max - dashCost + regen * DT)) < 1e-9, 'refilling from the next step');
-  r.tick(press('extra_attack'));
-  assert.ok(player.combatAssist, 'still closing in');
-  assert.ok(Math.abs(player.combat.energy - (max - dashCost + 2 * regen * DT)) < 1e-9, 'a replacement pays nothing');
-  r.tick(press('jump'));
-  assert.equal(player.combatAssist, null, 'cancelled');
-  assert.ok(Math.abs(player.combat.energy - (max - dashCost + 3 * regen * DT)) < 1e-9, 'nothing given back');
+test('Energy: Combat Assist costs none at all, as it starts, for a replacement or on a cancel, and the refill never stops for it', () => {
+  for (const c of playableCharacters()) {
+    const r = rig({ character: c, gap: 240 });
+    const { player } = r;
+    const { regen } = player.energyDef;
+    const from = 40;
+    player.combat.setEnergy(from);
+    r.tick(press('attack1'));
+    assert.ok(player.combatAssist, `#${c.id}: closing in`);
+    assert.ok(Math.abs(player.combat.energy - (from + regen * DT)) < 1e-9, `#${c.id}: nothing paid, refilled on its very step`);
+    r.tick();
+    assert.ok(Math.abs(player.combat.energy - (from + 2 * regen * DT)) < 1e-9, `#${c.id}: refilling on`);
+    r.tick(press('attack1'));
+    assert.ok(player.combatAssist, `#${c.id}: still closing in`);
+    assert.ok(Math.abs(player.combat.energy - (from + 3 * regen * DT)) < 1e-9, `#${c.id}: a replacement pays nothing`);
+    r.tick(press('jump'));
+    assert.equal(player.combatAssist, null, 'cancelled');
+    assert.ok(Math.abs(player.combat.energy - (from + 4 * regen * DT)) < 1e-9, `#${c.id}: nothing to give back, nothing given`);
+  }
 });
 
-test('exhausted, there is no approach, but the melee press still starts its attack where the fighter stands', () => {
+test('full, partly spent or exhausted, the approach starts the same and never touches Energy', () => {
   for (const c of playableCharacters()) {
     for (const { action, id } of groundMelee(c)) {
-      const r = rig({ character: c });
-      placeFoe(r, r.player.attacks[id], 80);
-      r.player.combat.setEnergy(0);
-      assert.equal(r.player.combat.energyExhausted, true);
-      r.tick(press(action));
-      assert.equal(r.player.combatAssist, null, `#${c.id} ${action}`);
-      assert.equal(r.player.combat.attack?.def.id, id, `#${c.id} ${action}: not swallowed`);
-      assert.ok(r.player.combat.energy < r.player.energyDef.dashCost, 'nothing spent');
+      for (const energy of [100, 55, 3, 0]) {
+        const why = `#${c.id} ${action} on ${energy}`;
+        const r = rig({ character: c });
+        placeFoe(r, r.player.attacks[id], 80);
+        r.player.combat.setEnergy(energy);
+        const exhausted = r.player.combat.energyExhausted;
+        assert.equal(exhausted, energy === 0, why);
+        r.tick(press(action));
+        assert.ok(r.player.combatAssist, `${why}: it closes in`);
+        assert.equal(r.player.combatAssist.attack, r.player.attacks[id], why);
+        const expected = Math.min(100, energy + r.player.energyDef.regen * DT);
+        assert.ok(Math.abs(r.player.combat.energy - expected) < 1e-9, `${why}: nothing spent, the refill as ever`);
+        assert.equal(r.player.combat.energyExhausted, exhausted, `${why}: it never exhausts anyone`);
+        untilAttack(r);
+        assert.equal(r.player.combat.attack?.def.id, id, `${why}: its attack, once in reach`);
+      }
     }
   }
-  // Any Energy left, not exhausted, is enough (as for a Dash).
-  const low = rig();
-  placeFoe(low, low.player.attacks.attack1, 80);
-  low.player.combat.setEnergy(3);
-  low.tick(press('attack1'));
-  assert.ok(low.player.combatAssist);
-  assert.equal(low.player.combat.energy, 0);
-  assert.equal(low.player.combat.energyExhausted, true);
 });
 
 // ---- The newest melee press wins -----------------------------------------------------------

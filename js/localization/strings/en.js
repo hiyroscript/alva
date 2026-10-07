@@ -284,7 +284,7 @@ export const EN = {
   'settings.customized': 'Custom layout',
   'settings.combat': 'Combat',
   'settings.combatAssist': 'Combat Assist',
-  'settings.combatAssistDesc': 'Automatically closes a short gap before a melee attack. Uses Energy and never affects ranged attacks.',
+  'settings.combatAssistDesc': 'Automatically closes a short gap before a melee attack. Never uses Energy and never affects ranged attacks.',
   'settings.combatAssistOn': 'On',
   'settings.combatAssistOff': 'Off',
 

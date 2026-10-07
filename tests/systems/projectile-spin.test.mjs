@@ -29,8 +29,8 @@ function recorder() {
 const FRAME = { canvas: {}, artW: 30, artH: 20, anchorArtX: 15, anchorArtY: 10 };
 
 test('rotationSpeed is 0 unless authored; #0001\'s Red, Maximum Blue and Hollow Purple spin six turns a second', () => {
-  assert.equal(createProjectileDefinition({ id: 'plain' }).rotationSpeed, 0);
-  assert.throws(() => createProjectileDefinition({ id: 'bad', rotationSpeed: 'fast' }), /degrees per second/);
+  assert.equal(createProjectileDefinition({ id: 'plain', damage: 1 }).rotationSpeed, 0);
+  assert.throws(() => createProjectileDefinition({ id: 'bad', damage: 1, rotationSpeed: 'fast' }), /degrees per second/);
   for (const id of ORBS) assert.equal(DEF_0001.projectiles[id].rotationSpeed, 2160, id);
   // Every other projectile is as it was: unrotated.
   for (const c of [...CHARACTERS, SAMPLE_FIGHTER]) {
@@ -58,7 +58,7 @@ test('the angle advances with the projectile\'s own age, step for step, and the 
   p.interpolate(1);
   assert.ok(near(p.renderAngle, p.angle));
   // A projectile that does not spin never has an angle.
-  assert.equal(projectileAngle(createProjectileDefinition({ id: 'still' }), 3), 0);
+  assert.equal(projectileAngle(createProjectileDefinition({ id: 'still', damage: 1 }), 3), 0);
 });
 
 test('the spin is art only: the hitbox, path and speed are those of the same projectile unspun', () => {

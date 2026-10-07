@@ -25,14 +25,14 @@ import * as attacksModule from '../../js/game/combat/attacks.js';
 import * as combatStateModule from '../../js/game/combat/combat-state.js';
 import * as defenseModule from '../../js/game/combat/defense.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
-import { CombatState } from '../../js/game/combat/combat-state.js';
+import { BLOCK_ENERGY_COST, CombatState } from '../../js/game/combat/combat-state.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { createProjectileDefinition } from '../../js/game/combat/projectile.js';
 import { createTechniqueDefinition } from '../../js/game/combat/technique.js';
 import { Battle } from '../../js/game/battle.js';
 import { getMap } from '../../js/data/maps.js';
 import { CONFIG } from '../../js/config.js';
-import { def, DT, fakeSprites, makeFighter, duel } from '../helpers/fighter-harness.mjs';
+import { def, DT, fakeSprites, makeFighter, duel, probeHit } from '../helpers/fighter-harness.mjs';
 import { stylesheetFiles } from '../helpers/stylesheet.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
@@ -52,9 +52,10 @@ function warnings(fn) {
   }
 }
 
-// A plain hit through the real attack-definition path: no stun or freeze,
+// A plain hit through the real attack-definition path (a probe: its damage
+// may be 0, which no authored hit deals; see probeHit): no stun or freeze,
 // so only damage and launch are in play.
-const probe = (damage, baseLaunch, directionalLaunch) => createAttackDefinition({
+const probe = (damage, baseLaunch, directionalLaunch) => probeHit({
   id: 'probe', damage, baseLaunch, directionalLaunch, hitstun: 0, blockstun: 0, hitstop: 0,
 });
 
@@ -107,7 +108,7 @@ test('the launch module is small: values, directions, validation, resolution and
     'BASE_LAUNCH_DESCRIPTIONS', 'BASE_LAUNCH_SUMMARY', 'BASE_LAUNCH_VALUES', 'DIRECTIONAL_LAUNCHES',
     'DIRECTIONAL_LAUNCH_SUMMARY', 'LAUNCH_FORMULA', 'LAUNCH_POINT_SUMMARY', 'LAUNCH_UNIT_SPEED', 'resolveBaseLaunch',
     'resolveDirectionalLaunch', 'resolveDirectionalLaunchValue', 'resolveHitLaunch', 'resolveLaunchStrength',
-  ]);
+  ].concat(['ALLOWED_DAMAGE_VALUES', 'resolveHitDamage']).sort());
   const code = read('js/data/launch.js').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(code, /perPoint|growth|\blevel|\b(Low|Mid|High)\b|bonus|knockback/i, 'no rates, levels, growth or bonus');
 });
@@ -182,7 +183,7 @@ test('Launch Point starts at 0 on every new combat state and every new fighter',
   assert.equal('knockback' in new CombatState(), false, 'the old accumulated Knockback is gone');
 });
 
-test('damage adds exactly the damage received: 0 + 2 = 2, + 4 = 6, + 1 = 7', () => {
+test('damage adds exactly the damage received: 0 + 3 = 3, + 5 = 8, + 1 = 9', () => {
   const { attack1, extra_attack: kick, attack3_object: blue } = realHits();
   const d = duel();
   const system = new CombatSystem();
@@ -191,11 +192,14 @@ test('damage adds exactly the damage received: 0 + 2 = 2, + 4 = 6, + 1 = 7', () 
     const e = system.applyHit(d.attacker, d.target, hit);
     seen.push([e.launchPointBefore, e.damage, e.launchPointAfter]);
   }
-  assert.deepEqual(seen, [[0, 2, 2], [2, 4, 6], [6, 1, 7]]);
-  assert.equal(d.target.combat.launchPoint, 7);
+  assert.deepEqual(seen, [[0, 3, 3], [3, 5, 8], [8, 1, 9]]);
+  assert.equal(d.target.combat.launchPoint, 9);
 });
 
 test('Launch Point never becomes negative', () => {
+  // No hit may be authored with negative damage...
+  assert.throws(() => createAttackDefinition({ id: 'probe', damage: -50 }), /Attack "probe" declares damage -50/);
+  // ...and even a bare one that had it could not take Launch Point below 0.
   const { target } = hitAt(10, probe(-50, 1, 'horizontal'));
   assert.equal(target.combat.launchPoint, 0);
 });
@@ -314,7 +318,7 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
       const { target, event } = hitAt(119, probe(5, baseLaunch, direction), { facing, shielding: true });
       assert.equal(event.type, 'block');
       assert.equal(event.damage, 0, 'no chip damage');
-      assert.equal(event.energyCost, def.energy.shieldHitCost);
+      assert.equal(event.energyCost, BLOCK_ENERGY_COST);
       assert.deepEqual([event.launchPointBefore, event.launchPointAfter], [119, 119]);
       assert.equal(target.combat.launchPoint, 119);
       assert.equal(event.baseLaunch, baseLaunch, 'the hit keeps its own data');
@@ -323,20 +327,20 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
       assert.deepEqual({ ...event.finalLaunch }, { x: 0, y: 0 });
       assert.deepEqual([target.body.vx, target.body.vy], [0, 0]);
       assert.notEqual(target.body.grounded, false, 'not lifted or driven down');
-      assert.equal(target.combat.energy, 100 - def.energy.shieldHitCost);
+      assert.equal(target.combat.energy, 100 - BLOCK_ENERGY_COST);
     }
   }
   // The old Block modifiers (chip damage, a halved sideways launch) are gone.
   for (const key of ['blockLaunch', 'BLOCKED_HORIZONTAL_LAUNCH_SCALE']) {
     for (const mod of [combatModule, attacksModule, combatStateModule, defenseModule]) assert.equal(key in mod, false, key);
   }
-  assert.equal('chipDamage' in createAttackDefinition({ id: 'x' }), false);
+  assert.equal('chipDamage' in createAttackDefinition({ id: 'x', damage: 1 }), false);
 });
 
 // ---- Events -----------------------------------------------------------------------
 
 test('a hit event describes the new system and nothing of the old one', () => {
-  const { event, attacker, target } = hitAt(116, realHits().extra_attack);
+  const { event, attacker, target } = hitAt(115, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
     'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hitstun',
     'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'paralysis', 'perfect', 'point',
@@ -346,7 +350,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
   assert.deepEqual([event.paralysis, event.stall], [0, 0], 'no hold, no stall');
   assert.deepEqual(
     [event.type, event.attacker, event.target, event.move, event.damage, event.launchPointBefore, event.launchPointAfter],
-    ['hit', attacker, target, 'extra_attack', 4, 116, 120],
+    ['hit', attacker, target, 'extra_attack', 5, 115, 120],
   );
   assert.equal(event.baseLaunch, 2, 'the integer multiplier, not a vector');
   assert.equal(event.directionalLaunch, 'vertical');
@@ -372,15 +376,15 @@ test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactl
   };
   const table = Object.fromEntries(Object.entries(authored).map(([id, h]) => [id, [h.damage, h.baseLaunch ?? 0, h.directionalLaunch ?? null]]));
   assert.deepEqual(table, {
-    attack1: [2, 1, 'horizontal'],
-    midair_attack1: [2, 1, 'horizontal'],
+    attack1: [3, 1, 'horizontal'],
+    midair_attack1: [3, 1, 'horizontal'],
     midair_attack2: [3, 2, 'horizontal'],
-    midair_attack3: [2, 1, 'vertical'],
-    extra_attack: [4, 2, 'vertical'],
-    attack2_object: [2, 1, 'horizontal'],
+    midair_attack3: [3, 1, 'vertical'],
+    extra_attack: [5, 2, 'vertical'],
+    attack2_object: [3, 1, 'horizontal'],
     attack3_object: [1, 0, null],
-    attack3_finisher: [2, 1, 'vertical'],
-    attack5_object: [12, 3, 'horizontal'],
+    attack3_finisher: [3, 1, 'vertical'],
+    attack5_object: [10, 3, 'horizontal'],
     burst: [3, 0, null],
   });
   // Red and Maximum Blue have no melee hit of their own: the orb is the attack.
@@ -397,15 +401,15 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
   const hits = realHits();
   const cases = [
     // [hit, from, to, strength, finalLaunch facing right (strength x 10)]
-    ['attack1', 118, 120, 120, { x: 1200, y: 0 }],
-    ['midair_attack1', 118, 120, 120, { x: 1200, y: 0 }],
+    ['attack1', 117, 120, 120, { x: 1200, y: 0 }],
+    ['midair_attack1', 117, 120, 120, { x: 1200, y: 0 }],
     ['midair_attack2', 117, 120, 240, { x: 2400, y: 0 }],
-    ['midair_attack3', 118, 120, 120, { x: 0, y: -1200 }],
-    ['extra_attack', 116, 120, 240, { x: 0, y: -2400 }],
-    ['attack2_object', 118, 120, 120, { x: 1200, y: 0 }],
+    ['midair_attack3', 117, 120, 120, { x: 0, y: -1200 }],
+    ['extra_attack', 115, 120, 240, { x: 0, y: -2400 }],
+    ['attack2_object', 117, 120, 120, { x: 1200, y: 0 }],
     ['attack3_object', 119, 120, 0, { x: 0, y: 0 }],
-    ['attack3_finisher', 118, 120, 120, { x: 0, y: -1200 }],
-    ['attack5_object', 108, 120, 360, { x: 3600, y: 0 }],
+    ['attack3_finisher', 117, 120, 120, { x: 0, y: -1200 }],
+    ['attack5_object', 110, 120, 360, { x: 3600, y: 0 }],
     ['burst', 117, 120, 0, { x: 0, y: 0 }],
   ];
   for (const [id, from, to, strength, final] of cases) {
@@ -421,8 +425,8 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
     }
   }
   // Facing left, the sideways hits travel left.
-  assert.equal(hitAt(118, hits.attack1, { facing: -1 }).target.body.vx, -1200);
-  assert.equal(hitAt(108, hits.attack5_object, { facing: -1 }).target.body.vx, -3600);
+  assert.equal(hitAt(117, hits.attack1, { facing: -1 }).target.body.vx, -1200);
+  assert.equal(hitAt(110, hits.attack5_object, { facing: -1 }).target.body.vx, -3600);
 });
 
 // ---- Respawn ----------------------------------------------------------------------

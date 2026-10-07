@@ -43,12 +43,12 @@ There are no import cycles (checked over every module).
 
 | Module | Owns | Used by |
 | --- | --- | --- |
-| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/touch-layout-editor.js` |
+| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`, `assertUniversalMovement`, `assertCombatRules`: damage tiers, repeat cooldowns, the Deflect's strike, universal Energy). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/touch-layout-editor.js` |
 | `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
 | `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
 | `movement.js` | The universal movement values every fighter runs on (`BASE_FIGHTER_MOVEMENT`), the check that refuses a definition's own, and the Discover copy for them. | `data/characters.js`, `game/fighters/fighter.js`, `game/rendering/hit-fx.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
-| `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation. | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
+| `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation; the damage tiers every hit deals (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage`). | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `difficulty.js` | The four CPU levels and their profiles. | `core/app.js`, `game/battle.js`, `game/ai/combat-ai.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
 | `abilities.js` | `abilityName`: a fighter's name for a move, or its neutral name. | `localization/strings/en.js`, `ui/mobile-abilities.js` |
 | `maps.js`, `practice-map.js` | The Quick Battle stages; the training stage (kept out of `MAPS`). | `core/app.js`, the battle, map-select and practice screens, `localization/strings/en.js` |
@@ -64,13 +64,13 @@ There are no import cycles (checked over every module).
 | `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order (Combat Assist's approach included: who has it, its presses, its cancellations); `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
 | `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/combat-ai.js` |
 | `fighters/fighter-controller.js` | `PlayerController` (the one kind that may carry Combat Assist), `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
-| `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation, melee or ranged (`isMeleeAttack`, `isRangedAttack`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
+| `combat/attacks.js` | The attack schema and phases, the longest repeat cooldown (`MAX_ATTACK_COOLDOWN`), motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation, melee or ranged (`isMeleeAttack`, `isRangedAttack`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
 | `combat/combat-assist.js` | Combat Assist's rules of measure: `assistsAttack`, `meleeGap`, `reachVector`, `approachMove`, `REACHED`, `approachClear`, `assistRange`, `assistSpeed`, `ASSIST_MARGIN`. | `fighters/fighter.js` |
 | `combat/hit-effects.js` | The shared hit effects (`unblockable`, `paralyze`, `blockPush`) and their validation. | `combat/attacks.js`, `combat/projectile.js`, `combat/technique.js` |
 | `combat/pull.js` | Pulls: attacks and projectiles drawing opponents in, each step. | `arena.js` |
 | `combat/defense.js` | The defense schema (the Shield, on the ground; air Shield fields refused). | `fighters/fighter.js` |
 | `combat/deflect.js` | The Deflect schema: an attack definition with every Deflect's fixed strike (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`). | `fighters/fighter.js` |
-| `combat/combat-state.js` | `CombatState`, `CooldownTimers`, `resolveEnergy`. | `fighters/fighter.js` |
+| `combat/combat-state.js` | `CombatState`, `CooldownTimers`, `resolveEnergy` and the universal Energy rules (`MAX_ENERGY`, `DASH_ENERGY_COST`, `BLOCK_ENERGY_COST`, `DEFLECT_ENERGY_COST`). | `fighters/fighter.js` |
 | `combat/combat.js` | `CombatSystem` (projectiles a live Deflect turns back, then hit resolution), launch reaction, `worldBox`. | `arena.js`, `combat/combat-assist.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
 | `combat/projectile.js` | Projectiles, and what they do to each other (`clashProjectiles`: repel, erase); `turnBack` (shared by repel and the Deflect); the art's spin (`projectileAngle`). | `arena.js`, `fighters/fighter.js` |
 | `combat/summon.js` | The summon system and its clones. | `arena.js`, `fighters/fighter.js`, `ai/moveset.js` |

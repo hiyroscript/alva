@@ -72,6 +72,14 @@ const LEDGE_MARGIN = 10;
 // A neutral press of a direction waits this long after the last press of the
 // same direction, so walking never double-taps into a Dash by accident.
 const TAP_SLACK = 1 / 60;
+// Seconds after a summon, a technique or a ranged attack during which the
+// same move again is weighed down (see specialOptions and rangedScore): its
+// own judgement, the same on every level, so a move with no cooldown is not
+// the only thing it ever does.
+const SPECIAL_REST = 8;
+// How much less a move is worth pressed again `since` seconds after it last
+// was: `weight` at once, nothing from SPECIAL_REST on.
+const restPenalty = (since, weight) => (since < SPECIAL_REST ? weight * (1 - since / SPECIAL_REST) : 0);
 
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 // Height above take-off `t` seconds into a jump at `v` under gravity `g`.
@@ -143,6 +151,11 @@ export class CombatAIController {
     // The last horizontal press and how long ago it was (see emit).
     this.tap = { dir: 0, age: Infinity };
     this.lastThrow = -Infinity;
+    // ...and each ranged attack by itself, by its action (see rangedScore).
+    this.lastThrown = new Map();
+    // When it last pressed each summon or technique, by its action (see
+    // specialOptions).
+    this.lastSpecial = new Map();
     // When it last pressed an attack or landed a hit: the longer neutral
     // drags on, the more it wants to commit (see urge).
     this.lastOffence = 0;
@@ -684,16 +697,17 @@ export class CombatAIController {
     const options = [{ score: (1 - p.guard) * 0.8 + (threat.severity < 3 ? 0.6 : 0), intent: { kind: 'take' } }];
 
     // Shield: on the ground only, up the step `shield` is held, from either
-    // side; costs Energy only if it blocks. Held through the threat, never
-    // much longer. Raised this close to contact it is a perfect Shield (see
-    // Fighter.perfectShield), free: a timing the level has to earn, so a
-    // lower one mostly fumbles it and takes the hit instead.
+    // side; costs Energy only if it blocks, the same whether the block is
+    // perfect or not. Held through the threat, never much longer. Raised
+    // this close to contact it is a perfect Shield (see
+    // Fighter.perfectShield), with no blockstun: a timing the level has to
+    // earn, so a lower one mostly fumbles it and takes the hit instead.
     // Never against a hit no Shield stops.
     const justInTime = !self.combat.shielding && threat.contactIn <= (self.defense?.perfectWindow ?? 0);
     if (s.grounded && s.ms.groundShield && !threat.unblockable && self.shieldAllowed() &&
         (!justInTime || this.rng() < p.guard ** 4)) {
       const cost = self.energyDef.shieldHitCost;
-      const drain = justInTime ? 0 : cost >= s.energy ? 1.2 : (cost / s.energy) * 0.8;
+      const drain = cost >= s.energy ? 1.2 : (cost / s.energy) * 0.8;
       const linger = 0.04 + (1 - p.guard) * 0.25;
       const hold = Math.min(threat.endIn + linger, SHIELD_MAX_HOLD);
       options.push({ score: weight - p.energyCare * drain, intent: { kind: 'shield', until: this.clock + hold } });
@@ -741,11 +755,16 @@ export class CombatAIController {
     // would meet while it is live is turned back at its thrower (see
     // deflectCatches). Pressed on `shield`, now: an answer whose timing the
     // level's own reaction already has to make. Unblockable shots too (a
-    // Deflect is no Shield).
+    // Deflect is no Shield). It costs Energy as it starts, whatever it
+    // meets, so never while exhausted, and weighed like a block's.
     const deflect = s.ms.deflect;
-    if (deflect && !s.grounded && ready && !self.combat.cooldowns.has(deflect.id) && !self.airStartBlocked(deflect.atk) &&
-        this.deflectCatches(s, deflect, threat)) {
-      options.push({ score: weight * 1.2, intent: this.attackIntent({ ...deflect, face: Math.sign(s.foe.body.x - s.x) || s.facing }) });
+    if (deflect && !s.grounded && ready && !s.exhausted && !self.combat.cooldowns.has(deflect.id) &&
+        !self.airStartBlocked(deflect.atk) && this.deflectCatches(s, deflect, threat)) {
+      const spend = deflect.cost >= s.energy ? 1.2 : (deflect.cost / Math.max(1, s.energy)) * 0.8;
+      options.push({
+        score: weight * 1.2 - p.energyCare * spend * 0.5,
+        intent: this.attackIntent({ ...deflect, face: Math.sign(s.foe.body.x - s.x) || s.facing }),
+      });
     }
 
     // Strike first: a hit stops a Throw before it lets go, and ends a
@@ -766,13 +785,14 @@ export class CombatAIController {
   // then, as far as the level projects. An attack with a motion of its own
   // is judged by where that motion takes its strikes instead (see
   // motionFits). Never one used up until the fighter lands again. In the
-  // air its Deflect is one of them (an aerial strike on `shield`).
+  // air its Deflect is one of them (an aerial strike on `shield`), while it
+  // has the Energy to start one (it is never exhausted).
   meleeOptions(s, air = !s.grounded) {
     const { self, foe, p } = s;
     const out = [];
     const fb = foe.body;
     const toward = Math.sign(fb.x - s.x) || s.facing;
-    const moves = air && s.ms.deflect ? [...s.ms.melee, s.ms.deflect] : s.ms.melee;
+    const moves = air && s.ms.deflect && !s.exhausted ? [...s.ms.melee, s.ms.deflect] : s.ms.melee;
     for (const m of moves) {
       if (m.air !== air || self.combat.cooldowns.has(m.id) || self.airStartBlocked(m.atk)) continue;
       const atk = m.atk;
@@ -978,9 +998,13 @@ export class CombatAIController {
     let score = s.aggro * (0.2 + 0.55 * far) + s.urge * 0.25 * far + 0.3 * this.shotValue(r.proj, s);
     if (s.openings.length && s.foeBusy > t) score += 0.6 * p.punish;
     if (s.foeShielding) score += 0.25 * p.punish;
-    // Not the same trick over and over.
+    // Not the same trick over and over: no throw straight after another,
+    // and the same one less still (a shot with no cooldown would otherwise
+    // be the only one it throws).
     const since = this.clock - this.lastThrow;
     if (since < 1.6) score -= (1.6 - since) * 0.35;
+    const sameSince = this.clock - (this.lastThrown.get(r.action) ?? -Infinity);
+    score -= restPenalty(sameSince, 0.75);
     return score;
   }
 
@@ -988,12 +1012,14 @@ export class CombatAIController {
   // 5), each one ready and on the ground pressed on its own button when it
   // fits: a summon at an opponent likely to stay put, a technique whose
   // burst or projectile it is in line for. A technique goes the way the
-  // fighter faces, so it turns first. Worth its long cooldown only when it
-  // is likely to land, as the level judges it. A summon holds the fighter
-  // only for its startup (if it has one), as it would a player, and its
-  // lead counts it; a technique holds it in place while it casts, so it is
-  // worth less the closer the opponent could strike first, unless the
-  // opponent is busy for longer than that.
+  // fighter faces, so it turns first. Worth its cast (and its cooldown,
+  // if it has one) only when it is likely to land, as the level judges it,
+  // and not the same trick over and over: one with no cooldown is not
+  // pressed again the moment it is free (SPECIAL_REST, each move apart). A
+  // summon holds the fighter only for its startup (if it has one), as it
+  // would a player, and its lead counts it; a technique holds it in place
+  // while it casts, so it is worth less the closer the opponent could
+  // strike first, unless the opponent is busy for longer than that.
   specialOptions(s) {
     const { self, p } = s;
     if (!s.canAct || !s.grounded) return [];
@@ -1010,9 +1036,11 @@ export class CombatAIController {
       // one, a technique no Shield stops is a smaller risk.
       if (exposed && s.foeShielding && c.hit?.unblockable) risk = Math.max(risk, 0.6);
       const face = c.type === 'technique' ? s.dir : 0;
+      const since = this.clock - (this.lastSpecial.get(c.action) ?? -Infinity);
+      const rest = restPenalty(since, 2.5);
       out.push({
-        score: p.specials * (0.3 + 2 * v) * risk + s.urge * 0.2,
-        intent: { kind: 'attack', action: c.action, face, until: this.clock + 0.3 },
+        score: p.specials * (0.3 + 2 * v) * risk + s.urge * 0.2 - rest,
+        intent: { kind: 'attack', action: c.action, face, until: this.clock + 0.3, special: true },
       });
     }
     return out;
@@ -1127,7 +1155,11 @@ export class CombatAIController {
     it.pressed = true;
     it.pressedAt = this.clock;
     this.lastOffence = this.clock;
-    if (it.ranged) this.lastThrow = this.clock;
+    if (it.ranged) {
+      this.lastThrow = this.clock;
+      this.lastThrown.set(it.action, this.clock);
+    }
+    if (it.special) this.lastSpecial.set(it.action, this.clock);
   }
 
   // A planned follow-up: whatever strike connects now, if any. True when

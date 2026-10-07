@@ -11,7 +11,7 @@
 //
 // Outputs: CHARACTERS (the list, in roster order of registration),
 // getCharacter, isPlayable, getPlayableCharacter, playableCharacters,
-// characterFramePaths, and the asset-path helpers framePath / frames (from
+// characterFramePaths, assertCombatRules, and the asset-path helpers framePath / frames (from
 // js/data/characters/helpers.js, re-exported here so callers keep one
 // import).
 //
@@ -20,10 +20,13 @@
 //     the whole run: tests register temporary fighters by pushing onto it
 //     and splice them out again (tests/fighters/fixtures/test-fighters.mjs).
 //     Never freeze it or replace it.
-//   - Every definition passes assertLoadout (js/data/loadout.js) and
-//     assertUniversalMovement (js/data/movement.js) as this module loads,
-//     every problem named; one that breaks the loadout rules or declares
-//     movement of its own (a `movement` profile, `powers`) never loads.
+//   - Every definition passes assertLoadout (js/data/loadout.js),
+//     assertUniversalMovement (js/data/movement.js) and assertCombatRules
+//     (below) as this module loads, every problem named; one that breaks
+//     the loadout rules, declares movement of its own (a `movement`
+//     profile, `powers`), deals damage off the tiers (1, 3, 5, 10), gives an
+//     attack a repeat cooldown over 0.05 s or sets its own Energy maximum
+//     or costs never loads.
 //   - A definition existing is not the same as it being playable.
 //     getCharacter finds any definition (the engine and its tests build
 //     fighters from it); only an `available` one is playable (isPlayable,
@@ -42,10 +45,11 @@
 //      (codename_rule), never the move's name in game;
 //   2. write js/data/characters/<id>.js exporting its definition, its moves
 //      keyed by the universal move codenames (MOVES in js/config.js) and
-//      its loadout following js/data/loadout.js, with each hit's `damage`,
-//      `baseLaunch` and `directionalLaunch` (js/data/launch.js). No
-//      movement numbers: it runs, jumps and Dashes exactly as every other
-//      fighter does;
+//      its loadout following js/data/loadout.js, with each hit's `damage`
+//      (1, 3, 5 or 10), `baseLaunch` and `directionalLaunch`
+//      (js/data/launch.js). No movement numbers: it runs, jumps and Dashes
+//      exactly as every other fighter does; and no Energy maximum or costs:
+//      only its refill rate is its own;
 //   3. import it below and add it to CHARACTERS, with a rosterSlot of its
 //      own;
 //   4. set `available: true` once it is ready to be played.
@@ -56,6 +60,11 @@
 
 import { assertLoadout } from './loadout.js';
 import { assertUniversalMovement } from './movement.js';
+import { createAttackDefinition } from '../game/combat/attacks.js';
+import { resolveEnergy } from '../game/combat/combat-state.js';
+import { createDeflectDefinition } from '../game/combat/deflect.js';
+import { createProjectileDefinition } from '../game/combat/projectile.js';
+import { createTechniqueDefinition } from '../game/combat/technique.js';
 import { CHARACTER_0001 } from './characters/0001.js';
 import { CHARACTER_0002 } from './characters/0002.js';
 
@@ -101,9 +110,28 @@ export function characterFramePaths(def) {
   return [...new Set(out)];
 }
 
-// No definition that breaks the attack loadout rules, or that declares
-// movement of its own, is ever loaded.
+// Throws, naming the move, for a definition whose combat data breaks a
+// shared rule: every attack (each strike of a multi-hit one), projectile
+// (its finisher too), technique burst and Deflect is built here exactly as
+// the Fighter builds it, so a hit dealing anything but 1, 3, 5 or 10, an
+// attack with a repeat cooldown over MAX_ATTACK_COOLDOWN, a Deflect off its
+// fixed strike or an `energy` entry that sets its own maximum or costs is
+// refused as the registry loads, not when a match first builds the
+// fighter. A summon performs one of these attacks, so its hits are checked
+// with them.
+export function assertCombatRules(def) {
+  const who = `Character "${def?.id}"`;
+  for (const [id, spec] of Object.entries(def?.attacks ?? {})) createAttackDefinition({ id, ...spec });
+  for (const [id, spec] of Object.entries(def?.projectiles ?? {})) createProjectileDefinition({ id, ...spec });
+  for (const [id, spec] of Object.entries(def?.techniques ?? {})) createTechniqueDefinition({ id, ...spec });
+  createDeflectDefinition(def?.deflect);
+  resolveEnergy(def?.energy, who);
+}
+
+// No definition that breaks the attack loadout rules, declares movement of
+// its own or breaks a combat rule is ever loaded.
 for (const def of CHARACTERS) {
   assertLoadout(def);
   assertUniversalMovement(def);
+  assertCombatRules(def);
 }
