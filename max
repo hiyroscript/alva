@@ -1,626 +1,260 @@
-Implement a complete Fighters section in Alva’s Discover screen.
+Work in the hiyroscript/alva repository on the current main branch.
 
-Do not just make a visual mockup or write a plan. Inspect the current repository, implement the feature fully, update documentation/specs, add/modify tests, and run the complete test suite with:
+Implement a universal Launch Point recovery/decay mechanic for the game.
 
-node --test
+Required gameplay behavior
 
-Follow the repository’s existing architecture and conventions. In particular:
+Alva currently uses Launch Point instead of health. Hits add their damage to the target’s CombatState.launchPoint, and launch strength is calculated from the target’s new Launch Point.
 
-* ALVA_SPEC.md is the product specification.
-* Fighter-specific behavior lives in docs/characters/<id>.md.
-* Fighter definitions live in js/data/characters/<id>.js.
-* Shared systems must never special-case a fighter ID.
-* Movement remains universal.
-* character_rule is protected. Do not edit, move, rename, reformat, or otherwise modify character_rule.
-* The UI is fully English/French localized. Do not hardcode visible UI copy directly into screen implementation.
-* Preserve keyboard, gamepad, pointer/touch, accessibility and responsive behavior.
-* Preserve existing behavior everywhere outside this feature.
+Change the universal Launch Point rules so that:
 
-Goal
+* Whenever a fighter goes 2.0 seconds without being hit by a real, unblocked hit, their Launch Point begins recovering.
+* After that 2.0-second grace period, reduce their Launch Point by exactly 1 point every 0.5 seconds.
+* Recovery continues at that rate until the fighter is hit again or reaches 0.
+* Launch Point must never go below 0.
+* Any new real hit immediately resets the entire recovery timer, including any partially accumulated 0.5-second recovery interval.
+* After a new hit, there must again be a full 2.0-second grace period followed by a full 0.5-second interval before the first recovered point. In other words, if a hit lands at t = 0, the first -1 happens at t = 2.5, the next at t = 3.0, then 3.5, etc.
+* A blocked hit does not count as “getting hit” for this mechanic. It already adds 0 Launch Point and produces a block event, so it must not reset the recovery timer.
+* Every genuine unblocked hit counts, regardless of whether its Base Launch is 0: melee attacks, individual multi-hit strikes, projectiles, summons/clones, techniques, Deflect strikes, etc. Do not implement separate handling for those sources; they already converge on CombatSystem.applyHit.
+* Do not special-case any fighter ID or move ID.
+* Do not give fighters character-specific recovery values. This is one universal Launch rule.
 
-Add a new Fighters section to Discover.
+The mechanic must use the game’s fixed-step simulation time, not setTimeout, setInterval, Date.now, render-frame time, or another wall clock. It should therefore remain deterministic.
 
-Discover must now be ordered:
+Recovery should depend only on elapsed simulation time since the last real hit. Being airborne, grounded, attacking, shielding, stunned, paralyzed, dashing, or otherwise occupied must not stop the recovery clock. Impact freeze/hitstop should follow the same fixed-step clock convention used by the other passive combat timers/cooldowns rather than introducing a separate wall-clock behavior.
 
-1. Fighters
-2. Movement
-3. Launch
-4. Passives
+When the game itself is paused and fixed simulation steps are not advancing, Launch Point recovery naturally must not advance either.
 
-Fighters must be the first section and the section shown by default whenever Discover is entered.
+A fighter that has fallen into the Void is out of play and is not being updated, so do not add a special out-of-play recovery loop. Its Launch Point should continue behaving as it does now while waiting for respawn, and the fresh CombatState created on respawn should start at Launch Point 0 with fresh recovery timing.
 
-The current Discover implementation is in:
+Repository architecture to preserve
 
-* js/screens/discover-screen.js
-* css/discover.css
-* tests/interface/discover.test.mjs
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
+Read the repository documentation and existing implementation before editing, especially:
 
-The current code and tests deliberately say that Discover never reads character data and currently enforce exactly three sections. Those assumptions are now obsolete for the new Fighters page. Update them carefully.
-
-Movement and Launch should still remain generic and roster-independent. Only the new Fighters page should read fighter/profile data.
-
-⸻
-
-1. Fighters page
-
-The Fighters section should let the player browse the actual fighters in the game and view a character preview in the same visual language as the existing Select Fighter roster.
-
-Study and reuse the patterns from:
-
-* js/ui/fighter-roster.js
-* css/setup.css
-* the Select Fighter screen
-* Practice Ground’s fighter dialogs
-
-Do not globally change the existing Select Fighter/Practice Ground preview behavior.
-
-FighterRoster is shared by several gameplay screens. Those screens must continue to show the existing Available / Locked status and their normal Confirm behavior.
-
-For Discover, either:
-
-* extend the existing roster component with a clean explicit read-only/Discover mode, or
-* create a dedicated Discover fighter-browser component using the same visual primitives.
-
-Choose whichever keeps the architecture cleaner.
-
-The Discover Fighters browser is informational. It must not start a match and must not display a Confirm button.
-
-The fighter list/profile must be data-driven. Do not hardcode DOM for #0001 and #0002 directly into discover-screen.js.
-
-Use the existing roster order/character registry as the source of fighter order.
-
-Unavailable/locked fighters must retain appropriate locked behavior rather than accidentally becoming playable through Discover.
-
-Discover must also continue to work without crashing when no fighter is currently playable.
-
-⸻
-
-2. Difficulty rating
-
-Every fighter shown in the Fighters section needs one single difficulty rating from 1 to 5 stars.
-
-There must NOT be separate ratings such as:
-
-* “Difficulty to play”
-* “Difficulty to master”
-* “Beginner difficulty”
-* “Mastery difficulty”
-
-There is exactly one rating.
-
-That one rating should represent the combination of:
-
-1. how difficult the fighter is to pick up and play effectively, and
-2. how difficult the fighter is to fully master.
-
-Use this interpretation consistently:
-
-* 1 star: very easy to learn and comparatively simple to master.
-* 2 stars: easy core game plan with limited additional mastery burden.
-* 3 stars: approachable fundamentals but meaningful decision-making/execution depth at higher levels.
-* 4 stars: demanding to use well and has substantial mastery requirements.
-* 5 stars: difficult both to pilot effectively and to master; highly layered mechanics, situational decisions, setup/resource requirements, or punishing commitments.
-
-Initial ratings for the current roster:
-
-* #0001 — 5/5
-* #0002 — 3/5
-
-These ratings are intentional.
-
-Why #0001 is 5/5
-
-#0001 is a space-control/setup fighter with a much larger and more contextual toolkit:
-
-* five numbered attack buttons plus an extra attack,
-* Red and Maximum Blue projectile control,
-* pulls and repels,
-* projectile reflection/erasure,
-* aerial hover attacks,
-* a homing Red Kick,
-* Unlimited Void paralysis setups,
-* Hollow Purple as a long-commitment major finisher,
-* Infinity,
-* aerial Deflect,
-* multiple combo routes,
-* significant positional requirements,
-* Energy and cooldown management,
-* strong moves with long telegraphs that become punishable when used badly.
-
-It has both a significant learning burden and a high mastery ceiling.
-
-Why #0002 is 3/5
-
-#0002 has a more immediately understandable game plan:
-
-* One-Two,
-* Rapid Kicks,
-* Homing Attack,
-* Bounce Attack,
-* Spin Attack,
-* Blue Tornado,
-* Whirlwind,
-* Deflect.
-
-Its basic pressure and approach tools are easier to understand and execute than #0001’s full toolkit. Mastery still requires momentum management, aerial resource awareness, free-fall/air-use state management, approach-angle selection, trap placement, launch chasing and knowing when not to overcommit, so it should not be rated 1 or 2.
-
-⸻
-
-3. Replace “Available” only inside Discover
-
-In the existing fighter preview, playable fighters normally show the status text:
-
-Available
-
-On the new Discover → Fighters page only, replace that status with the fighter’s difficulty stars.
-
-Do not remove or replace “Available” from Select Fighter, Watch Mode, Practice Ground or any other roster that uses FighterRoster.
-
-The difficulty should visibly render all five positions so the scale is clear, for example:
-
-#0001:
-
-★★★★★
-
-#0002:
-
-★★★☆☆
-
-The stars are informational, not individually interactive.
-
-Provide an accessible name such as:
-
-* Difficulty: 5 out of 5 stars
-* Difficulty: 3 out of 5 stars
-
-The visible stars can be aria-hidden if an equivalent accessible label is supplied on their container.
-
-Do not use five separate focusable controls.
-
-Do not reuse the existing availability dot pseudo-element in a way that makes the difficulty look like an availability indicator. Give the rating appropriate Discover-specific styling/semantics.
-
-⸻
-
-4. “Play style description” interaction
-
-In the fighter preview’s information/header area, add an interactive text control on the far right that visibly says:
-
-Play style description
-
-It should appear on the same upper information row as the difficulty rating where space permits:
-
-* difficulty stars aligned toward the left,
-* Play style description aligned at the far right,
-* fighter name below them.
-
-On smaller layouts it may wrap cleanly, but it must remain visually associated with the profile and must not overflow or become unreadable.
-
-The text must be underlined so it visibly looks interactive.
-
-Do not use a clickable <span> or other fake control.
-
-Use a real <button type="button"> styled as text, or an equally semantic interactive element.
-
-It should:
-
-* be reachable with Tab/menu navigation,
-* respond to keyboard activation,
-* respond to gamepad activation through the existing menu/navigation system,
-* respond to pointer/touch,
-* show the normal non-pointer focus treatment,
-* expose aria-haspopup="dialog".
-
-Clicking/activating it opens a modal dialogue containing that fighter’s play-style description.
-
-⸻
-
-5. Play-style dialog
-
-Use Alva’s existing modal conventions. Study ChoiceDialog, Settings, Practice dialogs and the MenuNavigator scope behavior.
-
-This is informational content, not an alert or destructive confirmation, so use:
-
-role="dialog"
-
-not alertdialog.
-
-The modal must:
-
-* set aria-modal="true",
-* have an accessible title,
-* show the selected fighter’s display name and play-style description,
-* provide a Close control,
-* put focus inside the dialog when opened,
-* use its own MenuNavigator scope,
-* make the Discover screen beneath it inert while open,
-* close with Escape,
-* close with gamepad Back,
-* close from its Close button,
-* optionally follow the project’s normal outside/dim-overlay click-to-dismiss behavior,
-* restore focus to the exact Play style description control that opened it.
-
-Do not repurpose ConfirmDialog, since that is an alertdialog with confirm/cancel semantics.
-
-Either create a small reusable informational dialog abstraction or a clean fighter-description-specific implementation that follows existing overlay conventions.
-
-Do not duplicate modal-navigation logic badly if an existing helper can be sensibly generalized.
-
-⸻
-
-6. Fighter profile data
-
-Create a proper data-driven profile layer rather than embedding fighter descriptions in the screen code.
-
-A reasonable structure would be something equivalent to:
-
-js/data/fighter-profiles.js
-
-with data keyed by fighter ID:
-
-{
-  '0001': {
-    difficulty: 5,
-    descriptionKey: 'discover.fighter.0001.playStyle',
-    reviewedSourceHash: '...'
-  },
-  '0002': {
-    difficulty: 3,
-    descriptionKey: 'discover.fighter.0002.playStyle',
-    reviewedSourceHash: '...'
-  }
-}
-
-The exact API/name can differ if another structure integrates better, but preserve these principles:
-
-* profile data is separate from rendering,
-* difficulty is validated as one integer from 1–5,
-* each playable fighter must have a profile,
-* descriptions are localized,
-* no fighter-specific checks such as if (id === '0001') appear in shared UI code,
-* the profile layer can grow automatically when more fighters are registered.
-
-Do not put the descriptions directly in discover-screen.js.
-
-⸻
-
-7. Mandatory profile re-review when a fighter changes
-
-This requirement is important:
-
-Whenever a fighter’s character definition changes, their Discover profile must be explicitly rechecked.
-
-Do not satisfy this with only a comment saying “remember to review it.” Add an automated guard so the repository tells us when the review is stale.
-
-Implement a test-time source-review fingerprint.
-
-Recommended approach:
-
-1. Keep fighter profile metadata in a file separate from js/data/characters/<id>.js.
-2. For every fighter profile, store a reviewedSourceHash representing the associated js/data/characters/<id>.js source at the time its difficulty/play-style profile was reviewed.
-3. Add a Node test that:
-    * reads the character source file as UTF-8,
-    * normalizes line endings to \n,
-    * calculates a SHA-256 digest,
-    * compares it with that profile’s reviewedSourceHash.
-4. If the fighter source changes, the test must fail with an explicit message similar to:
-    #0001 changed since its Discover profile was reviewed. Recheck its difficulty and play-style description, then update reviewedSourceHash.
-
-This hash is a maintenance/review guard only. It is not gameplay behavior.
-
-When implementing this feature, review both current fighters against their current definitions and then generate/store their current hashes.
-
-This intentionally means a change to the fighter definition requires somebody to look at the profile again before tests pass.
-
-Also add coverage so a newly playable fighter cannot ship without:
-
-* a valid 1–5 difficulty,
-* a play-style description key,
-* a current review hash.
-
-Do not create a self-referential hash by storing the hash inside the character source file itself.
-
-⸻
-
-8. Initial play-style descriptions
-
-Use the following meaning/content for the current fighters. You can make small editorial improvements for clarity, but do not change the gameplay claims unless the current implementation contradicts them.
-
-#0001 — English
-
-A space-control and setup fighter that wins by controlling range, pulling or repelling opponents, and converting openings into powerful launchers or technique sequences. Red and Maximum Blue control space, while Blue and High Kick turn close-range openings into launches. Unlimited Void creates a long follow-up window, and Hollow Purple is a slow, high-commitment finisher. Infinity and Deflect reward strong defensive timing. Its strongest options demand careful spacing, cooldown and Energy management, matchup knowledge and precise timing, and a missed setup or long cast can leave it vulnerable.
-
-Difficulty: 5/5
-
-#0002 — English
-
-A momentum-driven rushdown and aerial-chase fighter. One-Two and Rapid Kicks provide straightforward ground pressure, while Homing Attack, Bounce Attack, Spin Attack and Blue Tornado let it approach, chase and launch from several angles. Whirlwind can control space and create launch opportunities, and Deflect can turn projectile pressure back on the opponent. Its core game plan is approachable, but strong play requires preserving momentum, managing limited air uses and free-fall states, choosing safe approach angles, and knowing when not to overcommit into Shields or punish windows.
-
-Difficulty: 3/5
-
-Keep the profile focused on how the fighter plays, not a move-by-move encyclopedia. The detailed move specifications already exist in docs/characters/.
-
-Do not mention any real/canonical character name for #0001. Preserve the repository’s existing naming rules.
-
-French
-
-Add natural French translations for both descriptions and every new interface label.
-
-Suggested terminology:
-
-* Fighters → Combattants
-* Play style description → Description du style de jeu
-* Difficulty: {rating} out of 5 stars → Difficulté : {rating} étoiles sur 5
-
-Translate the actual profile paragraphs naturally rather than mechanically word-for-word.
-
-⸻
-
-9. Localization
-
-Add translation keys for at least:
-
-* Fighters section label/title,
-* Play style description control,
-* play-style dialog title if needed,
-* accessible difficulty label,
-* #0001 play-style description,
-* #0002 play-style description,
-* any empty/locked informational state introduced by the feature.
-
-Add both English and French strings.
-
-Follow the existing i18n system and update i18n tests as required.
-
-Proper fighter names such as #0001 and #0002 stay unchanged between languages.
-
-⸻
-
-10. Discover section/navigation changes
-
-Update SECTIONS so its order is:
-
-fighters
-movement
-launch
-passives
-
-Entering Discover must activate fighters.
-
-Update all current logic/tests/comments that assume Movement is first.
-
-Wide layout:
-
-* rail stays vertical,
-* directional navigation must reach all four tabs,
-* moving from the active Fighters tab into its content should reach meaningful fighter controls,
-* moving back toward the rail should behave consistently with the existing Discover navigation model.
-
-Narrow layout:
-
-* rail stays horizontal,
-* all four tabs must fit or scroll cleanly without clipping,
-* French labels must also remain usable,
-* arrows/D-pad must traverse all four tabs,
-* content must not cause page-level horizontal scrolling.
-
-The current CSS contains comments/assumptions about “three sections.” Update those for four sections.
-
-Do not reduce touch targets below the project’s normal accessibility sizing just to squeeze in the fourth tab.
-
-⸻
-
-11. Preserve the existing generic reference pages
-
-Do not regress Movement or Launch.
-
-The existing design intentionally builds:
-
-* Movement from the universal movement registry.
-* Launch from the Launch registry.
-
-Those pages should still not list individual fighter ownership or attacks.
-
-The old Discover tests currently contain assertions such as:
-
-* Discover names no fighter.
-* Discover never imports characters.js.
-* the pages stay the same as the roster grows.
-
-Those assumptions need to be narrowed, not blindly deleted.
-
-After this feature:
-
-* The Fighters page obviously contains fighter names and reads character/profile data.
-* Movement and Launch must still remain generic and unchanged by adding fighters.
-
-Rewrite tests so that the roster-independence assertions apply specifically to the Movement and Launch pages rather than to all of Discover.
-
-Passives remains intentionally empty unless this task specifically requires a structural adjustment to support the fourth tab. Do not invent Passives content.
-
-⸻
-
-12. Existing “Available” behavior must remain elsewhere
-
-Add regression coverage proving:
-
-* Select Fighter still says Available for a playable fighter.
-* Practice fighter-selection UI still keeps the existing status behavior.
-* Discover Fighters uses stars instead of Available.
-* The Discover change has not modified roster.available, roster.statusAvailable, or regular roster accessibility semantics unless there is a very strong implementation reason.
-
-The requirement is to replace Available on the Fighters Discover page, not to redefine availability across the game.
-
-⸻
-
-13. Tests
-
-Update/add tests comprehensively.
-
-At minimum cover:
-
-Discover structure
-
-* Exactly four sections.
-* IDs/order are fighters, movement, launch, passives.
-* Fighters is active on entry.
-* Correct ARIA tab/tabpanel relationships.
-* Roving tabindex still works.
-* Wide and narrow navigation includes all four tabs.
-
-Fighter profiles
-
-* Every playable character has a profile.
-* Difficulty is an integer from 1 through 5.
-* Only one difficulty value exists; there are no separate learn/master scores.
-* #0001 = 5.
-* #0002 = 3.
-* Current character source hashes match the stored review hashes.
-* Editing/changing a fighter definition would make the review-hash test fail until its profile is reviewed.
-
-Fighters UI
-
-* Current fighters appear in the expected roster order.
-* Selecting/focusing a fighter updates the preview.
-* The Discover preview shows stars, not Available.
-* #0001 visibly produces five filled stars.
-* #0002 visibly produces three filled and two unfilled stars.
-* Rating has an accessible x out of 5 stars name.
-* The stars themselves do not create five navigation targets.
-* There is no Confirm/start-match action in Discover Fighters.
-* Locked/non-playable fighters cannot become playable from this screen.
-
-Play-style description
-
-* Underlined interactive control exists.
-* It is a real button/semantic control.
-* It exposes dialog semantics.
-* It opens the correct fighter’s description.
-* #0001 and #0002 show different profile text.
-* The dialog uses role="dialog" and aria-modal="true".
-* Keyboard/gamepad focus enters the dialog.
-* Escape/Back closes it.
-* Close control closes it.
-* Focus returns to the opener.
-* The background is inert while the dialog is open.
-* French localization updates the control/dialog/content correctly.
-
-Regressions
-
-* Existing Movement content remains registry-driven.
-* Existing Launch content remains registry-driven.
-* Passives remains empty.
-* Select Fighter retains Available status.
-* Empty-roster behavior does not crash Discover.
-* Existing Home → Discover behavior remains functional.
-
-Run all existing tests, not only the new Discover tests.
-
-⸻
-
-14. Documentation and stale comments
-
-Update documentation to match the feature.
-
-At minimum inspect and update:
-
+* CLAUDE.md
 * ALVA_SPEC.md
 * README.md
-* docs/architecture/module-responsibilities.md
-* docs/architecture/character-system.md if its field/ownership table needs the new profile relationship
-* docs/characters/adding-characters.md
-* comments at the top of js/screens/discover-screen.js
-* comments in css/discover.css
-* any Home/Discover comments that still describe Discover as only Movement/Launch/Passives
-* relevant testing documentation if the profile-review hash becomes part of the character workflow
+* docs/systems/launch.md
+* docs/development/testing.md
+* js/data/launch.js
+* js/game/combat/combat-state.js
+* js/game/combat/combat.js
+* js/game/fighters/fighter.js
+* js/game/arena.js
+* tests/systems/launch.test.mjs
+* tests/systems/fighter-stats.test.mjs
 
-docs/characters/adding-characters.md should explicitly tell future contributors that before setting a fighter playable they must add/review its Discover profile, assign one combined 1–5 difficulty rating, write its localized play-style description and record the current source-review hash.
+Important existing architecture:
 
-Document the meaning of the single difficulty score clearly enough that future ratings stay consistent.
+js/data/launch.js owns the universal Launch concepts and formula.
 
-Remove stale specification text saying Discover has “exactly three sections” or that it never reads character data.
+CombatState.launchPoint is the fighter’s current accumulated Launch Point.
 
-Do not remove the invariant that shared gameplay systems never special-case fighter IDs.
+Fighter.update(dt) calls combat.update(dt) once per fixed simulation step.
 
-⸻
+CombatSystem.applyHit() is the shared hit-resolution path for melee, projectiles, summoned clones and techniques. It currently determines whether a hit was blocked, adds damage to target.combat.launchPoint, calculates launch using the new Launch Point, and emits the hit/block event.
 
-15. Visual quality
+A blocked hit currently does:
 
-Keep the visual design consistent with Alva.
+* damage = 0
+* no Launch Point gain
+* no launch
+* event type block
 
-Do not add an unrelated card design or framework.
+A real hit produces event type hit.
 
-Use existing:
+Preserve this architecture. The new mechanic belongs in the shared Launch/CombatState system, not Battle, Practice, the HUD, individual fighter definitions, or individual attack implementations.
 
-* typography,
-* glass/surface treatment,
-* border variables,
-* spacing,
-* focus rings,
-* responsive breakpoints,
-* mono metadata styling,
-* preview art behavior.
+Implementation design
 
-Difficulty stars should look intentional and readable at all supported viewport sizes.
+Use per-fighter state in CombatState to track Launch Point recovery timing.
 
-The Play style description text should read as a subtle secondary action, not a large primary button, but its interactive state and keyboard focus must still be obvious.
+Choose clear names that match this repository’s style. The implementation should represent the two concepts cleanly:
 
-The page must continue fitting inside the app viewport rather than causing the browser page itself to scroll.
+1. elapsed/grace time since the most recent real hit;
+2. progress toward the next 0.5-second recovery tick once recovery is active.
 
-⸻
+It is acceptable to model this as one total elapsed timer if that produces simpler and less error-prone boundary behavior, provided resetting a hit also clears all fractional recovery progress.
 
-16. Architectural constraints
+Prefer defining the universal timing/value constants alongside the universal Launch rules, rather than scattering magic numbers through the runtime. Suitable conceptual constants are:
 
-Do not:
+* recovery delay: 2
+* recovery interval: 0.5
+* recovery amount: 1
 
-* special-case fighter IDs in shared UI/game systems,
-* duplicate fighter mechanics into the profile layer,
-* derive difficulty automatically from move count,
-* expose separate learning/mastery ratings,
-* change universal movement,
-* alter fighter balance,
-* alter the actual moves,
-* change availability/playability rules,
-* modify character_rule,
-* replace the existing regular roster’s Available state globally,
-* introduce new dependencies for something the existing vanilla JS architecture can handle.
+Follow existing naming/style conventions rather than blindly using those exact constant names.
 
-The profile text is editorial metadata based on existing gameplay, not a second source of gameplay truth.
+The fixed-step update must be robust if an update receives a dt larger than 0.5 seconds. It must be capable of applying however many complete recovery intervals elapsed rather than silently dropping ticks. Clamp the result at 0.
 
-The actual character definitions and specifications remain authoritative for mechanics.
+Once Launch Point reaches 0, it must stay at 0. Avoid negative values and avoid accumulating behavior that could later cause an unexpected immediate recovery after a new hit. A new hit must always begin a completely fresh timing cycle.
 
-⸻
+Reset the recovery timer from the shared unblocked-hit path in CombatSystem.applyHit. Do it only for a real hit, not for a Shield block.
 
-17. Definition of done
+Do not change the fundamental ordering of hit resolution:
 
-This task is complete only when:
+1. determine block;
+2. determine real damage;
+3. add damage to Launch Point;
+4. use that new Launch Point for this hit’s launch calculation.
 
-* Discover opens to Fighters first.
-* The rail is Fighters → Movement → Launch → Passives.
-* Current fighters can be browsed from Fighters.
-* #0001 shows ★★★★★.
-* #0002 shows ★★★☆☆.
-* There is exactly one difficulty rating per fighter.
-* The rating represents both ease of playing and mastery depth together.
-* Discover shows the rating where Available would normally be shown.
-* Existing selection screens still show Available normally.
-* “Play style description” appears underlined on the far right of the fighter profile header.
-* Activating it opens an accessible modal with the selected fighter’s localized play-style description.
-* Profiles are data-driven.
-* A changed fighter definition causes an automated stale-profile/re-review test failure.
-* Every playable fighter is required to have a valid reviewed profile.
-* English and French are complete.
-* wide/narrow keyboard, gamepad, pointer and touch behavior work.
-* Movement and Launch remain generic.
-* Passives remains intentionally empty.
-* specs/docs reflect the new feature.
-* node --test passes in full.
+The recovery feature must not alter how much the current hit launches its target. The hit still adds damage first and uses that resulting number immediately. Recovery only happens later as simulation time passes without another hit.
 
-After implementation, provide a concise summary of:
+Do not introduce fractional Launch Point recovery. Launch Point may be high and has no maximum, but this recovery removes whole points: 1 per completed 0.5-second recovery interval.
 
-1. files changed,
-2. profile ratings/descriptions added,
-3. how the automatic profile-recheck guard works,
-4. navigation/accessibility behavior,
-5. full test results.
+Timing/boundary requirements
+
+Pay particular attention to exact fixed-step boundaries and the repository’s existing floating-point timing conventions such as PHASE_EPSILON.
+
+Expected example:
+
+A fighter is hit and finishes that hit at Launch Point 10.
+
+* 0.0 s after hit: 10
+* 1.0 s after hit: 10
+* immediately before 2.0 s: 10
+* 2.0 s: still 10
+* immediately before 2.5 s: 10
+* 2.5 s: 9
+* 3.0 s: 8
+* 3.5 s: 7
+* and so on until 0
+
+If another hit lands at 2.30 seconds, any progress toward the pending recovery tick is discarded. Add that hit’s damage normally and restart the full schedule from that hit. The first possible recovered point is 2.5 seconds after the new hit.
+
+Make boundary behavior deterministic under the normal fixed timestep.
+
+Tests
+
+Extend the shared Launch system tests rather than creating fighter-specific behavior.
+
+Add strong automated coverage in tests/systems/launch.test.mjs and, only where appropriate, existing related system tests.
+
+Tests should prove at minimum:
+
+* A fresh CombatState still starts at Launch Point 0.
+* Launch Point still increases by exactly hit damage.
+* An unblocked hit resets the Launch recovery timing.
+* No recovery occurs before the entire 2-second grace period has elapsed.
+* No point is removed exactly at the end of the grace period if the first recovery tick is not yet due.
+* The first point is removed after the following 0.5 seconds.
+* Another point is removed every subsequent 0.5 seconds.
+* Recovery works from both small and very large Launch Point values.
+* Recovery stops at exactly 0 and never produces a negative value.
+* A hit during the 2-second grace period restarts the full grace period.
+* A hit after recovery has started resets both the 2-second delay and any partial 0.5-second interval.
+* A blocked hit does not add Launch Point and does not reset the “time since last real hit” recovery schedule.
+* A real hit with Base Launch 0 still resets recovery because it is still a real hit.
+* Recovery is generic and does not depend on fighter ID, attack ID or hit source.
+* Respawn/restart still gives a fresh Launch Point of 0 with clean recovery state.
+* Large dt values do not lose completed recovery intervals.
+* Existing hit-event fields and launch calculations remain correct.
+
+Use the repository’s real CombatState, CombatSystem, fighter harness and probeHit patterns where appropriate rather than mocking the mechanic into existence.
+
+Preserve existing tests that establish:
+
+* Launch Point has no maximum.
+* Damage is added before launch strength is calculated.
+* Shield blocks add no Launch Point.
+* Respawning after the Void resets Launch Point to 0.
+* Combat remains character-neutral.
+
+Do not weaken or delete tests merely to accommodate this change.
+
+Run:
+
+node --test tests/systems/launch.test.mjs
+node --test
+
+The complete suite must pass.
+
+Documentation and in-game reference
+
+This changes a core documented gameplay rule, so update all authoritative/current descriptions of Launch Point.
+
+At minimum update:
+
+ALVA_SPEC.md §7.2.7 Launch
+
+It currently describes Launch Point as starting at 0, growing by damage received, never going below 0 and having no maximum. Amend that rule to explicitly describe the 2-second no-hit grace period and the subsequent -1 every 0.5 s recovery.
+
+docs/systems/launch.md
+
+Update “The formula” / Launch Point explanation to document the recovery rules, exact timing, reset-on-real-hit behavior and Shield exception.
+
+js/data/launch.js
+
+Update the module comments describing Launch Point.
+
+Update LAUNCH_POINT_SUMMARY, because this is the shared copy used by the in-game Discover Launch reference. The Discover page must not continue telling players that Launch Point only accumulates until an elimination.
+
+Keep the existing formula unchanged:
+
+launch strength = Base Launch × the target's new Launch Point
+
+Update README.md where appropriate so its high-level explanation is no longer misleading. Keep it concise; detailed timing belongs in the specification/system documentation.
+
+Update comments in js/game/combat/combat-state.js, js/game/combat/combat.js, or other touched files if they currently claim Launch Point “only ever grows” or otherwise contradict the new rule.
+
+Search the repository for wording such as:
+
+* only ever grows
+* grows by
+* accumulated damage
+* Launch Point
+* descriptions implying it changes only from damage/respawn
+
+Update current product/system documentation where necessary. Do not rewrite historical records in UPDATES.md simply because they describe the game as it existed at that time.
+
+Do not edit, move, rename or reformat character_rule.
+
+UI and gameplay scope
+
+Do not add a new meter, icon, countdown, animation, effect, setting or control for this mechanic unless the existing architecture actually requires one.
+
+The existing HUD already reads CombatState.launchPoint, so it should simply display the recovered value automatically.
+
+Do not change:
+
+* damage tiers;
+* Base Launch values;
+* Directional Launch;
+* launch speed conversion;
+* hitstun;
+* launch reaction;
+* launch steering;
+* launch bounce;
+* Energy;
+* Shield costs;
+* fighter definitions;
+* CPU difficulty rules;
+* scoring;
+* Void/respawn timing.
+
+The AI may naturally observe the lower current Launch Point through the same state it already reads. Do not add AI-specific recovery logic.
+
+Quality constraints
+
+Keep the solution small, generic and deterministic.
+
+There must be one universal implementation, not duplicated logic across Battle, Watch Mode and Practice Ground.
+
+Do not put the mechanic in rendering or UI code.
+
+Do not create fighter-specific configuration for it.
+
+Do not use browser timers.
+
+Do not round simulation timestamps based on wall time.
+
+Avoid magic numbers when the Launch system can own named constants.
+
+Respect the repository’s module responsibility rules and source-scanning architecture tests.
+
+Before finishing, inspect the diff for stale comments or documentation that still says Launch Point only increases.
+
+Acceptance criteria
+
+The change is complete when a fighter who takes a hit gets the usual Launch Point increase and launch calculation, stays at that value for a full 2 seconds without another real hit, then loses exactly 1 Launch Point every 0.5 seconds until reaching 0; any later real hit adds its damage and completely restarts that timing; Shielded/blocked hits do not restart it; no value can fall below 0; this behaves identically for every fighter and every shared hit source; respawns/restarts remain clean; Discover/spec/system documentation explains the new mechanic; and the full node --test suite passes.
+
+When done, provide a concise implementation summary, list the files changed, describe the timing/state model you chose, and report the test commands and results.
