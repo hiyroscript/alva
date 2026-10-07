@@ -38,7 +38,7 @@ import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
-import { assistsAttack, assistSpeed, assistRange, approachDistance, approachClear } from '../combat/combat-assist.js';
+import { assistsAttack, assistSpeed, assistRange, approachMove, approachClear, REACHED } from '../combat/combat-assist.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -246,11 +246,12 @@ export class Fighter {
     this.dash = null;
     this.dashTap = null;
     // Combat Assist's approach in progress (see tryCombatAssist), or null:
-    // { action, attack, target, direction, air, animation, need, travelled,
+    // { action, attack, target, direction, air, animation, move, travelled,
     // time }, the melee press it serves (the newest), its attack, the
-    // opponent it closes on, the way it goes, whether it is the air's (flat
-    // across, as an air dash) or the ground's, its clip, how far it still
-    // has to go, how far it has gone and for how long. Its Energy is paid
+    // opponent it closes on, the way it faces, whether it is the air's
+    // (straight at its target, any way) or the ground's (straight across),
+    // its clip, the move it still has to make ({ dx, dy, length }, see
+    // approachMove), how far it has gone and for how long. Its Energy is paid
     // once, as it starts; `assistPaidAt` is that step (no refill on it).
     this.combatAssist = null;
     this.assistPaidAt = -1;
@@ -555,8 +556,8 @@ export class Fighter {
     // gravity it falls under this step). A summon's startup holds the
     // fighter still where it stands, as a technique does. An air dash owns
     // the body too: straight across at its speed, no fall. So does Combat
-    // Assist's approach, the Dash's way on the ground, the air dash's in the
-    // air.
+    // Assist's approach: across on the ground, the Dash's way; in the air,
+    // at the air dash's speed, any way at its target.
     const atk = combat.attack;
     const assist = this.combatAssist;
     let gravityShare = 1;
@@ -584,11 +585,14 @@ export class Fighter {
     } else if (assist) {
       // Straight at its target at the Dash's (or the air dash's) speed,
       // never past the point its attack reaches from (see assistIntents):
-      // the last step covers only what is left. In the air, flat across
-      // with no fall. Physics and pushboxes stop it like any body.
-      body.vx = assist.direction * Math.min(assistSpeed(this, assist.air), assist.need / dt);
+      // the last step covers only what is left. On the ground across; in
+      // the air whichever way the target is, with no fall. Physics and
+      // pushboxes stop it like any body.
+      const { dx, dy, length } = assist.move;
+      const speed = length > 0 ? Math.min(assistSpeed(this, assist.air), length / dt) / length : 0;
+      body.vx = assist.direction * dx * speed;
       if (assist.air) {
-        body.vy = 0;
+        body.vy = dy * speed;
         gravityShare = 0;
       }
     } else if (combat.shielding) {
@@ -762,12 +766,13 @@ export class Fighter {
     // Its approach counts the time and distance it has covered (see
     // assistIntents). As a Dash, one on the ground ends on leaving it; as
     // an air dash, one in the air ends on meeting the ground; neither
-    // passes through a solid. Ended so, its attack never comes.
+    // passes through a solid (a wall, or a ceiling in the air). Ended so,
+    // its attack never comes.
     const closing = this.combatAssist;
     if (closing) {
       closing.time += dt;
-      closing.travelled += Math.abs(body.x - body.prevX);
-      if (closing.air === body.grounded || body.wall === closing.direction) this.cancelCombatAssist();
+      closing.travelled += Math.hypot(body.x - body.prevX, body.y - body.prevY);
+      if (closing.air === body.grounded || body.wall === closing.direction || body.bonked) this.cancelCombatAssist();
     }
 
     // ---- Energy refill -----------------------------------------------------
@@ -1079,14 +1084,16 @@ export class Fighter {
   // combat button's), the fighter is free to act (never
   // cutting an attack or a Dash short), its opponent is in play, and the
   // attack is out of reach of it but its box within one Dash's travel
-  // (approachDistance: on its level, ahead of it, never through it), with
-  // nothing in the way (approachClear: on the ground, footing too).
+  // (approachMove: ahead of it, never through it; on the ground, on its
+  // level), with nothing in the way (approachClear: on the ground, footing
+  // too; in the air, nothing to land on).
   //
-  // On the ground it is the Dash's: dashSpeed, its mouvment clip. In the air
-  // it is the air dash's: flat across at airDashSpeed (no fall: its
-  // vertical speed zeroed, gravity held off), its midair_mouvment clip, and
-  // it uses up an air dash of the airtime (airDashUses), so never with none
-  // left, in free fall or still flying from a launch. Either pays dashCost
+  // On the ground it is the Dash's: straight across at dashSpeed, its
+  // mouvment clip. In the air it is the air dash's: straight at the target,
+  // down, up or across, at airDashSpeed (gravity held off throughout), its
+  // midair_mouvment clip, and it uses up an air dash of the airtime
+  // (airDashUses), so never with none left, in free fall or still flying
+  // from a launch. Either pays dashCost
   // (as a Dash does: never while exhausted), faces the opponent, carries a
   // burst (see `burst`) and plays its clip from the first frame. Anything
   // else (in reach already, too far, no art, no Energy, no air dash left)
@@ -1102,10 +1109,10 @@ export class Fighter {
     const range = assistRange(this, air);
     if (!range || !this.sprites.has(animation)) return false;
     const direction = Math.sign(foe.body.x - this.body.x) || this.facing;
-    const need = approachDistance(this, atk, foe, direction, range);
-    if (!(need > 0 && need < Infinity) || !approachClear(this, this.stage, direction, need, air)) return false;
+    const move = approachMove(this, atk, foe, direction, range, air, true);
+    if (!move || move === REACHED || !approachClear(this, this.stage, direction, move, air)) return false;
     if (!this.combat.spendEnergy(this.energyDef.dashCost)) return false;
-    this.combatAssist = { action, attack: atk, target: foe, direction, air, animation, need, travelled: 0, time: 0 };
+    this.combatAssist = { action, attack: atk, target: foe, direction, air, animation, move, travelled: 0, time: 0 };
     this.assistPaidAt = this.steps;
     if (air) {
       this.airDashes--;
@@ -1175,9 +1182,9 @@ export class Fighter {
   // target, or where the fighter is once the approach can get no closer (a
   // Dash's or air dash's travel or time spent, the target off its level or
   // behind it: it may whiff, as a press out of reach does). Otherwise it
-  // plans this step's move, the distance still to go, with nothing in the
-  // way: a wall (or, on the ground, a ledge) stops the fighter there and
-  // ends it.
+  // plans this step's move, what is still to go, with nothing in the way:
+  // a wall, a ceiling, a ledge on the ground or a landing in the air stops
+  // the fighter there and ends it.
   stepCombatAssist(held) {
     const a = this.combatAssist;
     const foe = this.opponent;
@@ -1188,17 +1195,18 @@ export class Fighter {
     }
     const left = assistRange(this, a.air) - a.travelled;
     const duration = a.air ? this.airDashDuration : this.dashDuration;
-    const need = a.time < duration - TIME_EPSILON ? approachDistance(this, a.attack, foe, a.direction, left) : Infinity;
-    if (!(need > 0 && need < Infinity)) {
+    const move = a.time < duration - TIME_EPSILON ? approachMove(this, a.attack, foe, a.direction, left, a.air) : null;
+    if (!move || move === REACHED) {
       this.finishCombatAssist(held);
       return;
     }
-    if (!approachClear(this, this.stage, a.direction, need, a.air)) {
+    if (!approachClear(this, this.stage, a.direction, move, a.air)) {
       this.cancelCombatAssist();
       this.body.vx = 0;
+      if (a.air) this.body.vy = 0;
       return;
     }
-    a.need = need;
+    a.move = move;
   }
 
   // The approach is over, its target reached or as close as it gets: it
@@ -1208,9 +1216,10 @@ export class Fighter {
   // held direction and all. One that cannot start now is not
   // started, nor kept for later.
   finishCombatAssist(held) {
-    const { action } = this.combatAssist;
+    const { action, air } = this.combatAssist;
     this.combatAssist = null;
     this.body.vx = 0;
+    if (air) this.body.vy = 0;
     if (this.tryAction(action, held, false)) this.bufferedAttack = null;
   }
 

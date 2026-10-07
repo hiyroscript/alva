@@ -213,8 +213,8 @@ most one Dash's (or air dash's) travel (`assistRange` in
 [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js)),
 at up to `dashSpeed` (or `airDashSpeed`), its `mouvment` (or
 `midair_mouvment`) clip played at that movement's rate, for `dashCost`.
-In the air it is flat across with no fall, as an air dash, and uses up the
-airtime's air dash. It is not a Dash (`fighter.combatAssist`, never
+In the air it goes straight at the target, down, up or across, with no
+fall, and uses up the airtime's air dash. It is not a Dash (`fighter.combatAssist`, never
 `fighter.dash`): it covers only the distance the attack needs, ends by
 starting that attack (stopped where it reached), and a jump, a Dash
 request (which then Dashes as above), the Shield, the Deflect or another
