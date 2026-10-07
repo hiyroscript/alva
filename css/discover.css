@@ -3,7 +3,8 @@
    docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
-   Discover — the in-game reference: an index rail beside one page
+   Discover — the in-game reference: an index rail of four sections
+   (Fighters, Movement, Launch, Passives) beside one page
    --------------------------------------------------------------------- */
 
 .discover-layout {
@@ -73,7 +74,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 /* One reference entry per topic (universal movement, each Launch topic),
    under a hairline: what it does beside its moves, values or directions,
    in two columns wherever both fit. Mechanics only: no fighter is ever
-   named or singled out here. */
+   named or singled out on the Movement and Launch pages. */
 .discover-entry {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
@@ -169,6 +170,74 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 }
 .discover-tier-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.4; }
 
+/* ---------------------------------------------------------------------
+   Fighters — the roster, read-only, beside its preview
+   --------------------------------------------------------------------- */
+
+/* The Select Fighter roster and preview (css/setup.css), filling the page
+   rather than scrolling it: the roster scrolls in its own panel, so the
+   browser page itself never scrolls. No page title: the open tab names the
+   page, and the roster panel its grid. */
+.discover-panel--fighters { overflow: hidden; padding: 4px; }
+.discover-fighters { display: grid; height: 100%; min-height: 0; gap: clamp(10px, 1.8vw, 22px); }
+
+/* The preview's top row: the rating (or the Locked / Not rated status) at
+   the left, Play style description at the far right; it wraps on narrow
+   previews, the action staying on the row's right edge. */
+.preview-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  justify-self: stretch;
+  min-width: 0;
+}
+.preview-status-row > [hidden], .fighter-browser-empty[hidden] { display: none; }
+.status-badge.is-unrated { color: var(--text-muted); }
+
+/* The one difficulty rating, in the status badge's place: a mono label and
+   five stars, the first ones filled. Stars, not a dot, so it never reads
+   as availability; read as one name ("Difficulty: 3 out of 5 stars"). */
+.difficulty-rating { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.difficulty-rating-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.difficulty-stars { display: inline-flex; gap: 2px; font-size: clamp(14px, 2.4vh, 18px); line-height: 1; }
+.difficulty-star { color: var(--text-muted); }
+.difficulty-star.is-filled { color: var(--text-strong); }
+
+/* A secondary action set as underlined text (Play style description): a
+   real button, quiet until hovered, with the usual ring for keyboard and
+   gamepad focus and a comfortable press area around its words. */
+.text-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-left: auto;
+  padding: 4px 2px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: right;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  color: var(--text-secondary);
+  transition: color 120ms ease, box-shadow 120ms ease;
+}
+.text-action:hover { color: var(--text-strong); }
+html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-shadow: var(--focus-ring); }
+
+/* With no playable fighter: one muted line under the locked preview. */
+.fighter-browser-empty { color: var(--text-secondary); font-size: 13px; line-height: 1.4; }
+
 /* Compact landscape: a slimmer rail and tighter entries and tiers, so a
    page's entries scroll by in few steps. The rail stays down the side
    here, where height is scarcer than width. */
@@ -186,19 +255,36 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
    js/screens/discover-screen.js. */
 @media (max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px) {
   .discover-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: clamp(10px, 2vh, 16px); }
-  .discover-rail { flex-direction: row; gap: 2px; padding-right: 0; border-right: 0; border-bottom: 1px solid var(--border); }
+  /* Four sections share the row; if a window (or the longer French labels)
+     cannot fit them, the rail scrolls sideways on its own instead of
+     clipping a tab or widening the page. */
+  .discover-rail {
+    flex-direction: row;
+    gap: 2px;
+    min-width: 0;
+    padding-right: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+  .discover-rail::-webkit-scrollbar { display: none; }
   .discover-tab {
-    flex: 1;
+    flex: 1 0 auto;
     justify-content: center;
-    min-height: 40px;
+    min-height: 44px;
     margin-bottom: -1px;
-    padding: 8px 6px;
+    padding: 8px 10px;
     border-left: 0;
     border-bottom: 2px solid transparent;
     border-radius: 3px 3px 0 0;
-    /* Tighter tracking, so three sections share even a narrow window. */
-    letter-spacing: 0.1em;
+    /* Tighter tracking, so four sections share even a narrow window. */
+    letter-spacing: 0.08em;
     text-align: center;
+    white-space: nowrap;
   }
   .discover-tab.is-active { border-bottom-color: var(--accent); }
 }

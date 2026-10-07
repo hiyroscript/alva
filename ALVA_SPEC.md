@@ -268,7 +268,7 @@ Splash → Home → Select Mode → Quick Battle → Custom Play → Select Diff
 Select Mode → Quick Battle → play-type dialog → Esc / Back / close → Select Mode (nothing chosen)
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
-Home → Discover (Movement / Launch / Passives reference; Back returns Home)
+Home → Discover (Fighters / Movement / Launch / Passives reference, opening on Fighters; Back returns Home)
 Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
@@ -734,34 +734,101 @@ An in-game reference, entered from Home's Discover action. Its composition
 follows Seren's Cars & more reference screen (an index rail beside a
 scrollable page of structured entries) in Alva's own visual language:
 charcoal surfaces, off-white type, thin borders and the green accent.
-Discover is a character-neutral mechanics reference, not a roster or stat
-sheet: it explains how each mechanic works and never says which fighter (or
-which of a fighter's attacks) uses which Base Launch or Directional
-Launch. No
-character name or
-ID appears anywhere on it, visibly or in accessible text, and it does not
-read the character database, so it stays the same as fighters are added.
+It has four sections. **Fighters** is the one page about the fighters
+themselves: it browses the roster read-only, with each fighter's one
+difficulty rating and its play-style description, and it reads the
+character registry and the fighter profiles (`js/data/fighter-profiles.js`),
+so it grows as fighters are added. **Movement** and **Launch** are a
+character-neutral mechanics reference, not a roster or stat sheet: they
+explain how each mechanic works and never say which fighter (or which of a
+fighter's attacks) uses which Base Launch or Directional Launch. No
+character name or ID appears on them, visibly or in accessible text, and
+they do not read the character database, so they stay the same as fighters
+are added. **Passives** is empty on purpose. No shared code special-cases a
+fighter's id here either: every fighter-specific value on the Fighters page
+comes from its definition and its profile.
 
 - **Header:** the standard menu header — Back (Alva's back icon, labelled
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
   return Home.
-- **Rail:** exactly three sections, **MOVEMENT**, **LAUNCH** then
-  **PASSIVES** (ids `movement`, `launch`, `passives`), as a
+- **Rail:** exactly four sections, **FIGHTERS**, **MOVEMENT**, **LAUNCH**
+  then **PASSIVES** (ids `fighters`, `movement`, `launch`, `passives`), as a
   `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
-  tabindex; each page a focusable `tabpanel`). Every visit opens on Movement.
+  tabindex; each page a `tabpanel`, the reference pages focusable). Every
+  visit opens on Fighters.
   The open section wears a green bar on its leading edge, a faint green wash
   and bolder, full-strength type, so it never relies on colour alone.
   Keyboard or gamepad focus on a section opens it; a click or tap selects
   it; mouse hover is only a preview. Down the left on wide and short
   landscape windows; across the top of the page (bar underneath) on narrow
   windows (≤ 600 px wide unless shorter than 441 px) and tall ones, with
-  slightly tighter tracking so the three sections fit side by side.
-- **Page:** fills the rest and scrolls on its own; the document never
-  scrolls. The open page is a stop in menu navigation so a gamepad can
-  scroll it: ↑ / ↓ scroll it while it can scroll that way, then move on,
-  and leaving it toward the rail lands on the open section's tab. The hidden
-  page is `hidden`, so nothing in it can take focus. Focus shows as an inset
-  frame, so an empty page shows it too.
+  slightly tighter tracking so the four sections fit side by side; where a
+  window (or the longer French labels) cannot fit them, the rail scrolls
+  sideways on its own rather than clip a tab or widen the page, and no tab
+  shrinks below its label or a 44 px touch target. Arrows / D-pad follow
+  the rail in either orientation through all four tabs.
+- **Page:** fills the rest; the document never scrolls. A reference page
+  (Movement, Launch, Passives) scrolls on its own and is a stop in menu
+  navigation so a gamepad can scroll it: ↑ / ↓ scroll it while it can
+  scroll that way, then move on. The Fighters page is no stop itself: its
+  fighters and its play-style button are, and moving from its tab toward
+  the page lands on the selected fighter. Leaving any page toward the rail
+  lands on the open section's tab, never another one, so the page never
+  switches underneath. The hidden pages are `hidden`, so nothing in them
+  can take focus. A reference page's focus shows as an inset frame, so an
+  empty page shows it too.
+- **Fighters:** the Select Fighter roster (`js/ui/fighter-roster.js`) and
+  its animated preview, browsed read-only (`js/ui/fighter-browser.js`):
+  the same grid, roster order, portraits, locked placeholders and idle
+  preview, beside each other (stacked on tall windows), the roster
+  scrolling in its own panel. The page has no title of its own (the tab
+  names it, the roster panel its grid), so all its height goes to them. Focusing a fighter previews it; pressing,
+  clicking, tapping or confirming one only selects it (its check mark).
+  There is no Confirm and nothing starts a match; a locked or disabled
+  fighter stays a non-interactive locked slot, so nothing becomes playable
+  here. Each visit returns to the fighter last browsed (else the first
+  playable one).
+  - **Difficulty:** where a roster's preview says **Available**, the
+    Fighters page shows the fighter's one difficulty rating instead: a mono
+    "Difficulty" label and five stars, the first ones filled (#0001
+    ★★★★★, #0002 ★★★☆☆), as one image named "Difficulty: 5 out of 5 stars"
+    (the stars themselves hidden from assistive technology, never focusable
+    and never a control). Stars, not the availability dot, so the rating
+    never reads as availability. Each playable slot is named "#0001,
+    difficulty 5 out of 5". Select Fighter, Select CPU, Watch Mode's
+    rosters and Practice Ground's dialogs keep Available, Locked and
+    Confirm unchanged.
+  - **The one rating** (1 to 5, a whole number, set by a person in the
+    fighter's profile, never derived from move counts) rates together how
+    hard the fighter is to pick up and play effectively and how hard it is
+    to master; there are no separate learning or mastery scores. 1: very
+    easy to learn and comparatively simple to master. 2: an easy core game
+    plan with little extra to master. 3: approachable fundamentals, with
+    meaningful decision-making and execution depth at higher levels. 4:
+    demanding to use well, with substantial mastery requirements. 5:
+    difficult both to pilot effectively and to master (highly layered
+    mechanics, situational decisions, setup or resource requirements,
+    punishing commitments). #0001 is 5 (a large, contextual space-control
+    and setup toolkit with Energy and cooldown management and punishable
+    long telegraphs); #0002 is 3 (a readable rushdown plan, with mastery in
+    momentum, air uses, free fall, approach angles and not overcommitting).
+  - **Play style description:** on the rating's row, at its far right (the
+    rating at the left, the fighter's name under both; the row wraps
+    cleanly on narrow previews), a real `<button type="button">` set as
+    underlined secondary text with `aria-haspopup="dialog"`, reached by
+    Tab, arrows and D-pad, activated by keyboard, gamepad, mouse or touch,
+    with the usual focus ring for keyboard and gamepad. It opens a modal
+    (`InfoDialog`, `role="dialog"`, never `alertdialog`; `aria-modal`;
+    labelled by its title): the kicker "Play style", the fighter's name as
+    the title and its localized play-style description, with a Close
+    button that takes focus. It has its own navigation scope; the screen
+    beneath is inert while it is open; Escape, gamepad Back, Close or a
+    press on the dim close it, and focus returns to the button that opened
+    it.
+  - A playable fighter without a profile (only ever a test fighter) shows
+    "Not rated" and no button; a locked slot shows Locked; with no playable
+    fighter at all, every slot is locked and a line under the preview says
+    "No fighters to show yet." Discover still opens.
 - **Movement:** one entry, **Universal movement**, built only from
   `MOVEMENT_SUMMARY` and `MOVEMENT_GUIDE` in `js/data/movement.js`, so it
   cannot drift from gameplay: "Movement is the same for everyone: one run,
@@ -802,9 +869,10 @@ read the character database, so it stays the same as fighters are added.
   It names no fighter or attack, and never shows the removed Low / Mid /
   High levels or growth.
 - No tuning values (velocities, speeds) or other physics
-  constants are shown on either page, and there is no fighter list, "Used
-  by" label or ownership highlighting. On short landscape windows the
-  entries and rows tighten so a page's entries scroll by in a few steps.
+  constants are shown on the Movement or Launch page, and there is no
+  fighter list, "Used by" label or ownership highlighting on them. On short
+  landscape windows the entries and rows tighten so a page's entries
+  scroll by in a few steps.
 - **Passives:** intentionally empty — no cards, placeholder or "coming
   soon" copy — until a passives registry exists. The section is fully
   selectable and accessible.
@@ -2490,6 +2558,21 @@ there, and nothing in one is a rule for another fighter.
   speedster, in its moves and never its run: the One-Two, Homing Attack,
   Rapid Kicks, Bounce Attack, Spin Attack, Blue Tornado and Whirlwind, a
   guard, and its swatting Deflect).
+
+Each playable fighter also has a **Discover profile**
+(`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
+translation key of its play-style description and the review hash of its
+definition. The profile is editorial, written from the definition and the
+character specification, which stay authoritative for every mechanic; the
+game never reads it. Its `reviewedSourceHash` is the SHA-256 of
+`js/data/characters/<id>.js` (UTF-8, line endings normalized to `\n`) as it
+was when the profile was last reviewed, kept in the profile and never in
+the definition. `tests/fighters/profiles.test.mjs` fails as soon as the
+definition changes ("#0001 changed since its Discover profile was
+reviewed. Recheck its difficulty and play-style description, then update
+reviewedSourceHash"), and whenever a playable fighter has no valid profile
+or description in both languages, so every change to a fighter brings its
+profile back for review. Current profiles: #0001 5/5, #0002 3/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).

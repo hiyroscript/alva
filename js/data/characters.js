@@ -52,7 +52,10 @@
 //      only its refill rate is its own;
 //   3. import it below and add it to CHARACTERS, with a rosterSlot of its
 //      own;
-//   4. set `available: true` once it is ready to be played.
+//   4. give it a Discover profile in js/data/fighter-profiles.js (one 1-5
+//      difficulty, a play-style description in both languages, the review
+//      hash of its definition), then set `available: true` once it is ready
+//      to be played.
 //
 // A fighter whose art comes before its combat attributes can still be
 // added: an attack whose art is in is `pending` (art only, see

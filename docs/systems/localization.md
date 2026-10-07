@@ -40,7 +40,10 @@ test fails if either language lacks a key the other has. A fighter's
 button names come from its `mobileAbilities` labels and its ability names
 from `abilityNames` (English, read from the definition), and are
 translated in `strings/fr.js` as `ability.<id>.<button>` /
-`ability.<id>.<move>`.
+`ability.<id>.<move>`. Its Discover play-style description is interface
+copy, authored in both tables as `discover.fighter.<id>.playStyle` (the
+key its profile names in `js/data/fighter-profiles.js`); a fighter's name
+(#0001) is the same in both languages.
 
 ## Tests
 

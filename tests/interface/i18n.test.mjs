@@ -426,7 +426,8 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(difficulty.cards[0].getAttribute('aria-label'), 'Facile, niveau 1 sur 4');
     assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Réactions rapides. Se défend et punit.');
     // Discover: tabs and the pages built from the registries.
-    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Déplacement', 'Éjection', 'Passifs']);
+    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Déplacement', 'Éjection', 'Passifs']);
+    assert.equal(discover.browser.describeBtn.textContent, 'Description du style de jeu');
     assert.equal(discover.el.querySelector('.screen-title').textContent, 'Découvrir');
     const tierNames = discover.el.querySelectorAll('.discover-tier-name').map((n) => n.textContent);
     assert.ok(tierNames.includes('Triple saut'));
@@ -510,6 +511,9 @@ test('every fighter-specific string belongs to a fighter that exists, in either 
       // (credits.sprites<id>), never a removed one's.
       const credited = key.match(/^credits\.sprites(\d{4})\./)?.[1];
       if (credited) assert.ok(ids.has(credited), `${language}: ${key} credits no fighter that exists`);
+      // A play-style description (Discover) is an existing fighter's.
+      const described = key.match(/^discover\.fighter\.([^.]+)\./)?.[1];
+      if (described) assert.ok(ids.has(described), `${language}: ${key} describes no fighter that exists`);
       assert.doesNotMatch(key, /^credits\.\d/, `${language}: ${key}`);
     }
     const text = Object.values(table).filter((v) => typeof v === 'string').join('\n');

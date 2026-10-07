@@ -7,7 +7,7 @@ a module's exports reaches exactly those. The folders' roles:
 | Folder | Role | May import |
 | --- | --- | --- |
 | `js/core/` | Application shell: the app controller, screens, input devices, settings, assets, device and utilities. | config, data, localization, game, screens, ui (only `app.js` wires everything together) |
-| `js/data/` | Registries and pure data: fighters, universal movement, loadout rules, Launch, difficulty, maps, ability names. No DOM, no simulation state. | config, other data (and `loadout.js` reads the technique clip-field names from `game/combat/technique.js`) |
+| `js/data/` | Registries and pure data: fighters, Discover's fighter profiles, universal movement, loadout rules, Launch, difficulty, maps, ability names. No DOM, no simulation state. | config, other data (and `loadout.js` reads the technique clip-field names from `game/combat/technique.js`) |
 | `js/game/` | The simulation (fighters, combat, AI, physics, modes) and its canvas rendering. No DOM except the canvas it is given. | config, core/utils, data, stages, localization (the arena's canvas label only) |
 | `js/stages/` | Stage themes: procedural Canvas art, perspective, the Void's look. | core |
 | `js/localization/` | The interface languages. | config, core/settings, data (for registry-owned English copy) |
@@ -43,7 +43,8 @@ There are no import cycles (checked over every module).
 
 | Module | Owns | Used by |
 | --- | --- | --- |
-| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`, `assertUniversalMovement`, `assertCombatRules`: damage tiers, repeat cooldowns, the Deflect's strike, universal Energy). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/touch-layout-editor.js` |
+| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`, `assertUniversalMovement`, `assertCombatRules`: damage tiers, repeat cooldowns, the Deflect's strike, universal Energy). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/fighter-browser.js`, `ui/touch-layout-editor.js` |
+| `fighter-profiles.js` | Discover's editorial profile of each fighter, keyed by id (`FIGHTER_PROFILES`, `getFighterProfile`): ONE 1–5 difficulty rating (`DIFFICULTY_SCALE` says what each step means), its play-style description's translation key and `reviewedSourceHash`, the SHA-256 of its definition's source when last reviewed (`tests/fighters/profiles.test.mjs` fails once the definition changes). `assertFighterProfile` refuses anything else. Imports nothing; the game never reads it. | `ui/fighter-browser.js` |
 | `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
 | `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
@@ -112,10 +113,11 @@ Fighter goes next), used by `character-select-screen.js` and
 | `touch-controls.js` | `TouchControls`: both touch layouts. | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |
 | `mobile-abilities.js` | Which touch buttons a fighter has, their names and art. | `touch-controls.js` |
 | `touch-layout-editor.js` | The layout editor. | `core/app.js` |
-| `fighter-roster.js` | The 48-slot roster (Select Fighter, Quick Battle's Select CPU, Watch Mode's CPU screens, Practice Ground's dialogs). | `screens/character-select-screen.js`, `screens/practice-screen.js` |
+| `fighter-roster.js` | The 48-slot roster (Select Fighter, Quick Battle's Select CPU, Watch Mode's CPU screens, Practice Ground's dialogs), with its Available / Locked status and Confirm. Its preview head, status, Confirm and slot activation are hooks a subclass may override. | `screens/character-select-screen.js`, `screens/practice-screen.js`, `fighter-browser.js` |
+| `fighter-browser.js` | `FighterBrowser`: the roster read-only for Discover's Fighters page (no Confirm; a press only selects), each fighter's difficulty stars in the Available badge's place and the Play style description button; `playStyleDialog` (the `InfoDialog` content). | `screens/discover-screen.js` |
 | `sprite-art.js` | Portrait and preview painting. | `fighter-roster.js`, `hud.js`, `stage-preview.js` |
 | `stage-preview.js` | Select Stage's live preview. | `screens/map-select-screen.js` |
-| `overlays.js` | The loading overlay, the confirm dialog and the choice dialog (Quick Battle's play type). | `core/app.js` |
+| `overlays.js` | The loading overlay, the confirm dialog (`alertdialog`), and the `role="dialog"` modals built on one shared base (its own navigation scope, the screen beneath inert, focus returned): the choice dialog (Quick Battle's play type) and the information dialog (`InfoDialog`, Discover's play-style description). | `core/app.js` |
 | `settings-dialog.js`, `language-dialog.js` | Settings; the first-launch language chooser. | `core/app.js` |
 | `credits.js`, `logo.js`, `icons.js` | The credits list, the wordmark, inline SVG glyphs. | Home, overlays, the HUD and touch controls |
 

@@ -283,6 +283,7 @@ export const FR = {
 
   'discover.title': 'Découvrir',
   'discover.sections': 'Sections de Découvrir',
+  'discover.fighters': 'Combattants',
   'discover.movement': 'Déplacement',
   'discover.launch': 'Éjection',
   'discover.passives': 'Passifs',
@@ -294,6 +295,15 @@ export const FR = {
   'discover.baseLaunchValues': 'Valeurs d’Éjection de base',
   'discover.directionalLaunchTitle': 'Éjection directionnelle',
   'discover.directions': 'Directions d’Éjection directionnelle',
+  'discover.difficulty': 'Difficulté',
+  'discover.difficultyRating': ({ rating, max }) => `Difficulté : ${rating} ${rating > 1 ? 'étoiles' : 'étoile'} sur ${max}`,
+  'discover.unrated': 'Non évalué',
+  'discover.noFighters': 'Aucun combattant à afficher pour le moment.',
+  'discover.fighterSlot': '{name}, difficulté {rating} sur {max}',
+  'discover.playStyle': 'Description du style de jeu',
+  'discover.playStyleTitle': 'Style de jeu',
+  'discover.fighter.0001.playStyle': 'Un combattant de contrôle de l’espace et de mise en place, qui gagne en maîtrisant la distance, en attirant ou en repoussant l’adversaire, et en transformant chaque ouverture en éjections puissantes ou en enchaînements de techniques. Rouge et Bleu maximal contrôlent l’espace, tandis que Bleu et le Coup de pied haut changent les ouvertures au corps à corps en éjections. Vide infini ouvre une longue fenêtre de suite, et Violet creux est un coup de grâce lent qui engage lourdement. Infini et le Renvoi récompensent un bon timing défensif. Ses meilleures options exigent un placement soigné, une gestion des temps de recharge et de l’Énergie, une bonne connaissance des affrontements et un timing précis, et une mise en place ratée ou une longue incantation peut le laisser vulnérable.',
+  'discover.fighter.0002.playStyle': 'Un combattant de pression offensive et de poursuite aérienne, porté par son élan. Un-deux et Coups de pied rapides offrent une pression au sol simple et directe, tandis qu’Attaque à tête chercheuse, Attaque rebondissante, Attaque tournoyante et Tornade bleue lui permettent d’approcher, de poursuivre et d’éjecter sous plusieurs angles. Tourbillon peut contrôler l’espace et créer des occasions d’éjection, et le Renvoi peut retourner la pression des projectiles contre l’adversaire. Son plan de jeu de base est accessible, mais bien le jouer demande de préserver son élan, de gérer ses utilisations aériennes limitées et ses états de chute libre, de choisir des angles d’approche sûrs et de savoir ne pas trop s’engager face aux Boucliers ou aux fenêtres de punition.',
 
   'touch.dpad': 'Déplacement',
   'touch.joystick': 'Joystick de déplacement',

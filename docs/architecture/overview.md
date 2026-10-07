@@ -78,6 +78,7 @@ Content is data, behaviour is shared code:
 | Data | Read by |
 | --- | --- |
 | Fighters: `js/data/characters.js` and one module per fighter in `js/data/characters/` | the Fighter, combat, the AI, the touch controls, the roster, localization |
+| Fighter profiles (Discover's one difficulty rating, play-style description key and review hash per fighter): `js/data/fighter-profiles.js` | Discover's Fighters page only; never the game |
 | Loadout rules: `js/data/loadout.js` | the registry (validation), the Fighter, the AI, the touch controls |
 | Universal movement, Launch: `js/data/movement.js`, `js/data/launch.js` | the Fighter, combat, Discover, localization |
 | CPU levels: `js/data/difficulty.js` | the Battle and the combat AI |

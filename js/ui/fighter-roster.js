@@ -10,6 +10,12 @@
 // appear, drives update(dt) while they are visible and decides what
 // confirming a fighter means (`onConfirm(def)`). Preview element ids come
 // from `previewId`, so several rosters can share the page.
+//
+// Discover's Fighters page browses the same roster read-only
+// (js/ui/fighter-browser.js, a subclass): it overrides the hooks marked
+// below (the preview's head, its status and what activating a slot does)
+// and has no Confirm. Every roster here keeps the Available / Locked status
+// and its Confirm.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
@@ -78,16 +84,32 @@ export class FighterRoster {
     this.previewCanvas = el('canvas', { class: 'preview-canvas', 'aria-hidden': 'true' });
     this.status = el('span', { class: 'status-badge' });
     this.name = el('h2', { class: 'preview-name', id: previewId });
-    this.confirmBtn = el('button', { class: 'btn btn--primary btn--confirm', type: 'button', 'data-nav': true });
-    this.confirmBtn.addEventListener('click', () => this.confirm());
+    this.confirmBtn = this.buildConfirm();
 
     this.previewPanel = el('aside', { class: 'char-preview', 'aria-labelledby': previewId, 'aria-live': 'polite' }, [
       el('div', { class: 'preview-stage' }, [this.previewCanvas]),
-      el('div', { class: 'preview-info' }, [
-        el('div', { class: 'preview-head' }, [this.status, this.name]),
-        this.confirmBtn,
-      ]),
+      el('div', { class: 'preview-info' }, [this.buildPreviewHead(previewId), this.confirmBtn]),
     ]);
+  }
+
+  // Hook: the preview's head, the status over the fighter's name. Built
+  // while the constructor runs.
+  buildPreviewHead() {
+    return el('div', { class: 'preview-head' }, [this.status, this.name]);
+  }
+
+  // Hook: the Confirm button under the preview (null for none).
+  buildConfirm() {
+    const button = el('button', { class: 'btn btn--primary btn--confirm', type: 'button', 'data-nav': true });
+    button.addEventListener('click', () => this.confirm());
+    return button;
+  }
+
+  // Hook: the status shown over the previewed fighter's name: Available for
+  // a playable fighter `def`, Locked for a locked slot (`def` null).
+  showStatus(def) {
+    setText(this.status, def ? 'roster.statusAvailable' : 'roster.statusLocked');
+    this.status.className = `status-badge ${def ? 'is-available' : 'is-locked'}`;
   }
 
   // The slot of playable fighter `id`, else the first playable one's, else
@@ -154,6 +176,7 @@ export class FighterRoster {
     this.updateConfirm();
   }
 
+  // Hook: a slot pressed, clicked or confirmed.
   activate(slot, e) {
     if (!isPlayable(slot._def)) return;
     // Keyboard/gamepad activation confirms immediately; pointer selects first
@@ -170,8 +193,7 @@ export class FighterRoster {
     const num = String(slot._index + 1).padStart(2, '0');
     if (!isPlayable(def)) {
       this.host?.classList.add('is-locked-preview');
-      setText(this.status, 'roster.statusLocked');
-      this.status.className = 'status-badge is-locked';
+      this.showStatus(null);
       setText(this.name, 'roster.slot', { num });
       this.previewSprites = null;
       this.clearPreview();
@@ -179,8 +201,7 @@ export class FighterRoster {
       return;
     }
     this.host?.classList.remove('is-locked-preview');
-    setText(this.status, 'roster.statusAvailable');
-    this.status.className = 'status-badge is-available';
+    this.showStatus(def);
     this.name.textContent = def.displayName;
     this.name.setAttribute('data-i18n', '');
     const set = this.app.getSprites(def.id);

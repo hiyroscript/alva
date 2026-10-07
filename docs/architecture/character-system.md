@@ -74,6 +74,31 @@ with the problem named.
 Character-specific constants (playback rates, art measurements, shared
 hitboxes) live beside the definition in the same module.
 
+## The Discover profile, beside the definition
+
+Each playable fighter also has a **profile** in
+[`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), keyed
+by its id and kept out of the definition on purpose:
+
+| Field | Read by | Meaning |
+| --- | --- | --- |
+| `difficulty` | Discover's Fighters page (`js/ui/fighter-browser.js`) | ONE whole number from 1 to 5 rating together how hard the fighter is to pick up and play effectively and how hard it is to master (`DIFFICULTY_SCALE`). Never separate learning and mastery scores, never derived from move counts: a person assigns it. |
+| `descriptionKey` | Discover's play-style dialog | The translation key of its play-style description (English and French): how it plays, not a move list. |
+| `reviewedSourceHash` | the tests only | The SHA-256 of `js/data/characters/<id>.js` (UTF-8, `\n` line endings) when the profile was last reviewed. |
+
+The profile is editorial: the definition and the fighter's specification
+stay authoritative for every mechanic, and the game never reads the
+profile. It must follow the definition, though:
+[`tests/fighters/profiles.test.mjs`](../../tests/fighters/profiles.test.mjs)
+fails whenever a definition's source no longer matches its profile's
+`reviewedSourceHash`, and whenever a playable fighter has no valid profile
+or description in both languages. Changing a fighter therefore always
+brings its rating and description back for review
+([adding a fighter: the Discover
+profile](../characters/adding-characters.md#7-the-discover-profile)). The
+hash lives in the profile, never in the definition, so it never covers
+itself.
+
 ## What stays shared
 
 Shared code may *mention* a fighter in a comment as an example ("e.g.
