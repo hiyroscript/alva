@@ -149,7 +149,7 @@ const { ScreenManager, Screen } = await import('../../js/core/screen-manager.js'
 const { App } = await import('../../js/core/app.js');
 const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
 const { HomeScreen } = await import('../../js/screens/home-screen.js');
-const { SettingsDialog } = await import('../../js/ui/settings-dialog.js');
+const { SettingsDialog, SETTINGS_SECTIONS } = await import('../../js/ui/settings-dialog.js');
 const { LanguageDialog } = await import('../../js/ui/language-dialog.js');
 const { TouchLayoutEditor } = await import('../../js/ui/touch-layout-editor.js');
 const { ICONS } = await import('../../js/ui/icons.js');
@@ -194,9 +194,11 @@ const stored = (storage) => JSON.parse(storage.map.get(SETTINGS_KEY));
 // Keyboard input: key() runs a keydown through every listener, as the app does.
 function fakeInput() {
   const listeners = new Set();
+  const padListeners = new Set();
   return {
     onKey(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    onPadMenu: noop,
+    onPadMenu(fn) { padListeners.add(fn); },
+    pad(cmd) { for (const fn of padListeners) fn(cmd); },
     key(code) {
       const e = { code, repeat: false, altKey: false, ctrlKey: false, metaKey: false, preventDefault: noop };
       for (const fn of [...listeners]) fn(e);
@@ -809,12 +811,12 @@ test('the gear opens the Settings dialog over Home: no screen change, a modal wi
     assert.equal(app.nav.scopes.at(-1), dialog.scope, 'its own navigation scope');
     assert.equal(app.nav.scopeEl, dialog.root);
     assert.equal(home.el.inert, true, 'nothing behind it can be reached');
-    assert.equal(document.activeElement, languageNamed(dialog, 'en'), 'focus lands on the language in use');
+    assert.equal(document.activeElement, dialog.tabs[0], 'focus lands on the Language tab');
     // The panel is translucent glass over a dim, not an opaque screen.
     assert.ok(dialog.panel.classList.contains('glass') && dialog.panel.classList.contains('glass--panel'));
     const css = stylesheet();
     assert.match(css.match(/\n\.settings-overlay \{([^}]*)\}/)?.[1] ?? '', /background: rgba\(0, 0, 0, 0\.\d+\);/);
-    assert.match(css.match(/\n\.settings-body \{([^}]*)\}/)?.[1] ?? '', /overflow-y: auto;[\s\S]*touch-action: pan-y;/, 'it scrolls on its own');
+    assert.match(css.match(/\n\.settings-section \{([^}]*)\}/)?.[1] ?? '', /overflow-y: auto;[\s\S]*touch-action: pan-y;/, 'it scrolls on its own');
   } finally {
     done();
   }
@@ -862,8 +864,9 @@ test('exactly three sections, Language, Controls and Combat, and nothing else', 
     assert.deepEqual(found.map((s) => s.tagName), ['SECTION', 'SECTION', 'SECTION']);
     assert.deepEqual(found.map((s) => s.querySelector('.settings-group-title').textContent), ['Language', 'Controls', 'Combat']);
     for (const section of found) {
-      const heading = section.querySelector('.settings-group-title');
-      assert.equal(section.getAttribute('aria-labelledby'), heading.getAttribute('id'));
+      const category = dialog.categories.find(({ panel }) => panel === section);
+      assert.equal(section.getAttribute('aria-labelledby'), category.tab.getAttribute('id'));
+      assert.equal(section.getAttribute('role'), 'tabpanel');
     }
     assert.doesNotMatch(dialog.root.textContent, /Audio|Sound|Volume|Graphics|Difficulty|Account/i);
   } finally {
@@ -892,6 +895,9 @@ test('Language: English and Français as two radio buttons; picking one saves it
     assert.ok(languageNamed(dialog, 'fr').classList.contains('is-current'));
     assert.equal(dialog.isOpen, true, 'the dialog stays open');
     assert.equal(document.documentElement.lang, 'fr');
+    assert.equal(dialog.activeSection, 'language');
+    assert.deepEqual(dialog.tabs.map((tab) => tab.textContent), ['Langue', 'Commandes', 'Combat']);
+    assert.equal(dialog.tablist.getAttribute('aria-label'), 'Catégories des paramètres');
     // Everything visible in it follows at once.
     assert.equal(dialog.root.querySelector('.settings-title').textContent, 'Paramètres');
     assert.deepEqual(dialog.root.querySelectorAll('.settings-group-title').map((h) => h.textContent), ['Langue', 'Commandes', 'Combat']);
@@ -916,6 +922,7 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
   const { app, home, dialog, storage, done } = boot();
   try {
     home.settingsButton.click();
+    dialog.tabs[1].click();
     const group = dialog.root.querySelector('.settings-options');
     assert.equal(group.getAttribute('role'), 'radiogroup');
     assert.equal(group.getAttribute('aria-labelledby'), 'settings-mobile-title');
@@ -959,6 +966,8 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
     assert.equal(app.touchEditor.isOpen, false, 'Back leaves the editor first');
     assert.equal(dialog.isOpen, true);
     assert.equal(dialog.root.inert, false);
+    assert.equal(dialog.activeSection, 'controls');
+    assert.equal(dialog.sections.controls.hidden, false);
     assert.equal(document.activeElement, customize, 'focus back on Customize');
     app.input.key('Escape');
     assert.equal(dialog.isOpen, false);
@@ -972,6 +981,7 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
   const { app, home, dialog, storage, done } = boot();
   try {
     home.settingsButton.click();
+    dialog.tabs[2].click();
     const section = dialog.sections.combat;
     assert.equal(section.getAttribute('data-settings-section'), 'combat');
     assert.equal(section.querySelector('.settings-subtitle').textContent, 'Combat Assist');
@@ -1014,8 +1024,10 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
     app.settings.combatAssist = true;
     assert.deepEqual(checked(dialog.assistOptions), ['true', 'false']);
     off.click();
-    // In French.
+    // In French, through Language and back to Combat.
+    dialog.tabs[0].click();
     languageNamed(dialog, 'fr').click();
+    dialog.tabs[2].click();
     assert.equal(section.querySelector('.settings-group-title').textContent, 'Combat');
     assert.equal(section.querySelector('.settings-subtitle').textContent, 'Assistance au combat');
     assert.equal(desc.textContent,
@@ -1034,58 +1046,165 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
   }
 });
 
-test('keyboard and gamepad move through the dialog and choose in it, and navigation never escapes behind it', () => {
+test('keyboard and gamepad navigate tabs, visible settings and Close inside the dialog', () => {
   const { app, home, dialog, done } = boot();
   try {
-    Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
-    place(home.settingsButton, 1180, 20, 44, 44);
-    place(dialog.closeButton, 900, 60, 44, 44);
+    dialog.tabs.forEach((tab, i) => place(tab, 300 + i * 200, 100, 180, 44));
+    place(dialog.closeButton, 900, 40, 44, 44);
     dialog.languageOptions.forEach((o, i) => place(o, 300 + i * 320, 180, 300, 50));
-    dialog.schemeOptions.forEach((o, i) => place(o, 300 + i * 320, 300, 300, 160));
-    place(dialog.customizeButton, 300, 480, 300, 44);
-    dialog.assistOptions.forEach((o, i) => place(o, 300 + i * 320, 600, 300, 50));
+    dialog.schemeOptions.forEach((o, i) => place(o, 300 + i * 320, 220, 300, 160));
+    place(dialog.customizeButton, 300, 400, 300, 44);
+    dialog.assistOptions.forEach((o, i) => place(o, 300 + i * 320, 220, 300, 50));
     home.settingsButton.click();
+    assert.equal(document.activeElement, dialog.tabs[0]);
+    app.input.key('ArrowDown');
     assert.equal(document.activeElement, languageNamed(dialog, 'en'));
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, languageNamed(dialog, 'fr'));
-    assert.equal(app.settings.language, 'en', 'moving is not choosing');
+    assert.equal(app.settings.language, 'en', 'moving among settings is not choosing');
+    app.input.key('ArrowUp');
+    assert.equal(document.activeElement, dialog.tabs[0], 'returns to its own tab');
+    app.input.key('ArrowRight');
+    assert.equal(dialog.activeSection, 'controls');
+    assert.equal(document.activeElement, dialog.tabs[1]);
     app.input.key('ArrowDown');
-    assert.equal(document.activeElement, schemeNamed(dialog, 'classic'));
-    app.nav.command('confirm', null); // gamepad A
-    assert.equal(app.settings.mobileControls, 'classic');
-    // Customize sits under Joystick's card; Combat's choices are further down.
-    app.input.key('ArrowLeft');
     assert.equal(document.activeElement, schemeNamed(dialog, 'joystick'));
-    assert.equal(app.settings.mobileControls, 'classic', 'moving is not choosing');
+    app.input.key('ArrowRight');
+    app.input.pad('confirm');
+    assert.equal(app.settings.mobileControls, 'classic');
+    app.input.key('ArrowLeft');
     app.input.key('ArrowDown');
     assert.equal(document.activeElement, dialog.customizeButton);
-    // On to Combat: moving is not choosing, then the pad chooses Off.
     app.input.key('ArrowDown');
+    assert.equal(document.activeElement, dialog.customizeButton, 'cannot enter hidden Combat');
+    app.input.key('ArrowUp');
+    app.input.key('ArrowUp');
+    assert.equal(document.activeElement, dialog.tabs[1]);
+    app.input.pad('right');
+    assert.equal(dialog.activeSection, 'combat');
+    app.input.pad('down');
     assert.equal(document.activeElement, assistNamed(dialog, true));
-    app.input.key('ArrowRight');
-    assert.equal(document.activeElement, assistNamed(dialog, false));
-    assert.equal(app.settings.combatAssist, true, 'moving is not choosing');
-    app.nav.command('confirm', null); // gamepad A
+    app.input.pad('right');
+    assert.equal(app.settings.combatAssist, true);
+    app.input.pad('confirm');
     assert.equal(app.settings.combatAssist, false);
-    assert.deepEqual(checked(dialog.assistOptions), ['false', 'true']);
-    assert.equal(document.activeElement, assistNamed(dialog, false), 'focus stays on the choice');
-    // (Enter and Space activate a button natively in a browser; J is the
-    // game's own confirm key.)
-    app.input.key('KeyJ');
-    assert.equal(app.settings.combatAssist, false, 'choosing it again changes nothing');
     app.input.key('ArrowLeft');
     app.input.key('KeyJ');
-    assert.equal(app.settings.combatAssist, true, 'the keyboard chooses too');
-    // Never out to Home's menu, far to the left.
-    for (const key of ['ArrowLeft', 'ArrowLeft', 'ArrowDown', 'ArrowDown']) app.input.key(key);
+    assert.equal(app.settings.combatAssist, true, 'keyboard confirm also chooses');
+    app.input.pad('up');
+    assert.equal(document.activeElement, dialog.tabs[2]);
+    app.input.pad('right');
+    assert.equal(dialog.activeSection, 'language', 'wraps after the last tab');
+    app.input.pad('left');
+    assert.equal(dialog.activeSection, 'combat', 'wraps before the first tab');
+    assert.equal(app.screens.current, home);
     assert.ok(dialog.root.contains(document.activeElement));
-    for (const item of Object.values(home.actions)) assert.equal(app.nav.inScope(item), false);
-    for (let i = 0; i < 4; i++) app.input.key('ArrowUp');
+    app.input.key('ArrowUp');
     assert.equal(document.activeElement, dialog.closeButton);
+    app.input.key('ArrowDown');
+    assert.equal(document.activeElement, dialog.tabs[2]);
+    app.input.key('ArrowUp');
     app.input.key('KeyJ');
     assert.equal(dialog.isOpen, false);
     assert.equal(document.activeElement, home.settingsButton);
+  } finally { done(); }
+});
+
+test('tabs expose one panel, roving tabindex and valid focus; switching does not write or reset settings', () => {
+  const { app, home, dialog, storage, done } = boot();
+  try {
+    home.settingsButton.click();
+    assert.equal(dialog.tablist.getAttribute('role'), 'tablist');
+    assert.equal(dialog.tablist.getAttribute('aria-orientation'), 'horizontal');
+    assert.deepEqual(dialog.tabs.map((tab) => tab.textContent), ['Language', 'Controls', 'Combat']);
+    assert.equal(dialog.activeSection, 'language');
+    app.settings.set('mobileControls', 'classic');
+    app.settings.set('combatAssist', false);
+    app.settings.setTouchLayout('classic', { jump: { x: 0.8, y: 0.7, scale: 1.2 } });
+    const before = stored(storage);
+    const writes = storage.writes;
+    for (const current of dialog.categories) {
+      current.tab.click();
+      assert.equal(document.activeElement, current.tab);
+      assert.equal(current.tab.tagName, 'BUTTON');
+      assert.equal(current.tab.getAttribute('role'), 'tab');
+      assert.equal(current.tab.hasAttribute('data-nav-no-hover-focus'), true);
+      const candidates = app.nav.candidates(dialog.root);
+      for (const category of dialog.categories) {
+        const on = category === current;
+        assert.equal(category.panel.hidden, !on);
+        assert.equal(category.tab.getAttribute('aria-selected'), String(on));
+        assert.equal(category.tab.getAttribute('tabindex'), on ? '0' : '-1');
+        assert.equal(category.tab.classList.contains('is-active'), on);
+        assert.equal(category.tab.getAttribute('aria-controls'), category.panel.getAttribute('id'));
+        if (!on) assert.ok(!candidates.some((item) => category.panel.contains(item)), 'hidden controls excluded');
+      }
+      assert.deepEqual(stored(storage), before);
+      assert.equal(storage.writes, writes);
+      current.panel.scrollTop = 120;
+    }
+    dialog.tabs[1].click();
+    assert.equal(dialog.sections.controls.scrollTop, 0, 'section restarts at top');
+    dialog.customizeButton.focus();
+    dialog.showSection('language');
+    assert.equal(document.activeElement, dialog.tabs[0], 'focus leaves the hidden panel');
+    dialog.tabs[2].click();
+    dialog.close();
+    home.settingsButton.click();
+    assert.equal(dialog.activeSection, 'language', 'every opening starts on Language');
+    assert.equal(document.activeElement, dialog.tabs[0]);
+    assert.deepEqual(stored(storage), before);
+    assert.match(stylesheet(), /\.settings-section\[hidden\]\s*\{\s*display: none;/);
+  } finally { done(); }
+});
+
+test('Tab and Shift+Tab wrap within visible controls, and closing removes its scope only once', () => {
+  const { app, home, dialog, done } = boot();
+  try {
+    home.settingsButton.click();
+    dialog.tabs[1].click();
+    let prevented = 0;
+    const tab = (shiftKey) => dialog.root.dispatch('keydown', { key: 'Tab', shiftKey, preventDefault: () => prevented++ });
+    dialog.customizeButton.focus();
+    tab(false);
+    assert.equal(document.activeElement, dialog.closeButton);
+    tab(true);
+    assert.equal(document.activeElement, dialog.customizeButton);
+    assert.equal(prevented, 2);
+    dialog.tabs[1].focus();
+    tab(false);
+    assert.equal(prevented, 2, 'ordinary Tab movement remains native');
+    let pops = 0;
+    const pop = app.nav.popScope.bind(app.nav);
+    app.nav.popScope = (scope) => { pops++; pop(scope); };
+    dialog.open();
+    assert.equal(app.nav.scopes.length, 1, 'opening twice does not duplicate scopes');
+    dialog.close();
+    dialog.close();
+    assert.equal(pops, 1);
+  } finally { done(); }
+});
+
+test('another configured section gets a tab, panel and directional navigation without algorithm changes', () => {
+  const control = new Element('button');
+  control.setAttribute('data-nav', '');
+  SETTINGS_SECTIONS.push({ id: 'test-section', label: 'settings.title', build: () => [control] });
+  const { app, home, dialog, done } = boot();
+  try {
+    home.settingsButton.click();
+    assert.equal(dialog.tabs.length, 4);
+    app.input.pad('left');
+    assert.equal(dialog.activeSection, 'test-section');
+    assert.equal(dialog.currentSection.panel.hidden, false);
+    assert.equal(dialog.currentSection.tab.getAttribute('aria-controls'), 'settings-panel-test-section');
+    app.input.pad('down');
+    assert.equal(document.activeElement, control);
+    app.input.pad('up');
+    assert.equal(document.activeElement, dialog.tabs[3]);
+    app.input.pad('right');
+    assert.equal(dialog.activeSection, 'language');
   } finally {
+    SETTINGS_SECTIONS.pop();
     done();
   }
 });

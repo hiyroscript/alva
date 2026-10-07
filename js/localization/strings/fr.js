@@ -318,6 +318,7 @@ export const FR = {
 
   'settings.title': 'Paramètres',
   'settings.close': 'Fermer les paramètres',
+  'settings.sections': 'Catégories des paramètres',
   'settings.language': 'Langue',
   'settings.languageNote': 'La langue de tous les menus, libellés et messages.',
   'settings.controls': 'Commandes',
