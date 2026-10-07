@@ -1,422 +1,262 @@
-ALVA — Redesign Settings Dialog with Top Section Navigation
+ALVA — Settings grammar and capitalization overhaul
 
 Objective
 
-Redesign ALVA’s existing Settings dialog to introduce a modern, organized, scalable tabbed section navigation system at the top of the dialog.
+Review and polish the entire Settings interface in the Alva game.
 
-Currently, the Settings dialog contains several sections stacked vertically inside one scrollable container. Players must scroll down to find and access settings in lower sections.
+The goal is to make every heading, option, button, description, and label grammatically correct, professionally written, and consistently capitalized.
 
-This becomes increasingly inconvenient as more settings and categories are added.
+Use sentence case throughout Settings, rather than title case or all-uppercase formatting.
 
-The goal is to replace this long scrolling layout with separate, directly accessible settings sections, selected through a horizontal navigation bar at the top of the dialog.
+Examples:
 
-Important: This is a structural UI/UX improvement, not a redesign of the actual settings or their functionality. Preserve ALVA’s established visual identity and existing behavior.
+* CONTROLS → Controls
+* LANGUAGE → Language
+* COMBAT → Combat
+* Mobile Controls → Mobile controls
+* Classic Buttons → Classic buttons
+* Combat Assist → Combat assist
+* DEFAULT → Default
+* CUSTOM LAYOUT → Custom layout
+* SIZE → Size
 
-1. Understand the existing implementation
+Apply this consistently across the entire Settings experience, not just these examples.
 
-Before modifying anything, inspect the repository and understand how the game handles dialogs, input, localization, settings persistence, and responsive layouts.
+1. Explore the existing implementation
+
+Before making changes, examine the relevant code and understand how the Settings interface works.
+
+Repository: hiyroscript/alva
 
 Important files:
 
-* js/ui/settings-dialog.js — Current dialog implementation and its three sections.
-* css/settings.css — Styling for Settings, language selection, and the touch control editor.
-* js/core/settings.js — Settings storage, validation, defaults, and persistence.
-* js/core/menu-navigator.js — Shared keyboard and gamepad navigation.
-* js/screens/discover-screen.js — Existing tabbed section navigation reference.
-* css/discover.css — Existing tab styling and navigation patterns.
-* js/localization/strings/en.js — English translations.
-* js/localization/strings/fr.js — French translations.
-* tests/interface/settings.test.mjs — Existing settings tests.
-* ALVA_SPEC.md — Authoritative game specification, particularly §6.10.
-* docs/development/conventions.md — Architectural and styling conventions.
+* js/ui/settings-dialog.js
+* js/ui/touch-layout-editor.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* js/localization/i18n.js
+* css/settings.css
+* css/components.css
+* tests/interface/settings.test.mjs
+* tests/interface/i18n.test.mjs
 
-Reuse established patterns where appropriate. Do not introduce a framework, dependency, or unnecessary architectural complexity.
+Also consult ALVA_SPEC.md, docs/systems/localization.md, and codename_rule to respect the game’s architecture and naming conventions.
 
-2. Add top navigation tabs
+Understand how the language system, Settings tabs, control options, customization editor, and CSS interact before editing.
 
-The Settings dialog should have the following structure:
+2. Standardize capitalization
 
-Header
+Use these rules throughout Settings:
 
-ALVA / Settings title and the existing Close button.
+1. Use sentence case for headings, labels, options, badges, and buttons.
+2. Capitalize the first word of a standalone label.
+3. Keep subsequent words lowercase unless they are proper nouns, acronyms, or intentionally named game mechanics.
+4. Preserve the official capitalization of ALVA, English, Français, CPU, and established game-mode names when appropriate.
+5. Don’t capitalize ordinary words purely for visual emphasis.
+6. Avoid changing the actual meaning of interface text.
 
-Navigation bar
+For example, the Controls section should display:
 
-A horizontal row of clickable category tabs immediately beneath the header:
+Controls
 
-Language | Controls | Combat
+Mobile controls
 
-Content area
+Joystick — Default
 
-A dedicated panel displaying only the settings belonging to the currently selected category.
+Classic buttons
 
-The navigation bar must remain visible while interacting with settings. The player should never need to scroll through unrelated categories to reach another section.
+Customize touch controls
 
-Each tab must:
+Every other section should follow the same presentation style.
 
-* Be an actual interactive button.
-* Have a clear active state.
-* Be accessible using mouse, touchscreen, keyboard, and gamepad.
-* Open its corresponding section immediately.
-* Keep the Settings dialog open when switching sections.
-* Never trigger a page transition or affect gameplay.
-* Display properly in English and French.
+3. Fix the actual source of uppercase text
 
-Do not implement this as anchor links that scroll to different positions in the same long page.
+In css/settings.css, inspect the existing text-transform: uppercase rules.
 
-Only one settings section should be visible at a time.
+The current stylesheet forces uppercase presentation on several Settings elements, including:
 
-3. Organize existing settings
+* .settings-group-title
+* .settings-option-tag
+* .touch-editor-size-label
 
-Preserve all existing settings, descriptions, choices, and functionality.
+Remove or appropriately override these transformations so the elements display the exact capitalization provided by the translations.
 
-Language tab
+Check for additional inherited uppercase styles affecting Settings.
 
-Contains:
+Do not remove uppercase styling globally from unrelated screens or intentional branding. For example, ALVA’s wordmark must remain unchanged.
 
-* English
-* Français
+Keep the existing typography, colors, spacing, borders, and overall visual design.
 
-Retain the existing selection indicators and radio-group semantics.
+4. Correct grammar and awkward wording
 
-Changing the language must immediately update the game interface, including the Settings dialog and tab labels.
+Review every English string associated with Settings, including descriptions and the touch-control editor.
 
-The dialog should remain open, and the Language tab should remain selected.
+Fix spelling mistakes, unnatural phrasing, inconsistent capitalization, and ambiguous instructions.
 
-Controls tab
+One confirmed issue is:
 
-Contains:
+settings.scheme.joystickDesc
 
-* Mobile Controls
-* Joystick option
-* Classic Buttons option
-* Existing visual previews
-* Default and Selected indicators
-* Customize touch controls button
-* Description of the currently selected layout
-* Custom layout indicator when applicable
+Current text:
 
-The Customize button must continue opening the existing touch layout editor.
+“A round joystick to move, with one-tap Left and Right mouvement buttons to Dash.”
 
-Returning from the editor must restore the Settings dialog with the Controls tab still selected, preserving the appropriate focus.
+This contains incorrect English wording.
 
-Do not alter keyboard/gamepad mappings or change existing touch layout behavior.
+Rewrite it naturally, preserving the actual gameplay instructions.
 
-Combat tab
+Also review:
 
-Contains:
+* settings.controlsNote
+* settings.scheme.classicDesc
+* settings.customizeNote
+* settings.combatAssistDesc
+* All settings.* strings
+* Relevant editor.* strings
+* Relevant touch-control labels shown in the editor
 
-* Combat Assist
-* Existing explanation
-* On option
-* Off option
-* Default and selected indicators
+Pay particular attention to dynamically generated descriptions.
 
-Combat Assist must retain its current behavior, default value, and persistence.
+For example, the current customization description inserts a capitalized scheme name into the middle of a sentence:
 
-Do not alter combat calculations, player mechanics, CPU behavior, or Watch Mode.
+“Move and resize every control of the Classic Buttons layout.”
 
-4. Visual design requirements
+This should read naturally regardless of which layout is selected.
 
-The new navigation must feel native to ALVA.
+You may simplify the sentence or introduce context-appropriate translations if necessary.
 
-Preserve the existing:
+Preserve the meaning and placeholders where needed.
 
-* Dark translucent glass dialog
-* Background dimming and blur
-* Typography
-* Green accent colors
-* Border and corner styling
-* Button styling
-* Spacing conventions
-* Focus indicators
-* Overall aesthetic
+5. Respect localization
 
-Design the tab navigation as an integrated part of the modal rather than as a separate floating component.
+Alva supports English and French.
 
-Active tab
-
-The selected tab should have:
-
-* Stronger text contrast
-* A visible green bottom indicator or underline
-* A subtle accent background, if appropriate
-* An unmistakable selected state, not communicated by color alone
-
-Inactive tabs
-
-Inactive tabs should have:
-
-* Muted text
-* Appropriate hover feedback
-* Clear keyboard/gamepad focus indicators
-* No distracting animations
-
-Use subtle transitions consistent with ALVA’s existing animation timings.
-
-Respect reduced-motion preferences.
-
-Avoid excessive glow, oversized buttons, decorative gradients, or introducing a new visual language.
-
-5. Layout and scrolling behavior
-
-The layout should behave as three primary regions:
-
-1. Fixed dialog header
-2. Fixed top section navigation
-3. Flexible active-section content area
-
-The header and navigation tabs should remain visible at all times.
-
-Only the selected section’s content may scroll vertically when it cannot fit in the available space.
-
-Switching sections should immediately display the selected panel at its top, or restore its previous internal scroll position if implemented consistently.
-
-Important: Do not allow the entire Settings dialog to become one large vertically scrolling collection of categories again.
-
-Preserve the current behavior in which Home remains fixed behind the modal.
-
-Use appropriate CSS grid/flex sizing, including min-height: 0 where necessary, to avoid overflow issues.
-
-6. Responsive layout
-
-ALVA supports desktop browsers, tablets, and mobile devices in landscape orientation. All must be supported.
-
-Desktop
-
-Display the category tabs in a horizontal row beneath the header.
-
-Distribute spacing naturally and ensure the content area uses the available dialog space efficiently.
-
-Mobile and compact landscape
-
-The section navigation must remain horizontal and accessible, even when vertical screen space is limited.
+English is the fallback language, and both languages share the localization-key structure.
 
 Requirements:
 
-* Keep tabs easy to tap, preferably with a minimum 44px interaction target.
-* Prevent tab labels from overlapping or becoming unreadable.
-* Use compact padding and typography where appropriate.
-* If future categories exceed the available width, allow the tab bar itself to scroll horizontally.
-* Do not shrink category names until they become illegible.
-* Automatically reveal the selected tab if it sits outside the visible part of the horizontal navigation.
-* Avoid introducing horizontal scrolling to the entire dialog.
-* Keep the Close button accessible.
-* Ensure the active settings panel remains usable in very short landscape viewports.
+* Correct English text in js/localization/strings/en.js.
+* Review the corresponding French strings for genuine spelling, grammar, or capitalization inconsistencies.
+* Respect French capitalization conventions rather than mechanically applying English rules.
+* Keep existing localization keys stable.
+* Preserve dynamic placeholders and their correct grammatical placement.
+* Ensure switching languages updates Settings immediately without refreshing.
+* Ensure the touch-control editor uses the correct translations.
 
-Retain existing compact-mode behavior where appropriate, including hiding optional control-card descriptions below the existing height threshold.
+Do not translate internal identifiers, CSS classes, stored setting names, or gameplay codenames.
 
-Do not hide the Combat Assist explanation merely to make the panel smaller.
+In particular, preserve the intentionally spelled internal animation codename mouvment, as documented by the repository. User-facing English spelling mistakes can be corrected without renaming internal identifiers.
 
-7. Keyboard and gamepad navigation
+6. Cover the entire Settings experience
 
-ALVA already has a shared MenuNavigator system.
+Audit all three Settings categories.
 
-Integrate the new tabs with this system rather than building a competing input handler.
+Language
 
-Expected behavior:
+* Category tab and section heading
+* Language descriptions
+* English and Français options
+* Related labels and accessibility text
 
-* Mouse click or touch selects a tab.
-* Keyboard and gamepad users can reach the navigation tabs.
-* Left/Right arrows and gamepad D-pad can navigate between category tabs.
-* The current category updates when a tab is activated.
-* Players can move naturally between the navigation bar and the settings within the active section.
-* Confirm inputs continue activating the focused setting.
-* Navigation must never reach hidden sections.
-* Navigation must never escape to the Home screen while Settings is open.
+Controls
 
-Follow the existing Discover screen’s tab-navigation conventions where appropriate.
+* Category tab and section heading
+* Mobile controls heading
+* Joystick option
+* Classic buttons option
+* Default and custom layout badges
+* Layout descriptions
+* Customize touch controls button
+* Dynamic customization descriptions
 
-Consider using the dialog’s navigation scope and its directional input handling for predictable tab movement.
+Combat
 
-Important: ALVA’s shared navigator focuses elements on mouse hover by default. Tab hover must not accidentally change the selected section.
+* Category tab and section heading
+* Combat assist heading
+* Explanation of the feature
+* On and Off selections
+* Default badge
 
-Use the established data-nav-no-hover-focus convention or equivalent appropriate handling.
+Also review the entire touch-control editor, including its heading, selected-layout label, Size label, instructions, reset button, completion button, and accessibility announcements.
 
-When switching tabs, make sure focus remains valid. Do not leave keyboard or gamepad focus on an element that has become hidden.
+Ensure text capitalization remains consistent when the user changes Settings or switches languages.
 
-Opening Settings
+7. Preserve functionality and design
 
-Open on the Language section by default.
+This is a copy-editing and presentation-consistency update, not a gameplay redesign.
 
-Focus the active Language tab so the category navigation is immediately discoverable and accessible.
+Do not modify:
 
-Closing Settings
+* Combat mechanics or movement behavior
+* Joystick and classic control functionality
+* Combat assist behavior
+* Settings persistence or saved-value compatibility
+* Keyboard, mouse, touch, or gamepad navigation
+* Selection states or focus management
+* Modal behavior
+* The game’s overall UI layout and visual identity
 
-Preserve every current dismissal method:
+Do not rename internal settings IDs, localization keys, or control identifiers to match the new display text.
 
-* Close button
-* Escape
-* Gamepad Back
-* Clicking the dimmed backdrop
+Keep the interface responsive on desktop, tablets, and phones in landscape orientation.
 
-Return focus to the Home settings gear.
+Ensure the corrected text fits comfortably in existing interface elements without clipping, overflow, or awkward wrapping.
 
-Make sure the dialog’s navigation scope is removed exactly once.
+8. Update and run tests
 
-8. Accessibility
+The existing interface tests contain exact string assertions that will need updating.
 
-Implement proper tabbed-interface semantics.
+In particular, review:
 
-Use:
+* tests/interface/settings.test.mjs
+* tests/interface/i18n.test.mjs
+* Any relevant CSS or touch-layout editor tests
 
-* role="tablist" on the category navigation
-* role="tab" on category buttons
-* role="tabpanel" on category content panels
-* aria-selected for the current tab
-* aria-controls to connect tabs to panels
-* aria-labelledby to connect panels with their tabs
-* Roving tabindex where appropriate
-* Correct hidden states for inactive panels
+Update expected strings when the intended display copy changes.
 
-Only the selected tab should participate in normal Tab navigation, while directional navigation must still reach the other tabs.
+Add focused regression coverage verifying that:
 
-Ensure inactive panels are genuinely hidden from rendering, assistive technologies, and input navigation. Add explicit CSS for [hidden] panels where necessary so existing display rules cannot override hiding.
+1. Settings headings use sentence case.
+2. Classic buttons, Mobile controls, and Combat assist appear correctly.
+3. CSS no longer forces Settings headings or badges into uppercase.
+4. Both English and French remain correctly localized.
+5. Dynamic layout descriptions are grammatically correct.
+6. All settings continue to save, load, and respond to player input correctly.
 
-Preserve the existing modal semantics:
-
-* role="dialog"
-* aria-modal="true"
-* Dialog title association
-* Focus restoration
-* Background inert behavior
-
-Do not break the radio groups within individual sections.
-
-The category tabs represent navigation, while radio controls represent saved setting choices. Keep these concepts semantically separate.
-
-9. Scalable architecture for future settings
-
-This is a major reason for the change.
-
-ALVA will receive more settings and categories over time.
-
-Make it straightforward to add another settings section without rewriting the dialog’s layout or navigation logic.
-
-Prefer a small, centralized section definition containing information such as:
-
-* Stable section ID
-* Localization key
-* Section content or content builder
-
-Generate the navigation tabs and corresponding panels from this definition where practical.
-
-Keep category ordering predictable.
-
-Avoid hardcoding navigation behavior specifically for exactly three tabs.
-
-Adding a fourth or fifth category should not require changing the navigation algorithm, layout structure, or overflow system.
-
-However, do not introduce speculative or empty settings categories now.
-
-Only the three existing categories should appear in this update.
-
-Do not change the saved settings schema simply to support UI navigation.
-
-The selected tab is a presentation concern, not a new gameplay preference.
-
-10. Preserve all existing functionality
-
-This implementation must not change how settings are saved or applied.
-
-Preserve:
-
-* Immediate settings persistence
-* Existing localStorage key and schema version
-* Saved language behavior
-* Saved mobile controls behavior
-* Per-layout custom touch configurations
-* Combat Assist behavior
-* First-launch language selection
-* English/French localization
-* Touch layout editor integration
-* Existing menu and gamepad input mappings
-* Home screen behavior
-* Dialog opening and closing behavior
-
-Do not modify gameplay code unless a genuine integration issue requires it.
-
-Avoid unrelated refactoring.
-
-11. Tests and verification
-
-Update and extend the existing tests in tests/interface/settings.test.mjs.
-
-At minimum, verify:
-
-1. Exactly three category tabs exist: Language, Controls, and Combat.
-2. Language is selected by default when Settings opens.
-3. Exactly one panel is visible at any moment.
-4. Selecting Controls hides Language and Combat.
-5. Selecting Combat shows only Combat settings.
-6. Changing settings still saves the correct values.
-7. Switching categories does not reset any settings.
-8. Hidden section controls cannot be reached through the menu navigator.
-9. Keyboard and gamepad directional navigation works across tabs.
-10. Focus remains inside the dialog.
-11. Opening and closing the touch editor returns to Controls.
-12. Switching languages updates tab labels and settings text immediately.
-13. Closing Settings restores focus to the Home gear.
-14. Reopening Settings has the specified default selection.
-15. The active tab has correct ARIA attributes.
-16. Adding an additional section to the section configuration would work without rewriting navigation.
-
-Update existing assertions that assume all three sections are simultaneously visible.
-
-Preserve unrelated test coverage.
-
-Run:
-
-node --test tests/interface/settings.test.mjs
-
-Then run the complete test suite:
+Run the full test suite:
 
 node --test
 
-Perform real-browser visual verification because the fake DOM tests cannot validate layout geometry, focus visibility, horizontal overflow, or touch responsiveness.
+Do not delete or weaken existing tests merely to make them pass.
 
-Test desktop, compact landscape mobile, narrow screens, and French translations.
+9. Final quality review
 
-12. Documentation
+After implementing the changes, inspect the complete Settings experience in both languages.
 
-Update ALVA_SPEC.md, particularly section 6.10, to accurately describe the new Settings navigation.
+Check every category, selectable option, description, badge, and touch-editor control.
 
-Document:
+Compare the final UI against these requirements:
 
-* Top tab navigation
-* One visible section at a time
-* Focus and directional navigation rules
-* Internal scrolling behavior
-* Responsive horizontal tab overflow
-* Future section extensibility
+* No unintended uppercase headings.
+* No inconsistent title-case labels.
+* No spelling or obvious grammar errors.
+* No awkward dynamically generated sentences.
+* No broken translations.
+* No visual regressions.
+* No changes to gameplay functionality.
 
-Preserve the specification’s existing descriptions of settings and their behavior.
+The desired result is a polished, consistent Settings interface that feels professionally written while retaining Alva’s existing design.
 
-Update other relevant documentation only where necessary.
+Deliverables
 
-13. Acceptance criteria
+Implement the actual changes in the repository.
 
-The implementation is complete when:
+When finished, provide:
 
-* Players can open Settings and immediately see Language, Controls, and Combat as clickable tabs at the top.
-* Switching between these categories requires no vertical scrolling.
-* Each section contains only its corresponding settings.
-* The header and category navigation remain accessible while scrolling section content.
-* The layout looks consistent with ALVA’s current visual design.
-* The interface works on desktop, mobile, keyboard, touchscreen, and gamepad.
-* English and French work correctly.
-* Existing settings, their persistence, and the touch editor behave exactly as before.
-* The system is designed to accommodate additional settings categories.
-* All relevant tests pass and documentation matches the implementation.
+1. A concise summary of the corrections.
+2. The files modified.
+3. Important before-and-after text examples.
+4. The results of the tests.
+5. Any remaining issues that could not be verified.
 
-Final instructions
-
-Implement the changes directly in the existing architecture.
-
-Prioritize simplicity, responsiveness, maintainability, accessibility, and consistency with the rest of ALVA.
-
-Do not create a separate Settings screen, replace the existing modal, introduce a framework, or redesign unrelated interfaces.
-
-The central principle is simple: Settings should be organized into immediately accessible categories, not one long page that players have to scroll through.
-
-After implementation, provide a concise summary of changed files, resulting behavior, test results, and any remaining limitations.
+Important: Do not stop after fixing the examples provided. Perform a comprehensive audit of the entire Settings interface and correct every comparable issue you find. Keep the changes targeted, minimal, and consistent with the project’s existing architecture.
