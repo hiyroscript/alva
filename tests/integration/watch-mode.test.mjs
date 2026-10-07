@@ -360,7 +360,7 @@ test('Home: Watch Mode sits between Play and Practice Ground, styled like the se
   const { play, watch, practice, discover } = home.actions;
   assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Play → Watch Mode → Practice Ground → Discover');
   assert.deepEqual(home.el.querySelector('.home-actions').children, [play, watch, practice, discover], 'in the DOM in that order');
-  assert.ok(watch.html.includes('<span>Watch Mode</span>'));
+  assert.ok(watch.html.includes('<span>Watch mode</span>'));
   assert.ok(watch.html.includes(ICONS.right), 'the secondary actions\' chevron');
   assert.equal(watch.className, practice.className, 'the same outlined Home action as Practice Ground and Discover');
   assert.equal(watch.className, 'home-action');
@@ -373,7 +373,7 @@ test('Home: Watch Mode sits between Play and Practice Ground, styled like the se
   assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.settingsButton],
     'keyboard / gamepad reach all four, in order, then the Settings gear');
   // Practice Ground and Discover still open their screens (their stand-ins).
-  assert.ok(practice.html.includes('<span>Practice Ground</span>'));
+  assert.ok(practice.html.includes('<span>Practice ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
   const src = readFileSync(new URL('../../js/screens/home-screen.js', import.meta.url), 'utf8');
   assert.match(src, /practice\.addEventListener\('click', startMatch\('practice'\)\)/, 'Practice Ground starts a match');
