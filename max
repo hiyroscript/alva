@@ -1,280 +1,569 @@
-ALVA — Standardize Touch-Control Icons and Personalization Screen
+ALVA — Mouvement Controls and Mobile Button Consistency Update
 
 Objective
 
-Update Alva’s mobile touch-control interface to make the universal action icons clearer and ensure the button personalization screen always displays neutral, character-independent icons.
+Inspect and update the existing ALVA game to improve Mouvement controls, eliminate double-tap Dash activation, and standardize the appearance of mobile action buttons.
 
 Repository: hiyroscript/alva
 Branch: main
+Technology: Vanilla JavaScript (ES modules), CSS, HTML, Canvas 2D.
 
-This is a UI presentation update, not a gameplay or input-system redesign. Preserve all combat mechanics, button bindings, control positions, customization functionality, and character-specific gameplay abilities.
+This must be a complete, functional change to the existing game, not a visual mockup or an isolated workaround.
 
-1. Jump button — Remove the bottom line
+Preserve all existing gameplay mechanics that are unrelated to the requested control changes.
 
-Primary file: js/ui/icons.js
+⸻
 
-The current ICONS.jump SVG displays an upward-pointing arrow with a separate horizontal line beneath it.
+1. Remove Double-Tap Mouvement Activation Completely
 
-Change the icon so that:
+Current behavior
 
-* Only the upward-pointing arrow remains.
-* Remove the separate horizontal baseline below the arrow.
-* Preserve the arrow’s vertical shaft and arrowhead.
-* Keep the icon centered and visually balanced.
-* Preserve the existing stroke thickness, SVG dimensions, and color inheritance.
+The game currently allows a Dash (internally associated with Mouvement) when a player double-taps a directional Run control.
 
-The current SVG includes:
+This behavior exists in the shared fighter movement implementation, not just the Classic mobile interface.
 
-<path d="M5 20.5h14"/>
+Relevant code:
 
-Remove that specific bottom line without removing the actual arrow shaft.
+* js/game/fighters/fighter.js: dashAsked(), trackDashTaps()
+* js/game/fighters/movement.js: readDashTap()
+* js/data/movement.js: dashTapWindow
+* js/core/input-manager.js: directional press detection and Mouvement requests
+* js/game/ai/combat-ai.js: CPU Dash activation
 
-Apply the updated Jump icon everywhere it is used, including battle controls, Practice Ground, and the touch-control customization screen.
+Required behavior
 
-Do not change the Jump action, jump physics, multiple-jump behavior, or input binding.
+Mouvement must NEVER be activated through double-tapping Run Left or Run Right.
 
-2. Defence button — Always display the shield icon
+This applies regardless of whether the character is on the ground or airborne.
 
-Primary files:
+Requirements:
 
-* js/ui/touch-controls.js
-* js/ui/icons.js
+1. Repeatedly tapping Run Left must only produce normal directional movement.
+2. Repeatedly tapping Run Right must only produce normal directional movement.
+3. Double-tapping, triple-tapping, or rapidly alternating directional inputs must never trigger Mouvement.
+4. Quickly flicking the joystick in either direction must never accidentally trigger Mouvement.
+5. Running must remain completely independent from Mouvement activation.
+6. Both ground Dash and air Dash must require an explicit Mouvement request.
+7. Do not substitute a long press, swipe, or another hidden gesture for the removed double-tap behavior.
 
-Currently, the defence button changes its displayed icon depending on whether the fighter is grounded or airborne.
+Remove the engine-level fallback that interprets two Run press edges as a Dash request.
 
-On the ground, it shows ICONS.shield.
+Retire obsolete tap-tracking state and logic where it is no longer needed.
 
-In the air, when a fighter has Deflect, it switches to ICONS.deflect.
+Preserve existing Mouvement mechanics
 
-Remove this visual icon-switching behavior.
+Do not change the actual gameplay functionality of Mouvement.
 
-Required behavior:
+Keep:
 
-* The defence button must always display ICONS.shield.
-* This applies on the ground and in the air.
-* It applies to every playable character.
-* It applies in regular battles, Practice Ground, and the touch-control editor.
-* The shield icon must not change when the fighter jumps, falls, lands, or enters another combat state.
+* Existing Dash and air Dash speeds.
+* Dash and air Dash durations.
+* Energy costs.
+* Movement cooldowns.
+* Ground and airborne restrictions.
+* Existing animation requirements.
+* Momentum preservation.
+* Attack and Jump cancellation behavior.
+* Movement buffering.
+* Existing physics and collision handling.
 
-In TouchControls.refreshAbilities(), stop replacing the shield’s artwork with ICONS.deflect.
+Continue routing explicit Mouvement requests through the existing Fighter.tryMouvment() behavior, which selects tryDash() or tryAirDash() as appropriate.
 
-Important: Preserve the actual Shield and Deflect mechanics. An airborne press must still perform Deflect when supported by the fighter. The button must continue sending the existing shield input.
+Only change how Mouvement is requested—not what Mouvement does.
 
-The accessibility label may continue identifying the airborne action as “Deflect” when appropriate, because the actual action changes. Only the visible icon must remain the shield.
+Keyboard, gamepad, and CPU compatibility
 
-Do not change the defensive mechanics, Energy consumption, timing windows, or combat behavior.
+Because double-tap detection currently exists in the shared engine, removing it must not unintentionally make Dash unavailable on non-touch devices or to the CPU.
 
-3. Mouvement buttons — Use double arrows
+For keyboard and gamepad, introduce intentional, documented, non-double-tap Mouvement inputs using available, non-conflicting controls. For example, separate keyboard bindings such as Q/E and a dedicated gamepad modifier plus direction are acceptable if they fit the existing input scheme.
 
-Primary files:
+Do not override existing combat, Jump, Shield, or menu mappings.
 
-* js/ui/icons.js
-* js/ui/touch-controls.js
+Update CombatAIController to request Mouvement explicitly rather than synthesizing two Run presses. Preserve the CPU’s ability to Dash, air Dash, recover, and execute Dash follow-ups.
 
-In the Joystick control scheme, there are two separate Mouvement buttons:
+Normal CPU running must not accidentally activate Mouvement.
+
+⸻
+
+2. Add Two Dedicated Mouvement Buttons to Classic Buttons
+
+Current behavior
+
+Classic Buttons currently displays two directional controls:
+
+[ Run Left ]   [ Run Right ]
+
+Players must double-tap these buttons to Dash.
+
+Joystick mode already has two dedicated Mouvement buttons, using the stable identifiers:
 
 * mouvementLeft
 * mouvementRight
 
-These currently display single directional arrow icons.
+Required behavior
 
-Replace them with double directional arrows.
+Classic Buttons must have four separate directional controls:
 
-Desired appearance
+* Run Left
+* Run Right
+* Mouvement Left
+* Mouvement Right
 
-* Left Mouvement: two arrows pointing left, visually similar to ≪.
-* Right Mouvement: two arrows pointing right, visually similar to ≫.
-* Each button should contain two distinct arrowheads pointing in the same direction.
-* Use clean SVG geometry consistent with the current icon system.
-* Keep the double arrows centered inside their circular buttons.
-* Maintain adequate spacing and legibility at small mobile sizes.
+The layout must clearly distinguish normal running from Mouvement.
 
-Prefer adding dedicated universal icons to ICONS, such as mouvementLeft and mouvementRight, or similarly descriptive names.
+Default visual arrangement
 
-Update MOUVEMENT_BUTTONS to reference the new icons.
+Use the following conceptual layout in the bottom-left corner:
 
-The Classic Buttons scheme’s ordinary runLeft and runRight controls should retain their existing single-arrow appearance. The double-arrow design is specifically for the Joystick scheme’s Mouvement/Dash buttons.
+     [≪]       [≫]       ← Mouvement
+     [<]       [>]       ← Run
 
-Preserve the existing internal codenames, spelling, input events, Dash/air-dash logic, and touch behavior.
+The Mouvement buttons should sit directly above their corresponding Run buttons, maintaining a balanced, symmetrical arrangement.
 
-4. Button personalization screen — Always show default icons
+Use the existing smaller Mouvement button style from Joystick mode.
 
-Primary files:
+Requirements:
 
-* js/ui/touch-layout-editor.js
+1. Mouvement Left and Right must be visibly separate buttons.
+2. Each should display two directional arrowheads.
+3. Run Left and Right should continue displaying single arrowheads.
+4. Tapping either Mouvement button once requests exactly one Dash in that direction.
+5. Holding a Mouvement button must not generate repeated Dash requests.
+6. The Mouvement buttons must not behave as normal Run buttons.
+7. Players must be able to hold Run while tapping a Mouvement button.
+8. Jump, attacks, Shield, and other simultaneous touch combinations must continue working.
+
+Implementation
+
+Reuse the existing Mouvement control behavior wherever possible.
+
+Relevant implementation:
+
 * js/ui/touch-controls.js
-* js/ui/mobile-abilities.js
+* css/touch-controls.css
+* js/core/touch-layout.js
 
-This is an important distinction between the customization editor and actual gameplay.
+Prefer shared Mouvement button construction and event-handling logic for both schemes rather than duplicating gameplay logic.
 
-Currently, the touch-control editor displays character-specific attack artwork based on the fighter last selected.
+Update TouchControls.build() and TouchControls.setScheme() so both schemes display the correct controls.
 
-This is not the desired behavior.
+The Classic scheme must now expose:
 
-The button personalization screen must always show neutral default icons, completely independent of the selected character.
+* runLeft
+* runRight
+* mouvementLeft
+* mouvementRight
 
-Default icon mapping
+Ensure the new buttons are correctly managed by the existing multi-touch and pointer capture systems.
 
-Control	Required icon
-Attack 1	One dot (ICONS.pip1)
-Attack 2	Two dots (ICONS.pip2)
-Attack 3	Three dots (ICONS.pip3)
-Attack 4	Four dots (ICONS.pip4)
-Attack 5	Five dots (ICONS.pip5)
-Extra Attack	Universal ring (ICONS.ring)
-Transform	Universal star (ICONS.transform)
-Defence	Universal shield (ICONS.shield)
-Jump	Updated upward arrow without baseline
-Left Mouvement	Double left arrows
-Right Mouvement	Double right arrows
-Classic Left / Right	Existing single left/right arrows
-Joystick	Existing universal joystick appearance
+Important: Classic mode’s .tc-dpad captures pointer input to support sliding between Run Left and Run Right. Adding Mouvement buttons must not cause their pointer events to be interpreted as Run presses by that container.
 
-The neutral attack pips, ring, Transform star, shield, and other universal SVGs already exist. Reuse them rather than creating duplicate assets.
+Preserve the existing ability to slide a finger between the two Run buttons.
 
-Required editor behavior
+Make sure changing schemes, pausing, releasing a pointer, cancelling touch, or losing pointer capture never leaves a button visually or logically pressed.
 
-1. Opening Settings → Controls → Customize touch controls must display the default icons for every button.
-2. No attack button may display a fighter sprite, ability preview image, animation frame, projectile image, or character-specific icon.
-3. Every attack slot from Attack 1 through Attack 5 must remain visible, even if the currently selected character does not possess that attack.
-4. The icons must not depend on the player’s last selected fighter.
-5. Switching characters elsewhere must never change the editor’s icons.
-6. Reopening the editor must produce the same neutral icon mapping.
-7. Switching between Joystick and Classic layouts must preserve the appropriate neutral icons.
-8. The editor should use neutral, localized control names such as “Attack 1”, “Attack 2”, and “Extra Attack”, rather than character-specific move names.
-9. Existing resizing, dragging, control selection, keyboard/gamepad editing, layout persistence, and Reset to Defaults must work exactly as before.
+⸻
 
-Implementation guidance
+3. Center the Mouvement Arrow Icons
 
-In TouchLayoutEditor.open(), the current implementation calls:
+Current issue
 
-this.touch.setCharacter(getPlayableCharacter(this.app.selection?.characterId));
+The double-arrow icons inside the Mouvement buttons need better visual alignment.
 
-This makes the editor’s button presentation depend on the selected character.
+Relevant files:
 
-Use the neutral rendering path instead, such as this.touch.setCharacter(null), while preserving the editor’s showAbsent: true behavior.
+* js/ui/icons.js
+* css/touch-controls.css
 
-Check that the neutral path consistently produces default icons and labels for every control.
+The existing ICONS.mouvementLeft and ICONS.mouvementRight definitions use SVG paths that can appear directionally weighted.
 
-Avoid unnecessarily changing the rendering behavior of the actual battle interface.
+Required appearance
 
-Important separation
+Both arrowheads should look properly centered within their circular buttons.
 
-In the personalization screen: Always show neutral icons.
+Requirements:
 
-In real gameplay: Continue displaying each fighter’s authored attack artwork wherever that is the existing intended behavior.
+1. Center the overall double-arrow symbol horizontally.
+2. Center it vertically.
+3. Maintain equal visual spacing between both arrowheads.
+4. Make the left and right variants visually symmetrical.
+5. Keep consistent stroke thickness and proportions.
+6. Preserve the double-arrow design.
+7. Ensure neither symbol appears pushed toward the button’s outer edge.
 
-The universal changes to Jump, Defence, and Mouvement icons should apply in both contexts.
+Adjust the SVG path geometry and, if necessary, the icon sizing or alignment CSS.
 
-Do not remove or modify the character artwork assets, character definitions, move previews, or abilities simply to achieve the neutral editor appearance.
+Do not reposition the entire Mouvement button to compensate for misaligned artwork.
 
-5. Preserve the existing control system
+The icon should be centered inside its own button.
 
-The implementation must maintain all existing interaction behavior.
+Scaling
 
-In particular:
+Verify that the arrow alignment remains correct when:
 
-* Do not modify the input codenames shield, jump, attack1 through attack5, extra_attack, transform, mouvementLeft, or mouvementRight.
-* Preserve the existing data-action, data-mouvement, and data-control identifiers.
-* Preserve multi-touch support, simultaneous button presses, pointer capture, and pressed states.
-* Preserve the existing button positions, sizing, hit targets, and honeycomb attack layout.
-* Do not reset or migrate the user’s saved custom layouts unnecessarily.
-* Preserve localization in English and French.
-* Do not modify game physics, character data, damage, cooldowns, or movement mechanics.
-* Do not modify the protected character_rule file.
+* The screen size changes.
+* Landscape dimensions change.
+* The user customizes the button size.
+* The button is pressed.
+* The button is displayed in the touch layout editor.
 
-Keep the solution simple, reusable, and compatible with additional characters introduced in the future.
+The same corrected icon should be used in both Joystick and Classic layouts.
 
-6. Update automated tests
+⸻
 
-Relevant test files:
+4. Make Jump and Extra Attack Match the Other Action Buttons
 
-* tests/interface/controls-ui.test.mjs
-* tests/interface/touch-layout.test.mjs
+Current issue
 
-Update existing expectations that explicitly require the old icons or character-specific artwork in the editor.
+The Jump and Extra Attack buttons do not have the same appearance as the other circular action buttons.
 
-Add regression coverage for the following scenarios:
+In css/touch-controls.css, the general .tc-btn class already defines the standard button appearance.
+
+However, separate CSS overrides change Jump and Extra Attack.
+
+For example:
+
+* .tc-extra_attack increases size to 112%, changes border width to 3px, and applies its own background and border colors.
+* .tc-jump applies a different background and border color.
+
+These differences make the action cluster visually inconsistent.
+
+Required behavior
+
+Jump and Extra Attack must use the exact same standard button design as the other action buttons.
+
+Standardize:
+
+* Diameter.
+* Circular shape.
+* Border thickness.
+* Border color.
+* Background color.
+* Transparency.
+* Shadow.
+* Pressed animation.
+* Pressed-state background and border.
+* Default visual intensity.
+
+Use the shared .tc-btn styling as the primary source of truth.
+
+Remove unnecessary visual overrides rather than creating new overrides to imitate the other buttons.
+
+Extra Attack
+
+Remove its special enlarged appearance and oversized border.
+
+Extra Attack should have the same outer diameter, border, background, and pressed feedback as Attack 1–5.
+
+Keep:
+
+* Its existing position in the action cluster.
+* Its fighter-specific sprite preview.
+* Its accessible name.
+* Its existing gameplay behavior.
+
+The fighter’s artwork may differ, but the button container must look identical.
 
 Jump
 
-* ICONS.jump contains the upward arrow.
-* The bottom horizontal baseline is absent.
-* The icon is the same across fighters and screens.
+Remove its special background and border styling.
 
-Defence
+Jump must use the same button appearance as the others.
 
-* Grounded fighters display ICONS.shield.
-* Airborne fighters display ICONS.shield.
-* Fighters with or without Deflect display ICONS.shield.
-* Airborne Deflect behavior and accessible naming remain functional.
-* Landing or jumping does not replace the shield icon.
+Keep:
 
-Mouvement
+* Its upward-arrow symbol.
+* Its existing position.
+* Its standard and higher-jump mechanics.
+* Its airborne jump functionality.
+* Its existing touch handling.
 
-* mouvementLeft uses the new double-left-arrow SVG.
-* mouvementRight uses the new double-right-arrow SVG.
-* Classic movement buttons retain their single arrows.
-* Both Mouvement buttons still generate the correct Dash requests.
+Action cluster layout
 
-Personalization editor
+Preserve the intended layout:
 
-* All five numbered attacks use their matching pip icons.
-* Extra Attack uses the universal ring.
-* Transform, Defence, and Jump use their correct universal glyphs.
-* No .tc-sprite-icon elements appear on customization controls.
-* Neutral icons are shown with character 0001 selected.
-* The exact same neutral icons are shown with character 0002 selected.
-* The editor remains neutral with no character selected.
-* Missing attacks remain visible in the editor.
-* The editor displays neutral localized control names.
-* Saved layouts, resizing, dragging, and Reset to Defaults still work.
-* The normal gameplay interface continues to display the appropriate character-specific attack artwork.
+        [4]   [5]   [EXTRA]
+     [3]   [TRANSFORM] [SHIELD]
+        [1]   [2]   [JUMP]
+
+All these action buttons should now have consistent outer dimensions.
+
+Recalculate any cluster geometry that previously depended on Extra Attack being larger.
+
+Do not introduce overlaps or uneven alignment.
+
+Existing special visual states that communicate actual gameplay information, such as unavailable abilities or reserved Transform, should remain functional.
+
+⸻
+
+5. Update the Touch Layout Customization Editor
+
+ALVA already allows players to move and resize touch controls from Settings.
+
+Relevant files:
+
+* js/core/touch-layout.js
+* js/ui/touch-layout-editor.js
+* js/core/settings.js
+
+The new Classic Mouvement buttons must fully participate in this system.
+
+Required functionality
+
+Players must be able to independently:
+
+* Select Mouvement Left.
+* Select Mouvement Right.
+* Move either button.
+* Resize either button.
+* Restore default positions and sizes.
+
+Add both Mouvement IDs to the Classic scheme’s TOUCH_CONTROL_IDS list.
+
+Keep the existing stable identifiers; do not introduce alternative spellings or duplicate logical actions.
+
+Ensure:
+
+1. Both buttons appear in the Classic layout editor.
+2. The editor displays their correct double-arrow icons.
+3. Their localized accessible names are correct.
+4. Their custom positions and sizes persist after saving and reopening the game.
+5. Their positions remain valid across device sizes.
+6. Resetting the Classic layout restores all four directional controls to their intended default arrangement.
+7. Existing saved Classic layouts remain compatible and retain the player’s previously customized controls.
+8. Joystick and Classic layouts continue to save independently.
+
+Do not unnecessarily reset users’ existing settings or change the storage schema if the existing schema can represent the additional controls.
+
+⸻
+
+6. Update the Mobile Controls Settings Preview
+
+Relevant files:
+
+* js/ui/settings-dialog.js
+* css/settings.css
+
+The Classic Buttons selection card currently previews only the Run Left and Run Right buttons.
+
+Update this preview to accurately represent the redesigned Classic layout.
+
+It should show two larger Run buttons with two smaller Mouvement buttons above them.
+
+Keep the Joystick preview consistent with its existing design.
+
+Update the accompanying descriptions to explain that both layouts use dedicated Mouvement buttons.
+
+Remove any instruction telling players to double-tap a direction to Dash.
+
+The previews must remain compact, legible, and responsive.
+
+⸻
+
+7. Preserve Localization and Naming Conventions
+
+ALVA supports both English and French.
+
+Update the relevant text in:
+
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+
+Ensure that:
+
+* Classic Buttons descriptions explain the new dedicated Mouvement controls.
+* No active UI text claims that double-tapping Run activates Dash.
+* Both Mouvement buttons retain their correct localized accessible names.
+* The settings previews and editor remain correctly localized.
+* The Discover movement descriptions reflect the new explicit Dash activation method.
+
+Important naming convention:
+
+Preserve the repository’s existing internal identifiers:
+
+* mouvementLeft
+* mouvementRight
+* mouvementLeftPressed
+* mouvementRightPressed
+* queueTouchMouvement
+* mouvment
+* midair_mouvment
+
+The unusual spelling mouvment for animation and move identifiers is intentional.
+
+Do not rename animations, asset files, or character data.
+
+Do not modify the protected character_rule file.
+
+⸻
+
+8. Keep the Game Responsive and Playable
+
+Test both mobile schemes in:
+
+* Quick Battle.
+* Practice Ground.
+* Touch layout editor.
+
+Verify behavior on different landscape screen dimensions.
+
+Pay particular attention to the bottom-left control cluster.
+
+The four Classic directional buttons must not overlap each other, the screen’s safe area, or unrelated controls.
+
+Requirements:
+
+* Both Run buttons remain comfortable to hold.
+* Both Mouvement buttons remain easy to tap.
+* All four have independent hit targets.
+* Run + Jump works.
+* Run + Attack works.
+* Run + Mouvement works.
+* Mouvement + Jump works when the existing movement rules permit it.
+* Simultaneous controls do not interfere with one another.
+* Pointer cancellation and scheme changes release controls correctly.
+* Resized and repositioned controls remain interactive at their displayed locations.
+
+The desktop experience and Watch Mode should not gain unwanted touch UI.
+
+Avoid introducing performance-heavy DOM work inside the game loop.
+
+⸻
+
+9. Update Tests
+
+The existing test suite has substantial input and interface coverage.
+
+Review and update:
+
+* tests/systems/dash.test.mjs
+* tests/systems/air-mouvment.test.mjs
+* tests/systems/movement.test.mjs
+* tests/systems/combat-ai.test.mjs
+* tests/interface/controls-ui.test.mjs
+* tests/interface/touch-layout.test.mjs
+* tests/interface/settings.test.mjs
+
+Update other affected tests where necessary.
+
+Mandatory test cases
+
+Mouvement activation
+
+* A single Run press never starts Dash.
+* Two rapid Run presses never start Dash.
+* Multiple rapid Run presses never start Dash.
+* Rapidly changing joystick direction never starts Dash.
+* Double-tapping Run while airborne never starts air Dash.
+* Dedicated Mouvement Left starts the correct Dash when permitted.
+* Dedicated Mouvement Right starts the correct Dash when permitted.
+* Explicit airborne requests start air Dash when permitted.
+* One Mouvement press produces one request, not a held or repeated action.
+* Existing movement cooldown and Energy restrictions still apply.
+* CPU Dash and air Dash behavior remains operational through explicit requests.
+
+Classic Buttons
+
+* Four directional buttons appear.
+* Two send held Run inputs.
+* Two send one-shot Mouvement requests.
+* Run and Mouvement can be used simultaneously.
+* A Mouvement press cannot accidentally activate Run.
+* Sliding between Run buttons still works.
+* Switching layouts releases active inputs.
+
+Appearance
+
+* Jump and Extra Attack inherit the standard action-button geometry and styling.
+* Both have the same outer dimensions as other action buttons.
+* Their normal and pressed states match the shared style.
+* Mouvement double-arrow graphics are centered and symmetrical.
+
+Customization
+
+* Both Classic Mouvement buttons appear in the editor.
+* Moving and resizing them works.
+* Positions persist.
+* Reset restores defaults.
+* Existing saved layouts are preserved.
+
+Validation
 
 Run:
 
 node --test
 
-Fix any regressions caused by these presentation changes.
+Fix relevant failures instead of deleting tests or weakening their assertions.
 
-7. Documentation consistency
+Perform browser-based visual verification where possible, including mobile landscape and different touch-control sizes.
 
-Review and update any descriptions that now contradict the desired interface, particularly:
+Do not report visual verification as completed unless it was actually performed.
 
+⸻
+
+10. Update Project Documentation
+
+Update the current behavior documented in:
+
+* README.md
+* ALVA_SPEC.md
 * docs/systems/input.md
-* Relevant comments in js/ui/touch-controls.js
-* Relevant comments in js/ui/touch-layout-editor.js
-* Relevant comments in js/ui/icons.js
-* Relevant test descriptions
+* docs/systems/movement.md
 
-The documentation must explain that Defence always uses the shield glyph, Mouvement uses double arrows, and the editor uses neutral icons regardless of character.
+Search other active documentation for references to double-tap Dash activation and correct them.
 
-8. Acceptance criteria
+The product specification must accurately describe the new controls.
 
-The work is complete only when:
+Do not rewrite historical records as though previous behavior never existed. If necessary, append a change entry to UPDATES.md.
 
-1. The Jump icon has no horizontal line beneath it.
-2. Defence always displays the shield icon, including in the air.
-3. The Joystick scheme’s two Mouvement buttons display double directional arrows.
-4. Every attack button on the personalization screen displays the correct number of dots.
-5. All other personalization controls display universal default icons, never fighter-specific artwork.
-6. All attack slots are available for layout editing regardless of selected character.
-7. Character-specific attack artwork continues to work normally during gameplay.
-8. Existing input behavior, saved layouts, localization, and combat mechanics remain unchanged.
-9. Automated tests pass.
+Maintain the repository’s existing structure and documentation conventions.
 
-9. Final deliverable
+⸻
 
-Implement the changes directly in the appropriate existing modules.
+11. Acceptance Criteria
 
-Keep the patch focused on the interface and avoid unrelated refactoring.
+This update is complete only when all of the following conditions are satisfied:
 
-When finished, provide:
+* [ ]	Mouvement can no longer be triggered by double-tapping Run.
+* [ ]	Ground Dash and air Dash use explicit Mouvement requests.
+* [ ]	Keyboard, gamepad, and CPU Dash functionality is not inadvertently broken.
+* [ ]	Classic Buttons displays two Run buttons and two dedicated Mouvement buttons.
+* [ ]	Both Mouvement buttons function exactly like their Joystick equivalents.
+* [ ]	Double-arrow icons are visually centered in both layouts.
+* [ ]	Jump matches the other action buttons in size and appearance.
+* [ ]	Extra Attack matches the other action buttons in size and appearance.
+* [ ]	All action buttons retain their correct artwork and functionality.
+* [ ]	Layout customization supports the two new Classic controls.
+* [ ]	Existing saved layouts remain compatible.
+* [ ]	Settings previews accurately reflect the updated control layouts.
+* [ ]	English and French instructions reflect the new behavior.
+* [ ]	Multi-touch functionality remains intact.
+* [ ]	Battle and Practice Ground work correctly.
+* [ ]	Existing movement physics, costs, cooldowns, and animations remain unchanged.
+* [ ]	Automated tests pass.
+* [ ]	Documentation is updated.
 
-* A concise summary of the changes.
-* The files modified.
-* Any new or updated tests.
-* The result of running node --test.
-* Confirmation that gameplay mechanics and saved touch layouts are unchanged.
+Final Implementation Instructions
 
-Final goal: Alva’s touch controls should have consistent universal Jump, Defence, and Mouvement icons, while the personalization screen should display a clean, neutral set of buttons that looks the same for every character.
+First, inspect the relevant existing code and understand how the systems interact.
+
+Then implement the changes directly within the current architecture.
+
+Reuse existing controls, shared styling, input pipelines, and stable identifiers wherever practical.
+
+Do not create a parallel movement system or duplicate input logic unnecessarily.
+
+Do not modify unrelated character mechanics, attack definitions, physics tuning, or the visual identity of the game.
+
+Prioritize correct gameplay behavior, precise visual consistency, multi-touch reliability, and backward compatibility.
+
+When complete, provide:
+
+1. A summary of the changes made.
+2. The relevant files modified.
+3. The new explicit input mappings for each supported device.
+4. The automated test results.
+5. Any visual verification performed.
+6. Any remaining limitations.
+
+The desired outcome is simple: Run only runs; Mouvement has its own intentional controls; both mobile layouts have independent Left and Right Mouvement buttons; the arrows are centered; and Jump and Extra Attack look identical in style and size to the rest of ALVA’s action buttons.
