@@ -1,262 +1,226 @@
-ALVA — Settings grammar and capitalization overhaul
+ALVA — Shield Label and Home Navigation Update
 
-Objective
-
-Review and polish the entire Settings interface in the Alva game.
-
-The goal is to make every heading, option, button, description, and label grammatically correct, professionally written, and consistently capitalized.
-
-Use sentence case throughout Settings, rather than title case or all-uppercase formatting.
-
-Examples:
-
-* CONTROLS → Controls
-* LANGUAGE → Language
-* COMBAT → Combat
-* Mobile Controls → Mobile controls
-* Classic Buttons → Classic buttons
-* Combat Assist → Combat assist
-* DEFAULT → Default
-* CUSTOM LAYOUT → Custom layout
-* SIZE → Size
-
-Apply this consistently across the entire Settings experience, not just these examples.
-
-1. Explore the existing implementation
-
-Before making changes, examine the relevant code and understand how the Settings interface works.
+You are working on the existing Alva browser fighting game.
 
 Repository: hiyroscript/alva
+Branch: main
 
-Important files:
+Your task is to implement three targeted interface improvements while preserving the game’s established design, responsiveness, accessibility, and gameplay functionality.
 
-* js/ui/settings-dialog.js
+Before changing anything, study the existing implementation. Read CLAUDE.md, the relevant sections of ALVA_SPEC.md, and the current Home, Settings, and navigation code.
+
+Do not redesign the game. Integrate these changes naturally into its existing architecture.
+
+1. Fix the Shield label in Settings
+
+Inspect the Settings interface, particularly Settings → Controls → Customize touch controls.
+
+The touch-control layout editor currently obtains the selected control’s displayed name through TouchLayoutEditor.nameOf() and displays it in .touch-editor-name.
+
+Make the following changes to the Shield label:
+
+* In English, the displayed label must read exactly shield, all lowercase, instead of Shield.
+* Make this specific label bold, preferably font-weight 700.
+* Change its text color to match the game’s bright purple Energy bar, currently #b026ff.
+* Keep the label clean, sharp, readable, and visually consistent with Alva’s typography.
+* Apply this special styling only when the selected control is shield.
+* Other control names must retain their existing appearance.
+* When switching to another control or clearing the selection, remove the Shield-specific styling.
+* Respect the game’s English/French localization system. In French, use the appropriate localized lowercase label rather than introducing English text.
+* Do not change the underlying shield control ID, keyboard/gamepad bindings, or combat behavior.
+
+Relevant files include:
+
 * js/ui/touch-layout-editor.js
+* css/settings.css
+* js/config.js
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
-* js/localization/i18n.js
-* css/settings.css
-* css/components.css
-* tests/interface/settings.test.mjs
-* tests/interface/i18n.test.mjs
+* js/game/rendering/fighter-status.js
 
-Also consult ALVA_SPEC.md, docs/systems/localization.md, and codename_rule to respect the game’s architecture and naming conventions.
+The purple reference comes from ENERGY_STYLE.fill in fighter-status.js. Match that existing color exactly rather than choosing another purple.
 
-Understand how the language system, Settings tabs, control options, customization editor, and CSS interact before editing.
+Do not accidentally restyle the entire Settings interface, all control labels, or the actual Energy bar.
 
-2. Standardize capitalization
+2. Add a Help button to the left of Settings
 
-Use these rules throughout Settings:
+On the Home screen, the existing Settings gear sits at the top-right corner.
 
-1. Use sentence case for headings, labels, options, badges, and buttons.
-2. Capitalize the first word of a standalone label.
-3. Keep subsequent words lowercase unless they are proper nouns, acronyms, or intentionally named game mechanics.
-4. Preserve the official capitalization of ALVA, English, Français, CPU, and established game-mode names when appropriate.
-5. Don’t capitalize ordinary words purely for visual emphasis.
-6. Avoid changing the actual meaning of interface text.
-
-For example, the Controls section should display:
-
-Controls
-
-Mobile controls
-
-Joystick — Default
-
-Classic buttons
-
-Customize touch controls
-
-Every other section should follow the same presentation style.
-
-3. Fix the actual source of uppercase text
-
-In css/settings.css, inspect the existing text-transform: uppercase rules.
-
-The current stylesheet forces uppercase presentation on several Settings elements, including:
-
-* .settings-group-title
-* .settings-option-tag
-* .touch-editor-size-label
-
-Remove or appropriately override these transformations so the elements display the exact capitalization provided by the translations.
-
-Check for additional inherited uppercase styles affecting Settings.
-
-Do not remove uppercase styling globally from unrelated screens or intentional branding. For example, ALVA’s wordmark must remain unchanged.
-
-Keep the existing typography, colors, spacing, borders, and overall visual design.
-
-4. Correct grammar and awkward wording
-
-Review every English string associated with Settings, including descriptions and the touch-control editor.
-
-Fix spelling mistakes, unnatural phrasing, inconsistent capitalization, and ambiguous instructions.
-
-One confirmed issue is:
-
-settings.scheme.joystickDesc
-
-Current text:
-
-“A round joystick to move, with one-tap Left and Right mouvement buttons to Dash.”
-
-This contains incorrect English wording.
-
-Rewrite it naturally, preserving the actual gameplay instructions.
-
-Also review:
-
-* settings.controlsNote
-* settings.scheme.classicDesc
-* settings.customizeNote
-* settings.combatAssistDesc
-* All settings.* strings
-* Relevant editor.* strings
-* Relevant touch-control labels shown in the editor
-
-Pay particular attention to dynamically generated descriptions.
-
-For example, the current customization description inserts a capitalized scheme name into the middle of a sentence:
-
-“Move and resize every control of the Classic Buttons layout.”
-
-This should read naturally regardless of which layout is selected.
-
-You may simplify the sentence or introduce context-appropriate translations if necessary.
-
-Preserve the meaning and placeholders where needed.
-
-5. Respect localization
-
-Alva supports English and French.
-
-English is the fallback language, and both languages share the localization-key structure.
+Add a new square button with a question mark (?) icon to the left of the Settings gear.
 
 Requirements:
 
-* Correct English text in js/localization/strings/en.js.
-* Review the corresponding French strings for genuine spelling, grammar, or capitalization inconsistencies.
-* Respect French capitalization conventions rather than mechanically applying English rules.
-* Keep existing localization keys stable.
-* Preserve dynamic placeholders and their correct grammatical placement.
-* Ensure switching languages updates Settings immediately without refreshing.
-* Ensure the touch-control editor uses the correct translations.
+* Use the same dimensions, background, border, border radius, and overall visual language as the existing Settings button.
+* Center the question mark icon precisely.
+* Prefer an original inline SVG question-mark icon added to the existing ICONS collection in js/ui/icons.js.
+* Match the established icon size and visual weight.
+* Place the button within the same top-right navigation group.
+* Maintain consistent spacing between buttons.
+* Give it an accessible Help label, including a suitable French translation.
+* This is a future Help button. It must not open anything or navigate anywhere yet.
+* Do not create a Help page, modal, tooltip panel, or additional feature.
+* Mark it appropriately as currently unavailable without making the UI appear broken.
 
-Do not translate internal identifiers, CSS classes, stored setting names, or gameplay codenames.
+This is a visual placeholder for a future feature.
 
-In particular, preserve the intentionally spelled internal animation codename mouvment, as documented by the repository. User-facing English spelling mistakes can be corrected without renaming internal identifiers.
+3. Add a Controller button between Help and Settings
 
-6. Cover the entire Settings experience
+The repository already contains the image:
 
-Audit all three Settings categories.
+controller.PNG
 
-Language
+Use this existing file as the icon for another Home-screen button.
 
-* Category tab and section heading
-* Language descriptions
-* English and Français options
-* Related labels and accessibility text
+Position the three buttons in this exact order, from left to right:
 
-Controls
+Help (?) → Controller (controller.PNG) → Settings (gear)
 
-* Category tab and section heading
-* Mobile controls heading
-* Joystick option
-* Classic buttons option
-* Default and custom layout badges
-* Layout descriptions
-* Customize touch controls button
-* Dynamic customization descriptions
+Requirements:
 
-Combat
+* Create a new square Controller button between Help and Settings.
+* Use the actual repository-root controller.PNG asset, preserving the exact filename capitalization.
+* Do not replace it with an emoji, a generated controller symbol, or a third-party icon.
+* Display the image centered inside the button.
+* Scale it proportionally with object-fit: contain so the entire controller icon is visible without distortion.
+* Preserve the image’s transparency and original artwork.
+* Keep the visual size balanced against the Help and Settings icons.
+* Match the existing button dimensions, border, background, and spacing.
+* Give it an accessible Controller label, with English and French localization.
+* Like Help, this button is not functional yet.
+* It must not open a menu, start controller pairing, change settings, or affect gameplay.
+* Do not implement controller configuration or controller detection in this update.
 
-* Category tab and section heading
-* Combat assist heading
-* Explanation of the feature
-* On and Off selections
-* Default badge
+The goal is to establish its permanent visual position without introducing its eventual functionality.
 
-Also review the entire touch-control editor, including its heading, selected-layout label, Size label, instructions, reset button, completion button, and accessibility announcements.
+4. Refactor the Home buttons into one responsive group
 
-Ensure text capitalization remains consistent when the user changes Settings or switches languages.
+Currently js/screens/home-screen.js creates this.settingsButton directly, and css/home.css positions .home-settings independently using absolute positioning.
 
-7. Preserve functionality and design
+Rather than positioning three unrelated buttons with separate right offsets, create a shared top-right container.
 
-This is a copy-editing and presentation-consistency update, not a gameplay redesign.
+Suggested structure:
 
-Do not modify:
+* .home-utility-buttons — shared positioned container.
+* .home-help — question mark placeholder.
+* .home-controller — controller image placeholder.
+* .home-settings — existing functioning settings button.
 
-* Combat mechanics or movement behavior
-* Joystick and classic control functionality
-* Combat assist behavior
-* Settings persistence or saved-value compatibility
-* Keyboard, mouse, touch, or gamepad navigation
-* Selection states or focus management
-* Modal behavior
-* The game’s overall UI layout and visual identity
+Use Flexbox to maintain horizontal alignment and uniform spacing.
 
-Do not rename internal settings IDs, localization keys, or control identifiers to match the new display text.
+Preserve the existing Settings button’s location as the rightmost anchor. The two new buttons should extend toward the left.
 
-Keep the interface responsive on desktop, tablets, and phones in landscape orientation.
+The group should:
 
-Ensure the corrected text fits comfortably in existing interface elements without clipping, overflow, or awkward wrapping.
+* Remain aligned to the top-right corner.
+* Respect existing safe-area variables such as --safe-t and --safe-r.
+* Preserve the existing compact button sizing, currently approximately 40–48 px.
+* Use consistent spacing, approximately 8–10 px where practical.
+* Avoid overlapping the Home title, navigation actions, footer, or credits.
+* Work in desktop, tablet, and mobile layouts.
+* Remain usable in narrow portrait and short landscape viewports.
+* Respect reduced-motion preferences.
+* Preserve the established dark glass-like appearance.
 
-8. Update and run tests
+Only the Settings gear should retain its current rotating hover/focus animation. Do not rotate the question mark or controller image.
 
-The existing interface tests contain exact string assertions that will need updating.
+5. Preserve existing behavior
 
-In particular, review:
+The existing Settings gear must continue to work exactly as before.
+
+Clicking or activating it must open SettingsDialog, and closing the dialog must return focus to the gear.
+
+Do not alter:
+
+* Play, Watch Mode, Practice Ground, or Discover navigation.
+* The Settings dialog’s three existing categories.
+* Existing saved settings or their schema.
+* Keyboard and gamepad gameplay bindings.
+* Combat, physics, or character systems.
+* The credits animation.
+* The Home screen’s default focus behavior.
+
+Help and Controller must remain placeholders with no functional action.
+
+Follow the established data-nav and MenuNavigator conventions. Inactive placeholder buttons should not interfere with keyboard/gamepad navigation or displace Settings as the usable top-right action.
+
+6. Localization and accessibility
+
+Alva supports English and French, including live language switching.
+
+Ensure that:
+
+* Each button has a meaningful accessible name.
+* Placeholder availability is communicated appropriately.
+* No untranslated strings appear after changing languages.
+* Decorative SVG/image contents do not create duplicate spoken labels.
+* The existing Settings button remains keyboard/gamepad accessible.
+* Existing focus indicators remain consistent.
+* The image asset loads without a broken-image indicator.
+
+Avoid unnecessary changes to the existing localization architecture.
+
+7. Update tests and relevant documentation
+
+Inspect existing tests, particularly:
 
 * tests/interface/settings.test.mjs
+* tests/interface/controls-ui.test.mjs
 * tests/interface/i18n.test.mjs
-* Any relevant CSS or touch-layout editor tests
+* tests/integration/empty-roster.test.mjs
+* tests/integration/practice-ground.test.mjs
+* tests/integration/watch-mode.test.mjs
 
-Update expected strings when the intended display copy changes.
+Update affected expectations and add tests covering:
 
-Add focused regression coverage verifying that:
+1. The presence of all three Home utility buttons.
+2. Their precise order: Help, Controller, Settings.
+3. Use of the real controller.PNG asset.
+4. The fact that Help and Controller perform no action.
+5. Continued Settings dialog functionality and focus restoration.
+6. Existing keyboard/gamepad navigation.
+7. The lowercase Shield label in the touch-control editor.
+8. Shield-specific bold styling and its exact purple color.
+9. Resetting the special styling when another control is selected.
+10. English and French localization.
 
-1. Settings headings use sentence case.
-2. Classic buttons, Mobile controls, and Combat assist appear correctly.
-3. CSS no longer forces Settings headings or badges into uppercase.
-4. Both English and French remain correctly localized.
-5. Dynamic layout descriptions are grammatically correct.
-6. All settings continue to save, load, and respond to player input correctly.
+Update the applicable Home and Settings sections of ALVA_SPEC.md so the documented UI matches the implementation.
 
-Run the full test suite:
+Run the full test suite using:
 
 node --test
 
-Do not delete or weaken existing tests merely to make them pass.
+Do not remove tests or weaken unrelated assertions just to make the suite pass.
 
-9. Final quality review
+8. Final verification
 
-After implementing the changes, inspect the complete Settings experience in both languages.
+Before finishing, verify the following acceptance criteria:
 
-Check every category, selectable option, description, badge, and touch-editor control.
+* [ ]	Home displays three small buttons at the top right.
+* [ ]	The leftmost button uses a centered question mark icon.
+* [ ]	The middle button displays the original controller.PNG.
+* [ ]	The rightmost button remains the existing Settings gear.
+* [ ]	All three buttons share a cohesive design and alignment.
+* [ ]	Help does nothing when activated.
+* [ ]	Controller does nothing when activated.
+* [ ]	Settings opens and closes normally.
+* [ ]	The touch-control editor displays shield in lowercase in English.
+* [ ]	That label is bold and exactly matches the existing purple Energy bar color.
+* [ ]	Other control labels remain unchanged.
+* [ ]	Desktop, mobile, portrait, and landscape layouts remain visually correct.
+* [ ]	Localization and accessibility are preserved.
+* [ ]	Existing gameplay behavior is unchanged.
+* [ ]	All tests pass.
 
-Compare the final UI against these requirements:
+9. Implementation constraints
 
-* No unintended uppercase headings.
-* No inconsistent title-case labels.
-* No spelling or obvious grammar errors.
-* No awkward dynamically generated sentences.
-* No broken translations.
-* No visual regressions.
-* No changes to gameplay functionality.
+Make minimal, maintainable changes.
 
-The desired result is a polished, consistent Settings interface that feels professionally written while retaining Alva’s existing design.
+Reuse existing utilities, CSS variables, localization helpers, and component conventions wherever possible.
 
-Deliverables
+Do not introduce a UI framework, icon dependency, new Settings category, or unrelated refactor.
 
-Implement the actual changes in the repository.
+Do not modify protected files such as character_rule.
 
-When finished, provide:
+Expected final delivery: Implement the changes, provide a concise summary of modified files, explain any important design decisions, and report test results. If browser testing is available, visually verify both the Home screen and the Shield label in Settings.
 
-1. A concise summary of the corrections.
-2. The files modified.
-3. Important before-and-after text examples.
-4. The results of the tests.
-5. Any remaining issues that could not be verified.
-
-Important: Do not stop after fixing the examples provided. Perform a comprehensive audit of the entire Settings interface and correct every comparable issue you find. Keep the changes targeted, minimal, and consistent with the project’s existing architecture.
+The finished result should look like a native part of Alva, not an externally added interface.
