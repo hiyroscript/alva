@@ -177,7 +177,7 @@ const CODE_LABELS = /\b(T|D|attack1|attack2|A1|A2)\b/;
 // ---- Glyphs and art ----------------------------------------------------------
 
 test('the glyphs that stay are inline SVG in currentColor, hidden from assistive technology; the old fighter glyphs are gone', () => {
-  for (const name of ['shield', 'transform', 'jump', 'left', 'right', 'tornado', 'ring', 'pip1', 'pip2', 'pip3', 'pip4', 'pip5']) {
+  for (const name of ['shield', 'transform', 'jump', 'left', 'right', 'mouvementLeft', 'mouvementRight', 'tornado', 'ring', 'pip1', 'pip2', 'pip3', 'pip4', 'pip5']) {
     const icon = ICONS[name];
     assert.equal(typeof icon, 'string', name);
     assert.match(icon, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon( icon--fill)?">/, `${name}: the shared icon helper`);
@@ -195,6 +195,33 @@ test('the glyphs that stay are inline SVG in currentColor, hidden from assistive
   for (const gone of ['shuriken', 'punch', 'kick', 'spin', 'block']) assert.equal(ICONS[gone], undefined, gone);
   const code = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => read(`js/${f}`)).join('\n');
   assert.doesNotMatch(code, /ICONS\.(shuriken|punch|kick|spin)\b|icon: '(shuriken|punch|kick|spin)'/);
+});
+
+test('Jump keeps its upward shaft and arrowhead without a bottom baseline', () => {
+  assert.match(ICONS.jump, /<path d="M12 17.5V5.5"\/>/);
+  assert.match(ICONS.jump, /<path d="M6.5 11 12 5.5l5.5 5.5"\/>/);
+  assert.doesNotMatch(ICONS.jump, /M5 20\.5h14/);
+  assert.equal((ICONS.jump.match(/<path /g) ?? []).length, 2);
+});
+
+test('Mouvement glyphs have two spaced arrowheads pointing in the same direction', () => {
+  for (const [icon, direction] of [[ICONS.mouvementLeft, -1], [ICONS.mouvementRight, 1]]) {
+    const paths = [...icon.matchAll(/<path d="M([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)"\/>/g)]
+      .map((match) => match.slice(1).map(Number));
+    assert.equal(paths.length, 2, 'two distinct arrowheads');
+    for (const [x1, y1, tipX, tipY, x2, y2] of paths) {
+      assert.equal(x1, x2);
+      assert.equal(Math.sign(tipX - x1), direction);
+      assert.equal(tipY, 12);
+      assert.equal((y1 + y2) / 2, 12, 'vertically centered');
+    }
+    const firstX = paths[0].filter((_, i) => i % 2 === 0);
+    const secondX = paths[1].filter((_, i) => i % 2 === 0);
+    assert.ok(Math.max(...firstX) < Math.min(...secondX), 'space between arrowheads');
+    assert.equal((Math.min(...firstX) + Math.max(...secondX)) / 2, 12, 'horizontally centered');
+  }
+  assert.equal((ICONS.left.match(/<path /g) ?? []).length, 1);
+  assert.equal((ICONS.right.match(/<path /g) ?? []).length, 1);
 });
 
 test('fighter art is one real image element per button, never image markup or an asset path written in the UI', () => {
@@ -619,7 +646,7 @@ test('a language change never names the hidden buttons again', () => {
   }
 });
 
-test('the touch layout editor keeps absent buttons on show, neutral, so every fighter\'s layout can place them', () => {
+test('showAbsent keeps missing abilities visible with neutral glyphs without overriding authored gameplay art', () => {
   const tc = new TouchControls(new Element('div'), { setTouch() {}, queueTouchMouvement() {} }, { scheme: 'joystick', showAbsent: true });
   tc.setCharacter(MOVELESS);
   const b = (a) => tc.buttons.get(a);
@@ -666,7 +693,7 @@ test('#0002\'s buttons show its own art: the Whirlwind, the One-Two, the Rapid K
   }
 });
 
-test('the movement controls, Shield and Transform look exactly as before, whatever the fighter, in both schemes', () => {
+test('movement uses double arrows for Dash and single arrows for Classic, independent of the fighter', () => {
   const glyphs = (tc) => ({
     pad: [...tc.padButtons.values()].map((b) => [b.getAttribute('data-action'), b.innerHTML, b.getAttribute('aria-label')]),
     dash: [...tc.mouvementButtons.values()].map((b) => [b.innerHTML, b.getAttribute('aria-label')]),
@@ -676,7 +703,7 @@ test('the movement controls, Shield and Transform look exactly as before, whatev
   });
   const expected = {
     pad: [['runLeft', ICONS.left, 'Move left'], ['runRight', ICONS.right, 'Move right']],
-    dash: [[ICONS.left, 'Left movement'], [ICONS.right, 'Right movement']],
+    dash: [[ICONS.mouvementLeft, 'Left movement'], [ICONS.mouvementRight, 'Right movement']],
     stick: [1, 0],
     shield: [ICONS.shield, 'Shield'],
     transform: [ICONS.transform, true],
@@ -1215,8 +1242,8 @@ test('the Joystick scheme: a movement joystick between Left movement and Right m
   // The Dash buttons, mouvementLeft and mouvementRight: real buttons with
   // localized display names, stable identifiers, and readable arrow glyphs.
   for (const [b, name, icon, side, control] of [
-    [mouvementLeft, 'Left movement', ICONS.left, 'left', 'mouvementLeft'],
-    [mouvementRight, 'Right movement', ICONS.right, 'right', 'mouvementRight'],
+    [mouvementLeft, 'Left movement', ICONS.mouvementLeft, 'left', 'mouvementLeft'],
+    [mouvementRight, 'Right movement', ICONS.mouvementRight, 'right', 'mouvementRight'],
   ]) {
     assert.equal(b.tagName, 'BUTTON');
     assert.equal(b.getAttribute('type'), 'button');
@@ -1782,7 +1809,7 @@ test('ground/air previews follow each loadout and reuse images, buttons and simu
   }
 });
 
-test('the Shield button says what it does where the fighter is: Shield on the ground, Deflect in the air, the same `shield` input', () => {
+test('Defence always shows the shield, named Shield on the ground and Deflect in the air, sending shield', () => {
   for (const def of [DEF_0001, DEF_0002]) for (const scheme of ['classic', 'joystick']) {
     const { tc, calls } = touchControls(def, { scheme });
     const b = tc.buttons.get('shield');
@@ -1792,13 +1819,25 @@ test('the Shield button says what it does where the fighter is: Shield on the gr
     assert.equal(tc.buttons.get('shield'), b, 'the same button');
     assert.equal(b.getAttribute('aria-label'), 'Deflect');
     assert.equal(b.getAttribute('data-i18n-aria-label'), 'touch.deflect');
-    assert.equal(look(b), ICONS.deflect);
+    assert.equal(look(b), ICONS.shield, 'Deflect keeps the shield artwork');
+    setLanguage('fr');
+    try {
+      localizeTree(tc.root);
+      assert.equal(b.getAttribute('aria-label'), 'Renvoi');
+      assert.equal(look(b), ICONS.shield);
+    } finally {
+      setLanguage('en');
+      localizeTree(tc.root);
+    }
     assert.equal(b.getAttribute('data-action'), 'shield', 'its input never changes');
     press(b, 1);
     assert.deepEqual(calls.at(-1), ['shield', true]);
     tc.setAirborne(false);
     assert.equal(b.getAttribute('aria-label'), 'Shield');
     assert.equal(look(b), ICONS.shield);
+    assert.ok(b.classList.contains('is-pressed'), 'landing preserves the held pointer');
+    tc.setAirborne(true);
+    assert.equal(look(b), ICONS.shield, 'jumping again preserves the glyph');
     tc.releaseAll();
   }
   // A fighter with no Deflect keeps its Shield's name and glyph in the air.

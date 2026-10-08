@@ -27,7 +27,7 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.4 (input), §6.10
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | A / Cross | the upward arrow |
 | Extra attack | `extra_attack` | J | X / Square | top of the cluster |
 | Transform (reserved) | `transform` | K | Y / Triangle | dashed button |
-| Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | RB / RT | **Shield**, named and drawn **Deflect** while airborne |
+| Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | RB / RT | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | B, LB, LT, L3, R3 | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Start | the timer / pause or More button |
 
@@ -50,8 +50,8 @@ Controls → Mobile Controls:
 
 - **Joystick** (the default): one round joystick holding `runLeft` /
   `runRight` past a small deadzone (digital, like every other input), with
-  two one-tap Dash buttons above it.
-- **Classic Buttons**: Left and Right with thumb sliding; double-tap to
+  two one-tap Mouvement/Dash buttons with double directional arrows above it.
+- **Classic Buttons**: single Left and Right arrows with thumb sliding; double-tap to
   Dash.
 
 Both share the lower-right cluster: the numbered attack buttons fill fixed
@@ -70,9 +70,10 @@ fighter's own art, chosen in its `mobileAbilities`
 (`preview: { animation, frame }`, `previews.air` for a distinct airborne
 move, `collection: 'projectileAnimations'` to pick projectile art, an
 optional `fallbackIcon`); Jump, Shield, Transform, the arrows, the joystick
-and the Dash buttons keep their universal glyphs (the Shield button's turns
-to the Deflect's, with the name **Deflect**, while the fighter is in the air
-and has a Deflect: the same button sending `shield`). A button with nothing to
+and the Dash buttons keep their universal glyphs. Jump is an upward arrow
+without a baseline. Defence always shows the shield glyph, including in the
+air; its accessible name becomes **Deflect** when the fighter has one,
+with the same button still sending `shield`. A button with nothing to
 show falls back to a neutral glyph with its name and input unchanged.
 Presentation never changes a button's codename or what it sends. In the
 air, ground-only abilities stay visible but dimmed (`aria-disabled`).
@@ -80,8 +81,12 @@ air, ground-only abilities stay visible but dimmed (`aria-disabled`).
 **Custom layouts.** Settings → Controls → Customize touch controls opens
 the editor over a still battle screen: every control can be moved and
 resized (70 % to 180 %), by pointer, keyboard or gamepad, and all five
-numbered buttons show (in their neutral look where a fighter has none)
-because the layout is every fighter's. Positions are stored as fractions
+numbered buttons always show their matching one-to-five pip icons. Every
+editor control uses a universal icon and a neutral localized name, regardless
+of the selected fighter: Extra Attack uses the ring, Transform the star,
+Defence the shield, Jump the upward arrow, and movement the scheme's arrows
+or joystick. Gameplay keeps each fighter's authored attack artwork.
+Positions are stored as fractions
 of the safe touch area and sizes as scales, keyed by control id, never by
 label or slot; each layout keeps its own arrangement.
 

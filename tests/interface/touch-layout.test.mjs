@@ -663,7 +663,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(editor.touch.scheme, 'classic');
   assert.equal(editor.touch.enabled, false, 'nothing it does reaches gameplay');
   assert.ok(editor.touchRoot.classList.contains('touch-controls'));
-  assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Jab', 'the fighter\'s own look');
+  assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Attack 1', 'neutral even with a playable fighter selected');
   for (const [id, node] of editor.touch.getControlElements('classic')) {
     assert.equal(node.hasAttribute('data-nav'), true, id);
     assert.equal(node.getAttribute('tabindex'), '0', id);
@@ -684,7 +684,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(closed, 1);
   assert.equal(document.activeElement, back, 'focus back where it came from');
   // A pick that cannot be played (a disabled fighter, none at all) shows
-  // the neutral look instead of a fighter's own.
+  // the same neutral look.
   for (const id of [TEST_DISABLED.id, null]) {
     app.selection.characterId = id;
     editor.open({ scheme: 'classic', returnFocus: back });
@@ -692,6 +692,59 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
     editor.doneButton.click();
   }
 }));
+
+test('the editor always uses neutral localized icons for every selection, scheme and reopening', () => {
+  const { app, editor, storage } = editorApp();
+  const icons = {
+    extra_attack: ICONS.ring, transform: ICONS.transform, shield: ICONS.shield, jump: ICONS.jump,
+    ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`attack${n}`, ICONS[`pip${n}`]])),
+    mouvementLeft: ICONS.mouvementLeft, mouvementRight: ICONS.mouvementRight,
+    runLeft: ICONS.left, runRight: ICONS.right,
+  };
+  const check = (language) => {
+    assert.equal(editor.touchRoot.querySelectorAll('.tc-sprite-icon').length, 0);
+    assert.equal(editor.touchRoot.dataset.attackButtons, '5');
+    for (const [id, node] of editor.touch.getControlElements()) {
+      assert.equal(node.hidden, false, `${id}: available to edit`);
+      if (id === 'stick') {
+        assert.deepEqual(node.children, [editor.touch.knob], 'universal joystick');
+        continue;
+      }
+      assert.equal(node.innerHTML, icons[id], id);
+      assert.equal(node.getAttribute('data-control'), id);
+    }
+    for (let n = 1; n <= 5; n++) {
+      const node = editor.touch.actionButtons.get(`attack${n}`);
+      assert.equal(node.getAttribute('data-slot'), String(n));
+      assert.equal(node.getAttribute('aria-label'), `${language === 'fr' ? 'Attaque' : 'Attack'} ${n}`);
+      assert.equal((node.innerHTML.match(/<circle /g) ?? []).length, n);
+    }
+    assert.equal(editor.touch.actionButtons.get('extra_attack').getAttribute('aria-label'),
+      language === 'fr' ? 'Attaque supplémentaire' : 'Extra Attack');
+    editor.select('attack5');
+    assert.equal(editor.nameEl.textContent, language === 'fr' ? 'Attaque 5' : 'Attack 5');
+  };
+  try {
+    for (const characterId of ['0001', '0002', null, '0001']) {
+      app.selection.characterId = characterId;
+      for (const scheme of ['joystick', 'classic', 'joystick']) {
+        editor.open({ scheme });
+        check('en');
+        setLanguage('fr');
+        localizeTree(editor.touchRoot);
+        check('fr');
+        setLanguage('en');
+        localizeTree(editor.touchRoot);
+        check('en');
+        editor.close();
+      }
+    }
+    assert.equal(storage.writes, 0, 'opening or switching selections never rewrites saved layouts');
+  } finally {
+    editor.close();
+    setLanguage('en');
+  }
+});
 
 test('dragging a control moves it on screen and saves once, as fractions, when the drag ends; a tap only selects', () => {
   const { app, editor, storage } = editorApp();

@@ -1014,13 +1014,13 @@ code and stylesheet as in battle, never enabled, so nothing it does reaches
 gameplay. Every control of the layout can be moved and resized, the joystick
 itself included:
 
-- **Joystick:** Left mouvement, the joystick, Right mouvement, and
-  the actions (High Kick / `extra_attack`, Transform, Shield, Jab /
-  `attack1`, Red / `attack2`, Maximum Blue / `attack3`, Unlimited Void /
-  `attack4`, Hollow Purple / `attack5`, Jump; for #0001's names: every
-  fighter shares the layout, so all five numbered buttons show, one the
-  fighter does not have, such as #0002's `attack4` and `attack5`, in its
-  neutral look).
+- **Joystick:** Left mouvement (double left arrows), the joystick, Right
+  mouvement (double right arrows), and the actions (Extra Attack, Transform,
+  Shield, Attack 1 through Attack 5, Jump). Every editor control uses neutral
+  localized names and universal icons, regardless of the selected fighter:
+  one to five pips for the numbered attacks, the ring for Extra Attack, the
+  star for Transform, the shield for Defence and the upward arrow for Jump.
+  All five numbered buttons remain available even if a fighter lacks them.
 - **Classic Buttons:** Left, Right, and the same actions.
 
 Each control has a stable control id, independent of its translated name
@@ -2947,7 +2947,8 @@ Adding one is described in
   `previews.air` describes the distinct airborne move selected by `actions`;
   `preview` or `previews.ground` describes ground/shared artwork. A preview
   may explicitly select `collection: 'projectileAnimations'`. Jump always
-  uses `ICONS.jump`, with its universal name ("Jump", "Saut").
+  uses `ICONS.jump`, an upward arrow without a baseline, with its universal
+  name ("Jump", "Saut").
   After each simulation frame, Battle and Practice synchronize the actual
   player's grounded state with `TouchControls.setAirborne`; unchanged
   states do no presentation work. Landing restores ground artwork. Air
@@ -2972,10 +2973,11 @@ Adding one is described in
   to the controls and keep their original monochrome SVG glyphs
   (`currentColor`, from `js/ui/icons.js`): **Shield** (the shield outline,
   labelled "Shield"; held for as long as the pointer stays on it; while the
-  fighter is in the air and has a Deflect, the Deflect's swipe glyph,
+  fighter is in the air and has a Deflect, the same shield glyph,
   labelled "Deflect", the same button sending `shield`) in the
   old Block slot, Jump and the Left / Right arrows, the joystick and the
-  Dash buttons. Only the presentation is per fighter: each button's
+  Dash buttons (double directional arrows; Classic keeps single arrows).
+  Only the presentation is per fighter: each button's
   `data-action` is its control codename (`extra_attack`, `transform`,
   `shield`, `attack1` to `attack5`, `jump`, `runLeft`, `runRight`),
   whatever it looks like, so #0001's Unlimited Void is `attack4` and its
@@ -2992,8 +2994,8 @@ Adding one is described in
   not drawn, not named, never focused and never pressed (a hidden `attack1`
   or `attack2` keeps its slot empty, so no other button moves); the same
   element returns for a fighter that has it.
-  The touch layout editor keeps it on show, neutral, since every fighter
-  shares the layout.
+  The touch layout editor keeps every button on show with neutral icons
+  and names, since every fighter shares the layout.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
 - Gameplay pauses when the pause menu (Practice Ground: the Practice menu,

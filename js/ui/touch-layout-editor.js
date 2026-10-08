@@ -1,7 +1,7 @@
 // TOUCH LAYOUT EDITOR: the second layer of Settings, opened by Settings ›
 // Controls › Customize touch controls. Over a stand-in of the battle screen
 // it shows the scheme in use (Joystick or Classic Buttons) with its real
-// touch controls, drawn exactly as in battle and placed by the same code
+// touch controls, drawn with neutral icons and placed by the same battle code
 // (a TouchControls instance that is never enabled, so nothing it does
 // reaches gameplay), and lets the player move and resize every one of them:
 //
@@ -29,7 +29,6 @@ import {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, clampScale, normalizePoint, placeControl,
 } from '../core/touch-layout.js';
 import { TouchControls } from './touch-controls.js';
-import { getPlayableCharacter } from '../data/characters.js';
 import { ICONS } from './icons.js';
 
 // Arrow command -> unit step.
@@ -58,8 +57,8 @@ export class TouchLayoutEditor {
     // The real controls on a still, representative battle screen. Their
     // input goes nowhere and they are never enabled.
     this.touchRoot = el('div', { class: 'touch-controls is-editing' });
-    // Every control stays on show, one the fighter lacks included (in its
-    // neutral look): the layout is every fighter's.
+    // Every control stays on show with neutral icons and names, including
+    // all five attacks: the layout is every fighter's.
     this.touch = new TouchControls(this.touchRoot, { setTouch() {}, queueTouchMouvement() {} }, { showAbsent: true });
     this.stage = el('div', { class: 'touch-editor-stage', role: 'group', ...tattr('aria-label', 'editor.surface') }, [
       el('div', { class: 'touch-editor-scene', 'aria-hidden': 'true' }, [
@@ -191,9 +190,8 @@ export class TouchLayoutEditor {
     this.onClose = onClose;
     this.layout = this.app.settings.touchLayout(this.scheme);
     this.root.hidden = false;
-    // The fighter the player last picked, so the combat buttons look as they
-    // will; the neutral look while none is playable.
-    this.touch.setCharacter(getPlayableCharacter(this.app.selection?.characterId));
+    // Layouts apply to every fighter; icons and names never follow selection.
+    this.touch.setCharacter(null);
     this.touch.setScheme(this.scheme);
     // The other scheme's controls were detached during a language switch.
     // Translate them once mounted, before using their names in the toolbar.
