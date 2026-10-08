@@ -35,9 +35,9 @@ import { ICONS } from './icons.js';
 // only (the card's name and line say the same).
 const PREVIEW = Object.freeze({
   joystick: () => el('span', { class: 'settings-preview settings-preview--joystick', 'aria-hidden': 'true' }, [
-    el('i', { class: 'sp-dash sp-dash--left' }),
+    el('i', { class: 'sp-dash sp-dash--left', html: ICONS.mouvementLeft }),
     el('i', { class: 'sp-stick' }, [el('i', { class: 'sp-knob' })]),
-    el('i', { class: 'sp-dash sp-dash--right' }),
+    el('i', { class: 'sp-dash sp-dash--right', html: ICONS.mouvementRight }),
   ]),
   classic: () => el('span', { class: 'settings-preview settings-preview--classic', 'aria-hidden': 'true' }, [
     el('i', { class: 'sp-dash sp-dash--left', html: ICONS.mouvementLeft }),

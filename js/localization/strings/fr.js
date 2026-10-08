@@ -141,6 +141,7 @@ export const FR = {
   'home.settings': 'Paramètres',
   'home.help': 'Aide',
   'home.controller': 'Manette',
+  'home.download': 'Télécharger',
   'home.credits': 'Crédits',
   'home.creditsRegion': 'Crédits. Faites défiler ou utilisez les flèches haut et bas et les touches Page précédente et Page suivante pour les lire.',
   'home.by': 'Par {developer}',

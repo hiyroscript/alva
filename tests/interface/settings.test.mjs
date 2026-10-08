@@ -6,7 +6,7 @@
 // Settings gear, and the Settings dialog it opens over Home (modal
 // semantics, its navigation scope, focus, exactly the Language, Controls
 // and Combat sections, every choice saved at once),
-// plus the unavailable Help / Controller placeholders. On a minimal
+// plus the unavailable Help / Controller / Download placeholders. On a minimal
 // fake DOM; layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -785,18 +785,20 @@ test('Home has four menu actions and a top-right Help, Controller, Settings grou
   }
 });
 
-test('Help and Controller are localized, unavailable and inert, without displacing Settings navigation', () => {
+test('Help, Controller and Download are localized, unavailable and inert, without displacing Settings navigation', () => {
   const { app, home, dialog, storage, done } = boot();
   try {
     const [help, controller, settings] = home.utilityButtons.children;
+    const download = home.el.querySelector('.home-download');
     const before = storage.writes;
     const focus = document.activeElement;
-    for (const button of [help, controller]) {
+    for (const button of [help, controller, download]) {
       assert.equal(button.tagName, 'BUTTON');
       assert.equal(button.getAttribute('type'), 'button');
       assert.equal(button.disabled, true, 'native unavailable semantics');
       assert.equal(button.hasAttribute('data-nav'), false);
       assert.equal(app.nav.candidates(home.el).includes(button), false);
+      assert.equal(button.listeners.size, 0, 'no activation or focus handlers');
       button.click();
       button.click(0); // keyboard / gamepad-style activation
       button.dispatch('click'); // even a stale synthetic event has no action
@@ -808,17 +810,36 @@ test('Help and Controller are localized, unavailable and inert, without displaci
     }
     assert.equal(storage.writes, before);
     assert.equal(app.nav.candidates(home.el).at(-1), settings);
-    for (const [language, names] of [
-      ['en', ['Help', 'Controller', 'Settings']],
-      ['fr', ['Aide', 'Manette', 'Paramètres']],
-      ['en', ['Help', 'Controller', 'Settings']],
+    for (const [language, names, downloadLabel] of [
+      ['en', ['Help', 'Controller', 'Settings'], 'Download'],
+      ['fr', ['Aide', 'Manette', 'Paramètres'], 'Télécharger'],
+      ['en', ['Help', 'Controller', 'Settings'], 'Download'],
     ]) {
       app.settings.set('language', language);
       assert.deepEqual(home.utilityButtons.children.map((b) => b.getAttribute('aria-label')), names);
+      assert.equal(download.getAttribute('aria-label'), downloadLabel);
     }
   } finally {
     done();
   }
+});
+
+test('Home footer keeps its attribution and contains one decorative Download icon button', () => {
+  const { home, done } = boot();
+  try {
+    const footer = home.el.querySelector('.home-footer');
+    const buttons = home.el.querySelectorAll('.home-download');
+    assert.equal(buttons.length, 1);
+    const [download] = buttons;
+    assert.equal(download.parentNode, footer);
+    assert.deepEqual(footer.children.map((node) => node.tagName), ['SPAN', 'BUTTON']);
+    assert.equal(footer.children[0].textContent, t('home.by', { developer: CONFIG.developer }));
+    assert.equal(download.innerHTML, ICONS.download);
+    assert.match(ICONS.download, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon">/);
+    assert.doesNotMatch(ICONS.download, /#[0-9a-f]{3,8}\b|rgba?\(|\b(fill|stroke)="|<(image|text|use)\b|href=/i);
+    assert.equal(download.hasAttribute('aria-haspopup'), false);
+    assert.equal(download.hasAttribute('href'), false);
+  } finally { done(); }
 });
 
 // Play is Home's default only while a fighter is playable: a test-only one
@@ -1544,7 +1565,7 @@ test('English and French credits keep the same structure, and French keeps every
   }
 });
 
-test('Classic settings preview shows smaller double-arrow Mouvement buttons above both Run buttons', () => {
+test('both settings previews show directional Mouvement icons and retain their control structures', () => {
   const { dialog, done } = boot();
   try {
     const classic = dialog.root.querySelector('.settings-preview--classic');
@@ -1554,5 +1575,15 @@ test('Classic settings preview shows smaller double-arrow Mouvement buttons abov
     assert.equal(classic.querySelectorAll('.sp-dash').length, 2);
     assert.equal(classic.querySelectorAll('.sp-pad').length, 2);
     assert.equal(joystick.children.length, 3);
+    assert.deepEqual(joystick.children.map((node) => node.className), ['sp-dash sp-dash--left', 'sp-stick', 'sp-dash sp-dash--right']);
+    assert.equal(joystick.querySelector('.sp-dash--left').innerHTML, ICONS.mouvementLeft);
+    assert.equal(joystick.querySelector('.sp-dash--right').innerHTML, ICONS.mouvementRight);
+    const stick = joystick.querySelector('.sp-stick');
+    assert.equal(stick.innerHTML, '');
+    assert.equal(stick.children.length, 1);
+    assert.equal(stick.children[0].className, 'sp-knob');
+    assert.equal(stick.children[0].children.length, 0);
+    assert.equal(stick.children[0].innerHTML, '');
+    assert.equal(joystick.getAttribute('aria-hidden'), 'true');
   } finally { done(); }
 });
