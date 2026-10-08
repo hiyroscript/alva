@@ -1,4 +1,4 @@
-/* Home: the wordmark, the main actions, the Settings gear and the credits
+/* Home: the wordmark, the main actions, the utility buttons and the credits
    strip. One part of the stylesheet index.html loads in order
    (css/base.css first; see docs/development/conventions.md). */
 
@@ -119,14 +119,18 @@
 }
 .home-note[hidden] { display: none; }
 
-/* Settings: a compact gear in the top right corner, clear of the notch and
-   the rounded corner, above the credits column. Home chrome, not a menu
-   action. */
-.home-settings {
+/* Utilities: compact squares in the top right, clear of the notch and
+   rounded corner. Settings anchors the group; future actions extend left. */
+.home-utility-buttons {
   position: absolute;
   top: max(var(--safe-t), clamp(12px, 2.6vh, 24px));
   right: max(var(--safe-r), clamp(12px, 2.2vw, 28px));
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home-utility-buttons > button {
   display: grid;
   place-items: center;
   width: clamp(40px, 7vh, 48px);
@@ -137,12 +141,15 @@
   color: var(--text-secondary);
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, color var(--dur-fast) ease, transform 90ms ease;
 }
-.home-settings .icon { font-size: clamp(20px, 3.4vh, 24px); transition: transform var(--dur) var(--ease); }
+.home-utility-buttons .icon { font-size: clamp(20px, 3.4vh, 24px); }
+.home-controller img { width: clamp(24px, 4vh, 28px); height: clamp(24px, 4vh, 28px); object-fit: contain; }
+.home-utility-buttons > button:disabled { cursor: default; }
+.home-settings .icon { transition: transform var(--dur) var(--ease); }
 .home-settings:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
 .home-settings:hover .icon, .home-settings:focus .icon { transform: rotate(30deg); }
 .home-settings:focus { box-shadow: var(--focus-ring); color: var(--text); }
 .home-settings:active { transform: translateY(1px); background: var(--surface-muted); }
-.screen--home.is-entering .home-settings { animation: fade-in 0.6s ease both; }
+.screen--home.is-entering .home-utility-buttons { animation: fade-in 0.6s ease both; }
 
 /* Two walls: the menu's near-black behind, and a semi-transparent glass strip
    in front of it with the green line on its edge. The strip and its credits

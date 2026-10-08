@@ -1,6 +1,6 @@
 // HOME: editorial wordmark and navigation beside a glass strip carrying a
-// looping credits roll, with a compact Settings (gear) button in the top
-// right corner that opens the Settings dialog over Home.
+// looping credits roll, with compact Help, Controller and Settings buttons
+// in the top right. Only Settings is available and opens its dialog over Home.
 //
 // Play, Watch Mode and Practice Ground each start a match, so they are
 // open only while a fighter is playable: with none, they are disabled and
@@ -99,6 +99,19 @@ export class HomeScreen extends Screen {
       html: ICONS.settings,
     });
     this.settingsButton.addEventListener('click', () => app.settingsDialog.open({ returnFocus: this.settingsButton }));
+    // Future utilities: native disabled buttons announce unavailability and
+    // stay out of Tab and MenuNavigator, leaving Settings as the only action.
+    this.utilityButtons = el('div', { class: 'home-utility-buttons' }, [
+      el('button', {
+        class: 'home-help', type: 'button', disabled: true,
+        ...tattr('aria-label', 'home.help'), html: ICONS.help,
+      }),
+      el('button', {
+        class: 'home-controller', type: 'button', disabled: true,
+        ...tattr('aria-label', 'home.controller'),
+      }, [el('img', { src: 'controller.PNG', alt: '', 'aria-hidden': 'true', draggable: 'false' })]),
+      this.settingsButton,
+    ]);
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     // The source links a keyboard can reach (the first pass's).
@@ -179,7 +192,7 @@ export class HomeScreen extends Screen {
           this.noFightersNote,
         ]),
       ]),
-      this.settingsButton,
+      this.utilityButtons,
       el('footer', { class: 'home-footer' }, [
         el('span', tx('home.by', { developer: CONFIG.developer })),
       ]),

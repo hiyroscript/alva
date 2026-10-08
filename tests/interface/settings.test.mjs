@@ -6,7 +6,7 @@
 // Settings gear, and the Settings dialog it opens over Home (modal
 // semantics, its navigation scope, focus, exactly the Language, Controls
 // and Combat sections, every choice saved at once),
-// plus what the Settings screen and Help left behind: nothing. On a minimal
+// plus the unavailable Help / Controller placeholders. On a minimal
 // fake DOM; layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -153,6 +153,7 @@ const { SettingsDialog, SETTINGS_SECTIONS } = await import('../../js/ui/settings
 const { LanguageDialog } = await import('../../js/ui/language-dialog.js');
 const { TouchLayoutEditor } = await import('../../js/ui/touch-layout-editor.js');
 const { ICONS } = await import('../../js/ui/icons.js');
+const { ENERGY_STYLE } = await import('../../js/game/rendering/fighter-status.js');
 const creditsModule = await import('../../js/ui/credits.js');
 const { CREDITS, creditsText } = creditsModule;
 const { CONFIG } = await import('../../js/config.js');
@@ -740,7 +741,7 @@ test('choosing after navigation does not restore focus to an inactive Home', asy
 
 // ---- Home's Settings gear ------------------------------------------------------------
 
-test('Home has four menu actions and a separate Settings gear in the top right corner', () => {
+test('Home has four menu actions and a top-right Help, Controller, Settings group', () => {
   const { home, done } = boot();
   try {
     assert.deepEqual(Object.keys(home.actions), ['play', 'watch', 'practice', 'discover']);
@@ -755,16 +756,66 @@ test('Home has four menu actions and a separate Settings gear in the top right c
     assert.equal(gear.getAttribute('aria-haspopup'), 'dialog');
     assert.equal(gear.innerHTML, ICONS.settings, 'the gear glyph, no text');
     assert.equal(home.el.querySelector('.home-actions').children.includes(gear), false, 'not in the menu');
-    assert.equal(gear.parentNode, home.el, 'Home chrome');
+    const group = home.el.querySelector('.home-utility-buttons');
+    assert.equal(group.parentNode, home.el, 'Home chrome');
+    assert.equal(gear.parentNode, group);
+    assert.deepEqual(group.children.map((button) => button.className), ['home-help', 'home-controller', 'home-settings']);
+    const [help, controller] = group.children;
+    assert.equal(help.innerHTML, ICONS.help);
+    assert.match(ICONS.help, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon">/);
+    const img = controller.querySelector('img');
+    assert.equal(img.getAttribute('src'), 'controller.PNG');
+    assert.ok(existsSync(new URL(img.getAttribute('src'), ROOT)));
+    assert.equal(img.getAttribute('alt'), '');
+    assert.equal(img.getAttribute('aria-hidden'), 'true');
     // The glyph: the shared inline SVG style, in currentColor.
     assert.match(ICONS.settings, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon">/);
     assert.doesNotMatch(ICONS.settings, /#[0-9a-f]{3,8}\b|rgba?\(|\b(fill|stroke)="|<(image|text|use)\b|href=/i);
     // Placed by CSS in the top right, inside the safe area.
     const css = stylesheet();
-    const rule = css.match(/\n\.home-settings \{([^}]*)\}/)?.[1] ?? '';
+    const rule = css.match(/\n\.home-utility-buttons \{([^}]*)\}/)?.[1] ?? '';
     assert.match(rule, /position: absolute;/);
     assert.match(rule, /top: max\(var\(--safe-t\), /);
     assert.match(rule, /right: max\(var\(--safe-r\), /);
+    assert.match(rule, /display: flex;/);
+    assert.match(rule, /gap: 8px;/);
+    assert.match(css, /\.home-controller img \{[^}]*object-fit: contain;/);
+  } finally {
+    done();
+  }
+});
+
+test('Help and Controller are localized, unavailable and inert, without displacing Settings navigation', () => {
+  const { app, home, dialog, storage, done } = boot();
+  try {
+    const [help, controller, settings] = home.utilityButtons.children;
+    const before = storage.writes;
+    const focus = document.activeElement;
+    for (const button of [help, controller]) {
+      assert.equal(button.tagName, 'BUTTON');
+      assert.equal(button.getAttribute('type'), 'button');
+      assert.equal(button.disabled, true, 'native unavailable semantics');
+      assert.equal(button.hasAttribute('data-nav'), false);
+      assert.equal(app.nav.candidates(home.el).includes(button), false);
+      button.click();
+      button.click(0); // keyboard / gamepad-style activation
+      button.dispatch('click'); // even a stale synthetic event has no action
+      button.focus();
+      assert.equal(document.activeElement, focus);
+      assert.equal(app.screens.current, home);
+      assert.equal(dialog.isOpen, false);
+      assert.equal(app.nav.scopes.length, 0);
+    }
+    assert.equal(storage.writes, before);
+    assert.equal(app.nav.candidates(home.el).at(-1), settings);
+    for (const [language, names] of [
+      ['en', ['Help', 'Controller', 'Settings']],
+      ['fr', ['Aide', 'Manette', 'Paramètres']],
+      ['en', ['Help', 'Controller', 'Settings']],
+    ]) {
+      app.settings.set('language', language);
+      assert.deepEqual(home.utilityButtons.children.map((b) => b.getAttribute('aria-label')), names);
+    }
   } finally {
     done();
   }
@@ -777,12 +828,18 @@ test('keyboard and gamepad reach the gear from Home\'s menu', () => withTestFigh
   try {
     Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
     place(home.settingsButton, 1180, 20, 44, 44);
+    place(home.utilityButtons.children[0], 1076, 20, 44, 44);
+    place(home.utilityButtons.children[1], 1128, 20, 44, 44);
     assert.equal(document.activeElement, home.actions.play, 'Play is still the default');
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, home.settingsButton, '→ from the menu');
     app.input.key('ArrowLeft');
     app.input.key('ArrowUp');
     assert.equal(document.activeElement, home.settingsButton, '↑ from Play');
+    app.input.pad('left');
+    assert.ok(Object.values(home.actions).includes(document.activeElement), 'D-pad skips the placeholders');
+    app.input.pad('right');
+    assert.equal(document.activeElement, home.settingsButton, 'D-pad reaches Settings');
     app.nav.command('confirm', null); // gamepad A
     assert.equal(app.settingsDialog.isOpen, true);
   } finally {
@@ -1017,6 +1074,50 @@ test('both layouts keep localized copy, editor labels and saved choices across l
         assert.deepEqual(reloaded.touchLayout(scheme).jump, { x: 0.8, y: 0.7, scale: 1.2 });
       }
     }
+  } finally {
+    done();
+  }
+});
+
+test('only the selected shield label is lowercase, bold and Energy purple, in both languages and layouts', () => {
+  const { app, home, dialog, done } = boot();
+  try {
+    home.settingsButton.click();
+    dialog.showSection('controls');
+    const editor = app.touchEditor;
+    for (const scheme of ['joystick', 'classic']) {
+      schemeNamed(dialog, scheme).click();
+      dialog.customizeButton.click();
+      editor.select('shield');
+      for (const [language, label, controlLabel] of [['en', 'shield', 'Shield'], ['fr', 'bouclier', 'Bouclier'], ['en', 'shield', 'Shield']]) {
+        app.settings.set('language', language);
+        // The selected label updates through localizeTree, without reselection.
+        assert.equal(editor.nameEl.textContent, label);
+        assert.equal(editor.nameOf('shield'), label);
+        assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), true);
+        assert.equal(editor.controlNode('shield').getAttribute('aria-label'), controlLabel, 'shared control name unchanged');
+        assert.equal(editor.controlNode('shield').getAttribute('data-control'), 'shield');
+      }
+      editor.select('jump');
+      assert.equal(editor.nameEl.textContent, 'Jump');
+      assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), false);
+      localizeTree(editor.root);
+      assert.equal(editor.nameEl.textContent, 'Jump', 'no stale Shield translation marker');
+      editor.select('shield');
+      editor.select(null);
+      assert.equal(editor.nameEl.textContent, t('editor.none'));
+      assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), false);
+      editor.select('shield');
+      editor.close();
+      assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), false, 'closing clears the style');
+    }
+    const css = stylesheet();
+    const special = css.match(/\n\.touch-editor-name--shield \{([^}]*)\}/)?.[1] ?? '';
+    assert.match(special, /font-weight: 700;/);
+    assert.equal(special.match(/color: (#[\da-f]+);/)?.[1], ENERGY_STYLE.fill);
+    const normal = css.match(/\n\.touch-editor-name \{([^}]*)\}/)?.[1] ?? '';
+    assert.match(normal, /font-weight: 600;/);
+    assert.match(normal, /color: var\(--text-strong\);/);
   } finally {
     done();
   }
@@ -1284,7 +1385,7 @@ test('Settings is no longer a screen: no module, section, registration, navigati
   assert.doesNotMatch(css, /\.settings-layout|\.screen--settings|\.settings-group \{/);
 });
 
-test('Help is removed from the game: no Help screen, module, section or registration', () => {
+test('Help remains a placeholder: no Help screen, module, section or registration', () => {
   assert.equal(existsSync(new URL('js/ui/help-content.js', ROOT)), false);
   assert.equal(existsSync(new URL('js/screens/help-credits-screen.js', ROOT)), false);
   const html = read('index.html');
