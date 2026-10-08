@@ -141,6 +141,7 @@ export class CPUIntelligenceController {
     this.urgent = false;
     this.forceActive = false;
     this.confirmAt = null;
+    this.stalled = null;
     this.threats = [];
     this.locked = false;
   }
@@ -288,6 +289,19 @@ export class CPUIntelligenceController {
     this.thinkTimer -= S.dt;
     if (!this.plan || this.thinkTimer <= 0 || urgent) this.think(S, threats, urgent);
     this.execute(S);
+    this.steerLaunch(S, threats);
+  }
+
+  // A hit about to land that it is not avoiding: hold toward the stage's
+  // middle as it lands, so a launch is bent away from the Void (a launch is
+  // steered by the direction held as the hit lands). A skilled level does it
+  // on every severe hit; it never costs a jump (Jump is never held for it).
+  steerLaunch(S, threats) {
+    if (this.profile.defense < 0.7 || S.shielding || this.executor.wantJump) return;
+    const t = threats.find((x) => x.contactIn <= 2 * S.dt && x.severity > 8);
+    if (!t) return;
+    const mid = S.center - S.x;
+    if (Math.abs(mid) > 30) this.executor.move(Math.sign(mid));
   }
 
   think(S, threats, urgent = false) {
@@ -314,10 +328,14 @@ export class CPUIntelligenceController {
     if (!this.reactionsOnly) {
       const offence = planCandidates(S, this);
       for (const o of offence) {
-        // Starting something that the incoming threat lands through costs
-        // that threat.
-        if (threat && o.plan.kind !== 'strike' && o.plan.kind !== 'jumpStrike') o.value -= threat.severity * 0.9;
-        else if (threat && o.plan.kind === 'strike' && threat.contactIn < (o.plan.move?.startup ?? 0) + 0.02) o.value -= threat.severity * 0.9;
+        // Starting something the incoming threat lands through costs that
+        // threat: only a strike that lands first beats it.
+        if (threat) {
+          const pl = o.plan;
+          const first = (pl.kind === 'strike' && (pl.move?.startup ?? 0) + 0.02 < threat.contactIn)
+            || (pl.kind === 'jumpStrike' && pl.pressIn + pl.move.startup + 0.02 < threat.contactIn && !threat.unblockable);
+          if (!first) o.value -= threat.severity * 0.9;
+        }
         cands.push(o);
       }
     }
@@ -330,6 +348,11 @@ export class CPUIntelligenceController {
     if (this.forceActive) {
       this.forceActive = false;
       for (const c of cands) if (c.plan.kind === 'space' || c.plan.kind === 'edgeguard') c.value -= 5;
+    }
+    // A plan that just stalled (the watchdog caught it standing still) is
+    // set aside for a moment: something else gets the CPU moving.
+    if (this.stalled && S.clock < this.stalled.until) {
+      for (const c of cands) if (c.plan.kind === this.stalled.kind) c.value -= 6;
     }
     if (!cands.length) {
       if (this.reactionsOnly) {
@@ -419,6 +442,7 @@ export class CPUIntelligenceController {
       st.currentIdle = 0;
     }
     if (!this.frozen && !this.reactionsOnly && this.watchdog.check(S, out, this.plan, intentional)) {
+      if (this.plan) this.stalled = { kind: this.plan.kind, until: S.clock + 1 };
       this.plan = null;
       this.forceActive = true;
       this.urgent = true;

@@ -40,6 +40,13 @@ const GOAL_ROLES = Object.freeze({
   forceAction: { launcher: 1.2, finisher: 1.2 },
 });
 
+// Whether a Dash now leaves Energy for defence (a careful level keeps more
+// back), and may start at all.
+export function dashAffordable(S) {
+  const dash = S.k.dash;
+  return !!dash && S.movementReady(false) && !S.exhausted && S.energy - dash.cost >= 20 + 25 * S.profile.resources;
+}
+
 // Whether move `m` may be started right now (or the instant the fighter
 // is free): free to act, or able to cut short what it is doing; specials
 // only free and on the ground; never the same attack cutting into itself.
@@ -175,19 +182,40 @@ export function aerialPlan(S, m) {
   if (!m.air) return null;
   const kinds = S.grounded ? ['normal', 'high'] : [null, ...(S.airJumps > 0 && !S.freeFall ? ['air'] : [])];
   const steer = S.dir;
+  // Out over the Void only to edge-guard, close to the ledge and with an
+  // air jump kept for the way back, and only with the stage sense for it.
+  const floor = S.stage.floor;
+  const gapOf = (x) => (x < floor.x ? floor.x - x : x > floor.x + floor.w ? x - (floor.x + floor.w) : 0);
+  const safeOut = (from, kind) => {
+    if (S.goal !== 'edgeguard' || S.profile.stage < 0.6) return false;
+    const jumpsLeft = S.airJumps - (kind === 'air' ? 1 : 0);
+    const dashLeft = S.airDashes > 0 && !S.exhausted;
+    return gapOf(from.x) <= 140 && from.y - floor.y <= 30 && jumpsLeft >= 1 && (dashLeft || gapOf(from.x) <= 80) && !S.freeFall && !m.freeFall;
+  };
   for (const kind of kinds) {
     for (let k = 2; k <= 44; k += 2) {
       const delay = k * STEP;
       const a = arcAt(S, kind, steer, delay);
+      // The jump is steered not to sail past its target (see jumpStrike in
+      // plans.js): it holds just short of it.
+      const stop = foeAt(S, delay).x - steer * 12;
+      if ((a.x - stop) * steer > 0) {
+        a.x = stop;
+        a.vx = 0;
+      }
       if (S.grounded || kind === null) {
         const ground = S.stage.surfaceBelow(a.x - S.halfW, a.x + S.halfW, S.y - 1).y;
         if (a.y >= ground && a.vy > 0) break;
       }
       const from = { x: a.x, y: a.y, vx: a.vx, vy: a.vy, grounded: false };
       // Never jumping out over the Void without the means to come back.
-      if (!S.stage.surfaceBelow(from.x - S.halfW, from.x + S.halfW, from.y).ref && S.goal !== 'edgeguard') continue;
+      const out = !S.stage.surfaceBelow(from.x - S.halfW, from.x + S.halfW, from.y).ref;
+      if (out && !safeOut(from, kind)) continue;
       const fit = moveFit(S, m, { delay, from });
-      if (fit) return { kind, steer, delay, fit };
+      // ...and where the strike carries it (a homing dash flies to its
+      // target) stays as close.
+      if (fit && out && gapOf(foeAt(S, fit.t).x) > 170) continue;
+      if (fit) return { kind, steer, delay, fit, out };
     }
   }
   return null;
@@ -252,20 +280,23 @@ function offence(S, mem, out) {
         const antiAir = S.foeBusy < a.fit.t && S.fk?.moves.some((f) => f.roles.has('antiAir') && !f.air)
           ? foeHitWorth(S) * clamp((a.fit.t - 0.18) / 0.5, 0, 0.5) * (0.5 + 0.5 * S.profile.risk) : 0;
         const v = strikeValue(S, m, a.fit, { mem, delay: a.delay * 0.6 }) - (a.kind === 'high' ? 0.2 : 0) - (a.kind === 'air' ? 0.3 : 0) - antiAir;
-        out.push({ value: v, plan: { kind: 'jumpStrike', move: m, jump: a.kind, steer: a.steer, pressIn: a.delay, value: v } });
+        out.push({ value: v, plan: { kind: 'jumpStrike', move: m, jump: a.kind, steer: a.steer, pressIn: a.delay, value: v, offstageOK: a.out } });
       }
       continue;
     }
     // Into range on foot (or with a Dash), on the same level.
     if (!m.air && S.grounded && S.sameLevel && (m.kind !== 'summon')) {
       const band = bandFor(S, m);
-      const d = S.dist;
+      // The distance as this level judges it (its spacing error included,
+      // as the fit itself does).
+      const d = Math.max(0, S.dist + S.rangeError);
       if (d >= band.lo && d <= band.hi) continue; // in range but no fit (height, timing): later
       const gap = d > band.hi ? d - band.hi : band.lo - d;
       const toward = d > band.hi ? S.dir : -S.dir;
       if (!S.groundAhead(toward, Math.min(gap, 200))) continue;
-      const dash = k.dash && toward === S.dir && gap > 140 && S.movementReady(false) && !S.exhausted && p.mobility > 0.15
-        && S.groundAhead(toward, k.dash.reach + 20);
+      // A Dash in, if it leaves Energy for defence (a careful level keeps
+      // more back).
+      const dash = toward === S.dir && gap > 140 && p.mobility > 0.15 && dashAffordable(S) && S.groundAhead(toward, k.dash.reach + 20);
       const tReach = dash ? gap / 1100 + 0.05 : gap / S.self.maxSpeed;
       const fit = { t: tReach + m.startup, face: S.dir };
       const est = strikeValue(S, m, fit, { mem, delay: tReach }) * Math.exp(-tReach * 1.1);

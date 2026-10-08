@@ -163,10 +163,23 @@ export function navigateStep(S, ex, nav) {
         nav.phase = null;
         if (nav.tries > 3) return 'fail';
       }
+      // The take-off point, always on the surface it stands on: under a
+      // one-way platform, or beside a solid on whichever side has footing.
       let takeoff;
+      const here = on ?? surfaceUnder(S.stage, S.x, S.halfW, S.y - 1);
+      const lo = here ? here.x0 + S.halfW + 4 : -Infinity;
+      const hi = here ? here.x1 - S.halfW - 4 : Infinity;
       if (to.oneWay && S.x > to.x0 - 40 && S.x < to.x1 + 40) takeoff = clamp(S.x, to.x0 + 8, to.x1 - 8);
       else if (to.oneWay) takeoff = S.x < to.x0 ? to.x0 - 30 : to.x1 + 30;
-      else takeoff = S.x < (to.x0 + to.x1) / 2 ? to.x0 - S.halfW - 34 : to.x1 + S.halfW + 34;
+      else {
+        const left = to.x0 - S.halfW - 34;
+        const right = to.x1 + S.halfW + 34;
+        const okL = left >= lo && left <= hi;
+        const okR = right >= lo && right <= hi;
+        takeoff = okL && okR ? (Math.abs(left - S.x) < Math.abs(right - S.x) ? left : right) : okL ? left : okR ? right : null;
+        if (takeoff === null) return 'fail';
+      }
+      takeoff = clamp(takeoff, lo, hi);
       const dx = takeoff - S.x;
       if (Math.abs(dx) > 18 && !(to.oneWay && S.x > to.x0 && S.x < to.x1)) {
         ex.move(Math.sign(dx));

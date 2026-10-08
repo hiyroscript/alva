@@ -19,7 +19,7 @@
 
 import { STEP } from './forecast.js';
 import { moveFit } from './targeting.js';
-import { startable } from './tactics.js';
+import { startable, dashAffordable } from './tactics.js';
 import { navigateStep } from './navigation.js';
 
 // Plans that may hold the fighter still on purpose (a Shield up, a spacing
@@ -42,6 +42,8 @@ function started(S, m) {
 function strike(S, ex, plan, c) {
   const m = plan.move;
   if (plan.pressedAt === undefined) {
+    // Refused for longer than it would wait: something else, now.
+    if (m.ability ? S.self.combat.abilityCooldowns.active(m.id) : (S.self.combat.cooldowns.get(m.atk.id) ?? 0) > 0.3) return 'fail';
     const free = m.ability ? S.canAct && S.grounded : S.canFollowUp;
     if (!free) {
       // Busy a moment longer (its own recovery, a landing): wait for it.
@@ -83,10 +85,10 @@ function engage(S, ex, plan) {
     return 'fail';
   }
   if (!S.grounded) return 'done';
-  const d = S.dist;
+  const d = Math.max(0, S.dist + S.rangeError);
   const { lo, hi } = plan.band;
   if (plan.dashing) {
-    if (ex.dashResult || S.dashing) {
+    if (ex.dashResult || S.dashing || !dashAffordable(S)) {
       plan.dashing = false;
       plan.dash = false;
     } else {
@@ -95,7 +97,7 @@ function engage(S, ex, plan) {
     }
   }
   if (d > hi - 4) {
-    if (plan.dash && d - hi > 120 && S.canAct) {
+    if (plan.dash && d - hi > 120 && S.canAct && dashAffordable(S)) {
       plan.dashing = true;
       ex.dashResult = null;
       ex.dash(S.dir);
@@ -105,10 +107,13 @@ function engage(S, ex, plan) {
   } else if (d < lo + 4) {
     ex.move(-S.dir);
   } else {
-    // In its band but it would not connect (height, timing): a beat, then
-    // the planner looks again.
+    // In its band but it would not connect: over its head, the planner
+    // looks again at once; on its level, a little closer (its own spacing
+    // misread, or the step-in short), for a beat, then the planner again.
+    if (S.dy < -40) return 'done';
     plan.idle = (plan.idle ?? 0) + STEP;
     if (plan.idle > 0.15) return 'done';
+    if (S.dist > 12) ex.move(S.dir);
   }
   return 'run';
 }
@@ -133,12 +138,19 @@ function jumpStrike(S, ex, plan) {
   const t = S.clock - plan.at;
   if (S.grounded && t > 0.1) return 'done';
   if (!S.foeIn) return 'done';
+  // An edge-guard out over the Void ends the moment it drifts past where it
+  // can come back from, or sinks below the ledge: recovery takes over.
+  if (plan.offstageOK && S.offStage) {
+    const f = S.floor;
+    const gap = S.x < f.x ? f.x - S.x : S.x - (f.x + f.w);
+    if (gap > 150 || (S.vy > 0 && S.y > f.y - 10)) return 'done';
+  }
   // Toward the target, without sailing past it.
   const ahead = S.dx * plan.steer;
   ex.move(ahead > 26 ? plan.steer : ahead < 6 ? -plan.steer : 0);
   if (S.canFollowUp && S.moveReady(m)) {
     const fit = moveFit(S, m);
-    if (fit) return { next: { kind: 'strike', move: m, value: plan.value } };
+    if (fit) return { next: { kind: 'strike', move: m, value: plan.value, offstageOK: plan.offstageOK } };
   }
   if (t > plan.pressIn + 0.3) return 'done';
   return 'run';
@@ -231,6 +243,8 @@ function edgeguard(S, ex, plan) {
 function navigate(S, ex, plan) {
   if (S.clock > plan.until || !S.foeIn) return 'done';
   if (S.sameLevel && S.grounded) return 'done';
+  // The ledge guard refused the way it was going: another way, or another plan.
+  if (plan.blocked) return 'fail';
   return navigateStep(S, ex, plan.nav);
 }
 

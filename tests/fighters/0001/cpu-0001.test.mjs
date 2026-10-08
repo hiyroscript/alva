@@ -72,7 +72,8 @@ test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it 
     let answered = 0;
     for (let seed = 0; seed < 6; seed++) {
       let n = 0;
-      const ai = new CPUIntelligenceController({ difficulty: 'brutal', rng: mulberry32(600 + seed) });
+      // Its reactions alone: it answers what it sees, nothing of its own.
+      const ai = new CPUIntelligenceController({ difficulty: 'brutal', rng: mulberry32(600 + seed), reactionsOnly: true });
       const foe = new Fighter({
         def: DEF, sprites: fakeSpritesOf(DEF), stage, slot: 'p1', spawn: { x: 800, facing: 1 },
         controller: { getInput: () => (n === 5 ? P(button) : {}) },
@@ -82,13 +83,12 @@ test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it 
       cpu.opponent = foe;
       const world = { stage, projectiles: [], clones: [], fighters: [foe, cpu], score: { p1: 0, p2: 0 }, timeLeft: 99 };
       const ctx = { stage, gravity: CONFIG.sim.gravity, battle: world };
-      cpu.update(DT, ctx);
-      ai.thinkTimer = Infinity;
       let moved = false;
       for (; n < 150; n++) {
         foe.update(DT, ctx);
         cpu.update(DT, ctx);
-        if (ai.out.shield) shields++;
+        // A Shield raised (in the air the button is the Deflect, never one).
+        if (cpu.combat.shielding || (ai.out.shield && cpu.body.grounded)) shields++;
         if (ai.out.jumpPressed || ai.out.runLeft || ai.out.runRight || cpu.dash) moved = true;
         // Or it meets the sphere with an erasing one of its own (its own
         // Hollow Purple: two erasing projectiles both go).

@@ -19,7 +19,7 @@ import { readMoveset } from './moveset.js';
 export const ROLES = Object.freeze([
   'fast', 'comboStarter', 'comboExtender', 'launcher', 'finisher', 'antiAir', 'airToGround', 'groundPressure',
   'zoning', 'trap', 'pull', 'repel', 'erase', 'interceptProjectile', 'mobility', 'recovery', 'shieldPressure',
-  'unblockable', 'aerialPursuit', 'counter', 'paralyze',
+  'unblockable', 'aerialPursuit', 'counter', 'paralyze', 'heavy', 'poke',
 ]);
 
 export const moveKey = (action, air) => `${action}:${air ? 'air' : 'ground'}`;
@@ -95,6 +95,9 @@ function rolesOf(m) {
   }
   if (m.kind === 'technique' && m.burst) r.add('trap');
   if (m.kind === 'summon') r.add('trap');
+  // Whatever else it is: a heavy hit, or a plain poke.
+  if (hit.damage >= 5) r.add('heavy');
+  if (!r.size) r.add('poke');
   return r;
 }
 
