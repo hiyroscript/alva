@@ -289,7 +289,7 @@ test('after a Dash its burst runs on: held on, it eases back into the run; let g
     const { fighter, step } = makeFighter();
     step({ ...RIGHT, runRightPressed: true });
     step({});
-    step({ ...RIGHT, runRightPressed: true });
+    step({ ...RIGHT, mouvementRightPressed: true });
     assert.ok(fighter.dash);
     const energy = fighter.combat.energy;
     assert.equal(energy, 100 - DASH_ENERGY_COST, 'its Energy, once');
@@ -321,7 +321,7 @@ test('an attack pressed during a Dash comes out once its cancel time is reached,
   const { fighter, step } = makeFighter();
   step({ ...RIGHT, runRightPressed: true });
   step({});
-  step({ ...RIGHT, runRightPressed: true });
+  step({ ...RIGHT, mouvementRightPressed: true });
   step(P('attack1'));
   assert.equal(fighter.combat.attack, null, 'never in the Dash\'s first moment');
   let n = 1;
@@ -337,7 +337,7 @@ test('an attack pressed during a Dash comes out once its cancel time is reached,
   const late = makeFighter();
   late.step({ ...RIGHT, runRightPressed: true });
   late.step({});
-  late.step({ ...RIGHT, runRightPressed: true });
+  late.step({ ...RIGHT, mouvementRightPressed: true });
   while (late.fighter.dash.time < late.fighter.dash.duration - 3 * DT) late.step({});
   late.step(P('attack1'));
   assert.equal(late.fighter.combat.attack?.def.id, 'attack1');

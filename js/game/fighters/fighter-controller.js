@@ -19,7 +19,7 @@ export const HELD_CONTROLS = Object.freeze(ACTIONS.filter((action) => action !==
 
 // Every field Fighter.update reads, all false: a complete, neutral snapshot,
 // keyed by control codename. Besides each held control and its press edge,
-// the touch mouvement buttons' one-step Dash requests and the training
+// explicit one-step Mouvement requests from any device or CPU and the training
 // CPU's platform drop.
 export function blankInput() {
   const input = {};

@@ -368,7 +368,7 @@ test('a grounded Shield holds the fighter in place: no walking, Dash or jump, th
   // No Dash: a double tap while shielding starts nothing and costs nothing.
   step({ ...HOLD, runRight: true, runRightPressed: true });
   step(HOLD);
-  step({ ...HOLD, runRight: true, runRightPressed: true });
+  step({ ...HOLD, runRight: true, mouvementRightPressed: true });
   assert.equal(fighter.dash, null);
   assert.equal(fighter.combat.energy, 100);
   // No jump.

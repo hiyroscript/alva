@@ -105,6 +105,8 @@ export const CONFIG = Object.freeze({
   bindings: {
     runLeft: ['KeyA', 'ArrowLeft'],
     runRight: ['KeyD', 'ArrowRight'],
+    mouvementLeft: ['KeyQ'],
+    mouvementRight: ['KeyE'],
     down: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
     extra_attack: ['KeyJ'],

@@ -4,8 +4,7 @@
 //
 // Purpose: how ground acceleration and braking, turning, air steering,
 // overspeed, an attack's momentum, the hitstun drift, the fast fall, the
-// air jump, the higher jump and the double tap (the Dash's and the air
-// dash's) work. No fighter changes these rules or their numbers.
+// air jump and the higher jump work. No fighter changes these rules or their numbers.
 //
 // Inputs: the movement values (`mv`: BASE_FIGHTER_MOVEMENT in
 // js/data/movement.js, which lists every field), an attack definition
@@ -13,7 +12,7 @@
 // moved (js/game/physics.js).
 //
 // Outputs: pure functions. Each one reads what it is given and writes only
-// the body (or the tap record) it is handed; none keeps state of its own.
+// the body it is handed; none keeps state of its own.
 //
 // Important constraints: the Fighter (js/game/fighters/fighter.js) owns all
 // movement state (the body, the Dash, the burst, the jump buffer, the
@@ -139,21 +138,4 @@ export function highJumpLift(body, mv, fromY, gravity) {
   const left = normal * mv.highJumpHeight - (fromY - body.y);
   if (!(left > 0)) return 1;
   return Math.min(1, (body.vy * body.vy) / (2 * g * left));
-}
-
-// Double-tap detection on this step's run press edges (runLeftPressed /
-// runRightPressed, from any device). `tap` is the press still waiting for
-// its second tap ({ direction, age }, or null); it ages by `dt` here. A
-// press of the same direction within `dashTapWindow` seconds of it is a
-// double tap. Any other press (the other direction, or one too late)
-// becomes the new first tap; both directions on one step cancel it.
-// Returns { direction, tap }: the Dash asked for (1 right, -1 left, 0 none)
-// and the press now waiting.
-export function readDashTap(tap, input, mv, dt) {
-  if (tap) tap.age += dt;
-  if (!input.runLeftPressed && !input.runRightPressed) return { direction: 0, tap };
-  if (input.runLeftPressed && input.runRightPressed) return { direction: 0, tap: null };
-  const direction = input.runRightPressed ? 1 : -1;
-  if (tap && tap.direction === direction && tap.age <= mv.dashTapWindow + EPSILON) return { direction, tap: null };
-  return { direction: 0, tap: { direction, age: 0 } };
 }

@@ -1339,3 +1339,16 @@ each play type), `tests/interface/i18n.test.mjs` and
 
 When a new piece of work gets a name, add a row to the table and a section in
 the same shape: what it added, where to tune it, the code, and the tests.
+
+
+## Mouvement controls and mobile button consistency
+
+Run now only runs: repeated directional presses and joystick flicks cannot
+activate ground or air Dash. Mouvement uses Q/E on keyboard, Select/View/Share
+(standard button 8) plus direction on gamepad, and dedicated left/right buttons
+in both mobile layouts. Combat AI requests Mouvement explicitly; existing
+movement physics, Energy, cooldowns, buffering and cancellation are unchanged.
+Classic adds independently customizable smaller Mouvement buttons above Run,
+preserving old layouts and Run sliding. Both schemes share centered mirrored
+double arrows. Jump and Extra Attack inherit the standard action-button style;
+settings previews, English/French guidance and current documentation follow suit.

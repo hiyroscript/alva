@@ -86,7 +86,7 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
   assert.deepEqual([...NUMBERED_ATTACKS], ['attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
-  assert.deepEqual(Object.keys(CONFIG.bindings), [...ACTIONS]);
+  assert.deepEqual(Object.keys(CONFIG.bindings).sort(), [...ACTIONS, 'mouvementLeft', 'mouvementRight'].sort());
   assert.deepEqual(Object.keys(ACTION_LABELS), [...ACTIONS]);
   assert.deepEqual(CONFIG.bindings.runLeft, ['KeyA', 'ArrowLeft']);
   assert.deepEqual(CONFIG.bindings.runRight, ['KeyD', 'ArrowRight']);

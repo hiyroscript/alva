@@ -26,11 +26,11 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a}
 // #0001's Energy: its refill each fixed step, and the universal costs.
 const E = resolveEnergy(def.energy);
 const PER_STEP = E.regen * DT;
-// Two presses of `dir`, one step apart: a Dash's double tap.
+// Run setup followed by one explicit Mouvement request.
 const dash = (step, dir = 'runRight') => {
   step({ [`${dir}Pressed`]: true, [dir]: true });
   step({});
-  return step({ [`${dir}Pressed`]: true, [dir]: true });
+  return step({ [dir === 'runRight' ? 'mouvementRightPressed' : 'mouvementLeftPressed']: true, [dir]: true });
 };
 
 test('the Energy rules are universal: 100 full, 25 per Dash, air dash or Dash cancel, 15 per Deflect, 15 per blocked hit; a fighter sets only its refill', () => {
@@ -164,7 +164,7 @@ test('a Dash spends exactly its cost (25) as it starts, and only then; spending 
   step({ runLeftPressed: true, runLeft: true });
   step({});
   c.setEnergy(E.dashCost);
-  step({ runLeftPressed: true, runLeft: true });
+  step({ mouvementLeftPressed: true, runLeft: true });
   assert.ok(fighter.dash);
   assert.equal(c.energy, 0);
   assert.equal(c.energyExhausted, true, 'spending to zero exhausts at once');

@@ -20,7 +20,7 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/data/movement.js`](../../js/data/movement.js) | The numbers: `BASE_FIGHTER_MOVEMENT`, one frozen object every Fighter reads (`MOVEMENT_FIELDS` lists them). `movementProblems` / `assertUniversalMovement`, which the registry uses to refuse a definition that declares movement of its own. And the Discover copy (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`). |
-| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`, `readDashTap` (the double tap). Each reads the values it is given on every call and writes only the body or tap record it is handed. |
+| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms. It never knows why a body moves. |
 
@@ -87,7 +87,6 @@ plays every pairing at 30, 60 and 144 fps and compares every step).
 | `airJumps` / `airJumpRatio` | 2 / 0.78 | The triple jump: two jumps in the air, each at this × the jump's speed (about 105 units each). Landing or a hit gives both back. |
 | `dashSpeed` / `dashDuration` | 1250 / 1/6 | The Dash: a burst at this speed for this long (about 208 units). |
 | `dashCancelTime` | 0.05 | From this far into a Dash or air dash, an attack, a Deflect or a jump may cut it short. |
-| `dashTapWindow` | 0.22 | The most time between the two taps of a double tap (the Dash's and the air dash's). |
 | `airDashSpeed` / `airDashDuration` / `airDashUses` | 1250 / 1/6 / 1 | The air dash, once per airtime; landing or a hit gives it back. |
 | `attackBuffer` | 0.15 | How long an attack press (and a Dash request) the fighter cannot act on yet is kept. |
 | `hitstunFriction` / `hitstunAirDrag` | 1600 / 210 | How a launch or push runs down while stunned, whatever is held: the rates Launch Point is tuned against. |
@@ -172,11 +171,11 @@ dash, a plunge, a lift, a roll, a hover) owns the body instead
 fighter's own `mouvment` clip played once across it whatever its frame
 count and rate (the codename keeps that spelling: see
 [conventions](../development/conventions.md#codenames)). It starts on a
-double tap of a direction (two `runLeftPressed` / `runRightPressed` edges
-within `dashTapWindow`, from any device) or one tap of a Joystick-layout
-Dash button (`mouvementLeftPressed` / `mouvementRightPressed`), both
-through the same `Fighter.tryDash` (in the air the same requests are the
-air dash). It needs the fighter free to act (or in an attack that hit and
+one-step explicit request (`mouvementLeftPressed` / `mouvementRightPressed`):
+Q/E, Select/View + D-pad or left stick direction, or either touch layout's
+Mouvement buttons. Run taps never request it, on the ground or airborne.
+`Fighter.tryMouvment` selects `tryDash` on the ground or `tryAirDash` in the air.
+It needs the fighter free to act (or in an attack that hit and
 may be cut short: a Dash cancel), grounded, not shielding, not exhausted
 and real `mouvment` frames (refused and logged otherwise, never faked
 with the run). It costs 25 Energy (`DASH_ENERGY_COST`, the same for every

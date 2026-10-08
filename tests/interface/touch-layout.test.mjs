@@ -210,7 +210,7 @@ test('every control of both schemes has a stable id, independent of its label', 
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual([...TOUCH_CONTROL_IDS.classic], [
-    'runLeft', 'runRight', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'transform', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual(Object.keys(TOUCH_CONTROL_IDS), [...MOBILE_CONTROLS], 'one list per Mobile Controls scheme');
@@ -506,7 +506,7 @@ test('Classic Left / Right still slide into one another wherever they are placed
   tc.dpad.dispatch('pointerup', { pointerId: 1 });
   assert.deepEqual(calls.at(-1), ['runRight', false]);
   assert.equal(tc.pointers.size, 0);
-  // Two taps are still two presses (a Dash is the fighter's own double tap).
+  // Two Run taps remain ordinary directional presses.
   calls.length = 0;
   for (const id of [2, 3]) {
     tc.padButtons.get('runRight').dispatch('pointerdown', { pointerId: id, ...at('runRight') });
@@ -937,4 +937,42 @@ test('legacy layouts discard Down alone and keep all other positions and scales,
     assert.equal(editor.touch.getControlElements().has('down'), false);
     editor.close();
   }
+});
+
+test('Classic Mouvement controls move, resize, persist and reset independently while legacy layouts survive', () => {
+  const { app, editor, storage } = editorApp();
+  const legacy = { runLeft: { x: 0.2, y: 0.8, scale: 1.2 }, jump: { x: 0.8, y: 0.8, scale: 0.9 } };
+  const joystick = { mouvementLeft: { x: 0.1, y: 0.5, scale: 1.4 } };
+  app.settings.setTouchLayout('classic', legacy);
+  app.settings.setTouchLayout('joystick', joystick);
+  editor.open({ scheme: 'classic' });
+  for (const [i, id] of ['mouvementLeft', 'mouvementRight'].entries()) {
+    const node = editor.touch.controlElement(id);
+    assert.equal(node.innerHTML, ICONS[id]);
+    assert.equal(node.style.translate, '', 'new controls default without resetting old controls');
+    node.dispatch('pointerdown', { pointerId: 40 + i, button: 0, ...centre(node) });
+    node.dispatch('pointermove', { pointerId: 40 + i, clientX: 300 + i * 150, clientY: 220 });
+    node.dispatch('pointerup', { pointerId: 40 + i });
+    assert.equal(editor.selected, id);
+    editor.slider.value = String(120 + i * 20);
+    editor.slider.dispatch('input');
+    assert.equal(saved(storage).touchLayouts.classic[id].scale, 1.2 + i * 0.2);
+  }
+  const layout = saved(storage).touchLayouts.classic;
+  assert.deepEqual(layout.runLeft, legacy.runLeft);
+  assert.deepEqual(layout.jump, legacy.jump);
+  assert.deepEqual(saved(storage).touchLayouts.joystick, joystick);
+  editor.close();
+  app.settings = new Settings(storage);
+  editor.open({ scheme: 'classic' });
+  assert.deepEqual(editor.touch.getLayout(), layout);
+  for (const id of ['mouvementLeft', 'mouvementRight']) assert.notEqual(editor.touch.controlElement(id).style.translate, '');
+  editor.resetButton.click();
+  for (const id of ['runLeft', 'runRight', 'mouvementLeft', 'mouvementRight']) {
+    assert.equal(editor.touch.controlElement(id).style.translate, '');
+    assert.equal(editor.touch.controlElement(id).style.scale, '');
+  }
+  assert.deepEqual(saved(storage).touchLayouts.classic, {});
+  assert.deepEqual(saved(storage).touchLayouts.joystick, joystick);
+  editor.close();
 });

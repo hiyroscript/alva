@@ -236,6 +236,10 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 }
 .settings-preview .icon { font-size: calc(var(--sp) * 0.5); stroke-width: 2.8; }
 .settings-preview--classic { gap: calc(var(--sp) * 0.18); }
+.settings-preview--classic .sp-dash { top: auto; bottom: calc(var(--sp) * 1.18); width: calc(var(--sp) * 0.62); height: calc(var(--sp) * 0.62); }
+.settings-preview--classic .sp-dash--left { left: calc(var(--sp) * 0.19); }
+.settings-preview--classic .sp-dash--right { right: calc(var(--sp) * 0.19); }
+.settings-preview .sp-dash .icon { font-size: calc(var(--sp) * 0.29); }
 .sp-pad { width: var(--sp); height: var(--sp); }
 .settings-preview--joystick { width: calc(var(--sp) * 1.9); }
 .sp-stick { position: absolute; left: calc(var(--sp) * 0.2); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }

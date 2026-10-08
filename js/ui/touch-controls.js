@@ -1,7 +1,7 @@
 // Multi-touch landscape controls using the existing Pointer Events input.
 // Joystick: horizontal stick with Left movement / Right movement Dash
-// buttons with double arrows above it. Classic: single Left / Right arrows,
-// with sliding pointer capture.
+// buttons with double arrows above it. Classic: the same buttons above
+// single Left / Right Run arrows, with sliding pointer capture.
 // Both share the same action buttons. Jump always uses the upward arrow;
 // Defence its shield glyph, named Deflect while the fighter is in the
 // air (where the same button is its Deflect, for one that has one);
@@ -92,7 +92,7 @@ export function attackSlots(shown) {
   return slots;
 }
 
-// The Joystick scheme's single-tap Dash buttons, mouvementLeft and
+// Both schemes' shared single-tap Dash buttons, mouvementLeft and
 // mouvementRight. Keep those internal codenames; their display names are
 // localized independently (Left movement / Right movement in English).
 const MOUVEMENT_BUTTONS = [
@@ -103,8 +103,7 @@ const MOUVEMENT_BUTTONS = [
 // The joystick, in fractions of its radius. Pushed sideways past `engage` it
 // holds runLeft or runRight; back inside `deadzone` it lets go. The gap between
 // the two keeps a thumb resting near the edge from flickering the direction
-// (every flicker would be a fresh press, and two quick presses a Dash). Only
-// the sideways part counts: pushing up or down moves the knob, never Jump or
+// and changing Run unexpectedly. Only the sideways part counts: pushing up or down moves the knob, never Jump or
 // Down. The knob follows the thumb and stops `travel` from the centre, so it stays inside the base.
 export const JOYSTICK = Object.freeze({ deadzone: 0.24, engage: 0.34, travel: 0.56 });
 
@@ -207,7 +206,7 @@ export class TouchControls {
     this.setCharacter(null);
 
     // Classic lower-left cluster: it captures the pointer so a thumb can
-    // slide between LEFT / DOWN / RIGHT without lifting.
+    // slide between LEFT / RIGHT without lifting.
     dpad.addEventListener('pointerdown', (e) => this.onDpadDown(e));
     dpad.addEventListener('pointermove', (e) => this.onDpadMove(e));
     for (const type of END_EVENTS) dpad.addEventListener(type, (e) => this.onPointerEnd(e));
@@ -239,8 +238,10 @@ export class TouchControls {
     // pressed until the pointer lifts; it never holds a direction.
     for (const b of this.mouvementButtons.values()) {
       b.addEventListener('pointerdown', (e) => {
-        if (!this.enabled) return;
+        if (!this.enabled || this.mouvementPointers.has(e.pointerId)) return;
         e.preventDefault();
+        // Classic's Run container must never capture a Mouvement pointer.
+        e.stopPropagation?.();
         b.setPointerCapture?.(e.pointerId);
         this.mouvementPointers.set(e.pointerId, b);
         b.classList.add('is-pressed');
@@ -279,6 +280,13 @@ export class TouchControls {
       ...(joystick ? [] : this.padButtons),
       ...this.actionButtons,
     ]);
+    // Reuse the same Mouvement elements and handlers in either cluster.
+    this.dpad.replaceChildren(...this.padButtons.values());
+    this.joystick.replaceChildren(this.stick);
+    if (joystick) this.joystick.replaceChildren(
+      this.mouvementButtons.get('mouvementLeft'), this.stick, this.mouvementButtons.get('mouvementRight'),
+    );
+    else this.dpad.append(...this.mouvementButtons.values());
     this.root.replaceChildren(joystick ? this.joystick : this.dpad, this.actions);
     this.root.classList.toggle('is-joystick', joystick);
     this.root.classList.toggle('is-classic', !joystick);
@@ -293,10 +301,8 @@ export class TouchControls {
   controlElement(id, scheme = this.scheme) {
     if (!TOUCH_CONTROL_IDS[scheme]?.includes(id)) return null;
     if (scheme === 'classic' && this.padButtons.has(id)) return this.padButtons.get(id);
-    if (scheme === 'joystick') {
-      if (id === 'stick') return this.stick;
-      if (this.mouvementButtons.has(id)) return this.mouvementButtons.get(id);
-    }
+    if (this.mouvementButtons.has(id)) return this.mouvementButtons.get(id);
+    if (scheme === 'joystick' && id === 'stick') return this.stick;
     return this.actionButtons.get(id) ?? null;
   }
 
@@ -391,7 +397,7 @@ export class TouchControls {
   }
 
   onDpadDown(e) {
-    if (!this.enabled) return;
+    if (!this.enabled || this.mouvementPointers.has(e.pointerId) || e.target?.closest?.('[data-mouvement]')) return;
     e.preventDefault();
     const action = this.hitDpad(e.clientX, e.clientY);
     if (!action) return;
@@ -508,6 +514,7 @@ export class TouchControls {
     for (const id of [...this.pointers.keys()]) this.assign(id, null);
     this.counts.clear();
     this.mouvementPointers.clear();
+    this.input.clearTouchMouvement?.();
     for (const b of this.allButtons) b.classList.remove('is-pressed');
   }
 

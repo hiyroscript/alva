@@ -852,7 +852,7 @@ comes from its definition and its profile.
   through jumps, attacks and landings.", Jump "A tap is the normal jump;
   held a little longer, the higher jump.", Triple jump "Two more jumps in
   mid-air. Landing or being hit gives them back.", Fast fall "Hold Down
-  while falling to drop faster.", Dash "Double-tap a direction for a burst
+  while falling to drop faster.", Dash "Press Q/E, Select/View + left/right on gamepad, or a movement button for a burst
   of speed. An attack or a jump can cut in after a moment.", Air dash "The
   Dash in mid-air, flat across, once per airtime." No tiers and no
   numbers: there is nothing to compare.
@@ -919,7 +919,7 @@ indicator. Each section keeps its existing settings, in this order:
   - **Joystick** (marked "Default") — a circular joystick to move, the
     single-tap **Left mouvement** / **Right mouvement** Dash buttons above
     it.
-  - **Classic Buttons** — the original layout: Left and Right at the lower left, a double tap of Left or Right to Dash.
+  - **Classic Buttons** — Run Left and Run Right at the lower left, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above them.
 
   The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
   described by its line); hover only previews. The one in use carries a green
@@ -1021,7 +1021,7 @@ itself included:
   one to five pips for the numbered attacks, the ring for Extra Attack, the
   star for Transform, the shield for Defence and the upward arrow for Jump.
   All five numbered buttons remain available even if a fighter lacks them.
-- **Classic Buttons:** Left, Right, and the same actions.
+- **Classic Buttons:** Run Left, Run Right, Mouvement Left, Mouvement Right, and the same actions.
 
 Each control has a stable control id, independent of its translated name
 (`TOUCH_CONTROL_IDS` in `js/core/touch-layout.js`:
@@ -1499,17 +1499,14 @@ each fighter's own values are in its character specification (7.2.9).
     is never less responsive than one without.
   Attack movement, the combat input buffer, hit-cancels and hitstop are
   combat rules (7.2.4).
-- **Dash** (movement, not an attack): two press edges of the same
-  horizontal direction (`runLeftPressed` / `runRightPressed`, 7.4), the second
-  within `dashTapWindow` (0.22 s) of the first, start a Dash that
-  way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
-  waiting tap and both at once cancel it. A one-step request
-  (`mouvementLeftPressed` / `mouvementRightPressed`, 7.4: one tap of the
-  Joystick touch layout's Left mouvement / Right mouvement, `mouvementLeft`
-  / `mouvementRight`) goes straight to the same `tryDash`, so every rule,
-  cost and effect below applies unchanged; it is not a direction press (it
-  never pairs with one), it forgets any first tap waiting, and both at once
-  ask for nothing. A Dash needs the fighter free to act (no attack, stun,
+- **Dash** (movement, not an attack): only an explicit one-step request
+  (`mouvementLeftPressed` / `mouvementRightPressed`) starts it: keyboard Q/E,
+  gamepad Select/View/Share (standard button 8) + D-pad or left stick direction,
+  or one tap of either layout's Mouvement button. Held inputs never repeat a
+  request. Run taps, including repeated taps and joystick flicks, never Dash.
+  Opposing simultaneous requests ask for nothing. `Fighter.tryMouvment`
+  selects `tryDash` on the ground and `tryAirDash` in the air. Every existing
+  cost, restriction, animation, cancellation and buffer applies. A Dash needs the fighter free to act (no attack, stun,
   paralysis, technique or Dash running) or in an attack that hit and may
   be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4), grounded, not
   shielding nor holding `shield` for a Shield that can go up, not exhausted
@@ -1536,13 +1533,11 @@ each fighter's own values are in its character specification (7.2.9).
   jump pressed earlier in it is kept by the input buffers and comes out the
   first step it may. It cannot Shield, summon, start a technique or Dash
   again until it ends. It has no hitbox, damage, launch or invulnerability.
-  The training CPU never dashes (its input never has press edges); Quick
-  Battle's combat AI dashes only through the same double tap a player uses
-  (a press, a release and a press within the window), and guards against
-  double-tapping by accident.
+  The training CPU never dashes. Quick Battle's combat AI emits explicit
+  Mouvement requests, one per Dash intent, retaining its ledge guards,
+  airborne recovery and attack follow-ups. Normal CPU running never Dashes.
 - **Air dash** (movement, not an attack): the mid-air mouvment, a
-  capability apart from the Dash. The same requests (the double tap, the
-  one-step request) that Dash on the ground air dash in the air
+  capability apart from the Dash. The same explicit requests that Dash on the ground air dash in the air
   (`Fighter.tryMouvment`: `tryDash` on the ground, `tryAirDash` in the
   air). It needs its real `midair_mouvment` clip (without it the air dash
   is refused and logged, never faked with the Dash's clip or the run) and
@@ -1566,7 +1561,7 @@ each fighter's own values are in its character specification (7.2.9).
   attack, a Deflect or an air jump may cut it short (an air dash into an
   aerial keeps its speed). It has no hitbox, damage, launch,
   invulnerability, Shield or Deflect. Quick Battle's combat AI air dashes
-  through the same double tap: home when knocked off the stage too far
+  through the same explicit requests: home when knocked off the stage too far
   out, and in the air to close in.
 - **Movement repeat cooldowns.** `mouvment` and `midair_mouvment` each use
   their own 0.5-second acceptance timer in `CombatState.movementCooldowns`.
@@ -1935,7 +1930,7 @@ attack or a button.
   pressed meanwhile is not one: it is another move (below).
 - **Cancelled**, with its attack never coming and its air dash (in the
   air) never given back (it paid no Energy, so none is owed), by: a jump (the jump, or in the air an air jump,
-  takes over on that step), a Dash (a double tap or a mouvement button:
+  takes over on that step), a Dash (an explicit Mouvement request:
   the ordinary Dash, paying its own cost; in the air the air dash, already
   used up, so the request waits for the ground as ever), the Shield
   (pressed, or held where it may go up: the Shield goes up) or the Deflect
@@ -2495,7 +2490,7 @@ attack or a button.
     only on the step its button goes down). Attacks, projectiles, the Shield,
     summons and techniques (their own buttons, `attack4` and `attack5` for
     #0001, pressed directly), the fast fall (`down`), jumps and the Dash (a
-    double tap) all go through the fighter
+    explicit Mouvement request) all go through the fighter
     exactly as a player's do. It never writes to a fighter, never spawns or
     moves anything, never reads the player's raw input, and never uses the
     training CPU's platform drop: it walks off platform edges instead. It
@@ -2826,27 +2821,23 @@ Adding one is described in
   (`attack4`) Unlimited Void and `,` (`attack5`) Hollow Purple, pressed
   directly like any numbered button (7.2); for #0002, M and `,` do
   nothing. The input
-  snapshot (`InputManager.sample()`) carries `runLeftPressed` / `runRightPressed`
-  press edges for the Dash's double tap (7.2), from the same normalized
-  press counting as every other action, whichever device made them: a key
-  (never its auto-repeat), a touch button, the D-pad, or the left stick
-  crossing from neutral into its held zone (holding it there makes no more;
-  back near neutral and out again makes another). It also carries
-  `mouvementLeftPressed` / `mouvementRightPressed`: a Dash asked for in one tap
-  (`InputManager.queueTouchMouvement(direction)`, from the Joystick layout's
-  mouvement buttons, `mouvementLeft` / `mouvementRight`), true for exactly one sample and then gone (`flush()` and
-  `clear()` drop it too); it holds no direction and makes no press edge.
-  Every controller's snapshot carries both, false (the combat AI still
-  Dashes by double tap). Fighter never reads raw
-  key timestamps; menus never read these edges. In menus S/↓ still navigate down: menu bindings are separate
-  from the gameplay `down` action.
+  snapshot (`InputManager.sample()`) carries held controls and their press
+  edges from keys (never auto-repeat), touch, D-pad and stick. Run edges
+  never activate Mouvement. Separate `mouvementLeftPressed` /
+  `mouvementRightPressed` fields merge Q/E, Select/View + direction and
+  `queueTouchMouvement(direction)` from both touch layouts. Each request
+  lasts one sample; `flush()` and `clear()` discard pending requests.
+  A touch scheme switch or disabling its controls also clears pending touch
+  Mouvement. Touch Mouvement never holds Run. Every controller uses these
+  request fields, including CombatAIController. Menus retain their own mappings.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
   right), Down in battle (`down`: D-pad down / left stick down, held; the
   fast fall in the air and downward launch steering; menus still read them
   as Down), jump (A), the extra attack (X / Square), `attack1`
   (B / Circle), `attack2` (LB), `attack3` (LT), `attack4` (L3), `attack5`
   (R3), Transform (Y / Triangle, reserved), Shield (RB / RT) and Start to
-  pause/menus, sending the same codenames.
+  pause/menus, sending the same codenames. Select/View/Share (button 8) plus
+  a horizontal direction requests Mouvement once per chord press.
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
   layouts chosen under Settings → Controls → Mobile Controls (6.10);
   `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
@@ -2882,17 +2873,29 @@ Adding one is described in
     0.56 of the radius, and eases back to the centre on release, cancel,
     lost capture, pause, disabling or a scheme switch. It is digital like
     the rest of ALVA's input: how far it is pushed never changes speed.
-    Pushing it out twice quickly is a double tap, as with the gamepad stick.
+    Pushing it out repeatedly only Runs, as with the gamepad stick.
     The base is plain: no arrows are drawn in it, only the knob. Above its
     top-left and top-right sit two small Dash buttons named exactly **Left
-    mouvement** and **Right mouvement** (◀ ▶ glyphs): one tap asks for one
+    mouvement** and **Right mouvement** (centered double-arrow glyphs): one tap asks for one
     Dash that way (`queueTouchMouvement`, 7.2) and holds nothing; each
     shows pressed while touched. No Down button or extra hit region exists.
-  - **Classic Buttons**: lower-left Left · Right with thumb sliding and
-    double-tap Dash; no joystick or separate Dash buttons.
+  - **Classic Buttons**: lower-left Run Left · Run Right with thumb sliding,
+    with two smaller Mouvement buttons directly above them. Shared elements,
+    icons and one-shot handlers serve both schemes. Mouvement pointer events
+    never enter the Run container's sliding/capture path; holding Run while
+    tapping Mouvement or actions remains independent multi-touch input.
+    Both new controls can be moved/resized independently, using the existing
+    layout schema; old saved controls retain their positions and sizes.
 
   The editor exposes only these controls. Legacy saved `down` entries are
   discarded during sanitization; all other positions and scales survive.
+
+  All action buttons, including Jump and Extra Attack, inherit the same
+  `.tc-btn` diameter, border, background, transparency, shadow and pressed
+  feedback. Extra Attack keeps its artwork and top-right slot; the upper
+  attack row aligns with the lower row. Reserved/unavailable states remain.
+  Settings previews show the four Classic controls, with smaller Mouvement
+  buttons above Run. English and French descriptions explain dedicated inputs.
 
   Both layouts share the lower-right staggered cluster, in the same place
   in both. For example, for #0001 (five numbered buttons) it is —
@@ -2976,7 +2979,8 @@ Adding one is described in
   fighter is in the air and has a Deflect, the same shield glyph,
   labelled "Deflect", the same button sending `shield`) in the
   old Block slot, Jump and the Left / Right arrows, the joystick and the
-  Dash buttons (double directional arrows; Classic keeps single arrows).
+  Dash buttons (centered, mirrored double directional arrows in both schemes;
+  Classic Run keeps single arrows).
   Only the presentation is per fighter: each button's
   `data-action` is its control codename (`extra_attack`, `transform`,
   `shield`, `attack1` to `attack5`, `jump`, `runLeft`, `runRight`),

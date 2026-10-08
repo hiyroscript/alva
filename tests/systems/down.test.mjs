@@ -49,7 +49,7 @@ test('down is a gameplay direction on S / ↓, a held control and never a combat
     'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
-  assert.deepEqual(Object.keys(CONFIG.bindings).sort(), [...ACTIONS].sort(), 'one binding per action, nothing extra');
+  assert.deepEqual(Object.keys(CONFIG.bindings).sort(), [...ACTIONS, 'mouvementLeft', 'mouvementRight'].sort(), 'held actions and explicit Mouvement bindings');
   assert.ok(!Object.values(CONFIG.bindings).flat().includes('KeyC'), 'no extra C key');
   assert.deepEqual(CONFIG.menuBindings.down, ['ArrowDown', 'KeyS']);
   assert.deepEqual(CONFIG.menuBindings.up, ['ArrowUp', 'KeyW']);
@@ -159,12 +159,12 @@ test('holding Down never stops or slows normal movement: running, turning and wa
   assert.equal(fighter.state, 'idle');
 });
 
-test('holding Down never prevents a Dash: a double tap with it held dashes exactly as without', () => {
+test('holding Down never prevents a Dash: an explicit request with it held dashes exactly as without', () => {
   const dash = (held) => {
     const { fighter, step } = makeFighter();
     step({ runRight: true, runRightPressed: true, ...held });
     step(held);
-    step({ runRight: true, runRightPressed: true, ...held });
+    step({ runRight: true, mouvementRightPressed: true, ...held });
     assert.ok(fighter.dash, 'dashing');
     const log = [];
     while (fighter.dash) log.push([step({ runRight: true, ...held }).body.x, fighter.state]);

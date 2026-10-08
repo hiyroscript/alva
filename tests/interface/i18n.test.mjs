@@ -440,14 +440,14 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(hud.timeButton.getAttribute('aria-label'), 'Mettre en pause');
     assert.equal(hudRoot.querySelector('.hud-launch-point').getAttribute('aria-label'), 'Point d’éjection');
     // Touch-control names, the fighter's own included; the codenames never.
-    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Aller à droite']);
+    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Aller à droite', 'Mouvement à gauche', 'Mouvement à droite']);
     assert.equal(touch.dpad.getAttribute('aria-label'), 'Déplacement');
     assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Rouge');
     assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Bleu maximal');
     assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Vide infini');
     assert.equal(touch.buttons.get('attack5').getAttribute('aria-label'), 'Violet creux');
     assert.equal(touch.buttons.get('shield').getAttribute('aria-label'), 'Bouclier');
-    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action')), ['runLeft', 'runRight']);
+    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action') || b.getAttribute('data-mouvement')), ['runLeft', 'runRight', 'mouvementLeft', 'mouvementRight']);
     // Keyboard hints, keycaps too.
     assert.deepEqual(hints.querySelectorAll('.hint-label').map((l) => l.textContent), ['Naviguer', 'Sélectionner', 'Retour']);
     assert.deepEqual(hints.querySelectorAll('kbd').slice(-2).map((k) => k.textContent), ['Entrée', 'Échap']);
@@ -525,7 +525,7 @@ test('Settings labels use sentence case and dynamic editor copy preserves locali
   }
   assert.doesNotMatch(STRINGS.en['settings.scheme.joystickDesc'], /mouvement|mouvment/);
   assert.match(STRINGS.en['settings.scheme.joystickDesc'], /once to Dash left or right/);
-  assert.match(STRINGS.en['settings.scheme.classicDesc'], /Double-tap a direction to Dash/);
+  assert.match(STRINGS.en['settings.scheme.classicDesc'], /movement button above it once to Dash/);
 });
 
 test('internal identifiers never change with the language', () => {

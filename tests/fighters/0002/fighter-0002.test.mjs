@@ -342,10 +342,10 @@ test('Down on the ground is nothing: no state, no faster refill, and a Dash stil
   assert.ok(fighter.body.vx > 100);
   step({ down: true });
   for (let i = 0; i < 12; i++) step({ down: true });
-  step({ down: true, runRight: true, runRightPressed: true });
+  step({ down: true, runRight: true, mouvementRightPressed: true });
   step({ down: true });
-  step({ down: true, runRight: true, runRightPressed: true });
-  assert.ok(fighter.dash, 'a double tap Dashes, Down held or not');
+  step({ down: true, runRight: true, mouvementRightPressed: true });
+  assert.ok(fighter.dash, 'an explicit request Dashes, Down held or not');
 });
 
 test('in the air Down still fast-falls', () => {
@@ -832,7 +832,7 @@ test('a timing sanity check: the Dash is the universal one, its four frames play
   const { fighter, step } = solo();
   step({ runRight: true, runRightPressed: true });
   step({});
-  step({ runRight: true, runRightPressed: true });
+  step({ runRight: true, mouvementRightPressed: true });
   assert.ok(fighter.dash);
   assert.equal(fighter.dash.duration, MOVEMENT.dashDuration);
   assert.ok(Math.abs(4 / DEF.animations.mouvment.fps - fighter.dash.duration) < 1e-9, 'its clip\'s own pass matches');

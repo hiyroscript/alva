@@ -126,11 +126,11 @@ test('rings center untinted artwork and put outlined seconds below, recovering c
 // ---- Energy bar: only while below full ------------------------------------------
 
 const HOLD = { shield: true };
-// Two presses of `dir`, one step apart: a Dash's double tap.
-const doubleTap = (step, dir = 'runRight') => {
+// Run setup followed by one explicit Mouvement request.
+const requestDash = (step, dir = 'runRight') => {
   step({ [`${dir}Pressed`]: true, [dir]: true });
   step({});
-  return step({ [`${dir}Pressed`]: true, [dir]: true });
+  return step({ [dir === 'runRight' ? 'mouvementRightPressed' : 'mouvementLeftPressed']: true, [dir]: true });
 };
 const RECT = { x: 100, y: 52, w: 52, h: 6 };
 // What drawEnergyBar paints for `fighter` in RECT at dpr 1: its outline,
@@ -199,7 +199,7 @@ test('the Energy bar: hidden at full; one bright purple fill over a dark track i
 test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at once, it stays through the refill and goes at full', () => {
   const dashed = makeFighter();
   assert.equal(energyBarState(dashed.fighter).visible, false, 'fresh, full, hidden');
-  doubleTap(dashed.step);
+  requestDash(dashed.step);
   const d = duel();
   // Up well before the hit: an ordinary block, never a perfect one.
   for (let i = 0; i < 9; i++) d.tick({}, HOLD);
@@ -236,7 +236,7 @@ test('the gray exhaustion cycle: a Dash with too little left empties it, gray th
   step({ runRightPressed: true, runRight: true });
   step({});
   c.setEnergy(8);
-  step({ runRightPressed: true, runRight: true });
+  step({ mouvementRightPressed: true, runRight: true });
   assert.ok(fighter.dash, 'a Dash on 8, though it costs 15');
   assert.equal(c.energy, 0);
   assert.equal(c.energyExhausted, true);

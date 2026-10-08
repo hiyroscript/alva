@@ -3,14 +3,14 @@
 // values they are given, not against the universal ones: ground and air
 // steering, turning, braking, overspeed (held, let go, reversed; a burst in
 // the air), attack momentum, the hitstun drift, the fast fall, the air
-// jump, the higher jump's lift and the Dash's double tap, each checked
+// jump and the higher jump's lift, each checked
 // with made-up values. Whatever the numbers, the same rules turn them into
 // motion; the numbers every fighter actually runs on are checked in
 // tests/systems/universal-movement.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift, readDashTap,
+  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
 } from '../../js/game/fighters/movement.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { CONFIG } from '../../js/config.js';
@@ -25,7 +25,7 @@ const VALUES = Object.freeze({
   acceleration: 3000, deceleration: 2000, turnBoost: 3, overspeedDeceleration: 5000, overspeedHoldDeceleration: 1500,
   airAcceleration: 1500, airDeceleration: 300, airTurnBoost: 1.5, airOverspeedDeceleration: 2500,
   jumpVelocity: 1000, fastFallAcceleration: 9000, fastFallSpeed: 1200, airJumpRatio: 0.8, highJumpHeight: 1.5,
-  hitstunFriction: 700, hitstunAirDrag: 90, dashTapWindow: 0.2,
+  hitstunFriction: 700, hitstunAirDrag: 90,
 });
 const body = (fields = {}) => ({ x: 0, y: 0, vx: 0, vy: 0, grounded: true, gravityScale: 1, ...fields });
 
@@ -189,23 +189,9 @@ test('hitstun drift, fast fall, air jump and the higher jump read the values the
   assert.equal(highJumpLift(body({ vy: -700 }), VALUES, 0, 0), 1, 'no gravity, no lift');
 });
 
-test('the double tap: the same direction again within dashTapWindow is a Dash; any other press starts over', () => {
-  const press = (dir) => ({ runRightPressed: dir > 0, runLeftPressed: dir < 0 });
-  for (const window of [0.1, 0.3]) {
-    const mv = { ...VALUES, dashTapWindow: window };
-    let state = readDashTap(null, press(1), mv, DT);
-    assert.equal(state.direction, 0);
-    let tap = state.tap;
-    const within = Math.floor(window / DT);
-    for (let i = 1; i < within; i++) tap = readDashTap(tap, {}, mv, DT).tap;
-    state = readDashTap(tap, press(1), mv, DT);
-    assert.equal(state.direction, 1, `${window}: inside the window`);
-    assert.equal(state.tap, null, 'and it starts over');
-    let late = readDashTap(null, press(-1), mv, DT).tap;
-    for (let i = 0; i < within + 2; i++) late = readDashTap(late, {}, mv, DT).tap;
-    state = readDashTap(late, press(-1), mv, DT);
-    assert.equal(state.direction, 0, `${window}: too late`);
-    assert.deepEqual(state.tap, { direction: -1, age: 0 }, 'too late: the new first tap');
-  }
-  assert.equal(readDashTap({ direction: 1, age: 0 }, press(-1), VALUES, DT).direction, 0, 'the other way: no Dash');
+test('movement rules contain no tap detector or tap window', async () => {
+  const rules = await import('../../js/game/fighters/movement.js');
+  const { BASE_FIGHTER_MOVEMENT } = await import('../../js/data/movement.js');
+  assert.equal('readDashTap' in rules, false);
+  assert.equal('dashTapWindow' in BASE_FIGHTER_MOVEMENT, false);
 });

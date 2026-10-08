@@ -46,7 +46,7 @@ import { COMBAT_BUTTONS } from '../../config.js';
 import { blankInput } from './fighter-controller.js';
 import { approach, clamp } from '../../core/utils.js';
 import {
-  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift, readDashTap,
+  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
 } from './movement.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
@@ -242,11 +242,8 @@ export class Fighter {
     this.lastGroundY = this.body.y;
     this.inputLocked = false;
     // The Dash or air dash in progress ({ direction, time, duration, speed,
-    // air, animation }; see tryDash and tryAirDash), or null; and the last
-    // horizontal press still waiting for its double tap (see
-    // trackDashTaps): { direction, age }, or null.
+    // air, animation }; see tryDash and tryAirDash), or null.
     this.dash = null;
-    this.dashTap = null;
     // Combat Assist's approach in progress (see tryCombatAssist), or null:
     // { action, attack, target, direction, air, animation, move, travelled,
     // time }, the melee press it serves (the newest), its attack, the
@@ -370,7 +367,7 @@ export class Fighter {
       body.prevX = body.x;
       body.prevY = body.y;
       for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
-      const frozenDash = this.dashAsked(input, 0);
+      const frozenDash = this.dashAsked(input);
       if (frozenDash) this.bufferDash(frozenDash);
       combat.updateEnergy(dt);
       this.updateState(0);
@@ -409,7 +406,7 @@ export class Fighter {
     // The Dash this step asks for (see dashAsked), read before the intents:
     // asking for one also cancels Combat Assist's approach (see
     // assistIntents). It starts, or waits, in the Dash section below.
-    const dashDirection = this.dashAsked(input, dt);
+    const dashDirection = this.dashAsked(input);
 
     // ---- Combat intents --------------------------------------------------
     // Each press is its button's own move (see tryAction): an attack, or a
@@ -472,7 +469,7 @@ export class Fighter {
       }
     }
 
-    // ---- Dash: a double tap of runLeft or runRight, or a mouvement ------
+    // ---- Dash: an explicit mouvement request --------------------------
     // The Dash on the ground, the air dash in the air (see tryMouvment).
     // After the attacks (a Deflect included), so one started this step wins
     // over a Dash on the same step (canFollowUp). A Dash may cut short an
@@ -488,14 +485,8 @@ export class Fighter {
     // Deflect: see payEnergy) means no refill this step (see the end of
     // update).
     //
-    // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
-    // (the Joystick touch layout's single-tap mouvement buttons, see
-    // InputManager.queueTouchMouvement). The request goes through the very same
-    // tryMouvment, so every rule and cost of a double-tap Dash applies, and it
-    // is buffered or used up the same way. It is not a tap: it forgets any
-    // first tap waiting, so it never pairs with one, and this step's own
-    // direction press (if any) is not counted as one either. Both at once
-    // ask for nothing.
+    // Every device and the CPU use these one-step requests. Run presses
+    // never request movement. Opposing requests on the same step cancel.
     if (dashDirection) this.bufferDash(dashDirection);
     const wantedDash = this.bufferedDash;
     if (wantedDash) {
@@ -937,33 +928,13 @@ export class Fighter {
     return false;
   }
 
-  // The Dash this step's input asks for (1 right, -1 left, 0 none): a
-  // one-step mouvement request (mouvementLeftPressed /
-  // mouvementRightPressed; both at once is none), which forgets any first
-  // tap waiting, or else a double tap (see trackDashTaps) whose waiting tap
-  // ages by `dt`.
-  dashAsked(input, dt) {
-    if (input.mouvementLeftPressed || input.mouvementRightPressed) {
-      this.dashTap = null;
-      return (input.mouvementRightPressed ? 1 : 0) - (input.mouvementLeftPressed ? 1 : 0);
-    }
-    return this.trackDashTaps(input, dt);
+  // Explicit requests only. Run press edges have no role in Mouvement.
+  dashAsked(input) {
+    return (input.mouvementRightPressed ? 1 : 0) - (input.mouvementLeftPressed ? 1 : 0);
   }
 
-  // Double-tap detection on the run press edges (see readDashTap in
-  // js/game/fighters/movement.js): a press of the same direction as the one
-  // waiting, within movement.dashTapWindow seconds of it, returns its
-  // direction (1 right, -1 left); 0 otherwise. The press still waiting is
-  // the fighter's own (`dashTap`).
-  trackDashTaps(input, dt) {
-    const { direction, tap } = readDashTap(this.dashTap, input, this.movement, dt);
-    this.dashTap = tap;
-    return direction;
-  }
-
-  // Starts the mouvment `direction` (1 right, -1 left) asks for, by a double
-  // tap or a mouvement button: on the ground the Dash (tryDash), in the air
-  // the air dash (tryAirDash). True when one started.
+  // The same request selects the ground Dash or air dash, with all their
+  // existing costs, restrictions, buffering and cancellation rules.
   tryMouvment(direction, input = NEUTRAL_INPUT) {
     if (!direction) return false;
     return this.body.grounded ? this.tryDash(direction, input) : this.tryAirDash(direction);
@@ -1155,8 +1126,7 @@ export class Fighter {
   // This step's presses while the approach runs, before anything else reads
   // them, then the approach's own step (stepCombatAssist). The first that
   // applies takes the step:
-  //   - a jump (an air jump in the air), a Dash (a double tap or a
-  //     mouvement button) or the Shield (pressed, or held where it may go
+  //   - a jump (an air jump in the air), a Dash (an explicit mouvement request) or the Shield (pressed, or held where it may go
   //     up) cancels it, and goes through its own rules on this same step; a
   //     combat button pressed with it is dropped. In the air the `shield`
   //     press is its Deflect, as ever.

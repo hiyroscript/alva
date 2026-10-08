@@ -2,7 +2,7 @@
 // The air dash: the universal mid-air mouvment (airDashSpeed,
 // airDashDuration and airDashUses in js/data/movement.js, each fighter's own
 // midair_mouvment clip shown across it), a capability apart from the
-// grounded Dash. The same requests (a double tap, a mouvement button) make
+// grounded Dash. The same explicit requests make
 // the Dash on the ground and the air dash in the air. Movement only, a set
 // number per airtime, given back on landing and by a hit; its speed carries
 // on after it. Uses the real Fighter, CombatSystem and combat AI (see
@@ -97,13 +97,15 @@ for (const c of FIGHTERS) {
   });
 }
 
-test('a double tap in the air is the air dash too, through the same reading of the taps', () => {
+test('rapid Run presses in the air never start an air dash; an explicit request does', () => {
   for (const c of FIGHTERS) {
     const { fighter: f, step } = makeFighter({ character: c });
     step(JUMP);
     step({ runRight: true, runRightPressed: true });
     step({});
     step({ runRight: true, runRightPressed: true });
+    assert.equal(f.dash, null, `#${c.id}: Run only runs`);
+    step({ mouvementRightPressed: true });
     assert.equal(f.dash?.air, true, `#${c.id}`);
     assert.equal(f.dash.direction, 1);
   }

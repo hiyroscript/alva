@@ -307,7 +307,7 @@ export const EN = {
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Classic buttons',
   'settings.scheme.joystickDesc': 'Use the joystick to move. Tap either movement button once to Dash left or right.',
-  'settings.scheme.classicDesc': 'Use the left and right buttons to move. Double-tap a direction to Dash.',
+  'settings.scheme.classicDesc': 'Hold a left or right Run button to move. Tap a smaller movement button above it once to Dash.',
   'settings.customize': 'Customize touch controls',
   'settings.customizeNote': '{scheme}: move and resize each control.',
   'settings.customized': 'Custom layout',

@@ -171,7 +171,7 @@ function measure(c) {
     step({ ...RIGHT, runRightPressed: true });
     step({});
     const x = fighter.body.x;
-    step({ ...RIGHT, runRightPressed: true });
+    step({ ...RIGHT, mouvementRightPressed: true });
     out.dashSpeed = fighter.body.vx;
     let n = 1;
     while (fighter.dash) { step({}); n++; }
@@ -250,7 +250,7 @@ test('coyote time, the jump buffer and the combat input buffer are the same leng
     const { fighter, step } = makeFighter();
     step({ ...RIGHT, runRightPressed: true });
     step({});
-    step({ ...RIGHT, runRightPressed: true });
+    step({ ...RIGHT, mouvementRightPressed: true });
     step(P('attack1'));
     let n = 0;
     while (!fighter.combat.attack && n < 30) { step({}); n++; }

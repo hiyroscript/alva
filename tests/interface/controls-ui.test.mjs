@@ -1060,10 +1060,12 @@ test('before any fighter is named the controls are usable and neutral; a held bu
 
 // ---- Desktop controls ---------------------------------------------------------
 
-test('keyboard bindings are unchanged by the touch layouts, keyed by control codename', () => {
+test('keyboard preserves existing controls and adds separate Q/E Mouvement bindings', () => {
   assert.deepEqual({ ...CONFIG.bindings }, {
     runLeft: ['KeyA', 'ArrowLeft'],
     runRight: ['KeyD', 'ArrowRight'],
+    mouvementLeft: ['KeyQ'],
+    mouvementRight: ['KeyE'],
     down: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
     extra_attack: ['KeyJ'],
@@ -1081,10 +1083,9 @@ test('keyboard bindings are unchanged by the touch layouts, keyed by control cod
     shield: 'Shield', attack1: 'Attack 1', attack2: 'Attack 2', attack3: 'Attack 3', attack4: 'Attack 4', attack5: 'Attack 5',
     pause: 'Pause',
   });
-  // No Block or dash key: Dash stays a double tap on the keyboard, and the
-  // mouvement buttons are touch-only. No retired name survives as an alias.
+  // No Block or dash key: Mouvement uses separate request bindings. No retired name survives as an alias.
   for (const name of [
-    'block', 'dash', 'dashLeft', 'dashRight', 'mouvementLeft', 'mouvementRight',
+    'block', 'dash', 'dashLeft', 'dashRight',
     'left', 'right', 'primary', 'special', 'defense', 'action1', 'action2',
   ]) {
     assert.equal(CONFIG.bindings[name], undefined, name);
@@ -1109,8 +1110,8 @@ test('neither layout creates Down, including detached controls and lookup', () =
     assert.equal(tc.padButtons.has('down'), false);
     assert.equal(tc.controlElement('down', scheme), null);
     assert.ok(tc.allButtons.every((b) => b.getAttribute('data-action') !== 'down'));
-    assert.deepEqual(actionsOf(tc.dpad), ['runLeft', 'runRight']);
-    assert.equal(tc.joystick.children.length, 3);
+    assert.deepEqual(actionsOf(tc.dpad).filter(Boolean), ['runLeft', 'runRight']);
+    assert.equal(tc.joystick.children.length, scheme === 'joystick' ? 3 : 1);
   }
 });
 
@@ -1205,19 +1206,19 @@ test('Joystick is the default scheme; setScheme switches layouts and anything un
   assert.equal(new TouchControls(new Element('div'), input, { scheme: 'classic' }).scheme, 'classic');
 });
 
-test('Classic Buttons is the original layout: Left / Right at the lower left, the actions at the lower right', () => {
+test('Classic Buttons has Run and Mouvement Left / Right at the lower left, the actions at the lower right', () => {
   const { tc } = touchControls(DEF_0001, { scheme: 'classic' });
   assert.deepEqual(tc.root.children, [tc.dpad, tc.actions]);
-  assert.deepEqual(actionsOf(tc.dpad), ['runLeft', 'runRight']);
-  assert.deepEqual(tc.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right']);
+  assert.deepEqual(actionsOf(tc.dpad).filter(Boolean), ['runLeft', 'runRight']);
+  assert.deepEqual(tc.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Left movement', 'Right movement']);
   assert.equal(tc.dpad.getAttribute('aria-label'), 'Movement');
   assert.deepEqual(actionsOf(tc.actions), ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']);
   assert.equal(tc.buttons.has('down'), false);
   // Nothing of the Joystick scheme is on screen.
   assert.equal(tc.root.querySelectorAll('.tc-stick').length, 0);
-  assert.equal(tc.root.querySelectorAll('.tc-dash').length, 0);
+  assert.equal(tc.root.querySelectorAll('.tc-dash').length, 2);
   assert.equal(tc.root.querySelectorAll('.tc-stick-down').length, 0);
-  // Left and Right are ordinary held directions: a Dash still needs two taps.
+  // Left and Right are ordinary held directions: Mouvement has its own buttons.
   const { tc: tc2, calls } = touchControls(DEF_0001, { scheme: 'classic' });
   const at = layoutDpad(tc2);
   tc2.dpad.dispatch('pointerdown', { pointerId: 1, ...at('runRight'), preventDefault() {} });
@@ -1604,9 +1605,16 @@ test('the Shield touch button keeps the old Defense / Block coordinates', () => 
   assert.doesNotMatch(CSS, /\.tc-(block|defense)\b/);
 });
 
-test('the Shuriken touch button keeps the old Throw / Primary coordinates and size', () => {
-  assert.match(CSS, /\.tc-extra_attack \{\n  right: calc\(var\(--tc-pitch\) \* 0\.02\);\n  bottom: calc\(var\(--tc-pitch\) \* 1\.74\);\n  width: calc\(var\(--tc\) \* 1\.12\);\n  height: calc\(var\(--tc\) \* 1\.12\);/);
-  assert.doesNotMatch(CSS, /\.tc-(primary|throw|special|a1|a2)\b/);
+test('Jump and Extra Attack inherit the shared normal and pressed action-button style', () => {
+  for (const selector of ['tc-jump', 'tc-extra_attack']) {
+    const rules = [...CSS.matchAll(new RegExp(`\\.${selector} \\{([^}]*)\\}`, 'g'))];
+    assert.ok(rules.length > 0);
+    for (const rule of rules) {
+      assert.doesNotMatch(rule[1], /(?:width|height|border|background|opacity|shadow|transform|transition):/);
+    }
+  }
+  assert.match(CSS, /\.tc-btn \{[^}]*width: var\(--tc\);[^}]*height: var\(--tc\);/);
+  assert.match(CSS, /\.tc-btn.is-pressed \{[^}]*transform: scale\(0.9\);/);
 });
 
 // ---- Page zoom and gestures -----------------------------------------------
@@ -1737,7 +1745,7 @@ test('five attack buttons and the extra attack work together, multi-touch includ
 
 test('the numbered attack slots are a honeycomb round Transform and Shield: no two buttons of the cluster overlap', () => {
   // Centres and radii, in units of --tc (a button is 1 across, the extra
-  // attack 1.12, and a pitch is 1.17: --tc plus a 0.17 gap), from the
+  // attack 1, and a pitch is 1.17: --tc plus a 0.17 gap), from the
   // stylesheet's own rules.
   const PITCH = 1.17;
   const place = (selector) => {
@@ -1755,7 +1763,7 @@ test('the numbered attack slots are a honeycomb round Transform and Shield: no t
     jump: { ...place('.tc-jump'), size: 1 },
     shield: { ...place('.tc-shield'), size: 1 },
     transform: { ...place('.tc-transform'), size: 1 },
-    extra_attack: { ...place('.tc-extra_attack'), size: 1.12 },
+    extra_attack: { ...place('.tc-extra_attack'), size: 1 },
   };
   for (const n of [1, 2, 3, 4, 5]) buttons[`slot${n}`] = { ...place(`.tc-attack[data-slot="${n}"]`), size: 1 };
   const entries = Object.entries(buttons).map(([name, b]) => [name, { x: -(b.right + b.size / 2), y: -(b.bottom + b.size / 2), r: b.size / 2 }]);
@@ -1911,4 +1919,61 @@ test('a future fighter uses its own mapped air preview, or a fallback if missing
   delete def.mobileAbilities.attack1.previews.air;
   tc.setAirborne(true);
   assert.equal(look(b), ICONS.pip1);
+});
+
+for (const scheme of ['classic', 'joystick']) {
+  test(`${scheme}: shared Mouvement buttons are one-shot, independent from held Run and actions, and release cleanly`, () => {
+    const { tc, calls, input } = touchControls(DEF_0001, { scheme });
+    let pending = 0;
+    input.queueTouchMouvement = (dir) => { pending = dir; calls.push(['mouvement', dir]); };
+    input.clearTouchMouvement = () => { pending = 0; };
+    const left = tc.controlElement('mouvementLeft');
+    const right = tc.controlElement('mouvementRight');
+    assert.equal(left, tc.mouvementButtons.get('mouvementLeft'));
+    assert.equal(right.innerHTML, ICONS.mouvementRight);
+    if (scheme === 'classic') {
+      const at = layoutDpad(tc);
+      tc.onDpadDown({ pointerId: 1, ...at('runRight'), preventDefault() {} });
+    } else tc.assign(1, 'runRight');
+    press(tc.buttons.get('jump'), 2);
+    press(tc.buttons.get('attack1'), 3);
+    press(left, 4);
+    // Exercise the parent guard as well as the child's stopPropagation.
+    tc.onDpadDown({ pointerId: 4, clientX: 70, clientY: 20, preventDefault() {} });
+    press(left, 4);
+    assert.deepEqual(calls, [['runRight', true], ['jump', true], ['attack1', true], ['mouvement', -1]]);
+    assert.equal(tc.pointers.has(4), false, 'Mouvement never owns a Run pointer');
+    assert.equal(tc.counts.get('runRight'), 1);
+    for (const end of ['pointercancel', 'lostpointercapture', 'pointerup']) {
+      left.dispatch(end, { pointerId: 4 });
+      assert.equal(left.classList.contains('is-pressed'), false);
+      press(left, 4);
+    }
+    tc.setScheme(scheme === 'classic' ? 'joystick' : 'classic');
+    assert.equal(pending, 0, 'switch discards unsampled requests');
+    assert.equal(tc.pointers.size, 0);
+    assert.equal(tc.mouvementPointers.size, 0);
+    assert.ok(tc.allButtons.every((b) => !b.classList.contains('is-pressed')));
+    assert.equal(tc.controlElement('mouvementLeft'), left, 'same button and handlers after switching');
+    press(right, 5);
+    assert.equal(pending, 1);
+    tc.setEnabled(false);
+    assert.equal(pending, 0);
+    assert.equal(right.classList.contains('is-pressed'), false);
+  });
+}
+
+test('Mouvement artwork has centered bounds, even spacing, equal strokes and mirrored geometry', () => {
+  const paths = (icon) => [...icon.matchAll(/d="([^"]+)"/g)].map((m) => m[1].match(/[\d.]+/g).map(Number));
+  const left = paths(ICONS.mouvementLeft);
+  const right = paths(ICONS.mouvementRight);
+  for (const glyph of [left, right]) {
+    const xs = glyph.flatMap((p) => p.filter((_, i) => i % 2 === 0));
+    const ys = glyph.flatMap((p) => p.filter((_, i) => i % 2 === 1));
+    assert.equal(Math.min(...xs) + Math.max(...xs), 24);
+    assert.equal(Math.min(...ys) + Math.max(...ys), 24);
+    assert.deepEqual(glyph[1].map((v, i) => v - glyph[0][i]), [10, 0, 10, 0, 10, 0]);
+  }
+  assert.deepEqual(left.map((p) => p.map((v, i) => i % 2 === 0 ? 24 - v : v)).reverse(), right);
+  assert.doesNotMatch(ICONS.mouvementLeft + ICONS.mouvementRight, /stroke-width|transform/);
 });

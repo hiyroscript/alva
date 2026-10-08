@@ -397,7 +397,7 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   await screen.enter();
   assert.equal(screen.touch.scheme, 'classic');
   assert.equal(screen.touch.root.children[0], screen.touch.dpad);
-  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right']);
+  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Left movement', 'Right movement']);
   assert.equal(screen.touch.enabled, true);
   for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
   assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'High Kick', 'the fighter\'s own, whatever the layout');

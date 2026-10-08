@@ -7,8 +7,8 @@ export const ICONS = {
   left: svg('<path d="M15 4.5 7.5 12 15 19.5"/>'),
   right: svg('<path d="M9 4.5 16.5 12 9 19.5"/>'),
   // Joystick Mouvement/Dash buttons; Classic running keeps single arrows.
-  mouvementLeft: svg('<path d="M11 5.5 4.5 12 11 18.5"/><path d="M19.5 5.5 13 12 19.5 18.5"/>'),
-  mouvementRight: svg('<path d="M4.5 5.5 11 12 4.5 18.5"/><path d="M13 5.5 19.5 12 13 18.5"/>'),
+  mouvementLeft: svg('<path d="M10 6 4 12 10 18"/><path d="M20 6 14 12 20 18"/>'),
+  mouvementRight: svg('<path d="M4 6 10 12 4 18"/><path d="M14 6 20 12 14 18"/>'),
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/>'),

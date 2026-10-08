@@ -50,7 +50,7 @@ export const FR = {
   'movement.fastFall.name': 'Chute rapide',
   'movement.fastFall.description': 'Maintenez Bas en tombant pour descendre plus vite.',
   'movement.dash.name': 'Sprint',
-  'movement.dash.description': 'Touchez deux fois une direction pour un élan de vitesse. Une attaque ou un saut peut l’interrompre après un instant.',
+  'movement.dash.description': 'Appuyez sur Q/E, sur Select/View + gauche/droite à la manette, ou sur un bouton de mouvement pour un élan de vitesse. Une attaque ou un saut peut l’interrompre après un instant.',
   'movement.airDash.name': 'Sprint aérien',
   'movement.airDash.description': 'Le sprint en l’air, à l’horizontale, une fois avant de retoucher le sol.',
 
@@ -329,7 +329,7 @@ export const FR = {
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Boutons classiques',
   'settings.scheme.joystickDesc': 'Utilisez le joystick pour vous déplacer. Touchez un bouton de mouvement une fois pour sprinter à gauche ou à droite.',
-  'settings.scheme.classicDesc': 'Utilisez les boutons gauche et droite pour vous déplacer. Touchez deux fois une direction pour sprinter.',
+  'settings.scheme.classicDesc': 'Maintenez un bouton gauche ou droite pour courir. Touchez une fois un petit bouton de mouvement au-dessus pour sprinter.',
   'settings.customize': 'Personnaliser les commandes tactiles',
   'settings.customizeNote': '{scheme} : déplacez et redimensionnez chaque commande.',
   'settings.customized': 'Disposition personnalisée',

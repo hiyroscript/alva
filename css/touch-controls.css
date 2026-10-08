@@ -10,7 +10,7 @@
   --tc-gap: calc(var(--tc) * 0.17);
   --tc-pitch: calc(var(--tc) + var(--tc-gap));
   --tc-bottom: calc(max(var(--safe-b), 10px) + 1.6vh);
-  /* Joystick scheme: the stick's base, its knob and two Dash buttons. */
+  /* Stick geometry and the smaller Mouvement buttons shared by both schemes. */
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
   --tc-dash: calc(var(--tc) * 0.62);
@@ -39,7 +39,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-actions {
   right: calc(max(var(--safe-r), 12px) + 1.4vw);
   width: calc(var(--tc-pitch) * 2 + var(--tc));
-  height: calc(var(--tc-pitch) * 1.74 + var(--tc) * 1.12);
+  height: calc(var(--tc-pitch) * 1.74 + var(--tc));
 }
 /* A third numbered attack button reaches half a pitch further left. */
 .touch-controls[data-attack-buttons="3"] .tc-actions,
@@ -113,27 +113,19 @@ html.is-touch .touch-controls[hidden] { display: none; }
    ones on show (attackSlots): a honeycomb round Transform and Shield.
    Slots 1 and 2 (attack1, attack2) are the lower row beside Jump; slot 3 is
    left of Transform; slots 4 and 5 the top row, left of the extra attack
-   (a tenth of a pitch further left than the honeycomb, clear of its larger
-   button).
+   (aligned with the lower row).
                  [4]  [5]  [EXTRA]
               [3]  [TRANSFORM] [SHIELD]
                  [1]  [2]  [JUMP]            */
 .tc-attack[data-slot="1"] { right: calc(var(--tc-pitch) * 2); bottom: 0; }
 .tc-attack[data-slot="2"] { right: var(--tc-pitch); bottom: 0; }
 .tc-attack[data-slot="3"] { right: calc(var(--tc-pitch) * 2.5); bottom: calc(var(--tc-pitch) * 0.87); }
-.tc-attack[data-slot="4"] { right: calc(var(--tc-pitch) * 2.1); bottom: calc(var(--tc-pitch) * 1.74); }
-.tc-attack[data-slot="5"] { right: calc(var(--tc-pitch) * 1.1); bottom: calc(var(--tc-pitch) * 1.74); }
+.tc-attack[data-slot="4"] { right: calc(var(--tc-pitch) * 2); bottom: calc(var(--tc-pitch) * 1.74); }
+.tc-attack[data-slot="5"] { right: var(--tc-pitch); bottom: calc(var(--tc-pitch) * 1.74); }
 .tc-extra_attack {
-  right: calc(var(--tc-pitch) * 0.02);
+  right: 0;
   bottom: calc(var(--tc-pitch) * 1.74);
-  width: calc(var(--tc) * 1.12);
-  height: calc(var(--tc) * 1.12);
-  border-width: 3px;
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.1);
 }
-.tc-btn.is-unavailable { opacity: 0.4; border-style: dashed; }
-.tc-jump { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); }
 
 /* Joystick scheme (the Mobile Controls setting's default). The lower-left
    cluster is one round stick in the same translucent style as the buttons
@@ -191,4 +183,9 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-dash-left { left: calc(var(--tc) * -0.03); }
 .tc-dash-right { right: calc(var(--tc) * -0.03); }
 
-
+/* Classic: each smaller Mouvement target sits above its matching Run
+   target. The container still captures only Run pointers for sliding. */
+.tc-dpad .tc-dash { bottom: var(--tc-pitch); }
+.tc-dpad .tc-dash-left { left: calc((var(--tc) - var(--tc-dash)) / 2); }
+.tc-dpad .tc-dash-right { right: calc((var(--tc) - var(--tc-dash)) / 2); }
+.tc-dash .icon { display: block; }

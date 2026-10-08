@@ -1,9 +1,9 @@
 // Run with node --test tests/systems/dash.test.mjs (no dependencies).
 // Dash: #0001's mouvment frames (its Dash art) and their registration, the horizontal press
 // edges InputManager exposes (keyboard, touch, D-pad and stick alike), the
-// double tap, what a Dash needs to start, what it costs, how it moves (and
+// explicit Mouvement requests, what a Dash needs to start, what it costs, how it moves (and
 // stops), its priority against attacks and the Shield (Down held never
-// stops one), and that it is movement only. Also the one-tap request of the Joystick touch layout's
+// stops one), and that it is movement only. Also the one-tap request of both touch layouts'
 // Dash buttons (InputManager.queueTouchMouvement → mouvementLeftPressed /
 // mouvementRightPressed), which goes through the same tryDash and its rules.
 // Uses the real Fighter, InputManager and physics (see tests/helpers/fighter-harness.mjs).
@@ -68,8 +68,8 @@ test('the one mouvment frame lives in #0001\'s folder, is registered as a one-sh
   near(clip.heightRatio * idleArtH, Math.max(...dash.map((s) => s.h)), 'one art pixel per file pixel');
 });
 
-test('movement data: the universal Dash, 1250 (about 3x the top speed) for a sixth of a second, about 208 units, a 0.22 s double-tap window', () => {
-  assert.equal(MOVEMENT.dashTapWindow, 0.22);
+test('movement data: the universal Dash, 1250 (about 3x the top speed) for a sixth of a second, about 208 units, no Run tap window', () => {
+  assert.equal('dashTapWindow' in MOVEMENT, false);
   assert.equal(MOVEMENT.dashSpeed, 1250);
   const ratio = MOVEMENT.dashSpeed / MOVEMENT.maxSpeed;
   assert.ok(ratio >= 2.8 && ratio <= 3.1, `${ratio}`);
@@ -181,72 +181,38 @@ test('neutral and CPU inputs carry the new fields, always false; the training CP
   assert.equal(locked.fighter.dash, null, 'a locked fighter reads neutral input');
 });
 
-// ---- The double tap -------------------------------------------------------------------
+// ---- Run is independent from Mouvement ---------------------------------------
 
-test('one press never dashes; two presses of the same direction inside the window do, facing that way at once', () => {
-  const one = makeFighter();
-  for (let i = 0; i < 30; i++) one.step(i === 0 ? RIGHT : { runRight: true });
-  assert.equal(one.fighter.dash, null, 'a held run is not a Dash');
-  assert.notEqual(one.fighter.state, 'dash');
-  // Right, released, right again: a Dash to the right.
-  const { fighter, step } = makeFighter({ facing: -1 });
-  tap(step, RIGHT);
-  step(RIGHT);
-  assert.ok(fighter.dash);
-  assert.equal(fighter.dash.direction, 1);
-  assert.equal(fighter.facing, 1, 'faces the Dash at once');
-  assert.equal(fighter.state, 'dash');
-  // Left twice: to the left, even while facing right.
-  const left = makeFighter({ facing: 1 });
-  tap(left.step, LEFT);
-  left.step(LEFT);
-  assert.equal(left.fighter.dash?.direction, -1);
-  assert.equal(left.fighter.facing, -1);
-  // No release needed if the input gives two clean press edges.
-  const quick = makeFighter();
-  quick.step(RIGHT);
-  quick.step(RIGHT);
-  assert.ok(quick.fighter.dash);
-});
-
-test('the window: the second press up to 0.22 s after the first dashes, any later does not', () => {
-  const window = Math.floor(MOVEMENT.dashTapWindow / DT + 1e-9); // 13 steps
-  const inside = makeFighter();
-  doubleTap(inside.step, RIGHT, window);
-  assert.ok(inside.fighter.dash, `${window} steps apart`);
-  const outside = makeFighter();
-  doubleTap(outside.step, RIGHT, window + 1);
-  assert.equal(outside.fighter.dash, null, `${window + 1} steps apart`);
-  // The late press starts a new double tap of its own.
-  outside.step({});
-  outside.step(RIGHT);
-  assert.ok(outside.fighter.dash);
-});
-
-test('opposite directions never make a double tap: left then right, right then left', () => {
-  for (const [first, second] of [[LEFT, RIGHT], [RIGHT, LEFT]]) {
-    const { fighter, step } = makeFighter();
-    tap(step, first);
-    step(second);
-    assert.equal(fighter.dash, null);
-    // The second press replaced the first: its own double tap still works.
-    step({});
-    step(second);
-    assert.ok(fighter.dash);
-    assert.equal(fighter.dash.direction, second === RIGHT ? 1 : -1);
+for (const airborne of [false, true]) {
+  for (const sequence of [[RIGHT], [LEFT], [RIGHT, RIGHT], [LEFT, LEFT], [RIGHT, LEFT, RIGHT, RIGHT, LEFT, LEFT]]) {
+    test(`Run never Dashes, airborne=${airborne}, sequence=${JSON.stringify(sequence)}`, () => {
+      const { fighter, step } = makeFighter();
+      if (airborne) step({ jump: true, jumpPressed: true });
+      for (const press of sequence) {
+        step(press);
+        assert.equal(fighter.dash, null);
+        step({});
+        assert.equal(fighter.dash, null);
+      }
+      assert.equal(fighter.combat.energy, 100);
+      assert.equal('dashTap' in fighter, false);
+    });
   }
-  // Both at once cancels the tap waiting.
-  const both = makeFighter();
-  both.step(RIGHT);
-  both.step({ ...RIGHT, ...LEFT });
-  both.step(RIGHT);
-  assert.equal(both.fighter.dash, null);
+}
+
+test('held Run and rapid press edges remain ordinary movement indefinitely', () => {
+  const { fighter, step } = makeFighter();
+  for (let i = 0; i < 60; i++) {
+    step(RIGHT);
+    assert.equal(fighter.dash, null);
+  }
+  assert.equal(fighter.body.vx, MOVEMENT.maxSpeed);
 });
 
 test('a Dash plays the real mouvment clip once, its one leap held throughout, then the fighter runs or stands', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
-  step(RIGHT);
+  step({ ...RIGHT, mouvementRightPressed: true });
   const frames = [];
   let f = fighter;
   while (f.state === 'dash') {
@@ -265,7 +231,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
   const d = duel({ gap: 120, pushboxes: true });
   d.tick(RIGHT);
   d.tick({});
-  d.tick(RIGHT);
+  d.tick({ ...RIGHT, mouvementRightPressed: true });
   assert.ok(d.attacker.dash);
   for (let i = 0; i < DASH_STEPS; i++) {
     assert.equal(d.attacker.combat.attack, null, 'no attack');
@@ -280,7 +246,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
   const hit = duel({ gap: 40, attackerFacing: -1, x: 540, pushboxes: true });
   hit.tick({}, RIGHT);
   hit.tick({}, {});
-  hit.tick({ attack1: true, attack1Pressed: true }, RIGHT);
+  hit.tick({ attack1: true, attack1Pressed: true }, { ...RIGHT, mouvementRightPressed: true });
   assert.ok(hit.target.dash, 'the target dashes');
   hit.until(() => hit.events.length > 0);
   assert.equal(hit.events[0].type, 'hit');
@@ -291,7 +257,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
 
 // ---- Gating ------------------------------------------------------------------------------
 
-test('no Dash (and nothing spent) while attacking, stunned, paralyzed, shielding, already dashing, exhausted or without mouvment art; airborne, the double tap is the air dash', () => {
+test('no Dash (and nothing spent) while attacking, stunned, paralyzed, shielding, already dashing, exhausted or without mouvment art; airborne, the explicit request is the air dash', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -301,44 +267,44 @@ test('no Dash (and nothing spent) while attacking, stunned, paralyzed, shielding
     assert.equal(f.fighter.dash, wasDash, `${label}: no new Dash`);
     assert.ok(f.fighter.combat.energy >= before - 1e-9, `${label}: nothing spent`);
   };
-  // Airborne, the same double tap is the fighter's air dash, never a Dash
+  // Airborne, the same explicit request is the fighter's air dash, never a Dash
   // (see air-mouvment.test.mjs): its own clip and speed.
   const aloft = makeFighter();
   aloft.step({ jump: true, jumpPressed: true });
   aloft.step(RIGHT);
   aloft.step({});
-  aloft.step(RIGHT);
+  aloft.step({ ...RIGHT, mouvementRightPressed: true });
   assert.equal(aloft.fighter.dash?.air, true, 'airborne: the air dash');
   assert.equal(aloft.fighter.dash.animation, 'midair_mouvment');
   assert.equal(aloft.fighter.dash.speed, MOVEMENT.airDashSpeed);
   assert.equal(aloft.fighter.tryDash(1), false, 'tryDash itself is the ground\'s');
   refused('attacking', {
     before: (f) => { f.step(RIGHT); f.step({ attack1: true, attack1Pressed: true }); },
-    press: (f) => f.step(RIGHT),
+    press: (f) => f.step({ ...RIGHT, mouvementRightPressed: true }),
   });
   refused('stunned', {
     before: (f) => { f.step(RIGHT); f.fighter.combat.stun = 0.3; },
-    press: (f) => f.step(RIGHT),
+    press: (f) => f.step({ ...RIGHT, mouvementRightPressed: true }),
   });
   refused('paralyzed', {
     before: (f) => { f.step(RIGHT); f.fighter.combat.paralyze(1); },
-    press: (f) => f.step(RIGHT),
+    press: (f) => f.step({ ...RIGHT, mouvementRightPressed: true }),
   });
   refused('shielding', {
     before: (f) => { f.step({ shield: true, shieldPressed: true }); f.step({ shield: true, ...RIGHT }); },
-    press: (f) => f.step({ shield: true, ...RIGHT }),
+    press: (f) => f.step({ shield: true, ...RIGHT, mouvementRightPressed: true }),
   });
   refused('holding Shield on the tap', {
     before: (f) => f.step(RIGHT),
-    press: (f) => f.step({ shield: true, shieldPressed: true, ...RIGHT }),
+    press: (f) => f.step({ shield: true, shieldPressed: true, ...RIGHT, mouvementRightPressed: true }),
   });
   refused('already dashing', {
-    before: (f) => { f.step(RIGHT); f.step(RIGHT); assert.ok(f.fighter.dash); f.step(RIGHT); },
-    press: (f) => f.step(RIGHT),
+    before: (f) => { f.step({ ...RIGHT, mouvementRightPressed: true }); assert.ok(f.fighter.dash); f.step(RIGHT); },
+    press: (f) => f.step({ ...RIGHT, mouvementRightPressed: true }),
   });
   refused('exhausted', {
-    before: (f) => { f.fighter.combat.setEnergy(0); f.fighter.combat.regenEnergy(60); f.step(RIGHT); },
-    press: (f) => f.step(RIGHT),
+    before: (f) => { f.fighter.combat.setEnergy(0); f.fighter.combat.regenEnergy(60); f.step({ ...RIGHT, mouvementRightPressed: true }); },
+    press: (f) => f.step({ ...RIGHT, mouvementRightPressed: true }),
   });
   const warnings = [];
   const warn = console.warn;
@@ -347,7 +313,7 @@ test('no Dash (and nothing spent) while attacking, stunned, paralyzed, shielding
     refused('no mouvment art', {
       options: { sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'mouvment')) },
       before: (f) => f.step(RIGHT),
-      press: (f) => f.step(RIGHT),
+      press: (f) => f.step({ ...RIGHT, mouvementRightPressed: true }),
     });
   } finally {
     console.warn = warn;
@@ -360,41 +326,41 @@ test('short of Energy a Dash still happens, but takes all that is left: the bar 
   const c = fighter.combat;
   tap(step, RIGHT);
   c.setEnergy(10);
-  step(RIGHT);
+  step({ ...RIGHT, mouvementRightPressed: true });
   assert.ok(fighter.dash, 'a Dash on 10 Energy');
   assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'the full burst, not a weaker one');
   assert.deepEqual([c.energy, c.energyExhausted], [0, true]);
   while (fighter.dash) step({});
   for (let i = 0; i < 10; i++) step({});
   tap(step, RIGHT);
-  step(RIGHT);
+  step({ ...RIGHT, mouvementRightPressed: true });
   assert.equal(fighter.dash, null, 'exhausted: no Dash until full again');
   // Exactly its cost left empties it too.
   const exact = makeFighter();
   tap(exact.step, RIGHT);
   exact.fighter.combat.setEnergy(DASH_ENERGY_COST);
-  exact.step(RIGHT);
+  exact.step({ ...RIGHT, mouvementRightPressed: true });
   assert.ok(exact.fighter.dash);
   assert.deepEqual([exact.fighter.combat.energy, exact.fighter.combat.energyExhausted], [0, true]);
   // With more left, only its cost goes.
   const plenty = makeFighter();
   tap(plenty.step, RIGHT);
   plenty.fighter.combat.setEnergy(40);
-  plenty.step(RIGHT);
+  plenty.step({ ...RIGHT, mouvementRightPressed: true });
   assert.deepEqual([plenty.fighter.combat.energy, plenty.fighter.combat.energyExhausted], [40 - DASH_ENERGY_COST, false]);
 });
 
-test('a double tap that cannot Dash is used up, never queued for later', () => {
+test('a explicit request that cannot Dash is used up, never queued for later', () => {
   const { fighter, step } = makeFighter();
   step({ attack1: true, attack1Pressed: true });
   step(RIGHT);
   step({});
-  step(RIGHT); // the double tap, mid-attack: refused
+  step({ ...RIGHT, mouvementRightPressed: true }); // the explicit request, mid-attack: refused
   assert.equal(fighter.dash, null);
   while (fighter.combat.attack) step({ runRight: true });
   for (let i = 0; i < 20; i++) step({ runRight: true });
   assert.equal(fighter.dash, null, 'nothing happens once the attack is over');
-  // The press after it is a fresh first tap, not a second.
+  // A later Run press cannot resurrect the expired request.
   step({});
   step(RIGHT);
   assert.equal(fighter.dash, null);
@@ -407,7 +373,7 @@ test('a Dash spends its cost (25) exactly once as it starts, and bursts at dashS
   tap(step, RIGHT);
   const full = fighter.combat.energy;
   assert.equal(full, 100);
-  step(RIGHT);
+  step({ ...RIGHT, mouvementRightPressed: true });
   assert.equal(DASH_ENERGY_COST, 25);
   assert.equal(fighter.combat.energy, 75, 'exactly 25, no refill on that step');
   assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'dash speed from the first step');
@@ -440,7 +406,7 @@ test('a solid stops a Dash where it stands; walking off a ledge ends it, and the
   const walled = new StageCollision(stageMap({ solids: [{ id: 'crate', x: 640, y: 700, w: 60, h: 100 }] }));
   const w = makeFighter({ x: 560, stage: walled });
   tap(w.step, RIGHT);
-  w.step(RIGHT);
+  w.step({ ...RIGHT, mouvementRightPressed: true });
   assert.ok(w.fighter.dash);
   for (let i = 0; i < DASH_STEPS && w.fighter.dash; i++) w.step({});
   assert.equal(w.fighter.dash, null);
@@ -449,7 +415,7 @@ test('a solid stops a Dash where it stands; walking off a ledge ends it, and the
 
   const edge = makeFighter({ x: 1960 });
   tap(edge.step, RIGHT);
-  edge.step(RIGHT);
+  edge.step({ ...RIGHT, mouvementRightPressed: true });
   assert.ok(edge.fighter.dash);
   let steps = 0;
   while (edge.fighter.grounded && steps++ < DASH_STEPS) edge.step({});
@@ -462,28 +428,28 @@ test('a solid stops a Dash where it stands; walking off a ledge ends it, and the
 // ---- Priority -------------------------------------------------------------------------------
 
 test('Shield wins over a Dash on the same step; so does an attack; Down held never does', () => {
-  // Shield and the second tap together: the Shield, and nothing spent.
+  // Shield and the request together: the Shield, and nothing spent.
   const shield = makeFighter();
   tap(shield.step, RIGHT);
-  shield.step({ ...RIGHT, shield: true, shieldPressed: true });
+  shield.step({ ...RIGHT, mouvementRightPressed: true, shield: true, shieldPressed: true });
   assert.equal(shield.fighter.state, 'shield');
   assert.equal(shield.fighter.combat.shielding, true);
   assert.equal(shield.fighter.dash, null);
   assert.equal(shield.fighter.combat.energy, 100, 'raising the Shield is free');
-  // An attack and the second tap together: the attack.
+  // An attack and the request together: the attack.
   const attack = makeFighter();
   tap(attack.step, RIGHT);
-  attack.step({ ...RIGHT, attack2: true, attack2Pressed: true });
+  attack.step({ ...RIGHT, mouvementRightPressed: true, attack2: true, attack2Pressed: true });
   assert.equal(attack.fighter.state, 'attack');
   assert.equal(attack.fighter.combat.attack.def.id, 'attack2');
   assert.equal(attack.fighter.dash, null);
   assert.equal(attack.fighter.combat.energy, 100);
-  // Down pressed and held through the double tap: only a direction, so
+  // Down pressed and held through the explicit request: only a direction, so
   // the Dash comes out all the same, and costs what it always does.
   const down = makeFighter();
   down.step({ ...RIGHT, down: true, downPressed: true });
   down.step({ down: true });
-  down.step({ ...RIGHT, down: true });
+  down.step({ ...RIGHT, mouvementRightPressed: true, down: true });
   assert.ok(down.fighter.dash, 'a Dash with Down held');
   assert.equal(down.fighter.state, 'dash');
   assert.equal(down.fighter.combat.energy, 100 - DASH_ENERGY_COST);
@@ -491,7 +457,7 @@ test('Shield wins over a Dash on the same step; so does an attack; Down held nev
   // does nothing to it.
   const busy = makeFighter();
   tap(busy.step, RIGHT);
-  busy.step(RIGHT);
+  busy.step({ ...RIGHT, mouvementRightPressed: true });
   busy.step({ attack1: true, attack1Pressed: true, shield: true, shieldPressed: true, jump: true, down: true });
   assert.equal(busy.fighter.state, 'dash');
   assert.equal(busy.fighter.combat.attack, null);
@@ -571,7 +537,7 @@ test('every controller\'s input carries the request fields, false unless asked',
     bot.step(out);
   }
   const source = readFileSync(ROOT + 'js/game/ai/combat-ai.js', 'utf8');
-  assert.doesNotMatch(source, /dash(Left|Right)Pressed|queueTouchMouvement/, 'the combat AI still dashes by double tap only');
+  assert.doesNotMatch(source, /dash(Left|Right)Pressed|queueTouchMouvement/, 'the combat AI uses controller requests, never the touch API');
 });
 
 test('one request Dashes at once through tryDash: no double tap, no held direction, the same cost, speed, clip and facing', () => {
@@ -581,7 +547,7 @@ test('one request Dashes at once through tryDash: no double tap, no held directi
     const tryDash = fighter.tryDash.bind(fighter);
     fighter.tryDash = (...args) => { calls.push(args[0]); return tryDash(...args); };
     step(held);
-    assert.deepEqual(calls, [direction], 'the same tryDash as a double tap');
+    assert.deepEqual(calls, [direction], 'the shared tryDash');
     assert.ok(fighter.dash, 'one step, one request');
     assert.equal(fighter.dash.direction, direction);
     assert.equal(fighter.facing, direction, 'faces the Dash at once');
@@ -597,37 +563,27 @@ test('one request Dashes at once through tryDash: no double tap, no held directi
       n++;
     }
     assert.equal(n, DASH_STEPS + 1);
-    assert.equal(fighter.dashTap, null, 'never a waiting first tap');
+    assert.equal('dashTap' in fighter, false, 'no tap state');
   }
 });
 
-test('a request is not a direction press: it never pairs with a tap before it or after it', () => {
-  // A first tap waiting, then a request that is refused (Shield held): the
-  // tap is forgotten, so the next Right press is a first tap again.
+test('requests stay independent from Run before, during and after them; opposing requests cancel', () => {
   const { fighter, step } = makeFighter();
   step(RIGHT);
-  assert.ok(fighter.dashTap, 'a first tap waiting');
   step({ ...MOUVEMENT_RIGHT, shield: true, shieldPressed: true });
-  assert.equal(fighter.dash, null, 'refused while Shield is held');
-  assert.equal(fighter.dashTap, null, 'and the waiting tap is gone');
+  assert.equal(fighter.dash, null);
   step({});
   step(RIGHT);
-  assert.equal(fighter.dash, null, 'one Right press after it is only a first tap');
-  // A request with this step's own Right press: that press is not a tap.
+  step({});
+  step(RIGHT);
+  assert.equal(fighter.dash, null, 'Run never retries a refused request');
   const same = makeFighter();
   same.step({ ...RIGHT, ...MOUVEMENT_LEFT });
-  assert.equal(same.fighter.dash?.direction, -1, 'the request\'s own direction');
-  assert.equal(same.fighter.dashTap, null);
-  // Both directions at once ask for nothing (and spend nothing).
+  assert.equal(same.fighter.dash?.direction, -1);
   const both = makeFighter();
   both.step({ ...MOUVEMENT_LEFT, ...MOUVEMENT_RIGHT });
   assert.equal(both.fighter.dash, null);
   assert.equal(both.fighter.combat.energy, 100);
-  // The keyboard double tap is unchanged beside it.
-  const keys = makeFighter();
-  tap(keys.step, RIGHT);
-  keys.step(RIGHT);
-  assert.ok(keys.fighter.dash);
 });
 
 test('a request obeys every Dash rule: no Dash (and nothing spent) attacking, stunned, paralyzed, shielding, dashing, exhausted or without art; airborne it is the air dash', () => {
