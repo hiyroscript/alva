@@ -370,6 +370,8 @@ html:not(.is-pointer-input) .touch-editor .is-editor-selected:focus { outline-co
 .touch-editor-size { flex: 1 1 240px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; }
 .touch-editor-size-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: none; color: var(--text-muted); }
 .touch-editor-name { font-size: 13px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Match ENERGY_STYLE.fill in js/game/rendering/fighter-status.js. */
+.touch-editor-name--shield { font-weight: 700; color: #b026ff; }
 .touch-editor-size-controls { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
 .touch-editor-step {
   flex: none;

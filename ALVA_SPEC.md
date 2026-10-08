@@ -350,6 +350,18 @@ no header, build label, eyebrow or keyboard hint bar.
   makes room for. Focus starts on Discover. Discover, the Settings gear and
   the credits stay open. Home re-reads the roster on every visit, so the
   first playable fighter reopens them with nothing else to change.
+- **Utility buttons:** a shared `.home-utility-buttons` Flexbox group sits
+  at the top right, inside `--safe-t` / `--safe-r`, with 8 px gaps and
+  matching 40–48 px square dark glass buttons. Left to right: **Help**
+  ("Help" / "Aide", original question-mark SVG `ICONS.help`), **Controller**
+  ("Controller" / "Manette", the original root `controller.PNG`, centred
+  and proportionally fitted with `object-fit: contain`), **Settings**.
+  Help and Controller are future placeholders: native disabled buttons,
+  announced as unavailable by assistive technology, excluded from Tab and `data-nav`
+  navigation, with no activation handlers. Their artwork is decorative,
+  so each button has just one spoken label. Labels follow live language
+  changes. Settings retains its original rightmost position; the group
+  extends left. Only the Settings gear rotates on hover / focus.
 - **Settings gear:** Settings is Home chrome, not a menu action: a compact
   square button with an original inline SVG gear (`ICONS.settings`,
   `currentColor`), named "Settings" / "Paramètres", in the top right corner
@@ -1025,6 +1037,13 @@ is dropped when the layout is read.
   in 10 % steps, with the value beside them. The control grows or shrinks
   round its centre, and its touch area with it. The size controls are
   disabled while nothing is selected.
+  When `shield` is selected, only its toolbar name (`.touch-editor-name`)
+  reads **shield** in English or **bouclier** in French, in weight 700 and
+  the exact Energy fill purple `#b026ff` (`ENERGY_STYLE.fill`). This label
+  follows live language changes. Selecting another control, clearing the
+  selection or closing the editor removes its special styling; all other
+  names retain their existing appearance. The shared Shield control name,
+  id, bindings and combat behaviour are unchanged.
 - **Keyboard / gamepad:** in the editor (only there) the controls are
   focusable and part of the navigation scope. Enter / A on a focused control
   starts moving it (announced, a solid ring): the arrows or D-pad nudge it by
