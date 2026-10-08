@@ -145,6 +145,7 @@ export const FR = {
   'home.credits': 'Crédits',
   'home.creditsRegion': 'Crédits. Faites défiler ou utilisez les flèches haut et bas et les touches Page précédente et Page suivante pour les lire.',
   'home.by': 'Par {developer}',
+  'home.whyAlva': 'Pourquoi Alva ?',
 
   'credits.createdBy': 'Créé par {developer}',
   'credits.original.title': 'Création originale',

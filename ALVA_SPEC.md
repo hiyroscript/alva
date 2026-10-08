@@ -371,6 +371,12 @@ no header, build label, eyebrow or keyboard hint bar.
   the dialog closes. There is no gear over live Battle or Practice play.
 - **Footer:** "by hiyroscript" in gray monospace on the left and a compact
   Download icon button on the right, full width under a subtle top hairline.
+  Directly below the attribution, left-aligned with a small gap, is an
+  always-underlined "Why Alva?" / "Pourquoi Alva ?" text button. It is
+  enabled, reachable by Tab and keyboard/gamepad navigation, with a visible
+  keyboard focus indicator; activation intentionally does nothing. The
+  footer reserves at least 44 px plus the safe-area inset for both lines,
+  also accounted for in the wordmark's available height.
   Download ("Download" / "Télécharger", decorative `ICONS.download`) is a
   native disabled placeholder with no activation handler or `data-nav`.
   Its 28–40 px square fits the existing footer height and safe-area padding.

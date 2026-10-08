@@ -120,6 +120,7 @@ export const EN = {
   'home.credits': 'Credits',
   'home.creditsRegion': 'Credits. Scroll or use the Up and Down arrow keys, Page Up, and Page Down to read.',
   'home.by': 'By {developer}',
+  'home.whyAlva': 'Why Alva?',
 
   'credits.createdBy': 'Created by {developer}',
   'credits.original.title': 'Original work',
