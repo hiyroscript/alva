@@ -404,9 +404,6 @@ export class TouchLayoutEditor {
   // ---- Toolbar -----------------------------------------------------------------------
 
   nameOf(id) {
-    // This lowercase toolbar label is specific to the editor; the control's
-    // shared accessible name and gameplay bindings keep their existing form.
-    if (id === 'shield') return t('editor.shield');
     return this.controlNode(id)?.getAttribute('aria-label') ?? '';
   }
 
@@ -415,10 +412,7 @@ export class TouchLayoutEditor {
   // never falls off a button that just ran out of room).
   syncSelection() {
     const id = this.selected;
-    this.nameEl.classList.toggle('touch-editor-name--shield', id === 'shield');
-    if (id === 'shield') {
-      setText(this.nameEl, 'editor.shield');
-    } else if (id) {
+    if (id) {
       this.nameEl.textContent = this.nameOf(id);
       this.nameEl.setAttribute('data-i18n', '');
     } else {

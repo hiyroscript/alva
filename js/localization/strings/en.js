@@ -313,7 +313,9 @@ export const EN = {
   'settings.customized': 'Custom layout',
   'settings.combat': 'Combat',
   'settings.combatAssist': 'Combat assist',
-  'settings.combatAssistDesc': 'Automatically closes a short gap before a melee attack. Never uses Energy and never affects ranged attacks.',
+  'settings.combatAssistDescBeforeEnergy': 'Automatically closes a short gap before a melee attack. Never uses ',
+  'settings.energy': 'energy',
+  'settings.combatAssistDescAfterEnergy': ' and never affects ranged attacks.',
   'settings.combatAssistOn': 'On',
   'settings.combatAssistOff': 'Off',
 
@@ -322,7 +324,6 @@ export const EN = {
   'editor.hint': 'Drag a control to move it. Select one to resize it.',
   'editor.keyHint': 'Press Enter or A to move a control with the arrow keys or D-pad.',
   'editor.none': 'No control selected',
-  'editor.shield': 'shield',
   'editor.size': 'Size',
   'editor.sizeValue': '{percent}%',
   'editor.smaller': 'Smaller',

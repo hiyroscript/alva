@@ -177,7 +177,9 @@ test('English and French have exactly the same keys, every one a real string', (
   assert.deepEqual(fr.filter((k) => !en.includes(k)), [], 'no French key without English');
   for (const language of LANGUAGES) {
     for (const [key, value] of Object.entries(STRINGS[language])) {
-      assert.ok(typeof value === 'function' || (typeof value === 'string' && value.trim() === value && value), `${language} ${key}`);
+      // Inline sentence fragments preserve spacing around the emphasized energy word.
+      const fragment = ['settings.combatAssistDescBeforeEnergy', 'settings.combatAssistDescAfterEnergy'].includes(key);
+      assert.ok(typeof value === 'function' || (typeof value === 'string' && value.trim() && (fragment || value.trim() === value)), `${language} ${key}`);
       assert.match(key, /^[a-z][\w]*(\.[\w]+)+$/, `${key}: a dotted key, not a sentence`);
     }
   }

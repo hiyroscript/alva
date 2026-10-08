@@ -220,7 +220,11 @@ export class SettingsDialog {
     });
     const assistGroup = el('div', { class: 'settings-subgroup' }, [
       el('h4', { class: 'settings-subtitle', id: 'settings-assist-title', ...tx('settings.combatAssist') }),
-      el('p', { class: 'settings-group-note', id: 'settings-assist-desc', ...tx('settings.combatAssistDesc') }),
+      el('p', { class: 'settings-group-note', id: 'settings-assist-desc' }, [
+        el('span', tx('settings.combatAssistDescBeforeEnergy')),
+        el('strong', { class: 'settings-energy', ...tx('settings.energy') }),
+        el('span', tx('settings.combatAssistDescAfterEnergy')),
+      ]),
       el('div', {
         class: 'settings-choices', role: 'radiogroup',
         'aria-labelledby': 'settings-assist-title', 'aria-describedby': 'settings-assist-desc',

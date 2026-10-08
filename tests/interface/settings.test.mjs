@@ -1079,7 +1079,7 @@ test('both layouts keep localized copy, editor labels and saved choices across l
   }
 });
 
-test('only the selected shield label is lowercase, bold and Energy purple, in both languages and layouts', () => {
+test('the selected Shield label keeps its standard translated name and appearance in both layouts', () => {
   const { app, home, dialog, done } = boot();
   try {
     home.settingsButton.click();
@@ -1088,34 +1088,17 @@ test('only the selected shield label is lowercase, bold and Energy purple, in bo
     for (const scheme of ['joystick', 'classic']) {
       schemeNamed(dialog, scheme).click();
       dialog.customizeButton.click();
-      editor.select('shield');
-      for (const [language, label, controlLabel] of [['en', 'shield', 'Shield'], ['fr', 'bouclier', 'Bouclier'], ['en', 'shield', 'Shield']]) {
+      for (const [language, label] of [['en', 'Shield'], ['fr', 'Bouclier'], ['en', 'Shield']]) {
         app.settings.set('language', language);
-        // The selected label updates through localizeTree, without reselection.
+        editor.select('shield');
         assert.equal(editor.nameEl.textContent, label);
         assert.equal(editor.nameOf('shield'), label);
-        assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), true);
-        assert.equal(editor.controlNode('shield').getAttribute('aria-label'), controlLabel, 'shared control name unchanged');
-        assert.equal(editor.controlNode('shield').getAttribute('data-control'), 'shield');
+        assert.equal(editor.nameEl.className, 'touch-editor-name');
+        assert.equal(editor.controlNode('shield').getAttribute('aria-label'), label);
       }
-      editor.select('jump');
-      assert.equal(editor.nameEl.textContent, 'Jump');
-      assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), false);
-      localizeTree(editor.root);
-      assert.equal(editor.nameEl.textContent, 'Jump', 'no stale Shield translation marker');
-      editor.select('shield');
-      editor.select(null);
-      assert.equal(editor.nameEl.textContent, t('editor.none'));
-      assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), false);
-      editor.select('shield');
       editor.close();
-      assert.equal(editor.nameEl.classList.contains('touch-editor-name--shield'), false, 'closing clears the style');
     }
-    const css = stylesheet();
-    const special = css.match(/\n\.touch-editor-name--shield \{([^}]*)\}/)?.[1] ?? '';
-    assert.match(special, /font-weight: 700;/);
-    assert.equal(special.match(/color: (#[\da-f]+);/)?.[1], ENERGY_STYLE.fill);
-    const normal = css.match(/\n\.touch-editor-name \{([^}]*)\}/)?.[1] ?? '';
+    const normal = stylesheet().match(/\n\.touch-editor-name \{([^}]*)\}/)?.[1] ?? '';
     assert.match(normal, /font-weight: 600;/);
     assert.match(normal, /color: var\(--text-strong\);/);
   } finally {
@@ -1142,10 +1125,16 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
     assert.equal(section.getAttribute('data-settings-section'), 'combat');
     assert.equal(section.querySelector('.settings-subtitle').textContent, 'Combat assist');
     const desc = section.querySelector('.settings-group-note');
-    assert.equal(desc.textContent, 'Automatically closes a short gap before a melee attack. Never uses Energy and never affects ranged attacks.');
-    // Its line says it is melee only and costs Energy.
+    assert.equal(desc.textContent, 'Automatically closes a short gap before a melee attack. Never uses energy and never affects ranged attacks.');
+    // Its line says it is melee only and costs no energy.
     assert.match(desc.textContent, /melee/);
-    assert.match(desc.textContent, /Energy/);
+    assert.match(desc.textContent, /energy/);
+    const energy = desc.querySelector('.settings-energy');
+    assert.equal(energy.tagName, 'STRONG');
+    assert.equal(energy.textContent, 'energy');
+    const emphasis = stylesheet().match(/\n\.settings-energy \{([^}]*)\}/)?.[1] ?? '';
+    assert.match(emphasis, /font-weight: 700;/);
+    assert.equal(emphasis.match(/color: (#[\da-f]+);/)?.[1], ENERGY_STYLE.fill);
     const group = section.querySelector('.settings-choices');
     assert.equal(group.getAttribute('role'), 'radiogroup');
     assert.equal(group.getAttribute('aria-labelledby'), 'settings-assist-title');
@@ -1187,11 +1176,15 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
     assert.equal(section.querySelector('.settings-group-title').textContent, 'Combat');
     assert.equal(section.querySelector('.settings-subtitle').textContent, 'Assistance au combat');
     assert.equal(desc.textContent,
-      'Comble automatiquement un court écart avant une attaque au corps à corps. Ne consomme jamais d’Énergie et n’agit jamais sur les attaques à distance.');
+      'Comble automatiquement un court écart avant une attaque au corps à corps. Ne consomme jamais d’énergie et n’agit jamais sur les attaques à distance.');
+    assert.equal(energy.textContent, 'énergie');
     assert.match(on.textContent, /^Activée/);
     assert.match(on.textContent, /Par défaut/);
     assert.match(off.textContent, /^Désactivée/);
     assert.deepEqual(checked(dialog.assistOptions), ['false', 'true']);
+    app.settings.set('language', 'en');
+    assert.equal(energy.textContent, 'energy');
+    assert.match(desc.textContent, /Never uses energy and never affects/);
     // Reopened on a new visit (the same device): Off, checked.
     const again = boot(storage);
     again.home.settingsButton.click();
