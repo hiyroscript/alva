@@ -364,7 +364,8 @@ test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground an
     assert.equal(action.hasAttribute('data-nav'), true);
   }
   assert.ok(!home.el.querySelectorAll('.home-action').some((b) => /Help|Settings/.test(b.html)), 'no Help or Settings action');
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.settingsButton], 'keyboard / gamepad reach them, in order, then the gear');
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.settingsButton, home.el.querySelector('.home-why-alva')],
+    'keyboard / gamepad reach the actions in order, then the gear and footer placeholder');
   const actions = home.el.querySelector('.home-actions').children;
   assert.equal(actions.indexOf(discover), actions.indexOf(practice) + 1, 'Discover sits directly under Practice Ground');
   assert.equal(actions.includes(home.settingsButton), false, 'the gear is not in the menu');

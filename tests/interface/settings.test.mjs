@@ -809,7 +809,7 @@ test('Help, Controller and Download are localized, unavailable and inert, withou
       assert.equal(app.nav.scopes.length, 0);
     }
     assert.equal(storage.writes, before);
-    assert.equal(app.nav.candidates(home.el).at(-1), settings);
+    assert.ok(app.nav.candidates(home.el).includes(settings));
     for (const [language, names, downloadLabel] of [
       ['en', ['Help', 'Controller', 'Settings'], 'Download'],
       ['fr', ['Aide', 'Manette', 'Paramètres'], 'Télécharger'],
@@ -824,7 +824,7 @@ test('Help, Controller and Download are localized, unavailable and inert, withou
   }
 });
 
-test('Home footer keeps its attribution and contains one decorative Download icon button', () => {
+test('Home footer stacks one enabled Why Alva? button below the attribution, beside Download', () => {
   const { home, done } = boot();
   try {
     const footer = home.el.querySelector('.home-footer');
@@ -832,8 +832,21 @@ test('Home footer keeps its attribution and contains one decorative Download ico
     assert.equal(buttons.length, 1);
     const [download] = buttons;
     assert.equal(download.parentNode, footer);
-    assert.deepEqual(footer.children.map((node) => node.tagName), ['SPAN', 'BUTTON']);
-    assert.equal(footer.children[0].textContent, t('home.by', { developer: CONFIG.developer }));
+    const left = home.el.querySelector('.home-footer-left');
+    const whyButtons = home.el.querySelectorAll('.home-why-alva');
+    assert.equal(whyButtons.length, 1);
+    const [why] = whyButtons;
+    assert.deepEqual(footer.children, [left, download]);
+    assert.deepEqual(left.children.map((node) => node.tagName), ['SPAN', 'BUTTON']);
+    assert.equal(left.children[0].textContent, t('home.by', { developer: CONFIG.developer }));
+    assert.equal(left.children[1], why, 'immediately follows the attribution');
+    assert.equal(why.getAttribute('type'), 'button');
+    assert.equal(why.disabled, false);
+    assert.equal(why.getAttribute('tabindex'), null, 'keeps the native Tab stop');
+    assert.equal(why.getAttribute('data-i18n'), 'home.whyAlva');
+    assert.equal(why.textContent, 'Why Alva?');
+    assert.equal(why.hasAttribute('data-nav'), true);
+    assert.equal(home.el.querySelector('.home-actions').contains(why), false);
     assert.equal(download.innerHTML, ICONS.download);
     assert.match(ICONS.download, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon">/);
     assert.doesNotMatch(ICONS.download, /#[0-9a-f]{3,8}\b|rgba?\(|\b(fill|stroke)="|<(image|text|use)\b|href=/i);
@@ -841,6 +854,55 @@ test('Home footer keeps its attribution and contains one decorative Download ico
     assert.equal(download.hasAttribute('href'), false);
   } finally { done(); }
 });
+
+test('Why Alva? is persistently underlined and left-aligned with a keyboard focus cue', () => {
+  const css = stylesheet();
+  const left = css.match(/\n\.home-footer-left \{([^}]*)\}/)?.[1] ?? '';
+  assert.match(left, /display: flex;/);
+  assert.match(left, /flex-direction: column;/);
+  assert.match(left, /align-items: flex-start;/);
+  assert.match(left, /gap: 3px;/);
+  const button = css.match(/\n\.home-why-alva \{([^}]*)\}/)?.[1] ?? '';
+  assert.match(button, /text-decoration: underline;/);
+  assert.match(button, /text-underline-offset: 3px;/);
+  assert.match(button, /cursor: pointer;/);
+  assert.match(button, /font: inherit;/);
+  assert.match(css, /\.home-why-alva:focus-visible \{[^}]*outline: 2px solid var\(--text\);/);
+});
+
+test('keyboard and gamepad reach Why Alva? without changing Home, settings or game selection on activation', () => withTestFighters([TEST_A], () => {
+  const { app, home, dialog, storage, done } = boot();
+  try {
+    const why = home.el.querySelector('.home-why-alva');
+    Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
+    place(home.settingsButton, 1180, 20, 44, 44);
+    place(why, 80, 550, 100, 16);
+    const selection = structuredClone(app.selection);
+    const stack = [...app.screens.stack];
+    const writes = storage.writes;
+    assert.equal(document.activeElement, home.actions.play, 'Play remains the default');
+    home.actions.discover.focus();
+    app.input.key('ArrowDown');
+    assert.equal(document.activeElement, why);
+    assert.equal(why.listeners.size, 0, 'no action handlers');
+    why.click();
+    why.click(0); // Native keyboard activation (the fake DOM has no default actions).
+    app.input.pad('confirm');
+    assert.equal(document.activeElement, why);
+    assert.equal(app.screens.current, home);
+    assert.deepEqual(app.screens.stack, stack);
+    assert.deepEqual(app.selection, selection);
+    assert.equal(dialog.isOpen, false);
+    assert.equal(app.nav.scopes.length, 0);
+    assert.equal(storage.writes, writes);
+    app.input.pad('up');
+    assert.equal(document.activeElement, home.actions.discover);
+    app.input.pad('down');
+    assert.equal(document.activeElement, why);
+    home.focusDefault();
+    assert.equal(document.activeElement, home.actions.play);
+  } finally { done(); }
+}));
 
 // Play is Home's default only while a fighter is playable: a test-only one
 // (see tests/fighters/fixtures/test-fighters.mjs) here.
@@ -851,6 +913,7 @@ test('keyboard and gamepad reach the gear from Home\'s menu', () => withTestFigh
     place(home.settingsButton, 1180, 20, 44, 44);
     place(home.utilityButtons.children[0], 1076, 20, 44, 44);
     place(home.utilityButtons.children[1], 1128, 20, 44, 44);
+    place(home.el.querySelector('.home-why-alva'), 80, 550, 100, 16);
     assert.equal(document.activeElement, home.actions.play, 'Play is still the default');
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, home.settingsButton, '→ from the menu');
@@ -986,10 +1049,12 @@ test('Language: English and Français as two radio buttons; picking one saves it
     assert.equal(home.settingsButton.getAttribute('aria-label'), 'Paramètres');
     assert.equal(home.el.querySelector('.home-lede').textContent, 'Un projet de fan, fait avec cœur.');
     assert.equal(home.el.querySelector('.home-actions').getAttribute('aria-label'), 'Menu principal');
+    assert.equal(home.el.querySelector('.home-why-alva').textContent, 'Pourquoi Alva ?');
     // Back to English, the same way.
     languageNamed(dialog, 'en').click();
     assert.equal(dialog.root.querySelector('.settings-title').textContent, 'Settings');
     assert.equal(home.settingsButton.getAttribute('aria-label'), 'Settings');
+    assert.equal(home.el.querySelector('.home-why-alva').textContent, 'Why Alva?');
     assert.equal(document.documentElement.lang, 'en');
   } finally {
     done();

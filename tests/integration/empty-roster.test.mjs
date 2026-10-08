@@ -527,7 +527,7 @@ test('with nothing playable, Home closes Play, Watch Mode and Practice Ground an
   assert.equal(home.actions.discover.disabled, false);
   assert.equal(home.actions.discover.hasAttribute('aria-describedby'), false);
   // Keyboard and gamepad skip the closed actions: Discover leads.
-  assert.deepEqual(app.nav.candidates(home.el), [home.actions.discover, home.settingsButton]);
+  assert.deepEqual(app.nav.candidates(home.el), [home.actions.discover, home.settingsButton, home.el.querySelector('.home-why-alva')]);
   home.focusDefault();
   assert.equal(document.activeElement, home.actions.discover);
   // A press on a closed action goes nowhere, even one that gets past its

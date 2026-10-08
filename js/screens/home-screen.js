@@ -194,7 +194,13 @@ export class HomeScreen extends Screen {
       ]),
       this.utilityButtons,
       el('footer', { class: 'home-footer' }, [
-        el('span', tx('home.by', { developer: CONFIG.developer })),
+        el('div', { class: 'home-footer-left' }, [
+          el('span', tx('home.by', { developer: CONFIG.developer })),
+          // Focusable placeholder; activation intentionally has no action yet.
+          el('button', {
+            class: 'home-why-alva', type: 'button', 'data-nav': true, ...tx('home.whyAlva'),
+          }),
+        ]),
         el('button', {
           class: 'home-download', type: 'button', disabled: true,
           ...tattr('aria-label', 'home.download'), html: ICONS.download,

@@ -8,6 +8,7 @@
 
 .screen--home {
   --gutter: clamp(24px, 6vw, 112px);
+  --home-footer-height: clamp(44px, 8vh, 64px);
   /* Glass strip before its 21deg turn, as fractions of the screen width. */
   --glass-l: 0.64;
   --glass-w: 0.44;
@@ -43,7 +44,7 @@
      rules below, plus a little slack). The
      wordmark keeps its size wherever that leaves room, and shrinks only as
      much as a short screen needs, so the menu is never pushed off it. */
-  --below-logo: calc(max(var(--safe-t), 24px) + 24px + clamp(34px, 8vh, 64px) + var(--safe-b)
+  --below-logo: calc(max(var(--safe-t), 24px) + 24px + var(--home-footer-height) + var(--safe-b)
     + clamp(14px, 3vh, 28px) + var(--lede-size) * 1.45
     + clamp(18px, 5vh, 48px) + 4 * clamp(42px, 7.4vh, 58px) + 3 * 8px + 8px
     + var(--home-note-room));
@@ -251,7 +252,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: calc(clamp(34px, 8vh, 64px) + var(--safe-b));
+  min-height: calc(var(--home-footer-height) + var(--safe-b));
   padding: 0 max(var(--safe-r), var(--gutter)) var(--safe-b) max(var(--safe-l), var(--gutter));
   border-top: 1px solid var(--border);
   background: var(--bg);
@@ -259,7 +260,24 @@
   font-size: 11px;
   color: var(--text-muted);
 }
-.home-footer > span { min-width: 0; overflow-wrap: anywhere; }
+.home-footer-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.home-why-alva {
+  font: inherit;
+  color: var(--text-muted);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.home-why-alva:hover { color: var(--text); }
+.home-why-alva:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 /* The placeholder fits inside the existing footer, even on short phones. */
 .home-download {
   flex: none;
@@ -285,10 +303,11 @@
   .home-credits-col { pointer-events: none; }
 }
 @media (max-height: 500px) {
+  .screen--home { --home-footer-height: 44px; }
   .home-main { padding-top: max(var(--safe-t), 12px); padding-bottom: 12px; }
   .home-intro {
     --lede-size: 13px;
-    --below-logo: calc(max(var(--safe-t), 12px) + 12px + 32px + var(--safe-b)
+    --below-logo: calc(max(var(--safe-t), 12px) + 12px + var(--home-footer-height) + var(--safe-b)
       + 10px + var(--lede-size) * 1.45 + 12px + 4 * 36px + 3 * 5px + 6px
       + var(--home-note-room));
     --home-note-gap: 6px;
@@ -302,7 +321,6 @@
   /* The four actions fit a 360 px landscape phone above its home bar. */
   .home-actions { margin-top: 12px; gap: 5px; }
   .home-action { height: 36px; }
-  .home-footer { min-height: calc(32px + var(--safe-b)); }
   .home-credit + .home-credit { margin-top: 20px; }
   .home-credit-lead { font-size: 14px; }
   .home-credit-title, .home-credit-line { margin-top: 2px; font-size: 11px; line-height: 1.45; }
@@ -310,7 +328,7 @@
 }
 @media (max-height: 360px) {
   .home-intro {
-    --below-logo: calc(max(var(--safe-t), 12px) + 12px + 32px + var(--safe-b)
+    --below-logo: calc(max(var(--safe-t), 12px) + 12px + var(--home-footer-height) + var(--safe-b)
       + 8px + var(--lede-size) * 1.45 + 8px + 4 * clamp(30px, 10vh, 36px) + 3 * 4px + 6px
       + var(--home-note-room));
     --home-note-gap: 4px;
