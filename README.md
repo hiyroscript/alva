@@ -60,7 +60,7 @@ use.
   Shield, Energy, hit-cancels and an input buffer, launch steering and
   tumbling, launches that rebound off walls, and hit effects.
 - **Every input**: keyboard, gamepad, and touch in two layouts (a joystick
-  or classic buttons) that players can rearrange and resize, with each
+  or classic buttons), both with dedicated left/right Mouvement buttons, that players can rearrange and resize, with each
   fighter's own art on its touch buttons.
 - **Combat Assist** for the human player (on by default, in Settings): a
   melee attack pressed just out of reach closes the short gap first, and
@@ -95,7 +95,7 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
 | Move | A D or ← → | D-pad / left stick |
-| Dash (in the air: air dash) | double-tap a direction | double-tap a direction |
+| Dash (in the air: air dash) | Q / E (left / right) | Select / View + D-pad or left stick left / right |
 | Jump (hold a little longer: higher; again in the air: air jump) | W, Space or ↑ | A |
 | Down (fast fall; steer a launch down) | S or ↓ | D-pad / stick down |
 | Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | B / LB / LT / L3 / R3 |

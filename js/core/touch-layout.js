@@ -30,7 +30,7 @@ export const TOUCH_CONTROL_IDS = Object.freeze({
     'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
   classic: Object.freeze([
-    'runLeft', 'runRight',
+    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight',
     'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
 });

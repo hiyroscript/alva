@@ -426,7 +426,7 @@ test('its output is only the player\'s own controls: never a control the fighter
   }
 });
 
-test('Dash is a double tap of a direction on the levels that use it, and never an accident', () => {
+test('Dash uses explicit one-step requests on the levels that use it, and never Run taps', () => {
   let dashes = 0;
   for (let seed = 0; seed < 6; seed++) {
     const r = ring({ difficulty: 'brutal', seed: 500 + seed, cpuX: 300, foeX: 1500 });
@@ -435,10 +435,10 @@ test('Dash is a double tap of a direction on the levels that use it, and never a
       r.step();
       if (r.cpu.dash && r.cpu.dash !== prev) {
         dashes++;
-        const d = r.cpu.dash.direction > 0 ? 'runRight' : 'runLeft';
-        // The tap before this one, within the tap window: a real double tap.
+        const d = r.cpu.dash.direction > 0 ? 'mouvementRight' : 'mouvementLeft';
+        // The CPU explicitly requested the direction in its input snapshot.
         const taps = r.log.slice(-seconds(0.25)).filter((o) => o[`${d}Pressed`]);
-        assert.ok(taps.length >= 2, 'two presses of the same direction');
+        assert.equal(taps.length, 1, 'one explicit request');
         assert.equal(r.ai.intent?.kind, 'dash', 'it meant to');
       }
       prev = r.cpu.dash;
@@ -619,4 +619,34 @@ test('CPU filters ground/air Dash timers and long ordinary cooldowns before plan
     cpu.combat.movementCooldowns.clear();
     assert.equal(ai.airDashFree(ai.sense(cpu, foe, ctx)), true);
   }
+});
+
+test('CPU requests ground and air Mouvement once, including recovery, while already running', () => {
+  for (const air of [false, true]) for (const dir of [-1, 1]) {
+    const r = ring({ difficulty: 'brutal', cpuX: 1000, foeX: 1600 });
+    r.hush();
+    const { cpu, ai } = r;
+    if (air) Object.assign(cpu.body, { grounded: false, ground: null, y: 500, prevY: 500, vy: 0 });
+    ai.prev[dir > 0 ? 'runRight' : 'runLeft'] = true;
+    ai.setIntent({ kind: 'dash', dir, air, recover: air });
+    r.step();
+    assert.equal(cpu.dash?.direction, dir);
+    assert.equal(cpu.dash.air, air);
+    const key = dir > 0 ? 'mouvementRightPressed' : 'mouvementLeftPressed';
+    assert.equal(r.log.at(-1)[key], true);
+    assert.equal(r.log.at(-1)[dir > 0 ? 'runRightPressed' : 'runLeftPressed'], false, 'Run need not be re-pressed');
+    const dash = cpu.dash;
+    r.run(4);
+    assert.equal(cpu.dash, dash);
+    assert.ok(r.log.slice(-4).every((out) => !out.mouvementLeftPressed && !out.mouvementRightPressed));
+  }
+});
+
+test('CPU ledge guard cancels an explicit Dash request before it reaches Fighter', () => {
+  const r = ring({ difficulty: 'brutal', cpuX: 1980, foeX: 1500 });
+  r.hush();
+  r.ai.setIntent({ kind: 'dash', dir: 1 });
+  r.step();
+  assert.equal(r.log.at(-1).mouvementRightPressed, false);
+  assert.equal(r.cpu.dash, null);
 });

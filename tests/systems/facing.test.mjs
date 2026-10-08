@@ -25,11 +25,11 @@ globalThis.Path2D ??= class {
 const ATTACK1 = { attack1: true, attack1Pressed: true };
 const ATTACK2 = { attack2: true, attack2Pressed: true };
 const THROW = { extra_attack: true, extra_attackPressed: true };
-// Two presses of `dir`, one step apart: a Dash's double tap.
-const doubleTap = (step, dir) => {
+// Run setup followed by one explicit Mouvement request.
+const requestDash = (step, dir) => {
   step({ [`${dir}Pressed`]: true, [dir]: true });
   step({});
-  return step({ [`${dir}Pressed`]: true, [dir]: true });
+  return step({ [dir === 'runRight' ? 'mouvementRightPressed' : 'mouvementLeftPressed']: true, [dir]: true });
 };
 // Moves `foe` to x at once (no interpolation drift).
 const place = (foe, x) => Object.assign(foe.body, { x, prevX: x });
@@ -88,7 +88,7 @@ test('a Dash faces its own direction, and the opponent never overrides it afterw
     // The opponent on the side the Dash turns away from.
     const foe = makeFighter({ x: 1000 - 300 * facing });
     me.fighter.opponent = foe.fighter;
-    doubleTap(me.step, dir);
+    requestDash(me.step, dir);
     assert.ok(me.fighter.dash, `${dir} Dash started`);
     assert.equal(me.fighter.facing, facing, `${dir} Dash faces ${dir} at once`);
     while (me.fighter.dash) me.step();
@@ -161,7 +161,7 @@ test('a stun, a Dash or a paralysis still holds the facing whatever is held', ()
   for (let i = 0; i < 10; i++) stunned.step({ runLeft: true });
   assert.equal(stunned.fighter.facing, 1, 'stunned');
   const dashing = makeFighter({ facing: 1 });
-  doubleTap(dashing.step, 'runRight');
+  requestDash(dashing.step, 'runRight');
   assert.ok(dashing.fighter.dash);
   dashing.step({ runLeft: true });
   assert.ok(dashing.fighter.dash, 'still dashing');
@@ -262,7 +262,7 @@ test('combat CPU aims on the press and follows side switches in startup, active 
       assert.ok(f.combat.attack, `${character.id}, airborne=${airborne}`);
       assert.equal(f.facing, 1, 'aims before starting, with no held direction');
       assert.equal(f.dash, null);
-      assert.equal(f.dashTap, null, 'no synthetic directional press');
+      assert.equal('dashTap' in f, false, 'no obsolete tap state');
       const recovery = f.combat.attack.def.recovery;
       const phases = new Set();
       for (let n = 0; f.combat.attack && n < 200; n++) {

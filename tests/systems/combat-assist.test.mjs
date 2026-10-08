@@ -911,17 +911,17 @@ test('a jump cancels it and jumps on that very step; the Jab never comes', () =>
   assert.ok(!seen.has('attack1') && !seen.has('midair_attack1'), [...seen].join());
 });
 
-test('a Dash, by double tap or mouvement button, cancels it and Dashes by the ordinary rules, paying its own cost', () => {
-  for (const ask of ['tap', 'button']) {
+test('an explicit Dash, with or without held Run, cancels it and Dashes by the ordinary rules, paying its own cost', () => {
+  for (const ask of ['running', 'button']) {
     const r = closing();
     const { player } = r;
-    if (ask === 'tap') {
+    if (ask === 'running') {
       r.tick({ runRight: true, runRightPressed: true });
       assert.ok(player.combatAssist, 'a single press is no Dash and changes nothing');
       r.tick({});
     }
     const energy = player.combat.energy;
-    r.tick(ask === 'tap' ? { runRight: true, runRightPressed: true } : { mouvementRightPressed: true });
+    r.tick({ mouvementRightPressed: true, runRight: ask === 'running' });
     assert.equal(player.combatAssist, null, ask);
     assert.ok(player.dash, `${ask}: a real Dash`);
     assert.equal(player.state, 'dash');

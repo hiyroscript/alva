@@ -251,9 +251,8 @@ test('a jump or a Dash cuts a connected High Kick short; walking, the Shield and
     assert.equal(d.attacker.combat.attack, atk, `${Object.keys(held)[0]}: the attack plays on`);
   }
   const dash = hitBa2();
-  let tap = 0;
-  dash.run(() => (tap++ % 2 ? {} : { runRight: true, runRightPressed: true }), 3);
-  assert.ok(dash.attacker.dash, 'a double tap Dashes out of it');
+  dash.tick({ mouvementRightPressed: true });
+  assert.ok(dash.attacker.dash, 'an explicit request Dashes out of it');
   assert.equal(dash.attacker.combat.attack, null);
   assert.ok(dash.attacker.combat.cooldowns.has('extra_attack'), 'the kick\'s cooldown from the cut');
 });

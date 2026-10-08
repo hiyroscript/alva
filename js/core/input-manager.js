@@ -1,21 +1,12 @@
-// Unified gameplay input: keyboard + touch + gamepad merged into one
-// pressed-state table. Uses held state (never keydown auto-repeat) and counts
-// press edges so taps shorter than a simulation step are never lost. Every
-// gameplay control goes by its codename (config.js ACTIONS). runLeft and
-// runRight report their press edges too (runLeftPressed / runRightPressed),
-// whichever device made them: a key, a touch button, the D-pad, or the left
-// stick crossing from neutral into its held zone (holding it there makes no
-// more). Fighter reads two of them in a row as a Dash (see
-// Fighter.trackDashTaps). The Joystick touch layout's Left mouvement / Right
-// mouvement buttons (mouvementLeft / mouvementRight) ask for one Dash with a
-// single tap instead (queueTouchMouvement): a one-step request
-// (mouvementLeftPressed / mouvementRightPressed), never a held direction or a
-// press edge, that Fighter hands to the same Dash as a double tap.
+// Unified held controls and press edges from keyboard, touch and gamepad.
+// Mouvement is explicit: Q/E, Select/View + direction, or either layout's
+// movement buttons. Requests last one sample; Run never requests a Dash.
 
 import { ACTIONS } from '../config.js';
 import { HELD_CONTROLS, blankInput } from '../game/fighters/fighter-controller.js';
 
 const PAD_DEADZONE = 0.45;
+const MOUVEMENT_CONTROLS = ['mouvementLeft', 'mouvementRight'];
 
 // Standard Gamepad mapping -> gameplay actions. attack3 to attack5 are for
 // fighters with those buttons (a fighter only acts on the ones it has; see
@@ -53,7 +44,7 @@ export class InputManager {
     this.touch = new Set();
     this.pad = new Set();
     this.state = {};
-    for (const a of ACTIONS) this.state[a] = { held: false, presses: 0 };
+    for (const a of [...ACTIONS, ...MOUVEMENT_CONTROLS]) this.state[a] = { held: false, presses: 0 };
     // The Dash a touch mouvement button asked for since the last sample:
     // 1 right, -1 left, 0 none (see queueTouchMouvement).
     this.touchMouvement = 0;
@@ -147,11 +138,16 @@ export class InputManager {
   // reaches the next sample only, as mouvementLeftPressed /
   // mouvementRightPressed, and is gone after it: nothing is held, and
   // runLeft / runRight see no press. The latest request wins. Whether a Dash
-  // actually starts is Fighter.tryDash's call, as for a double tap.
+  // actually starts is Fighter.tryMouvment's call.
   queueTouchMouvement(direction) {
     if (direction !== 1 && direction !== -1) return;
     this.touchMouvement = direction;
     this.lastDevice = 'touch';
+  }
+
+  // Discard an unsampled touch request when its controls are deactivated.
+  clearTouchMouvement() {
+    this.touchMouvement = 0;
   }
 
   isHeld(action) {
@@ -192,8 +188,11 @@ export class InputManager {
       f[control] = this.isHeld(control);
       f[`${control}Pressed`] = this.consume(control);
     }
-    f.mouvementLeftPressed = this.touchMouvement === -1;
-    f.mouvementRightPressed = this.touchMouvement === 1;
+    // Consume both even when a touch request is also queued.
+    const left = this.consume('mouvementLeft');
+    const right = this.consume('mouvementRight');
+    f.mouvementLeftPressed = left || this.touchMouvement === -1;
+    f.mouvementRightPressed = right || this.touchMouvement === 1;
     this.touchMouvement = 0;
     return f;
   }
@@ -203,7 +202,12 @@ export class InputManager {
     if (!this.padConnected || !navigator.getGamepads) return;
     const pads = navigator.getGamepads();
     const pad = Array.from(pads).find((p) => p && p.connected);
-    if (!pad) return;
+    if (!pad) {
+      const prev = this.pad;
+      this.pad = new Set();
+      for (const action of prev) this._refresh(action);
+      return;
+    }
 
     const next = new Set();
     pad.buttons.forEach((b, i) => {
@@ -214,6 +218,14 @@ export class InputManager {
     if (ax < -PAD_DEADZONE) next.add('runLeft');
     if (ax > PAD_DEADZONE) next.add('runRight');
     if (ay > PAD_DEADZONE) next.add('down');
+
+    // Standard button 8 (Select / View / Share) is unused by combat and
+    // menus. Holding it makes a direction an intentional Mouvement press;
+    // a held chord emits only its initial edge, with normal Run preserved.
+    if (pad.buttons[8]?.pressed || pad.buttons[8]?.value > 0.5) {
+      if (next.has('runLeft')) next.add('mouvementLeft');
+      if (next.has('runRight')) next.add('mouvementRight');
+    }
 
     let changed = false;
     for (const a of next) if (!this.pad.has(a)) changed = true;

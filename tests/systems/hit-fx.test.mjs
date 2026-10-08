@@ -147,7 +147,7 @@ test('a Dash or an air dash leaves fainter afterimages while it lasts, then they
   assert.equal(fx.ghosts(f).length, 0, 'a run, however fast: none');
   sample({ runRight: true, runRightPressed: true });
   sample({});
-  sample({ runRight: true, runRightPressed: true });
+  sample({ runRight: true, mouvementRightPressed: true });
   assert.ok(f.dash);
   while (f.dash) sample({});
   const ghosts = fx.ghosts(f);

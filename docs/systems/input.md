@@ -22,7 +22,7 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.4 (input), §6.10
 | Action | Codename | Keyboard | Gamepad | Touch |
 | --- | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | A D or ← → | D-pad / left stick | Joystick, or Classic ◀ ▶ |
-| Dash (on the ground) / air dash (in the air) | a double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | double-tap A / D or ← / → | double-tap the D-pad or stick | Joystick: one tap of **Left mouvement** / **Right mouvement**; Classic: double-tap ◀ or ▶ |
+| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | Select / View / Share (standard button 8) + D-pad or left stick left / right | Both layouts: one tap of **Left movement** / **Right movement** |
 | Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | D-pad down / stick down | none |
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | A / Cross | the upward arrow |
 | Extra attack | `extra_attack` | J | X / Square | top of the cluster |
@@ -31,7 +31,7 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.4 (input), §6.10
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | B, LB, LT, L3, R3 | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Start | the timer / pause or More button |
 
-A control's codename is its one internal name: its key in
+A held control's codename is its one internal name: its key in
 `CONFIG.bindings` and `ACTIONS`, its field in every input snapshot (with a
 `…Pressed` edge), and for the combat buttons its key in a fighter's
 `actions`. A button a fighter has no move on keeps its key and pad button
@@ -51,8 +51,15 @@ Controls → Mobile Controls:
 - **Joystick** (the default): one round joystick holding `runLeft` /
   `runRight` past a small deadzone (digital, like every other input), with
   two one-tap Mouvement/Dash buttons with double directional arrows above it.
-- **Classic Buttons**: single Left and Right arrows with thumb sliding; double-tap to
-  Dash.
+- **Classic Buttons**: single Left and Right Run arrows with thumb sliding,
+  with smaller double-arrow Mouvement buttons directly above their matching Run buttons.
+
+Run presses and joystick flicks never request Mouvement. Keyboard and gamepad
+requests are rising edges, never auto-repeat or held actions. Holding Select/View
+while choosing a direction, or pressing it while already running, requests once;
+release the chord before requesting again. Touch Mouvement holds no Run input.
+Opposing simultaneous requests cancel. The CPU emits the same explicit request
+fields; normal CPU running never Dashes.
 
 Both share the lower-right cluster: the numbered attack buttons fill fixed
 slots, as many as the fighter has numbered attacks (`attackSlots`:
@@ -65,7 +72,9 @@ Transform and Shield:
           [1]  [2]  [JUMP]
 ```
 
-The extra attack and numbered attack buttons show a frame of the
+All action buttons, including Jump and Extra Attack, share the same diameter,
+border, background, shadow and pressed feedback. Reserved/unavailable states
+still communicate ability status. The extra attack and numbered attack buttons show a frame of the
 fighter's own art, chosen in its `mobileAbilities`
 (`preview: { animation, frame }`, `previews.air` for a distinct airborne
 move, `collection: 'projectileAnimations'` to pick projectile art, an
@@ -88,7 +97,10 @@ Defence the shield, Jump the upward arrow, and movement the scheme's arrows
 or joystick. Gameplay keeps each fighter's authored attack artwork.
 Positions are stored as fractions
 of the safe touch area and sizes as scales, keyed by control id, never by
-label or slot; each layout keeps its own arrangement.
+label or slot; each layout keeps its own arrangement. Both Classic Mouvement
+buttons are independently editable. Older Classic saves retain every existing
+custom control; the new buttons use defaults until customized. Reset restores
+all four directional controls without changing the other scheme.
 
 **Combat Assist** (Settings → Combat) is not part of the input system: no
 binding, device or `InputManager` code knows it. Keyboard, gamepad and

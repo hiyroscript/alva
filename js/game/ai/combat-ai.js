@@ -29,7 +29,7 @@
 //             instead, if the fighter's Deflect would be live as it arrives.
 //   act       turn the chosen intent into held buttons and one-step presses,
 //             over as many steps as it needs (turn, then strike, or turn,
-//             then press attack5 for #0001's Hollow Purple; tap, release, tap
+//             then press attack5 for #0001's Hollow Purple; request Mouvement
 //             for a Dash). It never presses a button the fighter has no
 //             action for.
 //
@@ -56,9 +56,8 @@ import { readMoveset } from './moveset.js';
 
 // The buttons a controller holds, by control codename (every held control:
 // the directions, Down included, Jump, Shield and every combat button up to
-// attack5); each has a matching `…Pressed` edge. The mouvement buttons are
-// touch-only: it Dashes (and air dashes) by double-tapping runLeft /
-// runRight, as a keyboard or gamepad player does.
+// attack5); each has a matching `…Pressed` edge. Mouvement is a separate
+// one-step request, shared with player input.
 const BUTTONS = HELD_CONTROLS;
 const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 
@@ -69,9 +68,6 @@ const SHIELD_MAX_HOLD = 0.9;
 // World units kept clear of a main-floor edge when walking, beyond the
 // stopping distance at the current speed.
 const LEDGE_MARGIN = 10;
-// A neutral press of a direction waits this long after the last press of the
-// same direction, so walking never double-taps into a Dash by accident.
-const TAP_SLACK = 1 / 60;
 // Seconds after a summon, a technique or a ranged attack during which the
 // same move again is weighed down (see specialOptions and rangedScore): its
 // own judgement, the same on every level, so a move with no cooldown is not
@@ -148,8 +144,7 @@ export class CombatAIController {
     this.seen = new WeakSet();
     this.openSeen = new WeakSet();
     this.foeWas = { stunned: false, exhausted: false };
-    // The last horizontal press and how long ago it was (see emit).
-    this.tap = { dir: 0, age: Infinity };
+    this.mouvement = 0;
     this.lastThrow = -Infinity;
     // ...and each ranged attack by itself, by its action (see rangedScore).
     this.lastThrown = new Map();
@@ -172,7 +167,7 @@ export class CombatAIController {
       this.body = self.body;
     }
     this.clock += dt;
-    this.tap.age += dt;
+    this.mouvement = 0;
     this.gravity = ctx.gravity ?? 2500;
     const held = this.held;
     for (const k of BUTTONS) held[k] = false;
@@ -226,8 +221,9 @@ export class CombatAIController {
     // Only the training CPU drops through platforms; no player control can,
     // so neither does this one (it walks off an edge instead).
     out.dropPressed = false;
-    if (out.runLeftPressed && out.runRightPressed) this.tap = { dir: 0, age: Infinity };
-    else if (out.runLeftPressed || out.runRightPressed) this.tap = { dir: out.runRightPressed ? 1 : -1, age: 0 };
+    out.mouvementLeftPressed = this.mouvement === -1;
+    out.mouvementRightPressed = this.mouvement === 1;
+    this.mouvement = 0;
     return out;
   }
 
@@ -1213,39 +1209,29 @@ export class CombatAIController {
     }
   }
 
-  // Dash: a tap, a release and a tap of the same direction, as a player
-  // double-taps; the fighter decides whether it can Dash (out of an attack
-  // that hit too: a Dash cancel). The same taps in the air (`air`) are its
-  // air dash; one made to get back to the stage (`recover`) goes back to
-  // recovering once it is over. A planned follow-up (`then`) strikes out of
-  // the Dash as soon as one connects, cutting it short.
+  // Request once, then keep steering through the Dash and its follow-up.
+  // Fighter owns ground/air eligibility, costs and cancellation as for players.
   actDash(self, foe, ctx, it, held) {
-    if (!self.dash && !self.movementReady(!!it.air)) {
+    if (!it.requested && !self.dash && !self.movementReady(!!it.air)) {
       it.done = true;
       return;
     }
     const key = DIR_KEY[it.dir];
-    // Already holding that way (running there): let go for a step first, so
-    // the first tap is a fresh press.
-    if (it.step === undefined && this.prev[key] && !it.released) {
-      it.released = true;
-      return;
-    }
-    const step = (it.step = (it.step ?? -1) + 1);
-    if (step === 0 && !(self.body.grounded === !it.air && self.canFollowUp())) {
-      it.done = true;
-      return;
-    }
-    if (step === 0 || step === 2) held[key] = true;
-    else if (step > 2) {
-      if (self.dash) {
-        held[key] = true;
-        if (it.then && self.dashCancellable && this.followUp(self, foe, ctx)) it.done = true;
-      } else {
+    if (!it.requested) {
+      if (!(self.body.grounded === !it.air && self.canFollowUp())) {
         it.done = true;
-        if (it.then) this.followUp(self, foe, ctx);
-        else if (it.recover && this.offStage(self, ctx.stage)) this.setIntent({ kind: 'recover' });
+        return;
       }
+      it.requested = true;
+      held[key] = true;
+      this.mouvement = it.dir;
+    } else if (self.dash) {
+      held[key] = true;
+      if (it.then && self.dashCancellable && this.followUp(self, foe, ctx)) it.done = true;
+    } else {
+      it.done = true;
+      if (it.then) this.followUp(self, foe, ctx);
+      else if (it.recover && this.offStage(self, ctx.stage)) this.setIntent({ kind: 'recover' });
     }
   }
 
@@ -1352,7 +1338,7 @@ export class CombatAIController {
 
   // Last checks on what the intent holds: never turn its own attack away
   // from the opponent, never walk off the main floor into open air, hop a
-  // solid block in the way, and never double-tap into a Dash by accident.
+  // solid block in the way, and check explicit Dash requests against ledges.
   guard(self, ctx, held) {
     const b = self.body;
     const dir = held.runRight === held.runLeft ? 0 : held.runRight ? 1 : -1;
@@ -1364,24 +1350,23 @@ export class CombatAIController {
     const foe = self.opponent;
     if (self.combat.attack && dir !== self.facing && foe && Math.sign(foe.body.x - b.x) !== dir) {
       held[key] = false;
+      this.mouvement = 0;
       return;
     }
     const dashing = this.intent?.kind === 'dash' && !this.intent.done;
     if (b.grounded && !this.intent?.jumped) {
       const decel = self.movement.deceleration;
       const stop = Math.sign(b.vx) === dir ? (b.vx * b.vx) / (2 * decel) : 0;
-      // A Dash's taps look a whole Dash ahead; running leaves braking room.
+      // A Dash request looks a whole Dash ahead; running leaves braking room.
       const margin = dashing ? (readMoveset(self).dash?.distance ?? 0) + LEDGE_MARGIN
         : LEDGE_MARGIN + stop;
       if (!this.groundAhead(self, ctx.stage, dir, margin)) {
         held[key] = false;
+        this.mouvement = 0;
         if (this.intent && this.intent.kind !== 'attack') this.intent.done = true;
         return;
       }
       if (b.wall === dir && self.canAct() && !this.prev.jump) held.jump = true;
-    }
-    if (!dashing && !this.prev[key] && this.tap.dir === dir && this.tap.age <= self.movement.dashTapWindow + TAP_SLACK) {
-      held[key] = false;
     }
   }
 }

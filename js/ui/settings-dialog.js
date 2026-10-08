@@ -40,6 +40,8 @@ const PREVIEW = Object.freeze({
     el('i', { class: 'sp-dash sp-dash--right' }),
   ]),
   classic: () => el('span', { class: 'settings-preview settings-preview--classic', 'aria-hidden': 'true' }, [
+    el('i', { class: 'sp-dash sp-dash--left', html: ICONS.mouvementLeft }),
+    el('i', { class: 'sp-dash sp-dash--right', html: ICONS.mouvementRight }),
     el('i', { class: 'sp-pad', html: ICONS.left }),
     el('i', { class: 'sp-pad', html: ICONS.right }),
   ]),

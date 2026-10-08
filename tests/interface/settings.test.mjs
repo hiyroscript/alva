@@ -1543,3 +1543,16 @@ test('English and French credits keep the same structure, and French keeps every
     assert.ok(fr[at].lines.join(' ').includes(name), `fr: ${name}`);
   }
 });
+
+test('Classic settings preview shows smaller double-arrow Mouvement buttons above both Run buttons', () => {
+  const { dialog, done } = boot();
+  try {
+    const classic = dialog.root.querySelector('.settings-preview--classic');
+    const joystick = dialog.root.querySelector('.settings-preview--joystick');
+    assert.equal(classic.children.length, 4);
+    assert.deepEqual(classic.children.map((node) => node.innerHTML), [ICONS.mouvementLeft, ICONS.mouvementRight, ICONS.left, ICONS.right]);
+    assert.equal(classic.querySelectorAll('.sp-dash').length, 2);
+    assert.equal(classic.querySelectorAll('.sp-pad').length, 2);
+    assert.equal(joystick.children.length, 3);
+  } finally { done(); }
+});

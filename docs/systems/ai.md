@@ -19,7 +19,7 @@ it thinks, never what its fighter can do. The product rules are
 `Fighter.update` asks its controller for one input snapshot per fixed
 step; the CPU produces exactly the snapshot a player would (held
 directions, Down, Jump, Shield, the combat buttons and their one-step
-`…Pressed` edges, a Dash or an air dash by double tap, a Deflect by a
+`…Pressed` edges, a Dash or an air dash by explicit Mouvement request, a Deflect by a
 fresh Shield press in the air). The fighter and the combat
 system decide what those inputs do, so the CPU cannot attack while
 stunned, skip recovery, bypass a cooldown or spawn anything itself. It

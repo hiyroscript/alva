@@ -50,7 +50,7 @@ for (const c of playableCharacters()) {
     const f = makeFighter({ x: 300 });
     f.step({ ...RIGHT, runRightPressed: true });
     f.step({});
-    f.step({ ...RIGHT, runRightPressed: true });
+    f.step({ ...RIGHT, mouvementRightPressed: true });
     for (let i = 0; i < n; i++) f.step({});
     assert.ok(f.fighter.dash, 'still dashing');
     return f;
@@ -255,7 +255,7 @@ for (const c of playableCharacters()) {
       const run = duel({ gap, x: 400 });
       run.tick({ ...RIGHT, runRightPressed: true });
       run.tick({});
-      run.tick({ ...RIGHT, runRightPressed: true });
+      run.tick({ ...RIGHT, mouvementRightPressed: true });
       run.tick(P('attack1'));
       for (let i = 0; i < 30 && !(run.attacker.combat.hitstop > 0); i++) run.tick({});
       if (run.attacker.combat.hitstop > 0 && run.attacker.body.vx > mv.maxSpeed) d = run;
@@ -307,7 +307,7 @@ test('holding the way it goes keeps a Dash\'s speed far longer than letting go; 
     const { fighter, step } = harnessFor(c).makeFighter({ x: 300 });
     step({ ...RIGHT, runRightPressed: true });
     step({});
-    step({ ...RIGHT, runRightPressed: true });
+    step({ ...RIGHT, mouvementRightPressed: true });
     while (fighter.dash) step({});
     const x = fighter.body.x;
     let n = 0;

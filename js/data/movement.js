@@ -77,8 +77,7 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   airJumpRatio: 0.78,
 
   // ---- The Dash and the air dash ---------------------------------------------
-  // A double tap of a direction within dashTapWindow (a mouvement button on
-  // touch) Dashes on the ground and air dashes in the air. Each is a burst
+  // An explicit mouvement request Dashes on the ground and air dashes in the air. Each is a burst
   // at its speed (never slower than the fighter already goes that way) for
   // its duration, its clip played once across it; an attack, a jump or a
   // Deflect may cut either short from dashCancelTime on. Its speed carries
@@ -86,7 +85,6 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   dashSpeed: 1250,
   dashDuration: 1 / 6,
   dashCancelTime: 0.05,
-  dashTapWindow: 0.22,
   airDashSpeed: 1250,
   airDashDuration: 1 / 6,
   airDashUses: 1,
@@ -153,7 +151,7 @@ export const MOVEMENT_GUIDE = Object.freeze([
   Object.freeze({
     id: 'dash',
     name: 'Dash',
-    description: 'Double-tap a direction for a burst of speed. An attack or a jump can cut in after a moment.',
+    description: 'Press Q/E, Select/View + left/right on gamepad, or a movement button for a burst of speed. An attack or a jump can cut in after a moment.',
   }),
   Object.freeze({ id: 'airDash', name: 'Air dash', description: 'The Dash in mid-air, flat across, once per airtime.' }),
 ]);
