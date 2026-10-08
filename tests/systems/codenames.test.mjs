@@ -365,8 +365,8 @@ test('no retired name is left in the tests or the current documentation either',
 // file name, path, line of code, style, test or document of the repository.
 // Its stem is written with a character class so this file never matches
 // itself; French words that only share its letters (Chargement, chargés,
-// en recharge: loading, and Energy refilling) are not it.
-const RETIRED_MECHANIC = /(?<!re)c[h]arg(?!ement|és)/i;
+// en recharge, Télécharger: loading, Energy refilling, downloading) are not it.
+const RETIRED_MECHANIC = /(?<!re|télé)c[h]arg(?!ement|és)/i;
 const BINARY = /\.(png|jpe?g|gif|webp|ico)$/i;
 
 // Every file and folder of the repository but its git store, as paths.
@@ -408,5 +408,5 @@ test('the guard still catches the retired mechanic coming back, under any of its
     assert.match(attempt, RETIRED_MECHANIC, `caught: ${attempt.slice(0, 40)}`);
   }
   // Words that only share its letters are not it.
-  for (const fine of ['re' + stem, 'Re' + stem, `${Stem.slice(0, 5)}ement`, `${stem.slice(0, 5)}és`]) assert.doesNotMatch(fine, RETIRED_MECHANIC, fine);
+  for (const fine of ['re' + stem, 'Re' + stem, `${Stem.slice(0, 5)}ement`, `${stem.slice(0, 5)}és`, 'Télécharger']) assert.doesNotMatch(fine, RETIRED_MECHANIC, fine);
 });

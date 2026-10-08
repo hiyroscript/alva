@@ -369,8 +369,11 @@ no header, build label, eyebrow or keyboard hint bar.
   It is in keyboard / gamepad navigation (→ from the menu, or ↑ from Play)
   and opens the Settings dialog over Home (6.10); focus returns to it when
   the dialog closes. There is no gear over live Battle or Practice play.
-- **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
-  top hairline.
+- **Footer:** "by hiyroscript" in gray monospace on the left and a compact
+  Download icon button on the right, full width under a subtle top hairline.
+  Download ("Download" / "Télécharger", decorative `ICONS.download`) is a
+  native disabled placeholder with no activation handler or `data-nav`.
+  Its 28–40 px square fits the existing footer height and safe-area padding.
 - **Credits strip:** two walls. The back wall is the same near-black as the
   menu; in front of it, a semi-transparent glass strip roughly covers the right
   44% on wide screens, angled 21 degrees and extended beyond the viewport, with

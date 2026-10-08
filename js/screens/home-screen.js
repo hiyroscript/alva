@@ -195,6 +195,10 @@ export class HomeScreen extends Screen {
       this.utilityButtons,
       el('footer', { class: 'home-footer' }, [
         el('span', tx('home.by', { developer: CONFIG.developer })),
+        el('button', {
+          class: 'home-download', type: 'button', disabled: true,
+          ...tattr('aria-label', 'home.download'), html: ICONS.download,
+        }),
       ]),
     );
     this.el.setAttribute('aria-labelledby', 'home-title');

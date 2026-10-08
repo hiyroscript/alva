@@ -116,6 +116,7 @@ export const EN = {
   'home.settings': 'Settings',
   'home.help': 'Help',
   'home.controller': 'Controller',
+  'home.download': 'Download',
   'home.credits': 'Credits',
   'home.creditsRegion': 'Credits. Scroll or use the Up and Down arrow keys, Page Up, and Page Down to read.',
   'home.by': 'By {developer}',

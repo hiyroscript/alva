@@ -38,6 +38,7 @@ export const ICONS = {
   back: svg('<path d="M14.5 5 7.5 12l7 7"/>'),
   // Home's future Help button: a centred question mark.
   help: svg('<path d="M8 8a4 4 0 0 1 8 0c0 3-4 3-4 6"/><circle cx="12" cy="19" r="1"/>'),
+  download: svg('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 16v5h16v-5"/>'),
   // Home's Settings button: an eight-toothed gear round a hub.
   settings: svg(
     '<path d="M10.34 5.1L10.66 2.49L13.34 2.49L13.66 5.1A7.1 7.1 0 0 1 15.71 5.95L17.78 4.33L19.67 6.22L18.05 8.29' +
