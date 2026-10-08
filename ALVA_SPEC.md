@@ -929,14 +929,16 @@ indicator. Each section keeps its existing settings, in this order:
   that layout and a "Custom layout" tag once it has one. Leaving the editor
   returns to the Controls tab with focus on Customize.
 - **Combat** — **Combat Assist** (7.2.4a), under the line "Automatically
-  closes a short gap before a melee attack. Never uses Energy and never
+  closes a short gap before a melee attack. Never uses energy and never
   affects ranged attacks.", with exactly two choices in the Language section's
   style: **On** (marked "Default") and **Off**, a `radiogroup` (labelled by
   the setting's name, described by its line) of two `radio` buttons; the
   one saved is ticked and outlined in green. Choosing one saves it at once
   and the dialog stays open; each Quick Battle or Practice Ground session
   reads it as it starts, for Player 1 only. French: **Combat**,
-  **Assistance au combat**, **Activée** / **Désactivée**.
+  **Assistance au combat**, **Activée** / **Désactivée**. In this description,
+  **energy** / **énergie** is lowercase, weight 700 and the exact Energy bar
+  fill purple `#b026ff` (`ENERGY_STYLE.fill`), including after live language changes.
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
@@ -1037,13 +1039,6 @@ is dropped when the layout is read.
   in 10 % steps, with the value beside them. The control grows or shrinks
   round its centre, and its touch area with it. The size controls are
   disabled while nothing is selected.
-  When `shield` is selected, only its toolbar name (`.touch-editor-name`)
-  reads **shield** in English or **bouclier** in French, in weight 700 and
-  the exact Energy fill purple `#b026ff` (`ENERGY_STYLE.fill`). This label
-  follows live language changes. Selecting another control, clearing the
-  selection or closing the editor removes its special styling; all other
-  names retain their existing appearance. The shared Shield control name,
-  id, bindings and combat behaviour are unchanged.
 - **Keyboard / gamepad:** in the editor (only there) the controls are
   focusable and part of the navigation scope. Enter / A on a focused control
   starts moving it (announced, a solid ring): the arrows or D-pad nudge it by

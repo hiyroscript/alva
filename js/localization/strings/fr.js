@@ -335,7 +335,9 @@ export const FR = {
   'settings.customized': 'Disposition personnalisée',
   'settings.combat': 'Combat',
   'settings.combatAssist': 'Assistance au combat',
-  'settings.combatAssistDesc': 'Comble automatiquement un court écart avant une attaque au corps à corps. Ne consomme jamais d’Énergie et n’agit jamais sur les attaques à distance.',
+  'settings.combatAssistDescBeforeEnergy': 'Comble automatiquement un court écart avant une attaque au corps à corps. Ne consomme jamais d’',
+  'settings.energy': 'énergie',
+  'settings.combatAssistDescAfterEnergy': ' et n’agit jamais sur les attaques à distance.',
   'settings.combatAssistOn': 'Activée',
   'settings.combatAssistOff': 'Désactivée',
 
@@ -344,7 +346,6 @@ export const FR = {
   'editor.hint': 'Faites glisser une commande pour la déplacer. Sélectionnez-en une pour la redimensionner.',
   'editor.keyHint': 'Appuyez sur Entrée ou A pour déplacer une commande avec les flèches ou la croix directionnelle.',
   'editor.none': 'Aucune commande sélectionnée',
-  'editor.shield': 'bouclier',
   'editor.size': 'Taille',
   'editor.sizeValue': '{percent} %',
   'editor.smaller': 'Réduire',
