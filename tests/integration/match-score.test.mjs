@@ -236,23 +236,39 @@ test('the timer keeps running through a respawn wait; time up during one keeps t
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
 });
 
-test('the Quick Battle CPU stands still while its opponent is out, then plays on', () => {
+test('while its opponent is out the Quick Battle CPU repositions for the respawn (never frozen, never attacking nobody), then plays on', () => {
   const sprites = fakeSprites();
   const input = { flush() {}, sample: () => ({}) };
   const battle = new Battle({
-    canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input,
+    canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input, seed: 4,
   });
   battle.setPhase('fight');
   const { p1, p2 } = battle;
+  // The CPU starts the wait out near a ledge, far from the middle.
+  p2.body.x = battle.map.mainStage.right - 120;
   intoVoid(battle, p1);
   battle.update(DT);
+  const start = p2.body.x;
+  let moving = 0;
   for (let i = 0; i < RESPAWN_STEPS - 1; i++) {
     battle.update(DT);
-    assert.equal(p2.moveDir, 0, 'nobody to follow');
+    const out = p2.controller.out;
+    assert.ok(['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'].every((a) => !out[`${a}Pressed`]), 'nobody to attack');
+    if (out.runLeft || out.runRight) moving++;
   }
   assert.equal(p1.lostToVoid, true);
+  assert.ok(moving > RESPAWN_STEPS / 4, `it keeps moving (${moving} of ${RESPAWN_STEPS} steps)`);
+  assert.ok(Math.abs(p2.body.x - battle.stage.centerX) < Math.abs(start - battle.stage.centerX) - 100, 'back toward the middle');
+  assert.ok(p2.body.grounded, 'on its feet, on the stage');
   battle.update(DT);
   assert.equal(p1.lostToVoid, false);
+  // And back to fighting the respawned opponent.
+  let attacked = false;
+  for (let i = 0; i < 360 && !attacked; i++) {
+    battle.update(DT);
+    attacked = !!p2.combat.attack || !!p2.technique;
+  }
+  assert.ok(attacked, 'it fights again');
 });
 
 test('a rematch (or a restart) resets the points to 0 and brings everyone back', () => {

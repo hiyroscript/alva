@@ -8,7 +8,7 @@
 // choices live in app.selection.watch, apart from Quick Battle's, so neither
 // setup ever changes the other's. One difficulty drives both CPUs, and CPU 1
 // and CPU 2 may be the same fighter. Starting hands the Battle screen
-// `mode: 'watch'`: a real Battle where both fighters are the combat AI.
+// `mode: 'watch'`: a real Battle where both fighters are CPU Intelligence.
 
 import { DifficultySelectScreen } from './difficulty-select-screen.js';
 import { CharacterSelectScreen } from './character-select-screen.js';

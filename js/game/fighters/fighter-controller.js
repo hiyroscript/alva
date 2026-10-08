@@ -1,7 +1,7 @@
 // Controllers turn intent into a FighterInput snapshot. Player 1 and the CPU
-// are completely separate: Quick Battle's CPU is the combat AI
-// (CombatAIController, js/game/ai/combat-ai.js), which plugs in here without
-// touching Fighter. TrainingAIController below is the older non-attacking
+// are completely separate: every competitive CPU is CPU Intelligence
+// (CPUIntelligenceController, js/game/ai/cpu-intelligence.js), which plugs
+// in here without touching Fighter. TrainingAIController below is the older non-attacking
 // training opponent, kept as a standalone controller. Only the player's
 // controller carries the player's Combat Assist preference; no CPU's ever
 // does.

@@ -10,7 +10,7 @@
 // combat (see tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import {
   BASE_FIGHTER_MOVEMENT, MOVEMENT_FIELDS, movementProblems, assertUniversalMovement,
 } from '../../js/data/movement.js';
@@ -73,7 +73,7 @@ test('no fighter definition declares movement, Powers or any movement field: the
   assert.match(movementProblems({ ...base, movement: {}, airJumps: 3 }).join(' '), /movement.*airJumps/);
   // The Powers module is gone, and nothing reads a definition's movement.
   assert.equal(existsSync(new URL('../../js/data/powers.js', import.meta.url)), false);
-  for (const file of ['js/game/fighters/fighter.js', 'js/game/fighters/movement.js', 'js/game/ai/combat-ai.js', 'js/game/ai/moveset.js', 'js/game/rendering/hit-fx.js']) {
+  for (const file of ['js/game/fighters/fighter.js', 'js/game/fighters/movement.js', 'js/game/rendering/hit-fx.js', ...readdirSync(new URL('../../js/game/ai/', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `js/game/ai/${f}`)]) {
     const source = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(source, /def\??\.movement|\.powers\b|powers\.js|getMaxSpeed|getJumpVelocity/, file);
   }

@@ -18,7 +18,7 @@ import { CombatSystem } from '../../js/game/combat/combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from '../../js/game/combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../../js/game/combat/summon.js';
 import { resolveSolidOverlap } from '../../js/game/physics.js';
-import { CombatAIController } from '../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../js/game/ai/cpu-intelligence.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { cooldownIndicators } from '../../js/game/rendering/fighter-status.js';
 import { abilityName } from '../../js/data/abilities.js';
@@ -133,7 +133,7 @@ test('a CPU plays it against a #0001 CPU: it attacks with its own moves and neve
   const ctx = { stage, gravity: CONFIG.sim.gravity, battle: world };
   const make = (character, sprites, x, facing, slot, seed) => new Fighter({
     def: character, sprites, stage, slot, label: slot, spawn: { x, facing },
-    controller: new CombatAIController({ difficulty: 'hard', rng: mulberry32(seed) }),
+    controller: new CPUIntelligenceController({ difficulty: 'hard', rng: mulberry32(seed) }),
   });
   const mine = make(SAMPLE_FIGHTER, SPRITES, 800, 1, 'p1', 7);
   const theirs = make(def, fakeSprites(), 1100, -1, 'p2', 8);

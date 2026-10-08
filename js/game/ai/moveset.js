@@ -1,11 +1,12 @@
-// The combat AI's moveset reader: what a fighter can do, read from its own
-// definition and art, for any fighter.
+// CPU Intelligence's moveset reader: what a fighter can do, read from its
+// own definition and art, for any fighter.
 //
 // Purpose: one place that turns a Fighter's resolved data (its `actions`,
 // attacks, projectiles, summons, techniques, defense, Deflect, Dash, air
-// dash and hurtboxes) into the options the CPU weighs
-// (js/game/ai/combat-ai.js). The CPU never assumes a move: whatever a
-// fighter's definition gives it, and nothing else, is in its moveset.
+// dash and hurtboxes) into what exists for CPU Intelligence; its combat
+// knowledge (js/game/ai/knowledge.js) then reads what each move is for.
+// The CPU never assumes a move: whatever a fighter's definition gives it,
+// and nothing else, is in its moveset.
 //
 // Inputs: a Fighter (js/game/fighters/fighter.js) with its resolved
 // definitions and SpriteSet.

@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { CHARACTERS, getCharacter, assertCombatRules } from '../../js/data/characters.js';
 import { ALLOWED_DAMAGE_VALUES, resolveHitDamage } from '../../js/data/launch.js';
 import { BASE_FIGHTER_MOVEMENT, MOVEMENT_FIELDS, assertUniversalMovement } from '../../js/data/movement.js';
-import { DIFFICULTY_IDS, CAPABILITY, getDifficultyProfile } from '../../js/data/difficulty.js';
+import { DIFFICULTY_IDS, CAPABILITY, getDifficultyProfile, TEMPERAMENT } from '../../js/data/difficulty.js';
 import { REPEAT_COOLDOWN } from '../../js/data/cooldowns.js';
 import { createSummonDefinition } from '../../js/game/combat/summon.js';
 import { CONFIG } from '../../js/config.js';
@@ -26,7 +26,8 @@ import { createDeflectDefinition } from '../../js/game/combat/deflect.js';
 import { Projectile, createProjectileDefinition } from '../../js/game/combat/projectile.js';
 import { createTechniqueDefinition } from '../../js/game/combat/technique.js';
 import { CombatSystem, worldBox } from '../../js/game/combat/combat.js';
-import { CombatAIController } from '../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../js/game/ai/cpu-intelligence.js';
+import { knowFighter } from '../../js/game/ai/knowledge.js';
 import { Fighter } from '../../js/game/fighters/fighter.js';
 import { PlayerController } from '../../js/game/fighters/fighter-controller.js';
 import { Battle } from '../../js/game/battle.js';
@@ -408,7 +409,7 @@ test('a hit authored off the tiers is refused at once, naming it, wherever it is
 
 test('difficulty is judgement only: a profile holds the CPU\'s traits and nothing the fight is made of', () => {
   for (const id of DIFFICULTY_IDS) {
-    assert.deepEqual(Object.keys(getDifficultyProfile(id)).sort(), Object.keys(CAPABILITY).sort(), id);
+    assert.deepEqual(Object.keys(getDifficultyProfile(id)).sort(), [...Object.keys(CAPABILITY), ...TEMPERAMENT].sort(), id);
   }
   // No module that builds or resolves a fighter, a hit, a launch or Energy
   // reads a difficulty: none of them can scale anything by one.
@@ -438,12 +439,11 @@ function exchange(controller, action, foeHeld = {}) {
   const world = { stage: STAGE, projectiles: [], clones: [], combat: system, fighters: [foe, me], score: { p1: 0, p2: 0 }, timeLeft: 99 };
   const ctx = { stage: STAGE, gravity: CONFIG.sim.gravity, battle: world };
   foe.combat.launchPoint = 40;
-  if (controller instanceof CombatAIController) {
-    // Bound to its fighter, its own neutral thinking paused: the one
-    // intent below is all it does, the same on every level.
-    me.update(DT, ctx);
-    controller.thinkTimer = Infinity;
-    controller.setIntent({ kind: 'attack', action, face: 1, until: controller.clock + 0.3 });
+  if (controller instanceof CPUIntelligenceController) {
+    // Handed the one plan below before its first step: a strike with that
+    // move and nothing of its own until it ends, the same on every level.
+    const move = knowFighter(me).moves.find((m) => m.action === action && !m.air);
+    controller.adoptPlan({ kind: 'strike', move });
   }
   let pressedAt = null;
   const events = [];
@@ -470,7 +470,7 @@ function exchange(controller, action, foeHeld = {}) {
 
 test('the same attack resolves identically under Easy, Medium, Hard and Brutal: damage, launch, stun, Energy, timing', () => {
   const runs = DIFFICULTY_IDS.map((difficulty) => {
-    const cpu = () => new CombatAIController({ difficulty, rng: mulberry32(5) });
+    const cpu = () => new CPUIntelligenceController({ difficulty, rng: mulberry32(5) });
     const kick = exchange(cpu(), 'extra_attack');
     const jab = exchange(cpu(), 'attack1');
     const blocked = exchange(cpu(), 'attack1', HOLD);
@@ -501,7 +501,7 @@ test('a CPU at any level and a player deal the same damage with the same hit, th
     let n = 0;
     const player = exchange(new PlayerController({ sample: () => (n++ === 0 ? P(action) : {}) }), action);
     for (const difficulty of DIFFICULTY_IDS) {
-      const cpu = exchange(new CombatAIController({ difficulty, rng: mulberry32(1) }), action);
+      const cpu = exchange(new CPUIntelligenceController({ difficulty, rng: mulberry32(1) }), action);
       assert.deepEqual(cpu.hit, player.hit, `${difficulty} ${action}`);
       assert.equal(cpu.built, player.built);
     }

@@ -187,7 +187,7 @@ const { MapSelectScreen } = await import('../../js/screens/map-select-screen.js'
 const { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } = await import('../../js/screens/watch-screens.js');
 const { BattleScreen } = await import('../../js/screens/battle-screen.js');
 const { Battle, BATTLE_MODES } = await import('../../js/game/battle.js');
-const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
 const { PlayerController } = await import('../../js/game/fighters/fighter-controller.js');
 
 // The test-only playable fighters beside #0001 (slot 01), registered before
@@ -719,8 +719,8 @@ test('a Watch Mode Battle: the combat AI on both sides at the chosen level, each
   for (const id of DIFFICULTY_IDS) {
     const battle = makeBattle({ difficulty: id, p1Def: DEF_9999, p2Def: DEF_0001 });
     assert.equal(battle.mode, 'watch');
-    assert.ok(battle.p1.controller instanceof CombatAIController);
-    assert.ok(battle.p2.controller instanceof CombatAIController);
+    assert.ok(battle.p1.controller instanceof CPUIntelligenceController);
+    assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
     assert.ok(!(battle.p1.controller instanceof PlayerController));
     assert.notEqual(battle.p1.controller, battle.p2.controller, 'a controller each');
     assert.deepEqual([battle.difficulty, battle.p1.controller.difficulty, battle.p2.controller.difficulty], [id, id, id]);
@@ -751,7 +751,7 @@ test('Quick Battle is unchanged: Player 1 against the CPU, tagged P1 and CPU', (
     assert.equal(battle.mode, 'quick-battle', `${mode}`);
     assert.ok(battle.p1.controller instanceof PlayerController);
     assert.equal(battle.p1.controller.input, input);
-    assert.ok(battle.p2.controller instanceof CombatAIController);
+    assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
     assert.equal(battle.p2.controller.difficulty, 'hard');
     assert.deepEqual([battle.p1.label, battle.p2.label], ['P1', 'CPU']);
   }
@@ -1190,13 +1190,13 @@ test('Restart Battle and Rematch keep both CPUs, their fighters, the level, the 
     assert.equal(screen.battle, battle, `${what}: the same battle`);
     assert.equal(battle.mode, 'watch');
     assert.deepEqual([battle.p1.controller, battle.p2.controller], [ai1, ai2], `${what}: the same two AIs, never a PlayerController`);
-    assert.ok(battle.p1.controller instanceof CombatAIController);
+    assert.ok(battle.p1.controller instanceof CPUIntelligenceController);
     assert.deepEqual([ai1.difficulty, ai2.difficulty], ['brutal', 'brutal']);
     assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['9999', 'test-a']);
     assert.deepEqual([battle.p1.label, battle.p2.label], ['CPU 1', 'CPU 2']);
     assert.equal(battle.map.id, 'city');
-    assert.equal(ai1.intent, null, `${what}: CPU 1 plans afresh`);
-    assert.equal(ai2.intent, null, `${what}: CPU 2 plans afresh`);
+    assert.equal(ai1.plan, null, `${what}: CPU 1 plans afresh`);
+    assert.equal(ai2.plan, null, `${what}: CPU 2 plans afresh`);
     assert.deepEqual(battle.score, { p1: 0, p2: 0 });
     assert.equal(battle.phase, 'intro');
     assert.equal(screen.hud.left.tag.textContent, 'CPU 1');
@@ -1370,7 +1370,7 @@ test('Return to Home after watching, then a Quick Battle behaves exactly as befo
   assert.deepEqual(app.loading.labels, ['Loading Test A']);
   assert.equal(battle.mode, 'quick-battle');
   assert.ok(battle.p1.controller instanceof PlayerController);
-  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
   assert.equal(battle.p2.controller.difficulty, 'easy', 'Quick Battle\'s level, not Watch Mode\'s');
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-a', 'test-a'], 'the CPU picked the same fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);

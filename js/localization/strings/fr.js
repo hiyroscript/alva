@@ -78,13 +78,13 @@ export const FR = {
   'launch.direction.reverseVertical.description': 'Éjecte vers le bas.',
 
   'difficulty.easy.name': 'Facile',
-  'difficulty.easy.description': 'Réactions lentes. Laisse des ouvertures.',
+  'difficulty.easy.description': 'Un joueur occasionnel. Toujours motivé, souvent imprécis.',
   'difficulty.medium.name': 'Moyen',
-  'difficulty.medium.description': 'Réactions et décisions équilibrées.',
+  'difficulty.medium.description': 'Un acharné. Met la pression, punit des erreurs.',
   'difficulty.hard.name': 'Difficile',
-  'difficulty.hard.description': 'Réactions rapides. Se défend et punit.',
+  'difficulty.hard.description': 'Un joueur de tournoi. Peu d’erreurs.',
   'difficulty.brutal.name': 'Brutal',
-  'difficulty.brutal.description': 'Réactions vives. Décisions implacables.',
+  'difficulty.brutal.description': 'L’élite. Vous lit, s’adapte, conclut.',
 
   'map.desert.name': 'Désert',
   'map.desert.tagline': 'Mesa de grès à l’heure dorée',

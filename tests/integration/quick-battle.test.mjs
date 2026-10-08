@@ -189,7 +189,7 @@ const { MapSelectScreen } = await import('../../js/screens/map-select-screen.js'
 const { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } = await import('../../js/screens/watch-screens.js');
 const { BattleScreen } = await import('../../js/screens/battle-screen.js');
 const { pickRandom, drawRegularPlay, quickBattleParams } = await import('../../js/screens/quick-battle-setup.js');
-const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
 const { PlayerController } = await import('../../js/game/fighters/fighter-controller.js');
 
 // Beside #0001 and #0002: Test A (slot 09), #9999 (#0001's art under another
@@ -539,7 +539,7 @@ test('Regular Play: Mode → Difficulty → Fighter → Battle, the CPU\'s fight
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-a', '9999']);
   assert.equal(battle.map.id, MAPS[1].id);
   assert.ok(battle.p1.controller instanceof PlayerController);
-  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
   assert.equal(battle.p2.controller.difficulty, 'hard');
   assert.deepEqual(app.loads, ['test-a', '9999'], 'both fighters load');
   screens.battle.exit();
@@ -727,7 +727,7 @@ test('Custom Play\'s Battle: two different fighters, Player 1 the player with th
   assert.deepEqual(app.loads, ['test-sample', 'test-a'], 'both sprite sets load');
   assert.equal(app.loading.labels.at(-1), 'Loading Sample and Test A');
   assert.ok(battle.p1.controller instanceof PlayerController);
-  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
   assert.equal(battle.p2.controller.difficulty, 'easy');
   assert.deepEqual([battle.p1.label, battle.p2.label], ['P1', 'CPU']);
   assert.deepEqual([screen.hud.left.name.textContent, screen.hud.right.name.textContent], ['Sample', 'Test A']);

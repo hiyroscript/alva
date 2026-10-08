@@ -12,7 +12,7 @@
 // startups; the Dash and the air dash need their art), the universal
 // movement values (BASE_FIGHTER_MOVEMENT, js/data/movement.js), a spawn,
 // the stage, and a controller (js/game/fighters/fighter-controller.js or
-// js/game/ai/combat-ai.js).
+// js/game/ai/cpu-intelligence.js).
 // Outputs: Fighter, separateFighters and COMBAT_ACTIONS.
 // Important constraints: the rules are shared; movement's numbers are
 // universal (no fighter has its own run, jump or Dash) and every other

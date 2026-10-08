@@ -240,7 +240,7 @@ test('a respawn takes the spawn\'s facing, and the opponent\'s side does not fli
 
 // Combat AI opts into per-step attack targeting; use scripted input to
 // isolate facing from tactical decisions and difficulty randomness.
-const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
 const { getCharacter } = await import('../../js/data/characters.js');
 const { fakeSpritesOf } = await import('../helpers/fighter-harness.mjs');
 const { spawnProjectiles } = await import('../../js/game/combat/projectile.js');
@@ -249,7 +249,7 @@ function aimedFighter(character = def, airborne = false) {
   const me = makeFighter({ character, sprites: fakeSpritesOf(character), x: 500, facing: -1 });
   const foe = makeFighter({ x: 750 }).fighter;
   me.fighter.opponent = foe;
-  me.fighter.controller.attackFacing = CombatAIController.prototype.attackFacing;
+  me.fighter.controller.attackFacing = CPUIntelligenceController.prototype.attackFacing;
   if (airborne) Object.assign(me.fighter.body, { y: -1000, prevY: -1000, grounded: false, ground: null });
   return { ...me, foe };
 }

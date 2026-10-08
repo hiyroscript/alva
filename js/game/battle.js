@@ -1,8 +1,9 @@
 // Battle: one match on the shared Arena (js/game/arena.js), with the intro /
 // fight / time-up / KO / result phases and the match clock. In Quick Battle
-// it is Player 1 against the combat AI (js/game/ai/combat-ai.js) at the chosen
-// difficulty; in Watch Mode both fighters are the combat AI, each with its
-// own controller, at the one chosen difficulty (see BATTLE_MODES). Every
+// it is Player 1 against CPU Intelligence (js/game/ai/cpu-intelligence.js)
+// at the chosen difficulty; in Watch Mode both fighters are CPU
+// Intelligence, each with its own controller, at the one chosen difficulty
+// (see BATTLE_MODES). Every
 // rule below is the same in both, the 7-minute clock and overtime
 // included. The Arena owns the fixed-timestep world and its Canvas 2D
 // rendering; DOM concerns (HUD, pause, overlays) live in the battle screen.
@@ -23,7 +24,7 @@ import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
 import { Fighter } from './fighters/fighter.js';
 import { PlayerController } from './fighters/fighter-controller.js';
-import { CombatAIController } from './ai/combat-ai.js';
+import { CPUIntelligenceController } from './ai/cpu-intelligence.js';
 import { resolveDifficulty } from '../data/difficulty.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 
@@ -69,7 +70,7 @@ export class Battle extends Arena {
 
     const sides = BATTLE_MODES[this.mode];
     const controllerFor = (side) => (side.cpu
-      ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
+      ? new CPUIntelligenceController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
       : new PlayerController(input, { combatAssist }));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({

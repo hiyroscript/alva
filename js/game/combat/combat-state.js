@@ -8,7 +8,7 @@
 // (MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST).
 // Important constraints: the Fighter (js/game/fighters/fighter.js) and
 // CombatSystem.applyHit (js/game/combat/combat.js) are the only writers;
-// readers (the HUD, the status drawn over a fighter, the combat AI) only
+// readers (the HUD, the status drawn over a fighter, CPU Intelligence) only
 // read. Every clock compares its boundaries with PHASE_EPSILON
 // (js/game/combat/attacks.js), so a phase a whole number of fixed steps
 // long lasts exactly that many steps.

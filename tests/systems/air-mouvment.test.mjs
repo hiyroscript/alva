@@ -14,7 +14,7 @@ import { getCharacter } from '../../js/data/characters.js';
 import { CONFIG } from '../../js/config.js';
 import { Projectile } from '../../js/game/combat/projectile.js';
 import { Fighter } from '../../js/game/fighters/fighter.js';
-import { CombatAIController } from '../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../js/game/ai/cpu-intelligence.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { mulberry32 } from '../../js/core/utils.js';
@@ -263,7 +263,7 @@ test('the air dash and the Dash are separate capabilities, each its art\'s: eith
 test('knocked off the stage with its air dash left, a CPU air dashes home', () => {
   for (const c of FIGHTERS) {
     const stage = new StageCollision(stageMap({ left: 0, right: 1000 }));
-    const ai = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(5) });
+    const ai = new CPUIntelligenceController({ difficulty: 'brutal', rng: mulberry32(5) });
     const me = new Fighter({ def: c, sprites: fakeSpritesOf(c), stage, slot: 'p1', label: 'CPU', spawn: { x: 1180, y: 700 }, controller: ai });
     const foe = new Fighter({ def: DEF_0001, sprites: fakeSpritesOf(DEF_0001), stage, slot: 'p2', label: 'P', spawn: { x: 500 } });
     me.opponent = foe;

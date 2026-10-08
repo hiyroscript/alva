@@ -786,8 +786,8 @@ test('a hit gives the air jumps back; a stun or an attack in progress (a Deflect
   assert.equal(deflect.fighter.airJumps, mv.airJumps, 'the Deflect plays on: the jump waits');
 });
 
-test('the CPUs let go of Jump inside the higher-jump window: their jumps are normal ones', async () => {
-  const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+test('the CPUs choose their jump\'s height through Jump\'s hold: a tap is the normal jump, held through the window the higher one', async () => {
+  const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
   const { TrainingAIController } = await import('../../js/game/fighters/fighter-controller.js');
   const normal = (920 * 920) / (2 * CONFIG.sim.gravity);
   const apexWith = (controller, prepare) => {
@@ -807,21 +807,24 @@ test('the CPUs let go of Jump inside the higher-jump window: their jumps are nor
       top = Math.min(top, d.attacker.body.y);
     }
     const run = held.indexOf(false, held.indexOf(true)) - held.indexOf(true);
-    assert.ok(run > 1 && run <= HIGH_WINDOW, `held ${run} steps: a moment, then let go in time`);
-    return 800 - top;
+    return { height: 800 - top, run };
   };
-  // The combat AI, handed a jump to make (as its jump-in or a hop would).
-  const ai = new CombatAIController({ difficulty: 'hard', rng: () => 0.5 });
-  const cpu = apexWith(ai, (d) => {
-    ai.getInput(d.attacker, DT, { stage: d.attacker.body && STAGE, gravity: CONFIG.sim.gravity });
-    ai.setIntent({ kind: 'jump', dir: 0 });
-    ai.intent.keepUntil = Infinity;
-    ai.thinkTimer = Infinity;
-  });
-  assert.ok(Math.abs(cpu - normal) < 8, `the combat AI: a normal jump (${cpu.toFixed(0)})`);
-  // The training CPU, hopping a block in its way.
+  // CPU Intelligence, handed a jump of each height (as a jump-in, an
+  // evasion or a climb would ask for).
+  for (const [jump, want] of [['normal', normal], ['high', normal * MOVEMENT.highJumpHeight]]) {
+    const ai = new CPUIntelligenceController({ difficulty: 'hard', rng: () => 0.5 });
+    const { height, run } = apexWith(ai, (d) => {
+      ai.getInput(d.attacker, DT, { stage: STAGE, gravity: CONFIG.sim.gravity });
+      ai.adoptPlan({ kind: 'evade', how: 'jump', jump, dir: 0 });
+    });
+    if (jump === 'normal') assert.ok(run > 1 && run <= HIGH_WINDOW, `normal: held ${run} steps, let go in time`);
+    else assert.ok(run > HIGH_WINDOW, `high: held ${run} steps, through the window`);
+    assert.ok(Math.abs(height - want) < 10, `CPU Intelligence's ${jump} jump: ${height.toFixed(0)} (${want.toFixed(0)})`);
+  }
+  // The training CPU, hopping a block in its way: always the normal jump.
   const training = new TrainingAIController({ rng: () => 0.5 });
   training.thinkTimer = Infinity;
   const hop = apexWith(training, () => { training.wantJump = true; });
-  assert.ok(Math.abs(hop - normal) < 8, `the training CPU: a normal jump (${hop.toFixed(0)})`);
+  assert.ok(hop.run > 1 && hop.run <= HIGH_WINDOW);
+  assert.ok(Math.abs(hop.height - normal) < 8, `the training CPU: a normal jump (${hop.height.toFixed(0)})`);
 });

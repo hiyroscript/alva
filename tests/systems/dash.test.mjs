@@ -570,8 +570,8 @@ test('every controller\'s input carries the request fields, false unless asked',
     assert.equal(out.mouvementRightPressed, false);
     bot.step(out);
   }
-  const source = readFileSync(ROOT + 'js/game/ai/combat-ai.js', 'utf8');
-  assert.doesNotMatch(source, /dash(Left|Right)Pressed|queueTouchMouvement/, 'the combat AI still dashes by double tap only');
+  const source = ['cpu-intelligence', 'execution', 'plans'].map((name) => readFileSync(ROOT + `js/game/ai/${name}.js`, 'utf8')).join('\n');
+  assert.doesNotMatch(source, /dash(Left|Right)Pressed|queueTouchMouvement|mouvement(Left|Right)Pressed = true/, 'CPU Intelligence dashes by double tap only');
 });
 
 test('one request Dashes at once through tryDash: no double tap, no held direction, the same cost, speed, clip and facing', () => {

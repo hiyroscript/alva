@@ -1244,7 +1244,7 @@ test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; 
   };
   const { fakeSpritesOf } = await import('../helpers/fighter-harness.mjs');
   const { MAPS } = await import('../../js/data/maps.js');
-  const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+  const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
   const { app, screen } = setup();
   app.selection = {
     characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id,
@@ -1265,7 +1265,7 @@ test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; 
   let battle = await enter();
   assert.equal(battle.p1.controller.kind, 'player');
   assert.equal(battle.p1.combatAssistOn, true);
-  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
   assert.equal(battle.p2.combatAssistOn, false, 'never the CPU');
   app.settings.set('combatAssist', false);
   battle = await enter();
@@ -1277,6 +1277,6 @@ test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; 
   battle = await enter({ mode: 'watch' });
   assert.equal(battle.p1.combatAssistOn, false, 'CPU 1');
   assert.equal(battle.p2.combatAssistOn, false, 'CPU 2');
-  assert.ok(battle.p1.controller instanceof CombatAIController && battle.p2.controller instanceof CombatAIController);
+  assert.ok(battle.p1.controller instanceof CPUIntelligenceController && battle.p2.controller instanceof CPUIntelligenceController);
   screen.exit?.();
 }));

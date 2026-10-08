@@ -394,7 +394,7 @@ test('the training CPU never walks off a ledge on its own', async () => {
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input,
   });
-  // Quick Battle's CPU is the combat AI now (see combat-ai.test.mjs for its
+  // Quick Battle's CPU is CPU Intelligence now (see cpu-intelligence.test.mjs for its
   // ledges); the training controller keeps its own guarantee.
   battle.p2.controller = new TrainingAIController({ rng: () => 0.5 });
   battle.setPhase('fight');

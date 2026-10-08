@@ -12,7 +12,7 @@ import { spawnClones, updateClones, removeDeadClones } from '../../js/game/comba
 import { applyPulls } from '../../js/game/combat/pull.js';
 import { StageCollision, resolveSolidOverlap } from '../../js/game/physics.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
-import { CombatAIController } from '../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../js/game/ai/cpu-intelligence.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { CONFIG } from '../../js/config.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../js/data/movement.js';
@@ -214,7 +214,7 @@ export function duel({
   return { attacker: a.fighter, target: b.fighter, tick, until, events, projectiles, clones };
 }
 
-// Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in
+// Two CPUs (CPUIntelligenceController) in a real fight on a flat stage, stepped in
 // Battle.update's order. Returns every step's inputs and states, keyed by
 // fighter; `cooling` lists the summons and techniques cooling down after
 // the step. `spritesA` / `spritesB` swap in other art (by default each
@@ -223,7 +223,7 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
   const stage = new StageCollision(stageMap());
   const make = (def, sprites, x, facing, slot, n) => new Fighter({
     def, sprites: sprites ?? fakeSpritesOf(def), stage, slot, label: `CPU ${n}`, spawn: { x, facing },
-    controller: new CombatAIController({ difficulty, rng: mulberry32(seed + n) }),
+    controller: new CPUIntelligenceController({ difficulty, rng: mulberry32(seed + n) }),
   });
   const a = make(defA, spritesA, 900, 1, 'p1', 1);
   const b = make(defB, spritesB, 1100, -1, 'p2', 2);

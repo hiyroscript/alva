@@ -1,5 +1,5 @@
 // Attack schema: how a character's `attacks` entries become the frozen
-// attack definitions the Fighter, the CombatSystem, summons and the combat AI
+// attack definitions the Fighter, the CombatSystem, summons and CPU Intelligence
 // all read. Universal: every fighter's attacks go through the same
 // createAttackDefinition, whatever the fighter.
 //
@@ -357,7 +357,7 @@ function resolveStrikes(spec, base) {
 // makes no motion of its own): a roll's box swept along its path from a
 // standstill, a plunge's down and a lift's up, and a homing dash's lock-on
 // range round the box's middle, ahead of it. For readers that plan or fear
-// an attack (the combat AI), never for resolving one. Null without a
+// an attack (CPU Intelligence), never for resolving one. Null without a
 // hitbox.
 export function attackReach(def) {
   const hb = def?.hitbox;
@@ -377,7 +377,7 @@ export function attackReach(def) {
 }
 
 // What kind of strike attack definition `def` is, for every reader that
-// sorts attacks (the Fighter's Combat Assist, the combat AI's moveset in
+// sorts attacks (the Fighter's Combat Assist, CPU Intelligence's moveset in
 // js/game/ai/moveset.js), so the two can never disagree: a projectile
 // attack is ranged; an attack with a hitbox of its own and no projectile is
 // melee. A pending attack has neither, so it is neither.

@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { CONFIG, COMBAT_BUTTONS } from '../../js/config.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { PlayerController, TrainingAIController, blankInput } from '../../js/game/fighters/fighter-controller.js';
-import { CombatAIController } from '../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../js/game/ai/cpu-intelligence.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { DEFLECT_ENERGY_COST } from '../../js/game/combat/combat-state.js';
@@ -1190,14 +1190,14 @@ test('only a player\'s controller with the setting on has it: never by slot, lab
   }).combatAssistOn;
   assert.equal(has(on), true);
   assert.equal(has(on, 'p2', 'CPU'), true, 'a player is a player whatever its slot or label');
-  assert.equal(has(new CombatAIController({ rng: mulberry32(1) })), false, 'P1\'s slot and label make no CPU a player');
+  assert.equal(has(new CPUIntelligenceController({ rng: mulberry32(1) })), false, 'P1\'s slot and label make no CPU a player');
   assert.equal(has(new TrainingAIController({ rng: mulberry32(1) })), false);
   assert.equal(has(null), false, 'the training dummy has no controller');
   assert.equal(has({ getInput: blankInput, combatAssist: true }), false, 'not a player\'s');
   assert.equal(has({ getInput: blankInput, kind: 'player' }), false, 'a player that has not turned it on');
   // And the CPU's controller never carries the setting.
-  assert.equal('combatAssist' in new CombatAIController({ rng: mulberry32(1) }), false);
-  assert.doesNotMatch(read('js/game/ai/combat-ai.js'), /combatAssist|Combat Assist/);
+  assert.equal('combatAssist' in new CPUIntelligenceController({ rng: mulberry32(1) }), false);
+  assert.doesNotMatch(read('js/game/ai/cpu-intelligence.js'), /combatAssist|Combat Assist/);
 });
 
 test('Quick Battle gives it to Player 1 only, as saved; Watch Mode to nobody; Practice Ground to the player, never the CPU', () => {
@@ -1208,7 +1208,7 @@ test('Quick Battle gives it to Player 1 only, as saved; Watch Mode to nobody; Pr
   const quick = battle({});
   assert.equal(quick.p1.combatAssistOn, true, 'on by default');
   assert.equal(quick.p2.combatAssistOn, false, 'never the CPU');
-  assert.ok(quick.p2.controller instanceof CombatAIController);
+  assert.ok(quick.p2.controller instanceof CPUIntelligenceController);
   const off = battle({ combatAssist: false });
   assert.equal(off.p1.combatAssistOn, false);
   assert.equal(off.p2.combatAssistOn, false);
@@ -1216,7 +1216,7 @@ test('Quick Battle gives it to Player 1 only, as saved; Watch Mode to nobody; Pr
     const watch = battle({ mode: 'watch', combatAssist });
     assert.equal(watch.p1.combatAssistOn, false, 'CPU 1');
     assert.equal(watch.p2.combatAssistOn, false, 'CPU 2');
-    assert.ok(watch.p1.controller instanceof CombatAIController && watch.p2.controller instanceof CombatAIController);
+    assert.ok(watch.p1.controller instanceof CPUIntelligenceController && watch.p2.controller instanceof CPUIntelligenceController);
     // A restart or rematch keeps it that way.
     watch.restart();
     assert.equal(watch.p1.combatAssistOn || watch.p2.combatAssistOn, false);
@@ -1240,7 +1240,7 @@ test('the setting never changes a CPU: its decisions and movement are the same w
   const run = (combatAssist) => {
     const input = { flush() {}, sample: blankInput };
     const b = new Battle({ canvas, map: getMap('desert'), p1Def: C1, p2Def: C1, p1Sprites: sprites, p2Sprites: sprites, input, seed: 7, combatAssist });
-    b.fx = { take() {}, takeBounce() {}, reset() {}, timeScale: 1, sampleTrail() {} };
+    b.fx = { take() {}, takeBounce() {}, reset() {}, addElimination() {}, timeScale: 1, sampleTrail() {} };
     b.setPhase('fight');
     const out = [];
     for (let i = 0; i < 900; i++) {

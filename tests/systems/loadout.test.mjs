@@ -10,7 +10,7 @@
 // controls-ui.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { CONFIG, NUMBERED_ATTACKS } from '../../js/config.js';
 import { CHARACTERS, getCharacter } from '../../js/data/characters.js';
 import {
@@ -413,8 +413,9 @@ test('every definition the game loads keeps the rules, and a broken one is refus
 
 test('the engine goes by the loadout, never by an attack\'s number: no character or attack special-cased', () => {
   for (const file of [
-    'js/game/fighters/fighter.js', 'js/game/fighters/movement.js', 'js/game/ai/combat-ai.js', 'js/game/ai/moveset.js',
+    'js/game/fighters/fighter.js', 'js/game/fighters/movement.js',
     'js/ui/touch-controls.js', 'js/ui/mobile-abilities.js', 'js/game/rendering/fighter-status.js',
+    ...readdirSync(new URL('../../js/game/ai/', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `js/game/ai/${f}`),
   ]) {
     const code = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /'000\d'/, `${file}: no fighter id`);

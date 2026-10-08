@@ -1,6 +1,6 @@
 // Run with node --test tests/fighters/0001/cpu-0001.test.mjs (no dependencies).
 // The combat AI playing #0001, and playing against it, from its data
-// alone (js/game/ai/moveset.js, js/game/ai/combat-ai.js): it reads Red and
+// alone (js/game/ai/moveset.js, js/game/ai/cpu-intelligence.js): it reads Red and
 // Maximum Blue as its projectiles, Blue's reach as its pull's, Unlimited
 // Void and Hollow Purple as techniques on their own buttons, and in real
 // fights it uses all of them; facing them, it never raises a Shield
@@ -12,7 +12,7 @@ import { cpuFight, DT, fakeSpritesOf, makeFighter, stageMap } from '../../helper
 import { CONFIG } from '../../../js/config.js';
 import { getCharacter } from '../../../js/data/characters.js';
 import { readMoveset } from '../../../js/game/ai/moveset.js';
-import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../../js/game/ai/cpu-intelligence.js';
 import { attackReach } from '../../../js/game/combat/attacks.js';
 import { Fighter } from '../../../js/game/fighters/fighter.js';
 import { StageCollision } from '../../../js/game/physics.js';
@@ -72,7 +72,7 @@ test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it 
     let answered = 0;
     for (let seed = 0; seed < 6; seed++) {
       let n = 0;
-      const ai = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(600 + seed) });
+      const ai = new CPUIntelligenceController({ difficulty: 'brutal', rng: mulberry32(600 + seed) });
       const foe = new Fighter({
         def: DEF, sprites: fakeSpritesOf(DEF), stage, slot: 'p1', spawn: { x: 800, facing: 1 },
         controller: { getInput: () => (n === 5 ? P(button) : {}) },

@@ -13,7 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { CHARACTERS, playableCharacters } from '../../js/data/characters.js';
 import {
   FIGHTER_PROFILES, DIFFICULTY_MIN, DIFFICULTY_MAX, DIFFICULTY_SCALE, getFighterProfile, assertFighterProfile,
@@ -167,7 +167,7 @@ test('profiles are editorial: kept apart from the definitions, never derived fro
   }
   // The game never reads a profile: only Discover's fighter browser does.
   const readers = ['js/ui/fighter-browser.js'];
-  for (const file of ['js/game/battle.js', 'js/game/practice.js', 'js/game/ai/combat-ai.js', 'js/ui/fighter-roster.js', 'js/data/characters.js']) {
+  for (const file of ['js/game/battle.js', 'js/game/practice.js', 'js/ui/fighter-roster.js', 'js/data/characters.js', ...readdirSync(new URL('js/game/ai/', ROOT)).filter((f) => f.endsWith('.js')).map((f) => `js/game/ai/${f}`)]) {
     const code = readFileSync(new URL(file, ROOT), 'utf8').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /fighter-profiles/, `${file} never imports the profiles`);
   }

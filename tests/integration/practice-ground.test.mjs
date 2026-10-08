@@ -191,7 +191,7 @@ const { FighterRoster } = await import('../../js/ui/fighter-roster.js');
 const { Battle } = await import('../../js/game/battle.js');
 const { HUD } = await import('../../js/ui/hud.js');
 const { PlayerController, TrainingAIController } = await import('../../js/game/fighters/fighter-controller.js');
-const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
 const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
 const { Settings } = await import('../../js/core/settings.js');
 const { ICONS } = await import('../../js/ui/icons.js');
@@ -2273,17 +2273,15 @@ test('the practice theme is registered and draws without building paths each fra
 
 test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two-panel HUD, with none of Practice\'s rules', () => {
   const input = fakeInput();
-  // Seeded: unseeded, about one CPU in twelve lands a hit in the first
-  // second and the Launch Point check below would fail at random.
   const battle = new Battle({
     canvas: new Element('canvas'), map: getMap('desert'),
     p1Def: DEF_0001, p2Def: DEF_0001, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input, seed: 1,
   });
   assert.equal(battle.fighters.length, 2);
   assert.ok(battle.p1.controller instanceof PlayerController);
-  // Quick Battle's CPU is the combat AI (Medium when no difficulty is
+  // Quick Battle's CPU is CPU Intelligence (Medium when no difficulty is
   // given); Practice Ground's dummy has no controller at all (above).
-  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.ok(battle.p2.controller instanceof CPUIntelligenceController);
   assert.equal(battle.p2.controller.difficulty, 'medium');
   assert.ok(!(battle.p2.controller instanceof TrainingAIController));
   assert.equal(battle.p2.label, 'CPU');
@@ -2301,7 +2299,9 @@ test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two
   // Quick Battle's own, after a point; see match-score.test.mjs).
   assert.ok(!(battle instanceof PracticeSession));
   for (const key of ['cpu', 'damageNumbers']) assert.equal(key in battle, false, `no ${key}`);
-  assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [0, 0]);
+  // Both started at 0; Player 1 (holding nothing) never touched the CPU,
+  // which is already fighting.
+  assert.equal(battle.p2.combat.launchPoint, 0);
 
   const root = new Element('div');
   const hud = new HUD(root);

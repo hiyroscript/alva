@@ -72,7 +72,7 @@ test('names only: no combat code reads them', () => {
   // Every simulation, combat, AI and rendering module under js/game/.
   const game = new URL('../../js/game/', import.meta.url);
   const files = readdirSync(game, { recursive: true }).filter((f) => f.endsWith('.js'));
-  assert.ok(files.includes('fighters/fighter.js') && files.includes('ai/combat-ai.js'));
+  assert.ok(files.includes('fighters/fighter.js') && files.includes('ai/cpu-intelligence.js'));
   for (const file of files) {
     const code = readFileSync(new URL(file, game), 'utf8');
     assert.doesNotMatch(code, /abilityNames?\b/, file);

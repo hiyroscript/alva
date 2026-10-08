@@ -17,7 +17,7 @@ import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { CombatSystem, worldBox } from '../../js/game/combat/combat.js';
 import { Projectile, clashProjectiles } from '../../js/game/combat/projectile.js';
 import { Fighter } from '../../js/game/fighters/fighter.js';
-import { CombatAIController } from '../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../js/game/ai/cpu-intelligence.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { DEFLECT_ENERGY_COST, resolveEnergy } from '../../js/game/combat/combat-state.js';
@@ -431,7 +431,7 @@ test('a CPU in the air Deflects a shot on course for it, and turns it back at it
     // No gravity, so the CPU hangs where it is while the tornado comes.
     const stage = new StageCollision(stageMap());
     const ctx = { stage, gravity: 0, battle: null };
-    const ai = new CombatAIController({ difficulty: 'hard', rng: mulberry32(7) });
+    const ai = new CPUIntelligenceController({ difficulty: 'hard', rng: mulberry32(7) });
     const me = new Fighter({ def: c, sprites: fakeSpritesOf(c), stage, slot: 'p2', label: 'CPU', spawn: { x: 700, y: 500, facing: 1 }, controller: ai });
     const foe = new Fighter({ def: DEF_0002, sprites: fakeSpritesOf(DEF_0002), stage, slot: 'p1', label: 'P', spawn: { x: 1300, facing: -1 } });
     me.opponent = foe;
@@ -459,7 +459,7 @@ test('a CPU never holds a Shield in the air: it presses the button there only to
   for (const [a, b] of [[DEF_0001, DEF_0002], [DEF_0002, DEF_0001]]) {
     const stage = new StageCollision(stageMap());
     const ctx = { stage, gravity: CONFIG.sim.gravity, battle: { projectiles: [], clones: [], combat: new CombatSystem() } };
-    const ais = [new CombatAIController({ difficulty: 'hard', rng: mulberry32(3) }), new CombatAIController({ difficulty: 'brutal', rng: mulberry32(4) })];
+    const ais = [new CPUIntelligenceController({ difficulty: 'hard', rng: mulberry32(3) }), new CPUIntelligenceController({ difficulty: 'brutal', rng: mulberry32(4) })];
     const fighters = [a, b].map((def, i) => new Fighter({
       def, sprites: fakeSpritesOf(def), stage, slot: i ? 'p2' : 'p1', label: `CPU ${i + 1}`,
       spawn: { x: 800 + i * 300, facing: i ? -1 : 1 }, controller: ais[i],

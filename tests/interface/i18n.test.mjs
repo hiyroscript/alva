@@ -426,7 +426,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     // Difficulty cards: names, lines and spoken labels.
     assert.deepEqual(difficulty.cards.map((c) => c.querySelector('.difficulty-name').textContent), ['Facile', 'Moyen', 'Difficile', 'Brutal']);
     assert.equal(difficulty.cards[0].getAttribute('aria-label'), 'Facile, niveau 1 sur 4');
-    assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Réactions rapides. Se défend et punit.');
+    assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Un joueur de tournoi. Peu d’erreurs.');
     // Discover: tabs and the pages built from the registries.
     assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Déplacement', 'Éjection', 'Passifs']);
     assert.equal(discover.browser.describeBtn.textContent, 'Description du style de jeu');

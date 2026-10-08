@@ -211,7 +211,7 @@ export class Technique {
   }
 
   // Seconds until it releases (0 once it has), and until it is over: what
-  // a reader such as the combat AI goes by.
+  // a reader such as CPU Intelligence goes by.
   get releaseIn() {
     return this.phase === 'cast' ? Math.max(0, this.castDuration - this.time) : 0;
   }

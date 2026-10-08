@@ -165,7 +165,7 @@ globalThis.document = {
 
 const { CONFIG } = await import('../../js/config.js');
 const {
-  DIFFICULTIES, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, CAPABILITY, resolveDifficulty, getDifficulty, getDifficultyProfile,
+  DIFFICULTIES, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, CAPABILITY, TEMPERAMENT, resolveDifficulty, getDifficulty, getDifficultyProfile,
 } = await import('../../js/data/difficulty.js');
 const { MAPS, getMap } = await import('../../js/data/maps.js');
 const { ICONS } = await import('../../js/ui/icons.js');
@@ -180,7 +180,7 @@ const { MapSelectScreen } = await import('../../js/screens/map-select-screen.js'
 const { BattleScreen } = await import('../../js/screens/battle-screen.js');
 const { Settings } = await import('../../js/core/settings.js');
 const { Battle } = await import('../../js/game/battle.js');
-const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+const { CPUIntelligenceController } = await import('../../js/game/ai/cpu-intelligence.js');
 const { mulberry32 } = await import('../../js/core/utils.js');
 
 // Keyboard input (key() runs a keydown through every listener, menus first,
@@ -297,7 +297,7 @@ test('profiles are ordered: no trait is ever better on a lower level', () => {
     }
   }
   // The traits that define the levels strictly improve at every step.
-  for (const trait of ['react', 'think', 'lapse', 'noise', 'guard', 'punish']) {
+  for (const trait of ['reaction', 'think', 'lapse', 'noise', 'misjudge', 'defense', 'punish', 'combo', 'horizon', 'recover']) {
     for (let i = 1; i < profiles.length; i++) {
       const lo = [].concat(profiles[i - 1][trait]);
       const hi = [].concat(profiles[i][trait]);
@@ -305,16 +305,22 @@ test('profiles are ordered: no trait is ever better on a lower level', () => {
     }
   }
   const brutal = getDifficultyProfile('brutal');
-  assert.ok(brutal.react[0] >= 3 * CONFIG.sim.step, 'even Brutal needs a few frames to react');
-  assert.ok(brutal.lapse > 0 && brutal.noise > 0, 'even Brutal is not perfect');
-  assert.ok(getDifficultyProfile('easy').react[0] > 0.25, 'Easy is usually too late even for attack2\'s startup');
+  assert.ok(brutal.reaction[0] >= 3 * CONFIG.sim.step, 'even Brutal needs a few frames to react');
+  assert.ok(brutal.lapse > 0 && brutal.noise > 0 && brutal.misjudge > 0, 'even Brutal is not perfect');
+  assert.ok(getDifficultyProfile('easy').reaction[0] > 0.25, 'Easy is usually too late even for a telegraphed kick');
+  // No idling trait at all: no level waits on purpose.
+  for (const d of DIFFICULTIES) assert.equal('hesitation' in d.profile, false, `${d.id}: no hesitation`);
+  // Aggression is a temperament, not a skill: it does not simply climb
+  // with the level.
+  const aggression = DIFFICULTY_IDS.map((id) => getDifficultyProfile(id).aggression);
+  assert.ok(aggression.some((v, i) => i > 0 && v < aggression[i - 1]), `aggression is not monotonic: ${aggression}`);
 });
 
 test('a profile holds perception and judgement only: nothing a fighter is made of', () => {
   const fighterStats = ['damage', 'speed', 'maxSpeed', 'jump', 'jumpVelocity', 'gravity', 'energy', 'dashCost', 'cooldown', 'hitstun',
     'startup', 'recovery', 'launch', 'baseLaunch', 'hitbox', 'hurtbox', 'respawn', 'score', 'invulnerable'];
   for (const d of DIFFICULTIES) {
-    assert.deepEqual(Object.keys(d.profile).sort(), Object.keys(CAPABILITY).sort(), `${d.id}: only AI traits`);
+    assert.deepEqual(Object.keys(d.profile).sort(), [...Object.keys(CAPABILITY), ...TEMPERAMENT].sort(), `${d.id}: only AI traits`);
     for (const k of Object.keys(d.profile)) assert.ok(!fighterStats.includes(k), k);
   }
   const src = ['fighters/fighter', 'fighters/movement', 'combat/combat', 'combat/attacks', 'combat/combat-state', 'combat/defense']
@@ -543,7 +549,7 @@ test('the Battle\'s CPU plays the chosen level, and keeps it through restarts, r
   for (const id of DIFFICULTY_IDS) {
     const battle = quickBattle(id);
     const ai = battle.p2.controller;
-    assert.ok(ai instanceof CombatAIController);
+    assert.ok(ai instanceof CPUIntelligenceController);
     assert.deepEqual([battle.difficulty, ai.difficulty], [id, id]);
     assert.equal(ai.profile, getDifficultyProfile(id));
     battle.setPhase('fight');
@@ -551,7 +557,7 @@ test('the Battle\'s CPU plays the chosen level, and keeps it through restarts, r
     battle.restart();
     assert.equal(battle.p2.controller, ai, 'the same controller after a restart');
     assert.equal(ai.difficulty, id);
-    assert.equal(ai.intent, null, 'nothing planned carries over');
+    assert.equal(ai.plan, null, 'nothing planned carries over');
     // A fall and a respawn.
     battle.setPhase('fight');
     Object.assign(battle.p2.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
@@ -601,7 +607,7 @@ test('the Battle screen hands the selected level to its Battle, and a rematch or
 test('a higher level beats a lower one: Brutal against Easy, seeded', () => {
   // Easy drives Player 1 through a second controller.
   const battle = quickBattle('brutal', 7);
-  battle.p1.controller = new CombatAIController({ difficulty: 'easy', rng: mulberry32(3) });
+  battle.p1.controller = new CPUIntelligenceController({ difficulty: 'easy', rng: mulberry32(3) });
   battle.setPhase('fight');
   let steps = 0;
   while (battle.phase !== 'result' && steps++ < Math.ceil(110 / DT)) battle.update(DT);

@@ -25,8 +25,9 @@ import { describeLoadout, loadoutProblems, specialAttacks } from '../../../js/da
 import { attackReach, createAttackDefinition, strikeLive } from '../../../js/game/combat/attacks.js';
 import { BLOCK_ENERGY_COST } from '../../../js/game/combat/combat-state.js';
 import { createProjectileDefinition } from '../../../js/game/combat/projectile.js';
-import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
+import { CPUIntelligenceController } from '../../../js/game/ai/cpu-intelligence.js';
 import { readMoveset } from '../../../js/game/ai/moveset.js';
+import { knowFighter } from '../../../js/game/ai/knowledge.js';
 import { Fighter } from '../../../js/game/fighters/fighter.js';
 import { SpriteSet, drawFrame } from '../../../js/game/rendering/sprite-normalizer.js';
 import { StageCollision } from '../../../js/game/physics.js';
@@ -361,9 +362,11 @@ test('the CPU plans no summon or technique with it: it has none', () => {
   const foe = makeFighter({ x: 1200, facing: -1 });
   s.fighter.opponent = foe.fighter;
   foe.fighter.opponent = s.fighter;
-  const ai = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(1) });
   assert.deepEqual(readMoveset(s.fighter).specials, []);
-  assert.deepEqual(ai.specialOptions({ self: s.fighter, p: ai.profile, canAct: true, grounded: true, ms: readMoveset(s.fighter) }), []);
+  // Its combat knowledge has no technique or summon to plan with.
+  const moves = knowFighter(s.fighter).moves;
+  assert.ok(moves.length > 0);
+  assert.deepEqual(moves.filter((m) => m.kind === 'technique' || m.kind === 'summon'), []);
 });
 
 // ---- attack1: the One-Two ----------------------------------------------------------------
@@ -762,7 +765,7 @@ test('the CPU reads every move from the data: its motions, and no summon or tech
 
 test('knocked off the stage with its air jump and air dash spent, the CPU rises back on its Blue Tornado', () => {
   const stage = new StageCollision(stageMap({ left: 0, right: 1000 }));
-  const ai = new CombatAIController({ difficulty: 'hard', rng: mulberry32(2) });
+  const ai = new CPUIntelligenceController({ difficulty: 'hard', rng: mulberry32(2) });
   const me = new Fighter({ def: DEF, sprites: SPRITES, stage, slot: 'p1', label: 'CPU', spawn: { x: 1100, y: 700 }, controller: ai });
   const foe = new Fighter({ def: DEF_0001, sprites: fakeSpritesOf(DEF_0001), stage, slot: 'p2', label: 'P', spawn: { x: 500 } });
   me.opponent = foe;
@@ -782,7 +785,7 @@ test('knocked off the stage with its air jump and air dash spent, the CPU rises 
 test('the CPU sends its Whirlwind at an opponent turtling behind its Shield at mid range', () => {
   for (const gap of [200, 340]) {
     const stage = new StageCollision(stageMap());
-    const ai = new CombatAIController({ difficulty: 'hard', rng: mulberry32(3) });
+    const ai = new CPUIntelligenceController({ difficulty: 'hard', rng: mulberry32(3) });
     const me = new Fighter({ def: DEF, sprites: SPRITES, stage, slot: 'p1', label: 'CPU', spawn: { x: 900, facing: 1 }, controller: ai });
     const foe = new Fighter({
       def: DEF_0001, sprites: fakeSpritesOf(DEF_0001), stage, slot: 'p2', label: 'P', spawn: { x: 900 + gap, facing: -1 },
