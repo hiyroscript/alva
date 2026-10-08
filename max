@@ -1,1717 +1,280 @@
-ALVA — CPU INTELLIGENCE
+ALVA — Standardize Touch-Control Icons and Personalization Screen
 
-Complete CPU Artificial Intelligence Replacement
+Objective
 
-PRIMARY OBJECTIVE
+Update Alva’s mobile touch-control interface to make the universal action icons clearer and ensure the button personalization screen always displays neutral, character-independent icons.
 
-Create a completely new combat artificial intelligence system called CPU Intelligence.
+Repository: hiyroscript/alva
+Branch: main
 
-This is a complete replacement of the current combat CPU system, not a small improvement, balancing patch, or collection of additional conditions.
+This is a UI presentation update, not a gameplay or input-system redesign. Preserve all combat mechanics, button bindings, control positions, customization functionality, and character-specific gameplay abilities.
 
-The ultimate goal is to make CPU opponents behave like real human players who understand Alva’s mechanics, their own characters, their opponents, the stage, and the constantly changing circumstances of a fight.
+1. Jump button — Remove the bottom line
 
-Every difficulty must feel human. Difficulty determines how intelligently that human-like player performs.
+Primary file: js/ui/icons.js
 
-The four difficulties represent:
+The current ICONS.jump SVG displays an upward-pointing arrow with a separate horizontal line beneath it.
 
-* Easy: Casual player.
-* Medium: Tryhard player.
-* Hard: Tournament/professional player.
-* Brutal: Elite player targeting a 95% or higher win rate against a defined, challenging benchmark population.
+Change the icon so that:
 
-Brutal should be extremely difficult to defeat through superior decision-making, positioning, consistency, prediction, adaptation, and mastery of mechanics—not through cheating or modified fighter statistics.
+* Only the upward-pointing arrow remains.
+* Remove the separate horizontal baseline below the arrow.
+* Preserve the arrow’s vertical shaft and arrowhead.
+* Keep the icon centered and visually balanced.
+* Preserve the existing stroke thickness, SVG dimensions, and color inheritance.
 
-TWO ABSOLUTE REQUIREMENTS
+The current SVG includes:
 
-1. NO INACTIVE CPU
+<path d="M5 20.5h14"/>
 
-A CPU must never stand still and do nothing when it is capable of taking a meaningful action, regardless of difficulty.
+Remove that specific bottom line without removing the actual arrow shaft.
 
-This requirement applies to Easy, Medium, Hard, and Brutal.
+Apply the updated Jump icon everywhere it is used, including battle controls, Practice Ground, and the touch-control customization screen.
 
-Never intentionally introduce inactivity to make a CPU easier.
+Do not change the Jump action, jump physics, multiple-jump behavior, or input binding.
 
-Remove idle and hesitation behaviors that cause the CPU to stop participating in combat.
+2. Defence button — Always display the shield icon
 
-At all times when the CPU can act, it should have a meaningful objective, such as:
+Primary files:
 
-* Closing distance.
-* Controlling spacing.
-* Repositioning.
-* Retreating strategically.
-* Maintaining a safe defensive position.
-* Setting up an attack.
-* Pursuing an airborne opponent.
-* Recovering toward the stage.
-* Preparing a counterattack.
-* Moving between platforms.
-* Maintaining an advantage.
-* Looking for an opening.
-* Pressuring an opponent.
-* Preparing for an opponent’s respawn.
+* js/ui/touch-controls.js
+* js/ui/icons.js
 
-A CPU can temporarily remain stationary when that serves a genuine purpose, such as shielding an attack, performing a stationary ability, holding a strategically important position, or waiting briefly for a punish opportunity.
+Currently, the defence button changes its displayed icon depending on whether the fighter is grounded or airborne.
 
-These are intentional actions, not inactivity.
+On the ground, it shows ICONS.shield.
 
-Never confuse forced inactivity from hitstun, paralysis, attack recovery, a locked animation, or the match’s inactive phase with an AI failure.
+In the air, when a fighter has Deflect, it switches to ICONS.deflect.
 
-When its opponent is temporarily out of play, the CPU should reposition sensibly, prepare for the respawn, or establish stage control instead of simply freezing.
+Remove this visual icon-switching behavior.
 
-If an intended action is unavailable or fails, immediately transition into another valid action or plan.
+Required behavior:
 
-Easy must behave like an inexperienced human actively trying to win, not a character that occasionally remembers to move.
+* The defence button must always display ICONS.shield.
+* This applies on the ground and in the air.
+* It applies to every playable character.
+* It applies in regular battles, Practice Ground, and the touch-control editor.
+* The shield icon must not change when the fighter jumps, falls, lands, or enters another combat state.
 
-2. COMPLETE MOVESET UTILIZATION
+In TouchControls.refreshAbilities(), stop replacing the shield’s artwork with ICONS.deflect.
 
-Every CPU difficulty must reasonably use every functional attack, ability, and combat option available to its character.
+Important: Preserve the actual Shield and Deflect mechanics. An airborne press must still perform Deflect when supported by the fighter. The button must continue sending the existing shield input.
 
-No valid attack should be permanently ignored because another move has a slightly higher score.
+The accessibility label may continue identifying the airborne action as “Deflect” when appropriate, because the actual action changes. Only the visible icon must remain the shield.
 
-The CPU must know:
+Do not change the defensive mechanics, Energy consumption, timing windows, or combat behavior.
 
-* What every attack does.
-* When the attack can be used.
-* Its intended tactical purpose.
-* Whether it is available on the ground or in the air.
-* Its range.
-* Its damage.
-* Its Base Launch.
-* Its Directional Launch.
-* Its startup, active frames, and recovery.
-* Its cooldown.
-* Its movement properties.
-* Its potential to start, continue, or finish combos.
-* Its effectiveness against shields.
-* Its interaction with projectiles.
-* Its defensive or mobility uses.
-* Its usefulness at different Launch Point values.
-* Its usefulness at different positions on the stage.
+3. Mouvement buttons — Use double arrows
 
-The CPU must actively create opportunities to use different moves, instead of only checking whether they are convenient at the current instant.
+Primary files:
 
-However, do not force meaningless moves or create robotic attack rotations.
+* js/ui/icons.js
+* js/ui/touch-controls.js
 
-Move diversity must arise from tactical decisions and appropriate opportunities.
+In the Joystick control scheme, there are two separate Mouvement buttons:
 
-A move that is temporarily unsafe, unavailable, or unsuitable should not be selected merely to satisfy a usage quota.
+* mouvementLeft
+* mouvementRight
 
-Measure moveset coverage across suitable combat scenarios, not by forcing every attack during every individual match.
+These currently display single directional arrow icons.
 
-These two requirements are universal invariants of CPU Intelligence.
+Replace them with double directional arrows.
 
-⸻
+Desired appearance
 
-PART 1 — UNDERSTAND ALVA BEFORE IMPLEMENTING
+* Left Mouvement: two arrows pointing left, visually similar to ≪.
+* Right Mouvement: two arrows pointing right, visually similar to ≫.
+* Each button should contain two distinct arrowheads pointing in the same direction.
+* Use clean SVG geometry consistent with the current icon system.
+* Keep the double arrows centered inside their circular buttons.
+* Maintain adequate spacing and legibility at small mobile sizes.
 
-Before writing the replacement, thoroughly inspect the existing repository.
+Prefer adding dedicated universal icons to ICONS, such as mouvementLeft and mouvementRight, or similarly descriptive names.
 
-The game is a browser-based 2D platform fighter using vanilla JavaScript ES modules and Canvas 2D, with a deterministic 60 Hz simulation.
+Update MOUVEMENT_BUTTONS to reference the new icons.
 
-Start with:
+The Classic Buttons scheme’s ordinary runLeft and runRight controls should retain their existing single-arrow appearance. The double-arrow design is specifically for the Joystick scheme’s Mouvement/Dash buttons.
 
-* README.md
-* ALVA_SPEC.md
-* CLAUDE.md
-* codename_rule
-* docs/systems/ai.md
-* docs/systems/combat.md
-* docs/systems/movement.md
-* docs/systems/launch.md
-* docs/systems/energy.md
-* docs/systems/defense.md
-* docs/gameplay/stages.md
-* docs/gameplay/battle.md
+Preserve the existing internal codenames, spelling, input events, Dash/air-dash logic, and touch behavior.
 
-Then inspect the implementation:
+4. Button personalization screen — Always show default icons
 
-* js/game/ai/combat-ai.js
-* js/game/ai/moveset.js
-* js/data/difficulty.js
-* js/game/battle.js
-* js/game/arena.js
-* js/game/fighters/fighter.js
-* js/game/fighters/fighter-controller.js
-* js/game/fighters/movement.js
-* js/game/combat/
-* js/game/physics.js
-* js/data/characters/
-* js/data/maps.js
+Primary files:
 
-Also review existing tests covering CPU combat, movement, hit-cancels, projectile interaction, energy, defense, Watch Mode, and fighter-specific behavior.
+* js/ui/touch-layout-editor.js
+* js/ui/touch-controls.js
+* js/ui/mobile-abilities.js
 
-Understand how everything interacts before replacing the controller.
+This is an important distinction between the customization editor and actual gameplay.
 
-Do not approximate existing rules from assumptions when their real implementations are available.
+Currently, the touch-control editor displays character-specific attack artwork based on the fighter last selected.
 
-Non-negotiable compatibility
+This is not the desired behavior.
 
-CPU Intelligence must operate through the same legal input interface as a human player.
+The button personalization screen must always show neutral default icons, completely independent of the selected character.
 
-It must not directly modify a fighter’s position, velocity, Energy, Launch Point, cooldowns, damage, hitboxes, or animation state.
+Default icon mapping
 
-It must not create attacks or projectiles independently of normal inputs.
+Control	Required icon
+Attack 1	One dot (ICONS.pip1)
+Attack 2	Two dots (ICONS.pip2)
+Attack 3	Three dots (ICONS.pip3)
+Attack 4	Four dots (ICONS.pip4)
+Attack 5	Five dots (ICONS.pip5)
+Extra Attack	Universal ring (ICONS.ring)
+Transform	Universal star (ICONS.transform)
+Defence	Universal shield (ICONS.shield)
+Jump	Updated upward arrow without baseline
+Left Mouvement	Double left arrows
+Right Mouvement	Double right arrows
+Classic Left / Right	Existing single left/right arrows
+Joystick	Existing universal joystick appearance
 
-It must respect every existing gameplay restriction.
+The neutral attack pips, ring, Transform star, shield, and other universal SVGs already exist. Reuse them rather than creating duplicate assets.
 
-Difficulty must never alter:
+Required editor behavior
 
-* Fighter damage.
-* Attack launch values.
-* Movement speed.
-* Gravity.
-* Jump strength.
-* Hitstun.
-* Attack startup and recovery.
-* Shield behavior.
-* Energy maximum or regeneration.
-* Energy costs.
-* Cooldowns.
-* Hitboxes.
-* Physics.
-* Respawn rules.
-* Scoring.
+1. Opening Settings → Controls → Customize touch controls must display the default icons for every button.
+2. No attack button may display a fighter sprite, ability preview image, animation frame, projectile image, or character-specific icon.
+3. Every attack slot from Attack 1 through Attack 5 must remain visible, even if the currently selected character does not possess that attack.
+4. The icons must not depend on the player’s last selected fighter.
+5. Switching characters elsewhere must never change the editor’s icons.
+6. Reopening the editor must produce the same neutral icon mapping.
+7. Switching between Joystick and Classic layouts must preserve the appropriate neutral icons.
+8. The editor should use neutral, localized control names such as “Attack 1”, “Attack 2”, and “Extra Attack”, rather than character-specific move names.
+9. Existing resizing, dragging, control selection, keyboard/gamepad editing, layout persistence, and Reset to Defaults must work exactly as before.
 
-CPU Intelligence must not receive the human player’s raw inputs or perfect information about their future decisions.
+Implementation guidance
 
-All opponents must follow the same combat rules.
+In TouchLayoutEditor.open(), the current implementation calls:
 
-Preserve deterministic behavior using the existing seeded RNG infrastructure.
+this.touch.setCharacter(getPlayableCharacter(this.app.selection?.characterId));
 
-⸻
+This makes the editor’s button presentation depend on the selected character.
 
-PART 2 — NEW CPU INTELLIGENCE ARCHITECTURE
+Use the neutral rendering path instead, such as this.touch.setCharacter(null), while preserving the editor’s showAbsent: true behavior.
 
-Implement a modular system, with a primary controller named CPUIntelligenceController.
+Check that the neutral path consistently produces default icons and labels for every control.
 
-Recommended architecture:
+Avoid unnecessarily changing the rendering behavior of the actual battle interface.
 
-1. Perception System: What the CPU can observe, recognize, and react to.
-2. Combat Knowledge System: Understanding its own moveset and observable opponent capabilities.
-3. Situation Analysis System: Understanding the current battle state.
-4. Strategic Brain: Choosing goals such as aggression, defense, trapping, recovery, or maintaining advantage.
-5. Tactical Planner: Selecting moves, combinations, movement routes, and defensive answers.
-6. Movement Intelligence: Translating movement goals into legal game inputs.
-7. Combat Execution: Executing multi-step action sequences and responding to their results.
-8. Adaptation System: Learning opponent tendencies during the match.
-9. Difficulty Intelligence: Adjusting the quality of decisions without removing capabilities.
-10. Safety and Recovery System: Preventing avoidable elimination, edge mistakes, and action deadlocks.
+Important separation
 
-Use maintainable modules with clearly separated responsibilities.
+In the personalization screen: Always show neutral icons.
 
-Avoid rebuilding another enormous monolithic AI file.
+In real gameplay: Continue displaying each fighter’s authored attack artwork wherever that is the existing intended behavior.
 
-The new system should use a continuous loop conceptually equivalent to:
+The universal changes to Jump, Defence, and Mouvement icons should apply in both contexts.
 
-Observe → Understand → Choose Goal → Plan → Execute → Evaluate Outcome → Adapt.
+Do not remove or modify the character artwork assets, character definitions, move previews, or abilities simply to achieve the neutral editor appearance.
 
-Immediate tactical reactions should be possible without unnecessarily restarting an entire strategic plan.
+5. Preserve the existing control system
 
-Longer-term goals should persist across multiple simulation steps.
+The implementation must maintain all existing interaction behavior.
 
-The CPU must know what it is currently attempting to accomplish and why.
+In particular:
 
-⸻
+* Do not modify the input codenames shield, jump, attack1 through attack5, extra_attack, transform, mouvementLeft, or mouvementRight.
+* Preserve the existing data-action, data-mouvement, and data-control identifiers.
+* Preserve multi-touch support, simultaneous button presses, pointer capture, and pressed states.
+* Preserve the existing button positions, sizing, hit targets, and honeycomb attack layout.
+* Do not reset or migrate the user’s saved custom layouts unnecessarily.
+* Preserve localization in English and French.
+* Do not modify game physics, character data, damage, cooldowns, or movement mechanics.
+* Do not modify the protected character_rule file.
 
-PART 3 — LAUNCH POINT INTELLIGENCE
+Keep the solution simple, reusable, and compatible with additional characters introduced in the future.
 
-Launch Point is one of Alva’s most important mechanics.
+6. Update automated tests
 
-It is not a traditional health bar.
+Relevant test files:
 
-Each successful unblocked hit raises Launch Point, and launching attacks become more dangerous as that value increases.
+* tests/interface/controls-ui.test.mjs
+* tests/interface/touch-layout.test.mjs
 
-The existing formula is:
+Update existing expectations that explicitly require the old icons or character-specific artwork in the editor.
 
-Launch Strength = Base Launch × Target's new Launch Point
+Add regression coverage for the following scenarios:
 
-Launch Speed = Launch Strength × 10
+Jump
 
-Damage is applied before launch strength is calculated.
+* ICONS.jump contains the upward arrow.
+* The bottom horizontal baseline is absent.
+* The icon is the same across fighters and screens.
 
-CPU Intelligence must understand and account for this formula.
+Defence
 
-Own Launch Point awareness
+* Grounded fighters display ICONS.shield.
+* Airborne fighters display ICONS.shield.
+* Fighters with or without Deflect display ICONS.shield.
+* Airborne Deflect behavior and accessible naming remain functional.
+* Landing or jumping does not replace the shield icon.
 
-The CPU must continuously evaluate its own Launch Point.
+Mouvement
 
-When relatively low, it can generally tolerate more risk and pursue damage-building opportunities.
+* mouvementLeft uses the new double-left-arrow SVG.
+* mouvementRight uses the new double-right-arrow SVG.
+* Classic movement buttons retain their single arrows.
+* Both Mouvement buttons still generate the correct Dash requests.
 
-As Launch Point rises, it should:
+Personalization editor
 
-* Recognize its increasing vulnerability.
-* Reduce unnecessary commitments.
-* Favor safer spacing.
-* Avoid dangerous ledge positions.
-* Protect its remaining movement options.
-* Use defensive movement more intelligently.
-* Become more selective about attacking.
-* Recognize attacks that might eliminate it.
-* Prefer advantageous trades instead of careless ones.
-* Defend against high-launch moves.
-* Retreat when doing so meaningfully improves survival.
+* All five numbered attacks use their matching pip icons.
+* Extra Attack uses the universal ring.
+* Transform, Defence, and Jump use their correct universal glyphs.
+* No .tc-sprite-icon elements appear on customization controls.
+* Neutral icons are shown with character 0001 selected.
+* The exact same neutral icons are shown with character 0002 selected.
+* The editor remains neutral with no character selected.
+* Missing attacks remain visible in the editor.
+* The editor displays neutral localized control names.
+* Saved layouts, resizing, dragging, and Reset to Defaults still work.
+* The normal gameplay interface continues to display the appropriate character-specific attack artwork.
 
-The transition must be smooth and contextual, not a rigid rule that says “above X Launch Point, always run away.”
-
-The CPU should also understand Launch Point recovery.
-
-Alva begins recovering Launch Point after a period without receiving an unblocked hit, with recovery occurring gradually afterward.
-
-A highly intelligent CPU can intentionally create enough distance or defensive pressure to benefit from this recovery.
-
-Lower difficulties understand the same mechanic but use it less effectively.
-
-Enemy Launch Point awareness
-
-The CPU must evaluate its opponent’s Launch Point.
-
-At low opposing Launch Point, prioritize:
-
-* Damage accumulation.
-* Combo starters.
-* Safe pressure.
-* Positioning improvements.
-* Launch Point denial through sustained successful pressure.
-
-At high opposing Launch Point, increasingly prioritize:
-
-* Launching attacks.
-* Directionally advantageous attacks.
-* Edge pressure.
-* Kill confirms.
-* Punishing unsafe recoveries.
-* Aerial follow-ups.
-* Finishing opportunities.
-
-Do not simply spam the move with the highest Base Launch.
-
-Evaluate whether it can actually connect and whether its direction creates a meaningful advantage.
-
-Dynamic fighting styles
-
-Create continuous transitions between strategic styles:
-
-* Aggressive pressure.
-* Combo-focused offense.
-* Balanced neutral.
-* Patient counterattacking.
-* Defensive spacing.
-* Survival-oriented play.
-* Edge control.
-* Finishing pressure.
-
-Style should depend on both fighters’ Launch Points, stage positions, available resources, score, remaining time, move availability, and opponent behavior.
-
-Examples:
-
-Low CPU Launch Point + low enemy Launch Point:
-Favor proactive offense, safe combos, and establishing control.
-
-High CPU Launch Point + low enemy Launch Point:
-Favor survival, controlled counterattacks, and protecting stage position.
-
-Low CPU Launch Point + high enemy Launch Point:
-Favor calculated finishing pressure and edge-guarding.
-
-High CPU Launch Point + high enemy Launch Point:
-Favor precise spacing, highly selective commitment, and immediate punishment of serious mistakes.
-
-These are tendencies, not mandatory fixed states.
-
-⸻
-
-PART 4 — REAL COMBAT DECISION-MAKING
-
-Every attack must have a purpose.
-
-The CPU should not merely select attacks because their cooldown is finished.
-
-It must understand the reason for using each option.
-
-Attack evaluation
-
-Consider:
-
-* Effective hitbox size.
-* Horizontal and vertical reach.
-* Relative positioning.
-* Opponent movement and velocity.
-* Own momentum.
-* Attack startup.
-* Hitbox activation.
-* Recovery vulnerability.
-* Expected damage.
-* Expected launch.
-* Directional Launch.
-* Opponent Launch Point after the hit.
-* Hitstun.
-* Shield interaction.
-* Projectile interaction.
-* Combo potential.
-* Mobility properties.
-* Stage geometry.
-* Distance from the Void.
-* Risk of retaliation.
-* Opportunity cost.
-
-Generate viable attack candidates and evaluate their expected outcomes.
-
-A fast low-damage attack may be preferable to a slow powerful attack if it is much more likely to connect.
-
-A launcher may be preferable to a damage-building attack near the Void.
-
-A movement attack may be useful even if dealing damage is not its primary immediate benefit.
-
-Range intelligence
-
-The CPU must know the effective ranges of every move.
-
-Include the fighter’s hurtboxes, the move’s hitboxes, movement during startup, attack-specific motion, pulls, projectile trajectories, and the opponent’s likely position when the move becomes active.
-
-Different attacks should have different ideal engagement distances.
-
-The CPU should deliberately enter these distances.
-
-Do not make a melee character constantly attack outside its reach.
-
-Do not make a projectile character constantly close into melee when its ranged tools would be more advantageous.
-
-Whiff awareness
-
-If the CPU notices the opponent miss an attack, it should evaluate whether the remaining recovery offers a punish opportunity.
-
-Punishment should depend on the actual recovery window and the CPU’s ability to reach the opponent before that window ends.
-
-Do not grant supernatural instant punishments.
-
-Attack safety
-
-Before committing, estimate whether the attack will:
-
-* Reach its target.
-* Be blocked.
-* Be interrupted.
-* Leave the CPU exposed.
-* Carry the CPU off a ledge.
-* Allow a safer follow-up.
-* Improve its position.
-* Create a favorable trade.
-
-Higher difficulties should increasingly prioritize favorable expected outcomes.
-
-⸻
-
-PART 5 — COMBO INTELLIGENCE
-
-The CPU must understand how to construct and execute real combos.
-
-Do not rely exclusively on predetermined sequences.
-
-Develop a data-driven combo system that uses the actual attack definitions, hitstun, launch trajectories, hit-cancel timing, movement, and opponent position.
-
-Combo stages
-
-Recognize:
-
-1. Combo starters.
-2. Combo extensions.
-3. Launch setups.
-4. Aerial follow-ups.
-5. Combo finishers.
-6. Chase opportunities.
-7. Situations where ending the combo is safer than continuing.
-
-Hit confirmation
-
-Recognize whether an attack actually connected.
-
-Use successful hits to trigger legal follow-ups.
-
-Do not treat a blocked attack as a successful hit.
-
-Do not attempt hit-cancels unless the existing combat rules permit them.
-
-Dynamic combos
-
-The CPU should choose follow-ups based on the opponent’s current position and velocity.
-
-For example:
-
-A quick ground strike connects.
-
-The CPU notices the resulting hitstun and spacing.
-
-It evaluates whether another ground strike, a launcher, a Dash chase, or a jump follow-up can connect.
-
-It chooses a continuation and executes it through normal inputs.
-
-If the opponent is pushed too far away, the CPU may decide to chase or return to neutral.
-
-If a planned follow-up becomes impossible, it should abandon it and find another productive action.
-
-Aerial combos
-
-The CPU must understand how to:
-
-* Jump after an opponent.
-* Position itself at the correct height.
-* Approach airborne targets.
-* Use appropriate mid-air attacks.
-* Use air movement for positioning.
-* Follow upward launches.
-* Intercept falling opponents.
-* Chase horizontally launched opponents when safe.
-
-The CPU must not automatically give up because its target is airborne.
-
-Difficulty differences
-
-Easy:
-Basic short combos, occasional dropped confirms, weaker follow-up choices.
-
-Medium:
-Consistent simple combinations and occasional extended conversions.
-
-Hard:
-Strong hit-confirming, deliberate combo routing, and accurate aerial continuation.
-
-Brutal:
-Near-optimal practical combo routing, strong situational conversions, and excellent decisions about when to continue or disengage.
-
-All levels should attempt combos and use the same legal mechanics.
-
-⸻
-
-PART 6 — MOVEMENT AND POSITIONING INTELLIGENCE
-
-Movement is a fundamental component of combat intelligence.
-
-Alva uses universal momentum-driven movement, with running, turning, jumping, triple jumps, fast-falling, Dashes, and air dashes.
-
-The CPU must understand these shared rules.
-
-Movement goals
-
-The CPU should continuously evaluate how to position itself advantageously.
-
-It should understand:
-
-* Closing distance.
-* Retreating.
-* Maintaining effective attack range.
-* Creating whiff-punish opportunities.
-* Baiting attacks.
-* Avoiding being cornered.
-* Establishing stage control.
-* Chasing opponents.
-* Intercepting airborne opponents.
-* Escaping projectile pressure.
-* Reaching platforms.
-* Returning from off-stage.
-
-Movement should appear intentional, not randomly oscillating.
-
-Dash intelligence
-
-Understand when to use Dash for:
-
-* Approaching quickly.
-* Punishing recovery.
-* Maintaining combo pressure.
-* Escaping a dangerous attack.
-* Closing the distance before attacking.
-* Carrying momentum into an attack.
-* Recovering positioning.
-
-Perform the Dash through the real double-tap input mechanism.
-
-Respect Dash cooldowns, Energy rules, and cancel timing.
-
-Air dash intelligence
-
-Understand when an air dash is appropriate for:
-
-* Aerial pursuit.
-* Air positioning.
-* Escaping danger.
-* Returning toward the stage.
-* Preparing an aerial attack.
-* Carrying momentum into an aerial strike.
-
-Account for its limited uses per airtime.
-
-Do not waste a potentially necessary recovery tool without evaluating the resulting risk.
-
-Momentum intelligence
-
-Predict the consequences of velocity carried into attacks, jumps, landings, and Dashes.
-
-Understand attack-specific momentum modifiers.
-
-Avoid running past an opponent unnecessarily.
-
-Use overspeed and movement carry intentionally when beneficial.
-
-Jump intelligence
-
-The CPU must understand:
-
-* Normal jumps.
-* Higher jumps.
-* Air jumps.
-* Jump availability.
-* Fast falling.
-* Horizontal air control.
-* Landing.
-* Movement between platforms.
-* Jumping to evade attacks.
-* Jumping to approach.
-* Jumping to attack airborne opponents.
-* Jumping to place itself within a move’s effective hitbox.
-
-Use the appropriate jump height.
-
-Do not always perform the same jump.
-
-Do not jump automatically whenever an opponent becomes airborne.
-
-Choose jumping because a calculated result makes it useful.
-
-⸻
-
-PART 7 — STAGE INTELLIGENCE
-
-CPU Intelligence must understand stage geometry rather than treating the arena as a flat infinite battlefield.
-
-Alva currently has:
-
-Desert: A main fighting surface with rock obstacles and no elevated one-way platforms.
-
-City: A rooftop stage with elevated one-way platforms, multiple vertical routes, and solid geometry.
-
-Both stages have open ledges and a dangerous Void beyond their boundaries.
-
-The CPU must use the actual stage data instead of hardcoding behavior based on stage names.
-
-Stage navigation
-
-Build stage-aware navigation using:
-
-* Main floor boundaries.
-* Platforms.
-* Solid obstacles.
-* Platform heights.
-* Reachable jumping routes.
-* Traversable surfaces.
-* Open ledges.
-* Current Void boundaries.
-* Available movement resources.
-
-The CPU should understand where it can safely stand, jump, land, and travel.
-
-It must not repeatedly walk into solid walls or become trapped in a navigation loop.
-
-Position advantage
-
-Recognize:
-
-* Center-stage control.
-* Opponent cornering.
-* Dangerous ledge positions.
-* Advantageous platform positions.
-* High-ground opportunities.
-* Bad escape routes.
-* Safe landing zones.
-* Ledge pressure opportunities.
-
-Prefer positions that improve survival or increase the likelihood of successful attacks.
-
-Overtime
-
-Alva’s overtime causes the Void boundaries to close in.
-
-CPU Intelligence must continuously read the actual active stage.void boundaries.
-
-It must adapt spacing and recovery decisions as the playable area becomes more dangerous.
-
-It must also account for score, remaining time, and the Launch Point tiebreaker.
-
-⸻
-
-PART 8 — EDGE-GUARDING, TRAPPING, AND RECOVERY
-
-Edge-guarding
-
-When the opponent is off-stage, the CPU should recognize the opportunity.
-
-Evaluate:
-
-* Opponent position.
-* Opponent velocity.
-* Remaining recovery resources, when observable or reasonably inferable.
-* Available jumps.
-* Likely recovery route.
-* Available attacking options.
-* Directional Launch.
-* Own position.
-* Risk of falling into the Void.
-
-Possible edge-guarding actions:
-
-* Hold a strategically advantageous ledge position.
-* Intercept an opponent’s return.
-* Attack an approaching airborne opponent.
-* Launch them farther from safety.
-* Use ranged attacks to limit recovery routes.
-* Jump off-stage for an interception when the CPU can recover safely.
-* Retreat back onto the stage when pursuit becomes dangerous.
-
-Do not have the CPU recklessly leap into the Void whenever an opponent leaves the main floor.
-
-Trapping
-
-Recognize opportunities to constrain an opponent’s available movement.
-
-Use projectiles, pulls, summons, techniques, attacks, and stage geometry to create pressure.
-
-A trap should have a meaningful purpose:
-
-* Force a jump.
-* Limit movement.
-* Create a punish opportunity.
-* Catch a landing.
-* Force a defensive reaction.
-* Maintain stage control.
-* Threaten a launch.
-* Prevent an easy recovery.
-
-Plan follow-ups based on the opponent’s response.
-
-Recovery intelligence
-
-When knocked away from the stage, survival becomes the highest priority.
-
-The CPU must evaluate:
-
-* Its current momentum.
-* Launch stun.
-* Remaining air jumps.
-* Available air dash.
-* Character-specific movement abilities.
-* Free-fall restrictions.
-* Stage height.
-* Ledge position.
-* Actual Void boundaries.
-* Estimated time until elimination.
-
-Develop an actionable recovery route rather than issuing one fixed movement direction.
-
-Use the safest available sequence of jumps, steering, air dash, and eligible mobility attacks.
-
-Understand that some movement attacks cannot start during an active launch or free fall.
-
-Avoid wasting the last available recovery action.
-
-Even Easy should actively attempt to recover.
-
-Difficulty should determine recovery quality, not whether recovery is attempted.
-
-⸻
-
-PART 9 — SHIELD AND DEFLECT INTELLIGENCE
-
-Alva has different defensive behavior on the ground and in the air.
-
-Ground: The Shield button holds a Shield.
-
-Air: A fresh Shield press starts the Deflect attack.
-
-These must remain distinct.
-
-Ground Shield intelligence
-
-The CPU must understand:
-
-* Incoming hit timing.
-* Shield effectiveness.
-* Unblockable attacks.
-* Perfect Shield opportunities.
-* Shield blockstun.
-* Energy costs.
-* Opponent recovery.
-* Whether shielding or moving is safer.
-* When to lower its Shield.
-* When a punish is possible after defending.
-
-Avoid permanent turtling.
-
-Avoid pointless repeated Shield presses.
-
-Do not Shield against attacks that are unblockable.
-
-Against unblockable attacks, consider jumping, movement, interruption, or other legal avoidance options.
-
-Deflect intelligence
-
-Deflect is not merely defensive.
-
-The CPU must recognize Deflect as a genuine attack.
-
-It can:
-
-* Strike an airborne opponent.
-* Deal damage.
-* Launch an opponent.
-* Turn incoming projectiles back.
-* Create spacing.
-* Punish an aerial approach.
-* Finish an opponent under suitable conditions.
-
-The shared Deflect strike deals 3 Launch Points at Base Launch 2.
-
-Its Directional Launch depends on the fighter.
-
-Jump-to-Deflect behavior
-
-The CPU must be able to recognize an incoming projectile and, when legal and physically feasible, jump into an appropriate position to Deflect it.
-
-Example:
-
-An opponent fires a projectile.
-
-The CPU estimates the projectile’s trajectory and arrival time.
-
-It determines that jumping would place its Deflect hitbox on the projectile’s path during the Deflect’s active window.
-
-It jumps, positions itself, and times the Deflect.
-
-The reflected projectile may then threaten its original owner.
-
-This must work as an intentional sequence rather than an accidental button press.
-
-Do not Deflect projectiles that cannot be reached or that have already passed.
-
-Do not assume Deflect provides immunity to every simultaneous attack.
-
-Offensive Deflect
-
-The CPU must sometimes use Deflect to attack an airborne opponent directly, even when no projectile exists.
-
-Evaluate it alongside other aerial attacks.
-
-Account for reach, damage, launch direction, Energy cost, recovery, and opportunity cost.
-
-Defensive difficulty
-
-Easy:
-Occasional Shield use, imperfect timing, basic Deflect attempts.
-
-Medium:
-Reasonable defensive awareness and occasional successful projectile Deflects.
-
-Hard:
-Effective protection, deliberate perfect Shield attempts, strong aerial defense.
-
-Brutal:
-Excellent threat recognition, precise legal timing, intelligent counterplay, and offensive Deflect utilization.
-
-Even Brutal must have a finite, nonzero reaction delay.
-
-⸻
-
-PART 10 — PROJECTILE INTELLIGENCE
-
-The CPU must understand projectiles as moving combat objects with identifiable properties.
-
-Recognize:
-
-* Projectile owner.
-* Current direction.
-* Velocity.
-* Position.
-* Hitbox.
-* Remaining lifetime.
-* Expected trajectory.
-* Damage.
-* Launch.
-* Hit effects.
-* Piercing behavior.
-* Pull effects.
-* Repelling behavior.
-* Erasing behavior.
-* Deflect interaction.
-
-Incoming projectile responses
-
-Evaluate whether to:
-
-* Jump over it.
-* Move out of its trajectory.
-* Shield it when blockable.
-* Deflect it in the air.
-* Jump and Deflect it.
-* Intercept it with a compatible move.
-* Avoid its pull radius.
-* Attack the opponent during projectile startup.
-* Reposition to a safer area.
-
-Decisions must depend on the actual mechanics of that projectile.
-
-Projectile offense
-
-When controlling a fighter with projectiles, evaluate:
-
-* Firing distance.
-* Opponent trajectory.
-* Available firing angle.
-* Obstacles.
-* Projectile travel time.
-* Opponent defensive options.
-* Combo potential.
-* Stage pressure.
-* Edge-guarding value.
-* Trapping opportunities.
-
-Do not fire into blocked trajectories repeatedly.
-
-Do not rely exclusively on ranged attacks when other moves create better opportunities.
-
-Projectile prediction
-
-Higher difficulties should forecast likely intersections more accurately.
-
-Use bounded physical prediction based on observable state.
-
-Do not read future inputs.
-
-⸻
-
-PART 11 — ENERGY INTELLIGENCE
-
-The CPU must understand Alva’s Energy rules.
-
-The maximum Energy is 100.
-
-Relevant shared costs:
-
-* Dash: 25.
-* Air dash: 25.
-* Dash cancel: 25.
-* Deflect: 15.
-* Shield block: 15 per blocked hit.
-
-Attacks, jumps, projectiles, summons, and techniques do not consume Energy merely by being used.
-
-Energy regenerates passively according to the fighter’s existing regeneration value.
-
-When Energy reaches zero, the fighter becomes exhausted and cannot use Energy-dependent defensive or movement actions until it has fully regenerated to 100.
-
-Resource strategy
-
-The CPU must evaluate whether spending Energy now creates enough benefit to justify losing future options.
-
-Examples:
-
-A high-Launch-Point CPU near a ledge may preserve Energy for an emergency air dash or defensive action.
-
-A low-risk CPU with full Energy may spend more aggressively to maintain pressure.
-
-A CPU facing a powerful projectile may preserve enough Energy for a Deflect opportunity.
-
-A CPU with exhausted Energy should change its fighting style because certain defensive and mobility options are unavailable.
-
-It must not repeatedly try to use exhausted abilities.
-
-Advanced planning
-
-Hard and Brutal should consider combinations of actions and their cumulative Energy requirements.
-
-For example:
-
-Dash approach → attack → Dash cancel.
-
-Evaluate whether the available Energy supports the intended sequence and whether spending it leaves acceptable defensive resources.
-
-Do not prohibit legal actions merely because Energy is below their listed cost: Alva allows a non-exhausted fighter to spend its remaining positive Energy, even if that exhausts it.
-
-The CPU must understand the consequences of that choice.
-
-⸻
-
-PART 12 — CHARACTER AND MOVESET INTELLIGENCE
-
-CPU Intelligence must work for every current and future fighter.
-
-Never hardcode an AI decision based on a character ID.
-
-Read the character’s moveset and derive tactical information from its actual definitions.
-
-Each usable move should have a tactical descriptor based on its mechanics.
-
-Examples of useful inferred roles:
-
-* Fast punish.
-* Combo starter.
-* Combo extender.
-* Launcher.
-* Finisher.
-* Anti-air.
-* Air-to-ground attack.
-* Ground pressure.
-* Zoning.
-* Trap.
-* Pull.
-* Repel.
-* Projectile interception.
-* Mobility.
-* Recovery.
-* Shield pressure.
-* Unblockable punish.
-* Aerial pursuit.
-* Defensive counterattack.
-
-A move may have multiple roles.
-
-The AI must not rely only on its player-facing name to determine its purpose.
-
-Fighter #0001
-
-The CPU must understand and meaningfully utilize:
-
-Jab: Quick close-range attack, pressure, and hit-cancel opportunities.
-
-Floating Straight: Aerial attack that uses movement and hover behavior.
-
-Red: Projectile pressure, horizontal launching, Shield push, and projectile repelling.
-
-Red Kick: Homing aerial mobility, interception, and launching.
-
-Maximum Blue: Pulling opponents into its projectile, trapping, and vertical launches.
-
-Blue: Aerial pull, positioning control, and upward launching.
-
-Unlimited Void: Unblockable area technique that paralyzes an opponent and creates follow-up opportunities.
-
-Hollow Purple: Powerful unblockable projectile, projectile erasure, and high-Launch-Point finishing opportunities.
-
-High Kick: Strong vertical launching and aerial setup potential, balanced against its commitment.
-
-Infinity Shield: Ground defense, including its special melee stall behavior.
-
-Deflect: Aerial projectile reflection and offensive vertical launching.
-
-The CPU must understand that Unlimited Void’s paralysis offers follow-up opportunities, while Hollow Purple’s long cast creates vulnerability if started carelessly.
-
-It should be able to use Maximum Blue and Blue to establish pressure and create subsequent attacks.
-
-These are examples of behavior emerging from the data-driven system, not reasons to insert character-specific branches into the shared AI.
-
-Fighter #0002
-
-The CPU must understand and meaningfully utilize:
-
-One-Two: Fast multi-hit ground pressure and combo setup.
-
-Homing Attack: Aerial pursuit, closing distance, interception, and mobility.
-
-Rapid Kicks: Multi-hit offense and a stronger horizontal finisher.
-
-Bounce Attack: Downward aerial attack, ground interception, and bounce-based positioning.
-
-Spin Attack: Ground mobility, pressure, and attacking while rolling.
-
-Blue Tornado: Rising aerial attacks, carrying opponents upward, and potential finishing opportunities.
-
-Whirlwind: Projectile trapping, multi-hit pressure, and vertical launching.
-
-Ground Shield: Defensive blocking and perfect Shield opportunities.
-
-Deflect: Aerial counterattack, horizontal launching, and projectile reflection.
-
-The CPU must account for Homing Attack and Blue Tornado’s airtime and free-fall limitations.
-
-It must understand that Spin Attack and other movement attacks can also serve positional purposes.
-
-It should intentionally create situations where Whirlwind can threaten an opponent rather than ignoring it because of its startup and cooldown.
-
-Again, implement these behaviors generically through moveset interpretation.
-
-⸻
-
-PART 13 — HUMAN-LIKE BEHAVIOR
-
-This system must feel like an actual player, not a mechanical bot.
-
-Human-like behavior should emerge from:
-
-* Coherent goals.
-* Natural movement.
-* A meaningful fighting style.
-* Reactions to visible events.
-* Recognizable pressure.
-* Defensive adaptations.
-* Intentional combos.
-* Occasional misjudgments.
-* Baiting.
-* Spacing.
-* Reading opponents.
-* Choosing when to commit.
-* Changing strategies after unsuccessful exchanges.
-
-Remove robotic behaviors
-
-Avoid:
-
-* Constantly oscillating left and right for no tactical reason.
-* Jumping at fixed intervals.
-* Spamming one move.
-* Attacking empty space repeatedly.
-* Repeatedly shielding without a threat.
-* Running blindly into projectiles.
-* Following opponents into the Void without recovery options.
-* Performing identical attacks in an endless sequence.
-* Freezing after an attack.
-* Waiting without an objective.
-* Repeatedly attempting unavailable moves.
-* Making immediate perfect responses to every opponent action.
-* Abandoning plans every frame because of insignificant changes.
-
-Human imperfections
-
-Lower difficulty should produce believable errors.
-
-For example:
-
-Easy may misjudge spacing, approach at the wrong moment, or choose an unsafe attack.
-
-Medium may recognize a punish too late or choose a less effective combo continuation.
-
-Hard may occasionally overcommit or misread an opponent’s approach.
-
-Brutal should make very few significant tactical mistakes but should still operate with finite reaction times and imperfect knowledge.
-
-Never use purposeless inactivity as a substitute for lower intelligence.
-
-⸻
-
-PART 14 — OPPONENT ADAPTATION
-
-The CPU should recognize patterns from the opponent’s actual observed behavior.
-
-Track useful information such as:
-
-* Frequently used attacks.
-* Repeated projectile use.
-* Common approach patterns.
-* Jumping habits.
-* Shield frequency.
-* Defensive reactions.
-* Common recovery routes.
-* Aggressive versus passive tendencies.
-* Repeated unsafe moves.
-* Frequent aerial approaches.
-* Preferred engagement distance.
-
-Use this history to adjust decision-making.
-
-Examples:
-
-An opponent repeatedly jumps toward the CPU.
-
-The CPU increasingly values aerial interception and anti-air options.
-
-An opponent repeatedly shields.
-
-The CPU increasingly considers unblockable attacks, repositioning, and other legitimate Shield counterplay.
-
-An opponent frequently fires projectiles.
-
-The CPU starts favoring positioning and defensive options that counter the observed trajectories.
-
-An opponent repeatedly attacks unsafely.
-
-The CPU increasingly positions itself to punish those recoveries.
-
-Adaptation must be gradual, evidence-based, and limited by difficulty.
-
-Do not assume patterns from one action.
-
-Do not grant perfect predictions of an opponent’s next input.
-
-Retain short-term relevant knowledge through the current match, but clear or appropriately reset it on a new match.
-
-⸻
-
-PART 15 — DIFFICULTY INTELLIGENCE
-
-All four difficulties must use the same foundational CPU Intelligence architecture.
-
-Do not implement Easy as an entirely separate simplistic bot or Brutal as a different rule-breaking controller.
-
-Lower difficulties are weaker because their perception, prediction, execution, tactical judgement, adaptation, and planning are less developed.
-
-EASY — CASUAL PLAYER
-
-Behavioral identity: A real casual player who is actively trying to win.
-
-Characteristics:
-
-* Constant purposeful participation.
-* Basic approach and retreat.
-* Uses its full moveset when relevant.
-* Simple combos.
-* Occasional jumps and Dashes.
-* Understands basic attack range but misjudges it sometimes.
-* Slower reactions.
-* Inconsistent punishes.
-* Basic Shield usage.
-* Occasional Deflect.
-* Attempts recovery.
-* Recognizes obvious ledge danger.
-* Basic Launch Point awareness.
-* Weak prediction.
-* Limited adaptation.
-* Sometimes overcommits.
-
-Must still be capable of surprising the player with a good attack, successful combo, or smart defensive action.
-
-It should feel inexperienced, not disabled.
-
-MEDIUM — TRYHARD PLAYER
-
-Behavioral identity: An actively competitive player trying hard to win.
-
-Characteristics:
-
-* Consistent movement.
-* Reasonable spacing.
-* Active pressure.
-* Better combo utilization.
-* Uses the majority of available opportunities.
-* More deliberate projectiles.
-* Moderate Shield and Deflect timing.
-* Uses Dash and air dash strategically.
-* Attempts aerial pursuit.
-* Recognizes common mistakes.
-* Reasonable stage awareness.
-* Adjusts aggression based on Launch Point.
-* Uses traps and character abilities.
-* Punishes some unsafe attacks.
-* More reliable recovery.
-* Basic opponent adaptation.
-
-It should demand actual effort to defeat.
-
-HARD — TOURNAMENT / PROFESSIONAL PLAYER
-
-Behavioral identity: A highly experienced competitive player.
-
-Characteristics:
-
-* Fast but fair reactions.
-* Strong positioning.
-* Good neutral-game decisions.
-* Reliable hit confirmation.
-* Advanced combo routing.
-* Effective aerial pressure.
-* Strong edge-guarding.
-* Accurate range judgement.
-* Consistent punish execution.
-* Good projectile prediction.
-* Intelligent trapping.
-* Precise resource management.
-* Frequent tactical adaptation.
-* Effective defensive responses.
-* Strong understanding of both fighters’ Launch Point.
-* Excellent use of mobility attacks.
-* Strong ability to control the fight’s pace.
-* Few unforced mistakes.
-
-It should feel like a skilled player with significant matchup experience.
-
-BRUTAL — ELITE INTELLIGENCE
-
-Behavioral identity: An exceptionally skilled player capable of consistently dominating a demanding benchmark population.
-
-Target: 95% or greater match win rate against a clearly defined, nontrivial evaluation suite.
-
-This is a measurable balancing objective, not permission to cheat or a guarantee against every human player.
-
-Characteristics:
-
-* Extremely strong tactical evaluation.
-* Excellent but nonzero reaction time.
-* Near-optimal practical move selection.
-* Advanced spacing and interception.
-* Highly reliable punishes.
-* Strong combo conversions.
-* Very effective edge-guarding.
-* Excellent off-stage recovery.
-* Intelligent baiting.
-* Precise projectile counterplay.
-* Strong offensive Deflect.
-* Advanced Energy management.
-* Exceptional Launch Point awareness.
-* High-quality multi-step plans.
-* Excellent adaptation to observed patterns.
-* Strong use of traps and stage geometry.
-* Highly efficient movement and mobility attacks.
-* Very few unnecessary commitments.
-* Strong identification of finishing opportunities.
-
-Brutal must understand when aggression is correct and when defense is correct.
-
-It must not mindlessly rush the opponent simply because its aggression parameter is high.
-
-It should be capable of overwhelming pressure, but also capable of patient, controlled counterplay.
-
-When an opponent makes a serious mistake, Brutal should capitalize consistently.
-
-When the opponent is playing safely, Brutal should intelligently create openings rather than randomly attacking.
-
-Difficulty tuning principles
-
-Use a shared intelligence configuration to adjust:
-
-* Reaction delay.
-* Perception reliability.
-* Decision accuracy.
-* Prediction horizon.
-* Spacing precision.
-* Planning depth.
-* Punish recognition.
-* Combo execution reliability.
-* Defensive timing.
-* Risk assessment quality.
-* Opponent pattern recognition.
-* Adaptation speed.
-* Strategic resource valuation.
-
-Tuning must preserve a meaningful progression from Easy through Brutal.
-
-Do not make aggression monotonically increase as difficulty increases.
-
-A smarter CPU should choose aggression or defense according to the situation.
-
-A lower difficulty can still make an excellent decision occasionally.
-
-A higher difficulty should make better decisions more consistently.
-
-⸻
-
-PART 16 — STRATEGIC PLANNING
-
-Introduce a goal-based planning system.
-
-Possible combat goals:
-
-* Build Launch Point.
-* Secure a finishing launch.
-* Win neutral.
-* Establish spacing advantage.
-* Maintain offensive pressure.
-* Force an opponent into a trap.
-* Punish a specific recovery.
-* Catch an aerial landing.
-* Edge-guard.
-* Escape a dangerous position.
-* Recover from off-stage.
-* Preserve Energy.
-* Avoid a projectile threat.
-* Restore safe stage control.
-* Protect a score lead.
-* Force action when behind.
-* Prepare for an opponent respawn.
-
-Each goal should generate tactical plans.
-
-Example:
-
-Goal: Finish high-Launch-Point opponent.
-
-Plan: Move into favorable range → force opponent toward ledge → create an opening → use an appropriately directed launcher → evaluate whether edge-guarding is safe.
-
-Another example:
-
-Goal: Survive at high Launch Point.
-
-Plan: Leave dangerous ledge area → establish safe spacing → avoid an incoming heavy attack → punish the opponent’s missed commitment → regain stage control.
-
-Plans must be interruptible by genuine emergencies.
-
-Plans must also be abandoned when they become impossible.
-
-Do not continuously reset useful plans because of tiny positional fluctuations.
-
-Use reasonable commitment, hysteresis, and replanning rules to avoid indecisive behavior.
-
-⸻
-
-PART 17 — EXECUTION AND INPUT RELIABILITY
-
-CPU Intelligence needs an execution layer that converts decisions into real legal inputs.
-
-It must:
-
-* Produce the same standard input snapshot format as the player controller.
-* Generate correct one-step button-pressed edges.
-* Avoid accidental repeated presses.
-* Handle releasing and re-pressing controls.
-* Execute Dash and air dash through double taps.
-* Handle jump hold duration.
-* Respect attack buffering.
-* Respect ground and air action differences.
-* Respect hit-cancel conditions.
-* Respect cooldowns.
-* Handle landing transitions.
-* Understand animation commitment.
-* Cancel invalid action plans safely.
-* Recover from failed input sequences.
-* Preserve correct targeting and facing.
-
-Do not create hidden gameplay advantages.
-
-Preserve existing attack-facing behavior where it is part of the CPU controller contract.
-
-A CPU should not become stuck because an attack was rejected, a target moved, an intended jump did not start, or a planned Dash was unavailable.
-
-Provide deterministic fallback behavior that continues pursuing a meaningful objective.
-
-⸻
-
-PART 18 — CPU INTELLIGENCE VALIDATION
-
-Create comprehensive automated tests and repeatable gameplay simulations.
-
-Fundamental correctness tests
-
-Verify:
-
-1. Every difficulty actively participates throughout controllable combat.
-2. No difficulty enters unexplained extended inactivity.
-3. Every usable attack has tactical opportunities in which the CPU selects and successfully executes it.
-4. Every character-specific move is respected.
-5. Ground and aerial moves are used correctly.
-6. CPU inputs follow human-equivalent rules.
-7. CPU actions obey cooldowns and animation restrictions.
-8. Energy is spent correctly.
-9. Exhaustion is respected.
-10. Launch Point calculation remains unchanged.
-11. Shield and Deflect remain distinct.
-12. Dash inputs are legal.
-13. The CPU never receives Combat Assist.
-14. Unknown difficulty still resolves appropriately.
-15. Fixed-step determinism is preserved.
-16. Seeded CPU-vs-CPU matches replay identically.
-17. No CPU behavior mutates fighter statistics or combat rules.
-
-Combat intelligence tests
-
-Test specific scenarios:
-
-* Low Launch Point offense.
-* High Launch Point defense.
-* Opponent near a ledge.
-* CPU near a ledge.
-* Both fighters at high Launch Point.
-* Opponent misses a long-recovery move.
-* Opponent starts a slow attack.
-* Opponent repeatedly Shields.
-* Incoming blockable projectile.
-* Incoming unblockable attack.
-* Jump-to-Deflect opportunity.
-* Offensive Deflect against an airborne fighter.
-* Airborne opponent within jump-attack reach.
-* Grounded opponent vulnerable to a launcher.
-* Combo starter connects.
-* Planned combo follow-up becomes impossible.
-* Low Energy.
-* Complete Energy exhaustion.
-* Off-stage recovery with jumps available.
-* Off-stage recovery with only an air dash.
-* Recovery using an eligible movement attack.
-* Movement between City platforms.
-* Obstacle navigation on Desert.
-* Projectile collision and reflection.
-* Closing Void during overtime.
-
-Tests should verify not only that inputs were pressed, but whether they achieved the intended legal game behavior.
-
-Moveset coverage tests
-
-For every playable fighter, dynamically enumerate valid moves.
-
-Construct situations where each move serves a reasonable purpose.
-
-Verify that CPU Intelligence can recognize and execute that move.
-
-Repeat for all four difficulties.
-
-Use representative seeds to account for difficulty-dependent decision variation.
-
-Do not make tests dependent on hardcoded fighter IDs.
-
-Add fighter-specific scenario tests only where a fighter has a unique mechanic that needs exact verification.
-
-Human-like behavior tests
-
-Detect:
-
-* Unproductive idle loops.
-* Repetitive attack spam.
-* Direction oscillation.
-* Repeated invalid actions.
-* Endless Shield holding.
-* Failed approach loops.
-* Unnecessary off-stage movement.
-* Navigation deadlocks.
-* Excessive plan switching.
-* Obvious missed punish opportunities.
-
-Collect and analyze action histories rather than checking only individual frames.
-
-Competitive evaluation
-
-Build a repeatable CPU-vs-CPU benchmark covering:
-
-* All playable fighter matchups.
-* Mirror matches.
-* Both stages.
-* Multiple initial seeds.
-* Both starting sides.
-* Multiple opponent strategies.
-* Different Launch Point situations.
-* Match score pressure.
-* Overtime.
-* Projectile-heavy opponents.
-* Defensive opponents.
-* Aggressive opponents.
-* Skilled scripted benchmark opponents.
-
-Measure:
-
-* Match win rate.
-* Knockout rate.
-* Self-elimination rate.
-* Damage dealt and received.
-* Successful punishes.
-* Combo completion.
-* Recovery success.
-* Stage-control efficiency.
-* Deflect attempts and success.
-* Energy efficiency.
-* Valid move utilization.
-* Unproductive idle duration.
-* Difficulty performance progression.
-
-Brutal should target at least 95% match victories against the declared benchmark population.
-
-Benchmark strength must be meaningful and documented.
-
-Do not artificially weaken benchmark opponents to claim success.
-
-Report measured results transparently.
-
-Measure whether the four difficulties are meaningfully distinct without breaking their shared capabilities.
-
-⸻
-
-PART 19 — PERFORMANCE AND DETERMINISM
-
-The system must run efficiently in a browser and remain compatible with Alva’s fixed-step architecture.
-
-Use:
-
-* Cached move knowledge.
-* Efficient threat analysis.
-* Bounded prediction horizons.
-* Limited candidate generation.
-* Appropriate strategic reassessment intervals.
-* Lightweight tactical updates when urgency requires them.
-* Deterministic seeded random decisions.
-
-Avoid expensive unrestricted search over future combat states.
-
-If using forward simulation, keep it bounded and side-effect-free.
-
-Never advance or mutate the real game to test hypothetical choices.
-
-No additional external runtime dependencies should be necessary.
-
-The system must remain suitable for desktop and mobile devices.
-
-Avoid frame stalls and excessive garbage collection during active matches.
-
-⸻
-
-PART 20 — COMPLETE REPLACEMENT AND INTEGRATION
-
-The existing CombatAIController is being retired.
-
-Replace the old combat AI architecture with CPU Intelligence.
-
-The new controller must become the active CPU controller in:
-
-* Quick Battle Regular Play.
-* Quick Battle Custom Play.
-* Watch Mode.
-* CPU versus CPU matches.
-* Mirror matches.
-* Restarted battles.
-* Rematches.
-* Respawns.
-
-Preserve the existing Practice Ground training dummy behavior. It is intentionally passive and is not a competitive combat CPU.
-
-Update js/game/battle.js to construct CPUIntelligenceController.
-
-Replace or retire obsolete combat AI modules instead of keeping a second competing implementation.
-
-Update js/data/difficulty.js to contain the new intelligence profiles.
-
-The existing CPU moveset reader may be replaced or redesigned, but its character-neutral, data-driven functionality must be preserved and expanded.
-
-Review and update every outdated test that explicitly assumes CombatAIController, its old hesitation behavior, or stationary waiting while an opponent is out of play.
-
-Do not simply delete tests to make the suite pass.
-
-Replace obsolete behavior assertions with tests of the new intended functionality.
-
-Preserve unrelated game behavior.
-
-Do not change fighter mechanics to compensate for AI implementation difficulties.
-
-⸻
-
-PART 21 — DOCUMENTATION
-
-Update the documentation to describe CPU Intelligence as the current system.
-
-Required documentation includes:
-
-* ALVA_SPEC.md
-* docs/systems/ai.md
-* docs/gameplay/battle.md
-* Relevant architecture documentation.
-* Relevant testing documentation.
-* README.md if its description becomes outdated.
-
-Ensure the new specifications clearly explain the four difficulties and both non-negotiable requirements.
-
-Keep character definitions and codename_rule compatible.
-
-Do not alter the protected character_rule file.
-
-Maintain the existing project’s conventions and documentation structure.
-
-⸻
-
-PART 22 — IMPLEMENTATION PROCESS
-
-Complete the work in a controlled sequence.
-
-Phase 1: Codebase audit
-
-Document how the current CPU selects, plans, and executes actions.
-
-Identify the causes of inactivity, weak move diversity, ineffective defense, missed combos, poor navigation, and other relevant limitations.
-
-Confirm existing mechanics before designing replacements.
-
-Phase 2: Core intelligence
-
-Implement perception, state analysis, move knowledge, strategic planning, and tactical decision-making.
-
-Ensure character-neutral behavior.
-
-Phase 3: Combat execution
-
-Implement reliable attack execution, movement plans, combos, follow-ups, interrupts, shielding, and Deflect.
-
-Phase 4: Stage and survival intelligence
-
-Implement navigation, edge control, edge-guarding, off-stage recovery, and Void prediction.
-
-Phase 5: Advanced combat strategy
-
-Implement resource intelligence, Launch Point-based play-style changes, trapping, adaptation, and matchup-aware decision-making.
-
-Phase 6: Difficulty profiles
-
-Configure Easy, Medium, Hard, and Brutal using the same intelligence foundation.
-
-Phase 7: Integration
-
-Retire the old combat AI and integrate CPU Intelligence into all applicable modes.
-
-Phase 8: Validation and tuning
-
-Run the existing test suite using:
+Run:
 
 node --test
 
-Add the new behavioral, combat, matchup, and performance tests.
+Fix any regressions caused by these presentation changes.
 
-Run repeatable simulated battles and tune the difficulty profiles using measured outcomes.
+7. Documentation consistency
 
-Phase 9: Documentation and cleanup
+Review and update any descriptions that now contradict the desired interface, particularly:
 
-Remove obsolete combat AI paths, repair imports, update documentation, and ensure the repository has one clearly defined competitive CPU system.
+* docs/systems/input.md
+* Relevant comments in js/ui/touch-controls.js
+* Relevant comments in js/ui/touch-layout-editor.js
+* Relevant comments in js/ui/icons.js
+* Relevant test descriptions
 
-⸻
+The documentation must explain that Defence always uses the shield glyph, Mouvement uses double arrows, and the editor uses neutral icons regardless of character.
 
-FINAL ACCEPTANCE CRITERIA
+8. Acceptance criteria
 
-The implementation is complete only when:
+The work is complete only when:
 
-* CPU Intelligence fully replaces the former combat CPU controller.
-* Every competitive CPU uses the new system.
-* All difficulties actively pursue meaningful goals.
-* No controllable CPU pointlessly freezes.
-* Every functional character attack and ability can be intentionally selected and used.
-* Attacks have recognizable tactical purposes.
-* Combos are constructed and executed using real combat mechanics.
-* The CPU understands its own and its opponent’s Launch Point.
-* Fighting style dynamically shifts between aggression and defense.
-* The CPU can pressure, retreat, defend, punish, and edge-guard.
-* The CPU can navigate every current stage.
-* The CPU can recover intelligently from off-stage.
-* Projectiles are recognized and countered appropriately.
-* The CPU can jump to Deflect a projectile.
-* Deflect is also utilized offensively against enemy fighters.
-* The CPU understands horizontal and vertical attack ranges.
-* The CPU jumps and repositions to attack airborne opponents.
-* The CPU manages Energy and exhaustion.
-* The CPU makes tactical use of mobility attacks.
-* The CPU adapts to observed opponent behavior.
-* Easy feels like a casual player.
-* Medium feels like a tryhard player.
-* Hard feels like a tournament-level player.
-* Brutal feels exceptionally strong and is evaluated against the 95%+ benchmark target.
-* All characters remain mechanically fair.
-* Existing combat systems are not weakened or bypassed.
-* CPU behavior is deterministic under seeded simulation.
-* The automated tests pass.
-* Documentation accurately describes the replacement.
+1. The Jump icon has no horizontal line beneath it.
+2. Defence always displays the shield icon, including in the air.
+3. The Joystick scheme’s two Mouvement buttons display double directional arrows.
+4. Every attack button on the personalization screen displays the correct number of dots.
+5. All other personalization controls display universal default icons, never fighter-specific artwork.
+6. All attack slots are available for layout editing regardless of selected character.
+7. Character-specific attack artwork continues to work normally during gameplay.
+8. Existing input behavior, saved layouts, localization, and combat mechanics remain unchanged.
+9. Automated tests pass.
 
-MOST IMPORTANT DESIGN PHILOSOPHY
+9. Final deliverable
 
-Do not build four separate bots. Build one genuine combat intelligence system and vary the quality of that intelligence.
+Implement the changes directly in the appropriate existing modules.
 
-A casual player still moves, attacks, defends, jumps, experiments, and tries to win.
+Keep the patch focused on the interface and avoid unrelated refactoring.
 
-A tryhard player understands more mechanics and executes them more consistently.
+When finished, provide:
 
-A professional player understands positioning, risk, punishment, and pressure at a high level.
+* A concise summary of the changes.
+* The files modified.
+* Any new or updated tests.
+* The result of running node --test.
+* Confirmation that gameplay mechanics and saved touch layouts are unchanged.
 
-An elite player combines all of these abilities with exceptional consistency, planning, prediction, and adaptation.
-
-Every difficulty must feel like it is being controlled by a real person with their own skill level.
-
-The CPU should not merely press buttons.
-
-It should understand what it is trying to accomplish, why an action is useful, what result it expects, what actually happened, and what it should do next.
-
-This is the foundation of CPU Intelligence.
-
-Implement the complete system in the actual Alva repository. Do not stop after creating architecture plans, interfaces, or partial scaffolding. Integrate the replacement, validate it through real gameplay simulations, fix discovered problems, and provide a final implementation report identifying changed modules, tests, moveset coverage, gameplay improvements, and measured difficulty performance.
+Final goal: Alva’s touch controls should have consistent universal Jump, Defence, and Mouvement icons, while the personalization screen should display a clean, neutral set of buttons that looks the same for every character.
