@@ -1,345 +1,238 @@
-ALVA — Controls Preview and Home Screen UI Update
+ALVA — Add “Why Alva?” to the Home Screen
 
 Objective
 
-Implement two small, polished UI improvements in the Alva game. Both changes must integrate naturally with Alva’s existing design system, component structure, localization, responsiveness, and accessibility.
+Modify the existing Alva Home Screen to introduce a new text-based interactive element labeled “Why Alva?”, positioned directly below the existing “By hiyroscript” developer attribution.
 
-Tasks:
+The new element must have a clearly visible underline that communicates it is clickable.
 
-1. Add the missing directional Mouvement icons to the Joystick preview in Settings → Controls.
-2. Add a new, non-functional Download button with a download icon at the bottom-right of the Home Screen.
+For now, clicking it must do absolutely nothing. It is a visual and interactive placeholder for a future feature.
 
-These are visual/interface changes only. Do not introduce new gameplay mechanics or change existing control behavior.
+This should be a small, carefully integrated UI addition, not a redesign.
 
-Project context
+1. Project context
 
 Repository: hiyroscript/alva
 
-Alva is a browser-based 2D platform fighting game built with native JavaScript ES modules, HTML, CSS, and Canvas 2D. It does not use a framework or build system.
+Alva is a browser-based 2D platform fighting game using native JavaScript ES modules, HTML, CSS and Canvas 2D. There is no frontend framework or build step.
 
-The UI uses near-black backgrounds, subtle glass-like surfaces, restrained green accents, outlined controls, and original SVG icons.
+The Home Screen features:
 
-Before implementing, inspect the relevant source files and understand how the components interact.
+* The ALVA wordmark and tagline.
+* Play, Watch Mode, Practice Ground and Discover.
+* A scrolling credits section.
+* Help, Controller and Settings controls.
+* A bottom footer containing the developer attribution and a disabled Download icon.
 
-Important files:
+Preserve the existing game design, its minimalist dark aesthetic, typography, spacing and responsiveness.
 
-* js/ui/settings-dialog.js — Settings interface and control previews.
-* css/settings.css — Settings layout and preview styling.
-* js/screens/home-screen.js — Home Screen construction and navigation.
-* css/home.css — Home Screen layout and responsive styling.
-* js/ui/icons.js — Shared SVG icon definitions.
+Before editing, review the current implementation and the relevant project documentation.
+
+2. Relevant files
+
+The principal files are:
+
+* js/screens/home-screen.js — Home Screen structure and behavior.
+* css/home.css — Home Screen styling, including the footer.
 * js/localization/strings/en.js — English translations.
 * js/localization/strings/fr.js — French translations.
-* tests/interface/settings.test.mjs — Settings and Home Screen tests.
-* tests/interface/controls-ui.test.mjs — Control icon and input tests.
+* tests/interface/settings.test.mjs — Existing Home footer structure assertions.
+* tests/interface/i18n.test.mjs — Localization tests.
 
-Respect existing architecture and naming conventions.
+The Home Screen is generated dynamically in JavaScript. Do not unnecessarily move its content into index.html.
 
-⸻
+3. Exact positioning
 
-Task 1 — Joystick preview: Add directional icons
+Locate the existing footer created in js/screens/home-screen.js.
 
-Current behavior
+It currently contains the localized developer attribution using:
 
-Open Settings → Controls.
+tx('home.by', { developer: CONFIG.developer })
 
-There are two Mobile Controls options:
+The footer uses the .home-footer class and also contains a disabled .home-download button.
 
-* Joystick
-* Classic Buttons
+Modify the footer’s left area so the content appears vertically in the following order:
 
-Each option contains a miniature preview of its touch-control layout.
+By hiyroscript
 
-The Classic preview correctly displays double-arrow Mouvement icons inside its two smaller circular buttons.
+Why Alva?
 
-However, the Joystick preview currently displays the two smaller circular buttons without any icons.
+The requirements are:
 
-The missing icons make the Joystick preview look incomplete compared with Classic.
+1. Keep the developer attribution exactly as it currently appears.
+2. Add “Why Alva?” immediately underneath.
+3. Align the left edges of both text elements.
+4. Maintain a small, intentional vertical gap between them.
+5. Keep both items grouped on the left side of the footer.
+6. Preserve the Download icon’s existing position on the far right.
+7. Do not place the new element inside the main Play/Watch/Practice/Discover navigation.
 
-Required implementation
+A small wrapper, such as .home-footer-left, is appropriate for vertically stacking the attribution and new element while retaining the footer’s existing horizontal flex layout.
 
-Update the Joystick preview so that its two smaller circular buttons contain the same Mouvement icons used in Classic.
+4. Visual design
 
-Specifically:
+The new element must look native to Alva.
 
-* The upper-left small circle must contain ICONS.mouvementLeft.
-* The upper-right small circle must contain ICONS.mouvementRight.
-* The main joystick circle and its inner knob must remain unchanged.
+Use the existing styling conventions in css/home.css:
 
-Existing implementation
+* Retain the footer’s monospace typography (var(--font-mono)).
+* Use a text size consistent with the existing footer, approximately 11px unless minor responsive adjustments are necessary.
+* Use a subtle, readable foreground color from the existing design tokens.
+* Avoid bold, oversized or brightly colored typography.
+* Do not add a card, border box, background panel, icon or arrow.
+* The underline must be visible at all times, not only on hover.
+* Give the underline a small offset from the text for readability.
+* Use cursor: pointer to communicate interactivity.
+* A restrained hover color change is acceptable.
+* Provide a keyboard-visible focus indicator consistent with Alva’s UI.
 
-In js/ui/settings-dialog.js, locate the PREVIEW object.
+The final result should feel like an intentional, understated footer link rather than an additional primary menu action.
 
-The Classic preview already uses:
+5. Interaction behavior — IMPORTANT
 
-* html: ICONS.mouvementLeft
-* html: ICONS.mouvementRight
+The “Why Alva?” element must look clickable and be genuinely focusable, but must not perform an action yet.
 
-The Joystick preview currently creates the corresponding .sp-dash--left and .sp-dash--right elements without these icons.
+Use a semantic <button type="button"> styled as understated text.
 
-Reuse the existing SVG icons in the Joystick preview, rather than creating replacements.
+Do not use a disabled button, since the element must retain its interactive appearance and be keyboard-focusable.
 
-Visual requirements
+On click or activation:
 
-The Joystick preview must:
+* Do not navigate anywhere.
+* Do not open a page, modal or overlay.
+* Do not change the current screen.
+* Do not display an alert, toast or notification.
+* Do not modify game state.
+* Do not launch gameplay.
+* Do not alter the URL or scroll position.
+* Do not log an unnecessary message.
 
-* Display the correct directional double-arrow icons.
-* Use the exact same icon design as Classic.
-* Center each icon precisely inside its circular button.
-* Preserve its existing overall dimensions and layout.
-* Maintain equal visual weight between the left and right icons.
-* Keep the icons legible on small mobile screens.
-* Preserve the selected-card green border treatment.
-* Look consistent with Alva’s current dark interface.
+A button without an action handler is acceptable for this placeholder.
 
-The existing CSS selector .settings-preview .sp-dash .icon already defines small icon sizing. Reuse it where possible.
+Make sure it can be reached using standard keyboard navigation. Consider Alva’s existing data-nav and MenuNavigator conventions so gamepad focus navigation remains coherent. Activating it with a keyboard or gamepad must also have no effect.
 
-Only adjust CSS if necessary for visual alignment or readability. Avoid unnecessarily changing the size or position of the circles.
+Do not create a new screen, route, dialog or feature implementation.
 
-Restrictions
+6. Localization
 
-Do not modify the actual gameplay joystick, Dash behavior, touch input mappings, saved control configurations, or Classic controls.
+Alva supports English and French, including runtime language switching.
 
-This task concerns only the small illustration displayed in Settings.
+Do not hardcode the visible text directly into the Home Screen.
 
-⸻
+Add a new translation key following the existing naming scheme.
 
-Task 2 — Add a Download button to the Home Screen
+Suggested key:
 
-Current behavior
+home.whyAlva
 
-The Home Screen contains:
+English:
 
-* The Alva logo and tagline.
-* Play, Watch Mode, Practice Ground, and Discover navigation.
-* A top-right utility group containing Help, Controller, and Settings.
-* A scrolling credits panel.
-* A bottom footer containing the developer attribution.
+Why Alva?
 
-Help and Controller are currently disabled placeholder buttons. Settings is functional.
+French:
 
-Required implementation
+Pourquoi Alva ?
 
-Add one new Download button in the bottom-right corner of the Home Screen.
+Render the button text using Alva’s existing localization helper, such as tx().
 
-This must be a visible, icon-only button using a download symbol.
+Verify that changing the game language updates the label immediately without requiring a reload.
 
-It is a placeholder for a future feature and must not perform any action.
+Keep the existing developer attribution localization unchanged.
 
-Placement
+7. Responsive layout
 
-The download button should sit at the far right of the Home Screen’s bottom footer area, visually aligned with the existing layout.
+The footer must remain functional and visually balanced across supported screen sizes, especially small landscape mobile displays.
 
-Recommended implementation:
+Pay attention to these existing constraints:
 
-* Add the button inside the existing .home-footer element in js/screens/home-screen.js.
-* Keep the developer attribution on the left.
-* Place the Download button on the far right.
-* Use the existing footer flex layout and appropriate spacing.
+* .home-footer currently uses a horizontal flex layout and safe-area padding.
+* Its height is relatively compact.
+* css/home.css includes special rules for heights below 500px and 360px.
+* The Home Screen’s .home-intro calculates available space using --below-logo.
 
-This positioning should avoid covering the main menu or the scrolling credits.
+The additional line must not cause clipping, overflow or overlap with the Download icon, navigation buttons or device safe areas.
 
-Do not place the button inside .home-utility-buttons, since that group belongs in the top-right corner.
+If more footer height is required, adjust it minimally and update the relevant Home Screen height calculations so the ALVA wordmark and main menu continue fitting properly.
 
-Button appearance
+Avoid unnecessary changes to global styling.
 
-The new Download button should:
+8. Preserve existing behavior
 
-* Use a compact square design.
-* Follow the visual styling of Alva’s existing utility buttons.
-* Have a dark, subtle background.
-* Use a thin, understated border.
-* Display a centered download icon.
-* Use the existing theme colors rather than hardcoded unrelated colors.
-* Have consistent internal padding and alignment.
-* Remain visible without attracting excessive attention.
+Do not change any unrelated Home Screen functionality.
 
-It should appear as a native part of Alva’s interface, not a separate design element.
+In particular, preserve:
 
-Download icon
+* The four existing menu actions and their navigation.
+* Existing Settings behavior.
+* Disabled Help, Controller and Download placeholders.
+* Scrolling credits and their interactions.
+* Screen entry/exit animations.
+* Default focus behavior.
+* English/French localization.
+* Reduced-motion behavior.
+* Existing gameplay, fighter systems, controls and rendering.
 
-In js/ui/icons.js, introduce a new shared icon:
+Keep the modification isolated to the footer and its directly related styling, localization and tests.
 
-ICONS.download
+9. Tests and verification
 
-Create a simple inline SVG using the existing svg() helper.
+Update affected tests where necessary.
 
-The icon should represent a downward-facing arrow entering a download tray or horizontal base.
+The existing Home footer test in tests/interface/settings.test.mjs assumes the footer directly contains a SPAN and BUTTON. Adjust this assertion to accommodate the new left-side wrapper while continuing to verify the original developer attribution and Download button.
 
-Follow the conventions of the other icons:
+Add relevant assertions confirming:
 
-* Use the existing 24 × 24 SVG coordinate system.
-* Inherit currentColor through existing CSS.
-* Use simple, clean stroked geometry.
-* Keep stroke thickness visually consistent.
-* Avoid external images, emoji, icon libraries, or dependencies.
+1. Exactly one “Why Alva?” button exists on Home.
+2. It is directly underneath the developer attribution.
+3. It has type="button".
+4. It is not disabled.
+5. It uses the new localization key.
+6. Its underline is persistently defined in CSS.
+7. Clicking it does not change screens or game state.
+8. Its English and French labels are correct.
+9. It does not interfere with existing Home actions or focus behavior.
 
-The icon must be recognizable at small sizes.
-
-Non-functional behavior
-
-The Download button must be completely non-functional.
-
-Requirements:
-
-* Use a native HTML button.
-* Set type="button".
-* Set disabled: true.
-* Do not attach a click handler.
-* Do not trigger downloads.
-* Do not open a URL.
-* Do not navigate to another screen.
-* Do not display a popup, tooltip indicating an active download, or dialog.
-* Do not modify settings or game state.
-* Do not add it to keyboard/gamepad menu navigation using data-nav.
-
-Follow the disabled-button pattern already used by the Help and Controller buttons.
-
-The button is intentionally visible but unavailable.
-
-Localization and accessibility
-
-Add a new localized string:
-
-* English: home.download → Download
-* French: home.download → Télécharger
-
-Use the existing localization helper to provide an accessible aria-label and, if consistent with nearby controls, a localized title.
-
-The SVG itself must remain decorative and hidden from assistive technology, following the shared icon conventions.
-
-Native disabled semantics should communicate that the feature is currently unavailable.
-
-Responsive requirements
-
-The button must display correctly on:
-
-* Desktop landscape screens.
-* Laptop-sized windows.
-* Tablet landscape layouts.
-* Small mobile landscape layouts.
-* Narrow or portrait browser windows.
-* Short-height mobile screens.
-
-Respect the existing safe-area variables:
-
-* --safe-r
-* --safe-b
-* --safe-l
-
-Ensure the button:
-
-* Does not overlap the developer attribution.
-* Remains aligned to the right.
-* Does not disappear outside the viewport.
-* Does not significantly increase the footer height on short screens.
-* Does not obstruct menu actions or other interactive elements.
-* Does not introduce unwanted horizontal scrolling.
-
-If required, reduce the button’s dimensions at smaller viewport heights using Alva’s existing CSS conventions.
-
-⸻
-
-Task 3 — Maintain design and architecture consistency
-
-Preserve Alva’s established interface.
-
-Do not redesign either screen.
-
-Follow these principles:
-
-1. Reuse existing components and SVG icons wherever possible.
-2. Make focused changes rather than restructuring entire files.
-3. Follow the existing naming conventions.
-4. Reuse CSS variables for surfaces, borders, spacing, and colors.
-5. Keep all existing controls functional.
-6. Preserve keyboard, gamepad, and touch navigation.
-7. Maintain English and French localization support.
-8. Do not introduce new dependencies.
-9. Do not alter gameplay, fighter data, physics, combat, or rendering.
-10. Avoid unnecessary refactoring or unrelated visual changes.
-
-The result should look like the two improvements were always part of the game.
-
-⸻
-
-Task 4 — Tests and verification
-
-Update or extend the existing tests as necessary.
-
-Joystick preview tests
-
-In tests/interface/settings.test.mjs, extend the existing preview test to verify:
-
-* The Classic preview remains unchanged.
-* The Joystick preview still contains three main elements.
-* The two smaller Joystick circles contain the correct SVG icons.
-* The left circle contains ICONS.mouvementLeft.
-* The right circle contains ICONS.mouvementRight.
-* The joystick and knob retain their existing structure.
-* No functional touch-control behavior is modified.
-
-Home Screen tests
-
-Verify that:
-
-* The new Download button exists in the Home footer.
-* It uses ICONS.download.
-* It is a native disabled button.
-* It has the correct accessible label.
-* It is not registered as a navigation candidate.
-* Activating or attempting to focus it does not change the active screen.
-* It does not open Settings or another dialog.
-* It does not write to saved settings.
-* Existing Home menu actions and top-right utility buttons remain unchanged.
-* Both English and French labels work correctly.
-
-Visual verification
-
-Check the updated UI in the browser.
-
-For the Joystick preview, verify that both double-arrow icons are visible, centered, and consistent with Classic.
-
-For the Home Screen, verify that the Download icon appears at the bottom-right, is correctly aligned with the footer, and does not interfere with nearby content.
-
-Check responsive behavior at representative desktop, tablet, and small landscape-phone resolutions.
-
-Run the test suite
-
-Execute:
+Run the existing test suite using:
 
 node --test
 
-Fix any regressions introduced by these changes.
+Also check for styling and localization regressions. If browser testing is available, verify the footer visually at desktop and small landscape-mobile sizes.
 
-⸻
+10. Expected result
 
-Acceptance criteria
+The Home Screen footer should visually resemble:
 
-The work is complete when:
+By hiyroscript
 
-* [ ]	The Joystick preview shows the double-left-arrow icon in its smaller left circle.
-* [ ]	The Joystick preview shows the double-right-arrow icon in its smaller right circle.
-* [ ]	Both icons match the Classic preview.
-* [ ]	The main joystick preview retains its original shape and positioning.
-* [ ]	A new Download icon button appears at the bottom-right of Home.
-* [ ]	The button integrates with the existing footer and visual design.
-* [ ]	The Download button is visibly present but completely non-functional.
-* [ ]	Existing Home actions and Settings behavior are preserved.
-* [ ]	The button is localized in English and French.
-* [ ]	Accessibility and responsive layout remain correct.
-* [ ]	All relevant automated tests pass.
+Why Alva?
 
-Final deliverable
+The existing Download icon remains on the opposite side.
 
-Implement the changes directly in the existing project.
+“Why Alva?” is visibly underlined, has a pointer cursor and normal interactive focus behavior, but currently has no destination or functionality.
 
-After implementation, provide a concise summary covering:
+11. Scope restrictions
 
-1. Which files were modified.
-2. What changed in the Joystick preview.
-3. How the new Download button was implemented and positioned.
-4. Any responsive or accessibility adjustments.
-5. Test results.
+Do not build a “Why Alva?” information page yet.
 
-Keep the changes minimal, maintainable, and production-quality. Do not implement an actual download feature.
+Do not write explanatory content about Alva.
+
+Do not add a temporary modal.
+
+Do not add hidden or partially implemented navigation.
+
+Do not redesign the Home Screen.
+
+Do not modify gameplay systems.
+
+Prefer the smallest maintainable implementation that fits the project’s existing architecture.
+
+Deliverables
+
+Implement the changes directly in the existing project files, then provide:
+
+* A brief summary of the implementation.
+* The files changed.
+* The results of testing.
+* Confirmation that “Why Alva?” is underlined, positioned below “By hiyroscript”, and does nothing when activated.
+
+Priority: precise positioning, existing Alva styling, full responsiveness, and zero action on activation.
