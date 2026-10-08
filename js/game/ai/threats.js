@@ -29,8 +29,12 @@ import { launchFor, KO_VALUE, energyCost, punishCost, hitWorth } from './valuati
 
 const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
 
-// Threats further off than this (seconds to contact) wait for a later look.
+// Threats further off than this (seconds to contact) wait for a later look;
+// a projectile, seen from far off, is planned for earlier (a jump to
+// Deflect it may have to start well before it arrives).
 export const DEFENSE_HORIZON = 0.5;
+export const SHOT_HORIZON = 0.9;
+export const horizonOf = (t) => (t.shot ? SHOT_HORIZON : DEFENSE_HORIZON);
 
 // How bad hit `hit` landing on the CPU, coming from side `from`, would
 // be: its damage, its stun, and its launch from the Launch Point it would
@@ -213,23 +217,22 @@ export function deflectCatches(S, threat, delay = 0, arc = (t) => selfAt(S, t)) 
   return false;
 }
 
-// From the ground: a jump (and which kind) and when to press the Deflect
-// in the air so it catches shot `threat`: { jumpIn, deflectIn, kind } (s
+// From the ground: a jump (and which height) and when to press the Deflect
+// in the air so it catches shot `threat`: { jumpIn, deflectIn, jump } (s
 // from now), searched over a few frames; null when none works.
 export function jumpDeflectPlan(S, threat) {
   const d = S.k.deflect;
   if (!d || !d.catches || !threat.shot || !S.grounded) return null;
   for (const kind of ['normal', 'high']) {
-    for (let j = 0; j <= 18; j += 1) {
+    for (let j = 0; j <= 40; j += 1) {
       const jumpIn = j * STEP;
       if (jumpIn > threat.contactIn) break;
-      for (let e = 2; e <= 16; e += 1) {
+      for (let e = 1; e <= 46; e += 1) {
         const deflectIn = jumpIn + e * STEP;
         if (deflectIn + d.atk.startup > threat.contactIn + 0.02) break;
         const arc = (t) => (t <= jumpIn ? { x: S.x, y: S.y } : jumpArc({ x: S.x, y: S.y, vx: 0, vy: 0 }, kind, 0, t - jumpIn, S.g));
         if (!deflectCatches(S, threat, deflectIn, arc)) continue;
-        // Its body clear of the shot until then.
-        return { jumpIn, deflectIn, kind };
+        return { jumpIn, deflectIn, jump: kind };
       }
     }
   }
@@ -385,7 +388,7 @@ export function defenseOptions(S, threat) {
 // The best answer to the soonest threat it can still answer, or null when
 // there is nothing to answer (or nothing better than what it is doing).
 export function chooseDefense(S, threats, pick) {
-  const threat = threats.find((t) => t.contactIn <= DEFENSE_HORIZON && t.endIn > 0);
+  const threat = threats.find((t) => t.contactIn <= horizonOf(t) && t.endIn > 0);
   if (!threat) return null;
   const options = defenseOptions(S, threat);
   return pick(options);

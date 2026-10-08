@@ -148,7 +148,7 @@ export function navigateStep(S, ex, nav) {
   const edge = nav.path[nav.i];
   if (!edge) return 'done';
   const to = edge.to;
-  const on = S.grounded ? surfaceUnder(S.stage, S.x, S.halfW, S.y + 1) : null;
+  const on = S.grounded ? surfaceUnder(S.stage, S.x, S.halfW, S.y - 1) : null;
   if (S.grounded && on === to) {
     nav.i++;
     nav.phase = null;
@@ -233,7 +233,9 @@ export function recoverStep(S, ex, rec) {
   // casual one jumps as soon as it starts to fall.
   const low = 70 - 110 * q; // feet this far above the ledge (negative: below) before it jumps
   const sink = vy > -60 && (depth > low || (depth > -40 && gap > driftReach));
-  const voidClose = S.y + 0 > stage.void.bottom - 260 + S.self.body.height / 2;
+  // Falling close to the Void's bottom: no waiting for the best moment (but
+  // never a second jump on top of a rise still going).
+  const voidClose = vy > -150 && S.y > stage.void.bottom - 260 + S.height / 2;
   if (S.airJumps > 0 && !S.freeFall && (sink || voidClose) && gap > 0) {
     // Above the ledge and the air dash closes the gap: keep the jump.
     if (!(canAirDash && depth < -10 && gap < 230 && gap > driftReach)) {

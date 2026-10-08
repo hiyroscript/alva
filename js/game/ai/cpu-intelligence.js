@@ -51,7 +51,7 @@ import { Perception } from './perception.js';
 import { buildSituation } from './situation.js';
 import { Strategy } from './strategy.js';
 import { planCandidates } from './tactics.js';
-import { assessThreats, defenseOptions, deflectCatches, DEFENSE_HORIZON } from './threats.js';
+import { assessThreats, defenseOptions, deflectCatches, DEFENSE_HORIZON, horizonOf } from './threats.js';
 import { OpponentModel } from './adaptation.js';
 import { Executor } from './execution.js';
 import { runPlan, INTENTIONAL } from './plans.js';
@@ -277,7 +277,7 @@ export class CPUIntelligenceController {
     let urgent = this.urgent;
     this.urgent = false;
     for (const t of threats) {
-      if (t.ref && t.contactIn <= DEFENSE_HORIZON && !this.answered.has(t.ref)) {
+      if (t.ref && t.contactIn <= horizonOf(t) && !this.answered.has(t.ref)) {
         this.answered.add(t.ref);
         urgent = true;
       }
@@ -300,7 +300,7 @@ export class CPUIntelligenceController {
     this.danger = { mine: S.myDanger, foe: S.foeDanger };
     this.stats.goals[S.goal] = (this.stats.goals[S.goal] ?? 0) + 1;
     const cands = [];
-    const threat = threats.find((t) => t.contactIn <= DEFENSE_HORIZON && t.endIn > 0);
+    const threat = threats.find((t) => t.contactIn <= horizonOf(t) && t.endIn > 0);
     if (threat && (S.canAct || S.shielding || S.cancellable)) {
       const opts = defenseOptions(S, threat);
       // A level that defends worse sometimes misreads what is coming.

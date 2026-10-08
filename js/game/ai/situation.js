@@ -43,7 +43,7 @@ export function buildSituation(c, self, foe, ctx, fv) {
     foeCache: [], foeFlight: null,
   };
   S.offStage = !b.grounded && offStage(stage, b.x, b.halfW, b.y);
-  S.surface = b.grounded ? surfaceUnder(stage, b.x, b.halfW, b.y + 1) : null;
+  S.surface = b.grounded ? surfaceUnder(stage, b.x, b.halfW, b.y - 1) : null;
   S.ledge = ledgeInfo(stage, b.x);
   // Readiness, as the fighter's own rules decide it.
   S.movementReady = (air) => self.movementReady(air);
@@ -72,7 +72,7 @@ export function buildSituation(c, self, foe, ctx, fv) {
     S.foeExhausted = fv.exhausted;
     S.foeOffStage = !fv.grounded && offStage(stage, fv.x, fv.halfW, fv.y);
     S.foeLedge = ledgeInfo(stage, fv.x);
-    S.foeSurface = fv.grounded ? surfaceUnder(stage, fv.x, fv.halfW, fv.y + 1) : null;
+    S.foeSurface = fv.grounded ? surfaceUnder(stage, fv.x, fv.halfW, fv.y - 1) : null;
     S.foeLevel = fv.grounded ? fv.y : fv.lastGroundY;
     S.sameLevel = Math.abs(S.foeLevel - b.y) < 40 || (!fv.grounded && fv.y > b.y - 140 && fv.y < b.y + 40);
     // Seconds until it can act again, from what its animation shows.
@@ -85,6 +85,18 @@ export function buildSituation(c, self, foe, ctx, fv) {
     S.foeWhiffing = !!def && S.foePhase === 'recovery' && !fv.atkHasHit;
     S.foeHeld = fv.stun > 0 || fv.paralysis > 0;
     S.foeFlight = foeFlightOf(S);
+    // What it can throw at the CPU from where it is (in the air, its air
+    // moves; a homing dash reaches as far as it locks on): its quickest
+    // strike and its longest reach right now.
+    let fastest = Infinity;
+    let reach = 0;
+    for (const m of fv.grounded ? fk.ground : fk.air) {
+      if (m.kind !== 'melee' && m.kind !== 'deflect') continue;
+      const r = m.motion === 'homing' ? m.atk.motion.range : m.reach.x + m.reach.w;
+      if (m.startup < fastest) fastest = m.startup;
+      if (r > reach) reach = r;
+    }
+    S.foeStrike = { fastest, reach };
   } else {
     S.dx = 0;
     S.dir = self.facing;

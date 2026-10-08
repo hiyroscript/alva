@@ -62,6 +62,7 @@ export function runMatch({ a, b, defA, defB, mapId, seed, cap = CONFIG.battle.ma
   battle.setPhase('fight');
   const sides = battle.fighters.map((f) => ({
     f, falls: 0, selfFalls: 0, dealt: 0, taken: 0, hits: 0, offstage: 0, returned: 0, lastHitAt: -Infinity, out: false, wasOff: false,
+    ctrl: false,
   }));
   let steps = 0;
   const limit = Math.ceil(cap / DT);
@@ -84,21 +85,31 @@ export function runMatch({ a, b, defA, defB, mapId, seed, cap = CONFIG.battle.ma
     }
     for (const s of sides) {
       const f = s.f;
+      // Off-stage trips it had a chance to recover from (it could act at
+      // some point out there), while the fight was on: made it back, or not.
       if (f.lostToVoid && !s.out) {
         s.out = true;
-        s.falls++;
-        if (t - s.lastHitAt > 2.5) s.selfFalls++;
-        if (s.wasOff) s.wasOff = false;
+        // A fall once the match is decided (inputs locked) is no fall.
+        const live = battle.phase === 'fight' || battle.score.p1 + battle.score.p2 > 0 && battle.phase === 'ko' && s.f === battle.fighters.find((x) => battle.score[x.opponent.slot] >= battle.pointsToWin);
+        if (live) s.falls++;
+        if (live && t - s.lastHitAt > 2.5) s.selfFalls++;
+        if (s.wasOff && s.ctrl && battle.phase === 'fight') s.offstage++;
+        s.wasOff = false;
       } else if (!f.lostToVoid) {
         s.out = false;
         const b = f.body;
         const off = !b.grounded && !battle.stage.surfaceBelow(b.x - b.halfW, b.x + b.halfW, b.y).ref;
         if (off && !s.wasOff) {
           s.wasOff = true;
-          s.offstage++;
-        } else if (s.wasOff && b.grounded) {
+          s.ctrl = false;
+        }
+        if (s.wasOff && off && f.canAct()) s.ctrl = true;
+        if (s.wasOff && b.grounded) {
           s.wasOff = false;
-          s.returned++;
+          if (s.ctrl) {
+            s.offstage++;
+            s.returned++;
+          }
         }
       }
     }

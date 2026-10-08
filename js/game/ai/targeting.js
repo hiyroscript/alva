@@ -87,6 +87,13 @@ export function meleeFit(S, m, { delay = 0, from = S, err = S.rangeError } = {})
   const t0 = atk.startup;
   const drift = attackDrift(S.self, atk, from.vx, t0, air, toward);
   const sx = from.x + drift;
+  // On the ground, never a strike whose own slide carries it off the
+  // stage's edge into open air.
+  if (!air && Math.abs(from.vx) > 40) {
+    const slide = attackDrift(S.self, atk, from.vx, atk.total, false, toward);
+    const ex = from.x + slide;
+    if (!S.stage.surfaceBelow(ex - S.halfW * 0.5, ex + S.halfW * 0.5, from.y).ref) return null;
+  }
   const n = Math.max(1, Math.round(atk.active / STEP));
   for (let k = 0; k < n; k += 2) {
     const t = t0 + k * STEP;

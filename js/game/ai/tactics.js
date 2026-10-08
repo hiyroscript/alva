@@ -85,6 +85,7 @@ function landingOdds(S, m, fit) {
 // less what it spends.
 export function strikeValue(S, m, fit, { mem = null, delay = 0 } = {}) {
   const p = S.profile;
+  const model = S.model;
   const { pHit, pBlock, at } = landingOdds(S, m, fit);
   let worth = hitWorth(S, m, { at, face: fit.face });
   const roles = GOAL_ROLES[S.goal];
@@ -111,6 +112,13 @@ export function strikeValue(S, m, fit, { mem = null, delay = 0 } = {}) {
   let v = pHit * worth + pBlock * onBlock - (1 - pHit - pBlock) * whiff;
   // A cast holds the fighter in place: struck first, it is broken.
   if (m.kind === 'technique' && S.foeBusy < m.startup) v -= punishCost(S, m.startup, dist) * 0.8;
+  // Up close against a free opponent, its own quicker strike may land
+  // first: a slow startup there is a gamble.
+  else if (S.fk && S.foeBusy < fit.t && S.foeStrike && Math.hypot(S.dist, S.dy) < S.foeStrike.reach + S.me.hw + 40) {
+    const lead = fit.t - (S.foeStrike.fastest + 0.03);
+    const pFirst = clamp(lead / 0.3, 0, 0.6) * (0.5 + 0.5 * (model?.rate.approaches ?? 0.5));
+    v -= pFirst * foeHitWorth(S) * (0.4 + 0.6 * p.risk);
+  }
   v -= 0.12 * m.total + (m.cooldown > 1.5 ? 0.1 * Math.min(m.cooldown, 6) : 0);
   v -= energyCost(S, m.energy);
   v -= delay * 0.8;
@@ -122,7 +130,6 @@ export function strikeValue(S, m, fit, { mem = null, delay = 0 } = {}) {
   if (mem) v += variety(S, m, mem, pHit);
   // Habits: anti-air against jumpers, Shield pressure against turtles,
   // shots meeting shots against zoners.
-  const model = S.model;
   if (model) {
     if (m.roles.has('antiAir') && !S.foeGrounded) v += 1.5 * Math.max(0, model.bias('jumpIns') + 0.3);
     if (m.roles.has('shieldPressure') || m.roles.has('unblockable')) v += 2 * Math.max(0, model.bias('shields'));
@@ -295,6 +302,25 @@ function neutral(S, mem, out) {
     if (p.punish > 0.5 && dist < foeReach + 120 && dist > foeReach - 10) {
       const bv = (p.punish - 0.5) * 2 + Math.max(0, model.bias('unsafe')) * 2 + Math.max(0, model.bias('approaches')) - 0.3;
       out.push({ value: bv, plan: { kind: 'bait', phase: 'in', depth: foeReach - 6, out: foeReach + 40, until: S.clock + 0.9, value: bv } });
+    }
+  }
+  // Guard: the Shield up for a moment with the opponent free at its range,
+  // as a player does against strikes too quick to react to; more against
+  // one that comes in a lot, more again with a Shield that stalls what it
+  // blocks (a punish). Never for long, never one guard straight after
+  // another (no turtling).
+  if (S.grounded && S.k.shield && !S.exhausted && S.foeIn && S.foeBusy <= 0.02 && S.self.shieldAllowed()) {
+    // A jump-in coming at it counts from as far as its air strikes reach.
+    const comingIn = !S.foeGrounded && Math.sign(S.fvx) === -S.dir && Math.abs(S.fvx) > 80;
+    const range = comingIn ? Math.max(foeReach, S.foeStrike?.reach ?? 0) : foeReach;
+    const near = Math.hypot(dist, S.dy) < range + 50;
+    if (near) {
+      const pAttack = clamp(0.2 + 0.3 * (model.rate.approaches ?? 0.5) + 0.25 * a + (comingIn ? 0.25 + 0.3 * Math.max(0, model.bias('jumpIns')) : 0), 0, 0.85);
+      const since = S.clock - (mem.lastGuard ?? -Infinity);
+      let v = foeHitWorth(S) * pAttack * 0.5 * (0.4 + 0.6 * p.defense) - 0.9 - energyCost(S, 15) * pAttack;
+      if (S.k.shield.stall > 0) v += pAttack * 2.2 * p.punish;
+      if (since < 0.8) v -= 2.5 * (1 - since / 0.8);
+      out.push({ value: v, plan: { kind: 'shield', raiseAt: S.clock, until: S.clock + 0.22 + 0.2 * S.rng(), guard: true, value: v } });
     }
   }
   // Back to the middle: a ledge behind it (hits send it toward it), or

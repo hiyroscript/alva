@@ -234,8 +234,9 @@ function navigate(S, ex, plan) {
   return navigateStep(S, ex, plan.nav);
 }
 
-function shield(S, ex, plan) {
+function shield(S, ex, plan, c) {
   if (!S.grounded) return 'done';
+  if (plan.guard) c.lastGuard = S.clock;
   if (S.clock >= plan.raiseAt) ex.shield();
   if (S.clock > plan.until && S.self.combat.shieldStun <= 0) return 'done';
   return 'run';
@@ -277,7 +278,7 @@ function jumpDeflect(S, ex, plan) {
   if (!plan.jumped) {
     if (t >= plan.jumpIn - 1e-6) {
       if (!S.grounded || !S.canAct) return 'fail';
-      ex.jump(plan.kind);
+      ex.jump(plan.jump);
       plan.jumped = true;
     }
     return 'run';
