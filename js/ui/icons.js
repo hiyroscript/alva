@@ -6,20 +6,23 @@ const svg = (body, { fill = false, vb = 24 } = {}) =>
 export const ICONS = {
   left: svg('<path d="M15 4.5 7.5 12 15 19.5"/>'),
   right: svg('<path d="M9 4.5 16.5 12 9 19.5"/>'),
+  // Joystick Mouvement/Dash buttons; Classic running keeps single arrows.
+  mouvementLeft: svg('<path d="M11 5.5 4.5 12 11 18.5"/><path d="M19.5 5.5 13 12 19.5 18.5"/>'),
+  mouvementRight: svg('<path d="M4.5 5.5 11 12 4.5 18.5"/><path d="M13 5.5 19.5 12 13 18.5"/>'),
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
-  jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),
+  jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/>'),
   transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
-  // The universal Shield button's glyph (see js/ui/touch-controls.js). A
+  // The universal Defence glyph, on the ground and in the air. A
   // fighter's own combat buttons show frames of its own art instead (see
   // js/ui/mobile-abilities.js).
   shield: svg('<path d="M12 3C10 4.4 7.6 5.2 5.2 5.5Q4.4 5.6 4.4 6.4V10C4.4 15.2 7.6 18.8 12 21C16.4 18.8 19.6 15.2 19.6 10V6.4Q19.6 5.6 18.8 5.5C16.4 5.2 14 4.4 12 3Z"/>'),
-  // The same button in the air, where it is the fighter's Deflect: a swipe
-  // sweeping up and an arrow sent back the way it came.
+  // Deflect artwork: a swipe and a reflected arrow. The touch Defence
+  // button keeps the shield glyph even when its action is Deflect.
   deflect: svg('<path d="M5 19.5C5 12 9.5 6.5 17 5"/><path d="M13.5 3.5 17 5l-2 3.2"/><path d="M19.5 13.5H11"/><path d="M14 10.5l-3 3 3 3"/>'),
   // Neutral stand-ins for a combat button with no frame of a fighter's art
-  // to show (no fighter named yet, a button the layout editor shows for a
-  // fighter that lacks it, a frame that fails to load): a ring for the large
+  // to show (no fighter named yet, every button in the layout editor,
+  // or a frame that fails to load): a ring for the large
   // extra_attack button, and one to five pips for the numbered attack
   // buttons, attack1 to attack5.
   tornado: svg('<path d="M3 5c4-2 14-2 18 0M4 8c4 2 12 2 16 0M6 12c3 2 9 2 12 0M8 16c2 1 6 1 8 0M11 20h2"/>'),
