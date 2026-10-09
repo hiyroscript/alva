@@ -67,7 +67,10 @@ use.
   never costs Energy. Never for ranged attacks, never for a CPU.
 - **The whole interface in English and French**, Settings, and a
   **Discover** reference: the fighters, each with one 1–5 difficulty
-  rating and a play-style description, then universal movement and Launch.
+  rating and a concise play-style description, then Lore, universal movement
+  and Launch. Lore starts with introductions for future world and character
+  stories, in English and French. Shared rosters place numbers at the
+  bottom-right beside names on a translucent dark strip.
 
 ## Run it
 
