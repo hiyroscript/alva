@@ -1,361 +1,345 @@
-ALVA — Universal Fighter Difficulty & Play Style UI Update
+ALVA — Discover and roster UI refinement
 
 Objective
 
-Update ALVA’s fighter roster interface so every roster consistently displays each playable fighter’s difficulty rating and provides access to their play-style description.
+Improve the visual consistency, readability, typography, and spacing of the ALVA game’s Discover interface and fighter roster previews.
 
-The system currently exists in Discover → Fighters. Extend it throughout the game while improving its presentation.
+Repository: https://github.com/hiyroscript/alva
 
-This is a focused UI/UX update. Preserve ALVA’s existing visual identity, gameplay systems, navigation behavior, and character data.
+First, inspect the existing implementation and understand how Discover, fighter selection, character previews, localization, and navigation work together. Then implement the following changes directly in the existing architecture.
 
-1. Understand the existing architecture
+This is a focused UI/UX refinement, not a redesign. Preserve ALVA’s current visual identity, colors, typography, layout structure, game mechanics, and navigation system.
 
-Repository: hiyroscript/alva
+1. Lower the “Read play style” action when there is no Confirm button
 
-Review these files before implementing:
+Current behavior
 
-Core UI
+The game uses a shared FighterRoster component across several screens, including fighter selection and Discover.
 
-* js/ui/fighter-roster.js — Shared roster grid, selection logic, animated previews, and Confirm button.
-* js/ui/fighter-browser.js — Discover’s existing difficulty stars and play-style action.
-* js/data/fighter-profiles.js — Difficulty ratings and localized description references.
-* js/ui/overlays.js — Existing InfoDialog implementation.
+The preview information area displays:
 
-Screens
+* Difficulty stars or a status badge.
+* The fighter’s name.
+* The “Read play style” action.
+* A Confirm button, when appropriate.
 
-* js/screens/character-select-screen.js
-* js/screens/quick-cpu-screen.js
-* js/screens/watch-screens.js
-* js/screens/practice-screen.js
-* js/screens/discover-screen.js
+Discover uses FighterBrowser, which extends FighterRoster but intentionally does not display a Confirm button.
 
-Styling and localization
+Currently, the “Read play style” action can appear too close to the fighter name and difficulty stars when no Confirm button is present.
 
+Required changes
+
+For any roster preview that does not have a Confirm button:
+
+1. Position “Read play style” lower within the preview information area.
+2. Keep the action aligned to the bottom-right.
+3. Create a more noticeable but natural vertical separation between the fighter name/difficulty information and the action.
+4. Preserve the difficulty stars above the fighter name.
+5. Maintain the current underlined text-button appearance rather than turning it into a large primary button.
+6. Preserve keyboard, gamepad, mouse, and touch accessibility.
+7. Keep its existing functionality: clicking it must still open the correct fighter’s play-style dialog.
+8. Do not introduce an empty Confirm button or a placeholder occupying its position.
+
+Use the absence of the Confirm button as the condition for this layout variation. Prefer a reusable, scoped class or equivalent component state rather than styling based on individual fighter IDs.
+
+The normal roster layout, where a Confirm button exists, must remain unchanged.
+
+The spacing must also adapt to short landscape windows and mobile devices without clipping text or sacrificing excessive space from the animated fighter preview.
+
+Relevant files
+
+* js/ui/fighter-roster.js
+* js/ui/fighter-browser.js
 * css/setup.css
 * css/discover.css
-* css/practice.css
-* css/responsive.css
+
+2. Completely remove the Passives section from Discover
+
+Current behavior
+
+Discover currently contains four sections:
+
+1. Fighters
+2. Movement
+3. Launch
+4. Passives
+
+Passives is registered as an intentionally empty section.
+
+Required changes
+
+Completely remove Passives from the Discover interface.
+
+The final navigation must have exactly three sections, in this order:
+
+Fighters → Movement → Launch
+
+Requirements:
+
+* Remove Passives from the section registration in js/screens/discover-screen.js.
+* Remove its tab and associated empty panel.
+* Remove obsolete Passives-specific Discover scaffolding and comments.
+* Remove unused localization entries when appropriate.
+* Update any documentation that describes Discover as having four sections.
+* Preserve the existing behavior where opening Discover always selects Fighters first.
+* Ensure clicking, keyboard navigation, and gamepad navigation work normally with three tabs.
+* Ensure the horizontal mobile navigation naturally accommodates the remaining three tabs.
+* Preserve correct ARIA relationships, selected states, and focus handling.
+
+Important: Removing Passives from Discover does not mean removing passive abilities or related mechanics from the fighting game. This change affects only the Discover interface.
+
+3. Redesign the Movement information as flowing paragraphs
+
+Current behavior
+
+The Movement section contains an introductory explanation about universal movement, followed by several individual entries presented inside bordered rectangular holders.
+
+The current movement topics come from MOVEMENT_GUIDE in js/data/movement.js:
+
+* Run
+* Jump
+* Triple jump
+* Fast fall
+* Dash
+* Air dash
+
+These entries currently use .discover-tiers, .discover-tier, and decorative movement markers.
+
+Required changes
+
+Remove the individual holder/card presentation for Movement.
+
+Instead, display the information as normal readable text immediately after the introductory paragraph.
+
+The desired hierarchy is:
+
+Movement
+
+Universal movement
+
+[Existing introductory paragraph explaining that movement is universal.]
+
+[One additional flowing paragraph explaining Run, Jump, Triple jump, Fast fall, Dash, and Air dash.]
+
+Formatting
+
+1. Keep the original introductory paragraph.
+2. Add a second paragraph immediately below it.
+3. Combine the six movement explanations into one coherent paragraph.
+4. Preserve the information provided by the existing movement registry.
+5. Use subtle inline emphasis, such as bold movement names, if it improves readability.
+6. Do not use cards, outlined holders, shaded blocks, decorative bullet markers, or tier-style containers.
+7. Use natural punctuation and spacing between explanations.
+8. Maintain the same readable typography, line height, and muted text palette used in Discover.
+9. Let the paragraph occupy a sensible reading width rather than forcing the text into unnecessarily narrow columns.
+10. Ensure the paragraph wraps naturally and remains readable on desktop and mobile.
+
+Implementation constraints
+
+Continue deriving the content from MOVEMENT_GUIDE and its localized translation keys.
+
+Do not duplicate all movement descriptions as a separate hardcoded English paragraph that could drift away from the game’s source data.
+
+Update buildMovementPage() in js/screens/discover-screen.js to render the content using appropriate semantic paragraph elements.
+
+Remove movement-only visual styles that are no longer needed, without breaking the Launch section’s list presentation.
+
+Keep the actual universal movement mechanics and tuning values untouched.
+
+Relevant files
+
+* js/screens/discover-screen.js
+* css/discover.css
+* js/data/movement.js — reference data, not a request to change gameplay
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
 
-Read the relevant documentation in ALVA_SPEC.md before modifying the interface.
+4. Correct capitalization and grammar throughout Discover
 
-2. Show difficulty in EVERY roster
+Current problem
 
-All fighter-selection interfaces must display the selected or previewed fighter’s difficulty stars.
+Many labels are displayed entirely in uppercase because of CSS text-transform: uppercase.
+
+Examples include:
+
+* MOVEMENT
+* LAUNCH
+* UNIVERSAL MOVEMENT
+* Movement entry names and Launch headings
+
+This makes the interface less natural to read.
+
+Required changes
+
+Use normal, grammatically appropriate capitalization throughout the entire Discover interface.
+
+Examples:
+
+Current appearance	Desired appearance
+FIGHTERS	Fighters
+MOVEMENT	Movement
+LAUNCH	Launch
+UNIVERSAL MOVEMENT	Universal movement
+RUN	Run
+JUMP	Jump
+TRIPLE JUMP	Triple jump
+FAST FALL	Fast fall
+AIR DASH	Air dash
+ROSTER	Roster
+LOCKED	Locked
+NOT RATED	Not rated
+
+Review the entire Discover interface, not only the main navigation.
 
 This includes:
 
-1. Discover → Fighters
-2. Quick Battle → Select Fighter
-3. Custom Play → Select CPU
-4. Watch Mode → Select CPU 1
-5. Watch Mode → Select CPU 2
-6. Practice Ground → Change Fighter
-7. Practice Ground → Select CPU / Change CPU
+* Discover navigation tabs.
+* Page headings.
+* Section headings.
+* Movement descriptions and inline names.
+* Launch section headings.
+* Launch value and direction labels.
+* Roster panel headings.
+* Fighter preview labels and statuses.
+* The “Read play style” action.
+* The play-style dialog’s headings and descriptions.
 
-Important: Implement this through shared roster UI code so that future roster instances automatically inherit the feature.
+Capitalization rules
 
-Difficulty presentation
+Use natural sentence case for regular headings and labels.
 
-Use ALVA’s existing five-star rating system.
+Keep proper names, official mechanic names, acronyms, and technical terms correctly capitalized when required by the game’s established terminology.
 
-Examples based on current fighter profiles:
+For example, preserve the meaningful capitalization of established terms such as “Launch Point”, “Base Launch”, and “Directional Launch” when they refer to the game’s named mechanics.
 
-* #0001: ★★★★★
-* #0002: ★★★☆☆
+Do not blindly convert all text to lowercase. Do not change the ALVA brand name.
 
-Rules:
+Correct actual spelling, grammar, and punctuation problems where necessary, without altering the meaning of gameplay descriptions.
 
-* Display exactly five stars.
-* Filled stars represent the character’s existing difficulty rating.
-* Unfilled stars remain visible.
-* Maintain ALVA’s existing star styling and colors.
-* Do not introduce another difficulty calculation or rating system.
-* Display the rating in the preview information area, near the fighter’s name.
-* Update the rating immediately when the previewed fighter changes.
+CSS requirements
 
-REMOVE the visible “Difficulty” label
+Inspect and correct uppercase transformations within these selectors:
 
-The current Discover interface displays:
+* .discover-tab
+* .discover-page-title
+* .discover-entry-title
+* .discover-tier-name
 
-DIFFICULTY ★★★★★
+Also inspect shared styles such as .panel-title and .status-badge, which can affect text inside Discover.
 
-Change this to:
+Use Discover-scoped overrides where needed so capitalization changes do not unintentionally alter the appearance of other game screens.
 
-★★★★★
+Preserve the existing font hierarchy, weight, color, and overall styling as much as possible.
 
-Remove the visible word “Difficulty” entirely from beside the stars on every roster.
+Localization
 
-Do not replace it with another visible heading or indicator.
+ALVA supports English and French. All modifications must respect both languages.
 
-However, retain an accessible description such as “Difficulty: 5 out of 5 stars” for screen readers. The stars should remain informational and non-interactive.
+Review the relevant strings in:
 
-Do not confuse fighter difficulty ratings with Quick Battle’s separate CPU difficulty selection.
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-3. Rename the play-style action
+Ensure capitalization and grammar are appropriate for each language independently.
 
-The current button says:
+Do not apply English capitalization conventions blindly to French.
 
-Play style description
+Preserve localization keys that remain in use and ensure language switching continues to update every relevant UI element.
 
-Change it everywhere to exactly:
+5. Preserve the established architecture
 
-Read play style
+ALVA is built using vanilla JavaScript, CSS, HTML, and Canvas 2D. It does not require a frontend framework or build system.
 
-Requirements:
+Follow the architecture already established by the repository.
 
-* Update the existing localization key rather than hardcoding text in individual screens.
-* Update English and French translations.
-* Use a natural French equivalent such as “Lire le style de jeu”.
-* Keep the existing modal’s title, “Play style”, unless a change is needed for consistency.
-* Do not rewrite or shorten the actual character descriptions.
-* Ensure the action updates correctly when the game’s language changes.
+Important constraints:
 
-4. Make “Read play style” smaller
+* Do not introduce React, Vue, or other new frameworks.
+* Do not alter combat systems, player movement, fighter definitions, difficulty values, or launch calculations.
+* Do not modify character art or animation assets.
+* Do not introduce fighter-ID-specific special cases in shared UI components.
+* Do not modify the protected character_rule file.
+* Preserve the intentional internal codename spelling mouvment where required by codename_rule. This spelling is part of the game’s internal naming contract and is not a player-facing typo to correct.
+* Preserve all existing navigation, focus management, and modal functionality.
+* Keep the implementation concise and consistent with existing code conventions.
 
-The current .text-action styling uses a 12px font.
+6. Responsive design and accessibility
 
-Reduce the visible text size slightly, targeting approximately 11px.
+Verify that the modified interface works in:
 
-Design requirements:
+* Desktop landscape.
+* Short laptop-sized landscape windows.
+* Mobile landscape.
+* Narrow screens where Discover uses horizontal navigation.
+* English and French.
 
-* Smaller than the current text.
-* Subtle and secondary to the fighter’s name and difficulty stars.
-* Maintain the existing understated, underlined text-button appearance.
-* Use ALVA’s existing typography and color variables.
-* Preserve readable contrast.
-* Keep a comfortable clickable/tappable area despite the smaller font.
-* Preserve hover, active, keyboard-focus, and gamepad-focus states.
+Ensure:
 
-The action should feel like a small informational link, not a primary button.
+* No clipped headings or overflowing paragraphs.
+* No horizontal scrolling caused by Movement descriptions.
+* Readable spacing between the introductory and detailed Movement paragraphs.
+* Proper placement of “Read play style” in previews without Confirm.
+* Consistent difficulty-star alignment.
+* Correct focus indicators and keyboard navigation.
+* Accessible tab labels, tab-panel relationships, and localized names.
+* No invisible Passives tab or panel remaining in the navigation.
+* No regressions in the Launch reference layout.
 
-5. Move “Read play style” to the BOTTOM RIGHT
+7. Update automated tests
 
-Currently, Discover places the play-style action on the same horizontal row as the difficulty rating.
+The repository uses Node’s built-in test runner.
 
-This arrangement must change.
+Review and update tests/interface/discover.test.mjs, along with other affected tests.
 
-New layout
+Specifically:
 
-Organize the fighter preview information so that:
-
-* Difficulty stars appear near the top-left of the information area.
-* The fighter’s name remains prominently displayed.
-* “Read play style” appears at the bottom-right corner of the preview information area.
-* The action is right-aligned and visually separated from the difficulty stars.
-* It must not sit next to the stars anymore.
-
-Suggested visual hierarchy:
-
-┌─────────────────────────────┐
-│                             │
-│     ANIMATED FIGHTER        │
-│         PREVIEW             │
-│                             │
-├─────────────────────────────┤
-│ ★★★★★                       │
-│                             │
-│ #0001                       │
-│                             │
-│              Read play style│
-│                             │
-│ ┌─────────────────────────┐ │
-│ │     Confirm fighter     │ │
-│ └─────────────────────────┘ │
-└─────────────────────────────┘
-
-For selection screens, the link should occupy the bottom-right of the information area immediately above the existing Confirm button.
-
-For Discover, which has no Confirm button, position the link at the bottom-right of its preview information section.
-
-Use Flexbox or CSS Grid so the alignment is reliable. Avoid fragile absolute positioning that might overlap other content.
-
-The result must look intentional on both desktop and mobile.
-
-6. Make the play-style dialog available in all rosters
-
-Currently, Discover uses FighterBrowser and playStyleDialog() to display fighter descriptions through app.infoDialog.
-
-Extend this capability to every roster.
-
-Expected behavior
-
-When a player activates “Read play style”:
-
-1. Open the existing informational modal.
-2. Show the currently previewed fighter’s display name.
-3. Show the localized play-style description from fighter-profiles.js.
-4. Allow the user to read the full description.
-5. Close through the existing Close button, Escape, gamepad Back, or backdrop dismissal.
-6. Return focus to the same “Read play style” button after closing.
-
-The modal must NOT:
-
-* Confirm the fighter.
-* Begin a battle.
-* Change the fighter selection.
-* Advance setup steps.
-* Unpause Practice Ground.
-* Trigger any gameplay action.
-
-This is purely an informational interaction.
-
-Preserve existing modal accessibility, navigation scopes, focus trapping, and background inertness.
-
-7. Refactor shared code properly
-
-Avoid independently duplicating the difficulty and description UI across screens.
-
-Recommended approach:
-
-* Move or extract reusable difficulty-rating rendering from FighterBrowser into shared roster functionality.
-* Share the “Read play style” control and its profile lookup.
-* Make FighterRoster display the profile of the currently previewed fighter.
-* Keep FighterBrowser’s Discover-specific read-only behavior.
-* Preserve each roster’s independent state, unique preview IDs, navigation, and confirmation callbacks.
-* Reuse the existing InfoDialog and localized fighter descriptions.
-* Avoid circular imports when reorganizing playStyleDialog().
-
-The implementation must remain character-agnostic.
-
-Do not hardcode fighter IDs, names, star counts, or descriptions into UI components.
-
-Every future playable fighter with a valid profile should automatically receive the same UI.
-
-8. Handle locked and missing-profile fighters
-
-Maintain current roster behavior.
-
-Playable fighter with a valid profile:
-
-* Show five difficulty stars.
-* Show “Read play style”.
-* Open the corresponding description.
-
-Playable fighter without a profile:
-
-* Show the existing “Not rated” fallback.
-* Hide the play-style action.
-* Do not crash or show stale information.
-
-Locked or disabled fighter:
-
-* Retain its Locked state.
-* Hide difficulty stars.
-* Hide “Read play style”.
-* Do not load or reveal character details.
-
-No playable fighters:
-
-* Preserve existing empty-roster behavior.
-* Keep Confirm disabled.
-* Do not show a misleading difficulty rating or description.
-
-9. Responsive design
-
-Ensure the new layout works across:
-
-* Desktop screens
-* Compact landscape windows
-* Mobile landscape
-* Tablets
-* Short-height viewports
-* Practice Ground’s roster overlays
-* Discover’s responsive layouts
-
-Requirements:
-
-* Stars must remain clearly visible.
-* The smaller action must remain legible and clickable.
-* “Read play style” should stay right-aligned.
-* Text must not overlap the fighter’s name or Confirm button.
-* Avoid clipping and horizontal overflow.
-* Preserve a useful amount of space for the animated fighter preview.
-* Do not unnecessarily enlarge the bottom information panel.
-* French translations must fit or wrap gracefully.
-
-Use existing CSS variables and conventions rather than introducing unrelated styling.
-
-10. Preserve existing gameplay and navigation
-
-Do not alter:
-
-* Fighter abilities or combat mechanics.
-* Character availability.
-* The 48-slot roster structure.
-* Portraits and preview animations.
-* Character selection and confirmation logic.
-* CPU selection.
-* Quick Battle or Watch Mode setup progression.
-* Practice Ground fighter swapping.
-* Existing keyboard, mouse, touch, and gamepad navigation.
-* Existing character profile ratings or description content.
-
-Discover must remain read-only, while regular selection screens must retain their existing Confirm buttons and behavior.
-
-11. Update documentation and tests
-
-The current ALVA_SPEC.md explicitly describes difficulty ratings as a Discover-only feature.
-
-Update that specification to reflect the new universal-roster behavior.
-
-Update relevant automated tests, particularly:
-
-* tests/interface/discover.test.mjs
-* tests/interface/i18n.test.mjs
-* tests/integration/empty-roster.test.mjs
-* Other affected roster, navigation, or Practice Ground UI tests.
-
-Existing tests that assume difficulty ratings appear only in Discover will need to be revised.
-
-Required test coverage
-
-Verify that:
-
-1. Every roster shows the correct fighter difficulty stars.
-2. The visible “Difficulty” label is absent.
-3. The rating remains accessible to screen readers.
-4. Every roster shows the smaller “Read play style” action.
-5. The action appears at the bottom-right, not beside the stars.
-6. Activating the action opens the correct localized description.
-7. Closing the dialog restores focus and does not advance gameplay.
-8. Switching fighters updates stars and descriptions without stale information.
-9. Locked, disabled, unrated, and empty-roster states remain correct.
-10. English and French work properly.
-11. The new controls work with keyboard, mouse, touch, and gamepad.
-12. The layout behaves correctly across supported screen sizes.
-
-Run the full test suite:
+1. Change the expected Discover tab count from four to three.
+2. Remove assertions expecting Passives to exist.
+3. Update keyboard/gamepad navigation tests for the three-tab order.
+4. Update Movement tests to expect introductory and detailed paragraphs rather than a list of bordered rows.
+5. Verify all six movement descriptions are still present and correctly localized.
+6. Add or update coverage for normal-case Discover labels.
+7. Verify the play-style action is positioned using the no-Confirm layout variant.
+8. Verify Confirm-enabled rosters retain their existing structure and behavior.
+9. Preserve existing tests for difficulty ratings, locked fighters, unrated fighters, modal interactions, and roster selection.
+10. Verify both English and French UI strings.
+
+Run:
 
 node --test
 
-Resolve regressions caused by the changes.
+Correct all failures caused by the intended changes. Do not delete meaningful test coverage merely to make the suite pass.
 
-12. Final acceptance criteria
+Automated tests do not fully verify browser layout, so also inspect the responsive visual behavior when a browser environment is available.
 
-The update is complete only when:
+8. Final acceptance criteria
 
-* All existing roster instances support difficulty ratings and play-style descriptions.
-* The stars have no visible “Difficulty” label.
-* The button text is “Read play style”.
-* That button is visibly smaller and positioned at the bottom-right.
-* The existing play-style modal works consistently everywhere.
-* Discover maintains its read-only behavior.
-* Selection screens and Practice Ground retain their original functionality.
-* Future fighters inherit the feature automatically.
-* Documentation reflects the new behavior.
-* Relevant automated tests pass.
+The task is complete only when:
 
-Implementation priorities
+* [ ]	“Read play style” sits noticeably lower, toward the bottom-right of the preview information area, whenever the roster has no Confirm button.
+* [ ]	Rosters that do have a Confirm button remain visually unchanged.
+* [ ]	Discover has exactly three tabs: Fighters, Movement, Launch.
+* [ ]	Passives is no longer visible or registered as a Discover section.
+* [ ]	Movement’s six explanations appear in one readable paragraph directly after the introductory paragraph.
+* [ ]	Movement no longer uses individual outlined holders.
+* [ ]	Launch retains its existing mechanic explanations and structured reference content.
+* [ ]	Discover text uses natural capitalization rather than forced all-caps styling.
+* [ ]	English and French remain correct and functional.
+* [ ]	Keyboard, gamepad, mouse, and touch interactions remain functional.
+* [ ]	The relevant tests are updated and the full suite passes.
+* [ ]	No unrelated gameplay mechanics or visuals are modified.
 
-1. Correct universal behavior.
-2. Clean shared architecture.
-3. Precise visual positioning.
-4. Consistent responsive styling.
-5. Accessibility and localization.
-6. No unrelated gameplay or interface changes.
+9. Final deliverable
 
-Do not redesign ALVA. Make this feel like a natural extension of the existing polished fighter-selection interface.
+Implement the modifications in the repository rather than stopping at a proposed plan.
 
-After implementation, provide a concise summary of the changed files, UI decisions, and test results.
+After implementation, provide:
+
+1. A concise summary of the changes.
+2. The actual files modified.
+3. An explanation of how the no-Confirm roster layout works.
+4. Confirmation that the three-tab Discover navigation functions correctly.
+5. The automated test results.
+6. Any remaining visual verification limitations.
+
+Priority: Deliver a cleaner, more polished, naturally readable Discover interface while preserving the existing ALVA design language and gameplay behavior. Avoid unnecessary refactoring or unrelated changes.
