@@ -165,9 +165,9 @@ test('profiles are editorial: kept apart from the definitions, never derived fro
     const hash = getFighterProfile(def.id)?.reviewedSourceHash;
     if (hash) assert.ok(!source.includes(hash), `${def.id}: the hash is not inside what it hashes`);
   }
-  // The game never reads a profile: only Discover's fighter browser does.
-  const readers = ['js/ui/fighter-browser.js'];
-  for (const file of ['js/game/battle.js', 'js/game/practice.js', 'js/game/ai/combat-ai.js', 'js/ui/fighter-roster.js', 'js/data/characters.js']) {
+  // Gameplay never reads a profile; the shared roster and browser do.
+  const readers = ['js/ui/fighter-roster.js', 'js/ui/fighter-browser.js'];
+  for (const file of ['js/game/battle.js', 'js/game/practice.js', 'js/game/ai/combat-ai.js', 'js/data/characters.js']) {
     const code = readFileSync(new URL(file, ROOT), 'utf8').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /fighter-profiles/, `${file} never imports the profiles`);
   }

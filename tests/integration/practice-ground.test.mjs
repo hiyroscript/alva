@@ -187,6 +187,7 @@ const { createTheme } = await import('../../js/stages/index.js');
 const { PracticeTheme } = await import('../../js/stages/practice-theme.js');
 const { PracticeSession, formatDamage } = await import('../../js/game/practice.js');
 const { Fighter } = await import('../../js/game/fighters/fighter.js');
+const { InfoDialog } = await import('../../js/ui/overlays.js');
 const { FighterRoster } = await import('../../js/ui/fighter-roster.js');
 const { Battle } = await import('../../js/game/battle.js');
 const { HUD } = await import('../../js/ui/hud.js');
@@ -1434,21 +1435,25 @@ test('Enable CPU (once the CPU is disabled) opens a second shared roster in its 
   assert.deepEqual([previews, otherPreviews, frames], [1, 0, 0]);
 });
 
-test('both Practice rosters keep the regular status and Confirm: Available for a playable fighter, Locked for a locked slot, never Discover\'s stars', async () => {
+test('both Practice rosters share profile stars and the action while keeping Confirm and Locked', async () => {
   const { screen } = await enterPractice();
   screen.openMenu();
   screen.openRoster();
   for (const roster of [screen.roster, screen.cpuRoster]) {
     roster.show('0001');
-    assert.equal(roster.status.hidden, false);
-    assert.equal(roster.status.textContent, 'Available');
-    assert.equal(roster.status.className, 'status-badge is-available');
+    assert.equal(roster.status.hidden, true);
     assert.ok(roster.previewPanel.contains(roster.confirmBtn), 'Confirm under the preview');
     assert.equal(roster.confirmBtn.textContent, 'Confirm fighter');
     assert.equal(roster.slots[0].getAttribute('aria-label'), '#0001, available');
-    assert.equal(roster.previewPanel.querySelector('.difficulty-rating'), null, 'no difficulty stars');
-    assert.equal(roster.previewPanel.querySelector('.play-style-action'), null, 'no play-style button');
-    assert.ok(!roster.previewPanel.textContent.includes('★'));
+    assert.equal(roster.rating.hidden, false);
+    assert.equal(roster.stars.textContent, '★★★★★');
+    assert.equal(roster.rating.getAttribute('aria-label'), 'Difficulty: 5 out of 5 stars');
+    assert.equal(roster.rating.querySelector('.difficulty-rating-label'), null);
+    assert.equal(roster.describeBtn.textContent, 'Read play style');
+    assert.equal(roster.describeBtn.hidden, false);
+    const info = roster.describeBtn.parentNode;
+    assert.equal(info.children[1], roster.describeBtn);
+    assert.equal(info.children[2], roster.confirmBtn);
     const locked = roster.slots.find((s) => !s._def?.available);
     roster.preview(locked);
     assert.equal(roster.status.textContent, 'Locked');
@@ -2362,4 +2367,48 @@ test('Practice synchronizes air icons after the player frame and restores ground
   assert.equal(touch.airborne, false);
   assert.equal(image.getAttribute('src'), ground);
   screen.exit();
+});
+
+test('play-style dialogs over both Practice rosters restore their scope and keep the session paused and unchanged', async () => {
+  const { app, screen } = await enterPractice();
+  app.infoDialog = new InfoDialog(new Element('div'), app);
+  screen.openMenu();
+  for (const cpu of [false, true]) {
+    if (cpu) screen.openCpuRoster();
+    else screen.openRoster();
+    const roster = cpu ? screen.cpuRoster : screen.roster;
+    const scope = app.nav.scopeEl;
+    const player = screen.session.player;
+    const opponent = screen.session.cpu;
+    const selected = roster.selectedId;
+    roster.preview(roster.slotFor('0002'));
+    let frames = 0;
+    screen.session.frame = () => frames++;
+    for (const close of [
+      () => app.infoDialog.closeButton.click(),
+      () => app.input.key('Escape'),
+      () => app.nav.command('back', null),
+      () => app.infoDialog.root.dispatch('click'),
+    ]) {
+      roster.describeBtn.click();
+      assert.equal(app.infoDialog.isOpen, true);
+      assert.equal(app.infoDialog.title.textContent, '#0002');
+      assert.equal(screen.el.inert, true);
+      screen.update(DT);
+      assert.equal(frames, 0);
+      close();
+      assert.equal(app.infoDialog.isOpen, false);
+      assert.equal(document.activeElement, roster.describeBtn);
+      assert.equal(app.nav.scopeEl, scope);
+      assert.equal(screen.el.inert, false);
+      assert.equal(screen.isRunning, false);
+      assert.equal(screen.menuOpen, true);
+      assert.equal(cpu ? screen.cpuRosterOpen : screen.rosterOpen, true);
+      assert.equal(screen.session.player, player);
+      assert.equal(screen.session.cpu, opponent);
+      assert.equal(roster.selectedId, selected);
+    }
+    if (cpu) screen.closeCpuRoster();
+    else screen.closeRoster();
+  }
 });
