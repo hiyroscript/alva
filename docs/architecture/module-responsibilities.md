@@ -44,11 +44,10 @@ There are no import cycles (checked over every module).
 | Module | Owns | Used by |
 | --- | --- | --- |
 | `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`, `assertUniversalMovement`, `assertCombatRules`: damage tiers, repeat cooldowns, the Deflect's strike, universal Energy). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/fighter-browser.js`, `ui/touch-layout-editor.js` |
-| `fighter-profiles.js` | Discover's editorial profile of each fighter, keyed by id (`FIGHTER_PROFILES`, `getFighterProfile`): ONE 1–5 difficulty rating (`DIFFICULTY_SCALE` says what each step means), its concise, two-sentence play-style description’s translation key (approach, strengths, vulnerabilities; no named moves) and `reviewedSourceHash`, the SHA-256 of its definition's source when last reviewed (`tests/fighters/profiles.test.mjs` fails once the definition changes). `assertFighterProfile` refuses anything else. Imports nothing; the game never reads it. | `ui/fighter-browser.js` |
+| `fighter-profiles.js` | Discover's editorial profile of each fighter, keyed by id (`FIGHTER_PROFILES`, `getFighterProfile`): ONE 1–5 difficulty rating (`DIFFICULTY_SCALE` says what each step means), its play-style description's translation key and `reviewedSourceHash`, the SHA-256 of its definition's source when last reviewed (`tests/fighters/profiles.test.mjs` fails once the definition changes). `assertFighterProfile` refuses anything else. Imports nothing; the game never reads it. | `ui/fighter-browser.js` |
 | `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
 | `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
-| `lore.js` | Ordered narrative entry ids and localization keys for Discover’s Lore page. Introductory placeholders until sourced world or character stories are added; independent of gameplay and navigation. | `screens/discover-screen.js` |
 | `movement.js` | The universal movement values every fighter runs on (`BASE_FIGHTER_MOVEMENT`), the check that refuses a definition's own, and the Discover copy for them. | `data/characters.js`, `game/fighters/fighter.js`, `game/rendering/hit-fx.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation; the damage tiers every hit deals (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage`). | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `difficulty.js` | The four CPU levels and their profiles. | `core/app.js`, `game/battle.js`, `game/ai/combat-ai.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
@@ -107,11 +106,6 @@ registered by `core/app.js` and owns its own section of `index.html`.
 Fighter goes next), used by `character-select-screen.js` and
 `map-select-screen.js`.
 
-Discover’s section registry (`js/screens/discover-screen.js`) orders Fighters,
-Lore, Movement and Launch, opening on Fighters. Lore reads `data/lore.js` and
-English/French translation keys; it shares the accessible tab activation,
-independent scrolling and keyboard/gamepad navigation of the reference pages.
-
 | `js/ui/` module | Owns | Used by |
 | --- | --- | --- |
 | `components.js` | Shared menu pieces (headers with their setup steps, each setup's steps and Quick Battle's play types, buttons, hint bars). | the setup screens, battle, practice, discover |
@@ -119,8 +113,8 @@ independent scrolling and keyboard/gamepad navigation of the reference pages.
 | `touch-controls.js` | `TouchControls`: both touch layouts. | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |
 | `mobile-abilities.js` | Which touch buttons a fighter has, their names and art. | `touch-controls.js` |
 | `touch-layout-editor.js` | The layout editor. | `core/app.js` |
-| `fighter-roster.js` | The 48-slot roster (Select Fighter, Quick Battle's Select CPU, Watch Mode's CPU screens, Practice Ground's dialogs), with bottom-right slot numbers and left-aligned names on a translucent strip. Shared difficulty stars and play-style modal; the action sits above Confirm, or at the bottom-right when Confirm is absent. Its preview head, status, Confirm and slot activation are hooks a subclass may override. | `screens/character-select-screen.js`, `screens/practice-screen.js`, `fighter-browser.js` |
-| `fighter-browser.js` | `FighterBrowser`: the roster read-only for Discover's Fighters page (no Confirm; a press only selects), each fighter's difficulty stars in the Available badge's place and the Play style description button, using the shared `InfoDialog`. | `screens/discover-screen.js` |
+| `fighter-roster.js` | The 48-slot roster (Select Fighter, Quick Battle's Select CPU, Watch Mode's CPU screens, Practice Ground's dialogs), with its Available / Locked status and Confirm. Its preview head, status, Confirm and slot activation are hooks a subclass may override. | `screens/character-select-screen.js`, `screens/practice-screen.js`, `fighter-browser.js` |
+| `fighter-browser.js` | `FighterBrowser`: the roster read-only for Discover's Fighters page (no Confirm; a press only selects), each fighter's difficulty stars in the Available badge's place and the Play style description button; `playStyleDialog` (the `InfoDialog` content). | `screens/discover-screen.js` |
 | `sprite-art.js` | Portrait and preview painting. | `fighter-roster.js`, `hud.js`, `stage-preview.js` |
 | `stage-preview.js` | Select Stage's live preview. | `screens/map-select-screen.js` |
 | `overlays.js` | The loading overlay, the confirm dialog (`alertdialog`), and the `role="dialog"` modals built on one shared base (its own navigation scope, the screen beneath inert, focus returned): the choice dialog (Quick Battle's play type) and the information dialog (`InfoDialog`, Discover's play-style description). | `core/app.js` |

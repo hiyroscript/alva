@@ -174,39 +174,32 @@ test('profiles are editorial: kept apart from the definitions, never derived fro
   for (const file of readers) assert.match(readFileSync(new URL(file, ROOT), 'utf8'), /fighter-profiles\.js/);
 });
 
-test('each play-style description is concise and translated, without move names or technical details', () => {
+test('each play-style description reads in English and French, its own for each fighter, about how it plays', () => {
   const keys = Object.values(FIGHTER_PROFILES).map((p) => p.descriptionKey);
   assert.equal(new Set(keys).size, keys.length, 'one description per fighter');
   for (const [id, { descriptionKey }] of Object.entries(FIGHTER_PROFILES)) {
-    assert.notEqual(STRINGS.en[descriptionKey], STRINGS.fr[descriptionKey], `${id}: translated`);
-    for (const language of ['en', 'fr']) {
-      const copy = STRINGS[language][descriptionKey];
-      assert.equal(typeof copy, 'string');
-      const words = copy.trim().split(/\s+/).length;
-      assert.ok(words >= 30 && words <= 55, `${id} ${language}: ${words} words, expected 30–55`);
-      assert.equal(copy.match(/[.!?](?:\s|$)/g)?.length, 2, 'two concise sentences');
-      assert.doesNotMatch(copy, /\d|cooldown|recharge|Energy|Énergie|damage|dégâts|frames?|stars?|étoiles?|difficulty|difficulté/i);
-      assert.doesNotMatch(copy, /faster|plus rapide/i, 'no universal movement advantage');
-      // Whole localized ability names, including future fighters, must stay in their guides.
-      for (const [key, name] of Object.entries(STRINGS[language])) {
-        if (!key.startsWith(`ability.${id}.`) || typeof name !== 'string') continue;
-        const wordsInName = name.toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
-        const wordsInCopy = copy.toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
-        assert.ok(!` ${wordsInCopy} `.includes(` ${wordsInName} `), `${id} ${language}: no named ${name}`);
-      }
-    }
+    const en = STRINGS.en[descriptionKey];
+    const fr = STRINGS.fr[descriptionKey];
+    assert.ok(typeof en === 'string' && en.length > 200, `${id}: English`);
+    assert.ok(typeof fr === 'string' && fr.length > 200, `${id}: French`);
+    assert.notEqual(en, fr, `${id}: really translated`);
+    assert.doesNotMatch(en, /\b\d\/5\b|stars?|difficulty/i, `${id}: the rating is shown as stars, not repeated in the text`);
   }
-});
-
-test('the reviewed summaries convey each fighter’s approach, strengths and vulnerabilities in both languages', () => {
-  const control = 'discover.fighter.0001.playStyle';
-  const pressure = 'discover.fighter.0002.playStyle';
-  assert.match(STRINGS.en[control], /patient.*controls space.*creates openings/i);
-  assert.match(STRINGS.en[control], /Strong at.*mistakes.*vulnerable.*pressured.*committing/i);
-  assert.match(STRINGS.fr[control], /patient.*contrôle l’espace.*ouvertures/i);
-  assert.match(STRINGS.fr[control], /excelle.*erreurs.*vulnérable.*pression.*s’engage/i);
-  assert.match(STRINGS.en[pressure], /aggressive.*momentum.*up close.*air/i);
-  assert.match(STRINGS.en[pressure], /Strong at.*offense.*chasing.*vulnerable.*predictable.*overcommitting/i);
-  assert.match(STRINGS.fr[pressure], /agressif.*élan.*corps à corps.*airs/i);
-  assert.match(STRINGS.fr[pressure], /excelle.*offensive.*poursuite.*s’expose.*prévisibles.*s’engage/i);
+  // #0001: space control and setup; #0002: momentum rushdown and aerial chase.
+  assert.match(STRINGS.en['discover.fighter.0001.playStyle'], /^A space-control and setup fighter/);
+  assert.match(STRINGS.en['discover.fighter.0001.playStyle'], /Red and Maximum Blue control space/);
+  assert.match(STRINGS.en['discover.fighter.0001.playStyle'], /Hollow Purple is a slow, high-commitment finisher/);
+  assert.match(STRINGS.en['discover.fighter.0002.playStyle'], /^A momentum-driven rushdown and aerial-chase fighter/);
+  assert.match(STRINGS.en['discover.fighter.0002.playStyle'], /managing limited air uses and free-fall states/);
+  assert.match(STRINGS.fr['discover.fighter.0001.playStyle'], /^Un combattant de contrôle de l’espace et de mise en place/);
+  assert.match(STRINGS.fr['discover.fighter.0002.playStyle'], /^Un combattant de pression offensive et de poursuite aérienne/);
+  // The moves it names are the fighter's own, by their names in each language.
+  for (const [action, en] of [['attack2', 'Red'], ['attack3', 'Maximum Blue'], ['attack4', 'Unlimited Void'], ['attack5', 'Hollow Purple']]) {
+    assert.equal(STRINGS.en[`ability.0001.${action}`], en);
+    assert.ok(STRINGS.fr['discover.fighter.0001.playStyle'].includes(STRINGS.fr[`ability.0001.${action}`]), `${action} in French`);
+  }
+  for (const action of ['attack1', 'attack2', 'midair_attack1', 'midair_attack2', 'attack3', 'midair_attack3', 'extra_attack']) {
+    assert.ok(STRINGS.en['discover.fighter.0002.playStyle'].includes(STRINGS.en[`ability.0002.${action}`]), `${action} in English`);
+    assert.ok(STRINGS.fr['discover.fighter.0002.playStyle'].includes(STRINGS.fr[`ability.0002.${action}`]), `${action} in French`);
+  }
 });
