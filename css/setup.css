@@ -157,7 +157,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   touch-action: pan-y;
 }
 .roster-grid {
-  --slot: clamp(68px, calc(5.2vw + 3.2vh), 112px);
+  --slot: clamp(54px, calc(5.2vw + 3.2vh), 112px);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--slot), 1fr));
   gap: clamp(5px, 0.7vw, 9px);
@@ -179,9 +179,8 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
 .slot.is-locked .slot-art .icon { width: 100%; height: 100%; fill: var(--surface-sunken); }
 .slot-num {
   position: absolute;
-  bottom: 4px;
-  right: 6px;
-  line-height: 1.25;
+  top: 4px;
+  left: 6px;
   font-family: var(--font-mono);
   font-size: clamp(8px, 1.3vh, 10px);
   font-weight: 600;
@@ -200,8 +199,8 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   left: 0;
   right: 0;
   bottom: 0;
-  /* Reserve the number’s width and a gap without dimming either label. */
-  padding: 3px 24px 4px 6px;
+  /* The fighter identifier (#0001, etc.) sits at the lower-right inset. */
+  padding: 3px 6px 4px;
   background: rgb(20 20 20 / 80%);
   overflow: hidden;
   white-space: nowrap;
@@ -209,7 +208,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   border-top: 1px solid var(--border);
   font-weight: 600;
   font-size: clamp(10px, 1.7vh, 13px);
-  text-align: left;
+  text-align: right;
   color: var(--text);
 }
 .slot-check {
