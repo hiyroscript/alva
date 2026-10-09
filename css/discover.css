@@ -3,8 +3,8 @@
    docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
-   Discover — the in-game reference: an index rail of four sections
-   (Fighters, Movement, Launch, Passives) beside one page
+   Discover — the in-game reference: an index rail of three sections
+   (Fighters, Movement, Launch) beside one page
    --------------------------------------------------------------------- */
 
 .discover-layout {
@@ -34,7 +34,7 @@
   font-weight: 600;
   letter-spacing: 0.14em;
   text-align: left;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-muted);
   transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
@@ -58,7 +58,7 @@ html:not(.is-pointer-input) .discover-tab:focus { box-shadow: var(--focus-ring-i
   -webkit-user-select: text;
 }
 .discover-panel:focus { outline: none; }
-/* Framed rather than recoloured: an empty page shows its focus too. */
+/* An inset frame keeps keyboard and gamepad focus visible. */
 html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring-inset); }
 
 .discover-page { display: grid; gap: clamp(10px, 2vh, 16px); max-width: 1040px; }
@@ -67,12 +67,12 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-secondary);
 }
 
 /* One reference entry per topic (universal movement, each Launch topic),
-   under a hairline: what it does beside its moves, values or directions,
+   under a hairline: Launch explanations beside their values or directions,
    in two columns wherever both fit. Mechanics only: no fighter is ever
    named or singled out on the Movement and Launch pages. */
 .discover-entry {
@@ -89,11 +89,15 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   font-size: clamp(17px, 3.2vh, 22px);
   line-height: 1.15;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-strong);
   text-wrap: balance;
 }
 .discover-entry-text { max-width: 46ch; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
+
+/* Movement reads across one comfortable column, with no individual holders. */
+.discover-page--movement .discover-entry { grid-template-columns: minmax(0, 1fr); }
+.discover-page--movement .discover-entry-text { max-width: 72ch; }
 
 .discover-tiers { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; min-width: 0; }
 .discover-tier {
@@ -106,21 +110,6 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--surface);
-}
-/* A universal movement's marker: a plain bullet, the same for every row
-   (none of them is more or less of anything). */
-.discover-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-}
-.discover-mark::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 1px;
-  background: var(--text-secondary);
 }
 /* A Base Launch value, in the meter's place: the multiplier itself, as a
    small numeric marker. */
@@ -163,7 +152,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-strong);
   /* Long names split evenly rather than orphaning the tier number. */
   text-wrap: balance;
@@ -181,16 +170,21 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 .discover-panel--fighters { overflow: hidden; padding: 4px; }
 .discover-fighters { display: grid; height: 100%; min-height: 0; gap: clamp(10px, 1.8vw, 22px); }
 
+/* Shared roster labels keep their authored case only on Discover. The
+   play-style dialog lives outside the screen, so target its own copy key. */
+.screen--discover .panel-title,
+.screen--discover .status-badge,
+.info-panel .kicker[data-i18n="discover.playStyleTitle"] { text-transform: none; }
+
 .fighter-browser-empty[hidden] { display: none; }
 
 /* With no playable fighter: one muted line under the locked preview. */
 .fighter-browser-empty { color: var(--text-secondary); font-size: 13px; line-height: 1.4; }
 
-/* Compact landscape: a slimmer rail and tighter entries and tiers, so a
+/* Compact landscape: tighter entries and tiers, so a
    page's entries scroll by in few steps. The rail stays down the side
    here, where height is scarcer than width. */
 @media (max-height: 560px) {
-  .discover-layout { grid-template-columns: clamp(108px, 16vw, 200px) minmax(0, 1fr); }
   .discover-tab { min-height: 38px; padding: 8px 10px; font-size: 11px; letter-spacing: 0.12em; }
   .discover-entry-about { gap: 6px; }
   .discover-tiers { gap: 6px; }
@@ -203,7 +197,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
    js/screens/discover-screen.js. */
 @media (max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px) {
   .discover-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: clamp(10px, 2vh, 16px); }
-  /* Four sections share the row; if a window (or the longer French labels)
+  /* Three sections share the row; if a window (or the longer French labels)
      cannot fit them, the rail scrolls sideways on its own instead of
      clipping a tab or widening the page. */
   .discover-rail {
@@ -229,7 +223,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
     border-left: 0;
     border-bottom: 2px solid transparent;
     border-radius: 3px 3px 0 0;
-    /* Tighter tracking, so four sections share even a narrow window. */
+    /* Tighter tracking, so three sections share even a narrow window. */
     letter-spacing: 0.08em;
     text-align: center;
     white-space: nowrap;

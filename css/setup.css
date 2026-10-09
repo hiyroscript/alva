@@ -312,6 +312,17 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
 .text-action:active { color: var(--text-strong); }
 .play-style-action { justify-self: end; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
 
+/* With no Confirm, separate the final action from the name and stars.
+   Content sets the height; short windows keep more room for the animation. */
+.preview-info--no-confirm { row-gap: clamp(16px, 4vh, 40px); }
+@media (max-height: 560px) {
+  .preview-info.preview-info--no-confirm { row-gap: clamp(12px, 3vh, 18px); }
+}
+/* Stacked rosters have a shorter preview even in a tall window. */
+@media (max-aspect-ratio: 1/1) and (min-height: 600px) {
+  .preview-info--no-confirm { row-gap: 16px; }
+}
+
 /* ---------------------------------------------------------------------
    Map select
    --------------------------------------------------------------------- */
