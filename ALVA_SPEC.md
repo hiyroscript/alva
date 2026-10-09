@@ -495,7 +495,19 @@ no header, build label, eyebrow or keyboard hint bar.
 - The selected fighter keeps its check badge but no green outline; focus uses
   the standard neutral focus ring.
 - Preview panel: clean animated idle fighter preview in original colours,
-  availability badge, fighter name, and "Confirm fighter" primary button.
+  five difficulty stars above the fighter name, a small underlined "Read
+  play style" action at the bottom-right of the information area, immediately
+  above the "Confirm fighter" primary button. The shared `FighterRoster`
+  supplies this profile UI to Select Fighter, Custom Play's Select CPU,
+  both Watch Mode CPU screens, both Practice Ground roster dialogs, and
+  Discover's read-only Fighters page (6.9). The action uses 11px text and
+  a comfortable press area; Grid keeps it separate from the stars, aligned
+  right and able to wrap in English and French. Opening the existing
+  `InfoDialog` describes the currently previewed fighter, never confirms,
+  changes selection, advances setup or unpauses Practice Ground. Closing
+  returns focus to the same action and restores the roster navigation scope.
+  Locked or disabled fighters show Locked without stars or a description;
+  playable fighters without a profile show Not rated without the action.
   No animation controls, frame facts, attack-set or roster-slot metadata,
   preview floor line, roster availability count, or bottom control hints.
   Keyboard/gamepad activation confirms immediately; pointer selects first and confirms on a second press.
@@ -810,16 +822,14 @@ comes from its definition and its profile.
   fighter stays a non-interactive locked slot, so nothing becomes playable
   here. Each visit returns to the fighter last browsed (else the first
   playable one).
-  - **Difficulty:** where a roster's preview says **Available**, the
-    Fighters page shows the fighter's one difficulty rating instead: a mono
-    "Difficulty" label and five stars, the first ones filled (#0001
-    ★★★★★, #0002 ★★★☆☆), as one image named "Difficulty: 5 out of 5 stars"
-    (the stars themselves hidden from assistive technology, never focusable
-    and never a control). Stars, not the availability dot, so the rating
-    never reads as availability. Each playable slot is named "#0001,
-    difficulty 5 out of 5". Select Fighter, Select CPU, Watch Mode's
-    rosters and Practice Ground's dialogs keep Available, Locked and
-    Confirm unchanged.
+  - **Difficulty:** every roster's preview shares the fighter's one rating:
+    exactly five stars, the first ones filled (#0001 ★★★★★, #0002 ★★★☆☆),
+    above the name at the left. There is no visible "Difficulty" label.
+    The rating is one image named "Difficulty: 5 out of 5 stars" (the stars
+    themselves hidden from assistive technology, never focusable or a
+    control). This is independent of Quick Battle's CPU difficulty.
+    Discover's playable slots are named "#0001, difficulty 5 out of 5";
+    selection rosters retain their slot names and Confirm behavior.
   - **The one rating** (1 to 5, a whole number, set by a person in the
     fighter's profile, never derived from move counts) rates together how
     hard the fighter is to pick up and play effectively and how hard it is
@@ -834,10 +844,9 @@ comes from its definition and its profile.
     and setup toolkit with Energy and cooldown management and punishable
     long telegraphs); #0002 is 3 (a readable rushdown plan, with mastery in
     momentum, air uses, free fall, approach angles and not overcommitting).
-  - **Play style description:** on the rating's row, at its far right (the
-    rating at the left, the fighter's name under both; the row wraps
-    cleanly on narrow previews), a real `<button type="button">` set as
-    underlined secondary text with `aria-haspopup="dialog"`, reached by
+  - **Read play style:** at the bottom-right of the preview information,
+    below the fighter name on its own row, a real `<button type="button">`
+    set as 11px underlined secondary text with `aria-haspopup="dialog"`, reached by
     Tab, arrows and D-pad, activated by keyboard, gamepad, mouse or touch,
     with the usual focus ring for keyboard and gamepad. It opens a modal
     (`InfoDialog`, `role="dialog"`, never `alertdialog`; `aria-modal`;

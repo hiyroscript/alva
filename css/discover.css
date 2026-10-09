@@ -181,59 +181,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 .discover-panel--fighters { overflow: hidden; padding: 4px; }
 .discover-fighters { display: grid; height: 100%; min-height: 0; gap: clamp(10px, 1.8vw, 22px); }
 
-/* The preview's top row: the rating (or the Locked / Not rated status) at
-   the left, Play style description at the far right; it wraps on narrow
-   previews, the action staying on the row's right edge. */
-.preview-status-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 12px;
-  justify-self: stretch;
-  min-width: 0;
-}
-.preview-status-row > [hidden], .fighter-browser-empty[hidden] { display: none; }
-.status-badge.is-unrated { color: var(--text-muted); }
-
-/* The one difficulty rating, in the status badge's place: a mono label and
-   five stars, the first ones filled. Stars, not a dot, so it never reads
-   as availability; read as one name ("Difficulty: 3 out of 5 stars"). */
-.difficulty-rating { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.difficulty-rating-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.difficulty-stars { display: inline-flex; gap: 2px; font-size: clamp(14px, 2.4vh, 18px); line-height: 1; }
-.difficulty-star { color: var(--text-muted); }
-.difficulty-star.is-filled { color: var(--text-strong); }
-
-/* A secondary action set as underlined text (Play style description): a
-   real button, quiet until hovered, with the usual ring for keyboard and
-   gamepad focus and a comfortable press area around its words. */
-.text-action {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  margin-left: auto;
-  padding: 4px 2px;
-  border-radius: 2px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: right;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  color: var(--text-secondary);
-  transition: color 120ms ease, box-shadow 120ms ease;
-}
-.text-action:hover { color: var(--text-strong); }
-html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-shadow: var(--focus-ring); }
+.fighter-browser-empty[hidden] { display: none; }
 
 /* With no playable fighter: one muted line under the locked preview. */
 .fighter-browser-empty { color: var(--text-secondary); font-size: 13px; line-height: 1.4; }

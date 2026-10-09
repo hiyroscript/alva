@@ -279,7 +279,7 @@ export const EN = {
   'discover.unrated': 'Not rated',
   'discover.noFighters': 'No fighters to show yet.',
   'discover.fighterSlot': '{name}, difficulty {rating} out of {max}',
-  'discover.playStyle': 'Play style description',
+  'discover.playStyle': 'Read play style',
   'discover.playStyleTitle': 'Play style',
   // Each fighter's play-style description (its profile's descriptionKey,
   // js/data/fighter-profiles.js): how it plays, not a move list. Recheck it

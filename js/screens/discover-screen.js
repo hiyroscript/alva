@@ -5,7 +5,7 @@
 // Fighters is the one page about the fighters themselves: the roster,
 // browsed read-only (js/ui/fighter-browser.js) in the Select Fighter
 // roster's order and look, each playable fighter's one difficulty rating as
-// stars where a roster says Available, and its play-style description in a
+// stars shared by every roster, and its play-style description in a
 // modal (app.infoDialog). It reads the character registry and the fighter
 // profiles (js/data/fighter-profiles.js), never a fighter's id: it grows
 // with the roster. It starts nothing and confirms nothing.
@@ -37,7 +37,7 @@ import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
 import { tx, tattr } from '../localization/i18n.js';
 import { screenHeader } from '../ui/components.js';
-import { FighterBrowser, playStyleDialog } from '../ui/fighter-browser.js';
+import { FighterBrowser } from '../ui/fighter-browser.js';
 import { MOVEMENT_GUIDE } from '../data/movement.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
@@ -124,7 +124,6 @@ function buildLaunchPage() {
 function buildFightersPage(screen) {
   screen.browser = new FighterBrowser(screen.app, {
     host: screen.el,
-    onDescribe: (def, profile, opener) => screen.app.infoDialog?.open(playStyleDialog(def, profile, opener)),
   });
   return el('div', { class: 'discover-fighters char-layout' }, [screen.browser.rosterPanel, screen.browser.previewPanel]);
 }

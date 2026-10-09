@@ -429,7 +429,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Réactions rapides. Se défend et punit.');
     // Discover: tabs and the pages built from the registries.
     assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Déplacement', 'Éjection', 'Passifs']);
-    assert.equal(discover.browser.describeBtn.textContent, 'Description du style de jeu');
+    assert.equal(discover.browser.describeBtn.textContent, 'Lire le style de jeu');
     assert.equal(discover.el.querySelector('.screen-title').textContent, 'Découvrir');
     const tierNames = discover.el.querySelectorAll('.discover-tier-name').map((n) => n.textContent);
     assert.ok(tierNames.includes('Triple saut'));

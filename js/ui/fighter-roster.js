@@ -13,16 +13,20 @@
 //
 // Discover's Fighters page browses the same roster read-only
 // (js/ui/fighter-browser.js, a subclass): it overrides the hooks marked
-// below (the preview's head, its status and what activating a slot does)
-// and has no Confirm. Every roster here keeps the Available / Locked status
-// and its Confirm.
+// below (confirmation and what activating a slot does) and has no Confirm.
+// Every roster shares the previewed fighter's difficulty and play-style
+// action, with Locked / Not rated fallbacks; selection rosters keep Confirm.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, setText } from '../localization/i18n.js';
+import { tx, tattr, setText, setAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { CHARACTERS, isPlayable, getPlayableCharacter } from '../data/characters.js';
+import { getFighterProfile, DIFFICULTY_MAX } from '../data/fighter-profiles.js';
 import { fitCanvas, drawFrameAt, paintPortrait } from './sprite-art.js';
+
+const STAR_FILLED = '★';
+const STAR_EMPTY = '☆';
 
 export class FighterRoster {
   // `host` carries the is-locked-preview state while a locked slot is shown.
@@ -88,14 +92,25 @@ export class FighterRoster {
 
     this.previewPanel = el('aside', { class: 'char-preview', 'aria-labelledby': previewId, 'aria-live': 'polite' }, [
       el('div', { class: 'preview-stage' }, [this.previewCanvas]),
-      el('div', { class: 'preview-info' }, [this.buildPreviewHead(previewId), this.confirmBtn]),
+      el('div', { class: 'preview-info' }, [this.buildPreviewHead(previewId), this.describeBtn, this.confirmBtn]),
     ]);
   }
 
-  // Hook: the preview's head, the status over the fighter's name. Built
-  // while the constructor runs.
-  buildPreviewHead() {
-    return el('div', { class: 'preview-head' }, [this.status, this.name]);
+  // Shared profile head; the action occupies its own row above Confirm.
+  buildPreviewHead(previewId) {
+    this.stars = el('span', { class: 'difficulty-stars', 'aria-hidden': 'true' });
+    this.rating = el('span', { class: 'difficulty-rating', role: 'img', hidden: true }, [
+      this.stars,
+    ]);
+    this.describeBtn = el('button', {
+      class: 'text-action play-style-action', type: 'button', 'data-nav': true, hidden: true,
+      'aria-haspopup': 'dialog', 'aria-describedby': previewId, ...tx('discover.playStyle'),
+    });
+    this.describeBtn.addEventListener('click', () => this.describe());
+    return el('div', { class: 'preview-head' }, [
+      el('div', { class: 'preview-status-row' }, [this.status, this.rating]),
+      this.name,
+    ]);
   }
 
   // Hook: the Confirm button under the preview (null for none).
@@ -105,11 +120,52 @@ export class FighterRoster {
     return button;
   }
 
-  // Hook: the status shown over the previewed fighter's name: Available for
-  // a playable fighter `def`, Locked for a locked slot (`def` null).
   showStatus(def) {
-    setText(this.status, def ? 'roster.statusAvailable' : 'roster.statusLocked');
-    this.status.className = `status-badge ${def ? 'is-available' : 'is-locked'}`;
+    const profile = def ? getFighterProfile(def.id) : null;
+    this.described = def && profile ? def : null;
+    this.describeBtn.hidden = !this.described;
+    this.rating.hidden = !this.described;
+    this.status.hidden = !!this.described;
+    if (this.described) {
+      this.renderRating(profile.difficulty);
+      return;
+    }
+    this.stars.replaceChildren();
+    delete this.rating.dataset.rating;
+    this.rating.removeAttribute('aria-label');
+    this.rating.removeAttribute('data-i18n-aria-label');
+    this.rating.removeAttribute('data-i18n-aria-label-params');
+    if (def) {
+      setText(this.status, 'discover.unrated');
+      this.status.className = 'status-badge is-unrated';
+    } else {
+      setText(this.status, 'roster.statusLocked');
+      this.status.className = 'status-badge is-locked';
+    }
+  }
+
+  // Five stars, the first `rating` filled, under one accessible name.
+  renderRating(rating) {
+    this.rating.dataset.rating = String(rating);
+    setAttr(this.rating, 'aria-label', 'discover.difficultyRating', { rating, max: DIFFICULTY_MAX });
+    this.stars.replaceChildren(...Array.from({ length: DIFFICULTY_MAX }, (_, i) => {
+      const filled = i < rating;
+      return el('span', { class: `difficulty-star${filled ? ' is-filled' : ''}`, text: filled ? STAR_FILLED : STAR_EMPTY });
+    }));
+  }
+
+  // Describe the preview, independently of the selected fighter.
+  get describedFighter() {
+    return this.described ?? null;
+  }
+
+  describe() {
+    const def = this.describedFighter;
+    const profile = isPlayable(def) ? getFighterProfile(def.id) : null;
+    if (profile) this.app.infoDialog?.open({
+      kicker: 'discover.playStyleTitle', title: def.displayName,
+      body: profile.descriptionKey, opener: this.describeBtn,
+    });
   }
 
   // The slot of playable fighter `id`, else the first playable one's, else

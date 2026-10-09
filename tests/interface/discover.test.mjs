@@ -3,7 +3,7 @@
 // ScreenManager, the Fighters / Movement / Launch / Passives tabs (Fighters
 // first and open on every visit); the Fighters page: the roster browsed
 // read-only in roster order, each fighter's one difficulty rating as stars
-// where a roster says Available, the Play style description button and its
+// shared by every roster, the Read play style button and its
 // modal dialog, locked and unrated fighters, the empty roster, French; the
 // Movement page built from the universal movement registry alone (the run,
 // the jumps, the fast fall, the Dash and the air dash every fighter shares)
@@ -571,7 +571,7 @@ test('focusing or pressing a fighter previews and selects it; nothing confirms a
   assert.equal(browser.name.textContent, '#0002');
 });
 
-test('the preview shows the one difficulty rating as stars where a roster says Available: #0001 ★★★★★, #0002 ★★★☆☆', () => {
+test('the preview shows the shared difficulty rating as stars: #0001 ★★★★★, #0002 ★★★☆☆', () => {
   const { discover } = openDiscover();
   const { browser } = discover;
   const check = (id, stars, filled, label) => {
@@ -603,8 +603,7 @@ test('the preview shows the one difficulty rating as stars where a roster says A
   assert.equal(getFighterProfile('0001').difficulty, 5);
   assert.equal(getFighterProfile('0002').difficulty, 3);
 
-  // The rating stays Discover's own: not the status badge, not its
-  // availability dot, and the regular roster's strings are untouched.
+  // The shared rating has no availability dot; slot strings stay unchanged.
   assert.ok(!browser.rating.classList.contains('status-badge'));
   const css = stylesheet();
   assert.match(css, /\.status-badge::before \{ content: ""; width: 6px; height: 6px; border-radius: 50%;/);
@@ -638,28 +637,32 @@ test('a playable fighter with no profile shows Not rated and nothing to describe
   assert.equal(browser.empty.hidden, true, 'the empty-roster line only while nothing is playable');
 }));
 
-test('Play style description is a real, underlined text button at the far right of the status row, announcing a dialog', () => {
+test('Read play style is a real, underlined text button at the bottom-right of the information area, announcing a dialog', () => {
   const { discover, app } = openDiscover();
   const { browser } = discover;
   const button = browser.describeBtn;
   assert.equal(button.tagName, 'BUTTON');
   assert.equal(button.getAttribute('type'), 'button');
-  assert.equal(button.textContent, 'Play style description');
+  assert.equal(button.textContent, 'Read play style');
   assert.equal(button.getAttribute('aria-haspopup'), 'dialog');
   assert.equal(button.getAttribute('aria-describedby'), browser.name.id, 'it says whose');
   assert.equal(button.hasAttribute('data-nav'), true, 'reached by keyboard and gamepad');
   assert.equal(button.hidden, false);
   assert.ok(app.nav.candidates(discover.el).includes(button));
-  // Rating at the left, the button at the far right, the name under them.
-  const row = button.parentNode;
-  assert.ok(row.classList.contains('preview-status-row'));
-  assert.equal(row.children.at(-1), button);
-  assert.equal(row.parentNode.children[1], browser.name);
+  // The action has its own row after the name, separate from the stars.
+  const info = button.parentNode;
+  assert.ok(info.classList.contains('preview-info'));
+  assert.equal(info.children[1], button);
+  assert.ok(info.children[0].contains(browser.name));
+  assert.ok(info.children[0].contains(browser.rating));
+  assert.equal(browser.rating.querySelector('.difficulty-rating-label'), null);
 
   const css = stylesheet();
   const rule = css.match(/\n\.text-action \{[^}]*\}/)?.[0] ?? '';
   assert.match(rule, /text-decoration: underline;/, 'underlined, so it reads as interactive');
   assert.match(rule, /margin-left: auto;/, 'pushed to the far right');
+  assert.match(rule, /font-size: 11px;/);
+  assert.match(css, /\.play-style-action \{[^}]*justify-self: end;/);
   assert.match(rule, /min-height: 32px;/, 'a comfortable press area');
   assert.match(css, /html:not\(\.is-pointer-input\) \.text-action:focus \{[^}]*box-shadow: var\(--focus-ring\);/, 'the usual keyboard / gamepad ring');
   assert.match(css, /\.preview-status-row \{[^}]*flex-wrap: wrap;[^}]*justify-content: space-between;/, 'wraps cleanly on narrow previews');
@@ -748,6 +751,22 @@ test('keyboard and gamepad stay inside the open dialog: arrows keep focus on Clo
   assertFocus(discover.browser.describeBtn);
 });
 
+test('Tab and Shift+Tab stay on the informational dialog Close control', () => {
+  const { app, discover } = openDiscover();
+  discover.browser.describeBtn.click();
+  for (const shiftKey of [false, true]) {
+    let prevented = false;
+    app.infoDialog.root.dispatch('keydown', {
+      code: 'Tab', shiftKey, preventDefault: () => { prevented = true; },
+    });
+    assert.equal(prevented, true);
+    assertFocus(app.infoDialog.closeButton);
+    assert.equal(app.infoDialog.isOpen, true);
+  }
+  app.infoDialog.close();
+  assertFocus(discover.browser.describeBtn);
+});
+
 test('the Fighters page in French: tab, title, rating, button, slot names and the dialog all follow the language', () => {
   const { discover, app } = openDiscover();
   const { browser } = discover;
@@ -760,8 +779,8 @@ test('the Fighters page in French: tab, title, rating, button, slot names and th
     assert.equal(sectionsOf(discover).fighters.tab.textContent, 'Combattants');
     assert.equal(text(sectionsOf(discover).fighters.panel.querySelector('.panel-title')), 'Combattants');
     assert.equal(browser.rating.getAttribute('aria-label'), 'Difficulté : 5 étoiles sur 5');
-    assert.equal(browser.rating.querySelector('.difficulty-rating-label').textContent, 'Difficulté');
-    assert.equal(browser.describeBtn.textContent, 'Description du style de jeu');
+    assert.equal(browser.rating.querySelector('.difficulty-rating-label'), null);
+    assert.equal(browser.describeBtn.textContent, 'Lire le style de jeu');
     assert.equal(slotOf(discover, '0002').getAttribute('aria-label'), '#0002, difficulté 3 sur 5');
     assert.equal(app.infoDialog.kicker.textContent, 'Style de jeu');
     assert.equal(app.infoDialog.title.textContent, '#0001', 'a fighter\'s name is its own in every language');
@@ -778,7 +797,7 @@ test('the Fighters page in French: tab, title, rating, button, slot names and th
     setLanguage('en');
     for (const root of all) localizeTree(root);
   }
-  assert.equal(browser.describeBtn.textContent, 'Play style description');
+  assert.equal(browser.describeBtn.textContent, 'Read play style');
   assert.equal(browser.rating.getAttribute('aria-label'), 'Difficulty: 3 out of 5 stars');
 });
 
@@ -960,7 +979,7 @@ test('only the Fighters page names fighters: Movement, Launch and Passives carry
   const code = source.replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(code, /characters\.js|fighter-profiles\.js|\bCHARACTERS\b|getCharacter\b/, 'the screen itself never imports the roster');
   assert.doesNotMatch(code, /'0001'|'0002'|#0001|#0002/, 'no fighter id in the screen');
-  assert.match(source, /import \{ FighterBrowser, playStyleDialog \} from '\.\.\/ui\/fighter-browser\.js';/);
+  assert.match(source, /import \{ FighterBrowser \} from '\.\.\/ui\/fighter-browser\.js';/);
   assert.doesNotMatch(source, /getFighterPowerTier|fighterTiers|\.powers\b/);
   assert.doesNotMatch(source, /knockback/i, 'no trace of the old Knockback page');
   assert.doesNotMatch(source, /Used by|is-used/);

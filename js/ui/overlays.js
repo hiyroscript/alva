@@ -300,6 +300,13 @@ export class InfoDialog extends ModalDialog {
       ]),
     );
     this.closeButton.addEventListener('click', () => this.close());
+    // Close is this informational dialog's only focusable control. Keep
+    // Tab and Shift+Tab here as well as the scoped arrow/gamepad navigation.
+    root.addEventListener('keydown', (e) => {
+      if (e.code !== 'Tab' || !this.isOpen) return;
+      e.preventDefault();
+      this.closeButton.focus({ preventScroll: true });
+    });
     this.isOpen = false;
   }
 

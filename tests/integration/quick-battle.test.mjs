@@ -174,9 +174,9 @@ const { DEFAULT_DIFFICULTY } = await import('../../js/data/difficulty.js');
 const { MAPS } = await import('../../js/data/maps.js');
 const { PRACTICE_MAP } = await import('../../js/data/practice-map.js');
 const { ICONS } = await import('../../js/ui/icons.js');
-const { ConfirmDialog, ChoiceDialog } = await import('../../js/ui/overlays.js');
+const { ConfirmDialog, ChoiceDialog, InfoDialog } = await import('../../js/ui/overlays.js');
 const { Settings } = await import('../../js/core/settings.js');
-const { setLanguage, localizeTree } = await import('../../js/localization/i18n.js');
+const { setLanguage, localizeTree, t } = await import('../../js/localization/i18n.js');
 const { ScreenManager } = await import('../../js/core/screen-manager.js');
 const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
 const { initialSelection } = await import('../../js/core/app.js');
@@ -659,7 +659,7 @@ test('Custom Play: Mode → Difficulty → Fighter → CPU → Stage → Battle;
   screens.battle.exit();
 });
 
-test('Select Fighter, Select CPU and Watch Mode\'s rosters still say Available and keep Confirm: Discover\'s stars stay on Discover', () => {
+test('Select Fighter, Select CPU and Watch Mode share profile stars and the action while keeping Confirm', () => {
   const { app, screens } = boot();
   app.selection.playType = 'custom';
   for (const screen of [screens.character, screens.cpu, screens.watchCpu1, screens.watchCpu2]) {
@@ -667,15 +667,19 @@ test('Select Fighter, Select CPU and Watch Mode\'s rosters still say Available a
     const { roster } = screen;
     const slot = slotOf(screen, '0001');
     slot.focus();
-    assert.equal(roster.status.hidden, false, screen.id);
-    assert.equal(roster.status.textContent, 'Available', screen.id);
-    assert.equal(roster.status.className, 'status-badge is-available');
+    assert.equal(roster.status.hidden, true, screen.id);
     assert.equal(slot.getAttribute('aria-label'), '#0001, available', 'the regular accessible name');
     assert.ok(roster.previewPanel.contains(roster.confirmBtn), `${screen.id}: Confirm under the preview`);
     assert.equal(roster.confirmBtn.disabled, false);
-    assert.equal(roster.previewPanel.querySelector('.difficulty-rating'), null, `${screen.id}: no difficulty stars`);
-    assert.equal(roster.previewPanel.querySelector('.play-style-action'), null, `${screen.id}: no play-style button`);
-    assert.ok(!roster.previewPanel.textContent.includes('★'));
+    assert.equal(roster.rating.hidden, false);
+    assert.equal(roster.stars.textContent, '★★★★★');
+    assert.equal(roster.rating.getAttribute('aria-label'), 'Difficulty: 5 out of 5 stars');
+    assert.equal(roster.rating.querySelector('.difficulty-rating-label'), null);
+    assert.equal(roster.describeBtn.textContent, 'Read play style');
+    assert.equal(roster.describeBtn.hidden, false);
+    const info = roster.describeBtn.parentNode;
+    assert.equal(info.children[1], roster.describeBtn);
+    assert.equal(info.children[2], roster.confirmBtn);
     roster.preview(roster.slots[TEST_DISABLED.rosterSlot]);
     assert.equal(roster.status.textContent, 'Locked', screen.id);
   }
@@ -821,4 +825,56 @@ test('Quick Battle choices never touch Watch Mode\'s', async () => {
   await startRegular(booted, { cpu: TEST_SAMPLE });
   booted.screens.battle.exit();
   assert.deepEqual(app.selection.watch, watch);
+});
+
+test('every setup roster describes the preview in both languages without selecting or advancing, then restores focus', () => {
+  const { app, screens } = boot();
+  app.infoDialog = new InfoDialog(new Element('div'), app);
+  for (const screen of [screens.character, screens.cpu, screens.watchCpu1, screens.watchCpu2]) {
+    app.screens.go(screen.id);
+    const { roster } = screen;
+    const selection = JSON.stringify(app.selection);
+    const selected = roster.selectedId;
+    for (const language of ['en', 'fr']) {
+      setLanguage(language);
+      try {
+        for (const [id, stars] of [['0002', '★★★☆☆'], ['0001', '★★★★★']]) {
+          slotOf(screen, id).focus();
+          localizeTree(screen.el);
+          assert.equal(roster.stars.textContent, stars);
+          assert.equal(roster.describeBtn.textContent, language === 'en' ? 'Read play style' : 'Lire le style de jeu');
+          assert.equal(roster.describeBtn.getAttribute('aria-describedby'), roster.name.id);
+          assert.match(roster.rating.getAttribute('aria-label'), language === 'en' ? /^Difficulty:/ : /^Difficulté :/);
+          const scope = app.nav.scopeEl;
+          roster.describeBtn.focus();
+          app.nav.command('confirm', null);
+          const dialog = app.infoDialog;
+          assert.equal(dialog.isOpen, true);
+          assert.equal(dialog.title.textContent, `#${id}`);
+          assert.equal(dialog.body.textContent, t(`discover.fighter.${id}.playStyle`));
+          assert.equal(screen.el.inert, true);
+          assert.equal(document.activeElement, dialog.closeButton);
+          if (id === '0002') app.nav.command('back', null);
+          else dialog.closeButton.click();
+          assert.equal(dialog.isOpen, false);
+          assert.equal(screen.el.inert, false);
+          assert.equal(app.nav.scopeEl, scope);
+          assert.equal(document.activeElement, roster.describeBtn);
+          assert.equal(roster.selectedId, selected);
+          assert.equal(JSON.stringify(app.selection), selection);
+          assert.equal(app.screens.current, screen);
+        }
+      } finally { setLanguage('en'); localizeTree(screen.el); }
+    }
+    // Clear previously displayed data for unrated, disabled and empty slots.
+    for (const slot of [slotOf(screen, TEST_A.id), roster.slots[TEST_DISABLED.rosterSlot], roster.slots[20]]) {
+      roster.preview(slot);
+      assert.equal(roster.rating.hidden, true);
+      assert.equal(roster.describeBtn.hidden, true);
+      assert.equal(roster.stars.textContent, '');
+      assert.equal(roster.describedFighter, null);
+      roster.describe();
+      assert.equal(app.infoDialog.isOpen, false);
+    }
+  }
 });

@@ -434,6 +434,9 @@ test('with nothing playable, the roster renders every slot locked, disabled #000
   }
   // The preview is the locked first slot's: no fighter's art.
   assert.equal(roster.status.textContent, 'Locked');
+  assert.equal(roster.rating.hidden, true);
+  assert.equal(roster.describeBtn.hidden, true);
+  assert.equal(roster.describedFighter, null);
   assert.equal(roster.name.textContent, 'Slot 01');
   assert.ok(host.classList.contains('is-locked-preview'));
   assert.equal(roster.previewSprites, null);
