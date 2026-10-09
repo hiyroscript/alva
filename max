@@ -1,345 +1,442 @@
-ALVA — Discover and roster UI refinement
+ALVA — Roster UI Improvements, Discover Lore & Play-Style Rewrite
 
 Objective
 
-Improve the visual consistency, readability, typography, and spacing of the ALVA game’s Discover interface and fighter roster previews.
+Make a focused, polished update to Alva’s roster presentation and Discover interface.
 
-Repository: https://github.com/hiyroscript/alva
+First, inspect the current repository, understand the existing UI architecture, character system, localization, navigation, and responsive design. Then implement all requested changes directly in the game.
 
-First, inspect the existing implementation and understand how Discover, fighter selection, character previews, localization, and navigation work together. Then implement the following changes directly in the existing architecture.
+This is a UI and editorial-content update, not a gameplay overhaul. Preserve Alva’s existing visual identity: dark charcoal surfaces, clean typography, subtle borders, restrained green accents, and consistent spacing.
 
-This is a focused UI/UX refinement, not a redesign. Preserve ALVA’s current visual identity, colors, typography, layout structure, game mechanics, and navigation system.
+The final result must work across desktop, mobile landscape, keyboard, mouse, touch, and gamepad.
 
-1. Lower the “Read play style” action when there is no Confirm button
+Repository: hiyroscript/alva
 
-Current behavior
+1. All rosters — move character numbers to the bottom-right
 
-The game uses a shared FighterRoster component across several screens, including fighter selection and Discover.
+Current implementation
 
-The preview information area displays:
-
-* Difficulty stars or a status badge.
-* The fighter’s name.
-* The “Read play style” action.
-* A Confirm button, when appropriate.
-
-Discover uses FighterBrowser, which extends FighterRoster but intentionally does not display a Confirm button.
-
-Currently, the “Read play style” action can appear too close to the fighter name and difficulty stars when no Confirm button is present.
-
-Required changes
-
-For any roster preview that does not have a Confirm button:
-
-1. Position “Read play style” lower within the preview information area.
-2. Keep the action aligned to the bottom-right.
-3. Create a more noticeable but natural vertical separation between the fighter name/difficulty information and the action.
-4. Preserve the difficulty stars above the fighter name.
-5. Maintain the current underlined text-button appearance rather than turning it into a large primary button.
-6. Preserve keyboard, gamepad, mouse, and touch accessibility.
-7. Keep its existing functionality: clicking it must still open the correct fighter’s play-style dialog.
-8. Do not introduce an empty Confirm button or a placeholder occupying its position.
-
-Use the absence of the Confirm button as the condition for this layout variation. Prefer a reusable, scoped class or equivalent component state rather than styling based on individual fighter IDs.
-
-The normal roster layout, where a Confirm button exists, must remain unchanged.
-
-The spacing must also adapt to short landscape windows and mobile devices without clipping text or sacrificing excessive space from the animated fighter preview.
-
-Relevant files
+The shared roster is implemented in:
 
 * js/ui/fighter-roster.js
 * js/ui/fighter-browser.js
 * css/setup.css
-* css/discover.css
+* css/responsive.css
 
-2. Completely remove the Passives section from Discover
+Each roster slot contains a .slot-num element currently positioned at the top-left. Available fighters also have a .slot-name strip across the bottom of their portrait.
 
-Current behavior
+Required changes
 
-Discover currently contains four sections:
+Move the character/slot number from the top-left to the bottom-right corner of every roster card.
+
+Requirements:
+
+* Apply the change to every roster that uses the shared component.
+* Position the number neatly inside the card’s lower-right area.
+* Keep consistent right and bottom spacing across all card sizes.
+* Preserve the current numbering format.
+* Ensure the number remains clearly visible and does not overlap the fighter’s name.
+* If the number shares the bottom strip with the fighter’s name, reserve enough horizontal space for both.
+* Keep fighter names aligned to the left and numbers aligned to the right.
+* Apply the placement consistently to available, selected, locked, and disabled roster slots.
+* Preserve the locked icons, selection checkmarks, portraits, focus rings, and accessibility labels.
+* Do not hardcode positioning per fighter.
+
+Use the shared component and styles rather than adding individual overrides to different screens.
+
+Make the black name strip slightly transparent
+
+The black/dark strip behind a character’s name currently looks too solid.
+
+Make it slightly transparent, so the portrait remains subtly visible underneath it.
+
+Design direction:
+
+* Use a dark translucent background, approximately 75–85% opacity, adjusted to suit the existing theme.
+* Keep the same general height and clean appearance.
+* Maintain strong contrast for the name and character number.
+* Do not reduce the opacity of the text itself.
+* Do not make the strip heavily transparent or difficult to read.
+* Keep the effect consistent across hover, focus, and selected states.
+
+Only the background layer should become translucent.
+
+Screens to cover
+
+The change must appear everywhere the shared roster is used, including:
+
+* Select Fighter.
+* Custom Play’s Select CPU.
+* Both Watch Mode CPU selection screens.
+* Practice Ground’s Change Fighter roster.
+* Practice Ground’s CPU selection roster.
+* Discover → Fighters.
+
+If another roster instance uses the same component, it must receive the update automatically.
+
+⸻
+
+2. Discover — add a new “Lore” section
+
+Current implementation
+
+Discover currently contains three sections:
 
 1. Fighters
 2. Movement
 3. Launch
-4. Passives
 
-Passives is registered as an intentionally empty section.
+The navigation is defined in js/screens/discover-screen.js, using the SECTIONS registry.
 
-Required changes
-
-Completely remove Passives from the Discover interface.
-
-The final navigation must have exactly three sections, in this order:
-
-Fighters → Movement → Launch
-
-Requirements:
-
-* Remove Passives from the section registration in js/screens/discover-screen.js.
-* Remove its tab and associated empty panel.
-* Remove obsolete Passives-specific Discover scaffolding and comments.
-* Remove unused localization entries when appropriate.
-* Update any documentation that describes Discover as having four sections.
-* Preserve the existing behavior where opening Discover always selects Fighters first.
-* Ensure clicking, keyboard navigation, and gamepad navigation work normally with three tabs.
-* Ensure the horizontal mobile navigation naturally accommodates the remaining three tabs.
-* Preserve correct ARIA relationships, selected states, and focus handling.
-
-Important: Removing Passives from Discover does not mean removing passive abilities or related mechanics from the fighting game. This change affects only the Discover interface.
-
-3. Redesign the Movement information as flowing paragraphs
-
-Current behavior
-
-The Movement section contains an introductory explanation about universal movement, followed by several individual entries presented inside bordered rectangular holders.
-
-The current movement topics come from MOVEMENT_GUIDE in js/data/movement.js:
-
-* Run
-* Jump
-* Triple jump
-* Fast fall
-* Dash
-* Air dash
-
-These entries currently use .discover-tiers, .discover-tier, and decorative movement markers.
+The page styling is in css/discover.css.
 
 Required changes
 
-Remove the individual holder/card presentation for Movement.
+Add a fourth section named Lore.
 
-Instead, display the information as normal readable text immediately after the introductory paragraph.
+The new section order should be:
 
-The desired hierarchy is:
+1. Fighters
+2. Lore
+3. Movement
+4. Launch
 
-Movement
+Keep Fighters as the default section when entering Discover.
 
-Universal movement
+Lore page design
 
-[Existing introductory paragraph explaining that movement is universal.]
+Lore should feel like a natural part of the existing Discover interface, not a completely different screen.
 
-[One additional flowing paragraph explaining Run, Jump, Triple jump, Fast fall, Dash, and Air dash.]
+Create a dedicated Lore page with:
 
-Formatting
+* A properly styled Lore heading.
+* A clean, readable content area.
+* Structured sections suitable for worldbuilding and character history.
+* Comfortable text spacing and typography.
+* Subtle separators and existing Alva colors.
+* Vertical scrolling if its content exceeds the available height.
 
-1. Keep the original introductory paragraph.
-2. Add a second paragraph immediately below it.
-3. Combine the six movement explanations into one coherent paragraph.
-4. Preserve the information provided by the existing movement registry.
-5. Use subtle inline emphasis, such as bold movement names, if it improves readability.
-6. Do not use cards, outlined holders, shaded blocks, decorative bullet markers, or tier-style containers.
-7. Use natural punctuation and spacing between explanations.
-8. Maintain the same readable typography, line height, and muted text palette used in Discover.
-9. Let the paragraph occupy a sensible reading width rather than forcing the text into unnecessarily narrow columns.
-10. Ensure the paragraph wraps naturally and remains readable on desktop and mobile.
+The page should be visually engaging but restrained.
 
-Implementation constraints
+Content requirements:
 
-Continue deriving the content from MOVEMENT_GUIDE and its localized translation keys.
+Lore is for narrative information, worldbuilding, character backgrounds, and established story context.
 
-Do not duplicate all movement descriptions as a separate hardcoded English paragraph that could drift away from the game’s source data.
+It must not become another gameplay guide or repeat the Movement and Launch sections.
 
-Update buildMovementPage() in js/screens/discover-screen.js to render the content using appropriate semantic paragraph elements.
+Review the repository’s existing documentation for established narrative information before writing the initial content.
 
-Remove movement-only visual styles that are no longer needed, without breaking the Launch section’s list presentation.
+Do not invent major canonical events, character relationships, fictional factions, origins, or world history without a source in the project.
 
-Keep the actual universal movement mechanics and tuning values untouched.
+If there is not enough established lore to populate a complete page, create a polished introductory Lore section with concise placeholder or introductory copy indicating that more stories will be added. Prepare the structure for future lore entries.
 
-Relevant files
+Avoid confusing gameplay mechanics with confirmed fictional-world lore.
 
-* js/screens/discover-screen.js
-* css/discover.css
-* js/data/movement.js — reference data, not a request to change gameplay
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
+Future-proof the Lore system
 
-4. Correct capitalization and grammar throughout Discover
+Make future lore additions straightforward.
+
+Ideally, keep Lore content separate from navigation logic, using a clear structured data source or localization keys where appropriate.
+
+It should be possible to add future world lore or character stories without rewriting the Discover navigation.
+
+Do not hardcode special behavior for character #0001 or #0002.
+
+Navigation requirements
+
+The Lore tab must behave exactly like the other Discover tabs.
+
+* Mouse click activates it.
+* Keyboard focus activates it.
+* Gamepad navigation can reach it.
+* Touch navigation works.
+* Only one Discover section is active at a time.
+* Hidden sections cannot receive focus.
+* The active tab has the existing visual treatment.
+* Screen readers receive the correct tab and panel relationships.
+* The content is independently scrollable when needed.
+* Back navigation remains unchanged.
+
+Preserve the existing accessible tablist, tab, and tabpanel structure, including aria-selected, aria-controls, and roving tabindex behavior.
+
+Responsive behavior
+
+The new fourth tab must fit naturally into Discover’s layout.
+
+On wide screens, maintain the vertical navigation rail.
+
+On narrow screens, maintain the horizontal navigation rail.
+
+Do not reduce labels to unreadable sizes or shrink touch targets below their existing minimum.
+
+Allow the horizontal rail to scroll when four labels cannot fit, including when using French translations.
+
+Avoid clipping, horizontal page overflow, or broken navigation in short landscape windows.
+
+⸻
+
+3. Rosters without Confirm — move “Read play style” fully to the bottom-right
+
+Current implementation
+
+The play-style button is generated by FighterRoster and currently uses:
+
+* .play-style-action
+* .text-action
+* .preview-info
+* .preview-info--no-confirm
+
+The FighterBrowser subclass removes the Confirm button.
+
+Required behavior
+
+Whenever a roster does not have a Confirm character button, the Read play style action must sit at the very bottom-right of the character preview information area.
+
+It should not float awkwardly immediately beneath the character name with unnecessary empty space below it.
+
+Design requirements:
+
+* Right-align the action.
+* Anchor it visually at the bottom edge of the preview information area.
+* Keep only a small, consistent amount of right and bottom padding.
+* Preserve sufficient padding for its focus outline and touch target.
+* Keep it separate from the fighter name and difficulty stars.
+* Preserve the underlined, quiet secondary-action appearance.
+* Maintain legibility when the translated label wraps.
+* Avoid overlap with the animated fighter preview.
+* Avoid using fragile absolute positioning that breaks at smaller resolutions.
+
+Prefer a robust flex or grid arrangement.
+
+Important distinction
+
+Rosters with a Confirm button must remain different.
+
+For Confirm-enabled rosters:
+
+* Keep Read play style above Confirm.
+* Preserve the existing Confirm button behavior.
+* Maintain reasonable spacing between the two controls.
+* Do not push the action below Confirm.
+
+For rosters without Confirm:
+
+* Read play style becomes the final, bottom-right action.
+* Do not add an unnecessary empty button area.
+* Do not introduce a Confirm button.
+
+Implement this based on whether the roster has Confirm, not based on the screen name or character ID.
+
+The existing .preview-info--no-confirm hook is a suitable place to start.
+
+⸻
+
+4. Rewrite every fighter’s play-style description
 
 Current problem
 
-Many labels are displayed entirely in uppercase because of CSS text-transform: uppercase.
+The descriptions are unnecessarily long.
 
-Examples include:
+They currently read like detailed explanations of attacks and abilities instead of short summaries of how the fighter actually plays.
 
-* MOVEMENT
-* LAUNCH
-* UNIVERSAL MOVEMENT
-* Movement entry names and Launch headings
+Players should understand a character’s play style quickly without reading a full paragraph of mechanics.
 
-This makes the interface less natural to read.
+New writing rules
 
-Required changes
+Rewrite all existing play-style descriptions, and establish the same rule for future fighters.
 
-Use normal, grammatically appropriate capitalization throughout the entire Discover interface.
+Every description must communicate three things:
 
-Examples:
+1. Play style: How does this fighter generally approach combat?
+2. Strengths: What is this fighter particularly good at?
+3. Weaknesses: What situations or decisions make this fighter vulnerable?
 
-Current appearance	Desired appearance
-FIGHTERS	Fighters
-MOVEMENT	Movement
-LAUNCH	Launch
-UNIVERSAL MOVEMENT	Universal movement
-RUN	Run
-JUMP	Jump
-TRIPLE JUMP	Triple jump
-FAST FALL	Fast fall
-AIR DASH	Air dash
-ROSTER	Roster
-LOCKED	Locked
-NOT RATED	Not rated
+The description must be short, direct, and useful to someone choosing a fighter.
 
-Review the entire Discover interface, not only the main navigation.
+Strict content requirements
 
-This includes:
+* Aim for two concise sentences per fighter, approximately 30–55 words total.
+* Explain the overall combat approach and strengths/weaknesses.
+* Use natural, readable language.
+* Avoid listing individual attacks.
+* Avoid naming abilities, techniques, or special moves.
+* Avoid cooldown numbers, Energy costs, damage values, or technical frame information.
+* Avoid repeating information already represented by the difficulty stars.
+* Avoid unnecessary lore or character backstory.
+* Avoid exaggerated marketing language.
+* Do not claim a fighter has faster universal movement: Alva deliberately gives all fighters the same baseline locomotion.
+* Make each fighter feel distinct without introducing inaccurate gameplay claims.
 
-* Discover navigation tabs.
-* Page headings.
-* Section headings.
-* Movement descriptions and inline names.
-* Launch section headings.
-* Launch value and direction labels.
-* Roster panel headings.
-* Fighter preview labels and statuses.
-* The “Read play style” action.
-* The play-style dialog’s headings and descriptions.
+Descriptions should convey the experience of playing the character, not their move inventory.
 
-Capitalization rules
+Suggested English descriptions
 
-Use natural sentence case for regular headings and labels.
+Fighter #0001
 
-Keep proper names, official mechanic names, acronyms, and technical terms correctly capitalized when required by the game’s established terminology.
+“A patient fighter who controls space, creates openings, and punishes careless approaches. Strong at setting the pace and capitalizing on mistakes, but vulnerable when pressured or when committing too early.”
 
-For example, preserve the meaningful capitalization of established terms such as “Launch Point”, “Base Launch”, and “Directional Launch” when they refer to the game’s named mechanics.
+Fighter #0002
 
-Do not blindly convert all text to lowercase. Do not change the ALVA brand name.
+“An aggressive, momentum-driven fighter who pressures opponents up close and pursues them through the air. Strong at maintaining offense and chasing escapes, but vulnerable to predictable approaches and overcommitting.”
 
-Correct actual spelling, grammar, and punctuation problems where necessary, without altering the meaning of gameplay descriptions.
+These examples establish the target length and tone. Refine them if necessary after checking the actual fighter definitions and specifications.
 
-CSS requirements
+French localization
 
-Inspect and correct uppercase transformations within these selectors:
+Update the French versions with the same information and approximately the same brevity.
 
-* .discover-tab
-* .discover-page-title
-* .discover-entry-title
-* .discover-tier-name
+The French text must sound natural, not mechanically translated.
 
-Also inspect shared styles such as .panel-title and .status-badge, which can affect text inside Discover.
+Keep established character terminology and maintain semantic consistency between the languages.
 
-Use Discover-scoped overrides where needed so capitalization changes do not unintentionally alter the appearance of other game screens.
+Data integrity
 
-Preserve the existing font hierarchy, weight, color, and overall styling as much as possible.
+The existing descriptions are referenced through:
 
-Localization
-
-ALVA supports English and French. All modifications must respect both languages.
-
-Review the relevant strings in:
-
+* js/data/fighter-profiles.js
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
 
-Ensure capitalization and grammar are appropriate for each language independently.
+Preserve the current profile architecture and description keys.
 
-Do not apply English capitalization conventions blindly to French.
+Do not move editorial descriptions into the gameplay definitions.
 
-Preserve localization keys that remain in use and ensure language switching continues to update every relevant UI element.
+Do not alter difficulty ratings just because the descriptions are changing.
 
-5. Preserve the established architecture
+Preserve the reviewedSourceHash system and only update review hashes when justified by the source-review contract.
 
-ALVA is built using vanilla JavaScript, CSS, HTML, and Canvas 2D. It does not require a frontend framework or build system.
+⸻
 
-Follow the architecture already established by the repository.
+5. Localization and accessibility
 
-Important constraints:
+Alva supports English and French. Every new visible string must support both languages.
 
-* Do not introduce React, Vue, or other new frameworks.
-* Do not alter combat systems, player movement, fighter definitions, difficulty values, or launch calculations.
-* Do not modify character art or animation assets.
-* Do not introduce fighter-ID-specific special cases in shared UI components.
-* Do not modify the protected character_rule file.
-* Preserve the intentional internal codename spelling mouvment where required by codename_rule. This spelling is part of the game’s internal naming contract and is not a player-facing typo to correct.
-* Preserve all existing navigation, focus management, and modal functionality.
-* Keep the implementation concise and consistent with existing code conventions.
+Add the necessary Lore translation keys to the existing localization tables.
 
-6. Responsive design and accessibility
+Verify that:
 
-Verify that the modified interface works in:
+* Lore appears correctly in English and French.
+* Switching language updates the section label and page content.
+* Existing play-style modal titles and buttons remain translated.
+* Shortened descriptions appear correctly in both languages.
+* No untranslated keys appear visibly.
+* Longer French labels do not break the layout.
 
-* Desktop landscape.
-* Short laptop-sized landscape windows.
-* Mobile landscape.
-* Narrow screens where Discover uses horizontal navigation.
-* English and French.
+Preserve the existing InfoDialog behavior.
 
-Ensure:
+Opening Read play style must not select or confirm a fighter, start a match, or unpause Practice Ground.
 
-* No clipped headings or overflowing paragraphs.
-* No horizontal scrolling caused by Movement descriptions.
-* Readable spacing between the introductory and detailed Movement paragraphs.
-* Proper placement of “Read play style” in previews without Confirm.
-* Consistent difficulty-star alignment.
-* Correct focus indicators and keyboard navigation.
-* Accessible tab labels, tab-panel relationships, and localized names.
-* No invisible Passives tab or panel remaining in the navigation.
-* No regressions in the Launch reference layout.
+Closing the modal must return focus to the triggering button.
 
-7. Update automated tests
+⸻
 
-The repository uses Node’s built-in test runner.
+6. Update tests and documentation
 
-Review and update tests/interface/discover.test.mjs, along with other affected tests.
+Do not leave tests asserting obsolete behavior.
 
-Specifically:
+Test updates
 
-1. Change the expected Discover tab count from four to three.
-2. Remove assertions expecting Passives to exist.
-3. Update keyboard/gamepad navigation tests for the three-tab order.
-4. Update Movement tests to expect introductory and detailed paragraphs rather than a list of bordered rows.
-5. Verify all six movement descriptions are still present and correctly localized.
-6. Add or update coverage for normal-case Discover labels.
-7. Verify the play-style action is positioned using the no-Confirm layout variant.
-8. Verify Confirm-enabled rosters retain their existing structure and behavior.
-9. Preserve existing tests for difficulty ratings, locked fighters, unrated fighters, modal interactions, and roster selection.
-10. Verify both English and French UI strings.
+Inspect and update at least:
 
-Run:
+* tests/interface/discover.test.mjs
+* tests/fighters/profiles.test.mjs
+* Relevant roster and responsive styling tests.
+* Localization tests, where applicable.
+
+Some existing profile tests require descriptions longer than 200 characters and explicitly check for named abilities.
+
+Those requirements directly conflict with the new writing rules and must be replaced.
+
+New tests should validate that descriptions are short, translated, contain meaningful gameplay identity and strengths/weaknesses, and do not turn into lists of moves.
+
+Update Discover navigation tests from three sections to four.
+
+Verify the correct order:
+
+fighters → lore → movement → launch
+
+Test Lore activation, accessibility, hidden-panel behavior, language switching, and navigation.
+
+Add regression coverage for roster number positioning, the translucent name strip, and the different Read play style layouts where practical.
+
+Documentation updates
+
+Update the relevant parts of:
+
+* ALVA_SPEC.md
+* README.md
+* docs/architecture/module-responsibilities.md
+* Other documentation that explicitly describes Discover’s sections or roster layout.
+
+Remove outdated claims that Discover has exactly three sections.
+
+Document the new concise play-style writing policy.
+
+Preserve historical documentation conventions and do not alter protected files such as character_rule.
+
+⸻
+
+7. Visual quality and consistency
+
+The changes should look intentional and professionally integrated.
+
+Prioritize:
+
+* Consistent component styling.
+* Legible text over dark portrait artwork.
+* Subtle transparency.
+* Precise bottom-right alignment.
+* Responsive spacing.
+* Clear hierarchy.
+* No unnecessary animations.
+* No new dependencies or frameworks.
+* No major changes to the game’s navigation architecture.
+
+Do not redesign the whole game.
+
+Do not modify combat, fighter statistics, movement, hit detection, scoring, or other gameplay systems.
+
+Do not alter character art or asset paths unless genuinely necessary for these UI requirements.
+
+⸻
+
+8. Final acceptance checklist
+
+The implementation is complete only when:
+
+* [ ]	Every shared roster places its slot number at the bottom-right.
+* [ ]	Character names and numbers do not overlap.
+* [ ]	The dark character-name strip is subtly translucent.
+* [ ]	Available, selected, locked, and disabled slots remain correct.
+* [ ]	Every roster without Confirm places Read play style at the bottom-right.
+* [ ]	Rosters with Confirm preserve Read play style above Confirm.
+* [ ]	Discover contains Fighters, Lore, Movement, and Launch.
+* [ ]	Lore displays a properly designed, localized content page.
+* [ ]	All four Discover tabs work with keyboard, gamepad, mouse, and touch.
+* [ ]	Shortened play-style descriptions explain approach, strengths, and weaknesses without listing abilities.
+* [ ]	All modified UI works in English and French.
+* [ ]	Mobile landscape and narrow layouts remain usable.
+* [ ]	Existing selection, preview, modal, and confirmation behavior remains intact.
+* [ ]	Tests and documentation reflect the new implementation.
+
+9. Verification and delivery
+
+Run the full test suite:
 
 node --test
 
-Correct all failures caused by the intended changes. Do not delete meaningful test coverage merely to make the suite pass.
+Also inspect the game in a browser through a local HTTP server if the environment supports it.
 
-Automated tests do not fully verify browser layout, so also inspect the responsive visual behavior when a browser environment is available.
+Visually check the actual UI at desktop and mobile landscape sizes, including Discover, a Confirm-enabled roster, and a roster without Confirm.
 
-8. Final acceptance criteria
+Fix any regressions introduced by the changes.
 
-The task is complete only when:
+At completion, provide:
 
-* [ ]	“Read play style” sits noticeably lower, toward the bottom-right of the preview information area, whenever the roster has no Confirm button.
-* [ ]	Rosters that do have a Confirm button remain visually unchanged.
-* [ ]	Discover has exactly three tabs: Fighters, Movement, Launch.
-* [ ]	Passives is no longer visible or registered as a Discover section.
-* [ ]	Movement’s six explanations appear in one readable paragraph directly after the introductory paragraph.
-* [ ]	Movement no longer uses individual outlined holders.
-* [ ]	Launch retains its existing mechanic explanations and structured reference content.
-* [ ]	Discover text uses natural capitalization rather than forced all-caps styling.
-* [ ]	English and French remain correct and functional.
-* [ ]	Keyboard, gamepad, mouse, and touch interactions remain functional.
-* [ ]	The relevant tests are updated and the full suite passes.
-* [ ]	No unrelated gameplay mechanics or visuals are modified.
+1. A summary of the changes made.
+2. The main files modified.
+3. The exact final play-style descriptions for #0001 and #0002 in both languages.
+4. The Lore section’s content and structure.
+5. Test results and any remaining limitations.
 
-9. Final deliverable
-
-Implement the modifications in the repository rather than stopping at a proposed plan.
-
-After implementation, provide:
-
-1. A concise summary of the changes.
-2. The actual files modified.
-3. An explanation of how the no-Confirm roster layout works.
-4. Confirmation that the three-tab Discover navigation functions correctly.
-5. The automated test results.
-6. Any remaining visual verification limitations.
-
-Priority: Deliver a cleaner, more polished, naturally readable Discover interface while preserving the existing ALVA design language and gameplay behavior. Avoid unnecessary refactoring or unrelated changes.
+Implement the changes rather than merely describing how to implement them. Keep the work focused, maintainable, consistent with Alva’s established architecture, and ready for review.
