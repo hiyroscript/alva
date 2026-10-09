@@ -130,3 +130,5 @@ Player-facing names such as “Punch,” “Kick” or other character-specific 
 Touch buttons show a frame of the character's own art for their move, chosen in its UI data by animation codename and frame (counted from 0), never by a file name of their own. The picture is presentation only: each button still sends its control codename.
 
 When adding or updating a character, keep its attack count, button routing, airborne variants, object ownership and animation assets consistent with these shared rules.
+
+You will be choosing whether the character has 2 more attacks.
