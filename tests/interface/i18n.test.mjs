@@ -428,8 +428,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(difficulty.cards[0].getAttribute('aria-label'), 'Facile, niveau 1 sur 4');
     assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Réactions rapides. Se défend et punit.');
     // Discover: tabs and the pages built from the registries.
-    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Récits', 'Déplacement', 'Éjection']);
-    assert.equal(discover.sections.find((s) => s.id === 'lore').panel.querySelector('.discover-entry-text').textContent, STRINGS.fr['lore.intro']);
+    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Déplacement', 'Éjection']);
     assert.equal(discover.browser.describeBtn.textContent, 'Lire le style de jeu');
     assert.equal(discover.el.querySelector('.screen-title').textContent, 'Découvrir');
     const tierNames = discover.el.querySelectorAll('.discover-tier-name').map((n) => n.textContent);

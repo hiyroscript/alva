@@ -14,9 +14,7 @@
 //
 // `descriptionKey` is the translation key of its play-style description
 // (js/localization/strings/en.js and fr.js): how the fighter plays, not a
-// move list. Use two concise sentences (about 30–55 words) on approach,
-// strengths and vulnerabilities; no named moves, numerical mechanics,
-// rating commentary, lore or claims of faster universal movement.
+// move list.
 //
 // `reviewedSourceHash` is the SHA-256 of the fighter's definition source
 // (js/data/characters/<id>.js read as UTF-8, line endings normalized to
