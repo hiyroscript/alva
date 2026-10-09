@@ -263,6 +263,12 @@ export const EN = {
   'discover.title': 'Discover',
   'discover.sections': 'Discover sections',
   'discover.fighters': 'Fighters',
+  'discover.lore': 'Lore',
+  'lore.intro': 'Every story needs a place to begin. This space will collect the stories of Alva’s world and its fighters as they are added.',
+  'lore.world.title': 'The world',
+  'lore.world.text': 'World stories are still to come. Future entries will explore the setting and its history.',
+  'lore.fighters.title': 'Fighter stories',
+  'lore.fighters.text': 'There is more to a fighter than a battle. Character backgrounds will appear here as their stories are added.',
   'discover.movement': 'Movement',
   'discover.launch': 'Launch',
   'discover.movementTitle': 'Universal movement',
@@ -282,8 +288,8 @@ export const EN = {
   // Each fighter's play-style description (its profile's descriptionKey,
   // js/data/fighter-profiles.js): how it plays, not a move list. Recheck it
   // whenever the fighter's definition changes.
-  'discover.fighter.0001.playStyle': 'A space-control and setup fighter that wins by controlling range, pulling or repelling opponents, and converting openings into powerful launchers or technique sequences. Red and Maximum Blue control space, while Blue and High Kick turn close-range openings into launches. Unlimited Void creates a long follow-up window, and Hollow Purple is a slow, high-commitment finisher. Infinity and Deflect reward strong defensive timing. Its strongest options demand careful spacing, cooldown and Energy management, matchup knowledge and precise timing, and a missed setup or a long cast can leave it vulnerable.',
-  'discover.fighter.0002.playStyle': 'A momentum-driven rushdown and aerial-chase fighter. One-Two and Rapid Kicks provide straightforward ground pressure, while Homing Attack, Bounce Attack, Spin Attack and Blue Tornado let it approach, chase and launch from several angles. Whirlwind can control space and create launch opportunities, and Deflect can turn projectile pressure back on the opponent. Its core game plan is approachable, but strong play requires preserving momentum, managing limited air uses and free-fall states, choosing safe approach angles, and knowing when not to overcommit into Shields or punish windows.',
+  'discover.fighter.0001.playStyle': 'A patient fighter who controls space, creates openings, and punishes careless approaches. Strong at setting the pace and capitalizing on mistakes, but vulnerable when pressured or when committing too early.',
+  'discover.fighter.0002.playStyle': 'An aggressive, momentum-driven fighter who pressures opponents up close and pursues them through the air. Strong at sustaining close-range offense and chasing escapes, but vulnerable to predictable approaches and overcommitting.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

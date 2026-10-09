@@ -268,7 +268,7 @@ Splash → Home → Select Mode → Quick Battle → Custom Play → Select Diff
 Select Mode → Quick Battle → play-type dialog → Esc / Back / close → Select Mode (nothing chosen)
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
-Home → Discover (Fighters / Movement / Launch reference, opening on Fighters; Back returns Home)
+Home → Discover (Fighters / Lore / Movement / Launch reference, opening on Fighters; Back returns Home)
 Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
@@ -475,6 +475,11 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.4 Select Fighter
 
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
+  Every shared roster places its two-digit slot number at the bottom-right,
+  including selected, locked and disabled slots. Fighter names stay left in
+  an 80%-opaque dark strip, with space reserved for the number; only the
+  background is translucent. Long names truncate without overlapping numbers.
+  Portraits, checkmarks, locks and accessible names retain their behavior.
 - The roster is `CHARACTERS`, placed by each fighter's `rosterSlot`; a
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
@@ -768,11 +773,12 @@ An in-game reference, entered from Home's Discover action. Its composition
 follows Seren's Cars & more reference screen (an index rail beside a
 scrollable page of structured entries) in Alva's own visual language:
 charcoal surfaces, off-white type, thin borders and the green accent.
-It has three sections. **Fighters** is the one page about the fighters
+It has four sections. **Fighters** is the one page about the fighters
 themselves: it browses the roster read-only, with each fighter's one
 difficulty rating and its play-style description, and it reads the
 character registry and the fighter profiles (`js/data/fighter-profiles.js`),
-so it grows as fighters are added. **Movement** and **Launch** are a
+so it grows as fighters are added. **Lore** holds narrative introductions
+and future world and character stories, separately from gameplay. **Movement** and **Launch** are a
 character-neutral mechanics reference, not a roster or stat sheet: they
 explain how each mechanic works and never say which fighter (or which of a
 fighter's attacks) uses which Base Launch or Directional Launch. No
@@ -785,8 +791,8 @@ comes from its definition and its profile.
 - **Header:** the standard menu header — Back (Alva's back icon, labelled
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
   return Home.
-- **Rail:** exactly three sections, **Fighters**, **Movement**, **Launch**
-  (ids `fighters`, `movement`, `launch`), as a
+- **Rail:** four sections, **Fighters**, **Lore**, **Movement**, **Launch**
+  (ids `fighters`, `lore`, `movement`, `launch`), as a
   `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
   tabindex; each page a `tabpanel`, the reference pages focusable). Every
   visit opens on Fighters.
@@ -796,16 +802,16 @@ comes from its definition and its profile.
   it; mouse hover is only a preview. Down the left on wide and short
   landscape windows; across the top of the page (bar underneath) on narrow
   windows (≤ 600 px wide unless shorter than 441 px) and tall ones, with
-  slightly tighter tracking so the three sections fit side by side; where a
+  slightly tighter tracking so the four sections can share a row; where a
   window (or the longer French labels) cannot fit them, the rail scrolls
   sideways on its own rather than clip a tab or widen the page, and no tab
   shrinks below its label or a 44 px touch target. Arrows / D-pad follow
-  the rail in either orientation through all three tabs.
+  the rail in either orientation through all four tabs.
 - **Typography:** natural sentence case for headings and labels in English
   and French, including roster statuses and the play-style dialog. Named
   mechanics such as Launch Point retain their established capitalization.
 - **Page:** fills the rest; the document never scrolls. A reference page
-  (Movement, Launch) scrolls on its own and is a stop in menu
+  (Lore, Movement, Launch) scrolls on its own and is a stop in menu
   navigation so a gamepad can scroll it: ↑ / ↓ scroll it while it can
   scroll that way, then move on. The Fighters page is no stop itself: its
   fighters and its play-style button are, and moving from its tab toward
@@ -850,9 +856,11 @@ comes from its definition and its profile.
     below the fighter name on its own row, a real `<button type="button">`
     set as 11px underlined secondary text with `aria-haspopup="dialog"`, reached by
     Tab, arrows and D-pad, activated by keyboard, gamepad, mouse or touch,
-    with the usual focus ring for keyboard and gamepad. Extra responsive
-    separation applies whenever Confirm is absent (`preview-info--no-confirm`);
-    Confirm-enabled rosters keep their spacing. It opens a modal
+    with the usual focus ring for keyboard and gamepad. Whenever Confirm is
+    absent (`preview-info--no-confirm`), a column flex layout pushes the
+    action to the bottom-right with an 8 px right and bottom inset, without
+    an empty button area. Wrapped labels stay in normal flow. Confirm-enabled
+    rosters keep the action above Confirm and their existing spacing. It opens a modal
     (`InfoDialog`, `role="dialog"`, never `alertdialog`; `aria-modal`;
     labelled by its title): the kicker "Play style", the fighter's name as
     the title and its localized play-style description, with a Close
@@ -864,6 +872,20 @@ comes from its definition and its profile.
     "Not rated" and no button; a locked slot shows Locked; with no playable
     fighter at all, every slot is locked and a line under the preview says
     "No fighters to show yet." Discover still opens.
+- **Lore:** a localized heading and introduction, then single-column entries
+  under subtle separators: **The world** and **Fighter stories**. The initial
+  copy explicitly says stories are still to come: the project does not yet
+  establish world history or character backgrounds. No invented canon or
+  mechanics presented as lore. `js/data/lore.js` holds the ordered entry ids
+  and translation keys; add sourced entries there and English/French copy
+  in the localization tables without changing navigation. Paragraphs use a
+  comfortable reading width; the panel scrolls independently.
+- **Play-style writing:** each fighter gets two concise sentences, about
+  30–55 words, covering approach, strengths and vulnerabilities in natural
+  English and French. No named moves, move inventories, numerical mechanics,
+  difficulty commentary or backstory, and no faster universal locomotion.
+  Definitions and fighter specifications remain authoritative; editorial
+  changes alone do not change difficulty or the source-review hash.
 - **Movement:** one entry, **Universal movement**, built only from
   `MOVEMENT_SUMMARY` and `MOVEMENT_GUIDE` in `js/data/movement.js`, so it
   cannot drift from gameplay: "Movement is the same for everyone: one run,
