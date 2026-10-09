@@ -1333,24 +1333,29 @@ test('Lore has localized narrative introductions from a separate registry, with 
   }
 });
 
-test('shared roster numbers retain their format in every state and reserve room on a translucent name strip', () => withTestFighters([TEST_DISABLED], () => {
+test('shared roster fighter identifiers sit bottom-right on a translucent strip; slot indices stay top-left', () => withTestFighters([TEST_DISABLED], () => {
   const { discover } = openDiscover();
   const { browser } = discover;
   browser.slots.forEach((slot, i) => {
     assert.equal(slot.querySelector('.slot-num').textContent, String(i + 1).padStart(2, '0'));
+    const name = slot.querySelector('.slot-name');
+    if (slot.classList.contains('is-available')) assert.equal(name.textContent, slot._def.displayName);
+    else assert.equal(name, null, 'locked and disabled slots do not invent fighter labels');
   });
   assert.ok(browser.slots.some((s) => s.classList.contains('is-selected')));
   assert.ok(browser.slots.some((s) => s._def === TEST_DISABLED && s.classList.contains('is-locked')));
   const css = stylesheet();
   const number = css.match(/\n\.slot-num \{[^}]*\}/)[0];
-  assert.match(number, /bottom: 4px;/);
-  assert.match(number, /right: 6px;/);
-  assert.doesNotMatch(number, /(?:top|left):/);
+  assert.match(number, /top: 4px;/);
+  assert.match(number, /left: 6px;/);
+  assert.doesNotMatch(number, /(?:bottom|right):/);
   const name = css.match(/\n\.slot-name \{[^}]*\}/)[0];
-  assert.match(name, /padding: 3px 24px 4px 6px;/);
+  assert.match(name, /bottom: 0;/);
+  assert.match(name, /right: 0;/);
+  assert.match(name, /padding: 3px 6px 4px;/);
   assert.match(name, /background: rgb\(20 20 20 \/ 80%\);/);
   assert.doesNotMatch(name, /(?:^|[;\s])opacity:/);
-  assert.match(name, /text-align: left;/);
+  assert.match(name, /text-align: right;/);
   assert.match(name, /text-overflow: ellipsis;/);
-  assert.match(css, /--slot: clamp\(68px,/, 'small cards leave room for a name and two-digit number');
+  assert.match(css, /--slot: clamp\(54px,/, 'the original card sizing is preserved');
 }));

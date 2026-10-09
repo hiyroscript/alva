@@ -475,10 +475,12 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.4 Select Fighter
 
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
-  Every shared roster places its two-digit slot number at the bottom-right,
-  including selected, locked and disabled slots. Fighter names stay left in
-  an 80%-opaque dark strip, with space reserved for the number; only the
-  background is translucent. Long names truncate without overlapping numbers.
+  Every shared roster places the fighter identifier (`#0001`, `#0002`, etc.)
+  at the bottom-right of an 80%-opaque dark strip; only the background is
+  translucent. Long fighter labels truncate within the strip. The small
+  two-digit slot index (`01`, `02`, etc.) stays at the top-left in every
+  state. Locked and disabled slots retain their slot index and lock without
+  adding a fighter label. The original responsive card sizing is preserved.
   Portraits, checkmarks, locks and accessible names retain their behavior.
 - The roster is `CHARACTERS`, placed by each fighter's `rosterSlot`; a
   fighter is always shown with the `#`. Only a playable fighter (`available`,

@@ -69,8 +69,9 @@ use.
   **Discover** reference: the fighters, each with one 1–5 difficulty
   rating and a concise play-style description, then Lore, universal movement
   and Launch. Lore starts with introductions for future world and character
-  stories, in English and French. Shared rosters place numbers at the
-  bottom-right beside names on a translucent dark strip.
+  stories, in English and French. Shared rosters place fighter identifiers
+  (`#0001`, etc.) at the bottom-right of a translucent dark strip; small
+  slot indices stay at the top-left.
 
 ## Run it
 
