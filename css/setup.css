@@ -157,7 +157,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   touch-action: pan-y;
 }
 .roster-grid {
-  --slot: clamp(54px, calc(5.2vw + 3.2vh), 112px);
+  --slot: clamp(68px, calc(5.2vw + 3.2vh), 112px);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--slot), 1fr));
   gap: clamp(5px, 0.7vw, 9px);
@@ -179,8 +179,9 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
 .slot.is-locked .slot-art .icon { width: 100%; height: 100%; fill: var(--surface-sunken); }
 .slot-num {
   position: absolute;
-  top: 4px;
-  left: 6px;
+  bottom: 4px;
+  right: 6px;
+  line-height: 1.25;
   font-family: var(--font-mono);
   font-size: clamp(8px, 1.3vh, 10px);
   font-weight: 600;
@@ -199,8 +200,12 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 3px 6px 4px;
-  background: var(--surface);
+  /* Reserve the number’s width and a gap without dimming either label. */
+  padding: 3px 24px 4px 6px;
+  background: rgb(20 20 20 / 80%);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   border-top: 1px solid var(--border);
   font-weight: 600;
   font-size: clamp(10px, 1.7vh, 13px);
@@ -312,15 +317,24 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
 .text-action:active { color: var(--text-strong); }
 .play-style-action { justify-self: end; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
 
-/* With no Confirm, separate the final action from the name and stars.
-   Content sets the height; short windows keep more room for the animation. */
-.preview-info--no-confirm { row-gap: clamp(16px, 4vh, 40px); }
-@media (max-height: 560px) {
-  .preview-info.preview-info--no-confirm { row-gap: clamp(12px, 3vh, 18px); }
+/* With no Confirm, the final action consumes spare vertical space and
+   sits at the lower-right inset. Flex keeps wrapped labels in normal flow. */
+.preview-info--no-confirm {
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(104px, 20vh, 156px);
+  gap: 12px;
+  padding-right: 8px;
+  padding-bottom: 8px;
 }
-/* Stacked rosters have a shorter preview even in a tall window. */
+.preview-info--no-confirm .play-style-action {
+  margin-top: auto;
+  align-self: flex-end;
+  flex-shrink: 0;
+}
+/* A stacked preview has less height to share with its animation. */
 @media (max-aspect-ratio: 1/1) and (min-height: 600px) {
-  .preview-info--no-confirm { row-gap: 16px; }
+  .preview-info--no-confirm { min-height: 0; gap: 8px; }
 }
 
 /* ---------------------------------------------------------------------
