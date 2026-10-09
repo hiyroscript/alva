@@ -312,14 +312,15 @@ valid, current one fails
 2. **Write its play-style description** under
    `discover.fighter.0027.playStyle` in
    [`en.js`](../../js/localization/strings/en.js) and a natural French
-   translation in [`fr.js`](../../js/localization/strings/fr.js) (its moves
-   by their names in each language). One paragraph on how it plays: its
-   game plan, what it is strong at, what makes it hard to master. Not a
-   move list (that is its specification's job), no rating or numbers in
-   the text (the stars show the rating), and no real or canonical
-   character name ([`codename_rule`](../../codename_rule)). It must agree
-   with the definition: the definition and the specification are the
-   authority, the profile only describes them.
+   translation in [`fr.js`](../../js/localization/strings/fr.js). Use two
+   concise sentences, about 30–55 words total, covering combat approach,
+   strengths and vulnerabilities. No named abilities or move inventories,
+   numerical mechanics, difficulty commentary, backstory, or claims of faster
+   universal movement. Keep both languages semantically consistent and use
+   no real or canonical character name ([`codename_rule`](../../codename_rule)).
+   Review the actual definition and specification: they remain authoritative.
+   A copy-only rewrite does not change difficulty or the review hash; only
+   record a new hash after reviewing a changed definition under the contract.
 3. **Record the review hash**: the SHA-256 of its definition's source, its
    line endings normalized to `\n`:
 
