@@ -428,11 +428,12 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(difficulty.cards[0].getAttribute('aria-label'), 'Facile, niveau 1 sur 4');
     assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Réactions rapides. Se défend et punit.');
     // Discover: tabs and the pages built from the registries.
-    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Déplacement', 'Éjection', 'Passifs']);
+    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Combattants', 'Déplacement', 'Éjection']);
     assert.equal(discover.browser.describeBtn.textContent, 'Lire le style de jeu');
     assert.equal(discover.el.querySelector('.screen-title').textContent, 'Découvrir');
     const tierNames = discover.el.querySelectorAll('.discover-tier-name').map((n) => n.textContent);
-    assert.ok(tierNames.includes('Triple saut'));
+    const movementNames = discover.el.querySelectorAll('strong').map((n) => n.textContent);
+    assert.deepEqual(movementNames, ['Course', 'Saut', 'Triple saut', 'Chute rapide', 'Sprint', 'Sprint aérien']);
     assert.ok(tierNames.includes('Éjection de base 2'));
     assert.ok(discover.el.querySelectorAll('.discover-formula')[0].textContent.startsWith('Force d’éjection'));
     // The HUD's spoken labels.

@@ -268,7 +268,7 @@ Splash → Home → Select Mode → Quick Battle → Custom Play → Select Diff
 Select Mode → Quick Battle → play-type dialog → Esc / Back / close → Select Mode (nothing chosen)
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
-Home → Discover (Fighters / Movement / Launch / Passives reference, opening on Fighters; Back returns Home)
+Home → Discover (Fighters / Movement / Launch reference, opening on Fighters; Back returns Home)
 Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
@@ -768,7 +768,7 @@ An in-game reference, entered from Home's Discover action. Its composition
 follows Seren's Cars & more reference screen (an index rail beside a
 scrollable page of structured entries) in Alva's own visual language:
 charcoal surfaces, off-white type, thin borders and the green accent.
-It has four sections. **Fighters** is the one page about the fighters
+It has three sections. **Fighters** is the one page about the fighters
 themselves: it browses the roster read-only, with each fighter's one
 difficulty rating and its play-style description, and it reads the
 character registry and the fighter profiles (`js/data/fighter-profiles.js`),
@@ -778,15 +778,15 @@ explain how each mechanic works and never say which fighter (or which of a
 fighter's attacks) uses which Base Launch or Directional Launch. No
 character name or ID appears on them, visibly or in accessible text, and
 they do not read the character database, so they stay the same as fighters
-are added. **Passives** is empty on purpose. No shared code special-cases a
+are added. No shared code special-cases a
 fighter's id here either: every fighter-specific value on the Fighters page
 comes from its definition and its profile.
 
 - **Header:** the standard menu header — Back (Alva's back icon, labelled
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
   return Home.
-- **Rail:** exactly four sections, **FIGHTERS**, **MOVEMENT**, **LAUNCH**
-  then **PASSIVES** (ids `fighters`, `movement`, `launch`, `passives`), as a
+- **Rail:** exactly three sections, **Fighters**, **Movement**, **Launch**
+  (ids `fighters`, `movement`, `launch`), as a
   `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
   tabindex; each page a `tabpanel`, the reference pages focusable). Every
   visit opens on Fighters.
@@ -796,21 +796,23 @@ comes from its definition and its profile.
   it; mouse hover is only a preview. Down the left on wide and short
   landscape windows; across the top of the page (bar underneath) on narrow
   windows (≤ 600 px wide unless shorter than 441 px) and tall ones, with
-  slightly tighter tracking so the four sections fit side by side; where a
+  slightly tighter tracking so the three sections fit side by side; where a
   window (or the longer French labels) cannot fit them, the rail scrolls
   sideways on its own rather than clip a tab or widen the page, and no tab
   shrinks below its label or a 44 px touch target. Arrows / D-pad follow
-  the rail in either orientation through all four tabs.
+  the rail in either orientation through all three tabs.
+- **Typography:** natural sentence case for headings and labels in English
+  and French, including roster statuses and the play-style dialog. Named
+  mechanics such as Launch Point retain their established capitalization.
 - **Page:** fills the rest; the document never scrolls. A reference page
-  (Movement, Launch, Passives) scrolls on its own and is a stop in menu
+  (Movement, Launch) scrolls on its own and is a stop in menu
   navigation so a gamepad can scroll it: ↑ / ↓ scroll it while it can
   scroll that way, then move on. The Fighters page is no stop itself: its
   fighters and its play-style button are, and moving from its tab toward
   the page lands on the selected fighter. Leaving any page toward the rail
   lands on the open section's tab, never another one, so the page never
   switches underneath. The hidden pages are `hidden`, so nothing in them
-  can take focus. A reference page's focus shows as an inset frame, so an
-  empty page shows it too.
+  can take focus. A reference page's focus shows as an inset frame.
 - **Fighters:** the Select Fighter roster (`js/ui/fighter-roster.js`) and
   its animated preview, browsed read-only (`js/ui/fighter-browser.js`):
   the same grid, roster order, portraits, locked placeholders and idle
@@ -848,7 +850,9 @@ comes from its definition and its profile.
     below the fighter name on its own row, a real `<button type="button">`
     set as 11px underlined secondary text with `aria-haspopup="dialog"`, reached by
     Tab, arrows and D-pad, activated by keyboard, gamepad, mouse or touch,
-    with the usual focus ring for keyboard and gamepad. It opens a modal
+    with the usual focus ring for keyboard and gamepad. Extra responsive
+    separation applies whenever Confirm is absent (`preview-info--no-confirm`);
+    Confirm-enabled rosters keep their spacing. It opens a modal
     (`InfoDialog`, `role="dialog"`, never `alertdialog`; `aria-modal`;
     labelled by its title): the kicker "Play style", the fighter's name as
     the title and its localized play-style description, with a Close
@@ -863,9 +867,10 @@ comes from its definition and its profile.
 - **Movement:** one entry, **Universal movement**, built only from
   `MOVEMENT_SUMMARY` and `MOVEMENT_GUIDE` in `js/data/movement.js`, so it
   cannot drift from gameplay: "Movement is the same for everyone: one run,
-  one set of jumps, one Dash. What sets each apart is their moves." beside
-  (stacked when there is no room for two columns) its rows, each with its
-  name, description and a plain bullet (none is ranked or singled out):
+  one set of jumps, one Dash. What sets each apart is their moves." A second
+  paragraph follows immediately, joining the six localized explanations
+  with subtly bold inline names. It uses a comfortable reading width,
+  without cards, borders or decorative markers:
   Run "Quick to full speed and quick to turn. Speed you build carries on
   through jumps, attacks and landings.", Jump "A tap is the normal jump;
   held a little longer, the higher jump.", Triple jump "Two more jumps in
@@ -876,7 +881,7 @@ comes from its definition and its profile.
   numbers: there is nothing to compare.
 - **Launch:** built only from the registry and reference copy in
   `js/data/launch.js` (`BASE_LAUNCH_VALUES`, `DIRECTIONAL_LAUNCHES` and their
-  summaries), in the same entry and row language as Movement. Three entries:
+  summaries), retaining structured reference rows. Three entries:
   - **Launch Point**: starts at 0; each unblocked hit adds its damage and
     restarts recovery. After 2 seconds without a hit, every following 0.5
     seconds removes 1 point down to 0 (first point at 2.5 seconds). Blocks
@@ -905,9 +910,6 @@ comes from its definition and its profile.
   fighter list, "Used by" label or ownership highlighting on them. On short
   landscape windows the entries and rows tighten so a page's entries
   scroll by in a few steps.
-- **Passives:** intentionally empty — no cards, placeholder or "coming
-  soon" copy — until a passives registry exists. The section is fully
-  selectable and accessible.
 - A new universal movement appears here once it is added to
   `MOVEMENT_GUIDE`, with no change to the screen.
 

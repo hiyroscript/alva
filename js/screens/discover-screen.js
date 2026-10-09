@@ -1,5 +1,5 @@
 // DISCOVER: the in-game reference. An index rail of sections (Fighters,
-// Movement, Launch, Passives) beside one page; on narrow windows the rail
+// Movement, Launch) beside one page; on narrow windows the rail
 // runs across the top instead. Every visit opens on Fighters.
 //
 // Fighters is the one page about the fighters themselves: the roster,
@@ -17,7 +17,7 @@
 // Base Launch values and the formula they follow, and every Directional
 // Launch). They explain mechanics only: they never read the roster or say
 // which fighter or attack uses which Base Launch or direction, so they stay
-// the same as the roster grows. Passives is empty on purpose.
+// the same as the roster grows.
 //
 // The rail is a tablist with automatic activation: keyboard or gamepad focus
 // on a section shows it, a click or tap selects it, and mouse hover is only a
@@ -82,16 +82,18 @@ function row(dataset, marker, name, description) {
   ]);
 }
 
-// Movement: the one entry every fighter shares (it says so), beside the
-// universal run, jumps and Dash, each marked with a plain bullet. Names
-// and descriptions only: no tuning numbers.
+// Movement: the shared introduction followed by one flowing paragraph.
+// Each inline name and description stays localized from the registry.
 function buildMovementPage() {
-  return el('div', { class: 'discover-page' }, [
+  return el('div', { class: 'discover-page discover-page--movement' }, [
     el('h2', { class: 'discover-page-title', ...tx('discover.movement') }),
-    entry('movement', 'discover.movementTitle', 'movement.summary',
-      el('ul', { class: 'discover-tiers', ...tattr('aria-label', 'discover.movementList') }, MOVEMENT_GUIDE.map((move) =>
-        row({ move: move.id }, el('span', { class: 'discover-mark', 'aria-hidden': 'true' }),
-          `movement.${move.id}.name`, `movement.${move.id}.description`)))),
+    entry('movement', 'discover.movementTitle', 'movement.summary', null,
+      el('p', { class: 'discover-entry-text' }, MOVEMENT_GUIDE.flatMap((move, i) => [
+        i ? ' ' : '',
+        el('strong', { ...tx(`movement.${move.id}.name`) }),
+        '. ',
+        el('span', { ...tx(`movement.${move.id}.description`) }),
+      ]))),
   ]);
 }
 
@@ -128,8 +130,6 @@ function buildFightersPage(screen) {
   return el('div', { class: 'discover-fighters char-layout' }, [screen.browser.rosterPanel, screen.browser.previewPanel]);
 }
 
-// Passives has no content yet, on purpose: the section is scaffolding for a
-// future passives registry, so its page stays empty rather than faked.
 // `label` is the tab's translation key. A `page` section is a reference page
 // (a navigation stop of its own that ↑ / ↓ scroll); Fighters is not: its
 // controls take focus instead, from `enter`.
@@ -137,7 +137,6 @@ const SECTIONS = [
   { id: 'fighters', label: 'discover.fighters', build: buildFightersPage, page: false, enter: (screen) => screen.browser.focusSelected() },
   { id: 'movement', label: 'discover.movement', build: buildMovementPage, page: true },
   { id: 'launch', label: 'discover.launch', build: buildLaunchPage, page: true },
-  { id: 'passives', label: 'discover.passives', build: () => null, page: true },
 ];
 
 export class DiscoverScreen extends Screen {

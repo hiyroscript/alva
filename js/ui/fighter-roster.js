@@ -92,7 +92,7 @@ export class FighterRoster {
 
     this.previewPanel = el('aside', { class: 'char-preview', 'aria-labelledby': previewId, 'aria-live': 'polite' }, [
       el('div', { class: 'preview-stage' }, [this.previewCanvas]),
-      el('div', { class: 'preview-info' }, [this.buildPreviewHead(previewId), this.describeBtn, this.confirmBtn]),
+      el('div', { class: `preview-info${this.confirmBtn ? '' : ' preview-info--no-confirm'}` }, [this.buildPreviewHead(previewId), this.describeBtn, this.confirmBtn]),
     ]);
   }
 
