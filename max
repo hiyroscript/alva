@@ -1,238 +1,361 @@
-ALVA — Add “Why Alva?” to the Home Screen
+ALVA — Universal Fighter Difficulty & Play Style UI Update
 
 Objective
 
-Modify the existing Alva Home Screen to introduce a new text-based interactive element labeled “Why Alva?”, positioned directly below the existing “By hiyroscript” developer attribution.
+Update ALVA’s fighter roster interface so every roster consistently displays each playable fighter’s difficulty rating and provides access to their play-style description.
 
-The new element must have a clearly visible underline that communicates it is clickable.
+The system currently exists in Discover → Fighters. Extend it throughout the game while improving its presentation.
 
-For now, clicking it must do absolutely nothing. It is a visual and interactive placeholder for a future feature.
+This is a focused UI/UX update. Preserve ALVA’s existing visual identity, gameplay systems, navigation behavior, and character data.
 
-This should be a small, carefully integrated UI addition, not a redesign.
-
-1. Project context
+1. Understand the existing architecture
 
 Repository: hiyroscript/alva
 
-Alva is a browser-based 2D platform fighting game using native JavaScript ES modules, HTML, CSS and Canvas 2D. There is no frontend framework or build step.
+Review these files before implementing:
 
-The Home Screen features:
+Core UI
 
-* The ALVA wordmark and tagline.
-* Play, Watch Mode, Practice Ground and Discover.
-* A scrolling credits section.
-* Help, Controller and Settings controls.
-* A bottom footer containing the developer attribution and a disabled Download icon.
+* js/ui/fighter-roster.js — Shared roster grid, selection logic, animated previews, and Confirm button.
+* js/ui/fighter-browser.js — Discover’s existing difficulty stars and play-style action.
+* js/data/fighter-profiles.js — Difficulty ratings and localized description references.
+* js/ui/overlays.js — Existing InfoDialog implementation.
 
-Preserve the existing game design, its minimalist dark aesthetic, typography, spacing and responsiveness.
+Screens
 
-Before editing, review the current implementation and the relevant project documentation.
+* js/screens/character-select-screen.js
+* js/screens/quick-cpu-screen.js
+* js/screens/watch-screens.js
+* js/screens/practice-screen.js
+* js/screens/discover-screen.js
 
-2. Relevant files
+Styling and localization
 
-The principal files are:
+* css/setup.css
+* css/discover.css
+* css/practice.css
+* css/responsive.css
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-* js/screens/home-screen.js — Home Screen structure and behavior.
-* css/home.css — Home Screen styling, including the footer.
-* js/localization/strings/en.js — English translations.
-* js/localization/strings/fr.js — French translations.
-* tests/interface/settings.test.mjs — Existing Home footer structure assertions.
-* tests/interface/i18n.test.mjs — Localization tests.
+Read the relevant documentation in ALVA_SPEC.md before modifying the interface.
 
-The Home Screen is generated dynamically in JavaScript. Do not unnecessarily move its content into index.html.
+2. Show difficulty in EVERY roster
 
-3. Exact positioning
+All fighter-selection interfaces must display the selected or previewed fighter’s difficulty stars.
 
-Locate the existing footer created in js/screens/home-screen.js.
+This includes:
 
-It currently contains the localized developer attribution using:
+1. Discover → Fighters
+2. Quick Battle → Select Fighter
+3. Custom Play → Select CPU
+4. Watch Mode → Select CPU 1
+5. Watch Mode → Select CPU 2
+6. Practice Ground → Change Fighter
+7. Practice Ground → Select CPU / Change CPU
 
-tx('home.by', { developer: CONFIG.developer })
+Important: Implement this through shared roster UI code so that future roster instances automatically inherit the feature.
 
-The footer uses the .home-footer class and also contains a disabled .home-download button.
+Difficulty presentation
 
-Modify the footer’s left area so the content appears vertically in the following order:
+Use ALVA’s existing five-star rating system.
 
-By hiyroscript
+Examples based on current fighter profiles:
 
-Why Alva?
+* #0001: ★★★★★
+* #0002: ★★★☆☆
 
-The requirements are:
+Rules:
 
-1. Keep the developer attribution exactly as it currently appears.
-2. Add “Why Alva?” immediately underneath.
-3. Align the left edges of both text elements.
-4. Maintain a small, intentional vertical gap between them.
-5. Keep both items grouped on the left side of the footer.
-6. Preserve the Download icon’s existing position on the far right.
-7. Do not place the new element inside the main Play/Watch/Practice/Discover navigation.
+* Display exactly five stars.
+* Filled stars represent the character’s existing difficulty rating.
+* Unfilled stars remain visible.
+* Maintain ALVA’s existing star styling and colors.
+* Do not introduce another difficulty calculation or rating system.
+* Display the rating in the preview information area, near the fighter’s name.
+* Update the rating immediately when the previewed fighter changes.
 
-A small wrapper, such as .home-footer-left, is appropriate for vertically stacking the attribution and new element while retaining the footer’s existing horizontal flex layout.
+REMOVE the visible “Difficulty” label
 
-4. Visual design
+The current Discover interface displays:
 
-The new element must look native to Alva.
+DIFFICULTY ★★★★★
 
-Use the existing styling conventions in css/home.css:
+Change this to:
 
-* Retain the footer’s monospace typography (var(--font-mono)).
-* Use a text size consistent with the existing footer, approximately 11px unless minor responsive adjustments are necessary.
-* Use a subtle, readable foreground color from the existing design tokens.
-* Avoid bold, oversized or brightly colored typography.
-* Do not add a card, border box, background panel, icon or arrow.
-* The underline must be visible at all times, not only on hover.
-* Give the underline a small offset from the text for readability.
-* Use cursor: pointer to communicate interactivity.
-* A restrained hover color change is acceptable.
-* Provide a keyboard-visible focus indicator consistent with Alva’s UI.
+★★★★★
 
-The final result should feel like an intentional, understated footer link rather than an additional primary menu action.
+Remove the visible word “Difficulty” entirely from beside the stars on every roster.
 
-5. Interaction behavior — IMPORTANT
+Do not replace it with another visible heading or indicator.
 
-The “Why Alva?” element must look clickable and be genuinely focusable, but must not perform an action yet.
+However, retain an accessible description such as “Difficulty: 5 out of 5 stars” for screen readers. The stars should remain informational and non-interactive.
 
-Use a semantic <button type="button"> styled as understated text.
+Do not confuse fighter difficulty ratings with Quick Battle’s separate CPU difficulty selection.
 
-Do not use a disabled button, since the element must retain its interactive appearance and be keyboard-focusable.
+3. Rename the play-style action
 
-On click or activation:
+The current button says:
 
-* Do not navigate anywhere.
-* Do not open a page, modal or overlay.
-* Do not change the current screen.
-* Do not display an alert, toast or notification.
-* Do not modify game state.
-* Do not launch gameplay.
-* Do not alter the URL or scroll position.
-* Do not log an unnecessary message.
+Play style description
 
-A button without an action handler is acceptable for this placeholder.
+Change it everywhere to exactly:
 
-Make sure it can be reached using standard keyboard navigation. Consider Alva’s existing data-nav and MenuNavigator conventions so gamepad focus navigation remains coherent. Activating it with a keyboard or gamepad must also have no effect.
+Read play style
 
-Do not create a new screen, route, dialog or feature implementation.
+Requirements:
 
-6. Localization
+* Update the existing localization key rather than hardcoding text in individual screens.
+* Update English and French translations.
+* Use a natural French equivalent such as “Lire le style de jeu”.
+* Keep the existing modal’s title, “Play style”, unless a change is needed for consistency.
+* Do not rewrite or shorten the actual character descriptions.
+* Ensure the action updates correctly when the game’s language changes.
 
-Alva supports English and French, including runtime language switching.
+4. Make “Read play style” smaller
 
-Do not hardcode the visible text directly into the Home Screen.
+The current .text-action styling uses a 12px font.
 
-Add a new translation key following the existing naming scheme.
+Reduce the visible text size slightly, targeting approximately 11px.
 
-Suggested key:
+Design requirements:
 
-home.whyAlva
+* Smaller than the current text.
+* Subtle and secondary to the fighter’s name and difficulty stars.
+* Maintain the existing understated, underlined text-button appearance.
+* Use ALVA’s existing typography and color variables.
+* Preserve readable contrast.
+* Keep a comfortable clickable/tappable area despite the smaller font.
+* Preserve hover, active, keyboard-focus, and gamepad-focus states.
 
-English:
+The action should feel like a small informational link, not a primary button.
 
-Why Alva?
+5. Move “Read play style” to the BOTTOM RIGHT
 
-French:
+Currently, Discover places the play-style action on the same horizontal row as the difficulty rating.
 
-Pourquoi Alva ?
+This arrangement must change.
 
-Render the button text using Alva’s existing localization helper, such as tx().
+New layout
 
-Verify that changing the game language updates the label immediately without requiring a reload.
+Organize the fighter preview information so that:
 
-Keep the existing developer attribution localization unchanged.
+* Difficulty stars appear near the top-left of the information area.
+* The fighter’s name remains prominently displayed.
+* “Read play style” appears at the bottom-right corner of the preview information area.
+* The action is right-aligned and visually separated from the difficulty stars.
+* It must not sit next to the stars anymore.
 
-7. Responsive layout
+Suggested visual hierarchy:
 
-The footer must remain functional and visually balanced across supported screen sizes, especially small landscape mobile displays.
+┌─────────────────────────────┐
+│                             │
+│     ANIMATED FIGHTER        │
+│         PREVIEW             │
+│                             │
+├─────────────────────────────┤
+│ ★★★★★                       │
+│                             │
+│ #0001                       │
+│                             │
+│              Read play style│
+│                             │
+│ ┌─────────────────────────┐ │
+│ │     Confirm fighter     │ │
+│ └─────────────────────────┘ │
+└─────────────────────────────┘
 
-Pay attention to these existing constraints:
+For selection screens, the link should occupy the bottom-right of the information area immediately above the existing Confirm button.
 
-* .home-footer currently uses a horizontal flex layout and safe-area padding.
-* Its height is relatively compact.
-* css/home.css includes special rules for heights below 500px and 360px.
-* The Home Screen’s .home-intro calculates available space using --below-logo.
+For Discover, which has no Confirm button, position the link at the bottom-right of its preview information section.
 
-The additional line must not cause clipping, overflow or overlap with the Download icon, navigation buttons or device safe areas.
+Use Flexbox or CSS Grid so the alignment is reliable. Avoid fragile absolute positioning that might overlap other content.
 
-If more footer height is required, adjust it minimally and update the relevant Home Screen height calculations so the ALVA wordmark and main menu continue fitting properly.
+The result must look intentional on both desktop and mobile.
 
-Avoid unnecessary changes to global styling.
+6. Make the play-style dialog available in all rosters
 
-8. Preserve existing behavior
+Currently, Discover uses FighterBrowser and playStyleDialog() to display fighter descriptions through app.infoDialog.
 
-Do not change any unrelated Home Screen functionality.
+Extend this capability to every roster.
 
-In particular, preserve:
+Expected behavior
 
-* The four existing menu actions and their navigation.
-* Existing Settings behavior.
-* Disabled Help, Controller and Download placeholders.
-* Scrolling credits and their interactions.
-* Screen entry/exit animations.
-* Default focus behavior.
-* English/French localization.
-* Reduced-motion behavior.
-* Existing gameplay, fighter systems, controls and rendering.
+When a player activates “Read play style”:
 
-Keep the modification isolated to the footer and its directly related styling, localization and tests.
+1. Open the existing informational modal.
+2. Show the currently previewed fighter’s display name.
+3. Show the localized play-style description from fighter-profiles.js.
+4. Allow the user to read the full description.
+5. Close through the existing Close button, Escape, gamepad Back, or backdrop dismissal.
+6. Return focus to the same “Read play style” button after closing.
 
-9. Tests and verification
+The modal must NOT:
 
-Update affected tests where necessary.
+* Confirm the fighter.
+* Begin a battle.
+* Change the fighter selection.
+* Advance setup steps.
+* Unpause Practice Ground.
+* Trigger any gameplay action.
 
-The existing Home footer test in tests/interface/settings.test.mjs assumes the footer directly contains a SPAN and BUTTON. Adjust this assertion to accommodate the new left-side wrapper while continuing to verify the original developer attribution and Download button.
+This is purely an informational interaction.
 
-Add relevant assertions confirming:
+Preserve existing modal accessibility, navigation scopes, focus trapping, and background inertness.
 
-1. Exactly one “Why Alva?” button exists on Home.
-2. It is directly underneath the developer attribution.
-3. It has type="button".
-4. It is not disabled.
-5. It uses the new localization key.
-6. Its underline is persistently defined in CSS.
-7. Clicking it does not change screens or game state.
-8. Its English and French labels are correct.
-9. It does not interfere with existing Home actions or focus behavior.
+7. Refactor shared code properly
 
-Run the existing test suite using:
+Avoid independently duplicating the difficulty and description UI across screens.
+
+Recommended approach:
+
+* Move or extract reusable difficulty-rating rendering from FighterBrowser into shared roster functionality.
+* Share the “Read play style” control and its profile lookup.
+* Make FighterRoster display the profile of the currently previewed fighter.
+* Keep FighterBrowser’s Discover-specific read-only behavior.
+* Preserve each roster’s independent state, unique preview IDs, navigation, and confirmation callbacks.
+* Reuse the existing InfoDialog and localized fighter descriptions.
+* Avoid circular imports when reorganizing playStyleDialog().
+
+The implementation must remain character-agnostic.
+
+Do not hardcode fighter IDs, names, star counts, or descriptions into UI components.
+
+Every future playable fighter with a valid profile should automatically receive the same UI.
+
+8. Handle locked and missing-profile fighters
+
+Maintain current roster behavior.
+
+Playable fighter with a valid profile:
+
+* Show five difficulty stars.
+* Show “Read play style”.
+* Open the corresponding description.
+
+Playable fighter without a profile:
+
+* Show the existing “Not rated” fallback.
+* Hide the play-style action.
+* Do not crash or show stale information.
+
+Locked or disabled fighter:
+
+* Retain its Locked state.
+* Hide difficulty stars.
+* Hide “Read play style”.
+* Do not load or reveal character details.
+
+No playable fighters:
+
+* Preserve existing empty-roster behavior.
+* Keep Confirm disabled.
+* Do not show a misleading difficulty rating or description.
+
+9. Responsive design
+
+Ensure the new layout works across:
+
+* Desktop screens
+* Compact landscape windows
+* Mobile landscape
+* Tablets
+* Short-height viewports
+* Practice Ground’s roster overlays
+* Discover’s responsive layouts
+
+Requirements:
+
+* Stars must remain clearly visible.
+* The smaller action must remain legible and clickable.
+* “Read play style” should stay right-aligned.
+* Text must not overlap the fighter’s name or Confirm button.
+* Avoid clipping and horizontal overflow.
+* Preserve a useful amount of space for the animated fighter preview.
+* Do not unnecessarily enlarge the bottom information panel.
+* French translations must fit or wrap gracefully.
+
+Use existing CSS variables and conventions rather than introducing unrelated styling.
+
+10. Preserve existing gameplay and navigation
+
+Do not alter:
+
+* Fighter abilities or combat mechanics.
+* Character availability.
+* The 48-slot roster structure.
+* Portraits and preview animations.
+* Character selection and confirmation logic.
+* CPU selection.
+* Quick Battle or Watch Mode setup progression.
+* Practice Ground fighter swapping.
+* Existing keyboard, mouse, touch, and gamepad navigation.
+* Existing character profile ratings or description content.
+
+Discover must remain read-only, while regular selection screens must retain their existing Confirm buttons and behavior.
+
+11. Update documentation and tests
+
+The current ALVA_SPEC.md explicitly describes difficulty ratings as a Discover-only feature.
+
+Update that specification to reflect the new universal-roster behavior.
+
+Update relevant automated tests, particularly:
+
+* tests/interface/discover.test.mjs
+* tests/interface/i18n.test.mjs
+* tests/integration/empty-roster.test.mjs
+* Other affected roster, navigation, or Practice Ground UI tests.
+
+Existing tests that assume difficulty ratings appear only in Discover will need to be revised.
+
+Required test coverage
+
+Verify that:
+
+1. Every roster shows the correct fighter difficulty stars.
+2. The visible “Difficulty” label is absent.
+3. The rating remains accessible to screen readers.
+4. Every roster shows the smaller “Read play style” action.
+5. The action appears at the bottom-right, not beside the stars.
+6. Activating the action opens the correct localized description.
+7. Closing the dialog restores focus and does not advance gameplay.
+8. Switching fighters updates stars and descriptions without stale information.
+9. Locked, disabled, unrated, and empty-roster states remain correct.
+10. English and French work properly.
+11. The new controls work with keyboard, mouse, touch, and gamepad.
+12. The layout behaves correctly across supported screen sizes.
+
+Run the full test suite:
 
 node --test
 
-Also check for styling and localization regressions. If browser testing is available, verify the footer visually at desktop and small landscape-mobile sizes.
+Resolve regressions caused by the changes.
 
-10. Expected result
+12. Final acceptance criteria
 
-The Home Screen footer should visually resemble:
+The update is complete only when:
 
-By hiyroscript
+* All existing roster instances support difficulty ratings and play-style descriptions.
+* The stars have no visible “Difficulty” label.
+* The button text is “Read play style”.
+* That button is visibly smaller and positioned at the bottom-right.
+* The existing play-style modal works consistently everywhere.
+* Discover maintains its read-only behavior.
+* Selection screens and Practice Ground retain their original functionality.
+* Future fighters inherit the feature automatically.
+* Documentation reflects the new behavior.
+* Relevant automated tests pass.
 
-Why Alva?
+Implementation priorities
 
-The existing Download icon remains on the opposite side.
+1. Correct universal behavior.
+2. Clean shared architecture.
+3. Precise visual positioning.
+4. Consistent responsive styling.
+5. Accessibility and localization.
+6. No unrelated gameplay or interface changes.
 
-“Why Alva?” is visibly underlined, has a pointer cursor and normal interactive focus behavior, but currently has no destination or functionality.
+Do not redesign ALVA. Make this feel like a natural extension of the existing polished fighter-selection interface.
 
-11. Scope restrictions
-
-Do not build a “Why Alva?” information page yet.
-
-Do not write explanatory content about Alva.
-
-Do not add a temporary modal.
-
-Do not add hidden or partially implemented navigation.
-
-Do not redesign the Home Screen.
-
-Do not modify gameplay systems.
-
-Prefer the smallest maintainable implementation that fits the project’s existing architecture.
-
-Deliverables
-
-Implement the changes directly in the existing project files, then provide:
-
-* A brief summary of the implementation.
-* The files changed.
-* The results of testing.
-* Confirmation that “Why Alva?” is underlined, positioned below “By hiyroscript”, and does nothing when activated.
-
-Priority: precise positioning, existing Alva styling, full responsiveness, and zero action on activation.
+After implementation, provide a concise summary of the changed files, UI decisions, and test results.
