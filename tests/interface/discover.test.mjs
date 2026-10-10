@@ -1,6 +1,6 @@
 // Run with node --test tests/interface/discover.test.mjs (no dependencies).
 // Discover: its registration, Home → Discover → Back through the real
-// ScreenManager, the Fighters / Lore / Movement / Launch tabs (Fighters
+// ScreenManager, the Fighters / Movement / Launch tabs (Fighters
 // first and open on every visit); the Fighters page: the roster browsed
 // read-only in roster order, each fighter's one difficulty rating as stars
 // shared by every roster, the Read play style button and its
@@ -387,8 +387,8 @@ test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
 
 test('every visit opens on Fighters, whatever the last one left open', () => {
   const { app, home, discover } = boot();
-  const { fighters, lore, movement, launch } = sectionsOf(discover);
-  for (const last of [lore, movement, launch]) {
+  const { fighters, movement, launch } = sectionsOf(discover);
+  for (const last of [movement, launch]) {
     home.actions.discover.click();
     last.tab.click();
     assert.deepEqual(selected(discover), [last.id]);
@@ -396,7 +396,7 @@ test('every visit opens on Fighters, whatever the last one left open', () => {
     home.actions.discover.click();
     assert.deepEqual(selected(discover), ['fighters']);
     assert.equal(fighters.panel.hidden, false);
-    for (const other of [lore, movement, launch]) assert.equal(other.panel.hidden, true);
+    for (const other of [movement, launch]) assert.equal(other.panel.hidden, true);
     assertFocus(fighters.tab);
     app.screens.back();
   }
@@ -404,16 +404,16 @@ test('every visit opens on Fighters, whatever the last one left open', () => {
 
 // ---- Tabs -----------------------------------------------------------------------
 
-test('Fighters, Lore, Movement and Launch are real, labelled tabs, in that order; Fighters is selected by default', () => {
+test('Fighters, Movement and Launch are real, labelled tabs, in that order; Fighters is selected by default', () => {
   const { app, discover } = openDiscover();
   const rail = discover.el.querySelector('.discover-rail');
   assert.equal(rail.getAttribute('role'), 'tablist');
   assert.equal(rail.getAttribute('aria-label'), 'Discover sections');
   assert.equal(rail.getAttribute('aria-orientation'), 'vertical');
-  assert.equal(discover.sections.length, 4, 'exactly four sections');
-  assert.deepEqual(rail.children, discover.sections.map((s) => s.tab), 'Fighters, Lore, Movement, then Launch');
+  assert.equal(discover.sections.length, 3, 'exactly three sections');
+  assert.deepEqual(rail.children, discover.sections.map((s) => s.tab), 'Fighters, Movement, then Launch');
   assert.deepEqual(discover.sections.map((s) => [s.id, s.tab.textContent]), [
-    ['fighters', 'Fighters'], ['lore', 'Lore'], ['movement', 'Movement'], ['launch', 'Launch'],
+    ['fighters', 'Fighters'], ['movement', 'Movement'], ['launch', 'Launch'],
   ]);
 
   for (const { id, tab, panel } of discover.sections) {
@@ -431,8 +431,8 @@ test('Fighters, Lore, Movement and Launch are real, labelled tabs, in that order
   // The reference pages are navigation stops of their own (a gamepad
   // scrolls them); the Fighters page has its own controls instead, so it is
   // no stop and no Tab stop itself.
-  const { fighters, lore, movement, launch } = sectionsOf(discover);
-  for (const page of [lore, movement, launch]) {
+  const { fighters, movement, launch } = sectionsOf(discover);
+  for (const page of [movement, launch]) {
     assert.equal(page.panel.getAttribute('tabindex'), '0');
     assert.equal(page.panel.hasAttribute('data-nav'), true);
   }
@@ -451,7 +451,7 @@ test('Fighters, Lore, Movement and Launch are real, labelled tabs, in that order
   assert.equal(fighters.tab.classList.contains('is-active'), true);
   assert.equal(fighters.tab.getAttribute('tabindex'), '0');
   assert.equal(fighters.panel.hidden, false);
-  for (const other of [lore, movement, launch]) {
+  for (const other of [movement, launch]) {
     assert.equal(other.tab.getAttribute('aria-selected'), 'false');
     assert.equal(other.tab.classList.contains('is-active'), false);
     assert.equal(other.tab.getAttribute('tabindex'), '-1', 'roving tabindex');
@@ -462,7 +462,7 @@ test('Fighters, Lore, Movement and Launch are real, labelled tabs, in that order
 
 test('every section is selectable by click and by focus, with one roving tab stop; a hidden page takes no focus', () => {
   const { app, discover } = openDiscover();
-  const { fighters, lore, movement, launch } = sectionsOf(discover);
+  const { fighters, movement, launch } = sectionsOf(discover);
   const only = (on) => {
     assert.deepEqual(selected(discover), [on.id]);
     for (const s of discover.sections) {
@@ -890,7 +890,7 @@ test('Movement paragraphs and Launch labels follow English and French, including
       setLanguage(lang);
       localizeTree(discover.el);
       const strings = STRINGS[lang];
-      assert.deepEqual(discover.tabs.map(text), ['fighters', 'lore', 'movement', 'launch'].map((id) => strings[`discover.${id}`]));
+      assert.deepEqual(discover.tabs.map(text), ['fighters', 'movement', 'launch'].map((id) => strings[`discover.${id}`]));
       assert.equal(discover.rail.getAttribute('aria-label'), strings['discover.sections']);
       assert.equal(text(movement.panel.querySelector('.discover-page-title')), strings['discover.movement']);
       assert.equal(text(movement.panel.querySelector('.discover-entry-title')), strings['discover.movementTitle']);
@@ -1027,7 +1027,7 @@ test('only the Fighters page names fighters: Movement and Launch carry no roster
   // Every definition's name, playable or not.
   const names = CHARACTERS.map((c) => c.displayName);
   assert.ok(names.includes('#0001'));
-  const { fighters, lore, movement, launch } = sectionsOf(discover);
+  const { fighters, movement, launch } = sectionsOf(discover);
   for (const section of [movement, launch]) {
     // Visible text, attributes (hidden accessible names included) and markup.
     const all = everything(section.panel);
@@ -1076,7 +1076,7 @@ test('only the Fighters page names fighters: Movement and Launch carry no roster
 test('the Movement and Launch pages stay the same as the roster grows; the Fighters page grows with it', () => {
   const render = () => {
     const { discover } = openDiscover();
-    const { fighters, lore, movement, launch } = sectionsOf(discover);
+    const { fighters, movement, launch } = sectionsOf(discover);
     return { reference: everything(movement.panel) + everything(launch.panel), fighters: everything(fighters.panel) };
   };
   const before = render();
@@ -1106,13 +1106,22 @@ test('Passives has no tab, panel, registration or unused translation', () => {
   }
 });
 
+test('Lore has no tab or panel, including hidden DOM', () => {
+  const { discover } = openDiscover();
+  assert.doesNotMatch(everything(discover.el), /discover-(?:tab|panel)-lore|discover-page--lore|discover\.lore|lore\./i);
+  assert.deepEqual(discover.el.querySelectorAll('.discover-tab').map((tab) => tab.id),
+    ['discover-tab-fighters', 'discover-tab-movement', 'discover-tab-launch']);
+  assert.deepEqual(discover.el.querySelectorAll('.discover-panel').map((panel) => panel.id),
+    ['discover-panel-fighters', 'discover-panel-movement', 'discover-panel-launch']);
+});
+
 // ---- Keyboard / gamepad navigation --------------------------------------------
 
 test('keyboard and gamepad reach Discover from Home and every control on it (wide layout)', () => withTestFighters([TEST_A], () => {
   const { app, home, discover, plays } = boot();
   layOutHome(home);
   layOutWide(discover);
-  const { fighters, lore, movement, launch } = sectionsOf(discover);
+  const { fighters, movement, launch } = sectionsOf(discover);
   const back = discover.el.querySelector('.btn-back');
   const { browser } = discover;
 
@@ -1128,8 +1137,8 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assert.equal(app.screens.current, discover);
   assertFocus(fighters.tab);
 
-  // Down the rail through all four tabs and back up.
-  for (const [key, to] of [['ArrowDown', lore], ['ArrowDown', movement], ['ArrowDown', launch], ['ArrowUp', movement], ['ArrowUp', lore], ['ArrowUp', fighters]]) {
+  // Down the rail through all three tabs and back up.
+  for (const [key, to] of [['ArrowDown', movement], ['ArrowDown', launch], ['ArrowUp', movement], ['ArrowUp', fighters]]) {
     app.input.key(key);
     assertFocus(to.tab, `${key} → ${to.id}`);
     assert.deepEqual(selected(discover), [to.id]);
@@ -1203,8 +1212,6 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assertFocus(movement.tab);
 
   app.input.key('ArrowUp');
-  assertFocus(lore.tab);
-  app.input.key('ArrowUp');
   assertFocus(fighters.tab);
   app.input.key('ArrowUp');
   assertFocus(back);
@@ -1218,36 +1225,59 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assert.equal(app.screens.current, home);
 }));
 
-test('↑ / ↓ scroll a long page while it can scroll, then move on', () => {
+test('Movement and Launch scroll independently by keyboard and gamepad, then return to their active tab', () => {
   const { app, discover } = openDiscover();
   layOutWide(discover);
-  const { movement } = sectionsOf(discover);
-  movement.tab.focus();
-  Object.assign(movement.panel, { scrollHeight: 1000, clientHeight: 400, scrollTop: 0 });
-
-  app.nav.command('right', null);
-  assertFocus(movement.panel);
-  app.input.key('ArrowDown');
-  assertFocus(movement.panel);
-  assert.equal(movement.panel.scrollTop, 160);
-  for (let i = 0; i < 5; i++) app.input.key('ArrowDown');
-  assert.equal(movement.panel.scrollTop, 600, 'stops at the end');
-  assertFocus(movement.panel, 'nothing below: focus stays');
-  for (let i = 0; i < 4; i++) app.input.key('ArrowUp');
-  assert.equal(movement.panel.scrollTop, 0);
-  assertFocus(movement.panel);
-  app.input.key('ArrowUp');
-  assertFocus(movement.tab, 'at the top, ↑ leaves for the open tab');
+  const { movement, launch } = sectionsOf(discover);
+  for (const page of [movement, launch]) {
+    Object.assign(page.panel, { scrollHeight: 1000, clientHeight: 400, scrollTop: 0 });
+  }
+  for (const page of [movement, launch]) {
+    const other = page === movement ? launch : movement;
+    page.tab.focus();
+    app.nav.command('right', null);
+    assertFocus(page.panel);
+    app.input.key('ArrowDown');
+    assertFocus(page.panel);
+    assert.equal(page.panel.scrollTop, 160);
+    app.nav.command('down', null);
+    assert.equal(page.panel.scrollTop, 320);
+    assert.equal(other.panel.scrollTop, 0, 'the hidden reference page does not scroll');
+    for (let i = 0; i < 5; i++) app.nav.command('down', null);
+    assert.equal(page.panel.scrollTop, 600, 'stops at the end');
+    assertFocus(page.panel, 'nothing below: focus stays');
+    for (let i = 0; i < 4; i++) app.input.key('ArrowUp');
+    assert.equal(page.panel.scrollTop, 0);
+    assertFocus(page.panel);
+    app.nav.command('up', null);
+    assertFocus(page.tab, 'at the top, ↑ leaves for the open tab');
+  }
 });
 
-test('narrow layout: the rail runs across the top, arrows follow all four tabs, and ↓ enters the Fighters page', () => {
+for (const [layout, arrange, forward, backward] of [
+  ['wide', layOutWide, 'down', 'up'],
+  ['narrow', layOutNarrow, 'right', 'left'],
+]) {
+  test(`gamepad traverses all three tabs in both directions (${layout})`, () => {
+    const { app, discover } = openDiscover();
+    arrange(discover);
+    const { fighters, movement, launch } = sectionsOf(discover);
+    for (const [direction, target] of [[forward, movement], [forward, launch], [backward, movement], [backward, fighters]]) {
+      app.nav.command(direction, null);
+      assertFocus(target.tab);
+      assert.deepEqual(selected(discover), [target.id]);
+    }
+  });
+}
+
+test('narrow layout: the rail runs across the top, arrows follow all three tabs, and ↓ enters the Fighters page', () => {
   window.matchMedia = () => ({ matches: true, addEventListener: noop });
   try {
     const { app, discover } = openDiscover();
     layOutNarrow(discover);
     assert.equal(discover.el.querySelector('.discover-rail').getAttribute('aria-orientation'), 'horizontal');
-    const { fighters, lore, movement, launch } = sectionsOf(discover);
-    for (const [key, to] of [['ArrowRight', lore], ['ArrowRight', movement], ['ArrowRight', launch], ['ArrowLeft', movement], ['ArrowLeft', lore], ['ArrowLeft', fighters]]) {
+    const { fighters, movement, launch } = sectionsOf(discover);
+    for (const [key, to] of [['ArrowRight', movement], ['ArrowRight', launch], ['ArrowLeft', movement], ['ArrowLeft', fighters]]) {
       app.input.key(key);
       assertFocus(to.tab, `${key} → ${to.id}`);
       assert.deepEqual(selected(discover), [to.id]);
@@ -1274,9 +1304,9 @@ test('narrow layout: the rail runs across the top, arrows follow all four tabs, 
   }
 });
 
-test('the narrow rail fits four sections: it scrolls sideways rather than clip, never shrinks a tab below a touch target, and the page never scrolls sideways', () => {
+test('the narrow rail fits three sections: it scrolls sideways rather than clip, never shrinks a tab below a touch target, and the page never scrolls sideways', () => {
   const css = readFileSync(new URL('../../css/discover.css', import.meta.url), 'utf8');
-  assert.doesNotMatch(css, /three sections|passives/i, 'no obsolete section scaffolding');
+  assert.doesNotMatch(css, /four sections|lore|passives/i, 'no obsolete section scaffolding');
   const narrow = css.slice(css.indexOf('@media (max-width: 600px) and (min-height: 441px)'));
   const rail = narrow.match(/\.discover-rail \{[^}]*\}/)[0];
   assert.match(rail, /overflow-x: auto;/);
@@ -1293,44 +1323,6 @@ test('the narrow rail fits four sections: it scrolls sideways rather than clip, 
   const source = readFileSync(new URL('../../js/screens/discover-screen.js', import.meta.url), 'utf8');
   const query = source.match(/const NARROW_QUERY = '([^']+)'/)[1];
   assert.ok(css.includes(`@media ${query} {`));
-});
-
-// Lore remains editorial content, independently scrollable like the guides.
-test('Lore has localized narrative introductions from a separate registry, with labelled entries', async () => {
-  const { LORE_ENTRIES } = await import('../../js/data/lore.js');
-  const { app, discover } = openDiscover();
-  layOutWide(discover);
-  const { lore } = sectionsOf(discover);
-  lore.tab.focus();
-  app.nav.command('right', null);
-  assertFocus(lore.panel);
-  Object.assign(lore.panel, { scrollHeight: 1000, clientHeight: 400, scrollTop: 0 });
-  app.nav.command('down', null);
-  assert.equal(lore.panel.scrollTop, 160);
-  app.nav.command('left', null);
-  assertFocus(lore.tab);
-  try {
-    for (const language of ['fr', 'en']) {
-      setLanguage(language);
-      localizeTree(discover.el);
-      assert.equal(lore.tab.textContent, STRINGS[language]['discover.lore']);
-      assert.equal(text(lore.panel.querySelector('.discover-page-title')), STRINGS[language]['discover.lore']);
-      assert.ok(text(lore.panel).includes(STRINGS[language]['lore.intro']));
-      const entries = lore.panel.querySelectorAll('.discover-entry');
-      assert.equal(entries.length, LORE_ENTRIES.length);
-      entries.forEach((entry, i) => {
-        const title = entry.querySelector('.discover-entry-title');
-        assert.equal(entry.getAttribute('aria-labelledby'), title.id);
-        assert.equal(title.textContent, STRINGS[language][LORE_ENTRIES[i].titleKey]);
-        assert.equal(text(entry.querySelector('.discover-entry-text')), STRINGS[language][LORE_ENTRIES[i].textKey]);
-      });
-      assert.doesNotMatch(text(lore.panel), /lore\.|discover\.|Launch Point|Point d’éjection|Energy|Énergie/);
-      assert.equal(discover.active, 'lore', 'language changes preserve the active section');
-    }
-  } finally {
-    setLanguage('en');
-    localizeTree(discover.el);
-  }
 });
 
 test('shared roster fighter identifiers sit bottom-right on a translucent strip; slot indices stay top-left', () => withTestFighters([TEST_DISABLED], () => {

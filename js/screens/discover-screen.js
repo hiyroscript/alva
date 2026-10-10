@@ -1,5 +1,5 @@
 // DISCOVER: the in-game reference. An index rail of sections (Fighters,
-// Lore, Movement, Launch) beside one page; on narrow windows the rail
+// Movement, Launch) beside one page; on narrow windows the rail
 // runs across the top instead. Every visit opens on Fighters.
 //
 // Fighters is the one page about the fighters themselves: the roster,
@@ -10,7 +10,6 @@
 // profiles (js/data/fighter-profiles.js), never a fighter's id: it grows
 // with the roster. It starts nothing and confirms nothing.
 //
-// Lore introduces future world and character stories from js/data/lore.js.
 // The mechanics pages are built from the registry the game plays by, never the
 // tuning values, so the reference cannot drift from gameplay: Movement from
 // MOVEMENT_GUIDE in js/data/movement.js (the universal run, jumps and Dash
@@ -39,7 +38,6 @@ import { el } from '../core/utils.js';
 import { tx, tattr } from '../localization/i18n.js';
 import { screenHeader } from '../ui/components.js';
 import { FighterBrowser } from '../ui/fighter-browser.js';
-import { LORE_ENTRIES } from '../data/lore.js';
 import { MOVEMENT_GUIDE } from '../data/movement.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
@@ -81,15 +79,6 @@ function row(dataset, marker, name, description) {
       el('span', { class: 'discover-tier-name', ...tx(...label(name)) }),
       el('span', { class: 'discover-tier-desc', ...tx(...label(description)) }),
     ]),
-  ]);
-}
-
-// Narrative entries use the same readable reference layout and scroll behavior.
-function buildLorePage() {
-  return el('div', { class: 'discover-page discover-page--lore' }, [
-    el('h2', { class: 'discover-page-title', ...tx('discover.lore') }),
-    el('p', { class: 'discover-entry-text', ...tx('lore.intro') }),
-    ...LORE_ENTRIES.map(({ id, titleKey, textKey }) => entry(`lore-${id}`, titleKey, textKey)),
   ]);
 }
 
@@ -146,7 +135,6 @@ function buildFightersPage(screen) {
 // controls take focus instead, from `enter`.
 const SECTIONS = [
   { id: 'fighters', label: 'discover.fighters', build: buildFightersPage, page: false, enter: (screen) => screen.browser.focusSelected() },
-  { id: 'lore', label: 'discover.lore', build: buildLorePage, page: true },
   { id: 'movement', label: 'discover.movement', build: buildMovementPage, page: true },
   { id: 'launch', label: 'discover.launch', build: buildLaunchPage, page: true },
 ];

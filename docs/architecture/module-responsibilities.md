@@ -48,7 +48,6 @@ There are no import cycles (checked over every module).
 | `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
 | `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
-| `lore.js` | Ordered narrative entry ids and localization keys for Discover’s Lore page. Introductory placeholders until sourced world or character stories are added; independent of gameplay and navigation. | `screens/discover-screen.js` |
 | `movement.js` | The universal movement values every fighter runs on (`BASE_FIGHTER_MOVEMENT`), the check that refuses a definition's own, and the Discover copy for them. | `data/characters.js`, `game/fighters/fighter.js`, `game/rendering/hit-fx.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation; the damage tiers every hit deals (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage`). | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `difficulty.js` | The four CPU levels and their profiles. | `core/app.js`, `game/battle.js`, `game/ai/combat-ai.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
@@ -107,10 +106,10 @@ registered by `core/app.js` and owns its own section of `index.html`.
 Fighter goes next), used by `character-select-screen.js` and
 `map-select-screen.js`.
 
-Discover’s section registry (`js/screens/discover-screen.js`) orders Fighters,
-Lore, Movement and Launch, opening on Fighters. Lore reads `data/lore.js` and
-English/French translation keys; it shares the accessible tab activation,
-independent scrolling and keyboard/gamepad navigation of the reference pages.
+Discover’s section registry (`js/screens/discover-screen.js`) orders three sections:
+Fighters, Movement and Launch, opening on Fighters. All three use accessible
+tab activation and keyboard/gamepad navigation. Movement and Launch read their
+registries through English/French translation keys and scroll independently.
 
 | `js/ui/` module | Owns | Used by |
 | --- | --- | --- |

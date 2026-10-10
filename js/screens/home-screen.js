@@ -65,7 +65,7 @@ export class HomeScreen extends Screen {
     // The secondary actions, outlined with a chevron. Watch Mode (CPU vs
     // CPU) opens its own setup, never Select Mode; Practice Ground goes
     // straight into the training room (no mode, fighter or stage select);
-    // Discover opens the in-game reference (Fighters, Lore, Movement, Launch).
+    // Discover opens the in-game reference (Fighters, Movement, Launch).
     const secondary = (id, key) => el('button', {
       class: 'home-action', type: 'button', 'data-nav': true,
       'data-home-action': id, ...iconLabel(key, ICONS.right),
