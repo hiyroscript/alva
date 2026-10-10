@@ -27,11 +27,11 @@ import { NUMBERED_ATTACKS } from '../config.js';
 export const TOUCH_CONTROL_IDS = Object.freeze({
   joystick: Object.freeze([
     'mouvementLeft', 'stick', 'mouvementRight',
-    'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
+    'extra_attack', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
   classic: Object.freeze([
     'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight',
-    'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
+    'extra_attack', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
 });
 

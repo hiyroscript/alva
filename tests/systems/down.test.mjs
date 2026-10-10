@@ -46,7 +46,7 @@ test('down is a gameplay direction on S / ↓, a held control and never a combat
   assert.equal(input.downPressed, false);
   // The gameplay actions are exactly these: nothing else on the left hand.
   assert.deepEqual(ACTIONS, [
-    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
   assert.deepEqual(Object.keys(CONFIG.bindings).sort(), [...ACTIONS, 'mouvementLeft', 'mouvementRight'].sort(), 'held actions and explicit Mouvement bindings');
@@ -116,7 +116,7 @@ test('InputManager samples a held down from S, ↓, D-pad down and the left stic
   // own action and holds no Down.
   for (const [i, action] of [
     [0, 'jump'], [1, 'attack1'], [4, 'attack2'], [6, 'attack3'], [10, 'attack4'], [11, 'attack5'],
-    [5, 'shield'], [7, 'shield'], [2, 'extra_attack'], [3, 'transform'],
+    [5, 'shield'], [7, 'shield'], [2, 'extra_attack'],
   ]) {
     pad.buttons[i] = { pressed: true, value: 1 };
     input.pollGamepads(4000);

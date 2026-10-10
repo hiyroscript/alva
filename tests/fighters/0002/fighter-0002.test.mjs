@@ -178,11 +178,10 @@ test('no summon or technique: every numbered button an ordinary attack, and Ener
   assert.deepEqual(Object.keys(DEF.energy), ['regen'], 'its refill rate only: the maximum and every cost are universal');
 });
 
-test('three numbered attacks, each a button of its own with its mid-air version, plus the extra_attack; Transform reserved', () => {
+test('three numbered attacks, each a button of its own with its mid-air version, plus the extra_attack', () => {
   assert.deepEqual(loadoutProblems(DEF), []);
   assert.deepEqual(DEF.actions, {
     extra_attack: 'extra_attack',
-    transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { ground: 'attack3', air: 'midair_attack3' },
@@ -239,9 +238,6 @@ test('its in-game names and touch buttons name each move, in English and French'
   assert.equal(previewFrame(DEF, 'extra_attack').url, DEF.projectileAnimations.extra_attack_object.frames[2], 'the existing tornado projectile');
   assert.notEqual(art('jump'), art('attack3'), 'Jump never looks like the Spin');
   assert.equal(mobileAbility(DEF, 'attack4'), null, 'no fourth button');
-  assert.equal(mobileAbility(DEF, 'transform').pending, true, 'Transform reserved');
-  assert.equal(mobileAbility(DEF, 'transform').icon, ICONS.transform, 'Transform keeps its star');
-  assert.equal(mobileAbility(DEF, 'transform').sprite, null);
   assert.equal(STRINGS.fr['ability.0002.attack3'], 'Attaque tournoyante');
 });
 

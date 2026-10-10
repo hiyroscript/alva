@@ -108,14 +108,13 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-btn.is-unavailable { opacity: 0.4; border-style: dashed; }
 .tc-jump { right: 0; bottom: 0; }
 .tc-shield { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
-.tc-transform { right: calc(var(--tc-pitch) * 1.5); bottom: calc(var(--tc-pitch) * 0.87); }
 /* Numbered attack buttons, by the slot TouchControls.setCharacter gives the
-   ones on show (attackSlots): a honeycomb round Transform and Shield.
+   ones on show (attackSlots): a staggered cluster beside Shield.
    Slots 1 and 2 (attack1, attack2) are the lower row beside Jump; slot 3 is
-   left of Transform; slots 4 and 5 the top row, left of the extra attack
+   at the left of the middle row; slots 4 and 5 the top row, left of the extra attack
    (aligned with the lower row).
                  [4]  [5]  [EXTRA]
-              [3]  [TRANSFORM] [SHIELD]
+              [3]              [SHIELD]
                  [1]  [2]  [JUMP]            */
 .tc-attack[data-slot="1"] { right: calc(var(--tc-pitch) * 2); bottom: 0; }
 .tc-attack[data-slot="2"] { right: var(--tc-pitch); bottom: 0; }

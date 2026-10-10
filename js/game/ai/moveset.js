@@ -61,7 +61,7 @@ const MOVESETS = new WeakMap();
 // Deflect in the air (`deflect`, on the `shield` button: its attack and
 // reach, and whether it turns projectiles back), a Dash and an air dash
 // (the universal ones, if it has their art: how far each goes).
-// An action mapped to null (a reserved button, like #0001's transform) is
+// An action mapped to null (an unavailable button) is
 // left out, as is anything the fighter would refuse for missing art, so the
 // AI never presses a button that cannot do anything.
 export function readMoveset(f) {

@@ -12,7 +12,7 @@ import { t, hasTranslation } from '../localization/i18n.js';
 import { COMBAT_BUTTONS } from '../config.js';
 import { ICONS } from './icons.js';
 import { abilityName } from '../data/abilities.js';
-import { SPRITE_BUTTONS, abilityMove, previewFrame } from '../data/ability-preview.js';
+import { abilityMove, previewFrame } from '../data/ability-preview.js';
 export { SPRITE_BUTTONS, abilityMove, abilityAvailable, previewFrame } from '../data/ability-preview.js';
 
 // The touch buttons whose look belongs to the fighter: every combat button
@@ -21,37 +21,29 @@ export { SPRITE_BUTTONS, abilityMove, abilityAvailable, previewFrame } from '../
 export const ABILITY_ACTIONS = COMBAT_BUTTONS;
 
 // The neutral glyph of each button with no frame of its own to show: one
-// that tells them apart (a ring, one pip per attack number, the star, the
+// that tells them apart (a ring, one pip per attack number, the
 // jump arrow), never a fighter's.
 const FALLBACK_ICONS = Object.freeze({
-  extra_attack: 'ring', transform: 'transform', jump: 'jump',
+  extra_attack: 'ring', jump: 'jump',
   attack1: 'pip1', attack2: 'pip2', attack3: 'pip3', attack4: 'pip4', attack5: 'pip5',
 });
-
-// Buttons shown as reserved (a dashed outline) while the fighter has no
-// entry of its own for them: a fighter with a Transform presents it in its
-// `mobileAbilities`, and without one it is the neutral star, dashed.
-const RESERVED = new Set(['transform']);
 
 // How `def` has the ability on `action`'s button, from its `actions`:
 //
 //   'implemented'  mapped to a move: the fighter's own button
-//   'reserved'     mapped to null, or Transform with nothing of the
-//                  fighter's own to present: wired, a move still to come,
+//   'reserved'     mapped to null with no presentation of its own,
 //                  shown dashed
 //   'absent'       left out of its `actions`: a button the fighter does not
 //                  have at all (attack3 to attack5 for a fighter with fewer
 //                  numbered attacks; an extra_attack it has none of), so it
 //                  shows no button
 //
-// With no `actions` to go by (no fighter named yet) every button stays,
-// Transform reserved. A fighter that presents its own Transform (in
-// `mobileAbilities`) is never shown reserved.
+// With no `actions` to go by (no fighter named yet) every button stays.
 export function abilityPresence(def, action) {
   const actions = def?.actions;
   if (actions && !Object.hasOwn(actions, action)) return 'absent';
   const own = def?.mobileAbilities?.[action];
-  if (!own && (RESERVED.has(action) || actions?.[action] === null)) return 'reserved';
+  if (!own && actions?.[action] === null) return 'reserved';
   return 'implemented';
 }
 
@@ -85,14 +77,10 @@ export function mobileAbility(def, action, airborne = false) {
   const key = mobileAbilityLabelKey(def, action, airborne);
   const move = abilityMove(def, action, airborne);
   const airName = airborne && move && move !== abilityMove(def, action, false) ? abilityName(def, move) : null;
-  // A button drawn with a glyph rather than art (Transform) shows the
-  // fighter's own glyph when it presents one (`icon`, a key of ICONS), else
-  // the star; every other button's glyph is the neutral one.
-  const glyph = SPRITE_BUTTONS.includes(action) ? null : ICONS[own?.icon];
   return {
     label: key ? t(key) : airName || own?.label,
     sprite: previewFrame(def, action, airborne),
-    icon: glyph || ICONS[own?.fallbackIcon] || ICONS[FALLBACK_ICONS[action]],
+    icon: ICONS[own?.fallbackIcon] || ICONS[FALLBACK_ICONS[action]],
     pending: presence === 'reserved',
   };
 }

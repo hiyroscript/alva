@@ -337,11 +337,9 @@ export const CHARACTER_0002 = {
   },
 
   // Three numbered attacks, all ordinary: three buttons, each with its
-  // mid-air version (see js/data/loadout.js). The sheet's transformation
-  // art has no move yet: Transform is reserved.
+  // mid-air version (see js/data/loadout.js).
   actions: {
     extra_attack: 'extra_attack', // the Whirlwind
-    transform: null, // reserved
     attack1: { ground: 'attack1', air: 'midair_attack1' }, // the One-Two / the Homing Attack
     attack2: { ground: 'attack2', air: 'midair_attack2' }, // the Rapid Kicks / the Bounce Attack
     attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Spin Attack / the Blue Tornado

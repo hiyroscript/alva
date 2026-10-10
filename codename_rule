@@ -44,7 +44,7 @@ Attack numbers identify moves; they do not prescribe damage, effects or mechanic
 
 extra_attack is a separate, additional character-specific action. It may be a projectile, throw, utility move or other unique attack. It does not count toward the 2–5 numbered attack limit, so a character may have five numbered attacks plus extra_attack. Its airborne availability is defined by the character's loadout.
 
-Shield, Deflect, movement, mid-air movement, jump, down and transform are not numbered attacks.
+Shield, Deflect, movement, mid-air movement, jump and down are not numbered attacks.
 
 ## Attack launch levels
 

@@ -1248,7 +1248,6 @@ test('the touch buttons\' art follows Player 1\'s fighter, with a universal Jump
     ]);
     assert.equal(touch.buttons.get('attack1').querySelector('.tc-sprite-icon'), sprite, 'the same image, its source swapped in place');
     assert.equal(touch.buttons.get('shield').innerHTML, ICONS.shield, 'Shield is universal');
-    assert.equal(touch.buttons.get('transform').innerHTML, ICONS.transform, 'Transform keeps its star');
     assert.equal(touch.enabled, true, 'playing again');
     // The same controls, refreshed in place, still sending the same inputs.
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
@@ -1295,9 +1294,9 @@ test('Change Fighter into and out of a fighter with no moves, again and again: i
     assert.equal(p.combat.launchPoint, 0);
     assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
     // The same controls, refreshed: no ability button for the fighter with
-    // no moves, Test A's High Kick, Transform, Jab and Red back for it.
+    // no moves, Test A's High Kick, Jab and Red back for it.
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
-    const own = { extra_attack: 'High Kick', transform: 'Transform', attack1: 'Jab', attack2: 'Red' };
+    const own = { extra_attack: 'High Kick', attack1: 'Jab', attack2: 'Red' };
     const moveless = id === 'test-moveless';
     for (const [action, name] of Object.entries(own)) {
       const b = touch.buttons.get(action);
@@ -1309,7 +1308,7 @@ test('Change Fighter into and out of a fighter with no moves, again and again: i
   }
   // Playing it: every combat button does nothing, and it still jumps.
   const p = screen.session.player;
-  for (const action of ['extra_attack', 'transform', 'attack1', 'attack2']) {
+  for (const action of ['extra_attack', 'attack1', 'attack2']) {
     input.script.push({ [action]: true, [`${action}Pressed`]: true });
     screen.session.update(DT);
     assert.equal(p.combat.attack, null, action);
@@ -1340,10 +1339,10 @@ test('Change Fighter into and out of a fighter with different moves: its own but
     assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
   }
-  // The sample fighter's own buttons: Palm Strike, Awakening and Jab, attack2
+  // The sample fighter's own buttons: Palm Strike and Jab, attack2
   // left neutral.
-  const names = ['extra_attack', 'transform', 'attack1', 'attack2'].map((a) => touch.buttons.get(a).getAttribute('aria-label'));
-  assert.deepEqual(names, ['Palm Strike', 'Awakening', 'Jab', 'Attack 2']);
+  const names = ['extra_attack', 'attack1', 'attack2'].map((a) => touch.buttons.get(a).getAttribute('aria-label'));
+  assert.deepEqual(names, ['Palm Strike', 'Jab', 'Attack 2']);
   // Playing it: its Jab comes out of attack1.
   const p = screen.session.player;
   input.script.push({ attack1: true, attack1Pressed: true });

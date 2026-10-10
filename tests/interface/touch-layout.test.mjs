@@ -182,7 +182,6 @@ function layOut(tc, scheme = tc.scheme) {
     runLeft: [30, 420, 60, 60],
     runRight: [190, 420, 60, 60],
     extra_attack: [900, 250, 68, 68],
-    transform: [800, 330, 60, 60],
     shield: [880, 330, 60, 60],
     attack1: [760, 420, 60, 60],
     attack2: [840, 420, 60, 60],
@@ -206,11 +205,11 @@ const centre = (node) => ({ clientX: node.rect.left + node.rect.width / 2, clien
 
 test('every control of both schemes has a stable id, independent of its label', () => {
   assert.deepEqual([...TOUCH_CONTROL_IDS.joystick], [
-    'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'transform', 'shield',
+    'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual([...TOUCH_CONTROL_IDS.classic], [
-    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual(Object.keys(TOUCH_CONTROL_IDS), [...MOBILE_CONTROLS], 'one list per Mobile Controls scheme');
@@ -224,7 +223,7 @@ test('every control of both schemes has a stable id, independent of its label', 
   assert.equal(joystick.get('mouvementRight'), tc.mouvementButtons.get('mouvementRight'));
   const classic = tc.getControlElements('classic');
   for (const id of ['runLeft', 'runRight']) assert.equal(classic.get(id), tc.padButtons.get(id), id);
-  for (const id of ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']) {
+  for (const id of ['extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']) {
     assert.equal(joystick.get(id), tc.actionButtons.get(id), `${id}: joystick`);
     assert.equal(classic.get(id), tc.actionButtons.get(id), `${id}: classic, the same element`);
   }
@@ -342,7 +341,7 @@ test('a custom layout moves and sizes each control by id, kept on screen, and a 
   assert.equal(dashLeft.style.translate, '-10.0px -250.0px');
   assert.equal(dashLeft.style.scale ?? '', '');
   // Everything else is left alone.
-  for (const id of ['mouvementRight', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2']) {
+  for (const id of ['mouvementRight', 'extra_attack', 'shield', 'attack1', 'attack2']) {
     assert.equal(tc.controlElement(id).style.translate, '', id);
   }
   // A new window size or orientation: the same fractions on the new screen.
@@ -421,7 +420,7 @@ test('a custom layout never changes what a button sends: every held action, both
     const { tc, calls } = touchControls(scheme);
     layOut(tc);
     scatter(tc);
-    const held = ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'jump'];
+    const held = ['extra_attack', 'shield', 'attack1', 'attack2', 'jump'];
     held.forEach((action, i) => {
       const b = tc.buttons.get(action);
       assert.equal(b.getAttribute('data-action'), action, `${scheme}: ${action} keeps its codename`);
@@ -696,7 +695,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
 test('the editor always uses neutral localized icons for every selection, scheme and reopening', () => {
   const { app, editor, storage } = editorApp();
   const icons = {
-    extra_attack: ICONS.ring, transform: ICONS.transform, shield: ICONS.shield, jump: ICONS.jump,
+    extra_attack: ICONS.ring, shield: ICONS.shield, jump: ICONS.jump,
     ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`attack${n}`, ICONS[`pip${n}`]])),
     mouvementLeft: ICONS.mouvementLeft, mouvementRight: ICONS.mouvementRight,
     runLeft: ICONS.left, runRight: ICONS.right,
@@ -975,4 +974,38 @@ test('Classic Mouvement controls move, resize, persist and reset independently w
   assert.deepEqual(saved(storage).touchLayouts.classic, {});
   assert.deepEqual(saved(storage).touchLayouts.joystick, joystick);
   editor.close();
+});
+
+test('legacy Transform placements are discarded in both schemes, including editor lookup and saving', () => {
+  const storage = memoryStorage();
+  const layouts = Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, {
+    ...Object.fromEntries(TOUCH_CONTROL_IDS[scheme].map((id, i) => [id, { x: (20 + i * 2) / 100, y: 0.7, scale: 1.2 }])),
+    transform: { x: 0.75, y: 0.6, scale: 1.4 },
+  }]));
+  storage.setItem(SETTINGS_KEY, JSON.stringify({ version: 3, language: 'fr', mobileControls: 'classic', combatAssist: false, touchLayouts: layouts }));
+  const settings = new Settings(storage);
+  assert.equal(settings.get('language'), 'fr');
+  assert.equal(settings.get('mobileControls'), 'classic');
+  assert.equal(settings.get('combatAssist'), false);
+  for (const scheme of MOBILE_CONTROLS) {
+    const { transform, ...expected } = layouts[scheme];
+    assert.deepEqual(settings.touchLayout(scheme), expected, 'every valid position and scale survives');
+    assert.deepEqual(sanitizeTouchLayout(scheme, layouts[scheme]), expected);
+    const { tc } = touchControls(scheme);
+    tc.setLayout(layouts[scheme]);
+    assert.equal(tc.buttons.has('transform'), false);
+    assert.equal(tc.actionButtons.has('transform'), false);
+    assert.equal(tc.controlElement('transform'), null);
+    assert.equal(tc.root.querySelector('[data-action="transform"]'), null);
+    const { editor } = editorApp();
+    editor.open({ scheme });
+    assert.equal(editor.touch.getControlElements().has('transform'), false);
+    assert.equal(editor.touchRoot.querySelector('[data-control="transform"]'), null);
+    editor.close();
+  }
+  settings.save();
+  const saved = JSON.parse(storage.getItem(SETTINGS_KEY));
+  assert.equal(saved.version, 3, 'no settings version bump');
+  assert.deepEqual(saved.touchLayouts, settings.get('touchLayouts'));
+  assert.deepEqual(new Settings(storage).values, settings.values, 'sanitized settings round-trip');
 });

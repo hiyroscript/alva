@@ -338,10 +338,9 @@ export const CHARACTER_0001 = {
   // Five numbered attacks, each a button of its own (see
   // js/data/loadout.js): attack1 to attack3 ordinary attacks with their
   // mid-air versions, attack4 and attack5 techniques (ground only, with no
-  // cooldown). Transform is reserved.
+  // cooldown).
   actions: {
     extra_attack: 'extra_attack', // the High Kick
-    transform: null, // reserved
     attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Jab / the Floating Straight
     attack2: { ground: 'attack2', air: 'midair_attack2' }, // Red / the Red Kick
     attack3: { ground: 'attack3', air: 'midair_attack3' }, // Maximum Blue / Blue

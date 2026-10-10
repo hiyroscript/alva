@@ -110,7 +110,6 @@ export const CONFIG = Object.freeze({
     down: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
     extra_attack: ['KeyJ'],
-    transform: ['KeyK'],
     shield: ['KeyL'],
     attack1: ['KeyU'],
     attack2: ['KeyI'],
@@ -140,16 +139,16 @@ export const CONFIG = Object.freeze({
 // js/data/loadout.js).
 export const NUMBERED_ATTACKS = Object.freeze(['attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
 
-// The combat buttons: one per numbered attack, the optional extra_attack
-// and the reserved transform. Each maps to a move through the character's
+// The combat buttons: one per numbered attack and the optional extra_attack.
+// Each maps to a move through the character's
 // `actions`; shield, jump and the directions (down included) are held-state
 // controls, read apart.
-export const COMBAT_BUTTONS = Object.freeze(['extra_attack', 'transform', ...NUMBERED_ATTACKS]);
+export const COMBAT_BUTTONS = Object.freeze(['extra_attack', ...NUMBERED_ATTACKS]);
 
 // The control codenames: universal, the same for every character.
 export const ACTIONS = Object.freeze([
   'runLeft', 'runRight', 'down', 'jump',
-  'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS,
+  'extra_attack', 'shield', ...NUMBERED_ATTACKS,
   'pause',
 ]);
 
@@ -162,7 +161,6 @@ export const ACTION_LABELS = Object.freeze({
   down: 'Down',
   jump: 'Jump',
   extra_attack: 'Extra Attack',
-  transform: 'Transform',
   shield: 'Shield',
   attack1: 'Attack 1',
   attack2: 'Attack 2',
@@ -192,5 +190,4 @@ export const MOVES = Object.freeze({
   attack5: Object.freeze({ number: 5, air: false, label: 'Attack 5' }),
   midair_attack5: Object.freeze({ number: 5, air: true, label: 'Mid-air Attack 5' }),
   extra_attack: Object.freeze({ number: null, air: false, label: 'Extra Attack' }),
-  transform: Object.freeze({ number: null, air: false, label: 'Transform' }),
 });

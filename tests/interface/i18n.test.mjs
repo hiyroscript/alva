@@ -533,7 +533,7 @@ test('Settings labels use sentence case and dynamic editor copy preserves locali
 test('internal identifiers never change with the language', () => {
   inFrench(() => {
     const touch = new TouchControls(new Element('div'), { setTouch: noop, queueTouchMouvement: noop });
-    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'shield', 'transform']);
+    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'shield']);
     assert.deepEqual([...touch.mouvementButtons.keys()], ['mouvementLeft', 'mouvementRight']);
     assert.equal(touch.scheme, 'joystick');
     const app = fakeApp();
@@ -579,4 +579,13 @@ test('the empty-roster strings read in both languages', () => {
   assert.equal(STRINGS.fr['common.fighterUnavailable'], 'Combattant indisponible');
   assert.match(STRINGS.en['common.fighterUnavailableMessage'], /cannot start/);
   assert.match(STRINGS.fr['common.fighterUnavailableMessage'], /ne peut pas commencer/);
+});
+
+test('neither language registers a Transform control label', async () => {
+  for (const language of ['en', 'fr']) {
+    const strings = await import(`../../js/localization/strings/${language}.js`);
+    for (const table of Object.values(strings)) {
+      if (table && typeof table === 'object') assert.equal(Object.hasOwn(table, 'control.transform'), false, language);
+    }
+  }
 });

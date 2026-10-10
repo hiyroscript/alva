@@ -32,8 +32,8 @@ const SHIELD = { shield: true, shieldPressed: true };
 
 test('each button makes the sample fighter\'s own move, on the ground and in the air', () => {
   // attack3 is a summon: no attack of the fighter's own (see below).
-  const ground = { extra_attack: 'extra_attack', transform: 'transform', attack1: 'attack1', attack2: 'attack2', attack3: null };
-  const air = { extra_attack: 'extra_attack', transform: 'transform', attack1: 'midair_attack1', attack2: 'midair_attack2', attack3: null };
+  const ground = { extra_attack: 'extra_attack', attack1: 'attack1', attack2: 'attack2', attack3: null };
+  const air = { extra_attack: 'extra_attack', attack1: 'midair_attack1', attack2: 'midair_attack2', attack3: null };
   for (const [button, move] of Object.entries(ground)) {
     const { fighter, step } = sample();
     step(P(button));
@@ -117,7 +117,6 @@ test('the CPU reads its moveset from its own data', () => {
     ['attack1', 'attack1', false], ['attack1', 'midair_attack1', true],
     ['attack2', 'attack2', false], ['attack2', 'midair_attack2', true],
     ['extra_attack', 'extra_attack', false], ['extra_attack', 'extra_attack', true],
-    ['transform', 'transform', false], ['transform', 'transform', true],
   ]);
   assert.deepEqual(moves.ranged, [], 'no projectile');
   assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack3', 'attack3', 'summon']]);
@@ -176,6 +175,5 @@ test('its ability names are its own; unnamed moves, and moves it does not have, 
     attack5: 'Attack 5',
     midair_attack5: 'Mid-air Attack 5',
     extra_attack: 'Palm Strike',
-    transform: 'Awakening',
   });
 });

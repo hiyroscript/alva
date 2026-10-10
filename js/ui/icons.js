@@ -12,7 +12,6 @@ export const ICONS = {
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/>'),
-  transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
   // The universal Defence glyph, on the ground and in the air. A
   // fighter's own combat buttons show frames of its own art instead (see
   // js/ui/mobile-abilities.js).

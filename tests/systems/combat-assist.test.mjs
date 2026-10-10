@@ -388,14 +388,14 @@ test('ranged attacks never get it: a projectile attack starts where the fighter 
 });
 
 test('summons, techniques, pending attacks and reserved buttons never get it', () => {
-  // A technique (#0001's attack4) and a reserved button (its transform).
+  // A technique (#0001's attack4) and an unavailable Extra Attack.
   const t = rig({ gap: 150 });
   t.tick(press('attack4'));
   assert.ok(t.player.technique, 'the technique starts');
   assert.equal(t.player.combatAssist, null);
   assert.equal(t.player.combat.energy, t.player.combat.maxEnergy);
-  const reserved = rig({ gap: 150 });
-  reserved.tick(press('transform'));
+  const reserved = rig({ character: variant('assist-unavailable', { actions: { ...C1.actions, extra_attack: null } }), gap: 150 });
+  reserved.tick(press('extra_attack'));
   assert.equal(reserved.player.combatAssist, null);
   assert.equal(reserved.player.combat.attack, null);
   assert.equal(reserved.player.state, 'idle', 'a reserved button does nothing');
@@ -985,8 +985,8 @@ test('any other move pressed while closing in cancels it and starts as ever on t
   assert.equal(pending.player.combat.attack?.def.pending, true);
   assert.equal(watchAttacks(pending, 90).has('attack1'), false);
   // A reserved button does nothing at all, the approach included.
-  const reserved = closing();
-  reserved.tick(press('transform'));
+  const reserved = closing({ character: variant('assist-unavailable', { actions: { ...C1.actions, extra_attack: null } }) });
+  reserved.tick(press('extra_attack'));
   assert.ok(reserved.player.combatAssist, 'still closing in');
 });
 

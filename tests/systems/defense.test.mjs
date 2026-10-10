@@ -211,7 +211,7 @@ test('the shared input is shield on L; no block, dodge or defense action', () =>
   assert.equal(CONFIG.bindings.defense, undefined, 'no alias for the retired name');
   assert.equal(ACTION_LABELS.shield, 'Shield');
   assert.deepEqual(ACTIONS, [
-    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
 });
@@ -253,7 +253,7 @@ test('InputManager exposes shield / shieldPressed from L, RB and RT; other pad b
     button(i, false);
     assert.equal(input.sample().shield, false);
   }
-  for (const [i, action] of [[0, 'jump'], [1, 'attack1'], [4, 'attack2'], [13, 'down'], [2, 'extra_attack'], [3, 'transform']]) {
+  for (const [i, action] of [[0, 'jump'], [1, 'attack1'], [4, 'attack2'], [13, 'down'], [2, 'extra_attack']]) {
     button(i, true);
     f = input.sample();
     assert.equal(f[action], true, `button ${i} -> ${action}`);

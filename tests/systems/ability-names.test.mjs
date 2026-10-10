@@ -38,7 +38,6 @@ test('#0001 names the moves it has names for; the rest keep their neutral names'
     attack5: 'Hollow Purple',
     midair_attack5: 'Mid-air Attack 5',
     extra_attack: 'High Kick',
-    transform: 'Transform',
   });
 });
 

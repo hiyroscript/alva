@@ -1,5 +1,19 @@
 # Named updates
 
+## Permanent removal of Transform
+
+Transform has been permanently removed from gameplay: no action, move,
+keyboard/gamepad binding, touch button, editor control, character slot or
+preview remains. Combat buttons are Extra Attack and Attack 1–5. K still
+works as menu Back; Y / Triangle is unassigned in gameplay.
+
+Both touch schemes retain every remaining button's position and size.
+The existing layout sanitizer drops the obsolete saved ID while preserving
+other controls and preferences; the settings version is unchanged. The
+sample fighter's Awakening fixture was removed, while its other attacks
+and summon remain covered. Fighter profile hashes were reviewed and
+updated without changing ratings, play styles or combat balance.
+
 Some larger pieces of work have a name, so they can be referred to later
 ("make the bounce update's rebounds softer", "undo part of the movement
 update"). Each entry says what the update added, where its tuning lives, and

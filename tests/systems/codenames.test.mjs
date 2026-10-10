@@ -3,8 +3,8 @@
 // They are universal, the same for every character (a character's own
 // ability names are per character): every gameplay control (runLeft,
 // runRight, mouvementLeft, mouvementRight, down, jump, shield,
-// extra_attack, transform, attack1 to attack5, pause), every move (attack1
-// to attack5, midair_attack1 to midair_attack5, extra_attack, transform) and
+// extra_attack, attack1 to attack5, pause), every move (attack1
+// to attack5, midair_attack1 to midair_attack5, extra_attack) and
 // every file (<id>_<codename>_<frame>.png) goes by exactly one name, from
 // the bindings and input snapshots through every character's data, its
 // summons and techniques, their cooldowns, the combat AI and the art on
@@ -30,7 +30,7 @@ import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
 const ROOT = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 
-const HELD = ['runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
+const HELD = ['runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
 
 // The normalized fighter input snapshot, field for field.
 const SNAPSHOT = [
@@ -82,7 +82,7 @@ const RETIRED_CODE = new RegExp([
 
 test('the gameplay controls are the canonical codenames; existing keys unchanged, attack3 to attack5 on free keys', () => {
   assert.deepEqual([...ACTIONS], [
-    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
   assert.deepEqual([...NUMBERED_ATTACKS], ['attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
@@ -94,7 +94,6 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
   assert.deepEqual(CONFIG.bindings.jump, ['KeyW', 'Space', 'ArrowUp']);
   // The migrated controls keep their keys.
   assert.deepEqual(CONFIG.bindings.extra_attack, ['KeyJ']);
-  assert.deepEqual(CONFIG.bindings.transform, ['KeyK']);
   assert.deepEqual(CONFIG.bindings.shield, ['KeyL']);
   assert.deepEqual(CONFIG.bindings.attack1, ['KeyU']);
   assert.deepEqual(CONFIG.bindings.attack2, ['KeyI']);
@@ -110,7 +109,6 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
     ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack'].map((a) => ACTION_LABELS[a]),
     ['Attack 1', 'Attack 2', 'Attack 3', 'Attack 4', 'Attack 5', 'Extra Attack'],
   );
-  assert.equal(ACTION_LABELS.transform, 'Transform');
   assert.equal(ACTION_LABELS.shield, 'Shield');
   // Menus keep their own directions: menu Left / Right are not runLeft / runRight.
   assert.deepEqual(Object.keys(CONFIG.menuBindings), ['up', 'down', 'left', 'right', 'confirm', 'back']);
@@ -120,24 +118,23 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
   }
 });
 
-test('the combat buttons are extra_attack, transform and attack1 to attack5; shield, jump and down stay held-state controls', () => {
-  assert.deepEqual([...COMBAT_BUTTONS], ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
+test('the combat buttons are extra_attack and attack1 to attack5; shield, jump and down stay held-state controls', () => {
+  assert.deepEqual([...COMBAT_BUTTONS], ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
   assert.equal(COMBAT_ACTIONS, COMBAT_BUTTONS, 'the Fighter reads the same list');
   for (const held of ['shield', 'jump', 'down']) assert.ok(!COMBAT_ACTIONS.includes(held), held);
   assert.deepEqual([...ABILITY_ACTIONS], [...COMBAT_BUTTONS], 'the touch buttons a fighter presents');
 });
 
-test('the move codenames are universal and neutral: numbered attacks, their mid-air versions, the extra attack and transform', () => {
+test('the move codenames are universal and neutral: numbered attacks, their mid-air versions, the extra attack', () => {
   assert.deepEqual(Object.keys(MOVES), [
     'attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3',
-    'attack4', 'midair_attack4', 'attack5', 'midair_attack5', 'extra_attack', 'transform',
+    'attack4', 'midair_attack4', 'attack5', 'midair_attack5', 'extra_attack',
   ]);
   for (const [i, id] of NUMBERED_ATTACKS.entries()) {
     assert.deepEqual({ ...MOVES[id] }, { number: i + 1, air: false, label: `Attack ${i + 1}` });
     assert.deepEqual({ ...MOVES[`midair_${id}`] }, { number: i + 1, air: true, label: `Mid-air Attack ${i + 1}` });
   }
   assert.deepEqual({ ...MOVES.extra_attack }, { number: null, air: false, label: 'Extra Attack' });
-  assert.deepEqual({ ...MOVES.transform }, { number: null, air: false, label: 'Transform' });
   // Nothing global says what attack3 or attack4 is for: whether it is an
   // ordinary attack, a summon or a technique is each character's loadout.
   for (const m of Object.values(MOVES)) {
@@ -191,18 +188,17 @@ test('every controller builds the same canonical input snapshot, every combat bu
 test('#0001\'s actions resolve to the canonical move ids: attacks on the ground and in the air, attack4 and attack5 its techniques', () => {
   assert.deepEqual(def.actions, {
     extra_attack: 'extra_attack',
-    transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { ground: 'attack3', air: 'midair_attack3' },
     attack4: { type: 'technique', id: 'attack4' },
     attack5: { type: 'technique', id: 'attack5' },
   });
-  assert.deepEqual(COMBAT_ACTIONS.map((a) => specialAction(def, a)?.id ?? null), [null, null, null, null, null, 'attack4', 'attack5']);
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => specialAction(def, a)?.id ?? null), [null, null, null, null, 'attack4', 'attack5']);
   const { fighter, step } = makeFighter();
-  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'attack1', 'attack2', 'attack3', null, null]);
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', 'attack1', 'attack2', 'attack3', null, null]);
   step({ jump: true, jumpPressed: true });
-  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'midair_attack1', 'midair_attack2', 'midair_attack3', null, null]);
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3', null, null]);
 });
 
 test('#0001\'s moves, clips and objects go by the codenames: attack1 to attack3 with their mid-air versions, extra_attack, attack4 and attack5', () => {
@@ -279,7 +275,7 @@ test('the combat AI discovers the moveset by its canonical names, and reaches at
   ]);
   assert.deepEqual(moves.ranged.map((m) => [m.action, m.id, m.air]), [['attack2', 'attack2', false], ['attack3', 'attack3', false]]);
   assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack4', 'attack4', 'technique'], ['attack5', 'attack5', 'technique']]);
-  assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'), 'transform is reserved');
+  assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'), 'retired action is absent');
   assert.ok([...moves.melee, ...moves.ranged].every((m) => !['attack4', 'attack5'].includes(m.action)), 'attack4 and attack5 are no melee or ranged attacks');
   // The Shield button's own move in the air goes by its universal codename.
   assert.deepEqual([moves.deflect.action, moves.deflect.id, moves.deflect.air], ['shield', 'deflect', true]);
@@ -409,4 +405,19 @@ test('the guard still catches the retired mechanic coming back, under any of its
   }
   // Words that only share its letters are not it.
   for (const fine of ['re' + stem, 'Re' + stem, `${Stem.slice(0, 5)}ement`, `${stem.slice(0, 5)}és`, 'Télécharger']) assert.doesNotMatch(fine, RETIRED_MECHANIC, fine);
+});
+
+test('Transform is absent from gameplay registries, snapshots and all fighter metadata', () => {
+  for (const list of [ACTIONS, COMBAT_BUTTONS, COMBAT_ACTIONS, ABILITY_ACTIONS]) {
+    assert.equal(list.includes('transform'), false);
+  }
+  for (const table of [CONFIG.bindings, ACTION_LABELS, MOVES, blankInput()]) {
+    assert.equal(Object.hasOwn(table, 'transform'), false);
+    assert.equal(Object.hasOwn(table, 'transformPressed'), false);
+  }
+  for (const fighter of [...CHARACTERS, SAMPLE_FIGHTER]) {
+    for (const field of ['actions', 'attacks', 'animations', 'mobileAbilities', 'abilityNames']) {
+      assert.equal(Object.hasOwn(fighter[field] ?? {}, 'transform'), false, `${fighter.id}.${field}`);
+    }
+  }
 });

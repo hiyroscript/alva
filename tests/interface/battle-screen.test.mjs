@@ -1003,13 +1003,12 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   // What a button shows: the file of its sprite (the fighter's own art), or
   // its glyph's markup.
   const look = (b) => b.querySelector('.tc-sprite-icon')?.getAttribute('src').split('/').pop() ?? b.html;
-  const shown = ['extra_attack', 'shield', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump'].map((a) => [
+  const shown = ['extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump'].map((a) => [
     touch.buttons.get(a).getAttribute('aria-label'), look(touch.buttons.get(a)), touch.buttons.get(a).getAttribute('data-action'),
   ]);
   assert.deepEqual(shown, [
     ['High Kick', '0001_extra_attack_4.png', 'extra_attack'],
     ['Shield', ICONS.shield, 'shield'],
-    ['Transform', ICONS.transform, 'transform'],
     ['Jab', '0001_attack1_4.png', 'attack1'],
     ['Red', '0001_attack2_object_1.png', 'attack2'],
     ['Maximum Blue', '0001_attack3_object_1.png', 'attack3'],
@@ -1017,7 +1016,6 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
     ['Hollow Purple', '0001_attack5_object_1.png', 'attack5'],
     ['Jump', ICONS.jump, 'jump'],
   ]);
-  assert.ok(touch.buttons.get('transform').classList.contains('is-pending'), 'Transform reserved, dashed');
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
 

@@ -75,7 +75,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0001': Object.freeze({
     difficulty: 5,
     descriptionKey: 'discover.fighter.0001.playStyle',
-    reviewedSourceHash: '5d48a4d579ee5e58d350861a49c6d3dcd9521c3bc1cfd5a8ad834b605b6fc59c',
+    reviewedSourceHash: '76eceb6209fa3a16720c670fce4566c1d0f7004252ff546021de0642d4d58fe3',
   }),
   // A momentum rushdown and aerial chaser: a readable core game plan, with
   // mastery in momentum, air uses and free fall, approach angles, trap
@@ -83,7 +83,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0002': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0002.playStyle',
-    reviewedSourceHash: '25bcadbe010db31a33bf7948fc5de0dee3ff8b8fc137bad281e13fc740d256de',
+    reviewedSourceHash: '3803e4ffd2052c2dee90978b8a1b15868c3bcaeb047c74ae19da5311476eb22b',
   }),
 });
 

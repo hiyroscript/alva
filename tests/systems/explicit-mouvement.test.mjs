@@ -70,7 +70,7 @@ test('gamepad modifier preserves Jump, Shield, attacks, Start and menu mappings'
   const menu = [];
   input.onPadMenu((command) => menu.push(command));
   button(8, true);
-  for (const [i, action] of [[0, 'jump'], [5, 'shield'], [1, 'attack1'], [4, 'attack2'], [6, 'attack3'], [10, 'attack4'], [11, 'attack5'], [2, 'extra_attack'], [3, 'transform']]) {
+  for (const [i, action] of [[0, 'jump'], [5, 'shield'], [1, 'attack1'], [4, 'attack2'], [6, 'attack3'], [10, 'attack4'], [11, 'attack5'], [2, 'extra_attack']]) {
     button(i, true);
     assert.equal(input.sample()[`${action}Pressed`], true, action);
     button(i, false);
@@ -106,4 +106,29 @@ test('short keyboard taps survive sampling, releases re-arm, opposing requests c
     const f = input.sample();
     assert.equal(f.mouvementLeftPressed || f.mouvementRightPressed, false);
   }
+});
+
+test('K and Y/Triangle generate no gameplay action; keyboard and gamepad menu Back still work', () => {
+  const { input, key, button } = device();
+  const before = { ...input.sample() };
+  const menuKeys = [];
+  input.onKey((event) => { if (CONFIG.menuBindings.back.includes(event.code)) menuKeys.push(event.code); });
+  key('KeyK', true);
+  assert.deepEqual(input.sample(), before, 'K produces neither a held action nor a press edge');
+  key('KeyK', false);
+  assert.deepEqual(menuKeys, ['KeyK'], 'K still reaches independent menu navigation');
+  const menu = [];
+  input.onPadMenu((command) => menu.push(command));
+  for (let press = 0; press < 2; press++) {
+    button(3, true);
+    assert.deepEqual(input.sample(), before, 'Y/Triangle is unassigned, including repeated presses');
+    assert.deepEqual([...input.pad], []);
+    assert.equal(Object.hasOwn(input.state, 'transform'), false);
+    button(3, false);
+    assert.deepEqual(input.sample(), before);
+  }
+  assert.deepEqual(menu, []);
+  button(1, true);
+  assert.equal(input.sample().attack1Pressed, true, 'B/Circle retains Attack 1');
+  assert.deepEqual(menu, ['back'], 'B/Circle retains menu Back');
 });

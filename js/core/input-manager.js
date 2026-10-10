@@ -15,7 +15,6 @@ const MOUVEMENT_CONTROLS = ['mouvementLeft', 'mouvementRight'];
 const PAD_BUTTONS = {
   0: 'jump',          // A / Cross
   2: 'extra_attack',  // X / Square (#0001's High Kick)
-  3: 'transform',     // Y / Triangle
   1: 'attack1',       // B / Circle
   4: 'attack2',       // LB
   6: 'attack3',       // LT

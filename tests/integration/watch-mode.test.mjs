@@ -845,7 +845,7 @@ test('spectating: nothing reads gameplay input, and held buttons change nothing 
   // fight would change.
   const all = fakeInput();
   const everything = {};
-  for (const k of ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']) {
+  for (const k of ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']) {
     everything[k] = true;
     everything[`${k}Pressed`] = true;
   }
@@ -1003,18 +1003,18 @@ test('Quick Battle with a fighter with different moves: picked from slot 05 for 
   assert.deepEqual(app.loading.labels.at(-1), 'Loading Sample');
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-sample'], 'the CPU picked the same fighter');
   const touch = screens.battle.touch;
-  const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
+  const abilities = ['extra_attack', 'attack1', 'attack2'];
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'Palm Strike'], [false, 'Awakening'], [false, 'Jab'], [false, 'Attack 2'],
+    [false, 'Palm Strike'], [false, 'Jab'], [false, 'Attack 2'],
   ]);
   trace(battle, 300);
   for (const f of battle.fighters) assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y));
   screens.battle.exit();
-  // Back to Test A: High Kick, Transform, Jab and Red.
+  // Back to Test A: High Kick, Jab and Red.
   app.screens.go('home', {}, { reset: true });
   await startQuickBattle(booted, { fighter: TEST_A });
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'High Kick'], [false, 'Transform'], [false, 'Jab'], [false, 'Red'],
+    [false, 'High Kick'], [false, 'Jab'], [false, 'Red'],
   ]);
   screens.battle.exit();
 });
@@ -1329,7 +1329,7 @@ test('Quick Battle with a fighter with no moves: picked from slot 04 for both si
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-moveless', 'test-moveless'], 'the CPU picked the same fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   const touch = screens.battle.touch;
-  const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
+  const abilities = ['extra_attack', 'attack1', 'attack2'];
   for (const action of abilities) {
     assert.equal(touch.buttons.get(action).hidden, true, action);
     assert.equal(touch.buttons.get(action).getAttribute('aria-label'), null, action);
@@ -1339,11 +1339,11 @@ test('Quick Battle with a fighter with no moves: picked from slot 04 for both si
   trace(battle, 300);
   for (const f of battle.fighters) assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y));
   screens.battle.exit();
-  // Back to Test A: High Kick, Transform, Jab and Red are back.
+  // Back to Test A: High Kick, Jab and Red are back.
   app.screens.go('home', {}, { reset: true });
   await startQuickBattle(booted, { fighter: TEST_A });
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'High Kick'], [false, 'Transform'], [false, 'Jab'], [false, 'Red'],
+    [false, 'High Kick'], [false, 'Jab'], [false, 'Red'],
   ]);
   screens.battle.exit();
 });

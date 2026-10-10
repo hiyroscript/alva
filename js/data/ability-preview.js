@@ -2,7 +2,7 @@
 import { NUMBERED_ATTACKS } from '../config.js';
 import { specialAction } from './loadout.js';
 
-// Extra and numbered attacks use fighter art; Transform and Jump keep glyphs.
+// Extra and numbered attacks use fighter art; Jump keeps its glyph.
 export const SPRITE_BUTTONS = Object.freeze(['extra_attack', ...NUMBERED_ATTACKS]);
 
 // Previews already reported as naming no frame, so each warns once.

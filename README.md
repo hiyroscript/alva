@@ -105,7 +105,6 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 | Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | B / LB / LT / L3 / R3 |
 | Extra attack | J | X |
 | Shield (hold, on the ground) / Deflect (press, in the air) | L | RB / RT |
-| Transform (reserved) | K | Y |
 | Pause | Esc or P | Start |
 
 What each attack button does is the fighter's own; a fighter with fewer

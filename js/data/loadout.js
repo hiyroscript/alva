@@ -11,7 +11,6 @@
 //   extra_attack            one optional special attack of the character's
 //                           own (a throw, a projectile, a utility move),
 //                           never counted among the numbered ones
-//   transform               reserved
 //
 // The one rule: a numbered attack the fighter has is a numbered combat
 // button the player presses directly. Nothing else reaches one: no held
@@ -211,7 +210,7 @@ export function loadoutProblems(def) {
         checkTechnique(button);
       }
     } else if (mapping !== null) {
-      // extra_attack and transform: their own move, or null (reserved).
+      // extra_attack: its own move, or null (reserved).
       if (mapping !== button) say(`actions.${button} must be '${button}' or null`);
       else needAttack(button, `actions.${button}`);
     }

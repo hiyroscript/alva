@@ -30,7 +30,7 @@ The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat),
 Every fighter's moves go by the universal move codenames (`MOVES` in
 [`js/config.js`](../../js/config.js)): the numbered attacks `attack1` to
 `attack5`, their mid-air versions `midair_attack1` to `midair_attack5`, one
-optional `extra_attack`, and the reserved `transform`. What a player calls
+optional `extra_attack`. What a player calls
 a move is the fighter's `abilityNames`, never its codename. The rules,
 checked for every definition as the registry loads (`assertLoadout`: a
 definition that breaks one is refused, every problem named):
@@ -51,8 +51,7 @@ definition that breaks one is refused, every problem named):
 - Whatever an attack creates is named after it: a projectile
   `<attack>_object` (a technique's included), a summon's cloud
   `<attack>_object...`, a technique's own poses `<attack>_...`.
-- `extra_attack: 'extra_attack'` is one attack; `transform: null` is
-  wired but reserved; a button left out of `actions` does nothing for that
+- `extra_attack: 'extra_attack'` is one attack; a button left out of `actions` does nothing for that
   fighter (its touch button is hidden and the CPU never presses it).
 
 | Numbered attacks | Buttons (touch slots in order) |
@@ -442,7 +441,6 @@ starts the very attack asked for. The rules are
 | `summons` / `techniques` | no special moves; the CPU never plans one |
 | `projectiles` | no projectile attacks |
 | `deflect` | the Shield button does nothing in the air |
-| `transform` (or `null`) | reserved: the button is wired, does nothing, dashed on touch |
 
 ## Tests
 

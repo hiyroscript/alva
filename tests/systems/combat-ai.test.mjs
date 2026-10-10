@@ -27,8 +27,8 @@ import { mulberry32 } from '../../js/core/utils.js';
 import { blankInput } from '../../js/game/fighters/fighter-controller.js';
 import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
 
-const BUTTONS = ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
-const COMBAT = ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3'];
+const BUTTONS = ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
+const COMBAT = ['extra_attack', 'attack1', 'attack2', 'attack3'];
 
 // A flat main floor from x 0 to 2000 (top 800), and one with a platform a
 // jump above the floor.
@@ -141,8 +141,8 @@ test('while its own attack plays it never turns away from its opponent (a held d
   assert.ok(attacks > 300, `plenty of attacks (${attacks})`);
 });
 
-test('it never presses a reserved button, and never drops through a platform', () => {
-  assert.equal(def.actions.transform, null, '#0001\'s transform is reserved');
+test('it uses only supported actions, and never drops through a platform', () => {
+  assert.equal(Object.hasOwn(def.actions, 'transform'), false);
   const moves = readMoveset(new Fighter({ def, sprites: fakeSprites(), stage: FLAT, spawn: { x: 100 } }));
   // Read from the fighter's own data: the High Kick on the ground and in the
   // air, attack1 on both, attack2 and attack3 as close moves in the air and
@@ -162,7 +162,7 @@ test('it never presses a reserved button, and never drops through a platform', (
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, seed: 11, stage: RAISED, cpuX: 900, foeX: 1400 });
     r.run(seconds(12));
-    assert.ok(r.log.every((o) => !o.transform && !o.transformPressed), `${difficulty}: transform never pressed`);
+    assert.ok(r.log.every((o) => !Object.hasOwn(o, 'transform') && !Object.hasOwn(o, 'transformPressed')), `${difficulty}: transform never pressed`);
     assert.ok(r.log.every((o) => !o.dropPressed), `${difficulty}: no platform drop (no player control has one)`);
   }
 });
@@ -529,7 +529,7 @@ test('the training controller still never presses a combat button, Down or Shiel
     cpu.update(DT, ctx);
     foe.update(DT, ctx);
     const o = trainee.out;
-    for (const k of ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'shield']) {
+    for (const k of ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'shield']) {
       assert.ok(!o[k] && !o[`${k}Pressed`], `never ${k}`);
     }
   }

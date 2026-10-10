@@ -10,8 +10,6 @@
 // has:
 //   extra_attack  a melee palm strike, usable in the air too, planted (no
 //                 hover: #0001's floats)
-//   transform     a real move (#0001's is reserved), presented on its own
-//                 touch button
 //   attack1 / midair_attack1, attack2 / midair_attack2
 //                 on the ground and in the air, its own timings
 //   attack3       its own button, a clone summon that performs attack2
@@ -21,7 +19,7 @@
 //   no Defense: the shield button does nothing
 //   its own touch labels, frames of its own clips on its touch buttons
 //   (attack2 left neutral, and no jump frame of its own, so Jump keeps its
-//   arrow) and its own glyph on its Transform, and ability names (attack2
+//   arrow), and ability names (attack2
 //   and both mid-air attacks left unnamed)
 //
 // Its body, physics, Powers, Energy and art are #0001's, borrowed: they are
@@ -48,7 +46,6 @@ export const SAMPLE_FIGHTER = Object.freeze({
     idle: A.idle, run: A.run, jump: A.jump, fall: A.fall, land: A.land,
     hurt: A.hurt, midair_hurt: A.midair_hurt, mouvment: A.mouvment,
     extra_attack: at(A.attack1),          // 6 frames
-    transform: at(A.attack4_cast),        // 6 frames
     attack1: at(A.midair_attack3),        // 4 frames
     midair_attack1: at(A.attack2),        // 5 frames
     attack2: at(A.land),                  // 2 frames
@@ -61,7 +58,6 @@ export const SAMPLE_FIGHTER = Object.freeze({
 
   actions: {
     extra_attack: 'extra_attack',
-    transform: 'transform',
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { type: 'summon', id: 'attack3' },
@@ -80,12 +76,10 @@ export const SAMPLE_FIGHTER = Object.freeze({
 
   mobileAbilities: {
     extra_attack: { label: 'Palm Strike', preview: { animation: 'extra_attack', frame: 3 } },
-    transform: { label: 'Awakening', icon: 'up' },
     attack1: { label: 'Jab', preview: { animation: 'attack1', frame: 1 } },
   },
   abilityNames: {
     extra_attack: 'Palm Strike',
-    transform: 'Awakening',
     attack1: 'Jab',
     attack3: 'Shadow Knee',
   },
@@ -97,12 +91,6 @@ export const SAMPLE_FIGHTER = Object.freeze({
       hitbox: { x: 10, y: -80, w: 34, h: 30 },
       hitstun: 0.25, blockstun: 0.12, hitstop: 0.06, cooldown: 0.05,
       airMomentum: 1, airControl: 0.5,
-    },
-    transform: {
-      animation: 'transform', startup: 2 / FPS, active: 1 / FPS, recovery: 0,
-      damage: 3, baseLaunch: 2, directionalLaunch: 'vertical',
-      hitbox: { x: 8, y: -100, w: 26, h: 80 },
-      hitstun: 0.3, blockstun: 0.15, hitstop: 0.05, cooldown: 0.05,
     },
     attack1: {
       animation: 'attack1', startup: 1 / FPS, active: 1 / FPS, recovery: 2 / FPS,

@@ -167,7 +167,6 @@ own:
 ```js
 actions: {
   extra_attack: 'extra_attack',                          // optional
-  transform: null,                                       // reserved
   attack1: { ground: 'attack1', air: 'midair_attack1' },
   attack2: { ground: 'attack2', air: 'midair_attack2' },
   attack3: { type: 'summon', id: 'attack3' },            // optional: a summon...
@@ -259,7 +258,7 @@ the fighter or for its button: never a check for `'0027'` in shared code.
   `collection: 'projectileAnimations'` to pick projectile art, and an
   optional `fallbackIcon` ([input](../systems/input.md#touch-controls)).
   Pick the frame that reads as the move (its strike, its release), not
-  blindly the first. Jump, Shield (Deflect in the air) and Transform keep
+  blindly the first. Jump and Shield (Deflect in the air) keep
   their universal glyphs.
 - **Ability names:** `abilityNames`, keyed by move codename
   (`attack1: 'Uppercut'`); a move left out keeps its neutral name
