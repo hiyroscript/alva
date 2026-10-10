@@ -1,442 +1,457 @@
-ALVA — Roster UI Improvements, Discover Lore & Play-Style Rewrite
+ALVA — Permanently Remove the Transform Feature
 
-Objective
+Mission
 
-Make a focused, polished update to Alva’s roster presentation and Discover interface.
-
-First, inspect the current repository, understand the existing UI architecture, character system, localization, navigation, and responsive design. Then implement all requested changes directly in the game.
-
-This is a UI and editorial-content update, not a gameplay overhaul. Preserve Alva’s existing visual identity: dark charcoal surfaces, clean typography, subtle borders, restrained green accents, and consistent spacing.
-
-The final result must work across desktop, mobile landscape, keyboard, mouse, touch, and gamepad.
+Completely and permanently remove the Transform button, action, and associated gameplay capability from the Alva fighting game.
 
 Repository: hiyroscript/alva
+Target branch: main
 
-1. All rosters — move character numbers to the bottom-right
+Transform will never be used in this game. It is not a planned feature, an upcoming ability, or something that should remain reserved for future development.
 
-Current implementation
+This is a permanent feature deletion, not a temporary UI adjustment.
 
-The shared roster is implemented in:
+Do not simply hide the button with CSS, disable its input, or leave placeholder code behind. Remove the entire obsolete feature from the current codebase, including controls, configuration, data models, presentation, documentation, and tests.
 
-* js/ui/fighter-roster.js
-* js/ui/fighter-browser.js
-* css/setup.css
-* css/responsive.css
+Preserve every unrelated feature and existing gameplay mechanic.
 
-Each roster slot contains a .slot-num element currently positioned at the top-left. Available fighters also have a .slot-name strip across the bottom of their portrait.
+⸻
 
-Required changes
+1. Understand the Architecture First
 
-Move the character/slot number from the top-left to the bottom-right corner of every roster card.
+Before editing, examine:
+
+* CLAUDE.md
+* README.md
+* ALVA_SPEC.md
+* codename_rule
+* docs/systems/input.md
+* docs/systems/combat.md
+* docs/architecture/character-system.md
+* docs/development/testing.md
+
+Alva is a vanilla JavaScript, HTML, and CSS browser-based platform fighting game.
+
+It uses shared systems for all fighters, with individual fighter abilities declared through character data.
+
+The game supports keyboard, gamepad, and two customizable mobile control schemes: Joystick and Classic Buttons.
+
+The following must remain fully functional:
+
+* Numbered attacks 1–5
+* Extra Attack
+* Shield and aerial Deflect
+* Jumping and triple jumping
+* Running, Dash, and air dash
+* Down input and fast fall
+* Combat Assist
+* Energy, cooldowns, hit-cancels, and attack buffering
+* CPU combat and Watch Mode
+* Quick Battle and Practice Ground
+* Custom touch-control layouts
+* English and French localization
+
+Do not alter combat balance or redesign unrelated systems.
+
+Important: character_rule is protected. Do not edit, move, rename, or reformat it.
+
+2. Remove Transform from the Global Configuration
+
+Inspect js/config.js.
+
+Remove Transform from all gameplay definitions, including:
+
+* CONFIG.bindings.transform
+* The transform entry in COMBAT_BUTTONS
+* The transform entry in ACTIONS
+* ACTION_LABELS.transform
+* MOVES.transform
+* Associated documentation comments
+
+The combat button list should consist only of extra_attack and the five numbered attacks.
+
+The keyboard’s K key must no longer trigger a Transform gameplay action.
+
+However, CONFIG.menuBindings.back independently uses KeyK for menu navigation. Preserve that separate functionality unless there is a compelling architectural reason to change it. Removing Transform does not mean disabling unrelated menu navigation.
+
+Remove any Transform-specific state or input snapshot fields that were generated through shared action lists.
+
+3. Remove Transform from Gamepad Input
+
+Inspect js/core/input-manager.js.
+
+The current gamepad mapping associates standard gamepad button index 3 (Y / Triangle) with transform.
+
+Remove this association completely.
 
 Requirements:
 
-* Apply the change to every roster that uses the shared component.
-* Position the number neatly inside the card’s lower-right area.
-* Keep consistent right and bottom spacing across all card sizes.
-* Preserve the current numbering format.
-* Ensure the number remains clearly visible and does not overlap the fighter’s name.
-* If the number shares the bottom strip with the fighter’s name, reserve enough horizontal space for both.
-* Keep fighter names aligned to the left and numbers aligned to the right.
-* Apply the placement consistently to available, selected, locked, and disabled roster slots.
-* Preserve the locked icons, selection checkmarks, portraits, focus rings, and accessibility labels.
-* Do not hardcode positioning per fighter.
+* Y / Triangle must not trigger Transform.
+* No hidden or reserved Transform action should be generated.
+* Do not automatically reassign Y / Triangle to another attack.
+* Preserve every other gamepad mapping.
+* Preserve independent menu navigation behavior.
 
-Use the shared component and styles rather than adding individual overrides to different screens.
+Review the input manager’s state initialization, sampling, held controls, and press-edge handling for assumptions about Transform.
 
-Make the black name strip slightly transparent
+Also inspect:
 
-The black/dark strip behind a character’s name currently looks too solid.
+* js/game/fighters/fighter-controller.js
+* js/game/fighters/fighter.js
+* js/game/ai/moveset.js
+* js/game/ai/combat-ai.js
 
-Make it slightly transparent, so the portrait remains subtly visible underneath it.
+Remove stale Transform-specific references and assumptions while preserving generic shared combat processing.
 
-Design direction:
+4. Completely Remove the Mobile Transform Button
 
-* Use a dark translucent background, approximately 75–85% opacity, adjusted to suit the existing theme.
-* Keep the same general height and clean appearance.
-* Maintain strong contrast for the name and character number.
-* Do not reduce the opacity of the text itself.
-* Do not make the strip heavily transparent or difficult to read.
-* Keep the effect consistent across hover, focus, and selected states.
+Inspect js/ui/touch-controls.js.
 
-Only the background layer should become translucent.
+The current lower-right combat cluster contains:
 
-Screens to cover
+          [4]  [5]  [EXTRA]
+       [3]  [TRANSFORM] [SHIELD]
+          [1]  [2]  [JUMP]
 
-The change must appear everywhere the shared roster is used, including:
+Transform currently occupies the middle row between the numbered attack cluster and Shield.
 
-* Select Fighter.
-* Custom Play’s Select CPU.
-* Both Watch Mode CPU selection screens.
-* Practice Ground’s Change Fighter roster.
-* Practice Ground’s CPU selection roster.
-* Discover → Fighters.
+Delete it from the ACTION_BUTTONS configuration and ensure it is never constructed.
 
-If another roster instance uses the same component, it must receive the update automatically.
+Requirements:
 
-⸻
+* No Transform DOM button.
+* No data-action="transform" element.
+* No Transform pointer handler.
+* No Transform entry in button maps.
+* No Transform input events.
+* No Transform accessible label.
+* No disabled, invisible, or reserved Transform placeholder.
+* No ghost button in either mobile control scheme.
 
-2. Discover — add a new “Lore” section
+Review the layouts visually after removal.
 
-Current implementation
+Keep the remaining controls logically arranged, properly spaced, and easy to reach.
 
-Discover currently contains three sections:
+If removing Transform leaves an awkward empty space, make minimal, deliberate layout adjustments to produce a clean cluster. Do not unnecessarily reshuffle the numbered attack slots or change players’ established button positions.
 
-1. Fighters
-2. Movement
-3. Launch
+Maintain proper touch hit targets, safe-area behavior, and multi-touch functionality.
 
-The navigation is defined in js/screens/discover-screen.js, using the SECTIONS registry.
+Both Joystick and Classic Buttons must remain operational.
 
-The page styling is in css/discover.css.
+5. Clean Up the Mobile Button Presentation
 
-Required changes
+Inspect:
 
-Add a fourth section named Lore.
+* js/ui/mobile-abilities.js
+* js/data/ability-preview.js
+* js/ui/icons.js
 
-The new section order should be:
+The current code contains Transform-specific fallback icons, reserved states, and special treatment.
 
-1. Fighters
-2. Lore
-3. Movement
-4. Launch
+Remove:
 
-Keep Fighters as the default section when entering Discover.
+* Transform from the fallback icon mapping.
+* Transform from the reserved-action set.
+* Transform-specific handling in abilityPresence.
+* Transform-specific comments and conditions in mobileAbility.
+* The dedicated ICONS.transform star icon, provided no unrelated feature depends on it.
+* Any Transform-only preview or display logic.
 
-Lore page design
+Keep the generic ability-presence system working for legitimately absent or unavailable numbered attacks and Extra Attack.
 
-Lore should feel like a natural part of the existing Discover interface, not a completely different screen.
+Preserve sprite previews, fallback icons, active/inactive states, and airborne ability presentation for all remaining combat buttons.
 
-Create a dedicated Lore page with:
+Do not remove generic CSS or canvas transforms used for rendering, scaling, positioning, or animation. Those are unrelated technical operations.
 
-* A properly styled Lore heading.
-* A clean, readable content area.
-* Structured sections suitable for worldbuilding and character history.
-* Comfortable text spacing and typography.
-* Subtle separators and existing Alva colors.
-* Vertical scrolling if its content exceeds the available height.
+6. Remove Transform from Touch Layout Customization
 
-The page should be visually engaging but restrained.
+Inspect:
 
-Content requirements:
+* js/core/touch-layout.js
+* js/ui/touch-layout-editor.js
+* js/core/settings.js
 
-Lore is for narrative information, worldbuilding, character backgrounds, and established story context.
+Currently TOUCH_CONTROL_IDS includes transform in both the joystick and classic arrays.
 
-It must not become another gameplay guide or repeat the Movement and Launch sections.
+Remove it from both.
 
-Review the repository’s existing documentation for established narrative information before writing the initial content.
+The touch editor must no longer present Transform as something a player can select, move, resize, or save.
 
-Do not invent major canonical events, character relationships, fictional factions, origins, or world history without a source in the project.
+Existing saved layouts must remain compatible.
 
-If there is not enough established lore to populate a complete page, create a polished introductory Lore section with concise placeholder or introductory copy indicating that more stories will be added. Prepare the structure for future lore entries.
+Some existing players may have saved custom positions for Transform.
 
-Avoid confusing gameplay mechanics with confirmed fictional-world lore.
+When loading those older layouts:
 
-Future-proof the Lore system
+1. Ignore the obsolete transform entry.
+2. Preserve every other valid control position and scale.
+3. Do not crash or invalidate the entire layout.
+4. Ensure future saves no longer include Transform.
+5. Preserve existing touch layout settings and player preferences.
 
-Make future lore additions straightforward.
+Use the existing layout sanitization architecture rather than introducing a separate one-off storage system.
 
-Ideally, keep Lore content separate from navigation logic, using a clear structured data source or localization keys where appropriate.
+Do not reset all player settings or bump the settings version unnecessarily.
 
-It should be possible to add future world lore or character stories without rewriting the Discover navigation.
+7. Remove Transform from Character Definitions
 
-Do not hardcode special behavior for character #0001 or #0002.
+Inspect:
 
-Navigation requirements
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* js/data/characters.js
+* js/data/loadout.js
+* js/data/abilities.js
 
-The Lore tab must behave exactly like the other Discover tabs.
+Both playable fighters currently declare:
 
-* Mouse click activates it.
-* Keyboard focus activates it.
-* Gamepad navigation can reach it.
-* Touch navigation works.
-* Only one Discover section is active at a time.
-* Hidden sections cannot receive focus.
-* The active tab has the existing visual treatment.
-* Screen readers receive the correct tab and panel relationships.
-* The content is independently scrollable when needed.
-* Back navigation remains unchanged.
+transform: null
 
-Preserve the existing accessible tablist, tab, and tabpanel structure, including aria-selected, aria-controls, and roving tabindex behavior.
+inside their action mappings.
 
-Responsive behavior
+Remove these entries.
 
-The new fourth tab must fit naturally into Discover’s layout.
+Transform should no longer be a valid character action, supported move codename, reserved slot, or future loadout option.
 
-On wide screens, maintain the vertical navigation rail.
+Update the loadout rules to reject Transform as an unknown combat action.
 
-On narrow screens, maintain the horizontal navigation rail.
+Audit character metadata, including:
 
-Do not reduce labels to unreadable sizes or shrink touch targets below their existing minimum.
+* actions
+* attacks
+* animations
+* mobileAbilities
+* abilityNames
 
-Allow the horizontal rail to scroll when four labels cannot fit, including when using French translations.
+Remove Transform-specific entries where present.
 
-Avoid clipping, horizontal page overflow, or broken navigation in short landscape windows.
+Preserve every legitimate ability of fighters #0001 and #0002. Do not replace Transform with another ability or alter their numbered attack counts.
 
-⸻
+If character definition files change, review and update their Discover profile source hashes in js/data/fighter-profiles.js as required by the repository’s existing tests. Retain their current difficulty ratings and play-style descriptions unless an actual gameplay change justifies changing them.
 
-3. Rosters without Confirm — move “Read play style” fully to the bottom-right
+8. Remove Transform from the Combat and AI Architecture
 
-Current implementation
+Trace how COMBAT_BUTTONS propagates into:
 
-The play-style button is generated by FighterRoster and currently uses:
+* Fighter input handling
+* Attack selection
+* Buffered attacks
+* Cooldown management
+* Combat Assist
+* CPU moveset generation
+* AI action selection
+* Input snapshot creation
+* Shared combat tests
 
-* .play-style-action
-* .text-action
-* .preview-info
-* .preview-info--no-confirm
+Remove assumptions that Transform is a combat action.
 
-The FighterBrowser subclass removes the Confirm button.
+Do not create compatibility aliases, permanently disabled Transform handlers, or special cases that silently preserve the obsolete action.
 
-Required behavior
+The game should have no gameplay pathway that can activate Transform.
 
-Whenever a roster does not have a Confirm character button, the Read play style action must sit at the very bottom-right of the character preview information area.
+The existing architecture should continue processing all remaining combat buttons consistently.
 
-It should not float awkwardly immediately beneath the character name with unnecessary empty space below it.
+Avoid fighter-ID-specific exceptions or unnecessary refactors.
 
-Design requirements:
+9. Remove Transform from Test Fixtures
 
-* Right-align the action.
-* Anchor it visually at the bottom edge of the preview information area.
-* Keep only a small, consistent amount of right and bottom padding.
-* Preserve sufficient padding for its focus outline and touch target.
-* Keep it separate from the fighter name and difficulty stars.
-* Preserve the underlined, quiet secondary-action appearance.
-* Maintain legibility when the translated label wraps.
-* Avoid overlap with the animated fighter preview.
-* Avoid using fragile absolute positioning that breaks at smaller resolutions.
+This step is especially important.
 
-Prefer a robust flex or grid arrangement.
+Inspect tests/fighters/fixtures/sample-fighter.mjs.
 
-Important distinction
+Unlike the two playable characters, this test-only fighter actually uses Transform as an implemented attack called Awakening.
 
-Rosters with a Confirm button must remain different.
+It currently declares Transform in its animations, actions, attacks, ability names, and mobile ability metadata.
 
-For Confirm-enabled rosters:
+Remove this obsolete synthetic mechanic completely.
 
-* Keep Read play style above Confirm.
-* Preserve the existing Confirm button behavior.
-* Maintain reasonable spacing between the two controls.
-* Do not push the action below Confirm.
+Update its dependent tests, particularly:
 
-For rosters without Confirm:
+* tests/systems/sample-fighter.test.mjs
+* tests/interface/controls-ui.test.mjs
+* tests/systems/codenames.test.mjs
 
-* Read play style becomes the final, bottom-right action.
-* Do not add an unnecessary empty button area.
-* Do not introduce a Confirm button.
+Preserve coverage for the sample fighter’s legitimate unique abilities, including its Extra Attack, numbered attacks, and summon.
 
-Implement this based on whether the roster has Confirm, not based on the screen name or character ID.
+If a valuable generic test needs a substitute, use an existing valid attack or another legitimate supported mechanism instead of retaining Transform under a hidden name.
 
-The existing .preview-info--no-confirm hook is a suitable place to start.
+Do not preserve a feature exclusively because historical tests reference it.
 
-⸻
+Tests must reflect the intended architecture, not prevent obsolete functionality from being deleted.
 
-4. Rewrite every fighter’s play-style description
+10. Update All Affected Tests
 
-Current problem
+Perform a comprehensive audit of the tests/ directory.
 
-The descriptions are unnecessarily long.
+Pay special attention to:
 
-They currently read like detailed explanations of attacks and abilities instead of short summaries of how the fighter actually plays.
+* tests/interface/controls-ui.test.mjs
+* tests/interface/touch-layout.test.mjs
+* tests/interface/i18n.test.mjs
+* tests/interface/battle-screen.test.mjs
+* tests/integration/practice-ground.test.mjs
+* tests/systems/codenames.test.mjs
+* tests/systems/loadout.test.mjs
+* tests/systems/combat-ai.test.mjs
+* tests/systems/sample-fighter.test.mjs
+* tests/systems/ability-names.test.mjs
+* tests/systems/explicit-mouvement.test.mjs
+* tests/systems/down.test.mjs
+* tests/systems/defense.test.mjs
+* tests/systems/combat-assist.test.mjs
+* tests/fighters/0001/fighter-0001.test.mjs
+* tests/fighters/0002/fighter-0002.test.mjs
+* tests/integration/watch-mode.test.mjs
 
-Players should understand a character’s play style quickly without reading a full paragraph of mechanics.
+Also inspect all other tests and fixtures for references.
 
-New writing rules
+Remove obsolete assertions about Transform’s existence, reserved state, labels, glyph, input mapping, or implemented behavior.
 
-Rewrite all existing play-style descriptions, and establish the same rule for future fighters.
+Update action arrays and expected control counts.
 
-Every description must communicate three things:
+Add appropriate regression checks confirming:
 
-1. Play style: How does this fighter generally approach combat?
-2. Strengths: What is this fighter particularly good at?
-3. Weaknesses: What situations or decisions make this fighter vulnerable?
+* Transform is not a registered gameplay action.
+* Transform is not a registered move.
+* Transform is absent from both touch layouts.
+* Transform is absent from the touch layout editor.
+* Transform is not mapped to the gamepad.
+* Keyboard K does not produce a gameplay Transform press.
+* Old saved Transform layout entries are discarded safely.
+* Loadout validation rejects an attempted Transform action.
+* All remaining combat and defensive controls work normally.
 
-The description must be short, direct, and useful to someone choosing a fighter.
+Avoid broad text-based checks that accidentally reject legitimate CSS transform, canvas setTransform, or similar rendering operations.
 
-Strict content requirements
+11. Remove Transform Localization and Documentation
 
-* Aim for two concise sentences per fighter, approximately 30–55 words total.
-* Explain the overall combat approach and strengths/weaknesses.
-* Use natural, readable language.
-* Avoid listing individual attacks.
-* Avoid naming abilities, techniques, or special moves.
-* Avoid cooldown numbers, Energy costs, damage values, or technical frame information.
-* Avoid repeating information already represented by the difficulty stars.
-* Avoid unnecessary lore or character backstory.
-* Avoid exaggerated marketing language.
-* Do not claim a fighter has faster universal movement: Alva deliberately gives all fighters the same baseline locomotion.
-* Make each fighter feel distinct without introducing inaccurate gameplay claims.
+Inspect:
 
-Descriptions should convey the experience of playing the character, not their move inventory.
-
-Suggested English descriptions
-
-Fighter #0001
-
-“A patient fighter who controls space, creates openings, and punishes careless approaches. Strong at setting the pace and capitalizing on mistakes, but vulnerable when pressured or when committing too early.”
-
-Fighter #0002
-
-“An aggressive, momentum-driven fighter who pressures opponents up close and pursues them through the air. Strong at maintaining offense and chasing escapes, but vulnerable to predictable approaches and overcommitting.”
-
-These examples establish the target length and tone. Refine them if necessary after checking the actual fighter definitions and specifications.
-
-French localization
-
-Update the French versions with the same information and approximately the same brevity.
-
-The French text must sound natural, not mechanically translated.
-
-Keep established character terminology and maintain semantic consistency between the languages.
-
-Data integrity
-
-The existing descriptions are referenced through:
-
-* js/data/fighter-profiles.js
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
-
-Preserve the current profile architecture and description keys.
-
-Do not move editorial descriptions into the gameplay definitions.
-
-Do not alter difficulty ratings just because the descriptions are changing.
-
-Preserve the reviewedSourceHash system and only update review hashes when justified by the source-review contract.
-
-⸻
-
-5. Localization and accessibility
-
-Alva supports English and French. Every new visible string must support both languages.
-
-Add the necessary Lore translation keys to the existing localization tables.
-
-Verify that:
-
-* Lore appears correctly in English and French.
-* Switching language updates the section label and page content.
-* Existing play-style modal titles and buttons remain translated.
-* Shortened descriptions appear correctly in both languages.
-* No untranslated keys appear visibly.
-* Longer French labels do not break the layout.
-
-Preserve the existing InfoDialog behavior.
-
-Opening Read play style must not select or confirm a fighter, start a match, or unpause Practice Ground.
-
-Closing the modal must return focus to the triggering button.
-
-⸻
-
-6. Update tests and documentation
-
-Do not leave tests asserting obsolete behavior.
-
-Test updates
-
-Inspect and update at least:
-
-* tests/interface/discover.test.mjs
-* tests/fighters/profiles.test.mjs
-* Relevant roster and responsive styling tests.
-* Localization tests, where applicable.
-
-Some existing profile tests require descriptions longer than 200 characters and explicitly check for named abilities.
-
-Those requirements directly conflict with the new writing rules and must be replaced.
-
-New tests should validate that descriptions are short, translated, contain meaningful gameplay identity and strengths/weaknesses, and do not turn into lists of moves.
-
-Update Discover navigation tests from three sections to four.
-
-Verify the correct order:
-
-fighters → lore → movement → launch
-
-Test Lore activation, accessibility, hidden-panel behavior, language switching, and navigation.
-
-Add regression coverage for roster number positioning, the translucent name strip, and the different Read play style layouts where practical.
-
-Documentation updates
-
-Update the relevant parts of:
-
-* ALVA_SPEC.md
 * README.md
-* docs/architecture/module-responsibilities.md
-* Other documentation that explicitly describes Discover’s sections or roster layout.
+* ALVA_SPEC.md
+* codename_rule
+* docs/systems/input.md
+* docs/systems/combat.md
+* docs/development/conventions.md
+* docs/characters/
+* docs/characters/adding-characters.md
+* Other current documentation referencing the feature
 
-Remove outdated claims that Discover has exactly three sections.
+Remove the obsolete control.transform translation and all current instructions that describe Transform as an available or reserved action.
 
-Document the new concise play-style writing policy.
+Update control tables, example loadouts, character creation instructions, mobile layout diagrams, and button explanations.
 
-Preserve historical documentation conventions and do not alter protected files such as character_rule.
+Audit any controller diagrams or image assets for obsolete Transform labels.
 
-⸻
+If a diagram displays the retired control, update the diagram or its presentation so it no longer advertises that function.
 
-7. Visual quality and consistency
+Do not rewrite unrelated historical records in UPDATES.md. Historical discussion may remain as history, but no current specification should claim Transform exists or is planned.
 
-The changes should look intentional and professionally integrated.
+Document the permanent removal as part of the implementation.
 
-Prioritize:
+12. Preserve the Rest of Alva
 
-* Consistent component styling.
-* Legible text over dark portrait artwork.
-* Subtle transparency.
-* Precise bottom-right alignment.
-* Responsive spacing.
-* Clear hierarchy.
-* No unnecessary animations.
-* No new dependencies or frameworks.
-* No major changes to the game’s navigation architecture.
+This is a focused deletion.
 
-Do not redesign the whole game.
+Do not:
 
-Do not modify combat, fighter statistics, movement, hit detection, scoring, or other gameplay systems.
+* Replace Transform with a new feature.
+* Reassign its position to a new reserved button.
+* Invent transformation mechanics.
+* Change fighter damage, attack timing, or balance.
+* Change movement physics.
+* Remove Extra Attack.
+* Change Shield or Deflect behavior.
+* Break controller navigation.
+* Remove legitimate generic rendering transforms.
+* Remove unrelated art assets.
+* Modify protected repository files.
+* Refactor unrelated game systems unnecessarily.
 
-Do not alter character art or asset paths unless genuinely necessary for these UI requirements.
+Favor actual code deletion and simplification over introducing abstractions or compatibility code for a feature that will never return.
 
-⸻
+13. Test Everything
 
-8. Final acceptance checklist
-
-The implementation is complete only when:
-
-* [ ]	Every shared roster places its slot number at the bottom-right.
-* [ ]	Character names and numbers do not overlap.
-* [ ]	The dark character-name strip is subtly translucent.
-* [ ]	Available, selected, locked, and disabled slots remain correct.
-* [ ]	Every roster without Confirm places Read play style at the bottom-right.
-* [ ]	Rosters with Confirm preserve Read play style above Confirm.
-* [ ]	Discover contains Fighters, Lore, Movement, and Launch.
-* [ ]	Lore displays a properly designed, localized content page.
-* [ ]	All four Discover tabs work with keyboard, gamepad, mouse, and touch.
-* [ ]	Shortened play-style descriptions explain approach, strengths, and weaknesses without listing abilities.
-* [ ]	All modified UI works in English and French.
-* [ ]	Mobile landscape and narrow layouts remain usable.
-* [ ]	Existing selection, preview, modal, and confirmation behavior remains intact.
-* [ ]	Tests and documentation reflect the new implementation.
-
-9. Verification and delivery
-
-Run the full test suite:
+Run the complete test suite:
 
 node --test
 
-Also inspect the game in a browser through a local HTTP server if the environment supports it.
+Fix failures caused by the removal without weakening unrelated assertions.
 
-Visually check the actual UI at desktop and mobile landscape sizes, including Discover, a Confirm-enabled roster, and a roster without Confirm.
+Additionally, verify the game in a browser using a local HTTP server:
 
-Fix any regressions introduced by the changes.
+python3 -m http.server 8000
 
-At completion, provide:
+Manually inspect and test:
 
-1. A summary of the changes made.
-2. The main files modified.
-3. The exact final play-style descriptions for #0001 and #0002 in both languages.
-4. The Lore section’s content and structure.
-5. Test results and any remaining limitations.
+1. Quick Battle with both playable fighters.
+2. Practice Ground.
+3. Watch Mode.
+4. Desktop keyboard controls.
+5. Standard gamepad controls.
+6. Mobile landscape with Joystick controls.
+7. Mobile landscape with Classic Buttons.
+8. Touch-control customization and saving.
+9. Previously saved custom touch layouts.
+10. English and French interfaces.
+11. Different screen sizes and safe-area layouts.
+12. Ground and airborne attacks.
 
-Implement the changes rather than merely describing how to implement them. Keep the work focused, maintainable, consistent with Alva’s established architecture, and ready for review.
+Confirm that there are no JavaScript errors, missing button references, broken pointer captures, misleading labels, or layout regressions.
+
+If browser or gamepad testing is unavailable, clearly distinguish unverified manual checks from completed automated tests.
+
+14. Final Repository Audit
+
+Search the repository for all feature-specific references, including:
+
+* transform as a control codename
+* transformPressed
+* control.transform
+* ICONS.transform
+* tc-transform
+* actions.transform
+* mobileAbilities.transform
+* Reserved Transform documentation
+* Transform-specific fixtures and assertions
+
+Remove remaining active feature references.
+
+Do not delete legitimate uses of transform in CSS, JavaScript graphics, animation, or geometry.
+
+Verify that no live part of the game still exposes the retired feature.
+
+Acceptance Criteria
+
+This task is complete only when:
+
+* [ ]	No Transform button exists anywhere in gameplay.
+* [ ]	Transform is removed from both mobile control schemes.
+* [ ]	Transform cannot be selected in the layout editor.
+* [ ]	No gameplay keyboard or gamepad binding activates Transform.
+* [ ]	No Transform action or move exists in shared configuration.
+* [ ]	No playable or test-only fighter uses Transform.
+* [ ]	No combat or AI system treats Transform as a supported action.
+* [ ]	No obsolete Transform glyph or presentation code remains.
+* [ ]	Saved layouts containing its old ID load safely.
+* [ ]	Current documentation and localization match the new controls.
+* [ ]	All remaining attacks, movement, and defensive systems still work.
+* [ ]	The complete automated test suite passes.
+* [ ]	Any unavailable manual verification is explicitly reported.
+
+Deliverables
+
+Implement the changes in the repository.
+
+When finished, provide:
+
+1. A concise summary of the removal.
+2. A list of changed files and the reason for each change.
+3. A description of any touch-layout adjustments.
+4. Automated test results and manual verification status.
+5. Confirmation that Transform no longer exists as a gameplay feature.
+6. Any remaining limitations or risks.
+
+Final directive: Transform is permanently retired from Alva. Remove its entire active implementation, not just its visible button. Leave the rest of the game intact, clean, functional, and fully tested.
