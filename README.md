@@ -66,10 +66,9 @@ use.
   melee attack pressed just out of reach closes the short gap first, and
   never costs Energy. Never for ranged attacks, never for a CPU.
 - **The whole interface in English and French**, Settings, and a
-  **Discover** reference: the fighters, each with one 1–5 difficulty
-  rating and a concise play-style description, then Lore, universal movement
-  and Launch. Lore starts with introductions for future world and character
-  stories, in English and French. Shared rosters place fighter identifiers
+  **Discover** reference with three sections: Fighters, Movement, and Launch.
+  Fighters each have one 1–5 difficulty rating and a concise play-style
+  description; Movement explains universal movement. Shared rosters place fighter identifiers
   (`#0001`, etc.) at the bottom-right of a translucent dark strip; small
   slot indices stay at the top-left.
 

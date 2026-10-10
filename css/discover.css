@@ -3,8 +3,8 @@
    docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
-   Discover — the in-game reference: an index rail of four sections
-   (Fighters, Lore, Movement, Launch) beside one page
+   Discover — the in-game reference: an index rail of three sections
+   (Fighters, Movement, Launch) beside one page
    --------------------------------------------------------------------- */
 
 .discover-layout {
@@ -97,7 +97,6 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 .discover-entry-text { max-width: 46ch; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
 
 /* Movement reads across one comfortable column, with no individual holders. */
-.discover-page--lore .discover-entry,
 .discover-page--movement .discover-entry { grid-template-columns: minmax(0, 1fr); }
 .discover-page--movement .discover-entry-text { max-width: 72ch; }
 
@@ -199,7 +198,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
    js/screens/discover-screen.js. */
 @media (max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px) {
   .discover-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: clamp(10px, 2vh, 16px); }
-  /* Four sections share the row; if a window (or the longer French labels)
+  /* Three sections share the row; if a window (or the longer French labels)
      cannot fit them, the rail scrolls sideways on its own instead of
      clipping a tab or widening the page. */
   .discover-rail {
@@ -232,8 +231,3 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   }
   .discover-tab.is-active { border-bottom-color: var(--accent); }
 }
-
-/* Lore keeps narrative paragraphs in a single readable column. Entries
-   inherit the reference page’s subtle separators and spacing. */
-.discover-page--lore { max-width: 72ch; }
-.discover-page--lore .discover-entry-text { line-height: 1.65; }
