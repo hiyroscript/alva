@@ -1,360 +1,1762 @@
-ALVA — Completely Remove Lore from Discover
+MASTER IMPLEMENTATION PROMPT
 
-Objective
+ALVA: CPU Intelligence — Complete AI Replacement System
 
-Work in the GitHub repository hiyroscript/alva, on the latest main branch.
+1. Mission
 
-Completely remove the Lore feature from Discover, including its tab, page, data source, translations, dedicated styling, tests, and references in documentation describing the current application.
+You are a senior game AI engineer, combat-systems architect, and competitive platform-fighting-game designer.
 
-The final Discover interface must contain exactly three sections, in this order:
+Your task is to design, implement, integrate, test, and optimize a completely new CPU opponent system for ALVA called CPU Intelligence.
 
-1. Fighters
-2. Movement
-3. Launch
+Repository: hiyroscript/alva
 
-This is a complete feature removal, not simply hiding a tab.
+This is a full replacement of the current combat CPU intelligence, not an adjustment, patch, or extension of its existing decision-making.
 
-Do not replace Lore with another feature, placeholder, empty page, or “Coming soon” message.
+The new system must create opponents that feel like real human players across all four difficulties, with intelligent movement, positioning, reactions, combos, defense, stage awareness, and tactical decisions.
 
-Preserve all remaining functionality, presentation quality, accessibility, localization, and gameplay behavior.
+The CPU must understand what it can do, what its opponent can do, the circumstances of the fight, and why a particular action is useful.
 
-1. Understand the existing implementation
+It should not simply react to distance thresholds or randomly select moves.
 
-Before editing, inspect the following repository files:
+The desired result is an opponent that appears to be thinking, adapting, making plans, executing strategies, recognizing opportunities, and learning from its opponent during a match.
 
-* CLAUDE.md
-* ALVA_SPEC.md
-* js/screens/discover-screen.js
-* js/data/lore.js
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* css/discover.css
-* js/screens/home-screen.js
-* tests/interface/discover.test.mjs
-* tests/interface/i18n.test.mjs
-* tests/interface/stylesheets.test.mjs
-* README.md
-* docs/architecture/module-responsibilities.md
-* docs/development/testing.md
+Most importantly: implement one universal intelligence system that automatically understands and plays every character through existing character and move data.
 
-Understand Discover’s current section registry, tab construction, panel activation, keyboard/gamepad navigation, localization, and responsive layout.
+Do not create separate CPU brains, decision trees, hardcoded move scripts, or custom strategic logic for individual characters.
 
-Observe the project’s existing conventions. Make the smallest coherent change that fully removes the feature.
+The difficulty levels must share the same fundamental intelligence architecture. They differ in how effectively they observe, anticipate, evaluate, react, plan, adapt, and execute.
 
-2. Remove Lore from Discover’s implementation
+The four difficulties represent:
 
-File: js/screens/discover-screen.js
+Difficulty	Intended skill
+Easy	Casual human player
+Medium	Competitive tryhard player
+Hard	Tournament/professional-level player
+Brutal	Elite player with a target win rate of 95% or higher against a defined competitive benchmark
 
-Remove the following:
+A CPU on Easy must still feel like a human playing the game. It should simply be noticeably less skilled than the higher difficulties.
 
-* The LORE_ENTRIES import from ../data/lore.js.
-* The entire buildLorePage() function.
-* The Lore section definition in the SECTIONS array.
-* Any Lore-specific rendering or narrative scaffolding.
-* Comments describing Lore as part of Discover.
+A CPU on Brutal must be extremely difficult to defeat through superior decision-making, without cheating.
 
-Keep the existing generic reference-page helpers if Movement or Launch still uses them.
+Do not stop at a design document or prototype. Implement the working system in the repository, integrate it into the game, and validate it.
 
-The final section registry must contain exactly:
+⸻
 
-* fighters — using buildFightersPage.
-* movement — using buildMovementPage.
-* launch — using buildLaunchPage.
+2. Mandatory Repository Investigation
 
-Do not change how Fighters is initially selected.
+Before writing the replacement, thoroughly explore the repository and understand the actual systems.
 
-Preserve the existing automatic activation system, ARIA tab relationships, roving tabindex, panel visibility, and keyboard/gamepad navigation.
+The relevant existing modules include:
 
-Ensure no Lore panel or tab is constructed, registered, rendered, or focusable.
+* js/game/ai/combat-ai.js — current CombatAIController.
+* js/game/ai/moveset.js — current universal moveset discovery.
+* js/data/difficulty.js — current difficulty configuration.
+* js/game/battle.js — battle controllers, difficulty, seeded randomness.
+* js/game/fighters/fighter.js — fighter state, inputs, attacks, movement, cancels.
+* js/game/fighters/fighter-controller.js — player-compatible input contract.
+* js/game/fighters/movement.js — shared movement implementation.
+* js/data/movement.js — universal locomotion configuration.
+* js/game/combat/attacks.js — attack definitions, phases, hitboxes, movement.
+* js/game/combat/combat.js — hit resolution and launch behavior.
+* js/game/combat/combat-state.js — Energy, Launch Point, stun, cooldowns.
+* js/game/combat/defense.js and deflect.js — defense mechanics.
+* js/game/combat/projectile.js — projectile mechanics and interactions.
+* js/game/combat/summon.js and technique.js — special abilities.
+* js/game/physics.js — stage collision and movement physics.
+* js/data/maps.js — stage geometry and Void boundaries.
+* js/data/characters/0001.js and 0002.js — actual playable fighter definitions.
 
-3. Delete the Lore data module
+Also read ALVA_SPEC.md, the relevant docs/systems/ documentation, the character documentation, and existing tests.
 
-File: js/data/lore.js
+Investigate the complete current controller lifecycle, every supported player input, every available combat action, and the order in which movement and combat are processed.
 
-Delete this file entirely.
+Understand existing animation requirements, input buffering, active hitboxes, attack startup and recovery, Dash cancellation, hit cancellation, airborne restrictions, and ability cooldowns.
 
-The file currently defines LORE_ENTRIES, containing the editorial entries for the world and fighters.
+Identify the current CPU’s shortcomings and obsolete behavior.
 
-Once Lore is removed, this registry serves no remaining purpose.
+Do not preserve a bad behavior merely because an existing test expects it. Update tests when their assumptions conflict with the new requirements, while preserving tests that verify legitimate gameplay mechanics.
 
-Do not leave an empty array, empty module, compatibility export, or unused replacement.
+Do not modify the underlying combat balance as a shortcut to improving CPU performance.
 
-Verify that no active imports or runtime references to LORE_ENTRIES remain.
+⸻
 
-4. Remove all Lore localization entries
+3. Absolute Non-Negotiable Requirements
 
-Files:
+Rule A — CPUs must never become inactive
 
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
+On every difficulty, a CPU must never stand still doing nothing while it is free to act and the match is active.
 
-Delete the following keys from both localization tables:
+This includes Easy.
 
-* discover.lore
-* lore.intro
-* lore.world.title
-* lore.world.text
-* lore.fighters.title
-* lore.fighters.text
+The CPU must always have a purposeful objective or meaningful ongoing action.
 
-Remove their corresponding English and French text completely.
+Examples include:
 
-Preserve all other Discover translation keys, especially:
+* Advancing toward an opponent.
+* Retreating to a safer position.
+* Maintaining advantageous spacing.
+* Moving to a better stage location.
+* Jumping or changing elevation.
+* Preparing an attack or combo.
+* Shielding an actual threat.
+* Baiting the opponent while maintaining active positioning.
+* Recovering to the stage.
+* Repositioning while the opponent respawns.
+* Managing distance while Energy or Launch Point recovers.
 
-* discover.title
-* discover.sections
-* discover.fighters
-* discover.movement
-* discover.launch
-* Fighter difficulty and play-style strings
-* Movement descriptions
-* Launch descriptions
+Do not implement random movement just to satisfy activity. The movement must have a tactical purpose.
 
-Do not change the game’s default language or localization infrastructure.
+A brief natural pause, deliberate bait, or held defensive position is acceptable when it is part of a meaningful plan. Prolonged neutral inactivity is not.
 
-Verify that switching between English and French still correctly translates all three remaining tabs and pages.
+Stun, hitstop, paralysis, forced attack animations, respawn transitions, match introductions, and other states where the fighter cannot act are exceptions. These are physical game restrictions, not failures of intelligence.
 
-5. Clean up Discover’s CSS
+Create an action-liveness system that detects and corrects empty, expired, failed, or stuck plans.
 
-File: css/discover.css
+There should be no generic idle intent that causes CPUs to repeatedly wait without a purpose.
 
-Remove all styling that exists exclusively for Lore, including:
+Rule B — Every available move must be used
 
-* .discover-page--lore
-* Lore-specific entry layout selectors
-* Lore-specific paragraph width and line-height overrides
-* Comments documenting Lore’s visual presentation
-
-There is currently a shared selector for Lore and Movement:
-
-.discover-page--lore .discover-entry, .discover-page--movement .discover-entry
-
-Refactor it so the Movement layout remains intact without referencing Lore.
-
-Preserve the existing readable Movement column and reference-page styling.
-
-Update the top-level comments to describe the new three-section Discover interface.
-
-Update responsive-layout comments that describe four sections.
-
-Do not introduce unnecessary redesigns.
-
-Maintain proper sizing and alignment of the three remaining tabs on desktop, mobile, and narrow viewports.
-
-Keep current breakpoints, typography, transitions, focus indicators, colors, and touch-target behavior unless a small adjustment is demonstrably necessary.
-
-6. Preserve Discover’s navigation and behavior
-
-Removing Lore must not break the menu system.
-
-The new navigation order is:
-
-Wide screens (vertical rail)
-
-Fighters → Movement → Launch
-
-Narrow screens (horizontal rail)
-
-Fighters → Movement → Launch
-
-Verify the following behavior:
-
-* Discover always opens on Fighters.
-* Each section can be selected by mouse, touch, keyboard, and gamepad.
-* Focusing a tab activates its section.
-* Exactly one section is selected at a time.
-* Hidden panels cannot receive focus.
-* The selected tab uses the correct roving tabindex.
-* Keyboard/gamepad movement skips no section and encounters no empty navigation position.
-* Moving from a reference panel toward the rail returns focus to its active tab.
-* Movement and Launch retain independent scrolling with gamepad support.
-* Returning Home and reopening Discover resets to Fighters.
-* The Fighters browser retains its previously browsed fighter according to existing behavior.
-
-Preserve Back, Escape, Backspace, and controller Back behavior.
-
-Do not modify shared navigation infrastructure unless strictly required.
-
-7. Preserve all remaining Discover features
-
-Fighters must remain fully functional.
-
-Preserve:
-
-* Read-only fighter roster.
-* All playable and locked roster slots.
-* Animated fighter previews.
-* Shared 1–5 difficulty ratings.
-* Localized play-style descriptions and modal dialog.
-* Controller and keyboard navigation.
-* Empty-roster and unrated-fighter states.
-* Existing fighter ordering and selection behavior.
-
-Movement must remain unchanged in content and mechanics.
-
-Preserve its universal movement descriptions, registry-driven content, localization, formatting, and scrolling.
-
-Launch must remain unchanged in content and mechanics.
-
-Preserve Launch Point, Base Launch values, directional launches, the formula, and existing visual markers.
-
-Do not modify any gameplay values, combat systems, fighter definitions, assets, or underlying movement/launch registries.
-
-Lore removal must have zero gameplay impact.
-
-8. Update existing tests
-
-File: tests/interface/discover.test.mjs
-
-Update all tests that assume four sections or reference Lore.
+Every CPU, on every difficulty, must reasonably utilize its character’s complete valid moveset.
 
 This includes:
 
-* Expected section count: four → three.
-* Expected tab IDs and labels.
-* Section ordering.
-* Default-selection and reopening checks.
-* Focus and activation checks.
-* Panel accessibility checks.
-* Keyboard and gamepad navigation sequences.
-* Wide and narrow navigation sequences.
-* Localized tab label expectations.
-* Responsive tab layout assertions.
-* Existing destructuring of sectionsOf(discover) that includes lore.
+* Every numbered attack available to that character.
+* Grounded attacks.
+* Aerial attacks.
+* Extra attacks.
+* Summons.
+* Techniques.
+* Projectiles.
+* Movement-based attacks.
+* Deflect as an offensive attack.
+* Deflect as a projectile counter.
+* Other legitimate character abilities.
 
-Remove the test dedicated to rendering and scrolling Lore’s narrative entries, including its import of js/data/lore.js.
+If a character has five numbered attacks, the CPU must understand all five.
 
-Update the existing responsive CSS test carefully: it currently rejects the phrase three sections as obsolete scaffolding. That assertion must no longer reject an accurate three-section description.
+If another character has three, it must understand those three.
 
-Do not weaken unrelated tests to force them to pass.
+A ground-only move must never be attempted in the air. An unavailable or reserved action must never be pressed.
 
-File: tests/interface/i18n.test.mjs
+Move utilization must be intelligent, not arbitrary.
 
-Update the French Discover tab expectation to:
+Do not force a dangerous move into an obviously inappropriate situation merely to increase usage statistics.
 
-['Combattants', 'Déplacement', 'Éjection']
+Instead, create conditions, setups, and strategies where different moves become worthwhile.
 
-Remove assertions that inspect the Lore panel or read Lore translations.
+If an attack rarely gets chosen because another attack always scores higher, improve the tactical evaluation and combo/setup planning rather than inserting meaningless randomness.
 
-Keep all other localization assertions intact.
+Track move usage and opportunity coverage during testing.
 
-Additional regression coverage
+Every supported move must have at least one meaningful scenario where the intelligence recognizes and executes it.
 
-Add or update tests proving:
+Rule C — Universal intelligence
 
-1. Discover exposes exactly fighters, movement, and launch, in that order.
-2. No Lore tab or panel exists in the Discover DOM.
-3. The English and French localization tables contain no removed Lore keys.
-4. All three remaining sections are accessible by pointer, keyboard, and gamepad.
-5. Returning to Discover consistently selects Fighters.
-6. Movement and Launch still display correct localized content.
-7. The reference pages remain individually scrollable.
-8. Nothing outside Discover unexpectedly changes.
+Never branch on fighter IDs such as 0001, 0002, or specific character names.
 
-Test the actual final behavior, not implementation details unnecessarily.
+Never write a character-specific CPU brain.
 
-9. Update current documentation
+Never implement bespoke instructions such as “if fighter 0001, always use attack4 against shielding opponents.”
 
-Update references to Discover’s former four-section structure in:
+Instead, recognize the generic properties of the move: for example, an unblockable area technique that can punish a stationary shielding opponent.
 
-* ALVA_SPEC.md
-* README.md
-* docs/architecture/module-responsibilities.md
-* docs/development/testing.md
-* js/screens/home-screen.js comments
-* Any other active documentation that describes the current Discover interface
+The same logic must work for any future fighter with comparable capabilities.
 
-The documentation must consistently state that Discover contains three sections: Fighters, Movement, and Launch.
+Rule D — No cheating
 
-In ALVA_SPEC.md, remove the Lore-specific product requirements, including its narrative entries, placeholder content, and registry instructions.
+The CPU must obey exactly the same combat and movement rules as the human player.
 
-Update descriptions of the section rail, reference-page scrolling, keyboard navigation, and responsive tabs.
+No increased damage, artificial launch power, faster movement, hidden Energy, ignored recovery, shortened cooldowns, extra jumps, impossible inputs, or special invulnerability.
 
-In docs/architecture/module-responsibilities.md, remove the row documenting js/data/lore.js.
+All decisions must ultimately become legitimate player-compatible commands through the controller.
 
-Preserve valid historical information and unrelated references to character identity or lore outside the removed Discover feature. Do not rewrite the repository’s historical update log merely to erase past mentions.
+Do not directly alter fighter position, velocity, cooldowns, hit results, combat state, or projectiles.
 
-Do not touch character_rule, which is protected by the repository instructions.
+Do not inspect the player’s raw controller inputs to predict attacks before the moves become observable.
 
-10. Audit for leftover references
+Brutal must be powerful because it makes better decisions, not because it has privileges.
 
-Perform a repository-wide search for:
+⸻
 
-* LORE_ENTRIES
-* buildLorePage
-* discover.lore
-* lore.intro
-* lore.world
-* lore.fighters
-* discover-page--lore
-* discover-tab-lore
-* discover-panel-lore
-* References to Discover having four sections
-* References to Lore as a current Discover tab or page
+4. Core Architecture: One Brain, Every Character
 
-Inspect the matches individually.
+Build CPU Intelligence using a layered architecture.
 
-There must be no remaining runtime implementation, localization key, obsolete test expectation, or current-product documentation requiring the removed Lore feature.
+Recommended layers:
 
-Unrelated uses of the ordinary word “lore” in character-design discussions or historical records do not need to be erased.
+1. Universal Capability Analyzer
+2. Perception and Situational Awareness
+3. World Model and Short-Term Memory
+4. Opponent Modeling
+5. Strategic Decision-Making
+6. Tactical Action Evaluation
+7. Combo and Sequence Planning
+8. Stage Navigation and Recovery
+9. Input Execution and Safety
+10. Difficulty and Humanization
+11. Debugging, Telemetry, and Validation
 
-Ensure there are no broken imports, dangling identifiers, dead functions, unused styles, or invalid references.
+You may organize these into separate modules under js/game/ai/cpu-intelligence/ or another coherent directory that fits the repository architecture.
 
-11. Run validation
+Avoid making the entire intelligence a single giant controller with hundreds of unrelated conditions.
 
-This repository is a static JavaScript game using Node’s built-in test runner.
+The existing CombatAIController may become a thin compatibility wrapper if necessary, but the old decision system must no longer operate.
 
-Run these focused tests:
+Preserve existing external contracts where appropriate so battle modes and other systems continue working.
 
-node --test tests/interface/discover.test.mjs
-node --test tests/interface/i18n.test.mjs
-node --test tests/interface/stylesheets.test.mjs
+Universal capability analysis
 
-Then run the complete regression suite:
+Extend or replace readMoveset with a comprehensive capability analyzer.
+
+It must inspect the fighter’s current valid definition and automatically construct an actionable model of everything the fighter can perform.
+
+For every move, resolve:
+
+* Button/action mapping and actual attack identifier.
+* Availability on ground and in air.
+* Startup, active frames, recovery, total commitment.
+* Hitbox geometry, effective reach, and vertical coverage.
+* Damage per strike and expected total damage.
+* Base Launch.
+* Directional Launch.
+* Resulting launch trajectory.
+* Hitstun, blockstun, and hitstop.
+* Multi-hit behavior, carry, and finishers.
+* Movement, momentum, steering, and displacement.
+* Projectile spawning, speed, duration, travel distance, and interactions.
+* Special effects such as pull, paralysis, unblockable, block push, repel, erase, and projectile reflection.
+* Cooldowns and ability requirements.
+* Hit-cancel and Dash-cancel opportunities.
+* Air-use limits and free-fall consequences.
+* Energy requirements where applicable.
+* Stage and positioning risks.
+* Whether the attack is suitable for initiating, extending, or finishing a combo.
+* Whether the attack can help with mobility or recovery.
+* Whether it can hit a grounded, airborne, or transitioning opponent.
+* Whether it can create space, hold space, trap, intercept, or punish.
+
+Derive move roles dynamically.
+
+A move may have several roles simultaneously:
+
+poke, approach, launcher, comboStarter, comboExtender, finisher, antiAir, airToGround, edgeGuard, zoning, trap, punish, counterProjectile, mobility, recovery, shieldPressure, areaDenial, defensiveDisengage.
+
+Roles are not hardcoded to particular attack buttons.
+
+For example, a move with fast startup, limited reach, and low commitment may qualify as a poke or punish. A move that creates significant horizontal launch near the Void may become a finisher. A rising aerial attack may qualify as both an anti-air attack and a vertical mobility option.
+
+An attack can change roles depending on the situation.
+
+Cache immutable capabilities for performance, but evaluate live cooldowns, Energy, attack states, air-use limits, and availability every time a move is considered.
+
+Future character additions should require no new CPU logic when their capabilities are expressed through the supported combat schemas.
+
+⸻
+
+5. Situational Awareness and Perception
+
+The CPU needs a continuous understanding of the match.
+
+Its world model must include:
+
+Self-awareness: position, horizontal and vertical velocity, facing, grounded/airborne state, available jumps, air dashes, current attack phase, recovery, stun, Energy, Launch Point, available moves, cooldowns, defensive options, proximity to hazards, and escape paths.
+
+Opponent awareness: visible location and movement, attack startup/active/recovery, current commitment, grounded or airborne state, expected reach, projectile activity, Shield state, Energy state, Launch Point, observed habits, and likely follow-ups.
+
+Environmental awareness: surfaces, ledges, platforms, solid obstacles, Void boundaries, available landing locations, vertical routes, and overtime changes.
+
+Match awareness: scores, remaining time, whether a stock/point advantage should be defended, current risk, and whether eliminating or surviving is the priority.
+
+Perception must respect reaction time
+
+Do not allow immediate perfect response to new opponent actions.
+
+Use a perception-event system:
+
+1. An observable event happens.
+2. The event becomes available after the difficulty’s reaction delay.
+3. The CPU evaluates it using the information it has recognized.
+4. The CPU decides and issues legal inputs.
+
+Events include attacks, projectile releases, jumps, Dashes, landings, whiffs, exposed recovery, shields, and special-ability startups.
+
+Brutal may notice events quickly, but never before they become observable and never with zero reaction delay.
+
+Prediction is allowed using previously observed movement, known combat data, and physical trajectories.
+
+Future player inputs are not known.
+
+Maintain short-term memory of events and recent opponent behavior. Forget stale observations when the evidence is no longer useful.
+
+⸻
+
+6. Intelligent Launch Point and Knockback Management
+
+This is one of the most important parts of CPU Intelligence.
+
+ALVA uses Launch Point rather than conventional health.
+
+The existing mechanics must be respected:
+
+* Launch Point begins at 0.
+* Unblocked damage adds to Launch Point.
+* The hit’s damage is applied before calculating its launch.
+* Launch strength = Base Launch × the defender’s new Launch Point.
+* Base Launch values are 0, 1, 2, and 3.
+* Launch directions are horizontal, vertical, reverse vertical, or none.
+* The actual launch velocity follows the shared launch conversion and physics.
+* Launch Point begins recovering after the prescribed no-hit delay.
+
+Create a risk model that considers both fighters’ current Launch Points.
+
+A CPU must understand that higher Launch Point increases danger even when the next attack deals relatively little damage.
+
+Own Launch Point
+
+When the CPU’s own Launch Point rises:
+
+* Become more aware of elimination threats.
+* Avoid unnecessarily standing near dangerous ledges.
+* Value safe ground and escape routes.
+* Recognize which opposing moves have dangerous launch strength and direction.
+* Defend more intelligently rather than shielding everything.
+* Create space when temporary disengagement is advantageous.
+* Let Launch Point recover when it can do so safely.
+* Reduce high-risk commitments when those commitments could lead to elimination.
+* Preserve offensive pressure when it offers a safer option than retreat.
+
+Do not implement a simplistic threshold where high Launch Point always means running away.
+
+Opponent Launch Point
+
+When the opponent’s Launch Point rises:
+
+* Recognize finishing opportunities.
+* Increase the value of appropriate high-Base-Launch moves.
+* Prefer launches that lead toward nearby Void boundaries.
+* Position to control the opponent’s escape direction.
+* Use combo routes that set up reliable finishers.
+* Edge-guard when the opponent is vulnerable.
+* Stop unnecessarily choosing low-impact moves when a credible finishing opportunity exists.
+
+Dynamic playstyle transitions
+
+The CPU should smoothly transition between:
+
+* Extremely offensive.
+* Aggressively controlled.
+* Balanced.
+* Defensive counterplay.
+* Survival-oriented.
+* Opportunistic finishing.
+
+The transition should consider both fighters’ Launch Points, position, momentum, available abilities, Energy, stage hazards, score, and time.
+
+Two fighters with equally high Launch Points should not necessarily play alike. Their current positions, movesets, and defensive options matter.
+
+Use a continuous risk/reward model with hysteresis rather than rapid, unrealistic switching every frame.
+
+⸻
+
+7. Purposeful Move Selection
+
+Every attack must be selected for a reason.
+
+The CPU must ask:
+
+* Can this move actually reach the opponent?
+* Is the opponent at the correct height?
+* Where will both fighters be when it becomes active?
+* Is the opponent vulnerable long enough?
+* What happens if the move misses?
+* Can the opponent shield or counter it?
+* Does the move create a combo opportunity?
+* Is the attack better for damage, launching, positioning, zoning, trapping, or recovery?
+* Is another attack more appropriate?
+* Will using it put the CPU in danger?
+* What follow-up becomes available?
+
+Build a generic candidate evaluator that computes expected utility.
+
+Conceptually:
+
+ActionUtility = ExpectedHitValue + PositionGain + ComboPotential + DefensiveBenefit + StageControl + StrategicValue - WhiffRisk - PunishRisk - ResourceCost - CommitmentCost - EliminationRisk
+
+Use probability, timing, trajectories, and context rather than fixed arbitrary rankings.
+
+The evaluation must understand:
+
+Damage: the amount of Launch Point inflicted, including multi-hit attacks.
+
+Base Launch: how strongly a hit launches at the opponent’s current Launch Point.
+
+Launch direction: where the opponent is likely to travel, including stage geometry and elimination risk.
+
+Range: both horizontal and vertical, including moving hitboxes and effective reach during attack motion.
+
+Speed: startup, active windows, recovery, and potential interruption.
+
+Safety: the likelihood that the move will be punished, blocked, evaded, or counterattacked.
+
+Utility: whether a move controls space, pulls opponents, creates paralysis, reflects projectiles, or initiates positional advantage.
+
+A high-damage move must not automatically be preferred over a fast move.
+
+A short-range move must not be rejected simply because the CPU currently stands far away. The planner should consider approaching into its optimal range.
+
+A defensive move must not be selected just because it is available.
+
+Create meaningful tactical setups rather than treating each move as an independent one-button decision.
+
+⸻
+
+8. Combos, Follow-Ups, and Attack Chains
+
+Implement a universal combo planner.
+
+The CPU must understand how moves connect through the actual combat system.
+
+Discover valid combo opportunities through:
+
+* Startup and recovery timing.
+* Hitstun.
+* Hitstop.
+* Hit-cancel rules.
+* Launch trajectories.
+* Hitbox geometry.
+* Ground/air transitions.
+* Movement during attacks.
+* Momentum retention.
+* Dash and air Dash follow-ups.
+* Cooldowns.
+* Position after each hit.
+* Opponent vulnerability.
+* Per-airtime move limits.
+
+Support:
+
+* Ground-to-ground combos.
+* Ground-to-air conversions.
+* Air-to-air combos.
+* Air-to-ground follow-ups.
+* Launch chasing.
+* Anti-air conversions.
+* Projectile into melee setups.
+* Trap into punish sequences.
+* Hit-cancel chains.
+* Dash-cancel extensions.
+* Deflect into follow-up attacks where legal.
+* Position-dependent finishing routes.
+
+Build small dynamically generated combo graphs or limited-depth planners rather than character-specific combo scripts.
+
+Each graph node should represent an available move or movement action. Valid edges must be determined by actual timing and reach.
+
+The CPU should plan at least one or two actions ahead when appropriate, with stronger difficulties using longer and more accurate plans.
+
+Do not assume every apparent hit guarantees a follow-up.
+
+If the opponent escapes, the CPU must abandon the invalid combo rather than continue attacking empty space.
+
+A combo should stop when the CPU loses advantage or a safer objective becomes more important.
+
+Difficulty behavior:
+
+* Easy uses simple, inconsistent, but recognizable combos.
+* Medium performs reliable basic combos and some extensions.
+* Hard recognizes and executes advanced conversions.
+* Brutal seeks strong routes, maximizes legal punish windows, and consistently converts real openings.
+
+All difficulties must remain capable of using every attack as a standalone action or as part of a suitable sequence.
+
+⸻
+
+9. Positioning, Footwork, and Neutral Game
+
+The CPU must be intelligent even when nobody is attacking.
+
+Create a continuous neutral-game system that maintains useful positioning.
+
+It must understand:
+
+* Its own effective attack ranges.
+* The opponent’s effective attack ranges.
+* Safe and unsafe spacing.
+* Threat ranges including the opponent’s attack movement.
+* Approaching versus retreating.
+* Facing and movement momentum.
+* Height advantage and disadvantage.
+* Ground versus air control.
+* Ledge proximity.
+* Projectile lanes.
+* Available cover or obstacles.
+* Whether an opponent is approaching, retreating, shielding, or committing.
+
+Possible behaviors include:
+
+Spacing: remain outside an opponent’s dangerous range while preserving the ability to punish.
+
+Whiff baiting: move close enough to encourage an opponent to attack, retreat before contact, then punish the recovery.
+
+Approaching: close distance through a safe route when the CPU needs to initiate offense.
+
+Corner pressure: restrict an opponent’s room without carelessly walking into the Void.
+
+Kiting: maintain distance when ranged attacks, recovery, or survival justify it.
+
+Crossing levels: use platforms and jump paths to reach an opponent at a different elevation.
+
+Repositioning: change position when the current location offers no useful tactical advantage.
+
+The CPU must not run directly into the opponent indefinitely.
+
+It must not repeatedly walk back and forth without purpose.
+
+It must not continuously jump just to look active.
+
+It must not remain outside fighting range for an entire match when it has a viable offensive path.
+
+Every movement decision should support a recognizable short-term or long-term goal.
+
+⸻
+
+10. Advanced Mobility Intelligence
+
+ALVA has shared movement mechanics, including running, jumps, air jumps, fast falling, Dash, and air Dash.
+
+Movement must be integrated into combat planning rather than treated as mere transportation.
+
+The CPU should know when to:
+
+* Walk or run to close distance.
+* Dash to punish a distant opponent.
+* Dash-cancel into an attack.
+* Use air Dash to extend an aerial approach.
+* Jump to access an aerial attack.
+* Jump to hit an airborne opponent.
+* Jump over incoming attacks and projectiles.
+* Use fast fall to adjust timing or positioning.
+* Preserve momentum through attack startups.
+* Change direction in the air.
+* Use additional air jumps to pursue or recover.
+* Use movement-based attacks as mobility tools.
+* Land safely after an offensive aerial sequence.
+
+Analyze each move’s own movement properties.
+
+Examples include homing attacks, rolling attacks, rising attacks, plunges, and hovering moves.
+
+If an attack moves the fighter substantially, the CPU must recognize that movement as part of its utility.
+
+It should use a move for mobility when the movement is genuinely useful and the attack is available.
+
+However, never spend an aerial attack or enter free fall without assessing the resulting risk.
+
+Use shared movement functions and game physics where possible rather than creating an inaccurate duplicate movement model.
+
+Respect the rules for air Dash availability, launch recovery, air-use counters, free fall, Dash cancellation, and movement cooldowns.
+
+All four difficulties must use Dash and air Dash when suitable. Difficulty must affect how effectively they use these actions, not forbid them entirely.
+
+⸻
+
+11. Aerial Combat and Anti-Air Intelligence
+
+The CPU must actively understand the vertical dimension.
+
+It must distinguish:
+
+* Grounded opponent.
+* Rising opponent.
+* Falling opponent.
+* Opponent above the CPU.
+* Opponent below the CPU.
+* Opponent crossing through the CPU’s height.
+* Opponent vulnerable while airborne.
+* Opponent approaching a platform.
+* Opponent recovering from a launch.
+
+The CPU must intentionally jump to attack airborne opponents when the situation warrants it.
+
+It must choose the correct aerial move based on actual vertical reach and timing.
+
+Do not simply jump and hope a ground attack connects.
+
+Implement aerial interception prediction:
+
+1. Estimate the opponent’s future trajectory using current visible motion.
+2. Determine reachable interception positions.
+3. Evaluate available jump and air movement options.
+4. Choose an aerial attack with an appropriate active hitbox.
+5. Account for startup and movement during the attack.
+6. Ensure a safe follow-up or landing when possible.
+
+Hard and Brutal should reliably recognize aerial punish opportunities.
+
+Easy and Medium should still attempt legitimate anti-air attacks and aerial pursuit, but with less accurate timing and positioning.
+
+⸻
+
+12. Shield Intelligence
+
+The CPU must know when shielding is advantageous and when it is dangerous.
+
+The game’s actual Shield rules are authoritative:
+
+* Shield operates on the ground.
+* It is a held defensive state.
+* It prevents movement and certain actions while held.
+* A successful block costs Energy.
+* A perfect Shield has specific timing rules.
+* Unblockable attacks bypass Shield.
+* Block push can create positional danger.
+* Shield does not become an aerial guard.
+
+The CPU should consider:
+
+* Attack time until contact.
+* Whether the attack is blockable.
+* Its own availability to raise Shield.
+* Shield Energy cost.
+* How many hits may need blocking.
+* Whether blocking pushes it near a ledge.
+* Whether it can punish after blocking.
+* Whether jumping, spacing, or counterattacking would be safer.
+* Whether the opponent is baiting its Shield.
+* Whether repeatedly shielding is becoming predictable.
+
+Do not spam Shield.
+
+Do not hold Shield indefinitely without a reason.
+
+Do not shield against known unblockable attacks as if it would stop them.
+
+Brutal must recognize good perfect-Shield opportunities while still obeying reaction and rearm timing. It must not execute impossible frame-perfect defense against unpredictable actions.
+
+Shielding is a tactical choice, not the universal answer to incoming danger.
+
+⸻
+
+13. Deflect Intelligence — Defensive and Offensive
+
+Deflect is especially important.
+
+In ALVA, the Shield button produces a different action in the air: Deflect.
+
+Deflect is an aerial attack with a startup, active window, hitbox, recovery, and Energy cost.
+
+It can damage and launch an opponent. When supported by its definition, it can also turn projectiles back.
+
+The universal Deflect strike deals 3 damage at Base Launch 2, with direction defined by the fighter.
+
+The CPU must understand Deflect as both a defensive counter and an offensive attack.
+
+Defensive Deflect
+
+The CPU must:
+
+* Recognize incoming projectile trajectories.
+* Estimate contact time.
+* Account for its own movement.
+* Predict when its Deflect hitbox will be active.
+* Jump when necessary and feasible to access Deflect.
+* Press Deflect early enough for the projectile to meet its active hitbox.
+* Avoid Deflecting too late.
+* Consider the recovery risk if it misses.
+* Account for Energy and exhaustion.
+* Recognize reflected or redirected projectiles.
+* Avoid treating Deflect as invulnerability.
+
+Offensive Deflect
+
+The CPU should also recognize when Deflect itself is a good attack.
+
+Examples:
+
+* Striking an airborne opponent inside Deflect range.
+* Intercepting a jumping opponent.
+* Using Deflect as a surprise aerial strike.
+* Launching an opponent toward a dangerous boundary.
+* Connecting Deflect after an appropriate aerial movement.
+* Punishing an opponent whose recovery overlaps the Deflect’s active window.
+
+Because Deflect has a genuine attack hitbox, do not restrict it to projectile defense.
+
+Evaluate it alongside other valid aerial attacks, with its Energy cost and risk.
+
+All difficulties must use Deflect meaningfully.
+
+Brutal should use it with excellent timing, while Easy may misjudge some opportunities without simply refusing to use it.
+
+⸻
+
+14. Projectile Intelligence
+
+The CPU must understand projectiles as moving combat entities, not simply objects to avoid.
+
+Track:
+
+* Projectile ownership.
+* Position.
+* Velocity.
+* Direction.
+* Hitbox.
+* Lifetime.
+* Expected travel.
+* Collision probability.
+* Damage and launch.
+* Piercing or multi-hit behavior.
+* Pull effects.
+* Blockability.
+* Repel and erase interactions.
+* Whether the projectile can be Deflected.
+* Whether its path is obstructed by stage geometry.
+
+The CPU must know when to:
+
+* Throw projectiles at the opponent.
+* Use them to maintain favorable distance.
+* Use them to control a landing zone.
+* Use them to pressure a shielding opponent when appropriate.
+* Jump over them.
+* Retreat from them.
+* Shield them.
+* Deflect them.
+* Counter them with another projectile when permitted.
+* Interrupt the opponent before the projectile is released.
+* Pursue behind its own projectile.
+* Turn a successful projectile hit into additional pressure.
+
+The CPU must understand that projectiles can change ownership through reflection or repel behavior.
+
+Avoid automatically reacting to friendly projectiles as enemy threats.
+
+Do not continuously throw projectiles if the opponent is out of range, positioned outside their trajectory, or consistently countering them.
+
+Make projectile usage purposeful, varied, and responsive to the opponent.
+
+⸻
+
+15. Stage Intelligence
+
+Build a universal stage analyzer using actual stage geometry.
+
+ALVA currently includes stages with different layouts, including Desert and City.
+
+The intelligence must work with these stages and automatically support future stages.
+
+Understand:
+
+* Main floor boundaries.
+* Platform positions and widths.
+* One-way platform behavior.
+* Solid obstacles.
+* Surface elevations.
+* Clear and blocked movement paths.
+* Jumpable routes.
+* Accessible landing positions.
+* Open air.
+* Void elimination boundaries.
+* Overtime Void contraction.
+* Position relative to stage center.
+* Available recovery corridors.
+* Projectile collision lanes.
+* Areas where attacks can launch opponents into danger.
+
+Stage navigation
+
+The CPU must navigate to opponents on different elevations.
+
+It must avoid getting stuck underneath platforms or running against solid obstacles.
+
+It should select reachable routes using actual jump capabilities and stage collisions.
+
+Never assume the player has a platform-drop input where none exists.
+
+Use walking off a platform, jumping, or appropriate movement-based attacks when those are the actual available routes.
+
+Edge-guarding
+
+The CPU must recognize when the opponent is offstage or near the Void.
+
+It should evaluate:
+
+* Opponent trajectory.
+* Available jumps and air Dash.
+* The opponent’s likely recovery path.
+* Its own attack range.
+* The direction and strength of potential launches.
+* Whether an aerial interception is possible.
+* Whether it can safely return afterward.
+
+It should use appropriate attacks to intercept recovery.
+
+A high Launch Point opponent near the Void should be recognized as a major opportunity.
+
+However, edge-guarding must never blindly override the CPU’s own survival.
+
+Ledge trapping
+
+When the opponent is trapped near a ledge, the CPU should:
+
+* Control the available safe space.
+* Pressure escape attempts.
+* Cover jump approaches.
+* Use attacks that exploit limited movement.
+* Punish predictable recovery or approach routes.
+* Avoid unnecessarily leaving its own safe footing.
+
+Ledge trapping and offstage pursuit are different strategies. Implement both.
+
+Overtime
+
+When the Void closes during overtime, immediately adapt positioning and risk evaluation.
+
+The CPU must use the current active Void boundaries, not just the stage’s original limits.
+
+Survival and elimination opportunities must respond to the shrinking safe area.
+
+⸻
+
+16. Trapping, Zoning, and Space Control
+
+Some moves are more valuable for controlling where an opponent can move than for dealing immediate damage.
+
+The CPU must recognize attacks that:
+
+* Remain active over time.
+* Create persistent projectiles.
+* Pull or carry targets.
+* Cover large areas.
+* Punish stationary opponents.
+* Restrict approaches.
+* Occupy an escape route.
+* Force an opponent to move.
+* Set up a subsequent attack.
+
+Create a simple threat map representing temporarily dangerous regions.
+
+Use it to:
+
+* Avoid entering enemy-controlled space.
+* Place attacks in useful lanes.
+* Predict where the opponent can safely move.
+* Set up traps.
+* Restrict escape routes.
+* Convert a successful trap into an appropriate punish.
+
+Do not assign a fighter a permanent zoner or rushdown identity.
+
+Instead, recognize the character’s available tools and their contextual effectiveness.
+
+Even a primarily offensive fighter should understand defensive zoning when one of its moves supports it.
+
+⸻
+
+17. Punishing Opponent Mistakes
+
+The CPU should actively search for punish opportunities.
+
+Examples include:
+
+* Missed melee attacks.
+* Long recovery animations.
+* Unsafe projectile startups.
+* Failed aerial attacks.
+* Bad landings.
+* Poor spacing.
+* Predictable jumps.
+* Repeated shielding.
+* Failed Deflects.
+* Unsafe Dashes.
+* Exhausted Energy.
+* Techniques cast too close.
+* Overcommitting near a ledge.
+
+Calculate whether an available attack can reach and become active before the opening closes.
+
+Choose a fast punish when the window is short.
+
+Choose a more rewarding move when the opponent remains vulnerable long enough.
+
+Convert punishes into combos where legal.
+
+Higher difficulties should be increasingly accurate at identifying and exploiting short openings.
+
+Lower difficulties should miss some opportunities naturally, but never lose the fundamental ability to punish.
+
+⸻
+
+18. Energy Intelligence
+
+Energy must become a central decision-making resource.
+
+Respect ALVA’s existing rules:
+
+* Maximum Energy: 100.
+* Ground Dash, air Dash, and applicable Dash cancels: 25.
+* Deflect: 15.
+* Each Shielded hit: 15.
+* Exhaustion at 0.
+* Exhausted fighters cannot use Energy-dependent defensive/movement abilities until Energy refills completely.
+* Fighters may spend their remaining Energy even if it is less than the usual action cost.
+* Attacks, normal jumps, summons, and techniques do not inherently spend Energy.
+
+The CPU must know both its own and the opponent’s relevant Energy states.
+
+Resource decisions
+
+Consider whether to:
+
+* Dash offensively.
+* Save Energy for a defensive response.
+* Use a Deflect.
+* Take a block.
+* Recover to safety without spending Energy.
+* Disengage temporarily while the bar recovers.
+* Spend its remaining Energy to avoid an otherwise likely elimination.
+* Pressure an opponent whose Energy is exhausted.
+
+Do not treat a low Energy value as automatically prohibiting all Energy-based actions. Respect the actual exhaustion rules.
+
+Evaluate the consequences of reaching 0.
+
+Brutal should manage Energy strategically over multiple interactions.
+
+Easy may spend less efficiently, but it must still understand what Energy does.
+
+No CPU may create or regenerate Energy outside the actual game mechanics.
+
+⸻
+
+19. Dynamic Strategic Playstyles
+
+Create a strategy layer that continuously evaluates the current situation.
+
+Suggested strategic modes:
+
+Rushdown: high offensive pressure, fast approaches, close-range conversions.
+
+Controlled Offense: pressure while maintaining good spacing and escape options.
+
+Balanced Neutral: alternate between approaching, defending, and punishing.
+
+Counterplay: invite an opponent’s commitment and capitalize on mistakes.
+
+Zoning: control space using attacks and projectiles.
+
+Trap Control: restrict opponent movement and capitalize on predictable escapes.
+
+Survival: reduce elimination risk while maintaining useful actions.
+
+Finisher Hunt: seek reliable elimination opportunities.
+
+Recovery: return safely to the stage and regain a viable position.
+
+These are universal strategic states, not character-specific personalities.
+
+The CPU must determine when each mode is useful from the current matchup and available capabilities.
+
+A CPU can transition from survival into offense when a safe punish appears.
+
+A CPU can disengage from offense when its Launch Point becomes dangerous.
+
+A CPU can use a defensive strategy to set up an aggressive counterattack.
+
+Transitions must feel deliberate rather than random.
+
+Avoid repetitive cycles between modes.
+
+⸻
+
+20. Opponent Adaptation and Human-Like Memory
+
+Implement a lightweight opponent-behavior model.
+
+During a match, track observable tendencies such as:
+
+* Frequent jumping.
+* Repeated grounded attacks.
+* Preferred approach distance.
+* Projectile usage.
+* Defensive habits.
+* Repeated Shield timing.
+* Frequent Dashes.
+* Common aerial entry routes.
+* Aggressive versus passive play.
+* Common follow-ups after attacks.
+* Repeatedly attempting the same unsafe move.
+* Retreating toward a particular side.
+* Repeated unsuccessful escape choices.
+
+Use rolling statistics with decay, not permanent assumptions based on one observation.
+
+The CPU should adapt gradually.
+
+Examples:
+
+* Against frequent jumps, position for aerial interception.
+* Against projectile-heavy opponents, prioritize safe approach paths and projectile counters.
+* Against overly aggressive players, increase spacing and punish opportunities.
+* Against passive defenders, use movement, traps, and suitable unblockable attacks.
+* Against repeated predictable approaches, cover the relevant trajectory.
+
+Do not allow the CPU to read future inputs or perfectly predict random decisions.
+
+Difficulty should control how quickly and accurately observations become useful.
+
+Easy might recognize only obvious repeated habits.
+
+Medium should show meaningful adaptation.
+
+Hard should punish predictable habits consistently.
+
+Brutal should adapt efficiently while remaining limited to information actually observed.
+
+Memory should reset appropriately on a new match or rematch unless existing game design intentionally preserves it.
+
+⸻
+
+21. Difficulty System — Intelligence, Not Restrictions
+
+Every difficulty runs the same CPU Intelligence engine.
+
+Do not maintain four separate sets of combat behaviors.
+
+Difficulty parameters should control:
+
+* Reaction delay.
+* Event recognition accuracy.
+* Perception lapses.
+* Decision reassessment.
+* Predictive horizon.
+* Trajectory estimation accuracy.
+* Spacing precision.
+* Strategic planning depth.
+* Combo planning depth.
+* Combo execution reliability.
+* Punish recognition.
+* Opponent pattern recognition.
+* Adaptation speed.
+* Resource management.
+* Risk evaluation.
+* Move-selection consistency.
+* Defensive timing.
+* Stage awareness.
+* Opportunity recognition.
+
+The difficulties must be ordered in competence, but their available actions must remain identical.
+
+Easy — Casual Player
+
+Easy should feel like someone who knows the basic controls and enjoys fighting but does not consistently make optimal decisions.
+
+Behavior:
+
+* Actively moves and attacks.
+* Uses the whole valid moveset.
+* Performs simple combos.
+* Sometimes attacks from imperfect spacing.
+* Reacts relatively slowly.
+* Makes recognizable defensive attempts.
+* Occasionally misjudges approaches.
+* Understands basic Launch Point danger.
+* Uses basic aerial attacks.
+* Can Dash, Deflect, and edge-guard.
+* Sometimes misses good punish opportunities.
+* Still tries to win.
+
+Easy must not be a motionless target, an attack-spamming dummy, or a CPU with half its features disabled.
+
+Medium — Tryhard Player
+
+Medium represents someone actively trying to become competitive.
+
+Behavior:
+
+* Reliable neutral movement.
+* Good use of the full moveset.
+* More consistent combos.
+* Recognizes unsafe enemy attacks.
+* Uses Dash and air Dash strategically.
+* Makes meaningful stage-positioning decisions.
+* Adapts to repeated opponent behavior.
+* Protects itself when Launch Point becomes dangerous.
+* Uses aerial pursuit and anti-air attacks.
+* Knows when to use Shield versus Deflect.
+* Can set traps and apply pressure.
+* Makes occasional noticeable tactical errors.
+
+Medium must be substantially more capable than Easy without relying on superior fighter stats.
+
+Hard — Tournament/Pro Player
+
+Hard should feel like an experienced competitive player.
+
+Behavior:
+
+* Strong spacing.
+* Reliable movement.
+* Advanced combos.
+* Fast punish recognition.
+* Strong stage control.
+* Intelligent resource preservation.
+* Reliable aerial interceptions.
+* Purposeful edge-guarding.
+* Good trap setups.
+* Strong match adaptation.
+* Effective pressure and counterplay.
+* Good understanding of launch and elimination scenarios.
+* Relatively few unnecessary attacks.
+* Accurate decisions under pressure.
+
+Hard should feel genuinely threatening rather than merely more aggressive.
+
+Brutal — Elite Competitive Player
+
+Brutal is the highest-performing version of the universal intelligence.
+
+Its target is 95% or higher match win rate against a clearly defined, varied competitive benchmark suite. Track performance separately against Hard and other strong opponents. A universal 95% guarantee against arbitrary human players is not assumed or claimed.
+
+Behavior:
+
+* Extremely strong spacing and positioning.
+* Exceptional punish selection.
+* Deep combo optimization.
+* Highly accurate recovery prediction.
+* Intelligent edge-guarding and trapping.
+* Excellent resource awareness.
+* Strong Launch Point-based strategy shifts.
+* Sophisticated conditioning and counterplay.
+* Efficient exploitation of real opponent mistakes.
+* Rapid adaptation to repeated behavior.
+* Highly effective move diversity.
+* Excellent defensive timing.
+* Strong aerial combat.
+* Few unnecessary risks.
+* Aggressive finishing when victory is realistically available.
+
+Brutal must still obey ordinary reaction limits, cooldowns, inputs, Energy, physics, and other rules.
+
+It must not gain hidden knowledge, permanent invulnerability, or impossible mechanical precision.
+
+Its dominance must emerge from the quality of its intelligence.
+
+Tune profiles through empirical match testing rather than assuming that shorter reaction time alone produces superior play.
+
+⸻
+
+22. Human-Like Execution
+
+The entire system must feel like it is controlling a fighter through real decisions.
+
+Do not create robot-like patterns such as:
+
+* Attacking at a fixed interval.
+* Constantly running into the opponent.
+* Jumping every few seconds regardless of circumstances.
+* Always selecting the highest-damage move.
+* Holding Shield for no reason.
+* Constantly switching movement directions.
+* Performing identical combos in every situation.
+* Responding on the exact same frame every time.
+* Knowing an opponent’s action before it begins.
+* Reacting perfectly to every projectile.
+* Walking off ledges while following a target.
+* Standing still because no immediate attack is in range.
+
+Use natural variation in timing, spacing, tactical preferences, and responses.
+
+Variation must be seeded and deterministic under the same match seed.
+
+Humanization should change how the CPU expresses its intelligence, not replace intelligent decisions with noise.
+
+A strong player might choose an alternate viable combo because it has better positioning, resource preservation, or surprise value.
+
+A casual player might choose an imperfect but plausible attack.
+
+Both are human-like.
+
+Avoid fake intelligence built from random jitter or arbitrary button pressing.
+
+⸻
+
+23. Hierarchical Decision-Making
+
+Use a deliberate hierarchy of control.
+
+Strategic layer: decides the overall objective: pressure, survive, trap, recover, or find a finisher.
+
+Tactical layer: selects the best immediate opportunity and short sequence.
+
+Execution layer: produces legal inputs every simulation step.
+
+Suggested execution priorities:
+
+1. Respect forced game states and input restrictions.
+2. Prevent immediate elimination when a legal survival action exists.
+3. Respond to urgent high-risk threats.
+4. Execute valid guaranteed or high-confidence punish/combo opportunities.
+5. Continue a committed tactical plan.
+6. Maintain the active strategic objective.
+7. Reposition or generate a new meaningful plan.
+
+Do not constantly abandon good plans on every frame.
+
+Use intent lifetimes, commitment windows, explicit completion conditions, and interruption priorities.
+
+A CPU performing a good multi-step approach should not change its mind because of tiny score fluctuations.
+
+An imminent dangerous projectile may legitimately interrupt the approach.
+
+Create safe fallbacks whenever a plan fails.
+
+A planner failure must not result in indefinite inactivity.
+
+Use event-driven urgent decisions, periodic tactical reassessment, and per-step execution.
+
+Keep computation efficient enough for browser gameplay at the existing fixed simulation rate.
+
+Avoid expensive full-world searches every frame.
+
+⸻
+
+24. Predictive Simulation and Tactical Search
+
+Develop a lightweight prediction system using actual game mechanics.
+
+It should estimate:
+
+* Future fighter positions.
+* Attack hitbox arrival.
+* Projectile interception.
+* Landing positions.
+* Jump trajectories.
+* Dash travel.
+* Move-induced displacement.
+* Launch trajectories.
+* Ledge crossing.
+* Recovery feasibility.
+* Combo connection probability.
+* Punishable recovery windows.
+
+Do not build a second physics engine with different rules.
+
+Reuse shared mechanics and pure functions where practical.
+
+A limited-depth search or utility-based action planner is preferred over massive hardcoded condition trees.
+
+The search can use a reduced state representation rather than cloning the full game.
+
+Account for uncertainty.
+
+A prediction based on an opponent continuing its current movement is not a guarantee the opponent will do so.
+
+Brutal may analyze more candidate sequences and longer horizons.
+
+Easy may use shorter lookahead and less accurate predictions.
+
+All difficulties should still recognize the same kinds of tactical possibilities.
+
+⸻
+
+25. Specific Character Coverage Without Character-Specific AI
+
+Use the currently available fighters to validate the universal system.
+
+Fighter #0001
+
+The capability analyzer should automatically understand:
+
+* Jab and its hit-cancel follow-up.
+* Floating Straight and its aerial movement.
+* Red as a repelling projectile and spacing tool.
+* Red Kick as a homing aerial attack.
+* Maximum Blue as a pulling, multi-hit projectile.
+* Blue as an aerial pull and strike.
+* Unlimited Void as an unblockable paralysis technique.
+* Hollow Purple as a powerful, committed, unblockable projectile technique.
+* High Kick as a launcher.
+* Deflect as an aerial strike and projectile counter.
+
+The CPU must determine when to use each capability from its generic properties.
+
+Fighter #0002
+
+The same engine should automatically understand:
+
+* One-Two as a multi-hit grounded attack.
+* Homing Attack as an aerial approach/interception move.
+* Rapid Kicks as a multi-hit launcher.
+* Bounce Attack as a downward aerial strike and mobility option.
+* Spin Attack as a moving attack with unique safety considerations.
+* Blue Tornado as a rising aerial attack with free-fall consequences.
+* Whirlwind as a slower, persistent, multi-hit projectile setup.
+* Deflect as an aerial attack and projectile counter.
+
+It should never try attack4 or attack5 for #0002, since that character does not have them.
+
+These examples are for validation only. The CPU implementation must never contain branches based on these fighters’ IDs or names.
+
+Add generic fixture fighters with unusual but valid move combinations to prove that the analyzer handles future roster expansion.
+
+Include fixtures with summons, techniques, different numbers of attacks, alternative move directions, and missing optional capabilities.
+
+⸻
+
+26. Recovery and Survival Intelligence
+
+Offstage recovery deserves its own high-priority planner.
+
+The CPU must assess:
+
+* Whether it is currently above or below the stage surface.
+* Distance from the nearest safe landing position.
+* Horizontal and vertical momentum.
+* Number of remaining jumps.
+* Air Dash availability.
+* Remaining Energy.
+* Available movement-based attacks.
+* Free-fall restrictions.
+* Launch-reaction restrictions.
+* Opponent interference.
+* Current Void boundaries.
+
+Plan a recovery route using legal movement.
+
+Potential actions:
+
+* Drift toward the stage.
+* Use available air jumps.
+* Air Dash home when suitable.
+* Use a valid rising or movement-based attack when it improves recovery.
+* Adjust horizontal positioning before landing.
+* Avoid an opponent’s edge-guarding attack.
+* Choose the safest reachable landing zone.
+
+Do not use every jump immediately when spacing their use provides a better recovery.
+
+Do not save Energy at the cost of certain elimination.
+
+Do not activate a free-fall-producing move when it eliminates the remaining recovery route unless it is the best available option.
+
+The current CPU’s survival behavior must be improved, not simply copied.
+
+Recovery should be a competence shared by every difficulty, with increasing accuracy.
+
+⸻
+
+27. Match Strategy and Win Conditions
+
+The CPU must play to win under ALVA’s real match rules.
+
+It must understand points, elimination, time remaining, and overtime.
+
+When ahead:
+
+* Avoid unnecessary elimination risks.
+* Maintain safe but active positioning.
+* Punish reckless approaches.
+* Seek favorable eliminations instead of abandoning offense entirely.
+
+When behind:
+
+* Increase willingness to take calculated risks.
+* Seek meaningful damage and finishing opportunities.
+* Apply pressure when time is running out.
+* Avoid passive strategies that cannot realistically recover the match.
+
+When tied late:
+
+* Prioritize position and elimination risk.
+* Respect the approaching overtime state.
+* Look for high-value finishing opportunities.
+
+Match strategy should interact with Launch Point, Energy, and stage control rather than override them with simple score-based aggression multipliers.
+
+⸻
+
+28. Implementation Rules and Integration
+
+Implement CPU Intelligence as the authoritative combat CPU system.
+
+Integrate it into:
+
+* Quick Battle CPU opponents.
+* Regular Play CPU opponents.
+* Custom Play CPU opponents.
+* Watch Mode CPU versus CPU.
+
+Preserve existing mode selection, difficulty selection, rematch, reset, scoring, and seeded replay behavior.
+
+The separate non-attacking Practice Ground training dummy should retain its intended purpose unless a gameplay requirement explicitly calls for its replacement.
+
+Preserve the controller’s player-compatible input structure, including held controls and one-step Pressed edges.
+
+Respect the existing explicit Mouvement requests used for Dash and air Dash.
+
+Handle fresh Jump and Shield presses correctly.
+
+In particular, do not accidentally create an aerial Deflect by carrying an inappropriate held Shield state into the air.
+
+Preserve appropriate targeting and facing contracts, but audit any CPU-only orientation behavior so it does not produce implausible or unfair instantaneous actions.
+
+Never directly spawn projectiles, issue hits, teleport a fighter, or manipulate combat resources.
+
+The CPU chooses inputs. The existing fighter, combat, and physics systems resolve the outcome.
+
+Keep the system modular, deterministic, and performant.
+
+Reuse valid utilities from the original system if they are correct, but fully remove obsolete intelligence behavior rather than maintaining two competing decision engines.
+
+Update difficulty descriptions and English/French UI text where necessary to reflect the new intended skills.
+
+⸻
+
+29. Automated Test Requirements
+
+Implement extensive tests for CPU Intelligence.
+
+Do not rely only on whether it wins a few example matches.
+
+A. Core behavior tests
+
+Verify that all difficulties:
+
+* Produce valid player-compatible inputs.
+* Respect movement and combat restrictions.
+* Never become indefinitely inactive while actionable.
+* Can approach an opponent.
+* Can retreat when threatened.
+* Navigate stage geometry.
+* Respond to projectiles.
+* Use Shield appropriately.
+* Use Deflect both defensively and offensively.
+* Select correct grounded and aerial moves.
+* Pursue airborne opponents.
+* Recover from offstage situations.
+* Manage Energy.
+* Adapt decisions to Launch Point.
+* Punish observable mistakes.
+* Change strategic behavior under different match conditions.
+
+B. Move coverage tests
+
+Automatically enumerate every valid action and move variation for each playable fighter.
+
+For each, construct at least one realistic opportunity where it is useful.
+
+Verify that the CPU can recognize, select, and execute that action.
+
+Include every difficulty.
+
+Do not consider coverage complete merely because the engine lists the move.
+
+It must actually issue the appropriate legal input and demonstrate its intended tactical use.
+
+Track runtime move-selection frequency across longer matches to detect moves that are effectively ignored.
+
+C. Combat correctness tests
+
+Ensure no difficulty modifies:
+
+* Damage.
+* Base Launch.
+* Launch direction.
+* Hitboxes.
+* Hitstun or blockstun.
+* Cooldowns.
+* Energy costs.
+* Maximum Energy.
+* Jump counts.
+* Movement speeds.
+* Attack timing.
+* Projectile mechanics.
+* Fighter physics.
+
+Verify correct press edges, cooldowns, hit-cancels, attack buffering, and air-use restrictions.
+
+D. Difficulty progression tests
+
+Compare performance across all four levels using repeatable match scenarios.
+
+Verify that stronger profiles demonstrate better:
+
+* Defensive reactions.
+* Punish conversion.
+* Combo completion.
+* Stage survival.
+* Spacing.
+* Energy management.
+* Aerial targeting.
+* Offensive efficiency.
+* Opponent adaptation.
+
+Avoid relying on one single seeded match to prove difficulty ordering.
+
+E. Full match benchmarks
+
+Run large sets of deterministic matches.
+
+Vary:
+
+* Fighter matchup.
+* Starting side.
+* Stage.
+* Seed.
+* Difficulty pairing.
+* Opponent playstyle.
+
+Include aggressive, defensive, projectile-focused, jump-heavy, and balanced reference opponents.
+
+Test both Desert and City.
+
+Include overtime and high Launch Point conditions.
+
+Collect:
+
+* Match win rate.
+* Damage and Launch Point inflicted.
+* Damage and Launch Point received.
+* Elimination efficiency.
+* Move usage distribution.
+* Combo success.
+* Punish conversion rate.
+* Shield success.
+* Deflect success.
+* Successful recoveries.
+* Accidental self-eliminations.
+* Inactivity incidents.
+* Energy-exhaustion mistakes.
+* Invalid action attempts.
+* Stuck navigation incidents.
+
+Brutal’s 95% win-rate target should be tested against a published benchmark composition with a statistically meaningful number of games, not fabricated or measured only against a trivial opponent.
+
+Report measured outcomes rather than claiming the target has been achieved without evidence.
+
+F. Determinism
+
+The same initial state, same seed, and same input sequence must produce identical CPU decisions and match outcomes.
+
+Use injected seeded RNG.
+
+Do not introduce unseeded Math.random() or wall-clock-dependent decision behavior.
+
+G. Existing tests
+
+Run the existing repository test suite with:
 
 node --test
 
-Fix any failures caused by the removal, without changing unrelated gameplay behavior or deleting meaningful assertions.
+Preserve valid combat, fighter, input, stage, and integration tests.
 
-If a browser environment is available, manually inspect Discover in English and French on wide and narrow layouts.
+Review older CPU tests that encode obsolete behavior.
 
-Verify visual alignment, tab activation, Back behavior, readable reference content, roster interaction, focus indication, and scrolling.
+In particular, tests that explicitly expect a CPU to remain inactive while an opponent is absent, or prohibit Easy from ever using certain available movement tools, must be revised to match the new specification.
 
-If browser testing is unavailable, explicitly report that limitation rather than claiming visual verification.
+Do not simply delete difficult tests.
 
-12. Acceptance criteria
+Replace outdated expectations with stronger, behaviorally correct coverage.
 
-The task is complete only when:
+⸻
 
-* [ ]	Discover shows exactly three tabs: Fighters, Movement, Launch.
-* [ ]	Lore is entirely absent from the interface.
-* [ ]	No Lore page or inactive Lore panel remains in the DOM.
-* [ ]	js/data/lore.js has been deleted.
-* [ ]	All Lore imports, rendering functions, translations, and CSS selectors are removed.
-* [ ]	Keyboard, mouse, touch, and gamepad navigation remain correct.
-* [ ]	Both English and French work correctly.
-* [ ]	All three remaining sections retain their existing functionality.
-* [ ]	Current product documentation reflects the three-section interface.
-* [ ]	Tests have been updated to match the intended product.
-* [ ]	The full regression suite passes, or any environmental blockers are clearly reported.
-* [ ]	No gameplay changes or unrelated refactors are introduced.
+30. Debugging and Developer Observability
 
-13. Implementation expectations
+Add a developer-facing diagnostic system that can explain why the CPU made a decision.
 
-Implement the removal directly; do not stop after generating an analysis or proposed plan.
+It should be disabled or lightweight during normal play.
 
-Make focused, maintainable changes using existing project conventions.
+Useful information includes:
 
-Do not introduce dependencies, feature flags, compatibility stubs, replacement narrative content, or unrelated refactoring.
+* Current strategic mode.
+* Current tactical intent.
+* Current target position.
+* Recognized threats.
+* Predicted opponent position.
+* Selected attack and its intended purpose.
+* Estimated hit probability.
+* Current danger level.
+* Desired spacing.
+* Own Launch Point and risk classification.
+* Opponent Launch Point and finishing potential.
+* Current Energy policy.
+* Active combo plan.
+* Reason a plan was interrupted.
+* Reason a move was rejected.
+* Recent opponent-pattern observations.
 
-Do not redesign Discover. The goal is to retain its existing appearance and functionality while completely eliminating Lore and its supporting code.
+Include aggregate counters for invalid inputs, expired plans, stuck navigation, inactivity, and move usage.
 
-When finished, provide:
+A debug trace should explain decisions in practical terms, for example:
 
-1. A summary of the changes.
-2. All files modified or deleted.
-3. The results of focused tests and the full test suite.
-4. Any checks that could not be performed.
-5. Confirmation that Discover now contains exactly Fighters, Movement, and Launch.
+“Opponent is in recovery; fast grounded attack is in range before recovery ends.”
 
-Final result: Lore must be completely removed from Discover, cleanly and permanently, with no dead code or regressions.
+Or:
+
+“Own Launch Point is high; retreating from the ledge while preserving an anti-air response.”
+
+Or:
+
+“Opponent is airborne, rising, and inside the predicted interception path; jumping to use an aerial attack.”
+
+This must come from actual decision data, not fabricated descriptive text.
+
+⸻
+
+31. Performance and Engineering Quality
+
+ALVA runs as a browser-based JavaScript game with fixed-step simulation.
+
+CPU Intelligence must remain efficient during live gameplay.
+
+Requirements:
+
+* Support multiple CPUs simultaneously in Watch Mode.
+* Avoid allocating large temporary structures every frame.
+* Cache immutable move metadata.
+* Recompute expensive predictions only when necessary.
+* Use bounded searches.
+* Keep the high-frequency execution loop lightweight.
+* Allow urgent reactions without waiting for a slow strategic update.
+* Avoid DOM dependencies inside the simulation modules.
+* Prevent circular imports.
+* Keep reusable logic in shared modules.
+* Preserve deterministic simulation.
+* Avoid introducing unnecessary external dependencies.
+
+Prefer understandable, testable engineering over an unnecessarily complicated machine-learning implementation.
+
+A well-designed utility/planning system with accurate game knowledge is preferable to a neural-network system that cannot be verified or maintained.
+
+⸻
+
+32. Required Implementation Workflow
+
+Work through these stages in order, but complete the implementation rather than stopping after analysis.
+
+Phase 1 — Audit
+
+Read the codebase and identify all relevant mechanics, controller contracts, current CPU assumptions, and obsolete tests.
+
+Document important integration constraints.
+
+Phase 2 — Architecture
+
+Design the universal capability model, perception layer, strategy evaluator, tactical planner, execution controller, and difficulty parameters.
+
+Explain how the system avoids character-specific intelligence.
+
+Phase 3 — Replacement
+
+Implement the new CPU Intelligence modules and remove the current decision engine.
+
+Preserve correct integration points.
+
+Phase 4 — Core Combat
+
+Implement movement, spacing, attack selection, defensive reactions, aerial combat, combos, and recovery.
+
+Phase 5 — Advanced Intelligence
+
+Implement launch-aware strategy, edge-guarding, trapping, projectile control, opponent adaptation, dynamic playstyles, and match strategy.
+
+Phase 6 — Difficulty Calibration
+
+Make Easy, Medium, Hard, and Brutal distinct through decision quality while sharing the same capabilities.
+
+Phase 7 — Validation
+
+Run unit, integration, scenario, roster coverage, and multi-match benchmark tests.
+
+Fix identified issues.
+
+Phase 8 — Optimization and Cleanup
+
+Profile performance, eliminate obsolete code, update documentation, and ensure the new system is maintainable.
+
+⸻
+
+33. Definition of Done
+
+CPU Intelligence is complete only when the following conditions are satisfied:
+
+* [ ]	The previous combat CPU decision system has been replaced.
+* [ ]	Exactly one universal intelligence architecture operates across all fighters.
+* [ ]	No character-specific CPU brain is required.
+* [ ]	Every valid move is automatically discovered.
+* [ ]	Every available attack/ability has demonstrated meaningful CPU usage.
+* [ ]	All difficulties remain active and purposeful.
+* [ ]	CPUs make appropriate offensive and defensive decisions.
+* [ ]	CPUs understand both fighters’ Launch Points.
+* [ ]	CPUs change strategy based on elimination risk.
+* [ ]	CPUs understand damage, Base Launch, and launch directions.
+* [ ]	CPUs use combos and legal follow-ups.
+* [ ]	CPUs use attacks and abilities for mobility where useful.
+* [ ]	CPUs jump intentionally to attack airborne opponents.
+* [ ]	CPUs understand attack reach and vertical hitboxes.
+* [ ]	CPUs recognize and respond to incoming projectiles.
+* [ ]	CPUs know when to Shield.
+* [ ]	CPUs know when to Deflect.
+* [ ]	CPUs can jump into appropriate Deflect opportunities.
+* [ ]	CPUs use Deflect as an actual attack.
+* [ ]	CPUs manage Energy and exhaustion intelligently.
+* [ ]	CPUs navigate different stage layouts.
+* [ ]	CPUs edge-guard and ledge-trap.
+* [ ]	CPUs punish whiffs and unsafe commitments.
+* [ ]	CPUs adapt to repeated opponent habits.
+* [ ]	CPUs recover intelligently when offstage.
+* [ ]	Easy feels like a casual player.
+* [ ]	Medium feels like a competitive tryhard.
+* [ ]	Hard feels like a tournament-level player.
+* [ ]	Brutal feels exceptionally powerful and has measured benchmark performance toward its 95% target.
+* [ ]	Difficulty never changes the fighter’s physical/combat mechanics.
+* [ ]	Seeded matches remain deterministic.
+* [ ]	CPU-vs-CPU Watch Mode works correctly.
+* [ ]	Existing gameplay mechanics remain intact.
+* [ ]	Automated tests pass.
+* [ ]	Performance remains suitable for real-time browser gameplay.
+* [ ]	The new architecture is documented.
+
+34. Final Delivery Requirements
+
+After implementing the system, provide:
+
+1. A summary of the replacement architecture.
+2. The actual files created, changed, and removed.
+3. An explanation of how universal character intelligence works without character-specific brains.
+4. How each difficulty differs.
+5. How the new system guarantees purposeful activity while respecting forced game states.
+6. How complete moveset coverage was verified.
+7. How Launch Point, Energy, combos, defense, projectiles, stage navigation, and adaptation work.
+8. Test results, including the full repository test suite.
+9. CPU benchmark outcomes with measured win rates and limitations.
+10. Any remaining issues or areas that require further balancing.
+
+Do not report functionality as working unless it is implemented and tested.
+
+Do not leave the old AI running as a fallback that silently replaces CPU Intelligence.
+
+Do not solve the problem by introducing random attack spam, forced meaningless movement, or character-specific scripts.
+
+Final Guiding Principle
+
+CPU Intelligence is not supposed to make the computer push buttons. It is supposed to make the computer understand the fight.
+
+Every action should have an identifiable purpose.
+
+Every character should be understood through its mechanics.
+
+Every difficulty should behave like a real player with a different level of skill.
+
+Easy should feel human and beatable.
+
+Medium should feel determined and competitive.
+
+Hard should feel highly skilled and strategically dangerous.
+
+Brutal should feel like an elite opponent that consistently anticipates, positions, punishes, adapts, and converts opportunities while still playing fairly.
+
+The system must be universal, extensible, responsive, convincing, and genuinely intelligent.
+
+Implement the complete CPU Intelligence replacement for ALVA.
