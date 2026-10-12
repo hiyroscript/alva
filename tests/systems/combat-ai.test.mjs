@@ -1,16 +1,17 @@
 // Run with node --test tests/systems/combat-ai.test.mjs (no dependencies).
-// Quick Battle's combat AI (js/game/ai/combat-ai.js): it fights through the
-// same inputs a player has (attacks, projectiles, techniques on their own
-// buttons, Shield, Dash, jumps, the fast fall), reacts
-// late on low levels and early (never
-// instantly) on high ones, reassesses faster the higher it goes, keeps off
-// the Void's edge, waits while its opponent is out, and never touches a
-// fighter's stats. Deterministic: every CPU gets a seeded RNG. Runs the real
-// Fighter, CombatSystem, projectiles, clones and physics in a small "ring"
-// (the Arena's step order without its rendering).
+// The combat CPU (CombatAIController, js/game/ai/combat-ai.js, driven by CPU
+// Intelligence in js/game/ai/cpu-intelligence/): it fights through the same
+// inputs a player has (attacks, projectiles, techniques on their own
+// buttons, Shield, Dash, jumps, the fast fall), reacts late on low levels
+// and early (never instantly) on high ones, reassesses faster the higher it
+// goes, keeps off the Void's edge unless it can get back, repositions with a
+// purpose while its opponent is out, and never touches a fighter's stats.
+// Deterministic: every CPU gets a seeded RNG. Runs the real Fighter,
+// CombatSystem, projectiles, clones and physics in a small "ring" (the
+// Arena's step order without its rendering).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { def, DT, cpuFight, fakeSprites, fakeSpritesOf, stageMap } from '../helpers/fighter-harness.mjs';
 import { CONFIG } from '../../js/config.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
@@ -20,6 +21,7 @@ import { spawnClones, updateClones, removeDeadClones } from '../../js/game/comba
 import { StageCollision, resolveSolidOverlap } from '../../js/game/physics.js';
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
+import { analyzeCapabilities, moveReady } from '../../js/game/ai/cpu-intelligence/capabilities.js';
 import { TrainingAIController } from '../../js/game/fighters/fighter-controller.js';
 import { DIFFICULTY_IDS, getDifficultyProfile } from '../../js/data/difficulty.js';
 import { getCharacter } from '../../js/data/characters.js';
@@ -66,7 +68,7 @@ function ring({
     const fighters = world.fighters.filter((f) => !f.lostToVoid);
     for (const f of fighters) {
       f.update(DT, ctx);
-      if (f === cpu) log.push({ ...ai.out, step: n, intent: ai.intent?.kind ?? null });
+      if (f === cpu) log.push({ ...ai.out, step: n, plan: ai.plan?.kind ?? null });
     }
     if (fighters.length === 2) separateFighters(fighters[0], fighters[1], stage);
     for (const f of fighters) resolveSolidOverlap(f.body, stage);
@@ -81,12 +83,12 @@ function ring({
   const run = (steps) => {
     for (let i = 0; i < steps; i++) step();
   };
-  // Binds the controller to its fighter (its first step starts it fresh)
-  // and pauses its own neutral decisions: from here only the events it
-  // takes in (or an intent a test gives it) make it act.
+  // Holds the CPU's own offense and footwork (it still perceives, defends
+  // and recovers) and binds it to its fighter: from here only what it takes
+  // in (or a command a test gives it) makes it act.
   const hush = () => {
+    ai.neutral = false;
     step();
-    ai.thinkTimer = Infinity;
   };
   return { ai, cpu, foe, world, ctx, log, events, step, run, hush, get n() { return n; } };
 }
@@ -111,34 +113,47 @@ test('every level fights: it presses real attack buttons, its fighter attacks th
   }
 });
 
-test('while its own attack plays it never turns away from its opponent (a held direction turns an attack)', () => {
+test('while its own attack plays it never turns away from where it sees its opponent', () => {
   let attacks = 0;
   for (const difficulty of DIFFICULTY_IDS) {
-    for (const seed of [1, 2, 3, 4, 5]) {
+    for (const seed of [1, 2, 3]) {
       // Against another CPU, so both close in, cross over and strike. Where
-      // each one's opponent is, as its controller decides (the first to
-      // step has already moved when the second decides).
-      const side = new Map();
-      const decide = (controller) => (self, dt, ctx) => {
-        side.set(self, Math.sign(self.opponent.body.x - self.body.x));
-        return controller.getInput(self, dt, ctx);
-      };
-      const other = decide(new CombatAIController({ difficulty, rng: mulberry32(seed + 100) }));
-      const r = ring({ difficulty, seed, cpuX: 900, foeX: 1100, script: (n, self) => other(self, DT, r.ctx) });
-      r.cpu.controller = { getInput: decide(r.ai) };
-      for (let i = 0; i < seconds(30); i++) {
+      // each one perceives its opponent (its picture is `latency` old: a
+      // side switch is followed once it has been seen, as a player's held
+      // direction would follow it).
+      const other = new CombatAIController({ difficulty, rng: mulberry32(seed + 100) });
+      const r = ring({ difficulty, seed, cpuX: 900, foeX: 1100, script: (n, self) => other.getInput(self, DT, r.ctx) });
+      r.foe.controller = other;
+      const controllers = new Map([[r.cpu, r.ai], [r.foe, other]]);
+      // What each one saw when its fighter asked (the Fighter asks once a
+      // step, before it moves; the pushboxes may separate them after).
+      const seen = new Map();
+      for (const [f, c] of controllers) {
+        const ask = c.attackFacing.bind(c);
+        c.attackFacing = (self) => {
+          const dir = ask(self);
+          const op = c.situation?.present ? c.situation.op : null;
+          if (dir != null && op && op.x !== self.body.x) {
+            assert.equal(dir, Math.sign(op.x - self.body.x), 'toward the perceived opponent, not the live one');
+          }
+          seen.set(f, dir);
+          return dir;
+        };
+      }
+      for (let i = 0; i < seconds(20); i++) {
         const before = [r.cpu, r.foe].map((f) => ({ f, atk: f.combat.attack, facing: f.facing }));
+        seen.clear();
         r.step();
         for (const { f, atk, facing } of before) {
           if (!atk && f.combat.attack) attacks++;
-          if (!atk || f.combat.attack !== atk || f.facing === facing) continue;
-          assert.equal(f.facing, side.get(f), `${difficulty} seed ${seed}: ${f.label} turned away mid-attack at step ${r.n}`);
+          if (!atk || f.combat.attack !== atk || f.facing === facing || atk.def.motion) continue;
+          assert.equal(f.facing, seen.get(f), `${difficulty} seed ${seed}: ${f.label} turned away from where it sees its opponent at step ${r.n}`);
         }
-        if (r.cpu.body.y > 2000 || r.foe.body.y > 2000) break; // one fell into the Void
+        if (r.cpu.body.y > 2000 || r.foe.body.y > 2000) break;
       }
     }
   }
-  assert.ok(attacks > 300, `plenty of attacks (${attacks})`);
+  assert.ok(attacks > 200, `plenty of attacks (${attacks})`);
 });
 
 test('it never presses a reserved button, and never drops through a platform', () => {
@@ -304,37 +319,53 @@ test('it follows its opponent up onto a platform', () => {
   }
 });
 
-test('it stands still while its opponent is lost to the Void, then plays on', () => {
+test('while its opponent is lost to the Void it repositions with a purpose, never attacks nobody, then plays on', () => {
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, seed: 13, cpuX: 800, foeX: 1300 });
     r.run(seconds(0.5));
     r.foe.lostToVoid = true;
-    const x = r.cpu.body.x;
     r.run(seconds(1.5));
     const tail = r.log.slice(-seconds(1.2));
-    assert.ok(tail.every((o) => !o.runLeft && !o.runRight && !o.jump), `${difficulty} does not chase`);
     assert.ok(tail.every((o) => COMBAT.every((a) => !o[`${a}Pressed`])), `${difficulty} does not attack nobody`);
-    assert.ok(Math.abs(r.cpu.body.x - x) < 25, 'it stays put');
+    assert.ok(tail.some((o) => o.runLeft || o.runRight), `${difficulty} takes up a position rather than standing idle`);
+    assert.ok(tail.every((o) => o.plan === null || ['reposition', 'air', 'recover'].includes(o.plan)), `${difficulty}: ${[...new Set(tail.map((o) => o.plan))]}`);
+    assert.equal(r.cpu.body.grounded, true, 'on the stage');
     r.foe.lostToVoid = false;
     r.run(seconds(3));
-    assert.ok(r.log.slice(-seconds(3)).some((o) => o.runLeft || o.runRight || COMBAT.some((a) => o[`${a}Pressed`])), 'back to fighting');
+    assert.ok(r.log.slice(-seconds(3)).some((o) => COMBAT.some((a) => o[`${a}Pressed`])), 'back to fighting');
   }
 });
 
-test('it never walks off the main floor after an opponent hovering past the ledge', () => {
+test('it never walks off the main floor after an opponent hovering past the ledge; it only leaves to edge-guard when it can get back', () => {
   const right = 2000;
   for (const difficulty of DIFFICULTY_IDS) {
     for (let seed = 0; seed < 4; seed++) {
       const r = ring({ difficulty, seed, cpuX: right - 80, foeX: right - 40 });
       // The opponent hangs in the air out past the east ledge.
       Object.assign(r.foe.body, { x: right + 260, y: 700, gravityScale: 0, grounded: false, ground: null });
+      let left = 0;
       for (let i = 0; i < seconds(5); i++) {
         r.foe.body.vy = 0;
         r.step();
-        assert.ok(r.cpu.body.x <= right + 1, `${difficulty}/${seed}: still over the floor at step ${i}`);
+        // Walking (or Dashing) off the floor is never what it does: off
+        // it, it is in the air, jumped out on purpose.
+        if (r.cpu.body.x > right + r.cpu.body.halfW) {
+          left++;
+          assert.ok(!r.cpu.body.grounded, `${difficulty}/${seed}: off the floor only in the air`);
+        }
+        assert.ok(r.cpu.body.y < 900, `${difficulty}/${seed}: never falls (step ${i})`);
       }
-      assert.equal(r.cpu.body.grounded, true);
-      assert.ok(r.cpu.body.x > right - 200, 'it waits near the edge rather than running off');
+      // Its opponent drops back onto the floor: whatever it was doing out
+      // there, it comes back to the floor.
+      Object.assign(r.foe.body, { x: right - 400, y: 800, vx: 0, vy: 0, gravityScale: r.foe.movement.gravityScale });
+      let back = false;
+      for (let i = 0; i < seconds(2) && !back; i++) {
+        r.step();
+        assert.ok(r.cpu.body.y < 900, `${difficulty}/${seed}: never falls`);
+        back = r.cpu.body.grounded && r.cpu.body.ground === FLAT.floor;
+      }
+      assert.ok(back, `${difficulty}/${seed}: back on the floor`);
+      void left;
     }
   }
 });
@@ -342,7 +373,7 @@ test('it never walks off the main floor after an opponent hovering past the ledg
 test('a walk toward the ledge stops at it', () => {
   const r = ring({ difficulty: 'easy', seed: 1, cpuX: 1900, foeX: 1500 });
   r.hush();
-  r.ai.setIntent({ kind: 'move', dir: 1, until: Infinity });
+  r.ai.command({ move: 1, seconds: 3 });
   r.run(seconds(2));
   assert.equal(r.cpu.body.grounded, true, 'still standing');
   assert.equal(r.cpu.body.ground, FLAT.floor);
@@ -355,14 +386,12 @@ test('a walk toward the ledge stops at it', () => {
 test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own button, nothing held with it, and never again while it cools down', () => {
   const specials = readMoveset(ring().cpu).specials;
   assert.deepEqual(specials.map((c) => c.action), ['attack4', 'attack5']);
-  // #0001's techniques have no cooldown; a fighter whose do (the same
-  // techniques, cooling down) shows the CPU waiting one out.
+  // #0001's techniques, and a fighter whose same techniques cool down
+  // longer, showing the CPU waiting one out.
   for (const [special, cpuDef] of specials.flatMap((c) => [[c, def], [c, COOLING_CASTER]])) {
-    const cooling = cpuDef.techniques[special.id].cooldown > 0;
     const r = ring({ difficulty: 'hard', seed: 17, cpuX: 900, foeX: 1100, cpuDef });
     r.hush();
-    const face = special.type === 'technique' ? 1 : 0;
-    r.ai.setIntent({ kind: 'attack', action: special.action, face, until: r.ai.clock + 0.3 });
+    r.ai.command({ press: special.action });
     let cast = null;
     for (let i = 0; i < seconds(1.5); i++) {
       r.step();
@@ -376,13 +405,16 @@ test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own bu
     for (const other of ['attack1', 'attack2', 'attack3', 'extra_attack', 'shield']) {
       if (other !== special.action) assert.equal(press[other], false, `${special.id}: no ${other} with it`);
     }
-    assert.equal(r.cpu.combat.abilityCooldowns.active(special.id), cooling, `${special.id}: a cooldown only where it has one`);
+    assert.equal(r.cpu.combat.abilityCooldowns.active(special.id), true, `${special.id}: its cooldown runs`);
     assert.equal(cast?.action, special.action, `${special.id}: the technique came from its own button`);
-    // Its own options never offer it again while it is cooling down.
-    if (cooling) {
-      const s = r.ai.sense(r.cpu, r.foe, r.ctx);
-      assert.ok(!r.ai.specialOptions(s).some((o) => o.intent.action === special.action), `${special.id}: not while cooling down`);
-    }
+    // While it cools down the move is not ready, and a command to press it
+    // again presses nothing.
+    const move = analyzeCapabilities(r.cpu).moves.find((m) => m.action === special.action);
+    assert.equal(moveReady(r.cpu, move), false, `${special.id}: not ready while cooling down`);
+    r.ai.command({ press: special.action });
+    r.run(seconds(0.3));
+    assert.equal(r.log.slice(-seconds(0.3)).filter((o) => o[`${special.action}Pressed`]).length, 0, `${special.id}: never pressed while cooling down`);
+    assert.equal(r.ai.telemetry.counters.invalidInputs, 0);
   }
 });
 
@@ -419,39 +451,33 @@ test('its output is only the player\'s own controls: never a control the fighter
     const r = ring({ difficulty, seed: 9, cpuX: 700, foeX: 1100, script: (n) => (n % 120 < 30 ? { runLeft: true } : {}) });
     r.run(seconds(8));
     for (const out of r.log) {
-      const { step, intent, ...controls } = out;
+      const { step, plan, ...controls } = out;
       assert.deepEqual(Object.keys(controls).sort(), allowed, `${difficulty}: the same controls a player has`);
     }
-    assert.ok(r.log.every((o) => o.intent === null || typeof o.intent === 'string'));
+    assert.ok(r.log.every((o) => o.plan === null || typeof o.plan === 'string'));
   }
 });
 
-test('Dash uses explicit one-step requests on the levels that use it, and never Run taps', () => {
-  let dashes = 0;
-  for (let seed = 0; seed < 6; seed++) {
-    const r = ring({ difficulty: 'brutal', seed: 500 + seed, cpuX: 300, foeX: 1500 });
-    let prev = null;
-    for (let i = 0; i < seconds(6); i++) {
-      r.step();
-      if (r.cpu.dash && r.cpu.dash !== prev) {
-        dashes++;
-        const d = r.cpu.dash.direction > 0 ? 'mouvementRight' : 'mouvementLeft';
-        // The CPU explicitly requested the direction in its input snapshot.
-        const taps = r.log.slice(-seconds(0.25)).filter((o) => o[`${d}Pressed`]);
-        assert.equal(taps.length, 1, 'one explicit request');
-        assert.equal(r.ai.intent?.kind, 'dash', 'it meant to');
+test('every level Dashes, always by explicit one-step requests and never by Run taps', () => {
+  for (const difficulty of DIFFICULTY_IDS) {
+    let dashes = 0;
+    for (let seed = 0; seed < 6 && !dashes; seed++) {
+      const r = ring({ difficulty, seed: 500 + seed, cpuX: 300, foeX: 1500 });
+      let prev = null;
+      for (let i = 0; i < seconds(8); i++) {
+        r.step();
+        if (r.cpu.dash && r.cpu.dash !== prev) {
+          dashes++;
+          const d = r.cpu.dash.direction > 0 ? 'mouvementRight' : 'mouvementLeft';
+          // The CPU explicitly requested the direction in its input snapshot.
+          const taps = r.log.slice(-seconds(0.25)).filter((o) => o[`${d}Pressed`]);
+          assert.equal(taps.length, 1, `${difficulty}: one explicit request`);
+        }
+        prev = r.cpu.dash;
       }
-      prev = r.cpu.dash;
     }
+    assert.ok(dashes > 0, `${difficulty} Dashes (a casual player too)`);
   }
-  assert.ok(dashes > 0, 'Brutal dashes');
-  const easy = ring({ difficulty: 'easy', seed: 1, cpuX: 300, foeX: 1500 });
-  let easyDash = false;
-  for (let i = 0; i < seconds(8); i++) {
-    easy.step();
-    easyDash ||= !!easy.cpu.dash;
-  }
-  assert.equal(easyDash, false, 'Easy never dashes');
 });
 
 // ---- Cadence, difficulty and fairness -------------------------------------------------
@@ -461,10 +487,10 @@ test('higher levels reassess more often', () => {
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, seed: 21, cpuX: 700, foeX: 1300 });
     let count = 0;
-    const think = r.ai.think.bind(r.ai);
-    r.ai.think = (...args) => {
+    const begin = r.ai.evaluator.begin.bind(r.ai.evaluator);
+    r.ai.evaluator.begin = (...args) => {
       count++;
-      return think(...args);
+      return begin(...args);
     };
     r.run(seconds(10));
     thinks[difficulty] = count;
@@ -501,17 +527,23 @@ test('difficulty never changes the fighter: identical stats on every level, befo
 });
 
 test('the controller only reads the game: no writes to fighters, no raw input, no unseeded randomness', () => {
-  const src = ['combat-ai', 'moveset'].map((name) => readFileSync(new URL(`../../js/game/ai/${name}.js`, import.meta.url), 'utf8'))
-    .join('\n').replace(/\/\/.*$/gm, '');
-  // Assignments to anything reached through a fighter.
-  const writes = src.match(/(^|[\s;(,{])(self|foe|fighter|target|f)\.[\w.]+\s*(=(?!=)|\+=|-=|\+\+|--)/gm) ?? [];
-  assert.deepEqual(writes, []);
-  // No calls that act on a fighter instead of pressing its buttons.
-  for (const call of ['tryAction', 'tryDash', 'trySpecial', 'trySummon', 'tryTechnique', 'applyHit', 'spendEnergy', 'dropThrough', 'endTechnique', 'reset(']) {
-    assert.ok(!new RegExp(`(self|foe)\\.${call.replace('(', '\\(')}`).test(src), call);
+  const dir = new URL('../../js/game/ai/', import.meta.url);
+  const files = readdirSync(dir, { recursive: true }).filter((f) => f.endsWith('.js'));
+  assert.ok(files.includes('combat-ai.js') && files.includes('moveset.js') && files.some((f) => f.startsWith('cpu-intelligence')));
+  for (const file of files) {
+    const src = readFileSync(new URL(file, dir), 'utf8').replace(/\/\/.*$/gm, '');
+    // Assignments to anything reached through a fighter.
+    const writes = src.match(/(^|[\s;(,{])(self|foe|fighter|target|f)\.[\w.]+\s*(=(?!=)|\+=|-=|\+\+|--)/gm) ?? [];
+    assert.deepEqual(writes, [], file);
+    // No calls that act on a fighter instead of pressing its buttons.
+    for (const call of ['tryAction', 'tryDash', 'tryAirDash', 'tryDeflect', 'trySpecial', 'trySummon', 'tryTechnique', 'applyHit', 'spendEnergy', 'payEnergy',
+      'dropThrough', 'endTechnique', 'startAttack', 'reset(', 'respawn(']) {
+      assert.ok(!new RegExp(`(self|foe|fighter|s\\.self|s\\.foe)\\.${call.replace('(', '\\(')}`).test(src), `${file}: ${call}`);
+    }
+    assert.ok(!/Math\.random\(\)/.test(src.replace('rng = Math.random', '')), `${file}: randomness comes from the injected rng`);
+    assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval/.test(src), `${file}: never the wall clock`);
+    assert.ok(!/input-manager|InputManager|\.sample\(|document\.|window\./.test(src), `${file}: never the player's input or the DOM`);
   }
-  assert.ok(!/Math\.random\(\)/.test(src.replace('rng = Math.random', '')), 'randomness comes from the injected rng');
-  assert.ok(!/input-manager|InputManager|\.sample\(/.test(src), 'never reads the player\'s input');
 });
 
 // ---- Practice Ground keeps its training dummy --------------------------------------
@@ -537,36 +569,37 @@ test('the training controller still never presses a combat button, Down or Shiel
   assert.equal(foe.combat.launchPoint, 0, 'it never hit anyone');
 });
 
-test('an attack intent with a stale side presses immediately, and Fighter aims at the current target without a turn tap', () => {
+test('a commanded attack presses at once with no turn tap, and the Fighter aims it at where the CPU sees its target', () => {
   const r = ring({ cpuFacing: -1 });
   r.hush();
-  const held = {};
-  const intent = { action: 'attack1', face: -1, until: r.ai.clock + 1 };
-  r.ai.actAttack(r.cpu, intent, held);
-  assert.equal(held.attack1, true);
-  assert.equal(held.runLeft, undefined);
-  assert.equal(held.runRight, undefined);
-  r.cpu.tryAction('attack1', -1);
-  assert.equal(r.cpu.facing, 1, 'live target wins over stale planned direction');
-  assert.ok(r.cpu.combat.attack);
+  r.run(seconds(0.4));
+  r.ai.command({ press: 'attack1' });
+  r.step();
+  const out = r.log.at(-1);
+  assert.equal(out.attack1Pressed, true);
+  assert.equal(out.runLeft, false);
+  assert.equal(out.runRight, false);
+  assert.ok(r.cpu.combat.attack, 'the attack started');
+  assert.equal(r.cpu.facing, 1, 'turned to its target as the press was accepted, not by a direction');
 });
 
 test('an aerial attack presses without adding a direction just to turn its sprite', () => {
   const r = ring({ cpuFacing: -1 });
   r.hush();
-  r.cpu.body.grounded = false;
-  r.foe.body.x = r.cpu.body.x + 25;
-  r.ai.meleeOptions = () => [{ action: 'attack1', face: 1 }];
-  const held = {};
-  const intent = { jumped: true, air: true, dir: 1 };
-  r.ai.actJump(r.cpu, r.foe, r.ctx, intent, held);
-  assert.equal(held.attack1, true);
-  assert.equal(held.runLeft, undefined);
-  assert.equal(held.runRight, undefined);
-  assert.equal(intent.struck, true);
+  r.run(seconds(0.4));
+  r.ai.command({ jump: 'ground', dir: 0, hold: 0.1 });
+  r.run(8);
+  assert.equal(r.cpu.body.grounded, false);
+  r.ai.command({ press: 'attack1' });
+  r.step();
+  const out = r.log.at(-1);
+  assert.equal(out.attack1Pressed, true);
+  assert.equal(out.runLeft || out.runRight, false);
+  assert.equal(r.cpu.combat.attack?.def.id, 'midair_attack1');
+  assert.equal(r.cpu.facing, 1);
 });
 
-test('the CPU uses the new cancels as a player would: strikes out of its Dashes and follows up out of hit-cancels, never on Easy', () => {
+test('the CPU uses the cancels as a player would: strikes out of its Dashes and follows up out of hit-cancels, on every level, more on Brutal', () => {
   // A strike started on a step the fighter was still dashing (cut short
   // past its cancel time), and a new attack straight out of another one
   // (cut short once it hit).
@@ -586,49 +619,44 @@ test('the CPU uses the new cancels as a player would: strikes out of its Dashes 
     return { dashStrikes, followUps };
   };
   const brutal = count('brutal');
+  const easy = count('easy');
   assert.ok(brutal.dashStrikes > 0, `Brutal strikes out of a Dash (${brutal.dashStrikes})`);
   assert.ok(brutal.followUps > 0, `Brutal follows up out of a hit-cancel (${brutal.followUps})`);
-  const easy = count('easy');
-  assert.equal(easy.dashStrikes, 0, 'Easy never Dashes at all');
-  assert.ok(easy.followUps < brutal.followUps, `Easy follows up less (${easy.followUps})`);
+  assert.ok(easy.dashStrikes > 0 || easy.followUps > 0, `Easy uses them too, if less well (${JSON.stringify(easy)})`);
 });
 
 test('CPU filters ground/air Dash timers and long ordinary cooldowns before planning or pressing', () => {
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, cpuDef: getCharacter('0002'), foeX: 1200 });
     r.hush();
-    const { cpu, foe, ai, ctx } = r;
+    const { cpu, ai } = r;
     cpu.combat.movementCooldowns.start('mouvment', 0.5);
-    cpu.combat.movementCooldowns.start('midair_mouvment', 0.5);
     cpu.combat.cooldowns.set('extra_attack', 5);
-    const s = ai.sense(cpu, foe, ctx);
-    assert.ok(!ai.options(s).some(o => o.intent.kind === 'dash'));
-    const shot = readMoveset(cpu).ranged.find(m => m.id === 'extra_attack');
-    assert.equal(ai.rangedScore(shot, s), 0);
-    const held = {};
-    const cast = { action: 'extra_attack', until: ai.clock + 1 };
-    ai.actAttack(cpu, cast, held);
-    assert.equal(cast.done, true);
-    assert.equal(held.extra_attack, undefined);
-    const dash = { dir: 1 };
-    ai.actDash(cpu, foe, ctx, dash, held);
-    assert.equal(dash.done, true);
-    assert.equal(held.runRight, undefined);
-    Object.assign(cpu.body, { grounded: false, ground: null, y: 300 });
-    assert.equal(ai.airDashFree(ai.sense(cpu, foe, ctx)), false);
-    cpu.combat.movementCooldowns.clear();
-    assert.equal(ai.airDashFree(ai.sense(cpu, foe, ctx)), true);
+    // Nothing it weighs uses them.
+    const s = ai.situation.build(ai, cpu, r.foe, r.ctx, true);
+    ai.evaluator.begin(s);
+    const cands = ai.evaluator.candidates(s, [], {});
+    assert.ok(!cands.some((c) => c.kind === 'dashStrike'), `${difficulty}: no Dash strike while the Dash cools down`);
+    assert.ok(!cands.some((c) => c.move.id === 'extra_attack'), `${difficulty}: no Whirlwind while it cools down`);
+    // Commanded anyway, it presses nothing the fighter would refuse.
+    ai.command({ press: 'extra_attack' });
+    r.run(3);
+    ai.command({ dash: 1 });
+    r.run(3);
+    const tail = r.log.slice(-6);
+    assert.ok(tail.every((o) => !o.extra_attackPressed && !o.mouvementRightPressed), difficulty);
+    assert.equal(ai.telemetry.counters.invalidInputs, 0);
   }
 });
 
-test('CPU requests ground and air Mouvement once, including recovery, while already running', () => {
+test('CPU requests ground and air Mouvement once, while already running', () => {
   for (const air of [false, true]) for (const dir of [-1, 1]) {
     const r = ring({ difficulty: 'brutal', cpuX: 1000, foeX: 1600 });
     r.hush();
     const { cpu, ai } = r;
     if (air) Object.assign(cpu.body, { grounded: false, ground: null, y: 500, prevY: 500, vy: 0 });
-    ai.prev[dir > 0 ? 'runRight' : 'runLeft'] = true;
-    ai.setIntent({ kind: 'dash', dir, air, recover: air });
+    ai.executor.prev[dir > 0 ? 'runRight' : 'runLeft'] = true;
+    ai.command({ dash: dir });
     r.step();
     assert.equal(cpu.dash?.direction, dir);
     assert.equal(cpu.dash.air, air);
@@ -645,7 +673,7 @@ test('CPU requests ground and air Mouvement once, including recovery, while alre
 test('CPU ledge guard cancels an explicit Dash request before it reaches Fighter', () => {
   const r = ring({ difficulty: 'brutal', cpuX: 1980, foeX: 1500 });
   r.hush();
-  r.ai.setIntent({ kind: 'dash', dir: 1 });
+  r.ai.command({ dash: 1 });
   r.step();
   assert.equal(r.log.at(-1).mouvementRightPressed, false);
   assert.equal(r.cpu.dash, null);

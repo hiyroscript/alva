@@ -19,7 +19,8 @@
 
 import { analyzeCapabilities } from './capabilities.js';
 import { StageModel } from './stage-model.js';
-import { Track, predictTrack } from './prediction.js';
+import { Track, predictTrack, recoverySim } from './prediction.js';
+import { riseOf } from './values.js';
 
 const STEP = 1 / 60;
 
@@ -44,6 +45,7 @@ export class Situation {
     this.shots = [];
     this.clones = [];
     this.match = {};
+    this.recOut = {};
   }
 
   // Rebuilds the picture for this step. `brain` supplies the clock,
@@ -136,6 +138,20 @@ export class Situation {
       target,
     });
     this.foeTrack.origin = Math.min(steps, this.foeTrack.len - 1);
+    // Off the stage and free to act, it will try to get back: its likely
+    // recovery, not a plain fall (what an edge-guard plays against).
+    if (deep && brain.profile.stageSense > 0.3 && !(v.stun > 0) && !v.grounded &&
+        this.model.offstage(v.x, v.y, v.halfW, false)) {
+      const fc = this.foeCaps;
+      const res = {
+        airJumps: v.freeFall ? 0 : v.airJumps,
+        airDash: fc.movement.airDash && v.airDashes > 0 ? fc.movement.airDash.distance : 0,
+        dashOk: !v.exhausted, launched: v.launched, rise: v.freeFall ? null : riseOf(fc),
+      };
+      recoverySim(this.model, this.gravity, st, res, { jumpBelow: 30, dashFar: 150, maxSteps: Math.min(this.foeTrack.cap, steps + 120) }, this.recOut, this.foeTrack);
+      if (this.foeTrack.len) this.foeTrack.origin = Math.min(steps, this.foeTrack.len - 1);
+      else predictTrack(this.foeTrack, ctx.stage, this.gravity, st, { steps: steps + 24, horizon: age, velScale: 1, target });
+    }
     const k = this.foeTrack.i(0);
     op.x = this.foeTrack.x[k] + brain.err.x;
     op.y = this.foeTrack.y[k];

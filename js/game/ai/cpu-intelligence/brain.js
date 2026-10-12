@@ -110,6 +110,7 @@ export class CpuIntelligence {
     this.threatened = false;
     this.diDir = 0;
     this.diUntil = 0;
+    this.pendingShield = null;
     this.sees = { opening: true, finisher: true };
     this.lastUsedLife = new Set();
     this.executor.reset();
@@ -230,6 +231,13 @@ export class CpuIntelligence {
     }
     // Threats: the best answer to anything newly recognized.
     this.answerThreats(s);
+    // A deferred answer whose moment has come.
+    const ps = this.pendingShield;
+    if (ps && this.clock >= (ps.kind === 'shield' ? ps.raiseAt : ps.startAt) - 1.5 * STEP) {
+      this.pendingShield = null;
+      const ok = ps.kind === 'shield' ? me.grounded && (me.canAct || me.shielding) && this.clock < ps.until : me.grounded && me.canAct;
+      if (ok) this.setPlan(this.planFromAnswer(ps, s), s, `${ps.kind} moment`);
+    }
     // Combos: a hit just landed.
     if (this.combo && !this.combo.decided && this.plan?.kind !== 'recover') this.followUp(s);
     // The plan in progress.
@@ -298,6 +306,14 @@ export class CpuIntelligence {
       this.telemetry.count('threats');
       const answer = this.defense.choose(s, t);
       if (!answer) continue;
+      // An answer for later (a Shield to raise, a jump to time): carry on
+      // until its moment comes.
+      const at = answer.kind === 'shield' ? answer.raiseAt : answer.startAt;
+      if (at != null && at - this.clock > 0.1) {
+        this.pendingShield = answer;
+        this.telemetry.count(`answer.${answer.kind}`);
+        break;
+      }
       const plan = this.planFromAnswer(answer, s);
       if (plan) {
         this.telemetry.count(`answer.${answer.kind}`);
@@ -402,6 +418,7 @@ export class CpuIntelligence {
 
   planFromCandidate(c, why) {
     const reason = why ? `${why}: ${c.reason}` : c.reason;
+    if (c.kind === 'jumpStrike' || c.kind === 'dashStrike') this.markPattern(c.kind);
     if (c.kind === 'dashStrike') return makePlan('dashStrike', { cand: c, reason, until: this.clock + 0.6 }, this);
     if (c.kind === 'jumpStrike') return makePlan('jumpStrike', { cand: c, reason, until: this.clock + (c.pressK + 30) * STEP }, this);
     return makePlan('strike', { cand: c, reason, wait: 0.15 }, this);
@@ -551,7 +568,9 @@ export class CpuIntelligence {
     const st = { x: me.x, y: me.y, vx: me.vx, vy: me.vy, grounded: false, halfW: me.halfW, height: me.height };
     for (const v of variants.slice(0, n)) {
       const r = recoverySim(s.model, s.gravity, st, { ...res, airDash: v.dashFar > 0 ? res.airDash : 0 }, { ...v, maxSteps: 200 });
-      const score = (r.ok ? 100 : r.fell ? -100 : 0) + Math.min(60, r.margin) - r.jumps * 4 - (r.dashed ? 6 : 0);
+      // Back on the stage, with room, keeping the most for later: a lift
+      // that ends in free fall is the last resort.
+      const score = (r.ok ? 100 : r.fell ? -100 : 0) + Math.min(60, r.margin) - r.jumps * 4 - (r.dashed ? 6 : 0) - (r.rose ? 25 : 0);
       if (score > bestScore) {
         bestScore = score;
         best = v;
@@ -611,13 +630,25 @@ export class CpuIntelligence {
     this.lastOffence = this.clock;
   }
 
-  // How predictable move `m` has become from repeating it (0-0.3): what a
-  // watching opponent would anticipate.
-  predictability(m) {
-    const u = this.usage.get(m.key);
-    if (!u) return 0;
-    const n = u.n * Math.exp(-(this.clock - u.at) / 6);
-    return Math.min(0.3, Math.max(0, n - 1.2) * 0.07);
+  // How predictable move `m` (and the way it is delivered: a jump-in, a
+  // Dash-in) has become from repeating it (0-0.4): what a watching
+  // opponent would anticipate, and cover.
+  predictability(m, kind = null) {
+    const decayed = (key) => {
+      const u = this.usage.get(key);
+      return u ? u.n * Math.exp(-(this.clock - u.at) / 6) : 0;
+    };
+    const own = Math.min(0.3, Math.max(0, decayed(m.key) - 1.2) * 0.07);
+    const how = kind === 'jumpStrike' || kind === 'dashStrike' ? Math.min(0.25, Math.max(0, decayed(kind) - 2) * 0.05) : 0;
+    return Math.min(0.4, own + how);
+  }
+
+  // Remembers the way a strike was delivered (a jump-in, a Dash-in).
+  markPattern(kind) {
+    const u = this.usage.get(kind) ?? { n: 0, at: -Infinity };
+    u.n = u.n * Math.exp(-(this.clock - u.at) / 6) + 1;
+    u.at = this.clock;
+    this.usage.set(kind, u);
   }
 
   // Whether `m` has not been used yet this life: a little surprise value.

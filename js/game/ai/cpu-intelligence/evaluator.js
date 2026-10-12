@@ -102,7 +102,12 @@ export class Evaluator {
       if (c) out.push(c);
     }
     if (s.me.grounded && (self.canFollowUp() || combo) && !s.me.shielding) this.dashStrikes(s, out, combo, k0);
-    this.jumpStrikes(s, out, combo, k0);
+    // The jump arcs are the heaviest search: at most every 70 ms (a combo's
+    // follow-up always gets one).
+    if (combo || this.brain.clock - (this.jumpEvalAt ?? -1) >= 0.07) {
+      this.jumpEvalAt = this.brain.clock;
+      this.jumpStrikes(s, out, combo, k0);
+    }
     return out;
   }
 
@@ -157,7 +162,7 @@ export class Evaluator {
     const ks = t.i(Math.round(shot.spawnAt / STEP));
     const x0 = t.x[ks] + face * shot.offset.x;
     const y0 = t.y[ks] + shot.offset.y;
-    const r = projectileContact(s.stage, shot, x0, y0, face, k0 * STEP + shot.spawnAt, s.foeTrack, s.foeCaps.hurt, this.shot);
+    const r = projectileContact(s.stage, shot, x0, y0, face, k0 * STEP + shot.spawnAt, s.foeTrack, s.foeCaps.hurt, this.shot, this.pullable(s));
     if (r.contact < 0) return null;
     const flight = (r.contact - k0) * STEP - shot.spawnAt;
     return {
@@ -193,7 +198,7 @@ export class Evaluator {
       const shot = m.projectile;
       const x0 = me.x + face * shot.offset.x;
       const y0 = me.y + shot.offset.y;
-      const r = projectileContact(s.stage, shot, x0, y0, face, shot.spawnAt, s.foeTrack, hurt, this.shot);
+      const r = projectileContact(s.stage, shot, x0, y0, face, shot.spawnAt, s.foeTrack, hurt, this.shot, this.pullable(s));
       if (r.contact < 0) return null;
       return {
         move: m, k0: 0, contactK: r.contact, margin: 30, marginUp: r.margin, strikes: r.strikes, face, projectile: true,
@@ -286,14 +291,19 @@ export class Evaluator {
       if (me.airJumps > 0 && !me.freeFall && free) kinds.push('air');
     }
     if (!kinds.length) return;
-    const fk = s.foeTrack.i(18);
-    const fx = s.foeTrack.x[fk];
-    const targets = [fx - s.dir * 40, fx];
-    if (p.planDepth >= 3) targets.push(fx - s.dir * 90);
-    if (p.planDepth >= 2) targets.push(me.x);
-    const delays = combo ? [k0] : me.grounded && !s.op.grounded && p.planDepth >= 3 ? [0, 6, 12] : [0];
     const aerials = s.caps.aerial.filter((m) => m.kind !== 'ranged' && !(m.kind === 'deflect' && me.exhausted));
     if (!aerials.length) return;
+    // Out of reach of any arc: a whole jump's drift plus the longest
+    // aerial reach (a homing dash's lock-on included).
+    let longest = 0;
+    for (const m of aerials) if (m.reach) longest = Math.max(longest, Math.abs(m.reach.x), Math.abs(m.reach.x + m.reach.w));
+    const fk = s.foeTrack.i(18);
+    const fx = s.foeTrack.x[fk];
+    if (Math.abs(fx - me.x) > s.caps.movement.airtime * MV.maxSpeed * 1.2 + longest + 80) return;
+    const targets = [fx - s.dir * 40, fx];
+    if (p.planDepth >= 2) targets.push(me.x);
+    if (p.planDepth >= 4) targets.push(fx - s.dir * 90);
+    const delays = combo ? [k0] : me.grounded && !s.op.grounded && p.planDepth >= 3 ? [0, 8] : [0];
     const hurt = s.foeCaps.hurt;
     for (const delay of delays) {
       for (const jump of kinds) {
@@ -303,19 +313,24 @@ export class Evaluator {
           for (const m of aerials) {
             if (!this.readyInAir(self, m, me.grounded)) continue;
             const lead = Math.round(m.lead / STEP);
+            const r = m.reach ?? m.hitbox;
+            if (!r) continue;
             // Not before its cooldown is over.
             const from = Math.max(jump ? 2 : 1, Math.ceil((self.combat.cooldowns.get(m.id) ?? 0) / STEP) - delay + 1);
             for (let j = from; j < arc.len; j += 2) {
               const a = arc.i(j - 1);
               if (arc.g[a]) break;
-              // Cheap check first: is the opponent anywhere near this
-              // move's reach when it comes out?
+              // Cheap check first: the move's reach (either way it may
+              // face), carried by the arc's drift to when it strikes,
+              // against where the opponent will be then.
               const f = s.foeTrack.i(j + delay + lead);
-              const ddx = Math.abs(s.foeTrack.x[f] - arc.x[a]);
-              const reach = m.reach ? Math.max(Math.abs(m.reach.x), Math.abs(m.reach.x + m.reach.w)) : 60;
-              if (ddx > reach + hurt.hw + 60) continue;
-              const ddy = s.foeTrack.y[f] - arc.y[a];
-              if (ddy < (m.reach?.y ?? -100) - 140 || ddy > (m.reach ? m.reach.y + m.reach.h : 40) + 160) continue;
+              const hover = m.motion === 'hover' || m.motion === 'homing';
+              const ax = arc.x[a] + arc.vx[a] * m.lead * (m.airMomentum ?? 1);
+              const ay = hover ? arc.y[a] : arc.y[a] + arc.vy[a] * m.lead + 0.5 * s.gravity * m.lead * m.lead;
+              const ddx = Math.abs(s.foeTrack.x[f] - ax);
+              if (ddx > Math.max(Math.abs(r.x), Math.abs(r.x + r.w)) + hurt.hw + 20) continue;
+              const fy = s.foeTrack.y[f];
+              if (fy + hurt.bottom < ay + r.y - 30 || fy + hurt.top > ay + r.y + r.h + 30 + (m.motion === 'bounce' ? 400 : 0)) continue;
               const st = { x: arc.x[a], y: arc.y[a], vx: arc.vx[a], vy: arc.vy[a], grounded: false, halfW: me.halfW, height: me.height };
               const face = Math.sign(s.foeTrack.x[f] - st.x) || me.facing;
               const c = this.melee(s, m, st, face, j + delay);
@@ -335,6 +350,13 @@ export class Evaluator {
         }
       }
     }
+  }
+
+  // Whether a pull can drag the opponent: not behind a Shield, held by a
+  // paralysis, or committed to a cast or a summon's startup.
+  pullable(s) {
+    const v = s.op.view;
+    return !s.op.shielding && !(v.paralysis > 0) && !v.techniqueDef && !v.summon;
   }
 
   // Whether aerial `m` could start later in this airtime: its cooldown
@@ -380,7 +402,7 @@ export class Evaluator {
     }
     // A projectile from far away gives time to see it.
     if (c.projectile && c.flight > 0.3 && busy < tC) pg *= clamp(1.25 - c.flight, 0.35, 1);
-    pg *= 1 - brain.predictability(m);
+    pg *= 1 - brain.predictability(m, c.kind);
     // A Shield in the way. A stunned opponent that saw it coming raises
     // its Shield the moment it is free: it only has to be free in time.
     let pBlock = 0;
@@ -445,8 +467,12 @@ export class Evaluator {
     let cost = 0;
     const energy = (c.energy ?? 0) + (m.energyCost ?? 0);
     if (energy > 0) {
+      // Emptying the bar leaves no Shield, Dash or Deflect until it is full
+      // again: worth it only for a hit that ends a life.
       const left = s.me.energy - energy;
-      cost += (energy / 25) * (0.3 + p.energySense * 0.5) + (left <= 0 ? 7 * p.energySense : left < 30 ? 1.2 * p.energySense : 0);
+      const danger = brain.strategy.danger;
+      const empty = (8 + danger * 30 + this.foePunish * 0.5) * p.energySense;
+      cost += (energy / 25) * (0.3 + p.energySense * 0.5) + (left <= 0 ? empty : left < 30 ? (1.5 + danger * 4) * p.energySense : 0);
     }
     if (m.abilityCooldown > 1) cost += Math.min(2.5, m.abilityCooldown * 0.25);
     else if (m.cooldown > 1) cost += Math.min(1.5, m.cooldown * 0.15);

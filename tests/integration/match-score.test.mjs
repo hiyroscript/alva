@@ -236,20 +236,25 @@ test('the timer keeps running through a respawn wait; time up during one keeps t
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
 });
 
-test('the Quick Battle CPU stands still while its opponent is out, then plays on', () => {
+test('while its opponent is out the Quick Battle CPU repositions with a purpose, never attacks nobody, then plays on', () => {
   const sprites = fakeSprites();
   const input = { flush() {}, sample: () => ({}) };
   const battle = new Battle({
-    canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input,
+    canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input, seed: 4,
   });
   battle.setPhase('fight');
   const { p1, p2 } = battle;
   intoVoid(battle, p1);
   battle.update(DT);
+  let moved = 0;
   for (let i = 0; i < RESPAWN_STEPS - 1; i++) {
     battle.update(DT);
-    assert.equal(p2.moveDir, 0, 'nobody to follow');
+    const out = p2.controller.out;
+    assert.ok(!['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'].some((a) => out[`${a}Pressed`]), 'no attack at nobody');
+    if (p2.moveDir !== 0) moved++;
+    assert.ok(p2.body.grounded || p2.body.y < battle.stage.groundY + 1, 'it stays on the stage');
   }
+  assert.ok(moved > 10, `it takes up a position for the respawn (${moved} steps moving), never standing idle`);
   assert.equal(p1.lostToVoid, true);
   battle.update(DT);
   assert.equal(p1.lostToVoid, false);

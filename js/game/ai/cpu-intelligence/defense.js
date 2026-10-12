@@ -140,7 +140,6 @@ export class Defense {
         }
       }
     }
-    void myH;
     if (contact < 0) return;
     const pos = { x: s.me.x, y: s.me.y, grounded: s.me.grounded, halfW: s.me.halfW, height: s.me.height };
     const list = def.hits ? def.hits.map((h) => ({ ...h, dir: h.directionalLaunch })) : [{ ...def, dir: def.directionalLaunch }];
@@ -185,7 +184,7 @@ export class Defense {
     return {
       contact: (contact + 1) * STEP, end: (end + 1) * STEP + (def.pierce ? def.pierce.interval * def.pierce.hits : 0.02),
       top: y + def.hitbox.y - pull, bottom: y + def.hitbox.y + def.hitbox.h + pull, from: -dir, severity: sev.value, ko: sev.ko,
-      unblockable: !!def.unblockable, blockPush: def.blockPush ?? 0, x, y, dir, def, delay, pull, strikesLeft: n,
+      unblockable: !!def.unblockable, blockPush: def.blockPush ?? 0, x, y, dir, def, delay, pull, strikesLeft: n, age,
     };
   }
 
@@ -302,17 +301,31 @@ export class Defense {
         why: perfect ? 'perfect Shield' : 'Shield',
       });
     }
-    // A jump over it.
+    // A jump over it: now, or later for something still far off (the jump
+    // timed to clear it as it passes).
     if (me.grounded && canJump && Number.isFinite(threat.top)) {
-      for (const jump of ['ground', 'high']) {
-        const dirAway = -threat.from;
-        for (const dir of [0, dirAway]) {
-          if (this.clearsByJump(s, threat, jump, dir)) {
-            const landRisk = threat.kind === 'melee' ? 1.2 : 0.4;
-            options.push({ score: -0.6 - landRisk + (threat.kind !== 'melee' ? 0.8 : 0), plan: { kind: 'jump', jump, dir, why: 'jump over' }, why: 'jump over' });
-            break;
+      const latest = Math.max(0, threat.contact - 0.12);
+      const delays = [0];
+      for (let d = 0.1; d <= latest && delays.length < 8; d += 0.08) delays.push(d);
+      let found = null;
+      for (const delay of delays) {
+        for (const jump of ['ground', 'high']) {
+          for (const dir of [0, -threat.from]) {
+            if (this.clearsByJump(s, threat, jump, dir, delay)) {
+              found = { jump, dir, delay };
+              break;
+            }
           }
+          if (found) break;
         }
+        if (found) break;
+      }
+      if (found) {
+        const landRisk = threat.kind === 'melee' ? 1.2 : 0.4;
+        options.push({
+          score: -0.6 - landRisk + (threat.kind !== 'melee' ? 0.8 : 0),
+          plan: { kind: 'jump', jump: found.jump, dir: found.dir, startAt: brain.clock + found.delay, why: 'jump over' }, why: 'jump over',
+        });
       }
     }
     // Out of reach on foot, or by Dash.
@@ -320,14 +333,14 @@ export class Defense {
       const away = -threat.from;
       const room = s.model.edgeRoom(me.x, away);
       const need = this.clearance(s, threat, away);
-      if (need > 0) {
+      if (need > 0 && Number.isFinite(need)) {
         const t = Math.max(0, threat.contact - STEP);
         const walk = MV.maxSpeed * Math.max(0, t - 0.04);
         if (walk > need && room > need + me.halfW + 30) {
           options.push({ score: -0.5, plan: { kind: 'move', dir: away, until: brain.clock + threat.end + 0.05, why: 'steps out' }, why: 'steps out' });
         }
         const dash = s.caps.movement.dash;
-        if (dash && self.movementReady(false) && !me.exhausted && room > dash.distance + me.halfW + 40 && t > 0.05) {
+        if (dash && self.movementReady(false) && !me.exhausted && room > dash.distance + me.halfW + 40 && t > 0.05 && dash.reach > need) {
           const left = me.energy - dash.cost;
           options.push({
             score: -0.9 - (dash.cost / 25) * p.energySense - (left <= 0 ? 6 : 0),
@@ -395,9 +408,16 @@ export class Defense {
   // How far the CPU must move away (toward `away`) for the threat's boxes
   // to miss it; 0 if it is already clear, Infinity if there is no box.
   clearance(s, threat, away) {
+    const h = s.caps.hurt;
+    if (threat.def && !threat.boxes && !threat.burst) {
+      // A projectile: only out of its remaining range, if it flies away from it.
+      if (away !== threat.dir) return Infinity;
+      const left = threat.def.lifetime - (threat.age ?? 0);
+      const endX = threat.x + threat.dir * threat.def.speed * left + threat.dir * (threat.def.hitbox.x + threat.def.hitbox.w);
+      return away > 0 ? endX - (s.me.x - h.hw) + 6 : s.me.x + h.hw - endX + 6;
+    }
     const list = threat.boxes ?? (threat.burst ? [threat.burst] : null);
     if (!list) return Infinity;
-    const h = s.caps.hurt;
     let need = 0;
     for (const b of list) {
       const n = away > 0 ? b.x + b.w - (s.me.x - h.hw) + 4 : s.me.x + h.hw - b.x + 4;
@@ -408,30 +428,50 @@ export class Defense {
 
   // Whether a jump (`jump`, steering `dir`) started now keeps the CPU's
   // body clear of the threat from its contact to its end.
-  clearsByJump(s, threat, jump, dir) {
-    const arc = arcTrack(this.arc, s.stage, s.gravity, s.me, { jump, dir, steps: 80 });
-    const from = Math.floor(threat.contact / STEP) - 1;
-    const to = Math.ceil(threat.end / STEP) + 1;
+  clearsByJump(s, threat, jump, dir, delay = 0) {
+    const arc = arcTrack(this.arc, s.stage, s.gravity, s.me, { jump, dir, steps: 90 });
+    const d = Math.round(delay / STEP);
+    // A projectile is checked over its whole remaining flight (moving
+    // changes when it would meet the CPU); an attack over its strikes.
+    const shot = threat.def && !threat.boxes && !threat.burst;
+    const from = shot ? 0 : Math.floor(threat.contact / STEP) - 1;
+    const to = shot ? Math.min(150, Math.ceil((threat.def.lifetime - (threat.age ?? 0) + (threat.delay ?? 0)) / STEP))
+      : Math.ceil(threat.end / STEP) + 1;
     for (let k = Math.max(0, from); k <= to; k++) {
-      const a = arc.i(k);
-      if (arc.g[a] && k > 2) return false;
+      // Standing where it is until the jump.
+      if (k < d) {
+        this.myBox(s, s.me.x, s.me.y, 2, box2);
+        if (this.hitsAt(threat, k, box2)) return false;
+        continue;
+      }
+      // Landed again it stands where it came down (a shot already past
+      // is no danger).
+      const a = arc.i(k - d);
+      if (arc.g[a] && k - d > 2 && !shot) return false;
       this.myBox(s, arc.x[a], arc.y[a], 2, box2);
-      if (threat.boxes) {
-        for (const b of threat.boxes) if (Math.abs(b.k - k) <= 1 && overlaps(b, box2)) return false;
-      } else if (threat.burst) {
-        if (overlaps(threat.burst, box2)) return false;
-      } else if (threat.def) {
-        const t = (k + 1) * STEP - (threat.delay ?? 0);
-        if (t < 0) continue;
-        boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y, threat.dir, box);
-        box.x -= threat.pull;
-        box.y -= threat.pull;
-        box.w += threat.pull * 2;
-        box.h += threat.pull * 2;
-        if (overlaps(box, box2)) return false;
-      } else if (box2.y + box2.h > threat.top) return false;
+      if (this.hitsAt(threat, k, box2)) return false;
     }
     return true;
+  }
+
+  // Whether `threat` meets box `b` (the CPU's) `k` steps from now.
+  hitsAt(threat, k, b) {
+    if (threat.boxes) {
+      for (const tb of threat.boxes) if (Math.abs(tb.k - k) <= 1 && overlaps(tb, b)) return true;
+      return false;
+    }
+    if (threat.burst) return k >= Math.floor(threat.contact / STEP) - 1 && overlaps(threat.burst, b);
+    if (threat.def) {
+      const t = (k + 1) * STEP - (threat.delay ?? 0);
+      if (t < 0) return false;
+      boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y, threat.dir, box);
+      box.x -= threat.pull;
+      box.y -= threat.pull;
+      box.w += threat.pull * 2;
+      box.h += threat.pull * 2;
+      return overlaps(box, b);
+    }
+    return b.y + b.h > threat.top;
   }
 
   // When to press the Deflect so its live box meets projectile `threat`

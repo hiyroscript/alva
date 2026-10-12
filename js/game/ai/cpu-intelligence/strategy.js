@@ -56,6 +56,8 @@ export class Strategy {
     this.scores = Object.fromEntries(MODES.map((m) => [m, 0]));
     this.danger = 0;
     this.finish = 0;
+    this.riskAt = 0;
+    this.riskReady = false;
     this.params = PARAMS.neutral;
   }
 
@@ -93,8 +95,13 @@ export class Strategy {
       this.switchTo(s.me.offstage ? 'recovery' : 'neutral');
       return this;
     }
-    this.danger = this.koThreat(s, judge, s.foeCaps, 'me');
-    this.finish = this.koThreat(s, judge, s.caps, 'foe');
+    // The launch sums are the heavy part: a few times a second is plenty.
+    if (this.since >= this.riskAt || !this.riskReady) {
+      this.danger = this.koThreat(s, judge, s.foeCaps, 'me');
+      this.finish = this.koThreat(s, judge, s.caps, 'foe');
+      this.riskAt = this.since + 0.2;
+      this.riskReady = true;
+    }
     const d = this.danger;
     const f = this.finish;
     const m = s.match;
@@ -134,6 +141,7 @@ export class Strategy {
   switchTo(mode) {
     if (mode === this.mode) return;
     this.mode = mode;
+    this.riskAt -= this.since;
     this.since = 0;
     this.params = PARAMS[mode];
   }

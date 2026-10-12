@@ -27,6 +27,7 @@ import { BLOCK_ENERGY_COST } from '../../../js/game/combat/combat-state.js';
 import { createProjectileDefinition } from '../../../js/game/combat/projectile.js';
 import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../../js/game/ai/moveset.js';
+import { analyzeCapabilities } from '../../../js/game/ai/cpu-intelligence/capabilities.js';
 import { Fighter } from '../../../js/game/fighters/fighter.js';
 import { SpriteSet, drawFrame } from '../../../js/game/rendering/sprite-normalizer.js';
 import { StageCollision } from '../../../js/game/physics.js';
@@ -356,14 +357,17 @@ test('in the air Down still fast-falls', () => {
   assert.equal(fighter.fastFalling, true);
 });
 
-test('the CPU plans no summon or technique with it: it has none', () => {
+test('the CPU plans no summon or technique with it, and never presses Attack 4 or Attack 5: it has none', () => {
   const s = makeFighter({ character: DEF, sprites: SPRITES });
-  const foe = makeFighter({ x: 1200, facing: -1 });
-  s.fighter.opponent = foe.fighter;
-  foe.fighter.opponent = s.fighter;
-  const ai = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(1) });
   assert.deepEqual(readMoveset(s.fighter).specials, []);
-  assert.deepEqual(ai.specialOptions({ self: s.fighter, p: ai.profile, canAct: true, grounded: true, ms: readMoveset(s.fighter) }), []);
+  const caps = analyzeCapabilities(s.fighter);
+  assert.deepEqual(caps.moves.filter((m) => m.kind === 'technique' || m.kind === 'summon'), []);
+  assert.ok(caps.moves.every((m) => m.action !== 'attack4' && m.action !== 'attack5'));
+  const { log } = cpuFight(DEF, DEF_0001, { seconds: 12, seed: 4, difficulty: 'brutal' });
+  for (const [f, steps] of log) {
+    if (f.def !== DEF) continue;
+    assert.ok(steps.every((o) => !o.attack4 && !o.attack5 && !o.attack4Pressed && !o.attack5Pressed));
+  }
 });
 
 // ---- attack1: the One-Two ----------------------------------------------------------------

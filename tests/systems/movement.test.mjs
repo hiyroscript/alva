@@ -813,10 +813,9 @@ test('the CPUs let go of Jump inside the higher-jump window: their jumps are nor
   // The combat AI, handed a jump to make (as its jump-in or a hop would).
   const ai = new CombatAIController({ difficulty: 'hard', rng: () => 0.5 });
   const cpu = apexWith(ai, (d) => {
+    ai.neutral = false;
     ai.getInput(d.attacker, DT, { stage: d.attacker.body && STAGE, gravity: CONFIG.sim.gravity });
-    ai.setIntent({ kind: 'jump', dir: 0 });
-    ai.intent.keepUntil = Infinity;
-    ai.thinkTimer = Infinity;
+    ai.command({ jump: 'ground', dir: 0 });
   });
   assert.ok(Math.abs(cpu - normal) < 8, `the combat AI: a normal jump (${cpu.toFixed(0)})`);
   // The training CPU, hopping a block in its way.

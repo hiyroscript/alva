@@ -439,11 +439,11 @@ function exchange(controller, action, foeHeld = {}) {
   const ctx = { stage: STAGE, gravity: CONFIG.sim.gravity, battle: world };
   foe.combat.launchPoint = 40;
   if (controller instanceof CombatAIController) {
-    // Bound to its fighter, its own neutral thinking paused: the one
-    // intent below is all it does, the same on every level.
+    // Its own neutral decisions held, bound to its fighter: the one press
+    // it is commanded is all it does, the same on every level.
+    controller.neutral = false;
     me.update(DT, ctx);
-    controller.thinkTimer = Infinity;
-    controller.setIntent({ kind: 'attack', action, face: 1, until: controller.clock + 0.3 });
+    controller.command({ press: action });
   }
   let pressedAt = null;
   const events = [];

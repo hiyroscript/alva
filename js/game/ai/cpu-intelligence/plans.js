@@ -311,6 +311,8 @@ const STEPS = {
       return 'run';
     }
     ex.dir(Math.abs(dx) > 2 ? sign(dx) : 0);
+    // Already over the stage: nothing more to spend, just land.
+    if (s.model.supported(me.x, me.halfW, me.y)) return brain.clock > plan.until ? 'fail' : 'run';
     const free = self.canFollowUp();
     // Still flying from a launch: an air dash or a lift waits until it acts.
     if (me.launched && free && me.vy > 0 && me.airJumps === 0) ex.fastFall();

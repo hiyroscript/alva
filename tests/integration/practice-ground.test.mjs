@@ -2279,8 +2279,6 @@ test('the practice theme is registered and draws without building paths each fra
 
 test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two-panel HUD, with none of Practice\'s rules', () => {
   const input = fakeInput();
-  // Seeded: unseeded, about one CPU in twelve lands a hit in the first
-  // second and the Launch Point check below would fail at random.
   const battle = new Battle({
     canvas: new Element('canvas'), map: getMap('desert'),
     p1Def: DEF_0001, p2Def: DEF_0001, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input, seed: 1,
@@ -2300,7 +2298,9 @@ test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two
   assert.equal(CONFIG.battle.matchSeconds, 420, '7 minutes');
   assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds);
   assert.equal(battle.p1.inputLocked, true, 'locked through the intro');
-  for (let i = 0; i < Math.ceil(CONFIG.battle.introSeconds * 60) + 60; i++) battle.update(DT);
+  // Just into the fight (the CPU is active from its first step, so a few
+  // steps later it may already have landed a hit).
+  for (let i = 0; i < Math.ceil(CONFIG.battle.introSeconds * 60) + 2; i++) battle.update(DT);
   assert.equal(battle.phase, 'fight');
   assert.ok(battle.timeLeft < CONFIG.battle.matchSeconds);
   // None of Practice Ground's rules: no damage numbers (its respawns are

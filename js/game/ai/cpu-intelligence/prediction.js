@@ -362,13 +362,13 @@ export function moveContact(stage, gravity, m, st, face, foe, hurt, self, out = 
   out.endK = steps;
   const strikes = m.strikes;
   const met = strikes.length > 1 ? new Uint8Array(strikes.length) : null;
-  const target = { x: 0, y: 0 };
+  const aim = { x: 0, y: 0 };
   for (let k = 0; k < steps; k++) {
     const fk = foe.i(k + k0);
-    target.x = foe.x[fk];
-    target.y = foe.y[fk] - (hurt.bottom - hurt.top) / 2;
-    if (turns) face = Math.sign(target.x - b.x) || face;
-    const share = attackStep(b, rec, face, target, false);
+    aim.x = foe.x[fk];
+    aim.y = foe.y[fk] - (hurt.bottom - hurt.top) / 2;
+    if (turns) face = Math.sign(aim.x - b.x) || face;
+    const share = attackStep(b, rec, face, aim, false);
     stepBody(b, STEP, stage, gravity * share, b.maxFall);
     // A homing dash or a plunge that meets the ground stops there.
     if (rec.motion && !rec.motion.done && b.grounded && def.motion &&
@@ -419,16 +419,22 @@ const shotBox = {};
 // seconds from now from (x0, y0) going `dir` meets the opponent on its
 // predicted path `foe` (hurt extent `hurt`): { contact (step from now, -1
 // none), margin (vertical slack), strikes (how many land at most), blocked
-// (a solid stops it first) }. Its pull, if any, widens what it catches.
-export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out = {}) {
+// (a solid stops it first) }. Its pull, if any, drags a `pullable`
+// opponent toward it (at the pull's speed, once inside its radius), which
+// the opponent's path does not show: a Shield, a paralysis or a cast holds
+// its ground.
+export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out = {}, pullable = true) {
   out.contact = -1;
   out.margin = -Infinity;
   out.strikes = 0;
   out.blocked = false;
   const startK = Math.max(0, Math.round(delay / STEP));
   const life = Math.round(p.lifetime / STEP);
-  const pull = p.pull?.radius ?? 0;
+  const pull = pullable && p.pull ? p.pull : null;
   const v = stage.void;
+  let dragX = 0;
+  let dragY = 0;
+  const midY = (hurt.top + hurt.bottom) / 2;
   for (let j = 0; j < life; j++) {
     const k = startK + j;
     const px = x0 + dir * p.speed * (j + 1) * STEP;
@@ -439,16 +445,30 @@ export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out =
       break;
     }
     const fk = foe.i(k);
-    const fx = foe.x[fk];
-    const fy = foe.y[fk];
-    const h0 = fx - hurt.hw - pull;
-    const h1 = fx + hurt.hw + pull;
-    const v0 = fy + hurt.top - pull;
-    const v1 = fy + hurt.bottom + pull;
+    let fx = foe.x[fk] + dragX;
+    let fy = foe.y[fk] + dragY;
+    if (pull) {
+      const cx = px + dir * (pull.offset?.x ?? 0);
+      const cy = y0 + (pull.offset?.y ?? 0);
+      const ddx = cx - fx;
+      const ddy = cy - (fy + midY);
+      const d = Math.hypot(ddx, ddy);
+      if (d <= pull.radius && d > 1e-6) {
+        const step = Math.min(pull.speed * STEP, d);
+        dragX += (ddx / d) * step;
+        dragY += (ddy / d) * step;
+        fx += (ddx / d) * step;
+        fy += (ddy / d) * step;
+      }
+    }
+    const h0 = fx - hurt.hw;
+    const h1 = fx + hurt.hw;
+    const v0 = fy + hurt.top;
+    const v1 = fy + hurt.bottom;
     if (shotBox.x < h1 && shotBox.x + shotBox.w > h0 && shotBox.y < v1 && shotBox.y + shotBox.h > v0) {
       out.contact = k;
       out.margin = Math.min(v1 - shotBox.y, shotBox.y + shotBox.h - v0);
-      out.strikes = p.pierce ? (pull > 0 || p.carry ? p.pierce.hits : Math.max(1, Math.ceil(p.pierce.hits / 2))) : 1;
+      out.strikes = p.pierce ? (pull || p.carry ? p.pierce.hits : Math.max(1, Math.ceil(p.pierce.hits / 2))) : 1;
       break;
     }
   }
@@ -513,8 +533,9 @@ const recBody = {};
 // jumps: air jumps used, dashed, margin (how high above the ledge it
 // clears, roughly) }. `policy` varies the timings: the CPU tries several
 // and keeps the best (see the recovery plan).
-export function recoverySim(model, gravity, st, res, policy = {}, out = {}) {
+export function recoverySim(model, gravity, st, res, policy = {}, out = {}, track = null) {
   const b = bodyFrom(st, recBody);
+  if (track) track.clear();
   const jumpBelow = policy.jumpBelow ?? 30;
   const dashFar = policy.dashFar ?? 150;
   const maxSteps = policy.maxSteps ?? 160;
@@ -529,29 +550,36 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}) {
   out.fell = false;
   out.jumps = 0;
   out.dashed = false;
+  out.rose = false;
   out.margin = -Infinity;
   out.t = 0;
   let minY = b.y;
+  let burst = false;
   for (let k = 0; k < maxSteps; k++) {
     const target = model.landingTarget(b.x, b.halfW, 14);
     const dx = target.x - b.x;
     const dir = Math.abs(dx) < 2 ? 0 : Math.sign(dx);
+    // Already over something to land on: nothing more to spend.
+    const over = model.supported(b.x, b.halfW, b.y);
     let share = 1;
     if (dashLeft > 0) {
       b.vx = dashDir * MV.airDashSpeed;
       b.vy = 0;
       share = 0;
       dashLeft -= STEP;
+      burst = true;
     } else if (riseLeft > 0) {
-      steer(b, MV, dir, rise.control ?? 0.5, 1, STEP, false);
+      steer(b, MV, dir, rise.control ?? 0.5, 1, STEP, burst);
       b.vy = -rise.speed;
       share = 0;
       riseLeft -= STEP;
       if (riseLeft <= 0) rise = null;
     } else {
-      steer(b, MV, dir, 1, 1, STEP, false);
+      steer(b, MV, dir, 1, 1, STEP, burst);
       const below = b.y - target.y;
-      if (dash && !launched && Math.abs(dx) > dashFar && below > -40 && below < 60 && (policy.dashEarly || b.vy > -150)) {
+      if (over) {
+        // Falling onto the stage: let it land.
+      } else if (dash && !launched && Math.abs(dx) > dashFar && below > -40 && below < 60 && (policy.dashEarly || b.vy > -150)) {
         dashLeft = MV.airDashDuration;
         dashDir = Math.sign(dx);
         dash = 0;
@@ -564,11 +592,14 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}) {
       } else if (!jumps && rise && b.vy > 0 && below > -20) {
         riseLeft = rise.time;
         launched = false;
+        out.rose = true;
       } else if (launched && b.vy > 0) {
         launched = false;
       }
     }
+    if (burst && Math.abs(b.vx) <= MV.maxSpeed) burst = false;
     stepBody(b, STEP, model.stage, gravity * share, b.maxFall);
+    if (track) track.push(b);
     out.t += STEP;
     minY = Math.min(minY, b.y);
     if (b.grounded) {

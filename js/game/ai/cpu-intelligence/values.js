@@ -1,4 +1,4 @@
-// CPU Intelligence: what outcomes are worth (Launch Point and knockback
+// CPU Intelligence: what outcomes are worth (Launch Point and launch
 // management).
 //
 // Purpose: one scale for every decision. A point of Launch Point dealt is
