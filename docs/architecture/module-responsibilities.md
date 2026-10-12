@@ -50,7 +50,7 @@ There are no import cycles (checked over every module).
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
 | `movement.js` | The universal movement values every fighter runs on (`BASE_FIGHTER_MOVEMENT`), the check that refuses a definition's own, and the Discover copy for them. | `data/characters.js`, `game/fighters/fighter.js`, `game/rendering/hit-fx.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation; the damage tiers every hit deals (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage`). | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
-| `difficulty.js` | The four CPU levels and their profiles. | `core/app.js`, `game/battle.js`, `game/ai/combat-ai.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
+| `difficulty.js` | The four CPU levels and their profiles (`CAPABILITY`: which way each trait improves). | `core/app.js`, `game/battle.js`, `game/ai/cpu-intelligence/brain.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
 | `abilities.js` | `abilityName`: a fighter's name for a move, or its neutral name. | `localization/strings/en.js`, `ui/mobile-abilities.js` |
 | `maps.js`, `practice-map.js` | The Quick Battle stages; the training stage (kept out of `MAPS`). | `core/app.js`, the battle, map-select and practice screens, `localization/strings/en.js` |
 
@@ -63,22 +63,34 @@ There are no import cycles (checked over every module).
 | `practice.js` | `PracticeSession`: Player 1 (with the player's Combat Assist setting) and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
 | `physics.js` | Bodies, integration, stage collision (`StageCollision`, with the queries `surfaceBelow`, `supportsAt`, `solidAcross` and `inVoid`; `stepBody`, `separate`, `dropThrough`). | `arena.js`, `fighters/fighter.js`, `rendering/hit-fx.js` |
 | `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order (Combat Assist's approach included: who has it, its presses, its cancellations); `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
-| `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/combat-ai.js` |
-| `fighters/fighter-controller.js` | `PlayerController` (the one kind that may carry Combat Assist), `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
-| `combat/attacks.js` | The attack schema and phases, validated repeat cooldowns (`js/data/cooldowns.js`), motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation, melee or ranged (`isMeleeAttack`, `isRangedAttack`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
+| `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/cpu-intelligence/prediction.js` |
+| `fighters/fighter-controller.js` | `PlayerController` (the one kind that may carry Combat Assist), `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/cpu-intelligence/executor.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
+| `combat/attacks.js` | The attack schema and phases, validated repeat cooldowns (`js/data/cooldowns.js`), motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation, melee or ranged (`isMeleeAttack`, `isRangedAttack`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/moveset.js`, `ai/cpu-intelligence/` |
 | `combat/combat-assist.js` | Combat Assist's rules of measure: `assistsAttack`, `meleeGap`, `reachVector`, `approachMove`, `REACHED`, `approachClear`, `assistRange`, `assistSpeed`, `ASSIST_MARGIN`. | `fighters/fighter.js` |
 | `combat/hit-effects.js` | The shared hit effects (`unblockable`, `paralyze`, `blockPush`) and their validation. | `combat/attacks.js`, `combat/projectile.js`, `combat/technique.js` |
 | `combat/pull.js` | Pulls: attacks and projectiles drawing opponents in, each step. | `arena.js` |
 | `combat/defense.js` | The defense schema (the Shield, on the ground; air Shield fields refused). | `fighters/fighter.js` |
 | `combat/deflect.js` | The Deflect schema: an attack definition with every Deflect's fixed strike (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`). | `fighters/fighter.js` |
 | `combat/combat-state.js` | `CombatState`, `CooldownTimers`, `resolveEnergy` and the universal Energy rules (`MAX_ENERGY`, `DASH_ENERGY_COST`, `BLOCK_ENERGY_COST`, `DEFLECT_ENERGY_COST`). | `fighters/fighter.js` |
-| `combat/combat.js` | `CombatSystem` (projectiles a live Deflect turns back, then hit resolution), launch reaction, `worldBox`. | `arena.js`, `combat/combat-assist.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
+| `combat/combat.js` | `CombatSystem` (projectiles a live Deflect turns back, then hit resolution), launch reaction, `worldBox`. | `arena.js`, `combat/combat-assist.js`, `fighters/fighter.js` |
 | `combat/projectile.js` | Projectiles, and what they do to each other (`clashProjectiles`: repel, erase); `turnBack` (shared by repel and the Deflect); the art's spin (`projectileAngle`). | `arena.js`, `fighters/fighter.js` |
 | `combat/summon.js` | The summon system and its clones. | `arena.js`, `fighters/fighter.js`, `ai/moveset.js` |
 | `combat/technique.js` | The technique runtime. | `fighters/fighter.js`, `ai/moveset.js`, `data/loadout.js` |
 | `combat/launch-bounce.js` | Launch rebounds and their settings. | `fighters/fighter.js`, `rendering/hit-fx.js` |
-| `ai/combat-ai.js` | `CombatAIController`. | `battle.js` |
-| `ai/moveset.js` | `readMoveset`, `hurtExtent`. | `ai/combat-ai.js` |
+| `ai/combat-ai.js` | `CombatAIController`: CPU Intelligence as the modes build it. | `battle.js` |
+| `ai/moveset.js` | `readMoveset`, `hurtExtent`: a definition read raw. | `ai/cpu-intelligence/capabilities.js` |
+| `ai/cpu-intelligence/brain.js` | `CpuIntelligence`: the layers run every step in their order, plans, recovery, liveness, the attack orientation, test directives (see [CPU Intelligence](../systems/ai.md)). | `ai/combat-ai.js` |
+| `ai/cpu-intelligence/capabilities.js` | `analyzeCapabilities` (each move's timing, reach, strikes and roles), `moveReady`, `MOVE_ROLES`. | the other CPU Intelligence modules |
+| `ai/cpu-intelligence/perception.js` | `Perception`: the opponent as seen `latency` ago, recognized events, seen projectiles and clones. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/situation.js`, `stage-model.js` | `Situation` (the world model rebuilt each step), `StageModel` (ledges, surfaces, the live Void). | `ai/cpu-intelligence/` |
+| `ai/cpu-intelligence/prediction.js` | The forward simulation on the game's rules: paths, jump arcs, move and projectile contact, launches, recoveries. | `ai/cpu-intelligence/` |
+| `ai/cpu-intelligence/opponent-model.js` | `OpponentModel`: the opponent's observed habits, decaying. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/strategy.js` | `Strategy`: the strategic mode with hysteresis. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/evaluator.js`, `values.js` | `Evaluator` (expected utility of every option), `LaunchJudge`, `KO_VALUE`. | `ai/cpu-intelligence/` |
+| `ai/cpu-intelligence/defense.js` | `Defense`: threats and their answers. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/plans.js` | `makePlan`, `COMMITTED`: each plan kind's steps. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/executor.js` | `Executor`: one legal input snapshot, the ledge guard. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/telemetry.js` | `Telemetry`, `STILL_LIMIT`: counters, move usage, the debug trace. | `ai/cpu-intelligence/brain.js` |
 | `rendering/sprite-normalizer.js` | `SpriteSet`, sprite normalization and drawing. | `arena.js`, `core/app.js`, `ui/stage-preview.js` |
 | `rendering/sprite-animator.js` | `SpriteAnimator`. | `fighters/fighter.js`, `combat/summon.js` |
 | `rendering/camera.js` | The camera. | `arena.js` |

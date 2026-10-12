@@ -97,7 +97,7 @@ hit and is past its `hitCancel`), its cooldown is over, it is not
 `groundOnly` in the air, its per-airtime starts are not used up, the
 fighter is not in free fall, and its art (and its projectile's art) is
 there. An attack faces the direction held as it starts (the combat AI
-faces its target instead). A press that cannot start yet is kept by the
+faces its target as it perceives it instead). A press that cannot start yet is kept by the
 combat input buffer for the universal `attackBuffer` (0.15 s,
 [movement](movement.md#2-the-universal-values)) and tried every step, so
 it comes out on the first step it can; in the air, a press whose ground
@@ -384,7 +384,7 @@ starts the very attack asked for. The rules are
   `PlayerController` alone. A CPU's controller (`CombatAIController`,
   `TrainingAIController`) or none (the practice dummy) never has it, so
   the exclusion is structural: no slot, label or fighter id is read, and
-  [`js/game/ai/combat-ai.js`](../../js/game/ai/combat-ai.js) has no
+  [`js/game/ai/`](../../js/game/ai/) (CPU Intelligence included) has no
   Combat Assist code.
 - **Start.** `tryAction` has checked the press may start its attack now;
   before `startAttack`, `tryCombatAssist` may start the approach instead:

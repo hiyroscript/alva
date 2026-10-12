@@ -16,13 +16,14 @@ a real browser.
 
 | Folder | What it covers |
 | --- | --- |
-| [`tests/systems/`](../../tests/systems/) | The shared mechanics, for every fighter: the shared combat rules over every fighter and every kind of hit at once (`combat-rules`: Energy 100 and its costs, the damage tiers 1 / 3 / 5 / 10, difficulty never touching a hit, the cooldowns, one movement baseline), movement, universal movement (`universal-movement`: the same values and trajectories for every fighter, the triple jump), momentum (`momentum`), the movement rules (`movement-rules`), the Dash and the air dash (`air-mouvment`), facing, Down, combos and hit-cancels, Energy, defense, the Deflect (`deflect`), Launch, launch reaction and bounce, loadouts, codenames, the fighter status, the hit effects on screen (`hit-fx`) and in play (`hit-effects`: unblockable, paralysis, block push, stall), pulls, projectile clashes, the projectiles' spin (`projectile-spin`), the cast form of techniques, Combat Assist (`combat-assist`: the player's melee approach, that it costs no Energy, its cancellations, and no CPU ever having it), stages, the combat AI, ability names, and a fighter that is not #0001. |
+| [`tests/systems/`](../../tests/systems/) | The shared mechanics, for every fighter: the shared combat rules over every fighter and every kind of hit at once (`combat-rules`: Energy 100 and its costs, the damage tiers 1 / 3 / 5 / 10, difficulty never touching a hit, the cooldowns, one movement baseline), movement, universal movement (`universal-movement`: the same values and trajectories for every fighter, the triple jump), momentum (`momentum`), the movement rules (`movement-rules`), the Dash and the air dash (`air-mouvment`), facing, Down, combos and hit-cancels, Energy, defense, the Deflect (`deflect`), Launch, launch reaction and bounce, loadouts, codenames, the fighter status, the hit effects on screen (`hit-fx`) and in play (`hit-effects`: unblockable, paralysis, block push, stall), pulls, projectile clashes, the projectiles' spin (`projectile-spin`), the cast form of techniques, Combat Assist (`combat-assist`: the player's melee approach, that it costs no Energy, its cancellations, and no CPU ever having it), stages, the combat AI's controller contract (`combat-ai`) and CPU Intelligence (`cpu-intelligence`: liveness, every move of every fighter recognized and used at every level, the Deflect both ways, recovery, strategy, punishes, difficulty progression, determinism), ability names, and a fighter that is not #0001. |
 | [`tests/fighters/0001/`](../../tests/fighters/0001/), [`tests/fighters/0002/`](../../tests/fighters/0002/) | One fighter's own art and moves, with its exact values. #0001's are split by subject: `fighter-0001` (registration, art, data, names), `moves-0001` (every move's mechanic), `combos-0001` (its combo routes) and `cpu-0001` (the CPU playing it and facing it). |
 | [`tests/fighters/profiles.test.mjs`](../../tests/fighters/profiles.test.mjs) | Every playable fighter's Discover profile: one whole 1–5 difficulty, a play-style description in both languages, and the profile-review guard (see below). |
 | [`tests/fighters/fixtures/`](../../tests/fighters/fixtures/) | Test-only fighters (never in the game): `sample-fighter.mjs` (different moves on the same codenames), `loadout-fighters.mjs` (one fighter per loadout shape), `test-fighters.mjs` (fighters the screen tests register for their own run), `cooling-fighters.mjs` (#0001 with technique cooldowns, for alternative shared cooldown durations). |
 | [`tests/interface/`](../../tests/interface/) | Screens (Discover: its three sections — Fighters, Movement, Launch — localization, reference-page scrolling, the Fighters page, the play-style dialog), the HUD, touch controls and their layouts, Settings, localization, the stylesheet parts, the splash. |
 | [`tests/integration/`](../../tests/integration/) | Whole modes: match scoring, the match clock and overtime in both battle modes (`overtime`: the closing Void, its waves, the elimination burst), difficulty, Watch Mode, Practice Ground, the empty roster, and every pairing of playable fighters. |
-| [`tests/helpers/`](../../tests/helpers/) | `fighter-harness.mjs` (the Fighter on a test stage), `png-art.mjs` (a PNG decoder and just enough canvas to normalize a fighter's real frames), `stylesheet.mjs` (the CSS as the page links it). |
+| [`tests/helpers/`](../../tests/helpers/) | `fighter-harness.mjs` (the Fighter on a test stage), `cpu-match.mjs` (a whole seeded match on a real `Battle` between any two controllers, with its measurements), `reference-opponents.mjs` (five scripted reference styles for the CPU benchmark), `png-art.mjs` (a PNG decoder and just enough canvas to normalize a fighter's real frames), `stylesheet.mjs` (the CSS as the page links it). |
+| [`tests/benchmarks/`](../../tests/benchmarks/) | Not run by `node --test`: `cpu-benchmark.mjs`, the CPU Intelligence match benchmark (see below). |
 
 ## Universal tests and fighter tests
 
@@ -44,6 +45,27 @@ and check #0001's numbers (frame-exact timings, combo routes). They are
 correct for #0001, and the same rules are covered for every fighter by the
 character-neutral tests above.
 
+## The CPU benchmark
+
+```sh
+node tests/benchmarks/cpu-benchmark.mjs                       # the standard suite, 2 seeds
+node tests/benchmarks/cpu-benchmark.mjs --seeds 4             # more games per matchup
+node tests/benchmarks/cpu-benchmark.mjs --only brutal:hard    # one matchup
+node tests/benchmarks/cpu-benchmark.mjs --from 5 --seeds 4    # seeds 5-8 (split runs across processes)
+node tests/benchmarks/cpu-benchmark.mjs --json out.json       # raw results too
+```
+
+Deterministic full matches (first to 3, the 7-minute clock and overtime)
+over every pairing of the playable fighters both ways round, both stages,
+both starting sides and the seeds asked for, for each matchup: Brutal
+against Hard and Medium, Hard against Medium and Easy, Medium against
+Easy, Brutal against each reference style, Easy against the balanced one.
+It reports each matchup's win rate with its 95% Wilson interval, points,
+Launch Point dealt and taken, eliminations and self-eliminations, combos,
+punishes, Shield blocks, Deflects, exhaustion, invalid inputs, inactivity,
+stuck navigation and every move's usage. The measured results are in
+[CPU Intelligence](../systems/ai.md#benchmark).
+
 ## The fighter harness
 
 [`tests/helpers/fighter-harness.mjs`](../../tests/helpers/fighter-harness.mjs)
@@ -55,7 +77,7 @@ metadata, no decoded PNGs):
 | `harnessFor(character)` | The helpers below, bound to one fighter: `{ def, fakeSprites, makeFighter, duel }`. Prefer it for anything that is not about #0001. |
 | `makeFighter({ character, sprites, x, y, facing, stage })` | One fighter, stepped by hand (`step(held)`). `sprites` defaults to the character's own. |
 | `duel({ attackerCharacter, targetCharacter, ... })` | Two fighters, their projectiles and clones and the real `CombatSystem`, stepped in the battle's order. |
-| `cpuFight(defA, defB, { seconds, seed, difficulty })` | Two seeded CPUs in a real fight. |
+| `cpuFight(defA, defB, { seconds, seed, difficulty })` | Two seeded CPUs in a real fight; its log keeps each step's inputs, attack, state, whether the fighter was free to act and exhausted. |
 | `fakeSpritesOf(character, ...)` | A sprite set for any character. |
 | `probeHit(spec)` | A bare hit for `CombatSystem.applyHit` that is no authored content: a probe of the launch, stun or hit-effect math dealing any damage (0 by default), every other field validated by `createAttackDefinition`. No authored hit may deal anything but 1, 3, 5 or 10. |
 | `DEFAULT_CHARACTER`, `def`, `fakeSprites`, `BASE` | The compatibility default: #0001, because the first tests were written against it. Used deliberately by #0001's own tests; not a reference fighter. |
