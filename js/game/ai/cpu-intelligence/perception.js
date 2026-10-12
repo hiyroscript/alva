@@ -39,7 +39,7 @@ function blankSnap() {
     energy: 100, exhausted: false, lp: 0, dash: null, dashDir: 0, dashSpeed: 0, dashLeft: 0, dashAir: false,
     technique: null, techniqueDef: null, techniquePhase: null, techniqueReleaseIn: 0, techniqueEndIn: 0, techniqueFacing: 1,
     summon: null, summonLeft: 0, airJumps: 0, airDashes: 0, freeFall: false, launched: false, tumbling: false,
-    canAct: true, assist: false, lastGroundY: 0, lost: false,
+    canAct: true, lastGroundY: 0, lost: false,
   };
 }
 
@@ -97,7 +97,6 @@ function snap(s, f, t) {
   s.launched = !!f.launch;
   s.tumbling = f.tumbling;
   s.canAct = f.canAct();
-  s.assist = !!f.combatAssist;
   s.lastGroundY = f.lastGroundY;
   s.lost = !!f.lostToVoid;
   return s;

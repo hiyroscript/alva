@@ -716,6 +716,16 @@ export class CpuIntelligence {
     return !this.lastUsedLife.has(m.key);
   }
 
+  // What reaching for move `m` is worth for variety alone: more the longer
+  // it has gone unused (a move left idle is one the opponent stops
+  // covering), most for one not yet used this life. A stronger player
+  // mixes its options up more deliberately (`adapt`).
+  variety(m) {
+    const u = this.usage.get(m.key);
+    const idle = u ? this.clock - u.at : this.clock + 30;
+    return (this.unused(m) ? 0.35 : 0) + Math.min(0.9, idle / 25) * (0.2 + 0.8 * this.profile.adapt);
+  }
+
   // The safety net (Rule A): free to act, on the ground, in a live match,
   // and nothing held, pressed or moving for longer than a brief pause:
   // an incident, and a fresh plan at once.

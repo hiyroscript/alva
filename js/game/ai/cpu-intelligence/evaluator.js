@@ -38,6 +38,7 @@ import {
 } from './prediction.js';
 import { LaunchJudge, KO_VALUE, riseOf } from './values.js';
 import { stepBody } from '../../physics.js';
+import { attackPhase } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
 // How quickly a sharp opponent reacts to a move it sees coming (seconds):
@@ -452,9 +453,16 @@ export class Evaluator {
     // itself carries it clear.
     const incoming = brain.incoming;
     let struckFirst = 0;
+    let blow = incoming?.severity ?? 0;
     if (incoming && !c.combo) {
       const first = incoming.contact < tC - 0.02 || (m.kind === 'technique' && incoming.contact < m.lead + 0.05);
       if (first) struckFirst = clamp(incoming.p ?? 0.8, 0, 1);
+    }
+    // Or the CPU's own way in (a Dash, a jump, the move's step) runs into
+    // the live box of the attack the opponent is already making.
+    if (!c.combo && struckFirst < 0.9 && this.intoActiveBlow(s, c)) {
+      struckFirst = 0.9;
+      blow = Math.max(blow, this.foePunish);
     }
     // Struck first: an opponent free to act before the strike lands (or a
     // projectile is let go, or a cast releases) and close enough to reach
@@ -494,13 +502,17 @@ export class Evaluator {
     const risk = params.risk * (0.4 + p.riskSense * 0.6);
     const lost = Math.max(struckFirst, interrupt);
     let utility = (pHit * vHit + pBlocked * vBlock * risk + pMiss * vMiss * risk) * (1 - lost) - cost -
-      interrupt * exposure * risk - struckFirst * (incoming?.severity ?? 0) * (0.4 + p.riskSense * 0.6) -
+      interrupt * exposure * risk - struckFirst * blow * (0.4 + p.riskSense * 0.6) -
       elim * KO_VALUE * s.match.koAgainst * (0.3 + p.riskSense * 0.7);
     // The strategy's preferred roles, and the CPU's own sense of variety.
     let bonus = 0;
     for (const role of m.roles) bonus += params.roles[role] ?? 0;
     utility += bonus * (0.5 + pHit);
-    if (brain.unused(m) && pHit > 0.25) utility += 0.35;
+    if (pHit > 0.25) utility += brain.variety(m);
+    // Tempo: the same hit is worth less the longer it takes to land (the
+    // time spent getting there is time the opponent gets back, and an
+    // opening wasted waiting).
+    if (utility > 0 && !c.projectile) utility /= 1 + Math.max(0, tC - 0.3) * 0.6;
     c.p = pHit * (1 - lost);
     c.pBlock = pBlocked;
     c.pg = pg;
@@ -510,6 +522,41 @@ export class Evaluator {
     c.elim = elim;
     c.reason = this.reason(s, m, c, busy, tC);
     return c;
+  }
+
+  // Whether the CPU's way to its strike (candidate `c`, whose own path is
+  // in selfTrack from step k0) crosses the live box of the attack the
+  // opponent is already making, as perceived, before the strike lands: on
+  // its way to the move's start (straight there, a Dash or a jump), then on
+  // the move's own path. A blow already on its way lands first.
+  intoActiveBlow(s, c) {
+    const op = s.op;
+    const def = op.attackDef;
+    if (!def?.hitbox || op.view.attackHit) return false;
+    const hurt = s.caps.hurt;
+    const t = this.selfTrack;
+    if (!t.len) return false;
+    const k0 = c.k0 ?? 0;
+    const last = Math.min(c.contactK, 90);
+    for (let k = 0; k <= last; k++) {
+      if (attackPhase(def, op.attackTime + (k + 1) * STEP) !== 'active') continue;
+      let x;
+      let y;
+      if (k < k0) {
+        const a = (k + 1) / k0;
+        x = s.me.x + (t.x[0] - s.me.x) * a;
+        y = s.me.y + (t.y[0] - s.me.y) * a;
+      } else {
+        const i = t.i(k - k0);
+        x = t.x[i];
+        y = t.y[i];
+      }
+      const fk = s.foeTrack.i(k);
+      boxAt(def.hitbox, s.foeTrack.x[fk], s.foeTrack.y[fk], op.facing, scratchBox);
+      if (scratchBox.x < x + hurt.hw && scratchBox.x + scratchBox.w > x - hurt.hw &&
+          scratchBox.y < y + hurt.bottom && scratchBox.y + scratchBox.h > y + hurt.top) return true;
+    }
+    return false;
   }
 
   // How likely move `m` (candidate `c`) leaves the CPU unable to get back:

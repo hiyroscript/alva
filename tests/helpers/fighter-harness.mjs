@@ -236,11 +236,13 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
   for (let n = 0; n < seconds / DT; n++) {
     for (const f of world.fighters) {
       if (f.lostToVoid) continue;
+      // Free to act as it decides this step (before the step plays out).
+      const free = f.canAct() && !f.inputLocked;
       f.update(DT, ctx);
       log.get(f).push({
         ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
         state: f.state, grounded: f.grounded, frame: frameName(f), cooling: [...f.combat.abilityCooldowns.entries.keys()],
-        technique: f.technique?.def.id ?? null,
+        technique: f.technique?.def.id ?? null, free, exhausted: f.combat.energyExhausted,
       });
       // Back on stage at once if the Void takes one: the fight goes on.
       if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);
