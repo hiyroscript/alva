@@ -155,6 +155,9 @@ const STEPS = {
     if (me.grounded && brain.clock - plan.jumpAt > 4 * STEP) return 'done';
     if (plan.pressedAt == null) {
       ex.dir(driftDir(me.x, me.vx, c.toX));
+      // Waiting off the stage for the moment to strike: never past the
+      // point of no return (the plan is dropped for the way back).
+      if (me.offstage && !brain.canStillReturn(s, plan)) return 'fail';
       const pressAt = plan.jumpAt + (c.pressK - (c.delayK ?? 0)) * STEP + plan.timing;
       if (brain.clock + 1e-9 < pressAt) return 'run';
       // Things change in flight (a pull, a hit, a turn): the strike must
@@ -184,7 +187,11 @@ const STEPS = {
     const self = s.self;
     if (plan.jump && !plan.jumped) {
       if (!s.me.grounded) plan.jumped = true;
-      else {
+      else if (plan.jumpAt != null && brain.clock + 1e-9 < plan.jumpAt) {
+        // Standing its ground until the moment to jump.
+        ex.dir(0);
+        return 'run';
+      } else {
         if (ex.jump(self, false)) {
           plan.jumped = true;
           brain.telemetry.count('jumps');
@@ -192,7 +199,7 @@ const STEPS = {
         return 'run';
       }
     }
-    if (s.me.grounded && brain.clock - plan.start > 4 * STEP) return 'fail';
+    if (s.me.grounded && brain.clock - Math.max(plan.start, plan.jumpAt ?? 0) > 4 * STEP) return 'fail';
     if (plan.pressedAt == null && brain.clock + 1e-9 < plan.pressAt) return 'run';
     const r = pressMove(plan, brain, s, ex, s.caps.deflect);
     if (r === 'done') brain.telemetry.count('deflects');

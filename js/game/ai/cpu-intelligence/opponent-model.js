@@ -31,6 +31,7 @@ export class OpponentModel {
     this.n = {
       jump: 0, groundAttack: 0, airAttack: 0, projectile: 0, dash: 0, shield: 0, whiff: 0,
       threatened: 0, shieldedThreat: 0, jumpedThreat: 0, approach: 0, retreat: 0, technique: 0,
+      closeTime: 0, closeAttack: 0,
     };
     this.attackDist = 120;
     this.attackDistW = 0;
@@ -60,8 +61,9 @@ export class OpponentModel {
   }
 
   // Ages every count by `dt` and takes in this step's recognized events and
-  // the opponent's motion relative to the CPU (`dx` from the CPU to it).
-  update(dt, events, view, dx, threatenedNow) {
+  // the opponent's motion relative to the CPU (`dx` from the CPU to it;
+  // `near`: within reach of its own strikes).
+  update(dt, events, view, dx, threatenedNow, near = false) {
     this.time += dt;
     const f = Math.exp(-DECAY * dt);
     for (const k of Object.keys(this.n)) this.n[k] *= f;
@@ -74,6 +76,7 @@ export class OpponentModel {
           if (def?.projectile) this.n.projectile += 1;
           else if (view.grounded) this.n.groundAttack += 1;
           else this.n.airAttack += 1;
+          if (near && !def?.projectile) this.n.closeAttack += 1;
           const d = Math.abs(dx);
           this.attackDist = (this.attackDist * this.attackDistW + d) / (this.attackDistW + 1);
           this.attackDistW += 1;
@@ -95,6 +98,7 @@ export class OpponentModel {
       }
     }
     if (threatenedNow) this.n.threatened += dt * 4;
+    if (near) this.n.closeTime += dt;
     // Pressing forward (toward the CPU) or backing off.
     const toward = -Math.sign(dx) * view.vx;
     if (view.grounded && Math.abs(view.vx) > 60) {
@@ -138,6 +142,17 @@ export class OpponentModel {
     return this.trust(this.n.whiff) * Math.min(1, this.rate('whiff') / 0.5);
   }
 
+  // How many attacks a second it starts within reach of the CPU: how likely
+  // it is to be pressing a button of its own at any moment up close (a
+  // prior of about one a second until seen).
+  get pressure() {
+    const t = this.n.closeTime;
+    const prior = 1.2;
+    const seen = t > 0.3 ? this.n.closeAttack / t : prior;
+    const w = this.trust(t * 2);
+    return prior * (1 - w) + seen * w;
+  }
+
   // How often it Dashes.
   get dashy() {
     return this.trust(this.n.dash) * Math.min(1, this.rate('dash') / 0.5);
@@ -158,7 +173,7 @@ export class OpponentModel {
     const r = (v) => Math.round(v * 100) / 100;
     return {
       jumpy: r(this.jumpy), shieldy: r(this.shieldy), zoner: r(this.zoner), aggressive: r(this.aggressive),
-      whiffy: r(this.whiffy), dashy: r(this.dashy), range: this.preferredRange && Math.round(this.preferredRange),
+      whiffy: r(this.whiffy), dashy: r(this.dashy), pressure: r(this.pressure), range: this.preferredRange && Math.round(this.preferredRange),
       repeats: this.predictableMove,
     };
   }

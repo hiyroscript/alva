@@ -360,9 +360,14 @@ export class Defense {
       const d = this.deflectTiming(s, threat, deflect);
       if (d) {
         const left = me.energy - deflect.energyCost;
+        // Turned back, it is the CPU's own for the rest of its flight: a
+        // hit on its thrower if it still reaches, most of all one still
+        // recovering from the throw.
+        const flight = Math.max(0, threat.def.lifetime - (threat.age ?? 0) - threat.contact) * threat.def.speed;
+        const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + (threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
         options.push({
-          score: 0.4 - (deflect.energyCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0) + (threat.unblockable ? 1 : 0),
-          plan: { kind: 'deflect', jump: d.jump, pressAt: brain.clock + d.press, why: 'Deflects it back' }, why: 'Deflect',
+          score: 0.4 + back - (deflect.energyCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0) + (threat.unblockable ? 1 : 0),
+          plan: { kind: 'deflect', jump: d.jump, jumpAt: brain.clock + d.jumpAt, startAt: d.jump ? brain.clock + d.jumpAt : null, pressAt: brain.clock + d.press, why: 'Deflects it back' }, why: 'Deflect',
         });
       }
     }
@@ -476,7 +481,9 @@ export class Defense {
 
   // When to press the Deflect so its live box meets projectile `threat`
   // before the projectile meets the CPU's body: { press (seconds from now),
-  // jump (a jump first, from the ground) } or null.
+  // jump (a jump first, from the ground), jumpAt (seconds from now) } or
+  // null. From the ground the jump may wait so the swat meets a low shot
+  // early in the rise.
   deflectTiming(s, threat, d) {
     if (!threat.def) return null;
     const me = s.me;
@@ -489,20 +496,32 @@ export class Defense {
     const hb = d.def.hitbox;
     const startK = Math.round(d.def.startup / STEP);
     const activeK = Math.max(1, Math.round(d.def.active / STEP));
-    const contactK = Math.floor(threat.contact / STEP);
-    const face = -threat.dir || me.facing;
-    for (let press = jumpFirst ? 2 : 0; press + startK <= contactK + activeK; press++) {
-      // The projectile must not meet the body before the Deflect is live.
-      const live0 = press + startK;
-      if (live0 > contactK + 1) break;
-      for (let k = live0; k < live0 + activeK; k++) {
-        const a = arc.i(k);
-        if (arc.g[a] && k > 3) break;
-        boxAt(hb, arc.x[a], arc.y[a], face, box2);
-        const t = (k + 1) * STEP - (threat.delay ?? 0);
-        if (t < 0) continue;
-        boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y, threat.dir, box);
-        if (overlaps(box, box2)) return { press: press * STEP, jump: jumpFirst };
+    // The step (0: this one) at whose end the projectile meets the body.
+    // The game turns projectiles back before any strikes in a step, so the
+    // Deflect must be live by that step at the latest.
+    const contactK = Math.round(threat.contact / STEP) - 1;
+    // The Fighter aims every attack, the Deflect included, at the opponent
+    // the CPU sees (CpuIntelligence.attackFacing): its box is on that side.
+    const face = Math.sign(s.op.x - me.x) || me.facing;
+    if (face !== -threat.dir) return null;
+    // Standing still until the jump, its arc is the same one, later. The
+    // latest jump that works is taken: the swat follows the takeoff, with
+    // no long wait in the air.
+    const lastJump = jumpFirst ? Math.max(0, contactK - startK - 1) : 0;
+    const wait = Math.round(0.3 / STEP);
+    for (let jumpAt = lastJump; jumpAt >= 0; jumpAt--) {
+      const first = jumpFirst ? jumpAt + 1 : 0;
+      for (let press = first; press + startK <= contactK && press - first <= wait; press++) {
+        const live0 = press + startK;
+        for (let k = live0; k < live0 + activeK; k++) {
+          const a = arc.i(k - jumpAt);
+          if (arc.g[a] && k - jumpAt > 3) break;
+          boxAt(hb, arc.x[a], arc.y[a], face, box2);
+          const t = (k + 1) * STEP - (threat.delay ?? 0);
+          if (t < 0) continue;
+          boxAt(threat.def.hitbox, threat.x + threat.dir * threat.def.speed * t, threat.y, threat.dir, box);
+          if (overlaps(box, box2)) return { press: press * STEP, jump: jumpFirst, jumpAt: jumpAt * STEP };
+        }
       }
     }
     return null;

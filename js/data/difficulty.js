@@ -90,7 +90,7 @@ const PROFILES = {
     energySense: 0.55, riskSense: 0.55, stageSense: 0.65, opportunity: 0.6, diSkill: 0.5, recoverySkill: 0.8, initiative: 0.6,
   },
   hard: {
-    react: [0.12, 0.19], lapse: 0.06, think: [0.065, 0.11], noise: 0.13, rangeError: 7, predictError: 0.1, timing: 0.02,
+    react: [0.15, 0.22], lapse: 0.06, think: [0.065, 0.11], noise: 0.13, rangeError: 7, predictError: 0.1, timing: 0.02,
     lookahead: 0.4, planDepth: 3, comboReliability: 0.88, guard: 0.82, perfectShield: 0.5, punish: 0.85, adapt: 0.7,
     energySense: 0.8, riskSense: 0.8, stageSense: 0.85, opportunity: 0.82, diSkill: 0.8, recoverySkill: 0.93, initiative: 0.68,
   },

@@ -74,9 +74,11 @@ export class Evaluator {
     let best = 3;
     const myPos = { x: s.me.x, y: s.me.y, grounded: s.me.grounded, halfW: s.me.halfW, height: s.me.height };
     const face = Math.sign(s.me.x - s.op.x) || 1;
+    // Its quick close moves, aerials and the Deflect included (it can jump
+    // to swat the CPU as well as strike it on foot).
     for (const m of s.foeCaps.moves) {
-      if (m.kind !== 'melee' || m.air) continue;
-      fast = Math.min(fast, m.lead);
+      if (m.kind !== 'melee' && m.kind !== 'deflect') continue;
+      if (!m.air) fast = Math.min(fast, m.lead);
       if (m.lead > 0.3) continue;
       const v = this.judge.strikes(s, 'me', m.strikes, m.strikes.length, myPos, face, this.hv).value;
       best = Math.max(best, v * (1 / (1 + m.lead * 2)));
@@ -441,7 +443,10 @@ export class Evaluator {
     const gap = Math.abs(s.foeTrack.x[endF] - c.endX);
     const near = gap < s.foeReach.lunge + 60 ? 1 : gap < s.foeReach.lunge + 220 ? 0.45 : 0.15;
     const punishable = clamp((window - this.foeFast - FOE_REACT * 0.6) / 0.25, 0, 1) * near;
-    let vMiss = -0.4 - punishable * this.foePunish * 0.75;
+    // What being hit costs: the opponent's best quick hit from here, or,
+    // at a Launch Point where its best launch ends the CPU's life, that.
+    const exposure = Math.max(this.foePunish, brain.strategy.danger * KO_VALUE * s.match.koAgainst * 0.8);
+    let vMiss = -0.4 - punishable * exposure * 0.75;
     // Something already on its way to the CPU that lands first: its attack
     // is lost (no attack has armour) and the blow lands, unless the move
     // itself carries it clear.
@@ -462,6 +467,14 @@ export class Evaluator {
       if (freeFor - reachIn > this.foeFast + 0.02) {
         interrupt = clamp((freeFor - reachIn - this.foeFast) / 0.25, 0, 0.85) * (0.3 + 0.55 * model.aggressive) * (op.shielding ? 0.5 : 1);
       }
+      // Both pressing at once: up close an opponent that starts a quicker
+      // strike of its own before this one lands wins the exchange, seen
+      // coming or not (it may already be pressing). How often it does is
+      // its habit (`pressure`: attacks a second within reach).
+      const open = exposedUntil - Math.max(busy, 0) - this.foeFast;
+      if (open > 0 && s.dist < s.foeReach.lunge + 40 && !op.shielding) {
+        interrupt = Math.max(interrupt, clamp(1 - Math.exp(-model.pressure * open), 0, 0.85));
+      }
     }
     // Resources: Energy (the Deflect's, a Dash's), a long cooldown.
     let cost = 0;
@@ -481,7 +494,7 @@ export class Evaluator {
     const risk = params.risk * (0.4 + p.riskSense * 0.6);
     const lost = Math.max(struckFirst, interrupt);
     let utility = (pHit * vHit + pBlocked * vBlock * risk + pMiss * vMiss * risk) * (1 - lost) - cost -
-      interrupt * this.foePunish * risk - struckFirst * (incoming?.severity ?? 0) * (0.4 + p.riskSense * 0.6) -
+      interrupt * exposure * risk - struckFirst * (incoming?.severity ?? 0) * (0.4 + p.riskSense * 0.6) -
       elim * KO_VALUE * s.match.koAgainst * (0.3 + p.riskSense * 0.7);
     // The strategy's preferred roles, and the CPU's own sense of variety.
     let bonus = 0;

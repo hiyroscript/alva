@@ -48,7 +48,7 @@ import { Defense } from './defense.js';
 import { Executor } from './executor.js';
 import { makePlan, COMMITTED } from './plans.js';
 import { Telemetry, STILL_LIMIT } from './telemetry.js';
-import { STEP, Track, predictTrack, recoverySim } from './prediction.js';
+import { STEP, Track, arcTrack, predictTrack, recoverySim } from './prediction.js';
 import { riseOf } from './values.js';
 import { analyzeCapabilities } from './capabilities.js';
 import { StageModel } from './stage-model.js';
@@ -71,6 +71,9 @@ export class CpuIntelligence {
     this.executor = new Executor();
     this.telemetry = new Telemetry(debug);
     this.comboTrack = new Track(160);
+    this.recoveryTrack = new Track(200);
+    this.lagTrack = new Track(40);
+    this.returnOut = {};
     this.scratchList = [];
     this.candidateList = [];
     this.out = this.executor.out;
@@ -147,7 +150,7 @@ export class CpuIntelligence {
     if (present) {
       const mine = self.combat.attack;
       const threatening = !!mine && mine.def.hitbox && self.combat.phase !== 'recovery' && s.dist < s.myReach.lunge + 40;
-      this.opponent.update(dt, this.perception.events, this.perception.view, s.dx, threatening);
+      this.opponent.update(dt, this.perception.events, this.perception.view, s.dx, threatening, s.dist < s.foeReach.lunge + 40);
     }
     if (think) {
       this.evaluator.begin(s);
@@ -336,7 +339,7 @@ export class CpuIntelligence {
       case 'airDrift':
         return makePlan('airDrift', { dir: a.dir, until: a.until, reason: a.why }, this);
       case 'deflect':
-        return makePlan('deflect', { jump: a.jump, pressAt: a.pressAt, threat: a.threat, until: this.clock + 1, reason: a.why }, this);
+        return makePlan('deflect', { jump: a.jump, jumpAt: a.jumpAt, pressAt: a.pressAt, threat: a.threat, until: this.clock + 1, reason: a.why }, this);
       case 'strike':
         return this.planFromCandidate(a.cand, a.why);
       case 'press':
@@ -566,11 +569,15 @@ export class CpuIntelligence {
     let best = variants[0];
     let bestScore = -Infinity;
     const st = { x: me.x, y: me.y, vx: me.vx, vy: me.vy, grounded: false, halfW: me.halfW, height: me.height };
+    const path = this.recoveryTrack;
     for (const v of variants.slice(0, n)) {
-      const r = recoverySim(s.model, s.gravity, st, { ...res, airDash: v.dashFar > 0 ? res.airDash : 0 }, { ...v, maxSteps: 200 });
+      const r = recoverySim(s.model, s.gravity, st, { ...res, airDash: v.dashFar > 0 ? res.airDash : 0 }, { ...v, maxSteps: 200 }, {}, path);
       // Back on the stage, with room, keeping the most for later: a lift
-      // that ends in free fall is the last resort.
-      const score = (r.ok ? 100 : r.fell ? -100 : 0) + Math.min(60, r.margin) - r.jumps * 4 - (r.dashed ? 6 : 0) - (r.rose ? 25 : 0);
+      // that ends in free fall is the last resort. A route through the
+      // reach of an opponent waiting at the ledge is a route into its
+      // edge-guard: the level's stage sense weighs it.
+      const score = (r.ok ? 100 : r.fell ? -100 : 0) + Math.min(60, r.margin) - r.jumps * 4 - (r.dashed ? 6 : 0) - (r.rose ? 25 : 0) -
+        this.edgeGuardExposure(s, path) * (0.3 + 0.7 * p.stageSense);
       if (score > bestScore) {
         bestScore = score;
         best = v;
@@ -582,6 +589,59 @@ export class CpuIntelligence {
       jumpBelow: Math.max(0, best.jumpBelow + (this.rng() * 2 - 1) * err), dashFar: best.dashFar, until: this.clock + 3,
       reason: `recovering: air jump ${Math.round(best.jumpBelow)} under the ledge${best.dashFar ? ', air dash home when far' : ''}`,
     }, this);
+  }
+
+  // Whether the CPU, off the stage and waiting on `plan`, could still get
+  // back if it set off a moment from now: falling `lag` seconds as it is,
+  // then the recovery it would fly with what it has left (the point of no
+  // return, with a margin). Checked every few steps per plan.
+  canStillReturn(s, plan, lag = 0.25) {
+    if (plan.returnAt != null && this.clock < plan.returnAt) return plan.canReturn;
+    plan.returnAt = this.clock + 3 * STEP;
+    const me = s.me;
+    const caps = s.caps;
+    const st = { x: me.x, y: me.y, vx: me.vx, vy: me.vy, grounded: false, halfW: me.halfW, height: me.height };
+    const fall = arcTrack(this.lagTrack, s.stage, s.gravity, st, { jump: null, dir: 0, steps: Math.round(lag / STEP) });
+    let ok = true;
+    if (fall.len) {
+      const k = fall.len - 1;
+      if (fall.g[k]) ok = true;
+      else {
+        const from = { x: fall.x[k], y: fall.y[k], vx: fall.vx[k], vy: fall.vy[k], grounded: false, halfW: me.halfW, height: me.height };
+        const res = {
+          airJumps: me.freeFall ? 0 : me.airJumps,
+          airDash: caps.movement.airDash && me.airDashes > 0 ? caps.movement.airDash.distance : 0,
+          dashOk: !me.exhausted, launched: false, rise: me.freeFall ? null : riseOf(caps),
+        };
+        ok = false;
+        for (const v of [{ jumpBelow: 30, dashFar: 150 }, { jumpBelow: 70, dashFar: 110 }, { jumpBelow: 10, dashFar: 220 }]) {
+          if (recoverySim(s.model, s.gravity, from, res, { ...v, maxSteps: 200 }, this.returnOut).ok) {
+            ok = true;
+            break;
+          }
+        }
+      }
+    }
+    // A lower level sometimes misses the moment.
+    plan.canReturn = ok || this.rng() > 0.6 + 0.4 * this.profile.stageSense;
+    return plan.canReturn;
+  }
+
+  // How exposed a recovery route (`path`, a Track from now) is to the
+  // opponent: the steps it passes within reach of where the opponent is
+  // predicted to be once free to act (its lunges and aerials), as a
+  // penalty on the route's score.
+  edgeGuardExposure(s, path) {
+    if (!s.present || s.op.offstage) return 0;
+    const reachX = s.foeReach.lunge + 50;
+    const reachY = s.foeCaps.height + 60;
+    const from = Math.ceil(s.op.busy / STEP);
+    let steps = 0;
+    for (let k = from; k < path.len; k++) {
+      const f = s.foeTrack.i(k);
+      if (Math.abs(path.x[k] - s.foeTrack.x[f]) < reachX && Math.abs(path.y[k] - s.foeTrack.y[f]) < reachY) steps++;
+    }
+    return Math.min(45, steps * 1.5);
   }
 
   // Steering a launch while stunned: toward the stage's centre, as a

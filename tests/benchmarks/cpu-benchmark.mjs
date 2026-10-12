@@ -3,6 +3,7 @@
 //   node tests/benchmarks/cpu-benchmark.mjs                 # the standard suite
 //   node tests/benchmarks/cpu-benchmark.mjs --seeds 6       # more games per cell
 //   node tests/benchmarks/cpu-benchmark.mjs --only brutal:hard
+//   node tests/benchmarks/cpu-benchmark.mjs --from 5 --seeds 4   # seeds 5-8
 //   node tests/benchmarks/cpu-benchmark.mjs --json out.json # raw results too
 //
 // Full, deterministic matches (tests/helpers/cpu-match.mjs: a real Battle
@@ -34,6 +35,8 @@ const arg = (name, fallback) => {
   return i >= 0 ? args[i + 1] : fallback;
 };
 const SEEDS = Number(arg('seeds', 2));
+if (process.env.FLAGS) for (const f of process.env.FLAGS.split(',')) globalThis[f] = true;
+const FROM = Number(arg('from', 1));
 const ONLY = arg('only', null);
 const JSON_OUT = arg('json', null);
 const MAPS = (arg('maps', 'desert,city')).split(',');
@@ -68,7 +71,7 @@ for (const [x, y] of MATCHUPS) {
   };
   for (const map of MAPS) {
     for (const [defA, defB] of pairs) {
-      for (let seed = 1; seed <= SEEDS; seed++) {
+      for (let seed = FROM; seed < FROM + SEEDS; seed++) {
         for (const flip of [false, true]) {
           // `x` plays defA from the left, or from the right (flipped).
           const m = flip
