@@ -16,6 +16,9 @@ import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
 import { attackReach } from '../../../js/game/combat/attacks.js';
 import { Fighter } from '../../../js/game/fighters/fighter.js';
 import { StageCollision } from '../../../js/game/physics.js';
+import { CombatSystem } from '../../../js/game/combat/combat.js';
+import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../../js/game/combat/projectile.js';
+import { applyPulls } from '../../../js/game/combat/pull.js';
 import { mulberry32 } from '../../../js/core/utils.js';
 
 const DEF = getCharacter('0001');
@@ -65,11 +68,12 @@ test('CPU fights with #0001 use its whole kit: the Jab, the High Kick, Red, Maxi
   for (const move of ['attack2_object', 'attack3_object', 'attack5_object']) assert.ok(landed.has(move), `${move} lands`);
 });
 
-test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it gets out of the way or erases it instead', () => {
+test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it gets out of the way, erases it or breaks the cast', () => {
   const stage = new StageCollision(stageMap());
   for (const [button, gap] of [['attack5', 420], ['attack4', 200]]) {
     let shields = 0;
     let answered = 0;
+    let spared = 0;
     for (let seed = 0; seed < 6; seed++) {
       let n = 0;
       const ai = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(600 + seed) });
@@ -80,24 +84,43 @@ test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it 
       const cpu = new Fighter({ def: DEF, sprites: fakeSpritesOf(DEF), stage, slot: 'p2', spawn: { x: 800 + gap, facing: -1 }, controller: ai });
       foe.opponent = cpu;
       cpu.opponent = foe;
-      const world = { stage, projectiles: [], clones: [], fighters: [foe, cpu], score: { p1: 0, p2: 0 }, timeLeft: 99 };
+      const system = new CombatSystem();
+      const world = { stage, projectiles: [], clones: [], combat: system, fighters: [foe, cpu], score: { p1: 0, p2: 0 }, timeLeft: 99 };
       const ctx = { stage, gravity: CONFIG.sim.gravity, battle: world };
+      // Its own offense held: only its answer to the cast acts.
+      ai.neutral = false;
       cpu.update(DT, ctx);
-      ai.thinkTimer = Infinity;
       let moved = false;
+      let casting = false;
+      let hit = false;
       for (; n < 150; n++) {
         foe.update(DT, ctx);
         cpu.update(DT, ctx);
-        if (ai.out.shield) shields++;
+        spawnProjectiles(world.fighters, world.projectiles);
+        for (const p of world.projectiles) p.update(DT, stage);
+        clashProjectiles(world.projectiles);
+        applyPulls(world.fighters, world.projectiles, DT);
+        for (const e of system.update(world.fighters, world.projectiles, [])) {
+          if (e.target === cpu && e.type === 'hit' && (e.technique || e.move === 'attack5_object')) hit = true;
+        }
+        removeDeadProjectiles(world.projectiles);
+        // A real Shield (the button in the air is the Deflect, which may
+        // well turn the sphere back).
+        if (cpu.combat.shielding) shields++;
         if (ai.out.jumpPressed || ai.out.runLeft || ai.out.runRight || cpu.dash) moved = true;
         // Or it meets the sphere with an erasing one of its own (its own
         // Hollow Purple: two erasing projectiles both go).
         const shot = cpu.technique?.def.projectile;
         if (shot && cpu.projectileDefs[shot.id]?.erase) moved = true;
+        // Or it breaks the cast before it lets go (no technique has armour).
+        if (casting && !foe.technique && foe.combat.stun > 0) moved = true;
+        casting = !!foe.technique;
       }
       if (moved) answered++;
+      if (!hit) spared++;
     }
     assert.equal(shields, 0, `${button}: no Shield against what no Shield stops`);
-    assert.ok(answered >= 3, `${button}: it moves to answer it (${answered}/6)`);
+    assert.ok(answered >= 3, `${button}: it answers it (${answered}/6)`);
+    assert.ok(spared >= 3, `${button}: and the technique misses it (${spared}/6)`);
   }
 });

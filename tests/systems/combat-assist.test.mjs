@@ -13,7 +13,7 @@
 // fixture, never one fighter's numbers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { CONFIG, COMBAT_BUTTONS } from '../../js/config.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { PlayerController, TrainingAIController, blankInput } from '../../js/game/fighters/fighter-controller.js';
@@ -1197,7 +1197,9 @@ test('only a player\'s controller with the setting on has it: never by slot, lab
   assert.equal(has({ getInput: blankInput, kind: 'player' }), false, 'a player that has not turned it on');
   // And the CPU's controller never carries the setting.
   assert.equal('combatAssist' in new CombatAIController({ rng: mulberry32(1) }), false);
-  assert.doesNotMatch(read('js/game/ai/combat-ai.js'), /combatAssist|Combat Assist/);
+  for (const file of ['js/game/ai/combat-ai.js', ...readdirSync(new URL('../../js/game/ai/cpu-intelligence/', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `js/game/ai/cpu-intelligence/${f}`)]) {
+    assert.doesNotMatch(read(file), /combatAssist|Combat Assist/, file);
+  }
 });
 
 test('Quick Battle gives it to Player 1 only, as saved; Watch Mode to nobody; Practice Ground to the player, never the CPU', () => {
@@ -1240,7 +1242,7 @@ test('the setting never changes a CPU: its decisions and movement are the same w
   const run = (combatAssist) => {
     const input = { flush() {}, sample: blankInput };
     const b = new Battle({ canvas, map: getMap('desert'), p1Def: C1, p2Def: C1, p1Sprites: sprites, p2Sprites: sprites, input, seed: 7, combatAssist });
-    b.fx = { take() {}, takeBounce() {}, reset() {}, timeScale: 1, sampleTrail() {} };
+    b.fx = { take() {}, takeBounce() {}, reset() {}, addElimination() {}, timeScale: 1, sampleTrail() {} };
     b.setPhase('fight');
     const out = [];
     for (let i = 0; i < 900; i++) {

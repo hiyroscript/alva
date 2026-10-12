@@ -551,7 +551,7 @@ test('the Battle\'s CPU plays the chosen level, and keeps it through restarts, r
     battle.restart();
     assert.equal(battle.p2.controller, ai, 'the same controller after a restart');
     assert.equal(ai.difficulty, id);
-    assert.equal(ai.intent, null, 'nothing planned carries over');
+    assert.equal(ai.plan, null, 'nothing planned carries over');
     // A fall and a respawn.
     battle.setPhase('fight');
     Object.assign(battle.p2.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });

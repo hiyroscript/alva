@@ -113,35 +113,35 @@ Medium on a fresh start), the same for both play types, and stays through
 Restart Battle, Rematch and every Void respawn; Practice Ground never reads
 it.
 
-- **Easy:** slower reactions, often too late or not at all; pauses, misjudges
-  spacing, rarely uses its fighter's summons and techniques (#0001's
-  Unlimited Void and Hollow Purple, say). Still attacks: inexperienced, not
-  disabled.
-- **Medium:** a balanced opponent: its fighter's attacks and extra attack,
-  an occasional Shield, summon or technique; answers slow threats, still
-  gets caught.
-- **Hard:** fast reactions; Shields and steps away from real threats (in
-  the air, Deflects the shots it can catch), punishes recovery, spaces,
-  jumps in, dashes and air dashes, and uses its summons and techniques
-  deliberately.
-- **Brutal:** reacts within a few frames (never instantly), reassesses
-  constantly, manages Energy and cooldowns, and uses the full moveset. It
-  still waits, spaces and retreats when that is the stronger choice.
+All four levels are one intelligence, CPU Intelligence, using every move,
+the Dash, the air dash, the Shield and the Deflect, and never idle while
+free to act:
+
+- **Easy:** a casual player. Sees things late (or misses them), misjudges
+  ranges, rarely times a punish, recovers loosely; beatable, but always
+  playing.
+- **Medium:** a tryhard. Combos, answers the slower threats, picks up the
+  opponent's habits, recovers reliably.
+- **Hard:** tournament level. Reads the telegraphed moves, punishes whiffs
+  and bad landings, edge-guards, manages Energy and spacing.
+- **Brutal:** elite. Reacts within a few frames (never instantly),
+  reassesses constantly, adapts fast, finishes when a launch ends a life.
+  It still waits, spaces and retreats when that is the stronger choice.
 
 **Difficulty changes how well the CPU thinks, not what its fighter is
 allowed to do.** `js/data/difficulty.js` holds one profile per level, the
 only place a level is validated (anything unknown is Medium): reaction
-window, lapse chance, reassessment interval, decision noise, hesitation,
-spacing error, motion lookahead, and weights for defense, punishing, the
-summons and techniques (`specials`), Dash, planning, aggression, stage sense
-and Energy care. Every trait
-is ordered from Easy to Brutal. None of it touches a fighter: damage, launch,
-stun, timing, speed, jumps, gravity, Dash, Shield, Energy and what anything
-costs in it, cooldowns, hitboxes, respawns and scoring are the character's
-and the match's own, identical on every level (and the same hit resolves
-exactly as a player's would).
+window, lapse chance, reassessment interval, decision noise, range,
+prediction and timing error, lookahead, plan depth, combo reliability,
+guard, perfect Shield timing, punish and opportunity recognition,
+adaptation, Energy, risk and stage sense, launch steering, recovery skill
+and initiative. Every trait is ordered from Easy to Brutal. None of it
+touches a fighter: damage, launch, stun, timing, speed, jumps, gravity,
+Dash, Shield, Energy and what anything costs in it, cooldowns, hitboxes,
+respawns and scoring are the character's and the match's own, identical on
+every level (and the same hit resolves exactly as a player's would).
 
-How the CPU plays: [combat AI](../systems/ai.md).
+How the CPU plays: [CPU Intelligence](../systems/ai.md).
 
 ## Code
 

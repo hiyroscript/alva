@@ -1,99 +1,116 @@
-// Quick Battle difficulty: how well the CPU thinks, never what its fighter
-// is allowed to do.
+// Quick Battle and Watch Mode difficulty: how well the CPU thinks, never
+// what its fighter is allowed to do.
 //
-// Each level is a profile read by the combat AI (js/game/ai/combat-ai.js). The
-// profile tunes the controller's perception and judgement only: how soon it
-// notices what the opponent does, how often it reassesses, how noisy and how
-// careful its choices are and how far ahead it projects movement. Nothing here
-// reaches the fighter: damage, launch, speed, jumps, gravity, Dash, Shield,
-// Energy and its costs, cooldowns, hitboxes, hitstun, blockstun, timing and
-// every other mechanic are the character's own and the shared rules', and
-// identical on every level (see Fighter in js/game/fighters/fighter.js). No
-// module of the fighter or the combat engine reads a difficulty, and a
-// profile holds only the traits below (CAPABILITY): no multiplier for any
-// of those exists, so none can scale a hit.
+// Each level is a profile read by CPU Intelligence
+// (js/game/ai/cpu-intelligence/, driven by the CombatAIController in
+// js/game/ai/combat-ai.js). All four levels run the same engine with the
+// same capabilities: every move, the Dash and the air dash, the Shield, the
+// Deflect, edge-guarding and recovery. A profile tunes only how well that
+// engine observes, anticipates, evaluates, reacts, plans, adapts and
+// executes. Nothing here reaches the fighter: damage, launch, speed, jumps,
+// gravity, Dash, Shield, Energy and its costs, cooldowns, hitboxes, hitstun,
+// blockstun, timing and every other mechanic are the character's own and
+// the shared rules', and identical on every level (see Fighter in
+// js/game/fighters/fighter.js). No module of the fighter or the combat
+// engine reads a difficulty, and a profile holds only the traits below
+// (CAPABILITY): no multiplier for any of those exists, so none can scale a
+// hit.
 //
 // Profile traits (seconds and world units are simulation time and space):
 //
-//   react       [min, max] delay from seeing something (an attack's startup,
-//               a projectile, a clone's cloud, a rush, a whiff) to acting
-//               on it. Sampled per event, so it varies from one to the next.
-//               Never zero: Brutal still takes a few frames.
-//   lapse       chance an event is never noticed at all.
-//   think       [min, max] seconds between neutral reassessments.
-//   noise       relative jitter on every option's score (decision randomness).
-//   hesitation  chance a neutral reassessment just waits instead of acting.
-//   rangeError  world units of spacing misjudgement, either way.
-//   lookahead   seconds of motion projected when judging where the opponent,
-//               its attacks and projectiles will be (0: where they are now).
-//   guard       defensive awareness: how strongly a real threat is answered
-//               (Shield, stepping or jumping away) instead of ignored.
-//   punish      how readily an opening (a whiff, recovery, an exhausted
-//               opponent) is noticed and taken.
-//   specials    judgement with the fighter's summons and techniques (e.g.
-//               #0001's attack4 and attack5): when one is worth its cast
-//               (and its cooldown, if it has one). A fighter with none never
-//               uses it.
-//   dash        how much Dash is part of its movement.
-//   plan        seconds a multi-step plan (approach then strike, Dash then
-//               strike) is kept before it is thought over again.
-//   aggression  weight on offence against waiting and spacing.
-//   stage       stage awareness: ledge caution, centre-stage preference and
-//               the value of knocking the opponent toward the Void.
-//   energyCare  how much Energy it keeps back for the Shield and the
-//               Deflect (what each costs is the same on every level).
+//   react         [min, max] perception latency: how old the CPU's picture
+//                 of its opponent is (resampled now and then within the
+//                 window). Nothing the opponent does is seen before it has
+//                 been on screen this long; never zero, so even Brutal
+//                 needs a few frames.
+//   lapse         chance a new opponent action (an attack, a throw, a jump,
+//                 a whiff) is not recognized as something to answer.
+//   think         [min, max] seconds between tactical reassessments (an
+//                 urgent event always gets a look at once).
+//   noise         relative jitter on every option's utility: how
+//                 consistently the best option is the one chosen.
+//   rangeError    world units of spacing misjudgement, either way.
+//   predictError  fractional error on the projected motion of the
+//                 opponent and its projectiles.
+//   lookahead     seconds of the opponent's free motion it projects.
+//   planDepth     how far its plans look: combo search depth, the jump arcs
+//                 and recovery routes it weighs (1 to 4).
+//   comboReliability  chance a follow-up it has found is executed in time.
+//   timing        seconds of execution error on a timed press.
+//   guard         defensive awareness: how fully a real threat is answered
+//                 (Shield, Deflect, a jump or a step away) and how well.
+//   perfectShield chance it times a perfect Shield against a hit it saw
+//                 coming (always within its own reaction and the rearm).
+//   punish        chance an opening (a whiff, a recovery, a bad landing, an
+//                 exhausted opponent) is recognized and taken.
+//   adapt         how quickly and how far observed opponent habits shape
+//                 its choices.
+//   energySense   Energy management: what it keeps back, when it spends.
+//   riskSense     how fully whiff, punish and elimination risk is weighed.
+//   stageSense    ledges, blast zones, edge-guarding and ledge-trapping.
+//   opportunity   recognizing finishers, traps and openings worth a commitment.
+//   diSkill       chance it steers a launch (holds the best direction) while
+//                 stunned, as a player may.
+//   recoverySkill how accurately it plans a route back to the stage.
+//   initiative    willingness to take the initiative (start offense) rather
+//                 than wait for the opponent's commitment.
 //
-// Every trait is ordered by level (see CAPABILITY): a higher level never has a
-// slower reaction, a lapse more often or a noisier judgement than a lower one.
-// Randomness still lets an Easy CPU make a good call now and then.
+// Every trait is ordered by level (see CAPABILITY): a higher level never has
+// a slower reaction, a lapse more often or a noisier judgement than a lower
+// one. Randomness (seeded) still lets an Easy CPU make a good call now and
+// then.
 
 export const DEFAULT_DIFFICULTY = 'medium';
 
 // Which way each trait improves: 1 when a larger value is the stronger CPU,
 // -1 when a smaller one is. Ranges compare both bounds.
 export const CAPABILITY = Object.freeze({
-  react: -1, lapse: -1, think: -1, noise: -1, hesitation: -1, rangeError: -1,
-  lookahead: 1, guard: 1, punish: 1, specials: 1, dash: 1, plan: 1, aggression: 1, stage: 1, energyCare: 1,
+  react: -1, lapse: -1, think: -1, noise: -1, rangeError: -1, predictError: -1, timing: -1,
+  lookahead: 1, planDepth: 1, comboReliability: 1, guard: 1, perfectShield: 1, punish: 1, adapt: 1,
+  energySense: 1, riskSense: 1, stageSense: 1, opportunity: 1, diSkill: 1, recoverySkill: 1, initiative: 1,
 });
 
 // The reaction windows are the same for every fighter. They are set
 // against startups from about 1/12 s (a jab) through a quarter of a second
 // (a telegraphed kick) to half a second or more (a technique's cast, a
-// clone's cloud): against those, Easy is usually too late even for the
-// kick, Medium answers the slow ones, Hard reads the kick reliably and
-// Brutal sometimes even the jab, but never on the frame it starts. Another fighter's moves are read by the same windows, so a
+// clone's cloud): Easy, a casual player, is usually too late even for the
+// kick; Medium answers the slower moves; Hard, a tournament player, reads
+// the kick reliably; Brutal sometimes even the jab, but never on the frame
+// it starts. Another fighter's moves are read by the same windows, so a
 // faster or slower startup is simply harder or easier to answer.
 const PROFILES = {
   easy: {
-    react: [0.45, 0.85], lapse: 0.4, think: [0.45, 0.85], noise: 0.6, hesitation: 0.32, rangeError: 28,
-    lookahead: 0, guard: 0.3, punish: 0.15, specials: 0.12, dash: 0, plan: 0,
-    aggression: 0.45, stage: 0.3, energyCare: 0.15,
+    react: [0.3, 0.46], lapse: 0.3, think: [0.2, 0.34], noise: 0.5, rangeError: 26, predictError: 0.35, timing: 0.07,
+    lookahead: 0.12, planDepth: 1, comboReliability: 0.45, guard: 0.35, perfectShield: 0.04, punish: 0.35, adapt: 0.15,
+    energySense: 0.3, riskSense: 0.3, stageSense: 0.4, opportunity: 0.35, diSkill: 0.2, recoverySkill: 0.55, initiative: 0.5,
   },
   medium: {
-    react: [0.22, 0.45], lapse: 0.18, think: [0.24, 0.46], noise: 0.32, hesitation: 0.14, rangeError: 14,
-    lookahead: 0.1, guard: 0.55, punish: 0.45, specials: 0.45, dash: 0.25, plan: 0.45,
-    aggression: 0.55, stage: 0.6, energyCare: 0.45,
+    react: [0.19, 0.3], lapse: 0.14, think: [0.11, 0.2], noise: 0.27, rangeError: 14, predictError: 0.2, timing: 0.04,
+    lookahead: 0.25, planDepth: 2, comboReliability: 0.72, guard: 0.6, perfectShield: 0.2, punish: 0.62, adapt: 0.4,
+    energySense: 0.55, riskSense: 0.55, stageSense: 0.65, opportunity: 0.6, diSkill: 0.5, recoverySkill: 0.8, initiative: 0.6,
   },
   hard: {
-    react: [0.1, 0.24], lapse: 0.06, think: [0.12, 0.24], noise: 0.14, hesitation: 0.05, rangeError: 6,
-    lookahead: 0.22, guard: 0.8, punish: 0.8, specials: 0.78, dash: 0.55, plan: 0.7,
-    aggression: 0.62, stage: 0.85, energyCare: 0.7,
+    react: [0.15, 0.22], lapse: 0.06, think: [0.065, 0.11], noise: 0.13, rangeError: 7, predictError: 0.1, timing: 0.02,
+    lookahead: 0.4, planDepth: 3, comboReliability: 0.88, guard: 0.82, perfectShield: 0.5, punish: 0.85, adapt: 0.7,
+    energySense: 0.8, riskSense: 0.8, stageSense: 0.85, opportunity: 0.82, diSkill: 0.8, recoverySkill: 0.93, initiative: 0.68,
   },
   brutal: {
-    react: [0.05, 0.14], lapse: 0.02, think: [0.06, 0.13], noise: 0.05, hesitation: 0.02, rangeError: 2,
-    lookahead: 0.34, guard: 0.95, punish: 1, specials: 1, dash: 0.7, plan: 0.9,
-    aggression: 0.66, stage: 1, energyCare: 0.85,
+    react: [0.07, 0.105], lapse: 0.015, think: [0.034, 0.056], noise: 0.04, rangeError: 2, predictError: 0.04, timing: 0.008,
+    lookahead: 0.6, planDepth: 4, comboReliability: 0.98, guard: 0.96, perfectShield: 0.85, punish: 0.98, adapt: 0.95,
+    energySense: 0.95, riskSense: 0.96, stageSense: 1, opportunity: 0.97, diSkill: 1, recoverySkill: 1, initiative: 0.72,
   },
 };
 
 const freezeProfile = (p) => Object.freeze({ ...p, react: Object.freeze([...p.react]), think: Object.freeze([...p.think]) });
 
-// The four choices, in ascending order, as the Difficulty screen lists them.
+// The four choices, in ascending order, as the Difficulty screen lists them:
+// the skill each level plays at (js/localization/strings/en.js reads the
+// lines from here; fr.js translates them).
 export const DIFFICULTIES = Object.freeze([
-  { id: 'easy', index: '01', level: 1, name: 'Easy', description: 'Slower reactions. Leaves openings.' },
-  { id: 'medium', index: '02', level: 2, name: 'Medium', description: 'Balanced reactions and decisions.' },
-  { id: 'hard', index: '03', level: 3, name: 'Hard', description: 'Fast reactions. Defends and punishes.' },
-  { id: 'brutal', index: '04', level: 4, name: 'Brutal', description: 'Sharp reactions. Relentless decisions.' },
+  { id: 'easy', index: '01', level: 1, name: 'Easy', description: 'A casual player. Beatable, never idle.' },
+  { id: 'medium', index: '02', level: 2, name: 'Medium', description: 'A tryhard. Combos, adapts, recovers.' },
+  { id: 'hard', index: '03', level: 3, name: 'Hard', description: 'Tournament level. Punishes mistakes.' },
+  { id: 'brutal', index: '04', level: 4, name: 'Brutal', description: 'Elite. Reads, traps and finishes.' },
 ].map((d) => Object.freeze({ ...d, profile: freezeProfile(PROFILES[d.id]) })));
 
 export const DIFFICULTY_IDS = Object.freeze(DIFFICULTIES.map((d) => d.id));

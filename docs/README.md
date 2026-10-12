@@ -36,7 +36,7 @@ reads, what a fighter may leave out, and its tests.
 - [Defense](systems/defense.md): the Shield button and the Shield.
 - [Energy](systems/energy.md): the Dash, Combat Assist and Shield
   resource.
-- [Combat AI](systems/ai.md): the CPU and difficulty.
+- [CPU Intelligence](systems/ai.md): the CPU, its layers, difficulty and the benchmark.
 - [Input](systems/input.md): controls on every device, touch layouts and
   their editor.
 - [Rendering](systems/rendering.md): sprites, the camera, effects, the

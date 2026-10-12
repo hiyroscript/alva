@@ -448,9 +448,12 @@ no header, build label, eyebrow or keyboard hint bar.
   from Select Fighter returns here.
 - Four large selectable cards in ascending order, inspired by Seren's
   four-level scale but in Alva's charcoal, off-white and green:
-  **01 Easy** "Slower reactions. Leaves openings.", **02 Medium** "Balanced
-  reactions and decisions.", **03 Hard** "Fast reactions. Defends and
-  punishes.", **04 Brutal** "Sharp reactions. Relentless decisions." Each
+  **01 Easy** "A casual player. Beatable, never idle.", **02 Medium** "A
+  tryhard. Combos, adapts, recovers.", **03 Hard** "Tournament level.
+  Punishes mistakes.", **04 Brutal** "Elite. Reads, traps and finishes."
+  (French: "Un joueur occasionnel. Battable, jamais passif.", "Un joueur
+  acharné. Enchaîne, s’adapte, revient.", "Niveau tournoi. Punit les
+  erreurs.", "Élite. Lit, piège et achève."). Each
   shows its large mono index, a four-bar ascending scale (1 to 4 bars lit in
   the green accent, the rest hollow outlines, so the level reads by shape and
   label, never by colour alone; Brutal's top bar is a step brighter, the same
@@ -2519,65 +2522,108 @@ attack or a button.
   both controllers and reset their plans. Every rule below is the same as in
   Quick Battle, the 7-minute clock (`CONFIG.battle.matchSeconds`, one
   clock for every Battle) and overtime included.
+  - **One intelligence for every fighter and level.** The combat AI is
+    CPU Intelligence (`js/game/ai/cpu-intelligence/`, explained in
+    `docs/systems/ai.md`), one layered brain behind `CombatAIController`:
+    capability analysis, perception, a world model, an opponent model,
+    strategy, tactical evaluation, combos, stage navigation and recovery,
+    execution, difficulty humanization and telemetry. Nothing in it names a
+    fighter or branches on its id: every move, with its role (poke,
+    approach, combo starter, launcher, finisher, anti-air, zoning, trap,
+    area denial, punish, edge-guard, recovery, counter-projectile,
+    disengage), is read from the fighter's own data, so a new fighter is
+    played well without a CPU change.
   - **Input only.** Like `PlayerController`, it only returns the standard
     input snapshot (`runLeft`, `runRight`, `down`, `jump`, `shield`,
-    `extra_attack`, `transform`, `attack1` to `attack5` and their `…Pressed` edges, each edge true
-    only on the step its button goes down). Attacks, projectiles, the Shield,
-    summons and techniques (their own buttons, `attack4` and `attack5` for
-    #0001, pressed directly), the fast fall (`down`), jumps and the Dash (a
-    explicit Mouvement request) all go through the fighter
-    exactly as a player's do. It never writes to a fighter, never spawns or
-    moves anything, never reads the player's raw input, and never uses the
-    training CPU's platform drop: it walks off platform edges instead. It
-    never has Combat Assist (7.2.4a): its melee presses start their attacks
-    where it stands, whatever the player's setting, which never reaches it.
-  - **Sense → evaluate → act.** It senses what the simulation shows (both
-    fighters' positions, motion, attacks and their phases, Shield,
-    Energy, Launch Point, cooldowns, techniques, projectiles, clones, the
-    stage's ledges and platforms, the score and the clock through
-    `ctx.stage` / `ctx.battle`), scores the options that fit (answer a threat
-    with Shield (on the ground) / a step / a jump / a Dash / a strike first,
-    or in the air a shot on course with its Deflect when the Deflect would
-    be live as it arrives and it has the Energy for one; strike; throw a projectile;
-    approach; hold a spacing; jump in; Dash in; air dash in or home; press a summon or technique
-    button (a technique it saves for a safe distance or an opening rather
-    than casting it point blank, unless no Shield stops it and its
-    opponent hides behind one); make for the centre; wait), each built
-    from the fighter's own data (reach from its hitboxes and pulls, a
-    projectile's range, flight and worth (a piercing one's every strike)
-    from its data, a paralysis as the free hits it opens, its
-    summons and techniques from the typed buttons in `actions`, each only
-    on the ground and off cooldown; a button mapped to null is never
-    pressed), and acts over as many steps as needed.
-  - **Reaction.** A new attack startup, projectile, clone, technique or
-    whiff is an event, taken in after a delay sampled from the
-    level's reaction window, or never on a lapse; only then can it be
-    answered. Neutral decisions follow the level's reassessment cadence and
-    planning time. Prediction is limited to projecting current motion over a
-    short, level-set horizon.
-  - **Difficulty** (`js/data/difficulty.js`) sets only these traits: reaction
-    window, lapse chance, reassessment interval, decision noise, hesitation,
-    spacing error, motion lookahead, and weights for defense, punishing,
-    summons and techniques (`specials`), Dash, planning, aggression, stage sense and Energy care.
-    Every trait is ordered Easy → Brutal; Brutal's reaction is fast but never
-    zero. No level changes damage, launch, hitstun, blockstun, startup or
-    recovery, animation timing, speed, gravity, jumps, Dash, Shield, Energy
-    or what anything costs in it, cooldowns, hitboxes, physics,
-    invulnerability, score or respawns: a profile holds those traits and
-    nothing else, no module of the fighter or the combat engine reads it,
-    and the same hit resolves identically on every level and for a player.
-    Its judgement also keeps it from the same trick over and over: a move
-    with a short cooldown (a technique, a throw) is weighed down for a few
-    seconds after it was last used, the same on every level.
-  - It never walks off the main floor on its own, follows its opponent up and
-    down platforms, and stands still while its opponent is out of play.
+    `extra_attack`, `transform`, `attack1` to `attack5` and their `…Pressed`
+    edges, each edge true only on the step its button goes down). Attacks,
+    projectiles, the Shield, summons and techniques (their own buttons,
+    pressed directly), the fast fall (`down`), jumps and the Dash (an
+    explicit Mouvement request) all go through the fighter exactly as a
+    player's do. It never writes to a fighter, never spawns or moves
+    anything, never reads the player's raw input, never uses the wall clock
+    or unseeded randomness, and never uses the training CPU's platform drop:
+    it walks off platform edges instead. It never has Combat Assist
+    (7.2.4a).
+  - **Perception.** It sees its opponent as it was a reaction time ago
+    (the level's window, resampled now and then; never zero), carried
+    forward by its visible motion. A new attack startup, whiff, jump,
+    landing, Dash, Shield, exhaustion, projectile, clone or cast is an event
+    recognized after that delay, or never on a lapse; only then can it be
+    answered. Every attack it starts is aimed at where it sees its
+    opponent.
+  - **Each step, in order:** forced states (stunned, frozen, paralysed: it
+    only steers the launch); survival (off the stage, the best of several
+    simulated recovery routes, avoiding an edge-guarder's reach); threats
+    (the best answer to what it recognized: a Shield, perfect when the
+    level times it, a jump over, a step or Dash away, drifting clear, the
+    Deflect timed to turn a shot back at its thrower, a strike that lands
+    first, an erasing or repelling projectile; never a Shield against what
+    no Shield stops); combos (the best follow-up the rules allow, pressed
+    in time); the committed plan; then, on the level's reassessment
+    cadence, the strategic mode (rushdown, controlled offense, neutral,
+    counterplay, zoning, trap control, survival, finisher hunt, recovery,
+    re-weighed from both Launch Points, footing, Energy, kit, the
+    opponent's habits, the score, the clock and overtime, with hysteresis)
+    and a new plan: the attack sequence (a move now, out of a Dash, out of
+    a jump) with the best expected utility, or the movement the mode calls
+    for (neutral footwork, navigation to another level, edge-guarding,
+    repositioning).
+  - **Expected utility.** Each option is simulated on the game's own rules
+    against the opponent's predicted path: its chance to hit, be blocked
+    or miss; what a hit is worth by the real launch rules (a launch that
+    ends a life most, more at match point); what a block or a whiff leaves
+    the opponent to punish; the risk of being struck first, walking into a
+    live hit, being interrupted, or not getting back to the stage; Energy
+    (emptying the bar is worth it only for a life), cooldowns and tempo;
+    the strategic mode's preferred roles and variety (a long-unused move
+    grows more tempting). A strike is checked again from where the CPU
+    really is before it is pressed, and a jump-in waiting off the stage is
+    dropped before the point of no return.
+  - **Always playing (Rule A).** Free to act in a live match, it is never
+    still for longer than a deliberate pause (0.45 s): a liveness monitor
+    counts any longer stillness as an incident and takes a fresh plan at
+    once. While its opponent is out of play it repositions with a purpose
+    (near where its opponent will come back, at a safe distance) and never
+    attacks nobody.
+  - **Difficulty** (`js/data/difficulty.js`) sets only how well it thinks:
+    reaction window (`react`: Easy 0.30–0.46 s, Medium 0.19–0.30, Hard
+    0.15–0.22, Brutal 0.07–0.105), lapse chance, reassessment interval,
+    decision noise, range and prediction error, timing error, lookahead,
+    plan depth, combo reliability, guard, perfect Shield timing, punish and
+    opportunity recognition, adaptation, Energy, risk and stage sense,
+    launch steering, recovery skill and initiative. Every trait is ordered
+    Easy → Brutal (`CAPABILITY`). Easy is a casual player (late, loose,
+    never idle), Medium a tryhard (combos, adapts, recovers), Hard
+    tournament level (reads, punishes, edge-guards), Brutal elite (fast but
+    never instant, consistent, quick to adapt). Every level uses every
+    move, the Dash, the air dash, the Shield and the Deflect. No level
+    changes damage, launch, hitstun, blockstun, startup or recovery,
+    animation timing, speed, gravity, jumps, Dash, Shield, Energy or what
+    anything costs in it, cooldowns, hitboxes, physics, invulnerability,
+    score or respawns: a profile holds those traits and nothing else, no
+    module of the fighter or the combat engine reads it, and the same hit
+    resolves identically on every level and for a player.
+  - **Benchmark.** Brutal's target is a 95% match win rate against a
+    defined, varied benchmark (Hard, Medium and five scripted reference
+    styles; `tests/benchmarks/cpu-benchmark.mjs`), tracked separately
+    against Hard. The measured results are in `docs/systems/ai.md`; no
+    guarantee against arbitrary human players is claimed.
+  - **Determinism.** Each CPU draws from its own seeded RNG: the same seed
+    and inputs replay the same decisions and the same match.
+  - **Debugging.** With `debug`, it keeps a trace of its decisions, each
+    explained from its own data (mode, plan and why, hit chance and value,
+    both Launch Points, danger, Energy, what interrupted the last plan, the
+    opponent's habits); its counters (move usage, invalid inputs,
+    inactivity, stuck navigation, failed plans) always run.
   Practice Ground's CPU is a different thing: a controller-less training
   dummy that never moves or attacks, whatever the Quick Battle difficulty.
   The older non-attacking `TrainingAIController` remains in
   `js/game/fighters/fighter-controller.js`, unused by every mode.
   - **Attack orientation.** The combat controller supplies a live
     horizontal target direction for attack initiation and each simulation
-    step, including after both fighters move. Equal coordinates retain the
+    step, including after both fighters move: the direction of its
+    opponent as it perceives it. Equal coordinates retain the
     last valid direction; missing or out-of-play targets are ignored.
     Ordinary attacks turn their hitboxes and pending projectile release
     with their artwork. Motion attacks and techniques use separate visual

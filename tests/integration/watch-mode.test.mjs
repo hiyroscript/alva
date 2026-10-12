@@ -1195,8 +1195,8 @@ test('Restart Battle and Rematch keep both CPUs, their fighters, the level, the 
     assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['9999', 'test-a']);
     assert.deepEqual([battle.p1.label, battle.p2.label], ['CPU 1', 'CPU 2']);
     assert.equal(battle.map.id, 'city');
-    assert.equal(ai1.intent, null, `${what}: CPU 1 plans afresh`);
-    assert.equal(ai2.intent, null, `${what}: CPU 2 plans afresh`);
+    assert.equal(ai1.plan, null, `${what}: CPU 1 plans afresh`);
+    assert.equal(ai2.plan, null, `${what}: CPU 2 plans afresh`);
     assert.deepEqual(battle.score, { p1: 0, p2: 0 });
     assert.equal(battle.phase, 'intro');
     assert.equal(screen.hud.left.tag.textContent, 'CPU 1');

@@ -1352,3 +1352,66 @@ Classic adds independently customizable smaller Mouvement buttons above Run,
 preserving old layouts and Run sliding. Both schemes share centered mirrored
 double arrows. Jump and Extra Attack inherit the standard action-button style;
 settings previews, English/French guidance and current documentation follow suit.
+
+## CPU Intelligence
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: replace the combat CPU with one universal, layered intelligence for
+every fighter at every difficulty, Easy a casual player, Medium a tryhard,
+Hard tournament level, Brutal elite with a measured 95% target.
+
+**What it changed.**
+
+- **The CPU.** `CombatAIController` (`js/game/ai/combat-ai.js`) is now CPU
+  Intelligence (`js/game/ai/cpu-intelligence/`): capability analysis with
+  move roles, perception with a reaction delay and lapses, a world model
+  and forward simulation on the game's own rules, an opponent model,
+  strategic modes with hysteresis, expected-utility tactics, combo
+  follow-ups, stage navigation, recovery and edge-guarding, an executor of
+  legal inputs, difficulty humanization and telemetry with a debug trace
+  ([docs/systems/ai.md](./docs/systems/ai.md)). The old controller's code is
+  gone; every mode builds the CPU the same way as before.
+- **Always playing.** A liveness monitor: free to act, the CPU is never
+  still for longer than a deliberate pause. While its opponent is out of
+  play it repositions near where it will come back instead of standing
+  still.
+- **Every move, every level.** Every level uses every move, the Dash, the
+  air dash, the Shield and the Deflect (as a projectile counter and as an
+  attack); Easy now Dashes too.
+- **Difficulty.** `js/data/difficulty.js` holds a new set of thinking
+  traits (`CAPABILITY`: reaction window, lapses, cadence, noise, range,
+  prediction and timing error, lookahead, plan depth, combo reliability,
+  guard, perfect Shield, punish, opportunity, adaptation, Energy, risk and
+  stage sense, launch steering, recovery skill, initiative). Hard reacts in
+  0.15–0.22 s. The four lines on Select Difficulty (English and French)
+  describe the new players.
+
+**Where to tune it.** The profiles in `js/data/difficulty.js`; what
+outcomes are worth (`KO_VALUE` and the rest) in
+`js/game/ai/cpu-intelligence/values.js`; the strategic modes' weights
+(`PARAMS`) in `strategy.js`; the liveness pause (`STILL_LIMIT`) in
+`telemetry.js`.
+
+**Measured** (`node tests/benchmarks/cpu-benchmark.mjs --seeds 4`, 64
+games per matchup): Brutal 98.7% against the benchmark composition (Hard,
+Medium, five reference styles), 92.2% against Hard alone (below the 95%
+target); Hard 79.7% against Medium; Medium 93.8% against Easy; no invalid
+input, inactivity or stuck navigation. Details and limitations in
+[docs/systems/ai.md](./docs/systems/ai.md#benchmark).
+
+**Code:** `js/game/ai/cpu-intelligence/` (new: `brain.js`,
+`capabilities.js`, `perception.js`, `situation.js`, `stage-model.js`,
+`prediction.js`, `opponent-model.js`, `strategy.js`, `evaluator.js`,
+`values.js`, `defense.js`, `plans.js`, `executor.js`, `telemetry.js`),
+`js/game/ai/combat-ai.js`, `js/data/difficulty.js`,
+`js/localization/strings/fr.js`.
+
+**Tests:** `tests/systems/cpu-intelligence.test.mjs` (new);
+`tests/helpers/cpu-match.mjs`, `tests/helpers/reference-opponents.mjs` and
+`tests/benchmarks/cpu-benchmark.mjs` (new); `tests/systems/combat-ai.test.mjs`
+rewritten for the new contract; tests that expected the CPU to stand still
+while its opponent was out, or Easy never to Dash, now expect purposeful
+repositioning and every level's full kit (`match-score`, `practice-ground`,
+`watch-mode`, `difficulty`, `combat-rules`, `movement`, `cpu-0001`,
+`fighter-0002`); the source scans (`loadout`, `universal-movement`, `dash`,
+`combat-assist`, `profiles`) cover every CPU Intelligence module.
