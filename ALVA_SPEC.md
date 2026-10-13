@@ -443,7 +443,18 @@ no header, build label, eyebrow or keyboard hint bar.
 - Quick Battle card (Mode 01, name, description "Regular Play or Custom Play:
   choose a difficulty and your fighter, then enter battle.", green Select
   action) in a rail built for future modes.
-- Mode details panel: only its heading and a hairline beneath it.
+- Mode details panel: its heading and hairline, followed immediately by four
+  informational sections with moderately emphasized headings and muted descriptions:
+  **Quick Battle** (face a CPU, knock the opponent into the Void to score,
+  first to 3 points wins), **Regular Play** (choose fighter and difficulty;
+  CPU opponent and stage drawn at random), **Custom Play** (choose difficulty,
+  fighter, CPU opponent and stage), and **Match Rules** (7 minutes; a tied
+  score starts 1 minute of overtime as the Void closes in).
+  All content follows the active English or French language without a reload,
+  appears without selecting or hovering the card, and remains when returning
+  here or dismissing the play-type dialog. No additional controls. The panel
+  keeps its existing surface, padding and two-column placement (stacked on
+  tall/narrow displays); descriptions scroll internally when height is limited.
 - Mouse hover only previews the card (lighter surface and border) and does not
   move focus. A click, Enter or gamepad confirm selects Quick Battle and opens
   its **play-type dialog** (below); nothing advances until a play type is

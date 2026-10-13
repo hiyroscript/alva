@@ -55,8 +55,19 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 .mode-card:hover .mode-cta { background: var(--action-hover); }
 
 /* Same vertical padding as the card so both mono labels share a top line. */
-.mode-info { padding: clamp(12px, 2.6vh, 24px) clamp(14px, 1.8vw, 24px); }
-.mode-info .panel-title { padding-bottom: clamp(8px, 1.6vh, 12px); border-bottom: 1px solid var(--border); }
+.mode-info {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: clamp(12px, 2.6vh, 24px) clamp(14px, 1.8vw, 24px);
+}
+.mode-info .panel-title { flex: none; padding-bottom: clamp(8px, 1.6vh, 12px); border-bottom: 1px solid var(--border); }
+/* Only the descriptions scroll on short screens; the heading and Back stay put. */
+.mode-info-content { min-height: 0; margin-top: clamp(10px, 2.2vh, 20px); overflow-y: auto; overflow-wrap: anywhere; }
+.mode-info-section + .mode-info-section { margin-top: clamp(10px, 2.2vh, 20px); }
+.mode-info-heading { color: var(--text); font-size: clamp(14px, 2.2vh, 16px); font-weight: 600; }
+.mode-info-description { margin-top: 4px; color: var(--text-secondary); font-size: clamp(13px, 2vh, 14px); line-height: 1.45; }
 
 /* ---------------------------------------------------------------------
    Difficulty select

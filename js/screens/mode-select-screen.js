@@ -47,6 +47,15 @@ export class ModeSelectScreen extends Screen {
 
     const info = el('aside', { class: 'mode-info', ...tattr('aria-label', 'mode.details') }, [
       el('h2', { class: 'panel-title', ...tx('mode.details') }),
+      el('div', { class: 'mode-info-content' }, [
+        [mode.name, 'mode.quickBattle.overview'],
+        ['quickPlay.regular.name', 'mode.regular.description'],
+        ['quickPlay.custom.name', 'mode.custom.description'],
+        ['mode.rules.title', 'mode.rules.description'],
+      ].map(([heading, description]) => el('section', { class: 'mode-info-section' }, [
+        el('h3', { class: 'mode-info-heading', ...tx(heading) }),
+        el('p', { class: 'mode-info-description', ...tx(description) }),
+      ]))),
     ]);
 
     this.el.replaceChildren(
