@@ -1,1829 +1,890 @@
-ALVA — Complete Controller System Update
+ALVA — Combo Assist, Intelligent Move Cancellation, Controller Attack Artwork & Combat Assist Reliability Update
 
-Ergonomic Character-Specific Controls, Controller Detection, Menu Navigation, and Full Customization
-
-OBJECTIVE
-
-Implement a complete, high-quality controller system for the ALVA game.
+Project and objective
 
 Repository: hiyroscript/alva
 
-This update must introduce reliable PlayStation and Xbox controller support, controller connection management, a custom circular menu cursor, carefully designed default controls for every playable character, and a comprehensive per-character controller customization system.
+Implement a careful, production-quality update to Alva’s combat and controller systems.
 
-The update must integrate cleanly with ALVA’s existing architecture, preserve the current gameplay mechanics, and support future characters.
+This is a gameplay systems update, not a visual redesign or combat-engine rewrite.
 
-MOST IMPORTANT REQUIREMENT: COMFORTABLE CONTROLS ARE THE HIGHEST PRIORITY.
+The goal is to make combat feel significantly more responsive, allowing players to execute combos naturally, transition between moves intentionally, and consistently benefit from Combat Assist without unexpected cancellations or missed inputs.
 
-The purpose of this update is not simply to make controller buttons activate abilities. The purpose is to make ALVA genuinely comfortable, intuitive, responsive, and enjoyable to play on a controller.
+There are five deliverables:
 
-Every default control must be chosen according to how natural and comfortable the action is to execute.
+1. Add a new Combo assist setting, enabled by default, which intelligently alternates Attack 1 and Attack 2 when the requested attack is on its 0.5-second repeat cooldown.
+2. Implement intelligent move cancellation, letting players interrupt their current move with another explicitly requested legal move. Ordinary Run inputs must never cause a cancellation.
+3. Display each fighter’s attack artwork beside the corresponding move name in the controller controls editor, matching the existing mobile controls.
+4. Fix the bug where holding Run while attacking cancels Combat Assist.
+5. Fix the intermittent bug where Combat Assist is ignored when attacking immediately after another move.
 
-ALVA has a unique character system. Each fighter has different moves, abilities, and mechanics. Therefore, controller layouts must respect those differences.
+All five changes must integrate with one another.
 
-This is the central design philosophy:
-
-Universal gameplay actions have consistent recommended defaults across all characters. Character-specific actions receive their own ergonomically optimized defaults. Players can then fully customize either category for each individual character.
-
-This principle must guide the entire implementation.
+Do not implement them as independent shortcuts that create inconsistencies in the fighter state machine.
 
 ⸻
 
-PART 1 — UNDERSTAND ALVA BEFORE MAKING CHANGES
+1. Required repository investigation
 
-Before implementing anything, thoroughly inspect the repository and understand the current game.
+Before editing, understand the existing systems and their relationships.
 
-Read the project documentation, character definitions, input architecture, menu navigation, settings implementation, and existing tests.
+Read and respect:
 
-Pay particular attention to:
-
-* README.md
 * ALVA_SPEC.md
 * CLAUDE.md
 * codename_rule
-* character_rule
+* docs/architecture/overview.md
+* docs/architecture/character-system.md
+* docs/systems/combat.md
 * docs/systems/input.md
 * docs/systems/movement.md
-* docs/systems/defense.md
-* docs/characters/0001.md
-* docs/characters/0002.md
-* docs/characters/adding-characters.md
-* js/config.js
-* js/core/input-manager.js
-* js/core/menu-navigator.js
-* js/core/settings.js
-* js/core/app.js
-* js/game/fighters/fighter-controller.js
+* docs/development/testing.md
+
+Pay particular attention to these implementation files:
+
+Combat and fighter execution
+
 * js/game/fighters/fighter.js
-* js/data/characters.js
-* js/data/characters/0001.js
-* js/data/characters/0002.js
-* js/data/abilities.js
-* js/data/loadout.js
-* js/screens/home-screen.js
+* js/game/fighters/fighter-controller.js
+* js/game/combat/combat-state.js
+* js/game/combat/combat-assist.js
+* js/game/combat/attacks.js
+* js/data/cooldowns.js
+* js/data/movement.js
+* js/game/combat/technique.js
+* js/game/combat/offense.js
+
+Input and control resolution
+
+* js/core/input-manager.js
+* js/core/controller-resolver.js
+* js/data/controller-profiles.js
+* js/config.js
+
+Settings
+
+* js/core/settings.js
+* js/ui/settings-dialog.js
 * js/screens/battle-screen.js
 * js/screens/practice-screen.js
-* js/ui/settings-dialog.js
-* js/ui/fighter-roster.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-Also inspect relevant localization files, CSS, UI components, and tests.
+Controller UI and attack artwork
 
-Understand the following before modifying the input system:
+* js/ui/controller-editor.js
+* js/ui/controller-glyphs.js
+* js/ui/mobile-abilities.js
+* js/data/ability-preview.js
+* js/ui/touch-controls.js
+* css/controller.css
+* css/settings.css
 
-1. How players issue attacks.
-2. How ground and aerial attacks use the same internal action slots.
-3. How abilities, projectiles, summons, and techniques are represented.
-4. How movement and Dash requests work.
-5. How Shield and Deflect differ.
-6. How gameplay input is buffered.
-7. How character definitions register abilities.
-8. How settings are saved.
-9. How menus receive keyboard and existing gamepad input.
-10. How Practice Ground changes the active fighter.
+Examine the existing characters 0001 and 0002, especially their different ground and aerial attacks, projectile attacks, attack motion, and controller bindings.
 
-ALVA uses vanilla JavaScript ES modules, Canvas 2D, HTML, and CSS.
+Understand the existing Fighter.update() execution order, tryAction(), startAttack(), cutAttack(), canAct(), canFollowUp(), tryCombatAssist(), assistIntents(), stepCombatAssist(), and attack buffering.
 
-Keep this architecture. Avoid introducing unnecessary dependencies or frameworks.
+Do not assume a move is simply an animation. Attacks can produce projectiles, change movement, start techniques, summon entities, or have persistent consequences.
 
-Do not change character abilities, combat mechanics, damage, animation timing, movement physics, or cooldowns simply to implement controller controls.
-
-The new controller system changes how actions are requested, not what the actions do.
+Preserve these mechanics.
 
 ⸻
 
-PART 2 — THE ERGONOMIC CONTROLLER DESIGN PHILOSOPHY
+2. Feature one — New Combo Assist setting
 
-This is the most important section of the entire update.
+Settings interface
 
-2.1 Comfort takes priority over arbitrary button assignments
+Under:
 
-Every default binding must be designed with actual controller ergonomics in mind.
+Settings → Combat
 
-Consider:
+Add:
 
-* How frequently an ability is used.
-* How quickly the player must activate it.
-* Whether the action is performed while moving.
-* Whether the player needs precise joystick direction.
-* Whether the action requires holding a button.
-* Whether it is a defensive reaction.
-* Whether it must be used immediately after another move.
-* Whether the player needs to jump simultaneously.
-* Whether a button combination is comfortable to perform.
-* Whether a control forces the player to move their thumb away from another essential control.
-* Whether the action can accidentally trigger another ability.
-* Whether the same controls are comfortable on both PlayStation and Xbox controllers.
+Combo assist
 
-For example, Jump is extremely frequent and often needs to be pressed while moving or attacking.
+Description:
 
-Cross/A is therefore an appropriate default because it is easy to reach.
+“Automatically alternates Attack 1 and Attack 2 when the requested attack is on cooldown, making combos easier to perform.”
 
-A basic punch is also frequent and should use an accessible face button, such as Square/X.
+Present it using the existing On/Off selection design used for Combat Assist.
 
-A special projectile may be less frequent and can comfortably use a trigger modifier combined with a face button.
+Requirements:
 
-However, a fast aerial attack should generally not require a complicated combination if a more comfortable single-button option is available.
+* Enabled by default for new players.
+* Independently configurable from Combat Assist.
+* Saved to localStorage through the existing Settings class.
+* Properly translated into English and French.
+* Visually consistent with existing Combat settings.
+* Accessible using keyboard, touchscreen, and controller navigation.
+* Preserve settings focus handling, radio selection, and existing navigation.
 
-Do not give a frequently used action an unnecessarily complicated input when an equally practical, more comfortable input exists.
+The Combat section should contain both settings as separate groups:
 
-2.2 Universal actions versus character-specific abilities
+Combat Assist: controls automatic melee approach.
 
-Separate actions into two conceptual categories.
+Combo Assist: controls automatic Attack 1 / Attack 2 alternation.
 
-Universal actions
+They must work independently and together.
 
-These are shared gameplay fundamentals, such as:
+Settings persistence
 
-* Running left and right.
-* Jumping.
-* Dash and air dash.
-* Shield.
-* Deflect.
-* Fast fall.
-* Pause.
+The existing settings schema is version 4.
 
-Their recommended default controls should remain consistent across the entire roster.
+Extend it appropriately to version 5.
 
-Character-specific actions
+Add:
 
-These are the individual attacks, abilities, and special mechanics belonging to a character.
+comboAssist: true | false
 
-They must not automatically inherit the same physical button solely because they share an internal attack codename.
+Default:
 
-For example, attack3 might be a powerful projectile for one character and a rolling melee attack for another.
+true
 
-The controller input should suit the actual move, not the attack number.
+Implement proper migration from versions 1, 2, 3, and 4.
 
-Attack numbers are internal identifiers, not a controller layout philosophy.
+A version 4 user who already disabled Combat Assist must retain that preference. Their language, mobile control scheme, custom touch layouts, and per-fighter controller bindings must also survive.
 
-2.3 Full player freedom
+Older saved settings should receive Combo Assist enabled by default.
 
-Although the default controls follow universal consistency, players must be allowed to change any gameplay binding for each individual fighter.
+Invalid values must be sanitized using the existing settings validation conventions.
 
-A player might prefer Circle/B for Jump on #0001 and Cross/A for Jump on #0002.
+Do not reset an entire settings object just because its new field is missing.
 
-The customization system must allow this.
+Pass the preference into the player’s controller in Quick Battle and Practice Ground, following the established Combat Assist settings flow.
 
-Universal consistency is a default design principle, not a limitation on customization.
+CPU controllers must not silently acquire the player’s Combo Assist preference.
 
-2.4 Future characters
+Gameplay behavior
 
-Every future fighter must be evaluated individually.
+Attack 1 and Attack 2 currently have a baseline 0.5-second repeat cooldown.
 
-When a new character is introduced, design its default controller layout using the same comfort-first principles.
+When Combo Assist is enabled:
 
-Do not automatically copy #0001 or #0002’s unique ability bindings.
-
-Examine what the character actually does, how each ability functions, and which control would make it most comfortable.
-
-⸻
-
-PART 3 — PLAYSTATION AND XBOX SUPPORT
-
-ALVA should recognize and support only compatible PlayStation and Xbox controllers.
-
-Target devices include:
-
-* PlayStation DualShock 4.
-* PlayStation DualSense.
-* Compatible Xbox One controllers.
-* Compatible Xbox Series controllers.
-
-Use the browser Gamepad API and its standard mapping where available.
-
-Handle device names and identification information carefully.
-
-Controller identifiers can differ across browsers, operating systems, connection types, and drivers.
-
-Implement a conservative, well-tested identification system.
-
-Do not claim that a controller is definitely PlayStation or Xbox when the available data is insufficient.
-
-Unsupported or unidentified controllers should be reported appropriately rather than silently receiving an incorrect layout.
-
-Do not intentionally provide Nintendo-specific or generic-controller gameplay support in this update.
-
-Button-name presentation
-
-Display the correct labels for the recognized controller family.
-
-PlayStation	Xbox
-Cross	A
-Circle	B
-Square	X
-Triangle	Y
-L1	LB
-R1	RB
-L2	LT
-R2	RT
-L3	LS
-R3	RS
-Options	Menu
-
-Use one normalized internal representation for equivalent physical buttons so character profiles work consistently across both supported controller families.
-
-If a PlayStation controller is being used, the interface should show PlayStation button names.
-
-If an Xbox controller is being used, show Xbox button names.
-
-Do not require players to mentally translate one controller’s labels into another.
-
-⸻
-
-PART 4 — CONTROLLER CONNECTION DETECTION
-
-4.1 Maximum of four controllers
-
-ALVA may recognize up to four supported connected controllers simultaneously.
-
-This is a connection-management limit, not a requirement to implement four-player combat.
-
-The existing game primarily uses one player against a CPU.
-
-Preserve that.
-
-For now, one supported controller is assigned to Player 1 while additional supported controllers remain available but do not control Player 1 unless selected.
-
-Never merge gameplay inputs from multiple controllers into one fighter.
-
-When more than four supported controllers are connected, detect the excess and prevent additional controllers from controlling ALVA.
-
-Use stable device assignments when possible.
-
-4.2 Activate the Home controller button
-
-On the Home screen, find the three small utility buttons at the top-right.
-
-The middle button has the controller icon from controller.PNG.
-
-This button is currently disabled.
-
-Enable it.
-
-Preserve its original icon, position, proportions, and visual identity.
-
-4.3 Add a connection status indicator
-
-Add a small circular status indicator at the bottom-right corner of the controller button.
-
-The indicator must always represent the current recognized-controller status.
-
-There are three statuses:
-
-Green — Connected
-
-A green circle with a white checkmark.
-
-Meaning:
-
-At least one and no more than four supported controllers are connected.
-
-Red — Disconnected
-
-A red circle with a clearly visible cross.
-
-Meaning:
-
-No supported controller is detected.
-
-The cross should have adequate contrast. A white-outlined red cross or a white cross against the red background is acceptable if needed for visibility.
-
-Orange — Too many controllers
-
-An orange circle with an exclamation mark.
-
-Meaning:
-
-More than four supported controllers are detected.
-
-The indicator must update automatically.
-
-Do not display all three statuses simultaneously.
-
-Use the existing ALVA visual language: clean, compact, modern, and consistent with the Home interface.
-
-The status must also be available through an accessible text label.
-
-⸻
-
-PART 5 — CONTROLLER CONNECTION DIALOG
-
-Clicking the Home controller button must open a dedicated dialog.
-
-Suggested title:
-
-Controller Connections
-
-Use the same translucent glass design as ALVA’s existing dialogs.
-
-Display:
-
-* Number of supported connected controllers.
-* Maximum supported controllers: 4.
-* Current status.
-* A list of detected supported controllers.
-* Unsupported or unrecognized devices, when relevant.
-* The controller assigned to Player 1.
-
-Example:
-
-2 Controllers Connected
-
-Controller 1 — DualSense Wireless Controller
-
-Status: Connected
-
-Assignment: Player 1
-
-Controller 2 — Xbox Wireless Controller
-
-Status: Connected
-
-Assignment: Available
-
-Allow the player to choose which supported controller controls Player 1.
-
-Do not allow inactive controllers to move the character or interfere with menus.
-
-Reconnect button
-
-At the bottom of the dialog, add:
-
-Reconnect
-
-Use a refresh icon.
-
-Clicking it must:
-
-1. Query currently available gamepads again.
-2. Detect newly connected controllers.
-3. Remove disconnected controllers.
-4. Update the connection count.
-5. Refresh controller assignments.
-6. Update the status indicator.
-7. Refresh the displayed device list.
-
-The button must perform a real refresh of the controller state.
-
-It must not simply replay an animation.
-
-Do not reload the game or erase settings.
-
-Since browser JavaScript cannot force a physical USB or Bluetooth connection, do not pretend that this button connects hardware directly.
-
-If necessary, show guidance explaining that the player may need to press a button on the controller before the browser recognizes it.
-
-Excess controllers
-
-When more than four supported controllers are connected, show a warning:
-
-Too Many Controllers Connected
-
-“ALVA supports up to four connected controllers. Disconnect an extra controller to remove this warning.”
-
-The first four eligible devices should remain usable where appropriate.
-
-Additional devices must remain inactive.
-
-Error handling
-
-Handle:
-
-* No controllers.
-* Unsupported devices.
-* Unavailable Gamepad API.
-* Browser privacy restrictions.
-* Disconnection while the dialog is open.
-* Connection after the game has loaded.
-* Browser focus loss.
-* Device reconnection.
-
-Do not crash the game because controller detection fails.
-
-⸻
-
-PART 6 — CUSTOM CIRCULAR CONTROLLER CURSOR
-
-Add a custom circular cursor for navigating ALVA’s menus with a controller.
-
-This should feel like a native part of the game’s interface.
-
-6.1 Appearance
-
-The cursor must be:
-
-* Circular.
-* Clearly visible.
-* Visually consistent with ALVA.
-* Smoothly animated.
-* Small enough not to hide UI information.
-* Large enough to identify easily.
-* Distinct from the mouse cursor.
-
-A circular outline with a subtle center indicator is a good starting design.
-
-Use an appropriate hover and selection animation.
-
-Avoid overly bright effects or excessive visual decoration.
-
-6.2 Cursor controls
-
-Default menu bindings:
-
-Action	PlayStation	Xbox
-Move cursor	Left joystick	Left joystick
-Confirm	Cross	A
-Back	Circle	B
-Directional focus navigation	D-pad	D-pad
-Scroll long panels	Right stick vertically	Right stick vertically
-Pause / Resume	Options	Menu
-
-The analog stick should move the cursor smoothly through the interface.
-
-Use:
-
-* Proper deadzones.
-* Comfortable movement speed.
-* Resolution-independent movement.
-* Smooth acceleration.
-* Predictable stopping.
-* Viewport boundaries.
-* Reliable hover detection.
-
-The cursor should not be excessively fast or slow.
-
-6.3 Selecting UI elements
-
-When hovering over an interactive element, pressing Cross/A activates it.
-
-Support:
-
-* Home buttons.
-* Mode selection.
-* Difficulty selection.
-* Character roster.
-* Stage selection.
-* Settings.
-* Controller Connections.
-* Controller customization.
-* Dialog buttons.
-* Practice menus.
-* Pause menus.
-* Result menus.
-* Discover.
-* Other navigable screens.
-
-Only interact with enabled elements inside the currently active screen or modal scope.
-
-Do not allow cursor clicks to pass through dialogs.
-
-6.4 Existing navigation compatibility
-
-ALVA already has MenuNavigator.
-
-Integrate the circular cursor with that system.
-
-Do not create two competing menu navigation engines.
-
-Keep controller focus, button activation, and cursor selection synchronized.
-
-When using the D-pad, the highlighted menu item should remain visible and automatically scroll into view.
-
-The circular cursor may move to the focused element when directional navigation is used, provided this does not cause confusing jumps or unwanted activation.
-
-6.5 Controller versus gameplay
-
-The cursor appears only when the player is navigating menus or interactive overlays.
-
-During gameplay:
-
-* The left stick moves the character.
-* The cursor disappears.
-* Menu confirmation inputs cannot activate combat abilities.
-
-During menus:
-
-* The left stick moves the cursor.
-* Combat input is suspended.
-* Buttons do not accidentally activate gameplay actions.
-
-When a menu closes, clear inappropriate buffered input to prevent accidental attacks or movement.
-
-Mouse, keyboard, and touch must remain functional.
-
-⸻
-
-PART 7 — UNIVERSAL DEFAULT CONTROLS
-
-The following default controls apply to all current and future characters.
-
-They should be chosen for consistency and comfort.
-
-Action	PlayStation	Xbox
-Move left/right	Left joystick	Left joystick
-Jump	Cross	A
-Dash / air dash	L1 + left joystick direction	LB + left joystick direction
-Dash while joystick is neutral	L1	LB
-Shield on ground	Hold Circle	Hold B
-Deflect in air	Press Circle	Press B
-Fast fall / steer downward	Left joystick down	Left joystick down
-Pause	Options	Menu
-
-7.1 Movement
-
-Use the left joystick for normal character movement.
-
-Horizontal stick direction determines left/right movement.
-
-Preserve ALVA’s existing movement behavior.
-
-Do not alter acceleration, momentum, jump physics, air movement, or running speed.
-
-7.2 Jump
-
-Cross/A is the universal default Jump button.
-
-This should remain consistent because Jump is one of the most frequent and important gameplay actions.
-
-Preserve:
-
-* Normal jumping.
-* Higher jumps based on hold duration.
-* Air jumping.
-* Triple jumping.
-* Existing jump buffering.
-
-7.3 Dash and air dash
-
-L1/LB is the universal default Dash button.
-
-This is particularly important.
-
-The player should be able to Dash without moving their right thumb away from the attack buttons.
-
-The direction depends on the left joystick.
+* If the player requests Attack 1 and Attack 1 is still on its repeat cooldown, attempt Attack 2 instead.
+* If the player requests Attack 2 and Attack 2 is still on its repeat cooldown, attempt Attack 1 instead.
+* If the originally requested attack is ready, use it normally.
+* If the alternative attack is unavailable or illegal, do not force it.
+* Never bypass either move’s actual cooldown.
+* Never create an extra attack or execute both moves from one press.
 
 Examples:
 
-Left joystick right + L1 = Dash right.
+Example A
 
-Left joystick left + L1 = Dash left.
+1. Player executes Attack 1.
+2. Attack 1 ends and enters its 0.5-second cooldown.
+3. Player presses Attack 1 again.
+4. Attack 1 remains unavailable.
+5. Attack 2 is available.
+6. The game executes Attack 2.
 
-Neutral joystick + L1 = Dash in the current facing direction.
+Example B
 
-Use the existing ALVA Dash and air-dash mechanics.
+1. Player executes Attack 2.
+2. Attack 2 enters its cooldown.
+3. Player presses Attack 2 again.
+4. Attack 1 is available.
+5. The game executes Attack 1.
 
-Do not change their movement values or Energy costs.
+Example C
 
-A held Dash button must not repeatedly trigger Dashes.
+1. Attack 1 and Attack 2 are both on cooldown.
+2. Player presses Attack 1.
+3. Neither attack can legally execute.
+4. Do not start either move, bypass their cooldowns, or generate phantom attacks.
 
-A fresh valid activation must issue one Dash request, using the intended direction at activation.
+Existing input-buffer behavior may apply when appropriate, but it must not generate stale or unexpected moves.
 
-Preserve the existing internal mouvementLeftPressed and mouvementRightPressed fields.
+Example D
 
-7.4 Shield
+Combo Assist is disabled.
 
-Circle/B is the universal default defensive button.
+Pressing Attack 1 must request Attack 1 only, regardless of whether Attack 2 is available.
 
-Shield must be held.
+Critical implementation details
 
-Holding Circle/B on the ground raises Shield.
+Resolve the alternative using the fighter’s actual loadout and present ground/air context.
 
-Releasing it lowers Shield.
+Do not hardcode character-specific moves.
 
-Never make Shield automatically toggle on and off.
+Character 0001 has a different Attack 2 behavior from character 0002; one attack can be ranged while another is melee.
 
-Preserve:
+Combo Assist should work based on logical Attack 1 / Attack 2 controls, not assumptions about the attack’s type, name, or animation.
 
-* Shield startup.
-* Shield release.
-* Perfect Shield.
-* Shield Energy.
-* Blocking behavior.
-* Recovery and restrictions.
+Respect:
 
-7.5 Deflect
+* Ground versus aerial attack selection.
+* Attack cooldowns.
+* Animation availability.
+* Ground-only restrictions.
+* Air-use limits.
+* Free-fall restrictions.
+* Existing movement and attack-motion rules.
+* Controller input context and binding resolution.
+* Specials and attack effects.
 
-In the air, a fresh Circle/B press triggers Deflect where supported.
+Do not modify the internal attack codename conventions.
 
-Deflect is a press-based action.
+Important: Perform Combo Assist resolution in a centralized and deterministic way. Every attack should have one effective action per press. Any buffered request must have clearly defined ownership and must not be silently remapped multiple times across successive simulation frames.
 
-Holding Circle/B must not repeatedly activate it.
-
-Do not introduce aerial shielding or air dodging.
+When a legal alternative is chosen, it must still pass through the ordinary move-starting and Combat Assist logic.
 
 ⸻
 
-PART 8 — CHARACTER #0001 DEFAULT CONTROLS
+3. Feature two — Intelligent move cancellation
 
-Character #0001 has melee moves, projectiles, aerial attacks, and special techniques.
+Desired player experience
 
-The default layout should make its basic attacks accessible while grouping its powerful projectile abilities under an intuitive trigger modifier.
+When a player deliberately requests another move while a move is currently playing, the game should intelligently interrupt the previous move and perform the requested move.
 
-8.1 Ground moves
-
-Ability	PlayStation	Xbox
-Jab	Square	X
-High Kick	Triangle	Y
-Red	Hold R2 + Square	Hold RT + X
-Maximum Blue	Hold R2 + Circle	Hold RT + B
-Unlimited Void	Hold L2 + Triangle	Hold LT + Y
-Hollow Purple	Hold R2 + Triangle	Hold RT + Y
-Infinity Shield	Hold Circle	Hold B
-
-Jab
-
-Square/X activates Jab.
-
-A basic punch must be extremely easy to perform.
-
-This is one of #0001’s most accessible and frequently used melee attacks.
-
-High Kick
-
-Triangle/Y activates High Kick on the ground.
-
-It remains easy to reach while moving or setting up combos.
-
-Red
-
-Hold R2/RT and press Square/X.
-
-This fires Red, #0001’s repelling projectile.
-
-The trigger serves as an offensive projectile modifier.
-
-Maximum Blue
-
-Hold R2/RT and press Circle/B.
-
-This activates Maximum Blue.
-
-It must not activate Infinity Shield at the same time.
-
-Unlimited Void
-
-Hold L2/LT and press Triangle/Y.
-
-Keep the original technique behavior, startup, and cooldown.
-
-Hollow Purple
-
-Hold R2/RT and press Triangle/Y.
-
-This should activate Hollow Purple instead of High Kick.
-
-Preserve its original casting mechanics.
-
-8.2 Aerial moves
-
-Ability	PlayStation	Xbox
-Floating Straight	Square	X
-Red Kick	Triangle	Y
-Blue	R1	RB
-High Kick	L2 + Square	LT + X
-Deflect	Circle	B
-
-Floating Straight
-
-Square/X performs the aerial punch.
-
-This maintains the intuitive connection between Square/X and a straightforward punch.
-
-Red Kick
-
-Triangle/Y activates Red Kick.
-
-This is a comfortable face-button input for a direct aerial attack.
-
-Blue
-
-R1/RB activates the aerial Blue attack.
-
-Using a shoulder button keeps the ability easy to perform without interfering with ordinary horizontal movement.
-
-Aerial High Kick
-
-L2/LT + Square/X activates High Kick in the air.
-
-Keep this as a separate, remappable binding.
-
-8.3 Special rules for #0001
-
-R2/RT functions as a modifier, not an independent attack.
-
-A trigger modifier must never accidentally activate the unmodified action.
+The player should no longer feel trapped in an unnecessary animation or recovery state when they are trying to transition into a different legal action.
 
 For example:
 
-R2 + Square = Red, not Jab.
+Attack 1 → Attack 2
+Attack 2 → Attack 1
+Attack → Jump
+Attack → Dash
+Attack → Shield
+Attack → Another legal special
+Dash → Attack
+Aerial attack → Another legal aerial move
 
-R2 + Circle = Maximum Blue, not Shield.
+These transitions should feel fast, consistent, and responsive.
 
-R2 + Triangle = Hollow Purple, not High Kick.
+Run is the exception
 
-L2 + Triangle = Unlimited Void.
+Ordinary Run must never cancel a move.
 
-All these combinations must be tested carefully.
-
-Ground-only abilities must not accidentally trigger their aerial counterparts just because they share an internal action slot.
-
-⸻
-
-PART 9 — CHARACTER #0002 DEFAULT CONTROLS
-
-Character #0002 is based around mobility, quick attacks, directional aerial combat, and spinning abilities.
-
-Its layout must feel fast and natural.
-
-The player should not need awkward combinations to perform its core movement-oriented abilities.
-
-9.1 Ground moves
-
-Ability	PlayStation	Xbox
-One-Two	Square	X
-Rapid Kicks	Triangle	Y
-Spin Attack	R1	RB
-Whirlwind	Hold R2 + Triangle	Hold RT + Y
-Shield	Hold Circle	Hold B
-
-One-Two
-
-Square/X activates the basic punch combination.
-
-Both current characters therefore use Square/X for their primary ground punch attacks.
-
-Rapid Kicks
-
-Triangle/Y activates Rapid Kicks.
-
-This keeps another direct ground attack on an accessible face button.
-
-Spin Attack
-
-R1/RB activates Spin Attack on the ground.
-
-This is an intentional improvement over placing Spin Attack on R2/RT.
-
-R1/RB is comfortable and easy to access during movement.
-
-It also avoids a trigger conflict with Whirlwind.
-
-Whirlwind
-
-Hold R2/RT and press Triangle/Y.
-
-This activates Whirlwind instead of Rapid Kicks.
-
-R2/RT is a modifier only for this combination, not a separate Spin Attack input.
-
-9.2 Aerial moves
-
-Ability	PlayStation	Xbox
-Homing Attack	Left stick left/right + Square	Left stick left/right + X
-Bounce Attack	Left stick down + Square	Left stick down + X
-Blue Tornado	R1	RB
-Deflect	Circle	B
-
-Homing Attack
-
-While airborne, use Square/X while pointing the left stick horizontally.
-
-The intended horizontal direction should determine the initiation direction before the existing homing behavior takes over.
-
-A neutral stick + Square/X may also activate Homing Attack using the character’s facing direction.
-
-Do not change the underlying target selection, attack speed, range, or recovery.
-
-Bounce Attack
-
-While airborne, point the left stick down and press Square/X.
-
-This activates Bounce Attack, the existing downward plunging move.
-
-It must not accidentally activate Homing Attack.
-
-The downward direction should take priority over horizontal direction when the stick is predominantly aimed downward.
-
-Use sensible deadzones and diagonal-direction handling.
-
-The combination should not trigger an unintended fast fall as a separate action on the same activation.
-
-Preserve the move’s existing physics and bounce behavior.
-
-Blue Tornado
-
-R1/RB activates Blue Tornado in the air.
-
-This deliberately shares a physical button with Spin Attack on the ground.
-
-This is a valid and desirable contextual binding.
-
-Spin Attack can only execute on the ground.
-
-Blue Tornado executes in the air.
-
-The player uses the same comfortable shoulder button for two contextually different spinning abilities.
-
-This is exactly the kind of ergonomic, character-aware decision the controller system should encourage.
-
-Do not activate both abilities.
-
-Do not change Blue Tornado’s existing movement or free-fall limitations.
-
-⸻
-
-PART 10 — BUTTON COMBINATIONS AND INPUT PRIORITY
-
-This part is extremely important because incorrect combination handling could make the controls frustrating.
-
-A fully functional controller system must distinguish between:
-
-* A normal button press.
-* A held button.
-* A modifier plus button.
-* A directional input plus button.
-* Ground-specific actions.
-* Air-specific actions.
-
-10.1 Reliable combination behavior
-
-Use modifier-first input as the primary rule.
-
-For example, to activate #0001’s Red:
-
-1. Hold R2.
-2. Press Square.
-3. Trigger Red exactly once.
-
-Do not trigger Jab.
-
-If Square was already pressed before R2, do not retroactively reinterpret that earlier Jab press as Red.
-
-For buttons pressed within the same input sample, recognize an unambiguous valid combination before an unmodified action.
-
-Most importantly, do not add noticeable input lag to ordinary attacks just to wait for a possible modifier.
-
-10.2 No accidental Shield activation
-
-When #0001 performs R2 + Circle:
-
-* Maximum Blue activates.
-* Shield does not activate.
-* The Shield input is not buffered for later.
-* Releasing R2 must not automatically raise Shield from the consumed Circle press.
-
-The player should release and press Circle again to begin normal shielding.
-
-If Circle was pressed first and Shield already started, adding R2 afterward should not retroactively fire Maximum Blue.
-
-10.3 No accidental attacks
+Run Left and Run Right are continuous movement/steering inputs, not requests to interrupt the current action.
 
 Examples:
 
-* R2 + Triangle must not also trigger the unmodified Triangle attack.
-* #0002’s downward Square input must not activate Homing Attack.
-* A ground move must not be selected when the fighter is airborne.
-* An aerial move must not replace an unavailable ground move.
-* Releasing a modifier must not create a new attack press.
-* Holding an attack button must not repeatedly activate it unless the action specifically supports that behavior.
+* Holding Right during Attack 1 must not cancel Attack 1.
+* Holding Left during Attack 2 must not cancel Attack 2.
+* Switching from Left to Right must not automatically cancel a move.
+* Holding Run while Combat Assist approaches an opponent must not cancel the approach.
+* Pressing Attack 2 while running should request Attack 2 and may cancel the current move, because the attack was explicitly requested.
 
-10.4 Context-specific priority
+Do not confuse Run with the explicit Dash/Mouvement input.
 
-Resolve compatible input candidates using:
+An explicit Dash button press is a move request and may cancel an eligible current move.
 
-1. Active character.
-2. Ground/air state.
-3. Validity of the action in that state.
-4. Matching physical buttons.
-5. Modifier specificity.
-6. Directional specificity.
-7. Activation type.
-8. Safe conflict-resolution rules.
+Likewise, distinguish Down used for steering or fast-fall control from an actual newly requested move. Continuous directional state alone should not be treated as a new attack or cancellation request.
 
-More specific valid combinations should normally take priority over less specific inputs.
+Intelligent cancellation design
 
-However, shielding, movement, and other continuously held controls must remain responsive.
+Do not implement cancellation as:
 
-Do not create artificial timing delays that make reactions slower.
+“Whenever any button is pressed, clear the current animation.”
 
-10.5 Do not change the combat engine
+That would introduce serious gameplay bugs.
 
-The resolver must convert physical controller input into the existing logical ALVA action fields.
+Instead, build a consistent move-intent and cancellation policy around the existing fighter state machine.
 
-For example, #0002’s Bounce Attack should resolve to the correct internal numbered attack request in the air.
+The recommended workflow is:
 
-Do not create an entirely separate gameplay system that directly executes Bounce Attack when a controller button is pressed.
+1. Read the resolved input snapshot.
+2. Identify newly requested actions.
+3. Ignore ordinary Run as a cancellation trigger.
+4. Determine which requested action should take priority.
+5. Resolve Combo Assist if applicable.
+6. Validate whether the requested move can legally start.
+7. If legal, cleanly interrupt the current cancelable action.
+8. Start the requested move immediately on the same eligible simulation step.
+9. Clear or update obsolete buffered input.
+10. Leave the previous move untouched if the requested action cannot legally execute.
 
-The fighter’s existing combat system remains responsible for executing and validating the move.
+Where the engine already has explicit special-case priorities, preserve those unless changing them is necessary and documented.
+
+Safety and legality conditions
+
+A cancellation must not automatically bypass:
+
+* Hitstun.
+* Paralysis.
+* Impact freeze / hitstop.
+* Respawn or Void states.
+* Attack cooldowns.
+* Special ability cooldowns.
+* Energy requirements.
+* Ground/air restrictions.
+* Missing animations.
+* Air dash usage limits.
+* Once-per-airtime attack restrictions.
+* Existing attack-specific validity checks.
+
+If a requested move is invalid, do not destroy a currently valid action just to attempt it.
+
+Broaden player-initiated cancel opportunities where appropriate, including whiffed and blocked attacks, rather than relying exclusively on the existing confirmed-hit cancel rule.
+
+However, preserve the distinction between an explicit player cancel and ordinary automatic state progression.
+
+Do not make passive movement, held input, or background game systems automatically interrupt actions.
+
+The feature is intended to improve player control, not to disable meaningful combat restrictions.
+
+Cleanly end the previous move
+
+When cancelling an attack, ensure:
+
+* Its hitbox no longer deals new hits.
+* Its animation stops appropriately.
+* Its current state is cleared.
+* Its normal cooldown starts according to the established rules.
+* Its unreleased projectile is not emitted later.
+* Already released projectiles remain valid.
+* Completed hit effects are not undone.
+* The new animation starts at the correct first frame.
+* The new move is not immediately overwritten by the old move’s state update.
+
+When cancelling movement, avoid erasing velocity unnecessarily.
+
+When cancelling a technique or summon startup, handle any unreleased effects safely. Respect cooldowns that were already committed and avoid duplicate summons or projectiles.
+
+Where a move has committed motion, distinguish between safely interrupting that motion and retroactively undoing effects.
+
+Prevent cancellation exploits
+
+The system must not allow:
+
+* Infinite restarting of the same attack.
+* Bypassing repeat cooldowns by alternating input tricks.
+* Duplicate hits from cancelled attacks.
+* Duplicate projectiles.
+* Multiple ability activations from one press.
+* Reusing air dashes without landing.
+* Unexpected double-spending or refunding of Energy.
+* Old buffered commands executing after a new command successfully started.
+* Cancelling because a held controller button is sampled repeatedly.
+* Ground moves activating in the air or vice versa.
+
+Same-move reactivation must follow valid cooldown rules.
+
+Input priority and buffering
+
+Retain the existing useful attack buffer, jump buffering, dash buffering, and controller ground/air contextual press behavior.
+
+A new deliberate input should supersede an obsolete buffered request when appropriate.
+
+During hitstop, retain permitted requests for execution after the freeze, without allowing input to age incorrectly.
+
+When multiple actions arrive in the same simulation step, choose a deterministic winner using one documented priority policy.
+
+Do not let two actions start simultaneously.
+
+Avoid repeatedly cancelling and restarting actions because a button remains held.
+
+This should behave consistently across keyboard, controller, and mobile.
+
+CPU behavior
+
+Player-initiated responsive cancellation must not accidentally make CPU opponents spam instant transitions or alter AI decision-making.
+
+Prefer applying the new request policy to human-controlled fighters while retaining the shared state validity rules.
+
+If any shared engine change affects CPUs, investigate and explicitly test the consequences.
 
 ⸻
 
-PART 11 — SETTINGS → CONTROLS → CONTROLLER CONTROLS
+4. Feature three — Attack artwork in controller controls
 
-In the existing Settings dialog, under Controls, add a new subsection titled:
+Current behavior
 
-Controller Controls
+Mobile controls already display artwork associated with a fighter’s attacks.
 
-Keep the existing Mobile Controls settings unchanged.
+The controller editor currently displays move names, descriptions, button bindings, and activation information without displaying equivalent artwork alongside each move name.
 
-Display a short explanation:
+Required UI change
 
-“Customize your controller controls for each character individually. Default layouts are designed for comfort and each character’s unique abilities.”
+Go to:
 
-Below this, add a button:
+Settings → Controls → Controller controls → Select fighter.
 
-Customize Controller Controls
+In the fighter’s control editor, display the appropriate attack image directly beside each attack’s name.
 
-Clicking the button opens a fighter roster dialog.
+For example, an Attack 1 row should display the actual Attack 1 preview artwork, not merely a generic attack icon.
 
-11.1 Roster selection
+A distinct aerial attack should display its appropriate aerial preview.
 
-Reuse the existing fighter roster design.
+This should work for:
 
-Display all 48 roster slots as appropriate.
+* Ground attacks.
+* Aerial attacks.
+* Extra attacks.
+* Projectile attacks.
+* Techniques and other special abilities where preview art is available.
 
-Currently available characters should be selectable.
+Keep universal movement and defense actions using their existing presentation unless an appropriate authored image already exists.
 
-Locked or unavailable characters must not open active customization profiles.
+Reuse the existing system
 
-When a player chooses #0001 or #0002, open the corresponding character’s controller editor.
+Examine:
 
-This selection must not affect the character selected for Quick Battle or Practice Ground.
+* js/data/ability-preview.js
+* js/ui/mobile-abilities.js
+* js/ui/touch-controls.js
 
-The roster dialog is only for choosing whose controls to customize.
+The existing previewFrame() infrastructure already selects authored animation frames, projectile frames, and mirrored artwork.
 
-⸻
+Reuse it.
 
-PART 12 — COMPLETE PER-CHARACTER CONTROLLER CUSTOMIZATION
+For controller actions, derive the preview from the action’s logical control and ground/air place, using the selected fighter definition.
 
-Players must be able to fully customize their controller gameplay bindings.
+Do not introduce character-specific image paths or duplicate artwork definitions.
 
-Every playable character must have an independent controller layout.
+An action in the controller editor may be identified as ground:attack1 or air:attack1, while the artwork selection uses the logical attack control and context. Handle that mapping correctly.
 
-The customization system must not be restricted to choosing from preset configurations.
+Rendering requirements
 
-12.1 Customization screen
+* Add a compact, consistent image beside the move name.
+* Preserve the full name and description.
+* Preserve controller binding labels and activation text.
+* Keep the row clickable and focusable.
+* Keep the existing selected and conflict states.
+* Use the appropriate sprite aspect ratio.
+* Preserve transparent backgrounds and mirroring.
+* Do not stretch, crop, or distort the image.
+* Keep images decorative for assistive technology because the move’s textual name is already present.
+* Prevent images from intercepting pointer interactions.
+* Provide a graceful fallback for unavailable or failed images.
+* Ensure images remain readable on smaller screens.
+* Avoid layout shifts when images finish loading.
+* Keep English and French labels intact.
 
-Display:
+Pay particular attention to css/controller.css and the existing .controller-row-name, .controller-row-text, and .controller-row layouts.
 
-* Character portrait.
-* Character name or codename.
-* Controller family currently active.
-* All available gameplay actions.
-* Current bindings.
-* Brief descriptions of abilities.
-* Edit buttons.
-* Save/Apply.
-* Cancel.
-* Restore Defaults.
-
-Organize actions into sensible categories:
-
-Movement
-
-Running, jumping, Dash, fast fall.
-
-Defense
-
-Shield, Deflect.
-
-Ground Attacks
-
-Ground-only and grounded versions of attacks.
-
-Aerial Attacks
-
-Airborne attacks and their special directional requirements.
-
-Special Abilities
-
-Projectiles, techniques, summons, or other unusual abilities.
-
-Other
-
-Pause and applicable universal or future gameplay actions.
-
-Do not duplicate unavailable attack slots as if they were functional abilities.
-
-12.2 Ability names and descriptions
-
-Use actual ability names.
-
-Avoid displaying only Attack 1, Attack 2, Attack 3, etc.
-
-For example:
-
-Red
-
-“Fires a repelling projectile that pushes enemies away.”
-
-Binding: R2 + Square
-
-Activation: Modifier + Press
-
-Blue Tornado
-
-“Spins upward into a tornado, carrying opponents into the air.”
-
-Binding: R1
-
-Activation: Press
-
-Shield
-
-“Blocks incoming attacks while the button is held.”
-
-Binding: Circle
-
-Activation: Hold
-
-Descriptions must be brief, clear, and accurate.
-
-Use the actual character definitions as the source of truth for ability availability and mechanics.
-
-Add localized descriptive metadata where needed.
-
-12.3 Fully editable binding types
-
-Allow the player to configure:
-
-Single button
-
-Examples:
-
-Square
-
-Circle
-
-R1
-
-R2
-
-L3
-
-Triangle
-
-Two-button combination
-
-Examples:
-
-R2 + Square
-
-L2 + Circle
-
-L1 + R1
-
-R2 + Triangle
-
-Directional combination
-
-Examples:
-
-Left stick down + Square
-
-Left stick left + Triangle
-
-Left stick right + R1
-
-Held input
-
-Examples:
-
-Hold Circle
-
-Hold R1
-
-Hold L2 + Triangle
-
-Press input
-
-Examples:
-
-Press Square
-
-Press R1
-
-Press R2 + Circle
-
-Also support meaningful remapping of movement axes and directional controls.
-
-The player should not be artificially restricted to the recommended default buttons.
-
-12.4 Activation method
-
-Players can choose appropriate activation methods.
-
-Press: Activates once when the specified button or combination becomes active.
-
-Hold-to-activate: Activates once after a defined short hold threshold, unless it is a genuinely continuous action.
-
-Continuous hold: Maintains an existing held action while the input remains active.
-
-Do not confuse holding a modifier with holding the ability itself.
-
-For example, R2 + Square normally means hold R2 as a modifier, then press Square once.
-
-It does not mean repeatedly firing Red while both buttons are held.
-
-For continuous mechanics like Shield, preserve their real behavior even when remapped.
-
-Shield must remain a held defensive action, not a toggle.
-
-Variable-height Jump must also retain its normal duration-sensitive behavior.
-
-Customization changes the input, not the game’s combat rules.
-
-12.5 Press-to-bind interface
-
-When selecting Change Binding, open an input-capture interface.
-
-Example:
-
-Press your preferred button or combination
-
-The game listens to the designated controller.
-
-Display the detected input.
-
-Allow the player to:
-
-* Confirm.
-* Retry.
-* Cancel.
-* Change activation type.
-
-Do not let captured buttons accidentally activate the menus behind the editor.
-
-Do not perform gameplay actions while capturing bindings.
-
-Make input capture comfortable and intuitive.
-
-12.6 Conflict detection
-
-Detect problematic bindings before saving.
-
-For example:
-
-If two ground attacks use the same single button and can activate in the same context, this is a conflict.
-
-Show a warning identifying the conflicting actions.
-
-However, do not treat every shared button as a conflict.
-
-Examples of valid reuse:
-
-* #0002’s Spin Attack and Blue Tornado share R1 because one is grounded and the other airborne.
-* A basic attack and an explicitly modified version may share the same face button when the modifier logic reliably separates them.
-* A ground Shield and aerial Deflect may use the same button.
-
-Allow legitimate contextual reuse.
-
-Prevent configurations that create unavoidable ambiguity.
-
-If necessary, provide a way to restore the original controls.
-
-12.7 Visual controller diagram
-
-Include an interactive controller diagram within the customization interface if practical.
-
-Show the currently recognized PlayStation or Xbox layout.
-
-Highlight the buttons involved in the selected binding.
-
-For combinations, highlight both inputs.
-
-This would make customizing controls easier to understand.
-
-Keep the diagram lightweight and use appropriate original or permitted vector UI assets.
-
-Do not make the diagram mandatory for functionality; the editor must remain accessible through textual controls and keyboard navigation.
-
-⸻
-
-PART 13 — SAVE CONTROLS FOR INDIVIDUAL CHARACTERS
-
-Each fighter must maintain its own saved controller settings.
-
-Example:
-
-Character #0001:
-
-Jump = Cross
-
-Jab = Square
-
-Red = R2 + Square
-
-Character #0002:
-
-Jump = Triangle
-
-One-Two = Square
-
-Blue Tornado = R1
-
-These profiles must remain independent.
-
-Changing #0002 must not overwrite #0001.
-
-13.1 Persistent saving
-
-Use ALVA’s existing settings architecture.
-
-Store configurations using stable character IDs.
-
-Example conceptual structure:
-
-controllerProfiles: {
-  "0001": {
-    // Custom controls for #0001
-  },
-  "0002": {
-    // Custom controls for #0002
-  }
-}
-
-Do not use roster positions or display names as save keys.
-
-Save valid configurations to the browser’s local storage through js/core/settings.js.
-
-Preserve all existing settings.
-
-Update the settings schema version and migrations correctly.
-
-Keep old Mobile Controls layouts, language settings, and Combat Assist preferences intact.
-
-13.2 Save, Cancel, and Restore
-
-Provide:
-
-Save / Apply
-
-Validates and saves changes.
-
-Cancel
-
-Discards unapplied changes.
-
-Restore Defaults
-
-Restores only the currently selected character’s recommended controller bindings.
-
-Use confirmation before discarding saved customizations.
-
-New profiles must load correctly when the game restarts.
-
-Malformed stored bindings must fail safely without breaking the rest of the settings.
-
-⸻
-
-PART 14 — FUTURE CHARACTER SUPPORT
-
-This controller system must scale to ALVA’s future roster.
-
-ALVA currently has two playable characters, but its roster is designed for many more.
-
-Never build the system assuming there will only be #0001 and #0002.
-
-14.1 Character definitions as the source of truth
-
-Determine available abilities from the fighter definitions.
-
-Use appropriate existing metadata such as:
-
-* actions
-* attacks
-* techniques
-* summons
-* abilityNames
-* mobileAbilities
-
-Controller profiles should reference stable logical action and move identifiers, not animation filenames or displayed labels.
-
-14.2 New character defaults
-
-When a new playable character is introduced:
-
-1. Identify its universal actions.
-2. Identify every unique ability.
-3. Understand how each ability works.
-4. Determine whether it is grounded, aerial, directional, held, or context-sensitive.
-5. Choose comfortable default controller bindings.
-6. Ensure no unintended conflicts.
-7. Make all actions available for customization.
-8. Add brief ability descriptions.
-9. Validate the character’s controller profile.
-
-A new fighter should receive a safe, editable fallback when no individually authored recommended defaults exist.
-
-However, do not mistake the fallback for a finalized ergonomic control layout.
-
-New fighters should receive consciously designed default bindings.
+Do not turn the editor into a substantially larger interface.
 
 Important
 
-The shared input engine must not contain hardcoded checks for specific character IDs.
+Artwork must correspond to the actual move, not just the attack number.
 
-Character-specific layout data may reference individual fighter IDs, but the controller engine itself must remain generic.
+For example, a fighter’s ground Attack 1 and aerial Attack 1 can have different previews.
 
-⸻
+Likewise, projectile attacks may use authored projectile animation frames rather than the fighter’s attack pose.
 
-PART 15 — INPUT SYSTEM ARCHITECTURE
-
-Separate controller functionality into clear responsibilities.
-
-Physical controller manager
-
-Responsible for:
-
-* Detecting controllers.
-* Identifying supported device families.
-* Tracking controller connections.
-* Tracking physical button/axis state.
-* Managing the four-controller limit.
-* Maintaining active controller assignments.
-
-Controller binding resolver
-
-Responsible for:
-
-* Reading active character profiles.
-* Resolving single buttons.
-* Resolving combinations.
-* Resolving directional inputs.
-* Resolving held and press actions.
-* Applying contextual validity.
-* Preventing duplicate/conflicting actions.
-
-Gameplay input integration
-
-Responsible for converting the resolved actions into ALVA’s existing gameplay input snapshot.
-
-Do not bypass the current input and fighter-controller contracts.
-
-Keyboard, touch, and controller should remain compatible input sources.
-
-Menu navigation
-
-Responsible for the circular cursor, selection, scrolling, focus, and navigation scopes.
-
-Keep this logically separate from the fighter’s combat controls.
-
-This architecture should be modular without becoming unnecessarily complicated.
+Use the existing metadata to select the correct one.
 
 ⸻
 
-PART 16 — IMPORTANT TECHNICAL CORRECTIONS
+5. Feature four — Holding Run must not cancel Combat Assist
 
-16.1 Do not make controller inputs feel delayed
+Current reported bug
 
-A player must never feel that basic attacks, Jump, Shield, or movement respond slowly because the system is waiting to detect a possible button combination.
+When a player is holding Run and then presses an attack without releasing Run, Combat Assist can automatically cancel itself.
 
-Prefer clear modifier-first controls.
+This makes it unreliable during ordinary movement.
 
-Recognize simultaneous inputs when unambiguous, but do not impose substantial artificial delays on ordinary actions.
+Expected behavior
 
-Responsiveness is part of comfort.
+1. Player holds Run toward an opponent.
+2. Player presses a melee attack.
+3. The opponent is outside the melee attack’s reach but within Combat Assist range.
+4. Combat Assist begins approaching.
+5. The player continues holding Run.
+6. Combat Assist completes normally.
+7. The requested attack starts.
 
-16.2 Avoid accidental actions
+Holding Run must not cancel this sequence.
 
-Never trigger multiple combat abilities from one intended combination.
+The behavior must work whether the player is running left or right.
 
-Do not allow trigger release to activate an unmodified attack.
+Investigation
 
-Do not fire attacks repeatedly from ordinary held buttons.
+Inspect:
 
-Do not allow menu navigation inputs to leak into combat.
+* InputManager.sample()
+* ControllerResolver.resolve()
+* Fighter.update()
+* Fighter.assistIntents()
+* Fighter.dashAsked()
+* Fighter.stepCombatAssist()
 
-16.3 Support controller disconnections
+Determine whether the cancellation comes from incorrect edge detection, unwanted Dash intent, input precedence, stale buffer state, or state-transition ordering.
 
-If the active controller disconnects, immediately release its held gameplay inputs.
+Do not merely hide the symptom.
 
-Prevent:
+Fix the underlying issue.
 
-* Endless running.
-* Permanent Shield.
-* Stuck attacks.
-* Unintended Dash requests.
-* Stuck menu selection.
+An ordinary running direction must never be interpreted as an explicit Dash request.
 
-Allow the player to select another connected supported controller.
+While Combat Assist owns the fighter’s movement, held Run may continue to exist in the input snapshot without cancelling the approach.
 
-Keyboard input should remain available.
+Preserve Combat Assist’s target tracking and normal obstruction checks.
 
-16.4 Correct controller identification
+Actual cancellation requests must still work
 
-Browsers may hide gamepads until initial interaction.
+These should remain capable of cancelling an active Combat Assist approach:
 
-Check existing connections where permitted, react to events, and provide manual refresh.
+* A newly requested Jump.
+* An explicit Dash request.
+* A legal defensive action.
+* A newly requested different move.
 
-Do not assume a gamepad is unsupported merely because a browser has not exposed it yet.
+When a replacement attack is requested, follow the established Combat Assist replacement or cancellation rules, integrated with the new intelligent move-cancellation policy.
 
-Do not misidentify uncertain devices.
+If Combo Assist remaps Attack 1 to Attack 2 during an approach, resolve the replacement legally.
 
-Clearly communicate detection limitations.
-
-16.5 Do not confuse four connections with multiplayer
-
-This update supports detection and management of up to four controllers.
-
-It must not silently implement multiplayer modes or alter Quick Battle’s player-versus-CPU structure.
-
-One active gameplay controller controls Player 1.
-
-16.6 Handle joystick direction carefully
-
-Directional attacks must use sensible thresholds.
-
-For #0002:
-
-* Left/right + Square → Homing Attack.
-* Down + Square → Bounce Attack.
-* Neutral + Square → Homing Attack using facing.
-
-When the joystick points diagonally, use a consistent dominant-axis policy rather than randomly selecting a move.
-
-Test directions near deadzone boundaries.
+Do not let the Run bug fix disable genuine player-requested cancellations.
 
 ⸻
 
-PART 17 — RESPECT REPOSITORY RULES
+6. Feature five — Combat Assist ignored after performing a move
 
-ALVA has a specific naming and architecture contract.
+Reported bug
 
-Preserve established codenames.
+Combat Assist sometimes does not activate when the player attacks soon after performing another move.
 
-Do not rename:
+The player may execute an attack immediately after a previous attack or during a transition, and the next melee attack starts without the expected approach.
 
-* attack1
-* attack2
-* midair_attack1
-* extra_attack
-* shield
-* jump
-* mouvementLeft
-* mouvementRight
-* Existing Dash animation codenames
+This is especially noticeable when chaining attacks.
 
-Keep the existing intentional spelling conventions.
+Important code-level finding to investigate
 
-The repository’s current codename_rule restricts modifier-based attack inputs.
+The current tryCombatAssist() implementation requires this.canAct().
 
-This update introduces controller-specific physical combinations.
+However, tryAction() may allow the next attack through canFollowUp() during a valid hit-cancel or dash-cancel state.
 
-Therefore, carefully revise the applicable input-routing rules.
+This means an attack may legally start while Combat Assist is rejected solely because the fighter has not returned to the completely idle state.
 
-The updated contract must distinguish between:
+That eligibility mismatch is a likely contributor.
 
-Logical gameplay actions, which remain consistent with ALVA’s existing combat engine.
+Investigate and fix it.
 
-Physical controller bindings, which may use modifiers, directional inputs, and contextual mappings.
+Do not blindly replace canAct() with canFollowUp() without examining the consequences.
 
-Do not change the character loadout format unnecessarily.
+When Combat Assist starts from a legal cancellation state, the previous attack or movement state must be cleanly ended first. Otherwise an old action may continue conflicting with the new approach.
 
-Do not change existing keyboard or touch behavior.
+Required behavioral rule
 
-Do not modify the protected character_rule file.
+If a melee attack can legally start, Combat Assist is enabled, and all of Combat Assist’s own reach/path conditions are satisfied, the attack should receive Combat Assist regardless of whether it was requested from idle or as a legal follow-up.
 
-⸻
+It should not be arbitrarily denied because the player recently completed or cancelled another move.
 
-PART 18 — GAME MODE INTEGRATION
+Combat Assist should remain unavailable when its real restrictions apply, such as a missing target, blocked path, exhausted aerial uses, invalid move, or an attack it is not designed to serve.
 
-The new controller controls must work across the game.
+Investigate transition scenarios
 
-Quick Battle
+Test Combat Assist after:
 
-Use the selected player’s fighter-specific saved profile.
+* An attack’s normal completion.
+* An attack’s recovery.
+* A confirmed hit-cancel.
+* An interrupted attack.
+* A completed Dash.
+* A Dash cancel into an attack.
+* A buffered attack.
+* Hitstop ending.
+* A summon or technique ending.
+* Landing.
+* Another Combat Assist completing.
+* Another Combat Assist being cancelled.
 
-Do not modify the CPU’s AI controls.
+Pay attention to the exact first fixed step on which the next move becomes legal.
 
-Practice Ground
+There must not be a one-frame window in which the attack starts but Combat Assist is unintentionally skipped.
 
-Use the current practice fighter’s profile.
+Additional reliability requirements
 
-When changing fighters, immediately switch to the new character’s controller layout at a safe point.
+Combat Assist should not:
 
-Clear stale buffered controller input so a previous character’s action does not activate on the next character.
+* Start twice for one press.
+* Start after the player’s buffered command has expired.
+* Use stale target information.
+* Survive a respawn or character replacement.
+* Start for attacks that do not qualify.
+* Ignore obstruction or ledge checks.
+* Spend Dash Energy.
+* Trigger Dash cooldowns.
+* Accidentally consume extra aerial movement uses.
+* Leave the fighter stuck in a movement animation.
+* Lose the actual attack on successful approach completion.
 
-Watch Mode
-
-Controller navigation works in menus and spectator interfaces.
-
-Do not allow gameplay inputs to control CPU fighters.
-
-Pause and results
-
-Use the appropriate menu controls.
-
-Keep menu Confirm and Back reliable regardless of character gameplay remapping.
-
-Prevent closing a menu from unintentionally activating Jump or an attack.
-
-⸻
-
-PART 19 — USER INTERFACE AND ACCESSIBILITY
-
-The update must look native to ALVA.
-
-Preserve its existing aesthetic:
-
-* Dark surfaces.
-* Translucent glass dialogs.
-* Clean typography.
-* Minimal decorative elements.
-* Appropriate spacing.
-* Smooth transitions.
-* Clear interactive states.
-
-Every new UI component must be responsive.
-
-Support:
-
-* Desktop.
-* Smaller laptop screens.
-* Landscape tablets.
-* Relevant landscape mobile layouts.
-
-Provide accessible names, readable labels, focus restoration, and keyboard navigation.
-
-The circular controller cursor must never prevent keyboard, mouse, or touch operation.
-
-All new player-facing text must support English and French through the existing localization system.
+Preserve the existing design: Combat Assist performs a short automatic approach and then executes the original attack under its ordinary attack rules.
 
 ⸻
 
-PART 20 — TESTING
+7. Integrating all five features
 
-This update must be thoroughly tested.
+The most important requirement is that these systems cooperate.
 
-Add automated tests for every major subsystem.
+Do not scatter separate replacement and cancellation checks throughout unrelated methods.
 
-Connection detection
+Use a cohesive input-intent pipeline that distinguishes:
 
-Test:
+1. Raw player input.
+2. Resolved logical action.
+3. Combo Assist substitution, if applicable.
+4. Move validity.
+5. Cancellation permission.
+6. Combat Assist eligibility.
+7. Actual execution.
+8. Buffer and cooldown updates.
 
-* Zero controllers.
-* One supported controller.
-* Four supported controllers.
-* Five supported controllers.
-* Unsupported devices.
-* Controller disconnection.
-* Controller reconnection.
-* Active controller switching.
-* Controller detection refresh.
-* Gamepad API absence.
-* Controller availability after user interaction.
+You may adapt this architecture to fit the existing code, but preserve a single clear source of truth.
 
-Universal controls
+Example interaction: Run + Combo Assist + Combat Assist
 
-Test:
+1. Player holds Run Right.
+2. Player performs Attack 1.
+3. Attack 1 enters its repeat cooldown.
+4. Player continues holding Run Right.
+5. Player presses Attack 1 again.
+6. Combo Assist identifies that Attack 1 is cooling down.
+7. Combo Assist resolves Attack 2 as the effective move, if legal.
+8. Attack 2 is melee and its target is just outside range.
+9. Combat Assist approaches the opponent.
+10. Run remains held, but does not cancel the approach.
+11. Combat Assist finishes and Attack 2 begins.
 
-* Left/right movement.
-* Jump.
-* Hold duration for variable jumping.
-* Dash left.
-* Dash right.
-* Neutral-direction Dash.
-* Air Dash.
-* Shield hold.
-* Shield release.
-* Aerial Deflect.
-* Pause.
+No duplicate attacks, invalid cooldown bypasses, or accidental cancellations should occur.
 
-#0001 controls
+Example interaction: deliberate interruption
 
-Test every default mapping.
+1. Player starts Attack 1.
+2. Player explicitly requests a different legal move.
+3. The cancellation system validates the requested move.
+4. Attack 1 is interrupted cleanly.
+5. The requested move starts.
+6. Old hitboxes, unreleased objects, and stale buffers cannot trigger afterward.
 
-Especially verify:
+Example interaction: denied move
 
-* Square activates Jab.
-* R2 + Square activates Red, not Jab.
-* R2 + Circle activates Maximum Blue, not Shield.
-* R2 + Triangle activates Hollow Purple, not High Kick.
-* L2 + Triangle activates Unlimited Void.
-* R1 activates aerial Blue.
-* All aerial bindings respect their correct contexts.
+1. Player starts a valid attack.
+2. Player requests another move that is unavailable because its cooldown remains active.
+3. Combo Assist has no legal substitution.
+4. The current attack must not be destroyed merely because another button was pressed.
 
-#0002 controls
+Example interaction: automatic approach replacement
 
-Test:
+1. Combat Assist is approaching for Attack 1.
+2. Player requests Attack 2.
+3. The system checks Attack 2’s availability and Combo Assist rules.
+4. If the replacement is legal and also qualifies for approach, update the pending approach.
+5. Otherwise follow the explicit cancellation policy.
+6. Never execute both the old and new attack from one replacement.
 
-* Square activates One-Two on the ground.
-* Triangle activates Rapid Kicks.
-* R1 activates Spin Attack on the ground.
-* R1 activates Blue Tornado in the air.
-* R2 + Triangle activates Whirlwind.
-* Horizontal + Square activates Homing Attack in the air.
-* Down + Square activates Bounce Attack in the air.
-* Neutral + Square activates the appropriate aerial Homing Attack.
-* Directional attacks do not trigger the wrong move.
+The integration should be designed intentionally rather than relying on incidental execution order.
 
-Custom controls
+⸻
 
-Test:
+8. Performance and implementation standards
 
-* Single-button binding.
-* Two-button binding.
-* Directional binding.
-* Hold-to-activate binding.
-* Continuous held action.
-* Conflict detection.
-* Valid context-based button reuse.
-* Save and reload.
-* Per-character independence.
-* Restore Defaults.
-* Cancel.
-* Old settings migration.
-* Invalid saved data.
-* New playable fighter registration.
+Alva is a vanilla JavaScript game with a fixed-step combat simulation.
 
-UI tests
+Preserve that architecture.
 
-Test:
+Requirements:
 
-* Controller status updates.
-* Connection dialog.
-* Reconnect button.
-* Controller cursor navigation.
-* Roster selection.
-* Nested dialogs.
-* Controller input capture.
-* Focus handling.
-* Keyboard and mouse compatibility.
-* Responsive layout.
-* English and French localization.
+* No new frameworks.
+* No unnecessary dependencies.
+* No wall-clock-based combat timers.
+* No expensive repeated allocations in the core simulation loop.
+* Deterministic behavior at the existing fixed simulation rate.
+* No character-ID-specific branches in shared engine code.
+* No unnecessary rendering changes.
+* No duplicated controller artwork definitions.
+* No new gameplay resources or cooldown systems unless demonstrably necessary.
 
-Regression testing
+Preserve the intentional mouvment codename spelling.
 
-Run the existing test suite:
+Do not modify character_rule.
+
+Do not remove tests or weaken existing assertions to make the changes pass.
+
+Keep modifications narrow, reviewable, and well documented.
+
+⸻
+
+9. Required automated tests
+
+Expand the existing test suite rather than replacing it.
+
+Relevant test files include:
+
+* tests/systems/combo.test.mjs
+* tests/systems/combat-assist.test.mjs
+* tests/systems/combat-rules.test.mjs
+* tests/systems/controller-input.test.mjs
+* tests/systems/explicit-mouvement.test.mjs
+* tests/interface/settings.test.mjs
+* tests/interface/controller-ui.test.mjs
+* tests/fighters/0001/combos-0001.test.mjs
+
+Create additional focused tests where appropriate.
+
+Combo Assist tests
+
+Verify:
+
+* Enabled by default.
+* Disabled setting preserves normal attack routing.
+* Attack 1 substitutes Attack 2 only when appropriate.
+* Attack 2 substitutes Attack 1 only when appropriate.
+* Both attacks cooling down results in no illegal attack.
+* Substitution does not bypass cooldown.
+* Exactly one attack results from one press.
+* Ground and aerial substitutions work.
+* Character 0001 and 0002 both work.
+* Ranged Attack 2 retains its actual ranged behavior.
+* No accidental repeated activation from held buttons.
+* Save, reload, and version migration work correctly.
+
+Intelligent cancellation tests
+
+Verify:
+
+* Attack → Attack.
+* Attack → Jump.
+* Attack → Dash.
+* Attack → Shield.
+* Dash → Attack.
+* Aerial Attack → Aerial Attack.
+* Legal special requests cancel correctly.
+* Illegal special requests do not corrupt the current action.
+* Run Left never cancels.
+* Run Right never cancels.
+* Direction reversal never cancels by itself.
+* Hitstop and hitstun remain protected.
+* Projectile release is not duplicated.
+* Interrupted summoning/techniques clean up correctly.
+* No illegal cooldown bypass.
+* No phantom or stale buffered attacks.
+* Repeated held input does not restart a move.
+
+Combat Assist reliability tests
+
+Verify:
+
+* Hold Run + Attack 1.
+* Hold Run + Attack 2.
+* Run Left and Run Right.
+* Keyboard controls.
+* Touch controls.
+* Controller analog movement.
+* Controller attack bindings and modifiers.
+* Combat Assist immediately after a normal attack.
+* Combat Assist after a hit-cancel.
+* Combat Assist after a Dash cancel.
+* Combat Assist from a buffered follow-up.
+* Combat Assist after landing.
+* Combat Assist with Combo Assist enabled.
+* Combat Assist with Combo Assist disabled.
+* Combat Assist cannot start when disabled.
+* CPU behavior remains unchanged.
+* No unexpected Energy expenditure.
+* Approaches still stop at walls, ledges, and invalid paths.
+
+Controller UI tests
+
+Verify:
+
+* Each attack row gets its authored preview where available.
+* Correct ground and aerial previews.
+* Correct projectile previews.
+* Correct mirroring.
+* Fallback for missing artwork.
+* No broken image layout.
+* Original names and bindings remain correct.
+* Keyboard and controller navigation remain functional.
+* English and French labels remain correct.
+* Responsive layouts are not broken.
+
+Determinism
+
+Test identical input sequences across repeated fixed-step simulations.
+
+All new cancellation and assist behavior must produce repeatable results.
+
+⸻
+
+10. Manual browser verification
+
+After automated tests, start the game through a local HTTP server and inspect the actual interface and gameplay.
+
+Do not rely solely on unit tests for visual or interaction correctness.
+
+Check both playable fighters in Practice Ground.
+
+Test at close range and at the edge of Combat Assist range.
+
+Perform rapid attacks, hold Run while attacking, change direction, cancel actions, and attempt combos.
+
+Check that the fighter responds immediately to valid requests without animation flicker, unwanted teleportation, extra damage, or stuck states.
+
+Inspect Settings → Combat and Settings → Controller controls visually.
+
+Verify artwork alignment, sizing, and readable text at desktop and mobile landscape sizes.
+
+Check the controller editor both with and without a connected controller.
+
+Check both languages.
+
+If browser execution is unavailable, report that limitation explicitly rather than claiming manual validation occurred.
+
+⸻
+
+11. Documentation updates
+
+Update the relevant documentation to reflect the implemented behavior:
+
+* ALVA_SPEC.md
+* docs/systems/combat.md
+* docs/systems/input.md
+* docs/systems/movement.md where cancellation affects movement
+* README.md if its feature descriptions become outdated
+* UPDATES.md with a clearly identified entry for this update
+
+If Combo Assist intentionally creates an exception to the existing one-logical-button/one-move routing contract, document that exception in codename_rule without renaming or changing the logical input codenames.
+
+Explain how Combo Assist differs from Combat Assist, how deliberate cancellation works, and why Run does not trigger cancellation.
+
+⸻
+
+12. Validation and completion
+
+Before implementing, establish the current test baseline.
+
+Make changes incrementally.
+
+After implementation, run:
 
 node --test
 
-Do not consider the implementation complete if existing tests fail.
+Resolve regressions caused by this update.
 
-Also perform manual browser verification where available.
+Preserve unrelated gameplay behavior unless a change is explicitly required.
 
-Test physical PlayStation and Xbox controllers if they are available.
+Do not adjust cooldown numbers, damage, launch values, or movement physics merely to make the new systems appear functional.
 
-If physical-controller testing cannot be performed, state that explicitly and distinguish mocked-device verification from real-hardware validation.
+If tests expose a conflict between older intentional mechanics and the new requirements, resolve it in the smallest coherent way, updating the relevant documentation and tests without hiding the conflict.
 
-⸻
+Definition of done
 
-PART 21 — DOCUMENTATION
+This update is complete only when:
 
-Update the relevant project documentation.
+1. Combo Assist is available under Combat, defaults to On, and correctly alternates Attack 1 and Attack 2 during repeat cooldowns.
+2. Deliberately requested legal moves can interrupt existing player moves cleanly and responsively, while Run never causes a cancellation.
+3. Controller controls display the proper fighter-specific artwork next to attack names, reusing the mobile preview system.
+4. Holding Run during an attack does not cancel Combat Assist.
+5. Combat Assist consistently works after recent actions and during legal follow-up transitions.
+6. Both assist features and move cancellation work together without stale input, duplicated attacks, or cooldown exploits.
+7. Existing fighter mechanics, CPU behavior, settings, and controls remain intact.
+8. The automated test suite passes, with new regression coverage.
+9. Documentation accurately reflects the final implementation.
 
-At minimum:
+Final deliverable
 
-* README.md
-* ALVA_SPEC.md
-* codename_rule
-* docs/systems/input.md
-* docs/characters/0001.md
-* docs/characters/0002.md
-* docs/characters/adding-characters.md
+Implement the changes in the repository rather than merely describing possible solutions.
 
-Document:
+At completion, provide:
 
-* Supported controller families.
-* Maximum of four controllers.
-* Controller detection behavior.
-* Connection indicator meanings.
-* Reconnect functionality.
-* Circular menu cursor.
-* Universal default controls.
-* Character-specific defaults.
-* Input-combination priority.
-* Controller customization.
-* Per-character saves.
-* Future character support.
+* A concise summary of the changes.
+* The files modified.
+* The technical causes identified for the two Combat Assist bugs.
+* The cancellation and Combo Assist rules implemented.
+* Test results, including any failures or unavailable checks.
+* Any remaining known limitations.
 
-Remove or revise outdated descriptions of controller controls that no longer apply.
-
-⸻
-
-PART 22 — IMPLEMENTATION ORDER
-
-Implement the update carefully in stages.
-
-Phase 1 — Controller connection management
-
-Establish reliable supported-controller identification, input tracking, device assignment, and connection limits.
-
-Phase 2 — Character-aware controller controls
-
-Implement normalized physical input, default profiles, contextual action resolution, and reliable button combinations.
-
-This is one of the highest-priority phases.
-
-Thoroughly test responsiveness and combat integration before continuing.
-
-Phase 3 — Controller user interface
-
-Enable the Home controller button, add connection indicators, create the connection dialog, and implement the circular cursor.
-
-Phase 4 — Full controller customization
-
-Build the fighter roster selection flow, character-specific editor, binding capture, conflict detection, saving, and reset functionality.
-
-Phase 5 — Future-proofing and validation
-
-Complete future-character integration, localization, documentation, accessibility, browser verification, and regression testing.
-
-Do not leave partially integrated systems or UI buttons that do nothing.
-
-⸻
-
-PART 23 — DEFINITION OF DONE
-
-The update is complete when all these requirements have been satisfied:
-
-1. PlayStation and Xbox controllers are supported through reliable browser-compatible detection.
-2. The game detects up to four supported controllers.
-3. More than four supported controllers produces the orange warning.
-4. The Home controller button is functional.
-5. The green, red, and orange indicators accurately reflect connection status.
-6. The Controller Connections dialog displays accurate information.
-7. Reconnect refreshes the actual device state.
-8. Controller assignments work without merging multiple players’ inputs.
-9. The circular cursor works throughout ALVA’s navigable interfaces.
-10. Menu and gameplay input are properly separated.
-11. Universal gameplay defaults are consistent across characters.
-12. Default controls are comfortable and responsive.
-13. #0001’s unique projectile and attack combinations function correctly.
-14. #0002’s directional aerial attacks work reliably.
-15. #0002’s Spin Attack and Blue Tornado correctly share R1/RB in their different contexts.
-16. Shield remains a held action.
-17. Button combinations never produce unwanted attacks.
-18. Players can remap every relevant gameplay control.
-19. Players can choose single buttons, combinations, directional modifiers, and appropriate activation methods.
-20. The editor provides ability names and brief descriptions.
-21. Binding conflicts are identified and resolved.
-22. Controller configurations save independently for every character.
-23. New playable characters can be integrated without hardcoding them into the shared controller engine.
-24. Keyboard and touch controls remain functional.
-25. CPU behavior and existing combat rules remain unchanged.
-26. English and French localization are complete.
-27. Automated tests pass.
-28. Documentation accurately describes the new system.
-
-⸻
-
-FINAL INSTRUCTIONS — COMFORT ABOVE EVERYTHING
-
-The fundamental purpose of this update is controller comfort.
-
-Do not treat comfort as a secondary detail.
-
-ALVA is a fast-paced platform fighter. Players must be able to move, jump, defend, Dash, and perform their character’s abilities naturally.
-
-A successful controller layout should feel intuitive after a short period of play.
-
-Players should not need to memorize awkward combinations for ordinary attacks.
-
-Fast abilities should be accessible quickly.
-
-Movement-oriented actions should not unnecessarily interfere with joystick movement.
-
-Defensive reactions should be reliable and immediate.
-
-Powerful or less frequent abilities may use comfortable modifier combinations when appropriate.
-
-Character-specific controls should reflect how each fighter actually plays.
-
-Do not force every fighter into the same ability layout.
-
-For example:
-
-* Both characters use Square/X for their primary punch because it is comfortable and consistent.
-* #0001 uses R2/RT combinations for projectiles because that groups its special attacks logically.
-* #0002 uses directional Square/X combinations for its aerial Homing and Bounce Attacks because those actions are direction-dependent.
-* #0002 uses R1/RB for both ground Spin Attack and aerial Blue Tornado because their ground/air contexts make this intuitive and conflict-free.
-* All fighters use L1/LB for Dash by default because it allows comfortable movement while keeping the right thumb available for attacks.
-* All fighters use Circle/B for defensive actions by default, with ground Shield held and aerial Deflect activated by a fresh press.
-
-These are examples of the reasoning that should guide this entire update.
-
-The default controller bindings must be deliberately designed rather than mechanically assigned.
-
-At the same time, players must have complete freedom to build layouts that match their individual preferences.
-
-The ideal result combines three qualities:
-
-1. Universal consistency: Shared gameplay fundamentals feel familiar across characters.
-
-2. Character-specific comfort: Each unique ability is assigned an input that naturally suits its mechanics.
-
-3. Complete customization: Players can override the recommended layout independently for every fighter.
-
-Do not sacrifice any of these qualities.
-
-Prioritize real gameplay comfort, input responsiveness, and predictability over unnecessary complexity.
-
-Preserve the existing mechanics, architecture, and identity of ALVA.
-
-Implement the update fully, test it carefully, and deliver an integrated system rather than disconnected features.
-
-When finished, report the implementation changes, automated test results, controller-specific verification performed, and any limitations.
-
-The final result should make playing ALVA with a controller feel natural, comfortable, responsive, and intentionally designed for every character — including the characters added in the future.
+Most important: Prioritize input reliability, predictable behavior, and preserving the existing combat engine. The update should make Alva’s combat noticeably smoother without introducing unpredictable cancellations, changing the characters’ intended abilities, or breaking existing gameplay.
