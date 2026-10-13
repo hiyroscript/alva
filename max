@@ -1,746 +1,1829 @@
-ALVA — Universal Attack Classification and Absolute Shield Protection
+ALVA — Complete Controller System Update
 
-Objective
+Ergonomic Character-Specific Controls, Controller Detection, Menu Navigation, and Full Customization
 
-Inspect the entire Alva repository and implement a permanent, universal combat rule:
+OBJECTIVE
 
-Anything whose purpose is to deal damage, or that can directly or indirectly result in damage, must be considered an ATTACK, regardless of its name, animation, ability category, execution mechanism, or character.
+Implement a complete, high-quality controller system for the ALVA game.
 
-This includes techniques, summons, projectiles, special abilities, reflected projectiles, multi-hit abilities, damage-producing effects, and any future mechanics capable of causing damage.
+Repository: hiyroscript/alva
 
-A successfully active Shield must block every attack without exception.
+This update must introduce reliable PlayStation and Xbox controller support, controller connection management, a custom circular menu cursor, carefully designed default controls for every playable character, and a comprehensive per-character controller customization system.
 
-Deflect is a special case: it is simultaneously a defensive ability and an offensive attack.
+The update must integrate cleanly with ALVA’s existing architecture, preserve the current gameplay mechanics, and support future characters.
 
-These rules must apply automatically to every current character and every character added in the future.
+MOST IMPORTANT REQUIREMENT: COMFORTABLE CONTROLS ARE THE HIGHEST PRIORITY.
 
-Do not solve this problem through hardcoded character IDs, lists of existing move names, or individual exceptions.
+The purpose of this update is not simply to make controller buttons activate abilities. The purpose is to make ALVA genuinely comfortable, intuitive, responsive, and enjoyable to play on a controller.
 
-1. Understand the existing architecture
+Every default control must be chosen according to how natural and comfortable the action is to execute.
 
-Before changing anything, inspect these modules:
+ALVA has a unique character system. Each fighter has different moves, abilities, and mechanics. Therefore, controller layouts must respect those differences.
 
-* js/game/combat/combat.js
-* js/game/combat/attacks.js
-* js/game/combat/defense.js
-* js/game/combat/deflect.js
-* js/game/combat/hit-effects.js
-* js/game/combat/projectile.js
-* js/game/combat/summon.js
-* js/game/combat/technique.js
-* js/game/combat/combat-state.js
+This is the central design philosophy:
+
+Universal gameplay actions have consistent recommended defaults across all characters. Character-specific actions receive their own ergonomically optimized defaults. Players can then fully customize either category for each individual character.
+
+This principle must guide the entire implementation.
+
+⸻
+
+PART 1 — UNDERSTAND ALVA BEFORE MAKING CHANGES
+
+Before implementing anything, thoroughly inspect the repository and understand the current game.
+
+Read the project documentation, character definitions, input architecture, menu navigation, settings implementation, and existing tests.
+
+Pay particular attention to:
+
+* README.md
+* ALVA_SPEC.md
+* CLAUDE.md
+* codename_rule
+* character_rule
+* docs/systems/input.md
+* docs/systems/movement.md
+* docs/systems/defense.md
+* docs/characters/0001.md
+* docs/characters/0002.md
+* docs/characters/adding-characters.md
+* js/config.js
+* js/core/input-manager.js
+* js/core/menu-navigator.js
+* js/core/settings.js
+* js/core/app.js
+* js/game/fighters/fighter-controller.js
 * js/game/fighters/fighter.js
-* js/data/loadout.js
 * js/data/characters.js
 * js/data/characters/0001.js
 * js/data/characters/0002.js
-* js/game/ai/moveset.js
-* js/game/ai/cpu-intelligence/
-* All relevant tests and combat documentation.
+* js/data/abilities.js
+* js/data/loadout.js
+* js/screens/home-screen.js
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+* js/ui/settings-dialog.js
+* js/ui/fighter-roster.js
 
-Also inspect ALVA_SPEC.md, the character-creation documentation, and the existing combat rules.
+Also inspect relevant localization files, CSS, UI components, and tests.
 
-Trace every path through which damage, Launch Point changes, hit effects, status effects, and offensive collisions can reach a fighter.
+Understand the following before modifying the input system:
 
-Do not assume that the ordinary attacks collection is the complete list of attacks.
+1. How players issue attacks.
+2. How ground and aerial attacks use the same internal action slots.
+3. How abilities, projectiles, summons, and techniques are represented.
+4. How movement and Dash requests work.
+5. How Shield and Deflect differ.
+6. How gameplay input is buffered.
+7. How character definitions register abilities.
+8. How settings are saved.
+9. How menus receive keyboard and existing gamepad input.
+10. How Practice Ground changes the active fighter.
 
-2. The universal definition of an attack
+ALVA uses vanilla JavaScript ES modules, Canvas 2D, HTML, and CSS.
 
-Attack classification must be based on what an action does or can produce, not what it is called.
+Keep this architecture. Avoid introducing unnecessary dependencies or frameworks.
 
-An action must be classified as an attack when any of the following is true:
+Do not change character abilities, combat mechanics, damage, animation timing, movement physics, or cooldowns simply to implement controller controls.
 
-1. It directly deals damage.
-2. It creates an entity capable of dealing damage.
-3. It summons another entity that attacks.
-4. It releases a damaging projectile.
-5. It creates a damaging area, burst, explosion, or persistent effect.
-6. It produces repeated or delayed damage.
-7. It produces a damaging secondary effect.
-8. It reflects, redirects, or transforms an attack into another damaging attack.
-9. It indirectly causes damage through its intended offensive mechanics.
-10. It has an offensive strike that can damage an opponent, even if the ability also has a defensive purpose.
+The new controller system changes how actions are requested, not what the actions do.
 
-The classification must describe the action’s capabilities, not merely whether it successfully hit someone.
+⸻
 
-An attack that misses is still an attack. A projectile that has not yet struck anything is still an attack. A summon that has not completed its startup is still an attack if it is intended to produce damage.
+PART 2 — THE ERGONOMIC CONTROLLER DESIGN PHILOSOPHY
 
-An attack that gets blocked remains an attack.
+This is the most important section of the entire update.
 
-An attack does not stop being an attack because its actual damage was reduced to zero.
+2.1 Comfort takes priority over arbitrary button assignments
 
-Examples
+Every default binding must be designed with actual controller ergonomics in mind.
 
-Action or mechanic	Classification
-Punch or kick	Attack
-Ordinary numbered combat move	Attack
-Damaging projectile	Attack
-Damaging technique	Attack
-Summon that attacks	Attack
-Clone’s strike	Attack
-Damaging area burst	Attack
-Multi-hit move	Attack
-Projectile finisher	Attack
-Damage-over-time effect	Attack
-Homing strike	Attack
-Offensive movement that deals damage	Attack
-Damaging counterattack	Attack
-Deflect with an offensive strike	Attack and defense
-Reflected damaging projectile	Attack
-Purely defensive Shield	Defense, not attack
-Ordinary non-damaging movement	Movement, not attack
+Consider:
 
-This classification is semantic and may coexist with other classifications.
+* How frequently an ability is used.
+* How quickly the player must activate it.
+* Whether the action is performed while moving.
+* Whether the player needs precise joystick direction.
+* Whether the action requires holding a button.
+* Whether it is a defensive reaction.
+* Whether it must be used immediately after another move.
+* Whether the player needs to jump simultaneously.
+* Whether a button combination is comfortable to perform.
+* Whether a control forces the player to move their thumb away from another essential control.
+* Whether the action can accidentally trigger another ability.
+* Whether the same controls are comfortable on both PlayStation and Xbox controllers.
 
-For example:
+For example, Jump is extremely frequent and often needs to be pressed while moving or attacking.
 
-* A technique can be both technique and attack.
-* A summon can be both summon and attack.
-* A projectile can be both projectile and attack.
-* A Deflect can be both defense and attack.
+Cross/A is therefore an appropriate default because it is easy to reach.
 
-An action must not be restricted to only one category when it legitimately belongs to multiple categories.
+A basic punch is also frequent and should use an accessible face button, such as Square/X.
 
-3. Preserve existing ability identities
+A special projectile may be less frequent and can comfortably use a trigger modifier combined with a face button.
 
-Do not rename existing abilities or change the player’s controls.
+However, a fast aerial attack should generally not require a complicated combination if a more comfortable single-button option is available.
 
-Alva uses universal internal codenames such as attack1, attack2, midair_attack1, extra_attack, and deflect.
+Do not give a frequently used action an unnecessarily complicated input when an equally practical, more comfortable input exists.
 
-It also has special action mappings such as:
+2.2 Universal actions versus character-specific abilities
 
-{ type: 'technique', id: 'attack4' }
+Separate actions into two conceptual categories.
 
-and
+Universal actions
 
-{ type: 'summon', id: 'attack3' }
+These are shared gameplay fundamentals, such as:
 
-Keep these existing mechanisms working.
+* Running left and right.
+* Jumping.
+* Dash and air dash.
+* Shield.
+* Deflect.
+* Fast fall.
+* Pause.
 
-Do not blindly replace type: 'technique' or type: 'summon' with type: 'attack', because the existing types control execution, animation, cooldowns, and spawning.
+Their recommended default controls should remain consistent across the entire roster.
 
-Instead, establish a separate universal offensive classification.
+Character-specific actions
 
-For example, an action can retain:
+These are the individual attacks, abilities, and special mechanics belonging to a character.
 
-* Its existing execution type.
-* Its original internal ID.
-* Its displayed ability name.
-* Its animation.
-* Its unique mechanics.
-* Its cooldown.
-* Its Energy requirements.
-* Its visual identity.
+They must not automatically inherit the same physical button solely because they share an internal attack codename.
 
-While also being classified as an attack.
+For example, attack3 might be a powerful projectile for one character and a rolling melee attack for another.
 
-The distinction must be clear:
+The controller input should suit the actual move, not the attack number.
 
-Execution type determines HOW the action works. Attack classification determines WHAT the action is capable of doing.
+Attack numbers are internal identifiers, not a controller layout philosophy.
 
-An offensive summon should never be excluded from attack-related logic simply because its execution type is summon.
+2.3 Full player freedom
 
-4. Implement shared attack classification
+Although the default controls follow universal consistency, players must be allowed to change any gameplay binding for each individual fighter.
 
-Create or extend a reusable classification mechanism within Alva’s shared combat architecture.
+A player might prefer Circle/B for Jump on #0001 and Cross/A for Jump on #0002.
 
-It should be possible for the engine to determine whether an ability, action, entity, or emitted effect is offensive without identifying its character or checking its displayed name.
+The customization system must allow this.
 
-The classification must propagate through generated objects.
+Universal consistency is a default design principle, not a limitation on customization.
+
+2.4 Future characters
+
+Every future fighter must be evaluated individually.
+
+When a new character is introduced, design its default controller layout using the same comfort-first principles.
+
+Do not automatically copy #0001 or #0002’s unique ability bindings.
+
+Examine what the character actually does, how each ability functions, and which control would make it most comfortable.
+
+⸻
+
+PART 3 — PLAYSTATION AND XBOX SUPPORT
+
+ALVA should recognize and support only compatible PlayStation and Xbox controllers.
+
+Target devices include:
+
+* PlayStation DualShock 4.
+* PlayStation DualSense.
+* Compatible Xbox One controllers.
+* Compatible Xbox Series controllers.
+
+Use the browser Gamepad API and its standard mapping where available.
+
+Handle device names and identification information carefully.
+
+Controller identifiers can differ across browsers, operating systems, connection types, and drivers.
+
+Implement a conservative, well-tested identification system.
+
+Do not claim that a controller is definitely PlayStation or Xbox when the available data is insufficient.
+
+Unsupported or unidentified controllers should be reported appropriately rather than silently receiving an incorrect layout.
+
+Do not intentionally provide Nintendo-specific or generic-controller gameplay support in this update.
+
+Button-name presentation
+
+Display the correct labels for the recognized controller family.
+
+PlayStation	Xbox
+Cross	A
+Circle	B
+Square	X
+Triangle	Y
+L1	LB
+R1	RB
+L2	LT
+R2	RT
+L3	LS
+R3	RS
+Options	Menu
+
+Use one normalized internal representation for equivalent physical buttons so character profiles work consistently across both supported controller families.
+
+If a PlayStation controller is being used, the interface should show PlayStation button names.
+
+If an Xbox controller is being used, show Xbox button names.
+
+Do not require players to mentally translate one controller’s labels into another.
+
+⸻
+
+PART 4 — CONTROLLER CONNECTION DETECTION
+
+4.1 Maximum of four controllers
+
+ALVA may recognize up to four supported connected controllers simultaneously.
+
+This is a connection-management limit, not a requirement to implement four-player combat.
+
+The existing game primarily uses one player against a CPU.
+
+Preserve that.
+
+For now, one supported controller is assigned to Player 1 while additional supported controllers remain available but do not control Player 1 unless selected.
+
+Never merge gameplay inputs from multiple controllers into one fighter.
+
+When more than four supported controllers are connected, detect the excess and prevent additional controllers from controlling ALVA.
+
+Use stable device assignments when possible.
+
+4.2 Activate the Home controller button
+
+On the Home screen, find the three small utility buttons at the top-right.
+
+The middle button has the controller icon from controller.PNG.
+
+This button is currently disabled.
+
+Enable it.
+
+Preserve its original icon, position, proportions, and visual identity.
+
+4.3 Add a connection status indicator
+
+Add a small circular status indicator at the bottom-right corner of the controller button.
+
+The indicator must always represent the current recognized-controller status.
+
+There are three statuses:
+
+Green — Connected
+
+A green circle with a white checkmark.
+
+Meaning:
+
+At least one and no more than four supported controllers are connected.
+
+Red — Disconnected
+
+A red circle with a clearly visible cross.
+
+Meaning:
+
+No supported controller is detected.
+
+The cross should have adequate contrast. A white-outlined red cross or a white cross against the red background is acceptable if needed for visibility.
+
+Orange — Too many controllers
+
+An orange circle with an exclamation mark.
+
+Meaning:
+
+More than four supported controllers are detected.
+
+The indicator must update automatically.
+
+Do not display all three statuses simultaneously.
+
+Use the existing ALVA visual language: clean, compact, modern, and consistent with the Home interface.
+
+The status must also be available through an accessible text label.
+
+⸻
+
+PART 5 — CONTROLLER CONNECTION DIALOG
+
+Clicking the Home controller button must open a dedicated dialog.
+
+Suggested title:
+
+Controller Connections
+
+Use the same translucent glass design as ALVA’s existing dialogs.
+
+Display:
+
+* Number of supported connected controllers.
+* Maximum supported controllers: 4.
+* Current status.
+* A list of detected supported controllers.
+* Unsupported or unrecognized devices, when relevant.
+* The controller assigned to Player 1.
+
+Example:
+
+2 Controllers Connected
+
+Controller 1 — DualSense Wireless Controller
+
+Status: Connected
+
+Assignment: Player 1
+
+Controller 2 — Xbox Wireless Controller
+
+Status: Connected
+
+Assignment: Available
+
+Allow the player to choose which supported controller controls Player 1.
+
+Do not allow inactive controllers to move the character or interfere with menus.
+
+Reconnect button
+
+At the bottom of the dialog, add:
+
+Reconnect
+
+Use a refresh icon.
+
+Clicking it must:
+
+1. Query currently available gamepads again.
+2. Detect newly connected controllers.
+3. Remove disconnected controllers.
+4. Update the connection count.
+5. Refresh controller assignments.
+6. Update the status indicator.
+7. Refresh the displayed device list.
+
+The button must perform a real refresh of the controller state.
+
+It must not simply replay an animation.
+
+Do not reload the game or erase settings.
+
+Since browser JavaScript cannot force a physical USB or Bluetooth connection, do not pretend that this button connects hardware directly.
+
+If necessary, show guidance explaining that the player may need to press a button on the controller before the browser recognizes it.
+
+Excess controllers
+
+When more than four supported controllers are connected, show a warning:
+
+Too Many Controllers Connected
+
+“ALVA supports up to four connected controllers. Disconnect an extra controller to remove this warning.”
+
+The first four eligible devices should remain usable where appropriate.
+
+Additional devices must remain inactive.
+
+Error handling
+
+Handle:
+
+* No controllers.
+* Unsupported devices.
+* Unavailable Gamepad API.
+* Browser privacy restrictions.
+* Disconnection while the dialog is open.
+* Connection after the game has loaded.
+* Browser focus loss.
+* Device reconnection.
+
+Do not crash the game because controller detection fails.
+
+⸻
+
+PART 6 — CUSTOM CIRCULAR CONTROLLER CURSOR
+
+Add a custom circular cursor for navigating ALVA’s menus with a controller.
+
+This should feel like a native part of the game’s interface.
+
+6.1 Appearance
+
+The cursor must be:
+
+* Circular.
+* Clearly visible.
+* Visually consistent with ALVA.
+* Smoothly animated.
+* Small enough not to hide UI information.
+* Large enough to identify easily.
+* Distinct from the mouse cursor.
+
+A circular outline with a subtle center indicator is a good starting design.
+
+Use an appropriate hover and selection animation.
+
+Avoid overly bright effects or excessive visual decoration.
+
+6.2 Cursor controls
+
+Default menu bindings:
+
+Action	PlayStation	Xbox
+Move cursor	Left joystick	Left joystick
+Confirm	Cross	A
+Back	Circle	B
+Directional focus navigation	D-pad	D-pad
+Scroll long panels	Right stick vertically	Right stick vertically
+Pause / Resume	Options	Menu
+
+The analog stick should move the cursor smoothly through the interface.
+
+Use:
+
+* Proper deadzones.
+* Comfortable movement speed.
+* Resolution-independent movement.
+* Smooth acceleration.
+* Predictable stopping.
+* Viewport boundaries.
+* Reliable hover detection.
+
+The cursor should not be excessively fast or slow.
+
+6.3 Selecting UI elements
+
+When hovering over an interactive element, pressing Cross/A activates it.
+
+Support:
+
+* Home buttons.
+* Mode selection.
+* Difficulty selection.
+* Character roster.
+* Stage selection.
+* Settings.
+* Controller Connections.
+* Controller customization.
+* Dialog buttons.
+* Practice menus.
+* Pause menus.
+* Result menus.
+* Discover.
+* Other navigable screens.
+
+Only interact with enabled elements inside the currently active screen or modal scope.
+
+Do not allow cursor clicks to pass through dialogs.
+
+6.4 Existing navigation compatibility
+
+ALVA already has MenuNavigator.
+
+Integrate the circular cursor with that system.
+
+Do not create two competing menu navigation engines.
+
+Keep controller focus, button activation, and cursor selection synchronized.
+
+When using the D-pad, the highlighted menu item should remain visible and automatically scroll into view.
+
+The circular cursor may move to the focused element when directional navigation is used, provided this does not cause confusing jumps or unwanted activation.
+
+6.5 Controller versus gameplay
+
+The cursor appears only when the player is navigating menus or interactive overlays.
+
+During gameplay:
+
+* The left stick moves the character.
+* The cursor disappears.
+* Menu confirmation inputs cannot activate combat abilities.
+
+During menus:
+
+* The left stick moves the cursor.
+* Combat input is suspended.
+* Buttons do not accidentally activate gameplay actions.
+
+When a menu closes, clear inappropriate buffered input to prevent accidental attacks or movement.
+
+Mouse, keyboard, and touch must remain functional.
+
+⸻
+
+PART 7 — UNIVERSAL DEFAULT CONTROLS
+
+The following default controls apply to all current and future characters.
+
+They should be chosen for consistency and comfort.
+
+Action	PlayStation	Xbox
+Move left/right	Left joystick	Left joystick
+Jump	Cross	A
+Dash / air dash	L1 + left joystick direction	LB + left joystick direction
+Dash while joystick is neutral	L1	LB
+Shield on ground	Hold Circle	Hold B
+Deflect in air	Press Circle	Press B
+Fast fall / steer downward	Left joystick down	Left joystick down
+Pause	Options	Menu
+
+7.1 Movement
+
+Use the left joystick for normal character movement.
+
+Horizontal stick direction determines left/right movement.
+
+Preserve ALVA’s existing movement behavior.
+
+Do not alter acceleration, momentum, jump physics, air movement, or running speed.
+
+7.2 Jump
+
+Cross/A is the universal default Jump button.
+
+This should remain consistent because Jump is one of the most frequent and important gameplay actions.
+
+Preserve:
+
+* Normal jumping.
+* Higher jumps based on hold duration.
+* Air jumping.
+* Triple jumping.
+* Existing jump buffering.
+
+7.3 Dash and air dash
+
+L1/LB is the universal default Dash button.
+
+This is particularly important.
+
+The player should be able to Dash without moving their right thumb away from the attack buttons.
+
+The direction depends on the left joystick.
 
 Examples:
 
-* A technique that releases a projectile must be classified as an attack.
-* The projectile must also be classified as an attack.
-* A summon that creates a clone capable of striking must be classified as an attack.
-* The clone’s strike must be classified as an attack.
-* A reflected projectile must remain an attack after ownership changes.
-* A move that produces multiple damage events remains an attack throughout its execution.
+Left joystick right + L1 = Dash right.
 
-Avoid relying exclusively on a manually authored boolean.
+Left joystick left + L1 = Dash left.
 
-If an ability definition contains a valid damaging component, classification should be inferred from that component or validated against it.
+Neutral joystick + L1 = Dash in the current facing direction.
 
-A declaration must not be allowed to mark a damaging ability as non-offensive and thereby evade defensive or combat rules.
+Use the existing ALVA Dash and air-dash mechanics.
 
-If explicit metadata is needed for categorization, validate it centrally.
+Do not change their movement values or Energy costs.
 
-Future mechanics must either use the shared attack interface or register their damaging effects through a validated shared damage pipeline.
+A held Dash button must not repeatedly trigger Dashes.
 
-5. Absolute Shield protection
+A fresh valid activation must issue one Dash request, using the intended direction at activation.
 
-This is a non-negotiable combat rule.
+Preserve the existing internal mouvementLeftPressed and mouvementRightPressed fields.
 
-When a fighter has successfully raised an active Shield, no incoming attack may bypass it.
+7.4 Shield
 
-The rule applies regardless of:
+Circle/B is the universal default defensive button.
 
-* Attack name.
-* Ability type.
-* Damage amount.
-* Character.
-* Projectile size.
-* Attack speed.
-* Hitbox size.
-* Launch strength.
-* Source direction.
-* Multi-hit behavior.
-* Special properties.
-* Whether the source is a fighter, projectile, summon, clone, technique, or another offensive entity.
+Shield must be held.
 
-A hit that contacts an active Shield must resolve as a block.
+Holding Circle/B on the ground raises Shield.
 
-A blocked attack must not:
+Releasing it lowers Shield.
 
-* Increase the defender’s Launch Point.
-* Deal damage.
-* Apply an offensive status effect such as paralysis.
-* Apply a damaging secondary effect.
-* Trigger ordinary hitstun.
-* Launch the defender.
-* Apply damage through a delayed or secondary callback.
-* Bypass the Shield through a special damage handler.
-* Ignore the Shield because of the action’s execution type.
+Never make Shield automatically toggle on and off.
 
-Normal blocking behavior can remain.
+Preserve:
 
-This includes Shield Energy expenditure, blockstun, hitstop, perfect Shield timing, defensive stall, and authored non-damaging block reactions such as blockPush.
+* Shield startup.
+* Shield release.
+* Perfect Shield.
+* Shield Energy.
+* Blocking behavior.
+* Recovery and restrictions.
 
-A block reaction must never secretly apply the damage or offensive status that the Shield was meant to prevent.
+7.5 Deflect
 
-The Shield must work from every direction, as the existing system intends.
+In the air, a fresh Circle/B press triggers Deflect where supported.
 
-Preserve Alva’s existing rule that a Shield is a grounded defensive action, not an aerial guard.
+Deflect is a press-based action.
 
-Shield exhaustion
+Holding Circle/B must not repeatedly activate it.
 
-Preserve the existing Energy and exhaustion system unless a change is strictly required to enforce this specification.
+Do not introduce aerial shielding or air dodging.
 
-A Shield that is active at the instant a hit is resolved must successfully block that hit, even if paying the blocking cost exhausts the defender’s remaining Energy.
+⸻
 
-If exhaustion legitimately lowers the Shield afterward, subsequent attacks can hit once the Shield is no longer active.
+PART 8 — CHARACTER #0001 DEFAULT CONTROLS
 
-Do not retroactively convert the attack that broke the Shield into an unblocked hit.
+Character #0001 has melee moves, projectiles, aerial attacks, and special techniques.
 
-Ensure simultaneous collisions are resolved deterministically.
+The default layout should make its basic attacks accessible while grouping its powerful projectile abilities under an intuitive trigger modifier.
 
-At no point should an attack register damage while the target remains successfully Shielding.
+8.1 Ground moves
 
-6. Remove all Shield-bypass behavior
+Ability	PlayStation	Xbox
+Jab	Square	X
+High Kick	Triangle	Y
+Red	Hold R2 + Square	Hold RT + X
+Maximum Blue	Hold R2 + Circle	Hold RT + B
+Unlimited Void	Hold L2 + Triangle	Hold LT + Y
+Hollow Purple	Hold R2 + Triangle	Hold RT + Y
+Infinity Shield	Hold Circle	Hold B
 
-The repository currently supports the unblockable hit effect.
+Jab
 
-This conflicts with the new universal rule.
+Square/X activates Jab.
 
-Audit unblockable and every other mechanic that can bypass defense.
+A basic punch must be extremely easy to perform.
 
-In particular, examine:
+This is one of #0001’s most accessible and frequently used melee attacks.
 
-* CombatSystem.applyHit
-* resolveHitEffects
-* Attack definitions
-* Projectile definitions
-* Piercing projectile finishers
-* Technique burst definitions
-* Summoned attacks
-* Character data
-* CPU threat evaluation
-* CPU Shield decisions
+High Kick
 
-Remove or safely deprecate the gameplay effect of unblockable.
+Triangle/Y activates High Kick on the ground.
 
-Do not leave any functional condition equivalent to:
+It remains easy to reach while moving or setting up combos.
 
-shielding && !unblockable
+Red
 
-An active Shield must block independently of an attack’s former unblockable property.
+Hold R2/RT and press Square/X.
 
-Prevent future character definitions from reintroducing a Shield bypass.
+This fires Red, #0001’s repelling projectile.
 
-Prefer rejecting unsupported bypass declarations through shared validation rather than silently letting them override universal combat rules.
+The trigger serves as an offensive projectile modifier.
 
-If legacy metadata is retained for compatibility, it must have absolutely no power to bypass Shield.
+Maximum Blue
 
-Update or remove obsolete tests, documentation, and AI logic that assume an unblockable attack should penetrate active defense.
+Hold R2/RT and press Circle/B.
 
-7. Existing character #0001
+This activates Maximum Blue.
 
-Audit all of #0001’s moves.
-
-Pay particular attention to the following abilities.
+It must not activate Infinity Shield at the same time.
 
 Unlimited Void
 
-Currently implemented as a technique with a damaging burst and paralysis.
+Hold L2/LT and press Triangle/Y.
 
-It is an attack.
-
-It must remain a technique with its existing name, animations, timing, and intended offensive identity.
-
-However, if the opponent’s Shield is active when the burst connects:
-
-* The burst must be blocked.
-* No Launch Point may be added.
-* No paralysis may be applied.
-* No launching or direct offensive hit effects may occur.
-* The event must be recognized as a block.
-
-If the opponent is not Shielding, preserve the normal damage and paralysis behavior.
+Keep the original technique behavior, startup, and cooldown.
 
 Hollow Purple
 
-Currently implemented as a technique releasing a powerful projectile with projectile-erasing behavior.
+Hold R2/RT and press Triangle/Y.
 
-It is an attack.
+This should activate Hollow Purple instead of High Kick.
 
-Preserve the name Hollow Purple, its animation, projectile identity, damage tier, launch data, timing, and projectile-erasing identity wherever compatible with Shield protection.
+Preserve its original casting mechanics.
 
-However, Hollow Purple must not ignore an active Shield.
+8.2 Aerial moves
 
-A Shielded target must take no damage or offensive effects from it.
+Ability	PlayStation	Xbox
+Floating Straight	Square	X
+Red Kick	Triangle	Y
+Blue	R1	RB
+High Kick	L2 + Square	LT + X
+Deflect	Circle	B
 
-Audit its erase and pass-through behavior carefully. No piercing, erasing, or persistent projectile mechanic may allow a blocked attack to penetrate the Shield and later register damage on the protected fighter.
+Floating Straight
 
-Resolve projectile-to-Shield collision consistently. Prefer consuming or stopping a projectile when the Shield blocks it, rather than allowing blocked projectiles to behave as if the Shield did not exist.
+Square/X performs the aerial punch.
 
-Red and Maximum Blue
+This maintains the intuitive connection between Square/X and a straightforward punch.
 
-These are attacks regardless of whether their gameplay involves repelling, pulling, repeated strikes, or a final damaging hit.
+Red Kick
 
-Ensure their projectiles, pulls, strikes, and finishers are correctly classified.
+Triangle/Y activates Red Kick.
 
-Shield protection must extend to all their damaging interactions.
+This is a comfortable face-button input for a direct aerial attack.
 
-Preserve the existing distinction between successful direct hits and defensive block reactions.
+Blue
 
-8. Existing character #0002
+R1/RB activates the aerial Blue attack.
 
-Audit all of #0002’s attacks, including:
+Using a shoulder button keeps the ability easy to perform without interfering with ordinary horizontal movement.
 
-* One-Two.
-* Homing Attack.
-* Rapid Kicks.
-* Bounce Attack.
-* Spin Attack.
-* Blue Tornado.
-* Whirlwind.
-* Ground and aerial variants.
-* Multi-hit strikes.
-* Projectile-based moves.
+Aerial High Kick
 
-These are all attacks when capable of inflicting damage.
+L2/LT + Square/X activates High Kick in the air.
 
-Their different execution methods must not affect whether Shield can defend against them.
+Keep this as a separate, remappable binding.
 
-Preserve their movement, rebound, launch, combo, timing, and animation mechanics unless a change is necessary to fix incorrect Shield interactions.
+8.3 Special rules for #0001
 
-Do not reduce their offensive capabilities merely to make classification work.
+R2/RT functions as a modifier, not an independent attack.
 
-9. Deflect is BOTH attack and defense
+A trigger modifier must never accidentally activate the unmodified action.
 
-Deflect must be explicitly recognized as a hybrid action.
+For example:
 
-It is not merely an ordinary defensive state and not merely an offensive move.
+R2 + Square = Red, not Jab.
 
-Its defensive functionality is real, and its offensive functionality is real.
+R2 + Circle = Maximum Blue, not Shield.
 
-Offensive properties
+R2 + Triangle = Hollow Purple, not High Kick.
 
-Deflect must remain an attack because it has an active damaging strike.
+L2 + Triangle = Unlimited Void.
 
-It must continue to participate in ordinary attack systems, including:
+All these combinations must be tested carefully.
 
-* Attack startup.
-* Active frames.
-* Recovery.
-* Hit detection.
-* Damage calculation.
-* Launch.
-* Hitstop.
-* Hit cancellation.
-* Attack interruption.
-* Attack-related AI evaluation.
+Ground-only abilities must not accidentally trigger their aerial counterparts just because they share an internal action slot.
 
-Maintain the shared Deflect damage and Base Launch rules currently used by Alva.
+⸻
 
-Defensive properties
+PART 9 — CHARACTER #0002 DEFAULT CONTROLS
 
-Deflect must retain its ability to intercept and redirect eligible incoming projectiles.
+Character #0002 is based around mobility, quick attacks, directional aerial combat, and spinning abilities.
 
-The redirected projectile must:
+Its layout must feel fast and natural.
 
-* Remain an attack.
-* Use the correct new owner.
-* Preserve the intended projectile mechanics.
-* Be capable of hitting its former owner.
-* Be blocked normally if its eventual target is Shielding.
-* Never gain immunity to Shield because it was deflected.
+The player should not need awkward combinations to perform its core movement-oriented abilities.
 
-Important distinction
+9.1 Ground moves
 
-Deflect being defensive does not automatically make it a Shield.
+Ability	PlayStation	Xbox
+One-Two	Square	X
+Rapid Kicks	Triangle	Y
+Spin Attack	R1	RB
+Whirlwind	Hold R2 + Triangle	Hold RT + Y
+Shield	Hold Circle	Hold B
 
-Preserve Alva’s existing aerial behavior: Deflect is an active countering action rather than a held, invulnerable guard.
+One-Two
 
-It can still be interrupted or struck when the incoming hit is not actually intercepted.
+Square/X activates the basic punch combination.
 
-Likewise, when Deflect’s damaging strike meets an opponent’s active ground Shield, that strike must be blocked.
+Both current characters therefore use Square/X for their primary ground punch attacks.
 
-Deflect can be an attack and a defense at the same time without becoming an invulnerable Shield.
+Rapid Kicks
 
-10. Summons and clones
+Triangle/Y activates Rapid Kicks.
 
-A summon that creates something capable of dealing damage must be considered an attack.
+This keeps another direct ground attack on an accessible face button.
 
-It does not matter that the owner isn’t directly performing the resulting hit.
+Spin Attack
 
-The following should all be connected to the same offensive action:
+R1/RB activates Spin Attack on the ground.
 
-* The summoning ability.
-* The spawned entity.
-* The entity’s attack.
-* The damage event.
-* The original owner for damage attribution.
+This is an intentional improvement over placing Spin Attack on R2/RT.
 
-The owner’s classification must not be lost when the spawned entity becomes independent.
+R1/RB is comfortable and easy to access during movement.
 
-When a clone attacks a Shielded opponent, the opponent must block it normally.
+It also avoids a trigger conflict with Whirlwind.
 
-Do not allow clone attacks to bypass Shield because clones are not full fighter entities.
+Whirlwind
 
-Do not make their strikes bypass normal hit rules because they use a detached hit source.
+Hold R2/RT and press Triangle/Y.
 
-Preserve summon cooldowns, spawn position, startup animations, and targeting.
+This activates Whirlwind instead of Rapid Kicks.
 
-Use the existing test-only summoning fighters to validate the behavior even if the current playable roster does not include a summoner.
+R2/RT is a modifier only for this combination, not a separate Spin Attack input.
 
-11. Techniques, projectiles, and future effects
+9.2 Aerial moves
 
-A technique that causes or produces damage is an attack.
+Ability	PlayStation	Xbox
+Homing Attack	Left stick left/right + Square	Left stick left/right + X
+Bounce Attack	Left stick down + Square	Left stick down + X
+Blue Tornado	R1	RB
+Deflect	Circle	B
 
-This remains true when the technique itself has no ordinary melee hitbox.
+Homing Attack
 
-The same classification applies to:
+While airborne, use Square/X while pointing the left stick horizontally.
 
-* Projectile-producing casts.
-* Area attacks.
-* Explosions.
-* Lingering damage.
-* Traps.
-* Summoned attacks.
-* Conditional damage.
-* Reflected damage.
-* Chain reactions.
-* Multi-stage abilities.
-* Delayed impacts.
-* Repeating hit effects.
+The intended horizontal direction should determine the initiation direction before the existing homing behavior takes over.
 
-If a future ability contains both harmless and damaging phases, classify the overall ability as an attack when it has damaging potential.
+A neutral stick + Square/X may also activate Homing Attack using the character’s facing direction.
 
-However, resolve actual Shield collisions at the point where damage or a hostile effect would reach the defender.
+Do not change the underlying target selection, attack speed, range, or recovery.
 
-A preparatory animation does not automatically inflict damage merely because the overall ability is offensive.
+Bounce Attack
 
-Every generated attack must carry enough source information to identify its owner, originating ability, and actual hit.
+While airborne, point the left stick down and press Square/X.
 
-No future mechanism may directly modify an opponent’s Launch Point to bypass the shared damage resolution system.
+This activates Bounce Attack, the existing downward plunging move.
 
-Audit any direct damage mutation or status-application paths and ensure they obey the same defensive rules.
+It must not accidentally activate Homing Attack.
 
-Ordinary arena rules, such as the Void and falling out of the stage, should remain distinct from authored attacks. Do not mistakenly classify normal movement, environmental ring-outs, or recovery mechanics as attacks unless an offensive ability actually produces their damaging effect.
+The downward direction should take priority over horizontal direction when the stick is predominantly aimed downward.
 
-12. Centralize attack and block resolution
+Use sensible deadzones and diagonal-direction handling.
 
-The shared combat resolver must be authoritative.
+The combination should not trigger an unintended fast fall as a separate action on the same activation.
 
-All attack damage must follow a consistent sequence:
+Preserve the move’s existing physics and bounce behavior.
 
-1. Identify the damaging source and its owning fighter, if applicable.
-2. Determine whether the source is an attack.
-3. Resolve contact with the target.
-4. Determine whether the target has an active Shield at contact.
-5. If Shield is active, resolve a successful block.
-6. If Shield is not active, apply the attack’s legitimate damage and effects.
-7. Emit consistent combat events.
-8. Apply the correct animation, Energy, and hit reactions.
+Blue Tornado
 
-Do not scatter different interpretations of Shield through unrelated character modules.
+R1/RB activates Blue Tornado in the air.
 
-Audit CombatSystem.applyHit and its callers.
+This deliberately shares a physical button with Spin Attack on the ground.
 
-Check that blocked hits never trigger callbacks or secondary handlers that assume the target suffered an unblocked hit.
+This is a valid and desirable contextual binding.
 
-For example, a blocked attack must not accidentally cancel a defender’s technique or summoning startup through an unconditional real-hit handler unless that behavior is explicitly defined as a normal block interaction.
+Spin Attack can only execute on the ground.
 
-Keep combat event metadata accurate.
+Blue Tornado executes in the air.
 
-Events should identify the offensive source while preserving details such as projectile, summon, technique, or Deflect involvement.
+The player uses the same comfortable shoulder button for two contextually different spinning abilities.
 
-A blocked technique should not be recorded as a successful damaging hit.
+This is exactly the kind of ergonomic, character-aware decision the controller system should encourage.
 
-13. Update the CPU AI
+Do not activate both abilities.
 
-The CPU must understand the new classification and Shield rules.
+Do not change Blue Tornado’s existing movement or free-fall limitations.
 
-Inspect:
+⸻
 
-* The moveset reader.
-* Capability analysis.
-* Threat identification.
-* Defensive planning.
-* Tactical evaluation.
-* Offensive scoring.
-* Projectile prediction.
-* Shield decision-making.
+PART 10 — BUTTON COMBINATIONS AND INPUT PRIORITY
 
-The CPU must recognize that techniques, summons, projectiles, and Deflect can all be attacks.
+This part is extremely important because incorrect combination handling could make the controls frustrating.
 
-It must not treat an offensive technique or summon as harmless merely because it isn’t an ordinary melee attack.
+A fully functional controller system must distinguish between:
 
-Remove assumptions that some damaging abilities cannot be blocked.
+* A normal button press.
+* A held button.
+* A modifier plus button.
+* A directional input plus button.
+* Ground-specific actions.
+* Air-specific actions.
 
-Previously unblockable moves must now be evaluated as blockable by an active Shield.
+10.1 Reliable combination behavior
 
-The CPU should be capable of choosing Shield against Hollow Purple or Unlimited Void when its normal defensive decision-making considers Shield appropriate.
+Use modifier-first input as the primary rule.
 
-Preserve intelligent alternatives such as movement, jumping, interrupting a cast, or Deflecting a projectile.
+For example, to activate #0001’s Red:
 
-Do not force the AI always to Shield.
+1. Hold R2.
+2. Press Square.
+3. Trigger Red exactly once.
 
-Ensure damage predictions, hit probabilities, Shield probabilities, and offensive scoring agree with the actual combat resolver.
+Do not trigger Jab.
 
-The AI must never predict a successful damaging hit against a target whose Shield would block it.
+If Square was already pressed before R2, do not retroactively reinterpret that earlier Jab press as Red.
 
-Remove obsolete AI roles or logic that depend on penetrating an active Shield, or redefine them without violating the new rules.
+For buttons pressed within the same input sample, recognize an unambiguous valid combination before an unmodified action.
 
-14. Future-character compatibility
+Most importantly, do not add noticeable input lag to ordinary attacks just to wait for a possible modifier.
 
-This is essential.
+10.2 No accidental Shield activation
 
-The implementation must not require manually teaching the engine every new character’s ability names.
+When #0001 performs R2 + Circle:
 
-A future character could have an ability called:
+* Maximum Blue activates.
+* Shield does not activate.
+* The Shield input is not buffered for later.
+* Releasing R2 must not automatically raise Shield from the consumed Circle press.
 
-* Shadow Clone.
-* Divine Judgment.
-* Meteor Storm.
-* Lightning Cage.
-* Counter Pulse.
-* Spirit Explosion.
-* Poison Field.
-* Phantom Strike.
+The player should release and press Circle again to begin normal shielding.
 
-Those names are examples, not special cases to hardcode.
+If Circle was pressed first and Shield already started, adding R2 afterward should not retroactively fire Maximum Blue.
 
-If any of these abilities can produce damage, the shared engine must recognize them as attacks.
+10.3 No accidental attacks
 
-If their resulting offensive effects strike an active Shield, Shield must block them.
+Examples:
 
-A future developer should be able to introduce a new damaging move through the established character-data and combat systems without writing a character-specific Shield exception.
+* R2 + Triangle must not also trigger the unmodified Triangle attack.
+* #0002’s downward Square input must not activate Homing Attack.
+* A ground move must not be selected when the fighter is airborne.
+* An aerial move must not replace an unavailable ground move.
+* Releasing a modifier must not create a new attack press.
+* Holding an attack button must not repeatedly activate it unless the action specifically supports that behavior.
 
-If a completely new attack-producing mechanic is introduced, its registration must enforce the universal attack and Shield contract automatically.
+10.4 Context-specific priority
 
-Add validation that detects invalid or unsupported damage paths before they silently reach gameplay.
+Resolve compatible input candidates using:
 
-Do not compromise existing character-creation conventions.
+1. Active character.
+2. Ground/air state.
+3. Validity of the action in that state.
+4. Matching physical buttons.
+5. Modifier specificity.
+6. Directional specificity.
+7. Activation type.
+8. Safe conflict-resolution rules.
 
-15. Comprehensive tests
+More specific valid combinations should normally take priority over less specific inputs.
 
-Do not treat implementation as complete without automated tests.
+However, shielding, movement, and other continuously held controls must remain responsive.
 
-Create or extend tests covering the following.
+Do not create artificial timing delays that make reactions slower.
 
-Attack classification
+10.5 Do not change the combat engine
 
-Verify that:
+The resolver must convert physical controller input into the existing logical ALVA action fields.
 
-* Ordinary melee attacks are attacks.
-* Ranged attacks are attacks.
-* Projectile-producing actions are attacks.
-* Damaging techniques are attacks.
-* Summons producing damaging clones are attacks.
-* Clone strikes are attacks.
-* Multi-hit attacks are attacks.
-* Projectile finishers are attacks.
-* Deflect is both offensive and defensive.
-* Reflected projectiles remain attacks.
-* Damaging secondary effects remain associated with attacks.
-* Pure movement is not incorrectly classified as an attack.
-* Pure defensive Shield is not an offensive attack.
-* A damaging move remains classified as an attack when it misses or is blocked.
+For example, #0002’s Bounce Attack should resolve to the correct internal numbered attack request in the air.
 
-Shield protection
+Do not create an entirely separate gameplay system that directly executes Bounce Attack when a controller button is pressed.
 
-For every supported damage source, test:
+The fighter’s existing combat system remains responsible for executing and validating the move.
 
-1. Target without Shield: normal damage.
-2. Target with active Shield: block.
-3. Target with perfect Shield: block.
-4. Attack hitting from behind: block.
-5. Attack with high damage: block.
-6. Attack with high launch: block.
-7. Attack with paralysis: block, no paralysis.
-8. Formerly unblockable attack: block.
-9. Multi-hit attack: correct defensive interaction.
-10. Projectile finisher: block.
-11. Summoned clone strike: block.
-12. Technique burst: block.
-13. Reflected projectile: block.
-14. Deflect’s own strike: block.
-15. Shield at low Energy: the current collision still blocks.
-16. Shield exhaustion: only subsequent hits after the Shield has dropped can land.
-17. Same-frame multiple attacks: deterministic, correct defensive behavior.
-18. Delayed secondary damage: cannot bypass an active Shield.
-19. Piercing and erasing projectiles: cannot penetrate the active Shield to damage the protected fighter.
+⸻
 
-For every blocked hit, assert that the defender’s Launch Point does not increase and no forbidden offensive status effect is applied.
+PART 11 — SETTINGS → CONTROLS → CONTROLLER CONTROLS
 
-Existing-character regressions
+In the existing Settings dialog, under Controls, add a new subsection titled:
 
-Test all current playable characters.
+Controller Controls
 
-Specifically verify:
+Keep the existing Mobile Controls settings unchanged.
 
-* Unlimited Void is classified as an attack and is blockable.
-* Hollow Purple is classified as an attack and is blockable.
-* Red and Maximum Blue retain their intended offensive mechanics.
-* #0002’s ordinary and special attacks are blockable.
-* Deflect continues to redirect projectiles.
-* Deflected projectiles are still blockable.
-* Summons from fixture characters obey the same rules.
-* Existing combos, animation timing, damage tiers, and cooldowns remain valid.
+Display a short explanation:
 
-Future-character regression tests
+“Customize your controller controls for each character individually. Default layouts are designed for comfort and each character’s unique abilities.”
 
-Create representative test-only character definitions with unusual offensive mechanics.
+Below this, add a button:
 
-Examples should include:
+Customize Controller Controls
 
-* A summon that attacks later.
-* A technique that releases multiple damaging sources.
-* A damaging area effect.
-* A delayed damaging effect.
-* A hybrid defensive/offensive ability.
+Clicking the button opens a fighter roster dialog.
 
-Prove that these are classified correctly and cannot penetrate Shield without character-specific code.
+11.1 Roster selection
 
-16. Documentation and consistency
+Reuse the existing fighter roster design.
 
-Update the relevant documentation:
+Display all 48 roster slots as appropriate.
 
-* ALVA_SPEC.md
-* docs/systems/combat.md
-* docs/systems/defense.md
-* docs/architecture/character-system.md
-* docs/characters/adding-characters.md
-* Character documentation where Shield bypasses are currently described.
-* Any other relevant comments, tests, or user-facing explanations.
+Currently available characters should be selectable.
 
-Ensure documentation consistently distinguishes between an attack’s execution type and its offensive classification.
+Locked or unavailable characters must not open active customization profiles.
 
-Remove outdated descriptions claiming an active Shield cannot stop Hollow Purple, Unlimited Void, or other attacks.
+When a player chooses #0001 or #0002, open the corresponding character’s controller editor.
 
-Preserve existing ability names.
+This selection must not affect the character selected for Quick Battle or Practice Ground.
 
-If player-facing descriptions require changes, maintain consistency across English and French.
+The roster dialog is only for choosing whose controls to customize.
 
-Do not modify protected owner-direction files or unrelated mechanics.
+⸻
 
-17. Implementation quality requirements
+PART 12 — COMPLETE PER-CHARACTER CONTROLLER CUSTOMIZATION
 
-Follow Alva’s current architectural conventions.
+Players must be able to fully customize their controller gameplay bindings.
 
-The solution must be:
+Every playable character must have an independent controller layout.
 
-* Centralized.
-* Deterministic.
-* Data-driven.
-* Character-independent.
-* Extensible.
-* Compatible with existing mechanics.
-* Properly validated.
-* Fully tested.
+The customization system must not be restricted to choosing from preset configurations.
 
-Avoid workarounds such as:
+12.1 Customization screen
 
-* Checking specific fighter IDs.
-* Checking ability names.
-* Maintaining a fixed list of Shield-blockable attacks.
-* Only fixing Hollow Purple and Unlimited Void.
-* Changing labels without changing combat logic.
-* Ignoring damage generated by special abilities.
-* Treating summon or technique as mutually exclusive with attack.
-* Creating separate damage pipelines that do not check Shield.
-* Adding special rules that future characters can accidentally evade.
+Display:
 
-Keep the implementation as focused as possible, but modify all affected modules to ensure the rule is enforced throughout the game.
+* Character portrait.
+* Character name or codename.
+* Controller family currently active.
+* All available gameplay actions.
+* Current bindings.
+* Brief descriptions of abilities.
+* Edit buttons.
+* Save/Apply.
+* Cancel.
+* Restore Defaults.
 
-18. Verification
+Organize actions into sensible categories:
 
-Run the full test suite:
+Movement
+
+Running, jumping, Dash, fast fall.
+
+Defense
+
+Shield, Deflect.
+
+Ground Attacks
+
+Ground-only and grounded versions of attacks.
+
+Aerial Attacks
+
+Airborne attacks and their special directional requirements.
+
+Special Abilities
+
+Projectiles, techniques, summons, or other unusual abilities.
+
+Other
+
+Pause and applicable universal or future gameplay actions.
+
+Do not duplicate unavailable attack slots as if they were functional abilities.
+
+12.2 Ability names and descriptions
+
+Use actual ability names.
+
+Avoid displaying only Attack 1, Attack 2, Attack 3, etc.
+
+For example:
+
+Red
+
+“Fires a repelling projectile that pushes enemies away.”
+
+Binding: R2 + Square
+
+Activation: Modifier + Press
+
+Blue Tornado
+
+“Spins upward into a tornado, carrying opponents into the air.”
+
+Binding: R1
+
+Activation: Press
+
+Shield
+
+“Blocks incoming attacks while the button is held.”
+
+Binding: Circle
+
+Activation: Hold
+
+Descriptions must be brief, clear, and accurate.
+
+Use the actual character definitions as the source of truth for ability availability and mechanics.
+
+Add localized descriptive metadata where needed.
+
+12.3 Fully editable binding types
+
+Allow the player to configure:
+
+Single button
+
+Examples:
+
+Square
+
+Circle
+
+R1
+
+R2
+
+L3
+
+Triangle
+
+Two-button combination
+
+Examples:
+
+R2 + Square
+
+L2 + Circle
+
+L1 + R1
+
+R2 + Triangle
+
+Directional combination
+
+Examples:
+
+Left stick down + Square
+
+Left stick left + Triangle
+
+Left stick right + R1
+
+Held input
+
+Examples:
+
+Hold Circle
+
+Hold R1
+
+Hold L2 + Triangle
+
+Press input
+
+Examples:
+
+Press Square
+
+Press R1
+
+Press R2 + Circle
+
+Also support meaningful remapping of movement axes and directional controls.
+
+The player should not be artificially restricted to the recommended default buttons.
+
+12.4 Activation method
+
+Players can choose appropriate activation methods.
+
+Press: Activates once when the specified button or combination becomes active.
+
+Hold-to-activate: Activates once after a defined short hold threshold, unless it is a genuinely continuous action.
+
+Continuous hold: Maintains an existing held action while the input remains active.
+
+Do not confuse holding a modifier with holding the ability itself.
+
+For example, R2 + Square normally means hold R2 as a modifier, then press Square once.
+
+It does not mean repeatedly firing Red while both buttons are held.
+
+For continuous mechanics like Shield, preserve their real behavior even when remapped.
+
+Shield must remain a held defensive action, not a toggle.
+
+Variable-height Jump must also retain its normal duration-sensitive behavior.
+
+Customization changes the input, not the game’s combat rules.
+
+12.5 Press-to-bind interface
+
+When selecting Change Binding, open an input-capture interface.
+
+Example:
+
+Press your preferred button or combination
+
+The game listens to the designated controller.
+
+Display the detected input.
+
+Allow the player to:
+
+* Confirm.
+* Retry.
+* Cancel.
+* Change activation type.
+
+Do not let captured buttons accidentally activate the menus behind the editor.
+
+Do not perform gameplay actions while capturing bindings.
+
+Make input capture comfortable and intuitive.
+
+12.6 Conflict detection
+
+Detect problematic bindings before saving.
+
+For example:
+
+If two ground attacks use the same single button and can activate in the same context, this is a conflict.
+
+Show a warning identifying the conflicting actions.
+
+However, do not treat every shared button as a conflict.
+
+Examples of valid reuse:
+
+* #0002’s Spin Attack and Blue Tornado share R1 because one is grounded and the other airborne.
+* A basic attack and an explicitly modified version may share the same face button when the modifier logic reliably separates them.
+* A ground Shield and aerial Deflect may use the same button.
+
+Allow legitimate contextual reuse.
+
+Prevent configurations that create unavoidable ambiguity.
+
+If necessary, provide a way to restore the original controls.
+
+12.7 Visual controller diagram
+
+Include an interactive controller diagram within the customization interface if practical.
+
+Show the currently recognized PlayStation or Xbox layout.
+
+Highlight the buttons involved in the selected binding.
+
+For combinations, highlight both inputs.
+
+This would make customizing controls easier to understand.
+
+Keep the diagram lightweight and use appropriate original or permitted vector UI assets.
+
+Do not make the diagram mandatory for functionality; the editor must remain accessible through textual controls and keyboard navigation.
+
+⸻
+
+PART 13 — SAVE CONTROLS FOR INDIVIDUAL CHARACTERS
+
+Each fighter must maintain its own saved controller settings.
+
+Example:
+
+Character #0001:
+
+Jump = Cross
+
+Jab = Square
+
+Red = R2 + Square
+
+Character #0002:
+
+Jump = Triangle
+
+One-Two = Square
+
+Blue Tornado = R1
+
+These profiles must remain independent.
+
+Changing #0002 must not overwrite #0001.
+
+13.1 Persistent saving
+
+Use ALVA’s existing settings architecture.
+
+Store configurations using stable character IDs.
+
+Example conceptual structure:
+
+controllerProfiles: {
+  "0001": {
+    // Custom controls for #0001
+  },
+  "0002": {
+    // Custom controls for #0002
+  }
+}
+
+Do not use roster positions or display names as save keys.
+
+Save valid configurations to the browser’s local storage through js/core/settings.js.
+
+Preserve all existing settings.
+
+Update the settings schema version and migrations correctly.
+
+Keep old Mobile Controls layouts, language settings, and Combat Assist preferences intact.
+
+13.2 Save, Cancel, and Restore
+
+Provide:
+
+Save / Apply
+
+Validates and saves changes.
+
+Cancel
+
+Discards unapplied changes.
+
+Restore Defaults
+
+Restores only the currently selected character’s recommended controller bindings.
+
+Use confirmation before discarding saved customizations.
+
+New profiles must load correctly when the game restarts.
+
+Malformed stored bindings must fail safely without breaking the rest of the settings.
+
+⸻
+
+PART 14 — FUTURE CHARACTER SUPPORT
+
+This controller system must scale to ALVA’s future roster.
+
+ALVA currently has two playable characters, but its roster is designed for many more.
+
+Never build the system assuming there will only be #0001 and #0002.
+
+14.1 Character definitions as the source of truth
+
+Determine available abilities from the fighter definitions.
+
+Use appropriate existing metadata such as:
+
+* actions
+* attacks
+* techniques
+* summons
+* abilityNames
+* mobileAbilities
+
+Controller profiles should reference stable logical action and move identifiers, not animation filenames or displayed labels.
+
+14.2 New character defaults
+
+When a new playable character is introduced:
+
+1. Identify its universal actions.
+2. Identify every unique ability.
+3. Understand how each ability works.
+4. Determine whether it is grounded, aerial, directional, held, or context-sensitive.
+5. Choose comfortable default controller bindings.
+6. Ensure no unintended conflicts.
+7. Make all actions available for customization.
+8. Add brief ability descriptions.
+9. Validate the character’s controller profile.
+
+A new fighter should receive a safe, editable fallback when no individually authored recommended defaults exist.
+
+However, do not mistake the fallback for a finalized ergonomic control layout.
+
+New fighters should receive consciously designed default bindings.
+
+Important
+
+The shared input engine must not contain hardcoded checks for specific character IDs.
+
+Character-specific layout data may reference individual fighter IDs, but the controller engine itself must remain generic.
+
+⸻
+
+PART 15 — INPUT SYSTEM ARCHITECTURE
+
+Separate controller functionality into clear responsibilities.
+
+Physical controller manager
+
+Responsible for:
+
+* Detecting controllers.
+* Identifying supported device families.
+* Tracking controller connections.
+* Tracking physical button/axis state.
+* Managing the four-controller limit.
+* Maintaining active controller assignments.
+
+Controller binding resolver
+
+Responsible for:
+
+* Reading active character profiles.
+* Resolving single buttons.
+* Resolving combinations.
+* Resolving directional inputs.
+* Resolving held and press actions.
+* Applying contextual validity.
+* Preventing duplicate/conflicting actions.
+
+Gameplay input integration
+
+Responsible for converting the resolved actions into ALVA’s existing gameplay input snapshot.
+
+Do not bypass the current input and fighter-controller contracts.
+
+Keyboard, touch, and controller should remain compatible input sources.
+
+Menu navigation
+
+Responsible for the circular cursor, selection, scrolling, focus, and navigation scopes.
+
+Keep this logically separate from the fighter’s combat controls.
+
+This architecture should be modular without becoming unnecessarily complicated.
+
+⸻
+
+PART 16 — IMPORTANT TECHNICAL CORRECTIONS
+
+16.1 Do not make controller inputs feel delayed
+
+A player must never feel that basic attacks, Jump, Shield, or movement respond slowly because the system is waiting to detect a possible button combination.
+
+Prefer clear modifier-first controls.
+
+Recognize simultaneous inputs when unambiguous, but do not impose substantial artificial delays on ordinary actions.
+
+Responsiveness is part of comfort.
+
+16.2 Avoid accidental actions
+
+Never trigger multiple combat abilities from one intended combination.
+
+Do not allow trigger release to activate an unmodified attack.
+
+Do not fire attacks repeatedly from ordinary held buttons.
+
+Do not allow menu navigation inputs to leak into combat.
+
+16.3 Support controller disconnections
+
+If the active controller disconnects, immediately release its held gameplay inputs.
+
+Prevent:
+
+* Endless running.
+* Permanent Shield.
+* Stuck attacks.
+* Unintended Dash requests.
+* Stuck menu selection.
+
+Allow the player to select another connected supported controller.
+
+Keyboard input should remain available.
+
+16.4 Correct controller identification
+
+Browsers may hide gamepads until initial interaction.
+
+Check existing connections where permitted, react to events, and provide manual refresh.
+
+Do not assume a gamepad is unsupported merely because a browser has not exposed it yet.
+
+Do not misidentify uncertain devices.
+
+Clearly communicate detection limitations.
+
+16.5 Do not confuse four connections with multiplayer
+
+This update supports detection and management of up to four controllers.
+
+It must not silently implement multiplayer modes or alter Quick Battle’s player-versus-CPU structure.
+
+One active gameplay controller controls Player 1.
+
+16.6 Handle joystick direction carefully
+
+Directional attacks must use sensible thresholds.
+
+For #0002:
+
+* Left/right + Square → Homing Attack.
+* Down + Square → Bounce Attack.
+* Neutral + Square → Homing Attack using facing.
+
+When the joystick points diagonally, use a consistent dominant-axis policy rather than randomly selecting a move.
+
+Test directions near deadzone boundaries.
+
+⸻
+
+PART 17 — RESPECT REPOSITORY RULES
+
+ALVA has a specific naming and architecture contract.
+
+Preserve established codenames.
+
+Do not rename:
+
+* attack1
+* attack2
+* midair_attack1
+* extra_attack
+* shield
+* jump
+* mouvementLeft
+* mouvementRight
+* Existing Dash animation codenames
+
+Keep the existing intentional spelling conventions.
+
+The repository’s current codename_rule restricts modifier-based attack inputs.
+
+This update introduces controller-specific physical combinations.
+
+Therefore, carefully revise the applicable input-routing rules.
+
+The updated contract must distinguish between:
+
+Logical gameplay actions, which remain consistent with ALVA’s existing combat engine.
+
+Physical controller bindings, which may use modifiers, directional inputs, and contextual mappings.
+
+Do not change the character loadout format unnecessarily.
+
+Do not change existing keyboard or touch behavior.
+
+Do not modify the protected character_rule file.
+
+⸻
+
+PART 18 — GAME MODE INTEGRATION
+
+The new controller controls must work across the game.
+
+Quick Battle
+
+Use the selected player’s fighter-specific saved profile.
+
+Do not modify the CPU’s AI controls.
+
+Practice Ground
+
+Use the current practice fighter’s profile.
+
+When changing fighters, immediately switch to the new character’s controller layout at a safe point.
+
+Clear stale buffered controller input so a previous character’s action does not activate on the next character.
+
+Watch Mode
+
+Controller navigation works in menus and spectator interfaces.
+
+Do not allow gameplay inputs to control CPU fighters.
+
+Pause and results
+
+Use the appropriate menu controls.
+
+Keep menu Confirm and Back reliable regardless of character gameplay remapping.
+
+Prevent closing a menu from unintentionally activating Jump or an attack.
+
+⸻
+
+PART 19 — USER INTERFACE AND ACCESSIBILITY
+
+The update must look native to ALVA.
+
+Preserve its existing aesthetic:
+
+* Dark surfaces.
+* Translucent glass dialogs.
+* Clean typography.
+* Minimal decorative elements.
+* Appropriate spacing.
+* Smooth transitions.
+* Clear interactive states.
+
+Every new UI component must be responsive.
+
+Support:
+
+* Desktop.
+* Smaller laptop screens.
+* Landscape tablets.
+* Relevant landscape mobile layouts.
+
+Provide accessible names, readable labels, focus restoration, and keyboard navigation.
+
+The circular controller cursor must never prevent keyboard, mouse, or touch operation.
+
+All new player-facing text must support English and French through the existing localization system.
+
+⸻
+
+PART 20 — TESTING
+
+This update must be thoroughly tested.
+
+Add automated tests for every major subsystem.
+
+Connection detection
+
+Test:
+
+* Zero controllers.
+* One supported controller.
+* Four supported controllers.
+* Five supported controllers.
+* Unsupported devices.
+* Controller disconnection.
+* Controller reconnection.
+* Active controller switching.
+* Controller detection refresh.
+* Gamepad API absence.
+* Controller availability after user interaction.
+
+Universal controls
+
+Test:
+
+* Left/right movement.
+* Jump.
+* Hold duration for variable jumping.
+* Dash left.
+* Dash right.
+* Neutral-direction Dash.
+* Air Dash.
+* Shield hold.
+* Shield release.
+* Aerial Deflect.
+* Pause.
+
+#0001 controls
+
+Test every default mapping.
+
+Especially verify:
+
+* Square activates Jab.
+* R2 + Square activates Red, not Jab.
+* R2 + Circle activates Maximum Blue, not Shield.
+* R2 + Triangle activates Hollow Purple, not High Kick.
+* L2 + Triangle activates Unlimited Void.
+* R1 activates aerial Blue.
+* All aerial bindings respect their correct contexts.
+
+#0002 controls
+
+Test:
+
+* Square activates One-Two on the ground.
+* Triangle activates Rapid Kicks.
+* R1 activates Spin Attack on the ground.
+* R1 activates Blue Tornado in the air.
+* R2 + Triangle activates Whirlwind.
+* Horizontal + Square activates Homing Attack in the air.
+* Down + Square activates Bounce Attack in the air.
+* Neutral + Square activates the appropriate aerial Homing Attack.
+* Directional attacks do not trigger the wrong move.
+
+Custom controls
+
+Test:
+
+* Single-button binding.
+* Two-button binding.
+* Directional binding.
+* Hold-to-activate binding.
+* Continuous held action.
+* Conflict detection.
+* Valid context-based button reuse.
+* Save and reload.
+* Per-character independence.
+* Restore Defaults.
+* Cancel.
+* Old settings migration.
+* Invalid saved data.
+* New playable fighter registration.
+
+UI tests
+
+Test:
+
+* Controller status updates.
+* Connection dialog.
+* Reconnect button.
+* Controller cursor navigation.
+* Roster selection.
+* Nested dialogs.
+* Controller input capture.
+* Focus handling.
+* Keyboard and mouse compatibility.
+* Responsive layout.
+* English and French localization.
+
+Regression testing
+
+Run the existing test suite:
 
 node --test
 
-Repair existing tests that encode the old Shield-bypass behavior.
+Do not consider the implementation complete if existing tests fail.
 
-Do not weaken or remove useful tests merely to obtain a passing suite.
+Also perform manual browser verification where available.
 
-Add stronger replacement tests for the new behavior.
+Test physical PlayStation and Xbox controllers if they are available.
 
-Perform a final repository-wide search for:
+If physical-controller testing cannot be performed, state that explicitly and distinguish mocked-device verification from real-hardware validation.
 
-* unblockable
-* Direct Launch Point mutations
-* Direct damage handling
-* Hit and block decisions
-* Special-action classification
-* Projectile collision handling
-* Summon and technique damage paths
-* AI assumptions about Shield bypasses
+⸻
 
-Verify that no functioning exception remains.
+PART 21 — DOCUMENTATION
 
-19. Final deliverables
+Update the relevant project documentation.
 
-After implementing the changes, provide:
+At minimum:
 
-1. A concise summary of the new universal attack-classification system.
-2. A list of all relevant files modified.
-3. An explanation of how Shield protection is now enforced.
-4. An explanation of how Deflect retains both offensive and defensive behavior.
-5. The result of the full automated test suite.
-6. Confirmation that #0001 and #0002 still function as intended.
-7. Confirmation that new characters inherit the rules automatically.
-8. Any remaining limitations, if applicable.
+* README.md
+* ALVA_SPEC.md
+* codename_rule
+* docs/systems/input.md
+* docs/characters/0001.md
+* docs/characters/0002.md
+* docs/characters/adding-characters.md
 
-Final acceptance criteria
+Document:
 
-The implementation is only complete if all these statements are true:
+* Supported controller families.
+* Maximum of four controllers.
+* Controller detection behavior.
+* Connection indicator meanings.
+* Reconnect functionality.
+* Circular menu cursor.
+* Universal default controls.
+* Character-specific defaults.
+* Input-combination priority.
+* Controller customization.
+* Per-character saves.
+* Future character support.
 
-RULE 1: If an action can cause damage, directly or indirectly, it is an attack.
+Remove or revise outdated descriptions of controller controls that no longer apply.
 
-RULE 2: Its name does not determine whether it is an attack.
+⸻
 
-RULE 3: Summons, techniques, projectiles, and other offensive mechanisms remain attacks even though they have different execution types.
+PART 22 — IMPLEMENTATION ORDER
 
-RULE 4: Deflect is both an attack and a defensive action.
+Implement the update carefully in stages.
 
-RULE 5: Every attack is blockable by an active Shield, without exceptions.
+Phase 1 — Controller connection management
 
-RULE 6: A blocked attack cannot inflict damage, increase Launch Point, or apply offensive hit effects through the Shield.
+Establish reliable supported-controller identification, input tracking, device assignment, and connection limits.
 
-RULE 7: Existing ability names, controls, animations, and unrelated mechanics remain intact.
+Phase 2 — Character-aware controller controls
 
-RULE 8: All current characters and future characters must follow these rules automatically.
+Implement normalized physical input, default profiles, contextual action resolution, and reliable button combinations.
 
-RULE 9: There must be no hidden damage pathway that avoids the universal Shield check.
+This is one of the highest-priority phases.
 
-RULE 10: The rules must be enforced by combat architecture and tests, not merely by documentation.
+Thoroughly test responsiveness and combat integration before continuing.
 
-Guiding principle
+Phase 3 — Controller user interface
 
-An attack is defined by its offensive capability, not by its name or how the game executes it.
+Enable the Home controller button, add connection indicators, create the connection dialog, and implement the circular cursor.
 
-A Shield is defined by its ability to block attacks, not by which attacks happen to be allowed through it.
+Phase 4 — Full controller customization
 
-Implement these principles universally and permanently across Alva.
+Build the fighter roster selection flow, character-specific editor, binding capture, conflict detection, saving, and reset functionality.
+
+Phase 5 — Future-proofing and validation
+
+Complete future-character integration, localization, documentation, accessibility, browser verification, and regression testing.
+
+Do not leave partially integrated systems or UI buttons that do nothing.
+
+⸻
+
+PART 23 — DEFINITION OF DONE
+
+The update is complete when all these requirements have been satisfied:
+
+1. PlayStation and Xbox controllers are supported through reliable browser-compatible detection.
+2. The game detects up to four supported controllers.
+3. More than four supported controllers produces the orange warning.
+4. The Home controller button is functional.
+5. The green, red, and orange indicators accurately reflect connection status.
+6. The Controller Connections dialog displays accurate information.
+7. Reconnect refreshes the actual device state.
+8. Controller assignments work without merging multiple players’ inputs.
+9. The circular cursor works throughout ALVA’s navigable interfaces.
+10. Menu and gameplay input are properly separated.
+11. Universal gameplay defaults are consistent across characters.
+12. Default controls are comfortable and responsive.
+13. #0001’s unique projectile and attack combinations function correctly.
+14. #0002’s directional aerial attacks work reliably.
+15. #0002’s Spin Attack and Blue Tornado correctly share R1/RB in their different contexts.
+16. Shield remains a held action.
+17. Button combinations never produce unwanted attacks.
+18. Players can remap every relevant gameplay control.
+19. Players can choose single buttons, combinations, directional modifiers, and appropriate activation methods.
+20. The editor provides ability names and brief descriptions.
+21. Binding conflicts are identified and resolved.
+22. Controller configurations save independently for every character.
+23. New playable characters can be integrated without hardcoding them into the shared controller engine.
+24. Keyboard and touch controls remain functional.
+25. CPU behavior and existing combat rules remain unchanged.
+26. English and French localization are complete.
+27. Automated tests pass.
+28. Documentation accurately describes the new system.
+
+⸻
+
+FINAL INSTRUCTIONS — COMFORT ABOVE EVERYTHING
+
+The fundamental purpose of this update is controller comfort.
+
+Do not treat comfort as a secondary detail.
+
+ALVA is a fast-paced platform fighter. Players must be able to move, jump, defend, Dash, and perform their character’s abilities naturally.
+
+A successful controller layout should feel intuitive after a short period of play.
+
+Players should not need to memorize awkward combinations for ordinary attacks.
+
+Fast abilities should be accessible quickly.
+
+Movement-oriented actions should not unnecessarily interfere with joystick movement.
+
+Defensive reactions should be reliable and immediate.
+
+Powerful or less frequent abilities may use comfortable modifier combinations when appropriate.
+
+Character-specific controls should reflect how each fighter actually plays.
+
+Do not force every fighter into the same ability layout.
+
+For example:
+
+* Both characters use Square/X for their primary punch because it is comfortable and consistent.
+* #0001 uses R2/RT combinations for projectiles because that groups its special attacks logically.
+* #0002 uses directional Square/X combinations for its aerial Homing and Bounce Attacks because those actions are direction-dependent.
+* #0002 uses R1/RB for both ground Spin Attack and aerial Blue Tornado because their ground/air contexts make this intuitive and conflict-free.
+* All fighters use L1/LB for Dash by default because it allows comfortable movement while keeping the right thumb available for attacks.
+* All fighters use Circle/B for defensive actions by default, with ground Shield held and aerial Deflect activated by a fresh press.
+
+These are examples of the reasoning that should guide this entire update.
+
+The default controller bindings must be deliberately designed rather than mechanically assigned.
+
+At the same time, players must have complete freedom to build layouts that match their individual preferences.
+
+The ideal result combines three qualities:
+
+1. Universal consistency: Shared gameplay fundamentals feel familiar across characters.
+
+2. Character-specific comfort: Each unique ability is assigned an input that naturally suits its mechanics.
+
+3. Complete customization: Players can override the recommended layout independently for every fighter.
+
+Do not sacrifice any of these qualities.
+
+Prioritize real gameplay comfort, input responsiveness, and predictability over unnecessary complexity.
+
+Preserve the existing mechanics, architecture, and identity of ALVA.
+
+Implement the update fully, test it carefully, and deliver an integrated system rather than disconnected features.
+
+When finished, report the implementation changes, automated test results, controller-specific verification performed, and any limitations.
+
+The final result should make playing ALVA with a controller feel natural, comfortable, responsive, and intentionally designed for every character — including the characters added in the future.
