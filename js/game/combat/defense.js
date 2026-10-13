@@ -27,16 +27,24 @@
 //     stall: 0.3,
 //   }
 //
-// While it is up (CombatState.shielding, see Fighter.update) any hit that
-// reaches the fighter's own hurtboxes, from either side, is blocked: it adds
-// no Launch Point and launches nothing, and the fighter pays
+// While it is up (CombatState.shielding, see Fighter.update) every hit that
+// reaches the fighter's own hurtboxes, from any side, is blocked, whatever
+// made it (a melee strike, a Deflect's, a projectile's, a clone's, a
+// technique's burst) and however hard it hits: every attack is blockable
+// (js/game/combat/offense.js). A blocked hit adds no Launch Point, launches
+// nothing, stuns nothing and applies none of its offensive hit effects (no
+// paralysis), and the fighter pays
 // BLOCK_ENERGY_COST (15, the same for every fighter and every block, a
 // perfect one's included: see js/game/combat/combat-state.js) for that one
 // hit instead. The Shield holds through
 // the hit's hitstop and blockstun (CombatState.shieldStun), never a hurt
 // pose. Holding it costs nothing; it cannot rise or stay up while the
 // fighter is exhausted (CombatState.canShield), nor once it is off the
-// ground.
+// ground. A hit it meets while up is blocked even if paying for it empties
+// the bar; only once the Shield has dropped can a later hit land.
+//
+// The Shield is a defense and never an attack (`offense`: PURE_DEFENSE):
+// it deals nothing, so a Shield that declares a hit's fields is refused.
 
 const SHIELD_DEFAULTS = Object.freeze({
   groundAnimation: null,
@@ -57,9 +65,14 @@ const SHIELD_DEFAULTS = Object.freeze({
   stall: 0,
 });
 
+import { PURE_DEFENSE } from './offense.js';
+
 // What a Shield may not declare: an air Shield and its slow fall. There is
 // none, so naming one is refused rather than quietly ignored.
 const SHIELD_REFUSED = Object.freeze(['airAnimation', 'slowFallSpeed', 'slowFallBrake']);
+
+// Nor anything that would make it strike: it is a defense, not an attack.
+const SHIELD_HARMLESS = Object.freeze(['damage', 'baseLaunch', 'directionalLaunch', 'paralyze', 'hitbox', 'hits', 'projectile', 'burst']);
 
 // Frozen form of a character's `defense` entry, or null for a fighter that
 // has none (the `shield` input then does nothing on the ground). Typed, so
@@ -71,7 +84,11 @@ export function createDefenseDefinition(spec) {
     if (declared.length) {
       throw new Error(`[Alva] A Shield declares ${declared.join(', ')}: there is no Shield in the air (the air's is the Deflect)`);
     }
-    return Object.freeze({ ...SHIELD_DEFAULTS, ...spec });
+    const strikes = SHIELD_HARMLESS.filter((field) => spec[field] !== undefined);
+    if (strikes.length || spec.offensive === true) {
+      throw new Error(`[Alva] A Shield declares ${strikes.length ? strikes.join(', ') : 'offensive: true'}: a Shield is a defense and deals nothing`);
+    }
+    return Object.freeze({ ...SHIELD_DEFAULTS, ...spec, offense: PURE_DEFENSE });
   }
   throw new Error(`[Alva] Unknown defense type "${spec.type}"`);
 }

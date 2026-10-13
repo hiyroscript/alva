@@ -344,7 +344,7 @@ test('a projectile the live Deflect catches never strikes the deflecting fighter
   }
 });
 
-test('turned back, its strikes start over, and it strikes the fighter who threw it: unblockable, erasing or piercing, it is turned back all the same', () => {
+test('turned back, its strikes start over, and it strikes the fighter who threw it: erasing or piercing, it is turned back all the same', () => {
   // #0001's Hollow Purple, at #0002 in the air.
   const d = duel({ attackerCharacter: DEF_0001, targetCharacter: DEF_0002, gap: 260 });
   aloft(d.target, 700, d.target.body.x);
@@ -357,7 +357,7 @@ test('turned back, its strikes start over, and it strikes the fighter who threw 
   purple.through.add(d.target);
   d.projectiles.push(purple);
   d.tick();
-  assert.equal(purple.owner, d.target, 'unblockable and erasing, it is turned back');
+  assert.equal(purple.owner, d.target, 'erasing, it is turned back');
   assert.equal(purple.hits, 0, 'its strikes start over');
   assert.equal(purple.lastStrike, -Infinity);
   assert.equal(purple.through.size, 0);

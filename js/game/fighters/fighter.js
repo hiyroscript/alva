@@ -345,7 +345,7 @@ export class Fighter {
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
     if (combat.release) {
-      this.releases.push({ id: combat.release.id, offset: combat.release.offset, direction: this.facing });
+      this.releases.push({ id: combat.release.id, offset: combat.release.offset, direction: this.facing, ability: combat.release.ability });
       combat.release = null;
     }
     // Jump presses count from the step they are made, the freeze included.

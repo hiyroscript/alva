@@ -67,7 +67,9 @@ import { createAttackDefinition } from '../game/combat/attacks.js';
 import { resolveEnergy } from '../game/combat/combat-state.js';
 import { createDeflectDefinition } from '../game/combat/deflect.js';
 import { createProjectileDefinition } from '../game/combat/projectile.js';
+import { createSummonDefinition } from '../game/combat/summon.js';
 import { createTechniqueDefinition } from '../game/combat/technique.js';
+import { summonOffense } from '../game/combat/offense.js';
 import { CHARACTER_0001 } from './characters/0001.js';
 import { CHARACTER_0002 } from './characters/0002.js';
 
@@ -120,13 +122,24 @@ export function characterFramePaths(def) {
 // attack with a non-finite or negative cooldown, a Deflect off its
 // fixed strike or an `energy` entry that sets its own maximum or costs is
 // refused as the registry loads, not when a match first builds the
-// fighter. A summon performs one of these attacks, so its hits are checked
-// with them.
+// fighter. So is any way past an active Shield (`unblockable` and the rest
+// of SHIELD_BYPASS_FIELDS, js/game/combat/offense.js) and any `offensive`
+// that disagrees with what a move does: building each definition
+// classifies it. A summon performs one of these attacks, so its hits are
+// checked with them, and the attack its clone performs must be one that
+// strikes (a summon is an attack: see summonOffense).
 export function assertCombatRules(def) {
   const who = `Character "${def?.id}"`;
-  for (const [id, spec] of Object.entries(def?.attacks ?? {})) createAttackDefinition({ id, ...spec });
+  const attacks = {};
+  for (const [id, spec] of Object.entries(def?.attacks ?? {})) attacks[id] = createAttackDefinition({ id, ...spec });
   for (const [id, spec] of Object.entries(def?.projectiles ?? {})) createProjectileDefinition({ id, ...spec });
   for (const [id, spec] of Object.entries(def?.techniques ?? {})) createTechniqueDefinition({ id, ...spec });
+  for (const [id, spec] of Object.entries(def?.summons ?? {})) {
+    const summon = createSummonDefinition({ id, ...spec });
+    if (!summonOffense(summon, attacks).attack) {
+      throw new Error(`[Alva] ${who}'s summon "${id}" sends a clone whose attack strikes nothing: a summon is an attack`);
+    }
+  }
   createDeflectDefinition(def?.deflect);
   resolveEnergy(def?.energy, who);
 }

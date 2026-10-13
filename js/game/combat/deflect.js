@@ -16,6 +16,17 @@
 // strike is live its box turns back the other fighters' projectiles it
 // meets.
 //
+// So a Deflect is both an attack and a defense (its `offense`, see
+// js/game/combat/offense.js: { attack: true, defense: true }): its strike
+// deals damage, launches, freezes and is cut short like any attack's, and
+// a target whose Shield is up blocks it like any other; its turning back
+// is a real defense, the projectile it turns back staying an attack (now
+// the deflecting fighter's), blockable by its new target's Shield. Being a
+// defense never makes it a Shield: it is no held guard, nothing about it is
+// invulnerable, and a blow it does not turn back strikes it as it would any
+// attacker. Every Deflect must turn projectiles back
+// (`deflectProjectiles`), so it is always both.
+//
 // It costs Energy, the same for every fighter: DEFLECT_ENERGY_COST (15, see
 // js/game/combat/combat-state.js), paid once as it starts (Fighter.tryDeflect),
 // whether it then strikes, turns a projectile back or meets nothing, and
@@ -39,7 +50,8 @@
 //
 // A Deflect is one strike in the air: a multi-hit string (`hits`), a
 // thrown projectile, a ground-only or a pending one is refused, and so is
-// one without a hitbox or a clip.
+// one without a hitbox or a clip, or one that does not turn projectiles
+// back (`deflectProjectiles: false`).
 
 import { createAttackDefinition } from './attacks.js';
 
@@ -68,7 +80,8 @@ export function createDeflectDefinition(spec) {
   }
   if (!spec.animation) throw new Error(`[Alva] ${owner} needs an animation`);
   if (!spec.hitbox) throw new Error(`[Alva] ${owner} needs a hitbox`);
+  if (spec.deflectProjectiles === false) throw new Error(`[Alva] ${owner} declares deflectProjectiles: false: a Deflect turns projectiles back`);
   return createAttackDefinition({
-    ...spec, id: 'deflect', damage: DEFLECT_DAMAGE, baseLaunch: DEFLECT_BASE_LAUNCH, groundOnly: false,
+    ...spec, id: 'deflect', damage: DEFLECT_DAMAGE, baseLaunch: DEFLECT_BASE_LAUNCH, groundOnly: false, deflectProjectiles: true,
   }, { cooldownExempt: true });
 }

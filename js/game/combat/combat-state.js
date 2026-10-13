@@ -365,7 +365,8 @@ export class CombatState {
       const proj = this.attack.def.projectile;
       if (proj && !this.attack.projectileSpawned && this.attack.time >= proj.spawnAt - PHASE_EPSILON) {
         this.attack.projectileSpawned = true;
-        if (this.stun <= 0) this.release = proj;
+        // Whatever releases it, the attack that threw it is its ability.
+        if (this.stun <= 0) this.release = { ...proj, ability: this.attack.def.id };
       }
       if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) this.endAttack();
     }

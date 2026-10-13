@@ -8,16 +8,17 @@
 // speed, box, pull and lifetime; one the CPU owns is never a threat, and a
 // projectile turned back is the turner's once the CPU has seen it turn),
 // a throw about to let go, a technique still casting (its burst and its
-// projectile), or a clone about to strike. Each has a time to contact, an
-// end, a box, a side, whether a Shield stops it, how hard it pushes a
-// Shield, and what it would cost the CPU (its damage and launch at the
-// CPU's Launch Point, a fall into the Void included).
+// projectile), or a clone about to strike. Every one of them is an attack,
+// and a raised Shield blocks every attack. Each has a time to contact, an
+// end, a box, a side, how hard it pushes a Shield, and what it would cost
+// the CPU (its damage and launch at the CPU's Launch Point, a fall into the
+// Void included).
 //
 // Answers, each simulated by the rules and weighed against the others:
 // the Shield (on the ground only, raised in time, held through the threat
-// and no longer, perfectly timed when the level can see it coming; never
-// against what no Shield stops, never into a push off a ledge, and its
-// Energy weighed), a jump over it, a step or a Dash out of reach, the
+// and no longer, perfectly timed when the level can see it coming, against
+// any threat: a cast's burst or sphere as well as a jab; never into a push
+// off a ledge, and its Energy weighed), a jump over it, a step or a Dash out of reach, the
 // Deflect (in the air, pressed so its live box meets the projectile; from
 // the ground by jumping into it), a counter-strike that lands first (a
 // cast or a throw broken before it lets go), meeting a projectile with an
@@ -45,6 +46,9 @@ export class Defense {
     this.threats = [];
     this.arc = new Track(90);
     this.hv = {};
+    // The answers the latest choose weighed, before the level's noise:
+    // { why, score, threat } each (the debug trace; nothing reads it back).
+    this.weighed = [];
   }
 
   // The CPU's hurt box with its feet at (x, y), padded.
@@ -147,7 +151,7 @@ export class Defense {
     out.push({
       kind: 'melee', ref: v.attack, def, contact: (contact + 1) * STEP, end: (end + 1) * STEP + 0.02, boxes, top,
       from: Math.sign(s.op.x - s.me.x) || -s.me.facing, severity: sev.value, ko: sev.ko,
-      unblockable: !!first.unblockable || !!def.unblockable, blockPush: first.blockPush ?? def.blockPush ?? 0,
+      blockPush: first.blockPush ?? def.blockPush ?? 0,
       strikesLeft: n, foeRecovery: def.total - tNow - (contact + 1) * STEP,
     });
   }
@@ -184,7 +188,7 @@ export class Defense {
     return {
       contact: (contact + 1) * STEP, end: (end + 1) * STEP + (def.pierce ? def.pierce.interval * def.pierce.hits : 0.02),
       top: y + def.hitbox.y - pull, bottom: y + def.hitbox.y + def.hitbox.h + pull, from: -dir, severity: sev.value, ko: sev.ko,
-      unblockable: !!def.unblockable, blockPush: def.blockPush ?? 0, x, y, dir, def, delay, pull, strikesLeft: n, age,
+      blockPush: def.blockPush ?? 0, x, y, dir, def, delay, pull, strikesLeft: n, age,
     };
   }
 
@@ -225,7 +229,7 @@ export class Defense {
         out.push({
           kind: 'technique', ref: v.technique, contact: releaseIn + STEP, end: releaseIn + 2 * STEP, burst: { x: box.x, y: box.y, w: box.w, h: box.h },
           top: box.y, from: Math.sign(s.op.x - s.me.x) || -1, severity: sev.value + (hit.paralyze ?? 0) * 8, ko: sev.ko,
-          unblockable: !!hit.unblockable, blockPush: hit.blockPush ?? 0, releaseIn, strikesLeft: 1,
+          blockPush: hit.blockPush ?? 0, releaseIn, strikesLeft: 1,
         });
       }
     }
@@ -259,7 +263,7 @@ export class Defense {
     return {
       kind: 'clone', ref: c, contact: Math.max(STEP, contact), end, boxes: [{ k: Math.round(contact / STEP), x: box.x, y: box.y, w: box.w, h: box.h }],
       top: box.y, from: Math.sign(box.x + box.w / 2 - s.me.x) || -1, severity: sev.value, ko: sev.ko,
-      unblockable: !!def.unblockable, blockPush: def.blockPush ?? 0, strikesLeft: 1,
+      blockPush: def.blockPush ?? 0, strikesLeft: 1,
     };
   }
 
@@ -282,7 +286,9 @@ export class Defense {
     const canJump = (me.canAct || self.combat.cancellable || self.dashCancellable) && !me.shielding;
     // The Shield.
     const shield = s.caps.shield;
-    if (shield && me.grounded && !me.exhausted && !threat.unblockable && (me.canAct || me.shielding) &&
+    // Every threat is an attack, and every attack is blockable: a technique's
+    // burst, a sphere, a clone's strike and a Deflect's as surely as a jab.
+    if (shield && me.grounded && !me.exhausted && (me.canAct || me.shielding) &&
         threat.contact > STEP * 0.5) {
       const cost = shield.blockCost;
       const exhausts = me.energy <= cost + 0.5;
@@ -366,7 +372,7 @@ export class Defense {
         const flight = Math.max(0, threat.def.lifetime - (threat.age ?? 0) - threat.contact) * threat.def.speed;
         const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + (threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
         options.push({
-          score: 0.4 + back - (deflect.energyCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0) + (threat.unblockable ? 1 : 0),
+          score: 0.4 + back - (deflect.energyCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0),
           plan: { kind: 'deflect', jump: d.jump, jumpAt: brain.clock + d.jumpAt, startAt: d.jump ? brain.clock + d.jumpAt : null, pressAt: brain.clock + d.press, why: 'Deflects it back' }, why: 'Deflect',
         });
       }
@@ -394,6 +400,7 @@ export class Defense {
         }
       }
     }
+    this.weighed = options.map((o) => ({ why: o.why, score: o.score, threat }));
     // The level's judgement: noise on every option, and a lower level
     // sometimes misses the better answer or freezes.
     let best = options[0];

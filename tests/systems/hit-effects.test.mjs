@@ -1,9 +1,10 @@
 // Run with node --test tests/systems/hit-effects.test.mjs (no dependencies).
 // The shared hit effects (js/game/combat/hit-effects.js), what any hit may
-// do beyond its damage and launch: `unblockable` (no Shield stops it),
-// `paralyze` (a timed hold that a launch ends) and `blockPush` (a Shield
-// that blocks it is shoved back); and a Shield's `stall` (a melee blow it
-// blocks freezes its attacker; see js/game/combat/defense.js). Checked with
+// do beyond its damage and launch: `paralyze` (a timed hold that a launch
+// ends) and `blockPush` (a Shield that blocks it is shoved back); that no
+// effect gets past a raised Shield, and that a way past one (`unblockable`
+// and the rest) is refused; and a Shield's `stall` (a melee blow it blocks
+// freezes its attacker; see js/game/combat/defense.js). Checked with
 // bespoke hits through the real CombatSystem.applyHit, then in play on the
 // real Fighter (see tests/helpers/fighter-harness.mjs). Nothing here names
 // a fighter's move: #0001 is only the body the hits land on.
@@ -14,6 +15,8 @@ import { HIT_EFFECT_FIELDS, resolveHitEffects } from '../../js/game/combat/hit-e
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { createProjectileDefinition } from '../../js/game/combat/projectile.js';
 import { createTechniqueDefinition } from '../../js/game/combat/technique.js';
+import { createSummonDefinition } from '../../js/game/combat/summon.js';
+import { SHIELD_BYPASS_FIELDS } from '../../js/game/combat/offense.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { applyPulls } from '../../js/game/combat/pull.js';
 import { getCharacter } from '../../js/data/characters.js';
@@ -47,19 +50,18 @@ function pair({ shield = false } = {}) {
 // ---- Data ---------------------------------------------------------------------------
 
 test('every effect is optional, and its default changes nothing', () => {
-  assert.deepEqual([...HIT_EFFECT_FIELDS], ['unblockable', 'paralyze', 'blockPush']);
-  assert.deepEqual(resolveHitEffects(undefined), { unblockable: false, paralyze: 0, blockPush: 0 });
-  assert.deepEqual(resolveHitEffects({ damage: 5 }), { unblockable: false, paralyze: 0, blockPush: 0 });
-  assert.deepEqual(resolveHitEffects({ unblockable: true, paralyze: 1.5, blockPush: 400 }), { unblockable: true, paralyze: 1.5, blockPush: 400 });
+  assert.deepEqual([...HIT_EFFECT_FIELDS], ['paralyze', 'blockPush']);
+  assert.deepEqual(resolveHitEffects(undefined), { paralyze: 0, blockPush: 0 });
+  assert.deepEqual(resolveHitEffects({ damage: 5 }), { paralyze: 0, blockPush: 0 });
+  assert.deepEqual(resolveHitEffects({ paralyze: 1.5, blockPush: 400 }), { paralyze: 1.5, blockPush: 400 });
   // An attack, a projectile, a technique's burst and a finisher all carry
   // them, resolved the same way.
-  assert.equal(hit().unblockable, false);
+  assert.equal(hit().unblockable, undefined, 'no hit has a way past a Shield');
   assert.equal(hit({ paralyze: 1 }).paralyze, 1);
   const proj = createProjectileDefinition({
-    id: 'testShot', speed: 100, damage: 1, unblockable: true, pierce: { hits: 2, interval: 0.1 }, finisher: { damage: 3 },
+    id: 'testShot', speed: 100, damage: 1, paralyze: 0.5, pierce: { hits: 2, interval: 0.1 }, finisher: { damage: 3 },
   });
-  assert.equal(proj.unblockable, true);
-  assert.equal(proj.finisher.unblockable, true, 'a finisher inherits its projectile\'s');
+  assert.equal(proj.finisher.paralyze, 0.5, 'a finisher inherits its projectile\'s');
   const tech = createTechniqueDefinition({
     id: 'testCast', castAnimation: 'a', releaseAnimation: 'b', burst: { hitbox: { x: -1, y: -1, w: 2, h: 2 }, hit: { damage: 1, paralyze: 2 } },
   });
@@ -73,7 +75,7 @@ test('every effect is optional, and its default changes nothing', () => {
 });
 
 test('a value of the wrong kind is refused, naming its owner', () => {
-  assert.throws(() => resolveHitEffects({ unblockable: 'yes' }, 'Hit "x"'), /Hit "x"'s unblockable must be true or false/);
+  assert.throws(() => resolveHitEffects({ unblockable: 'yes' }, 'Hit "x"'), /Hit "x" declares unblockable: every attack is blockable/);
   assert.throws(() => resolveHitEffects({ paralyze: -1 }), /paralyze must be seconds from 0/);
   assert.throws(() => resolveHitEffects({ blockPush: '520' }), /blockPush must be a speed from 0/);
   assert.throws(() => hit({ paralyze: 'long' }), /Attack "testHit"'s paralyze/);
@@ -85,24 +87,60 @@ test('nothing in the shared code names a fighter or a move', () => {
   assert.doesNotMatch(code, /000\d|attack\d|extra_attack|technique|projectile/);
 });
 
-// ---- Unblockable ----------------------------------------------------------------------
+// ---- No way past a Shield --------------------------------------------------------------
 
-test('an unblockable hit lands in full on a raised Shield, which pays nothing for it', () => {
-  const blockable = pair({ shield: true });
-  const blocked = blockable.system.applyHit(blockable.attacker, blockable.target, hit({ damage: 5 }));
-  assert.equal(blocked.type, 'block');
-  assert.equal(blockable.target.combat.launchPoint, 0);
+test('a way past a Shield is refused wherever a hit is built: an attack, a strike, a projectile, a finisher, a burst, a summon', () => {
+  for (const field of SHIELD_BYPASS_FIELDS) {
+    for (const value of [true, false]) {
+      const way = { [field]: value };
+      assert.throws(() => resolveHitEffects(way, 'Hit "x"'), new RegExp(`Hit "x" declares ${field}: every attack is blockable`));
+      assert.throws(() => hit(way), /Attack "testHit" declares/);
+      assert.throws(() => createAttackDefinition({ id: 'testPending', animation: 'a', pending: true, ...way }), /Attack "testPending" declares/);
+      assert.throws(() => createAttackDefinition({
+        id: 'testMulti', hitbox: { x: 0, y: -10, w: 10, h: 10 }, hits: [{ at: 0.1, active: 0.05, damage: 1, ...way }],
+      }), /testMulti" hit 1 declares/);
+      assert.throws(() => createProjectileDefinition({ id: 'testShot', damage: 1, ...way }), /Projectile "testShot" declares/);
+      assert.throws(() => createProjectileDefinition({
+        id: 'testShot', damage: 1, pierce: { hits: 2, interval: 0.1 }, finisher: { damage: 3, ...way },
+      }), /finisher declares/);
+      assert.throws(() => createTechniqueDefinition({
+        id: 'testCast', castAnimation: 'a', releaseAnimation: 'b', burst: { hitbox: { x: -1, y: -1, w: 2, h: 2 }, hit: { damage: 1, ...way } },
+      }), /declares/);
+      assert.throws(() => createTechniqueDefinition({ id: 'testCast', castAnimation: 'a', releaseAnimation: 'b', projectile: { id: 'x' }, ...way }), /Technique "testCast" declares/);
+      assert.throws(() => createSummonDefinition({ id: 'testSummon', attack: 'attack1', cloud: 'c', ...way }), /Summon "testSummon" declares/);
+    }
+  }
+});
 
-  const { attacker, target, system } = pair({ shield: true });
-  const energy = target.combat.energy;
-  const e = system.applyHit(attacker, target, hit({ damage: 5, baseLaunch: 1, directionalLaunch: 'horizontal', unblockable: true }));
-  assert.equal(e.type, 'hit');
-  assert.equal(e.damage, 5);
-  assert.equal(e.energyCost, 0, 'the Shield pays nothing');
-  assert.equal(target.combat.energy, energy);
-  assert.equal(target.combat.launchPoint, 5, 'its Launch Point builds');
-  assert.ok(e.launchSpeed > 0, 'and it is launched');
-  assert.ok(target.combat.stun > 0, 'and stunned');
+test('a hit that once got past a Shield is blocked like any other: nothing through, whatever its damage, launch or effects', () => {
+  // Even a hand-built definition that still carries the old field: applyHit
+  // never reads it.
+  for (const spec of [
+    { damage: 10, baseLaunch: 3, directionalLaunch: 'horizontal' },
+    { damage: 3, paralyze: 1.8 },
+    { damage: 5, baseLaunch: 2, directionalLaunch: 'vertical', carry: { lift: 300 } },
+  ]) {
+    const { attacker, target, system } = pair({ shield: true });
+    target.combat.launchPoint = 50;
+    const energy = target.combat.energy;
+    const legacy = Object.freeze({ ...hit(spec), unblockable: true });
+    const e = system.applyHit(attacker, target, legacy, { velocity: { x: 900, y: 0 } });
+    assert.equal(e.type, 'block', JSON.stringify(spec));
+    assert.equal(e.attack, true, 'an attack, blocked');
+    assert.equal(e.damage, 0);
+    assert.equal(e.launchStrength, 0);
+    assert.equal(e.launchSpeed, 0);
+    assert.equal(e.hitstun, 0);
+    assert.equal(e.paralysis, 0);
+    assert.equal(e.energyCost, target.energyDef.shieldHitCost, 'the Shield pays for it like any block');
+    assert.equal(target.combat.energy, energy - e.energyCost);
+    assert.equal(target.combat.launchPoint, 50, 'its Launch Point never moves');
+    assert.equal(target.combat.stun, 0);
+    assert.equal(target.combat.immobilized, false);
+    assert.equal(target.body.vx, 0, 'neither launched nor carried');
+    assert.equal(target.body.vy, 0);
+    assert.equal(target.combat.shielding, true);
+  }
 });
 
 // ---- Paralyze -----------------------------------------------------------------------

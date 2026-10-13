@@ -63,10 +63,17 @@
 // resolved by the same CombatSystem.applyHit as the owner's (a horizontal
 // launch travels along the clone's facing); the hit credits the owner
 // but freezes only the target and the clone itself, never the owner.
+//
+// A summon is an attack (its definition's `offense`, see
+// js/game/combat/offense.js): the summoning ability, the clone it sends,
+// the clone's strike and the hit it lands are one offensive action, its
+// owner's. Its clone is no fighter, but its strike is resolved like any
+// other: a target whose Shield is up blocks it.
 
 import { resolveCooldown } from '../../data/cooldowns.js';
 import { SpriteAnimator } from '../rendering/sprite-animator.js';
 import { attackPhase } from './attacks.js';
+import { assertNoShieldBypass, resolveOffense, summonOffense } from './offense.js';
 
 const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
@@ -89,8 +96,11 @@ const TIME_EPSILON = 1e-6;
 
 export function createSummonDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Summon definitions need an id');
-  const def = { ...SUMMON_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, `Summon "${spec.id}"`) };
+  const owner = `Summon "${spec.id}"`;
+  assertNoShieldBypass(spec, owner);
+  const def = { ...SUMMON_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, owner) };
   if (def.noGround) def.noGround = Object.freeze({ ...NO_GROUND_DEFAULTS, ...def.noGround });
+  def.offense = resolveOffense(spec, summonOffense(def), owner);
   return Object.freeze(def);
 }
 

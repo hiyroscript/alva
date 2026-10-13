@@ -71,8 +71,13 @@ Every fixed step, in this order:
    reach, drifting away, the Deflect (timed so the swat is live as the
    shot arrives, and worth more when the turned-back shot can still hit
    its thrower), a strike that lands first, or a projectile that erases or
-   repels it. Never a Shield against what no Shield stops. An answer for
-   later is held until its moment, so the CPU keeps playing meanwhile.
+   repels it. Every threat is an attack and every attack is blockable, so
+   the Shield is weighed against all of them: a technique's burst (Unlimited
+   Void), a sphere (Hollow Purple), a clone's strike and a Deflect's as
+   surely as a jab; it is chosen when it scores best, never forced (breaking
+   a cast before it lets go, or Deflecting a shot back, often scores
+   better). An answer for later is held until its moment, so the CPU keeps
+   playing meanwhile.
 5. **Combos.** When its hit lands, the best follow-up the rules allow is
    searched against the launch it dealt (hit-cancels, a Dash or a jump
    after the hit) and pressed in time, or dropped if it no longer
@@ -101,8 +106,12 @@ path, and scored as expected utility:
 
 - **P(hit), P(block), P(miss):** the room it has against how far the
   opponent could move once it sees it coming (and is free to), a Shield
-  in the way (the opponent's observed habit), the move's predictability
-  from repetition.
+  in the way (the opponent's observed habit; every move is blockable, a
+  technique's or a summon's included), the move's predictability from
+  repetition. An opponent already behind its Shield that cannot lower it
+  before the move lands (held in its blockstun, or no time to react)
+  blocks it for certain: the CPU never predicts a hit through a raised
+  Shield, and at most a small chance (that it is lowered first) otherwise.
 - **Values:** damage weighed by the Launch Point it reaches, the launch
   judged by the real launch rules (a launch that ends a life is worth
   `KO_VALUE`, more at match point; one that leaves the target off the
@@ -124,10 +133,13 @@ path, and scored as expected utility:
 
 Nothing in `js/game/ai/` names a fighter or branches on its id (Rule C,
 checked by the tests). Everything comes from the fighter's data through
-`analyzeCapabilities`: each move's role (`poke`, `approach`,
-`comboStarter`, `launcher`, `finisher`, `antiAir`, `zoning`, `trap`,
-`areaDenial`, `punish`, `edgeGuard`, `recovery`, `counterProjectile`,
-`defensiveDisengage`), its reach swept along its motion, its projectile's
+`analyzeCapabilities`: each move's classification (`offense`, the same
+shared reading combat makes: a technique, a summon, a throw and the Deflect
+are attacks to the CPU too, the Deflect a defense as well), its role
+(`poke`, `approach`, `comboStarter`, `launcher`, `finisher`, `antiAir`,
+`zoning`, `trap`, `areaDenial`, `punish`, `edgeGuard`, `recovery`,
+`counterProjectile`, `shieldPressure`, `defensiveDisengage`, `spike`; none
+gets past a Shield), its reach swept along its motion, its projectile's
 range and pull, its technique's burst, its summon's clone, its cooldowns
 and air uses. Movement is universal (`js/data/movement.js`). A new
 fighter is played well with no CPU change at all.
@@ -218,37 +230,48 @@ first side's, with their 95% Wilson interval.
 
 | Matchup | Win rate | Points | Launch Point dealt : taken (per game) |
 | --- | --- | --- | --- |
-| Brutal v Hard | **92.2%** (59–5) [83–97] | 2.91 : 1.20 | 238 : 147 |
-| Brutal v Medium | 98.4% (63–1) [92–100] | 2.98 : 0.73 | 237 : 120 |
-| Brutal v aggressive reference | 100% (64–0) [94–100] | 3.00 : 0.03 | 215 : 44 |
-| Brutal v defensive reference | 100% (64–0) [94–100] | 3.00 : 0.02 | 178 : 0 |
-| Brutal v projectile reference | 100% (64–0) [94–100] | 3.00 : 0.03 | 162 : 7 |
-| Brutal v jump-heavy reference | 100% (64–0) [94–100] | 3.00 : 0.09 | 218 : 64 |
-| Brutal v balanced reference | 100% (64–0) [94–100] | 3.00 : 0.05 | 195 : 28 |
-| Hard v Medium | 79.7% (51–13) [68–88] | 2.69 : 1.56 | 232 : 190 |
-| Hard v Easy | 98.4% (63–1) [92–100] | 2.97 : 0.48 | 234 : 104 |
-| Medium v Easy | 93.8% (60–4) [85–98] | 2.91 : 1.00 | 247 : 152 |
-| Easy v balanced reference | 100% (64–0) [94–100] | 3.00 : 0.25 | 205 : 86 |
+| Brutal v Hard | **85.9%** (55–9) [75–92] | 2.81 : 1.17 | 231 : 147 |
+| Brutal v Medium | 96.9% (62–2) [89–99] | 2.95 : 0.81 | 232 : 121 |
+| Brutal v aggressive reference | 100% (64–0) [94–100] | 3.00 : 0.05 | 218 : 39 |
+| Brutal v defensive reference | 100% (64–0) [94–100] | 3.00 : 0.03 | 173 : 1 |
+| Brutal v projectile reference | 100% (64–0) [94–100] | 3.00 : 0.02 | 155 : 6 |
+| Brutal v jump-heavy reference | 100% (64–0) [94–100] | 3.00 : 0.09 | 215 : 54 |
+| Brutal v balanced reference | 100% (64–0) [94–100] | 3.00 : 0.03 | 189 : 27 |
+| Hard v Medium | 85.9% (55–9) [75–92] | 2.80 : 1.42 | 230 : 173 |
+| Hard v Easy | 98.4% (63–1) [92–100] | 2.97 : 0.48 | 232 : 96 |
+| Medium v Easy | 92.2% (59–5) [83–97] | 2.89 : 1.02 | 240 : 151 |
+| Easy v balanced reference | 98.4% (63–1) [92–100] | 2.98 : 0.39 | 185 : 89 |
+
+Re-measured after every attack became blockable (Unlimited Void and
+Hollow Purple included, see [combat](combat.md#attack-classification)) and
+the CPU began weighing its Shield against every threat and predicting no
+hit through a raised Shield. The shifts from the previous measurement are
+within these intervals: over 256 games (seeds 1 to 16), Brutal v Hard is
+89.8% (230–26) [85.5–93.0], against the 91.4% measured before.
 
 - **Brutal's 95% target**, against the benchmark composition (Hard, Medium
-  and the five reference styles, 448 games): **98.7%** (442–6) [97.1–99.4],
-  met. **Against Hard alone it is not met: 92.2%** on these 64 games
-  (91.4% over 256 games on seeds 1–16 while tuning). Brutal and Hard are
+  and the five reference styles, 448 games): **97.5%** (437–11)
+  [95.7–98.6], met. **Against Hard alone it is not met: 85.9%** on these
+  64 games (89.8% over 256 games on seeds 1–16). Brutal and Hard are
   the same intelligence and the gap is mostly reaction time: Brutal's
   window was deliberately not pushed below 0.07 s to close it (in a
   128-game trial, Brutal at 0.05–0.075 s beat a faster Hard, 0.12–0.19 s,
   96.9% of the time; the specification rules out winning by mechanical
   precision alone). Hard was set to a tournament player's 0.15–0.22 s.
 - **Every move is used at every level** in these matches. Across Brutal v
-  Hard, #0001's moves range from 3.5% (Hollow Purple) to 21.3% (the
-  Homing Attack) of its presses, #0002's from 3.2% (the ground Spin
-  Attack) to 28.1% (the Homing Attack in the air); the Deflect is 6.8% and
-  20.5% of them (most as an aerial strike).
-- **Clean execution:** no invalid input, inactivity incident or stuck
-  navigation in any of the 704 matches. Falls with no hit in the 3
-  seconds before (self-eliminations) were rare: Brutal 4 in 448 games,
-  Hard 3 in 128, Medium 1 in 64, Easy 2 in 64. Energy ran out at most 10
-  times in 64 games (Brutal against the projectile reference).
+  Hard, #0001's moves range from 2.8% (Hollow Purple) to 21.9% (the Red
+  Kick) of its presses, #0002's from 2.8% (the ground Spin Attack) to
+  28.8% (the Homing Attack in the air); the Deflect is 6.9% and 19.8% of
+  them (most as an aerial strike).
+- **Clean execution:** no inactivity incident or stuck navigation in any
+  of the 704 matches, and two refused presses in all of them (one each in
+  Brutal and Easy against the balanced reference): an Unlimited Void that
+  started and was cut short by its caster losing its footing within the
+  CPU's check, and a Blue Tornado pressed in a recovery while the fighter
+  was still flying from a launch. Falls with no hit in the 3 seconds before
+  (self-eliminations) were rare: Brutal 7 in 448 games, Hard 1 in 128,
+  Medium 0 in 64, Easy 4 in 64. Energy ran out at most 7 times in 64
+  games.
 - **Limitations.** The reference opponents are simple scripts: every level,
   Easy included, beats them, so they measure robustness against styles,
   not human skill. No result here is a claim about play against people.

@@ -52,7 +52,9 @@ test('a technique is data: its clips, its cooldown and what it releases, frozen 
   assert.deepEqual(t.projectile, { id: 'attack4_object', offset: { x: 50, y: -40 } });
   assert.equal(t.burst.hit.damage, 3);
   assert.equal(t.burst.hit.blockstun, 0.12, 'a hit\'s own defaults');
-  assert.equal(t.burst.hit.unblockable, false, 'and the shared hit effects');
+  assert.equal(t.burst.hit.paralyze, 0, 'and the shared hit effects');
+  assert.deepEqual({ ...t.offense, sources: [...t.offense.sources] }, { attack: true, defense: false, sources: ['burst', 'projectile'] },
+    'executed as a technique, classified as an attack');
   assert.deepEqual([...TECHNIQUE_CLIPS], ['castAnimation', 'releaseAnimation']);
   assert.deepEqual(createTechniqueDefinition({ id: 'x', projectile: { id: 'o' } }).projectile.offset, { x: 0, y: 0 });
   assert.throws(() => createTechniqueDefinition({}), /need an id/);
@@ -96,7 +98,7 @@ test('it casts for its cast clip, standing still and committed, then releases on
   assert.equal(t.phase, 'release');
   assert.equal(t.released, true);
   assert.equal(fighter.releases.length, 1, 'its projectile, queued once');
-  assert.deepEqual(fighter.releases[0], { id: 'attack4_object', offset: { x: 50, y: -40 }, direction: 1 });
+  assert.deepEqual(fighter.releases[0], { id: 'attack4_object', offset: { x: 50, y: -40 }, direction: 1, ability: 'attack4' });
   fighter.releases.length = 0;
   let releaseSteps = 0;
   while (fighter.technique) {

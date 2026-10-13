@@ -115,9 +115,9 @@ test('its moves are not just damage: each one names the mechanic it is built on'
   assert.ok(p.attack2_object.blockPush > 0, 'and shoves a Shield');
   assert.ok(p.attack3_object.pull && p.attack3_object.pierce && p.attack3_object.finisher, 'Maximum Blue drags in and grinds');
   assert.equal(p.attack5_object.erase, true, 'Hollow Purple erases');
-  assert.equal(p.attack5_object.unblockable, true);
-  assert.equal(t.attack4.burst.hit.unblockable, true, 'Unlimited Void is a sure hit');
-  assert.ok(t.attack4.burst.hit.paralyze > 0, 'that paralyzes');
+  assert.equal(p.attack5_object.unblockable, undefined, 'and is blockable, like every attack');
+  assert.equal(t.attack4.burst.hit.unblockable, undefined, 'Unlimited Void too');
+  assert.ok(t.attack4.burst.hit.paralyze > 0, 'and it paralyzes');
   assert.ok(defense.stall > 0, 'Infinity stalls blows');
   assert.equal(defense.airAnimation, undefined, 'and is the ground\'s only');
   assert.equal(DEF.deflect.deflectProjectiles, true, 'its Deflect turns projectiles back');
