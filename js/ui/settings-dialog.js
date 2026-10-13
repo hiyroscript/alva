@@ -17,8 +17,12 @@
 //             line that says what it does: the player's melee attacks (on
 //             the ground or in the air) close a short gap first, free
 //             (it never costs Energy), never a ranged one (see
-//             Fighter.tryCombatAssist). Read as each Quick Battle or
-//             Practice Ground session starts; no CPU ever has it.
+//             Fighter.tryCombatAssist). Then Combo Assist, On (the
+//             default) or Off, the same way: Attack 1 pressed again once it
+//             has finished, while its repeat cooldown runs, is Attack 2,
+//             and the reverse (see Fighter.comboAction). Both are read as
+//             each Quick Battle or Practice Ground session starts; no CPU
+//             ever has either.
 //
 // Every choice saves on this device at once through app.settings
 // (js/core/settings.js). The dialog is modal: role="dialog" with
@@ -31,7 +35,7 @@
 import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
-import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_COMBAT_ASSIST } from '../core/settings.js';
+import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_COMBAT_ASSIST, DEFAULT_COMBO_ASSIST } from '../core/settings.js';
 import { ICONS } from './icons.js';
 
 // A small picture of each layout's lower-left corner, for sighted players
@@ -247,7 +251,30 @@ export class SettingsDialog {
         'aria-labelledby': 'settings-assist-title', 'aria-describedby': 'settings-assist-desc',
       }, this.assistOptions),
     ]);
-    return [assistGroup];
+    // Combo Assist's two choices, the same way, with its own line.
+    this.comboOptions = [true, false].map((on) => {
+      const option = el('button', {
+        class: 'settings-choice', type: 'button', role: 'radio', 'aria-checked': 'false',
+        'data-nav': true, 'data-combo-assist': on ? 'on' : 'off',
+      }, [
+        el('span', { class: 'settings-choice-name' }, [
+          el('span', tx(on ? 'settings.comboAssistOn' : 'settings.comboAssistOff')),
+          on === DEFAULT_COMBO_ASSIST ? el('span', { class: 'settings-option-tag', ...tx('common.default') }) : null,
+        ]),
+        el('span', { class: 'settings-language-check', 'aria-hidden': 'true', html: ICONS.check }),
+      ]);
+      option.addEventListener('click', () => this.chooseComboAssist(on));
+      return option;
+    });
+    const comboGroup = el('div', { class: 'settings-subgroup' }, [
+      el('h4', { class: 'settings-subtitle', id: 'settings-combo-title', ...tx('settings.comboAssist') }),
+      el('p', { class: 'settings-group-note', id: 'settings-combo-desc', ...tx('settings.comboAssistDesc') }),
+      el('div', {
+        class: 'settings-choices', role: 'radiogroup',
+        'aria-labelledby': 'settings-combo-title', 'aria-describedby': 'settings-combo-desc',
+      }, this.comboOptions),
+    ]);
+    return [assistGroup, comboGroup];
   }
 
   get currentSection() {
@@ -322,6 +349,10 @@ export class SettingsDialog {
     return this.assistOptions.find((o) => o.getAttribute('data-combat-assist') === (on ? 'on' : 'off'));
   }
 
+  comboFor(on) {
+    return this.comboOptions.find((o) => o.getAttribute('data-combo-assist') === (on ? 'on' : 'off'));
+  }
+
   // Opens over the current screen (Home), which goes inert beneath it, and
   // focuses the Language tab. `returnFocus` gets focus back on close.
   open({ returnFocus = document.activeElement } = {}) {
@@ -357,7 +388,7 @@ export class SettingsDialog {
   // Shows the saved choices checked, and the Customize line for the scheme
   // in use (with a Custom layout tag once that scheme has one).
   markCurrent() {
-    const { language, mobileControls, combatAssist } = this.app.settings;
+    const { language, mobileControls, combatAssist, comboAssist } = this.app.settings;
     for (const option of this.languageOptions) {
       const on = option.getAttribute('data-language') === language;
       option.classList.toggle('is-current', on);
@@ -370,6 +401,11 @@ export class SettingsDialog {
     }
     for (const option of this.assistOptions) {
       const on = option === this.assistFor(combatAssist);
+      option.classList.toggle('is-current', on);
+      option.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+    for (const option of this.comboOptions) {
+      const on = option === this.comboFor(comboAssist);
       option.classList.toggle('is-current', on);
       option.setAttribute('aria-checked', on ? 'true' : 'false');
     }
@@ -393,6 +429,13 @@ export class SettingsDialog {
   // Quick Battle or Practice Ground session uses it.
   chooseCombatAssist(on) {
     this.app.settings.set('combatAssist', on);
+    this.markCurrent();
+  }
+
+  // Saves Combo Assist on (`on` true) or off; the dialog stays. The next
+  // Quick Battle or Practice Ground session uses it.
+  chooseComboAssist(on) {
+    this.app.settings.set('comboAssist', on);
     this.markCurrent();
   }
 

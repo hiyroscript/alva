@@ -19,7 +19,7 @@
 // (js/game/combat/attacks.js), its opponent (body, facing, hurtboxes and
 // pushbox) and the stage collision (js/game/physics.js).
 // Outputs: assistsAttack, assistSpeed, assistRange, meleeGap, reachVector,
-// approachMove, approachClear, REACHED and ASSIST_MARGIN.
+// inReach, approachMove, approachClear, REACHED and ASSIST_MARGIN.
 //
 // Important constraints: pure and deterministic, from simulation data only
 // (bodies and definitions, never render positions, the DOM or a clock).
@@ -150,6 +150,14 @@ export function reachVector(fighter, box, target, direction, air = false, strike
 // The approach is over: the attack's own reach covers its target.
 export const REACHED = Object.freeze({ dx: 0, dy: 0, length: 0 });
 
+// Whether melee attack `atk`'s own reach (attackReach: its box, or where
+// its motion or pull takes it) already covers `target` from where
+// `fighter` is, facing `direction`: no approach is needed, only that
+// facing.
+export function inReach(fighter, atk, target, direction) {
+  return meleeGap(fighter, attackReach(atk), target, direction) < 0;
+}
+
 // Moves shorter than this are none (positions are sums of floats).
 const NO_MOVE = 1e-6;
 
@@ -168,7 +176,7 @@ const NO_MOVE = 1e-6;
 // (another level for the ground, the target behind).
 export function approachMove(fighter, atk, target, direction, left, air = false, start = false) {
   const reach = attackReach(atk);
-  if (start && meleeGap(fighter, reach, target, direction) < 0) return REACHED;
+  if (start && inReach(fighter, atk, target, direction)) return REACHED;
   const move = reachVector(fighter, reach, target, direction, air, atk.hitbox);
   if (!move) return null;
   if (move.length <= NO_MOVE) return REACHED;

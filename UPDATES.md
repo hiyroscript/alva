@@ -1499,3 +1499,87 @@ and the open controller button; Home's navigation order in `empty-roster`,
 `watch-mode` and `practice-ground`; `codenames` (the snapshot's two new
 fields). Every test uses mocked pads; real-hardware verification is
 separate (see [testing](./docs/development/testing.md#controllers-mocked-then-real-hardware)).
+
+## Combo Assist, move cancellation and controller art
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: a Combo Assist setting, intelligent player-requested move
+cancellation, each attack's artwork in Controller Controls, and two Combat
+Assist bugs fixed, as one action-resolution path rather than separate
+patches.
+
+**What it changed.**
+
+- **Combo Assist** (Settings › Combat, on by default, its own setting
+  apart from Combat Assist; English and French). For the human player
+  only: Attack 1 pressed again once its attack is over, while that attack's
+  own repeat cooldown runs, is Attack 2, and the reverse, each resolved
+  through the fighter's own loadout for the ground or the air. A press
+  made while the attack still plays is never cut, restarted or turned into
+  the other attack, now or later; the other attack keeps every rule of its
+  own (cooldown, art, airtime), and when it cannot start the press stays
+  its own. No timer of its own: the attack's own cooldown is the window.
+- **The player's move cancellation.** The human player's new request (an
+  attack, the Extra Attack, a summon or technique, a jump or air jump, a
+  Dash or air dash, a Shield press, a Deflect) cuts its attack in progress
+  short, hit or not, in any phase, only once the new move is known to
+  start and only if it was asked for after the attack began; the cut
+  attack's cooldown starts once and nothing it has not struck or released
+  ever is. Its press for the attack playing is no request. Run is never a
+  request. Forced states (freeze, stun, blockstun, paralysis) and
+  commitments (a technique, a summon's startup, a Dash's first moment,
+  Combat Assist's approach) keep their rules; a hit drops the player's
+  earlier requests. CPUs, the practice dummy and any other controller keep
+  the old rules exactly. **Intentional change:** for the player, a whiffed
+  or blocked attack's recovery can now be cut by any valid new request (the
+  hit-cancel and Dash cancel still work as before for everyone).
+- **Combat Assist, Run held** (bug). The finished approach started its
+  attack facing the held direction, so running away (or turning during
+  the approach) made the assisted attack whiff. It now faces the way the
+  approach went, and the run held as it starts never turns it back (a new
+  turn still does). An attack already in reach facing its target turns to
+  it the same way.
+- **Combat Assist after another move** (bug). It required the fighter to
+  be free to act, so a melee press out of a hit-cancel, a Dash past its
+  cancel time or the player's own cut started in place with no approach.
+  It is now weighed whenever the attack may start, by any route, and a
+  buffered press is weighed as it comes out; what it replaces ends only
+  once the approach is accepted.
+- **Controller Controls art.** Every move row in a fighter's controller
+  editor shows the move's own artwork beside its name, the frame its touch
+  button shows (ground and aerial versions apart, projectiles, techniques
+  and summons where authored, mirrored where the art faces left), with the
+  touch button's glyph when there is none or it fails to load.
+- **Settings** version 5 (`comboAssist`); version 4 and older migrate,
+  every existing choice kept and Combo Assist on.
+
+**Where to tune it.** Which buttons alternate: `COMBO_PAIRS` in
+`js/game/combat/combo-assist.js`. The window is each attack's own
+`cooldown` (and `REPEAT_COOLDOWN`), unchanged. The art: each fighter's
+`mobileAbilities`; its size: `--controller-art` in `css/controller.css`.
+
+**Code:** new `js/game/combat/combo-assist.js`; `js/game/fighters/fighter.js`
+(the player's requests: `playerControlled`, `comboAssistOn`, `comboAction`,
+`pressRequest`, `repeatsMove`, `playerMayCut`, `attackStartable`;
+`combatAssistFor` split from `tryCombatAssist`; `startAttack`'s `toward`,
+`startedAt`, `button`, `turnHold`; `cutAttack`, `tryAction`, `tryDash`,
+`tryAirDash`, `tryDeflect`, `trySpecial`, `trySummon`, `tryTechnique`,
+`assistIntents`, `finishCombatAssist`, `takeHit`, `updateFacing`, the jump
+and Shield in `update`), `js/game/combat/combat-assist.js` (`inReach`),
+`js/game/fighters/fighter-controller.js`, `js/game/battle.js`,
+`js/game/practice.js`, `js/screens/battle-screen.js`,
+`js/screens/practice-screen.js`, `js/core/settings.js`,
+`js/ui/settings-dialog.js`, `js/ui/controller-editor.js`,
+`css/controller.css`, the string tables.
+
+**Tests:** new `tests/systems/combo-assist.test.mjs`,
+`tests/systems/move-cancel.test.mjs`, `tests/systems/request-devices.test.mjs`
+and `tests/helpers/player-rig.mjs`; `combat-assist` (Run held, follow-ups,
+in reach behind, the air), `controller-ui` (the editor's art), `settings`
+(schema 5, the version 4 migration, Combo Assist in the store and the
+dialog). Existing tests needed no rewrite apart from `settings`, whose
+stored objects are now version 5 and whose "future version" is 6.
+Checked in headless Chromium too: the Settings › Combat panel in English
+and French, the editor's art for #0001 and #0002 at desktop and short
+landscape sizes, and Practice Ground with the keyboard (Run held, Combat
+Assist's approach and hit, Combo Assist's Red).

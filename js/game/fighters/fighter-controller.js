@@ -3,8 +3,9 @@
 // (CombatAIController, js/game/ai/combat-ai.js), which plugs in here without
 // touching Fighter. TrainingAIController below is the older non-attacking
 // training opponent, kept as a standalone controller. Only the player's
-// controller carries the player's Combat Assist preference; no CPU's ever
-// does.
+// controller carries the player's Combat Assist and Combo Assist
+// preferences, and only its presses are a player's deliberate requests
+// (see Fighter.playerControlled); no CPU's ever is.
 
 import { range } from '../../core/utils.js';
 import { ACTIONS } from '../../config.js';
@@ -44,18 +45,22 @@ export function jumpTapHold(self) {
   return Math.max(0, self.movement.highJumpWindow - 1.5 / 60);
 }
 
-// The human player's controller: the one kind ('player') that may have
-// Combat Assist (see Fighter.tryCombatAssist), and only while
-// `combatAssist`, the player's setting (Home › Settings › Combat, read as
-// the mode starts), is on. It is on by default, as the setting is.
+// The human player's controller: the one kind ('player') whose presses are
+// deliberate requests that may cut its own attack short (see
+// Fighter.playerMayCut), and the one that may have Combat Assist (see
+// Fighter.tryCombatAssist) and Combo Assist (see Fighter.comboAction), each
+// only while its own setting (`combatAssist`, `comboAssist`: Home ›
+// Settings › Combat, read as the mode starts) is on. Both are on by
+// default, as the settings are.
 // Each sample is taken for the fighter as it is at that step (on the ground
 // or not, its facing, which fighter it is), so a game controller resolves
 // through that fighter's own controller profile (js/core/input-manager.js).
 export class PlayerController {
-  constructor(input, { combatAssist = true } = {}) {
+  constructor(input, { combatAssist = true, comboAssist = true } = {}) {
     this.input = input;
     this.kind = 'player';
     this.combatAssist = combatAssist === true;
+    this.comboAssist = comboAssist === true;
   }
 
   getInput(self) {

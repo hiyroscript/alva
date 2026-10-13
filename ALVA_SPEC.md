@@ -996,6 +996,15 @@ indicator. Each section keeps its existing settings, in this order:
   **Assistance au combat**, **Activée** / **Désactivée**. In this description,
   **energy** / **énergie** is lowercase, weight 700 and the exact Energy bar
   fill purple `#b026ff` (`ENERGY_STYLE.fill`), including after live language changes.
+  Below it, its own setting, **Combo Assist** (7.2.4b), under the line
+  "Once Attack 1 or Attack 2 has finished, pressing it again during its
+  repeat cooldown automatically performs the other attack.", the same two
+  choices the same way (its own `radiogroup`, labelled and described by its
+  own name and line): **On** (marked "Default") and **Off**, saved at once,
+  read as each session starts, for Player 1 only. Neither choice changes
+  the other. French: **Assistance aux combos**, "Une fois l’Attaque 1 ou
+  l’Attaque 2 terminée, la presser à nouveau pendant son temps de recharge
+  déclenche automatiquement l’autre attaque.", **Activée** / **Désactivée**.
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
@@ -1030,10 +1039,10 @@ indicator. Each section keeps its existing settings, in this order:
   algorithm changes. The active section is presentation state only and is
   never saved as a preference.
 - Presentation, input configuration (the touch layouts and each fighter's
-  controller layout) and the human player's own Combat Assist only:
-  keyboard bindings, fighters, their moves, the CPU and the rules of a
-  fight never change, and Watch Mode stays free of player
-  controls (and of Combat Assist) whichever choices are saved.
+  controller layout) and the human player's own Combat Assist and Combo
+  Assist only: keyboard bindings, fighters, their moves, the CPU and the
+  rules of a fight never change, and Watch Mode stays free of player
+  controls (and of either assist) whichever choices are saved.
 - **Storage.** `js/core/settings.js` is the only module that touches
   storage (no other module reads or writes `localStorage` or
   `sessionStorage`): one versioned object under the `localStorage` key
@@ -1041,30 +1050,32 @@ indicator. Each section keeps its existing settings, in this order:
   each change —
 
   ```
-  { "version": 4,
+  { "version": 5,
     "language": "en" | "fr" | null,
     "mobileControls": "joystick" | "classic",
     "touchLayouts": { "joystick": { … }, "classic": { … } },
     "combatAssist": true | false,
+    "comboAssist": true | false,
     "controllerProfiles": { "<fighter id>": { "<action id>": binding, … }, … } }
   ```
 
   `language` is null until the player picks one (English is used meanwhile,
   but the first-launch chooser still asks: a default is never mistaken for a
-  choice). `combatAssist` is a real boolean, `true` unless the player turned
-  it off. Older objects are migrated: a version 1 object (`{ "version": 1,
-  "mobileControls": … }`) keeps its Joystick / Classic choice, with no
-  language chosen yet (so the chooser shows once) and both layouts empty;
-  a version 2 object keeps its language, Mobile Controls and both custom
-  layouts; a version 3 object keeps all of that and its Combat Assist.
-  Versions 1 and 2 get Combat Assist on, and every older version no
-  controller profile. `controllerProfiles` holds a whole controller layout
+  choice). `combatAssist` and `comboAssist` are real booleans, each `true`
+  unless the player turned it off. Older objects are migrated: a version 1
+  object (`{ "version": 1, "mobileControls": … }`) keeps its Joystick /
+  Classic choice, with no language chosen yet (so the chooser shows once)
+  and both layouts empty; a version 2 object keeps its language, Mobile
+  Controls and both custom layouts; a version 3 object keeps all of that
+  and its Combat Assist; a version 4 object keeps all of that and every
+  controller profile. Versions 1 and 2 get Combat Assist on, versions 1 to
+  3 no controller profile, and every older version Combo Assist on. `controllerProfiles` holds a whole controller layout
   (6.10b) for each fighter the player customized, keyed by the fighter's
   stable id (never a roster slot or a name); a fighter with none plays with
   its recommended layout. Every value is checked on load, one by one:
   nothing stored, corrupt JSON, any other version (a version that is not a
   number included), an unknown language or scheme, a malformed layout entry
-  (see 6.10a), a Combat Assist that is not a boolean, or a malformed
+  (see 6.10a), a Combat Assist or Combo Assist that is not a boolean, or a malformed
   controller binding (that action falls back to its recommended binding)
   falls back to its own default without disturbing valid neighbours. Storage that is missing or throws keeps every choice for the
   visit only.
@@ -1160,8 +1171,21 @@ English and French.
   "Change binding: <name>. <input>, <activation>.") with its real name
   (never "Attack 3"), a one-line description, its input in the family's
   names ("R2 + Square", "Left stick down + X") and its activation (Press,
-  Modifier + press, Hold to activate, Hold, Press (hold to jump higher)). No
-  slot the fighter lacks is shown. Beside the list, an original controller
+  Modifier + press, Hold to activate, Hold, Press (hold to jump higher)).
+  Every move row (each ground and aerial attack, the Extra Attack, a
+  projectile, a technique or a summon) also shows the move's own artwork
+  beside its name ("[art] Jab — Square", "[art] Red — R2 + Square"): the
+  very frame its touch button shows (`mobileAbilities` through
+  `previewFrame` in `js/data/ability-preview.js`: the ground preview for its
+  ground row, the air one for its aerial row, a projectile's, technique's or
+  summon's where authored), facing right (mirrored where its clip faces
+  left), transparent and pixel-crisp in a fixed square (40 px, 34 px under
+  560 px of width, 30 px under 520 px of height) that never moves the
+  binding, the activation or Change. It is decorative (empty `alt`, hidden
+  from assistive technology: the row's name says what it is); a move with
+  no frame, or one whose file fails to load (never tried again), shows its
+  touch button's glyph instead. Movement, Defense and Pause rows keep their
+  presentation, with no art. No slot the fighter lacks is shown. Beside the list, an original controller
   diagram (PlayStation or Xbox layout, the D-pad and left stick swapping
   places between them) lights the focused action's input: the button in
   green, a modifier in orange, the stick with its direction; it is never
@@ -1474,7 +1498,10 @@ each fighter's own values are in its character specification (7.2.9).
   Shield) the direction held turns it at once, left to right or right to
   left, as often as the player likes (`Fighter.updateFacing`): the hitbox,
   a step-in still to come and a projectile not yet released (e.g. #0001's
-  Red) all go the new way. Turning never walks or runs. A technique faces the direction held
+  Red) all go the new way. Turning never walks or runs. An attack Combat
+  Assist serves faces its target instead of the direction held as it
+  starts, and that held direction does not turn it back until it changes
+  (7.2.4a). A technique faces the direction held
   on the step it starts (so #0001's Hollow Purple pressed with Left held
   sends its sphere left); from then on a stun, a paralysis, a Dash, Combat
   Assist's approach and a technique hold the facing. A spawn or respawn takes the spawn's `facing`, and otherwise it
@@ -1833,7 +1860,11 @@ each fighter's own values are in its character specification (7.2.9).
     buffered jump: a jump pressed before the attack goes first and the
     attack comes out next step, in the air; pressed on the same step, the
     ground attack goes first. A Dash request is buffered the same way
-    (7.2.3).
+    (7.2.3). The human player's press is kept as the move it asked for as
+    it was pressed (Combo Assist, 7.2.4b, applied then, never later), its
+    press for the attack already playing is never kept (below), and a hit
+    on the player drops whatever it had kept, attack, Dash and jump alike:
+    nothing asked for before the hit comes out after the stun.
   - *Hit-cancels.* An attack that hits (a Shield's block does not count)
     may be cut short once its time reaches its `hitCancel` (seconds in, or
     null for never; the step its freeze ends at the earliest), by another
@@ -1854,6 +1885,46 @@ each fighter's own values are in its character specification (7.2.9).
     (7.2.9). No route loops: every hit adds to the Launch Point that sends
     the next one further, a Dash chase spends the Energy the Shield needs,
     and a wall's rebounds are capped until the target recovers (7.2.7).
+    These are the rules for every fighter; the human player also has its
+    own move cancellation (next).
+  - *The player's move cancellation.* The human player's fighter (its
+    controller is a `PlayerController`, kind `player`; never a CPU, the
+    practice dummy or any other controller, whose attacks keep exactly the
+    rules above) may cut its own attack short, its Deflect included, with a
+    new request: another attack or the Extra Attack, a summon or a
+    technique, a jump or an air jump, a Dash or an air dash (an explicit
+    Mouvement request, for the Dash cancel's 25 Energy), the Shield (a press
+    on the ground, the Shield going up on that step) or the Deflect (a press
+    in the air, for its 15). Hit or not, in its startup, active phase or
+    recovery: no hit is needed. The new move's own rules come first, every
+    one of them (its cooldown, its art, its place, ground-only or not, its
+    starts for the airtime, free fall, a launch, Energy, an exhausted
+    fighter, a technique's ground and cooldown); only once it is known to
+    start is the attack cut, through the ordinary end of an attack: its
+    repeat cooldown starts, once; whatever it has not struck or released
+    never is (a strike still to come, a projectile not yet thrown); what it
+    already sent out stays (a projectile in flight); its fighter keeps its
+    speed and facing as any cut does. A request that cannot start cuts
+    nothing. Only a request made after the attack began cuts it: a press
+    made on the step it started (a jump or a Dash pressed with the attack)
+    lost to it and never cuts it later, a Shield held since before the
+    attack never cuts it, and requests from the buffer keep the step they
+    were made on. Never while a forced state holds the fighter (an impact
+    freeze, hitstun, blockstun, a paralysis: a press made during the freeze
+    is kept by the buffer and cuts the attack the step the freeze ends),
+    and never anything that keeps a commitment of its own: a technique, a
+    summon's startup, a Dash or air dash before its cancel time, Combat
+    Assist's approach (which has its own rules, 7.2.4a). The player's press
+    for the attack already playing (its own button, or the button whose
+    press started it) is no request at all: never a cut, a restart or a
+    kept press, whatever its phase, whatever its hit-cancel. **Run is never
+    a request**: holding, turning or pressing a direction (keyboard, touch
+    or stick) only steers and turns as ever (an attack still turns to the
+    direction held); a Dash is only ever the explicit Mouvement request
+    (7.2.3). One step accepts at most one move: the first by the usual
+    order (a Deflect, then the combat buttons in order, then a buffered
+    press, then the Dash, the Shield, the jump), and nothing later on that
+    step cuts it.
   - *Hitstop.* Per hit, its own `hitstop`: crisp for light strikes (two
     steps), longer for heavy ones and finishers; a hard rebound off the
     stage freezes its fighter alone for `LAUNCH_BOUNCE.hitstop`. It freezes
@@ -2031,16 +2102,23 @@ attack or a button.
   projectile attack, a pending (art-only) attack, a summon, a technique, a
   reserved or unmapped button, the Shield or the Deflect (which is an
   attack, but on `shield`, and only in the air). On the ground for the ground attack, in the air for the
-  mid-air one (whichever the button starts where the fighter is), with the
-  fighter free to act (never cutting an attack, a hit-cancel or a Dash
-  short), its opponent in play (not lost to the Void) and its art present
+  mid-air one (whichever the button starts where the fighter is), whenever
+  that attack may start, by whichever route: free to act, out of a
+  hit-cancel, out of a Dash or air dash past its cancel time, or cutting
+  the player's own attack (7.2.4); a press the buffer kept is weighed as it
+  comes out, and one Combo Assist turned into the other attack (7.2.4b) is
+  weighed as that attack. What it would cut ends only once the approach (or
+  the attack) is accepted. With its opponent in play (not lost to the Void) and its art present
   (Energy never matters: full, partly spent or exhausted, it is the same):
   `mouvment` on the ground,
   `midair_mouvment` in the air, where it also needs the airtime's air dash
   still unused (`airDashUses`), and never in free fall or while still
   flying from a launch.
 - **When.** The attack is measured against the opponent's hurtboxes where
-  they are, facing it (`reachVector`). On the ground only hurtboxes at the
+  they are, facing it (`reachVector`). Already in reach facing its target
+  (`inReach`), the attack starts at once, with no approach, turned to its
+  target: one in reach behind the fighter, or with Run held away from it,
+  is thrown at it, not away. On the ground only hurtboxes at the
   box's height count, so a target on another level, in the air above it
   or behind it is out of reach. In the air the approach may also go up or
   down, so a target anywhere around it counts (an aerial is thrown from
@@ -2086,10 +2164,17 @@ attack or a button.
   (or air dash) applying to the whole approach. Once the attack reaches, it
   stops where it is (in the air, hanging there, gravity back) and the
   attack starts there by the ordinary rules (`tryAction`): its own phases,
-  hitbox, motion and held direction, exactly the attack thrown in reach
-  from that spot. Once it can get no closer (its travel or duration spent,
-  the target off its level or behind it), it stops and the attack starts
-  where it is.
+  hitbox and motion, exactly the attack thrown in reach from that spot,
+  facing the way the approach went. Once it can get no closer (its travel
+  or duration spent, the target off its level or behind it), it stops and
+  the attack starts where it is, facing the same way.
+- **Run held.** Holding Run, toward the target, away from it or turned
+  midway, never cancels or skips the approach (a direction held is never a
+  request: 7.2.4), and never turns the attack it serves away from its
+  target: an attack Combat Assist faced at its target keeps that facing
+  while the direction held as it started is still held; a new turn (the
+  direction let go and pressed again, or another one) turns it as any
+  attack turns (7.2.2).
 - **The newest melee press wins.** While it runs, a fresh melee press
   replaces the attack it ends in and the approach is measured
   for that attack's own reach; one already in reach starts at once. There
@@ -2114,9 +2199,60 @@ attack or a button.
   up), a reset, a rematch, a respawn, a replaced fighter or the arena
   going. A combat button pressed together with a jump, Dash or Shield that
   cancels it is dropped; a reserved button does nothing, as ever. While it
-  runs, held directions do not steer or turn the fighter.
+  runs, held directions do not steer, turn or cancel it.
 - **Off**, every press behaves exactly as it did before Combat Assist
   existed: movement, attacks, Energy, input and the CPU are untouched.
+
+#### 7.2.4b Combo Assist
+
+Combo Assist (Home › Settings › Combat, 6.10; on by default) turns a
+repeated basic attack into a two-hit string for the human player: Attack 1
+pressed again once its attack is over, while that attack's own repeat
+cooldown runs, performs Attack 2, and Attack 2 pressed again the same way
+performs Attack 1. The rule is shared (`comboAction` in
+`js/game/combat/combo-assist.js`, read by `Fighter.comboAction`); nothing in
+it names a fighter, an attack or an animation.
+
+- **Whose.** The human player's only, by its controller: a
+  `PlayerController` given the setting on (`comboAssist`), handed to
+  Player 1 alone by `Battle` and `PracticeSession` as each session starts.
+  A CPU (Quick Battle, both of Watch Mode's), the practice dummy and any
+  other controller never have it. It is its own setting: Combat Assist on
+  or off never changes it, nor the reverse.
+- **The window.** The source attack's own repeat cooldown
+  (`CombatState.cooldowns`, 7.2.4): the universal 0.5 s, or the attack's
+  longer authored one, which is never shortened or overwritten. No timer of
+  its own. It runs from the attack's end, its cut (7.2.4) or its
+  interruption by a hit, so any of them opens it.
+- **Never during the attack itself.** Attack 1 pressed while Attack 1 still
+  plays (startup, strike or recovery, mashed or not) is no request at all
+  (7.2.4): the attack is never cut, restarted or turned into Attack 2, and
+  nothing is kept to come out afterwards. The same for Attack 2. A press
+  made on the step the attack ends is a press once it is over. A press of
+  the button whose press started the attack in progress (Attack 1 again
+  during the Attack 2 it made) is that same request, so mashing one button
+  alternates whole attacks, each played out.
+- **What it asks for.** Only the attack1 and attack2 buttons alternate
+  (`COMBO_PAIRS`), never the Extra Attack or Attack 3 to 5, and only when
+  both are attacks. Each is resolved through the fighter's own `actions`
+  for where it is (`attackFor`): on the ground the ground attacks, in the
+  air the mid-air ones, so a ground attack cooling down never changes an
+  air press, nor the reverse. The press then becomes an ordinary request
+  for the other attack, through every rule a request goes through: its own
+  cooldown, art, place, starts for the airtime, the player's cancellation
+  rules (7.2.4) and Combat Assist (7.2.4a, which serves it if it is melee).
+- **Unavailable.** When the other attack could not start (its own cooldown
+  running, no art, ground-only in the air, its starts for the airtime used
+  up, free fall), the press stays the ordinary press it was: never forced
+  into a move that cannot start, never silently restarting the cooling one
+  (kept by the buffer as itself, it comes out only if its own cooldown ends
+  within the buffer, as without Combo Assist).
+- **When it is decided.** As the press is made: a press kept by the buffer
+  keeps the move it asked for then. Held buttons make one press (a key, a
+  touch control or a controller button held is never a stream of
+  requests), so holding never strings attacks by itself.
+- **Off**, every press is its own button's, exactly as before Combo Assist
+  existed.
 
 #### 7.2.5 Defense and Energy
 
@@ -2146,8 +2282,9 @@ attack or a button.
   up while `shield` is held and the Shield is allowed, down the step it is
   let go. Allowed means: the fighter is on the ground and free to act (no
   attack, stun, paralysis, technique or Dash; the Shield never cuts one
-  short, and comes up the step it ends if `shield` is still held, a
-  landing included), it is not exhausted (`CombatState.canShield`: any
+  short, but for the human player's own attack, which a Shield pressed
+  after it began cuts (7.2.4), and comes up the step it ends if `shield`
+  is still held, a landing included), it is not exhausted (`CombatState.canShield`: any
   Energy left is enough) and it has the held art. Leaving the ground
   drops it (a block's push off a ledge). It is decided before the
   combat intents: while `shield` is held with a Shield that can go up, no
@@ -2339,7 +2476,9 @@ attack or a button.
   on the type (`trySummon` / `tryTechnique`). The rule is shared: the
   button's own new press, on the ground, with the fighter free to act (no
   attack, stun, paralysis, technique, Dash or held Shield; one never cuts
-  an attack short) and its cooldown (if it has one) over. Anything else, an airborne press, a
+  an attack short, but for the human player's own attack, which a summon
+  or technique asked for after it began cuts once it is accepted, 7.2.4)
+  and its cooldown (if it has one) over. Anything else, an airborne press, a
   busy fighter, a cooldown still running, no opponent for a summon, missing
   art or invalid data, makes the press do nothing at all: never an
   ordinary attack in its place, never kept for later (the combat

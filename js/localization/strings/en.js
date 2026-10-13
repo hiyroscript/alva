@@ -322,6 +322,10 @@ export const EN = {
   'settings.combatAssistDescAfterEnergy': ' and never affects ranged attacks.',
   'settings.combatAssistOn': 'On',
   'settings.combatAssistOff': 'Off',
+  'settings.comboAssist': 'Combo assist',
+  'settings.comboAssistDesc': 'Once Attack 1 or Attack 2 has finished, pressing it again during its repeat cooldown automatically performs the other attack.',
+  'settings.comboAssistOn': 'On',
+  'settings.comboAssistOff': 'Off',
 
   'editor.label': 'Touch control editor',
   'editor.layout': '{scheme} layout',

@@ -20,7 +20,7 @@ import { PlayerController, TrainingAIController, blankInput } from '../../js/gam
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
-import { DEFLECT_ENERGY_COST } from '../../js/game/combat/combat-state.js';
+import { DEFLECT_ENERGY_COST, DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 import { isMeleeAttack, isRangedAttack, attackReach } from '../../js/game/combat/attacks.js';
 import { assistsAttack, assistRange, meleeGap, ASSIST_MARGIN } from '../../js/game/combat/combat-assist.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
@@ -102,7 +102,16 @@ function rig({
     removeDeadClones(clones);
     return player;
   };
-  return { player, foe, tick, events, projectiles, clones, system, input, held };
+  // Ticks with `now` until `pred` holds (at most `limit` steps); throws
+  // instead of hanging.
+  const until = (pred, now = {}, limit = 600) => {
+    for (let i = 0; i <= limit; i++) {
+      if (pred()) return i;
+      tick(now);
+    }
+    throw new Error('condition never reached');
+  };
+  return { player, foe, tick, until, events, projectiles, clones, system, input, held };
 }
 
 // Moves the foe so `box` (by default `atk`'s own reach, attackReach: its
@@ -1261,6 +1270,192 @@ test('the setting never changes a CPU: its decisions and movement are the same w
     for (const f of [a, b]) {
       assert.equal(f.combatAssistOn, false);
       assert.ok(!log.get(f).some((s) => s.state === 'assist'), `#${c.id}`);
+    }
+  }
+});
+
+// ---- Run held, and after another move ---------------------------------------------------------------
+
+// Steps `r` with `input` until the player's attack `id` has struck the foe
+// (a hit or a block), or `limit` steps: whether it did.
+function strikes(r, id, input = {}, limit = 90) {
+  for (let i = 0; i < limit; i++) {
+    if (r.events.some((e) => e.attacker === r.player && e.move === id)) return true;
+    r.tick(typeof input === 'function' ? input(i) : input);
+  }
+  return r.events.some((e) => e.attacker === r.player && e.move === id);
+}
+
+test('Run held through the whole request, toward the target, away from it or turned midway, never cancels or skips the approach, and the attack strikes its target: every fighter, every ground melee button', () => {
+  const runs = {
+    toward: () => ({ runRight: true }),
+    away: () => ({ runLeft: true }),
+    turned: (i) => (i < 2 ? { runRight: true } : { runLeft: true, runLeftPressed: i === 2 }),
+  };
+  for (const c of playableCharacters()) {
+    for (const { action, id } of groundMelee(c)) {
+      for (const [how, held] of Object.entries(runs)) {
+        const why = `#${c.id} ${action}, Run ${how}`;
+        const r = rig({ character: c, gap: 600 });
+        // Running already, at full speed, the way it is held.
+        for (let i = 0; i < 20; i++) r.tick(held(0));
+        const atk = r.player.attacks[id];
+        placeFoe(r, atk, 60);
+        r.tick({ ...held(0), ...press(action) });
+        assert.ok(r.player.combatAssist, `${why}: the approach starts`);
+        let i = 1;
+        while (r.player.combatAssist) {
+          assert.equal(r.player.combatAssist.direction, 1, `${why}: toward its target`);
+          r.tick(held(i++));
+          assert.ok(r.player.combatAssist || r.player.combat.attack?.def === atk, `${why}: never cancelled by Run (step ${i})`);
+        }
+        assert.equal(r.player.combat.attack?.def, atk, `${why}: the very attack asked for`);
+        assert.equal(r.player.facing, 1, `${why}: facing its target`);
+        assert.ok(strikes(r, id, (k) => held(i + k)), `${why}: it lands`);
+      }
+    }
+  }
+});
+
+test('an assisted attack keeps facing its target while the run held through it is held; a new turn still turns it, as any attack', () => {
+  const r = rig({ gap: 600 });
+  for (let i = 0; i < 20; i++) r.tick({ runLeft: true });
+  const atk = r.player.attacks.attack1;
+  placeFoe(r, atk, 60, atk.hitbox);
+  r.tick({ runLeft: true, ...press('attack1') });
+  while (r.player.combatAssist) r.tick({ runLeft: true });
+  const record = r.player.combat.attack;
+  assert.equal(record?.def, atk);
+  r.tick({ runLeft: true });
+  assert.equal(r.player.facing, 1, 'Left still held from before: it faces its target');
+  r.tick({});
+  r.tick({ runLeft: true, runLeftPressed: true });
+  assert.equal(r.player.combat.attack, record);
+  assert.equal(r.player.facing, -1, 'let go and turned again: it turns, as ever');
+});
+
+test('in reach already, behind the fighter: the attack turns to its target and lands, no approach; with Combat Assist off it strikes the way it faces, as ever', () => {
+  for (const c of playableCharacters()) {
+    for (const { action, id } of groundMelee(c)) {
+      for (const assist of [true, false]) {
+        const r = rig({ character: c, assist });
+        const atk = r.player.attacks[id];
+        placeFoe(r, atk, -4, atk.hitbox);
+        r.player.facing = -1;
+        r.tick({ runLeft: true, ...press(action) });
+        assert.equal(r.player.combatAssist, null, `#${c.id} ${action}: no approach`);
+        assert.equal(r.player.combat.attack?.def, atk);
+        assert.equal(r.player.facing, assist ? 1 : -1, `#${c.id} ${action} (${assist ? 'on' : 'off'})`);
+        if (assist) assert.ok(strikes(r, id, { runLeft: true }), `#${c.id} ${action}: it lands`);
+      }
+    }
+  }
+});
+
+test('a melee follow-up right after another move still gets its approach: out of a Dash past its cancel time, out of the player\'s own cut, out of a hit-cancel and from the buffer', () => {
+  for (const c of playableCharacters()) {
+    for (const { action, id } of groundMelee(c)) {
+      const why = `#${c.id} ${action}`;
+      const atk = rig({ character: c }).player.attacks[id];
+      // Out of a Dash past its cancel time: the Dash ends, the approach
+      // takes over and pays nothing more.
+      const d = rig({ character: c, gap: 600 });
+      d.tick({ mouvementRightPressed: true });
+      d.until(() => d.player.dashCancellable);
+      placeFoe(d, atk, 60);
+      d.tick(press(action));
+      assert.ok(d.player.combatAssist, `${why}: out of a Dash`);
+      assert.equal(d.player.dash, null, 'the Dash is over');
+      assert.ok(Math.abs(d.player.combat.energy - (100 - DASH_ENERGY_COST + 2 * DT * d.player.energyDef.regen)) < 1, 'only the Dash\'s cost');
+      assert.ok(strikes(d, id), `${why}: lands out of the Dash`);
+      // Out of the player's own cut: a ranged attack playing, the melee
+      // press cuts it and closes in.
+      const thrower = rig({ character: c, gap: 600 });
+      const ranged = COMBAT_BUTTONS.find((a) => {
+        const rid = thrower.player.attackFor(a, true);
+        return rid && isRangedAttack(thrower.player.attacks[rid]);
+      });
+      if (ranged) {
+        placeFoe(thrower, atk, 60);
+        thrower.tick(press(ranged));
+        const cast = thrower.player.combat.attack;
+        assert.ok(cast && !thrower.player.combatAssist, 'a ranged attack, never served');
+        thrower.tick(press(action));
+        assert.ok(thrower.player.combatAssist, `${why}: out of the player's own cut`);
+        assert.equal(thrower.player.combat.attack, null);
+        assert.ok(thrower.player.combat.cooldowns.has(cast.def.id), 'the cut attack\'s cooldown');
+        assert.ok(strikes(thrower, id), `${why}: lands out of the cut`);
+      }
+      // From the buffer: pressed in the last moments of a stun, it comes
+      // out as the stun ends, with its approach.
+      const stunned = rig({ character: c, gap: 600 });
+      placeFoe(stunned, atk, 60);
+      stunned.player.combat.stun = 3 * DT;
+      stunned.tick(press(action));
+      assert.equal(stunned.player.combatAssist, null, 'not while stunned');
+      stunned.until(() => stunned.player.combatAssist || stunned.player.combat.attack, {}, 10);
+      assert.ok(stunned.player.combatAssist, `${why}: the buffered press closes in as it comes out`);
+    }
+  }
+  // Out of a hit-cancel: the first attack sent its target out of reach;
+  // the follow-up closes in, the first attack's cooldown starting.
+  for (const c of playableCharacters()) {
+    const r = rig({ character: c, gap: 40 });
+    r.player.controller.comboAssist = false;
+    r.foe.combat.launchPoint = 100;
+    r.tick(press('attack1'));
+    const follow = groundMelee(c).find((m) => m.action !== 'attack1' && r.player.attacks[m.id].motion?.type !== 'roll');
+    const fatk = r.player.attacks[follow.id];
+    r.until(() => r.player.combat.cancellable && meleeGap(r.player, attackReach(fatk), r.foe, 1) > 0);
+    const first = r.player.combat.attack;
+    r.tick(press(follow.action));
+    assert.ok(r.player.combatAssist, `#${c.id}: out of a hit-cancel, the approach`);
+    assert.equal(r.player.combatAssist.attack, fatk);
+    assert.ok(r.player.combat.cooldowns.has(first.def.id), 'the cut attack\'s cooldown');
+  }
+});
+
+test('after another move the approach keeps every rule: a ranged or homing attack never gets one, nor one further than a Dash, nor through a wall', () => {
+  for (const c of playableCharacters()) {
+    const r = rig({ character: c, gap: 600 });
+    r.tick({ mouvementRightPressed: true });
+    r.until(() => r.player.dashCancellable);
+    for (const action of COMBAT_BUTTONS) {
+      const id = r.player.attackFor(action, true);
+      const atk = id && r.player.attacks[id];
+      if (!atk || assistsAttack(atk)) continue;
+      assert.equal(r.player.combatAssistFor(atk), null, `#${c.id} ${id}: never served`);
+    }
+    for (const { id } of groundMelee(c)) {
+      const atk = r.player.attacks[id];
+      placeFoe(r, atk, assistRange(r.player) + 10, atk.hitbox);
+      assert.equal(r.player.combatAssistFor(atk), null, `#${c.id} ${id}: too far`);
+    }
+  }
+  // A wall in the way, out of a Dash: no approach.
+  const wall = new StageCollision(stageMap({ solids: [{ id: 'pillar', x: 960, y: 640, w: 20, h: 160 }] }));
+  const r = rig({ stage: wall, gap: 200, x: 860 });
+  r.tick({ mouvementRightPressed: true });
+  r.until(() => r.player.dashCancellable || !r.player.dash);
+  assert.equal(r.player.combatAssistFor(r.player.attacks.attack1), null, 'a wall between them');
+});
+
+test('in the air with Run held, toward the target or away: the approach and the aerial strike the target', () => {
+  for (const c of playableCharacters()) {
+    for (const { action, id } of meleeButtons(c, true)) {
+      const atk = rig({ character: c }).player.attacks[id];
+      if (!assistsAttack(atk)) continue;
+      for (const held of [{ runRight: true }, { runLeft: true }]) {
+        const r = rig({ character: c, gap: 150 });
+        airborne(r);
+        placeFoe(r, atk, 50, atk.hitbox);
+        Object.assign(r.foe.body, { y: r.player.body.y, prevY: r.player.body.y, vy: 0, grounded: false, ground: null });
+        r.tick({ ...held, ...press(action) });
+        if (!r.player.combatAssist) continue;
+        while (r.player.combatAssist) r.tick(held);
+        assert.equal(r.player.combat.attack?.def.id, id, `#${c.id} ${id} ${Object.keys(held)[0]}`);
+        assert.equal(r.player.facing, 1, `#${c.id} ${id}: facing its target`);
+      }
     }
   }
 });
