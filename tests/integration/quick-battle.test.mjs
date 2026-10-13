@@ -362,6 +362,37 @@ test('the app registers Select CPU after Select Fighter, with its own section, a
 
 // ---- The choice dialog --------------------------------------------------------------
 
+test('Home Play shows all Mode details immediately and keeps them through dismissal and returning from setup', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  screens.home.actions.play.click();
+  const info = screens.mode.el.querySelector('.mode-info');
+  const headings = ['Quick Battle', 'Regular Play', 'Custom Play', 'Match Rules'];
+  const descriptions = [
+    'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
+    'Choose your fighter and difficulty. Your CPU opponent and stage are selected at random.',
+    'Customize your battle by choosing the difficulty, your fighter, the CPU opponent, and the stage.',
+    'Matches last 7 minutes. If the score is tied, a 1-minute overtime begins as the Void closes in.',
+  ];
+  const checkDetails = () => {
+    assert.equal(current(app), 'mode');
+    assert.deepEqual(info.querySelectorAll('h3').map((node) => node.textContent), headings);
+    assert.deepEqual(info.querySelectorAll('p').map((node) => node.textContent), descriptions);
+    assert.equal(info.querySelectorAll('[data-nav]').length, 0, 'details introduce no navigation targets');
+    assert.equal(document.activeElement, card(screens), 'the card retains default focus');
+  };
+  assert.equal(app.choiceDialog.isOpen, false, 'no card click needed to read the details');
+  checkDetails();
+  card(screens).click();
+  app.input.key('Escape');
+  await settle();
+  checkDetails();
+  card(screens).click();
+  await choose(booted, 'regular');
+  app.input.pad('back');
+  checkDetails();
+});
+
 test('Quick Battle opens a modal choice of Custom Play and Regular Play, Regular focused; nothing advances until one is chosen', async () => {
   const booted = boot();
   const { app, screens } = booted;
