@@ -37,10 +37,14 @@ reload. The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.11.
 
 Add the key to `strings/en.js` and its translation to `strings/fr.js`; a
 test fails if either language lacks a key the other has. A fighter's
-button names come from its `mobileAbilities` labels and its ability names
-from `abilityNames` (English, read from the definition), and are
-translated in `strings/fr.js` as `ability.<id>.<button>` /
-`ability.<id>.<move>`. Its Discover play-style description is interface
+button names come from its `mobileAbilities` labels, its ability names
+from `abilityNames` and its moves' one-line descriptions (the controller
+editor's) from `abilityDescriptions` (English, read from the definition),
+and are translated in `strings/fr.js` as `ability.<id>.<button>` /
+`ability.<id>.<move>` / `ability.<id>.<move>.description`. Controller
+button names that are codes (L1, R2, A, LB, Options, Menu) are the same in
+every language and never translated; the words (Cross, Circle, Square,
+Triangle, View, the D-pad, the sticks) are, under `pad.*`. Its Discover play-style description is interface
 copy, authored in both tables as `discover.fighter.<id>.playStyle` (the
 key its profile names in `js/data/fighter-profiles.js`); a fighter's name
 (#0001) is the same in both languages.

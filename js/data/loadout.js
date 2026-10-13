@@ -14,9 +14,12 @@
 //   transform               reserved
 //
 // The one rule: a numbered attack the fighter has is a numbered combat
-// button the player presses directly. Nothing else reaches one: no held
-// stance, modifier or other button. Its `actions` entry says which kind of
-// move the button is (ACTION_TYPES):
+// button of its own, a logical button the engine reads as one press.
+// Nothing else reaches one: no held stance, modifier or other logical
+// button. (A game controller's physical bindings may use a modifier or a
+// direction to choose which logical button a press sends: see
+// js/data/controller-profiles.js. They never change what a button does.)
+// Its `actions` entry says which kind of move the button is (ACTION_TYPES):
 //
 //   an ordinary attack   { ground: 'attackN', air: 'midair_attackN' }:
 //                        attackN on the ground, its mid-air version in the

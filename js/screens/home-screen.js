@@ -1,6 +1,10 @@
 // HOME: editorial wordmark and navigation beside a glass strip carrying a
 // looping credits roll, with compact Help, Controller and Settings buttons
-// in the top right. Only Settings is available and opens its dialog over Home.
+// in the top right. Controller opens Controller Connections and Settings
+// its dialog, each over Home; Help is still a placeholder. The Controller
+// button carries a small indicator of the controllers connected: green with
+// a check (one to four), red with a cross (none), orange with an
+// exclamation mark (more than four), kept up to date as they change.
 //
 // Play, Watch Mode and Practice Ground each start a match, so they are
 // open only while a fighter is playable: with none, they are disabled and
@@ -10,7 +14,8 @@
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel } from '../localization/i18n.js';
+import { tx, tattr, iconLabel, setAttr } from '../localization/i18n.js';
+import { STATUS_ICONS } from '../ui/controller-dialog.js';
 import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
 import { CREDITS, creditLabel, creditLink } from '../ui/credits.js';
@@ -99,17 +104,28 @@ export class HomeScreen extends Screen {
       html: ICONS.settings,
     });
     this.settingsButton.addEventListener('click', () => app.settingsDialog.open({ returnFocus: this.settingsButton }));
-    // Future utilities: native disabled buttons announce unavailability and
-    // stay out of Tab and MenuNavigator, leaving Settings as the only action.
+    // Controller: Controller Connections over Home
+    // (js/ui/controller-dialog.js), focus back here when it closes. Its
+    // indicator, bottom right of the picture, always shows the current
+    // status, and the button's name says it in words.
+    this.controllerStatus = el('span', { class: 'controller-badge', 'aria-hidden': 'true' });
+    this.controllerButton = el('button', {
+      class: 'home-controller', type: 'button', 'data-nav': true, 'data-home-controller': true, 'aria-haspopup': 'dialog',
+      ...tattr('title', 'home.controller'),
+    }, [
+      el('img', { src: 'controller.PNG', alt: '', 'aria-hidden': 'true', draggable: 'false' }),
+      this.controllerStatus,
+    ]);
+    this.controllerButton.addEventListener('click', () => app.controllerDialog?.open({ opener: this.controllerButton }));
+    app.controllers?.onChange(() => this.syncControllerStatus());
+    // Help is a future utility: a native disabled button announces
+    // unavailability and stays out of Tab and MenuNavigator.
     this.utilityButtons = el('div', { class: 'home-utility-buttons' }, [
       el('button', {
         class: 'home-help', type: 'button', disabled: true,
         ...tattr('aria-label', 'home.help'), html: ICONS.help,
       }),
-      el('button', {
-        class: 'home-controller', type: 'button', disabled: true,
-        ...tattr('aria-label', 'home.controller'),
-      }, [el('img', { src: 'controller.PNG', alt: '', 'aria-hidden': 'true', draggable: 'false' })]),
+      this.controllerButton,
       this.settingsButton,
     ]);
 
@@ -209,6 +225,17 @@ export class HomeScreen extends Screen {
     );
     this.el.setAttribute('aria-labelledby', 'home-title');
     this.syncMatchActions();
+    this.syncControllerStatus();
+  }
+
+  // The controller indicator: one status at a time, its mark and colour,
+  // and the button's spoken name with it ("Controller: Connected").
+  syncControllerStatus() {
+    const status = this.app.controllers?.status ?? 'disconnected';
+    this.controllerStatus.className = `controller-badge controller-badge--${status}`;
+    this.controllerStatus.innerHTML = STATUS_ICONS[status];
+    this.controllerButton.dataset.status = status;
+    setAttr(this.controllerButton, 'aria-label', 'home.controllerStatus', { status: { t: `controller.status.${status}` } });
   }
 
   // Opens or closes the match actions to follow the roster: with no
@@ -244,6 +271,7 @@ export class HomeScreen extends Screen {
   enter() {
     this.lastInteraction = -Infinity;
     this.syncMatchActions();
+    this.syncControllerStatus();
   }
 
   exit() {

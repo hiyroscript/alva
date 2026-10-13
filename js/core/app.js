@@ -9,6 +9,8 @@
 import { CONFIG } from '../config.js';
 import { AssetLoader } from './asset-loader.js';
 import { InputManager } from './input-manager.js';
+import { ControllerManager } from './controller-manager.js';
+import { resolveProfile } from '../data/controller-profiles.js';
 import { AudioManager } from './audio-manager.js';
 import { Device } from './device.js';
 import { ScreenManager } from './screen-manager.js';
@@ -19,6 +21,8 @@ import { LoadingOverlay, ConfirmDialog, ChoiceDialog, InfoDialog } from '../ui/o
 import { LanguageDialog } from '../ui/language-dialog.js';
 import { SettingsDialog } from '../ui/settings-dialog.js';
 import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
+import { ControllerDialog } from '../ui/controller-dialog.js';
+import { ControllerControls } from '../ui/controller-editor.js';
 import { getCharacter, getPlayableCharacter, playableCharacters, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
@@ -67,12 +71,23 @@ export class App {
   constructor() {
     this.config = CONFIG;
     this.device = new Device().init();
-    this.input = new InputManager(CONFIG.bindings);
     // The player's saved settings (Home › Settings), read once here, and
     // the interface language they hold (English until one is chosen). The
     // language follows every change of the setting, and the whole page
     // follows the language.
     this.settings = new Settings();
+    // Game controllers: up to four connected PlayStation / Xbox pads, one
+    // of them Player 1's. Its gameplay buttons follow the fighter played,
+    // through that fighter's saved controller layout (Settings › Controls ›
+    // Controller controls) or its recommended one.
+    this.controllers = new ControllerManager();
+    this.input = new InputManager(CONFIG.bindings, {
+      controllers: this.controllers,
+      profileFor: (def) => resolveProfile(def, def ? this.settings.controllerProfile(def.id) : null),
+    });
+    this.settings.onChange((name) => {
+      if (name === 'controllerProfiles') this.input.invalidateProfiles();
+    });
     this.i18n = i18n;
     followSettings(this.settings);
     onLanguageChange(() => this.localize());
@@ -87,6 +102,12 @@ export class App {
     this.languageDialog = new LanguageDialog(document.getElementById('language-dialog'), this);
     this.settingsDialog = new SettingsDialog(document.getElementById('settings-dialog'), this);
     this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
+    this.controllerDialog = new ControllerDialog(document.getElementById('controller-dialog'), this);
+    this.controllerControls = new ControllerControls(this, {
+      roster: document.getElementById('controller-roster'),
+      editor: document.getElementById('controller-editor'),
+      binding: document.getElementById('binding-dialog'),
+    });
 
     this.selection = initialSelection();
 
@@ -205,6 +226,7 @@ export class App {
     this.lastTime = now;
     this.input.pollGamepads(now);
     this.screens.current?.update(dt);
+    this.controllerControls?.update(dt);
     requestAnimationFrame(this.loop);
   }
 }

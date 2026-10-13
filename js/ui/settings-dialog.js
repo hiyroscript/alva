@@ -8,7 +8,10 @@
 //             Ground use: Joystick (the default) or Classic Buttons, as two
 //             cards, and Customize touch controls, which opens the touch
 //             layout editor (js/ui/touch-layout-editor.js) for the scheme in
-//             use. Keyboard and gamepad controls never change.
+//             use. Then Controller Controls: a line on what it is and
+//             Customize controller controls, which opens the fighter roster
+//             and each fighter's own controller layout
+//             (js/ui/controller-editor.js). Keyboard controls never change.
 //   Combat    Combat Assist, On (the default) or Off, a single choice
 //             (radio buttons, in the Language section's style) with the
 //             line that says what it does: the player's melee attacks (on
@@ -200,7 +203,19 @@ export class SettingsDialog {
       this.customizeButton,
       el('p', { class: 'settings-customize-text' }, [this.customizeNote, this.customTag]),
     ]);
-    return [schemeGroup, customize];
+
+    // Controller Controls: each fighter's own controller layout.
+    this.controllerButton = el('button', {
+      class: 'btn settings-customize settings-customize-controller', type: 'button', 'data-nav': true, 'aria-haspopup': 'dialog',
+      'aria-describedby': 'settings-controller-note', ...iconLabel('settings.customizeController', ICONS.right),
+    });
+    this.controllerButton.addEventListener('click', () => this.openControllerControls());
+    const controllerGroup = el('div', { class: 'settings-subgroup settings-controller-group' }, [
+      el('h4', { class: 'settings-subtitle', id: 'settings-controller-title', ...tx('settings.controllerControls') }),
+      el('p', { class: 'settings-group-note', id: 'settings-controller-note', ...tx('settings.controllerControlsNote') }),
+      el('div', { class: 'settings-customize-row' }, [this.controllerButton]),
+    ]);
+    return [schemeGroup, customize, controllerGroup];
   }
 
   buildCombat() {
@@ -322,10 +337,11 @@ export class SettingsDialog {
     this.currentSection.panel.scrollTop = 0;
   }
 
-  // Closes (the editor first, if it is open) and hands focus back.
+  // Closes (the editors first, if one is open) and hands focus back.
   close() {
     if (!this.open_) return;
     this.app.touchEditor?.close({ silent: true });
+    this.app.controllerControls?.close({ silent: true });
     this.open_ = false;
     this.root.hidden = true;
     this.root.inert = false;
@@ -378,6 +394,19 @@ export class SettingsDialog {
   chooseCombatAssist(on) {
     this.app.settings.set('combatAssist', on);
     this.markCurrent();
+  }
+
+  // Controller controls (the roster, then a fighter's editor), over this
+  // dialog.
+  openControllerControls() {
+    if (!this.open_ || !this.app.controllerControls) return;
+    this.root.inert = true;
+    this.app.controllerControls.open({
+      returnFocus: this.controllerButton,
+      onClose: () => {
+        this.root.inert = false;
+      },
+    });
   }
 
   // The touch layout editor, over this dialog, for the scheme in use.

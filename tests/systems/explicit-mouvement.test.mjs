@@ -2,25 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../../js/config.js';
 import { InputManager } from '../../js/core/input-manager.js';
+import { ControllerManager } from '../../js/core/controller-manager.js';
 import { makeFighter } from '../helpers/fighter-harness.mjs';
+import { fakePad, setButton, padSource, stubWindow } from '../helpers/fake-gamepad.mjs';
 
+// Keyboard, touch and a DualSense on its recommended layout, in play.
 function device() {
-  globalThis.window = { addEventListener() {} };
-  globalThis.document = { addEventListener() {}, hidden: false };
-  const pad = { connected: true, axes: [0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { getGamepads: () => [pad] } });
-  const input = new InputManager(CONFIG.bindings);
-  input.padConnected = true;
+  stubWindow();
+  const pad = fakePad();
+  const pads = [pad];
+  const input = new InputManager(CONFIG.bindings, { controllers: new ControllerManager({ source: padSource(pads), target: null }) });
   input.setGameplayActive(true);
+  let now = 0;
+  const poll = () => input.pollGamepads((now += 16));
+  poll();
+  input.sample();
   const key = (code, down, repeat = false) => input[down ? '_onKeyDown' : '_onKeyUp']({ code, repeat, preventDefault() {} });
-  const button = (i, down) => { pad.buttons[i] = { pressed: down, value: Number(down) }; input.pollGamepads(0); };
-  return { input, pad, key, button };
+  const button = (name, down) => { setButton(pad, name, down); poll(); };
+  const stick = (x) => { pad.axes[0] = x; poll(); };
+  return { input, pad, pads, key, button, stick, poll };
 }
 
 for (const airborne of [false, true]) {
   test(`keyboard, touch Run and gamepad flicks never Dash (airborne=${airborne})`, () => {
     for (const source of ['keyboard', 'touch', 'dpad', 'stick']) {
-      const { input, pad, key, button } = device();
+      const { input, key, button, stick } = device();
       const { fighter, step } = makeFighter();
       if (airborne) step({ jump: true, jumpPressed: true });
       for (const side of [1, 1, 1, -1, -1, 1, -1, 1]) {
@@ -28,8 +34,8 @@ for (const airborne of [false, true]) {
         for (const down of [true, false]) {
           if (source === 'keyboard') key(side > 0 ? 'KeyD' : 'KeyA', down);
           if (source === 'touch') input.setTouch(action, down);
-          if (source === 'dpad') button(side > 0 ? 15 : 14, down);
-          if (source === 'stick') { pad.axes[0] = down ? side : 0; input.pollGamepads(0); }
+          if (source === 'dpad') button(side > 0 ? 'dpadRight' : 'dpadLeft', down);
+          if (source === 'stick') stick(down ? side : 0);
           const frame = input.sample();
           assert.equal(frame.mouvementLeftPressed || frame.mouvementRightPressed, false);
           step(frame);
@@ -41,11 +47,12 @@ for (const airborne of [false, true]) {
 
   for (const side of [-1, 1]) for (const source of ['keyboard', 'gamepad', 'touch']) {
     test(`${source} explicitly Dashes ${side}, once per press (airborne=${airborne})`, () => {
-      const { input, key, button } = device();
+      const { input, key, button, stick, poll } = device();
       const { fighter, step } = makeFighter();
       if (airborne) step({ jump: true, jumpPressed: true });
       if (source === 'keyboard') key(side < 0 ? 'KeyQ' : 'KeyE', true);
-      if (source === 'gamepad') { button(side < 0 ? 14 : 15, true); button(8, true); }
+      // The Dash button (L1 / LB), the stick pointing the way.
+      if (source === 'gamepad') { stick(side); button('l1', true); }
       if (source === 'touch') input.queueTouchMouvement(side);
       const frame = input.sample();
       assert.equal(frame[side < 0 ? 'mouvementLeftPressed' : 'mouvementRightPressed'], true);
@@ -55,7 +62,7 @@ for (const airborne of [false, true]) {
       const dash = fighter.dash;
       for (let i = 0; i < 90; i++) {
         if (source === 'keyboard') key(side < 0 ? 'KeyQ' : 'KeyE', true, true);
-        input.pollGamepads(i);
+        poll();
         const next = input.sample();
         assert.equal(next.mouvementLeftPressed || next.mouvementRightPressed, false);
         step(next);
@@ -65,26 +72,35 @@ for (const airborne of [false, true]) {
   }
 }
 
-test('gamepad modifier preserves Jump, Shield, attacks, Start and menu mappings', () => {
-  const { input, button } = device();
+test('the Dash button leaves Jump, the Shield, Pause and the menu buttons as they are', () => {
+  const { input, button, poll } = device();
   const menu = [];
   input.onPadMenu((command) => menu.push(command));
-  button(8, true);
-  for (const [i, action] of [[0, 'jump'], [5, 'shield'], [1, 'attack1'], [4, 'attack2'], [6, 'attack3'], [10, 'attack4'], [11, 'attack5'], [2, 'extra_attack'], [3, 'transform']]) {
-    button(i, true);
-    assert.equal(input.sample()[`${action}Pressed`], true, action);
-    button(i, false);
+  button('l1', true);
+  input.sample();
+  for (const [name, field] of [['south', 'jumpPressed'], ['east', 'shieldPressed']]) {
+    button(name, true);
+    assert.equal(input.sample()[field], true, name);
+    button(name, false);
+    input.sample();
   }
-  button(9, true);
-  assert.ok(menu.includes('start'));
-  assert.ok(menu.includes('confirm'));
-  assert.ok(menu.includes('back'));
-  button(14, true);
-  assert.ok(menu.includes('left'));
+  // Options / Menu pauses in play...
+  button('start', true);
+  assert.deepEqual(menu, ['start']);
+  button('start', false);
+  button('l1', false);
+  // ...and the menus keep their own buttons.
+  input.setGameplayActive(false);
+  poll();
+  for (const [name, command] of [['south', 'confirm'], ['east', 'back'], ['start', 'start'], ['dpadLeft', 'left']]) {
+    button(name, true);
+    button(name, false);
+    assert.equal(menu.at(-1), command, name);
+  }
 });
 
 test('short keyboard taps survive sampling, releases re-arm, opposing requests cancel, and deactivation clears requests', () => {
-  const { input, key, pad, button } = device();
+  const { input, key, button, stick, pads, poll } = device();
   key('KeyQ', true); key('KeyQ', false);
   assert.equal(input.sample().mouvementLeftPressed, true);
   assert.equal(input.sample().mouvementLeftPressed, false);
@@ -93,12 +109,14 @@ test('short keyboard taps survive sampling, releases re-arm, opposing requests c
   step(input.sample());
   assert.equal(fighter.dash, null);
   input.clear();
-  button(15, true); button(8, true);
+  stick(1); button('l1', true);
   assert.equal(input.sample().mouvementRightPressed, true);
-  button(8, false); button(8, true);
+  button('l1', false); button('l1', true);
   assert.equal(input.sample().mouvementRightPressed, true);
-  pad.connected = false; input.pollGamepads(0);
-  assert.equal(input.isHeld('runRight'), false);
+  assert.equal(input.sample().runRight, true);
+  // The controller lost: nothing stays held.
+  pads.length = 0; poll();
+  assert.equal(input.sample().runRight, false);
   for (const clear of [() => input.flush(), () => input.clear(), () => input.setGameplayActive(false)]) {
     key('KeyQ', false); key('KeyQ', true);
     input.queueTouchMouvement(1);

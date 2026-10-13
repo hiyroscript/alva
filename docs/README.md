@@ -38,7 +38,8 @@ reads, what a fighter may leave out, and its tests.
   resource.
 - [CPU Intelligence](systems/ai.md): the CPU, its layers, difficulty and the benchmark.
 - [Input](systems/input.md): controls on every device, touch layouts and
-  their editor.
+  their editor, game controllers (PlayStation and Xbox: connections, the
+  menu cursor, each fighter's controller layout and its editor).
 - [Rendering](systems/rendering.md): sprites, the camera, effects, the
   status drawn with each fighter.
 - [Localization](systems/localization.md): English and French.

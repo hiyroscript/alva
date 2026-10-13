@@ -216,7 +216,7 @@ test('the shared input is shield on L; no block, dodge or defense action', () =>
   ]);
 });
 
-test('InputManager exposes shield / shieldPressed from L, RB and RT; other pad buttons are unchanged', async () => {
+test('InputManager exposes shield / shieldPressed from L and the controller\'s Circle / B; other pad buttons are not the Shield', async () => {
   const listeners = {};
   globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
   globalThis.document = { addEventListener() {}, hidden: false };
@@ -240,25 +240,27 @@ test('InputManager exposes shield / shieldPressed from L, RB and RT; other pad b
   key('keyup', 'KeyL');
   assert.equal(input.sample().shield, false);
 
-  listeners.gamepadconnected();
-  const button = (i, down) => {
-    pad.buttons[i] = { pressed: down, value: down ? 1 : 0 };
-    input.pollGamepads(0);
-  };
-  for (const i of [5, 7]) { // RB, RT
-    button(i, true);
-    f = input.sample();
-    assert.equal(f.shield, true, `button ${i}`);
-    assert.equal(f.shieldPressed, true, `button ${i}`);
-    button(i, false);
-    assert.equal(input.sample().shield, false);
-  }
-  for (const [i, action] of [[0, 'jump'], [1, 'attack1'], [4, 'attack2'], [13, 'down'], [2, 'extra_attack'], [3, 'transform']]) {
-    button(i, true);
-    f = input.sample();
-    assert.equal(f[action], true, `button ${i} -> ${action}`);
-    assert.equal(f.shield, false, `button ${i} is not Shield`);
-    button(i, false);
+  // A controller: Circle / B, held, is the Shield (the universal default),
+  // one press edge per press; RB / RT and every other default button are
+  // not.
+  const { controllerRig } = await import('../helpers/fake-gamepad.mjs');
+  const rig = await controllerRig();
+  rig.press('east');
+  f = rig.sample();
+  assert.equal(f.shield, true, 'Circle / B');
+  assert.equal(f.shieldPressed, true);
+  f = rig.sample();
+  assert.equal(f.shield, true, 'held');
+  assert.equal(f.shieldPressed, false, 'one press edge per press');
+  rig.press('east', false);
+  assert.equal(rig.sample().shield, false);
+  for (const [button, action] of [['south', 'jump'], ['r1', null], ['r2', null], ['l1', null], ['north', null]]) {
+    rig.press(button);
+    f = rig.sample();
+    if (action) assert.equal(f[action], true, `${button} -> ${action}`);
+    assert.equal(f.shield, false, `${button} is not Shield`);
+    rig.press(button, false);
+    rig.sample();
   }
 });
 

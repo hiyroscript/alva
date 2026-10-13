@@ -50,6 +50,12 @@ export const ICONS = {
   close: svg('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
   // Reset to defaults: an arrow turning back on itself.
   reset: svg('<path d="M5.5 12a6.5 6.5 0 1 0 1.9-4.6"/><path d="M5 4.5v4h4"/>'),
+  // Reconnect (Controller connections): two arrows chasing round.
+  refresh: svg('<path d="M19 8.5A7.5 7.5 0 0 0 5.6 7.3"/><path d="M5 3.8v3.9h3.9"/><path d="M5 15.5a7.5 7.5 0 0 0 13.4 1.2"/><path d="M19 20.2v-3.9h-3.9"/>'),
+  // The controller connection indicator's marks (on its own colour).
+  statusCheck: svg('<path d="M6.5 12.5 10.5 16.5 17.5 8"/>'),
+  statusCross: svg('<path d="M7.5 7.5l9 9M16.5 7.5l-9 9"/>'),
+  statusAlert: svg('<path d="M12 6v7.5"/><circle cx="12" cy="17.6" r="0.9"/>'),
   minus: svg('<path d="M6 12h12"/>'),
   plus: svg('<path d="M6 12h12M12 6v12"/>'),
   lock: svg('<rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),

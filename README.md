@@ -61,9 +61,16 @@ blocks every attack.
   that flow straight into attacks and jumps), a held Shield with a perfect
   Shield, Energy, hit-cancels and an input buffer, launch steering and
   tumbling, launches that rebound off walls, and hit effects.
-- **Every input**: keyboard, gamepad, and touch in two layouts (a joystick
-  or classic buttons), both with dedicated left/right Mouvement buttons, that players can rearrange and resize, with each
-  fighter's own art on its touch buttons.
+- **Every input**: keyboard, PlayStation and Xbox controllers, and touch in
+  two layouts (a joystick or classic buttons), both with dedicated
+  left/right Mouvement buttons, that players can rearrange and resize,
+  with each fighter's own art on its touch buttons.
+- **Controllers**: DualShock 4, DualSense, Xbox One and Xbox Series pads,
+  up to four connected (one plays Player 1), a connection indicator on
+  Home and a Controller Connections dialog with Reconnect, a circular
+  cursor for the menus, comfortable recommended controls designed for each
+  fighter, and a layout of your own for every fighter (Settings ›
+  Controls › Controller controls).
 - **Combat Assist** for the human player (on by default, in Settings): a
   melee attack pressed just out of reach closes the short gap first, and
   never costs Energy. Never for ranged attacks, never for a CPU.
@@ -97,22 +104,30 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 
 ## Controls
 
-| Action | Keyboard | Gamepad |
+| Action | Keyboard | Controller (PlayStation / Xbox) |
 | --- | --- | --- |
-| Move | A D or ← → | D-pad / left stick |
-| Dash (in the air: air dash) | Q / E (left / right) | Select / View + D-pad or left stick left / right |
-| Jump (hold a little longer: higher; again in the air: air jump) | W, Space or ↑ | A |
-| Down (fast fall; steer a launch down) | S or ↓ | D-pad / stick down |
-| Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | B / LB / LT / L3 / R3 |
-| Extra attack | J | X |
-| Shield (hold, on the ground) / Deflect (press, in the air) | L | RB / RT |
-| Transform (reserved) | K | Y |
-| Pause | Esc or P | Start |
+| Move | A D or ← → | Left stick |
+| Dash (in the air: air dash) | Q / E (left / right) | L1 / LB (the way the stick points, else the way you face) |
+| Jump (hold a little longer: higher; again in the air: air jump) | W, Space or ↑ | Cross / A |
+| Down (fast fall; steer a launch down) | S or ↓ | Left stick down |
+| Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | each fighter's own layout (below) |
+| Extra attack | J | each fighter's own layout |
+| Shield (hold, on the ground) / Deflect (press, in the air) | L | Circle / B |
+| Transform (reserved) | K | none |
+| Pause | Esc or P | Options / Menu |
 
 What each attack button does is the fighter's own; a fighter with fewer
-than five numbered attacks leaves the rest unused. On touch: a joystick
-(or Left / Right buttons) at the lower left and the action buttons at the
-lower right. Details, and the touch layouts, in [input](docs/systems/input.md).
+than five numbered attacks leaves the rest unused. On a controller each
+fighter has a layout designed for its moves (Square / X its basic punch
+for both fighters; #0001's projectiles and Hollow Purple behind R2 / RT and
+Unlimited Void behind L2 / LT; #0002's Spin Attack and Blue Tornado sharing
+R1 / RB on the ground and in the air, its Homing and Bounce Attacks picked
+by the stick), and every binding of every fighter can be changed in
+Settings › Controls › Controller controls. In menus the D-pad moves focus,
+the left stick moves a circular cursor, Cross / A confirms and Circle / B
+goes back. On touch: a joystick (or Left / Right buttons) at the lower left
+and the action buttons at the lower right. Details, the controller layouts
+and the touch layouts in [input](docs/systems/input.md).
 
 ## How the repository is organized
 
@@ -121,10 +136,13 @@ index.html              entry point (the screens' sections, overlays)
 css/                    the stylesheet, one part per area, linked in cascade order
 js/
   main.js, config.js    boot; codenames, bindings, timing and render settings
-  core/                 app controller, screens, input, settings, assets, device
+  core/                 app controller, screens, input (keyboard, touch, game
+                        controllers and their binding resolver), settings,
+                        assets, device
   data/                 registries: characters.js and one module per fighter in
                         characters/, Discover's fighter profiles, universal
-                        movement, loadout rules, Launch, difficulty, maps
+                        movement, loadout rules, controller profiles, Launch,
+                        difficulty, maps
   game/                 arena, battle, practice, physics
     fighters/           the Fighter, its movement rules, controllers
     combat/             attacks, defense, combat state, hit resolution,
@@ -133,7 +151,8 @@ js/
     rendering/          camera, sprites, hit and Shield effects, fighter status
   localization/         the translator and one string table per language
   stages/               procedural stage art
-  screens/, ui/         screens; interface components, HUD, touch controls
+  screens/, ui/         screens; interface components, HUD, touch controls,
+                        controller dialogs, editor and cursor
 assets/characters/<id>/ each fighter's art
 tests/                  systems/, fighters/<id>/, interface/, integration/, helpers/
 docs/                   architecture, systems, characters, gameplay, development
@@ -156,7 +175,8 @@ max                     the owner's working prompt for the current task (not a s
 ## Extending it
 
 - **A fighter:** art in `assets/characters/<id>/`, a definition module in
-  `js/data/characters/<id>.js`, one line in `js/data/characters.js`, and,
+  `js/data/characters/<id>.js` (its recommended controller layout
+  included), one line in `js/data/characters.js`, and,
   before it is made playable, its Discover profile (one difficulty rating,
   a play-style description in both languages and a review hash) in
   `js/data/fighter-profiles.js`. No engine code. See [adding a

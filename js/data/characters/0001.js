@@ -31,7 +31,7 @@
 // Hollow Purple after 5 s. These timers never alter their animation phases.
 // Deflect remains at 0; jumps, running and Shield are exempt.
 
-import { frames } from './helpers.js';
+import { frames, pad } from './helpers.js';
 
 // Height in art pixels of #0001's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -380,6 +380,49 @@ export const CHARACTER_0001 = {
     midair_attack3: 'Blue',
     attack4: 'Unlimited Void',
     attack5: 'Hollow Purple',
+  },
+
+  // What each move does, in a line, for the controller editor (Settings ›
+  // Controls › Controller controls). English here; other languages by key
+  // (ability.0001.<move>.description).
+  abilityDescriptions: {
+    extra_attack: 'A rising kick that launches the opponent upward.',
+    attack1: 'A quick punch that pushes the opponent back and opens a follow-up.',
+    midair_attack1: 'A lunging punch that keeps you standing on the air as it strikes.',
+    attack2: 'Fires a repelling projectile that pushes enemies away and turns projectiles around.',
+    midair_attack2: 'A lock-on flying kick that blasts the opponent away and springs off it.',
+    attack3: 'Fires a slow orb that drags nearby opponents into it and grinds them.',
+    midair_attack3: 'A palm that yanks a nearby opponent in and strikes it upward.',
+    attack4: 'A cast that paralyzes every opponent close around you.',
+    attack5: 'A long chant, then a vast sphere that erases projectiles and passes through fighters.',
+  },
+
+  // Its recommended controller layout (js/data/controller-profiles.js):
+  // its own moves' buttons, chosen for each move rather than its attack
+  // number. The universal actions keep everyone's buttons (the stick, Jump
+  // on Cross / A, Dash on L1 / LB, Circle / B for the Shield and the
+  // Deflect, Options / Menu to pause). Its two basic strikes are single
+  // face buttons: the Jab on Square / X, the High Kick on Triangle / Y. Its
+  // projectiles and its finisher sit behind R2 / RT, the offensive
+  // modifier, on the face button that matches: Red with Square, Maximum
+  // Blue with Circle (never the Shield), Hollow Purple with Triangle;
+  // Unlimited Void behind L2 / LT with Triangle. In the air the punch and
+  // kick stay where they were (the Floating Straight on Square, the Red
+  // Kick on Triangle), Blue takes R1 / RB and the High Kick L2 / LT +
+  // Square.
+  controller: {
+    layout: {
+      'ground:attack1': pad('west'),
+      'ground:extra_attack': pad('north'),
+      'ground:attack2': pad('west', { modifier: 'r2' }),
+      'ground:attack3': pad('east', { modifier: 'r2' }),
+      'ground:attack4': pad('north', { modifier: 'l2' }),
+      'ground:attack5': pad('north', { modifier: 'r2' }),
+      'air:attack1': pad('west'),
+      'air:attack2': pad('north'),
+      'air:attack3': pad('r1'),
+      'air:extra_attack': pad('west', { modifier: 'l2' }),
+    },
   },
 
   // Techniques, keyed by the attack they are (schema and phases:

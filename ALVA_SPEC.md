@@ -140,8 +140,9 @@ behave, and how it must look.
   reloads); inactive screens are `hidden` and `inert`.
 - Systems, by folder (each module's responsibility and dependencies:
   [`docs/architecture/module-responsibilities.md`](docs/architecture/module-responsibilities.md)):
-  `js/core/` (asset loader, input for keyboard, touch and gamepad, menu
-  navigator, device detection, audio stub, the player's settings
+  `js/core/` (asset loader, input for keyboard, touch and game
+  controllers with their connection manager and binding resolver (7.4a),
+  menu navigator, device detection, audio stub, the player's settings
   `js/core/settings.js` (6.10), touch-layout geometry, utilities);
   `js/localization/` (the interface language, 6.11, which `App` owns and
   applies to the whole page, with one string table per language);
@@ -354,12 +355,21 @@ no header, build label, eyebrow or keyboard hint bar.
   at the top right, inside `--safe-t` / `--safe-r`, with 8 px gaps and
   matching 40–48 px square dark glass buttons. Left to right: **Help**
   ("Help" / "Aide", original question-mark SVG `ICONS.help`), **Controller**
-  ("Controller" / "Manette", the original root `controller.PNG`, centred
-  and proportionally fitted with `object-fit: contain`), **Settings**.
-  Help and Controller are future placeholders: native disabled buttons,
-  announced as unavailable by assistive technology, excluded from Tab and `data-nav`
-  navigation, with no activation handlers. Their artwork is decorative,
-  so each button has just one spoken label. Labels follow live language
+  (the original root `controller.PNG`, centred and proportionally fitted
+  with `object-fit: contain`), **Settings**. Help is a future placeholder:
+  a native disabled button, announced as unavailable by assistive
+  technology, excluded from Tab and `data-nav` navigation, with no
+  activation handler. **Controller** is open: in Tab and menu navigation,
+  it opens Controller Connections (7.4a) over Home and focus returns to it
+  when that closes. A small circular indicator sits on its bottom-right
+  corner, always the current status of the controllers and only one at a
+  time: green with a white check (one to four supported controllers
+  connected), red with a white cross (none), orange with a dark exclamation
+  mark (more than four), ringed in the page's near-black, updated live. The
+  status is in the button's name: "Controller connections: Connected" /
+  "Connexions des manettes : Connectée" (Disconnected / Déconnectée, Too
+  many controllers / Trop de manettes). The artwork is decorative, so each
+  button has just one spoken label. Labels follow live language
   changes. Settings retains its original rightmost position; the group
   extends left. Only the Settings gear rotates on hover / focus.
 - **Settings gear:** Settings is Home chrome, not a menu action: a compact
@@ -602,7 +612,7 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   either uses the usual error with Retry and Back (to Select Stage).
 - **Spectator only.** No gameplay input is read and the touch controls are
   hidden, whichever Mobile Controls layout is chosen (no joystick, Dash
-  buttons or Down either). Pause (`Esc`, `P`, gamepad Start, the HUD's
+  buttons or Down either). Pause (`Esc`, `P`, a controller's Options / Menu, the HUD's
   timer or pause button), Resume, Restart Battle and Return to Home work as
   in Quick Battle, and so do Rematch and Change Stage (which returns to
   Watch Mode's Select Stage).
@@ -741,7 +751,7 @@ A training room, entered straight from Home.
   lower. No score dots (practice has no points), round label, timer or pause
   control. The CPU card shows only while there is a CPU: rebound when it is
   changed, hidden when it is disabled.
-- **Practice menu:** More, Esc / P or gamepad Start freezes practice
+- **Practice menu:** More, Esc / P or a controller's Options / Menu freezes practice
   (simulation, gameplay input and touch controls stop) and floats a light,
   translucent glass menu centred under the More button over a lightly
   dimmed, still stage. It holds exactly **Change Fighter** (green, focused),
@@ -893,7 +903,7 @@ comes from its definition and its profile.
   through jumps, attacks and landings.", Jump "A tap is the normal jump;
   held a little longer, the higher jump.", Triple jump "Two more jumps in
   mid-air. Landing or being hit gives them back.", Fast fall "Hold Down
-  while falling to drop faster.", Dash "Press Q/E, Select/View + left/right on gamepad, or a movement button for a burst
+  while falling to drop faster.", Dash "Press Q/E, the Dash button on a controller (the left shoulder button by default), or a movement button for a burst
   of speed. An attack or a jump can cut in after a moment.", Air dash "The
   Dash in mid-air, flat across, once per airtime." No tiers and no
   numbers: there is nothing to compare.
@@ -966,6 +976,15 @@ indicator. Each section keeps its existing settings, in this order:
   touch layout editor (6.10a) for the layout in use, beside a line naming
   that layout and a "Custom layout" tag once it has one. Leaving the editor
   returns to the Controls tab with focus on Customize.
+
+  Then **Controller controls** ("Commandes de la manette"), under the line
+  "Customize your controller controls for each character individually.
+  Default layouts are designed for comfort and each character’s unique
+  abilities.", and **Customize controller controls**, which opens the
+  fighter roster and each fighter's controller editor (6.10b). Mobile
+  Controls is unchanged. The section's note reads "The touch and controller
+  layouts for Quick Battle and Practice Ground. Keyboard controls stay the
+  same."
 - **Combat** — **Combat Assist** (7.2.4a), under the line "Automatically
   closes a short gap before a melee attack. Never uses energy and never
   affects ranged attacks.", with exactly two choices in the Language section's
@@ -1010,9 +1029,10 @@ indicator. Each section keeps its existing settings, in this order:
   are generated from it; adding a category needs no layout or navigation
   algorithm changes. The active section is presentation state only and is
   never saved as a preference.
-- Presentation, input configuration and the human player's own Combat
-  Assist only: keyboard bindings, gamepad mappings, fighters, the CPU and
-  the rules of a fight never change, and Watch Mode stays free of player
+- Presentation, input configuration (the touch layouts and each fighter's
+  controller layout) and the human player's own Combat Assist only:
+  keyboard bindings, fighters, their moves, the CPU and the rules of a
+  fight never change, and Watch Mode stays free of player
   controls (and of Combat Assist) whichever choices are saved.
 - **Storage.** `js/core/settings.js` is the only module that touches
   storage (no other module reads or writes `localStorage` or
@@ -1021,11 +1041,12 @@ indicator. Each section keeps its existing settings, in this order:
   each change —
 
   ```
-  { "version": 3,
+  { "version": 4,
     "language": "en" | "fr" | null,
     "mobileControls": "joystick" | "classic",
     "touchLayouts": { "joystick": { … }, "classic": { … } },
-    "combatAssist": true | false }
+    "combatAssist": true | false,
+    "controllerProfiles": { "<fighter id>": { "<action id>": binding, … }, … } }
   ```
 
   `language` is null until the player picks one (English is used meanwhile,
@@ -1035,11 +1056,17 @@ indicator. Each section keeps its existing settings, in this order:
   "mobileControls": … }`) keeps its Joystick / Classic choice, with no
   language chosen yet (so the chooser shows once) and both layouts empty;
   a version 2 object keeps its language, Mobile Controls and both custom
-  layouts. Either gets Combat Assist on. Every value is checked on load,
-  one by one: nothing stored, corrupt JSON, any other version, an unknown
-  language or scheme, a malformed layout entry (see 6.10a) or a Combat
-  Assist that is not a boolean falls back to its own default without
-  disturbing valid neighbours. Storage that is missing or throws keeps every choice for the
+  layouts; a version 3 object keeps all of that and its Combat Assist.
+  Versions 1 and 2 get Combat Assist on, and every older version no
+  controller profile. `controllerProfiles` holds a whole controller layout
+  (6.10b) for each fighter the player customized, keyed by the fighter's
+  stable id (never a roster slot or a name); a fighter with none plays with
+  its recommended layout. Every value is checked on load, one by one:
+  nothing stored, corrupt JSON, any other version (a version that is not a
+  number included), an unknown language or scheme, a malformed layout entry
+  (see 6.10a), a Combat Assist that is not a boolean, or a malformed
+  controller binding (that action falls back to its recommended binding)
+  falls back to its own default without disturbing valid neighbours. Storage that is missing or throws keeps every choice for the
   visit only.
 
 ### 6.10a Touch layout editor
@@ -1103,6 +1130,68 @@ is dropped when the layout is read.
   short landscape screens it tightens and drops its hint. The HUD's pause
   and More buttons sit above the touch controls in play (`.hud` z-index 4),
   so no layout can cover them.
+
+### 6.10b Controller controls
+
+Settings › Controls › **Customize controller controls** opens three
+layers over the Settings dialog (`js/ui/controller-editor.js`), each modal
+(`role="dialog"`, `aria-modal`, its own navigation scope, the layer beneath
+`inert`); `Esc`, Circle / B or Back steps back one layer, focus returning to
+what opened it, and closing Settings closes them all. Every string is in
+English and French.
+
+- **The roster.** The shared fighter roster (6.4) as one large glass
+  dialog, "Customize controller controls" under the kicker "Settings", with
+  a line saying the choice does not change the fighter played: all 48
+  slots; a playable fighter's slot opens its editor (keyboard / controller
+  activation at once, a pointer on a second press, or **Customize
+  controls**); a locked slot never does. Quick Battle's and Practice
+  Ground's fighters are never touched.
+- **The editor.** One fighter's controller layout: its portrait and name,
+  the family its buttons are named for ("PlayStation buttons, from your
+  controller."; with none connected, "No controller connected: showing
+  PlayStation buttons." with **Show Xbox buttons** to switch), a
+  "Recommended layout" / "Custom layout" tag, and a note when the fighter
+  has no designed layout yet. Every action the fighter has, by category —
+  **Movement** (Movement, Jump, Dash / air dash, Fast fall), **Defense**
+  (Shield, Deflect, where it has them), **Ground attacks**, **Aerial
+  attacks**, **Special abilities** (projectiles, techniques, summons, marked
+  Ground or Air), **Other** (Pause) — each one row (one focus stop, named
+  "Change binding: <name>. <input>, <activation>.") with its real name
+  (never "Attack 3"), a one-line description, its input in the family's
+  names ("R2 + Square", "Left stick down + X") and its activation (Press,
+  Modifier + press, Hold to activate, Hold, Press (hold to jump higher)). No
+  slot the fighter lacks is shown. Beside the list, an original controller
+  diagram (PlayStation or Xbox layout, the D-pad and left stick swapping
+  places between them) lights the focused action's input: the button in
+  green, a modifier in orange, the stick with its direction; it is never
+  needed, everything reads in text. Conflicts show live: errors (two
+  actions on the same input where both apply; a button the movement source
+  uses) keep **Save** off, warnings (a modifier that is also another
+  action's own button) only inform. **Save** stores the layout for this
+  fighter alone and closes (a layout equal to the recommended one is simply
+  forgotten); **Cancel** (or Back) asks "Discard changes?" first when there
+  are unsaved changes; **Restore defaults** asks "Restore recommended
+  controls?", then puts this fighter alone back on its recommended layout at
+  once. Saved layouts are used from the next sample of play and load on every
+  visit.
+- **The binding dialog.** "Change binding" for one action (its name and
+  line above): it listens to Player 1's controller ("Press your preferred
+  button or combination") and shows what it heard: the last button pressed
+  is the button, a button held before it the modifier, the stick's direction
+  as it went down the direction (for Fast fall a direction alone; for
+  Movement the stick or pad moved). The parts are also choosable in text,
+  each a value stepped by left / right (D-pad or arrows) or a click — Button,
+  Hold first, Stick direction, Activation (only those the action allows: the
+  Shield always held, Jump always press-and-hold, Pause a press; the Dash's
+  direction is the stick's) — so it works without a controller or the
+  diagram. **Retry** listens again, **Cancel** keeps the binding, **Confirm**
+  (off while the binding conflicts) takes it into the editor. While it
+  listens the controller only listens: no menu behind it reacts and no
+  gameplay runs.
+- **Responsive.** The editor fills up to 1080 × 860 px of the viewport, the
+  list scrolling inside; below 760 px wide (or short landscape screens) the
+  diagram moves under the list, and the binding dialog drops its diagram.
 
 ### 6.11 Language
 
@@ -1539,8 +1628,9 @@ each fighter's own values are in its character specification (7.2.9).
   combat rules (7.2.4).
 - **Dash** (movement, not an attack): only an explicit one-step request
   (`mouvementLeftPressed` / `mouvementRightPressed`) starts it: keyboard Q/E,
-  gamepad Select/View/Share (standard button 8) + D-pad or left stick direction,
-  or one tap of either layout's Mouvement button. Held inputs never repeat a
+  a controller's Dash binding (L1 / LB by default: toward the stick's side,
+  else the way the fighter faces; 7.4a), or one tap of either layout's
+  Mouvement button. Held inputs never repeat a
   request. Run taps, including repeated taps and joystick flicks, never Dash.
   Opposing simultaneous requests ask for nothing. `Fighter.tryMouvment`
   selects `tryDash` on the ground and `tryAirDash` in the air. Every existing
@@ -2031,8 +2121,10 @@ attack or a button.
 #### 7.2.5 Defense and Energy
 
 - `shield` is the shared player action, the Shield button (keyboard L,
-  gamepad RB / RT, the touch **Shield** button, named and drawn **Deflect**
-  while the fighter is in the air). On the ground it is the fighter's
+  a controller's Circle / B by default, held for the Shield and pressed in
+  the air for the Deflect, which a player may give different inputs (7.4a),
+  the touch **Shield** button, named and drawn **Deflect** while the fighter
+  is in the air). On the ground it is the fighter's
   Shield, held; in the air it is the fighter's Deflect, a fresh press
   (below). What it does is character data, not part of the input system:
   on the ground how a fighter defends (`defense` in each character's
@@ -2968,23 +3060,20 @@ Adding one is described in
   (`attack4`) Unlimited Void and `,` (`attack5`) Hollow Purple, pressed
   directly like any numbered button (7.2); for #0002, M and `,` do
   nothing. The input
-  snapshot (`InputManager.sample()`) carries held controls and their press
-  edges from keys (never auto-repeat), touch, D-pad and stick. Run edges
+  snapshot (`InputManager.sample(context)`, the fighter as it is at that
+  step) carries held controls and their press edges from keys (never
+  auto-repeat), touch and Player 1's controller (7.4a). Run edges
   never activate Mouvement. Separate `mouvementLeftPressed` /
-  `mouvementRightPressed` fields merge Q/E, Select/View + direction and
-  `queueTouchMouvement(direction)` from both touch layouts. Each request
+  `mouvementRightPressed` fields merge Q/E, the controller's Dash binding
+  and `queueTouchMouvement(direction)` from both touch layouts.
+  `pressedOnGround` / `pressedInAir` say where a controller's combat presses
+  were made for (7.4a); both are false for keys, touch and every CPU. Each request
   lasts one sample; `flush()` and `clear()` discard pending requests.
   A touch scheme switch or disabling its controls also clears pending touch
   Mouvement. Touch Mouvement never holds Run. Every controller uses these
   request fields, including CombatAIController. Menus retain their own mappings.
-- Gamepad (standard layout) for movement (D-pad / left stick left and
-  right), Down in battle (`down`: D-pad down / left stick down, held; the
-  fast fall in the air and downward launch steering; menus still read them
-  as Down), jump (A), the extra attack (X / Square), `attack1`
-  (B / Circle), `attack2` (LB), `attack3` (LT), `attack4` (L3), `attack5`
-  (R3), Transform (Y / Triangle, reserved), Shield (RB / RT) and Start to
-  pause/menus, sending the same codenames. Select/View/Share (button 8) plus
-  a horizontal direction requests Mouvement once per chord press.
+- Game controllers (PlayStation and Xbox, in the standard mapping), sending
+  the same codenames through each fighter's controller layout: see 7.4a.
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
   layouts chosen under Settings → Controls → Mobile Controls (6.10);
   `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
@@ -3152,6 +3241,157 @@ Adding one is described in
 - Gameplay pauses when the pause menu (Practice Ground: the Practice menu,
   the Change Fighter dialog or the CPU dialog) is open, the tab is hidden, or
   the device is blocked in portrait.
+
+### 7.4a Game controllers
+
+ALVA supports PlayStation (DualShock 4, DualSense) and Xbox (Xbox One,
+Xbox Series, and Xbox 360 pads, which share their layout) controllers
+through the browser's Gamepad API in its standard mapping, and nothing
+else: no Nintendo or generic controller is given a layout. Comfort decides
+every recommended control: universal actions keep the same inputs for every
+fighter, each fighter's own moves get inputs designed for them, and the
+player may change any of it, per fighter. Controllers change which control
+codename is sent, never what an action does.
+
+- **Identification** (`js/core/gamepad-devices.js`). Conservative: the USB
+  vendor id first (Sony 054c is PlayStation, Microsoft 045e is Xbox; known
+  product ids name the model: DualShock 4, DualSense, DualSense Edge, Xbox
+  One, Elite, Series, Adaptive, 360), then a product name in the id (Safari
+  and some drivers give no vendor), then XInput (the Xbox protocol). A
+  Nintendo pad, a generic pad, a bare "Wireless Controller" with no vendor,
+  or a supported pad without the standard mapping (its button numbers could
+  mean anything) is unsupported, with its reason. Buttons go by position
+  under one normalized name (`south`, `east`, `west`, `north`, `l1`, `r1`,
+  `l2`, `r2`, `select`, `start`, `l3`, `r3`, `dpadUp` … `dpadRight`), so one
+  layout serves both families; the interface names each as the family does:
+
+  | Normalized | PlayStation | Xbox |
+  | --- | --- | --- |
+  | `south` | Cross | A |
+  | `east` | Circle | B |
+  | `west` | Square | X |
+  | `north` | Triangle | Y |
+  | `l1` / `r1` | L1 / R1 | LB / RB |
+  | `l2` / `r2` | L2 / R2 | LT / RT |
+  | `l3` / `r3` | L3 / R3 | LS / RS |
+  | `start` | Options | Menu |
+  | `select` | Create (Share on a DualShock 4) | View (Back on an Xbox 360 pad) |
+
+  Triggers press at half travel and let go below 0.3 (no flicker).
+- **Connections** (`js/core/controller-manager.js`). Up to four supported
+  controllers are active (`MAX_CONTROLLERS`), in the order first seen; more
+  are detected but inactive until one of the four goes. Four connections
+  are a limit, not multiplayer: Quick Battle stays Player 1 against the CPU.
+  Player 1's controller is the one the player chose (whenever connected:
+  it gets Player 1 back on reconnecting), else the one that has it, else
+  the first active one; only it is ever read, in play or in menus, never
+  several merged. Statuses: **connected** (one to four supported),
+  **disconnected** (none), **tooMany** (more than four). Every frame the
+  manager re-reads the browser's gamepads (cheaply), so connections after
+  the game has loaded, reconnections and disconnections show at once; it
+  also listens to `gamepadconnected` / `gamepaddisconnected`. Player 1's
+  controller lost: its held inputs are let go at once (no endless run, no
+  stuck Shield, no stuck attack, no Dash, no stuck menu repeat) and the next
+  controller takes over; keyboard and touch keep working. Focus lost or the
+  page hidden: everything is let go, and a button still held when the page
+  is back is no press. No Gamepad API, or access blocked (a permissions
+  policy throwing on `getGamepads`): disconnected, and the dialog says
+  why; nothing throws. Browsers expose a controller only after a button
+  press on it: a controller not yet exposed is never called unsupported.
+- **Controller Connections** (`js/ui/controller-dialog.js`), from Home's
+  controller button (6.2): a glass dialog ("Controller connections") with
+  the status ("Status: Connected"), the count ("2 controllers connected"),
+  "Up to 4 controllers can be connected.", each supported controller
+  ("Controller 1 — DualSense Wireless Controller", its family, Status,
+  Assignment: Player 1, Available, or Inactive (over the limit)) with
+  **Use for Player 1** on each available one, an "Unsupported devices"
+  list with each reason, past four controllers an orange alert "Too many
+  controllers connected — ALVA supports up to four connected controllers.
+  Disconnect an extra controller to remove this warning.", a line on the
+  supported families, guidance to press a button on a controller the
+  browser has not shown yet, and **Reconnect** (a refresh icon), which
+  queries the browser again for real (new controllers found, lost ones
+  removed, the count, assignments, indicator and list brought up to date)
+  and announces what it found. It never reloads the game, touches a
+  setting or claims to connect hardware. The dialog updates live while
+  open. Modal, its own scope, Home inert beneath; Esc, Circle / B, Close or
+  the dim close it, focus back on the controller button.
+- **Menus.** Player 1's controller navigates every menu, dialog, pause and
+  result menu, Discover and Watch Mode's chrome with fixed buttons, whatever
+  a fighter's layout says: D-pad focus movement (a step at once, a repeat
+  after 380 ms, then every 130 ms; the focused item scrolls into view),
+  Cross / A confirm, Circle / B back, Options / Menu Start (pause and
+  resume), the right stick scrolling the panel under the cursor (or a box
+  with its own scroll, such as Home's credits). The left stick moves the
+  **controller cursor** (`js/ui/controller-cursor.js`), part of the menu
+  navigator: a 26 px white ring with a centre dot and a dark outline,
+  growing green over an item, shrinking as it activates; a radial
+  deadzone (0.18), an eased response, a top speed of 1.15 × the viewport's
+  shorter side per second (520 to 1500 px/s), a quick stop, kept inside the
+  viewport. Over an enabled item of the active scope it focuses it as a
+  mouse hover does (items whose focus selects them only highlight), so
+  focus, the cursor and activation are one selection; Cross / A activates
+  what it is on, never anything outside the scope (nothing passes through a
+  dialog). After D-pad movement it glides onto the focused item. It shows
+  only while the controller navigates a menu and hides for the keyboard,
+  the mouse, touch and play; it never takes the pointer, so mouse, keyboard
+  and touch work as ever.
+- **Play** (`js/core/controller-resolver.js`). Each sample resolves Player
+  1's controller for the fighter being played, as it is at that step (on the
+  ground or in the air, its facing), through its controller profile (its
+  saved layout for its id, else its recommended one), into the snapshot's
+  own codenames; the Fighter performs and validates every move as ever. One
+  press goes to at most one action, which owns the button until it is let
+  go (a held action is held only while its own press is). Combinations are
+  modifier first: a button pressed while a modifier is held (or with it in
+  the same sample) is that combination only, never its plain button, and
+  does nothing where the combination means nothing; a modifier added after
+  a press never changes it; letting go of a modifier is no press. Plain
+  presses never wait for a modifier, so nothing ordinary is delayed. Among a
+  press's bindings a stick direction beats left-or-right, which beats
+  anywhere; a direction needs the stick past half its travel and goes by the
+  dominant axis (an exact diagonal reads vertical); a directional press is
+  never also a fast fall on its step. Activations: press (once), hold to
+  activate (once, after 0.25 s; a tap does nothing), continuous (held).
+  Nothing repeats while held. A ground binding is never chosen in the air
+  nor an air binding on the ground; the snapshot says where its combat
+  presses were made for (`pressedOnGround` / `pressedInAir`), and the
+  Fighter never lets one buffered for the ground come out in the air, or
+  the reverse. Every button held as play starts or resumes, as the fighter
+  changes (Practice Ground switches layouts at once), and as Player 1's
+  controller changes is stale until let go, and presses made for another
+  fighter are dropped: the button that closed a menu never jumps or
+  attacks. The Pause binding opens the pause (or Practice) menu and never
+  reaches the fighter. Watch Mode's controller only navigates; no CPU is
+  ever controlled. Every CPU's controller is untouched.
+- **Universal recommended controls**, every fighter: Movement, the left
+  stick; Jump, Cross / A (held a little longer, the higher jump; the air
+  and triple jumps as ever); Dash / air dash, L1 / LB (toward the stick's
+  side past 0.3 of its travel, else the way the fighter faces; one per
+  press); Fast fall and downward launch steering, the left stick down;
+  Shield, Circle / B held (never a toggle); Deflect, Circle / B pressed in
+  the air; Pause, Options / Menu.
+- **Each fighter's recommended controls** are its own, authored in its
+  definition (`controller.layout`, validated as the registry loads:
+  complete, only moves it has, never a universal action, no conflict),
+  chosen for each move rather than its attack number, and documented in its
+  specification (7.2.9): #0001's Jab Square, High Kick Triangle, Red
+  R2 + Square, Maximum Blue R2 + Circle, Unlimited Void L2 + Triangle, Hollow
+  Purple R2 + Triangle, and in the air Floating Straight Square, Red Kick
+  Triangle, Blue R1, High Kick L2 + Square; #0002's One-Two Square, Rapid
+  Kicks Triangle, Spin Attack R1, Whirlwind R2 + Triangle, and in the air
+  Homing Attack Square (any way but down), Bounce Attack Down + Square, Blue
+  Tornado R1. A fighter without a layout gets a safe, conflict-free
+  fallback, shown as not designed yet; every playable fighter ships its own.
+- **Customization** (6.10b): every action of every fighter, with single
+  buttons, two-button combinations, a stick direction and an activation;
+  movement from the left stick, the D-pad, either, or the right stick.
+  Conflicts are refused before saving when unresolvable (the same input for
+  two actions that can both apply; a button the movement source uses) and
+  warned of otherwise; contextual reuse is allowed (a ground and an air
+  move on one button, the Shield and the Deflect on Circle, a combination
+  beside its plain button, a direction beside none). Layouts are saved per
+  fighter id (6.10 storage).
 
 ## 8. Accessibility
 

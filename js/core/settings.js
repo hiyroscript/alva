@@ -8,11 +8,12 @@
 //
 // Stored as
 //
-//   { version: 3,
+//   { version: 4,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
-//     combatAssist: true | false }
+//     combatAssist: true | false,
+//     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... } }
 //
 // `language` stays null until the player picks one: the game then speaks
 // English, but the first-launch chooser still asks (languageChosen), so a
@@ -22,15 +23,27 @@
 // presses close a short gap first (see Fighter.tryCombatAssist in
 // js/game/fighters/fighter.js): on unless the player turns it off.
 //
+// `controllerProfiles` holds the player's own controller layout for each
+// fighter they customized (Settings › Controls › Controller controls), keyed
+// by the fighter's stable id, never a roster slot or a name: the whole
+// layout, every action's binding by action id (js/data/controller-
+// profiles.js). A fighter with none plays with its recommended layout.
+// Each is checked entry by entry: a malformed binding is dropped (that
+// action falls back to its recommended binding), never the profile or the
+// rest of the settings.
+//
 // Older objects are migrated: version 1 ({ version: 1, mobileControls })
 // keeps its Mobile Controls choice, with no language chosen yet and no
 // custom layout; version 2 keeps its language, Mobile Controls and both
-// custom layouts. Either gets Combat Assist on. Missing, blocked or
-// unreadable storage, a stored object of any other version, and every value
-// that is not one of its setting's choices fall back to the defaults, value
-// by value, so the game always starts with a valid set.
+// custom layouts; version 3 keeps all of that and its Combat Assist. Versions
+// 1 and 2 get Combat Assist on, and every older version no controller
+// profile. Missing, blocked or unreadable storage, a stored object of any
+// other version, and every value that is not one of its setting's choices
+// fall back to the defaults, value by value, so the game always starts with
+// a valid set.
 
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
+import { sanitizeStoredProfile, sanitizeStoredProfiles } from '../data/controller-profiles.js';
 
 // The interface languages (see js/localization/i18n.js). English is the language in
 // use until the player picks one.
@@ -48,13 +61,14 @@ export const DEFAULT_MOBILE_CONTROLS = 'joystick';
 export const DEFAULT_COMBAT_ASSIST = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
   mobileControls: DEFAULT_MOBILE_CONTROLS,
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
   combatAssist: DEFAULT_COMBAT_ASSIST,
+  controllerProfiles: Object.freeze({}),
 });
 
 // The settings that are one choice from a list, and their allowed values.
@@ -81,6 +95,7 @@ function readCurrent(stored) {
     mobileControls: resolveSetting('mobileControls', stored.mobileControls),
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     combatAssist: resolveSetting('combatAssist', stored.combatAssist),
+    controllerProfiles: sanitizeStoredProfiles(stored.controllerProfiles),
   };
 }
 
@@ -94,6 +109,12 @@ const MIGRATIONS = Object.freeze({
   2: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
   }),
+  // Version 3 had everything but controller profiles: all of it kept, and
+  // no fighter customized yet.
+  3: (stored) => readCurrent({
+    language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
+    combatAssist: stored.combatAssist,
+  }),
 });
 
 // The settings a stored value holds: checked if it is the current version,
@@ -101,7 +122,8 @@ const MIGRATIONS = Object.freeze({
 export function readSettings(stored) {
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return readCurrent({});
   if (stored.version === SETTINGS_VERSION) return readCurrent(stored);
-  if (Object.hasOwn(MIGRATIONS, stored.version)) return MIGRATIONS[stored.version](stored);
+  // A real version number only: '3' is no version at all.
+  if (Number.isInteger(stored.version) && Object.hasOwn(MIGRATIONS, stored.version)) return MIGRATIONS[stored.version](stored);
   return readCurrent({});
 }
 
@@ -229,5 +251,37 @@ export class Settings {
   // Puts `scheme` back on Alva's original layout.
   resetTouchLayout(scheme) {
     return this.setTouchLayout(scheme, {});
+  }
+
+  // A copy of fighter `id`'s saved controller layout (every action's
+  // binding by action id), or null when it plays with its recommended one.
+  controllerProfile(id) {
+    const profile = this.values.controllerProfiles[id];
+    return profile ? sanitizeStoredProfile(profile) : null;
+  }
+
+  // Saves `profile` (bindings by action id, checked first) as fighter
+  // `id`'s controller layout; every other fighter's is untouched. An empty
+  // profile (or null) is the recommended layout again. A malformed id is
+  // refused (false). Listeners hear ('controllerProfiles', { id, profile })
+  // on a real change.
+  setControllerProfile(id, profile) {
+    if (typeof id !== 'string' || !/^[\w-]{1,32}$/.test(id)) return false;
+    const next = sanitizeStoredProfile(profile);
+    const empty = Object.keys(next).length === 0;
+    const current = this.values.controllerProfiles[id] ?? null;
+    if (empty ? current === null : JSON.stringify(next) === JSON.stringify(current)) return true;
+    const profiles = { ...this.values.controllerProfiles };
+    if (empty) delete profiles[id];
+    else profiles[id] = next;
+    this.values.controllerProfiles = profiles;
+    this.save();
+    this.emit('controllerProfiles', { id, profile: empty ? null : sanitizeStoredProfile(next) });
+    return true;
+  }
+
+  // Puts fighter `id` back on its recommended controller layout.
+  resetControllerProfile(id) {
+    return this.setControllerProfile(id, null);
   }
 }

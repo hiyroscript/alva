@@ -16,7 +16,7 @@
 // projectiles back, and it has an air dash of its own (its
 // midair_mouvment), flat out across the air.
 
-import { frames } from './helpers.js';
+import { frames, pad } from './helpers.js';
 
 // Height in art pixels of #0002's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -366,6 +366,42 @@ export const CHARACTER_0002 = {
     midair_attack2: 'Bounce Attack',
     attack3: 'Spin Attack',
     midair_attack3: 'Blue Tornado',
+  },
+
+  // What each move does, in a line, for the controller editor (Settings ›
+  // Controls › Controller controls). English here; other languages by key
+  // (ability.0002.<move>.description).
+  abilityDescriptions: {
+    extra_attack: 'Sends out a travelling tornado that catches, lifts and flings the opponent.',
+    attack1: 'A quick jab and straight that push the opponent away.',
+    midair_attack1: 'Curls up and dashes at the opponent, springing off it on a hit.',
+    attack2: 'A flurry of kicks that holds the opponent, then flings it away.',
+    midair_attack2: 'Plunges straight down, spikes what it meets and bounces back up.',
+    attack3: 'Rolls forward as a ball, faster from a run, bowling through the opponent.',
+    midair_attack3: 'Spins upward into a tornado, carrying opponents into the air.',
+  },
+
+  // Its recommended controller layout (js/data/controller-profiles.js),
+  // built for speed: nothing it moves with needs an awkward combination.
+  // The universal actions keep everyone's buttons (the stick, Jump on
+  // Cross / A, Dash on L1 / LB, Circle / B for the Shield and the Deflect,
+  // Options / Menu to pause). On the ground the One-Two is Square / X and
+  // the Rapid Kicks Triangle / Y; the Spin Attack takes R1 / RB, easy to hit
+  // on the run, and the Whirlwind R2 / RT + Triangle. In the air Square / X
+  // is its Homing Attack whichever way the stick points (the stick's side,
+  // or its facing), except Down + Square, its Bounce Attack, plunging; and
+  // R1 / RB is the Blue Tornado, the Spin Attack's place in the air (one
+  // button, two spins, never both).
+  controller: {
+    layout: {
+      'ground:attack1': pad('west'),
+      'ground:attack2': pad('north'),
+      'ground:attack3': pad('r1'),
+      'ground:extra_attack': pad('north', { modifier: 'r2' }),
+      'air:attack1': pad('west'),
+      'air:attack2': pad('west', { direction: 'down' }),
+      'air:attack3': pad('r1'),
+    },
   },
 
   // Attack definitions (schema: createAttackDefinition in

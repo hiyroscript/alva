@@ -36,7 +36,7 @@ const HELD = ['runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform'
 const SNAPSHOT = [
   ...HELD,
   ...HELD.map((control) => `${control}Pressed`),
-  'mouvementLeftPressed', 'mouvementRightPressed', 'dropPressed',
+  'mouvementLeftPressed', 'mouvementRightPressed', 'pressedOnGround', 'pressedInAir', 'dropPressed',
 ];
 
 // Every name the codename migrations retired, none of which may come back:

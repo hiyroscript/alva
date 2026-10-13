@@ -22,11 +22,12 @@
 //     Never freeze it or replace it.
 //   - Every definition passes assertLoadout (js/data/loadout.js),
 //     assertUniversalMovement (js/data/movement.js) and assertCombatRules
-//     (below) as this module loads, every problem named; one that breaks
-//     the loadout rules, declares movement of its own (a `movement`
-//     profile, `powers`), deals damage off the tiers (1, 3, 5, 10), gives an
-//     attack an invalid repeat cooldown or sets its own Energy maximum
-//     or costs never loads.
+//     (below) and assertControllerLayout (js/data/controller-profiles.js)
+//     as this module loads, every problem named; one that breaks the
+//     loadout rules, declares movement of its own (a `movement` profile,
+//     `powers`), deals damage off the tiers (1, 3, 5, 10), gives an attack
+//     an invalid repeat cooldown, sets its own Energy maximum or costs, or
+//     authors a controller layout that is invalid or conflicts never loads.
 //   - A definition existing is not the same as it being playable.
 //     getCharacter finds any definition (the engine and its tests build
 //     fighters from it); only an `available` one is playable (isPlayable,
@@ -62,6 +63,7 @@
 // js/game/combat/attacks.js).
 
 import { assertLoadout } from './loadout.js';
+import { assertControllerLayout } from './controller-profiles.js';
 import { assertUniversalMovement } from './movement.js';
 import { createAttackDefinition } from '../game/combat/attacks.js';
 import { resolveEnergy } from '../game/combat/combat-state.js';
@@ -145,9 +147,11 @@ export function assertCombatRules(def) {
 }
 
 // No definition that breaks the attack loadout rules, declares movement of
-// its own or breaks a combat rule is ever loaded.
+// its own, breaks a combat rule or authors an invalid or conflicting
+// controller layout is ever loaded.
 for (const def of CHARACTERS) {
   assertLoadout(def);
   assertUniversalMovement(def);
   assertCombatRules(def);
+  assertControllerLayout(def);
 }

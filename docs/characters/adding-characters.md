@@ -286,12 +286,68 @@ directly, and never with its own idea of when a Shield counts.
 - **Ability names:** `abilityNames`, keyed by move codename
   (`attack1: 'Uppercut'`); a move left out keeps its neutral name
   ("Attack 1").
+- **Ability descriptions:** `abilityDescriptions`, keyed by move codename
+  (`attack1: 'A rising punch that launches the opponent upward.'`): one
+  short, accurate line per move, shown in the controller editor.
 - **Localization:** the English names are read from `mobileAbilities` and
-  `abilityNames`; add their French translations to
+  `abilityNames`, the descriptions from `abilityDescriptions`; add their
+  French translations to
   [`js/localization/strings/fr.js`](../../js/localization/strings/fr.js)
-  as `ability.0027.<button>` and `ability.0027.<midair move>`
+  as `ability.0027.<button>`, `ability.0027.<midair move>` and
+  `ability.0027.<move>.description`
   ([localization](../systems/localization.md)). The i18n test fails while a
   key is missing in either language.
+
+### Controller layout
+
+Design its recommended controller layout as its own, never by copying
+another fighter's: `controller: { layout: { ... } }` in its definition,
+one binding per move it really has, each keyed by its action id
+(`ground:attack1`, `air:attack2`, `ground:attack4` for a summon or
+technique, `air:extra_attack` if its extra attack works in the air), built
+with the `pad` helper from
+[`js/data/characters/helpers.js`](../../js/data/characters/helpers.js):
+
+```js
+controller: {
+  layout: {
+    'ground:attack1': pad('west'),                       // Square / X
+    'ground:attack2': pad('west', { modifier: 'r2' }),   // R2 + Square / RT + X
+    'air:attack1': pad('west'),
+    'air:attack2': pad('west', { direction: 'down' }),   // Down + Square
+  },
+},
+```
+
+The universal actions (movement, Jump on Cross / A, the Dash on L1 / LB,
+Circle / B for the Shield and the Deflect, Options / Menu) keep everyone's
+buttons: a layout never names them. For each move ask how often it is
+used, how fast it must come out, whether it is thrown while moving or
+jumping, whether it needs a direction or a hold, whether it follows another
+move, and whether its input could set off something else: frequent, fast
+moves on single face buttons; powerful or rare ones behind a trigger
+modifier (R2 / RT, L2 / LT); a ground move and an air move may share a
+button (one is never chosen where the other applies); a direction picks
+between moves only where the move is about direction. Then:
+
+1. Identify its universal actions (a Shield, a Deflect?).
+2. List every move it has, where (ground, air), and what each does.
+3. Choose each input for comfort, as above.
+4. Check there is no conflict:
+   [`js/data/controller-profiles.js`](../../js/data/controller-profiles.js)
+   `controllerLayoutProblems` (the registry refuses a layout that is
+   incomplete, names a move the fighter lacks, retunes a universal action
+   or conflicts).
+5. Write each move's line in `abilityDescriptions` (and its French).
+6. Document the layout in its specification, as
+   [#0001](0001.md#controller-layout) and [#0002](0002.md#controller-layout)
+   do.
+
+A fighter registered with no layout still works: it gets a safe,
+conflict-free fallback (face buttons, then R1, then trigger combinations),
+which the editor flags as not designed yet; it is a placeholder, never a
+finished layout. Every playable fighter must ship one designed for it
+([`tests/systems/controller-profiles.test.mjs`](../../tests/systems/controller-profiles.test.mjs)).
 - **Credits:** add a credit group for its sprite source to
   [`js/ui/credits.js`](../../js/ui/credits.js), its lines as translation
   keys with their English and French strings, exactly as the source was
@@ -390,6 +446,9 @@ A new fighter is covered automatically by:
 - [`tests/fighters/profiles.test.mjs`](../../tests/fighters/profiles.test.mjs)
   (once playable: a valid Discover profile, a description in both
   languages and a review hash matching its definition);
+- [`tests/systems/controller-profiles.test.mjs`](../../tests/systems/controller-profiles.test.mjs)
+  (once playable: a complete, valid, conflict-free controller layout of
+  its own);
 - the localization and touch-control tests.
 
 Then add its own tests in `tests/fighters/0027/` for what is its own:

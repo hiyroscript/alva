@@ -151,7 +151,7 @@ export const MOVEMENT_GUIDE = Object.freeze([
   Object.freeze({
     id: 'dash',
     name: 'Dash',
-    description: 'Press Q/E, Select/View + left/right on gamepad, or a movement button for a burst of speed. An attack or a jump can cut in after a moment.',
+    description: 'Press Q/E, the Dash button on a controller (the left shoulder button by default), or a movement button for a burst of speed. An attack or a jump can cut in after a moment.',
   }),
   Object.freeze({ id: 'airDash', name: 'Air dash', description: 'The Dash in mid-air, flat across, once per airtime.' }),
 ]);

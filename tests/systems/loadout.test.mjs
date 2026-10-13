@@ -195,15 +195,11 @@ test('the combat input buffer keeps every numbered attack button through attack5
   }
 });
 
-test('keyboard O, M and , and gamepad LT, L3 and R3 press attack3, attack4 and attack5; the old keys are untouched', async () => {
-  const listeners = {};
-  globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
-  globalThis.document = { addEventListener() {}, hidden: false };
-  const pad = { connected: true, axes: [0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
-  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => [pad] }, configurable: true });
-  const { InputManager } = await import('../../js/core/input-manager.js');
-  const input = new InputManager(CONFIG.bindings);
-  const key = (type, code) => listeners[type]({ code, repeat: false, preventDefault() {} });
+test('keyboard O, M and , press attack3, attack4 and attack5, and a controller reaches every button through the fighter\'s own layout; the old keys are untouched', async () => {
+  const { controllerRig } = await import('../helpers/fake-gamepad.mjs');
+  const rig = await controllerRig();
+  const { input, listeners } = rig;
+  const key = (type, code) => listeners[type][0]({ code, repeat: false, preventDefault() {} });
   for (const [code, action] of [['KeyU', 'attack1'], ['KeyI', 'attack2'], ['KeyO', 'attack3'], ['KeyM', 'attack4'], ['Comma', 'attack5'], ['KeyJ', 'extra_attack']]) {
     key('keydown', code);
     const f = input.sample();
@@ -213,14 +209,20 @@ test('keyboard O, M and , and gamepad LT, L3 and R3 press attack3, attack4 and a
     key('keyup', code);
     input.sample();
   }
-  listeners.gamepadconnected();
-  for (const [i, action] of [[1, 'attack1'], [4, 'attack2'], [6, 'attack3'], [10, 'attack4'], [11, 'attack5'], [2, 'extra_attack']]) {
-    pad.buttons[i].pressed = true;
-    input.pollGamepads(0);
-    assert.equal(input.sample()[`${action}Pressed`], true, `pad button ${i}`);
-    pad.buttons[i].pressed = false;
-    input.pollGamepads(0);
-    input.sample();
+  // #0001 on the ground, on its recommended layout: every numbered button
+  // and its extra_attack, each from its own input, one combat press each.
+  const ground = { grounded: true, facing: 1, character: getCharacter('0001') };
+  input.sample(ground); // the fighter's first step: its layout from here on
+  for (const [inputs, action] of [
+    [['west'], 'attack1'], [['r2', 'west'], 'attack2'], [['r2', 'east'], 'attack3'],
+    [['l2', 'north'], 'attack4'], [['r2', 'north'], 'attack5'], [['north'], 'extra_attack'],
+  ]) {
+    for (const b of inputs) rig.press(b);
+    const f = input.sample(ground);
+    assert.deepEqual(COMBAT_ACTIONS.filter((a) => f[`${a}Pressed`]), [action], inputs.join(' + '));
+    assert.equal(f.pressedOnGround, true);
+    for (const b of inputs) rig.press(b, false);
+    input.sample(ground);
   }
 });
 
@@ -398,7 +400,7 @@ test('every definition the game loads keeps the rules, and a broken one is refus
     assert.doesNotThrow(() => assertLoadout(def));
   }
   const source = readFileSync(new URL('../../js/data/characters.js', import.meta.url), 'utf8');
-  assert.match(source, /for \(const def of CHARACTERS\) \{\s*assertLoadout\(def\);\s*assertUniversalMovement\(def\);\s*assertCombatRules\(def\);\s*\}/, 'the registry validates every definition it loads');
+  assert.match(source, /for \(const def of CHARACTERS\) \{\s*assertLoadout\(def\);\s*assertUniversalMovement\(def\);\s*assertCombatRules\(def\);\s*assertControllerLayout\(def\);\s*\}/, 'the registry validates every definition it loads');
   // The rules are generic: nothing in them names a character.
   const rules = readFileSync(new URL('../../js/data/loadout.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(rules, /'000\d'|#000\d|displayName|Punch|Kick|Shuriken|Clone|Sphere/);
