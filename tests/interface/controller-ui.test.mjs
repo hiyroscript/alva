@@ -169,7 +169,7 @@ const { ControllerManager } = await import('../../js/core/controller-manager.js'
 const { resolveProfile } = await import('../../js/data/controller-profiles.js');
 const { HomeScreen } = await import('../../js/screens/home-screen.js');
 const { SettingsDialog } = await import('../../js/ui/settings-dialog.js');
-const { ConfirmDialog } = await import('../../js/ui/overlays.js');
+const { ConfirmDialog, InfoDialog } = await import('../../js/ui/overlays.js');
 const { ControllerDialog } = await import('../../js/ui/controller-dialog.js');
 const { ControllerControls } = await import('../../js/ui/controller-editor.js');
 const { CONFIG } = await import('../../js/config.js');
@@ -207,9 +207,11 @@ function boot({ pads = [], api = 'available', storage = memoryStorage() } = {}) 
   app.nav = new MenuNavigator(app);
   const offSettings = followSettings(settings);
   const home = new HomeScreen(app);
-  const roots = Object.fromEntries(['settings', 'confirm', 'controller', 'roster', 'editor', 'binding'].map((k) => [k, new Element('div')]));
+  const roots = Object.fromEntries(['settings', 'confirm', 'controller', 'roster', 'editor', 'binding', 'info'].map((k) => [k, new Element('div')]));
   app.settingsDialog = new SettingsDialog(roots.settings, app);
   app.dialog = new ConfirmDialog(roots.confirm, app);
+  roots.info.hidden = true;
+  app.infoDialog = new InfoDialog(roots.info, app);
   app.controllerDialog = new ControllerDialog(roots.controller, app);
   app.controllerControls = new ControllerControls(app, { roster: roots.roster, editor: roots.editor, binding: roots.binding });
   body.replaceChildren(home.el, ...Object.values(roots));
@@ -437,6 +439,10 @@ test('the left stick shows the circular cursor in menus; it focuses what it hove
     target.addEventListener('click', () => opened++);
     press(env, 'south');
     assert.equal(opened, 1, 'Cross / A activates what the cursor is on');
+    assert.equal(env.app.infoDialog.isOpen, true, 'the story opens through the real controller input');
+    press(env, 'east');
+    assert.equal(env.app.infoDialog.isOpen, false, 'Circle / B closes the story');
+    assert.equal(document.activeElement, target);
     // Over a dialog, the item beneath it is out of scope: never clicked.
     env.app.controllerDialog.open();
     pointAt = env.home.actions.play;

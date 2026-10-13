@@ -62,21 +62,32 @@
   .choice-desc { font-size: 12px; line-height: 1.35; }
 }
 
-/* The information dialog (Discover's play-style description): the same
-   heading and close button as the choice dialog over one readable
-   paragraph. The panel scrolls on its own when a short window cannot fit
-   the text, so the close button stays reachable. */
+/* Information dialogs share a fixed heading and Close above a scrolling
+   body. Home's longer story uses a wider reading panel. The overlay's
+   existing safe-area padding bounds both sizes. */
 .info-panel {
   width: min(560px, 100%);
   max-height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  gap: clamp(10px, 2.2vh, 16px);
+}
+.info-panel--story { width: min(680px, 100%); }
+.info-panel .kicker[hidden] { display: none; }
+.info-body {
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  gap: clamp(10px, 2.2vh, 16px);
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+  max-width: 62ch;
+  font-size: 15px;
+  line-height: 1.6;
 }
-.info-panel .kicker[hidden] { display: none; }
-.info-body { max-width: 62ch; font-size: 15px; line-height: 1.6; }
+.info-panel--story .info-body { max-width: 65ch; }
+.info-body p + p { margin-top: 1em; }
+.info-body:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 @media (max-height: 420px) {
   .info-body { font-size: 13px; line-height: 1.45; }
 }

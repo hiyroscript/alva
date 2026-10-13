@@ -9,7 +9,7 @@
 // Play, Watch Mode and Practice Ground each start a match, so they are
 // open only while a fighter is playable: with none, they are disabled and
 // described by a "No fighters available" note under the menu. Discover,
-// Settings and the credits stay open whatever the roster holds.
+// Settings, Why Alva? and the credits stay open whatever the roster holds.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -193,6 +193,16 @@ export class HomeScreen extends Screen {
       this.scrollCredits(delta);
     });
 
+    const whyAlva = el('button', {
+      class: 'home-why-alva', type: 'button', 'data-nav': true,
+      'aria-haspopup': 'dialog', ...tx('home.whyAlva'),
+    });
+    whyAlva.addEventListener('click', () => app.infoDialog.open({
+      titleKey: 'home.whyAlva',
+      paragraphs: Array.from({ length: 7 }, (_, i) => `home.whyAlva.paragraph${i + 1}`),
+      opener: whyAlva,
+    }));
+
     this.el.replaceChildren(
       el('div', { class: 'home-scene' }, [
         el('div', { class: 'home-glass', 'aria-hidden': 'true' }),
@@ -212,10 +222,7 @@ export class HomeScreen extends Screen {
       el('footer', { class: 'home-footer' }, [
         el('div', { class: 'home-footer-left' }, [
           el('span', tx('home.by', { developer: CONFIG.developer })),
-          // Focusable placeholder; activation intentionally has no action yet.
-          el('button', {
-            class: 'home-why-alva', type: 'button', 'data-nav': true, ...tx('home.whyAlva'),
-          }),
+          whyAlva,
         ]),
         el('button', {
           class: 'home-download', type: 'button', disabled: true,

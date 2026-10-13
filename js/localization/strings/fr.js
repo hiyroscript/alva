@@ -162,6 +162,13 @@ export const FR = {
   'home.creditsRegion': 'Crédits. Faites défiler ou utilisez les flèches haut et bas et les touches Page précédente et Page suivante pour les lire.',
   'home.by': 'Par {developer}',
   'home.whyAlva': 'Pourquoi Alva ?',
+  'home.whyAlva.paragraph1': "Depuis toujours, j’aime la fiction, surtout les histoires de super-héros. Pendant longtemps, j’ai imaginé un jeu de combat où des personnages venus d’univers complètement différents pourraient s’affronter. Certains jeux se sont rapprochés de cette idée, mais ils n’ont pas tous connu le succès, tandis que d’autres étaient réservés à des plateformes auxquelles je n’avais pas accès.",
+  'home.whyAlva.paragraph2': "Un jour, en regardant des vidéos sur Internet, j’ai découvert quelque chose qui s’appelle MUGEN. C’est un moteur de jeu de combat qui permet de créer ses propres combattants à partir de sprites et d’animations. J’ai tout de suite adoré le concept. Cette liberté de création correspondait exactement à ce que j’avais toujours voulu découvrir. Malheureusement, je n’ai jamais eu d’appareil compatible pour en profiter.",
+  'home.whyAlva.paragraph3': "Ça m’a fait réfléchir. Je trouve dommage que certaines personnes ne puissent pas profiter d’une expérience qui leur plairait simplement parce qu’elles n’ont pas le bon appareil, ou parce qu’elles ne peuvent pas télécharger et installer un jeu. J’avais envie de rendre ce genre d’expérience plus accessible.",
+  'home.whyAlva.paragraph4': "Et c’est comme ça qu’est née l’idée d’Alva.",
+  'home.whyAlva.paragraph5': "Inspiré par la liberté de création de MUGEN, j’ai décidé de créer mon propre jeu de combat de plateformes dans le même esprit, mais en privilégiant l’accessibilité. Avec Alva, pas besoin de télécharger ou d’installer le jeu. Il suffit d’ouvrir un lien dans son navigateur, sur un appareil compatible, et de commencer à jouer.",
+  'home.whyAlva.paragraph6': "Alva est un projet de fan non officiel, né d’un véritable amour pour la fiction et des possibilités infinies qu’offrent les rencontres entre différents univers. C’est un jeu destiné à celles et ceux qui partagent cette même imagination et cet enthousiasme.",
+  'home.whyAlva.paragraph7': "Et voilà pourquoi Alva existe.",
 
   'credits.createdBy': 'Créé par {developer}',
   'credits.original.title': 'Création originale',

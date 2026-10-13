@@ -8,6 +8,7 @@
 // names, index.html's own labels) without a reload. On a minimal fake DOM.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const noop = () => {};
@@ -585,4 +586,21 @@ test('the empty-roster strings read in both languages', () => {
   assert.equal(STRINGS.fr['common.fighterUnavailable'], 'Combattant indisponible');
   assert.match(STRINGS.en['common.fighterUnavailableMessage'], /cannot start/);
   assert.match(STRINGS.fr['common.fighterUnavailableMessage'], /ne peut pas commencer/);
+});
+
+// Pin the approved complete story, including punctuation and paragraph order.
+// This also guards against adding names, franchises or roster promises later.
+test('Why Alva? preserves the exact approved English and French story without character or roster references', () => {
+  const approved = {
+    en: '3966f5d8b7468c03a26081579f20311ee13acc6d0532c055945964382ac41ff5',
+    fr: '86dbe479b967081e7291f1f209c54bdd6e0a8fac7b361d67aa635747476ea532',
+  };
+  for (const language of ['en', 'fr']) {
+    const paragraphs = Array.from({ length: 7 }, (_, i) => STRINGS[language][`home.whyAlva.paragraph${i + 1}`]);
+    assert.ok(paragraphs.every((text) => typeof text === 'string' && text.length > 0));
+    const story = paragraphs.join('\n\n');
+    assert.equal(createHash('sha256').update(story).digest('hex'), approved[language], language);
+    assert.doesNotMatch(story, /roster|playable|upcoming|unavailable|jouables|à venir|indisponibles|#\d{4}/i);
+    assert.match(story, /MUGEN/);
+  }
 });
