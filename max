@@ -1,1 +1,737 @@
+ALVA — Intelligent Combat, Combo Assist & Controller UI Update
 
+Primary objective
+
+Carefully implement a major combat responsiveness and accessibility update in the Alva repository:
+
+https://github.com/hiyroscript/alva
+
+This update has five interconnected requirements:
+
+1. Introduce a new Combo assist setting, enabled by default.
+2. Implement intelligent player-requested move interruption and cancellation.
+3. Display each attack’s artwork beside its name in Controller Controls.
+4. Fix Combat Assist being cancelled or bypassed when Run is held while attacking.
+5. Fix Combat Assist inconsistently failing immediately after another move.
+
+The most important requirement is intelligent, predictable combat behavior.
+
+The system must understand the difference between repeating the current attack, requesting a different attack, attacking during recovery, attacking during cooldown, and holding a movement direction.
+
+Do not implement simplistic logic that cancels every animation whenever an input is detected.
+
+Do not sacrifice existing gameplay mechanics to make these features work.
+
+⸻
+
+Phase 1 — Thoroughly understand the existing implementation
+
+Before modifying anything, study the actual repository and trace how inputs travel from each supported device into the combat system.
+
+Important files:
+
+Combat and movement
+
+* js/game/fighters/fighter.js
+* js/game/fighters/fighter-controller.js
+* js/game/combat/combat-state.js
+* js/game/combat/combat-assist.js
+* js/game/combat/attacks.js
+* js/data/cooldowns.js
+* js/data/movement.js
+
+Input handling
+
+* js/core/input-manager.js
+* js/core/controller-resolver.js
+* js/data/controller-profiles.js
+
+Settings
+
+* js/core/settings.js
+* js/ui/settings-dialog.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+
+Controller UI
+
+* js/ui/controller-editor.js
+* js/ui/mobile-abilities.js
+* js/data/ability-preview.js
+* js/ui/touch-controls.js
+* css/controller.css
+
+Session integration
+
+* js/game/battle.js
+* js/game/practice.js
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+
+Also inspect the character definitions, relevant documentation, and existing tests.
+
+Understand these existing mechanics before changing their behavior:
+
+* The shared 0.5-second repeat cooldown.
+* Individual attack cooldowns and longer authored cooldowns.
+* The normal combat input buffer.
+* Hit-confirmed attack cancellation.
+* Dash cancellation and its commitment window.
+* Combat Assist’s automatic approach.
+* Attack startup, active frames, and recovery.
+* Airborne versus grounded attacks.
+* Projectiles, summons, techniques, and the Deflect.
+* Fixed-step simulation and input press edges.
+* Directional movement and attack facing.
+
+The implementation must remain generic across every fighter.
+
+⸻
+
+Requirement 1 — New Combo assist setting
+
+Add a new setting under:
+
+Settings → Combat → Combo assist
+
+It must be separate from the existing Combat Assist setting.
+
+Default: On
+
+Allow players to choose On or Off, using the existing settings UI conventions.
+
+Provide a short description explaining that pressing Attack 1 or Attack 2 again during its repeat cooldown automatically performs the opposite attack.
+
+Persist the preference through the existing settings system.
+
+Update the settings schema and migrations carefully. Preserve every existing setting, including language, mobile controls, Combat Assist, custom touch layouts, and controller profiles.
+
+Add appropriate English and French translations.
+
+The setting should affect the human player only, not CPU fighters.
+
+Exact Combo Assist mechanics
+
+Alva already has a repeat cooldown system, generally 0.5 seconds after an attack finishes or is interrupted.
+
+Combo Assist must use this system.
+
+Example A — Attack 1 into Attack 2
+
+1. The player presses Attack 1.
+2. Attack 1 starts and performs its animation.
+3. Attack 1 finishes.
+4. Its existing 0.5-second repeat cooldown begins.
+5. The player presses Attack 1 again during that cooldown.
+6. Because Combo Assist is enabled, the game interprets the new press as Attack 2.
+7. Attack 2 executes if it is currently legal.
+
+Example B — Attack 2 into Attack 1
+
+The reverse must work identically.
+
+Attack 2 finishes, enters its repeat cooldown, and another Attack 2 press during that cooldown triggers Attack 1.
+
+Critical distinction: Never interrupt an active attack with its own button
+
+This is extremely important.
+
+Suppose Combo Assist is ON.
+
+The player starts Attack 1, then presses Attack 1 again while the original attack is still playing.
+
+Do not cancel Attack 1.
+
+Do not restart its animation.
+
+Do not immediately trigger Attack 2.
+
+Do not schedule an unwanted Attack 2 merely because the player pressed Attack 1 during its active animation.
+
+Allow Attack 1 to complete normally.
+
+Only when Attack 1 has actually finished and its repeat cooldown is active should a new Attack 1 press trigger Attack 2.
+
+The same rule applies symmetrically to Attack 2.
+
+Required behavior table
+
+Current situation	New input	Expected result
+Idle, both attacks ready	Attack 1	Attack 1
+Idle, both attacks ready	Attack 2	Attack 2
+Attack 1 actively playing	Attack 1	Preserve Attack 1
+Attack 2 actively playing	Attack 2	Preserve Attack 2
+Attack 1 completed, on cooldown	Attack 1	Attack 2
+Attack 2 completed, on cooldown	Attack 2	Attack 1
+Attack 1 playing	Attack 2	Request Attack 2 through move-cancellation rules
+Attack 2 playing	Attack 1	Request Attack 1 through move-cancellation rules
+Combo Assist OFF	Attack 1 on its cooldown	No automatic Attack 2
+Combo Assist OFF	Attack 2 on its cooldown	No automatic Attack 1
+
+Additional Combo Assist requirements
+
+* Only Attack 1 and Attack 2 participate in automatic alternation.
+* Extra Attack and Attack 3–5 must not automatically alternate.
+* Grounded and airborne move mappings must be respected.
+* Use Fighter.attackFor() and the fighter’s own loadout rather than hardcoded animation names.
+* Never bypass the alternate attack’s cooldown.
+* Never bypass missing animations, air-use limits, or other legality requirements.
+* If the alternate attack is unavailable, do not force it or silently restart an invalid move.
+* Hold inputs must not create uncontrolled repeated combos.
+* Only genuine new attack requests should trigger alternation.
+* Preserve normal attack behavior when Combo Assist is disabled.
+* The existing Combat Assist setting must operate independently of Combo Assist.
+
+Do not create a second artificial 0.5-second timer if the existing cooldown already provides the necessary state.
+
+For attacks with an explicitly longer authored cooldown, respect that cooldown. Do not overwrite or shorten it.
+
+⸻
+
+Requirement 2 — Intelligent move cancellation and interruption
+
+The player should be able to interrupt an existing move by deliberately requesting a different valid move.
+
+The intended result is responsive, fluid combat without unnecessary animation lockouts.
+
+However, cancellation must be context-aware.
+
+Fundamental rule
+
+A new, valid player-requested action should be able to replace the current action when game-state rules permit it. Run is not a cancellation request.
+
+Do not treat holding or changing the Run direction as requesting a new combat move.
+
+This distinction is mandatory.
+
+Types of requests
+
+Handle intentional requests for:
+
+* A different numbered attack.
+* Extra Attack.
+* Jump or air jump.
+* Dash or air dash.
+* Shield or Deflect.
+* A summon or technique where its rules allow execution.
+
+Only perform a cancellation if the requested replacement can actually be accepted.
+
+A failed request must not unnecessarily destroy the move that is already playing.
+
+Important: Same-attack protection
+
+If Attack 1 is active and the player presses Attack 1 again, preserve Attack 1.
+
+If Attack 2 is active and the player presses Attack 2 again, preserve Attack 2.
+
+Apply the same principle to other actions where repeated presses would simply restart the identical move without a meaningful new action.
+
+This prevents accidental animation resets, repeated startup frames, and unwanted interruption loops.
+
+Different-attack cancellation
+
+If Attack 1 is active and the player intentionally requests Attack 2:
+
+1. Determine whether Attack 2 is valid in the current context.
+2. Check its cooldown, required art, state restrictions, and any other prerequisites.
+3. If valid, interrupt Attack 1 through the proper combat-state cleanup.
+4. Start Attack 2 or its applicable Combat Assist approach.
+5. Apply Attack 1’s normal interruption cooldown.
+6. Ensure Attack 1 cannot continue delivering future strikes or releases after being cancelled.
+
+Do not require a successful hit as a universal prerequisite for player-requested move-to-move cancellation.
+
+Existing hit-cancel behavior may remain available, but it should not be the only mechanism through which the player can deliberately change moves.
+
+Movement is not an attack-cancellation request
+
+Normal running must never interrupt an attack or Combat Assist.
+
+Examples:
+
+* Attack 1 + hold Right: Attack 1 continues.
+* Attack 2 + hold Left: Attack 2 continues.
+* Attack 1 + change Right to Left: Attack 1 continues.
+* Combat Assist approaching + hold Run: approach continues.
+* Combat Assist approaching + change directional input: do not cancel solely because direction changed.
+
+Existing directional facing and attack steering rules should remain functional.
+
+Distinguish ordinary runLeft / runRight inputs from explicit mouvementLeftPressed / mouvementRightPressed Dash requests.
+
+A Dash is a discrete action request. Run is continuous locomotion.
+
+Smart cancellation safeguards
+
+Never allow player-initiated cancellation to violate fundamental combat restrictions.
+
+Respect:
+
+* Hitstun and blockstun.
+* Paralysis and immobilization.
+* Hitstop and impact freeze.
+* Ground-only moves.
+* Air-only move mappings.
+* Energy costs and exhaustion.
+* Move cooldowns.
+* Airborne usage limits.
+* Missing or invalid animation assets.
+* Existing projectile and hit resolution.
+* Game pause, input locks, death, respawn, and reset states.
+
+During hitstop, preserve eligible requests according to the existing buffering rules rather than forcing action execution inside the frozen simulation.
+
+Where an action has an intentional commitment or protected phase, determine the correct cancellation eligibility explicitly. Avoid accidental restrictions caused merely by unrelated state checks.
+
+Atomic action transitions
+
+This is essential.
+
+Do not cancel first and discover afterward that the replacement attack cannot start.
+
+Use a deliberate process:
+
+1. Read the incoming action request.
+2. Resolve Combo Assist mapping, if applicable.
+3. Determine whether the action is eligible.
+4. Check whether the current action may be interrupted.
+5. Accept or defer the new action.
+6. Only then cancel the previous action and transition.
+
+If the replacement cannot legally start, preserve the original action unless another explicit rule requires ending it.
+
+Cleanup requirements
+
+On cancellation:
+
+* End the previous action cleanly.
+* Start its appropriate cooldown exactly once.
+* Prevent duplicate hitboxes and strikes.
+* Prevent unreleased projectiles from spawning after interruption.
+* Preserve already-spawned projectiles and effects according to their existing rules.
+* Never duplicate technique effects or summoned entities.
+* Preserve legitimate motion and momentum.
+* Avoid unnecessary facing resets.
+* Preserve proper Energy accounting.
+
+Do not create animation-state corruption or invisible attacks.
+
+⸻
+
+Requirement 3 — Attack images in Controller Controls
+
+Navigate to:
+
+Settings → Controls → Controller controls → Select fighter → Customize controls
+
+Currently the controller editor displays attack names, descriptions, and bindings.
+
+Update it so that each attack displays its corresponding artwork beside its name.
+
+Expected appearance
+
+For example, a controller mapping row should visually contain:
+
+[Attack artwork] Jab — Square
+
+[Attack artwork] Red — R2 + Square
+
+The artwork must appear alongside the existing move name, while preserving the controller binding information.
+
+Reuse the mobile artwork system
+
+Alva already includes the infrastructure needed for this:
+
+* js/data/ability-preview.js
+* previewFrame()
+* js/ui/mobile-abilities.js
+* Fighter-specific mobileAbilities definitions.
+* Existing animation and projectile preview assets.
+
+Reuse the same authored art displayed on the mobile attack controls.
+
+Do not create new duplicate image assets or hardcode per-character filenames.
+
+Requirements
+
+* Display artwork for each applicable attack and ability row.
+* Support Attack 1 through Attack 5 where available.
+* Support Extra Attack.
+* Support the ground and aerial versions separately.
+* Display the correct preview for each move’s actual ground/air context.
+* Support projectile, summon, and technique previews when authored.
+* Respect each fighter’s source-facing and mirrored-art definitions.
+* Use transparent images and crisp pixel rendering.
+* Preserve the current controller editor layout.
+* Ensure images do not overlap descriptions, bindings, or action buttons.
+* Scale images appropriately on desktop, tablet, and smaller landscape screens.
+* Maintain readable move labels.
+* Preserve keyboard and controller navigation.
+* Keep existing accessible names and screen-reader behavior.
+* Use existing fallback icons when an image is missing or fails to load.
+
+Non-attack actions such as ordinary Movement should retain their appropriate existing presentation.
+
+Update css/controller.css as needed.
+
+The images are visual additions, not changes to bindings or action identities.
+
+⸻
+
+Requirement 4 — Fix Combat Assist being cancelled when Run is held
+
+There is a gameplay bug:
+
+When the player holds Run, then presses an attack while continuing to hold Run, Combat Assist may be cancelled or skipped.
+
+This behavior is incorrect.
+
+Combat Assist must work whether the player is standing still, running toward the opponent, running away, or changing directions.
+
+Expected behavior
+
+Suppose Combat Assist is ON.
+
+1. The player holds Right to run.
+2. While still holding Right, they press Attack 1.
+3. The attack qualifies for a Combat Assist approach.
+4. Combat Assist begins closing the gap.
+5. The player continues holding Right.
+6. Combat Assist completes its approach and performs the requested attack.
+
+No cancellation should occur simply because Run remains held.
+
+Repeat this with Left, different facing directions, and midair movement where relevant.
+
+Debugging requirements
+
+Trace the complete input path:
+
+Keyboard / Touch / Controller → Input Manager → Controller Resolver → PlayerController → Fighter.update() → Combat Assist.
+
+Investigate whether:
+
+* Run is being incorrectly classified as a new discrete action.
+* A held input is producing an unintended cancellation request.
+* Dash and Run are being confused.
+* A directional change is invalidating the approach.
+* Combat Assist is incorrectly rejected while another state remains active.
+* Buffer processing is overwriting the intended attack.
+* Current-facing or momentum calculations create unintended interruptions.
+
+Find and fix the actual cause.
+
+Do not use a workaround that merely suppresses all cancellation during Combat Assist.
+
+Explicit Jump, Dash, Shield, Deflect, and valid different-move requests must still behave according to the intelligent cancellation rules.
+
+Run must be passive movement input, never an implicit Combat Assist cancellation.
+
+⸻
+
+Requirement 5 — Fix Combat Assist being ignored after another move
+
+There is another intermittent bug:
+
+The player performs one move, then presses another attack soon afterward, but Combat Assist sometimes fails to activate.
+
+This is especially noticeable during transitions out of an attack’s active or recovery state.
+
+Existing architecture to investigate
+
+In fighter.js, Combat Assist’s initiation depends on the fighter being able to act.
+
+However, the existing combat engine can allow a follow-up attack during a hit-cancel even when the fighter is not fully free.
+
+This can produce a situation in which the new attack is accepted but Combat Assist’s gap-closing approach is skipped.
+
+Also inspect the existing short input buffer, which may expire before the player becomes eligible to act.
+
+Desired behavior
+
+If a player requests a valid melee attack that qualifies for Combat Assist, the system must properly evaluate Combat Assist as part of executing that request.
+
+It must not be bypassed merely because the attack follows another move.
+
+Examples:
+
+* Attack 1 finishes → Attack 2 is requested.
+* Attack 2 finishes → Attack 1 is requested.
+* Attack 1 is interrupted with another attack.
+* An attack is requested near the end of recovery.
+* An attack is buffered during impact freeze.
+* An attack begins immediately after Dash.
+* An attack is requested while Run remains held.
+* Combo Assist converts an Attack 1 cooldown press into Attack 2.
+* Combo Assist converts an Attack 2 cooldown press into Attack 1.
+
+Whenever the resolved attack is a valid Combat Assist candidate, apply the existing approach eligibility checks.
+
+Preserve the original Combat Assist behavior
+
+Combat Assist must still:
+
+* Apply only to eligible melee attacks.
+* Avoid unnecessary approach when already within reach.
+* Respect the existing maximum approach distance.
+* Respect walls, platforms, and ledges.
+* Avoid interfering with homing attacks.
+* Never activate for ranged attacks that are not eligible.
+* Never spend Dash Energy for its automatic approach.
+* Preserve airborne dash-use restrictions.
+* Remain disabled for CPU opponents.
+* Honor the player’s Combat Assist preference.
+
+Do not fix the bug by making Combat Assist automatically activate for every attack.
+
+The original targeting and distance rules must remain correct.
+
+Better buffered-intent handling
+
+Improve action-request handling so eligible follow-up inputs are not lost during brief legal transitions.
+
+Use a single, clearly defined pending-intent mechanism or carefully extend the current buffer.
+
+Requirements:
+
+* Preserve the most recent valid request when necessary.
+* Do not execute the same request twice.
+* Do not allow stale requests to fire unexpectedly much later.
+* Do not let a buffered duplicate of the active attack cancel it.
+* Clear pending requests appropriately after hitstun, invalid state transitions, resets, and character changes.
+* Preserve ground/air input context.
+* Respect newer valid requests.
+* Evaluate Combat Assist when the resolved attack actually becomes eligible to execute.
+* Avoid retaining inputs indefinitely throughout long techniques or cooldowns.
+
+Input assistance must make intended actions more reliable without inventing actions the player never requested.
+
+⸻
+
+Phase 2 — Build one coherent action-resolution system
+
+These requirements interact.
+
+Do not add several unrelated conditional patches.
+
+Introduce or refactor a small, understandable action-intent resolver inside the existing shared combat architecture.
+
+A good design distinguishes:
+
+Raw input: What physical action did the player request?
+
+Resolved action: What actual move should occur after applying Combo Assist?
+
+Current state: Is the fighter idle, attacking, recovering, dashing, using Combat Assist, stunned, or otherwise busy?
+
+Eligibility: Can the resolved move legally start?
+
+Cancellation: Does the accepted action require the current move to end?
+
+Execution: Should the system start the attack, trigger Combat Assist, initiate another type of action, defer briefly, or reject the request?
+
+Required priority principles
+
+1. Forced gameplay states such as stun, paralysis, and hitstop retain their necessary restrictions.
+2. A deliberate, valid new move request takes priority over ordinary locomotion.
+3. A duplicate request for the currently active move must not cancel that move.
+4. Combo Assist alternation is evaluated only when the source attack has finished and is on cooldown.
+5. Run direction never requests cancellation.
+6. A valid different attack may replace the current move through the cancellation rules.
+7. Eligible melee attacks must consistently evaluate Combat Assist.
+8. Invalid requests must not destroy otherwise valid actions.
+9. When competing requests occur in the same frame, use one deterministic precedence policy consistent with existing input conventions.
+10. Every accepted action must execute at most once.
+
+Do not rely on UI animation state or wall-clock time to decide gameplay logic.
+
+Use the existing fixed-step simulation and combat state.
+
+Separation of responsibilities
+
+Keep the systems conceptually separate:
+
+Combo Assist: Chooses Attack 1 or Attack 2 based on the source attack’s cooldown.
+
+Move Cancellation: Decides whether a different requested action can replace the current action.
+
+Combat Assist: Decides whether an eligible melee attack should close the gap before executing.
+
+Input Buffer: Preserves appropriate requests when execution must be deferred briefly.
+
+These systems must cooperate without duplicating or competing for the same input.
+
+⸻
+
+Phase 3 — Mandatory regression tests
+
+Add dedicated tests and expand relevant existing tests.
+
+Important existing test files include:
+
+* tests/systems/combat-assist.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/combat-rules.test.mjs
+* tests/systems/controller-input.test.mjs
+* tests/interface/settings.test.mjs
+* tests/interface/controller-ui.test.mjs
+
+Create new targeted test files if appropriate.
+
+Test all of the following
+
+Combo Assist
+
+* On by default.
+* Off disables alternation.
+* Setting persists after reload.
+* Existing settings migrate without losing preferences.
+* Attack 1 cooldown press triggers Attack 2.
+* Attack 2 cooldown press triggers Attack 1.
+* Attack 1 pressed while Attack 1 is playing never cancels it.
+* Attack 2 pressed while Attack 2 is playing never cancels it.
+* Rapid repeated presses do not cause animation restart loops.
+* Alternate attacks respect cooldowns and availability.
+* Ground and air mappings remain correct.
+* CPU fighters are unaffected.
+
+Cancellation
+
+* Different valid attack interrupts the current attack.
+* Same attack does not interrupt itself.
+* Invalid requests preserve the current action.
+* Jump and explicit Dash requests behave correctly.
+* Run presses do not cancel.
+* Changing direction does not cancel.
+* Hitstop and stun restrictions remain correct.
+* Cooldowns begin correctly after interruption.
+* No duplicate projectiles, strikes, or effects.
+* Energy accounting remains correct.
+
+Combat Assist
+
+* Holding Run while attacking does not suppress the approach.
+* Running left and right both work.
+* Reversing direction while running does not create an unintended cancellation.
+* Melee follow-ups immediately after attacks still receive Combat Assist.
+* Legal hit-cancel transitions still evaluate Combat Assist.
+* Buffered attack requests do not silently bypass Combat Assist.
+* Combo Assist and Combat Assist work together.
+* Ranged and homing attacks retain their exclusions.
+* Walls and ledges remain respected.
+* An explicit different action still cancels an ongoing approach appropriately.
+* Repeated identical simulations produce identical outcomes.
+
+Controller UI
+
+* Correct attack artwork for fighter #0001.
+* Correct artwork for fighter #0002.
+* Correct ground and air previews.
+* Projectile and special-move artwork.
+* Proper image mirroring.
+* Fallback for missing art.
+* No binding or accessible-label regressions.
+* Correct English and French presentation.
+* Responsive controller editor layout.
+
+Test keyboard, controller, and touch input where their event semantics differ.
+
+Integration testing
+
+Test sequences that combine multiple features, not merely individual functions.
+
+For example:
+
+1. Enable Combo Assist and Combat Assist.
+2. Run toward an opponent.
+3. Press Attack 1.
+4. Keep holding Run.
+5. Allow Attack 1 to finish.
+6. Press Attack 1 during its cooldown.
+7. Confirm Attack 2 is selected.
+8. Confirm Combat Assist activates if Attack 2 qualifies.
+9. Confirm no inputs are lost.
+10. Confirm no attack or approach is cancelled by Run.
+
+Also perform the opposite sequence with Attack 2 and Attack 1.
+
+Test equivalent interactions airborne where legal.
+
+⸻
+
+Phase 4 — Preserve Alva’s existing architecture
+
+Follow the conventions in CLAUDE.md, ALVA_SPEC.md, codename_rule, and the architecture documentation.
+
+Do not modify the protected character_rule file.
+
+Avoid hardcoding behavior specifically for fighter #0001 or #0002.
+
+Do not rewrite the movement engine, animation system, or entire combat engine unnecessarily.
+
+Preserve:
+
+* Character-specific movesets.
+* Attack damage and Launch Point calculations.
+* Energy costs.
+* Normal movement and momentum.
+* Ground and airborne animation logic.
+* Existing visual effects.
+* Shields and Deflect.
+* Projectile mechanics.
+* Summons and techniques.
+* CPU combat behavior unless an existing general-purpose regression requires a fix.
+* Existing controller bindings.
+* Mobile controls and their layouts.
+* Practice Ground and Quick Battle behavior.
+* Watch Mode CPU behavior.
+* Deterministic fixed-step simulation.
+
+Avoid global changes to the 0.5-second cooldown just to implement Combo Assist.
+
+Document any intentional changes to cancellation behavior and update existing tests that encode the old rules.
+
+Do not simply delete failing tests or weaken assertions.
+
+Update relevant specifications and system documentation so they accurately describe the new mechanics.
+
+⸻
+
+Final validation and delivery
+
+After implementation:
+
+1. Run the targeted combat, controls, settings, and interface tests.
+2. Run the complete test suite using:
+    node --test
+3. Review all changed files for accidental regressions.
+4. Manually check gameplay in a browser where possible.
+5. Test the key running/combo/cancellation scenarios with both available fighters.
+6. Verify Settings and Controller Controls in English and French.
+7. Check that no action can be duplicated, lost unnecessarily, or replayed from stale buffered input.
+8. Confirm that the new code is readable, maintainable, and appropriately documented.
+
+Definition of done
+
+The update is complete only when:
+
+* Combo Assist is available, enabled by default, and behaves exactly as described.
+* Repeating an active attack does not cancel that attack.
+* Repeating Attack 1 or Attack 2 during its own post-attack cooldown triggers the opposite move when valid.
+* Deliberately requesting another legal move results in responsive, clean cancellation.
+* Run never causes unintended move cancellation.
+* Combat Assist works reliably immediately after another move.
+* Running while attacking no longer disables or bypasses Combat Assist.
+* Combo Assist, Combat Assist, and move cancellation cooperate predictably.
+* Every controller attack row displays the appropriate fighter-specific artwork.
+* Existing game mechanics and interfaces remain functional.
+* Automated tests pass, including new regression tests covering these behaviors.
+
+This is a precision gameplay update, not simply an animation-speed or cooldown change.
+
+The final result should feel responsive and intelligent, but never unpredictable.
+
+Prioritize correctness, deterministic behavior, and compatibility over quick fixes.
+
+Before finishing, provide a concise report covering what changed, which files were modified, what bugs were identified and fixed, what tests passed, and any remaining limitations. Do not claim browser testing or bug reproduction unless it was actually performed.
