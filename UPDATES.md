@@ -1415,3 +1415,87 @@ repositioning and every level's full kit (`match-score`, `practice-ground`,
 `watch-mode`, `difficulty`, `combat-rules`, `movement`, `cpu-0001`,
 `fighter-0002`); the source scans (`loadout`, `universal-movement`, `dash`,
 `combat-assist`, `profiles`) cover every CPU Intelligence module.
+
+## Controller system
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: reliable PlayStation and Xbox controller support, connection
+management, a circular menu cursor, comfortable default controls designed
+for each fighter, and per-fighter customization of every binding, without
+changing any move, mechanic, timing, cooldown or the CPU.
+
+**What it changed.**
+
+- **Controllers.** PlayStation (DualShock 4, DualSense) and Xbox (One,
+  Series, 360) pads are identified conservatively by vendor id, product
+  name or XInput; Nintendo and generic pads, a bare "Wireless Controller"
+  and a non-standard mapping are reported unsupported, never given a
+  layout. Up to four supported controllers are active, in the order first
+  seen; one is Player 1's and only it is read. A lost controller lets go of
+  everything at once; focus loss suspends input.
+- **Home.** The controller button is open, with a live indicator (green
+  check, red cross, orange exclamation mark) and the status in its name.
+  It opens Controller Connections: the count, the status, each controller
+  with its assignment and Use for Player 1, unsupported devices, the
+  too-many warning and a real Reconnect.
+- **Menus.** The D-pad moves focus, Cross / A confirms, Circle / B goes
+  back, Options / Menu is Start, the right stick scrolls, and the left
+  stick drives a circular cursor that belongs to the menu navigator (hover
+  focuses, confirm activates, never outside the active scope).
+- **Play.** The old fixed gamepad mapping (B, LB, LT, L3, R3 for the
+  numbered attacks, RB / RT for the Shield, Select + direction to Dash) is
+  replaced by controller profiles: universal defaults for every fighter
+  (left stick, Cross / A Jump, L1 / LB Dash toward the stick or the facing,
+  stick down Fast fall, Circle / B held Shield and pressed Deflect, Options
+  / Menu Pause) and each fighter's own layout for its moves, authored in its
+  definition (#0001: Square Jab, Triangle High Kick, R2 + Square Red,
+  R2 + Circle Maximum Blue, L2 + Triangle Unlimited Void, R2 + Triangle
+  Hollow Purple; in the air Square, Triangle, R1 Blue, L2 + Square High
+  Kick. #0002: Square One-Two, Triangle Rapid Kicks, R1 Spin Attack,
+  R2 + Triangle Whirlwind; in the air Square Homing Attack, Down + Square
+  Bounce Attack, R1 Blue Tornado). The resolver sends the snapshot's own
+  codenames, for the fighter and where it is: one owner per press, modifier
+  first (R2 + Circle never raises the Shield), directions by dominant axis,
+  press / hold / continuous activations, nothing leaking from menus or from
+  another fighter. The Fighter keeps a controller's press for the place it
+  was made for (`pressedOnGround` / `pressedInAir`), so a ground move never
+  comes out as its air version; keyboard, touch and CPU behave as ever.
+- **Customization.** Settings › Controls › Controller controls: the
+  roster, each fighter's editor (categories, real names, descriptions, the
+  family's button names, a diagram, live conflicts) and a binding dialog
+  that captures combinations and directions or takes them in text; Save,
+  Cancel and Restore defaults per fighter; settings version 4 stores each
+  fighter's layout by its id (version 3 migrates).
+- **Rules.** `codename_rule` now separates logical actions (unchanged)
+  from physical controller bindings; a registered fighter whose layout is
+  incomplete, invalid or conflicting never loads.
+
+**Where to tune it.** The universal defaults (`UNIVERSAL_DEFAULTS`), the
+hold threshold and the fallback inputs in
+`js/data/controller-profiles.js`; each fighter's layout in its definition
+(`controller.layout`); the stick thresholds (`RUN_THRESHOLD`,
+`DIRECTION_DEADZONE`, `DASH_AIM_THRESHOLD`) in
+`js/core/controller-resolver.js`; the trigger thresholds and
+`MAX_CONTROLLERS` in `js/core/controller-manager.js`; the cursor's speed,
+deadzone and scrolling in `js/ui/controller-cursor.js`.
+
+**Code:** new `js/core/gamepad-devices.js`, `js/core/controller-manager.js`,
+`js/core/controller-resolver.js`, `js/data/controller-profiles.js`,
+`js/ui/controller-cursor.js`, `js/ui/controller-dialog.js`,
+`js/ui/controller-editor.js`, `js/ui/controller-glyphs.js`,
+`css/controller.css`; changed `js/core/input-manager.js`,
+`js/core/menu-navigator.js`, `js/core/settings.js`, `js/core/app.js`,
+`js/game/fighters/fighter-controller.js`, `js/game/fighters/fighter.js`
+(`pressPlace`), `js/screens/home-screen.js`, `js/ui/settings-dialog.js`,
+`js/data/characters.js`, `js/data/characters/0001.js`, `0002.js` and
+`helpers.js`, `js/data/movement.js` (the Dash's line), the string tables.
+
+**Tests:** new `tests/systems/controller-devices.test.mjs`,
+`controller-profiles.test.mjs`, `controller-input.test.mjs`,
+`tests/interface/controller-ui.test.mjs` and `tests/helpers/fake-gamepad.mjs`;
+the old fixed-mapping checks in `down`, `dash`, `defense`, `explicit-mouvement`
+and `loadout` rewritten for controller profiles; `settings` for version 4
+and the open controller button; Home's navigation order in `empty-roster`,
+`watch-mode` and `practice-ground`; `codenames` (the snapshot's two new
+fields). Every test uses mocked pads; real-hardware verification is
+separate (see [testing](./docs/development/testing.md#controllers-mocked-then-real-hardware)).

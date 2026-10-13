@@ -55,15 +55,10 @@ test('down is a gameplay direction on S / ↓, a held control and never a combat
   assert.deepEqual(CONFIG.menuBindings.up, ['ArrowUp', 'KeyW']);
 });
 
-test('InputManager samples a held down from S, ↓, D-pad down and the left stick; menus still read their own Down', async () => {
-  const listeners = {};
-  globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
-  globalThis.document = { addEventListener() {}, hidden: false };
-  const pad = { connected: true, axes: [0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
-  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => [pad] }, configurable: true });
-  const { InputManager } = await import('../../js/core/input-manager.js');
-  const input = new InputManager(CONFIG.bindings);
-  const key = (type, code, repeat = false) => listeners[type]({ code, repeat, preventDefault() {} });
+test('InputManager samples a held down from S, ↓ and the controller\'s left stick; the D-pad stays the menus\' Down', async () => {
+  const { controllerRig, setButton } = await import('../helpers/fake-gamepad.mjs');
+  const { input, pad, poll, stick, press, listeners } = await controllerRig();
+  const key = (type, code, repeat = false) => listeners[type][0]({ code, repeat, preventDefault() {} });
 
   const frame = input.sample();
   assert.ok('down' in frame && 'downPressed' in frame);
@@ -93,38 +88,50 @@ test('InputManager samples a held down from S, ↓, D-pad down and the left stic
   key('keyup', 'ArrowDown');
   assert.equal(input.sample().down, false);
 
-  listeners.gamepadconnected();
+  // The controller's Fast fall: the left stick pushed down (one edge, held
+  // while it stays down).
+  stick(0, 0.9);
+  let f = input.sample();
+  assert.equal(f.down, true);
+  assert.equal(f.downPressed, true);
+  assert.equal(input.sample().downPressed, false, 'held: no more edges');
+  stick(0, 0);
+  assert.equal(input.sample().down, false);
+
+  // The D-pad is not movement by default: it holds no Down in play...
+  press('dpadDown');
+  assert.equal(input.sample().down, false);
+  press('dpadDown', false);
+  input.sample();
+
+  // ...and in the menus it is the menus' own Down, while the stick drives
+  // the cursor instead of stepping focus.
   const menu = [];
+  const cursor = [];
   input.onPadMenu((cmd) => menu.push(cmd));
-  pad.buttons[13] = { pressed: true, value: 1 }; // D-pad down
-  input.pollGamepads(0);
-  assert.equal(input.sample().down, true);
+  input.onPadCursor((s) => cursor.push(s));
+  input.setGameplayActive(false);
+  setButton(pad, 'dpadDown', true);
+  poll();
   assert.deepEqual(menu, ['down'], 'menus still read D-pad down as Down');
-  pad.buttons[13] = { pressed: false, value: 0 };
-  input.pollGamepads(1000);
-  assert.equal(input.sample().down, false);
+  setButton(pad, 'dpadDown', false);
+  poll();
+  stick(0, 0.9);
+  assert.deepEqual(menu, ['down'], 'the stick is the cursor\'s, not a Down command');
+  assert.equal(cursor.at(-1).y, 0.9);
+  assert.equal(input.sample().down, false, 'nothing reaches play from a menu');
+  stick(0, 0);
+  input.setGameplayActive(true);
+  poll();
 
-  pad.axes[1] = 0.9; // left stick down
-  input.pollGamepads(2000);
-  assert.equal(input.sample().down, true);
-  assert.deepEqual(menu, ['down', 'down']);
-  pad.axes[1] = 0;
-  input.pollGamepads(3000);
-  assert.equal(input.sample().down, false);
-
-  // Every other pad mapping, the direct numbered attacks included, is its
-  // own action and holds no Down.
-  for (const [i, action] of [
-    [0, 'jump'], [1, 'attack1'], [4, 'attack2'], [6, 'attack3'], [10, 'attack4'], [11, 'attack5'],
-    [5, 'shield'], [7, 'shield'], [2, 'extra_attack'], [3, 'transform'],
-  ]) {
-    pad.buttons[i] = { pressed: true, value: 1 };
-    input.pollGamepads(4000);
-    const f = input.sample();
-    assert.equal(f[action], true, `button ${i}`);
+  // Every other universal binding is its own action and holds no Down.
+  for (const [button, action] of [['south', 'jump'], ['east', 'shield']]) {
+    press(button);
+    f = input.sample();
+    assert.equal(f[action], true, button);
     assert.equal(f.down, false);
-    pad.buttons[i] = { pressed: false, value: 0 };
-    input.pollGamepads(4000);
+    press(button, false);
+    input.sample();
   }
 });
 

@@ -15,7 +15,9 @@ index.html                 the screens' <section>s, overlays, css/ parts in casc
 └─ js/main.js              boot (and the boot error if it fails)
    └─ js/core/App          managers, frame loop, selection state, language, settings
       ├─ ScreenManager     splash → home → setup screens → battle / practice / discover
-      ├─ InputManager      keyboard, gamepad and touch → one snapshot per step
+      ├─ InputManager      keyboard, touch and Player 1's controller (through the
+      │                    fighter's controller layout) → one snapshot per step
+      ├─ ControllerManager connected PlayStation / Xbox controllers, Player 1's
       ├─ AssetLoader       fighter frames, preloaded for playable fighters
       └─ screens/BattleScreen or PracticeScreen
          └─ game/Battle or game/PracticeSession   (both extend game/Arena)

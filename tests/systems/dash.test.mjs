@@ -86,15 +86,11 @@ test('movement data: the universal Dash, 1250 (about 3x the top speed) for a six
 
 // ---- Input ---------------------------------------------------------------------------
 
-test('InputManager exposes runLeftPressed / runRightPressed: one edge per press, from keys, touch, D-pad and stick alike', async () => {
-  const listeners = {};
-  globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
-  globalThis.document = { addEventListener() {}, hidden: false };
-  const pad = { connected: true, axes: [0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
-  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => [pad] }, configurable: true });
-  const { InputManager } = await import('../../js/core/input-manager.js');
-  const input = new InputManager(CONFIG.bindings);
-  const key = (type, code, repeat = false) => listeners[type]({ code, repeat, preventDefault() {} });
+test('InputManager exposes runLeftPressed / runRightPressed: one edge per press, from keys, touch and the controller alike', async () => {
+  const { controllerRig } = await import('../helpers/fake-gamepad.mjs');
+  const { resolveProfile } = await import('../../js/data/controller-profiles.js');
+  const { input, press, stick, listeners } = await controllerRig();
+  const key = (type, code, repeat = false) => listeners[type][0]({ code, repeat, preventDefault() {} });
   const edges = () => {
     const f = input.sample();
     return [f.runLeftPressed, f.runRightPressed];
@@ -123,36 +119,38 @@ test('InputManager exposes runLeftPressed / runRightPressed: one edge per press,
   input.setTouch('runRight', true);
   assert.deepEqual(edges(), [false, true]);
   input.setTouch('runRight', false);
-  // D-pad left / right.
-  listeners.gamepadconnected();
-  const button = (i, down) => {
-    pad.buttons[i] = { pressed: down, value: down ? 1 : 0 };
-    input.pollGamepads(0);
-  };
-  button(14, true);
+  input.sample();
+  // The left stick (the default Movement): crossing from neutral into the
+  // held zone is one edge; holding it there is none; back near neutral and
+  // out again is another.
+  stick(-0.9, 0);
   assert.deepEqual(edges(), [true, false]);
-  input.pollGamepads(0);
-  assert.deepEqual(edges(), [false, false], 'held: no more edges');
-  button(14, false);
-  button(15, true);
-  assert.deepEqual(edges(), [false, true]);
-  button(15, false);
-  // The left stick: crossing from neutral into the held zone is one edge;
-  // holding it there is none; back near neutral and out again is another.
-  const stick = (x) => {
-    pad.axes[0] = x;
-    input.pollGamepads(0);
-  };
-  stick(-0.9);
-  assert.deepEqual(edges(), [true, false]);
-  stick(-0.95);
-  stick(-0.8);
+  stick(-0.95, 0);
+  stick(-0.8, 0);
   assert.deepEqual(edges(), [false, false]);
-  stick(0.1);
+  stick(0.1, 0);
   assert.equal(input.sample().runLeft, false);
-  stick(-0.9);
+  stick(-0.9, 0);
   assert.deepEqual(edges(), [true, false]);
-  stick(0);
+  stick(0, 0);
+  input.sample();
+  // The D-pad moves only for a player who picked it as Movement.
+  press('dpadLeft');
+  assert.deepEqual(edges(), [false, false], 'not Movement by default');
+  press('dpadLeft', false);
+  input.sample();
+  const dpad = await controllerRig({ profileFor: (d) => resolveProfile(d, { move: { source: 'dpad' } }) });
+  const dpadEdges = () => {
+    const f = dpad.input.sample();
+    return [f.runLeftPressed, f.runRightPressed];
+  };
+  dpad.press('dpadLeft');
+  assert.deepEqual(dpadEdges(), [true, false]);
+  dpad.poll();
+  assert.deepEqual(dpadEdges(), [false, false], 'held: no more edges');
+  dpad.press('dpadLeft', false);
+  dpad.press('dpadRight');
+  assert.deepEqual(dpadEdges(), [false, true]);
   // flush() drops them like any other buffered press.
   key('keydown', 'KeyD');
   input.flush();

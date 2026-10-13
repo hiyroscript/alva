@@ -152,7 +152,7 @@ export class ConfirmDialog {
 // the screen beneath inert while it is open, and focus returned on request
 // to what had it (the control that opened it). A press on the dim around
 // the panel dismisses it.
-class ModalDialog {
+export class ModalDialog {
   constructor(root, app, titleId) {
     this.root = root;
     this.app = app;

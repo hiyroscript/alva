@@ -19,14 +19,20 @@ export const HELD_CONTROLS = Object.freeze(ACTIONS.filter((action) => action !==
 
 // Every field Fighter.update reads, all false: a complete, neutral snapshot,
 // keyed by control codename. Besides each held control and its press edge,
-// explicit one-step Mouvement requests from any device or CPU and the training
-// CPU's platform drop.
+// explicit one-step Mouvement requests from any device or CPU, where the
+// step's combat presses were made for (`pressedOnGround` / `pressedInAir`:
+// a game controller resolves each press for the ground or the air, and a
+// press buffered for one never comes out in the other; neither, from a
+// keyboard, touch or a CPU, makes no such claim) and the training CPU's
+// platform drop.
 export function blankInput() {
   const input = {};
   for (const control of HELD_CONTROLS) input[control] = false;
   for (const control of HELD_CONTROLS) input[`${control}Pressed`] = false;
   input.mouvementLeftPressed = false;
   input.mouvementRightPressed = false;
+  input.pressedOnGround = false;
+  input.pressedInAir = false;
   input.dropPressed = false;
   return input;
 }
@@ -42,6 +48,9 @@ export function jumpTapHold(self) {
 // Combat Assist (see Fighter.tryCombatAssist), and only while
 // `combatAssist`, the player's setting (Home › Settings › Combat, read as
 // the mode starts), is on. It is on by default, as the setting is.
+// Each sample is taken for the fighter as it is at that step (on the ground
+// or not, its facing, which fighter it is), so a game controller resolves
+// through that fighter's own controller profile (js/core/input-manager.js).
 export class PlayerController {
   constructor(input, { combatAssist = true } = {}) {
     this.input = input;
@@ -49,8 +58,9 @@ export class PlayerController {
     this.combatAssist = combatAssist === true;
   }
 
-  getInput() {
-    return this.input.sample();
+  getInput(self) {
+    if (!self) return this.input.sample();
+    return this.input.sample({ grounded: !!self.body?.grounded, facing: self.facing, character: self.def ?? null });
   }
 }
 

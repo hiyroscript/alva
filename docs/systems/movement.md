@@ -172,7 +172,8 @@ fighter's own `mouvment` clip played once across it whatever its frame
 count and rate (the codename keeps that spelling: see
 [conventions](../development/conventions.md#codenames)). It starts on a
 one-step explicit request (`mouvementLeftPressed` / `mouvementRightPressed`):
-Q/E, Select/View + D-pad or left stick direction, or either touch layout's
+Q/E, the controller's Dash binding (L1 / LB by default: the way the stick
+points, else the way the fighter faces), or either touch layout's
 Mouvement buttons. Run taps never request it, on the ground or airborne.
 `Fighter.tryMouvment` selects `tryDash` on the ground or `tryAirDash` in the air.
 It needs the fighter free to act (or in an attack that hit and

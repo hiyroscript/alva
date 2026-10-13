@@ -1,8 +1,16 @@
 // Keyboard / gamepad menu navigation with spatial focus movement.
 // Works on the active screen, or on the top-most overlay scope (pause menu,
 // dialogs) when one is open.
+//
+// A game controller navigates through the same commands: its D-pad moves
+// focus, Cross / A confirms, Circle / B goes back, Options / Menu is Start
+// (js/core/input-manager.js). Its left stick drives the circular controller
+// cursor (js/ui/controller-cursor.js), which belongs to this navigator: it
+// hovers and focuses items of the same scope, and confirm activates what it
+// is on. Keyboard, mouse and touch hide it and keep working as ever.
 
 import { CONFIG } from '../config.js';
+import { ControllerCursor } from '../ui/controller-cursor.js';
 
 const DIRS = ['up', 'down', 'left', 'right'];
 
@@ -52,14 +60,17 @@ export class MenuNavigator {
     this.app = app;
     this.codeMap = buildCodeMap();
     this.scopes = []; // overlay scopes: { el, onBack, onStart }
+    this.cursor = new ControllerCursor(this);
     app.input.onKey((e) => {
       this.setPointerInput(false);
+      this.cursor.hide();
       this.onKey(e);
     });
     app.input.onPadMenu((cmd) => {
       this.setPointerInput(false);
-      this.command(cmd, null);
+      this.padCommand(cmd);
     });
+    app.input.onPadCursor?.((stick, dt) => this.cursor.move(stick, dt));
 
     // Mouse hover selects, so keyboard and mouse share one highlight. Items
     // marked data-nav-no-hover-focus treat hover as a preview and keep focus.
@@ -71,7 +82,24 @@ export class MenuNavigator {
         item.focus({ preventScroll: true });
       }
     });
-    document.addEventListener('pointerdown', () => this.setPointerInput(true), { capture: true, passive: true });
+    document.addEventListener('pointerdown', () => {
+      this.setPointerInput(true);
+      this.cursor.hide();
+    }, { capture: true, passive: true });
+    // The mouse taking over hides the controller cursor.
+    document.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) this.cursor.hide();
+    }, { passive: true });
+  }
+
+  // A controller's menu command: confirm activates what the cursor is on
+  // when it shows one, else the focused item; directions move focus and
+  // the cursor follows.
+  padCommand(cmd) {
+    if (cmd === 'confirm' && this.scopeEl && this.cursor.confirm()) return true;
+    const handled = this.command(cmd, null);
+    if (DIRS.includes(cmd)) this.cursor.followFocus();
+    return handled;
   }
 
   // html.is-pointer-input marks that the last menu input was a mouse or touch

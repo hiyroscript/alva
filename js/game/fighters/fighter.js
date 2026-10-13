@@ -64,6 +64,17 @@ const TIME_EPSILON = 1e-6;
 
 const NEUTRAL_INPUT = Object.freeze(blankInput());
 
+// Where a snapshot's combat presses were made for: 'ground' or 'air' when
+// a game controller resolved them for one place (its ground and air moves
+// may share a combat button: see js/core/controller-resolver.js), else
+// null (a keyboard, touch or a CPU: the press is the button's, wherever
+// the fighter is).
+export function pressPlace(input) {
+  if (input.pressedOnGround) return 'ground';
+  if (input.pressedInAir) return 'air';
+  return null;
+}
+
 // The fastest the run clip plays (x its own rate) by default, above top
 // speed: a burst's run-on looks as fast as it goes (a clip may say
 // otherwise with its own maxSpeedScale). Art only.
@@ -366,7 +377,7 @@ export class Fighter {
       // steps (a rebound freezes it at the surface it struck).
       body.prevX = body.x;
       body.prevY = body.y;
-      for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
+      for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action, pressPlace(input));
       const frozenDash = this.dashAsked(input);
       if (frozenDash) this.bufferDash(frozenDash);
       combat.updateEnergy(dt);
@@ -442,15 +453,20 @@ export class Fighter {
     const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0 && !this.freeFall);
     const jumpFirst = (at) =>
       this.jumpBuffer > 0 && canJump && this.jumpPressedAt < at && this.canFollowUp() && !shieldHeld;
+    // Where this step's presses were made for, if a game controller said
+    // (see pressPlace): a press for the ground is never the air's move, nor
+    // one for the air the ground's, now or from the buffer.
+    const place = pressPlace(input);
+    const here = body.grounded ? 'ground' : 'air';
     if (this.combatAssist) {
       this.assistIntents(input, held, shieldHeld, dashDirection);
     } else {
       let started = !body.grounded && !!input.shieldPressed && this.tryDeflect(held);
       if (started) this.bufferedAttack = null;
       for (const action of COMBAT_ACTIONS) {
-        if (!input[`${action}Pressed`]) continue;
+        if (!input[`${action}Pressed`] || (place && place !== here)) continue;
         if (shieldHeld || jumpFirst(this.steps)) {
-          this.bufferAttack(action);
+          this.bufferAttack(action, place);
           continue;
         }
         if (this.tryAction(action, held)) {
@@ -458,14 +474,16 @@ export class Fighter {
           started = true;
         } else if (!started) {
           // Not a press that lost to another made on this same step.
-          this.bufferAttack(action);
+          this.bufferAttack(action, place);
         }
       }
       const waiting = this.bufferedAttack;
-      if (!started && waiting && waiting.at < this.steps && !shieldHeld && !jumpFirst(waiting.at)) {
+      if (waiting?.place && waiting.place !== here) {
+        this.bufferedAttack = null;
+      } else if (!started && waiting && waiting.at < this.steps && !shieldHeld && !jumpFirst(waiting.at)) {
         const { action } = waiting;
         if (this.tryAction(action, held)) this.bufferedAttack = null;
-        else if (!this.attackMayStart(action)) this.bufferedAttack = null;
+        else if (!this.attackMayStart(action, waiting.place)) this.bufferedAttack = null;
       }
     }
 
@@ -818,10 +836,12 @@ export class Fighter {
   // Remembers `action`'s press for the combat input buffer: the latest
   // press that may start at all (see attackMayStart) wins, starting its own
   // movement.attackBuffer seconds. Any other press leaves the buffer as it
-  // is.
-  bufferAttack(action) {
-    if (!(this.movement.attackBuffer > 0) || !this.attackMayStart(action)) return;
-    this.bufferedAttack = { action, age: 0, at: this.steps };
+  // is. `place` ('ground' / 'air'), from a game controller, keeps the press
+  // for that place only: it never comes out as the other place's move (see
+  // pressPlace).
+  bufferAttack(action, place = null) {
+    if (!(this.movement.attackBuffer > 0) || !this.attackMayStart(action, place)) return;
+    this.bufferedAttack = { action, age: 0, at: this.steps, place };
   }
 
   // A hit (never a block) just landed on this fighter (see
@@ -1165,7 +1185,7 @@ export class Fighter {
       }
       this.cancelCombatAssist();
       if (this.tryAction(action, held)) this.bufferedAttack = null;
-      else this.bufferAttack(action);
+      else this.bufferAttack(action, pressPlace(input));
       return;
     }
     this.stepCombatAssist(held);
@@ -1632,7 +1652,10 @@ export class Fighter {
   // pressed just before landing). Never a reserved button (transform), a
   // button the character does not have, an attack without frames or one
   // used up until the fighter lands.
-  attackMayStart(action) {
+  // A press made for one place only (`place`, from a game controller)
+  // may start only there.
+  attackMayStart(action, place = null) {
+    if (place) return (place === 'ground') === this.body.grounded && this.attackStartsWhere(action, place === 'ground');
     if (this.attackStartsWhere(action, this.body.grounded)) return true;
     return !this.body.grounded && this.attackStartsWhere(action, true);
   }

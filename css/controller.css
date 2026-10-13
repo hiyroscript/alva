@@ -1,0 +1,449 @@
+/* Game controllers: Home's controller indicator, Controller Connections,
+   the circular controller cursor, and Settings › Controls › Controller
+   controls (its roster, the per-fighter editor and the binding dialog).
+   One part of the stylesheet index.html loads in order (css/base.css
+   first; see docs/development/conventions.md). */
+
+/* Visually hidden, still announced. */
+.controller-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------
+   Home: the controller button and its connection indicator
+   --------------------------------------------------------------------- */
+
+.home-controller { position: relative; }
+.home-controller:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
+.home-controller:focus { box-shadow: var(--focus-ring); }
+.home-controller:active { transform: translateY(1px); background: var(--surface-muted); }
+
+/* One status at a time, on the button's bottom-right corner, ringed in the
+   page's near-black so it reads over the controller picture. */
+.controller-badge,
+.controller-status-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--white);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.controller-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  pointer-events: none;
+}
+.controller-badge .icon,
+.controller-status-mark .icon { width: 12px; height: 12px; font-size: 12px; stroke-width: 3.2; }
+.controller-badge--connected,
+.controller-status-mark--connected { background: #1f9d4f; }
+.controller-badge--disconnected,
+.controller-status-mark--disconnected { background: #d63a3a; }
+/* Orange takes a dark mark: white would be too faint on it. */
+.controller-badge--tooMany,
+.controller-status-mark--tooMany { background: #f08c1a; color: #1b1004; }
+
+/* ---------------------------------------------------------------------
+   Controller Connections
+   --------------------------------------------------------------------- */
+
+.controller-overlay {
+  position: fixed;
+  z-index: 64;
+  background: rgba(0, 0, 0, 0.42);
+  animation: dim-in 0.18s ease both;
+}
+/* Over the shared .dialog-panel (css/overlays.css loads later): wider,
+   and never taller than the screen, its list scrolling inside. */
+.controller-overlay > .controller-panel {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-radius: 3px;
+  animation: fade-in 0.18s ease both;
+}
+.controller-body {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.controller-summary { display: grid; gap: 4px; }
+.controller-status { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-strong); font-size: clamp(15px, 2.6vh, 17px); }
+.controller-count { color: var(--text); font-size: 14px; }
+.controller-limit, .controller-note { color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+.controller-note[hidden], .controller-list[hidden], .controller-subtitle[hidden] { display: none; }
+.controller-subtitle { font-size: 13px; font-weight: 600; color: var(--text); }
+.controller-warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid rgba(240, 140, 26, 0.55);
+  border-radius: 3px;
+  background: rgba(240, 140, 26, 0.1);
+}
+.controller-warning[hidden] { display: none; }
+.controller-warning-mark { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: #f08c1a; color: #1b1004; }
+.controller-warning-mark .icon { width: 14px; height: 14px; stroke-width: 3.2; }
+.controller-warning-title { font-weight: 700; color: var(--text-strong); font-size: 14px; }
+.controller-warning-text { color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+.controller-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.controller-device {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.controller-device.is-player1 { border-color: rgba(47, 191, 99, 0.6); background: rgba(47, 191, 99, 0.08); }
+.controller-device.is-inactive, .controller-device.is-unsupported { opacity: 0.8; }
+.controller-device-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.controller-device-name { font-weight: 600; color: var(--text); font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.controller-device-num { color: var(--text-strong); }
+.controller-family { flex: none; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-muted); }
+.controller-device-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; color: var(--text-secondary); font-size: 13px; }
+.controller-device-meta > div { display: flex; gap: 6px; }
+.controller-device-meta dt { color: var(--text-muted); }
+.controller-device-meta dt::after { content: ":"; }
+.controller-device-meta dd { margin: 0; color: var(--text); }
+.controller-device.is-player1 .controller-assignment { color: var(--accent-hi); font-weight: 600; }
+.controller-use { justify-self: start; min-height: 36px; padding: 0 14px; font-size: 13px; }
+.controller-actions { justify-content: flex-start; }
+.controller-reconnect .icon { transition: transform 0.6s var(--ease); }
+.controller-reconnect.is-spinning .icon { transform: rotate(360deg); }
+
+/* ---------------------------------------------------------------------
+   The controller cursor
+   --------------------------------------------------------------------- */
+
+.controller-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.14s ease, visibility 0s linear 0.14s;
+}
+.controller-cursor.is-visible { opacity: 1; visibility: visible; transition: opacity 0.14s ease; }
+.controller-cursor-ring,
+.controller-cursor-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.controller-cursor-ring {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition: width 0.14s var(--ease), height 0.14s var(--ease), border-color 0.14s ease, background-color 0.14s ease;
+}
+.controller-cursor-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--white);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+.controller-cursor.is-hover .controller-cursor-ring {
+  width: 32px;
+  height: 32px;
+  border-color: var(--accent-hi);
+  background: rgba(47, 191, 99, 0.14);
+}
+.controller-cursor.is-pressed .controller-cursor-ring { width: 22px; height: 22px; }
+@media (prefers-reduced-motion: reduce) {
+  .controller-cursor, .controller-cursor-ring { transition: none; }
+}
+
+/* ---------------------------------------------------------------------
+   Controller controls: the roster
+   --------------------------------------------------------------------- */
+
+.controller-roster-overlay {
+  position: fixed;
+  z-index: 67;
+  background: rgba(0, 0, 0, 0.5);
+  animation: dim-in 0.18s ease both;
+}
+.controller-roster-overlay > .controller-roster-dialog { animation: fade-in 0.18s ease both; }
+/* Over the Settings dialog rather than a still stage: a denser fill, so
+   nothing beneath reads through. */
+.controller-roster-dialog.glass { background: var(--glass-sheen), rgba(10, 11, 13, 0.95); }
+.controller-roster-note { flex: none; color: var(--text-secondary); font-size: 13px; line-height: 1.45; margin-top: -4px; }
+
+/* ---------------------------------------------------------------------
+   Controller controls: the editor
+   --------------------------------------------------------------------- */
+
+.controller-editor-overlay {
+  position: fixed;
+  z-index: 68;
+  background: rgba(0, 0, 0, 0.5);
+  animation: dim-in 0.18s ease both;
+}
+.controller-editor-overlay > .controller-editor-panel { animation: fade-in 0.18s ease both; }
+.controller-editor-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(1080px, 100%);
+  height: min(860px, calc(100vh - 24px));
+  height: min(860px, calc(100dvh - 24px));
+  color: var(--text);
+  color-scheme: dark;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.controller-editor-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.6vw, 16px);
+  padding: clamp(10px, 2.2vh, 18px) clamp(14px, 2.2vw, 24px);
+  border-bottom: 1px solid var(--glass-seam);
+}
+.controller-editor-portrait-frame {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: clamp(44px, 8vh, 64px);
+  height: clamp(44px, 8vh, 64px);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+.controller-editor-portrait { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.controller-editor-heading { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.controller-editor-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.controller-editor-family-row { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; }
+.controller-editor-family { color: var(--text-secondary); font-size: 13px; }
+.controller-family-toggle[hidden] { display: none; }
+.controller-editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr);
+  min-height: 0;
+}
+.controller-editor-list-col {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  padding: clamp(10px, 2vh, 18px) clamp(14px, 2.2vw, 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.controller-editor-provisional { padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: 3px; color: var(--text-secondary); font-size: 13px; }
+.controller-editor-provisional[hidden] { display: none; }
+.controller-actions-list { display: grid; gap: 14px; }
+.controller-category { display: grid; gap: 6px; }
+.controller-category-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+.controller-rows { display: grid; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.controller-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px 14px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.controller-row:hover, .controller-row.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+.controller-row:focus { box-shadow: var(--focus-ring); border-color: var(--border-hover); }
+.controller-row.is-error { border-color: rgba(214, 58, 58, 0.75); }
+.controller-row.is-warning { border-color: rgba(240, 140, 26, 0.65); }
+.controller-row-text { display: grid; gap: 2px; min-width: 0; }
+.controller-row-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: var(--text-strong); }
+.controller-place { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; }
+.controller-row-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
+.controller-row-binding { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.controller-chip {
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.controller-row-activation { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.controller-row-change { font-size: 12px; font-weight: 600; color: var(--accent-hi); }
+.controller-editor-side {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  padding: clamp(10px, 2vh, 18px) clamp(14px, 2.2vw, 24px);
+  border-left: 1px solid var(--glass-seam);
+  overflow-y: auto;
+}
+.controller-detail { display: grid; gap: 2px; }
+.controller-detail-name { font-weight: 700; color: var(--text-strong); }
+.controller-detail-binding { color: var(--text-secondary); font-size: 13px; }
+.controller-conflicts { display: grid; gap: 6px; font-size: 13px; }
+.controller-conflicts ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.controller-conflicts-title { font-weight: 600; color: var(--text); }
+.controller-conflict, .binding-conflict { padding-left: 18px; position: relative; color: var(--text-secondary); line-height: 1.4; }
+.controller-conflict::before, .binding-conflict::before { content: ""; position: absolute; left: 4px; top: 0.45em; width: 8px; height: 8px; border-radius: 50%; }
+.controller-conflict.is-error::before, .binding-conflict.is-error::before { background: #d63a3a; }
+.controller-conflict.is-warning::before, .binding-conflict.is-warning::before { background: #f08c1a; }
+.controller-conflict-ok { color: var(--text-muted); }
+.controller-conflict-block { color: #ff8a8a; font-weight: 600; }
+.controller-editor-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: clamp(10px, 2vh, 16px) clamp(14px, 2.2vw, 24px);
+  border-top: 1px solid var(--glass-seam);
+}
+.controller-editor-foot-actions { display: flex; gap: 10px; }
+.controller-editor-foot .btn { padding: 0 18px; border-radius: 3px; }
+.controller-editor-foot .btn.is-outline-only { background: transparent; }
+
+/* ---------------------------------------------------------------------
+   The controller diagram
+   --------------------------------------------------------------------- */
+
+.pad-diagram { display: block; width: 100%; max-width: 360px; height: auto; margin: 0 auto; }
+.pad-body { fill: rgba(255, 255, 255, 0.06); stroke: rgba(255, 255, 255, 0.28); stroke-width: 1.5; }
+.pad-btn rect, .pad-btn circle { fill: rgba(10, 11, 13, 0.85); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.2; transition: fill var(--dur-fast) ease, stroke var(--dur-fast) ease; }
+.pad-btn text { fill: var(--text-secondary); font-family: var(--font); font-weight: 700; }
+.pad-stick .pad-stick-cap { fill: rgba(255, 255, 255, 0.08); }
+.pad-btn.is-on rect, .pad-btn.is-on circle { fill: var(--action); stroke: var(--accent-hi); }
+.pad-btn.is-on text { fill: var(--white); }
+.pad-btn.is-mod rect, .pad-btn.is-mod circle { fill: rgba(240, 140, 26, 0.85); stroke: #ffc27a; }
+.pad-btn.is-mod text { fill: #1b1004; }
+.is-dir > .pad-btn rect, .pad-stick.is-dir > circle { stroke: var(--accent-hi); stroke-width: 2; }
+.pad-arrow { fill: var(--accent-hi); font-weight: 700; }
+
+/* ---------------------------------------------------------------------
+   The binding dialog
+   --------------------------------------------------------------------- */
+
+.binding-overlay {
+  position: fixed;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.42);
+  animation: dim-in 0.15s ease both;
+}
+.binding-overlay > .binding-panel {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  border-radius: 3px;
+  animation: fade-in 0.15s ease both;
+}
+.binding-desc { color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+.binding-desc[hidden] { display: none; }
+.binding-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(200px, 1fr); gap: 16px; align-items: start; }
+.binding-main { display: grid; gap: 10px; }
+.binding-listen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 3px;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+}
+.binding-listen.is-listening { border-color: var(--accent); background: var(--accent-wash); }
+.binding-pulse { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--text-faint); }
+.binding-listen.is-listening .binding-pulse { background: var(--accent-hi); animation: binding-pulse 1s ease-in-out infinite; }
+@keyframes binding-pulse { 50% { opacity: 0.3; transform: scale(0.7); } }
+@media (prefers-reduced-motion: reduce) { .binding-listen.is-listening .binding-pulse { animation: none; } }
+.binding-detected { font-weight: 700; color: var(--text-strong); font-size: 14px; }
+.binding-fields { display: grid; gap: 6px; }
+.cycler-row { display: grid; grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.6fr); align-items: center; gap: 10px; }
+.cycler-row[hidden] { display: none; }
+.cycler-label { color: var(--text-secondary); font-size: 13px; }
+.cycler {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 20px;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 13px;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.cycler:hover, .cycler.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+.cycler:focus { box-shadow: var(--focus-ring); }
+.cycler:disabled { cursor: default; opacity: 0.75; }
+.cycler:disabled .cycler-arrow { visibility: hidden; }
+.cycler-value { text-align: center; overflow-wrap: anywhere; }
+.cycler-arrow { display: grid; place-items: center; color: var(--text-muted); }
+.cycler-arrow .icon { width: 14px; height: 14px; }
+.binding-hint, .binding-note { color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+.binding-note[hidden] { display: none; }
+.binding-conflicts { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.binding-diagram { align-self: center; }
+.binding-actions .btn { flex: 1 1 140px; border-radius: 3px; }
+.binding-actions .btn.is-outline-only { background: transparent; }
+
+/* The confirmation dialog, opened from the editor, above it. */
+.dialog-overlay.is-raised { z-index: 80; }
+
+/* ---------------------------------------------------------------------
+   Smaller screens: one column, the diagram under the list
+   --------------------------------------------------------------------- */
+
+@media (max-width: 760px), (max-height: 520px) and (max-width: 980px) {
+  .controller-editor-body { grid-template-columns: 1fr; overflow-y: auto; }
+  .controller-editor-list-col { overflow: visible; }
+  .controller-editor-side { border-left: 0; border-top: 1px solid var(--glass-seam); overflow: visible; }
+  .pad-diagram { max-width: 280px; }
+  .binding-layout { grid-template-columns: 1fr; }
+  .binding-diagram { display: none; }
+}
+@media (max-width: 560px) {
+  .controller-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .controller-row-change { display: none; }
+  .controller-editor-portrait-frame { display: none; }
+}
+@media (max-height: 520px) {
+  .controller-row { min-height: 44px; padding: 6px 10px; }
+  .controller-row-desc { display: none; }
+}

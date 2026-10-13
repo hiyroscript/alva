@@ -8,7 +8,7 @@ retraces them to Home, landing on each choice.
 
 - **Spectator only.** Both fighters are `CombatAIController`s, one each, and
   nobody controls either: no gameplay input is read and the touch controls
-  are hidden, in either Mobile Controls layout. Pause (`Esc`, `P`, gamepad Start or the HUD's pause button),
+  are hidden, in either Mobile Controls layout. Pause (`Esc`, `P`, a controller's Options / Menu or the HUD's pause button),
   Resume, Restart Battle, Rematch, Change Stage and Return to Home work as in
   Quick Battle.
 - **One difficulty for both.** The chosen level (Easy, Medium, Hard or

@@ -12,3 +12,11 @@ export const framePath = (id, codename, frame) => `./assets/characters/${id}/${i
 // Frames `from` to `from + count - 1` of `codename`, in order.
 export const frames = (id, codename, count, from = 1) =>
   Array.from({ length: count }, (_, i) => framePath(id, codename, from + i));
+
+// One binding of a fighter's recommended controller layout (its
+// `controller.layout`, see js/data/controller-profiles.js): `button`, a
+// normalized pad button ('west' is Square / X, 'r2' is R2 / RT), pressed;
+// with `modifier` held first and the movement stick pointing `direction`
+// when given.
+export const pad = (button, { modifier = null, direction = null, activation = 'press' } = {}) =>
+  ({ button, modifier, direction, activation });

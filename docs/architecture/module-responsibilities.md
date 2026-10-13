@@ -29,9 +29,12 @@ There are no import cycles (checked over every module).
 | --- | --- | --- |
 | `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's and Watch Mode's), preloading and loading fighters, the language and settings wiring. | `main.js` |
 | `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`). | `app.js`, every screen |
-| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and gamepad. | `app.js`, `screens/discover-screen.js` |
-| `input-manager.js` | `InputManager`: keyboard, gamepad and touch merged into one snapshot per step with press edges. | `app.js` |
-| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Combat Assist. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
+| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns). | `app.js`, `screens/discover-screen.js` |
+| `input-manager.js` | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step with press edges, resolved for the fighter being played; the controller's menu commands and cursor stick; binding capture. | `app.js` |
+| `gamepad-devices.js` | Controller identification (PlayStation / Xbox, conservatively), the normalized button names and each family's names for them. | `controller-manager.js`, `data/controller-profiles.js`, `ui/controller-glyphs.js` |
+| `controller-manager.js` | `ControllerManager`: connected controllers, the four-controller limit, the status, Player 1's controller, refresh, and Player 1's buttons and sticks each frame. | `app.js`, `input-manager.js`, `ui/controller-dialog.js`, `screens/home-screen.js`, `ui/controller-editor.js` |
+| `controller-resolver.js` | `ControllerResolver`, `compileProfile`: a controller's presses resolved into control codenames for a fighter and where it is (one owner per press, modifier first, directions, activations); the stick thresholds. | `input-manager.js`, `ui/controller-editor.js` |
+| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Combat Assist, each fighter's controller layout. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js`, `ui/controller-editor.js` |
 | `touch-layout.js` | Touch control ids, layout geometry and sanitizing. | `settings.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
 | `asset-loader.js` | Image loading and decoding. | `app.js` |
 | `device.js` | Touch-first detection, orientation, reduced motion. | `app.js` |
@@ -43,10 +46,11 @@ There are no import cycles (checked over every module).
 
 | Module | Owns | Used by |
 | --- | --- | --- |
-| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`, `assertUniversalMovement`, `assertCombatRules`: damage tiers, repeat cooldowns, the Deflect's strike, universal Energy). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/fighter-browser.js`, `ui/touch-layout-editor.js` |
+| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`, `assertUniversalMovement`, `assertCombatRules`: damage tiers, repeat cooldowns, the Deflect's strike, universal Energy; `assertControllerLayout`). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/fighter-browser.js`, `ui/touch-layout-editor.js` |
 | `fighter-profiles.js` | Discover's editorial profile of each fighter, keyed by id (`FIGHTER_PROFILES`, `getFighterProfile`): ONE 1–5 difficulty rating (`DIFFICULTY_SCALE` says what each step means), its concise, two-sentence play-style description’s translation key (approach, strengths, vulnerabilities; no named moves) and `reviewedSourceHash`, the SHA-256 of its definition's source when last reviewed (`tests/fighters/profiles.test.mjs` fails once the definition changes). `assertFighterProfile` refuses anything else. Imports nothing; the game never reads it. | `ui/fighter-browser.js` |
 | `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
-| `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
+| `characters/helpers.js` | `framePath`, `frames`: the asset-path convention; `pad`: one binding of a fighter's controller layout. | `characters.js` and each definition |
+| `controller-profiles.js` | Controller profiles: the actions a fighter can bind (from its definition), the universal defaults, each fighter's recommended layout (its own `controller.layout`, else a fallback), binding checks, conflicts, stored-profile sanitizing, and the layout rules the registry enforces. | `characters.js`, `core/settings.js`, `core/input-manager.js`, `core/app.js`, `ui/controller-editor.js` |
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
 | `movement.js` | The universal movement values every fighter runs on (`BASE_FIGHTER_MOVEMENT`), the check that refuses a definition's own, and the Discover copy for them. | `data/characters.js`, `game/fighters/fighter.js`, `game/rendering/hit-fx.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation; the damage tiers every hit deals (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage`). | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
@@ -137,6 +141,10 @@ registries through English/French translation keys and scroll independently.
 | `stage-preview.js` | Select Stage's live preview. | `screens/map-select-screen.js` |
 | `overlays.js` | The loading overlay, the confirm dialog (`alertdialog`), and the `role="dialog"` modals built on one shared base (its own navigation scope, the screen beneath inert, focus returned): the choice dialog (Quick Battle's play type) and the information dialog (`InfoDialog`, Discover's play-style description). | `core/app.js` |
 | `settings-dialog.js`, `language-dialog.js` | Settings; the first-launch language chooser. | `core/app.js` |
+| `controller-dialog.js` | Controller Connections (Home's controller button), and the status marks the Home indicator shares. | `core/app.js`, `screens/home-screen.js` |
+| `controller-editor.js` | `ControllerControls`: Settings › Controls › Controller controls: the roster, each fighter's editor and the binding dialog (capture, conflicts, save, cancel, restore). | `core/app.js` |
+| `controller-glyphs.js` | Button names by family, binding and activation phrases, action names and descriptions, the controller diagram. | `controller-dialog.js`, `controller-editor.js` |
+| `controller-cursor.js` | The circular controller cursor (part of the menu navigator). | `core/menu-navigator.js` |
 | `credits.js`, `logo.js`, `icons.js` | The credits list, the wordmark, inline SVG glyphs. | Home, overlays, the HUD and touch controls |
 
 ## `js/stages/`
