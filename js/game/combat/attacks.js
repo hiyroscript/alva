@@ -5,8 +5,9 @@
 //
 // Inputs: one attack entry from a character definition
 // (js/data/characters/<id>.js), plus its id; Base Launch / Directional
-// Launch and damage validation from js/data/launch.js, and the hit effects
-// (unblockable, paralyze, blockPush) from js/game/combat/hit-effects.js.
+// Launch and damage validation from js/data/launch.js, the hit effects
+// (paralyze, blockPush) from js/game/combat/hit-effects.js and the attack
+// classification from js/game/combat/offense.js.
 // Outputs: createAttackDefinition, attackPhase, strikeLive, attackReach,
 // isMeleeAttack / isRangedAttack (what kind of strike an attack is),
 // MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares with).
@@ -197,9 +198,18 @@
 //   deflect: { ..., hitbox: { x: 6, y: -118, w: 44, h: 98 }, deflectProjectiles: true },
 //
 // Every hit may also declare the shared hit effects (see
-// js/game/combat/hit-effects.js): `unblockable`, `paralyze` and
-// `blockPush`. A multi-hit attack's strikes take the attack's own unless
-// they declare theirs.
+// js/game/combat/hit-effects.js): `paralyze` and `blockPush`. A multi-hit
+// attack's strikes take the attack's own unless they declare theirs. None
+// gets past an active Shield, and nothing may declare a way past one
+// (`unblockable` and the rest of SHIELD_BYPASS_FIELDS in
+// js/game/combat/offense.js are refused): every attack is blockable.
+//
+// Every definition built here carries its classification, `offense` (see
+// js/game/combat/offense.js), inferred from what it does: an attack that
+// strikes, throws a projectile or turns projectiles back is an attack
+// (`offense.attack`), and one that turns them back is a defense too
+// (`offense.defense`: the Deflect). A pending attack is neither. An entry
+// may state `offensive` only to agree with that.
 //
 // Four more fields shape an attack's body. `airUses` (a count) is how many
 // times it may start in the air before the fighter lands again or is hit (0,
@@ -227,6 +237,7 @@
 import { REPEAT_COOLDOWN, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolveHitEffects } from './hit-effects.js';
+import { assertNoShieldBypass, attackOffense, resolveOffense } from './offense.js';
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -263,8 +274,7 @@ const ATTACK_DEFAULTS = {
   hurtboxes: null,   // the fighter's hurtboxes while it plays; null keeps its own
   pull: null,        // { radius, speed, offset }: draws opponents in while it is active (see above)
   deflectProjectiles: false, // its live hitbox turns other fighters' projectiles back (see above)
-  unblockable: false, // the shared hit effects (js/game/combat/hit-effects.js)
-  paralyze: 0,
+  paralyze: 0,       // the shared hit effects (js/game/combat/hit-effects.js)
   blockPush: 0,
 };
 
@@ -308,7 +318,7 @@ export function resolvePull(spec, owner) {
 
 // The fields a strike of a multi-hit attack takes from the attack when it
 // does not declare its own, and the ones only the strikes may declare.
-const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'unblockable', 'paralyze', 'blockPush']);
+const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush']);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
 // A multi-hit attack's strikes, frozen and validated, and what they make of
@@ -322,6 +332,7 @@ function resolveStrikes(spec, base) {
   let last = -Infinity;
   const hits = spec.hits.map((h, index) => {
     const who = `${owner} hit ${index + 1}`;
+    assertNoShieldBypass(h, who);
     if (!(h.at >= 0) || !(h.active > 0)) throw new Error(`[Alva] ${who} needs an \`at\` from 0 and a positive \`active\``);
     if (h.at < last) throw new Error(`[Alva] ${who} starts before the strike listed ahead of it`);
     last = h.at;
@@ -425,7 +436,7 @@ export function attackPhase(def, time) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'unblockable', 'paralyze', 'blockPush',
+  'deflectProjectiles', 'paralyze', 'blockPush',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -435,6 +446,8 @@ const PENDING_REFUSED = Object.freeze([
 // its clip, and strikes nothing.
 export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt = false } = {}) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
+  const owner = `Attack "${spec.id}"`;
+  assertNoShieldBypass(spec, owner);
   if (spec.pending) {
     const declared = PENDING_REFUSED.filter((field) => spec[field] !== undefined);
     if (declared.length) {
@@ -445,9 +458,9 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
       pending: true, startup: 0, active: 0, recovery: Math.max(0, clipDuration), hitbox: null, projectile: null,
     };
     def.total = def.recovery;
+    def.offense = resolveOffense(spec, attackOffense(def), owner);
     return Object.freeze(def);
   }
-  const owner = `Attack "${spec.id}"`;
   const def = spec.hits
     ? { ...ATTACK_DEFAULTS, ...spec }
     : { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, owner) };
@@ -463,5 +476,6 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
   def.deflectProjectiles = !!def.deflectProjectiles;
   if (def.deflectProjectiles && !def.hitbox) throw new Error(`[Alva] ${owner} deflects projectiles but has no hitbox to do it with`);
   def.total = def.startup + def.active + def.recovery;
+  def.offense = resolveOffense(spec, attackOffense(def), owner);
   return Object.freeze(def);
 }

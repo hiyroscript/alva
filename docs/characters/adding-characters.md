@@ -199,9 +199,12 @@ independent of the move's phases,
 [combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`), `pull`, `airUses`, `freeFall`, `passThrough`,
-`hurtboxes`, and on any hit the shared hit effects (`unblockable`,
-`paralyze`, `blockPush`)
+`hurtboxes`, and on any hit the shared hit effects (`paralyze`,
+`blockPush`)
 ([combat](../systems/combat.md#attack-mechanics-beyond-a-timed-hitbox)).
+There is no way past a Shield to author: every attack is blockable, and
+`unblockable` (or any other Shield bypass) is refused as the registry
+loads.
 An attack whose art is in but whose attributes are not can be
 `pending: true` for now (art only, no hit).
 
@@ -229,12 +232,28 @@ and its `hit`), or both ([techniques](../systems/combat.md#techniques);
 #0001's Unlimited Void and Hollow Purple). A technique of a different
 shape needs a new form in the runtime first.
 
+**Attack or not is never yours to declare.** However a move is executed
+(an attack, a projectile, a summon, a technique, the Deflect), the shared
+engine classifies it from what it does: anything that can deal damage,
+directly or through what it creates, is an attack, and a raised Shield
+blocks it ([attack
+classification](../systems/combat.md#attack-classification)). Name a move
+whatever you like (a Shadow Clone, a Meteor Storm, a Poison Field): no
+name is read. You may write `offensive: true` or `false` on a move for
+its readers, but it must agree with what the move does, or the fighter
+never loads; and a summon's clone must perform an attack that strikes.
+
 **Character-specific mechanics** belong in the definition when the
 shared schema can express them (as #0002's homing dash or plunge are
 `motion` data, and #0001's Maximum Blue drawing its target in is a
 projectile's `pull`). When it cannot, add the mechanic to the shared system as
 a capability any fighter can opt into, named for what it does, never for
 the fighter or for its button: never a check for `'0027'` in shared code.
+A new mechanic that deals damage reaches fighters only through
+`CombatSystem.applyHit` (the one place a Shield is consulted) with a hit
+built by the shared schemas (so its hit effects and its classification are
+validated): never by writing a Launch Point, a stun or a paralysis
+directly, and never with its own idea of when a Shield counts.
 
 ## 6. Defense, touch buttons and names
 
@@ -242,14 +261,17 @@ the fighter or for its button: never a check for `'0027'` in shared code.
   'shielding', ... }` for a Shield on the ground
   ([defense](../systems/defense.md)); `stall` to freeze the melee
   attackers it blocks; leave `defense` out for none. There is no Shield in
-  the air (an `airAnimation` or slow fall is refused).
+  the air (an `airAnimation` or slow fall is refused), and a Shield deals
+  nothing (a `damage`, `paralyze` or `hitbox` on it is refused). It blocks
+  every attack, from every side.
 - **Deflect:** `deflect: { animation: 'deflect', startup, active,
   recovery, hitbox, directionalLaunch, ..., deflectProjectiles: true }`
   for the Shield button in the air ([the
   Deflect](../systems/defense.md#the-deflect)): an attack whose strike is
   always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out) and that
   costs every fighter 15 Energy as it starts; its `cooldown`, if any, is
-  exempt from the ordinary 0.5 s baseline. Its box
+  exempt from the ordinary 0.5 s baseline. It is both an attack and a
+  defense (it must turn projectiles back), and never a Shield. Its box
   is also what catches projectiles, so cover the front of the body the
   move sweeps. Leave it out for none (the button then does nothing in the
   air).

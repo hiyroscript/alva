@@ -418,13 +418,12 @@ test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own bu
   }
 });
 
-test('left to itself, a high level uses Unlimited Void and Hollow Purple on a turtle, each from its own button', () => {
+test('left to itself, a high level uses Unlimited Void and Hollow Purple on an open opponent, each from its own button', () => {
   const used = { attack4: 0, attack5: 0 };
   for (let seed = 0; seed < 6; seed++) {
-    // An opponent a few steps away holding its Shield up, never battered
-    // (its Launch Point held at 0, so it stays on the stage): no Shield
-    // stops either technique.
-    const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX: 900, script: () => ({ shield: true }) });
+    // An opponent a few steps away that never guards, never battered (its
+    // Launch Point held at 0, so it stays on the stage).
+    const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX: 900, script: () => ({}) });
     let tech = null;
     let cooling = [];
     for (let i = 0; i < seconds(14); i++) {
@@ -443,6 +442,90 @@ test('left to itself, a high level uses Unlimited Void and Hollow Purple on a tu
   }
   assert.ok(used.attack4 > 0, `it casts Unlimited Void (${used.attack4})`);
   assert.ok(used.attack5 > 0, `it casts Hollow Purple (${used.attack5})`);
+});
+
+test('a turtle whose Shield never drops blocks everything a high level throws at it, its techniques included', () => {
+  const sources = new Set();
+  let sure = 0;
+  for (let seed = 0; seed < 4; seed++) {
+    // Its Shield held up and its Energy kept full, so it never drops.
+    const r = ring({ difficulty: 'brutal', seed: 420 + seed, cpuX: 700, foeX: 900, script: () => ({ shield: true }) });
+    // What it expects of each move it weighs: never a hit through a Shield
+    // that is up and cannot come down before the move lands.
+    const outcome = r.ai.evaluator.outcome.bind(r.ai.evaluator);
+    r.ai.evaluator.outcome = (s, m, c) => {
+      const out = outcome(s, m, c);
+      const lands = (c.contactK + 1) * DT;
+      if (out && s.op.shielding && s.op.busy >= lands - 0.03) {
+        sure++;
+        assert.equal(out.p, 0, `seed ${seed}: ${m.kind} ${m.id} predicted to land through a Shield held in blockstun`);
+      }
+      if (out && s.op.shielding) assert.ok(out.p <= 0.15 + 1e-9, `seed ${seed}: ${m.id} at most the chance the Shield is lowered first`);
+      return out;
+    };
+    for (let i = 0; i < seconds(10); i++) {
+      r.foe.combat.setEnergy(r.foe.combat.maxEnergy);
+      // Half the time it is also held in its blockstun, so its Shield cannot
+      // come down at all.
+      if (i >= seconds(5)) r.foe.combat.shieldStun = 0.5;
+      // Every so often it is made to cast, whatever it had in mind.
+      if (i % seconds(2) === 0 && r.cpu.canAct() && r.cpu.body.grounded) r.cpu.tryAction(i % seconds(4) === 0 ? 'attack4' : 'attack5');
+      r.step();
+      assert.equal(r.foe.combat.launchPoint, 0, `seed ${seed}: nothing gets through its Shield`);
+      assert.equal(r.foe.combat.immobilized, false, `seed ${seed}: never paralyzed`);
+    }
+    for (const e of r.events.filter((ev) => ev.target === r.foe)) {
+      assert.equal(e.type, 'block', `seed ${seed}: ${e.ability} (${e.source}) is blocked`);
+      assert.equal(e.damage, 0);
+      assert.equal(e.paralysis, 0);
+      assert.equal(e.attack, true, 'and is an attack all the same');
+      sources.add(`${e.source}:${e.ability}`);
+    }
+  }
+  assert.ok(sure > 0, 'it weighed moves into a Shield held in blockstun');
+  assert.ok(sources.has('technique:attack4'), `Unlimited Void's burst blocked (${[...sources]})`);
+  assert.ok(sources.has('projectile:attack5'), `Hollow Purple's sphere blocked (${[...sources]})`);
+});
+
+test('a high level weighs its Shield against Unlimited Void and Hollow Purple, and raising it blocks them', () => {
+  // A cast is an attack like any other: a Shield is among the answers the
+  // CPU weighs against it (with breaking the cast, Deflecting the sphere,
+  // jumping or stepping out). With no blow of its own to answer with (every
+  // move cooling down), the Shield is the answer it takes, and it blocks.
+  const offered = { attack4: 0, attack5: 0 };
+  const blocked = { attack4: 0, attack5: 0 };
+  for (const [move, foeX] of [['attack4', 720], ['attack5', 380]]) {
+    for (let seed = 0; seed < 8; seed++) {
+      // The CPU holds its own offense; the other side casts at it once.
+      const r = ring({
+        difficulty: 'brutal', seed: 440 + seed, cpuX: 900, foeX,
+        script: (n) => (n === 20 ? { [move]: true, [`${move}Pressed`]: true } : {}),
+      });
+      r.hush();
+      let seen = false;
+      for (let i = 0; i < seconds(3); i++) {
+        for (const id of [...Object.keys(r.cpu.attacks), r.cpu.deflect.id]) r.cpu.combat.cooldowns.set(id, 10);
+        for (const id of Object.keys(r.cpu.techniqueDefs)) {
+          if (!r.cpu.combat.abilityCooldowns.active(id)) r.cpu.combat.abilityCooldowns.start(id, 10);
+        }
+        r.step();
+        const weighed = r.ai.defense.weighed;
+        if (weighed.some((o) => o.threat.kind === 'technique') && weighed.some((o) => /Shield/.test(o.why))) seen = true;
+      }
+      if (seen) offered[move]++;
+      const onCpu = r.events.filter((e) => e.target === r.cpu && e.ability === move);
+      if (onCpu.some((e) => e.type === 'block')) blocked[move]++;
+      for (const e of onCpu.filter((ev) => ev.type === 'block')) {
+        assert.equal(e.damage, 0);
+        assert.equal(e.paralysis, 0, 'a blocked cast paralyzes nobody');
+        assert.equal(e.launchPointAfter, e.launchPointBefore);
+      }
+    }
+  }
+  assert.equal(offered.attack4, 8, 'a Shield is weighed against Unlimited Void every time');
+  assert.equal(offered.attack5, 8, 'and against Hollow Purple');
+  assert.ok(blocked.attack4 >= 4, `it Shields Unlimited Void (${blocked.attack4} of 8)`);
+  assert.ok(blocked.attack5 >= 4, `it Shields Hollow Purple (${blocked.attack5} of 8)`);
 });
 
 test('its output is only the player\'s own controls: never a control the fighter does not read', () => {

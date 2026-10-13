@@ -7,10 +7,14 @@
 // where it may start (ground or air), its timing and commitment, its
 // strikes (damage, Base Launch, Directional Launch, stuns, hit effects), its
 // reach over its own motion and pull, its projectile or burst, its costs
-// and limits, and the roles it can play. Roles are derived from those
-// properties, never from a button or a fighter: a fast, short, cheap strike
-// is a poke whoever throws it, a rising strike an anti-air, a slow lingering
-// projectile a trap.
+// and limits, its classification (`offense`: whether it is an attack, a
+// defense or both, read from the shared js/game/combat/offense.js, so a
+// technique, a summon, a throw and the Deflect are attacks here exactly as
+// they are in combat) and the roles it can play. Roles are derived from
+// those properties, never from a button or a fighter: a fast, short, cheap
+// strike is a poke whoever throws it, a rising strike an anti-air, a slow
+// lingering projectile a trap. No role gets past a Shield: every attack is
+// blockable, so the intelligence never plans on one that would.
 //
 // Inputs: a Fighter (its resolved attacks, projectiles, summons, techniques,
 // defense, Deflect, Energy rules and SpriteSet).
@@ -24,12 +28,13 @@
 
 import { readMoveset } from '../moveset.js';
 import { attackReach } from '../../combat/attacks.js';
+import { attackOffense, summonOffense, techniqueOffense } from '../../combat/offense.js';
 
 // Every role a move can be given (a move may have several at once).
 export const MOVE_ROLES = Object.freeze([
   'poke', 'approach', 'launcher', 'comboStarter', 'comboExtender', 'finisher', 'antiAir', 'airToGround', 'edgeGuard',
   'zoning', 'trap', 'punish', 'counterProjectile', 'mobility', 'recovery', 'shieldPressure', 'areaDenial',
-  'defensiveDisengage', 'spike', 'unblockable',
+  'defensiveDisengage', 'spike',
 ]);
 
 const CACHE = new WeakMap();
@@ -39,7 +44,7 @@ function strikeOf(h, at, end) {
   return Object.freeze({
     at, end, damage: h.damage ?? 0, baseLaunch: h.baseLaunch ?? 0, dir: h.directionalLaunch ?? null,
     hitbox: h.hitbox ?? null, hitstun: h.hitstun ?? 0, blockstun: h.blockstun ?? 0, hitstop: h.hitstop ?? 0,
-    paralyze: h.paralyze ?? 0, unblockable: !!h.unblockable, blockPush: h.blockPush ?? 0, carry: h.carry ?? null,
+    paralyze: h.paralyze ?? 0, blockPush: h.blockPush ?? 0, carry: h.carry ?? null,
   });
 }
 
@@ -69,7 +74,7 @@ function projectileModel(proj, spawnAt, offset) {
     def: proj, id: proj.id, speed: proj.speed, lifetime: proj.lifetime, range: proj.speed * proj.lifetime,
     spawnAt, offset: { x: offset?.x ?? 0, y: offset?.y ?? 0 }, hitbox: proj.hitbox,
     pierce: proj.pierce, pull: proj.pull, repel: !!proj.repel, erase: !!proj.erase,
-    unblockable: !!proj.unblockable, carry: proj.carry, strikes, damage: strikes.reduce((n, s) => n + s.damage, 0),
+    carry: proj.carry, strikes, damage: strikes.reduce((n, s) => n + s.damage, 0),
   });
 }
 
@@ -80,18 +85,16 @@ function sumStrikes(strikes) {
   let hitstun = 0;
   let paralyze = 0;
   let blockPush = 0;
-  let unblockable = strikes.length > 0;
   for (const s of strikes) {
     damage += s.damage;
     maxBaseLaunch = Math.max(maxBaseLaunch, s.dir ? s.baseLaunch : 0);
     hitstun = Math.max(hitstun, s.hitstun);
     paralyze = Math.max(paralyze, s.paralyze);
     blockPush = Math.max(blockPush, s.blockPush);
-    unblockable &&= s.unblockable;
   }
   const last = strikes[strikes.length - 1];
   return {
-    damage, maxBaseLaunch, hitstun, paralyze, blockPush, unblockable,
+    damage, maxBaseLaunch, hitstun, paralyze, blockPush,
     finisher: last ? { baseLaunch: last.baseLaunch, dir: last.dir } : { baseLaunch: 0, dir: null },
   };
 }
@@ -122,11 +125,10 @@ function rolesOf(m, height, fastest) {
   if (motion === 'homing' || motion === 'roll' || motion === 'rise' || motion === 'bounce' || m.step ||
       (motion === 'hover' && m.air && m.total >= 0.3)) r.add('mobility');
   if (m.air && (motion === 'rise' || motion === 'homing' || (motion === 'hover' && m.total >= 0.3))) r.add('recovery');
-  if (m.unblockable || m.blockPush > 0 || m.strikes.length > 1 || shot?.pierce) r.add('shieldPressure');
+  if (m.blockPush > 0 || m.strikes.length > 1 || shot?.pierce) r.add('shieldPressure');
   if (m.burst || (m.pull && m.pull.radius >= 120) || (shot && shot.lifetime >= 1)) r.add('areaDenial');
   if (m.passThrough || motion === 'rise' || shot?.repel) r.add('defensiveDisengage');
   if (fin.dir === 'reverseVertical' && fin.baseLaunch > 0) r.add('spike');
-  if (m.unblockable) r.add('unblockable');
   return r;
 }
 
@@ -137,7 +139,7 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
   const sum = sumStrikes(projectile ? projectile.strikes : strikes);
   const lead = projectile ? atk.projectile.spawnAt : strikes[0]?.at ?? atk.startup;
   return {
-    key: `${action}:${air ? 'air' : 'ground'}`, kind, action, id, air, def: atk,
+    key: `${action}:${air ? 'air' : 'ground'}`, kind, action, id, air, def: atk, offense: attackOffense(atk),
     startup: atk.startup, active: atk.active, recovery: atk.recovery, total: atk.total,
     lead, commitment: atk.total, strikes, projectile, burst: null, summon: null, ...sum,
     blockstun: Math.max(0, ...(projectile ? projectile.strikes : strikes).map((s) => s.blockstun)),
@@ -165,6 +167,7 @@ function techniqueMove(f, special, sprites) {
   const sum = sumStrikes([...strikes, ...(projectile ? projectile.strikes : [])]);
   return {
     key: `${special.action}:ground`, kind: 'technique', action: special.action, id: special.id, air: false, def: t,
+    offense: techniqueOffense(t),
     startup: cast, active: 1 / 60, recovery: release, total: cast + release, lead: cast, commitment: cast + release,
     strikes, projectile, burst: t.burst ? { box: t.burst.hitbox, hit: burstHit } : null, summon: null, ...sum,
     blockstun: burstHit?.blockstun ?? 0, hitstop: burstHit?.hitstop ?? 0, reach: t.burst ? { ...t.burst.hitbox } : null,
@@ -185,6 +188,7 @@ function summonMove(f, special, entry) {
   const startup = f.sprites.duration(s.startupAnimation);
   return {
     key: `${special.action}:ground`, kind: 'summon', action: special.action, id: special.id, air: false, def: s,
+    offense: summonOffense(s, f.attacks),
     startup, active: 0, recovery: 0, total: startup, lead: entry.lead, commitment: startup, strikes, projectile: null,
     burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, ...sum,
     blockstun: atk.blockstun, hitstop: atk.hitstop, reach: null, hitbox: atk.hitbox, motion: null, motionSpec: null,

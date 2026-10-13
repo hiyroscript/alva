@@ -34,7 +34,7 @@ test('the CPU reads #0001\'s moves from its data: two projectiles, its close mov
   const [voidCast, purple] = ms.specials;
   assert.deepEqual(voidCast.box, DEF.techniques.attack4.burst.hitbox);
   assert.ok(purple.box.w > DEF.projectiles.attack5_object.speed, 'the sphere\'s whole flight');
-  assert.ok(voidCast.hit.unblockable && voidCast.hit.paralyze > 0);
+  assert.ok(voidCast.hit.paralyze > 0 && voidCast.hit.unblockable === undefined, 'a paralyzing burst, blockable like any attack');
   // Blue's reach is its pull's circle, not just its palm.
   const blue = ms.melee.find((m) => m.id === 'midair_attack3');
   assert.deepEqual(blue.reach, attackReach(fighter.attacks.midair_attack3));

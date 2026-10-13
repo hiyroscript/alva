@@ -32,6 +32,20 @@ momentum" is a shared rule every fighter's attacks follow with their own
 `momentum` values. "#0002 is faster" is not a thing a definition can say:
 it runs exactly as fast as #0001, and its speed lives in its moves.
 
+Nor can a definition say what is an attack, or that one gets past a
+Shield. A move's **execution type** (an ordinary attack, a summon, a
+technique, the Deflect: `actions` and the schema it is built by) says how
+it works; its **classification** (attack, defense, both or neither:
+`offense`, inferred by the shared
+[`js/game/combat/offense.js`](../../js/game/combat/offense.js) from what
+it can do) says what it is, and is never read from its name. Every move
+that can deal damage, directly or through what it creates (a projectile, a
+burst, a clone's strike, a projectile turned back), is an attack, and a
+raised Shield blocks every attack ([combat: attack
+classification](../systems/combat.md#attack-classification)). So a future
+fighter's Shadow Clone, Meteor Storm or Poison Field obeys the Shield with
+no code written for it.
+
 ## The registry
 
 [`js/data/characters.js`](../../js/data/characters.js) is the one list of
@@ -50,9 +64,11 @@ loadout rules (`assertLoadout`), for movement of its own
 (`assertUniversalMovement`: a `movement` profile, `powers` or any
 universal movement field is refused) and against the combat rules
 (`assertCombatRules`: every hit's damage one of 1, 3, 5 or 10, every
-attack's repeat cooldown finite and non-negative, the Deflect's fixed strike, and
-no Energy maximum or cost of its own); one that breaks a rule is refused
-with the problem named.
+attack's repeat cooldown finite and non-negative, the Deflect's fixed strike, no
+way past a Shield (`unblockable` and every other Shield bypass), any
+`offensive` agreeing with what the move does, a summon's clone performing
+an attack that strikes, and no Energy maximum or cost of its own); one
+that breaks a rule is refused with the problem named.
 
 ## What a definition holds
 

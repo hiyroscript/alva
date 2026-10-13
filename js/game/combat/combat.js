@@ -26,19 +26,30 @@
 // a projectile's, they never freeze the owner.
 //
 // A technique (see js/game/combat/technique.js) is performed by the fighter
-// itself but is not an attack either: the burst it releases round itself is
-// its hit, resolved here through applyHit with its own data (what it throws
-// is a projectile like any other). It freezes only its targets.
+// itself but is executed as no ordinary attack: the burst it releases round
+// itself is its hit, resolved here through applyHit with its own data (what
+// it throws is a projectile like any other). It freezes only its targets.
 //
 // A fighter's Deflect (see js/game/combat/deflect.js) is one of its attacks
 // here, struck and blocked like any other; its hitbox's other job, turning
 // projectiles back (`deflectProjectiles`), is settled first every step
 // (deflectProjectiles), before any projectile can strike.
 //
+// However each is executed, every one of them is an attack (see
+// js/game/combat/offense.js), and applyHit is the one place any attack
+// reaches a fighter: melee strikes, a multi-hit string's, projectiles
+// (thrown, cast or turned back), clones' strikes and techniques' bursts
+// alike. It is also the one place a Shield is consulted, and it consults it
+// unconditionally: a target whose Shield is up when a hit reaches it blocks
+// that hit, whatever made it, whatever its damage, launch, size or speed
+// and whichever side it comes from. Nothing declares its way past one
+// (`unblockable` is refused as a hit is built). Nothing else writes a
+// fighter's Launch Point upward, stuns it for a hit or paralyzes it.
+//
 // Beyond damage and launch, a hit may carry the shared hit effects (see
-// js/game/combat/hit-effects.js): `unblockable` (no Shield stops it),
-// `paralyze` (a timed hold on the target, CombatState.paralyze, that a
-// launch ends) and `blockPush` (a Shield that blocks it is shoved back).
+// js/game/combat/hit-effects.js): `paralyze` (a timed hold on the target,
+// CombatState.paralyze, that a launch ends; never through a Shield) and
+// `blockPush` (a Shield that blocks it is shoved back, and nothing more).
 // And a Shield may stall the blows it blocks (`defense.stall`, see
 // js/game/combat/defense.js): a melee attacker freezes in it.
 
@@ -145,7 +156,8 @@ export class CombatSystem {
     // { type: 'hit' | 'block', attacker, target, move, damage, energyCost,
     //   launchPointBefore, launchPointAfter, baseLaunch, directionalLaunch,
     //   launchStrength, finalLaunch, launchSpeed, hitstun, perfect, point,
-    //   paralysis, stall, projectile, summon, technique }
+    //   paralysis, stall, projectile, summon, technique, attack, source,
+    //   ability, redirected }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
@@ -163,7 +175,14 @@ export class CombatSystem {
     // on its target (seconds, 0 for none) and `stall` how long a melee blow
     // the target's Shield blocked froze its attacker (0 for none). `attacker`
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
-    // `technique` are null for the fighter's own melee.
+    // `technique` are null for the fighter's own melee. `attack` is always
+    // true (every hit is an attack's, blocked or not, whatever it did);
+    // `source` is where it came from (ATTACK_SOURCES in
+    // js/game/combat/offense.js: 'melee', 'deflect', 'projectile', 'summon'
+    // or 'technique'), `ability` the id of the attack, technique or summon
+    // that produced it (a projectile's thrower's, kept when it is turned
+    // back) and `redirected` whether it is a projectile that was turned
+    // back. A blocked hit is recorded as a block, never as a hit.
     this.events = [];
     // { fighter, projectile, from, direction }: the projectiles turned back
     // this step (see deflectProjectiles), `from` the owner each one had.
@@ -207,9 +226,10 @@ export class CombatSystem {
       for (const target of fighters) {
         if (target === p.owner || !p.ready || p.passed(target)) continue;
         if (!strikePoint(hit, target)) continue;
-        // One hit, then it is gone (a Shielded projectile included); a
-        // piercing one strikes again every so often until its last strike,
-        // its finisher, and an erasing one flies on through (see
+        // One hit, then it is gone; a piercing one strikes again every so
+        // often until its last strike, its finisher, and an erasing one
+        // that hits flies on through. A Shield that blocks any of them
+        // stops it there, an erasing one included (see
         // js/game/combat/projectile.js).
         const def = p.nextHit;
         const event = this.applyHit(p.owner, target, def, {
@@ -304,21 +324,26 @@ export class CombatSystem {
     }
   }
 
-  // Shared by melee, projectiles, clones and techniques. `facing` is
+  // Shared by melee, projectiles, clones and techniques: every attack's hit
+  // on a fighter comes through here, and only here. `facing` is
   // the direction the hit travels: the attacker's facing for melee, the
   // projectile's own direction (fixed when thrown), the clone's facing
   // (fixed when summoned) or the technique's (fixed when it started). A
   // detached hit (a projectile's, a clone's or a technique's burst) freezes
   // only its target.
   //
-  // A target whose Shield is up blocks the hit, whichever side it comes
-  // from: no Launch Point, no launch and no hitstun, only the hit's hitstop
-  // and its blockstun, held in the Shield. The Shield pays
+  // A target whose Shield is up blocks the hit, whatever it is and whichever
+  // side it comes from: no Launch Point, no launch, no hitstun, no
+  // paralysis and no carry, only the hit's hitstop and its blockstun, held
+  // in the Shield, and its blockPush. The Shield pays
   // BLOCK_ENERGY_COST (energy.shieldHitCost, the same for every fighter) for
   // it, once, or all that is left when that is less, a perfect block
   // exactly as any other: a block that empties the bar exhausts the fighter
   // and drops the Shield straight away, so a later hit, even on this same
-  // step, lands in full. The block itself stands.
+  // step (hits resolve in the fixed order of update), lands in full. The
+  // block itself stands: the Shield was up when it met it. A blocked hit
+  // never reaches what only a real hit does (the target's technique or
+  // summoning startup cut short, its takeHit).
   //
   // Otherwise the damage is added to the target's Launch Point first, so
   // the hit that raises it already launches from the new total. The launch
@@ -332,12 +357,12 @@ export class CombatSystem {
   // target `velocity`, what struck it (the attacker's body, a projectile),
   // less its `lift` upward: it is dragged along.
   //
-  // The hit effects (js/game/combat/hit-effects.js): an `unblockable` hit
-  // is never blocked, Shield up or not. A real hit that `paralyze`s holds
-  // the target for that long (CombatState.paralyze) unless it launches it:
-  // any launching hit ends a paralysis first, so the launch is never held
-  // back. A blocked hit with `blockPush` still shoves the Shield along the
-  // hit's direction at that speed. And a melee blow the target's Shield
+  // The hit effects (js/game/combat/hit-effects.js): a real hit that
+  // `paralyze`s holds the target for that long (CombatState.paralyze)
+  // unless it launches it: any launching hit ends a paralysis first, so the
+  // launch is never held back; a blocked one paralyzes nobody. A blocked
+  // hit with `blockPush` still shoves the Shield along the hit's direction
+  // at that speed, and nothing more. And a melee blow the target's Shield
   // blocks stalls in it: the attacker is frozen for at least the Shield's
   // `stall` (a detached hit stalls nothing).
   applyHit(attacker, target, def, {
@@ -345,7 +370,9 @@ export class CombatSystem {
     detached = !!(projectile || summon || technique), point = bodyPoint(target), velocity = null,
   } = {}) {
     const tc = target.combat;
-    const blocked = tc.shielding && !def.unblockable;
+    // The universal Shield rule: up at contact, it blocks. Nothing about the
+    // hit is consulted.
+    const blocked = tc.shielding;
     // A perfect Shield (raised just in time, see Fighter.perfectShield)
     // blocks with no blockstun, so its fighter can answer at once; it pays
     // for the block like any other (no discount, nothing given back).
@@ -387,12 +414,14 @@ export class CombatSystem {
     if (!detached) attacker.combat.hitstop = def.hitstop;
     const stall = blocked && !detached ? target.defense?.stall ?? 0 : 0;
     if (stall > attacker.combat.hitstop) attacker.combat.hitstop = stall;
-    // ...and a technique: no armour. It ends at once (whatever it has not
-    // released yet never is), before the launch below moves the fighter. So does
-    // a summon's startup: the hurt pose shows on this very step, and no
-    // clone comes of it.
-    target.endTechnique?.('hit');
-    target.cancelSummon?.();
+    // ...and a technique: no armour. A real hit ends it at once (whatever it
+    // has not released yet never is), before the launch below moves the
+    // fighter. So does a summon's startup: the hurt pose shows on this very
+    // step, and no clone comes of it. A block is no hit.
+    if (!blocked) {
+      target.endTechnique?.('hit');
+      target.cancelSummon?.();
+    }
     // A launch ends a paralysis; a hit that paralyzes and launches nothing
     // holds the target.
     if (finalLaunch.x || finalLaunch.y) tc.releaseParalysis();
@@ -420,7 +449,10 @@ export class CombatSystem {
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, stall,
-      projectile, summon, technique,
+      projectile, summon, technique, attack: true,
+      source: projectile ? 'projectile' : summon ? 'summon' : technique ? 'technique' : def.deflectProjectiles ? 'deflect' : 'melee',
+      ability: projectile ? projectile.ability ?? null : summon ? summon.def?.id ?? null : technique ? technique.def?.id ?? null : def.id ?? null,
+      redirected: !!projectile?.redirected,
     };
     // The target's own reaction to a real hit (its air jumps back, see
     // Fighter.takeHit).

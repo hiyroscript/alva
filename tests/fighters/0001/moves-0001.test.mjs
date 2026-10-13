@@ -3,9 +3,10 @@
 // and its follow-ups, the Floating Straight and the High Kick standing on
 // the air, Red blasting, shoving a Shield and turning projectiles back, the
 // Red Kick locking on, Maximum Blue dragging its target in and grinding
-// it, Blue yanking an opponent to its palm, Unlimited Void's sure hit and
-// paralysis, Hollow Purple's chant and its sphere erasing and passing
-// through everything, and Infinity stalling the blows it blocks. Runs the
+// it, Blue yanking an opponent to its palm, Unlimited Void's burst and
+// paralysis, Hollow Purple's chant and its sphere erasing projectiles and
+// passing through the fighters it hits (each blocked by a raised Shield
+// like any attack), and Infinity stalling the blows it blocks. Runs the
 // real Fighter, projectiles, pulls and CombatSystem (see
 // tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
@@ -148,7 +149,7 @@ test('Red leaves the palms on frame 4 and flies 600 units/s for about 300 units'
   let n = 1;
   while (!fighter.releases.length && n < 30) { step({}); n++; }
   assert.equal(n, steps(A.attack2.projectile.spawnAt) + 1, 'on the step its time crosses spawnAt (the press step counted)');
-  assert.deepEqual(fighter.releases[0], { id: 'attack2_object', offset: { x: 44, y: -70 }, direction: 1 });
+  assert.deepEqual(fighter.releases[0], { id: 'attack2_object', offset: { x: 44, y: -70 }, direction: 1, ability: 'attack2' });
   const orb = DEF.projectiles.attack2_object;
   assert.equal(orb.speed, 600);
   assert.ok(Math.abs(orb.speed * orb.lifetime - 300) < 1);
@@ -288,17 +289,19 @@ test('Blue yanks an opponent in to its palm and strikes it upward, standing on t
 
 // ---- Unlimited Void -------------------------------------------------------------------------
 
-test('Unlimited Void: half a second of cast, then a sure hit round #0001 that no Shield stops, paralyzing for 1.7 s', () => {
+test('Unlimited Void: half a second of cast, then a hit round #0001 for 3, paralyzing for 1.7 s', () => {
   const d = versus({ gap: 200 });
-  raise(d);
-  d.tick(P('attack4'), HOLD);
+  d.tick(P('attack4'));
   const t = d.attacker.technique;
   assert.equal(t?.action, 'attack4');
   assert.equal(t.castDuration, 0.5);
-  tickUntil(d, () => d.events.length > 0, {}, HOLD, 60);
+  tickUntil(d, () => d.events.length > 0, {}, {}, 60);
   const [e] = d.events;
-  assert.equal(e.type, 'hit', 'through the Shield');
+  assert.equal(e.type, 'hit');
   assert.equal(e.technique, t);
+  assert.equal(e.source, 'technique', 'a technique, and an attack');
+  assert.equal(e.ability, 'attack4');
+  assert.equal(e.attack, true);
   assert.equal(e.damage, 3);
   assert.equal(e.energyCost, 0);
   assert.equal(e.paralysis, 1.7);
@@ -311,6 +314,37 @@ test('Unlimited Void: half a second of cast, then a sure hit round #0001 that no
   assert.equal(d.attacker.combat.abilityCooldowns.size, 1);
   d.tick(P('attack4'));
   assert.equal(d.attacker.technique, null, 'a free fighter still waits for the cooldown');
+});
+
+test('Unlimited Void meets a raised Shield like any attack: blocked, no Launch Point, no paralysis, no launch', () => {
+  for (const back of [false, true]) {
+    // Facing #0001 or with its back to it: the Shield blocks from every side.
+    const d = versus({ gap: 200, targetFacing: back ? 1 : -1 });
+    d.target.combat.launchPoint = 40;
+    raise(d);
+    const energy = d.target.combat.energy;
+    d.tick(P('attack4'), HOLD);
+    tickUntil(d, () => d.events.length > 0, {}, HOLD, 60);
+    const [e] = d.events;
+    assert.equal(e.type, 'block', `blocked (${back ? 'from behind' : 'from the front'})`);
+    assert.equal(e.source, 'technique');
+    assert.equal(e.ability, 'attack4');
+    assert.equal(e.attack, true, 'blocked, it is an attack all the same');
+    assert.equal(e.damage, 0);
+    assert.equal(e.paralysis, 0, 'no paralysis');
+    assert.equal(e.launchSpeed, 0, 'no launch');
+    assert.equal(e.launchPointAfter, 40);
+    assert.equal(e.energyCost, d.target.energyDef.shieldHitCost, 'the Shield pays for it, as for any block');
+    assert.equal(d.target.combat.energy, energy - e.energyCost);
+    assert.equal(d.target.combat.launchPoint, 40);
+    assert.equal(d.target.combat.immobilized, false);
+    assert.equal(d.target.combat.stun, 0);
+    assert.equal(d.target.combat.shielding, true, 'the guard holds');
+    for (let i = 0; i < steps(1); i++) d.tick({}, HOLD);
+    assert.equal(d.events.length, 1, 'nothing more comes of it later');
+    assert.equal(d.target.combat.launchPoint, 40);
+    assert.equal(d.target.combat.immobilized, false);
+  }
 });
 
 test('the domain reaches 250 units either side and well over #0001\'s head, and no further', () => {
@@ -350,26 +384,48 @@ test('a paralyzed opponent can be hit freely; the first hit that launches it set
 
 // ---- Hollow Purple ----------------------------------------------------------------------------
 
-test('Hollow Purple: a five-sixths of a second chant, then the sphere through any Shield for 10 and Base Launch 3, flying on through', () => {
+test('Hollow Purple: a five-sixths of a second chant, then the sphere for 10 and Base Launch 3, flying on through', () => {
   const d = versus({ gap: 400 });
-  raise(d);
   d.target.combat.launchPoint = 22;
-  d.tick(P('attack5'), HOLD);
+  d.tick(P('attack5'));
   const t = d.attacker.technique;
   assert.equal(t?.action, 'attack5');
   assert.ok(Math.abs(t.castDuration - 5 / 6) < 1e-9);
   let castSteps = 1;
-  while (d.attacker.technique?.phase === 'cast') { d.tick({}, HOLD); castSteps++; }
+  while (d.attacker.technique?.phase === 'cast') { d.tick({}); castSteps++; }
   assert.equal(castSteps, steps(5 / 6) + 1);
-  tickUntil(d, () => d.events.length > 0, {}, HOLD, 60);
+  tickUntil(d, () => d.events.length > 0, {}, {}, 60);
   const [e] = d.events;
-  assert.equal(e.type, 'hit', 'no Shield stops it');
+  assert.equal(e.type, 'hit');
+  assert.equal(e.source, 'projectile');
+  assert.equal(e.ability, 'attack5', 'cast by Hollow Purple');
   assert.equal(e.move, 'attack5_object');
   assert.equal(e.damage, 10, 'the top damage tier');
   assert.deepEqual({ ...e.finalLaunch }, { x: 3 * 32 * U, y: 0 });
   assert.equal(e.projectile.alive, true, 'it flies on through');
   for (let i = 0; i < 30; i++) d.tick();
   assert.equal(d.events.filter((x) => x.projectile === e.projectile).length, 1, 'each fighter once');
+});
+
+test('Hollow Purple meets a raised Shield like any attack: blocked, and the Shield stops the sphere there', () => {
+  for (const back of [false, true]) {
+    const d = versus({ gap: 400, targetFacing: back ? 1 : -1 });
+    d.target.combat.launchPoint = 22;
+    raise(d);
+    d.tick(P('attack5'), HOLD);
+    tickUntil(d, () => d.events.length > 0, {}, HOLD, 120);
+    const [e] = d.events;
+    assert.equal(e.type, 'block', `blocked (${back ? 'from behind' : 'from the front'})`);
+    assert.equal(e.source, 'projectile');
+    assert.equal(e.ability, 'attack5');
+    assert.equal(e.damage, 0, 'the top damage tier, and still nothing through the Shield');
+    assert.equal(e.launchSpeed, 0);
+    assert.equal(d.target.combat.launchPoint, 22);
+    assert.equal(e.projectile.alive, false, 'erasing or not, the Shield stops it');
+    for (let i = 0; i < steps(1); i++) d.tick({}, {});
+    assert.equal(d.events.length, 1, 'it never comes back to strike once the Shield is lowered');
+    assert.equal(d.target.combat.launchPoint, 22);
+  }
 });
 
 test('Hollow Purple erases the projectiles it meets; a hit during the chant breaks it and nothing is cast', () => {

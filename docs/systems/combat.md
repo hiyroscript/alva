@@ -4,6 +4,9 @@ How a button press becomes a move, how moves are defined, and how hits
 are found and resolved: one system for every fighter. A fighter's moves
 are data in its definition; the shared code turns that data into attacks,
 projectiles, summons and techniques and resolves every hit the same way.
+Whatever executes it, every move that can deal damage is an attack, and a
+raised Shield blocks every attack ([attack
+classification](#attack-classification)).
 
 The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat),
 §7.2.4a (Combat Assist) and §7.2.6 (summons and techniques); Launch is its own guide
@@ -18,7 +21,8 @@ The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat),
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
-| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`unblockable`, `paralyze`, `blockPush`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`. |
+| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`; it refuses any way past a Shield. |
+| [`js/game/combat/offense.js`](../../js/game/combat/offense.js) | The attack classification: what a definition can do, apart from how it is executed (`attackOffense`, `projectileOffense`, `techniqueOffense`, `summonOffense`, `actionOffense`, `classifyHit`, `isHarmfulHit`, `resolveOffense`), the hit sources events name (`ATTACK_SOURCES`), and the refused Shield bypasses (`SHIELD_BYPASS_FIELDS`, `assertNoShieldBypass`). |
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
@@ -85,7 +89,8 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
 | `hits`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
-| `unblockable` / `paralyze` / `blockPush` | false / 0 / 0 | The shared hit effects (below). |
+| `paralyze` / `blockPush` | 0 / 0 | The shared hit effects (below). |
+| `offensive` | — | Optional, and only to agree with what the attack does ([attack classification](#attack-classification)). |
 
 ### From a press to a move
 
@@ -173,12 +178,15 @@ them today):
   to the pull's circle for the CPU.
 - **Hit effects** (on any hit: an attack, a strike, a projectile, a
   finisher, a technique's burst; [`hit-effects.js`](../../js/game/combat/hit-effects.js)):
-  `unblockable` (a raised Shield takes it in full and pays nothing),
   `paralyze` (seconds a real hit holds its target in place: no acting, no
   sideways speed, its hurt pose; the longer hold wins, it runs down like
-  hitstun, and any hit that launches the target ends it), `blockPush` (a
-  Shield that blocks it is shoved along the hit's direction). Each
-  defaults to changing nothing; a value of the wrong kind is refused.
+  hitstun, and any hit that launches the target ends it; a blocked hit
+  paralyzes nobody), `blockPush` (a Shield that blocks it is shoved along
+  the hit's direction, and nothing more). Each defaults to changing
+  nothing; a value of the wrong kind is refused. There is no hit effect
+  that gets past a Shield: `unblockable` (gone) and every other field of
+  `SHIELD_BYPASS_FIELDS` is refused wherever a hit is built, true or
+  false.
 - **Turning projectiles back** (`deflectProjectiles: true`): while its
   active phase is open, its hitbox turns back every other fighter's
   projectile it meets, before any projectile strikes that step
@@ -187,6 +195,52 @@ them today):
 - **Per airtime** (`airUses`) and **free fall** (`freeFall: true`).
 - **Body** (`passThrough: true`: no pushbox while it plays; `hurtboxes`:
   the fighter's own replaced while it plays).
+
+## Attack classification
+
+How a move is **executed** and what it **is** are two separate things. Its
+execution type (an ordinary attack, a throw, a technique, a summon, the
+Deflect, the Shield) decides how it works: its timing, animation,
+cooldown, Energy and what it spawns, and none of that changes. Its
+classification, inferred by the shared
+[`offense.js`](../../js/game/combat/offense.js) from what the definition
+can do, decides whether it is an **attack**, a **defense**, or both. Every
+definition the schemas build carries it as `offense` (`{ attack, defense,
+sources }`), and a Fighter's button is read with `actionOffense`.
+
+An action is an attack when it can deal damage, directly or indirectly: a
+hit of its own that adds Launch Point, paralyzes or launches (`strike`), a
+multi-hit string (`strikes`), a projectile it releases or is (`projectile`,
+a piercing one's `finisher` too), a technique's burst (`burst`), a summon's
+clone that strikes (`clone`), or projectiles it turns back (`redirect`).
+So:
+
+| Move | Executed as | Classified |
+| --- | --- | --- |
+| A punch, a kick, a numbered attack, a multi-hit string, a homing dash, a roll | attack | attack |
+| A throw and its projectile, a piercing projectile and its finisher | attack, projectile | attack |
+| A cast's burst or projectile (Unlimited Void, Hollow Purple) | technique | attack |
+| A summon, its clone and the clone's strike | summon | attack |
+| The Deflect | attack (in the air) | attack **and** defense |
+| A projectile turned back | projectile (now the deflecting fighter's) | attack |
+| The Shield | defense | defense only |
+| Running, jumping, the Dash, the air dash; a pending attack | movement / art | neither |
+
+A move that misses, is blocked or is turned back stays an attack.
+Classification never reads a name, a codename, a button or a fighter: a
+future fighter's Shadow Clone, Meteor Storm or Poison Field is classified
+from its data with no code written for it. A definition may state
+`offensive` (true or false), but only to agree: a damaging move declared
+`offensive: false`, or a harmless one declared `true`, is refused, and so
+is a Shield that declares any hit field.
+
+**Every attack is blockable.** The one rule, enforced in `applyHit`
+([below](#hit-resolution)) for every source: a target whose Shield is up
+when a hit reaches it blocks that hit. Nothing may declare its way past
+one: `unblockable` and the other `SHIELD_BYPASS_FIELDS` (`ignoreShield`,
+`bypassShield`, `pierceShield`, `guardBreak`...) are refused on any
+attack, strike, projectile, finisher, technique, burst or summon, so no
+character definition can bring a Shield bypass back.
 
 ## Hit resolution
 
@@ -198,14 +252,20 @@ deflecting fighter's, so none of them strikes it this step), fighters'
 melee hitboxes (and strikes), live projectiles, summoned clones, then
 techniques (a burst due on its release step). Every hit goes through one
 `applyHit(attacker, target, def, ...)`, which never checks which fighter,
-attack or technique it is resolving:
+attack or technique it is resolving. It is the only place an attack
+reaches a fighter, and the only place a Shield is consulted:
 
-1. A target whose Shield is up blocks it (from any side) unless the hit is
-   `unblockable`: the Shield pays 15 Energy for it (`BLOCK_ENERGY_COST`),
-   a perfect one exactly the same (its only difference is no blockstun);
-   a hit with
-   `blockPush` shoves it back, and a Shield with a `stall` freezes a melee
-   attacker for that long ([defense](defense.md)).
+1. A target whose Shield is up when the hit reaches it blocks it, from
+   any side, whatever made it and however hard it hits: no field of the
+   hit is consulted. The Shield pays 15 Energy for it
+   (`BLOCK_ENERGY_COST`), or all it has left (a block that empties it
+   still stands; the Shield then drops, and only a hit after that, even
+   later on the same step, can land), a perfect one exactly the same (its
+   only difference is no blockstun); a hit with `blockPush` shoves it
+   back, and a Shield with a `stall` freezes a melee attacker for that
+   long ([defense](defense.md)). A blocked hit adds no Launch Point,
+   launches, stuns, paralyzes and carries nothing, and a blocked
+   projectile is stopped there, an erasing or piercing one included.
 2. Otherwise the hit's `damage` is added to the target's Launch Point,
    then its launch strength is `baseLaunch` × that new Launch Point, sent
    along its `directionalLaunch` and bent by the target's launch steering
@@ -214,15 +274,20 @@ attack or technique it is resolving:
 3. Hitstun (plus the launch's extra stun) or blockstun, and the hit's
    hitstop (the attacker freezes too, unless the hit is detached: a
    projectile's, a clone's or a technique's).
-4. A hit ends the target's technique and cancels its summon startup (no
-   armour).
+4. A real hit ends the target's technique and cancels its summon startup
+   (no armour); a block never does.
 5. A launch ends any paralysis; a real hit that `paralyze`s and launches
    nothing holds the target.
 6. The launch replaces the target's velocity, or a `carry` drags it.
 7. One event is recorded (`type` hit or block, attacker, target, move,
    damage, Launch Point before and after, launch values, stun, `perfect`,
    the point it landed, the `paralysis` it put on and the `stall` it
-   caused, and the projectile, summon or technique behind it), and the
+   caused, and the projectile, summon or technique behind it; `attack`
+   (always true: a blocked attack is still an attack, recorded as a
+   block, never as a hit), `source` (`melee`, `deflect`, `projectile`,
+   `summon` or `technique`), `ability` (the attack, technique or summon
+   that produced it, a projectile's kept when it is turned back) and
+   `redirected` (a projectile turned back)), and, on a real hit only, the
    target's own reaction runs (`Fighter.takeHit`: its air jumps and
    per-airtime attacks back, a tumble, a launch sequence).
 
@@ -243,9 +308,11 @@ spins as it flies, clockwise; 0, the default, is none: art only, see
 [rendering](rendering.md#projectile-spin)). A projectile flies straight
 in the direction its
 thrower faced at the release, never turns, hits once by default (a
-piercing one up to its `hits`, an erasing one each fighter once, flying
-on through), and is gone on a block, at the end of its lifetime, in the
-Void or against a solid. Its hits credit its thrower and freeze only its
+piercing one up to its `hits`, an erasing one each fighter it hits once,
+flying on through), and is gone on a block (any projectile, an erasing or
+piercing one included: a Shield stops it), at the end of its lifetime, in
+the Void or against a solid. Every projectile is an attack, and stays one
+when it is turned back. Its hits credit its thrower and freeze only its
 target. When two of different owners meet (`clashProjectiles`), erasing
 beats repelling beats neither: a repelling one turns the other back, its
 owner's from then on; an erasing one makes it disappear; two of the same
@@ -277,7 +344,11 @@ A clone lives through three phases (appear: the cloud forwards; attack:
 the attack once, with its own data; vanish: the cloud backwards) and is
 then removed. It never moves, turns or retargets, has no Launch Point,
 hurtboxes, pushbox or physics, and its hit is the attack's own, resolved
-by `applyHit` and credited to the owner. No opponent in play, or missing
+by `applyHit` and credited to the owner. A summon is an attack (the
+summoning, the clone, its strike and the hit it lands are one offensive
+action, the owner's): a target whose Shield is up blocks the clone's
+strike from whichever side the clone appears, and the registry refuses a
+summon whose clone could strike nothing. No opponent in play, or missing
 art, and the press does nothing (no cooldown). The exact rules:
 [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.6.
 
@@ -290,8 +361,9 @@ and the sample fighter keep the system tested.
 A numbered button that is a technique (`{ type: 'technique', id }`)
 starts `techniques[id]`: a multi-phase move the fighter itself performs,
 run by [`js/game/combat/technique.js`](../../js/game/combat/technique.js).
-It is not an attack, a projectile or a summon; while it runs it owns the
-fighter.
+It is executed as no ordinary attack (no `combat.attack`), projectile or
+summon; while it runs it owns the fighter. What it releases makes it an
+attack all the same, blocked by a raised Shield like any other.
 
 **One form: the cast.** The fighter stands committed to a casting pose,
 then lets go of what it casts all at once. Its phases are explicit:
@@ -305,8 +377,8 @@ mirrored, so a box round the fighter reaches both sides; then
 `releaseAnimation` plays once) and *done*. Fields: `castAnimation`,
 `releaseAnimation`, `cooldown`, `projectile`, `burst`; the burst's hit is
 validated like an attack's (damage, launch, stuns and hit effects). E.g.
-#0001's Unlimited Void (a burst that no Shield stops and that paralyzes)
-and Hollow Purple (a projectile that erases) ([its
+#0001's Unlimited Void (a burst that paralyzes) and Hollow Purple (a
+projectile that erases), each blocked by a raised Shield ([its
 specification](../characters/0001.md#each-move-in-detail)). Nothing in the
 runtime reads a fighter or a button; a technique of a different shape
 would be a new form in the runtime with its own fields, not a

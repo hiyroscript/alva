@@ -6,9 +6,13 @@
 // multi-phase move the real fighter performs, driven by this runtime. The
 // Fighter starts one (Fighter.tryTechnique), advances it every fixed step
 // and ends it; the Battle spawns what it releases and the CombatSystem
-// resolves its hits. It is not an attack (no combat.attack), a projectile
-// or a summon. Behaviour is data on the character (`techniques`, keyed by
-// the attack it is), and so are its clips, named after it (attack5_...).
+// resolves its hits. Its execution is its own: not an ordinary attack (no
+// combat.attack), a projectile or a summon. But what it does makes it an
+// attack all the same (its definition's `offense`, see
+// js/game/combat/offense.js): a burst that can harm and a projectile it
+// releases are attacks, blocked by an active Shield like any other.
+// Behaviour is data on the character (`techniques`, keyed by the attack it
+// is), and so are its clips, named after it (attack5_...).
 //
 // The runtime implements one form of technique: the cast. The fighter
 // stands still, committed to a casting pose, then lets go of what it casts
@@ -24,7 +28,7 @@
 //     },
 //     attack4: {
 //       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 0.5,
-//       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, unblockable: true, paralyze: 1.8 } },
+//       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, paralyze: 1.8 } },
 //     },
 //   },
 //
@@ -61,6 +65,8 @@
 // `damage` (one of the tiers 1, 3, 5 or 10, required), `baseLaunch` and
 // `directionalLaunch` (see js/data/launch.js) and hit effects
 // (js/game/combat/hit-effects.js), validated here exactly like an attack's.
+// A target whose Shield is up blocks it: no Launch Point, no paralysis, no
+// launch, whatever the burst's size or the side it comes from.
 //
 // A technique's repeat cooldown starts on acceptance, even if interrupted.
 // The shared 0.5-second minimum applies unless the fighter declares longer.
@@ -70,6 +76,7 @@
 import { resolveCooldown } from '../../data/cooldowns.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolveHitEffects } from './hit-effects.js';
+import { assertNoShieldBypass, resolveOffense, techniqueOffense } from './offense.js';
 
 const HIT_DEFAULTS = {
   baseLaunch: 0,
@@ -106,6 +113,9 @@ function createHit(id, spec) {
 
 export function createTechniqueDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Technique definitions need an id');
+  const owner = `Technique "${spec.id}"`;
+  assertNoShieldBypass(spec, owner);
+  assertNoShieldBypass(spec.burst, `${owner}'s burst`);
   const def = { ...TECHNIQUE_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, `Technique "${spec.id}"`) };
   if (def.projectile) {
     const o = def.projectile.offset ?? {};
@@ -114,6 +124,7 @@ export function createTechniqueDefinition(spec) {
   if (def.burst) {
     def.burst = Object.freeze({ hitbox: Object.freeze({ ...def.burst.hitbox }), hit: createHit(`${spec.id}.burst`, def.burst.hit) });
   }
+  def.offense = resolveOffense(spec, techniqueOffense(def), owner);
   return Object.freeze(def);
 }
 
@@ -182,7 +193,7 @@ export class Technique {
     if (this.released) return;
     this.released = true;
     const shot = this.def.projectile;
-    if (shot) this.owner.releases.push({ id: shot.id, offset: shot.offset, direction: this.facing });
+    if (shot) this.owner.releases.push({ id: shot.id, offset: shot.offset, direction: this.facing, ability: this.def.id });
     if (this.def.burst) this.burstDue = true;
   }
 

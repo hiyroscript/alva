@@ -26,10 +26,16 @@
 // `damage` (one of the tiers 1, 3, 5 or 10, required), `baseLaunch` and
 // `directionalLaunch` are the projectile's own damage, Base Launch and
 // Directional Launch (see js/data/launch.js), validated here exactly like
-// an attack's, and so are the shared hit effects (`unblockable`,
-// `paralyze`, `blockPush`; see js/game/combat/hit-effects.js). A
-// horizontal launch travels along the projectile's own direction. A
-// projectile with Base Launch 0 or no direction never launches.
+// an attack's, and so are the shared hit effects (`paralyze`,
+// `blockPush`; see js/game/combat/hit-effects.js). A horizontal launch
+// travels along the projectile's own direction. A projectile with Base
+// Launch 0 or no direction never launches.
+//
+// Every projectile is an attack (its definition's `offense`, see
+// js/game/combat/offense.js), whoever throws it, casts it or turns it back,
+// and every one is blockable: a Shield that blocks any strike of it stops
+// it there, an erasing one included (no projectile flies on through a
+// Shield to strike the fighter behind it later).
 //
 // A piercing projectile (`pierce: { hits, interval }`) strikes up to `hits`
 // times instead, at least `interval` seconds apart, staying in play between
@@ -62,7 +68,8 @@
 //                             by it (its strikes start over).
 //   erase: true               another fighter's projectile it meets is gone,
 //                             and it flies on through every fighter it
-//                             strikes (each once) instead of stopping.
+//                             strikes (each once) instead of stopping;
+//                             a Shield that blocks it still stops it.
 //
 // When two projectiles of different owners meet, erasing beats repelling
 // beats neither: an erasing one erases the other (two erasing ones, both
@@ -71,8 +78,9 @@
 //
 // A fighter's attack with `deflectProjectiles` (every fighter's Deflect, see
 // js/game/combat/deflect.js) turns a projectile back the same way, by the
-// same turnBack, whatever the projectile is: being unblockable, repelling,
-// piercing or erasing never keeps one from being turned back.
+// same turnBack, whatever the projectile is: being repelling, piercing or
+// erasing never keeps one from being turned back. Turned back, it is still
+// an attack (now its new owner's) and still blockable.
 //
 // One field is art only:
 //
@@ -97,6 +105,7 @@
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolvePull } from './attacks.js';
 import { resolveHitEffects } from './hit-effects.js';
+import { assertNoShieldBypass, projectileOffense, resolveOffense } from './offense.js';
 
 const PROJECTILE_DEFAULTS = {
   animation: null,
@@ -119,7 +128,7 @@ const PROJECTILE_DEFAULTS = {
 };
 
 // What a finisher takes from its projectile when it does not say.
-const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop', 'unblockable', 'paralyze', 'blockPush']);
+const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop', 'paralyze', 'blockPush']);
 
 // Age is a sum of fixed steps; compare against boundaries with a little slack
 // (see PHASE_EPSILON in attacks.js).
@@ -144,6 +153,7 @@ export function createProjectileDefinition(spec) {
     def.pierce = Object.freeze({ hits, interval });
     if (def.finisher) {
       const f = def.finisher;
+      assertNoShieldBypass(f, `${owner} finisher`);
       const inherited = Object.fromEntries(FINISHER_INHERITS.map((field) => [field, f[field] ?? def[field]]));
       def.finisher = Object.freeze({
         id: spec.id, damage: resolveHitDamage(f.damage, `${owner} finisher`), ...inherited, carry: null,
@@ -153,6 +163,7 @@ export function createProjectileDefinition(spec) {
   } else if (def.finisher) {
     throw new Error(`[Alva] Projectile "${spec.id}" has a finisher but no pierce`);
   }
+  def.offense = resolveOffense(spec, projectileOffense(def), owner);
   return Object.freeze(def);
 }
 
@@ -170,9 +181,15 @@ export class Projectile {
   // and `sprites` the set it came from (its owner's at release), whose
   // art-pixel scale it is drawn at whoever owns it later. `direction` is
   // fixed here: the projectile never follows its owner's later facing (only
-  // turnBack changes it).
-  constructor({ owner, def, anim, x, y, direction, sprites = owner?.sprites ?? null }) {
+  // turnBack changes it). `ability` is the attack or technique that
+  // released it (its id), kept whoever owns it later: where the attack came
+  // from, for the combat events.
+  constructor({ owner, def, anim, x, y, direction, sprites = owner?.sprites ?? null, ability = def?.id ?? null }) {
     this.owner = owner;
+    this.ability = ability;
+    // Turned back at least once (by a Deflect or a repelling projectile):
+    // still an attack, now its new owner's.
+    this.redirected = false;
     this.def = def;
     this.anim = anim;
     this.sprites = sprites;
@@ -214,11 +231,16 @@ export class Projectile {
   }
 
   // It struck `target` (see CombatSystem.update): counted, and gone after
-  // its only strike, its last or any a Shield blocked; an erasing one flies
-  // on through, never to strike that target again.
+  // its only strike, its last or any a Shield blocked (an erasing one
+  // included: a Shield stops every projectile); an erasing one that hit
+  // flies on through, never to strike that target again.
   struck(blocked, target = null) {
     this.hits++;
     this.lastStrike = this.age;
+    if (blocked) {
+      this.alive = false;
+      return;
+    }
     if (this.def.erase) {
       this.through.add(target);
       return;
@@ -242,6 +264,7 @@ export class Projectile {
   // late may not make it all the way home.
   turnBack(owner, direction) {
     this.owner = owner;
+    this.redirected = true;
     this.direction = direction;
     this.vx = this.speed * direction;
     this.hits = 0;
@@ -251,7 +274,7 @@ export class Projectile {
 
   // Builds the projectile an owner released, or null if it has no such
   // projectile or no art for it (never an invisible hitbox).
-  static release(owner, { id, offset, direction }) {
+  static release(owner, { id, offset, direction, ability = id }) {
     const def = owner.projectileDefs?.[id];
     const anim = def && owner.sprites.projectile(def.animation);
     if (!anim) {
@@ -260,7 +283,7 @@ export class Projectile {
     }
     const b = owner.body;
     return new Projectile({
-      owner, def, anim, direction,
+      owner, def, anim, direction, ability,
       x: b.x + (offset?.x ?? 0) * direction,
       y: b.y + (offset?.y ?? 0),
     });

@@ -23,19 +23,21 @@ Character identity changes the moveset, not run/jump/Dash fundamentals:**
 every fighter runs, jumps, triple-jumps and Dashes exactly alike, and
 speed you build carries on through jumps, attacks and landings. Moves are
 mechanics, not just poses with damage: summons, techniques, projectiles
-that pull, repel or erase (and a Deflect that turns them back), paralysis
-and unblockable hits, homing dashes, hovers, plunges, rolls, lifts and
-multi-hit strings are all part of the shared engine for any fighter to
-use.
+that pull, repel or erase (and a Deflect that turns them back), paralysis,
+homing dashes, hovers, plunges, rolls, lifts and multi-hit strings are all
+part of the shared engine for any fighter to use. However a move is
+executed, if it can deal damage it is an attack, and a raised Shield
+blocks every attack.
 
 ## What's in it
 
 - **Two playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
-  a paralyzing Unlimited Void no Shield stops, Hollow Purple erasing
-  everything in its path, and Infinity, a Shield that stalls the blows it
-  blocks) and
+  a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
+  its path and flying through every fighter it hits, both blocked by a
+  raised Shield like any attack, and Infinity, a Shield that stalls the
+  blows it blocks) and
   [#0002](docs/characters/0002.md), the speedster (a lock-on Homing
   Attack, a plunging Bounce Attack, a rolling Spin Attack, a rising Blue
   Tornado and a travelling Whirlwind). Both Shield on the ground and

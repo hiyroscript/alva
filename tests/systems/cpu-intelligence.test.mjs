@@ -341,17 +341,21 @@ test('its Launch Point shapes its strategy: in danger it turns to survival; with
 });
 
 test('the match situation shapes its strategy: behind late it presses, ahead late it protects its lead', () => {
+  // Over several fights, so no one exchange (a blow blocked or landed)
+  // decides it.
   const modes = (mine, theirs, timeLeft) => {
-    const r = arena({ difficulty: 'brutal', seed: 12, cpuX: 1000, foeX: 1300 });
-    r.world.score = { p1: theirs, p2: mine };
-    r.world.timeLeft = timeLeft;
-    r.cpu.combat.launchPoint = 60;
-    r.foe.combat.launchPoint = 60;
     const seen = {};
-    for (let i = 0; i < seconds(4); i++) {
-      r.step();
+    for (const seed of [12, 13, 14, 15]) {
+      const r = arena({ difficulty: 'brutal', seed, cpuX: 1000, foeX: 1300 });
+      r.world.score = { p1: theirs, p2: mine };
       r.world.timeLeft = timeLeft;
-      seen[r.ai.strategy.mode] = (seen[r.ai.strategy.mode] ?? 0) + 1;
+      r.cpu.combat.launchPoint = 60;
+      r.foe.combat.launchPoint = 60;
+      for (let i = 0; i < seconds(4); i++) {
+        r.step();
+        r.world.timeLeft = timeLeft;
+        seen[r.ai.strategy.mode] = (seen[r.ai.strategy.mode] ?? 0) + 1;
+      }
     }
     return seen;
   };

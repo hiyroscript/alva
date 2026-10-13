@@ -20,9 +20,11 @@
 // P(hit) comes from the move's real geometry and timing: whether a strike
 // meets the opponent's predicted path at all, how much room it has (how
 // far the opponent would have to move to escape), whether the opponent is
-// still busy when it lands or free to react, jump or Shield it (an
-// unblockable hit ignores the Shield), and how predictable the move has
-// become. A short-range move far from its target is not rejected: the
+// still busy when it lands or free to react, jump or Shield it (every
+// attack is blockable: a technique, a summon's clone, a projectile and a
+// Deflect alike; an opponent already behind its Shield when the move lands
+// and unable to lower it first blocks it for certain), and how predictable
+// the move has become. A short-range move far from its target is not rejected: the
 // Dash and jump sequences bring it into range, and the neutral layer walks
 // there. Nothing is ranked by button or by fighter.
 //
@@ -406,16 +408,20 @@ export class Evaluator {
     // A projectile from far away gives time to see it.
     if (c.projectile && c.flight > 0.3 && busy < tC) pg *= clamp(1.25 - c.flight, 0.35, 1);
     pg *= 1 - brain.predictability(m, c.kind);
-    // A Shield in the way. A stunned opponent that saw it coming raises
-    // its Shield the moment it is free: it only has to be free in time.
+    // A Shield in the way: every attack is blockable. A stunned opponent
+    // that saw it coming raises its Shield the moment it is free: it only
+    // has to be free in time. One whose Shield is already up blocks for
+    // certain if it cannot lower it before the move lands (held in its
+    // blockstun, or no time to react), and very likely otherwise: the CPU
+    // never counts on a hit through a raised Shield.
     let pBlock = 0;
-    const blockable = !m.unblockable && s.foeCaps.shield && !op.exhausted && fpos.grounded;
-    if (blockable && busy < tC - 0.03) {
+    const blockable = s.foeCaps.shield && !op.exhausted && fpos.grounded;
+    if (blockable && op.shielding) {
+      pBlock = busy >= tC - 0.03 || tC <= FOE_REACT ? 1 : 0.85;
+    } else if (blockable && busy < tC - 0.03) {
       const bias = clamp(model.shieldy * 1.5 + 0.1, 0.15, 0.9);
-      if (op.shielding) pBlock = 0.85;
-      else pBlock = bias * clamp((tC - 0.1) / 0.2, 0.12, 1);
+      pBlock = clamp(bias * clamp((tC - 0.1) / 0.2, 0.12, 1), 0, 0.92);
     }
-    pBlock = clamp(pBlock, 0, 0.92);
     const pHit = pg * (1 - pBlock);
     const pBlocked = pg * pBlock;
     const pMiss = 1 - pg;
@@ -592,7 +598,6 @@ export class Evaluator {
   reason(s, m, c, busy, tC) {
     const parts = [];
     if (busy >= tC - 0.02) parts.push(busy > 0.3 && s.op.stunned ? 'opponent stunned' : 'opponent busy');
-    else if (s.op.shielding && m.unblockable) parts.push('unblockable into a Shield');
     if (c.combo) parts.push('follow-up');
     if (c.kind === 'dashStrike') parts.push('Dash into');
     if (c.kind === 'jumpStrike') parts.push(s.op.grounded ? 'jump-in' : 'aerial interception');

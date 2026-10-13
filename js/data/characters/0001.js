@@ -16,10 +16,11 @@
 //   attack3  Maximum Blue, an attracting orb that drags its target into
 //            itself and grinds it (`pull`, `pierce`); in the air Blue, a
 //            palm that yanks the opponent in to it (an attack `pull`)
-//   attack4  Unlimited Void, a technique: a sure hit round itself that no
-//            Shield stops and that paralyzes (`unblockable`, `paralyze`)
+//   attack4  Unlimited Void, a technique: a burst round itself that
+//            paralyzes (`paralyze`); a raised Shield blocks it
 //   attack5  Hollow Purple, a technique: a chanted cast that sends a vast
-//            sphere through everything (`unblockable`, `erase`)
+//            sphere through every projectile and every fighter it hits
+//            (`erase`); a raised Shield blocks it, and stops it there
 //   extra_attack  the High Kick, its launcher, floating in the air too
 //
 // Its Shield is Infinity, on the ground: a hit it blocks stalls in it
@@ -220,10 +221,11 @@ export const CHARACTER_0001 = {
       rotationSpeed: ORB_SPIN_0001,
     },
     // Hollow Purple: a vast sphere (116 units across where it strikes)
-    // crossing the stage at 640 units/s for 1.8 s. It erases: no Shield
-    // stops it, it erases the projectiles it meets and it flies on through
-    // whatever it strikes. Its one hit is the heaviest #0001 has: 10, the
-    // top damage tier, Base Launch 3 sideways.
+    // crossing the stage at 640 units/s for 1.8 s. It erases: it erases the
+    // projectiles it meets and it flies on through whatever fighter it hits.
+    // A raised Shield blocks it like any attack, and stops it there. Its one
+    // hit is the heaviest #0001 has: 10, the top damage tier, Base Launch 3
+    // sideways.
     attack5_object: {
       animation: 'attack5_object',
       speed: 640,
@@ -235,7 +237,6 @@ export const CHARACTER_0001 = {
       hitstun: 0.55,
       blockstun: 0.3,
       hitstop: 0.12,
-      unblockable: true,
       erase: true,
       rotationSpeed: ORB_SPIN_0001,
     },
@@ -389,17 +390,18 @@ export const CHARACTER_0001 = {
   techniques: {
     // Unlimited Void: half a second to cast, then the domain closes round
     // #0001 as it steps forward: every opponent within 250 units either
-    // side, from well over its head to its feet, takes a sure hit no Shield
-    // stops (3) and is paralyzed for 1.7 s, unable to act, until then or
-    // until a hit launches it. #0001 is free again a third of a second
-    // later: about 1.4 s of an opponent that cannot move.
+    // side, from well over its head to its feet, takes a hit (3) and is
+    // paralyzed for 1.7 s, unable to act, until then or until a hit launches
+    // it. #0001 is free again a third of a second later: about 1.4 s of an
+    // opponent that cannot move. A raised Shield blocks it like any attack:
+    // no Launch Point and no paralysis.
     attack4: {
       castAnimation: 'attack4_cast',
       releaseAnimation: 'attack4_release',
       cooldown: 3,
       burst: {
         hitbox: { x: -250, y: -210, w: 500, h: 230 },
-        hit: { damage: 3, unblockable: true, paralyze: 1.7, hitstun: 0.25, blockstun: 0, hitstop: 0.12 },
+        hit: { damage: 3, paralyze: 1.7, hitstun: 0.25, blockstun: 0, hitstop: 0.12 },
       },
     },
     // Hollow Purple: the chant, five-sixths of a second (still its longest
