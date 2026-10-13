@@ -1,302 +1,308 @@
-ALVA — Implement the “Why Alva?” Dialogue
+ALVA — Complete the Mode Details Panel
 
 Objective
 
-Implement the “Why Alva?” feature on the Home Screen of Alva.
+Improve ALVA’s Select Mode screen by adding short, clear, and informative descriptions to the currently empty Mode details panel.
 
-When the player clicks or activates the existing “Why Alva?” text beneath the developer attribution, open a beautifully presented, readable dialogue explaining the personal story behind Alva, what inspired its creation, and what the project hopes to accomplish.
+The panel should explain the selected mode, how it works, the available play options, and the basic rules of a match.
 
-This must feel like a natural part of Alva’s existing interface, not an unrelated popup or a separate page.
+The goal is to make the interface feel complete and polished while maintaining ALVA’s existing visual identity, gameplay systems, and navigation.
 
-The dialogue should be personal, sincere, easy to read, and welcoming.
+This is a focused interface improvement. Do not redesign the screen or introduce unrelated features.
 
-Important: The story must never name, list, feature, suggest, or reference any specific fictional characters, regardless of whether they are currently playable, planned, or absent from the game. It must also never discuss the game’s roster or character availability.
+1. Examine the Existing Game
 
-1. Repository and Architecture
+Before implementing changes, explore the repository to understand how ALVA’s game modes, navigation, and user interface work.
 
-Repository: hiyroscript/alva
+Pay particular attention to:
 
-Before implementing, carefully examine the existing application structure and follow its conventions.
+* js/screens/mode-select-screen.js
+* js/screens/quick-battle-setup.js
+* js/screens/difficulty-select-screen.js
+* js/screens/home-screen.js
+* js/ui/components.js
+* css/setup.css
+* css/components.css
+* css/responsive.css
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* js/localization/i18n.js
+* docs/gameplay/battle.md
+* ALVA_SPEC.md
+
+Understand the actual gameplay mechanics and existing mode selection flow before writing any descriptions.
+
+Follow the repository’s established architecture and conventions.
+
+2. Current Issue
+
+The Select Mode screen currently contains two main sections:
+
+Left side — Mode selection
+
+A Quick Battle card that displays the mode name, a short description, and a Select action.
+
+Right side — Mode details
+
+A panel with the heading “Mode details” and a horizontal divider, but no content underneath.
+
+This makes the right side appear unfinished and leaves useful information about the mode unexplained.
+
+Populate this existing panel with concise descriptions that help players understand what they are selecting.
+
+Do not replace or restructure the existing layout.
+
+3. Mode Details Content
+
+Currently, Quick Battle is the only selectable mode on this screen.
+
+Display its details automatically when the player enters Select Mode.
+
+Use the following content as the intended English copy.
+
+Quick Battle
+
+“Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.”
+
+Regular Play
+
+“Choose your fighter and difficulty. Your CPU opponent and stage are selected at random.”
+
+Custom Play
+
+“Customize your battle by choosing the difficulty, your fighter, the CPU opponent, and the stage.”
+
+Match Rules
+
+“Matches last 7 minutes. If the score is tied, a 1-minute overtime begins as the Void closes in.”
+
+These descriptions should communicate the essential gameplay information without overwhelming the player.
+
+Maintain concise, natural wording. Avoid long paragraphs, technical explanations, or information unrelated to selecting the mode.
+
+The panel should be understandable at a glance.
+
+4. Content Structure and Presentation
+
+Organize the information in a clean, logical hierarchy.
+
+Suggested arrangement:
+
+Mode details
+
+Quick Battle
+Brief overview of the mode and how to win.
+
+Regular Play
+Short explanation of its automatic opponent and stage selection.
+
+Custom Play
+Short explanation of its customization options.
+
+Match Rules
+Brief explanation of the timer and overtime.
+
+Keep each section visually distinct through typography and spacing rather than unnecessary visual decoration.
+
+Use the existing panel heading, divider, background, borders, and overall proportions.
+
+The result should feel like an intentional part of ALVA’s established UI, not an additional feature layered onto it.
+
+5. Visual Design Requirements
+
+Match ALVA’s current dark, minimalist interface.
+
+Requirements:
+
+* Preserve the existing two-column layout.
+* Keep the Quick Battle card unchanged.
+* Keep the Mode details panel in its current position.
+* Maintain the existing heading and separator.
+* Use clear, moderately emphasized section headings.
+* Use muted secondary text for descriptions.
+* Apply consistent spacing between sections.
+* Maintain comfortable padding inside the panel.
+* Respect the existing typography, color palette, border treatments, and CSS variables.
+* Ensure the information is readable without excessive scrolling.
+* Avoid decorative images, unnecessary icons, animations, or additional interactive elements.
+
+The details should be visually subtle but sufficiently prominent to improve the overall screen.
+
+Do not make the panel unnecessarily crowded or complicated.
+
+6. Mode Selection and Interaction
+
+Preserve the existing Quick Battle selection behavior.
+
+The flow must remain:
+
+1. The player selects Play from Home.
+2. The Select Mode screen opens.
+3. The Quick Battle card appears alongside its information in Mode details.
+4. Selecting Quick Battle opens the existing play-type dialog.
+5. The player chooses Regular Play or Custom Play.
+6. The game continues to Select Difficulty and the remaining setup steps.
+
+The details panel is informational and must not interfere with this process.
+
+Important behavior requirements:
+
+* Descriptions appear as soon as Select Mode loads.
+* The panel does not require clicking the Quick Battle card to display information.
+* Hovering the card retains its existing visual behavior.
+* Keyboard and controller focus behavior remains unchanged.
+* No additional buttons or navigation steps are introduced.
+* Dismissing the play-type dialog continues to return to Select Mode normally.
+* Returning to Select Mode still displays the correct information.
+
+Keep the implementation simple and compatible with the existing code.
+
+Although the mode selection layout accommodates future modes, do not add placeholder modes or invent new gameplay options.
+
+Watch Mode and Practice Ground must remain accessible through their existing Home actions.
+
+7. Localization
+
+ALVA supports English and French. The new descriptions must work correctly in both languages.
+
+Use the existing localization system.
 
 Relevant files:
 
-* js/screens/home-screen.js — Home Screen and existing “Why Alva?” button.
-* js/ui/overlays.js — Existing InfoDialog and ModalDialog implementations.
-* js/core/app.js — Global dialogue instances and application state.
-* css/home.css — Home Screen styling.
-* css/overlays.css — Dialogue styling.
-* css/responsive.css — Responsive layout.
-* js/localization/strings/en.js — English localization.
-* js/localization/strings/fr.js — French localization.
-* js/localization/i18n.js — Translation system.
-* ALVA_SPEC.md — Authoritative product specification.
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* js/localization/i18n.js
 
-Alva uses vanilla JavaScript ES modules, HTML, CSS, and Canvas 2D. Do not introduce additional frameworks, libraries, dependencies, or build systems.
+Requirements:
 
-The Home Screen already contains an enabled .home-why-alva button. Preserve this existing button, its label, its location, and its established appearance.
+* Add translation keys for new descriptions.
+* Use existing translation keys for labels when appropriate.
+* Avoid hardcoded player-facing text.
+* Use established localization helpers such as tx().
+* Provide natural, accurate French translations.
+* Preserve the existing terminology and naming conventions.
+* Ensure the content updates immediately when the player changes languages.
+* Avoid missing or untranslated strings.
 
-Replace its placeholder behavior with a working interaction.
+Do not implement a separate localization mechanism.
 
-2. Required Interaction
+8. Responsive Behavior
 
-When the player activates “Why Alva?”:
+The new content must work across ALVA’s supported screen sizes.
 
-1. A modal dialogue opens over the Home Screen.
-2. The background is dimmed using Alva’s existing overlay styling.
-3. The dialogue displays the heading “Why Alva?”
-4. Beneath the heading, the creator’s story appears in properly separated paragraphs.
-5. The player can scroll through the story if it exceeds the available vertical space.
-6. A visible close button allows the player to dismiss the dialogue.
-7. Closing returns the player to the Home Screen without changing navigation state or interrupting existing Home Screen functionality.
+Desktop
 
-The dialogue must work with mouse, touch, keyboard, and supported controllers.
+Keep the existing side-by-side layout.
 
-Support closing through the existing application’s navigation conventions, including Escape, controller Back, the close button, and clicking the backdrop.
+The Mode details content should fit naturally inside the right panel without forcing changes to the Quick Battle card.
 
-Opening the dialogue repeatedly must work reliably.
+Mobile Landscape
 
-3. Exact English Dialogue Content
+Keep text compact and readable.
 
-Title: Why Alva?
+Ensure the descriptions do not overlap the header, navigation controls, or other elements.
 
-I’ve always been a big fan of fiction, especially when it comes to superheroes. For a long time, I imagined a fighting game where characters from completely different worlds could face each other. Some games came close to making that idea a reality, but not all of them were successful, and others were exclusive to platforms I couldn’t access.
+If necessary, adjust padding, font sizes, or internal overflow behavior using the existing responsive stylesheet conventions.
 
-One day, while watching videos online, I discovered something called MUGEN. It’s a fighting game engine that allows people to create their own fighters using sprites and animations. I immediately fell in love with the idea. The creative freedom it offered was exactly what I had always wanted to experience. Unfortunately, I never owned a device that could run it.
+Narrow and Tall Displays
 
-That got me thinking. It’s unfortunate that people can miss out on something they would love simply because they don’t have the right device, or because downloading and setting up a game isn’t an option for them. I wanted to find a way to make that kind of experience easier for more people to enjoy.
+Respect the current responsive stacking behavior.
 
-And that’s how Alva began.
+Avoid horizontal overflow, clipped descriptions, or distorted proportions.
 
-Inspired by the creative freedom behind MUGEN, I decided to create my own platform fighting game with a similar spirit, but with accessibility in mind. With Alva, there’s no need to download or install the game. All you have to do is open a link in your browser on a supported device and start playing.
+Make only the CSS changes needed for the new content.
 
-Alva is an unofficial fan-made project, created out of a genuine love for fiction and the endless possibilities of bringing different worlds together. It’s a game made for people who share that same imagination and excitement.
+9. Implementation Guidelines
 
-And that’s why Alva exists.
+Modify the existing implementation rather than replacing it.
 
-Writing Requirements
+In js/screens/mode-select-screen.js, extend the current mode-info panel to render the new informational sections beneath the existing heading.
 
-Preserve the exact meaning and personal perspective of the story.
+Use the project’s DOM utilities and localization helpers.
 
-The dialogue should read like the creator is speaking directly to the player, not like corporate marketing or advertising copy.
+Keep the structure readable and maintainable.
 
-Maintain the first-person perspective throughout.
+Prefer a simple, declarative approach using existing utilities over introducing unnecessary abstractions.
 
-Do not add:
+Add small, appropriately scoped CSS rules to css/setup.css if required.
 
-* Specific fictional character names.
-* Franchise names, other than MUGEN, which is essential to the creator’s story.
-* References to playable, upcoming, unavailable, or desired characters.
-* Promises about future features or unsupported devices.
-* Claims that Alva is officially associated with MUGEN or any other property.
-* Unnecessary promotional language.
+Do not introduce external dependencies.
 
-The text should express the inspiration behind the project, without implying that Alva is built using the MUGEN engine.
+Do not modify unrelated game logic.
 
-4. French Localization
+Specifically, preserve:
 
-Alva supports English and French, so the dialogue must also be available in French.
+* Quick Battle setup.
+* Regular Play and Custom Play selection.
+* CPU difficulty behavior.
+* Character selection.
+* Stage selection.
+* Battle scoring and overtime rules.
+* Mouse, keyboard, touch, and controller support.
+* Existing screen transitions and navigation.
 
-Use the following French version, retaining the same personal and natural tone.
+Do not modify the protected character_rule file.
 
-Title: Pourquoi Alva ?
+10. Documentation
 
-Depuis toujours, j’aime la fiction, surtout les histoires de super-héros. Pendant longtemps, j’ai imaginé un jeu de combat où des personnages venus d’univers complètement différents pourraient s’affronter. Certains jeux se sont rapprochés de cette idée, mais ils n’ont pas tous connu le succès, tandis que d’autres étaient réservés à des plateformes auxquelles je n’avais pas accès.
+Update ALVA_SPEC.md, specifically the Select Mode section, to reflect the new content in the Mode details panel.
 
-Un jour, en regardant des vidéos sur Internet, j’ai découvert quelque chose qui s’appelle MUGEN. C’est un moteur de jeu de combat qui permet de créer ses propres combattants à partir de sprites et d’animations. J’ai tout de suite adoré le concept. Cette liberté de création correspondait exactement à ce que j’avais toujours voulu découvrir. Malheureusement, je n’ai jamais eu d’appareil compatible pour en profiter.
+Replace the outdated specification that describes the panel as containing only a heading and separator.
 
-Ça m’a fait réfléchir. Je trouve dommage que certaines personnes ne puissent pas profiter d’une expérience qui leur plairait simplement parce qu’elles n’ont pas le bon appareil, ou parce qu’elles ne peuvent pas télécharger et installer un jeu. J’avais envie de rendre ce genre d’expérience plus accessible.
+Document the new information hierarchy without expanding the scope of the feature.
 
-Et c’est comme ça qu’est née l’idée d’Alva.
+Keep the documentation consistent with the actual implementation.
 
-Inspiré par la liberté de création de MUGEN, j’ai décidé de créer mon propre jeu de combat de plateformes dans le même esprit, mais en privilégiant l’accessibilité. Avec Alva, pas besoin de télécharger ou d’installer le jeu. Il suffit d’ouvrir un lien dans son navigateur, sur un appareil compatible, et de commencer à jouer.
+11. Testing and Verification
 
-Alva est un projet de fan non officiel, né d’un véritable amour pour la fiction et des possibilités infinies qu’offrent les rencontres entre différents univers. C’est un jeu destiné à celles et ceux qui partagent cette même imagination et cet enthousiasme.
+Add or update tests where appropriate.
 
-Et voilà pourquoi Alva existe.
+Verify the following:
 
-Store the English and French content within the existing localization system rather than hardcoding language-dependent content in the Home Screen.
+1. The Mode details panel contains meaningful content when Select Mode opens.
+2. Quick Battle information is visible.
+3. Regular Play and Custom Play descriptions are displayed correctly.
+4. Match rules are accurate.
+5. English and French translations are present.
+6. Language switching updates all descriptions without reloading.
+7. Selecting Quick Battle still opens the correct dialog.
+8. The existing setup navigation remains unchanged.
+9. Keyboard and controller interactions continue working.
+10. The interface remains readable across desktop and mobile landscape layouts.
 
-Prefer separate translation keys for individual paragraphs so the content remains easy to edit, translate, and maintain.
+Run the relevant tests:
 
-Switching the game’s language should also update this dialogue, including its title and body.
-
-5. Dialogue Design
-
-The dialogue must follow Alva’s existing visual identity.
-
-The interface should remain minimal, modern, polished, and readable.
-
-Appearance
-
-* Use the existing dark theme and glass-panel styling.
-* Use the application’s current typography, colors, borders, and corner styling.
-* Center the dialogue in the available viewport.
-* Dim the Home Screen behind it.
-* Keep the title clearly distinguishable from the body text.
-* Use comfortable line spacing and paragraph separation.
-* Avoid large decorative illustrations, character artwork, or unrelated icons.
-* Maintain a clean editorial presentation rather than an arcade-style announcement.
-
-The story is the focus of the dialogue.
-
-Layout
-
-Because this is significantly longer than the existing information dialogues, the interface must accommodate longer content.
-
-On larger screens, provide a comfortably sized panel without excessive line lengths.
-
-On smaller screens, especially phones in landscape orientation, the panel must fit within the available screen space.
-
-Use a scrollable content area.
-
-Ideally, the dialogue header and close button should remain accessible while the story scrolls independently.
-
-Scrolling must not cause the Home Screen behind the dialogue to move.
-
-Respect safe-area insets and existing responsive conventions.
-
-Do not create an oversized modal that clips important controls or forces the entire application viewport to scroll.
-
-Motion
-
-A subtle opening transition consistent with other Alva dialogues is appropriate.
-
-Do not introduce dramatic animations or effects.
-
-Respect the user’s reduced-motion preference.
-
-6. Integration With the Existing Dialogue System
-
-Alva already provides an InfoDialog instance through app.infoDialog.
-
-Prefer reusing and carefully extending that implementation.
-
-Currently, the information dialogue is primarily designed around one paragraph of text.
-
-Support structured, multi-paragraph content without breaking existing callers, particularly the Discover Screen’s play-style descriptions.
-
-A good implementation would allow the existing InfoDialog.open() method to accept either its current single-body format or an optional collection of localized paragraphs.
-
-Render separate paragraph elements rather than presenting the entire story as one dense text block.
-
-Use safe DOM text rendering rather than injecting the story through raw HTML.
-
-Maintain the existing dialogue behaviors:
-
-* Focus management.
-* Background inertness.
-* Escape and controller Back handling.
-* Backdrop dismissal.
-* Focus restoration.
-* Accessibility labels.
-* Navigation scopes.
-
-When the dialogue closes, keyboard/controller focus should return to the “Why Alva?” button.
-
-Opening and closing the dialogue must not create duplicate elements, duplicate event listeners, or stale navigation scopes.
-
-Do not create a completely separate modal system unless the existing implementation proves unsuitable.
-
-7. Home Screen Integration
-
-Within js/screens/home-screen.js, connect the existing .home-why-alva button to the information dialogue.
-
-Use the existing localization helpers for the heading and story.
-
-Ensure that clicking the button does not navigate away from the Home Screen.
-
-The Home Screen must remain otherwise unchanged.
-
-In particular, preserve:
-
-* Play.
-* Watch Mode.
-* Practice Ground.
-* Discover.
-* Settings.
-* Controller Connections.
-* The credits roll.
-* The existing footer layout.
-
-The dialogue must remain available even if no fighters are currently playable.
-
-Remove or update source comments that describe “Why Alva?” as a nonfunctional placeholder.
-
-8. Accessibility and Input Support
-
-Ensure the feature is fully accessible.
-
-The existing button must remain reachable through keyboard Tab navigation and the game’s controller navigation system.
-
-On opening:
-
-* Focus should move into the dialogue.
-* The heading must be announced appropriately.
-* The dialogue must have a valid accessible name.
-* The underlying Home Screen must not receive unintended keyboard or controller navigation.
-* Long content must be readable and scrollable.
-
-On closing:
-
-* Focus returns to the opening button.
-* The Home Screen becomes interactive again.
-* The navigation scope returns to its previous state.
-
-Test mouse clicks, touch activation, keyboard confirmation, and controller confirmation.
-
-Do not break any existing dialogue accessibility behavior.
-
-9. Documentation and Tests
-
-Update ALVA_SPEC.md to describe the new working “Why Alva?” functionality instead of its current placeholder behavior.
-
-Add or modify focused tests covering:
-
-1. The “Why Alva?” button opening its dialogue.
-2. The expected title and localized story content appearing.
-3. Paragraphs being rendered separately and in order.
-4. The absence of specific character or roster references in the story.
-5. Successful dismissal and correct focus restoration.
-6. Keyboard and controller navigation compatibility.
-7. Repeated opening and closing without errors.
-8. English and French localization.
-9. Existing Discover information dialogues remaining functional.
-10. The dialogue opening even when no fighters are available.
-
-Review existing Home Screen assertions in tests/interface/settings.test.mjs, controller navigation tests, localization tests, and empty-roster integration tests.
-
-Update outdated test descriptions referring to the button as a placeholder.
-
-Run the complete test suite using:
-
+node --test tests/interface/i18n.test.mjs
+node --test tests/integration/quick-battle.test.mjs
 node --test
 
-Also validate the presentation manually in a browser at typical desktop and compact landscape sizes, since automated DOM tests cannot fully verify the visual layout.
+If a real browser is available, visually inspect the Select Mode screen at different viewport sizes.
 
-10. Strict Scope
+Correct any layout issues introduced by the new content.
 
-This task is exclusively about adding the “Why Alva?” dialogue and supporting its presentation.
+12. Expected Final Result
 
-Do not modify battle mechanics, character definitions, movement, combat, stages, AI, character selection, or other unrelated systems.
+The Select Mode screen should retain its original appearance and behavior, with one meaningful improvement: the Mode details panel is now populated with concise, well-organized descriptions.
 
-Do not add new dependencies.
+Players should immediately understand:
 
-Do not redesign the Home Screen.
+* What Quick Battle offers.
+* How to score points and win.
+* The difference between Regular Play and Custom Play.
+* How long matches last.
+* What happens when the score is tied.
 
-Do not add character illustrations or roster information to this dialogue.
+The descriptions should be informative without being excessive.
 
-Do not change the original meaning of the creator’s story.
+Final requirements:
 
-Preserve the existing product design, architecture, and conventions.
+* No empty Mode details panel.
+* No unnecessary UI redesign.
+* No new modes.
+* No gameplay modifications.
+* No unnecessary complexity.
+* Full English and French support.
+* Clean, responsive styling.
+* Consistency with ALVA’s existing design and architecture.
 
-11. Expected Result
-
-When a player visits Alva’s Home Screen and selects “Why Alva?”, they should see a polished, scrollable dialogue that explains the creator’s personal motivation for building the game.
-
-It should tell a simple story:
-
-A love of fictional worlds led to the dream of a crossover fighting game. Discovering MUGEN demonstrated the possibilities of creative freedom, but device compatibility prevented the creator from enjoying it. That experience inspired Alva: an unofficial, browser-based fan game intended to make this kind of imaginative fighting experience easier to access.
-
-The player should finish reading with a clear understanding of why Alva was created and what it represents.
-
-Implement the feature completely, keep all unrelated behavior unchanged, and report the modified files, test results, and any remaining limitations.
+Implement the improvement directly in the existing codebase, update the relevant tests and documentation, and provide a concise summary of the changes and test results upon completion.
