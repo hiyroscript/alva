@@ -191,6 +191,7 @@ const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
 const { Settings } = await import('../../js/core/settings.js');
 const { App, initialSelection } = await import('../../js/core/app.js');
 const { FighterRoster } = await import('../../js/ui/fighter-roster.js');
+const { InfoDialog } = await import('../../js/ui/overlays.js');
 const { HomeScreen, MATCH_ACTIONS } = await import('../../js/screens/home-screen.js');
 const { CharacterSelectScreen } = await import('../../js/screens/character-select-screen.js');
 const { WatchFighterScreen } = await import('../../js/screens/watch-screens.js');
@@ -246,6 +247,9 @@ function fakeApp() {
     resetCharacter: noop,
   };
   app.nav = new MenuNavigator(app);
+  const infoRoot = new Element('div');
+  infoRoot.hidden = true;
+  app.infoDialog = new InfoDialog(infoRoot, app);
   return { app, loads, reads };
 }
 
@@ -545,6 +549,13 @@ test('with nothing playable, Home closes Play, Watch Mode and Practice Ground an
   assert.deepEqual(app.screens.calls, [['discover']]);
   home.settingsButton.click();
   assert.equal(app.settingsDialog.opened, 1);
+  const why = home.el.querySelector('.home-why-alva');
+  why.click();
+  assert.equal(app.infoDialog.isOpen, true, 'the story needs no playable fighters');
+  assert.equal(app.infoDialog.body.children.length, 7);
+  app.nav.command('back', null);
+  assert.equal(document.activeElement, why);
+  assert.equal(app.nav.scopes.length, 0);
   assert.equal(home.el.querySelectorAll('.home-credits-seq').length, 2, 'the credits still roll');
   // The note follows the language.
   setLanguage('fr');

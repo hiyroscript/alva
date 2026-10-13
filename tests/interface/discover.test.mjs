@@ -714,6 +714,140 @@ test('the no-Confirm layout follows the roster hook; Confirm-enabled rosters kee
     'any roster without Confirm, independent of Discover or a fighter id');
 });
 
+test('Why Alva? shows seven localized paragraphs in order, with an accessible heading and reading region', () => {
+  const { app, home } = boot();
+  const opener = home.el.querySelector('.home-why-alva');
+  const dialog = app.infoDialog;
+  try {
+    opener.click();
+    const nodes = [...dialog.body.children];
+    for (const language of ['en', 'fr', 'en']) {
+      setLanguage(language);
+      localizeTree(dialog.root);
+      assert.equal(dialog.title.textContent, language === 'en' ? 'Why Alva?' : 'Pourquoi Alva ?');
+      assert.equal(dialog.closeButton.getAttribute('aria-label'), language === 'en' ? 'Close' : 'Fermer');
+      assert.equal(dialog.root.getAttribute('aria-labelledby'), dialog.title.id);
+      assert.equal(dialog.root.getAttribute('aria-describedby'), null, 'long prose retains paragraph semantics');
+      assert.equal(dialog.body.getAttribute('role'), 'region');
+      assert.equal(dialog.body.getAttribute('aria-labelledby'), dialog.title.id);
+      assert.equal(dialog.body.getAttribute('tabindex'), '0');
+      assert.equal(nodes.length, 7);
+      nodes.forEach((node, i) => {
+        assert.equal(dialog.body.children[i], node, 'language changes preserve the paragraph nodes');
+        assert.equal(node.tagName, 'P');
+        assert.equal(node.textContent, STRINGS[language][`home.whyAlva.paragraph${i + 1}`]);
+        assert.equal(node.children.length, 1);
+        assert.ok(node.children[0] instanceof Text, 'story text is never parsed as HTML');
+      });
+      assert.equal(dialog.kicker.hidden, true);
+      assertFocus(dialog.closeButton);
+      assert.equal(home.el.inert, true);
+      assert.equal(app.screens.current, home);
+    }
+  } finally { dialog.close(); setLanguage('en'); }
+});
+
+test('Why Alva? supports every dismissal, restores its opener, and reuses one panel and scope', () => {
+  const { app, home } = boot();
+  const opener = home.el.querySelector('.home-why-alva');
+  const dialog = app.infoDialog;
+  const panel = dialog.panel;
+  const listenerCounts = [...dialog.root.listeners].map(([type, listeners]) => [type, listeners.length]);
+  const dismissals = [
+    () => app.input.key('Escape'), () => app.nav.command('back', null),
+    () => dialog.closeButton.click(), () => dialog.root.dispatch('click'),
+  ];
+  for (let i = 0; i < 12; i++) {
+    opener.focus();
+    app.input.key('KeyJ');
+    assert.equal(dialog.isOpen, true);
+    assert.equal(dialog.panel, panel);
+    assert.equal(dialog.body.scrollTop, 0);
+    assert.equal(app.nav.scopes.length, 1);
+    dialog.root.dispatch('click', { target: dialog.body });
+    assert.equal(dialog.isOpen, true, 'pressing inside never dismisses');
+    dialog.body.scrollTop = 100;
+    dismissals[i % dismissals.length]();
+    assert.equal(dialog.isOpen, false);
+    assert.equal(dialog.root.hidden, true);
+    assert.equal(home.el.inert, false);
+    assert.equal(app.screens.current, home);
+    assertFocus(opener);
+    assert.deepEqual(app.nav.scopes, []);
+  }
+  opener.click();
+  opener.click(); // A second request while open replaces, rather than stacking.
+  assert.equal(app.nav.scopes.length, 1);
+  assert.equal(dialog.body.children.length, 7);
+  dialog.close();
+  assert.deepEqual([...dialog.root.listeners].map(([type, listeners]) => [type, listeners.length]), listenerCounts);
+  assertFocus(opener);
+});
+
+test('story keyboard and controller scrolling stays scoped; Tab cycles between Close and the reading region', () => {
+  const { app, home } = boot();
+  const dialog = app.infoDialog;
+  home.el.querySelector('.home-why-alva').click();
+  dialog.body.clientHeight = 200;
+  dialog.body.scrollHeight = 1000;
+  app.input.key('ArrowDown');
+  assert.equal(dialog.body.scrollTop, 48);
+  app.nav.command('down', null);
+  assert.equal(dialog.body.scrollTop, 96);
+  app.nav.command('up', null);
+  assert.equal(dialog.body.scrollTop, 48);
+  assertFocus(dialog.closeButton);
+  assert.deepEqual(app.nav.candidates(app.nav.scopeEl), [dialog.closeButton]);
+  const key = (code, shiftKey = false) => {
+    let prevented = false;
+    dialog.root.dispatch('keydown', { code, shiftKey, preventDefault: () => { prevented = true; }, stopPropagation: noop });
+    assert.equal(prevented, true, code);
+  };
+  for (const shift of [false, true]) {
+    key('Tab', shift);
+    assertFocus(dialog.body);
+    key('Tab', shift);
+    assertFocus(dialog.closeButton);
+  }
+  key('PageDown');
+  assert.equal(dialog.body.scrollTop, 208);
+  key('PageUp');
+  assert.equal(dialog.body.scrollTop, 48);
+  key('End');
+  assert.equal(dialog.body.scrollTop, 800);
+  key('Home');
+  assert.equal(dialog.body.scrollTop, 0);
+  key('Tab');
+  key('Space');
+  assert.equal(dialog.body.scrollTop, 160);
+  key('Space', true);
+  assert.equal(dialog.body.scrollTop, 0);
+  key('Tab');
+  app.nav.command('confirm', null);
+  assert.equal(dialog.isOpen, false);
+});
+
+test('Discover single-body dialogs reset story presentation and localization when reusing InfoDialog', () => {
+  const { app, home, discover } = boot();
+  const dialog = app.infoDialog;
+  home.el.querySelector('.home-why-alva').click();
+  dialog.close();
+  home.actions.discover.click();
+  discover.browser.describeBtn.click();
+  assert.equal(dialog.isOpen, true);
+  assert.equal(dialog.body.children.length, 1);
+  assert.equal(dialog.panel.classList.contains('info-panel--story'), false);
+  assert.equal(dialog.body.getAttribute('tabindex'), null);
+  assert.equal(dialog.body.getAttribute('role'), null);
+  assert.equal(dialog.root.getAttribute('aria-describedby'), dialog.body.id);
+  setLanguage('fr');
+  try {
+    localizeTree(dialog.root);
+    assert.equal(dialog.title.textContent, '#0001');
+    assert.equal(dialog.body.textContent, STRINGS.fr['discover.fighter.0001.playStyle']);
+  } finally { dialog.close(); setLanguage('en'); }
+});
+
 test('the play-style dialog: role dialog, modal, titled with the fighter\'s name, its own description, focus inside, the screen inert', () => {
   const { discover, app } = openDiscover();
   const { browser } = discover;

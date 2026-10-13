@@ -384,8 +384,25 @@ no header, build label, eyebrow or keyboard hint bar.
   Directly below the attribution, left-aligned with a small gap, is an
   always-underlined "Why Alva?" / "Pourquoi Alva ?" text button. It is
   enabled, reachable by Tab and keyboard/gamepad navigation, with a visible
-  keyboard focus indicator; activation intentionally does nothing. The
-  footer reserves at least 44 px plus the safe-area inset for both lines,
+  keyboard focus indicator. Activation opens the shared `app.infoDialog`
+  over Home, titled "Why Alva?" / "Pourquoi Alva ?", with seven separately
+  localized paragraphs telling the creator’s story: love of fiction,
+  discovering MUGEN’s creative freedom, device barriers, and the inspiration
+  for an unofficial browser-based fan game. The story names no fictional
+  characters or franchises other than MUGEN and never discusses the roster.
+  Its title and paragraphs follow language changes while open. A dark glass
+  panel stays within the safe area, with a fixed heading and Close button
+  above the scrollable reading region; no artwork or extra decoration.
+  Mouse wheel, touch, keyboard arrows / Page Up / Page Down / Home / End
+  and controller D-pad up/down scroll the body without moving Home. Close
+  takes initial focus; Tab / Shift+Tab cycle between Close and the reading
+  region (Space scrolls while the region has focus). Escape, controller
+  Back, Close or the backdrop dismiss it and restore focus to this button.
+  Home stays inert while open, and its navigation state is preserved. The
+  dialog works even with no playable fighters; reopening starts at the top
+  without stacking scopes or listeners. Existing Discover single-paragraph
+  information dialogs retain their behavior. The footer reserves at least
+  44 px plus the safe-area inset for both lines,
   also accounted for in the wordmark's available height.
   Download ("Download" / "Télécharger", decorative `ICONS.download`) is a
   native disabled placeholder with no activation handler or `data-nav`.

@@ -125,6 +125,13 @@ export const EN = {
   'home.creditsRegion': 'Credits. Scroll or use the Up and Down arrow keys, Page Up, and Page Down to read.',
   'home.by': 'By {developer}',
   'home.whyAlva': 'Why Alva?',
+  'home.whyAlva.paragraph1': "I’ve always been a big fan of fiction, especially when it comes to superheroes. For a long time, I imagined a fighting game where characters from completely different worlds could face each other. Some games came close to making that idea a reality, but not all of them were successful, and others were exclusive to platforms I couldn’t access.",
+  'home.whyAlva.paragraph2': "One day, while watching videos online, I discovered something called MUGEN. It’s a fighting game engine that allows people to create their own fighters using sprites and animations. I immediately fell in love with the idea. The creative freedom it offered was exactly what I had always wanted to experience. Unfortunately, I never owned a device that could run it.",
+  'home.whyAlva.paragraph3': "That got me thinking. It’s unfortunate that people can miss out on something they would love simply because they don’t have the right device, or because downloading and setting up a game isn’t an option for them. I wanted to find a way to make that kind of experience easier for more people to enjoy.",
+  'home.whyAlva.paragraph4': "And that’s how Alva began.",
+  'home.whyAlva.paragraph5': "Inspired by the creative freedom behind MUGEN, I decided to create my own platform fighting game with a similar spirit, but with accessibility in mind. With Alva, there’s no need to download or install the game. All you have to do is open a link in your browser on a supported device and start playing.",
+  'home.whyAlva.paragraph6': "Alva is an unofficial fan-made project, created out of a genuine love for fiction and the endless possibilities of bringing different worlds together. It’s a game made for people who share that same imagination and excitement.",
+  'home.whyAlva.paragraph7': "And that’s why Alva exists.",
 
   'credits.createdBy': 'Created by {developer}',
   'credits.original.title': 'Original work',

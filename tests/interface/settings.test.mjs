@@ -149,6 +149,7 @@ const { t, followSettings, onLanguageChange, localizeTree, getLanguage, setLangu
 const { ScreenManager, Screen } = await import('../../js/core/screen-manager.js');
 const { App } = await import('../../js/core/app.js');
 const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
+const { InfoDialog } = await import('../../js/ui/overlays.js');
 const { HomeScreen } = await import('../../js/screens/home-screen.js');
 const { SettingsDialog, SETTINGS_SECTIONS } = await import('../../js/ui/settings-dialog.js');
 const { LanguageDialog } = await import('../../js/ui/language-dialog.js');
@@ -227,9 +228,12 @@ function boot(storage = memoryStorage()) {
   const home = new HomeScreen(app);
   const dialogRoot = new Element('div');
   const editorRoot = new Element('div');
+  const infoRoot = new Element('div');
+  infoRoot.hidden = true;
+  app.infoDialog = new InfoDialog(infoRoot, app);
   app.settingsDialog = new SettingsDialog(dialogRoot, app);
   app.touchEditor = new TouchLayoutEditor(editorRoot, app);
-  body.replaceChildren(home.el, dialogRoot, editorRoot);
+  body.replaceChildren(home.el, dialogRoot, editorRoot, infoRoot);
   const offLanguage = onLanguageChange(() => localizeTree(body));
   app.screens.register(home);
   app.screens.go('home');
@@ -956,7 +960,7 @@ test('Why Alva? is persistently underlined and left-aligned with a keyboard focu
   assert.match(css, /\.home-why-alva:focus-visible \{[^}]*outline: 2px solid var\(--text\);/);
 });
 
-test('keyboard and gamepad reach Why Alva? without changing Home, settings or game selection on activation', () => withTestFighters([TEST_A], () => {
+test('keyboard and gamepad open Why Alva? without changing Home, settings or game selection', () => withTestFighters([TEST_A], () => {
   const { app, home, dialog, storage, done } = boot();
   try {
     const why = home.el.querySelector('.home-why-alva');
@@ -970,10 +974,15 @@ test('keyboard and gamepad reach Why Alva? without changing Home, settings or ga
     home.actions.discover.focus();
     app.input.key('ArrowDown');
     assert.equal(document.activeElement, why);
-    assert.equal(why.listeners.size, 0, 'no action handlers');
-    why.click();
-    why.click(0); // Native keyboard activation (the fake DOM has no default actions).
-    app.input.pad('confirm');
+    for (const activate of [() => why.click(), () => why.click(0), () => app.input.pad('confirm')]) {
+      activate();
+      assert.equal(app.infoDialog.isOpen, true);
+      assert.equal(document.activeElement, app.infoDialog.closeButton);
+      assert.equal(home.el.inert, true);
+      app.input.pad('back');
+      assert.equal(app.infoDialog.isOpen, false);
+      assert.equal(home.el.inert, false);
+    }
     assert.equal(document.activeElement, why);
     assert.equal(app.screens.current, home);
     assert.deepEqual(app.screens.stack, stack);

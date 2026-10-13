@@ -273,9 +273,9 @@ export class ChoiceDialog extends ModalDialog {
   }
 }
 
-// A modal that only informs (Discover's play-style description): role
+// A modal that only informs (Discover's play style or Home's story): role
 // "dialog", never an alertdialog, since nothing is confirmed or destroyed.
-// A kicker and a title over a paragraph, and a Close button that takes focus
+// A kicker and a title over localized paragraphs, and Close takes focus
 // as it opens. Escape, gamepad Back, the Close button or a press on the dim
 // around the panel close it, and focus returns to the control that opened
 // it. The screen beneath is inert while it is open.
@@ -284,45 +284,79 @@ export class InfoDialog extends ModalDialog {
     super(root, app, 'info-dialog-title');
     this.kicker = el('span', { class: 'kicker' });
     this.title = el('h2', { class: 'dialog-title', id: 'info-dialog-title' });
-    this.body = el('p', { class: 'dialog-message info-body', id: 'info-dialog-body' });
+    this.body = el('div', { class: 'dialog-message info-body', id: 'info-dialog-body' });
     this.closeButton = el('button', {
       class: 'dialog-close', type: 'button', 'data-nav': true, 'data-nav-default': true,
       ...tattr('aria-label', 'common.close'), html: ICONS.close,
     });
     root.setAttribute('aria-describedby', 'info-dialog-body');
-    root.replaceChildren(
-      el('div', { class: 'dialog-panel info-panel glass glass--panel' }, [
-        el('div', { class: 'choice-header' }, [
-          el('div', { class: 'choice-heading' }, [this.kicker, this.title]),
-          this.closeButton,
-        ]),
-        this.body,
+    this.panel = el('div', { class: 'dialog-panel info-panel glass glass--panel' }, [
+      el('div', { class: 'choice-header' }, [
+        el('div', { class: 'choice-heading' }, [this.kicker, this.title]),
+        this.closeButton,
       ]),
-    );
+      this.body,
+    ]);
+    root.replaceChildren(this.panel);
     this.closeButton.addEventListener('click', () => this.close());
-    // Close is this informational dialog's only focusable control. Keep
-    // Tab and Shift+Tab here as well as the scoped arrow/gamepad navigation.
+    // Long stories have a focusable reading region. Tab cycles between it
+    // and Close; the navigation scope scrolls with keyboard / D-pad up/down
+    // even while Close has focus, without reaching the screen beneath.
+    this.scope.onDirection = (direction) => {
+      if (!this.longForm || !['up', 'down'].includes(direction)) return false;
+      this.body.scrollBy({ top: direction === 'up' ? -48 : 48, behavior: 'auto' });
+      return true;
+    };
     root.addEventListener('keydown', (e) => {
-      if (e.code !== 'Tab' || !this.isOpen) return;
-      e.preventDefault();
-      this.closeButton.focus({ preventScroll: true });
+      if (!this.isOpen || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        const target = this.longForm && document.activeElement === this.closeButton ? this.body : this.closeButton;
+        target.focus({ preventScroll: true });
+      } else if (this.longForm) {
+        const page = this.body.clientHeight * 0.8;
+        const delta = { PageUp: -page, PageDown: page, Home: -this.body.scrollHeight, End: this.body.scrollHeight,
+          ...(document.activeElement === this.body ? { Space: e.shiftKey ? -page : page } : {}) }[e.code];
+        if (delta === undefined) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.body.scrollBy({ top: delta, behavior: 'auto' });
+      }
     });
     this.isOpen = false;
   }
 
   // `kicker` and `body` are translation keys (so they follow the language
   // while open); `title` is text no translation owns, such as a fighter's
-  // name. `opener` is the control focus returns to (by default whatever had
-  // focus: a pressed button does not always take it).
-  open({ kicker = null, title, body, opener = null }) {
+  // name. Alternatively, `titleKey` and `paragraphs` are translation keys
+  // for a long story. `opener` is the control focus returns to (by default
+  // whatever had focus: a pressed button does not always take it).
+  open({ kicker = null, title, titleKey = null, body, paragraphs = null, opener = null }) {
     if (this.isOpen) this.close();
     if (kicker) setText(this.kicker, kicker);
     this.kicker.hidden = !kicker;
-    this.title.textContent = title;
-    this.title.setAttribute('data-i18n', '');
-    setText(this.body, body);
+    if (titleKey) setText(this.title, titleKey);
+    else {
+      this.title.textContent = title;
+      this.title.setAttribute('data-i18n', '');
+    }
+    this.longForm = !!paragraphs;
+    this.panel.classList.toggle('info-panel--story', this.longForm);
+    this.body.replaceChildren(...(paragraphs ?? [body]).map((key) => el('p', tx(key))));
+    if (this.longForm) {
+      // Preserve paragraph semantics for screen readers instead of announcing
+      // the entire long story as a single unstructured description on entry.
+      this.root.removeAttribute('aria-describedby');
+      this.body.setAttribute('tabindex', '0');
+      this.body.setAttribute('role', 'region');
+      this.body.setAttribute('aria-labelledby', 'info-dialog-title');
+    } else {
+      this.root.setAttribute('aria-describedby', 'info-dialog-body');
+      for (const name of ['tabindex', 'role', 'aria-labelledby']) this.body.removeAttribute(name);
+    }
     this.isOpen = true;
     this.show(this.closeButton, opener);
+    this.body.scrollTop = 0;
   }
 
   dismiss() {
