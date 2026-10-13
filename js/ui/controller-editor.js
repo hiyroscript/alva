@@ -14,8 +14,10 @@
 //                connected), and every action it has by category
 //                (Movement, Defense, Ground attacks, Aerial attacks,
 //                Special abilities, Other), each with its real name, a line
-//                on what it does, its input and how it activates, and a
-//                diagram lighting the input of the action in focus.
+//                on what it does, its input and how it activates (every
+//                move with its own artwork beside its name: the frame its
+//                touch button shows, see rowArt), and a diagram lighting
+//                the input of the action in focus.
 //                Conflicts are checked live (js/data/controller-
 //                profiles.js profileConflicts): an error keeps Save off, a
 //                warning only informs. Save stores the layout for this
@@ -43,6 +45,7 @@ import { stickDirection, movementVector, RUN_THRESHOLD } from '../core/controlle
 import { FighterRoster } from './fighter-roster.js';
 import { paintPortrait } from './sprite-art.js';
 import { ICONS } from './icons.js';
+import { mobileAbility } from './mobile-abilities.js';
 import {
   FAMILY_NAMES, displayFamily, buttonName, bindingText, activationText, actionName, actionDescription,
   diagramSVG, highlight, sourceName, directionName,
@@ -467,6 +470,9 @@ class EditorLayer {
     this.isOpen = false;
     this.def = null;
     this.familyChoice = null;
+    // Move art files that failed to load: shown as their glyph from then
+    // on, never tried again (see rowArt).
+    this.failedArt = new Set();
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-labelledby', 'controller-editor-title');
@@ -637,12 +643,14 @@ class EditorLayer {
     const activation = activationText(b, action);
     const placeTag = action.kind === 'attack' && action.category === 'abilities'
       ? el('span', { class: 'controller-place', ...tx(`controllerEditor.place.${action.place}`) }) : null;
+    const art = action.kind === 'attack' ? this.rowArt(action) : null;
     const row = el('button', {
       class: `controller-row${conflict ? ` is-${conflict}` : ''}`, type: 'button', 'data-nav': true, 'data-action': action.id,
       'aria-describedby': description ? descId : null,
       ...tattr('aria-label', 'controllerEditor.rowLabel', { name, input, activation: activation || '—' }),
     }, [
-      el('span', { class: 'controller-row-text' }, [
+      el('span', { class: `controller-row-text${art ? ' has-art' : ''}` }, [
+        art,
         el('span', { class: 'controller-row-name' }, [el('span', { text: name }), placeTag]),
         description ? el('span', { class: 'controller-row-desc', id: descId, text: description }) : null,
       ]),
@@ -658,6 +666,43 @@ class EditorLayer {
     });
     row.addEventListener('click', () => this.change(action));
     return row;
+  }
+
+  // Move `action`'s artwork beside its name: the very frame its touch
+  // button shows (mobileAbility in js/ui/mobile-abilities.js: the
+  // fighter's own `mobileAbilities` preview for that move, the ground or
+  // the mid-air one as the row is, a projectile's, summon's or technique's
+  // where authored), facing right (mirrored where its clip's art faces
+  // left), transparent and crisp. Decorative: hidden from assistive
+  // technology, the row's own name says what it is. Where the move has no
+  // frame, or once its file fails to load, its glyph (the same fallback
+  // the touch button shows). Null for a move with no presentation at all.
+  rowArt(action) {
+    const art = mobileAbility(this.def, action.control, action.place === 'air');
+    if (!art) return null;
+    const frame = el('span', { class: 'controller-row-art', 'aria-hidden': 'true' });
+    const glyph = () => {
+      frame.classList.add('is-glyph');
+      frame.innerHTML = art.icon ?? '';
+    };
+    const sprite = art.sprite;
+    if (!sprite || this.failedArt.has(sprite.url)) {
+      glyph();
+      return frame;
+    }
+    const img = el('img', {
+      class: `controller-row-sprite${sprite.mirrored ? ' is-mirrored' : ''}`, src: sprite.url, alt: '',
+      draggable: 'false', decoding: 'async',
+    });
+    img.addEventListener('error', () => {
+      if (!this.failedArt.has(sprite.url)) {
+        this.failedArt.add(sprite.url);
+        console.warn(`[Alva] Controller editor art "${sprite.url}" failed to load; showing its glyph.`);
+      }
+      if (frame.contains(img)) glyph();
+    });
+    frame.replaceChildren(img);
+    return frame;
   }
 
   renderDetail() {

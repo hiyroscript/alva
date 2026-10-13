@@ -3,16 +3,17 @@
 // One small versioned object under one localStorage key, read once at start
 // and written whole on every change, so nothing else in the game touches
 // storage. Presentation, input configuration and the human player's own
-// Combat Assist only: no setting changes a fighter, a stage, a CPU or the
-// rules of a fight.
+// Combat Assist and Combo Assist only: no setting changes a fighter, a
+// stage, a CPU or the rules of a fight.
 //
 // Stored as
 //
-//   { version: 4,
+//   { version: 5,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
 //     combatAssist: true | false,
+//     comboAssist: true | false,
 //     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... } }
 //
 // `language` stays null until the player picks one: the game then speaks
@@ -22,6 +23,9 @@
 // original layout. `combatAssist` is whether the human player's melee
 // presses close a short gap first (see Fighter.tryCombatAssist in
 // js/game/fighters/fighter.js): on unless the player turns it off.
+// `comboAssist` is whether the human player's Attack 1 pressed again while
+// its own repeat cooldown runs (the attack over) is Attack 2, and the
+// reverse (see Fighter.comboAction): on unless the player turns it off.
 //
 // `controllerProfiles` holds the player's own controller layout for each
 // fighter they customized (Settings › Controls › Controller controls), keyed
@@ -35,9 +39,10 @@
 // Older objects are migrated: version 1 ({ version: 1, mobileControls })
 // keeps its Mobile Controls choice, with no language chosen yet and no
 // custom layout; version 2 keeps its language, Mobile Controls and both
-// custom layouts; version 3 keeps all of that and its Combat Assist. Versions
-// 1 and 2 get Combat Assist on, and every older version no controller
-// profile. Missing, blocked or unreadable storage, a stored object of any
+// custom layouts; version 3 keeps all of that and its Combat Assist;
+// version 4 keeps all of that and its controller profiles. Versions 1 and 2
+// get Combat Assist on, versions 1 to 3 no controller profile, and every
+// older version Combo Assist on. Missing, blocked or unreadable storage, a stored object of any
 // other version, and every value that is not one of its setting's choices
 // fall back to the defaults, value by value, so the game always starts with
 // a valid set.
@@ -60,21 +65,26 @@ export const DEFAULT_MOBILE_CONTROLS = 'joystick';
 // turned it off.
 export const DEFAULT_COMBAT_ASSIST = true;
 
+// Combo Assist (Home › Settings › Combat) is on for a player who has never
+// turned it off.
+export const DEFAULT_COMBO_ASSIST = true;
+
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
   mobileControls: DEFAULT_MOBILE_CONTROLS,
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
   combatAssist: DEFAULT_COMBAT_ASSIST,
+  comboAssist: DEFAULT_COMBO_ASSIST,
   controllerProfiles: Object.freeze({}),
 });
 
 // The settings that are one choice from a list, and their allowed values.
 const CHOICES = Object.freeze({ language: LANGUAGES, mobileControls: MOBILE_CONTROLS });
 // The settings that are on or off: a real boolean, nothing else.
-const TOGGLES = Object.freeze(['combatAssist']);
+const TOGGLES = Object.freeze(['combatAssist', 'comboAssist']);
 
 // Whether `value` is one `name` may take: one of a choice's values, or a
 // boolean for a toggle.
@@ -95,6 +105,7 @@ function readCurrent(stored) {
     mobileControls: resolveSetting('mobileControls', stored.mobileControls),
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     combatAssist: resolveSetting('combatAssist', stored.combatAssist),
+    comboAssist: resolveSetting('comboAssist', stored.comboAssist),
     controllerProfiles: sanitizeStoredProfiles(stored.controllerProfiles),
   };
 }
@@ -109,11 +120,18 @@ const MIGRATIONS = Object.freeze({
   2: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
   }),
-  // Version 3 had everything but controller profiles: all of it kept, and
-  // no fighter customized yet.
+  // Version 3 had everything but controller profiles and Combo Assist: all
+  // of it kept, no fighter customized yet and Combo Assist on.
   3: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
     combatAssist: stored.combatAssist,
+  }),
+  // Version 4 had everything but Combo Assist: all of it kept (every
+  // fighter's controller layout included), and Combo Assist on, whatever
+  // the object may hold under that name.
+  4: (stored) => readCurrent({
+    language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
+    combatAssist: stored.combatAssist, controllerProfiles: stored.controllerProfiles,
   }),
 });
 
@@ -178,7 +196,7 @@ export class Settings {
   }
 
   // Sets choice `name` (language or mobileControls) or toggle
-  // (combatAssist) to `value` and saves; an unknown setting or value is
+  // (combatAssist, comboAssist) to `value` and saves; an unknown setting or value is
   // refused (false). Listeners hear about real changes only.
   set(name, value) {
     if (!allowed(name, value)) return false;
@@ -227,6 +245,16 @@ export class Settings {
 
   set combatAssist(value) {
     this.set('combatAssist', value);
+  }
+
+  // Whether the human player's Combo Assist is on (see the top of this
+  // file). Only a boolean is taken.
+  get comboAssist() {
+    return this.values.comboAssist;
+  }
+
+  set comboAssist(value) {
+    this.set('comboAssist', value);
   }
 
   // A copy of `scheme`'s custom touch layout ({} for the original one).

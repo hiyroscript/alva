@@ -241,6 +241,7 @@ export class BattleScreen extends Screen {
       reducedMotion: app.device.reducedMotion,
       difficulty,
       combatAssist: app.settings.combatAssist,
+      comboAssist: app.settings.comboAssist,
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.needsResize = true;

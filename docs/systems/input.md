@@ -16,12 +16,12 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/core/controller-resolver.js`](../../js/core/controller-resolver.js) | `ControllerResolver`: Player 1's presses resolved, for the fighter and where it is, into control codenames (combinations, directions, activations, one owner per press). |
 | [`js/ui/controller-cursor.js`](../../js/ui/controller-cursor.js) | The circular controller cursor, part of `MenuNavigator`. |
 | [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button names, binding phrases and the controller diagram. |
-| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Combat Assist setting, see [combat](combat.md#combat-assist)), `blankInput`, `HELD_CONTROLS`. |
+| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Combat Assist and Combo Assist settings, and its presses alone may cut its own attack short, see [combat](combat.md#the-players-requests)), `blankInput`, `HELD_CONTROLS`. |
 | [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
 | [`js/ui/mobile-abilities.js`](../../js/ui/mobile-abilities.js) | Which buttons a fighter has (`abilityPresence`, from its `actions`), and each button's name and frame (`previewFrame`, from its `mobileAbilities`). |
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
-| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Combat Assist on or off, and each fighter's saved controller layout (the only module touching storage). |
+| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Combat Assist and Combo Assist on or off, and each fighter's saved controller layout (the only module touching storage). |
 | [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges. |
 
 ## Controls
@@ -110,11 +110,18 @@ buttons are independently editable. Older Classic saves retain every existing
 custom control; the new buttons use defaults until customized. Reset restores
 all four directional controls without changing the other scheme.
 
-**Combat Assist** (Settings → Combat) is not part of the input system: no
-binding, device or `InputManager` code knows it. Keyboard, controller and
-touch presses reach the fighter in the same snapshot as ever, and the
-Fighter decides what a melee press does while the player's controller
-carries the setting ([combat](combat.md#combat-assist)).
+**Combat Assist** and **Combo Assist** (Settings → Combat), and the
+player's move cancellation, are not part of the input system: no binding,
+device or `InputManager` code knows them. Keyboard, controller and touch
+presses reach the fighter in the same snapshot as ever, one `…Pressed` edge
+per press (a key held, a touch control held or a controller button held is
+one press, never a stream: holding never strings attacks), and the Fighter
+decides what each press asks for, whether it cuts the player's attack and
+whether a melee press closes in, while the player's controller carries the
+settings ([combat](combat.md#the-players-requests)). `runLeft` /
+`runRight` (the keys, the touch Run buttons and joystick, the stick) only
+hold a direction: their press edges request nothing, so Run never cancels
+an attack or Combat Assist's approach.
 
 ## Game controllers
 
@@ -253,7 +260,14 @@ never opens), then the chosen fighter's editor: its portrait, name and the
 family the buttons are named for, and every action it has (Movement,
 Defense, Ground attacks, Aerial attacks, Special abilities, Other), each
 with its real name, a line on what it does, its input and activation, and a
-diagram lighting the input of the action in focus. Choosing an action opens
+diagram lighting the input of the action in focus. Every move row shows
+the move's own artwork beside its name, the frame its touch button shows
+(`mobileAbility` / `previewFrame` from the fighter's `mobileAbilities`:
+the ground preview on its ground row, the air one on its aerial row, a
+projectile's, technique's or summon's where authored; mirrored where its
+clip faces left), decorative only, with the touch button's glyph where it
+has none or its file fails to load (`EditorLayer.rowArt`); Movement,
+Defense and Pause rows have none. Choosing an action opens
 the binding dialog, which listens to Player 1's controller (a button, a
 modifier held first, the stick pointing first; for Fast fall a direction
 alone; for Movement the stick or pad moved) and can also be set in text with
@@ -267,7 +281,7 @@ Shared buttons that resolve one way are not conflicts: the same button on
 the ground and in the air (Spin Attack and Blue Tornado, the Shield and the
 Deflect), a combination beside its plain button, a direction beside none.
 **Save** stores the whole layout for that fighter alone, under its id
-(`controllerProfiles` in the settings, version 4); **Cancel** discards
+(`controllerProfiles` in the settings, version 5); **Cancel** discards
 unsaved changes after asking; **Restore defaults** asks, then puts that
 fighter alone back on its recommended layout. Saved layouts load on every
 visit; a malformed stored binding falls back to the recommended one, never
@@ -289,7 +303,12 @@ the rest of the settings.
   air context, custom bindings, menus, a lost controller, a fighter change.
 - [`tests/interface/controller-ui.test.mjs`](../../tests/interface/controller-ui.test.mjs):
   the Home indicator, Controller Connections, the cursor, Settings ›
-  Controller controls, the editor and binding capture, in both languages.
+  Controller controls, the editor (its move art for both fighters, ground
+  and air, mirroring and fallbacks) and binding capture, in both languages.
+- [`tests/systems/request-devices.test.mjs`](../../tests/systems/request-devices.test.mjs):
+  the keyboard, touch and a controller making the same requests: a held
+  button is one press, Combo Assist and move cancellation from each, Run
+  never a request.
 
 - [`tests/interface/controls-ui.test.mjs`](../../tests/interface/controls-ui.test.mjs):
   both layouts, the art on every button for both fighters, fallbacks, names

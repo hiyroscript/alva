@@ -607,6 +607,135 @@ test('#0002\'s editor in Xbox names: Down + Square is the Bounce Attack, R1 both
   } finally { none.done(); }
 });
 
+// The art beside a row's name: { url, mirrored } of its image, 'glyph'
+// for its fallback glyph, or null for no art at all.
+function rowArtOf(r) {
+  const frame = r.querySelector('.controller-row-art');
+  if (!frame) return null;
+  if (frame.classList.contains('is-glyph')) return 'glyph';
+  const img = frame.querySelector('.controller-row-sprite');
+  return { url: img.getAttribute('src'), mirrored: img.classList.contains('is-mirrored') };
+}
+
+test('every move row shows its own artwork beside its name, the touch button\'s frame for the ground or the air: #0001 and #0002', () => {
+  const expected = {
+    '0001': {
+      'ground:attack1': 'attack1_4', 'ground:extra_attack': 'extra_attack_4', 'air:attack1': 'midair_attack1_4',
+      'air:attack2': 'midair_attack2_4', 'air:attack3': 'midair_attack3_2', 'air:extra_attack': 'extra_attack_4',
+      'ground:attack2': 'attack2_object_1', 'ground:attack3': 'attack3_object_1', 'ground:attack4': 'attack4_6',
+      'ground:attack5': 'attack5_object_1',
+    },
+    '0002': {
+      'ground:attack1': 'attack1_4', 'ground:attack2': 'attack2_2', 'ground:attack3': 'attack3_5',
+      'air:attack1': 'midair_attack1_1', 'air:attack2': 'midair_attack2_5', 'air:attack3': 'midair_attack3_3',
+      'ground:extra_attack': 'extra_attack_object_3',
+    },
+  };
+  for (const [id, arts] of Object.entries(expected)) {
+    const env = boot();
+    try {
+      const editor = openEditor(env, id);
+      const moves = rows(editor).filter((r) => /^(ground|air):/.test(r.getAttribute('data-action')));
+      assert.deepEqual(moves.map((r) => r.getAttribute('data-action')).sort(), Object.keys(arts).sort(), `#${id}: every move row`);
+      for (const [action, frame] of Object.entries(arts)) {
+        const r = row(editor, action);
+        const art = rowArtOf(r);
+        assert.deepEqual(art, { url: `./assets/characters/${id}/${id}_${frame}.png`, mirrored: false }, `#${id} ${action}`);
+        // Beside its name, before it, decorative only: the row keeps its
+        // name, description, binding, label and description link.
+        const textCol = r.querySelector('.controller-row-text');
+        assert.ok(textCol.classList.contains('has-art'));
+        assert.equal(textCol.children[0], r.querySelector('.controller-row-art'), 'the art comes first, beside the name');
+        assert.equal(r.querySelector('.controller-row-art').getAttribute('aria-hidden'), 'true');
+        assert.equal(r.querySelector('.controller-row-sprite').getAttribute('alt'), '');
+        assert.match(r.getAttribute('aria-label'), new RegExp(`^Change binding: ${nameOf(r)}\\. `));
+        assert.ok(r.querySelector('.controller-chip'), 'its binding is still shown');
+        assert.ok(!r.querySelector('.controller-row-binding').querySelector('.controller-row-art'), 'never over the binding');
+      }
+      // Movement, Defense and Pause keep their presentation: no art.
+      for (const action of ['move', 'jump', 'dash', 'fastFall', 'shield', 'deflect', 'pause']) {
+        assert.equal(rowArtOf(row(editor, action)), null, `#${id} ${action}`);
+        assert.ok(!row(editor, action).querySelector('.controller-row-text').classList.contains('has-art'));
+      }
+    } finally { env.done(); }
+  }
+  // The binding and the art are one row: #0001's Red reads
+  // "[art] Red — R2 + Square".
+  const env = boot({ pads: [fakePad()] });
+  try {
+    const red = row(openEditor(env, '0001'), 'ground:attack2');
+    assert.equal(nameOf(red), 'Red');
+    assert.equal(text(red.querySelector('.controller-chip')), 'R2 + Square');
+    assert.equal(red.getAttribute('aria-label'), 'Change binding: Red. R2 + Square, Modifier + press.');
+  } finally { env.done(); }
+});
+
+test('move art mirrors where its clip faces left, falls back to its glyph when it has no frame or fails to load, and reads the same in French', () => {
+  const c1 = getCharacter('0001');
+  const variant = {
+    ...c1, id: 'art-check', displayName: 'Art check', available: false, rosterSlot: null,
+    animations: { ...c1.animations, attack1: { ...c1.animations.attack1, sourceFacing: -1 } },
+    mobileAbilities: { ...c1.mobileAbilities, extra_attack: { label: 'High Kick', preview: { animation: 'no_such_clip', frame: 0 } } },
+  };
+  const env = boot();
+  const warn = console.warn;
+  const warnings = [];
+  console.warn = (msg) => warnings.push(String(msg));
+  try {
+    openEditor(env, '0001');
+    const editor = env.app.controllerControls.editor;
+    editor.close();
+    editor.open(variant);
+    assert.deepEqual(rowArtOf(row(editor, 'ground:attack1')), { url: './assets/characters/0001/0001_attack1_4.png', mirrored: true },
+      'its clip faces left: mirrored, so it faces right as the buttons read');
+    assert.equal(rowArtOf(row(editor, 'air:attack1')).mirrored, false, 'the mid-air clip is its own');
+    // No frame to show: the touch button's own glyph (the ring).
+    const kick = row(editor, 'ground:extra_attack');
+    assert.equal(rowArtOf(kick), 'glyph');
+    assert.match(kick.querySelector('.controller-row-art').innerHTML, /<svg/);
+    assert.equal(nameOf(kick), 'High Kick', 'its name unchanged');
+    // A file that fails to load: its glyph at once, and never tried again.
+    const jab = row(editor, 'ground:attack1');
+    jab.querySelector('.controller-row-sprite').dispatch('error');
+    assert.equal(rowArtOf(jab), 'glyph');
+    assert.ok(warnings.some((w) => w.includes('0001_attack1_4.png')), 'reported');
+    editor.renderList();
+    assert.equal(rowArtOf(row(editor, 'ground:attack1')), 'glyph', 'still the glyph after a re-render');
+    assert.equal(rowArtOf(row(editor, 'air:attack1')).url, './assets/characters/0001/0001_midair_attack1_4.png', 'other art unaffected');
+    editor.close();
+    // In French: the same art, the names and labels in French.
+    env.settings.set('language', 'fr');
+    const fr = openEditor(env, '0001');
+    const jabFr = row(fr, 'ground:attack1');
+    assert.deepEqual(rowArtOf(row(fr, 'ground:attack2')), { url: './assets/characters/0001/0001_attack2_object_1.png', mirrored: false });
+    assert.equal(nameOf(jabFr), 'Direct', 'the French name beside the same art');
+    assert.equal(rowArtOf(jabFr), 'glyph', 'the file that failed is still not tried again');
+    assert.match(jabFr.getAttribute('aria-label'), /^Modifier la commande : Direct\. /);
+  } finally {
+    console.warn = warn;
+    env.done();
+  }
+});
+
+test('the move art is a fixed square beside the name, crisp and responsive, and never pushes the binding aside', () => {
+  const css = stylesheet();
+  const rule = (selector) => css.match(new RegExp(`\\n${selector.replace(/[.]/g, '\\.')} \\{([^}]*)\\}`))?.[1] ?? '';
+  assert.match(rule('.controller-row-text.has-art'), /grid-template-columns: var\(--controller-art\) minmax\(0, 1fr\);/);
+  const art = rule('.controller-row-art');
+  assert.match(art, /width: var\(--controller-art\);/);
+  assert.match(art, /height: var\(--controller-art\);/);
+  assert.match(art, /overflow: hidden;/);
+  const sprite = rule('.controller-row-sprite');
+  assert.match(sprite, /object-fit: contain;/);
+  assert.match(sprite, /image-rendering: pixelated;/);
+  assert.match(css, /\.controller-row-sprite\.is-mirrored \{ transform: scaleX\(-1\); \}/);
+  assert.match(css, /\.controller-row \{ --controller-art: 40px; \}/);
+  assert.match(css, /@media \(max-width: 560px\) \{\s*\.controller-row \{[^}]*--controller-art: 34px;/);
+  assert.match(css, /@media \(max-height: 520px\) \{\s*\.controller-row \{[^}]*--controller-art: 30px;/);
+  // The row's own columns are unchanged: the art lives inside the name's.
+  assert.match(css, /\n\.controller-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto auto;/);
+});
+
 test('a binding changed in text (no controller needed), saved for that fighter alone; Cancel asks before discarding', async () => {
   const env = boot();
   try {

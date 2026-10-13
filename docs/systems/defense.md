@@ -54,7 +54,9 @@ value.
   an attack, Dash, technique, summon startup, stun or paralysis short; it
   comes up the step that ends if `shield` is still held, a landing
   included (held through a jump it rises as the fighter lands, with its
-  raise pose).
+  raise pose). The one exception is the human player's own attack: a
+  Shield press made after that attack began cuts it and goes up on that
+  step ([combat](combat.md#the-players-requests)).
 - It takes the step: while it is held no attack, summon, technique, Dash
   or jump starts (an attack or a jump pressed meanwhile is buffered
   for the release; a summon or technique is not kept).

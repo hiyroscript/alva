@@ -240,6 +240,7 @@ export class PracticeGroundScreen extends Screen {
       input: app.input,
       reducedMotion: app.device.reducedMotion,
       combatAssist: app.settings.combatAssist,
+      comboAssist: app.settings.comboAssist,
     });
     // The CPU is on from the start: the same fighter and the same sprite
     // set (one load for both), at the CPU spawn facing Player 1, paired

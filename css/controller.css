@@ -285,6 +285,40 @@
 .controller-row.is-error { border-color: rgba(214, 58, 58, 0.75); }
 .controller-row.is-warning { border-color: rgba(240, 140, 26, 0.65); }
 .controller-row-text { display: grid; gap: 2px; min-width: 0; }
+/* A move's own artwork beside its name and line (the frame its touch
+   button shows, js/ui/controller-editor.js rowArt): a fixed square that
+   never pushes the binding or Change aside, the art transparent, fitted
+   whole and crisp, mirrored where its art faces left; its glyph where it
+   has none. */
+.controller-row { --controller-art: 40px; }
+.controller-row-text.has-art { grid-template-columns: var(--controller-art) minmax(0, 1fr); column-gap: 10px; align-items: center; }
+.controller-row-text.has-art > .controller-row-name,
+.controller-row-text.has-art > .controller-row-desc { grid-column: 2; min-width: 0; }
+.controller-row-art {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: var(--controller-art);
+  height: var(--controller-art);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+.controller-row-sprite {
+  display: block;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+.controller-row-sprite.is-mirrored { transform: scaleX(-1); }
+.controller-row-art.is-glyph .icon { width: 58%; height: 58%; }
 .controller-row-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: var(--text-strong); }
 .controller-place { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; }
 .controller-row-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
@@ -439,11 +473,11 @@
   .binding-diagram { display: none; }
 }
 @media (max-width: 560px) {
-  .controller-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .controller-row { grid-template-columns: minmax(0, 1fr) auto; --controller-art: 34px; }
   .controller-row-change { display: none; }
   .controller-editor-portrait-frame { display: none; }
 }
 @media (max-height: 520px) {
-  .controller-row { min-height: 44px; padding: 6px 10px; }
+  .controller-row { min-height: 44px; padding: 6px 10px; --controller-art: 30px; }
   .controller-row-desc { display: none; }
 }

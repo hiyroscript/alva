@@ -30,7 +30,8 @@ reads, what a fighter may leave out, and its tests.
   for every fighter), momentum, the triple jump, the Dash and the air
   dash.
 - [Combat](systems/combat.md): loadouts, attacks, hit resolution,
-  projectiles, summons, techniques, cooldowns, Combat Assist.
+  projectiles, summons, techniques, cooldowns, the player's requests (move
+  cancellation, Combo Assist), Combat Assist.
 - [Launch](systems/launch.md): Launch Point, Base and Directional Launch,
   launch reaction, rebounds.
 - [Defense](systems/defense.md): the Shield button and the Shield.

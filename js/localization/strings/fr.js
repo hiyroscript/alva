@@ -356,6 +356,10 @@ export const FR = {
   'settings.combatAssistDescAfterEnergy': ' et n’agit jamais sur les attaques à distance.',
   'settings.combatAssistOn': 'Activée',
   'settings.combatAssistOff': 'Désactivée',
+  'settings.comboAssist': 'Assistance aux combos',
+  'settings.comboAssistDesc': 'Une fois l’Attaque 1 ou l’Attaque 2 terminée, la presser à nouveau pendant son temps de recharge déclenche automatiquement l’autre attaque.',
+  'settings.comboAssistOn': 'Activée',
+  'settings.comboAssistOff': 'Désactivée',
 
   'editor.label': 'Éditeur des commandes tactiles',
   'editor.layout': 'Disposition : {scheme}',
