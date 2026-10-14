@@ -25,14 +25,14 @@
 //
 //   techniques: {
 //     attack5: {
-//       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 0.5,
+//       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release',
 //       projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
 //     },
 //     attack4: {
-//       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 0.5,
+//       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release',
 //       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, paralyze: 1.8 } },
 //     },
-//     attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 12, heal: 10 },
+//     attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', heal: 10 },
 //   },
 //
 // Phases, always explicit:
@@ -73,12 +73,16 @@
 // A target whose Shield is up blocks it: no Launch Point, no paralysis, no
 // launch, whatever the burst's size or the side it comes from.
 //
-// A technique's repeat cooldown starts on acceptance, even if interrupted.
-// The shared 0.5-second minimum applies unless the fighter declares longer.
-// It recovers every fixed step, including hitstop. Phase timing is separate.
+// A technique's cooldown starts on acceptance, even if interrupted. It is
+// the cooldown policy's (js/data/cooldowns.js), derived from what the cast
+// releases: 5 s when its burst or its projectile (judged from the fighter's
+// `projectiles`) deals 10 damage, else 3 s when it heals or paralyzes, else
+// the universal 0.5 s repeat delay. An entry may leave it out; one it
+// declares must agree. It recovers every fixed step, including hitstop.
+// Phase timing is separate.
 // A horizontal launch travels along the technique's facing.
 
-import { resolveCooldown } from '../../data/cooldowns.js';
+import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
 import { createHit } from './hit-effects.js';
 import { assertNoShieldBypass, resolveOffense, techniqueOffense } from './offense.js';
 
@@ -86,8 +90,9 @@ const TECHNIQUE_DEFAULTS = {
   castAnimation: null,
   releaseAnimation: null,
   // Seconds before the technique can be used again, from its start (see
-  // Fighter.tryTechnique): spent whether it lands or not. At least 0.5 seconds.
-  cooldown: 0.5,
+  // Fighter.tryTechnique): spent whether it lands or not. The cooldown
+  // policy's, never the entry's own (see above).
+  cooldown: REPEAT_COOLDOWN,
   // { id, offset }: the projectile it releases (see above), or null.
   projectile: null,
   // { hitbox, hit }: the burst round the fighter it releases, or null.
@@ -101,12 +106,16 @@ const TECHNIQUE_DEFAULTS = {
 // slack (see PHASE_EPSILON in attacks.js).
 const TIME_EPSILON = 1e-6;
 
-export function createTechniqueDefinition(spec) {
+// Frozen technique definition from a character's technique entry (plus its
+// `id`). `projectiles` is the fighter's own `projectiles` entry: the one it
+// releases counts toward its cooldown class.
+export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
   if (!spec?.id) throw new Error('[Alva] Technique definitions need an id');
   const owner = `Technique "${spec.id}"`;
   assertNoShieldBypass(spec, owner);
   assertNoShieldBypass(spec.burst, `${owner}'s burst`);
-  const def = { ...TECHNIQUE_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, `Technique "${spec.id}"`) };
+  const cls = cooldownClass('technique', spec, { projectiles });
+  const def = { ...TECHNIQUE_DEFAULTS, ...spec, cooldownClass: cls, cooldown: resolveCooldown(spec.cooldown, owner, { cls }) };
   if (def.projectile) {
     const o = def.projectile.offset ?? {};
     def.projectile = Object.freeze({ id: def.projectile.id, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });

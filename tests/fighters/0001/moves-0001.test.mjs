@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { DT, MOVEMENT, duel, fakeSpritesOf, makeFighter, steps } from '../../helpers/fighter-harness.mjs';
 import { getCharacter } from '../../../js/data/characters.js';
 import { LAUNCH_UNIT_SPEED as U } from '../../../js/data/launch.js';
+import { REPEAT_COOLDOWN } from '../../../js/data/cooldowns.js';
 
 const DEF = getCharacter('0001');
 const DEF_0002 = getCharacter('0002');
@@ -101,11 +102,11 @@ test('the Floating Straight stands on the air while it strikes: no fall, twice p
     if (fighter.combat.attack) assert.equal(fighter.body.vy, 0, 'standing on the air');
   }
   assert.ok(Math.abs(fighter.body.y - y) < 1, 'where it began');
-  for (let i = 0; i < steps(A.midair_attack1.cooldown); i++) step({});
+  for (let i = 0; i < steps(REPEAT_COOLDOWN); i++) step({});
   step(P('attack1'));
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1', 'a second one');
   while (fighter.combat.attack) step({});
-  for (let i = 0; i < steps(A.midair_attack1.cooldown); i++) step({});
+  for (let i = 0; i < steps(REPEAT_COOLDOWN); i++) step({});
   assert.equal(fighter.body.grounded, false);
   step(P('attack1'));
   assert.equal(fighter.combat.attack, null, 'not a third before it lands');

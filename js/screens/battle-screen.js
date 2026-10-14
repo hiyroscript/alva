@@ -24,6 +24,7 @@ import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
 import { Battle } from '../game/battle.js';
 import { HUD } from '../ui/hud.js';
+import { AbilityHUD } from '../ui/ability-hud.js';
 import { TouchControls } from '../ui/touch-controls.js';
 
 // Banner lines by state, as translation keys (with params).
@@ -83,6 +84,10 @@ export class BattleScreen extends Screen {
     this.hud = new HUD(this.hudRoot, { onPause: () => this.pause() });
     this.touchRoot = el('div', { class: 'touch-controls' });
     this.touch = new TouchControls(this.touchRoot, app.input);
+    // Player 1's moves in the corner, for keyboard and controller play
+    // (never Watch Mode's: nobody plays there).
+    this.abilityRoot = el('div');
+    this.abilityHud = new AbilityHUD(this.abilityRoot, { input: app.input, settings: app.settings });
 
     this.bannerSub = el('span', { class: 'banner-sub' });
     this.bannerMain = el('span', { class: 'banner-main' });
@@ -93,7 +98,7 @@ export class BattleScreen extends Screen {
     this.buildResult();
 
     this.el.replaceChildren(
-      this.canvas, this.hudRoot, this.touchRoot, this.banner,
+      this.canvas, this.hudRoot, this.abilityRoot, this.touchRoot, this.banner,
       this.pauseOverlay, this.resultOverlay,
     );
 
@@ -204,6 +209,8 @@ export class BattleScreen extends Screen {
     this.touchRoot.hidden = watch;
     this.el.classList.toggle('is-watch', watch);
     this.el.dataset.map = map.id;
+    // Nothing of an earlier battle shows while this one loads.
+    this.abilityHud.clear();
     this.token = {};
     const token = this.token;
 
@@ -244,6 +251,7 @@ export class BattleScreen extends Screen {
       comboAssist: app.settings.comboAssist,
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
+    this.abilityHud.bind(watch ? null : this.battle.p1);
     this.needsResize = true;
     this.paused = false;
     this.hidePause();
@@ -254,6 +262,7 @@ export class BattleScreen extends Screen {
     document.addEventListener('visibilitychange', this.onVisibility);
     document.activeElement?.blur?.();
     this.setPlayActive(true);
+    this.syncAbilityHud();
     this.el.classList.add('is-live');
 
     if (app.device.blockedPortrait) this.pause();
@@ -311,9 +320,22 @@ export class BattleScreen extends Screen {
     this.hidePause();
     this.hideResult();
     this.app.loading.hide();
+    this.abilityHud.clear();
     this.battle?.destroy();
     this.battle = null;
     this.el.classList.remove('is-live');
+  }
+
+  // The ability HUD follows Player 1 while a player plays (never in Watch
+  // Mode, never at the result); while it is on show (not on a touch screen,
+  // whose touch controls are the interface) it, not the rings over the
+  // fighter, carries Player 1's cooldowns.
+  syncAbilityHud() {
+    const battle = this.battle;
+    const playing = !!battle && this.mode !== 'watch' && battle.phase !== 'result';
+    if (playing) this.abilityHud.show(battle.p1);
+    else this.abilityHud.setVisible(false);
+    if (battle) battle.hudCooldownsFor = this.abilityHud.showing && !this.app.device.touchUI ? battle.p1 : null;
   }
 
   get isRunning() {
@@ -333,6 +355,7 @@ export class BattleScreen extends Screen {
     battle.frame(dt);
     this.touch.setAirborne(!!battle.primary && !battle.primary.grounded);
     this.hud.update(battle);
+    this.syncAbilityHud();
     // Handled after the frame rather than from inside the simulation step, so
     // the result menu opens on a settled battle.
     if (battle.phase === 'result') {
@@ -434,6 +457,7 @@ export class BattleScreen extends Screen {
     this.hud.update(this.battle);
     this.setBanner(null);
     this.hideResult();
+    this.syncAbilityHud();
     this.paused = true; // resume() clears it
     this.resume();
   }
@@ -480,6 +504,7 @@ export class BattleScreen extends Screen {
     }
     this.setBanner(null);
     this.setPlayActive(false);
+    this.syncAbilityHud();
     this.resultOverlay.hidden = false;
     this.app.nav.pushScope(this.resultScope);
     this.resultOverlay.querySelector('[data-nav-default]').focus({ preventScroll: true });
@@ -507,6 +532,7 @@ export class BattleScreen extends Screen {
     this.battle.restart();
     this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
     this.hud.update(this.battle);
+    this.syncAbilityHud();
     this.paused = false;
     this.setPlayActive(true);
     document.activeElement?.blur?.();

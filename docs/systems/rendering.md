@@ -90,11 +90,15 @@ whose art it is, whoever owns it now.
 
 Above each on-screen fighter's name tag, the bright purple **Energy bar**
 shows only below full and turns gray during exhaustion. Under the feet, a
-centered row shows only active cooldowns with a duration **above 0.5 seconds**:
-#0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s), and
-#0003 Heavenly Foot of Pain (2 s), Cherry Blossom Impact (4 s) and Mystical
-Palm Technique (12 s), including long ordinary attacks as well as summons and
-techniques.
+centered row shows only active cooldowns with a duration **above 0.5 seconds**
+(the cooldown policy's 3 s and 5 s, [combat](combat.md#cooldowns)):
+#0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s) and
+#0003 Mystical Palm Technique (3 s), long ordinary attacks as well as summons
+and techniques. The fighter the ability HUD shows
+([input](input.md#the-ability-hud)) has no rings while that HUD is on show
+(`Arena.hudCooldownsFor`, set by the screen each frame): the HUD carries its
+cooldowns, so the same timer is never shown twice as prominently. The CPU,
+Watch Mode's fighters and a player on a touch screen keep their rings.
 
 Each white, black-outlined ring fills clockwise from the top. Its center shows
 the same art as its touch button, selected once by `js/data/ability-preview.js`

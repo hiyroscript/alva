@@ -168,8 +168,9 @@ export class CombatState {
     // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
-    // Ordinary attack repeat cooldowns (baseline or longer override):
-    // attack id -> seconds left. Deflect keeps its authored delay.
+    // Ordinary attack cooldowns (the cooldown policy's, js/data/cooldowns.js:
+    // the 0.5 s repeat delay, or 3 s / 5 s): attack id -> seconds left. The
+    // Deflect has none.
     this.cooldowns = new Map();
     // The summons' and techniques' own cooldowns (e.g. #0001's attack4 and
     // attack5), by the attack each one is: the Fighter starts them, and

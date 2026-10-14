@@ -34,6 +34,12 @@ unavailable, with Back to Home.
   menu with **Change Fighter**, **Change CPU** (**Enable CPU** once you have
   disabled it) and **Return**. Press More, `Esc` or `P` again (or tap the dim) to carry
   on.
+- **Ability HUD.** With a keyboard or a controller, the practice
+  fighter's moves show in the bottom-right corner, as in Quick Battle
+  ([input](../systems/input.md#the-ability-hud)): art over input, ground
+  and air rows on a wheel, cooldowns read from the fighter. The Practice
+  menu and its rosters fade it out; Change Fighter replaces its whole
+  moveset at once.
 - **Change Fighter** opens the full roster as a large glass dialog over the
   paused stage. It is the same roster component as Select Fighter
   (`js/ui/fighter-roster.js`). Confirming swaps the fighter in place at the

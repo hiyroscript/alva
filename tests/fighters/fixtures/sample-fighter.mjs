@@ -70,7 +70,6 @@ export const SAMPLE_FIGHTER = Object.freeze({
     attack3: {
       attack: 'attack2',
       cloud: 'attack3_object',
-      cooldown: 3,
       behindDistance: 40,
       effectOffset: { x: 0, y: -44 },
       noGround: { attack: 'midair_attack2', offset: { x: 0, y: -36 } },

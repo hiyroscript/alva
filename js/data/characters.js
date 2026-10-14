@@ -25,8 +25,9 @@
 //     (below) and assertControllerLayout (js/data/controller-profiles.js)
 //     as this module loads, every problem named; one that breaks the
 //     loadout rules, declares movement of its own (a `movement` profile,
-//     `powers`), deals damage off the tiers (1, 3, 5, 10), gives an attack
-//     an invalid repeat cooldown, sets its own Energy maximum or costs, or
+//     `powers`), deals damage off the tiers (1, 3, 5, 10), declares a
+//     cooldown the cooldown policy does not give the move (js/data/
+//     cooldowns.js), sets its own Energy maximum or costs, or
 //     authors a controller layout that is invalid or conflicts never loads.
 //   - A definition existing is not the same as it being playable.
 //     getCharacter finds any definition (the engine and its tests build
@@ -122,8 +123,10 @@ export function characterFramePaths(def) {
 // Throws, naming the move, for a definition whose combat data breaks a
 // shared rule: every attack (each strike of a multi-hit one), projectile
 // (its finisher too), technique burst and Deflect is built here exactly as
-// the Fighter builds it, so a hit dealing anything but 1, 3, 5 or 10, an
-// attack with a non-finite or negative cooldown, a Deflect off its
+// the Fighter builds it, so a hit dealing anything but 1, 3, 5 or 10, a
+// move declaring a cooldown the cooldown policy does not give it
+// (js/data/cooldowns.js: 5 s for 10 damage, 3 s for a heal or a paralysis,
+// else the 0.5 s repeat delay; none for a Deflect), a Deflect off its
 // fixed strike or an `energy` entry that sets its own maximum or costs is
 // refused as the registry loads, not when a match first builds the
 // fighter. So is any way past an active Shield (`unblockable` and the rest
@@ -135,11 +138,14 @@ export function characterFramePaths(def) {
 export function assertCombatRules(def) {
   const who = `Character "${def?.id}"`;
   const attacks = {};
-  for (const [id, spec] of Object.entries(def?.attacks ?? {})) attacks[id] = createAttackDefinition({ id, ...spec });
+  const context = { projectiles: def?.projectiles ?? null, attacks: def?.attacks ?? null };
+  for (const [id, spec] of Object.entries(def?.attacks ?? {})) {
+    attacks[id] = createAttackDefinition({ id, ...spec }, { projectiles: context.projectiles });
+  }
   for (const [id, spec] of Object.entries(def?.projectiles ?? {})) createProjectileDefinition({ id, ...spec });
-  for (const [id, spec] of Object.entries(def?.techniques ?? {})) createTechniqueDefinition({ id, ...spec });
+  for (const [id, spec] of Object.entries(def?.techniques ?? {})) createTechniqueDefinition({ id, ...spec }, context);
   for (const [id, spec] of Object.entries(def?.summons ?? {})) {
-    const summon = createSummonDefinition({ id, ...spec });
+    const summon = createSummonDefinition({ id, ...spec }, context);
     if (!summonOffense(summon, attacks).attack) {
       throw new Error(`[Alva] ${who}'s summon "${id}" sends a clone whose attack strikes nothing: a summon is an attack`);
     }

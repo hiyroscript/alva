@@ -108,17 +108,17 @@ export const FUTURE_FIGHTER = Object.freeze({
   summons: {
     attack3: {
       attack: 'midair_attack3', cloud: 'attack3_object', startupAnimation: 'attack3_summon',
-      cooldown: 2, behindDistance: 30, effectOffset: { x: 0, y: -44 },
+      behindDistance: 30, effectOffset: { x: 0, y: -44 },
     },
   },
   techniques: {
     attack4: {
-      castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 2,
+      castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release',
       burst: { hitbox: { x: -120, y: -160, w: 240, h: 170 }, hit: { damage: 5, baseLaunch: 2, directionalLaunch: 'vertical' } },
       projectile: { id: 'attack4_object', offset: { x: 60, y: -50 } },
     },
     attack5: {
-      castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 2,
+      castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release',
       projectile: { id: 'attack5_object', offset: { x: 140, y: -60 } },
     },
   },

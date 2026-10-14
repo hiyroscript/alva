@@ -30,6 +30,7 @@ import { isPlayable, playableCharacters } from '../data/characters.js';
 import { PRACTICE_MAP } from '../data/practice-map.js';
 import { PracticeSession } from '../game/practice.js';
 import { PracticeHUD } from '../ui/hud.js';
+import { AbilityHUD } from '../ui/ability-hud.js';
 import { TouchControls } from '../ui/touch-controls.js';
 
 // Every fresh visit from Home starts with this fighter, and a practice CPU
@@ -53,13 +54,17 @@ export class PracticeGroundScreen extends Screen {
     this.hud = new PracticeHUD(this.hudRoot, { onMore: () => this.toggleMenu() });
     this.touchRoot = el('div', { class: 'touch-controls' });
     this.touch = new TouchControls(this.touchRoot, app.input);
+    // The practice fighter's moves in the corner, for keyboard and
+    // controller play.
+    this.abilityRoot = el('div');
+    this.abilityHud = new AbilityHUD(this.abilityRoot, { input: app.input, settings: app.settings });
 
     this.buildMenu();
     this.buildRoster();
     this.buildCpuRoster();
 
     this.el.replaceChildren(
-      this.canvas, this.hudRoot, this.touchRoot, this.menuOverlay, this.rosterOverlay, this.cpuRosterOverlay,
+      this.canvas, this.hudRoot, this.abilityRoot, this.touchRoot, this.menuOverlay, this.rosterOverlay, this.cpuRosterOverlay,
     );
 
     this.session = null;
@@ -248,6 +253,7 @@ export class PracticeGroundScreen extends Screen {
     this.session.setCPU(def, sprites);
     this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
+    this.syncAbilityHud();
     this.syncMenu();
     this.needsResize = true;
     this.resizeObserver.observe(this.el);
@@ -272,8 +278,19 @@ export class PracticeGroundScreen extends Screen {
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);
     this.app.loading.hide();
+    this.abilityHud.clear();
     this.session?.destroy();
     this.session = null;
+  }
+
+  // The ability HUD follows the practice fighter (a swap rebinds it); while
+  // it is on show (not on a touch screen) it, not the rings over the
+  // fighter, carries that fighter's cooldowns. The menu and the roster
+  // dialogs fade it (css/ability-hud.css).
+  syncAbilityHud() {
+    const session = this.session;
+    this.abilityHud.show(session?.player ?? null);
+    if (session) session.hudCooldownsFor = this.abilityHud.showing && !this.app.device.touchUI ? session.player : null;
   }
 
   // Running: a session exists and neither the menu nor a fighter load holds it.
@@ -306,6 +323,7 @@ export class PracticeGroundScreen extends Screen {
     session.frame(dt);
     this.touch.setAirborne(!!session.player && !session.player.grounded);
     this.hud.update(session);
+    this.syncAbilityHud();
   }
 
   onDeviceChange() {
@@ -463,6 +481,7 @@ export class PracticeGroundScreen extends Screen {
     this.touch.setCharacter(def);
     this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
+    this.syncAbilityHud();
     this.closeRoster({ silent: true });
     this.resume();
   }

@@ -318,8 +318,8 @@ export const CHARACTER_0002 = {
   // two frames more. Every Deflect's 3, Base Launch 2, here sideways, the way
   // the hand swats; while the swat is live it knocks the other fighter's
   // projectiles back at their thrower, now #0002's. A quarter of a second
-  // in all, falling as it swats and carrying the whole of its drift, and
-  // its existing defensive repeat cooldown (0.05 s), exempt from the baseline.
+  // in all, falling as it swats and carrying the whole of its drift, with
+  // no cooldown (the shared policy's for every Deflect: js/data/cooldowns.js).
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0002.deflect,
@@ -330,7 +330,6 @@ export const CHARACTER_0002 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    cooldown: 0.05,
     airMomentum: 1,
     airControl: 0.4,
     deflectProjectiles: true,
@@ -409,8 +408,10 @@ export const CHARACTER_0002 = {
   // and every hitbox is measured from its art (facing right from the
   // origin, mirrored with facing). Its speed is in its moves' own motion
   // (the homing dash, the plunge, the roll, the lift), never in how it runs.
-  // Ordinary moves use the universal 0.5-second repeat cooldown; Whirlwind
-  // overrides it to 5 seconds. Neither changes startup, strikes or recovery.
+  // Cooldowns are the shared policy's (js/data/cooldowns.js), never authored
+  // here: the Whirlwind, whose tornado's finisher deals 10, waits 5 seconds;
+  // every other move only the universal 0.5-second repeat delay. Neither
+  // changes startup, strikes or recovery.
   attacks: {
     // The One-Two: two strikes in one press, light and quick (a quarter of
     // a second in all). The jab (frame 2, 1) holds the target for the
@@ -432,7 +433,6 @@ export const CHARACTER_0002 = {
           damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal', hitstop: 0.05,
         },
       ],
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 1,
       friction: 0.5,
@@ -458,7 +458,6 @@ export const CHARACTER_0002 = {
       hitstun: 0.4,
       blockstun: 0.15,
       hitstop: 0.05,
-      cooldown: 0.5,
       airUses: 1,
       motion: { type: 'homing', range: 240, speed: 1100, rebound: 760, recoil: 140, exit: 0.25 },
       airMomentum: 0.6,
@@ -492,7 +491,6 @@ export const CHARACTER_0002 = {
           damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.3, hitstop: 0.08,
         },
       ],
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.8,
       friction: 0.8,
@@ -516,7 +514,6 @@ export const CHARACTER_0002 = {
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 0.05,
-      cooldown: 0.5,
       airUses: 2,
       motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 },
       airMomentum: 0.8,
@@ -544,7 +541,6 @@ export const CHARACTER_0002 = {
       hitstun: 0.24,
       blockstun: 0.15,
       hitstop: 0.06,
-      cooldown: 0.5,
       groundOnly: true,
       motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 1000, friction: 420, recoil: 260 },
       passThrough: true,
@@ -574,7 +570,6 @@ export const CHARACTER_0002 = {
           damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.07,
         },
       ],
-      cooldown: 0.5,
       airUses: 1,
       freeFall: true,
       motion: { type: 'rise', speed: 460 },
@@ -593,7 +588,6 @@ export const CHARACTER_0002 = {
       recovery: 3 / FPS_0002.extra_attack,
       hitbox: null,
       projectile: { id: 'extra_attack_object', spawnAt: 5 / FPS_0002.extra_attack, offset: { x: 44, y: -39 } },
-      cooldown: 5,
       groundOnly: true,
       momentum: 0.4,
       friction: 0.8,

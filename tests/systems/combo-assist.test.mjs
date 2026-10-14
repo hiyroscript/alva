@@ -325,14 +325,15 @@ test('the alternate keeps its own rules: its cooldown, its art, its starts for t
 });
 
 test('the window is the attack\'s own repeat cooldown, however long: nothing shortened, overwritten or timed apart', () => {
+  // An Attack 1 that deals 10: the cooldown policy's 5 s.
   const long = { ...C1, id: 'combo-long', displayName: 'combo-long', available: false, rosterSlot: null,
-    attacks: { ...C1.attacks, attack1: { ...C1.attacks.attack1, cooldown: 2 } } };
+    attacks: { ...C1.attacks, attack1: { ...C1.attacks.attack1, damage: 10 } } };
   const r = far(long);
   playOut(r, 'attack1');
-  assert.ok(Math.abs(r.player.combat.cooldowns.get('attack1') - 2) < 0.05, 'its authored 2 s');
-  for (let i = 0; i < Math.round(1.5 / DT); i++) r.tick();
+  assert.ok(Math.abs(r.player.combat.cooldowns.get('attack1') - 5) < 0.05, 'its 5 s');
+  for (let i = 0; i < Math.round(4.5 / DT); i++) r.tick();
   r.tick(press('attack1'));
-  assert.equal(attackOf(r.player), 'attack2', '1.5 s later, still its cooldown: Attack 2');
+  assert.equal(attackOf(r.player), 'attack2', '4.5 s later, still its cooldown: Attack 2');
   const left = r.player.combat.cooldowns.get('attack1');
   assert.ok(left > 0.4 && left < 0.55, `Attack 1's own cooldown runs on untouched: ${left}`);
   r.until(() => !r.player.combat.attack);

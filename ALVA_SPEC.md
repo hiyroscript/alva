@@ -1828,7 +1828,7 @@ each fighter's own values are in its character specification (7.2.9).
   mirrored with facing, live only in the active phase, at most one hit per
   attack), its `damage` (one of the four tiers, below), `baseLaunch` and
   `directionalLaunch` (7.2.7), `hitstun`, `blockstun`, `hitstop` and a
-  `cooldown` (at least 0.5 s, except Deflect; below), `groundOnly`, and how it moves and
+  `cooldown` (derived by the cooldown policy, never chosen; below), `groundOnly`, and how it moves and
   combos (below).
   - *Damage tiers.* Every hit in the game deals exactly **1, 3, 5 or 10**
     (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage` in `js/data/launch.js`),
@@ -1847,20 +1847,49 @@ each fighter's own values are in its character specification (7.2.9).
     `damage` is the sum of its strikes, derived (#0002's One-Two is 1 + 3),
     and a blocked hit's event reports 0 because it dealt none: neither is
     an authored hit.
-  - *Repeat cooldown.* Every discrete ordinary ground/air attack, extra attack,
-    projectile-producing attack, motion attack, summon, technique, Dash and air
-    dash has a per-move **0.5-second minimum** (`REPEAT_COOLDOWN`,
-    `js/data/cooldowns.js`). Missing or smaller non-negative values resolve to
-    it; explicit longer cooldowns have no artificial maximum. Negative,
-    non-numeric and non-finite values are rejected. Running, ground/air jumps,
-    Shield and Deflect are exempt (Deflect keeps #0001's 0, #0002's 0.05 s and #0003's 0).
+  - *Cooldown policy.* Every discrete move's reuse delay is derived from what
+    it does, the same rules for every fighter (`js/data/cooldowns.js`), never
+    chosen by its fighter. Exactly two special cooldowns exist besides the
+    universal **0.5-second repeat delay** (`REPEAT_COOLDOWN`):
+    1. **5 s** (`TEN_DAMAGE_COOLDOWN`) for a move that deals **10**: any one
+       hit of it dealing 10 (a strike, a multi-hit's finisher, the
+       projectile it throws or releases or that projectile's finisher, a
+       slam's impact, a technique's burst, a summoned clone's attack), or
+       everything one use can deal one target adding up to 10 or more;
+    2. otherwise **3 s** (`EXCEPTIONAL_COOLDOWN`) for a move with an
+       exceptional effect (`EXCEPTIONAL_EFFECTS`): a heal of Launch Point, or
+       a paralysis that holds its target unable to act;
+    3. otherwise nothing beyond the 0.5 s repeat delay.
+    The first rule that applies decides; the two never add up (a 10-damage
+    paralysis is 5 s, never 8). Nothing else earns a cooldown, however strong
+    it looks (`ROUTINE_EFFECTS`): launching, pushing, pulling (Blue and
+    Maximum Blue), homing, carrying, a projectile, a quake, a bounce, a slam,
+    ordinary hitstun or blockstun, a long animation. Every shared hit effect
+    is classified one way or the other on purpose. The cooldown is the move's
+    (the button's), never one per projectile or hitbox it creates. A
+    definition leaves `cooldown` out; one that declares it must agree with
+    the policy (a value up to 0.5 s on a move with no special class is the
+    baseline itself), or the registry refuses it as it loads, naming the move
+    (`resolveCooldown`): no fighter can author an 8-second move, a 12-second
+    heal or a 0.05 s Deflect. Every built definition records its class
+    (`cooldownClass`). Running, ground/air jumps and the Shield have no move
+    cooldown; the Deflect is exempt from the 0.5 s baseline (none at all,
+    for every fighter: Energy is its limit) though a special class would
+    still apply to it. The Dash and the air dash keep their own 0.5 s
+    movement timers (`CombatState.movementCooldowns`), outside the policy.
     Fast fall stays directional movement. These are reuse timers, never added
     to startup, active, recovery or animation timing and never global lockouts.
     Ordinary attacks use `CombatState.cooldowns` from their end, hit-cancel or
     interruption; same-move hit-cancels require the full repeat delay since
-    becoming cancellable. Summons and techniques use acceptance timers (7.2.6).
-    #0001's ordinary attacks use 0.5 s; #0002's use 0.5 s except Whirlwind's 5 s;
-    #0003's use 0.5 s except the Heavenly Foot of Pain's 2 s.
+    becoming cancellable. Summons and techniques use acceptance timers (7.2.6),
+    so cancelling or breaking one never escapes its cooldown. The roster:
+    #0001 Unlimited Void 3 s (paralysis) and Hollow Purple 5 s (its 10-damage
+    sphere); #0002 Whirlwind 5 s (its tornado's 10-damage finisher); #0003
+    Mystical Palm Technique 3 s (its heal); every other move of the three,
+    Red, Blue, Maximum Blue, Cherry Blossom Impact and the Heavenly Foot of
+    Pain included, only the 0.5 s repeat delay. The player, the CPU and the
+    ability HUD all read the same built definitions and combat state
+    (`js/game/combat/move-status.js` for presentation).
     An airborne version that lands
   plays its startup and strike on (never restarted, never switched to the
   ground version or Land), and its recovery is over on touchdown: the
@@ -2282,8 +2311,9 @@ it names a fighter, an attack or an animation.
   other controller never have it. It is its own setting: Combat Assist on
   or off never changes it, nor the reverse.
 - **The window.** The source attack's own repeat cooldown
-  (`CombatState.cooldowns`, 7.2.4): the universal 0.5 s, or the attack's
-  longer authored one, which is never shortened or overwritten. No timer of
+  (`CombatState.cooldowns`, 7.2.4): the universal 0.5 s, or the cooldown
+  policy's 3 s or 5 s for the attack, which is never shortened or
+  overwritten. No timer of
   its own. It runs from the attack's end, its cut (7.2.4) or its
   interruption by a hit, so any of them opens it.
 - **Never during the attack itself.** Attack 1 pressed while Attack 1 still
@@ -2404,12 +2434,12 @@ it names a fighter, an attack or an animation.
 - **Deflect.** In the air, a fresh `shield` press (`shieldPressed`,
   never the button held) is the fighter's Deflect: an attack in every
   way, through `createAttackDefinition` (its own `deflect` clip, startup,
-  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (exempt from the baseline; #0001's none, #0002's 0.05 s, #0003's none), momentum and steering), resolved by the same `CombatSystem` as any
+  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (the policy's: exempt from the 0.5 s baseline, so none, 7.2.4), momentum and steering), resolved by the same `CombatSystem` as any
   attack, trading, interrupted and punished as one. Its strike is the
   same for every fighter: **3** Launch Points at **Base Launch 2**
   (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`; a fighter authors neither, and
-  any other value is refused); its direction, timing, box, stuns and
-  cooldown are the fighter's own. It is one strike in the air (no `hits`,
+  any other value is refused); its direction, timing, box and stuns are
+  the fighter's own. It is one strike in the air (no `hits`,
   projectile, `pending` or `groundOnly`). It starts only in the air, free
   to act or in an attack that hit and may be cut short (7.2.4's
   hit-cancel), never stunned, paralyzed, in a Dash or air dash, in another
@@ -2547,9 +2577,11 @@ it names a fighter, an attack or an animation.
   ordinary attack in its place, never kept for later (the combat
   input buffer below keeps ordinary attacks only), never an invisible move.
   Holding the button does not repeat it, and neither Down nor any other
-  input changes what it does. Neither spends Energy. Each cooldown has the
-  shared 0.5-second floor and may be longer: #0001 Unlimited Void is 3 s,
-  Hollow Purple 5 s, with cast/release timing and paralysis unchanged. It is
+  input changes what it does. Neither spends Energy. Each cooldown is the
+  cooldown policy's (7.2.4): #0001 Unlimited Void 3 s (its paralysis),
+  Hollow Purple 5 s (its 10-damage sphere), #0003 the Mystical Palm
+  Technique 3 s (its heal) and Cherry Blossom Impact only the 0.5 s repeat
+  delay, with cast/release timing, damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from ordinary attacks' short
   repeat cooldowns in `CombatState.cooldowns`), started the moment the
@@ -2645,8 +2677,8 @@ it names a fighter, an attack or an animation.
   and the fighter falls), and a hit on the fighter ends it (no armour):
   whatever it had not released yet never is (a heal broken before it lets
   go heals nothing), while what it already let go stays (the projectile
-  flies on, the burst has landed, the heal is kept). Its cooldown, if
-  it has one, runs from its start whatever happens. Every clip, the projectile's art
+  flies on, the burst has landed, the heal is kept). Its cooldown runs
+  from its start whatever happens. Every clip, the projectile's art
   and valid data are required before it starts (`techniqueProblem`):
   anything missing logs a warning and the press does nothing. #0001's
   Unlimited Void (a burst) and Hollow Purple (a projectile) are casts
@@ -3128,10 +3160,14 @@ Adding one is described in
   (`#b026ff`), `energy / maxEnergy` wide, shrinking from the right; gray
   instead from the moment it empties and through the whole refill,
   proportional to what has come back, and gone, never purple, once full. Under the feet a row of
-  cooldown rings only for active durations above the 0.5-second baseline:
-  ordinary attacks as well as summons and techniques (#0001 Unlimited Void 3 s,
-  Hollow Purple 5 s, #0002 Whirlwind 5 s, #0003 Heavenly Foot of Pain 2 s,
-  Cherry Blossom Impact 4 s and Mystical Palm Technique 12 s). In control order, a lone ring is
+  cooldown rings only for active durations above the 0.5-second baseline
+  (the policy's 3 s and 5 s): ordinary attacks as well as summons and
+  techniques (#0001 Unlimited Void 3 s, Hollow Purple 5 s, #0002 Whirlwind
+  5 s, #0003 Mystical Palm Technique 3 s). The fighter the ability HUD
+  shows (below) has no rings while that HUD is on show
+  (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
+  timer never shows twice; the CPU, Watch Mode's fighters and a player on
+  a touch screen keep theirs. In control order, a lone ring is
   centered, multiple rings side by side, with no slot kept for ready moves.
   The white, black-outlined ring fills clockwise from the top (`progress =
   1 - remaining / duration`). Its center is the same artwork as the touch
@@ -3149,6 +3185,70 @@ Adding one is described in
   100"; the card has no Energy meter of its own), and each score row is an image labelled "Player 1:
   1 of 3 points". The HUD writes to the DOM only when a shown value
   changes.
+- **Ability HUD** (DOM, `js/ui/ability-hud.js`, `css/ability-hud.css`):
+  Player 1's moves in the bottom-right corner, inside the safe area, in
+  Quick Battle and Practice Ground for keyboard and controller play. Never
+  in Watch Mode, menus, loading or a result; faded out under the pause
+  menu and Practice Ground's menu and rosters; hidden on a touch screen
+  (`html.is-touch`), whose touch controls stay its interface. It never
+  takes the pointer or focus.
+  - *Tiles.* Every move is a small rounded tile on dark translucent
+    charcoal with a thin light edge and a soft shadow: the move's own art
+    (its button's authored preview frame, `previewFrame`; a distinct air
+    move's own air artwork, never the ground move's; aspect kept, pixelated,
+    original colours) above a **1px divider** above the input that performs
+    it. Missing or failed art shows the button's neutral glyph, never a
+    broken image. Tiles are about 48-62 px wide (`clamp` on the viewport,
+    shrinking so the longer row stays within about 44% of the width however
+    many moves a fighter has); a combination or a hold gets a slightly wider
+    tile rather than smaller text. Each tile is named for screen readers:
+    its move, its input in words, and Ready, Cooling down or why it is
+    unavailable.
+  - *Moves.* From the loadout alone (`abilityGroups`,
+    `js/game/combat/move-status.js`), in control order (attack1 to attack5,
+    then the extra attack): on the ground every button's ground move (an
+    attack, a summon or a technique), in the air every button's air move
+    that is not ground-only. A reserved button (Transform) or one a fighter
+    lacks shows nothing; no fighter is named in the code. #0001: ground the
+    Jab, Red, Maximum Blue, Unlimited Void, Hollow Purple and the High Kick,
+    air the Floating Straight, the Red Kick, Blue and the High Kick; #0002:
+    ground the One-Two, Rapid Kicks, Spin Attack and Whirlwind, air the
+    Homing Attack, Bounce Attack and Blue Tornado; #0003: ground the Chakra
+    Punch, Heel Drop, Cherry Blossom Impact, Mystical Palm Technique and
+    Chakra Haymaker, air the Leaping Kick and Heavenly Foot of Pain.
+  - *Ground and air wheel.* Two rows on two fixed positions: on top, full
+    size and opacity, the moves of where the fighter is now
+    (`Fighter.grounded`); beneath, about 70% the size, about half opacity
+    and tipped back a touch, the other place's, a preview of what comes
+    after landing or leaving the ground. Neither row ever disappears. A
+    change of place turns the wheel in about 320 ms (transform and opacity
+    only, eased): one row slides down and shrinks into the preview while the
+    other rises, grows and brightens into the top. A change mid-turn turns
+    back from where it is: nothing queues, no tile is rebuilt. No input
+    turns it. Reduced motion swaps at once.
+  - *Inputs.* Whichever device the player last used
+    (`InputManager.lastDevice`; a connected pad alone never counts): on a
+    keyboard the button's key from `CONFIG.bindings` as a keycap (U, I, O,
+    M, the comma, J by default); on a pad the fighter's resolved controller
+    profile for that place (`InputManager.profileFor`: the player's saved
+    layout, else the fighter's recommended one) in the family of Player 1's
+    pad, PlayStation or Xbox (□ / X, R2 / RT, a stick direction as an
+    arrow: #0002's Bounce Attack reads ↓ + □), a modifier first, a hold
+    marked HOLD. A saved layout or the language changing redraws them.
+  - *Cooldowns.* Read from the combat state each frame through
+    `abilityStatus` (never a timer of its own, so the HUD, the player's
+    presses and the CPU always agree): a special cooldown (3 s or 5 s)
+    darkens the art under a clockwise sweep from the top with its seconds
+    over it (`formatCooldown`: 5.0, 4.9 … ready); the 0.5 s repeat delay
+    shows only a faint sweep, no number; on recovery the overlay and number
+    go and the tile's edge lights for about 160 ms. A cooldown keeps
+    counting in whichever row its move is, and a change of place never
+    touches it. A move unavailable for another reason (its starts for this
+    airtime used up, free fall, missing art) is muted (grey art, dashed
+    edge) with no countdown. The input stays readable throughout.
+  - *Lifecycle.* Bound to Player 1 as play starts (Practice Ground's
+    Change Fighter replaces the whole moveset at once), cleared on leaving
+    the screen; it writes to the DOM only when a shown value changes.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.

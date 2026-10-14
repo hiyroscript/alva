@@ -28,7 +28,7 @@
 // appearing through a cloud (the blue orb's frame); the technique is
 // #0001's Unlimited Void (its clips borrowed under attack4's own names),
 // and in Case G attack5 is #0001's Hollow Purple with its projectile, each
-// with a 6 s cooldown of its own (#0001's have none).
+// with the cooldown the policy gives it (3 s and 5 s).
 import { getCharacter } from '../../../js/data/characters.js';
 import { NUMBERED_ATTACKS } from '../../../js/config.js';
 
@@ -82,7 +82,7 @@ export function loadoutFighter({ id, count, specials = false, casts = [], extra 
   if (special.includes('attack3')) {
     actions.attack3 = { type: 'summon', id: 'attack3' };
     def.summons.attack3 = {
-      attack: 'attack1', cloud: 'attack3_object', startupAnimation: 'attack3_summon', cooldown: 5,
+      attack: 'attack1', cloud: 'attack3_object', startupAnimation: 'attack3_summon',
       behindDistance: 48, effectOffset: { x: 0, y: -52 }, noGround: { attack: 'midair_attack1', offset: { x: 0, y: -40 } },
     };
     animations.attack3_summon = { ...A.attack4_cast, fps: 10 };
@@ -90,9 +90,10 @@ export function loadoutFighter({ id, count, specials = false, casts = [], extra 
   }
   for (const button of special.filter((b) => b === 'attack4' || b === 'attack5')) {
     actions[button] = { type: 'technique', id: button };
-    // #0001's own technique, with a cooldown of its own (#0001's has none),
-    // so the matrix covers the shared technique cooldown too.
-    def.techniques[button] = { ...BASE.techniques[button], cooldown: 6 };
+    // #0001's own technique, with the cooldown the policy gives it (3 s
+    // for Unlimited Void, 5 s for Hollow Purple), so the matrix covers the
+    // shared technique cooldown too.
+    def.techniques[button] = { ...BASE.techniques[button] };
     for (const key of Object.keys(BASE.animations).filter((k) => k.startsWith(`${button}_`))) animations[key] = A[key];
     const shot = BASE.techniques[button].projectile;
     if (shot) {

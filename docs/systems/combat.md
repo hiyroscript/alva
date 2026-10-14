@@ -28,6 +28,8 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
+| [`js/data/cooldowns.js`](../../js/data/cooldowns.js) | The cooldown policy: `REPEAT_COOLDOWN`, `EXCEPTIONAL_COOLDOWN`, `TEN_DAMAGE_COOLDOWN`, `EXCEPTIONAL_EFFECTS` / `ROUTINE_EFFECTS`, `moveImpact`, `cooldownClass`, `policyCooldown`, `resolveCooldown`. |
+| [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A read-only view of a fighter's moves for presentation: `abilityGroups`, `moveCooldown`, `moveRestriction`, `abilityStatus`. |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `attackStartable`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the player's requests (`playerControlled`, `comboAction`, `pressRequest`, `repeatsMove`, `playerMayCut`), the combat input buffer, hit-cancels, attack motion, summon startups, Combat Assist's approach (`combatAssistFor`, `tryCombatAssist`, `assistIntents`, `stepCombatAssist`, `finishCombatAssist`, `cancelCombatAssist`). |
 
@@ -53,7 +55,8 @@ definition that breaks one is refused, every problem named):
   - a technique, `{ type: 'technique', id: 'attackN' }` (`techniques.attackN`).
 - `attack1` and `attack2` are always ordinary; `attack3` to `attack5` may
   be any kind. A summon or technique is keyed by its own button, is
-  ground-only, has no mid-air version and may have a cooldown of its own.
+  ground-only, has no mid-air version and has a cooldown of its own (the
+  [cooldown policy](#cooldowns)'s).
 - Whatever an attack creates is named after it: a projectile
   `<attack>_object` (a technique's included), a summon's cloud
   `<attack>_object...`, a technique's own poses `<attack>_...`.
@@ -85,7 +88,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `damage` | — | Added to the target's Launch Point: 1, 3, 5 or 10 and nothing else (below). Required for an attack with a hitbox; one with none (a throw) may not declare it. |
 | `baseLaunch` / `directionalLaunch` | 0 / `null` | The hit's launch ([launch](launch.md)). |
 | `hitstun` / `blockstun` / `hitstop` | 0.2 / 0.12 / 0.06 s | |
-| `cooldown` | 0.5 | Per-move repeat delay after ending or interruption; finite longer overrides allowed (below). |
+| `cooldown` | policy | Per-move repeat delay after ending or interruption: derived by the [cooldown policy](#cooldowns); leave it out. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
 | `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): by default it keeps all the speed it starts with (a Dash's burst included), unsteered, under the normal friction. |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
@@ -364,7 +367,7 @@ own attacks once.
 | `attack` | — | The owner attack the clone performs (needs a hitbox and real frames). |
 | `cloud` | — | The effect clip it appears and vanishes through (`effectAnimations`, named `<attack>_object`). |
 | `startupAnimation` | null | An owner clip played once before the clone is sent out (the owner committed, still, keeping its facing); none: sent out on the press. |
-| `cooldown` | 0.5 | Minimum seconds before reuse, from the accepted press; longer overrides allowed. |
+| `cooldown` | policy | Seconds before reuse, from the accepted press: derived by the [cooldown policy](#cooldowns); leave it out. |
 | `behindDistance` | 48 | World units behind the target it appears. |
 | `effectOffset` | `{ x: 0, y: 0 }` | The cloud's centre from the clone's origin, facing right. |
 | `noGround` | null | `{ attack, offset }`: where there is no ground behind the target, appear at `offset` from the target and perform this attack instead. |
@@ -449,14 +452,45 @@ never touches any of it ([AI](ai.md)).
 
 ## Cooldowns
 
-`REPEAT_COOLDOWN` in `js/data/cooldowns.js` sets a **0.5-second minimum**
-for discrete moves: ordinary ground/air attacks, motion attacks, extra attacks,
-projectile casts, summons, techniques, Dash and air dash. Omitted or smaller
-non-negative values resolve to the baseline; explicit longer values are valid.
-Negative, non-numeric and non-finite values are refused. There is no maximum.
-Running, jumps (ground and air), Shield and Deflect are exempt; fast fall stays
-directional movement. Deflect preserves its authored delay (#0001 0, #0002 0.05 s, #0003 0)
-and Energy interaction. No timer changes an animation phase or locks other moves.
+Every discrete move's reuse delay comes from one **cooldown policy**
+([`js/data/cooldowns.js`](../../js/data/cooldowns.js)), derived from the
+move's structured combat data and never chosen by its fighter. Exactly two
+special lengths exist beside the universal **0.5-second repeat delay**
+(`REPEAT_COOLDOWN`):
+
+| Class (`cooldownClass`) | When | Cooldown |
+| --- | --- | --- |
+| `tenDamage` | Any one hit of the move deals 10 (a strike, a multi-hit's finisher, its projectile or that projectile's finisher, a slam's `impact`, a technique's `burst`, a summoned clone's attack), or everything one use can deal one target adds up to 10 or more | `TEN_DAMAGE_COOLDOWN`, 5 s |
+| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal`, or any hit's `paralyze` | `EXCEPTIONAL_COOLDOWN`, 3 s |
+| `ordinary` | Everything else | 0.5 s (none for an exempt move) |
+
+The first row that applies decides: a move never gets 3 s and 5 s added
+(a 10-damage paralysis is 5 s). Everything in `ROUTINE_EFFECTS` (a launch,
+`blockPush`, `pull`, `quake`, `carry`, `repel`, `erase`, `pierce`, a
+`motion`, hitstun and blockstun, `airUses`, `freeFall` and the rest) earns
+nothing however strong it looks; every shared hit effect
+(`HIT_EFFECT_FIELDS`) is in one list or the other, checked by the tests,
+so a new effect is classified on purpose. `moveImpact(kind, spec,
+context)` reads what one use can do to one target (`{ hits, heal }`, a
+piercing projectile's every strike included) and `cooldownClass` its
+class; the builders call them with the fighter's own `projectiles` (for a
+throw or a cast) and `attacks` (for a summon's clone):
+`createAttackDefinition(spec, { projectiles })`,
+`createTechniqueDefinition(spec, { projectiles })`,
+`createSummonDefinition(spec, { attacks, projectiles })`. The Fighter and
+`assertCombatRules` always pass them. The cooldown is the move's (its
+button's), never one per projectile or hitbox.
+
+A definition leaves `cooldown` out. One that declares it must agree with
+the policy (on a move with no special class a value up to 0.5 s is the
+baseline itself), or `resolveCooldown` refuses it, naming the move, as the
+registry loads: an 8-second move, a 12-second heal or a 0.05 s Deflect
+never reaches a match. Negative, non-numeric and non-finite values are
+refused too. Running, jumps (ground and air) and the Shield have no move
+cooldown; fast fall stays directional movement. The Deflect is exempt from
+the 0.5 s baseline: with no special class it has none at all, for every
+fighter (Energy is its limit). No timer changes an animation phase or
+locks other moves.
 
 Ordinary attacks use `CombatState.cooldowns`, starting on their end, a hit-cancel,
 the player's own cut or interruption. An attack may cut itself short only after its
@@ -475,9 +509,26 @@ even during hitstop; Combat Assist neither starts nor checks these timers.
 All stores recover on the fixed step, including hitstop, with `PHASE_EPSILON`
 at expiry. Reset/respawn clears all; a live overtime transition preserves them.
 
-#0001's Unlimited Void uses 3 s and Hollow Purple 5 s; #0002's Whirlwind uses 5 s;
-#0003's Heavenly Foot of Pain uses 2 s, Cherry Blossom Impact 4 s and the
-Mystical Palm Technique 12 s.
+The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
+(paralysis) and Hollow Purple 5 s (a 10-damage sphere); #0002's Whirlwind
+5 s (its tornado's 10-damage finisher); #0003's Mystical Palm Technique 3 s
+(heal). Everything else, Red, Blue and Maximum Blue (a pull earns nothing),
+Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a slam and a
+launch earn nothing) included, has only the 0.5 s repeat delay, and every
+Deflect none.
+
+**Reading cooldowns.** `CombatState.cooldowns` and
+`CombatState.abilityCooldowns` are the only stores. The player's presses,
+the CPU (`moveReady` in `js/game/ai/cpu-intelligence/capabilities.js`) and
+presentation read them; presentation goes through
+[`js/game/combat/move-status.js`](../../js/game/combat/move-status.js):
+`moveCooldown(fighter, id, kind)` (`{ id, duration, remaining, progress,
+cooling, special }`), `moveRestriction` (`airUses`, `freeFall` or `art`:
+an unavailability that is no cooldown), `abilityStatus` and
+`abilityGroups(def)` (each place's moves, from the loadout). It writes
+nothing and keeps no time, so the ability HUD ([input](input.md#the-ability-hud)),
+the player's presses and the CPU can never disagree, and changing place
+never touches a timer.
 Only durations above the baseline draw a persistent world-space ring: the same
 artwork as the touch button in the center and remaining seconds below, never a
 codename ([rendering](rendering.md#fighter-status)).
@@ -629,6 +680,11 @@ starts the very attack asked for. The rules are
 - [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs):
   the shared rules over every fighter and every kind of hit: the damage
   tiers, the cooldowns, Energy, difficulty and movement.
+- [`tests/systems/cooldown-policy.test.mjs`](../../tests/systems/cooldown-policy.test.mjs):
+  the cooldown policy: each class and its precedence, every way a move can
+  deal 10 or carry an exceptional effect, the routine effects that earn
+  nothing, refused authored values, the roster's table, a broken cast
+  keeping its cooldown, and the CPU reading the same cooldowns.
 - [`tests/systems/combo.test.mjs`](../../tests/systems/combo.test.mjs),
   [`fighter-stats.test.mjs`](../../tests/systems/fighter-stats.test.mjs),
   [`codenames.test.mjs`](../../tests/systems/codenames.test.mjs),

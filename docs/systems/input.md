@@ -18,6 +18,7 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button names, binding phrases and the controller diagram. |
 | [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Combat Assist and Combo Assist settings, and its presses alone may cut its own attack short, see [combat](combat.md#the-players-requests)), `blankInput`, `HELD_CONTROLS`. |
 | [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
+| [`js/ui/ability-hud.js`](../../js/ui/ability-hud.js), [`css/ability-hud.css`](../../css/ability-hud.css) | The ability HUD: Player 1's moves, their art and their keyboard or controller inputs in the bottom-right corner, on a ground / air wheel, with their cooldowns ([below](#the-ability-hud)). |
 | [`js/ui/mobile-abilities.js`](../../js/ui/mobile-abilities.js) | Which buttons a fighter has (`abilityPresence`, from its `actions`), and each button's name and frame (`previewFrame`, from its `mobileAbilities`). |
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
@@ -122,6 +123,58 @@ settings ([combat](combat.md#the-players-requests)). `runLeft` /
 `runRight` (the keys, the touch Run buttons and joystick, the stick) only
 hold a direction: their press edges request nothing, so Run never cancels
 an attack or Combat Assist's approach.
+
+## The ability HUD
+
+For keyboard and controller play, Quick Battle and Practice Ground show
+Player 1's moves in the bottom-right corner (`AbilityHUD`,
+`js/ui/ability-hud.js`; the spec's §7.3 has the whole look). It is
+information only: no focus, no pointer, no input of its own. A touch
+screen (`html.is-touch`) hides it: the touch controls are that layout's
+interface, and nothing about them changes.
+
+- **Moves** come from the fighter's loadout (`abilityGroups`,
+  `js/game/combat/move-status.js`), in control order: each button's ground
+  move on the ground row, each button's air move that is not ground-only
+  on the air row. A reserved Transform, a button the fighter lacks and a
+  missing move show nothing. Nothing in it names a fighter: a new fighter's
+  two to five numbered attacks and extra attack show with no code changed.
+- **Art** is each button's authored touch preview (`previewFrame`), the
+  distinct air move's own air artwork in the air row; a missing or failed
+  frame shows the button's neutral glyph (once failed, a file is not tried
+  again). Each tile keeps its one image element; only a fighter change
+  rebuilds tiles.
+- **Inputs** follow `InputManager.lastDevice` (a pad's press or a stick
+  pushed past half makes it `gamepad`, a key `keyboard`; a pad that is only
+  connected never counts). Keyboard: the button's first key in
+  `CONFIG.bindings` as a keycap (`keyCapLabel`: letters bare, the comma as
+  `,`). Controller: the binding of `<place>:<button>` in the fighter's
+  resolved profile (`InputManager.profileFor`: the player's saved layout
+  through `resolveProfile`, else the recommended one), drawn by
+  `abilityInput` in Player 1's pad's family (`buttonGlyph`: □ ✕ ○ △ and
+  L2 / R2 on PlayStation, A B X Y and LT / RT on Xbox; the default family
+  with no identified pad): a stick direction as an arrow, then the
+  modifier, then the button, joined by `+`, a hold marked HOLD; the tile's
+  accessible name says it in words (`bindingText`, `activationText`). A
+  change of device or pad family, a saved layout changing
+  (`controllerProfiles`) or the language changing redraws the inputs, never
+  the tiles.
+- **The wheel** turns with `Fighter.grounded` (`data-place` on the wheel;
+  the stylesheet's transforms and opacity do the rest, retargeting a
+  change mid-turn, at once with reduced motion).
+- **Cooldowns and restrictions** are read each frame through
+  `abilityStatus` from the combat state ([combat](combat.md#cooldowns)):
+  `cooling` (a 3 s or 5 s cooldown: sweep and seconds), `repeat` (the 0.5 s
+  repeat delay: a faint sweep), `restricted` (spent for this airtime, free
+  fall or missing art: muted, no countdown) or `ready`. Only changed values
+  reach the DOM.
+- **Screens.** `BattleScreen.syncAbilityHud` and
+  `PracticeGroundScreen.syncAbilityHud` show it for Player 1 after each
+  frame (`AbilityHUD.show`), hide it at a result and in Watch Mode, and
+  clear it on leaving; the pause menu and Practice Ground's menu and
+  rosters fade it out (CSS). While it shows (not on a touch screen) the
+  screen sets `hudCooldownsFor` on its Battle or practice session, so the
+  rings over Player 1 step aside ([rendering](rendering.md#fighter-status)).
 
 ## Game controllers
 
@@ -299,6 +352,13 @@ the rest of the settings.
 
 ## Tests
 
+- [`tests/interface/ability-hud.test.mjs`](../../tests/interface/ability-hud.test.mjs):
+  the ability HUD on real fighters: each fighter's rows (ground-only moves
+  never in the air, no reserved Transform), the wheel and rapid changes of
+  place, the art and its fallback, keyboard keys, PlayStation and Xbox
+  glyphs, a saved layout, device switching, cooldowns through changes of
+  place and on recovery, the repeat delay, airtime restrictions, a fighter
+  swap, which screens show it, its stylesheet and the arena's rings.
 - [`tests/systems/controller-devices.test.mjs`](../../tests/systems/controller-devices.test.mjs):
   identification across browsers, button names, zero / one / four / five
   controllers, unsupported devices, disconnection, reconnection, Player 1,
