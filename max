@@ -1,308 +1,172 @@
-ALVA — Complete the Mode Details Panel
+ALVA — Add a How to Play Dialog
 
 Objective
 
-Improve ALVA’s Select Mode screen by adding short, clear, and informative descriptions to the currently empty Mode details panel.
+Make the existing question-mark (?) button in the top-right corner of the Home screen functional.
 
-The panel should explain the selected mode, how it works, the available play options, and the basic rules of a match.
+When clicked, it should open a polished How to Play dialog that briefly explains Alva’s core gameplay mechanics to new players.
 
-The goal is to make the interface feel complete and polished while maintaining ALVA’s existing visual identity, gameplay systems, and navigation.
+The purpose is to help someone understand the fundamental rules of the game without overwhelming them with technical information or character-specific details.
 
-This is a focused interface improvement. Do not redesign the screen or introduce unrelated features.
+Do not change any gameplay mechanics. This task is strictly about the Home interface and its help dialog.
 
-1. Examine the Existing Game
+1. Understand and reuse the existing architecture
 
-Before implementing changes, explore the repository to understand how ALVA’s game modes, navigation, and user interface work.
+Before implementing, inspect the relevant code, especially:
 
-Pay particular attention to:
+* js/screens/home-screen.js — Contains the currently disabled .home-help button.
+* js/ui/overlays.js — Contains the existing InfoDialog and modal behavior.
+* js/core/app.js — Manages dialog instances.
+* css/overlays.css and css/home.css — Existing dialog and Home button styling.
+* js/localization/strings/en.js and fr.js — English and French translations.
+* docs/gameplay/battle.md — Elimination, scoring, and overtime.
+* docs/systems/launch.md — Launch Point, Base Launch, and Directional Launch.
+* docs/systems/energy.md and defense.md — Energy, Shield, and Deflect.
 
-* js/screens/mode-select-screen.js
-* js/screens/quick-battle-setup.js
-* js/screens/difficulty-select-screen.js
-* js/screens/home-screen.js
-* js/ui/components.js
-* css/setup.css
-* css/components.css
-* css/responsive.css
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* js/localization/i18n.js
-* docs/gameplay/battle.md
-* ALVA_SPEC.md
+Reuse established UI patterns rather than introducing a separate design system.
 
-Understand the actual gameplay mechanics and existing mode selection flow before writing any descriptions.
+2. Button behavior
 
-Follow the repository’s established architecture and conventions.
+The existing ? button should:
 
-2. Current Issue
+* Be enabled and clickable.
+* Open the How to Play dialog without navigating away from Home.
+* Remain in its current position alongside the other utility buttons.
+* Support mouse, touch, keyboard, and controller navigation.
+* Have an accessible label and dialog semantics.
+* Return focus to the ? button when the dialog closes.
 
-The Select Mode screen currently contains two main sections:
+Keep its current icon and general appearance.
 
-Left side — Mode selection
+3. Dialog design
 
-A Quick Battle card that displays the mode name, a short description, and a Select action.
+Use the existing Alva modal design language: dark translucent surfaces, subtle borders, restrained green accents, consistent typography, and the same visual styling as other information dialogs.
 
-Right side — Mode details
+The dialog should have:
 
-A panel with the heading “Mode details” and a horizontal divider, but no content underneath.
+* The title How to Play.
+* A close (×) button in the upper-right corner.
+* Eight clearly separated sections.
+* Short, readable paragraphs beneath their headings.
+* Comfortable spacing without unnecessary decoration.
+* A scrollable content area when necessary.
 
-This makes the right side appear unfinished and leaves useful information about the mode unexplained.
+The dialog must work on desktop and mobile in landscape orientation, including smaller screens.
 
-Populate this existing panel with concise descriptions that help players understand what they are selecting.
+It should close using the close button, Escape, controller Back, or clicking outside the panel, consistent with existing dialogs.
 
-Do not replace or restructure the existing layout.
+Prefer extending or reusing InfoDialog to support section headings and descriptions. Preserve its existing behavior for other uses, including the Why Alva? dialog.
 
-3. Mode Details Content
+4. Exact English content
 
-Currently, Quick Battle is the only selectable mode on this screen.
+Use the following player-facing text as the content baseline. Keep the language natural, friendly, and concise.
 
-Display its details automatically when the player enters Select Mode.
+How to Play
 
-Use the following content as the intended English copy.
+Elimination
 
-Quick Battle
+There’s no health bar in Alva. Instead, you score a point whenever your opponent falls into the Void. The first to reach 3 points wins the match.
 
-“Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.”
+Launch Point
 
-Regular Play
+Every unblocked hit raises your Launch Point, making you fly farther when launched. It gradually decreases when you go without taking hits.
 
-“Choose your fighter and difficulty. Your CPU opponent and stage are selected at random.”
+Base Launch
 
-Custom Play
+Base Launch determines how strongly a hit sends someone flying. The higher its value, the stronger the launch becomes, especially against someone with a high Launch Point. A Base Launch of 0 doesn’t send anyone flying.
 
-“Customize your battle by choosing the difficulty, your fighter, the CPU opponent, and the stage.”
+Directional Launch
 
-Match Rules
+Not every hit sends you in the same direction. Depending on the attack, you can be launched sideways, upward, or downward.
 
-“Matches last 7 minutes. If the score is tied, a 1-minute overtime begins as the Void closes in.”
+Overtime
 
-These descriptions should communicate the essential gameplay information without overwhelming the player.
+If both players have the same score when the 7-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.
 
-Maintain concise, natural wording. Avoid long paragraphs, technical explanations, or information unrelated to selecting the mode.
+Energy
 
-The panel should be understandable at a glance.
+Energy is used for dashing, Deflecting, and blocking hits with your Shield. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.
 
-4. Content Structure and Presentation
+Shield
 
-Organize the information in a clean, logical hierarchy.
+Hold the Shield button while on the ground to block incoming attacks from any direction. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.
 
-Suggested arrangement:
+Deflect
 
-Mode details
+While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. Deflecting costs Energy, even if it misses.
 
-Quick Battle
-Brief overview of the mode and how to win.
+5. Writing requirements
 
-Regular Play
-Short explanation of its automatic opponent and stage selection.
+The How to Play dialog must remain a brief introduction, not a complete gameplay manual.
 
-Custom Play
-Short explanation of its customization options.
+Strict content rules:
 
-Match Rules
-Brief explanation of the timer and overtime.
+* Cover only the eight sections listed above.
+* Never mention specific characters, character names, fighter IDs, individual moves, special abilities, or character-specific statistics.
+* Don’t introduce additional sections about controls, combos, movement, game modes, settings, or advanced combat systems.
+* Avoid internal development terminology, code references, formulas, or technical explanations in the player-facing content.
+* Use everyday language that someone playing for the first time can immediately understand.
+* Keep the eight section headings visible and easy to scan.
+* Avoid redundant explanations.
+* Preserve the actual rules documented in the repository.
 
-Keep each section visually distinct through typography and spacing rather than unnecessary visual decoration.
+The reader should understand why eliminations matter, how launching works, when overtime occurs, and how Energy, Shield, and Deflect interact.
 
-Use the existing panel heading, divider, background, borders, and overall proportions.
+Don’t make the text unnecessarily long.
 
-The result should feel like an intentional part of ALVA’s established UI, not an additional feature layered onto it.
+6. Localization
 
-5. Visual Design Requirements
+Alva supports both English and French.
 
-Match ALVA’s current dark, minimalist interface.
+Integrate the How to Play text into the existing localization system.
 
-Requirements:
+* Add translation keys for the dialog title, eight headings, and eight descriptions.
+* Provide natural French translations that preserve the meaning and approachable tone of the English copy.
+* Ensure the dialog displays the language selected in Settings.
+* Avoid hardcoding visible text directly into JavaScript components.
+* Switching the interface language must not leave stale translations in the dialog.
 
-* Preserve the existing two-column layout.
-* Keep the Quick Battle card unchanged.
-* Keep the Mode details panel in its current position.
-* Maintain the existing heading and separator.
-* Use clear, moderately emphasized section headings.
-* Use muted secondary text for descriptions.
-* Apply consistent spacing between sections.
-* Maintain comfortable padding inside the panel.
-* Respect the existing typography, color palette, border treatments, and CSS variables.
-* Ensure the information is readable without excessive scrolling.
-* Avoid decorative images, unnecessary icons, animations, or additional interactive elements.
+Do not change existing translations unrelated to this feature.
 
-The details should be visually subtle but sufficiently prominent to improve the overall screen.
+7. Technical implementation
 
-Do not make the panel unnecessarily crowded or complicated.
+Follow the repository’s existing conventions.
 
-6. Mode Selection and Interaction
+Important requirements:
 
-Preserve the existing Quick Battle selection behavior.
+* Do not install new dependencies.
+* Do not modify the underlying combat, scoring, physics, or defense systems.
+* Do not introduce duplicate modal infrastructure when existing utilities can handle the task.
+* Preserve existing overlay behavior, focus management, and controller navigation.
+* Keep styling consistent with the current Home interface.
+* Ensure the dialog content remains scrollable and readable on small screens.
+* Keep the implementation maintainable and avoid unnecessary abstractions.
 
-The flow must remain:
+If structured headings require extending InfoDialog, make that extension optional and backward-compatible.
 
-1. The player selects Play from Home.
-2. The Select Mode screen opens.
-3. The Quick Battle card appears alongside its information in Mode details.
-4. Selecting Quick Battle opens the existing play-type dialog.
-5. The player chooses Regular Play or Custom Play.
-6. The game continues to Select Difficulty and the remaining setup steps.
-
-The details panel is informational and must not interfere with this process.
-
-Important behavior requirements:
-
-* Descriptions appear as soon as Select Mode loads.
-* The panel does not require clicking the Quick Battle card to display information.
-* Hovering the card retains its existing visual behavior.
-* Keyboard and controller focus behavior remains unchanged.
-* No additional buttons or navigation steps are introduced.
-* Dismissing the play-type dialog continues to return to Select Mode normally.
-* Returning to Select Mode still displays the correct information.
-
-Keep the implementation simple and compatible with the existing code.
-
-Although the mode selection layout accommodates future modes, do not add placeholder modes or invent new gameplay options.
-
-Watch Mode and Practice Ground must remain accessible through their existing Home actions.
-
-7. Localization
-
-ALVA supports English and French. The new descriptions must work correctly in both languages.
-
-Use the existing localization system.
-
-Relevant files:
-
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* js/localization/i18n.js
-
-Requirements:
-
-* Add translation keys for new descriptions.
-* Use existing translation keys for labels when appropriate.
-* Avoid hardcoded player-facing text.
-* Use established localization helpers such as tx().
-* Provide natural, accurate French translations.
-* Preserve the existing terminology and naming conventions.
-* Ensure the content updates immediately when the player changes languages.
-* Avoid missing or untranslated strings.
-
-Do not implement a separate localization mechanism.
-
-8. Responsive Behavior
-
-The new content must work across ALVA’s supported screen sizes.
-
-Desktop
-
-Keep the existing side-by-side layout.
-
-The Mode details content should fit naturally inside the right panel without forcing changes to the Quick Battle card.
-
-Mobile Landscape
-
-Keep text compact and readable.
-
-Ensure the descriptions do not overlap the header, navigation controls, or other elements.
-
-If necessary, adjust padding, font sizes, or internal overflow behavior using the existing responsive stylesheet conventions.
-
-Narrow and Tall Displays
-
-Respect the current responsive stacking behavior.
-
-Avoid horizontal overflow, clipped descriptions, or distorted proportions.
-
-Make only the CSS changes needed for the new content.
-
-9. Implementation Guidelines
-
-Modify the existing implementation rather than replacing it.
-
-In js/screens/mode-select-screen.js, extend the current mode-info panel to render the new informational sections beneath the existing heading.
-
-Use the project’s DOM utilities and localization helpers.
-
-Keep the structure readable and maintainable.
-
-Prefer a simple, declarative approach using existing utilities over introducing unnecessary abstractions.
-
-Add small, appropriately scoped CSS rules to css/setup.css if required.
-
-Do not introduce external dependencies.
-
-Do not modify unrelated game logic.
-
-Specifically, preserve:
-
-* Quick Battle setup.
-* Regular Play and Custom Play selection.
-* CPU difficulty behavior.
-* Character selection.
-* Stage selection.
-* Battle scoring and overtime rules.
-* Mouse, keyboard, touch, and controller support.
-* Existing screen transitions and navigation.
-
-Do not modify the protected character_rule file.
-
-10. Documentation
-
-Update ALVA_SPEC.md, specifically the Select Mode section, to reflect the new content in the Mode details panel.
-
-Replace the outdated specification that describes the panel as containing only a heading and separator.
-
-Document the new information hierarchy without expanding the scope of the feature.
-
-Keep the documentation consistent with the actual implementation.
-
-11. Testing and Verification
-
-Add or update tests where appropriate.
+8. Validation
 
 Verify the following:
 
-1. The Mode details panel contains meaningful content when Select Mode opens.
-2. Quick Battle information is visible.
-3. Regular Play and Custom Play descriptions are displayed correctly.
-4. Match rules are accurate.
-5. English and French translations are present.
-6. Language switching updates all descriptions without reloading.
-7. Selecting Quick Battle still opens the correct dialog.
-8. The existing setup navigation remains unchanged.
-9. Keyboard and controller interactions continue working.
-10. The interface remains readable across desktop and mobile landscape layouts.
+1. The ? button is no longer disabled.
+2. Clicking it opens How to Play.
+3. All eight sections appear in the correct order.
+4. No other gameplay subjects appear.
+5. No specific characters or abilities are mentioned.
+6. The dialog closes correctly through supported methods.
+7. Keyboard and controller navigation work.
+8. Focus returns to the Help button after closing.
+9. English and French content display correctly.
+10. The content scrolls correctly on smaller screens.
+11. Other dialogs continue functioning as before.
+12. Existing tests pass using node --test.
 
-Run the relevant tests:
+Add or update appropriate interface tests for the new behavior.
 
-node --test tests/interface/i18n.test.mjs
-node --test tests/integration/quick-battle.test.mjs
-node --test
+Final expectation
 
-If a real browser is available, visually inspect the Select Mode screen at different viewport sizes.
+The result should feel like a native part of Alva: a small, accessible, well-designed help dialog that explains the essential gameplay rules in a way a new player can read and understand quickly.
 
-Correct any layout issues introduced by the new content.
+Prioritize clarity, simplicity, correctness, and consistency with the existing interface.
 
-12. Expected Final Result
-
-The Select Mode screen should retain its original appearance and behavior, with one meaningful improvement: the Mode details panel is now populated with concise, well-organized descriptions.
-
-Players should immediately understand:
-
-* What Quick Battle offers.
-* How to score points and win.
-* The difference between Regular Play and Custom Play.
-* How long matches last.
-* What happens when the score is tied.
-
-The descriptions should be informative without being excessive.
-
-Final requirements:
-
-* No empty Mode details panel.
-* No unnecessary UI redesign.
-* No new modes.
-* No gameplay modifications.
-* No unnecessary complexity.
-* Full English and French support.
-* Clean, responsive styling.
-* Consistency with ALVA’s existing design and architecture.
-
-Implement the improvement directly in the existing codebase, update the relevant tests and documentation, and provide a concise summary of the changes and test results upon completion.
+Implement the feature completely, without unrelated changes.
