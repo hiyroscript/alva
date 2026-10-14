@@ -1705,3 +1705,71 @@ screens in `tests/integration/empty-roster.test.mjs`,
 `tests/interface/battle-screen.test.mjs`, `controller-ui.test.mjs`,
 `discover.test.mjs`, `settings.test.mjs` and
 `tests/fighters/fixtures/test-fighters.mjs`.
+
+## Ability HUD and the cooldown policy
+
+Not a named update (it can become one if the owner names it). Asked for
+as: an animated, hero-shooter-inspired ability HUD for keyboard and
+controller play, with a ground / air scroll-wheel transition, the moves'
+own art and real inputs and cooldowns; and a strict universal cooldown
+policy: 5 s for a ten-damage attack, 3 s for a highly special effect
+(healing, paralysis, a hard hold), nothing beyond the 0.5 s repeat delay
+for anything else. `character_rule` was not touched.
+
+**What it added**
+
+- **The cooldown policy** (`js/data/cooldowns.js`): every move's reuse
+  delay derived from its structured data, never authored. `moveImpact`
+  reads everything one use can do to one target (strikes, a multi-hit's
+  finisher, its projectile and that projectile's finisher, a slam's
+  impact, a technique's burst and heal, a summoned clone's attack);
+  `cooldownClass` gives `tenDamage` (any hit of 10, or 10 in all: 5 s),
+  else `exceptional` (`heal`, `paralyze`: 3 s), else `ordinary` (0.5 s;
+  none for the exempt Deflect). The first that applies decides, so the
+  two never add up. `ROUTINE_EFFECTS` lists what earns nothing (a pull,
+  a quake, a launch, a slam, a bounce, ordinary hitstun …), and every hit
+  effect must be in one list or the other. `resolveCooldown` refuses any
+  authored value the policy does not give, so a future fighter cannot
+  declare an 8-second move. The builders take the fighter's own
+  `projectiles` / `attacks` as context (`createAttackDefinition`,
+  `createTechniqueDefinition`, `createSummonDefinition`); every definition
+  records its `cooldownClass`.
+- **The roster, reclassified** (authored `cooldown` fields removed from
+  all three definitions): #0001 Unlimited Void 3 s (unchanged, now a
+  paralysis), Hollow Purple 5 s (unchanged, now 10 damage); #0002
+  Whirlwind 5 s (unchanged, its tornado's 10-damage finisher), its
+  Deflect 0.05 s → none; #0003 Mystical Palm Technique 12 s → 3 s (heal),
+  Cherry Blossom Impact 4 s → 0.5 s, the Heavenly Foot of Pain 2 s → 0.5 s.
+  Damage, timing, hitboxes, launches and animations are untouched.
+- **A read-only move status** (`js/game/combat/move-status.js`):
+  `abilityGroups` (each place's moves from the loadout), `moveCooldown`,
+  `moveRestriction` (airtime spent, free fall, missing art: never shown as
+  a cooldown) and `abilityStatus`, read from `CombatState.cooldowns` and
+  `abilityCooldowns` alone.
+- **The ability HUD** (`js/ui/ability-hud.js`, `css/ability-hud.css`):
+  Player 1's moves bottom right in Quick Battle and Practice Ground, art
+  over a 1px divider over the input, current place on top and the other
+  beneath, smaller and dimmed, swapping in about 320 ms (CSS transforms
+  and opacity, retargeted mid-swap, instant with reduced motion);
+  keyboard keycaps from `CONFIG.bindings` or the fighter's resolved
+  controller profile in PlayStation or Xbox glyphs, following
+  `InputManager.lastDevice`; special cooldowns with a sweep and seconds,
+  the repeat delay as a faint sweep. Hidden on touch screens, in Watch
+  Mode, at results; faded under pause and Practice menus. While it shows,
+  the world-space cooldown rings of Player 1 step aside
+  (`Arena.hudCooldownsFor`).
+- **The CPU**: weighs the new cooldowns from the same definitions. One
+  CPU statistic was loosened: Brutal may empty its Energy one time more
+  than Easy in the seeded fights (it spends its last Energy only for a hit
+  that can end a life; on `main` seed 1 already broke the old strict
+  comparison, and #0002's Deflect losing its 0.05 s delay flipped seed 3).
+
+**Where to tune it:** the lengths and the exceptional / routine effects in
+`js/data/cooldowns.js`; the HUD's sizes, opacity and swap timing in the
+custom properties at the top of `css/ability-hud.css`.
+
+**Tests:** new `tests/systems/cooldown-policy.test.mjs` and
+`tests/interface/ability-hud.test.mjs`; `combat-rules`, `technique`,
+`deflect`, `combo-assist`, `sample-fighter`, `cpu-intelligence`,
+`fighter-0003`, `moves-0001`, `practice-ground`, `down` and the fixtures
+updated for the policy.

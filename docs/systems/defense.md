@@ -159,7 +159,7 @@ or `groundOnly`.
 | Fighter | `defense` (on the ground) | `deflect` (in the air) |
 | --- | --- | --- |
 | [#0001](../characters/0001.md#defense-energy-and-launch-reaction) | Infinity: stalling the melee blows it blocks for 0.25 s; perfect Shield 0.1 s after 0.25 s down. | The arm sweep: 1 / 2 / 2 frames at 15 fps (1/3 s), the front from the waist to over the head out to 50 units, launching upward; no cooldown. |
-| [#0002](../characters/0002.md#defense-energy-and-launch-reaction) | A guard; perfect Shield 0.1 s after 0.25 s down. | The swat: 1 / 2 / 2 frames at 20 fps (1/4 s), the front from the head to the knees out to 38 units, launching sideways; a 0.05 s cooldown. |
+| [#0002](../characters/0002.md#defense-energy-and-launch-reaction) | A guard; perfect Shield 0.1 s after 0.25 s down. | The swat: 1 / 2 / 2 frames at 20 fps (1/4 s), the front from the head to the knees out to 38 units, launching sideways; a no cooldown (the cooldown policy gives a Deflect none). |
 | [#0003](../characters/0003.md#defense-energy-and-launch-reaction) | A guard of crossed arms; perfect Shield 0.1 s after 0.25 s down. | The rising backhand sweep: 1 / 2 / 2 frames at 20 fps (1/4 s), the front from the feet to over the head out to 46 units, launching upward; no cooldown. |
 
 ## Tests

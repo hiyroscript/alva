@@ -510,18 +510,25 @@ test('a CPU at any level and a player deal the same damage with the same hit, th
 
 // ---- Cooldowns ------------------------------------------------------------------------------
 
-test('all discrete attacks inherit the baseline; authored longer delays have no artificial ceiling', () => {
+test('every discrete move takes the cooldown policy\'s delay: the baseline, else 3 s or 5 s; no authored value bypasses it', () => {
   assert.equal(REPEAT_COOLDOWN, 0.5);
   for (const c of CONTENT) {
     const { fighter } = makeFighter({ character: c });
-    for (const atk of Object.values(fighter.attacks)) assert.ok(atk.cooldown >= 0.5);
-    if (fighter.deflect) assert.equal(fighter.deflect.cooldown, c.deflect.cooldown ?? 0);
+    for (const atk of Object.values(fighter.attacks)) assert.ok([0.5, 3, 5].includes(atk.cooldown), `#${c.id} ${atk.id}: ${atk.cooldown}`);
+    for (const t of Object.values(fighter.techniqueDefs)) assert.ok([0.5, 3, 5].includes(t.cooldown), `#${c.id} ${t.id}: ${t.cooldown}`);
+    for (const t of Object.values(fighter.summonDefs)) assert.ok([0.5, 3, 5].includes(t.cooldown), `#${c.id} ${t.id}: ${t.cooldown}`);
+    if (fighter.deflect) assert.ok([0, 3, 5].includes(fighter.deflect.cooldown), `#${c.id} deflect`);
   }
-  for (const cooldown of [undefined, 0, 0.05, 0.5, 5, 120]) {
-    const expected = Math.max(0.5, cooldown ?? 0);
-    assert.equal(createAttackDefinition({ id: 'a', damage: 1, cooldown }).cooldown, expected);
-    assert.equal(createTechniqueDefinition({ id: 't', cooldown }).cooldown, expected);
-    assert.equal(createSummonDefinition({ id: 's', cooldown }).cooldown, expected);
+  // Up to the baseline is the baseline; nothing longer is the entry's to give.
+  for (const cooldown of [undefined, 0, 0.05, 0.5]) {
+    assert.equal(createAttackDefinition({ id: 'a', damage: 1, cooldown }).cooldown, 0.5);
+    assert.equal(createTechniqueDefinition({ id: 't', cooldown }).cooldown, 0.5);
+    assert.equal(createSummonDefinition({ id: 's', cooldown }).cooldown, 0.5);
+  }
+  for (const cooldown of [2, 3, 5, 8, 120]) {
+    assert.throws(() => createAttackDefinition({ id: 'a', damage: 1, cooldown }), /the cooldown policy gives it 0.5 s/);
+    assert.throws(() => createTechniqueDefinition({ id: 't', cooldown }), /the cooldown policy gives it 0.5 s/);
+    assert.throws(() => createSummonDefinition({ id: 's', cooldown }), /the cooldown policy gives it 0.5 s/);
   }
   for (const cooldown of [-1, Infinity, -Infinity, NaN, '0.5', null]) {
     for (const create of [createAttackDefinition, createTechniqueDefinition, createSummonDefinition]) {
@@ -529,9 +536,14 @@ test('all discrete attacks inherit the baseline; authored longer delays have no 
     }
     assert.throws(() => createDeflectDefinition({ ...DEF_0002.deflect, cooldown }), /finite, non-negative/);
   }
+  // A Deflect is exempt from the baseline: none at all, and nothing else.
+  assert.equal(createDeflectDefinition({ ...DEF_0002.deflect, cooldown: 0 }).cooldown, 0);
+  for (const cooldown of [0.05, 0.5, 3]) {
+    assert.throws(() => createDeflectDefinition({ ...DEF_0002.deflect, cooldown }), /the cooldown policy gives it 0 s/);
+  }
 });
 
-test('every roster attack waits its authored repeat delay after ending, independent of other attacks', () => {
+test('every roster attack waits its repeat delay after ending, independent of other attacks', () => {
   for (const c of CHARACTERS) {
     const { fighter: f, step } = makeFighter({ character: c });
     step(P('attack1'));
@@ -548,7 +560,7 @@ test('every roster attack waits its authored repeat delay after ending, independ
   assert.equal(one.deflect.cooldown, 0);
   assert.deepEqual(Object.values(one.techniqueDefs).map((t) => t.cooldown), [3, 5]);
   const two = makeFighter({ character: DEF_0002 }).fighter;
-  assert.equal(two.deflect.cooldown, 0.05);
+  assert.equal(two.deflect.cooldown, 0, 'its legacy 0.05 s is gone');
   for (const [id, atk] of Object.entries(two.attacks)) assert.equal(atk.cooldown, id === 'extra_attack' ? 5 : 0.5);
 });
 

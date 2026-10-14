@@ -17,8 +17,8 @@
 //
 // Important constraints: pure and deterministic, from simulation state
 // alone. It keeps no timer of its own: the source attack's repeat cooldown
-// (CombatState.cooldowns, from js/data/cooldowns.js or the attack's longer
-// authored one) is the whole window, so a longer cooldown is a longer
+// (CombatState.cooldowns, the cooldown policy's from js/data/cooldowns.js:
+// the repeat delay, or 3 s / 5 s) is the whole window, so a longer cooldown is a longer
 // window and nothing is shortened or overwritten. Only the two buttons in
 // COMBO_PAIRS ever alternate (never Extra Attack or Attack 3 to 5), each
 // resolved through the fighter's own `actions` for where it is (its

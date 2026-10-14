@@ -28,6 +28,16 @@ again. Player 1 alone has the touch controls (its fighter's art and names)
 and the Combat Assist setting; the difficulty only changes how the CPU
 thinks.
 
+**Ability HUD.** Playing with a keyboard or a controller, Player 1's
+moves sit in the bottom-right corner: each move's own art over the key or
+pad input that performs it, the moves of where the fighter is now on top
+and the other place's smaller beneath, turning like a small wheel as it
+jumps and lands, each with its cooldown (seconds for the 3 s and 5 s ones,
+a faint sweep for the 0.5 s repeat delay) ([input](../systems/input.md#the-ability-hud)).
+It hides under the pause menu and at the result, never shows in Watch
+Mode, and a touch screen keeps its touch controls instead. While it shows,
+Player 1's cooldown rings under its feet step aside; the CPU keeps its own.
+
 **Scoring.** 7 minutes (`CONFIG.battle.matchSeconds`, 420 s; the
 HUD starts at `7:00`), first to 3 points (`CONFIG.battle.pointsToWin`).
 Each time a fighter falls into the Void its opponent scores a point at

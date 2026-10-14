@@ -68,6 +68,12 @@ export class Arena {
     // Live summoned clones (js/game/combat/summon.js), in spawn order. Never
     // fighters: no pushbox, camera, HUD, marker or result role.
     this.clones = [];
+    // The fighter whose move cooldowns a screen's ability HUD shows
+    // (js/ui/ability-hud.js), or null: its world-space cooldown rings step
+    // aside for it, so the same timer is never shown twice as prominently.
+    // Every other fighter (the CPU, any fighter in a mode without that HUD)
+    // keeps its rings.
+    this.hudCooldownsFor = null;
     // A technique (js/game/combat/technique.js) lives on the
     // fighter performing it (`fighter.technique`), not here: that fighter
     // updates and ends it, and a reset ends it. What it releases is a
@@ -525,8 +531,9 @@ export class Arena {
   }
 
   // Energy bars and the long move cooldowns, for the fighters
-  // whose body is on screen: an off-screen fighter only gets its edge
-  // pointer. Each draws only while it has something to show (see
+  // whose body is on screen (the cooldowns of the fighter the ability HUD
+  // shows are there instead: see hudCooldownsFor): an off-screen fighter
+  // only gets its edge pointer. Each draws only while it has something to show (see
   // js/game/rendering/fighter-status.js).
   drawStatus(fighters = this.inPlay) {
     const { ctx, view } = this;
@@ -534,7 +541,7 @@ export class Arena {
       const [x, , footY] = this.markerAnchor(f);
       if (!statusOnScreen(x, footY, view)) continue;
       drawEnergyBar(ctx, f, this.energyBarRect(f), view.dpr);
-      drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
+      if (f !== this.hudCooldownsFor) drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
     }
   }
 

@@ -122,20 +122,23 @@ export class Fighter {
     this.dashDuration = sprites.duration('mouvment') > 0 ? this.movement.dashDuration : 0;
     this.airDashDuration = sprites.duration('midair_mouvment') > 0 ? this.movement.airDashDuration : 0;
     // A pending attack (art only, see js/game/combat/attacks.js) lasts one pass of
-    // its own clip.
+    // its own clip. Every move's cooldown is the cooldown policy's
+    // (js/data/cooldowns.js), judged with the fighter's own projectiles and
+    // attacks (what a throw, a cast or a clone really deals).
+    const context = { projectiles: def.projectiles ?? null, attacks: def.attacks ?? null };
     this.attacks = Object.fromEntries(
       Object.entries(def.attacks || {}).map(([id, spec]) => [
-        id, createAttackDefinition({ id, ...spec }, { clipDuration: sprites.duration(spec.animation) }),
+        id, createAttackDefinition({ id, ...spec }, { clipDuration: sprites.duration(spec.animation), projectiles: context.projectiles }),
       ]),
     );
     this.projectileDefs = Object.fromEntries(
       Object.entries(def.projectiles || {}).map(([id, spec]) => [id, createProjectileDefinition({ id, ...spec })]),
     );
     this.summonDefs = Object.fromEntries(
-      Object.entries(def.summons || {}).map(([id, spec]) => [id, createSummonDefinition({ id, ...spec })]),
+      Object.entries(def.summons || {}).map(([id, spec]) => [id, createSummonDefinition({ id, ...spec }, context)]),
     );
     this.techniqueDefs = Object.fromEntries(
-      Object.entries(def.techniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec })]),
+      Object.entries(def.techniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec }, context)]),
     );
     // What the shared `shield` input does for this character: on the ground
     // its `defense` entry (null: nothing), in the air its Deflect (its

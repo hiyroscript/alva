@@ -16,7 +16,7 @@ import { HELD_CONTROLS, blankInput } from '../../js/game/fighters/fighter-contro
 import {
   def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel,
 } from '../helpers/fighter-harness.mjs';
-import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
+import { COOLING_CASTER, techniqueCooldown } from '../fighters/fixtures/cooling-fighters.mjs';
 
 const DOWN = { down: true };
 const JUMP = { jump: true, jumpPressed: true };
@@ -210,7 +210,7 @@ test('holding Down never speeds up a cooldown: Attack 4 and Attack 5 recover in 
     };
     const plain = recover({});
     assert.deepEqual(recover(DOWN), plain, button);
-    assert.ok(Math.abs(plain.at(-1) - (COOLING_CASTER.techniques[button].cooldown - 1)) < 1e-6, `${button}: 1 s of cooldown per second`);
+    assert.ok(Math.abs(plain.at(-1) - (techniqueCooldown(COOLING_CASTER, button) - 1)) < 1e-6, `${button}: 1 s of cooldown per second`);
   }
 });
 

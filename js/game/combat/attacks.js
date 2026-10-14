@@ -31,7 +31,7 @@
 //     attack1: {
 //       animation: 'attack1', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 3, hitbox: { x: 18, y: -62, w: 34, h: 18 },
-//       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.5,
+//       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14,
 //     },
 //     attack2: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
 //     midair_attack2: { animation: 'midair_attack2', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
@@ -53,12 +53,17 @@
 // launches. An attack that strikes (one with a hitbox) must declare its
 // damage; one without (a throw: its projectile is the hit) may not.
 //
-// `cooldown` is a per-move reuse delay, never added to attack phases.
-// resolveCooldown applies the universal 0.5-second floor and accepts any
-// finite non-negative longer override. Deflect alone keeps its authored
-// delay. Ordinary timers begin when an attack ends, is cut short or is
-// interrupted. Self-cancels must have been open for that move's delay.
-// Summons and techniques start their own timers on acceptance.
+// `cooldown` is a per-move reuse delay, never added to attack phases. It is
+// the cooldown policy's (js/data/cooldowns.js), derived from what the
+// attack does: 5 s for one that deals 10 damage (its strikes, its slam's
+// impact, the projectile it throws: pass the fighter's `projectiles` so a
+// throw is judged by its projectile), 3 s for one that paralyzes, else the
+// universal 0.5 s repeat delay. An entry may leave it out; one it declares
+// must agree. The Deflect alone is exempt from the 0.5 s baseline (none at
+// all). Every definition records its class (`cooldownClass`). Ordinary
+// timers begin when an attack ends, is cut short or is interrupted.
+// Self-cancels must have been open for that move's delay. Summons and
+// techniques start their own timers on acceptance.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -100,7 +105,7 @@
 //   extra_attack: {
 //     animation: 'extra_attack', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
 //     hitbox: null, projectile: { id: 'extra_attack_object', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
-//     cooldown: 0.5, groundOnly: true,
+//     groundOnly: true,
 //   },
 //
 // A multi-hit attack lists its strikes in `hits` instead of one hitbox:
@@ -251,7 +256,7 @@
 //
 //   attack1: { animation: 'attack1', pending: true },
 
-import { REPEAT_COOLDOWN, resolveCooldown } from '../../data/cooldowns.js';
+import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { createHit, resolveHitEffects } from './hit-effects.js';
 import { assertNoShieldBypass, attackOffense, resolveOffense } from './offense.js';
@@ -497,8 +502,10 @@ const PENDING_REFUSED = Object.freeze([
 // Its `baseLaunch` and `directionalLaunch` are validated here, once, as
 // declared: neither is inferred from the damage, the hitbox or the other.
 // A pending attack (see above) lasts `clipDuration` seconds, one pass of
-// its clip, and strikes nothing.
-export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt = false } = {}) {
+// its clip, and strikes nothing. `projectiles` is the fighter's own
+// `projectiles` entry: the one this attack throws counts toward its
+// cooldown class (see `cooldown` above).
+export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt = false, projectiles = null } = {}) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
   const owner = `Attack "${spec.id}"`;
   assertNoShieldBypass(spec, owner);
@@ -512,6 +519,7 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
       pending: true, startup: 0, active: 0, recovery: Math.max(0, clipDuration), hitbox: null, projectile: null,
     };
     def.total = def.recovery;
+    def.cooldownClass = 'ordinary';
     def.offense = resolveOffense(spec, attackOffense(def), owner);
     return Object.freeze(def);
   }
@@ -524,7 +532,8 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
   else if (spec.damage !== undefined) {
     throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
   }
-  def.cooldown = resolveCooldown(spec.cooldown, owner, { exempt: cooldownExempt });
+  def.cooldownClass = cooldownClass('attack', spec, { projectiles });
+  def.cooldown = resolveCooldown(spec.cooldown, owner, { exempt: cooldownExempt, cls: def.cooldownClass });
   def.motion = resolveMotion(spec.motion, owner, spec.id);
   def.pull = resolvePull(spec.pull, owner);
   def.deflectProjectiles = !!def.deflectProjectiles;

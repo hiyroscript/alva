@@ -19,7 +19,7 @@
 //   summons: {
 //     attack3: {
 //       attack: 'attack1', cloud: 'attack3_object', startupAnimation: 'attack3_summon',
-//       cooldown: 5, behindDistance: 48, effectOffset: { x: 0, y: -44 },
+//       behindDistance: 48, effectOffset: { x: 0, y: -44 },
 //       noGround: { attack: 'midair_attack2', offset: { x: 0, y: -36 } },
 //     },
 //   },
@@ -64,13 +64,20 @@
 // launch travels along the clone's facing); the hit credits the owner
 // but freezes only the target and the clone itself, never the owner.
 //
+// Its cooldown is the cooldown policy's (js/data/cooldowns.js), derived
+// from the attack its clone performs (the more severe of its attack and its
+// no-ground one, judged from the fighter's `attacks` and `projectiles`): 5 s
+// for one that deals 10 damage, 3 s for one that paralyzes, else the
+// universal 0.5 s repeat delay. An entry may leave it out; one it declares
+// must agree.
+//
 // A summon is an attack (its definition's `offense`, see
 // js/game/combat/offense.js): the summoning ability, the clone it sends,
 // the clone's strike and the hit it lands are one offensive action, its
 // owner's. Its clone is no fighter, but its strike is resolved like any
 // other: a target whose Shield is up blocks it.
 
-import { resolveCooldown } from '../../data/cooldowns.js';
+import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
 import { SpriteAnimator } from '../rendering/sprite-animator.js';
 import { attackPhase } from './attacks.js';
 import { assertNoShieldBypass, resolveOffense, summonOffense } from './offense.js';
@@ -79,7 +86,7 @@ const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
   cloud: null,        // owner effect animation it appears / vanishes through
   startupAnimation: null, // owner fighter clip played once before the request (none: at once)
-  cooldown: 0.5,        // seconds before the owner can summon it again
+  cooldown: REPEAT_COOLDOWN, // seconds before the owner can summon it again: the policy's
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
   noGround: null,     // { attack, offset } where there is no ground behind
@@ -94,11 +101,15 @@ const NO_GROUND_DEFAULTS = {
 // slack (see PHASE_EPSILON in attacks.js).
 const TIME_EPSILON = 1e-6;
 
-export function createSummonDefinition(spec) {
+// Frozen summon definition from a character's summon entry (plus its
+// `id`). `attacks` and `projectiles` are the fighter's own entries: the
+// attack its clone performs decides its cooldown class.
+export function createSummonDefinition(spec, { attacks = null, projectiles = null } = {}) {
   if (!spec?.id) throw new Error('[Alva] Summon definitions need an id');
   const owner = `Summon "${spec.id}"`;
   assertNoShieldBypass(spec, owner);
-  const def = { ...SUMMON_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, owner) };
+  const cls = cooldownClass('summon', spec, { attacks, projectiles });
+  const def = { ...SUMMON_DEFAULTS, ...spec, cooldownClass: cls, cooldown: resolveCooldown(spec.cooldown, owner, { cls }) };
   if (def.noGround) def.noGround = Object.freeze({ ...NO_GROUND_DEFAULTS, ...def.noGround });
   def.offense = resolveOffense(spec, summonOffense(def), owner);
   return Object.freeze(def);

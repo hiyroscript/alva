@@ -62,7 +62,7 @@ parts in cascade order:
 | `base.css` | Design tokens (`:root`), reset, screens and transitions. Always first. |
 | `components.css` | Shared controls, the menu screen frame, panels. |
 | `splash.css`, `home.css`, `setup.css`, `discover.css`, `settings.css` | Their screens (setup: Select Mode, Difficulty, Fighter, CPU and Stage; settings: the dialog, the language chooser and the touch layout editor). |
-| `battle.css`, `touch-controls.css`, `battle-overlays.css`, `practice.css` | Battle chrome and the HUD; the touch controls; banners and the pause and result panels; Practice Ground. |
+| `battle.css`, `touch-controls.css`, `battle-overlays.css`, `practice.css`, `ability-hud.css` | Battle chrome and the HUD; the touch controls; banners and the pause and result panels; Practice Ground; the ability HUD (Player 1's moves in the bottom-right corner). |
 | `overlays.css` | Loading, the confirm and choice dialogs, the rotate prompt, and the shared surface finish that overrides the screens above. |
 | `responsive.css` | Breakpoint adjustments. Always last. |
 

@@ -335,7 +335,8 @@ test('Cherry Blossom Impact: a cast, then the ground erupts 150 either side, thr
       assert.ok(e[0].finalLaunch.y < 0, 'thrown upward');
       assert.equal(e[0].source, 'technique');
     }
-    assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'), 'its 4 s cooldown');
+    assert.equal(d.attacker.techniqueDefs.attack3.cooldown, 0.5, 'a quake and a launch earn no cooldown: only the repeat delay');
+    assert.equal(d.attacker.combat.abilityCooldowns.active('attack3'), false, 'over before the cast and release are');
   }
   assert.ok(Math.abs(cast.frames.length / cast.fps - 0.4) < 1e-9, 'a 0.4 s cast to see it coming');
 });
@@ -353,7 +354,7 @@ test('the Mystical Palm Technique heals it of 10 Launch Points as it stands up; 
   assert.ok(Math.abs((n + 1) * DT - 1) < 0.05, `a full second knelt (${((n + 1) * DT).toFixed(2)} s)`);
   assert.deepEqual(fighter.heals, [{ amount: 10, ability: 'attack4' }]);
   assert.equal(fighter.combat.launchPoint, 30);
-  assert.equal(fighter.combat.abilityCooldowns.duration('attack4'), 12);
+  assert.equal(fighter.combat.abilityCooldowns.duration('attack4'), 3, 'a heal: the policy\'s 3 s');
   // Broken while it kneels.
   const d = versus({ gap: 300 });
   d.attacker.combat.launchPoint = 40;

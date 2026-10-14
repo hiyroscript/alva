@@ -2108,10 +2108,10 @@ test('the CPU taken out or changed during a summoning startup: no clone, never a
     else session.setCPU(DEF_9999, fakeSprites());
     assert.equal(player.pendingSummon, null, `${change}: the startup is cut short`);
     assert.equal(player.state, 'idle', `${change}: free at once`);
+    assert.ok(player.combat.abilityCooldowns.active('attack3'), `${change}: the accepted use keeps its cooldown`);
     run({}, startupSteps(summoner, 'attack3') + 60);
     assert.deepEqual(session.clones, [], `${change}: no clone, at the old CPU or the new one`);
     assert.deepEqual(player.summons, []);
-    assert.ok(player.combat.abilityCooldowns.active('attack3'), `${change}: the accepted use keeps its cooldown`);
   }
 });
 

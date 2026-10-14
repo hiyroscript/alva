@@ -34,7 +34,7 @@ const CASTER = {
   actions: { ...def.actions, attack4: { type: 'technique', id: 'attack4' } },
   techniques: {
     attack4: {
-      castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 3,
+      castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release',
       projectile: { id: 'attack4_object', offset: { x: 50, y: -40 } },
       burst: { hitbox: { x: -100, y: -100, w: 200, h: 100 }, hit: { damage: 3, hitstun: 0.3, hitstop: 0.05 } },
     },
@@ -154,9 +154,11 @@ test('a hit during the cast breaks it and nothing is released; one after the rel
   assert.equal(early.attacker.technique, null);
   assert.equal(t.endReason, 'hit');
   assert.equal(t.released, false);
+  assert.ok(early.attacker.combat.abilityCooldowns.active('attack4'), 'its cooldown runs on all the same');
+  early.tick(P('attack4'));
+  assert.equal(early.attacker.technique, null, 'broken: no fresh cast escapes its cooldown');
   for (let i = 0; i < steps(CAST + RELEASE); i++) early.tick();
   assert.deepEqual(early.projectiles, [], 'nothing came of it');
-  assert.ok(early.attacker.combat.abilityCooldowns.active('attack4'), 'its cooldown runs on all the same');
   // In its release pose: the orb is out and flies on.
   const late = versus({ gap: 300 });
   late.tick({});
@@ -187,8 +189,24 @@ test('it needs the ground throughout: losing it ends the cast, nothing released,
   assert.deepEqual(fighter.releases, []);
 });
 
+// The caster with a burst that paralyzes: an exceptional effect, so the
+// cooldown policy gives it 3 s (js/data/cooldowns.js).
+const PARALYZER = {
+  ...CASTER,
+  id: 'test-paralyzer',
+  techniques: {
+    attack4: {
+      ...CASTER.techniques.attack4,
+      burst: { ...CASTER.techniques.attack4.burst, hit: { ...CASTER.techniques.attack4.burst.hit, paralyze: 0.5 } },
+    },
+  },
+};
+const PARALYZER_SPRITES = fakeSpritesOf(PARALYZER);
+
 test('its cooldown runs from its start; a press while it runs, in the air or mid-attack does nothing at all', () => {
-  const { fighter, step } = caster();
+  const { fighter, step } = makeFighter({ character: PARALYZER, sprites: PARALYZER_SPRITES });
+  assert.equal(fighter.techniqueDefs.attack4.cooldown, 3, 'a paralysis: the policy\'s 3 s');
+  assert.equal(caster().fighter.techniqueDefs.attack4.cooldown, 0.5, 'the plain caster: only the repeat delay');
   step({});
   step(P('attack4'));
   const cd = fighter.combat.abilityCooldowns;
@@ -223,7 +241,7 @@ test('its cooldown runs from its start; a press while it runs, in the air or mid
 const HEALER = {
   ...CASTER,
   id: 'test-healer',
-  techniques: { attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 3, heal: 10 } },
+  techniques: { attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', heal: 10 } },
 };
 const HEALER_SPRITES = fakeSpritesOf(HEALER);
 const healer = (opts = {}) => makeFighter({ character: HEALER, sprites: HEALER_SPRITES, ...opts });

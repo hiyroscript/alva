@@ -27,9 +27,11 @@
 // (`stall`). In the air the Shield button is its Deflect, a sweep of the
 // arm that turns projectiles back at their thrower; and it has an air dash
 // of its own (its midair_mouvment), apart from its Dash. Its orbs spin as
-// they fly. Ordinary moves repeat after 0.5 s; Unlimited Void after 3 s,
-// Hollow Purple after 5 s. These timers never alter their animation phases.
-// Deflect remains at 0; jumps, running and Shield are exempt.
+// they fly. Its cooldowns are the shared policy's (js/data/cooldowns.js),
+// derived from what each move does, never authored here: Unlimited Void's
+// paralysis waits 3 s, Hollow Purple's 10-damage sphere 5 s, every other
+// move only the universal 0.5 s repeat delay (Red's push and Blue's pull
+// earn nothing), and the Deflect none. They never alter animation phases.
 
 import { frames, pad } from './helpers.js';
 
@@ -319,7 +321,7 @@ export const CHARACTER_0001 = {
   // while the sweep is live it turns the other fighter's projectiles back
   // at their thrower, now #0001's. A third of a second in all, falling as
   // it sweeps and carrying the whole of its drift; no cooldown (the sweep
-  // itself, and its Energy, are its only limits).
+  // itself, and its Energy, are its only limits: see js/data/cooldowns.js).
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0001.deflect,
@@ -330,7 +332,6 @@ export const CHARACTER_0001 = {
     hitstun: 0.32,
     blockstun: 0.14,
     hitstop: 0.05,
-    cooldown: 0,
     airMomentum: 1,
     airControl: 0.4,
     deflectProjectiles: true,
@@ -338,8 +339,8 @@ export const CHARACTER_0001 = {
 
   // Five numbered attacks, each a button of its own (see
   // js/data/loadout.js): attack1 to attack3 ordinary attacks with their
-  // mid-air versions, attack4 and attack5 techniques (ground only, with no
-  // cooldown). Transform is reserved.
+  // mid-air versions, attack4 and attack5 techniques (ground only, each
+  // with the cooldown the policy gives it). Transform is reserved.
   actions: {
     extra_attack: 'extra_attack', // the High Kick
     transform: null, // reserved
@@ -429,7 +430,8 @@ export const CHARACTER_0001 = {
   // js/game/combat/technique.js). Each is a cast: #0001 stands committed to
   // it, then lets go all at once. A hit on #0001 before it lets go breaks
   // it (nothing released), and it needs the ground throughout. Cooldowns
-  // begin on acceptance and run on even if interrupted: 3 s and 5 s.
+  // begin on acceptance and run on even if interrupted; the policy gives
+  // Unlimited Void 3 s (its paralysis) and Hollow Purple 5 s (its 10).
   techniques: {
     // Unlimited Void: half a second to cast, then the domain closes round
     // #0001 as it steps forward: every opponent within 250 units either
@@ -441,7 +443,6 @@ export const CHARACTER_0001 = {
     attack4: {
       castAnimation: 'attack4_cast',
       releaseAnimation: 'attack4_release',
-      cooldown: 3,
       burst: {
         hitbox: { x: -250, y: -210, w: 500, h: 230 },
         hit: { damage: 3, paralyze: 1.7, hitstun: 0.25, blockstun: 0, hitstop: 0.12 },
@@ -453,7 +454,6 @@ export const CHARACTER_0001 = {
     attack5: {
       castAnimation: 'attack5_cast',
       releaseAnimation: 'attack5_release',
-      cooldown: 5,
       projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
     },
   },
@@ -463,8 +463,9 @@ export const CHARACTER_0001 = {
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). Every strike keeps the speed #0001 brings into
   // it unless its entry says otherwise: only its casts (Red, Maximum Blue)
-  // are planted. Each ordinary move has a 0.5-second repeat delay,
-  // independent of its phases and of other moves' cooldowns.
+  // are planted. Each has only the universal 0.5-second repeat delay (the
+  // cooldown policy's: none of them deals 10 or paralyzes), independent of
+  // its phases and of other moves' cooldowns.
   attacks: {
     // The Jab: frames 1-2 the wind-up, 3-4 the punch (its box out to 40
     // units, at the shoulders, just short of the fist's tip), 5-6 back,
@@ -485,7 +486,6 @@ export const CHARACTER_0001 = {
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 1 / 30,
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 1,
       friction: 0.6,
@@ -508,7 +508,6 @@ export const CHARACTER_0001 = {
       hitstun: 0.34,
       blockstun: 0.14,
       hitstop: 1 / 30,
-      cooldown: 0.5,
       airUses: 2,
       motion: { type: 'hover' },
       airMomentum: 0.8,
@@ -526,7 +525,6 @@ export const CHARACTER_0001 = {
       recovery: 2 / FPS_0001.attack2,
       hitbox: null,
       projectile: { id: 'attack2_object', spawnAt: 3 / FPS_0001.attack2, offset: { x: 44, y: -70 } },
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.5,
       friction: 0.8,
@@ -550,7 +548,6 @@ export const CHARACTER_0001 = {
       blockstun: 0.15,
       hitstop: 0.07,
       blockPush: 400,
-      cooldown: 0.5,
       airUses: 1,
       motion: { type: 'homing', range: 230, speed: 1050, rebound: 620, recoil: 240, exit: 0.3 },
       airMomentum: 0.6,
@@ -567,7 +564,6 @@ export const CHARACTER_0001 = {
       recovery: 2 / FPS_0001.attack3,
       hitbox: null,
       projectile: { id: 'attack3_object', spawnAt: 4 / FPS_0001.attack3, offset: { x: 78, y: -69 } },
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.4,
       friction: 0.8,
@@ -588,7 +584,6 @@ export const CHARACTER_0001 = {
       hitstun: 0.36,
       blockstun: 0.14,
       hitstop: 0.05,
-      cooldown: 0.5,
       airUses: 1,
       pull: { radius: 190, speed: 1300, offset: { x: 50, y: -72 } },
       motion: { type: 'hover' },
@@ -616,7 +611,6 @@ export const CHARACTER_0001 = {
       hitstun: 0.3,
       blockstun: 0.15,
       hitstop: 0.08,
-      cooldown: 0.5,
       momentum: 1,
       friction: 0.6,
       step: { at: 1 / FPS_0001.extra_attack, speed: 300 },

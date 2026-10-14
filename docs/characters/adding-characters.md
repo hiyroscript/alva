@@ -194,10 +194,11 @@ its `baseLaunch` (0 to
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Add how
 it moves (`momentum`, `control`, `friction`, `step`), whether a hit
-opens a follow-up (`hitCancel`) and an optional longer repeat
-`cooldown` (0.5 s minimum by default, with finite longer overrides;
-independent of the move's phases,
-[combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
+opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
+policy derives it from what the move does (5 s for 10 damage, 3 s for a
+heal or a paralysis, else the 0.5 s repeat delay; independent of the
+move's phases), and a value it does not give is refused as the registry
+loads ([combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`, `slam`: a plunge that lands with an `impact`),
 `pull`, `airUses`, `freeFall`, `passThrough`, `hurtboxes`, and on any hit
@@ -219,15 +220,15 @@ back (`repel`) or erase them and fly through fighters (`erase`).
 
 **A summon** (a clone of the fighter performing one of its own attacks)
 is a `summons.attackN` entry with its `attack`, its `cloud` (an
-`effectAnimations` entry named `attackN_object`), a `cooldown` if it
-should have one (0, the default, is none), and
+`effectAnimations` entry named `attackN_object`; its cooldown is the
+policy's, from the attack its clone performs), and
 optionally `startupAnimation` (`attackN_summon`) and `noGround`
 ([summons](../systems/combat.md#summons)).
 
 **A technique** is a `techniques.attackN` entry. The runtime supports one
 form, the cast: two fighter clips (`castAnimation`, `releaseAnimation`,
-named `attackN_cast` and `attackN_release` by convention), a `cooldown`
-if it should have one (0, the default, is none), and what it lets go of
+named `attackN_cast` and `attackN_release` by convention; its cooldown is
+the policy's, from what it releases), and what it lets go of
 as the cast ends: a `projectile` (an entry of `projectiles`,
 `attackN_object`), a `burst` round the fighter (a `hitbox` and its `hit`),
 a `heal` (Launch Point taken off its own fighter), or any of them together
@@ -274,8 +275,8 @@ directly, and never with its own idea of when a Shield counts.
   for the Shield button in the air ([the
   Deflect](../systems/defense.md#the-deflect)): an attack whose strike is
   always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out) and that
-  costs every fighter 15 Energy as it starts; its `cooldown`, if any, is
-  exempt from the ordinary 0.5 s baseline. It is both an attack and a
+  costs every fighter 15 Energy as it starts; it has no cooldown (the
+  policy exempts every Deflect from the 0.5 s baseline). It is both an attack and a
   defense (it must turn projectiles back), and never a Shield. Its box
   is also what catches projectiles, so cover the front of the body the
   move sweeps. Leave it out for none (the button then does nothing in the

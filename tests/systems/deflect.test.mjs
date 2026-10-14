@@ -131,28 +131,23 @@ for (const c of FIGHTERS) {
   });
 }
 
-test('a Deflect needs a fresh press each time, and waits out its own cooldown, if it has one; a press it cannot use is never kept for later', () => {
-  // #0002's Deflect cools down for three steps.
-  const { fighter: f, step } = makeFighter({ character: DEF_0002 });
-  aloft(f, 100);
-  step(PRESS);
-  while (f.combat.attack) step({});
-  assert.ok(f.combat.cooldowns.has('deflect'), 'its cooldown runs');
-  step(PRESS);
-  assert.equal(f.combat.attack, null, 'not during its cooldown...');
-  while (f.combat.cooldowns.has('deflect')) step({});
-  for (let i = 0; i < 5; i++) step({});
-  assert.equal(f.combat.attack, null, '...and never later from that press');
-  step(PRESS);
-  assert.equal(f.combat.attack?.def.id, 'deflect', 'a fresh press once it is over');
-  // #0001's has none: a fresh press the step after one ends starts the next.
-  const free = makeFighter();
-  aloft(free.fighter, 100);
-  free.step(PRESS);
-  while (free.fighter.combat.attack) free.step({});
-  assert.equal(free.fighter.combat.cooldowns.has('deflect'), false, 'no cooldown');
-  free.step(PRESS);
-  assert.equal(free.fighter.combat.attack?.def.id, 'deflect', 'at once');
+test('a Deflect needs a fresh press each time and has no cooldown; a press it cannot use is never kept for later', () => {
+  for (const c of [DEF_0001, DEF_0002]) {
+    const { fighter: f, step } = makeFighter({ character: c });
+    assert.equal(f.deflect.cooldown, 0, `#${c.id}: the policy gives every Deflect none`);
+    aloft(f, 100);
+    step(PRESS);
+    const started = f.combat.attack;
+    const t0 = started.time;
+    step(PRESS);
+    assert.ok(f.combat.attack === started && started.time > t0, `#${c.id}: a press mid-Deflect does not restart it`);
+    while (f.combat.attack) step({});
+    assert.equal(f.combat.cooldowns.has('deflect'), false, `#${c.id}: no cooldown`);
+    for (let i = 0; i < 5; i++) step({});
+    assert.equal(f.combat.attack, null, `#${c.id}: ...and never later from that press`);
+    step(PRESS);
+    assert.equal(f.combat.attack?.def.id, 'deflect', `#${c.id}: a fresh press starts the next at once`);
+  }
 });
 
 test('a Deflect never starts stunned, paralyzed, mid-attack, mid-Deflect, air dashing, in free fall or without its art', () => {

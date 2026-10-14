@@ -30,9 +30,12 @@
 // Its Shield is a guard of crossed arms, on the ground. In the air the
 // Shield button is its Deflect, a rising backhand sweep that turns
 // projectiles back; its air dash (its midair_mouvment) is a body flicker.
-// Ordinary moves repeat after 0.5 s, the Heavenly Foot of Pain after 2 s;
-// Cherry Blossom Impact after 4 s and the Mystical Palm Technique after
-// 12 s. These timers never alter their animation phases. The sheet's
+// Its cooldowns are the shared policy's (js/data/cooldowns.js), derived from
+// what each move does, never authored here: the Mystical Palm Technique's
+// heal waits 3 s; every other move (Cherry Blossom Impact and the Heavenly
+// Foot of Pain included: a quake, a slam and a launch earn nothing, and
+// neither deals 10) only the universal 0.5 s repeat delay, and the Deflect
+// none. These timers never alter their animation phases. The sheet's
 // sealed-strength poses have no move yet: Transform is reserved.
 
 import { frames, pad } from './helpers.js';
@@ -261,7 +264,6 @@ export const CHARACTER_0003 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    cooldown: 0,
     airMomentum: 1,
     airControl: 0.4,
     deflectProjectiles: true,
@@ -342,7 +344,9 @@ export const CHARACTER_0003 = {
   // js/game/combat/technique.js). Each is a cast: #0003 stands committed to
   // it, then lets go all at once. A hit on #0003 before it lets go breaks
   // it (nothing released), and it needs the ground throughout. Cooldowns
-  // begin on acceptance and run on even if interrupted: 4 s and 12 s.
+  // begin on acceptance and run on even if interrupted; the policy gives
+  // Cherry Blossom Impact only the 0.5 s repeat delay and the Mystical Palm
+  // Technique 3 s (its heal).
   techniques: {
     // Cherry Blossom Impact: 0.4 s to raise the fist, gather the chakra in
     // it and bring it down; as the fist meets the ground the ground erupts
@@ -355,7 +359,6 @@ export const CHARACTER_0003 = {
     attack3: {
       castAnimation: 'attack3_cast',
       releaseAnimation: 'attack3_release',
-      cooldown: 4,
       burst: {
         hitbox: { x: -150, y: -46, w: 300, h: 50 },
         hit: {
@@ -367,11 +370,10 @@ export const CHARACTER_0003 = {
     // The Mystical Palm Technique: a full second knelt, palms out (its
     // longest commitment, and nothing protects it); as it stands up it has
     // healed itself of 10 Launch Points (never below 0). A hit before then
-    // breaks it and heals nothing. Once every 12 seconds.
+    // breaks it and heals nothing. Once every 3 seconds.
     attack4: {
       castAnimation: 'attack4_cast',
       releaseAnimation: 'attack4_release',
-      cooldown: 12,
       heal: 10,
     },
   },
@@ -379,9 +381,9 @@ export const CHARACTER_0003 = {
   // Attack definitions (schema: createAttackDefinition in
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
-  // mirrored with facing). Each ordinary move has a 0.5-second repeat delay,
-  // independent of its phases and of other moves' cooldowns; the Heavenly
-  // Foot of Pain's is 2 s.
+  // mirrored with facing). Each has only the universal 0.5-second repeat
+  // delay (the cooldown policy's: none deals 10 or paralyzes), independent
+  // of its phases and of other moves' cooldowns.
   attacks: {
     // The Chakra Punch: frames 1-2 the wind-up, 3-4 the straight (its box
     // out to 40 units, at the shoulders), 5-6 back, 0.3 s in all. Light and
@@ -401,7 +403,6 @@ export const CHARACTER_0003 = {
       blockstun: 0.14,
       hitstop: 1 / 30,
       blockPush: 360,
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 1,
       friction: 0.6,
@@ -427,7 +428,6 @@ export const CHARACTER_0003 = {
       hitstun: 0.32,
       blockstun: 0.14,
       hitstop: 1 / 30,
-      cooldown: 0.5,
       airUses: 1,
       motion: { type: 'rise', speed: 420 },
       airMomentum: 0.8,
@@ -458,7 +458,6 @@ export const CHARACTER_0003 = {
           damage: 1, baseLaunch: 1, directionalLaunch: 'vertical', quake: true, hitstun: 0.36, blockPush: 200,
         },
       ],
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.6,
       friction: 0.8,
@@ -474,8 +473,8 @@ export const CHARACTER_0003 = {
     // Launch 3: a quake, so one in the air is untouched), and a Shield is
     // shoved back. Then 4/15 s with the heel in the ground (its impact
     // clip), a follow-up open from the second frame of it once anything
-    // has been hit. Once per airtime, every 2 seconds, never while flying
-    // from a launch; off the stage it plunges into the Void.
+    // has been hit. Once per airtime, never while flying from a launch;
+    // off the stage it plunges into the Void.
     midair_attack2: {
       animation: 'midair_attack2',
       startup: SLAM_HANG_0003,
@@ -488,7 +487,6 @@ export const CHARACTER_0003 = {
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 0.05,
-      cooldown: 2,
       airUses: 1,
       motion: {
         type: 'slam',
@@ -528,7 +526,6 @@ export const CHARACTER_0003 = {
       blockstun: 0.18,
       hitstop: 0.1,
       blockPush: 620,
-      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.6,
       friction: 0.7,
