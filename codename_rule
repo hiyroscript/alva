@@ -146,4 +146,4 @@ Touch buttons show a frame of the character's own art for their move, chosen in 
 
 When adding or updating a character, keep its attack count, button routing, airborne variants, object ownership and animation assets consistent with these shared rules.
 
-You will be choosing whether the character has 2 more attacks.
+You will be choosing whether the character has 2 or more attacks.
