@@ -138,10 +138,19 @@ shared reading combat makes: a technique, a summon, a throw and the Deflect
 are attacks to the CPU too, the Deflect a defense as well), its role
 (`poke`, `approach`, `comboStarter`, `launcher`, `finisher`, `antiAir`,
 `zoning`, `trap`, `areaDenial`, `punish`, `edgeGuard`, `recovery`,
-`counterProjectile`, `shieldPressure`, `defensiveDisengage`, `spike`; none
-gets past a Shield), its reach swept along its motion, its projectile's
-range and pull, its technique's burst, its summon's clone, its cooldowns
-and air uses. Movement is universal (`js/data/movement.js`). A new
+`counterProjectile`, `shieldPressure`, `defensiveDisengage`, `spike`,
+`heal`; none gets past a Shield), its reach swept along its motion (a
+slam's to where it would land, with its impact), its projectile's range
+and pull, its technique's burst and heal, its summon's clone, whether a
+hit is a quake, its cooldowns and air uses. The forward simulation follows
+the same rules as combat: a quake strike, burst or impact meets only a
+fighter its path has standing on the ground (so the CPU counts on none
+against an airborne opponent, and fears none while its own path keeps it
+in the air), and a slam stands through its landing where it lands. A
+heal is no attack: the CPU casts it when it has taken enough for the
+whole heal to count and the opponent, busy as long as it is and then
+closing in with a Dash and a run, could not reach it before the cast lets
+go (`healPlan`). Movement is universal (`js/data/movement.js`). A new
 fighter is played well with no CPU change at all.
 
 ## Difficulty
@@ -211,8 +220,11 @@ hands it one plan through the same inputs (`{ press }`, `{ jump, dir }`,
   the controller contract (press edges, perceived facing, reserved
   buttons, the ledge guard, reaction scaling, cooldowns, no writes).
 - [`tests/fighters/0001/cpu-0001.test.mjs`](../../tests/fighters/0001/cpu-0001.test.mjs),
-  [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs):
-  the CPU playing, and facing, each fighter.
+  [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs),
+  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs):
+  the CPU playing, and facing, each fighter; the quake and the slam read
+  by the CPU in [`quake.test.mjs`](../../tests/systems/quake.test.mjs) and
+  [`slam.test.mjs`](../../tests/systems/slam.test.mjs).
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle`, and five scripted reference styles.

@@ -135,7 +135,7 @@
 //   carry: { lift: 0 },
 //
 // `motion` is movement the attack makes itself, owning the fighter's
-// velocity while it lasts (gravity included, where it says so). Five kinds:
+// velocity while it lasts (gravity included, where it says so). Six kinds:
 //
 //   homing  the lock-on dash. Through the startup the fighter hangs in the
 //           air (no gravity, its drift braking). As the active phase opens
@@ -152,6 +152,19 @@
 //           allows) until it meets the ground or an opponent: either sends
 //           it back up at `rebound` and ends the attack at once, so it can
 //           bounce again. Meeting the ground this way is no landing.
+//   slam    the plunge that lands. The startup hangs, then the fighter
+//           drops at a fixed `fallSpeed` (no gravity; air steering as its
+//           `airControl` allows) until it meets the ground, striking
+//           whatever it passes on the way (an opponent never stops it).
+//           Meeting the ground ends the plunge there: the fighter stands
+//           where it landed, its `impact` (if any: `{ hitbox, hit,
+//           animation }`) strikes once every opponent its box meets round
+//           the landing point (facing right from the fighter's origin,
+//           mirrored; its hit an attack's own, a `quake` included), and
+//           the attack goes straight to its recovery: the landing, played
+//           on the ground (no landing cancel) in its impact's `animation`
+//           if it names one. A plunge whose active phase runs out in the
+//           air lands nothing: it carries on under gravity.
 //   rise    the lift. The startup hangs, then the fighter rises at `speed`
 //           (no gravity; air steering as its `airControl` allows) for the
 //           active phase, and carries on up from there under gravity.
@@ -172,6 +185,9 @@
 //
 //   midair_attack1: { ..., motion: { type: 'homing', range: 240, speed: 1000, rebound: 760, recoil: 140, exit: 0.2 } },
 //   midair_attack2: { ..., motion: { type: 'bounce', fallSpeed: 1300, rebound: 900 } },
+//   midair_attack2: { ..., motion: { type: 'slam', fallSpeed: 1500, impact: {
+//     hitbox: { x: -110, y: -40, w: 220, h: 44 }, hit: { damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', quake: true },
+//     animation: 'midair_attack2_impact' } } },
 //   midair_attack3: { ..., motion: { type: 'rise', speed: 460 } },
 //   attack3: { ..., motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, friction: 420, recoil: 260 } },
 //   midair_attack1: { ..., motion: { type: 'hover' } },
@@ -198,8 +214,9 @@
 //   deflect: { ..., hitbox: { x: 6, y: -118, w: 44, h: 98 }, deflectProjectiles: true },
 //
 // Every hit may also declare the shared hit effects (see
-// js/game/combat/hit-effects.js): `paralyze` and `blockPush`. A multi-hit
-// attack's strikes take the attack's own unless they declare theirs. None
+// js/game/combat/hit-effects.js): `paralyze`, `blockPush` and `quake` (it
+// reaches only fighters standing on the ground). A multi-hit attack's
+// strikes take the attack's own unless they declare theirs. None
 // gets past an active Shield, and nothing may declare a way past one
 // (`unblockable` and the rest of SHIELD_BYPASS_FIELDS in
 // js/game/combat/offense.js are refused): every attack is blockable.
@@ -236,7 +253,7 @@
 
 import { REPEAT_COOLDOWN, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
-import { resolveHitEffects } from './hit-effects.js';
+import { createHit, resolveHitEffects } from './hit-effects.js';
 import { assertNoShieldBypass, attackOffense, resolveOffense } from './offense.js';
 
 const ATTACK_DEFAULTS = {
@@ -276,6 +293,7 @@ const ATTACK_DEFAULTS = {
   deflectProjectiles: false, // its live hitbox turns other fighters' projectiles back (see above)
   paralyze: 0,       // the shared hit effects (js/game/combat/hit-effects.js)
   blockPush: 0,
+  quake: false,
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -286,16 +304,18 @@ const MOTION_DEFAULTS = Object.freeze({
   rise: Object.freeze({ speed: 0 }),
   roll: Object.freeze({ speed: 0, keep: 0, maxSpeed: Infinity, friction: 0, recoil: 0 }),
   hover: Object.freeze({}),
+  slam: Object.freeze({ fallSpeed: 0, impact: null }),
 });
 const MOTION_REQUIRED = Object.freeze({
-  homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'], hover: [],
+  homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'], hover: [], slam: ['fallSpeed'],
 });
 
 export const MOTION_TYPES = Object.freeze(Object.keys(MOTION_DEFAULTS));
 
-// The frozen motion of attack `owner` from its `motion` entry, or null. An
-// unknown kind, or one missing a speed it cannot do without, is refused.
-function resolveMotion(spec, owner) {
+// The frozen motion of attack `id` (`owner` in errors) from its `motion`
+// entry, or null. An unknown kind, or one missing a speed it cannot do
+// without, is refused; so is an impact on anything but a slam.
+function resolveMotion(spec, owner, id) {
   if (!spec) return null;
   const defaults = MOTION_DEFAULTS[spec.type];
   if (!defaults) throw new Error(`[Alva] ${owner} has motion type "${spec.type}" (${MOTION_TYPES.join(', ')})`);
@@ -303,7 +323,28 @@ function resolveMotion(spec, owner) {
   for (const field of MOTION_REQUIRED[spec.type]) {
     if (!(motion[field] > 0)) throw new Error(`[Alva] ${owner}'s ${spec.type} motion needs a positive ${field}`);
   }
+  if (spec.impact !== undefined && spec.type !== 'slam') throw new Error(`[Alva] ${owner}'s ${spec.type} motion has an impact: only a slam lands with one`);
+  if (spec.type === 'slam') motion.impact = resolveImpact(spec.impact, owner, id);
   return Object.freeze(motion);
+}
+
+// A slam's frozen impact (see `slam` above) from its `impact` entry, or
+// null: its box (facing right from the fighter's origin where it lands,
+// mirrored), its hit (an attack's hit, validated as one: see createHit in
+// js/game/combat/hit-effects.js, its id the attack's own) and the clip its
+// landing plays, if any.
+function resolveImpact(spec, owner, id) {
+  if (!spec) return null;
+  const who = `${owner}'s impact`;
+  assertNoShieldBypass(spec, who);
+  const box = spec.hitbox;
+  if (!(box?.w > 0 && box?.h > 0)) throw new Error(`[Alva] ${who} needs a hitbox`);
+  if (!spec.hit) throw new Error(`[Alva] ${who} needs a hit`);
+  return Object.freeze({
+    hitbox: Object.freeze({ x: box.x ?? 0, y: box.y ?? 0, w: box.w, h: box.h }),
+    hit: createHit(id, spec.hit, who),
+    animation: spec.animation ?? null,
+  });
 }
 
 // The frozen pull (see `pull` above) of `owner` from its `pull` entry, or
@@ -318,7 +359,7 @@ export function resolvePull(spec, owner) {
 
 // The fields a strike of a multi-hit attack takes from the attack when it
 // does not declare its own, and the ones only the strikes may declare.
-const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush']);
+const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake']);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
 // A multi-hit attack's strikes, frozen and validated, and what they make of
@@ -382,6 +423,19 @@ export function attackReach(def) {
     return { x: hb.x, y: hb.y, w: hb.w + reach, h: hb.h };
   }
   if (m.type === 'bounce') return { x: hb.x, y: hb.y, w: hb.w, h: hb.h + m.fallSpeed * t };
+  if (m.type === 'slam') {
+    // The plunge, and its impact where the plunge would land at the
+    // furthest.
+    const fall = m.fallSpeed * t;
+    const plunge = { x: hb.x, y: hb.y, w: hb.w, h: hb.h + fall };
+    const ib = m.impact?.hitbox;
+    if (!ib) return plunge;
+    const x0 = Math.min(plunge.x, ib.x);
+    const y0 = Math.min(plunge.y, ib.y + fall);
+    const x1 = Math.max(plunge.x + plunge.w, ib.x + ib.w);
+    const y1 = Math.max(plunge.y + plunge.h, ib.y + ib.h + fall);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
   if (m.type === 'rise') return { x: hb.x, y: hb.y - m.speed * t, w: hb.w, h: hb.h + m.speed * t };
   const cy = hb.y + hb.h / 2;
   return { x: hb.x, y: cy - m.range - hb.h / 2, w: m.range + hb.w, h: 2 * m.range + hb.h };
@@ -436,7 +490,7 @@ export function attackPhase(def, time) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'paralyze', 'blockPush',
+  'deflectProjectiles', 'paralyze', 'blockPush', 'quake',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -471,7 +525,7 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
     throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
   }
   def.cooldown = resolveCooldown(spec.cooldown, owner, { exempt: cooldownExempt });
-  def.motion = resolveMotion(spec.motion, owner);
+  def.motion = resolveMotion(spec.motion, owner, spec.id);
   def.pull = resolvePull(spec.pull, owner);
   def.deflectProjectiles = !!def.deflectProjectiles;
   if (def.deflectProjectiles && !def.hitbox) throw new Error(`[Alva] ${owner} deflects projectiles but has no hitbox to do it with`);

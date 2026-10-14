@@ -25,6 +25,9 @@
 // - A fighter the Void takes bursts where it went in: a flash, a ring and
 //   shards in its own colours (its visual.eliminationPalette, see
 //   eliminationPalette), drawn on after it has gone. Nothing but paint.
+// - A fighter that heals itself (a technique's heal, see Fighter.heals): a
+//   soft green ring opening round its body and a few plus marks floating up
+//   from it. Nothing but paint.
 //
 // With reduced motion there is no shake and no zoom, and an elimination's
 // shards barely travel; the rest stays.
@@ -48,7 +51,7 @@ export const HIT_FX = Object.freeze({
     time: 0.22, // seconds to die away (longer for bigger shakes, below)
   },
   flash: 1 / 60, // the white flash: one frame at 60 Hz, at least one frame drawn
-  sparks: { hit: 0.26, block: 0.2, perfect: 0.32 }, // lifetimes
+  sparks: { hit: 0.26, block: 0.2, perfect: 0.32, heal: 0.7 }, // lifetimes
   trail: {
     speed: 900, // world units/s: a tumbling fighter this fast leaves a trail
     every: 1 / 40, // seconds between afterimages
@@ -86,6 +89,7 @@ export const HIT_FX = Object.freeze({
 
 const AMBER = '#ffd27a';
 const RED = '#d21f2b';
+const HEAL = '#7dffa8';
 
 // The colours a fighter with no eliminationPalette of its own bursts in:
 // white, a light grey and the sparks' amber.
@@ -208,6 +212,16 @@ export class HitEffects {
       age: 0, life: e.life, seed: b.x * 0.23 + b.y * 0.31 + this.eliminations.length,
     });
     this.addShake(e.shake);
+  }
+
+  // `f` healed itself this step (`heal`, one of Fighter.heals): its glow,
+  // round the middle of its body, a little bigger for a bigger heal.
+  addHeal(f, heal) {
+    const b = f.body;
+    this.sparks.push({
+      kind: 'heal', x: b.x, y: b.y - b.height / 2, dx: 0, dy: -1, size: Math.min(2, 1 + (heal?.amount ?? 0) / 20),
+      age: 0, life: HIT_FX.sparks.heal, seed: b.x * 0.19 + b.y * 0.07 + (heal?.amount ?? 0),
+    });
   }
 
   addShake(amp) {
@@ -342,7 +356,33 @@ export class HitEffects {
       const px = dpr * s.size;
       ctx.save();
       ctx.lineCap = 'round';
-      if (s.kind === 'hit') {
+      if (s.kind === 'heal') {
+        // A soft green ring opening round the body, and plus marks floating
+        // up from it, each over a thin dark line so it reads on the pale
+        // stages too.
+        const rnd = seeded(s.seed);
+        ctx.globalAlpha = fade * 0.9;
+        ctx.lineWidth = Math.max(1, px * 2.5 * fade);
+        ctx.strokeStyle = HEAL;
+        ctx.beginPath();
+        ctx.arc(x, y, px * (10 + 22 * k), 0, Math.PI * 2);
+        ctx.stroke();
+        const arm = px * 3;
+        for (let i = 0; i < 5; i++) {
+          const px0 = x + (rnd() - 0.5) * px * 36;
+          const py0 = y + (rnd() - 0.2) * px * 24 - px * 30 * k;
+          for (const [color, w] of [['rgba(0, 0, 0, 0.35)', Math.max(1, px * 1.6) + 2 * dpr], [HEAL, Math.max(1, px * 1.6)]]) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = w;
+            ctx.beginPath();
+            ctx.moveTo(px0 - arm, py0);
+            ctx.lineTo(px0 + arm, py0);
+            ctx.moveTo(px0, py0 - arm);
+            ctx.lineTo(px0, py0 + arm);
+            ctx.stroke();
+          }
+        }
+      } else if (s.kind === 'hit') {
         const rnd = seeded(s.seed);
         const n = Math.round(6 + s.size * 4);
         const along = Math.hypot(s.dx, s.dy) > 0;

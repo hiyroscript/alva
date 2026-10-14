@@ -10,7 +10,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the land pose, pending attacks and summon startups; the Dash and the air dash last the universal Dash's length, their clips played once across it), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
-| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
+| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow, the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar and cooldown rings drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order and the debug overlay. |
@@ -91,14 +91,18 @@ whose art it is, whoever owns it now.
 Above each on-screen fighter's name tag, the bright purple **Energy bar**
 shows only below full and turns gray during exhaustion. Under the feet, a
 centered row shows only active cooldowns with a duration **above 0.5 seconds**:
-#0001 Unlimited Void (3 s), Hollow Purple (5 s), and #0002 Whirlwind (5 s),
-including long ordinary attacks as well as summons and techniques.
+#0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s), and
+#0003 Heavenly Foot of Pain (2 s), Cherry Blossom Impact (4 s) and Mystical
+Palm Technique (12 s), including long ordinary attacks as well as summons and
+techniques.
 
 Each white, black-outlined ring fills clockwise from the top. Its center shows
 the same art as its touch button, selected once by `js/data/ability-preview.js`
 from `mobileAbilities`: Unlimited Void's `attack4_cast` frame 5, Hollow Purple's
 `projectileAnimations.attack5_object` frame 0, Whirlwind's
-`projectileAnimations.extra_attack_object` frame 2. The renderer uses the
+`projectileAnimations.extra_attack_object` frame 2; the Heavenly Foot of
+Pain's `midair_attack2` frame 2, Cherry Blossom Impact's `attack3_cast` frame 2
+and the Mystical Palm Technique's `attack4_cast` frame 3. The renderer uses the
 fighter's loaded normalized sprites and `drawCenteredFrame`, preserving colors
 and transparency with smoothing off. There is no dependency on UI/DOM code and
 no duplicated preview definition. Missing art is not invented.
@@ -114,7 +118,11 @@ same fight with and without them). Screen shake scaled to the hit, a
 one-frame white flash on the fighter hit, sparks where it landed (a red
 ring for a block, white for a perfect Shield), speed trails behind a fast
 tumbling fighter and fainter ones behind a Dash or an air dash while it
-lasts (`trail.dashAlpha`), sparks and a small shake off a rebounding surface, and a
+lasts (`trail.dashAlpha`), sparks and a small shake off a rebounding surface, a
+heal glow on a fighter that heals itself (a technique's `heal`, read from
+`Fighter.heals`: a soft green ring opening round the middle of its body and a
+few green plus marks floating up, gone after `sparks.heal`, 0.7 s, a little
+bigger for a bigger heal), and a
 short slow-motion zoom on a launch predicted to reach the Void. Reduced
 motion drops the shake and the zoom. Tuning: `HIT_FX` (`shake`, `flash`,
 `sparks`, `trail`, `lethal`, `bounce`, `elimination`).
@@ -150,6 +158,7 @@ far; the colour flash and fade stay.
   fighter taken, its palette and place, outliving the fighter, gone after
   its life and on a restart, paint only).
 - Normalization against real PNGs: [`tests/fighters/0001/fighter-animation.test.mjs`](../../tests/fighters/0001/fighter-animation.test.mjs),
-  [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs).
+  [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs),
+  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs).
 - The canvas is a recording stand-in in every test: layout, scale and
   paint still need a real browser.

@@ -1161,9 +1161,11 @@ test('Battle never starts a fighter that is not playable: a disabled one, a remo
 }));
 
 test('Watch Mode and Quick Battle each refuse a pair with one fighter that cannot play, while others are playable', () => withTestFighters([TEST_A, TEST_DISABLED], async () => {
-  const [removed] = REMOVED_IDS;
   const off = TEST_DISABLED.id;
-  const pairs = [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed], [removed, TEST_A.id], [TEST_A.id, 'no-such-fighter']];
+  const pairs = [
+    [TEST_A.id, off], [off, TEST_A.id], ...REMOVED_IDS.flatMap((removed) => [[TEST_A.id, removed], [removed, TEST_A.id]]),
+    [TEST_A.id, 'no-such-fighter'], ['no-such-fighter', TEST_A.id],
+  ];
   for (const [a, b] of pairs) {
     for (const params of [
       { mode: 'watch', cpu1CharacterId: a, cpu2CharacterId: b },

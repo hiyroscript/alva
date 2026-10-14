@@ -141,6 +141,9 @@ test('in the air the air moves alternate: the mid-air Attack 1 cooling down make
       const airFirst = r.player.attackFor(first, false);
       const airSecond = r.player.attackFor(second, false);
       if (!airFirst || !airSecond) continue;
+      // A slam plunges until it lands (#0003's Heavenly Foot of Pain): it
+      // never leaves its fighter in the air for a second press there.
+      if (r.player.attacks[airFirst].motion?.type === 'slam') continue;
       r.tick(press(first));
       assert.equal(attackOf(r.player), airFirst, `#${c.id}: ${first} in the air`);
       r.until(() => !r.player.combat.attack);

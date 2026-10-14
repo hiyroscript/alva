@@ -68,8 +68,9 @@ definition that breaks one is refused, every problem named):
 | 4 | `attack1` … `attack4` |
 | 5 | `attack1` … `attack5` |
 
-For example, #0001 has five (attack4 and attack5 techniques) and #0002
-three ordinary ones ([character docs](../characters/README.md)).
+For example, #0001 has five (attack4 and attack5 techniques), #0002
+three ordinary ones and #0003 four (attack3 and attack4 techniques)
+([character docs](../characters/README.md)).
 
 ## Attacks
 
@@ -143,8 +144,8 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 and #0002 use them between
-them today):
+is built, and usable by any fighter (#0001, #0002 and #0003 use them
+between them today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
   its own window (`at` to `at + active`) and striking at most once, with
@@ -167,7 +168,19 @@ them today):
   `rebound`): hang, plunge, rebound off the ground or an opponent, the
   attack over. `rise` (`speed` required): hang, then lift. `roll`
   (`speed` required; `keep`, `maxSpeed`, `friction`, `recoil`): curl, then
-  roll on the running speed. A motion attack keeps its physical facing,
+  roll on the running speed. `slam` (`fallSpeed` required; `impact`): the
+  plunge that lands: hang through the startup, then plunge at `fallSpeed`
+  for the active phase, striking whatever the box passes and never stopped
+  by it; meeting the ground ends the plunge there, and the attack goes
+  straight to its recovery, played on the ground (no landing cancel, no
+  rebound) in its `impact.animation` clip (named `<attack>_impact`, from
+  the attack's own art) if it has one. Its optional `impact` (`hitbox`,
+  `hit`, `animation`) is struck once, the step it lands, at every opponent
+  its box meets round the landing point, either side; its hit is
+  validated like an attack's. A plunge that runs out in the air lands
+  nothing and falls on under gravity (#0003's Heavenly Foot of Pain).
+  `attackReach` takes in the plunge and the impact where it would land at
+  the furthest. A motion attack keeps its physical facing,
   and never starts while its fighter is still flying from a launch.
 - **Pull** (`pull: { radius, speed, offset }`): while the attack is active
   it draws every opponent whose middle is within `radius` of its point
@@ -185,7 +198,13 @@ them today):
   sideways speed, its hurt pose; the longer hold wins, it runs down like
   hitstun, and any hit that launches the target ends it; a blocked hit
   paralyzes nobody), `blockPush` (a Shield that blocks it is shoved along
-  the hit's direction, and nothing more). Each defaults to changing
+  the hit's direction, and nothing more), `quake` (true or false: a hit
+  that runs through the ground, so it reaches only a fighter standing on
+  it; an airborne one is passed by with nothing used up, so a strike stays
+  live for it and a projectile flies on, and jumping clears it; a Shield
+  raised on the ground blocks it like any hit; `hitReaches`, asked at
+  every place a hit meets a fighter). A strike inherits its attack's and a
+  finisher its projectile's. Each defaults to changing
   nothing; a value of the wrong kind is refused. There is no hit effect
   that gets past a Shield: `unblockable` (gone) and every other field of
   `SHIELD_BYPASS_FIELDS` is refused wherever a hit is built, true or
@@ -214,15 +233,19 @@ sources }`), and a Fighter's button is read with `actionOffense`.
 An action is an attack when it can deal damage, directly or indirectly: a
 hit of its own that adds Launch Point, paralyzes or launches (`strike`), a
 multi-hit string (`strikes`), a projectile it releases or is (`projectile`,
-a piercing one's `finisher` too), a technique's burst (`burst`), a summon's
-clone that strikes (`clone`), or projectiles it turns back (`redirect`).
+a piercing one's `finisher` too), a technique's burst (`burst`), a slam's
+impact where it lands (`impact`), a summon's clone that strikes (`clone`),
+or projectiles it turns back (`redirect`). A technique that only heals its
+own fighter harms nobody, so it is no attack.
 So:
 
 | Move | Executed as | Classified |
 | --- | --- | --- |
 | A punch, a kick, a numbered attack, a multi-hit string, a homing dash, a roll | attack | attack |
 | A throw and its projectile, a piercing projectile and its finisher | attack, projectile | attack |
-| A cast's burst or projectile (Unlimited Void, Hollow Purple) | technique | attack |
+| A cast's burst or projectile (Unlimited Void, Hollow Purple, Cherry Blossom Impact) | technique | attack |
+| A cast that only heals its own fighter (the Mystical Palm Technique) | technique | neither |
+| A plunge that lands with an impact (the Heavenly Foot of Pain) | attack (in the air) | attack |
 | A summon, its clone and the clone's strike | summon | attack |
 | The Deflect | attack (in the air) | attack **and** defense |
 | A projectile turned back | projectile (now the deflecting fighter's) | attack |
@@ -252,11 +275,14 @@ Each fixed step, after every fighter has moved (see the step order in
 `CombatSystem.update` resolves, in order: the projectiles a live
 Deflect turns back (`deflectProjectiles`: from then on they are the
 deflecting fighter's, so none of them strikes it this step), fighters'
-melee hitboxes (and strikes), live projectiles, summoned clones, then
+melee hitboxes (and strikes, and a slam's impact the step it lands),
+live projectiles, summoned clones, then
 techniques (a burst due on its release step). Every hit goes through one
 `applyHit(attacker, target, def, ...)`, which never checks which fighter,
 attack or technique it is resolving. It is the only place an attack
-reaches a fighter, and the only place a Shield is consulted:
+reaches a fighter, and the only place a Shield is consulted. Before it,
+every one of those places asks `hitReaches`: a `quake` hit never reaches
+a fighter off the ground, and nothing of it is used up. Then:
 
 1. A target whose Shield is up when the hit reaches it blocks it, from
    any side, whatever made it and however hard it hits: no field of the
@@ -377,17 +403,27 @@ once, its `projectile: { id, offset }`, thrown the snapshotted way as an
 attack throws one, and its `burst: { hitbox, hit }`, whose hit is dealt
 once to every opponent the box meets, facing right from the fighter and
 mirrored, so a box round the fighter reaches both sides; then
-`releaseAnimation` plays once) and *done*. Fields: `castAnimation`,
-`releaseAnimation`, `cooldown`, `projectile`, `burst`; the burst's hit is
-validated like an attack's (damage, launch, stuns and hit effects). E.g.
-#0001's Unlimited Void (a burst that paralyzes) and Hollow Purple (a
-projectile that erases), each blocked by a raised Shield ([its
-specification](../characters/0001.md#each-move-in-detail)). Nothing in the
+`releaseAnimation` plays once) and *done*. It may also let go of a
+`heal` (a whole number of Launch Points): on the release step its own
+fighter's Launch Point drops by that much, never below 0
+(`CombatState.heal`); a heal is no hit, so it neither restarts nor
+delays Launch Point recovery, records no hit event (the fighter's `heals`
+list, read by the hit effects for the glow, records it), and a cast
+broken before its release heals nothing. Fields: `castAnimation`,
+`releaseAnimation`, `cooldown`, `projectile`, `burst`, `heal`; the
+burst's hit is validated like an attack's (damage, launch, stuns and hit
+effects). E.g. #0001's Unlimited Void (a burst that paralyzes) and Hollow
+Purple (a projectile that erases), each blocked by a raised Shield ([its
+specification](../characters/0001.md#each-move-in-detail)), and #0003's
+Cherry Blossom Impact (a burst that is a quake) and Mystical Palm
+Technique (a heal, no attack; [its
+specification](../characters/0003.md#each-move-in-detail)). Nothing in the
 runtime reads a fighter or a button; a technique of a different shape
 would be a new form in the runtime with its own fields, not a
 reinterpretation of these.
 
-Any clip missing, the projectile's art missing, nothing to release, or
+Any clip missing, the projectile's art missing, nothing to release (no
+projectile, burst or heal), or
 invalid data, and the press does nothing (logged, no cooldown). Losing
 the ground or a hit on the fighter end it: whatever it had not released
 yet never is, and what it already let go stays.
@@ -419,7 +455,7 @@ projectile casts, summons, techniques, Dash and air dash. Omitted or smaller
 non-negative values resolve to the baseline; explicit longer values are valid.
 Negative, non-numeric and non-finite values are refused. There is no maximum.
 Running, jumps (ground and air), Shield and Deflect are exempt; fast fall stays
-directional movement. Deflect preserves its authored delay (#0001 0, #0002 0.05 s)
+directional movement. Deflect preserves its authored delay (#0001 0, #0002 0.05 s, #0003 0)
 and Energy interaction. No timer changes an animation phase or locks other moves.
 
 Ordinary attacks use `CombatState.cooldowns`, starting on their end, a hit-cancel,
@@ -439,7 +475,9 @@ even during hitstop; Combat Assist neither starts nor checks these timers.
 All stores recover on the fixed step, including hitstop, with `PHASE_EPSILON`
 at expiry. Reset/respawn clears all; a live overtime transition preserves them.
 
-#0001's Unlimited Void uses 3 s and Hollow Purple 5 s; #0002's Whirlwind uses 5 s.
+#0001's Unlimited Void uses 3 s and Hollow Purple 5 s; #0002's Whirlwind uses 5 s;
+#0003's Heavenly Foot of Pain uses 2 s, Cherry Blossom Impact 4 s and the
+Mystical Palm Technique 12 s.
 Only durations above the baseline draw a persistent world-space ring: the same
 artwork as the touch button in the center and remaining seconds below, never a
 codename ([rendering](rendering.md#fighter-status)).
@@ -618,9 +656,12 @@ starts the very attack asked for. The rules are
   [`hit-effects.test.mjs`](../../tests/systems/hit-effects.test.mjs),
   [`pull.test.mjs`](../../tests/systems/pull.test.mjs),
   [`projectile-clash.test.mjs`](../../tests/systems/projectile-clash.test.mjs),
-  [`technique.test.mjs`](../../tests/systems/technique.test.mjs).
+  [`technique.test.mjs`](../../tests/systems/technique.test.mjs) (the heal
+  included), [`quake.test.mjs`](../../tests/systems/quake.test.mjs),
+  [`slam.test.mjs`](../../tests/systems/slam.test.mjs).
 - Each fighter's moves: [`tests/fighters/0001/`](../../tests/fighters/0001/)
   (every move's mechanic, its combos, the CPU playing it),
-  [`tests/fighters/0002/`](../../tests/fighters/0002/).
+  [`tests/fighters/0002/`](../../tests/fighters/0002/),
+  [`tests/fighters/0003/`](../../tests/fighters/0003/).
 - Every pairing of playable fighters in a real battle:
   [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs).

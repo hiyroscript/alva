@@ -36,8 +36,9 @@
 // from: 'strike' (one hit of its own), 'strikes' (a multi-hit string),
 // 'projectile' (it releases one, or is one), 'finisher' (a piercing
 // projectile's last strike), 'burst' (a technique's hit round its caster),
-// 'clone' (a summoned clone that strikes) and 'redirect' (it turns
-// projectiles back, the Deflect's defensive half).
+// 'impact' (a slam's hit where it lands), 'clone' (a summoned clone that
+// strikes) and 'redirect' (it turns projectiles back, the Deflect's
+// defensive half).
 //
 // Every hit that reaches a fighter goes through CombatSystem.applyHit
 // (js/game/combat/combat.js), whatever made it; its event names the
@@ -88,9 +89,9 @@ export function classifyHit(hit) {
 }
 
 // An attack definition's (js/game/combat/attacks.js): a strike of its own
-// or a string of them that can harm, a projectile it throws, or projectiles
-// it turns back (then it is a defense too: the Deflect). A pending attack
-// has none of them.
+// or a string of them that can harm, a projectile it throws, a slam's
+// impact, or projectiles it turns back (then it is a defense too: the
+// Deflect). A pending attack has none of them.
 export function attackOffense(def) {
   const sources = [];
   if (def?.hits) {
@@ -99,6 +100,7 @@ export function attackOffense(def) {
     sources.push('strike');
   }
   if (def?.projectile) sources.push('projectile');
+  if (isHarmfulHit(def?.motion?.impact?.hit)) sources.push('impact');
   const defense = !!def?.deflectProjectiles;
   if (defense) sources.push('redirect');
   return sources.length ? profile(true, defense, sources) : NOT_AN_ATTACK;
@@ -116,7 +118,8 @@ export function projectileOffense(def) {
 
 // A technique definition's (js/game/combat/technique.js): its burst's hit
 // and the projectile it releases. Executed as a technique, it is an attack
-// all the same.
+// all the same. A heal of its own fighter harms nobody: a cast that only
+// heals is no attack.
 export function techniqueOffense(def) {
   const sources = [];
   if (def?.burst && isHarmfulHit(def.burst.hit)) sources.push('burst');

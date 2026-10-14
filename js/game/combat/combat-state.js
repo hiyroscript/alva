@@ -139,9 +139,10 @@ export class CooldownTimers {
 export class CombatState {
   constructor(energy = resolveEnergy()) {
     // Launch Point: each real hit adds its damage and restarts passive
-    // recovery (see CombatSystem.applyHit). Never negative, no maximum,
-    // and it never stops the fighter acting; a launching hit multiplies
-    // the new total by its Base Launch.
+    // recovery (see CombatSystem.applyHit); a technique's heal takes some
+    // off (see heal). Never negative, no maximum, and it never stops the
+    // fighter acting; a launching hit multiplies the new total by its Base
+    // Launch.
     this.launchPoint = 0;
     this.resetLaunchRecovery();
     // Energy for the Dash, the Deflect and the Shield (see resolveEnergy):
@@ -278,6 +279,16 @@ export class CombatState {
       this.launchPoint = 0;
       this.resetLaunchRecovery();
     }
+  }
+
+  // A heal of its own (a technique's `heal`, see js/game/combat/technique.js):
+  // `amount` Launch Points off, never below 0. Returns what it took off.
+  // Recovery runs on as it was: a heal is no hit, so it neither restarts
+  // nor speeds up the passive schedule.
+  heal(amount) {
+    const before = this.launchPoint;
+    this.launchPoint = Math.max(0, before - Math.max(0, amount));
+    return before - this.launchPoint;
   }
 
   // ---- Energy -----------------------------------------------------------------

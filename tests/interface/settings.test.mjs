@@ -1701,11 +1701,12 @@ test('Help remains a placeholder: no Help screen, module, section or registratio
 test('the Home credits still roll: both copies, the second hidden, every credit unchanged in English', () => {
   const credits = creditsText();
   assert.deepEqual(credits.map((g) => g.title), [
-    CONFIG.title, 'Original work', '#0001 sprite source', '#0002 sprite source', 'Rights', 'Project',
+    CONFIG.title, 'Original work', '#0001 sprite source', '#0002 sprite source', '#0003 sprite source', 'Rights', 'Project',
   ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, ['Sprite sheet by Finhj on DeviantArt', 'Sheet credits: ZetrasBlack, R0B4N']);
   assert.deepEqual(credits[3].lines, ['Sprite sheet by thespriteanimations on DeviantArt']);
+  assert.deepEqual(credits[4].lines, ['Sprite sheet ripped by Dazz & Fret on The Spriters Resource']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
 
@@ -1742,7 +1743,9 @@ test('in French the credits translate but proper names stay', () => {
     assert.ok(credits[2].lines[1].includes('ZetrasBlack') && credits[2].lines[1].includes('R0B4N'));
     assert.equal(credits[3].title, 'Source des sprites de #0002');
     assert.ok(credits[3].lines[0].includes('thespriteanimations') && credits[3].lines[0].includes('DeviantArt'));
-    assert.equal(credits[4].title, 'Droits');
+    assert.equal(credits[4].title, 'Source des sprites de #0003');
+    assert.ok(credits[4].lines[0].includes('Dazz & Fret') && credits[4].lines[0].includes('The Spriters Resource'));
+    assert.equal(credits[5].title, 'Droits');
     assert.equal(getLanguage(), 'fr');
   } finally {
     setLanguage('en');
@@ -1753,10 +1756,12 @@ test('in French the credits translate but proper names stay', () => {
 // Every name a removed or replaced fighter's art was credited with (the
 // first #0001's included): none of it applies now. (DeviantArt, where the
 // first #0002's sheet came from, is where the new #0002's and #0001's
-// sheets were published too: credited again, by their own artists.)
+// sheets were published too: credited again, by their own artists. And
+// Dazz & Fret ripped the new #0003's sheet, on The Spriters Resource, as
+// they did the first #0003's: credited again.)
 const RETIRED_CREDITS = [
   'Slender', 'Eric Knudsen', 'Victor Surge', 'Something Awful', 'XmayGrrr', 'Jus Sheet', 'renatoooferreiraaa',
-  'Dazz', 'FRET', 'Jump Ultimate Stars', 'Spriters Resource',
+  'Jump Ultimate Stars',
 ];
 
 test('the credits name only fighters that exist: a sprite group for each, #0001\'s its own sheet\'s, and nothing of a removed or replaced fighter is left', () => {
@@ -1776,25 +1781,27 @@ test('the credits name only fighters that exist: a sprite group for each, #0001\
   }
   // Gone from the data and its translations too.
   assert.deepEqual(CREDITS.map((g) => g.title), [
-    'brand.title', 'credits.original.title', 'credits.sprites0001.title', 'credits.sprites0002.title', 'credits.rights.title',
-    'credits.project.title',
+    'brand.title', 'credits.original.title', 'credits.sprites0001.title', 'credits.sprites0002.title', 'credits.sprites0003.title',
+    'credits.rights.title', 'credits.project.title',
   ]);
-  // Two linked lines: #0001's and #0002's sheets, each on its DeviantArt
-  // page (#0001's by the deviation's number alone, naming nothing).
+  // Three linked lines: #0001's and #0002's sheets, each on its DeviantArt
+  // page (#0001's by the deviation's number alone, naming nothing), and
+  // #0003's on The Spriters Resource (by the asset's number alone).
   const links = CREDITS.flatMap((g) => g.lines || []).filter((line) => line?.href);
-  assert.equal(links.length, 2);
+  assert.equal(links.length, 3);
   assert.equal(links[0].href, 'https://www.deviantart.com/finhj/art/1084627848');
   assert.match(links[1].href, /^https:\/\/www\.deviantart\.com\/thespriteanimations\/art\/[\w-]*1350194762$/);
-  assert.doesNotMatch(read('js/ui/credits.js'), /slender|sprites0003|credits\.sprites\.|Dazz|FRET/i);
+  assert.equal(links[2].href, 'https://www.spriters-resource.com/ds_dsi/jus/asset/20891/');
+  assert.doesNotMatch(read('js/ui/credits.js'), /slender|credits\.sprites\./i);
   for (const file of ['js/localization/i18n.js', 'js/localization/strings/en.js', 'js/localization/strings/fr.js']) {
-    assert.doesNotMatch(read(file), /credits\.\d|credits\.sprites0003|credits\.sprites\.|slender|XmayGrrr/i, file);
+    assert.doesNotMatch(read(file), /credits\.\d|credits\.sprites\.|slender|XmayGrrr/i, file);
   }
   // #0001's attribution: its sheet's artist and the credits the sheet
   // gives, then the notices after it.
   const credits = creditsText();
   const at = credits.findIndex((g) => g.title === '#0001 sprite source');
   assert.deepEqual(credits[at].lines, ['Sprite sheet by Finhj on DeviantArt', 'Sheet credits: ZetrasBlack, R0B4N']);
-  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['#0002 sprite source', 'Rights', 'Project']);
+  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['#0002 sprite source', '#0003 sprite source', 'Rights', 'Project']);
 });
 
 test('a credit line may still link to its source, accessibly, from the Home roll', () => {

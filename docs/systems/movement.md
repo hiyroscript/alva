@@ -231,7 +231,9 @@ Landing never holds a fighter. On the touchdown step it is free to run,
 turn, jump, attack, Dash or Shield; a press made just before (within its
 buffer) comes out at once. An attack started in the air whose recovery
 runs on the ground is over on touchdown (the **landing cancel**): its
-startup and strike play on, its recovery does not. The land clip is a
+startup and strike play on, its recovery does not. The one exception is a
+`slam` that lands: its landing is its recovery, played out on the ground
+in its impact clip ([combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)). The land clip is a
 pose only (a fighter without one, like #0002, simply goes to its stance):
 running, or anything of higher priority, goes straight past it, so a land
 clip never makes a fighter less responsive.
@@ -305,3 +307,7 @@ into attacks and jumps. The old values are kept in
   Straight.
 - [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs):
   #0002's motion attacks.
+- [`tests/systems/slam.test.mjs`](../../tests/systems/slam.test.mjs) and
+  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs):
+  the `slam` motion (#0003's Heavenly Foot of Pain), whose landing is its
+  recovery, never cancelled.

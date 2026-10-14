@@ -48,13 +48,17 @@
 //
 // Beyond damage and launch, a hit may carry the shared hit effects (see
 // js/game/combat/hit-effects.js): `paralyze` (a timed hold on the target,
-// CombatState.paralyze, that a launch ends; never through a Shield) and
-// `blockPush` (a Shield that blocks it is shoved back, and nothing more).
+// CombatState.paralyze, that a launch ends; never through a Shield),
+// `blockPush` (a Shield that blocks it is shoved back, and nothing more)
+// and `quake` (it reaches only a fighter standing on the ground: every
+// place below that a hit meets a fighter asks hitReaches first, so an
+// airborne one is passed by with nothing used up).
 // And a Shield may stall the blows it blocks (`defense.stall`, see
 // js/game/combat/defense.js): a melee attacker freezes in it.
 
 import { resolveLaunchStrength, resolveDirectionalLaunch } from '../../data/launch.js';
 import { strikeLive } from './attacks.js';
+import { hitReaches } from './hit-effects.js';
 
 // How a fighter responds to being launched (the character's
 // `launchReaction`, every field optional; the defaults change nothing):
@@ -144,7 +148,8 @@ const scratchShot = {};
 
 // Resolves hits each simulation step: first the projectiles a live
 // `deflectProjectiles` hitbox turns back (see deflectProjectiles), then
-// fighters' melee hitboxes, then live projectiles (see
+// fighters' melee hitboxes (a slam's impact the step it lands among
+// them, see impact), then live projectiles (see
 // js/game/combat/projectile.js), then summoned clones (see
 // js/game/combat/summon.js), then techniques' bursts (see
 // js/game/combat/technique.js). A
@@ -198,6 +203,7 @@ export class CombatSystem {
     this.deflectProjectiles(fighters, projectiles);
     for (const attacker of fighters) {
       const atk = attacker.combat.attack;
+      if (atk?.impactDue) this.impact(attacker, atk, fighters);
       if (!atk || attacker.combat.phase !== 'active') continue;
       if (atk.def.hits) {
         this.strike(attacker, atk, fighters);
@@ -207,7 +213,7 @@ export class CombatSystem {
       if (!atk.def.hitbox || atk.hasHit) continue;
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
-        if (target === attacker) continue;
+        if (target === attacker || !hitReaches(atk.def, target)) continue;
         const point = strikePoint(hit, target);
         if (!point) continue;
         // One hit per attack, blocked or not; only a real hit (never a
@@ -230,8 +236,10 @@ export class CombatSystem {
         // often until its last strike, its finisher, and an erasing one
         // that hits flies on through. A Shield that blocks any of them
         // stops it there, an erasing one included (see
-        // js/game/combat/projectile.js).
+        // js/game/combat/projectile.js). A quake flies on past a fighter
+        // off the ground.
         const def = p.nextHit;
+        if (!hitReaches(def, target)) continue;
         const event = this.applyHit(p.owner, target, def, {
           facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 },
         });
@@ -244,7 +252,7 @@ export class CombatSystem {
       const hit = c.hitbox(scratchHit);
       if (!hit) continue;
       for (const target of fighters) {
-        if (target === c.owner) continue;
+        if (target === c.owner || !hitReaches(c.attackDef, target)) continue;
         const point = strikePoint(hit, target);
         if (!point) continue;
         c.hasHit = true;
@@ -262,7 +270,7 @@ export class CombatSystem {
       const box = t?.takeBurst(scratchBurst);
       if (!box) continue;
       for (const target of fighters) {
-        if (target === owner) continue;
+        if (target === owner || !hitReaches(t.def.burst.hit, target)) continue;
         const point = strikePoint(box, target);
         if (point) this.applyHit(owner, target, t.def.burst.hit, { facing: t.facing, technique: t, point });
       }
@@ -296,6 +304,30 @@ export class CombatSystem {
     }
   }
 
+  // A slam's impact, due the step it lands (see `slam` in
+  // js/game/combat/attacks.js and Fighter.landSlam): its hit, once, on every
+  // opponent its box meets round the landing point (a quake only on those
+  // standing on the ground). The fighter's own blow, so it freezes it as a
+  // melee hit does; a real hit confirms the attack (its hitCancel counts
+  // from then), a block does not.
+  impact(attacker, atk, fighters) {
+    atk.impactDue = false;
+    const impact = atk.def.motion?.impact;
+    if (!impact) return;
+    const box = worldBox(attacker, impact.hitbox, scratchBurst);
+    for (const target of fighters) {
+      if (target === attacker || !hitReaches(impact.hit, target)) continue;
+      const point = strikePoint(box, target);
+      if (!point) continue;
+      atk.hasHit = true;
+      const event = this.applyHit(attacker, target, impact.hit, { point });
+      if (event.type === 'hit' && !atk.confirmed) {
+        atk.confirmed = true;
+        atk.confirmedAt = atk.time;
+      }
+    }
+  }
+
   // A multi-hit attack's strikes (see `hits` above) this step: each one
   // live in its own window, at most once, on the first opponent its box
   // meets. Any real hit confirms the attack (its hitCancel counts from the
@@ -307,7 +339,7 @@ export class CombatSystem {
       if (atk.struck.has(h.index) || !strikeLive(h, atk.time)) continue;
       const box = worldBox(attacker, h.hitbox, scratchHit);
       for (const target of fighters) {
-        if (target === attacker) continue;
+        if (target === attacker || !hitReaches(h, target)) continue;
         const point = strikePoint(box, target);
         if (!point) continue;
         atk.struck.add(h.index);

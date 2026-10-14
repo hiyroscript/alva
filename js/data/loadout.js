@@ -175,7 +175,7 @@ export function loadoutProblems(def) {
       if (!animations[key]) say(`technique ${id}'s ${field} "${key}" is not in \`animations\``);
       else if (!key.startsWith(`${id}_`)) say(`technique ${id}'s ${field} "${key}" is not named ${id}_...`);
     }
-    if (!technique.projectile && !technique.burst) say(`technique ${id} releases nothing (no projectile and no burst)`);
+    if (!technique.projectile && !technique.burst && !(technique.heal > 0)) say(`technique ${id} releases nothing (no projectile, no burst and no heal)`);
     const shot = technique.projectile;
     if (shot) {
       if (shot.id !== objectOf(id)) say(`technique ${id} releases "${shot.id}": its projectile is ${objectOf(id)}`);
@@ -240,6 +240,10 @@ export function loadoutProblems(def) {
       continue;
     }
     if (atk.animation && !animations[atk.animation]) say(`attack "${id}" plays "${atk.animation}", which is not in \`animations\``);
+    // A slam's landing clip, if it names one: the attack's own art.
+    const landing = atk.motion?.impact?.animation;
+    if (landing && !animations[landing]) say(`attack "${id}"'s impact plays "${landing}", which is not in \`animations\``);
+    else if (landing && !landing.startsWith(`${id}_`)) say(`attack "${id}"'s impact plays "${landing}": it is not named ${id}_...`);
     const shot = atk.projectile;
     if (!shot) continue;
     if (shot.id !== objectOf(id)) say(`attack "${id}" throws "${shot.id}": its projectile is ${objectOf(id)}`);

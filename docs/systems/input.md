@@ -248,6 +248,16 @@ chosen for each move, not its attack number:
 | Blue (air) | R1 / RB | | | |
 | High Kick (air) | L2 + Square / LT + X | | | |
 
+| #0003 | Recommended |
+| --- | --- |
+| Chakra Punch | Square / X |
+| Heel Drop | Triangle / Y |
+| Cherry Blossom Impact | R2 + Square / RT + X |
+| Chakra Haymaker | R2 + Triangle / RT + Y |
+| Mystical Palm Technique | L2 + Triangle / LT + Y |
+| Leaping Kick (air) | Square / X |
+| Heavenly Foot of Pain (air) | Triangle / Y |
+
 A fighter with no authored layout gets a safe, conflict-free fallback
 (face buttons, then R1, then trigger combinations), flagged in the editor
 as not designed yet; a fighter's layout may never retune the universal

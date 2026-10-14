@@ -74,10 +74,11 @@ is optional and the defaults change nothing:
 | `tumbleSpeed` | never | launched at least this fast, it tumbles in its mid-air hurt pose until it acts or lands |
 | `steerAngle` | 0 | degrees the direction it holds as a hit lands may bend the launch (never its strength) |
 
-A hit (never a block) also gives the target its air jumps back. #0001's
-and #0002's values are in their character specifications (both use 0.2 s
-per 1000 units/s up to 0.7 s and tumble from 1100 units/s; #0001 steers a
-launch up to 18°, #0002 15°).
+A hit (never a block) also gives the target its air jumps back. Each
+fighter's values are in its character specification (#0001 and #0002 use
+0.2 s per 1000 units/s up to 0.7 s, #0003 0.15 s up to 0.55 s; all three
+tumble from 1100 units/s; #0001 steers a launch up to 18°, #0002 15°,
+#0003 20°).
 
 A launching hit also ends a paralysis on the spot (a hit's `paralyze`,
 see [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)): a launch
@@ -109,7 +110,7 @@ one-way platforms only from above; the Void never.
 
 A fighter may override any of them with its own `launchBounce` entry
 (`enabled: false` turns rebounds off for it); an unknown field is logged
-and ignored. #0001 and #0002 override none. The settings came from the
+and ignored. No fighter overrides any today. The settings came from the
 [bounce update](../../UPDATES.md#bounce-update).
 
 ## Tests

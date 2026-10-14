@@ -159,6 +159,8 @@ export const EN = {
   'credits.sprites0001.sheetCredits': 'Sheet credits: ZetrasBlack, R0B4N',
   'credits.sprites0002.title': '#0002 sprite source',
   'credits.sprites0002.sheet': 'Sprite sheet by thespriteanimations on DeviantArt',
+  'credits.sprites0003.title': '#0003 sprite source',
+  'credits.sprites0003.sheet': 'Sprite sheet ripped by Dazz & Fret on The Spriters Resource',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -315,6 +317,7 @@ export const EN = {
   // whenever the fighter's definition changes.
   'discover.fighter.0001.playStyle': 'A patient fighter who controls space, creates openings, and punishes careless approaches. Strong at setting the pace and capitalizing on mistakes, but vulnerable when pressured or when committing too early.',
   'discover.fighter.0002.playStyle': 'An aggressive, momentum-driven fighter who pressures opponents up close and pursues them through the air. Strong at sustaining close-range offense and chasing escapes, but vulnerable to predictable approaches and overcommitting.',
+  'discover.fighter.0003.playStyle': 'A deliberate powerhouse who wins exchanges with heavy, well-timed blows that shake the ground and drive guards back, and who can heal when given room. Strong at punishing grounded opponents, but vulnerable to airborne approaches and to being rushed during long commitments.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

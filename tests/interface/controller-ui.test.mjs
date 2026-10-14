@@ -173,7 +173,7 @@ const { ConfirmDialog, InfoDialog } = await import('../../js/ui/overlays.js');
 const { ControllerDialog } = await import('../../js/ui/controller-dialog.js');
 const { ControllerControls } = await import('../../js/ui/controller-editor.js');
 const { CONFIG } = await import('../../js/config.js');
-const { getCharacter } = await import('../../js/data/characters.js');
+const { getCharacter, playableCharacters } = await import('../../js/data/characters.js');
 const { fakePad, setButton, padSource, PAD_IDS } = await import('../helpers/fake-gamepad.mjs');
 const { stylesheet } = await import('../helpers/stylesheet.mjs');
 
@@ -522,7 +522,7 @@ test('Customize controller controls opens the fighter roster: 48 slots, locked o
     const slots = controls.roster.roster.slots;
     assert.equal(slots.length, CONFIG.roster.totalSlots);
     const locked = slots.filter((s) => s.classList.contains('is-locked'));
-    assert.ok(locked.length >= 46);
+    assert.equal(locked.length, CONFIG.roster.totalSlots - playableCharacters().length);
     for (const slot of locked) assert.equal(slot.hasAttribute('data-nav'), false, 'a locked slot is no stop');
     controls.edit({ ...getCharacter('0001'), available: false });
     assert.equal(controls.editor.isOpen, false, 'an unplayable fighter has no editor');

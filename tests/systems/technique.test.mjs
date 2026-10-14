@@ -215,3 +215,65 @@ test('its cooldown runs from its start; a press while it runs, in the air or mid
   assert.equal(fighter.technique, null);
   assert.equal(cd.active('attack4'), false);
 });
+
+// ---- A heal of its own ----------------------------------------------------------------
+
+// The healer: the same caster, its Attack 4 a cast that heals it of 10
+// Launch Points and releases nothing else.
+const HEALER = {
+  ...CASTER,
+  id: 'test-healer',
+  techniques: { attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 3, heal: 10 } },
+};
+const HEALER_SPRITES = fakeSpritesOf(HEALER);
+const healer = (opts = {}) => makeFighter({ character: HEALER, sprites: HEALER_SPRITES, ...opts });
+
+test('a heal is a whole number of Launch Points; a cast that only heals releases something, and is no attack', () => {
+  const t = createTechniqueDefinition({ id: 'attack4', ...HEALER.techniques.attack4 });
+  assert.equal(t.heal, 10);
+  assert.equal(createTechniqueDefinition({ id: 'x', burst: CASTER.techniques.attack4.burst }).heal, 0, 'none by default');
+  assert.deepEqual({ ...t.offense, sources: [...t.offense.sources] }, { attack: false, defense: false, sources: [] },
+    'it harms nobody: no attack, whatever executes it');
+  assert.equal(techniqueProblem(healer().fighter, t), null, 'a heal is something to release');
+  for (const bad of [-1, 2.5, '10', NaN]) {
+    assert.throws(() => createTechniqueDefinition({ id: 'attack4', ...HEALER.techniques.attack4, heal: bad }), /heal must be a whole number/, String(bad));
+  }
+});
+
+test('as it releases it takes its heal off its own fighter\'s Launch Point, never below 0, and leaves the passive recovery as it was', () => {
+  const { fighter, step } = healer();
+  fighter.combat.launchPoint = 25;
+  fighter.combat.launchRecoveryRemaining = 99;
+  step(P('attack4'));
+  let at = -1;
+  for (let i = 0; i < steps(CAST) + 5 && at < 0; i++) {
+    step({});
+    if (fighter.heals.length) at = i;
+  }
+  assert.ok(at >= 0, 'healed');
+  assert.equal(fighter.technique.phase, 'release', 'as the cast ends');
+  assert.deepEqual(fighter.heals, [{ amount: 10, ability: 'attack4' }]);
+  assert.equal(fighter.combat.launchPoint, 15);
+  assert.ok(fighter.combat.launchRecoveryRemaining > 90, 'the passive schedule untouched');
+  step({});
+  assert.deepEqual(fighter.heals, [], 'recorded for its own step only');
+  // Below its heal, down to 0 and no further.
+  const low = healer();
+  low.fighter.combat.launchPoint = 4;
+  low.step(P('attack4'));
+  for (let i = 0; i < steps(CAST + RELEASE) + 5; i++) low.step({});
+  assert.equal(low.fighter.combat.launchPoint, 0);
+});
+
+test('a hit before it lets go breaks it and heals nothing', () => {
+  const d = duel({ attackerCharacter: HEALER, attackerSprites: HEALER_SPRITES, gap: 300 });
+  d.attacker.combat.launchPoint = 30;
+  d.tick({});
+  d.tick(P('attack4'));
+  d.tick();
+  new CombatSystem().applyHit(d.target, d.attacker, createAttackDefinition({ id: 'testHit', damage: 1, hitstun: 0.2, hitstop: 0 }));
+  assert.equal(d.attacker.technique, null);
+  for (let i = 0; i < steps(CAST + RELEASE); i++) d.tick();
+  assert.equal(d.attacker.combat.launchPoint, 31, 'only the hit counted');
+  assert.ok(d.attacker.combat.abilityCooldowns.active('attack4'), 'its cooldown runs on all the same');
+});

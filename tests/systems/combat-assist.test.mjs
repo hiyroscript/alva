@@ -124,12 +124,14 @@ function placeFoe(r, atk, gap, box = attackReach(atk)) {
 }
 
 // Every combat button whose attack (on the ground, or in the air: `air`)
-// is melee, for `character`.
+// is melee, for `character`: in the air, only one that may start there
+// (never a ground-only one, such as #0003's Chakra Haymaker).
 function meleeButtons(character, air) {
   const f = rig({ character }).player;
   return COMBAT_BUTTONS.filter((action) => {
     const id = f.attackFor(action, !air);
-    return !!id && isMeleeAttack(f.attacks[id]);
+    const atk = id ? f.attacks[id] : null;
+    return !!atk && isMeleeAttack(atk) && !(air && atk.groundOnly);
   }).map((action) => ({ action, id: f.attackFor(action, !air) }));
 }
 const groundMelee = (character) => meleeButtons(character, false);
@@ -378,13 +380,15 @@ test('turned off, every press behaves exactly as without the feature: movement, 
 // ---- Never for anything but a grounded melee press ---------------------------------------
 
 test('ranged attacks never get it: a projectile attack starts where the fighter stands, nothing paid', () => {
+  // Every fighter's that has one (#0003 throws nothing).
+  let tried = 0;
   for (const c of playableCharacters()) {
     const f = rig({ character: c }).player;
     const ranged = COMBAT_BUTTONS.filter((a) => {
       const id = f.attackFor(a, true);
       return id && isRangedAttack(f.attacks[id]);
     });
-    assert.ok(ranged.length > 0, `#${c.id} has a projectile attack`);
+    tried += ranged.length;
     for (const action of ranged) {
       const r = rig({ character: c, gap: 150 });
       const energy = r.player.combat.energy;
@@ -394,6 +398,7 @@ test('ranged attacks never get it: a projectile attack starts where the fighter 
       assert.equal(r.player.combat.energy, energy);
     }
   }
+  assert.ok(tried > 0, 'the roster has projectile attacks to try');
 });
 
 test('summons, techniques, pending attacks and reserved buttons never get it', () => {

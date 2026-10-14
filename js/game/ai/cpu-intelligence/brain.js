@@ -50,8 +50,9 @@ import { makePlan, COMMITTED } from './plans.js';
 import { Telemetry, STILL_LIMIT } from './telemetry.js';
 import { STEP, Track, arcTrack, predictTrack, recoverySim } from './prediction.js';
 import { riseOf } from './values.js';
-import { analyzeCapabilities } from './capabilities.js';
+import { analyzeCapabilities, moveReady } from './capabilities.js';
 import { StageModel } from './stage-model.js';
+import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
 // How far ahead a recognized threat is answered (seconds to contact).
 const THREAT_HORIZON = 0.9;
@@ -432,6 +433,8 @@ export class CpuIntelligence {
     const me = s.me;
     const params = this.strategy.params;
     if (me.offstage) return this.recoveryPlan(s);
+    const heal = this.healPlan(s);
+    if (heal) return heal;
     const list = this.evaluator.candidates(s, this.candidateList, {});
     let best = null;
     let bestV = -Infinity;
@@ -520,6 +523,37 @@ export class CpuIntelligence {
     return r || 300;
   }
 
+  // A heal of its own (a technique that gives Launch Point back, see
+  // `heal` in js/game/combat/technique.js): worth its cast once the CPU has
+  // taken enough for the whole heal to count, and only where nothing can
+  // break the cast before it lets go: no threat on its way, and the
+  // opponent (busy as long as it is, then closing in with a Dash and a run)
+  // unable to come within reach before then. With nobody to fight (the
+  // opponent respawning) that is any time on the ground.
+  healPlan(s) {
+    const me = s.me;
+    if (!me.grounded || !me.canAct || me.offstage) return null;
+    for (const m of s.caps.moves) {
+      if (!(m.heal > 0) || !moveReady(s.self, m) || me.lp < m.heal * 1.2) continue;
+      if (s.present) {
+        if (this.threatened || (this.incoming && this.incoming.contact < m.commitment + 0.15)) continue;
+        if (this.opponentArrives(s) < m.lead + 0.15) continue;
+      }
+      return makePlan('press', { move: m, reason: `heal: ${Math.round(me.lp)} Launch Point, the opponent out of reach` }, this);
+    }
+    return null;
+  }
+
+  // Seconds before the opponent could strike the CPU from where it is: what
+  // keeps it busy, a moment to react, then the gap beyond its longest reach
+  // closed with a Dash and a run at top speed.
+  opponentArrives(s) {
+    const gap = Math.max(0, s.dist - s.foeReach.lunge);
+    const dash = s.foeCaps.movement.dash ? MV.dashSpeed * MV.dashDuration : 0;
+    const close = gap <= dash ? gap / MV.dashSpeed : (dash ? MV.dashDuration : 0) + (gap - dash) / MV.maxSpeed;
+    return s.op.busy + 0.12 + close;
+  }
+
   // With its own decisions held (`neutral` off): only what keeps it safe.
   passivePlan(s) {
     if (s.me.offstage) return this.recoveryPlan(s);
@@ -534,7 +568,9 @@ export class CpuIntelligence {
     if (me.stun > 0 || me.paralysis > 0) return;
     if (me.offstage && this.plan?.kind !== 'recover') this.setPlan(this.recoveryPlan(s), s, 'offstage');
     if (!this.plan || (think && !COMMITTED.has(this.plan.kind))) {
-      if (me.grounded) {
+      const heal = this.neutral ? this.healPlan(s) : null;
+      if (heal) this.setPlan(heal, s, null);
+      else if (me.grounded) {
         const foe = s.foe;
         const spawnX = foe?.spawn?.x ?? s.model.centerX;
         const toward = Math.sign(s.model.centerX - spawnX) || 1;

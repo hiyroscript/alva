@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Two playable fighters** on a 48-slot roster:
+- **Three playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -40,9 +40,14 @@ blocks every attack.
   blows it blocks) and
   [#0002](docs/characters/0002.md), the speedster (a lock-on Homing
   Attack, a plunging Bounce Attack, a rolling Spin Attack, a rising Blue
-  Tornado and a travelling Whirlwind). Both Shield on the ground and
+  Tornado and a travelling Whirlwind), and
+  [#0003](docs/characters/0003.md), the medic brawler (blows that crack the
+  ground and reach only fighters standing on it, a heel-first plunge that
+  splits the ground where it lands, Cherry Blossom Impact erupting either
+  side of it, and the Mystical Palm Technique, a long kneeling cast that
+  heals its own Launch Point). All three Shield on the ground and
   Deflect in the air (a strike that knocks projectiles back at their
-  thrower), and both Dash on the ground and air dash.
+  thrower), and all three Dash on the ground and air dash.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then
@@ -119,10 +124,11 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 What each attack button does is the fighter's own; a fighter with fewer
 than five numbered attacks leaves the rest unused. On a controller each
 fighter has a layout designed for its moves (Square / X its basic punch
-for both fighters; #0001's projectiles and Hollow Purple behind R2 / RT and
+for every fighter; #0001's projectiles and Hollow Purple behind R2 / RT and
 Unlimited Void behind L2 / LT; #0002's Spin Attack and Blue Tornado sharing
 R1 / RB on the ground and in the air, its Homing and Bounce Attacks picked
-by the stick), and every binding of every fighter can be changed in
+by the stick; #0003's heel drops on Triangle / Y, Cherry Blossom Impact and
+its Chakra Haymaker behind R2 / RT and its heal behind L2 / LT), and every binding of every fighter can be changed in
 Settings › Controls › Controller controls. In menus the D-pad moves focus,
 the left stick moves a circular cursor, Cross / A confirms and Circle / B
 goes back. On touch: a joystick (or Left / Right buttons) at the lower left
@@ -202,6 +208,9 @@ credits: ZetrasBlack, R0B4N.
 
 **#0002 sprite source.** Sprite sheet by thespriteanimations on
 [DeviantArt](https://www.deviantart.com/thespriteanimations/art/Sprite-Sheet-1350194762).
+
+**#0003 sprite source.** Sprite sheet ripped by Dazz & Fret on
+[The Spriters Resource](https://www.spriters-resource.com/ds_dsi/jus/asset/20891/).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

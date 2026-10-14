@@ -85,6 +85,15 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0002.playStyle',
     reviewedSourceHash: '0141bc1d9d8045e24c3c989cf3bae3ab1a46221eb7fba403d228ace8c3262439',
   }),
+  // A ground-shattering bruiser and self-healer: a readable core of heavy,
+  // telegraphed blows, with mastery in reading who is standing on the
+  // ground for its quakes, the slam's commitment (and its danger off the
+  // stage), and finding safe room for its long, breakable heal.
+  '0003': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0003.playStyle',
+    reviewedSourceHash: 'faf797d31d42b5c1585c745b70227a4d6ee8acb61831123511451a95e7b06274',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

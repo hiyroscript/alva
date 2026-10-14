@@ -190,7 +190,9 @@ export class Evaluator {
       const fy = s.foeTrack.y[fk];
       const inX = Math.min(fx + hurt.hw - scratchBox.x, scratchBox.x + scratchBox.w - (fx - hurt.hw));
       const inY = Math.min(fy + hurt.bottom - scratchBox.y, scratchBox.y + scratchBox.h - (fy + hurt.top));
-      if (inX > 0 && inY > 0) {
+      // A quake reaches the opponent only standing on the ground.
+      const reaches = !m.burst.hit?.quake || s.foeTrack.g[fk];
+      if (reaches && inX > 0 && inY > 0) {
         // Toward the nearer side of the box is the way out.
         const out = Math.min(fx - scratchBox.x, scratchBox.x + scratchBox.w - fx) + hurt.hw;
         return {
@@ -335,7 +337,7 @@ export class Evaluator {
               const ddx = Math.abs(s.foeTrack.x[f] - ax);
               if (ddx > Math.max(Math.abs(r.x), Math.abs(r.x + r.w)) + hurt.hw + 20) continue;
               const fy = s.foeTrack.y[f];
-              if (fy + hurt.bottom < ay + r.y - 30 || fy + hurt.top > ay + r.y + r.h + 30 + (m.motion === 'bounce' ? 400 : 0)) continue;
+              if (fy + hurt.bottom < ay + r.y - 30 || fy + hurt.top > ay + r.y + r.h + 30 + (m.motion === 'bounce' || m.motion === 'slam' ? 400 : 0)) continue;
               const st = { x: arc.x[a], y: arc.y[a], vx: arc.vx[a], vy: arc.vy[a], grounded: false, halfW: me.halfW, height: me.height };
               const face = Math.sign(s.foeTrack.x[f] - st.x) || me.facing;
               const c = this.melee(s, m, st, face, j + delay);

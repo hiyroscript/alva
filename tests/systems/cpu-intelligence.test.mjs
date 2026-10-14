@@ -518,10 +518,34 @@ function tryOpportunity(D, move, difficulty, { dx, lift }, seed = 5) {
   return out;
 }
 
+// A heal's opportunity at `difficulty` (see CpuIntelligence.healPlan): the
+// CPU has taken three heals' worth of Launch Point and its opponent stands
+// still far across the ring, out of reach for longer than the cast. Its
+// job is done once the heal has come back to it.
+function tryHeal(D, move, difficulty, seed = 5) {
+  const r = arena({ cpuDef: D, foeDef: D, difficulty, seed, cpuX: 400, foeX: 1600 });
+  r.cpu.combat.launchPoint = move.heal * 3;
+  const out = { started: false, healed: 0 };
+  for (let i = 0; i < seconds(4) && !out.healed; i++) {
+    r.step();
+    if (r.cpu.technique?.def.id === move.id) out.started = true;
+    for (const h of r.cpu.heals) out.healed += h.amount;
+  }
+  return out;
+}
+
 test('every move of every fighter, in an opportunity made for it, is recognized, pressed and does its job, at every level', () => {
   for (const D of FIGHTERS) {
     const f = new Fighter({ def: D, sprites: fakeSpritesOf(D), stage: FLAT, spawn: { x: 1000 } });
     for (const m of analyzeCapabilities(f).moves) {
+      // A heal's job is its own fighter's Launch Point, not a hit.
+      if (m.heal > 0) {
+        for (const difficulty of DIFFICULTY_IDS) {
+          const o = tryHeal(D, m, difficulty);
+          assert.ok(o.started && o.healed === m.heal, `#${D.id} ${m.key} at ${difficulty}: heals ${JSON.stringify(o)}`);
+        }
+        continue;
+      }
       const spot = opportunityFor(D, m);
       assert.ok(spot, `#${D.id} ${m.key}: an opportunity where it is the tool`);
       for (const difficulty of DIFFICULTY_IDS) {

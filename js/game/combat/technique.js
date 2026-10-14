@@ -10,16 +10,18 @@
 // combat.attack), a projectile or a summon. But what it does makes it an
 // attack all the same (its definition's `offense`, see
 // js/game/combat/offense.js): a burst that can harm and a projectile it
-// releases are attacks, blocked by an active Shield like any other.
+// releases are attacks, blocked by an active Shield like any other. A cast
+// that only heals its own fighter harms nobody, so it is no attack.
 // Behaviour is data on the character (`techniques`, keyed by the attack it
 // is), and so are its clips, named after it (attack5_...).
 //
 // The runtime implements one form of technique: the cast. The fighter
 // stands still, committed to a casting pose, then lets go of what it casts
-// all at once: a projectile, a burst round itself, or both. Nothing in it
-// reads a fighter or a button: any fighter may give a cast its own clips,
-// timing, projectile and burst. E.g. #0001's Hollow Purple (attack5) and
-// Unlimited Void (attack4):
+// all at once: a projectile, a burst round itself, a heal of its own, or
+// any of them together. Nothing in it reads a fighter or a button: any
+// fighter may give a cast its own clips, timing, projectile, burst and
+// heal. E.g. #0001's Hollow Purple (attack5) and Unlimited Void (attack4),
+// and #0003's Mystical Palm Technique (attack4, a heal):
 //
 //   techniques: {
 //     attack5: {
@@ -30,6 +32,7 @@
 //       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 0.5,
 //       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, paralyze: 1.8 } },
 //     },
+//     attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 12, heal: 10 },
 //   },
 //
 // Phases, always explicit:
@@ -45,7 +48,9 @@
 //            attack throws one) and its `burst` (`hit` dealt once to every
 //            opponent whose hurtboxes its `hitbox` meets, facing right from
 //            the fighter's origin and mirrored: a box round the fighter
-//            reaches both sides). releaseAnimation then plays once, the
+//            reaches both sides) and its `heal` (that many Launch Points
+//            taken off its own fighter's, never below 0: see
+//            CombatState.heal). releaseAnimation then plays once, the
 //            fighter still committed.
 //   done     the fighter is free again.
 //
@@ -53,9 +58,9 @@
 // technique is over: losing the ground ends it at once (nothing released
 // if it was still casting) and the fighter falls (see Fighter.update). A hit
 // on the fighter ends it too (see CombatSystem.applyHit): no armour, no
-// invulnerability, so a cast can be broken before it lets go. What it has
-// released by then is out of its hands: the projectile flies on, the burst
-// has landed.
+// invulnerability, so a cast can be broken before it lets go (a heal
+// broken so heals nothing). What it has released by then is out of its
+// hands: the projectile flies on, the burst has landed, the heal is kept.
 //
 // Clocks follow the fighter's SpriteAnimator: a phase entered during the
 // fighter's own update counts that step (its first frame shows at `time` =
@@ -74,17 +79,8 @@
 // A horizontal launch travels along the technique's facing.
 
 import { resolveCooldown } from '../../data/cooldowns.js';
-import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
-import { resolveHitEffects } from './hit-effects.js';
+import { createHit } from './hit-effects.js';
 import { assertNoShieldBypass, resolveOffense, techniqueOffense } from './offense.js';
-
-const HIT_DEFAULTS = {
-  baseLaunch: 0,
-  directionalLaunch: null,
-  hitstun: 0.2,
-  blockstun: 0.12,
-  hitstop: 0.06,
-};
 
 const TECHNIQUE_DEFAULTS = {
   castAnimation: null,
@@ -96,20 +92,14 @@ const TECHNIQUE_DEFAULTS = {
   projectile: null,
   // { hitbox, hit }: the burst round the fighter it releases, or null.
   burst: null,
+  // Launch Point it takes off its own fighter as it releases (a whole
+  // number; 0 is none): see `heal` above.
+  heal: 0,
 };
 
 // Clocks are sums of fixed steps; compare against boundaries with a little
 // slack (see PHASE_EPSILON in attacks.js).
 const TIME_EPSILON = 1e-6;
-
-function createHit(id, spec) {
-  if (!spec) return null;
-  const owner = `Hit "${id}"`;
-  return Object.freeze({
-    ...HIT_DEFAULTS, ...spec, id,
-    damage: resolveHitDamage(spec.damage, owner), ...resolveHitLaunch(spec, owner), ...resolveHitEffects(spec, owner),
-  });
-}
 
 export function createTechniqueDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Technique definitions need an id');
@@ -124,6 +114,7 @@ export function createTechniqueDefinition(spec) {
   if (def.burst) {
     def.burst = Object.freeze({ hitbox: Object.freeze({ ...def.burst.hitbox }), hit: createHit(`${spec.id}.burst`, def.burst.hit) });
   }
+  if (!(Number.isInteger(def.heal) && def.heal >= 0)) throw new Error(`[Alva] ${owner}'s heal must be a whole number of Launch Points from 0`);
   def.offense = resolveOffense(spec, techniqueOffense(def), owner);
   return Object.freeze(def);
 }
@@ -138,7 +129,7 @@ export function techniqueProblem(owner, def) {
   for (const key of TECHNIQUE_CLIPS.map((field) => def[field])) {
     if (!key || !owner.sprites.has(key)) return `its fighter clip "${key}" has no animation frames`;
   }
-  if (!def.projectile && !def.burst) return 'it releases nothing (no projectile and no burst)';
+  if (!def.projectile && !def.burst && !(def.heal > 0)) return 'it releases nothing (no projectile, no burst and no heal)';
   if (def.projectile) {
     const proj = owner.projectileDefs?.[def.projectile.id];
     if (!proj) return `its projectile "${def.projectile.id}" is not defined`;
@@ -164,6 +155,7 @@ export class Technique {
     this.time = 0; // seconds into the current phase (see update)
     this.released = false;
     this.burstDue = false; // the burst, waiting for the CombatSystem
+    this.healDue = 0; // the heal, waiting for its fighter (see takeHeal)
     this.endReason = null;
     this.castDuration = owner.sprites.duration(def.castAnimation);
     this.releaseDuration = owner.sprites.duration(def.releaseAnimation);
@@ -195,6 +187,15 @@ export class Technique {
     const shot = this.def.projectile;
     if (shot) this.owner.releases.push({ id: shot.id, offset: shot.offset, direction: this.facing, ability: this.def.id });
     if (this.def.burst) this.burstDue = true;
+    if (this.def.heal > 0) this.healDue = this.def.heal;
+  }
+
+  // The heal due this step, taken (its fighter applies it, see
+  // Fighter.update): Launch Points, or 0 when none is due.
+  takeHeal() {
+    const heal = this.healDue;
+    this.healDue = 0;
+    return heal;
   }
 
   // The burst due this step, taken: its world-space box (`out`), centred on
@@ -245,6 +246,7 @@ export class Technique {
     this.phase = 'done';
     this.endReason = reason;
     this.burstDue = false;
+    this.healDue = 0;
     this.owner = null;
   }
 }
