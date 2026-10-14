@@ -1,8 +1,8 @@
 // Run with node --test tests/integration/empty-roster.test.mjs (no dependencies).
-// The roster as it ships: #0001 and #0002, both whole and playable. The
-// fighter that held slot 03 is gone (definition, art, tests, translations,
-// credits), and so is the one that held slot 02 before the new #0002 took
-// its place. And the empty roster, which the game still handles for the day
+// The roster as it ships: #0001, #0002 and #0003, each whole and playable.
+// The fighters that held slots 02 and 03 before the new #0002 and #0003
+// took their places left nothing of theirs behind (art, scaffolding,
+// translations, credits). And the empty roster, which the game still handles for the day
 // no fighter is playable: with every shipped fighter disabled for the
 // length of a test (`withoutFighters`), every route that would start a
 // match refuses rather than falling back to a disabled or missing fighter:
@@ -202,7 +202,8 @@ const exists = (path) => existsSync(new URL(path, ROOT));
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 const DEF_0001 = getCharacter('0001');
 const DEF_0002 = getCharacter('0002');
-const SHIPPED = [DEF_0001, DEF_0002];
+const DEF_0003 = getCharacter('0003');
+const SHIPPED = [DEF_0001, DEF_0002, DEF_0003];
 
 // Runs `fn` (sync or async) with every shipped fighter disabled, so nothing
 // is playable, and enables them again afterwards whatever happens.
@@ -255,8 +256,8 @@ function fakeApp() {
 
 // ---- The data -------------------------------------------------------------------
 
-test('the roster ships #0001 and #0002, both whole and playable', () => {
-  assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001', '0002']);
+test('the roster ships #0001, #0002 and #0003, each whole and playable', () => {
+  assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001', '0002', '0003']);
   assert.equal(DEF_0001.id, '0001');
   assert.equal(DEF_0001.displayName, '#0001');
   assert.equal(DEF_0001.rosterSlot, 0, 'slot 01');
@@ -267,7 +268,11 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.equal(DEF_0002.rosterSlot, 1, 'slot 02');
   assert.equal(isPlayable(DEF_0002), true);
   assert.equal(getPlayableCharacter('0002'), DEF_0002);
-  assert.deepEqual(playableCharacters(), [DEF_0001, DEF_0002]);
+  assert.equal(DEF_0003.displayName, '#0003');
+  assert.equal(DEF_0003.rosterSlot, 2, 'slot 03');
+  assert.equal(isPlayable(DEF_0003), true);
+  assert.equal(getPlayableCharacter('0003'), DEF_0003);
+  assert.deepEqual(playableCharacters(), [DEF_0001, DEF_0002, DEF_0003]);
   // Whole: five numbered attacks (three ordinary, with their mid-air
   // versions, and two techniques) and the High Kick.
   assert.deepEqual(Object.keys(DEF_0001.attacks).sort(),
@@ -300,7 +305,7 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.equal(STRINGS.en['credits.sprites0001.title'], '#0001 sprite source');
 });
 
-test('#0001 is every default: Quick Battle, both Watch Mode CPUs and Practice Ground; both fighters are preloaded', async () => {
+test('#0001 is every default: Quick Battle, both Watch Mode CPUs and Practice Ground; every fighter is preloaded', async () => {
   const selection = initialSelection();
   assert.equal(selection.characterId, '0001');
   assert.equal(selection.watch.cpu1CharacterId, '0001');
@@ -308,22 +313,23 @@ test('#0001 is every default: Quick Battle, both Watch Mode CPUs and Practice Gr
   assert.equal(practiceDefaultFighter(), DEF_0001);
   const asked = [];
   App.prototype.preloadFighters.call({ loadCharacter: (id) => asked.push(id) });
-  assert.deepEqual(asked, ['0001', '0002']);
+  assert.deepEqual(asked, ['0001', '0002', '0003']);
   // Home opens every match action, with no note.
   const { app } = fakeApp();
   const home = new HomeScreen(app);
   home.enter();
   for (const id of MATCH_ACTIONS) assert.equal(home.actions[id].disabled, false, id);
   assert.equal(home.el.querySelector('.home-note').hidden, true);
-  // The roster offers slots 01 and 02 and selects the first.
+  // The roster offers slots 01 to 03 and selects the first.
   const roster = new FighterRoster(app, { host: new Element('section'), onConfirm: noop });
   assert.equal(roster.slots[0]._def, DEF_0001);
   assert.equal(roster.slots[1]._def, DEF_0002);
-  for (const slot of roster.slots.slice(0, 2)) {
+  assert.equal(roster.slots[2]._def, DEF_0003);
+  for (const slot of roster.slots.slice(0, 3)) {
     assert.ok(!slot.classList.contains('is-locked'), 'open');
     assert.equal(slot.hasAttribute('data-nav'), true);
   }
-  assert.ok(roster.slots.slice(2).every((slot) => slot.classList.contains('is-locked')), 'the rest are locked');
+  assert.ok(roster.slots.slice(3).every((slot) => slot.classList.contains('is-locked')), 'the rest are locked');
   roster.show('0001');
   assert.equal(roster.selectedId, '0001');
   assert.equal(roster.confirmBtn.disabled, false);
@@ -338,7 +344,9 @@ test('the engine and its tests build #0001 from its definition, disabled or not'
 
 test('the removed fighters are gone: no definition, art, tests, helpers, or icon', () => {
   // Slot 02's first fighter left none of its files behind: the new #0002's
-  // folder holds only codename files, none under the old one's names.
+  // folder holds only codename files, none under the old one's names. (Slot
+  // 03's first fighter's id now belongs to the new #0003 the same way:
+  // REMOVED_IDS names none today, and what was its own is checked below.)
   for (const name of ['0002_fall.png', '0002_hurt.png', '0002_jump.png', '0002_land.png', '0002_midairhurt.png']) {
     assert.equal(exists(`assets/characters/0002/${name}`), false, name);
   }
@@ -355,7 +363,9 @@ test('the removed fighters are gone: no definition, art, tests, helpers, or icon
   assert.ok(!testFiles.includes('real-art.mjs'), 'their art helpers, with nothing left to use them');
   // Their scaffolding, not kept for later.
   for (const name of ['TEMPORARY_BASELINE', 'WORLD_PER_ART_0001']) assert.equal(name in charactersModule, false, name);
-  const scaffolding = new RegExp(`${REMOVED.map((id) => `BASE_${id}|FPS_${id}`).join('|')}|IDLE_ART_|TEMPORARY_BASELINE|WORLD_PER_ART|const numbered`);
+  const scaffolding = new RegExp([
+    ...REMOVED.flatMap((id) => [`BASE_${id}`, `FPS_${id}`]), 'IDLE_ART_', 'TEMPORARY_BASELINE', 'WORLD_PER_ART', 'const numbered',
+  ].join('|'));
   const definitions = ['js/data/characters.js', ...readdirSync(new URL('js/data/characters/', ROOT)).map((f) => `js/data/characters/${f}`)];
   for (const file of definitions) assert.doesNotMatch(read(file), scaffolding, file);
   assert.equal('palm' in ICONS, false, 'the palm glyph only they used');
@@ -369,7 +379,9 @@ test('no translation or credit is left for the removed fighters, in either langu
     }
     const text = Object.values(STRINGS[language]).filter((v) => typeof v === 'string').join('\n');
     for (const id of REMOVED) assert.ok(!text.includes(`#${id}`), `${language}: #${id}`);
-    assert.doesNotMatch(text, /Palm Strike|Frappe de paume|Dazz & Fret/, language);
+    // Slot 03's first fighter's move. (Its sheet's rippers, Dazz & Fret, are
+    // credited again: the new #0003's sheet is theirs too.)
+    assert.doesNotMatch(text, /Palm Strike|Frappe de paume/, language);
     setLanguage(language);
     try {
       const credits = creditsText();
@@ -411,7 +423,7 @@ test('with nothing playable, startup names no fighter for Quick Battle or Watch 
 
 // ---- The roster ----------------------------------------------------------------------
 
-test('with nothing playable, the roster renders every slot locked, disabled #0001\'s and #0002\'s included, selects nothing and never loads a preview', withoutFighters(() => {
+test('with nothing playable, the roster renders every slot locked, disabled #0001\'s, #0002\'s and #0003\'s included, selects nothing and never loads a preview', withoutFighters(() => {
   const { app, loads, reads } = fakeApp();
   const host = new Element('section');
   const confirmed = [];
@@ -589,5 +601,5 @@ test('with nothing playable, a fighter becoming playable reopens Home\'s match a
   home.enter();
   assert.ok(MATCH_ACTIONS.every((id) => home.actions[id].disabled));
   assert.equal(home.el.querySelector('.home-note').hidden, false);
-  assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001', '0002'], 'the test fighter is gone again');
+  assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001', '0002', '0003'], 'the test fighter is gone again');
 }));

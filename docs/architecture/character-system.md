@@ -2,9 +2,9 @@
 
 Alva is built around one universal character system: shared game systems
 that work for any fighter, and fighter definitions that supply everything
-that makes a fighter itself. #0001 and #0002 are two members of the
-roster, not templates: neither is the default that shared code falls back
-to, and adding a third means writing its definition, not copying either.
+that makes a fighter itself. #0001, #0002 and #0003 are members of the
+roster, not templates: none is the default that shared code falls back
+to, and adding another means writing its definition, not copying one.
 
 **All fighters share universal baseline locomotion. Character identity
 changes the moveset, not run/jump/Dash fundamentals.** Run speed,
@@ -27,7 +27,9 @@ motion included.
 So "#0001's Maximum Blue drags its target in" is a capability (a `pull`
 on its projectile) running on the shared pull rule; "#0002's Homing
 Attack dashes at its target" is a capability (a `homing` motion on its
-attack) running on the shared motion rules; and "an attack keeps its
+attack) running on the shared motion rules; "#0003's Cherry Blossom
+Impact can be jumped" is a capability (a `quake` on its burst's hit)
+running on the shared rule of what a hit reaches; and "an attack keeps its
 momentum" is a shared rule every fighter's attacks follow with their own
 `momentum` values. "#0002 is faster" is not a thing a definition can say:
 it runs exactly as fast as #0001, and its speed lives in its moves.

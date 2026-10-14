@@ -290,6 +290,10 @@ export class Fighter {
     // Projectiles released this step, waiting for the battle to spawn them
     // (see spawnProjectiles in js/game/combat/projectile.js).
     this.releases = [];
+    // Heals a technique of its own gave it this step ({ amount, ability }:
+    // the Launch Points taken off and the technique), for whoever shows
+    // them; cleared as each step starts.
+    this.heals = [];
     // Summons paid for this step, waiting for the battle to spawn them (see
     // spawnClones in js/game/combat/summon.js): { id, target }.
     this.summons = [];
@@ -343,6 +347,7 @@ export class Fighter {
     this.fastFalling = false;
     this.airJumped = false;
     this.bounce = null;
+    this.heals.length = 0;
     this.steerHeld.x = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
     this.steerHeld.y = (input.down ? 1 : 0) - (input.jump ? 1 : 0);
     this.updateAttackFacing();
@@ -557,6 +562,13 @@ export class Fighter {
     // pose), whatever is held.
     if (this.technique) {
       const ended = this.technique.update(dt);
+      // A heal it lets go of is this fighter's own Launch Point back, at
+      // once (see CombatState.heal), recorded for whoever shows it.
+      const heal = this.technique?.takeHeal();
+      if (heal > 0) {
+        const amount = combat.heal(heal);
+        this.heals.push({ amount, ability: this.technique.def.id });
+      }
       if (ended) this.endTechnique(ended);
     }
 
@@ -777,8 +789,9 @@ export class Fighter {
       // on the ground is over (its cooldown starting as if it had
       // finished), so the fighter acts on touchdown. Its startup and strike
       // play on as ever; its sideways speed carries on as the ground allows.
+      // A slam's landing is its recovery: never cancelled so.
       const a = combat.attack;
-      if (a?.airborne && combat.phase === 'recovery' && !this.inMotion) combat.endAttack();
+      if (a?.airborne && combat.phase === 'recovery' && !this.inMotion && !a.motion?.landed) combat.endAttack();
     }
     // A tumble lasts past the stun until the fighter does something: an
     // attack, a jump, the Shield or a fast fall. Steering alone does not end
@@ -1757,7 +1770,7 @@ export class Fighter {
     }
     this.moveAttack(atk, dir, dt);
     if (phase === 'startup') body.vy = 0;
-    else body.vy = spec.type === 'bounce' ? spec.fallSpeed : -spec.speed;
+    else body.vy = spec.type === 'rise' ? -spec.speed : spec.fallSpeed;
     return 0;
   }
 
@@ -1797,7 +1810,7 @@ export class Fighter {
 
   // After the body moved: a homing dash that reached the ground stops there;
   // a plunge that reached it bounces back up (no landing) and its attack is
-  // over, so it can bounce again.
+  // over, so it can bounce again; a slam lands there (see landSlam).
   motionContact(atk) {
     const m = atk.motion;
     if (!m || m.done || !this.body.grounded) return;
@@ -1808,7 +1821,22 @@ export class Fighter {
       m.done = true;
       this.springUp(spec.rebound);
       this.combat.endAttack();
+    } else if (spec.type === 'slam' && attackPhase(atk.def, atk.time) === 'active') {
+      this.landSlam(atk);
     }
+  }
+
+  // A slam meeting the ground (see `slam` in js/game/combat/attacks.js): it
+  // stands where it landed, its impact is due for the CombatSystem this
+  // step (CombatSystem.impact), and the attack goes straight to its
+  // recovery, the landing, played on the ground.
+  landSlam(atk) {
+    const m = atk.motion;
+    m.done = true;
+    m.landed = true;
+    this.body.vy = 0;
+    atk.time = atk.def.startup + atk.def.active;
+    if (atk.def.motion.impact) atk.impactDue = true;
   }
 
   // Attack `atk` met an opponent (see CombatSystem.update): `event` is the
@@ -2012,7 +2040,8 @@ export class Fighter {
   }
 
   // Animation key for a visual state. An attack plays its own clip for its
-  // whole length, even if the fighter lands or leaves the ground meanwhile.
+  // whole length, even if the fighter lands or leaves the ground meanwhile
+  // (but a slam's landing, which plays its impact's clip).
   // Hitstun, and being held by a paralysis (the `bound` state), show `hurt` on the ground and
   // `midair_hurt` in the air. A technique plays the clip of its current
   // phase, a summon's startup its summon's own startupAnimation, a Dash
@@ -2022,7 +2051,12 @@ export class Fighter {
   // pose, opening with `groundStartAnimation` for one frame as it goes up;
   // the shieldRelease state is `groundReleaseAnimation`.
   animationFor(state) {
-    if (state === 'attack') return this.combat.attack.def.animation;
+    if (state === 'attack') {
+      // A slam that has landed plays its impact's own clip, if it has one.
+      const a = this.combat.attack;
+      const landing = a.motion?.landed ? a.def.motion.impact?.animation : null;
+      return landing && this.sprites.has(landing) ? landing : a.def.animation;
+    }
     if (state === 'shield') {
       const spec = this.defense;
       const raising = this.stateTime < this.shieldStartDuration - TIME_EPSILON;

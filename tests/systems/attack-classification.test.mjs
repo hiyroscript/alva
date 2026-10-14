@@ -170,13 +170,24 @@ test('every playable fighter: every move it can make that can harm is an attack,
       assert.equal(atk.offense.attack, !atk.pending, `#${c.id} ${id}: every authored attack can harm`);
     }
     for (const [id, p] of Object.entries(f.projectileDefs)) assert.equal(p.offense.attack, true, `#${c.id} ${id}`);
-    for (const [id, t] of Object.entries(f.techniqueDefs)) assert.equal(t.offense.attack, true, `#${c.id} ${id}`);
+    // A technique is an attack exactly when what it releases can harm; one
+    // that harms nobody (#0003's Mystical Palm Technique) heals its own
+    // fighter, and is no attack.
+    const heals = new Set();
+    for (const [id, t] of Object.entries(f.techniqueDefs)) {
+      const harms = !!t.projectile || isHarmfulHit(t.burst?.hit);
+      assert.equal(t.offense.attack, harms, `#${c.id} ${id}`);
+      if (!harms) {
+        assert.ok(t.heal > 0, `#${c.id} ${id}: a technique that harms nobody heals its fighter`);
+        heals.add(id);
+      }
+    }
     for (const [id, s] of Object.entries(f.summonDefs)) assert.equal(summonOffense(s, f.attacks).attack, true, `#${c.id} ${id}`);
     // Every combat button it has is an attack on the ground and in the air
-    // (where it has one there).
+    // (where it has one there), but a heal's.
     for (const action of COMBAT_BUTTONS) {
       if (!c.actions?.[action]) continue;
-      assert.equal(actionOffense(f, action, true).attack, true, `#${c.id} ${action} on the ground`);
+      assert.equal(actionOffense(f, action, true).attack, !heals.has(action), `#${c.id} ${action} on the ground`);
     }
   }
 });

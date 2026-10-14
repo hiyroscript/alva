@@ -18,9 +18,9 @@ export function testFighter(id, displayName, rosterSlot, overrides = {}) {
   return { ...BASE, id, displayName, rosterSlot, available: true, ...overrides };
 }
 
-// The two the screen tests pick from: slots 09 and 03.
+// The two the screen tests pick from: slots 09 and 10 (slot 03 is #0003's).
 export const TEST_A = testFighter('test-a', 'Test A', 8);
-export const TEST_B = testFighter('test-b', 'Test B', 2);
+export const TEST_B = testFighter('test-b', 'Test B', 9);
 
 // A fighter with no moves at all (slot 04): every combat button left out of
 // its `actions`, so no touch button, attack, summon, technique, projectile,
@@ -43,11 +43,12 @@ export const TEST_SAMPLE = { ...SAMPLE_FIGHTER, id: 'test-sample', displayName: 
 // definition no route may start, and the roster shows locked.
 export const TEST_DISABLED = testFighter('test-disabled', 'Disabled', 6, { available: false });
 
-// The ids of the fighters removed from the roster: slot 03's. Only ever
-// checked for absence: no definition, art, string or credit of theirs may
-// come back, and a stale selection naming one must be refused. (Slot 02's
-// was removed too, and its id now belongs to the new #0002.)
-export const REMOVED_IDS = Object.freeze(['0003']);
+// The ids of the fighters removed from the roster and not given to another
+// since: none today. Only ever checked for absence: no definition, art,
+// string or credit of theirs may come back, and a stale selection naming
+// one must be refused. (Slot 02's and slot 03's first fighters were
+// removed, and their ids now belong to the new #0002 and #0003.)
+export const REMOVED_IDS = Object.freeze([]);
 
 // Adds `defs` to CHARACTERS, after the production entries. Returns the
 // function that takes exactly those out again.

@@ -6,7 +6,8 @@
 // their art checked), it resolves for every move its button and attack id,
 // where it may start (ground or air), its timing and commitment, its
 // strikes (damage, Base Launch, Directional Launch, stuns, hit effects), its
-// reach over its own motion and pull, its projectile or burst, its costs
+// reach over its own motion and pull, its projectile, burst or impact, the
+// heal it gives its own fighter, its costs
 // and limits, its classification (`offense`: whether it is an attack, a
 // defense or both, read from the shared js/game/combat/offense.js, so a
 // technique, a summon, a throw and the Deflect are attacks here exactly as
@@ -34,7 +35,7 @@ import { attackOffense, summonOffense, techniqueOffense } from '../../combat/off
 export const MOVE_ROLES = Object.freeze([
   'poke', 'approach', 'launcher', 'comboStarter', 'comboExtender', 'finisher', 'antiAir', 'airToGround', 'edgeGuard',
   'zoning', 'trap', 'punish', 'counterProjectile', 'mobility', 'recovery', 'shieldPressure', 'areaDenial',
-  'defensiveDisengage', 'spike',
+  'defensiveDisengage', 'spike', 'heal',
 ]);
 
 const CACHE = new WeakMap();
@@ -44,8 +45,18 @@ function strikeOf(h, at, end) {
   return Object.freeze({
     at, end, damage: h.damage ?? 0, baseLaunch: h.baseLaunch ?? 0, dir: h.directionalLaunch ?? null,
     hitbox: h.hitbox ?? null, hitstun: h.hitstun ?? 0, blockstun: h.blockstun ?? 0, hitstop: h.hitstop ?? 0,
-    paralyze: h.paralyze ?? 0, blockPush: h.blockPush ?? 0, carry: h.carry ?? null,
+    paralyze: h.paralyze ?? 0, blockPush: h.blockPush ?? 0, carry: h.carry ?? null, quake: !!h.quake,
   });
+}
+
+// A slam's impact (see `slam` in js/game/combat/attacks.js) as the
+// intelligence weighs it: its box round the landing point and its strike,
+// which lands whenever the plunge does (`at` is the earliest: the plunge's
+// start).
+function impactOf(atk) {
+  const impact = atk.motion?.type === 'slam' ? atk.motion.impact : null;
+  if (!impact) return null;
+  return Object.freeze({ box: impact.hitbox, strike: strikeOf(impact.hit, atk.startup, atk.startup + atk.active) });
 }
 
 // An attack's strikes in order: a multi-hit attack's each, else its one.
@@ -111,24 +122,28 @@ function rolesOf(m, height, fastest) {
   if (melee && m.lead <= Math.max(0.13, fastest * 1.25) && m.commitment <= 0.4) r.add('poke');
   if (melee && (m.lead <= Math.max(0.17, fastest * 1.6) || m.damage >= 5)) r.add('punish');
   if (motion === 'homing' || motion === 'roll' || m.step) r.add('approach');
+  const plunge = motion === 'bounce' || motion === 'slam';
   if (m.maxBaseLaunch >= 2 || (fin.dir === 'vertical' && fin.baseLaunch >= 1)) r.add('launcher');
   if (m.hitCancel != null || m.paralyze > 0 || m.pull || m.strikes.some((s) => s.baseLaunch === 0 && s.damage > 0)) r.add('comboStarter');
   if (m.air && melee && (m.hitCancel != null || motion === 'hover' || m.pull)) r.add('comboExtender');
   if ((fin.dir === 'horizontal' && fin.baseLaunch >= 2) || m.maxBaseLaunch >= 3 || m.damage >= 10) r.add('finisher');
   if (reach && (reach.y <= -height * 1.05 || (motion === 'rise') || (fin.dir === 'vertical' && reach.y <= -height * 0.8))) r.add('antiAir');
-  if (m.air && reach && (reach.y + reach.h >= -12 || motion === 'bounce')) r.add('airToGround');
+  if (m.air && reach && (reach.y + reach.h >= -12 || plunge)) r.add('airToGround');
   if (m.air && melee && (fin.dir === 'reverseVertical' || (fin.dir === 'horizontal' && fin.baseLaunch >= 1) || motion === 'homing')) r.add('edgeGuard');
   if (shot && shot.range >= 250) r.add('edgeGuard');
   if (shot && shot.range >= 250) r.add('zoning');
   if ((shot && ((shot.speed <= 420 && shot.lifetime >= 1) || shot.pull || shot.pierce)) || m.paralyze > 0 || m.kind === 'summon') r.add('trap');
   if (m.deflectProjectiles || shot?.repel || shot?.erase) r.add('counterProjectile');
-  if (motion === 'homing' || motion === 'roll' || motion === 'rise' || motion === 'bounce' || m.step ||
+  if (motion === 'homing' || motion === 'roll' || motion === 'rise' || plunge || m.step ||
       (motion === 'hover' && m.air && m.total >= 0.3)) r.add('mobility');
   if (m.air && (motion === 'rise' || motion === 'homing' || (motion === 'hover' && m.total >= 0.3))) r.add('recovery');
   if (m.blockPush > 0 || m.strikes.length > 1 || shot?.pierce) r.add('shieldPressure');
-  if (m.burst || (m.pull && m.pull.radius >= 120) || (shot && shot.lifetime >= 1)) r.add('areaDenial');
+  if (m.burst || m.impact || (m.pull && m.pull.radius >= 120) || (shot && shot.lifetime >= 1)) r.add('areaDenial');
   if (m.passThrough || motion === 'rise' || shot?.repel) r.add('defensiveDisengage');
   if (fin.dir === 'reverseVertical' && fin.baseLaunch > 0) r.add('spike');
+  // A heal of its own (Launch Point back): a move for a safe moment, never
+  // a strike (see CpuIntelligence.healPlan).
+  if (m.heal > 0) r.add('heal');
   return r;
 }
 
@@ -136,12 +151,13 @@ function rolesOf(m, height, fastest) {
 function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
   const strikes = attackStrikes(atk);
   const projectile = proj ? projectileModel(proj, atk.projectile.spawnAt, atk.projectile.offset) : null;
-  const sum = sumStrikes(projectile ? projectile.strikes : strikes);
+  const impact = impactOf(atk);
+  const sum = sumStrikes(projectile ? projectile.strikes : impact ? [...strikes, impact.strike] : strikes);
   const lead = projectile ? atk.projectile.spawnAt : strikes[0]?.at ?? atk.startup;
   return {
     key: `${action}:${air ? 'air' : 'ground'}`, kind, action, id, air, def: atk, offense: attackOffense(atk),
     startup: atk.startup, active: atk.active, recovery: atk.recovery, total: atk.total,
-    lead, commitment: atk.total, strikes, projectile, burst: null, summon: null, ...sum,
+    lead, commitment: atk.total, strikes, projectile, burst: null, summon: null, impact, heal: 0, ...sum,
     blockstun: Math.max(0, ...(projectile ? projectile.strikes : strikes).map((s) => s.blockstun)),
     hitstop: Math.max(0, ...(projectile ? projectile.strikes : strikes).map((s) => s.hitstop)),
     reach: projectile ? null : attackReach(atk), hitbox: atk.hitbox,
@@ -155,7 +171,8 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
 }
 
 // A technique: a cast that releases a projectile, a burst round the
-// fighter, or both, its fighter committed throughout.
+// fighter, a heal of its own (`heal`, Launch Points), or any of them
+// together, its fighter committed throughout.
 function techniqueMove(f, special, sprites) {
   const t = f.techniqueDefs[special.id];
   const cast = sprites.duration(t.castAnimation);
@@ -169,7 +186,8 @@ function techniqueMove(f, special, sprites) {
     key: `${special.action}:ground`, kind: 'technique', action: special.action, id: special.id, air: false, def: t,
     offense: techniqueOffense(t),
     startup: cast, active: 1 / 60, recovery: release, total: cast + release, lead: cast, commitment: cast + release,
-    strikes, projectile, burst: t.burst ? { box: t.burst.hitbox, hit: burstHit } : null, summon: null, ...sum,
+    strikes, projectile, burst: t.burst ? { box: t.burst.hitbox, hit: burstHit } : null, summon: null,
+    impact: null, heal: t.heal ?? 0, ...sum,
     blockstun: burstHit?.blockstun ?? 0, hitstop: burstHit?.hitstop ?? 0, reach: t.burst ? { ...t.burst.hitbox } : null,
     hitbox: t.burst?.hitbox ?? null, motion: null, motionSpec: null, pull: projectile?.pull ?? null,
     cooldown: 0, abilityCooldown: t.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
@@ -190,7 +208,7 @@ function summonMove(f, special, entry) {
     key: `${special.action}:ground`, kind: 'summon', action: special.action, id: special.id, air: false, def: s,
     offense: summonOffense(s, f.attacks),
     startup, active: 0, recovery: 0, total: startup, lead: entry.lead, commitment: startup, strikes, projectile: null,
-    burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, ...sum,
+    burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, impact: null, heal: 0, ...sum,
     blockstun: atk.blockstun, hitstop: atk.hitstop, reach: null, hitbox: atk.hitbox, motion: null, motionSpec: null,
     pull: null, cooldown: 0, abilityCooldown: s.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
     energyCost: 0, lockMovement: true, momentum: 0, airMomentum: 0, control: 0, airControl: 0, friction: 1, step: null,

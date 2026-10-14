@@ -184,8 +184,10 @@ export class Arena {
     this.updateRespawns(dt);
     const fighters = this.inPlay;
     for (const f of fighters) f.update(dt, this.simCtx);
-    // A launch that rebounded off the stage this step shows its impact.
+    // A launch that rebounded off the stage this step shows its impact,
+    // and a fighter that healed itself its glow.
     for (const f of fighters) if (f.bounce) this.fx.takeBounce(f.bounce);
+    for (const f of fighters) for (const heal of f.heals) this.fx.addHeal(f, heal);
     // Pushboxes keep every pair of fighters apart (a lone fighter has none;
     // a ricochet passes, see separateFighters).
     for (let i = 0; i < fighters.length; i++) {

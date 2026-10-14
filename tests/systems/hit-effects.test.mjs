@@ -50,10 +50,11 @@ function pair({ shield = false } = {}) {
 // ---- Data ---------------------------------------------------------------------------
 
 test('every effect is optional, and its default changes nothing', () => {
-  assert.deepEqual([...HIT_EFFECT_FIELDS], ['paralyze', 'blockPush']);
-  assert.deepEqual(resolveHitEffects(undefined), { paralyze: 0, blockPush: 0 });
-  assert.deepEqual(resolveHitEffects({ damage: 5 }), { paralyze: 0, blockPush: 0 });
-  assert.deepEqual(resolveHitEffects({ paralyze: 1.5, blockPush: 400 }), { paralyze: 1.5, blockPush: 400 });
+  assert.deepEqual([...HIT_EFFECT_FIELDS], ['paralyze', 'blockPush', 'quake']);
+  assert.deepEqual(resolveHitEffects(undefined), { paralyze: 0, blockPush: 0, quake: false });
+  assert.deepEqual(resolveHitEffects({ damage: 5 }), { paralyze: 0, blockPush: 0, quake: false });
+  assert.deepEqual(resolveHitEffects({ paralyze: 1.5, blockPush: 400 }), { paralyze: 1.5, blockPush: 400, quake: false });
+  assert.deepEqual(resolveHitEffects({ quake: true }), { paralyze: 0, blockPush: 0, quake: true });
   // An attack, a projectile, a technique's burst and a finisher all carry
   // them, resolved the same way.
   assert.equal(hit().unblockable, undefined, 'no hit has a way past a Shield');
@@ -78,6 +79,7 @@ test('a value of the wrong kind is refused, naming its owner', () => {
   assert.throws(() => resolveHitEffects({ unblockable: 'yes' }, 'Hit "x"'), /Hit "x" declares unblockable: every attack is blockable/);
   assert.throws(() => resolveHitEffects({ paralyze: -1 }), /paralyze must be seconds from 0/);
   assert.throws(() => resolveHitEffects({ blockPush: '520' }), /blockPush must be a speed from 0/);
+  assert.throws(() => resolveHitEffects({ quake: 'yes' }), /quake must be true or false/);
   assert.throws(() => hit({ paralyze: 'long' }), /Attack "testHit"'s paralyze/);
   assert.throws(() => createProjectileDefinition({ id: 'testShot', damage: 1, blockPush: -5 }), /Projectile "testShot"'s blockPush/);
 });

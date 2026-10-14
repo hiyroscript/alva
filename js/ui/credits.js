@@ -1,8 +1,8 @@
 // The credits, shown by the Home credits roll. Each group is a title, an
 // optional lead line and plain lines, every one a translation key (or
 // [key, params]; see js/localization/i18n.js), so the roll follows the language.
-// Proper names (Finhj, ZetrasBlack, R0B4N, thespriteanimations, DeviantArt)
-// stay as they are in every language. A
+// Proper names (Finhj, ZetrasBlack, R0B4N, thespriteanimations, DeviantArt,
+// Dazz & Fret, The Spriters Resource) stay as they are in every language. A
 // line may also link to its source:
 // { label: key or [key, params], href }, the label still translated and
 // the address never.
@@ -19,6 +19,10 @@ const SPRITES_0001 = 'https://www.deviantart.com/finhj/art/1084627848';
 // Where #0002's sprite sheet was published: its DeviantArt page, found by
 // the deviation's number.
 const SPRITES_0002 = 'https://www.deviantart.com/thespriteanimations/art/Sprite-Sheet-1350194762';
+// Where #0003's sprite sheet was published: its page on The Spriters
+// Resource, found by the asset's number alone (the page's title is left out
+// of the address: the character behind #0003 is never named).
+const SPRITES_0003 = 'https://www.spriters-resource.com/ds_dsi/jus/asset/20891/';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -36,6 +40,12 @@ export const CREDITS = [
   {
     title: 'credits.sprites0002.title',
     lines: [{ label: 'credits.sprites0002.sheet', href: SPRITES_0002 }],
+  },
+  // #0003's sheet, linked to where it was published, with who ripped it
+  // as the sheet itself says.
+  {
+    title: 'credits.sprites0003.title',
+    lines: [{ label: 'credits.sprites0003.sheet', href: SPRITES_0003 }],
   },
   {
     title: 'credits.rights.title',

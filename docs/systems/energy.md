@@ -38,9 +38,10 @@ A fighter's `energy` entry sets one thing, its refill rate:
 | --- | --- | --- |
 | `regen` | 12 | Refill per second, one passive rate whatever the fighter does. |
 
-#0001 declares `regen` 14, #0002 `regen` 12. Nothing else in the entry is
-a fighter's own: `max`, `dashCost`, `dashCancelCost`, `shieldHitCost` and
-`deflectCost` may be left out (and are, by both fighters), and declaring
+#0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15. Nothing
+else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
+`shieldHitCost` and `deflectCost` may be left out (and are, by every
+fighter), and declaring
 any of them with another value than the rule's, or a field the schema
 does not know, is refused, naming the fighter and the field.
 

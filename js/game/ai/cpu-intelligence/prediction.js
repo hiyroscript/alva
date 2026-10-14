@@ -170,7 +170,7 @@ function attackStep(body, rec, face, target, burst) {
     }
     steerAttack(body, MV, face, rec, 0, STEP, burst);
     if (phase === 'startup') body.vy = 0;
-    else body.vy = spec.type === 'bounce' ? spec.fallSpeed : -spec.speed;
+    else body.vy = spec.type === 'rise' ? -spec.speed : spec.fallSpeed;
     return 0;
   }
   if (def.lockMovement) steerAttack(body, MV, face, rec, 0, STEP, burst);
@@ -345,6 +345,9 @@ const myRec = {};
 // `k0` shifts the opponent's path: the move starts k0 steps from now (out
 // of a jump, a Dash). An ordinary attack turns its box toward the opponent
 // every step (the CPU's attack orientation); a motion attack keeps `face`.
+// A quake strike meets the opponent only where its path stands on the
+// ground; a slam that lands strikes with its impact there, then stands
+// through its landing (its recovery) where it landed.
 export function moveContact(stage, gravity, m, st, face, foe, hurt, self, out = {}, k0 = 0) {
   self.clear();
   const def = m.def;
@@ -372,11 +375,36 @@ export function moveContact(stage, gravity, m, st, face, foe, hurt, self, out = 
     stepBody(b, STEP, stage, gravity * share, b.maxFall);
     // A homing dash or a plunge that meets the ground stops there.
     if (rec.motion && !rec.motion.done && b.grounded && def.motion &&
-        (def.motion.type === 'homing' || def.motion.type === 'bounce') && attackPhase(def, rec.time) === 'active') {
+        (def.motion.type === 'homing' || def.motion.type === 'bounce' || def.motion.type === 'slam') &&
+        attackPhase(def, rec.time) === 'active') {
       rec.motion.done = true;
       if (def.motion.type === 'bounce') {
         self.push(b);
         out.endK = k + 1;
+        break;
+      }
+      if (def.motion.type === 'slam') {
+        // Landed: its impact round the landing point, then the landing.
+        b.vx = 0;
+        b.vy = 0;
+        self.push(b);
+        const imp = m.impact;
+        if (imp) {
+          const fx = foe.x[fk];
+          const fy = foe.y[fk];
+          boxAt(imp.box, b.x, b.y, face, hitBox);
+          const reaches = !imp.strike.quake || foe.g[fk];
+          if (reaches && hitBox.x < fx + hurt.hw && hitBox.x + hitBox.w > fx - hurt.hw &&
+              hitBox.y < fy + hurt.bottom && hitBox.y + hitBox.h > fy + hurt.top) {
+            if (out.contact < 0) out.contact = k;
+            out.strikes++;
+            out.margin = Math.max(out.margin, Math.min(hitBox.x + hitBox.w - (fx - hurt.hw), fx + hurt.hw - hitBox.x));
+            out.marginUp = Math.max(out.marginUp, fy + hurt.bottom - hitBox.y);
+          }
+        }
+        const landing = Math.ceil(def.recovery / STEP);
+        for (let j = 0; j < landing && self.len < self.cap; j++) self.push(b);
+        out.endK = k + 1 + landing;
         break;
       }
     }
@@ -390,6 +418,7 @@ export function moveContact(stage, gravity, m, st, face, foe, hurt, self, out = 
       const s = strikes[i];
       const live = met ? strikeLive({ at: s.at, active: s.end - s.at }, t) : attackPhase(def, t) === 'active';
       if (!live || (met && met[i])) continue;
+      if (s.quake && !foe.g[fk]) continue;
       const hb = s.hitbox ?? def.hitbox;
       boxAt(hb, b.x, b.y, face, hitBox);
       const h0 = fx - hurt.hw;

@@ -1583,3 +1583,125 @@ Checked in headless Chromium too: the Settings › Combat panel in English
 and French, the editor's art for #0001 and #0002 at desktop and short
 landscape sizes, and Practice Ground with the keyboard (Run held, Combat
 Assist's approach and hit, Combo Assist's Red).
+
+## #0003, the medic brawler
+
+Not a named update (it can become one if the owner names it). Asked for
+as: read `character_rule` and add character #0003 from a supplied sprite
+sheet: abilities with real mechanics based on the character's canon, not
+animations with plain damage; no move the character cannot perform in
+canon; two or more numbered attacks, the number left to the work;
+credited to the sheet's page on The Spriters Resource; never naming the
+character anywhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0003 in roster slot 03, playable: 82 frames cut from
+  the sheet into `assets/characters/0003/` (component-masked 1× crops, the
+  flat blue background (128, 128, 255) made transparent, nothing redrawn
+  or recoloured, every file `0003_<codename>_<frame>.png`), drawn at the
+  roster's art-pixel size (a 48-pixel idle, about 81 units tall). Movement
+  is the universal one; its Energy refills at 15 a second, the roster's
+  quickest.
+- **Its buttons:** four numbered attacks, each a button of its own (U, I,
+  O, M; touch slots 1 to 4): two ordinary attacks with mid-air versions
+  and two techniques, plus the extra attack. Transform stays reserved (the
+  sheet's sealed-strength poses have no move).
+- **Its moves**, each a mechanic: the Chakra Punch (a straight that shoves
+  a raised Shield back), the Leaping Kick (a `rise` off the air: its
+  anti-air and its way back to the stage), the Heel Drop (an axe kick
+  driving its target down, then a crack round the heel that pops up only
+  whoever still stands on the ground), the Heavenly Foot of Pain (a
+  heel-first plunge that lands and splits the ground round it, 2 s
+  cooldown), Cherry Blossom Impact (a technique: the ground erupts either
+  side of it and throws up everyone standing on it; jumping clears it, a
+  Shield blocks it; 4 s cooldown), the Mystical Palm Technique (a
+  technique: a second knelt, breakable by any hit, that takes 10 Launch
+  Point off itself; 12 s cooldown) and the Chakra Haymaker (its finisher, a
+  lunging overhand blow that drives a Shield across the ground).
+- **Engine features they are built on, generic for any fighter:**
+  - `quake`, a hit effect (`js/game/combat/hit-effects.js`): a hit that
+    runs through the ground reaches only fighters standing on it
+    (`hitReaches`, asked at every place a hit meets a fighter); an
+    airborne one is passed by with nothing used up. Declared on any hit
+    (attack, strike, projectile, finisher, burst, impact), inherited like
+    the other hit effects.
+  - the `slam` attack motion (`js/game/combat/attacks.js`): hang, plunge
+    at `fallSpeed`, and on meeting the ground strike once with its
+    optional `impact` (`hitbox`, `hit`) round the landing point, then play
+    the recovery on the ground in its `<attack>_impact` clip: no landing
+    cancel, no rebound. A plunge that runs out in the air lands nothing.
+    `attackReach`, the attack classification (`impact` source) and the
+    loadout's clip check know it.
+  - a technique's `heal` (`js/game/combat/technique.js`): Launch Point
+    taken off its own fighter as the cast lets go, never below 0
+    (`CombatState.heal`; no hit, so recovery runs on as it was;
+    `Fighter.heals` records it). A technique that only heals is no attack.
+    A soft green heal glow shows it (`HIT_FX.sparks.heal`, paint only).
+- **The CPU** plays it from the data: quakes reach only fighters its
+  prediction has on the ground (both ways), a slam's reach runs to where
+  it would land with its impact, and a heal (the new `heal` role) is cast
+  only once the whole heal counts and the opponent could not reach it
+  before the cast lets go (`healPlan` in `brain.js`).
+- **UI:** its touch buttons (each move's own frame), English and French
+  names and one-line descriptions, a recommended controller layout, a
+  Discover profile (3 / 5), and a credit group, "#0003 sprite source":
+  "Sprite sheet ripped by Dazz & Fret on The Spriters Resource" (the
+  sheet's own credit), linked to the sheet's page by the asset's number.
+- **Roster:** the absence checks for the fighter that once held slot 03
+  (removed in the [roster reset](#roster-reset)) are retired, as #0002's
+  were for slot 02: `REMOVED_IDS` is empty, and the scan for its old
+  names no longer flags the sheet's rippers, who are #0003's credit now.
+  The test-only fighter Test B moved from slot 03 to slot 10.
+
+**Balance, measured.** Tuned from seeded CPU-vs-CPU matches (full Watch
+Mode battles, first to 3, on Desert and City, 20 matches per cell; points
+#0003 : opponent). Against #0001: Medium 38 : 46, Hard 38 : 45, Brutal
+33 : 47. Against #0002: Medium 28 : 54, Hard 28 : 59, Brutal 32 : 50. The
+first cut scored about 5 : 24 at Hard against either: it had nothing in
+the air and no way back to the stage. Fixed by the Leaping Kick's rise,
+Base Launch 3 on its three big blows, a faster Heel Drop, a Deflect that
+reaches down to its feet, and a quicker launch reaction and Energy
+refill. #0002 stays its hard matchup (its quick Deflect swats #0003's
+jump-ins).
+
+**Where to tune it**
+
+- `js/data/characters/0003.js`: each attack's damage, launch, timing,
+  hitbox, `blockPush`, `quake`, `hits`, `motion` (the Leaping Kick's rise
+  `speed`; the slam's `fallSpeed`, `SLAM_PLUNGE_0003` and its `impact`
+  box and hit), `airUses` and `cooldown`; each technique's burst, `heal`,
+  cooldown and clip rates (`FPS_0003`); the Deflect, `energy.regen`,
+  `launchReaction` and the body.
+- The new capabilities' defaults: `MOTION_DEFAULTS.slam` in
+  `js/game/combat/attacks.js`, `quake` in `js/game/combat/hit-effects.js`,
+  `heal` in `js/game/combat/technique.js`; the glow in `HIT_FX` in
+  `js/game/rendering/hit-fx.js`.
+
+**Code:** `js/data/characters/0003.js`, registered in
+`js/data/characters.js`; `js/data/fighter-profiles.js`;
+`js/data/loadout.js` (the technique release and the impact clip);
+`createHit`, `hitReaches` and `quake` in `js/game/combat/hit-effects.js`;
+`slam` and `attackReach` in `js/game/combat/attacks.js`; `impact` and the
+`hitReaches` checks in `js/game/combat/combat.js`; the heal in
+`js/game/combat/technique.js` and `js/game/combat/combat-state.js`;
+`js/game/combat/offense.js`, `js/game/combat/projectile.js`; the plunge,
+the landing and the heal in `js/game/fighters/fighter.js`; the glow in
+`js/game/rendering/hit-fx.js` and `js/game/arena.js`; the CPU in
+`js/game/ai/cpu-intelligence/` (`capabilities`, `prediction`,
+`evaluator`, `defense`, `brain`); `js/ui/credits.js`,
+`js/localization/`.
+
+**Tests:** new `tests/fighters/0003/fighter-0003.test.mjs` (the real PNGs,
+scale and anchors, every move's mechanic, the CPU, names, credits, and a
+whole-repository check that the source character is named nowhere),
+`tests/systems/quake.test.mjs` and `tests/systems/slam.test.mjs`; the
+heal in `tests/systems/technique.test.mjs`; `hit-effects`,
+`attack-classification`, `combat-assist`, `combo-assist` and
+`cpu-intelligence` made to hold for a fighter with no projectile, a
+ground-only extra attack, a slam and a heal; the roster, credits and
+screens in `tests/integration/empty-roster.test.mjs`,
+`practice-ground.test.mjs`, `watch-mode.test.mjs`,
+`tests/interface/battle-screen.test.mjs`, `controller-ui.test.mjs`,
+`discover.test.mjs`, `settings.test.mjs` and
+`tests/fighters/fixtures/test-fighters.mjs`.

@@ -61,17 +61,18 @@ export class Defense {
     return out;
   }
 
-  // Where the CPU's feet will be `t` seconds on if it carries on as it is.
+  // Where the CPU's feet will be `t` seconds on if it carries on as it is,
+  // and whether it will be standing on the ground then (what a quake needs).
   myAt(s, t) {
     const me = s.me;
     if (me.grounded) {
       const slide = Math.min(t, 0.1);
-      return { x: me.x + me.vx * slide, y: me.y };
+      return { x: me.x + me.vx * slide, y: me.y, grounded: true };
     }
     const g = s.gravity * me.gravityScale;
     const y = me.y + me.vy * t + 0.5 * g * t * t;
     const floor = s.model.groundBelow(me.x, me.halfW, me.y);
-    return { x: me.x + me.vx * t, y: Math.min(y, floor) };
+    return { x: me.x + me.vx * t, y: Math.min(y, floor), grounded: y >= floor };
   }
 
   // Every threat the CPU can see (see the header), soonest first.
@@ -114,6 +115,10 @@ export class Defense {
     if (!def.hits && v.attackHit) return;
     const myH = s.caps.hurt;
     const face0 = def.motion ? v.facing : Math.sign(s.me.x - s.op.x) || v.facing;
+    // A slam's impact, where its plunge lands (see `slam` in
+    // js/game/combat/attacks.js): the opponent's path shows the landing.
+    const impact = def.motion?.type === 'slam' ? def.motion.impact : null;
+    let landed = false;
     let contact = -1;
     let end = -1;
     let n = 0;
@@ -128,9 +133,26 @@ export class Defense {
       const fy = s.foeTrack.y[fk];
       const me = this.myAt(s, (k + 1) * STEP);
       this.myBox(s, me.x, me.y, 4, box2);
+      if (impact && !landed && s.foeTrack.g[fk] && attackPhase(def, t) === 'active') {
+        landed = true;
+        boxAt(impact.hitbox, fx, fy, face0, box);
+        boxes.push({ k, x: box.x, y: box.y, w: box.w, h: box.h });
+        if ((!impact.hit.quake || me.grounded) && overlaps(box, box2)) {
+          if (contact < 0) {
+            contact = k;
+            first = impact.hit;
+          }
+          end = k;
+          n++;
+          top = Math.min(top, box.y);
+        }
+        break;
+      }
       for (const h of strikes) {
         const live = def.hits ? strikeLive(h, t) : attackPhase(def, t) === 'active';
         if (!live) continue;
+        // A quake passes by a CPU off the ground.
+        if (h.quake && !me.grounded) continue;
         boxAt(h.hitbox ?? def.hitbox, fx, fy, face0, box);
         boxes.push({ k, x: box.x, y: box.y, w: box.w, h: box.h });
         if (overlaps(box, box2)) {
@@ -147,6 +169,7 @@ export class Defense {
     if (contact < 0) return;
     const pos = { x: s.me.x, y: s.me.y, grounded: s.me.grounded, halfW: s.me.halfW, height: s.me.height };
     const list = def.hits ? def.hits.map((h) => ({ ...h, dir: h.directionalLaunch })) : [{ ...def, dir: def.directionalLaunch }];
+    if (impact) list.push({ ...impact.hit, dir: impact.hit.directionalLaunch });
     const sev = this.brain.evaluator.judge.strikes(s, 'me', list, Math.max(1, Math.min(n, list.length)), pos, face0, this.hv);
     out.push({
       kind: 'melee', ref: v.attack, def, contact: (contact + 1) * STEP, end: (end + 1) * STEP + 0.02, boxes, top,
@@ -222,7 +245,8 @@ export class Defense {
       boxAt(def.burst.hitbox, s.op.x, s.op.y, face, box);
       const me = this.myAt(s, releaseIn);
       this.myBox(s, me.x, me.y, 4, box2);
-      if (overlaps(box, box2)) {
+      // A quake passes by a CPU off the ground.
+      if ((!def.burst.hit.quake || me.grounded) && overlaps(box, box2)) {
         const pos = { x: s.me.x, y: s.me.y, grounded: s.me.grounded, halfW: s.me.halfW, height: s.me.height };
         const hit = def.burst.hit;
         const sev = this.brain.evaluator.judge.strikes(s, 'me', [{ ...hit, dir: hit.directionalLaunch }], 1, pos, face, this.hv);
