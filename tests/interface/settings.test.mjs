@@ -869,7 +869,7 @@ test('Home has four menu actions and a top-right Help, Controller, Settings grou
   }
 });
 
-test('Help and Download are localized, unavailable and inert; Controller is open and named with its status; Settings navigation stays', () => {
+test('Home utilities are localized and navigable; only Download remains unavailable', () => {
   const { app, home, dialog, storage, done } = boot();
   try {
     const [help, controller, settings] = home.utilityButtons.children;
@@ -882,7 +882,11 @@ test('Help and Download are localized, unavailable and inert; Controller is open
     assert.equal(controller.hasAttribute('data-nav'), true);
     assert.equal(controller.getAttribute('aria-haspopup'), 'dialog');
     assert.ok(app.nav.candidates(home.el).includes(controller));
-    for (const button of [help, download]) {
+    assert.equal(help.disabled, false);
+    assert.equal(help.hasAttribute('data-nav'), true);
+    assert.equal(help.getAttribute('aria-haspopup'), 'dialog');
+    assert.ok(app.nav.candidates(home.el).includes(help));
+    for (const button of [download]) {
       assert.equal(button.tagName, 'BUTTON');
       assert.equal(button.getAttribute('type'), 'button');
       assert.equal(button.disabled, true, 'native unavailable semantics');
@@ -912,6 +916,27 @@ test('Help and Download are localized, unavailable and inert; Controller is open
   } finally {
     done();
   }
+});
+
+test('How to Play follows Settings language changes while open and on reopening', () => {
+  const { app, home, done } = boot();
+  const info = app.infoDialog;
+  try {
+    home.helpButton.click();
+    for (const [language, title, first, last] of [
+      ['fr', 'Comment jouer', 'Élimination', 'Renvoi'],
+      ['en', 'How to Play', 'Elimination', 'Deflect'],
+    ]) {
+      app.settings.set('language', language);
+      assert.equal(info.title.textContent, title);
+      assert.equal(info.body.querySelectorAll('h3')[0].textContent, first);
+      assert.equal(info.body.querySelectorAll('h3')[7].textContent, last);
+      assert.equal(info.closeButton.getAttribute('aria-label'), language === 'fr' ? 'Fermer' : 'Close');
+      info.close();
+      home.helpButton.click();
+      assert.equal(info.title.textContent, title);
+    }
+  } finally { info.close(); done(); }
 });
 
 test('Home footer stacks one enabled Why Alva? button below the attribution, beside Download', () => {
@@ -1001,7 +1026,7 @@ test('keyboard and gamepad open Why Alva? without changing Home, settings or gam
 
 // Play is Home's default only while a fighter is playable: a test-only one
 // (see tests/fighters/fixtures/test-fighters.mjs) here.
-test('keyboard and gamepad reach the controller button and the gear from Home\'s menu', () => withTestFighters([TEST_A], () => {
+test('keyboard and gamepad reach Help, Controller and Settings from Home\'s menu', () => withTestFighters([TEST_A], () => {
   const { app, home, done } = boot();
   try {
     Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
@@ -1010,19 +1035,31 @@ test('keyboard and gamepad reach the controller button and the gear from Home\'s
     place(home.utilityButtons.children[1], 1128, 20, 44, 44);
     place(home.el.querySelector('.home-why-alva'), 80, 550, 100, 16);
     assert.equal(document.activeElement, home.actions.play, 'Play is still the default');
-    // The utility group's nearest open button first (Controller), then
-    // Settings beside it; Help, a placeholder, is skipped.
+    // The nearest utility is Help, followed by Controller and Settings.
     app.input.key('ArrowRight');
-    assert.equal(document.activeElement, home.controllerButton, '→ from the menu');
+    assert.equal(document.activeElement, home.helpButton, '→ from the menu');
+    app.input.key('KeyJ');
+    assert.equal(app.infoDialog.isOpen, true);
+    app.input.key('Escape');
+    assert.equal(document.activeElement, home.helpButton);
+    app.input.key('ArrowRight');
+    assert.equal(document.activeElement, home.controllerButton);
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, home.settingsButton, '→ again: the gear');
     app.input.key('ArrowLeft');
-    assert.equal(document.activeElement, home.controllerButton, 'never the Help placeholder');
+    assert.equal(document.activeElement, home.controllerButton);
+    app.input.key('ArrowLeft');
+    assert.equal(document.activeElement, home.helpButton);
     app.input.key('ArrowLeft');
     app.input.key('ArrowUp');
-    assert.equal(document.activeElement, home.controllerButton, '↑ from Play');
+    assert.equal(document.activeElement, home.helpButton, '↑ from Play');
+    app.input.pad('confirm');
+    assert.equal(app.infoDialog.isOpen, true);
+    app.input.pad('back');
+    assert.equal(document.activeElement, home.helpButton);
     app.input.pad('left');
     assert.ok(Object.values(home.actions).includes(document.activeElement), 'D-pad back to the menu');
+    app.input.pad('right');
     app.input.pad('right');
     app.input.pad('right');
     assert.equal(document.activeElement, home.settingsButton, 'D-pad reaches Settings');
