@@ -165,10 +165,7 @@ export const EN = {
   'mode.select': 'Select',
   'mode.details': 'Mode details',
   'mode.quickBattle.overview': 'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
-  'mode.regular.description': 'Choose your fighter and difficulty. Your CPU opponent and stage are selected at random.',
-  'mode.custom.description': 'Customize your battle by choosing the difficulty, your fighter, the CPU opponent, and the stage.',
-  'mode.rules.title': 'Match Rules',
-  'mode.rules.description': 'Matches last 7 minutes. If the score is tied, a 1-minute overtime begins as the Void closes in.',
+  'mode.quickBattle.rules.description': 'Quick Battle matches last up to 7 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
 
   'quickPlay.title': 'How do you want to play?',
   'quickPlay.custom.name': 'Custom Play',
