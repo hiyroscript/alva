@@ -329,9 +329,10 @@ export class InfoDialog extends ModalDialog {
   // `kicker` and `body` are translation keys (so they follow the language
   // while open); `title` is text no translation owns, such as a fighter's
   // name. Alternatively, `titleKey` and `paragraphs` are translation keys
-  // for a long story. `opener` is the control focus returns to (by default
+  // for a long story, or `sections` holds { heading, description } keys
+  // for a guide. `opener` is the control focus returns to (by default
   // whatever had focus: a pressed button does not always take it).
-  open({ kicker = null, title, titleKey = null, body, paragraphs = null, opener = null }) {
+  open({ kicker = null, title, titleKey = null, body, paragraphs = null, sections = null, opener = null }) {
     if (this.isOpen) this.close();
     if (kicker) setText(this.kicker, kicker);
     this.kicker.hidden = !kicker;
@@ -340,9 +341,14 @@ export class InfoDialog extends ModalDialog {
       this.title.textContent = title;
       this.title.setAttribute('data-i18n', '');
     }
-    this.longForm = !!paragraphs;
+    this.longForm = !!(paragraphs || sections);
     this.panel.classList.toggle('info-panel--story', this.longForm);
-    this.body.replaceChildren(...(paragraphs ?? [body]).map((key) => el('p', tx(key))));
+    this.body.replaceChildren(...(sections
+      ? sections.map(({ heading, description }) => el('section', { class: 'info-section' }, [
+        el('h3', { class: 'info-section-title', ...tx(heading) }),
+        el('p', tx(description)),
+      ]))
+      : (paragraphs ?? [body]).map((key) => el('p', tx(key)))));
     if (this.longForm) {
       // Preserve paragraph semantics for screen readers instead of announcing
       // the entire long story as a single unstructured description on entry.

@@ -747,9 +747,62 @@ test('Why Alva? shows seven localized paragraphs in order, with an accessible he
   } finally { dialog.close(); setLanguage('en'); }
 });
 
-test('Why Alva? supports every dismissal, restores its opener, and reuses one panel and scope', () => {
+test('How to Play contains exactly the eight approved sections in order in both languages', () => {
   const { app, home } = boot();
-  const opener = home.el.querySelector('.home-why-alva');
+  const dialog = app.infoDialog;
+  const ids = ['elimination', 'launchPoint', 'baseLaunch', 'directionalLaunch', 'overtime', 'energy', 'shield', 'deflect'];
+  const headings = ['Elimination', 'Launch Point', 'Base Launch', 'Directional Launch', 'Overtime', 'Energy', 'Shield', 'Deflect'];
+  const descriptions = [
+    "There’s no health bar in Alva. Instead, you score a point whenever your opponent falls into the Void. The first to reach 3 points wins the match.",
+    "Every unblocked hit raises your Launch Point, making you fly farther when launched. It gradually decreases when you go without taking hits.",
+    "Base Launch determines how strongly a hit sends someone flying. The higher its value, the stronger the launch becomes, especially against someone with a high Launch Point. A Base Launch of 0 doesn’t send anyone flying.",
+    "Not every hit sends you in the same direction. Depending on the attack, you can be launched sideways, upward, or downward.",
+    "If both players have the same score when the 7-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.",
+    "Energy is used for dashing, Deflecting, and blocking hits with your Shield. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.",
+    "Hold the Shield button while on the ground to block incoming attacks from any direction. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.",
+    "While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. Deflecting costs Energy, even if it misses.",
+  ];
+  try {
+    home.helpButton.click();
+    assert.equal(dialog.root.getAttribute('role'), 'dialog');
+    assert.equal(dialog.root.getAttribute('aria-modal'), 'true');
+    assert.equal(dialog.root.getAttribute('aria-labelledby'), dialog.title.id);
+    assert.equal(dialog.root.getAttribute('aria-describedby'), null);
+    assert.equal(dialog.body.getAttribute('role'), 'region');
+    assert.equal(dialog.body.getAttribute('tabindex'), '0');
+    assert.equal(dialog.body.getAttribute('aria-labelledby'), dialog.title.id);
+    assert.equal(dialog.kicker.hidden, true);
+    const nodes = [...dialog.body.children];
+    for (const language of ['en', 'fr', 'en']) {
+      setLanguage(language);
+      localizeTree(dialog.root);
+      assert.equal(dialog.title.textContent, language === 'en' ? 'How to Play' : 'Comment jouer');
+      assert.equal(dialog.body.children.length, 8);
+      nodes.forEach((node, i) => {
+        assert.equal(dialog.body.children[i], node, 'language changes preserve section nodes');
+        assert.equal(node.tagName, 'SECTION');
+        assert.deepEqual(node.children.map((child) => child.tagName), ['H3', 'P']);
+        for (const [index, field] of ['heading', 'description'].entries()) {
+          const copy = STRINGS[language][`howToPlay.${ids[i]}.${field}`];
+          assert.ok(copy, `${language} ${ids[i]} ${field} has its own translation`);
+          assert.equal(node.children[index].textContent, copy);
+        }
+        if (language === 'en') {
+          assert.equal(node.children[0].textContent, headings[i]);
+          assert.equal(node.children[1].textContent, descriptions[i]);
+        }
+      });
+      assertFocus(dialog.closeButton);
+      assert.equal(home.el.inert, true);
+      assert.equal(app.screens.current, home);
+    }
+  } finally { dialog.close(); setLanguage('en'); }
+});
+
+for (const [selector, count] of [['.home-why-alva', 7], ['.home-help', 8]]) {
+test(`${selector} supports every dismissal, restores its opener, and reuses one panel and scope`, () => {
+  const { app, home } = boot();
+  const opener = home.el.querySelector(selector);
   const dialog = app.infoDialog;
   const panel = dialog.panel;
   const listenerCounts = [...dialog.root.listeners].map(([type, listeners]) => [type, listeners.length]);
@@ -778,16 +831,19 @@ test('Why Alva? supports every dismissal, restores its opener, and reuses one pa
   opener.click();
   opener.click(); // A second request while open replaces, rather than stacking.
   assert.equal(app.nav.scopes.length, 1);
-  assert.equal(dialog.body.children.length, 7);
+  assert.equal(dialog.body.children.length, count);
   dialog.close();
   assert.deepEqual([...dialog.root.listeners].map(([type, listeners]) => [type, listeners.length]), listenerCounts);
   assertFocus(opener);
 });
 
-test('story keyboard and controller scrolling stays scoped; Tab cycles between Close and the reading region', () => {
+test(`${selector} keyboard and controller scrolling stays scoped; Tab cycles between Close and the reading region`, () => {
   const { app, home } = boot();
   const dialog = app.infoDialog;
-  home.el.querySelector('.home-why-alva').click();
+  const opener = home.el.querySelector(selector);
+  opener.focus();
+  app.nav.padCommand('confirm');
+  assert.equal(dialog.isOpen, true);
   dialog.body.clientHeight = 200;
   dialog.body.scrollHeight = 1000;
   app.input.key('ArrowDown');
@@ -826,11 +882,22 @@ test('story keyboard and controller scrolling stays scoped; Tab cycles between C
   app.nav.command('confirm', null);
   assert.equal(dialog.isOpen, false);
 });
+}
+
+test('How to Play sections are removed when InfoDialog is reused for Why Alva?', () => {
+  const { app, home } = boot();
+  home.helpButton.click();
+  app.infoDialog.close();
+  home.el.querySelector('.home-why-alva').click();
+  assert.deepEqual(app.infoDialog.body.children.map((node) => node.tagName), Array(7).fill('P'));
+  assert.equal(app.infoDialog.title.textContent, 'Why Alva?');
+  app.infoDialog.close();
+});
 
 test('Discover single-body dialogs reset story presentation and localization when reusing InfoDialog', () => {
   const { app, home, discover } = boot();
   const dialog = app.infoDialog;
-  home.el.querySelector('.home-why-alva').click();
+  home.helpButton.click();
   dialog.close();
   home.actions.discover.click();
   discover.browser.describeBtn.click();

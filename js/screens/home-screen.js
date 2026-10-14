@@ -1,7 +1,7 @@
 // HOME: editorial wordmark and navigation beside a glass strip carrying a
 // looping credits roll, with compact Help, Controller and Settings buttons
 // in the top right. Controller opens Controller Connections and Settings
-// its dialog, each over Home; Help is still a placeholder. The Controller
+// its dialog, each over Home; Help opens How to Play. The Controller
 // button carries a small indicator of the controllers connected: green with
 // a check (one to four), red with a cross (none), orange with an
 // exclamation mark (more than four), kept up to date as they change.
@@ -118,13 +118,20 @@ export class HomeScreen extends Screen {
     ]);
     this.controllerButton.addEventListener('click', () => app.controllerDialog?.open({ opener: this.controllerButton }));
     app.controllers?.onChange(() => this.syncControllerStatus());
-    // Help is a future utility: a native disabled button announces
-    // unavailability and stays out of Tab and MenuNavigator.
+    // Help shares the information dialog's reading region and navigation,
+    // returning focus here even when a touch does not focus the button.
+    this.helpButton = el('button', {
+      class: 'home-help', type: 'button', 'data-nav': true, 'aria-haspopup': 'dialog',
+      ...tattr('aria-label', 'home.help'), ...tattr('title', 'howToPlay.title'), html: ICONS.help,
+    });
+    this.helpButton.addEventListener('click', () => app.infoDialog.open({
+      titleKey: 'howToPlay.title',
+      sections: ['elimination', 'launchPoint', 'baseLaunch', 'directionalLaunch', 'overtime', 'energy', 'shield', 'deflect']
+        .map((id) => ({ heading: `howToPlay.${id}.heading`, description: `howToPlay.${id}.description` })),
+      opener: this.helpButton,
+    }));
     this.utilityButtons = el('div', { class: 'home-utility-buttons' }, [
-      el('button', {
-        class: 'home-help', type: 'button', disabled: true,
-        ...tattr('aria-label', 'home.help'), html: ICONS.help,
-      }),
+      this.helpButton,
       this.controllerButton,
       this.settingsButton,
     ]);
