@@ -1,172 +1,1014 @@
-ALVA — Add a How to Play Dialog
+ALVA — Animated Ability HUD & Universal Cooldown Rebalance
 
 Objective
 
-Make the existing question-mark (?) button in the top-right corner of the Home screen functional.
+Implement a polished, hero-shooter-inspired ability interface for keyboard and controller players during gameplay, together with a strict new universal cooldown policy.
 
-When clicked, it should open a polished How to Play dialog that briefly explains Alva’s core gameplay mechanics to new players.
+This is an implementation task, not a mockup. Make the changes in the actual game, connect them to the existing gameplay systems, and test everything thoroughly.
 
-The purpose is to help someone understand the fundamental rules of the game without overwhelming them with technical information or character-specific details.
+The desired result should feel like a professionally designed fighting-game HUD, with a smooth, scroll-wheel-style transition between grounded and airborne moves.
 
-Do not change any gameplay mechanics. This task is strictly about the Home interface and its help dialog.
+The implementation must preserve Alva’s identity: pixel-art character abilities, minimal dark UI, clean typography, readable controls, and fluid combat.
 
-1. Understand and reuse the existing architecture
+Repository: hiyroscript/alva
 
-Before implementing, inspect the relevant code, especially:
+1. Study the existing architecture first
 
-* js/screens/home-screen.js — Contains the currently disabled .home-help button.
-* js/ui/overlays.js — Contains the existing InfoDialog and modal behavior.
-* js/core/app.js — Manages dialog instances.
-* css/overlays.css and css/home.css — Existing dialog and Home button styling.
-* js/localization/strings/en.js and fr.js — English and French translations.
-* docs/gameplay/battle.md — Elimination, scoring, and overtime.
-* docs/systems/launch.md — Launch Point, Base Launch, and Directional Launch.
-* docs/systems/energy.md and defense.md — Energy, Shield, and Deflect.
+Alva is a browser-based, HTML/CSS/JavaScript platform fighter that renders gameplay with Canvas 2D and uses DOM elements for the HUD.
 
-Reuse established UI patterns rather than introducing a separate design system.
+Read the repository’s CLAUDE.md, ALVA_SPEC.md, codename_rule, and relevant gameplay documentation before making changes.
 
-2. Button behavior
+Pay particular attention to:
 
-The existing ? button should:
+HUD and gameplay screens
 
-* Be enabled and clickable.
-* Open the How to Play dialog without navigating away from Home.
-* Remain in its current position alongside the other utility buttons.
-* Support mouse, touch, keyboard, and controller navigation.
-* Have an accessible label and dialog semantics.
-* Return focus to the ? button when the dialog closes.
+* js/ui/hud.js
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+* css/battle.css
+* css/battle-overlays.css
+* css/responsive.css
 
-Keep its current icon and general appearance.
+Existing ability artwork
 
-3. Dialog design
+* js/ui/mobile-abilities.js
+* js/data/ability-preview.js
+* js/data/abilities.js
+* js/ui/touch-controls.js
+* js/ui/icons.js
 
-Use the existing Alva modal design language: dark translucent surfaces, subtle borders, restrained green accents, consistent typography, and the same visual styling as other information dialogs.
+Keyboard and controller systems
 
-The dialog should have:
+* js/config.js
+* js/core/input-manager.js
+* js/core/controller-manager.js
+* js/core/gamepad-devices.js
+* js/core/controller-resolver.js
+* js/data/controller-profiles.js
+* js/ui/controller-glyphs.js
+* js/core/settings.js
 
-* The title How to Play.
-* A close (×) button in the upper-right corner.
-* Eight clearly separated sections.
-* Short, readable paragraphs beneath their headings.
-* Comfortable spacing without unnecessary decoration.
-* A scrollable content area when necessary.
+Combat and cooldown systems
 
-The dialog must work on desktop and mobile in landscape orientation, including smaller screens.
+* js/data/cooldowns.js
+* js/game/combat/combat-state.js
+* js/game/combat/attacks.js
+* js/game/combat/technique.js
+* js/game/combat/summon.js
+* js/game/rendering/fighter-status.js
+* js/game/fighters/fighter.js
+* js/game/combat/offense.js
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* js/data/characters/0003.js
 
-It should close using the close button, Escape, controller Back, or clicking outside the panel, consistent with existing dialogs.
+Reuse these existing systems instead of building a disconnected parallel implementation.
 
-Prefer extending or reusing InfoDialog to support section headings and descriptions. Preserve its existing behavior for other uses, including the Why Alva? dialog.
+Do not modify the protected character_rule file.
 
-4. Exact English content
+⸻
 
-Use the following player-facing text as the content baseline. Keep the language natural, friendly, and concise.
+PART A — NEW GAMEPLAY ABILITY HUD
 
-How to Play
+2. General interface concept
 
-Elimination
+Create a new ability HUD that appears in the bottom-right corner of the gameplay screen whenever the human player is using a keyboard or game controller.
 
-There’s no health bar in Alva. Instead, you score a point whenever your opponent falls into the Void. The first to reach 3 points wins the match.
+It should take visual inspiration from modern hero shooters such as Overwatch, particularly their compact ability icons and clearly identified controls.
 
-Launch Point
+However, the HUD must fit Alva’s art direction rather than look like an unrelated UI imported from another game.
 
-Every unblocked hit raises your Launch Point, making you fly farther when launched. It gradually decreases when you go without taking hits.
+Every available move should have a small ability tile containing:
 
-Base Launch
+1. The move’s actual character artwork.
+2. A thin horizontal divider beneath the image.
+3. The keyboard key or controller button combination required to execute it.
+4. A clear cooldown indicator when applicable.
+5. An optional compact ability name where space permits.
 
-Base Launch determines how strongly a hit sends someone flying. The higher its value, the stronger the launch becomes, especially against someone with a high Launch Point. A Base Launch of 0 doesn’t send anyone flying.
+The image must be the main attraction. The input should be clearly readable underneath it.
 
-Directional Launch
+Do not use generic placeholder pictures for attacks when the game already contains the appropriate sprite artwork.
 
-Not every hit sends you in the same direction. Depending on the attack, you can be launched sideways, upward, or downward.
+3. Appearance and visual direction
 
-Overtime
+Use a restrained, premium visual style:
 
-If both players have the same score when the 7-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.
+* Dark, translucent charcoal backgrounds.
+* Thin, subtly illuminated borders.
+* Soft shadows for contrast against stages.
+* Rounded rectangular ability tiles, with modest corner radii.
+* Crisp pixel artwork, retaining original colors.
+* Bright, clearly readable control glyphs.
+* Minimal decorative elements.
+* Smooth animation and carefully controlled opacity.
+* A subtle distinction between active and inactive ability rows.
 
-Energy
+Each active ability tile should have an image area above a slim input-label area.
 
-Energy is used for dashing, Deflecting, and blocking hits with your Shield. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.
+The two areas must be separated by a 1px horizontal divider, using a muted white or neutral color.
 
-Shield
+The visual relationship should be roughly:
 
-Hold the Shield button while on the ground to block incoming attacks from any direction. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.
+ABILITY ARTWORK
 
-Deflect
+────────────
 
-While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. Deflecting costs Energy, even if it misses.
+REQUIRED INPUT
 
-5. Writing requirements
+Do not place all inputs in a separate control legend. The input must belong directly to its own ability tile.
 
-The How to Play dialog must remain a brief introduction, not a complete gameplay manual.
+Dimensions
 
-Strict content rules:
+For standard desktop gameplay, start with approximate targets:
 
-* Cover only the eight sections listed above.
-* Never mention specific characters, character names, fighter IDs, individual moves, special abilities, or character-specific statistics.
-* Don’t introduce additional sections about controls, combos, movement, game modes, settings, or advanced combat systems.
-* Avoid internal development terminology, code references, formulas, or technical explanations in the player-facing content.
-* Use everyday language that someone playing for the first time can immediately understand.
-* Keep the eight section headings visible and easy to scan.
-* Avoid redundant explanations.
-* Preserve the actual rules documented in the repository.
+* Active ability tile: 48–62px wide.
+* Active image area: approximately 38–48px.
+* Input region: approximately 17–22px high.
+* Space between cards: 4–7px.
+* Inactive ability tiles: around 65–75% of active size.
+* Active row opacity: 100%.
+* Inactive row opacity: approximately 40–55%.
 
-The reader should understand why eliminations matter, how launching works, when overtime occurs, and how Energy, Shield, and Deflect interact.
+These are design starting points, not rigid values. Tune them based on the actual game viewport.
 
-Don’t make the text unnecessarily long.
+Use CSS clamp() and viewport-relative sizing where appropriate.
 
-6. Localization
+The entire interface should remain compact, clean, and unobtrusive.
 
-Alva supports both English and French.
+Avoid extremely large panels, excessive bloom, thick borders, or distracting colored effects.
 
-Integrate the How to Play text into the existing localization system.
+4. Ground and air ability carousel
 
-* Add translation keys for the dialog title, eight headings, and eight descriptions.
-* Provide natural French translations that preserve the meaning and approachable tone of the English copy.
-* Ensure the dialog displays the language selected in Settings.
-* Avoid hardcoding visible text directly into JavaScript components.
-* Switching the interface language must not leave stale translations in the dialog.
+This is the most important visual feature.
 
-Do not change existing translations unrelated to this feature.
+The HUD must display two ability groups simultaneously: grounded moves and midair moves.
 
-7. Technical implementation
+One group is the active set; the other is the inactive preview.
 
-Follow the repository’s existing conventions.
+When the character is grounded
 
-Important requirements:
+The layout should be:
 
-* Do not install new dependencies.
-* Do not modify the underlying combat, scoring, physics, or defense systems.
-* Do not introduce duplicate modal infrastructure when existing utilities can handle the task.
-* Preserve existing overlay behavior, focus management, and controller navigation.
-* Keep styling consistent with the current Home interface.
-* Ensure the dialog content remains scrollable and readable on small screens.
-* Keep the implementation maintainable and avoid unnecessary abstractions.
+TOP — Ground abilities
 
-If structured headings require extending InfoDialog, make that extension optional and backward-compatible.
+* Large and prominent.
+* Full-opacity artwork.
+* Clearly visible input labels.
+* Normal-sized cards.
+* Visually indicated as the current moveset.
 
-8. Validation
+BOTTOM — Midair abilities
 
-Verify the following:
+* Smaller cards.
+* Lower opacity.
+* Slightly recessed appearance.
+* Inputs still visible but less prominent.
+* Clearly identifiable as the moves that become primary when airborne.
 
-1. The ? button is no longer disabled.
-2. Clicking it opens How to Play.
-3. All eight sections appear in the correct order.
-4. No other gameplay subjects appear.
-5. No specific characters or abilities are mentioned.
-6. The dialog closes correctly through supported methods.
-7. Keyboard and controller navigation work.
-8. Focus returns to the Help button after closing.
-9. English and French content display correctly.
-10. The content scrolls correctly on smaller screens.
-11. Other dialogs continue functioning as before.
-12. Existing tests pass using node --test.
+When the character is airborne
 
-Add or update appropriate interface tests for the new behavior.
+The groups exchange positions.
 
-Final expectation
+TOP — Midair abilities
 
-The result should feel like a native part of Alva: a small, accessible, well-designed help dialog that explains the essential gameplay rules in a way a new player can read and understand quickly.
+* Large and prominent.
+* Full opacity.
+* Their own correct midair artwork.
+* Their correct keyboard or controller inputs.
 
-Prioritize clarity, simplicity, correctness, and consistency with the existing interface.
+BOTTOM — Ground abilities
 
-Implement the feature completely, without unrelated changes.
+* Smaller.
+* Dimmed.
+* Recessed.
+* Still visible as a preview of what becomes available upon landing.
+
+The top position always represents the player’s current movement state.
+
+The bottom position always represents the opposite state.
+
+Neither group disappears just because it is inactive.
+
+5. Scroll-wheel transition animation
+
+The transition should look like a small vertical carousel or mechanical scrolling wheel.
+
+It must not instantly replace images or snap between layouts.
+
+When a character jumps or becomes airborne:
+
+1. The grounded row smoothly slides downward.
+2. The airborne row moves upward into the main position.
+3. The airborne row scales up toward full size.
+4. Its opacity smoothly increases to 100%.
+5. The grounded row scales down and fades into its preview state.
+6. Both settle cleanly into their new positions.
+
+When the character lands, play the reverse animation.
+
+Animation targets
+
+* Approximate duration: 280–360ms.
+* Smooth ease-in-out or carefully tuned cubic-bezier easing.
+* Animate transform and opacity wherever practical.
+* Small, tasteful vertical movement.
+* Subtle depth or perspective is welcome, but avoid dramatic 3D rotation.
+* No layout jumping, flickering, or sudden card reconstruction.
+
+The movement should feel like two layers rotating through two fixed positions.
+
+Important behavior
+
+The player cannot manually scroll this wheel.
+
+There should be no scroll buttons, mouse-wheel interaction, or controller input dedicated to changing it.
+
+The character’s actual movement state controls the carousel automatically.
+
+Use the existing fighter grounded state rather than inventing a separate gameplay state.
+
+If the player rapidly jumps, lands, bounces, or moves between grounded and airborne states, transitions must remain smooth and reversible.
+
+Avoid queueing several animations that continue after the character has already changed states again.
+
+Retarget an in-progress transition to the latest state.
+
+Respect prefers-reduced-motion by providing an immediate, non-animated transition.
+
+6. Character-specific ability display
+
+Alva currently has three playable fighters, with additional character slots planned.
+
+The HUD must work for every existing fighter and support future fighters automatically.
+
+Use the existing actions loadout mappings.
+
+Do not assume that every fighter has five attacks.
+
+Do not render empty or nonexistent move slots.
+
+Do not display unfinished reserved Transform functionality as though it were a playable ability.
+
+Character #0001
+
+Ground moves include:
+
+* Jab
+* Red
+* Maximum Blue
+* Unlimited Void
+* Hollow Purple
+* High Kick
+
+Midair moves include:
+
+* Floating Straight
+* Red Kick
+* Blue
+* High Kick
+
+Display the correct artwork for each move.
+
+Red and Maximum Blue should use their existing projectile artwork where their mobile previews already do so.
+
+Unlimited Void and Hollow Purple must remain ground-only abilities and should not incorrectly appear as usable midair moves.
+
+Character #0002
+
+Ground moves include:
+
+* One-Two
+* Rapid Kicks
+* Spin Attack
+* Whirlwind
+
+Midair moves include:
+
+* Homing Attack
+* Bounce Attack
+* Blue Tornado
+
+The Bounce Attack is particularly important because its controller binding requires a direction.
+
+Do not incorrectly show it as an ordinary Square/X press if the current binding is Down + Square/X.
+
+Character #0003
+
+Include its existing ground and air attacks, its special techniques, and Mystical Palm Technique.
+
+Use its actual ability mapping and artwork.
+
+Do not duplicate ground-only abilities in the active airborne group.
+
+Future compatibility
+
+The HUD must derive its move list from the character’s data.
+
+A future character with two, three, four, five, or a different combination of available attacks should work without modifying the HUD’s rendering logic.
+
+Do not introduce shared-code special cases based on fighter ID.
+
+7. Reuse existing ability artwork
+
+Alva already provides most of the necessary functionality through:
+
+* mobileAbility()
+* previewFrame()
+* abilityMove()
+* abilityAvailable()
+* controllerActions()
+
+Reuse these utilities or extend their shared presentation layer where necessary.
+
+Use mobileAbilities entries from each fighter definition.
+
+Honor the existing previews.air artwork when a move changes in midair.
+
+The HUD should never incorrectly display a grounded attack animation for a distinct airborne move that has its own artwork.
+
+Preserve image aspect ratios.
+
+Use crisp pixel rendering and never stretch sprites disproportionately.
+
+If artwork is unavailable or fails to load, use the existing neutral fallback glyph system. Do not show a broken image.
+
+Whenever possible, cache image elements or decoded assets rather than reloading artwork every animation frame.
+
+8. Keyboard input presentation
+
+For keyboard players, display the actual action binding from CONFIG.bindings.
+
+The default gameplay controls currently include:
+
+* U — Attack 1
+* I — Attack 2
+* O — Attack 3
+* M — Attack 4
+* , — Attack 5
+* J — Extra Attack
+* L — Shield / Deflect
+
+The HUD must associate these keys with the actual move performed by the selected fighter in the currently displayed ground or air state.
+
+Do not display generic Attack 1, Attack 2 labels in place of the ability artwork.
+
+Show the keyboard key itself in the tile’s bottom region.
+
+Use compact, easy-to-read keycap styling.
+
+The comma key must render correctly.
+
+Support any applicable binding updates rather than permanently hard-coding the displayed labels.
+
+9. Controller input presentation
+
+Controller players must see their actual button bindings.
+
+Support both PlayStation and Xbox controllers using the existing device-detection system.
+
+Use the current fighter’s resolved controller profile, including player-customized layouts.
+
+This is essential because Alva allows different controller mappings for different characters.
+
+For example, character #0001’s recommended bindings include combinations such as:
+
+* R2 + Square for Red (PlayStation).
+* R2 + Circle for Maximum Blue.
+* L2 + Triangle for Unlimited Void.
+* R2 + Triangle for Hollow Purple.
+
+The Xbox display must use the equivalent Xbox button names.
+
+Character #0002’s midair Bounce Attack uses a directional combination and must display that requirement clearly.
+
+For controller bindings, support:
+
+* Single button presses.
+* Modifier + button combinations.
+* Direction + button combinations.
+* Hold activations.
+* Different bindings for ground and air.
+* Saved player remappings.
+
+Use resolveProfile() and existing glyph/label utilities such as bindingText() where appropriate.
+
+Do not create a second independent controller-binding table.
+
+Input device switching
+
+Use the existing InputManager.lastDevice behavior to determine whether to display keyboard keys or controller inputs.
+
+When a player switches from keyboard to gamepad, the visible input labels should update accordingly.
+
+When switching back to keyboard, restore keyboard labels.
+
+Do not rebuild the entire HUD unnecessarily.
+
+Do not mistake a connected but unused controller for proof that the player is actively using it.
+
+The displayed controller button family should match the actual active controller whenever identifiable.
+
+10. Ability ordering and readability
+
+Arrange abilities in a consistent, logical order.
+
+Prefer gameplay/control order or a visually sensible arrangement based on the existing controller profile.
+
+The player should quickly understand which tile corresponds to which move.
+
+Do not rearrange the entire ability row every time a cooldown starts or finishes.
+
+The only major group movement should be the ground/air carousel transition.
+
+For longer input combinations, use compact controller glyphs or a slightly wider tile instead of tiny unreadable text.
+
+Optionally provide a discreet move-name label or accessible descriptive label for clarity.
+
+The interface must not look cluttered.
+
+⸻
+
+PART B — COOLDOWN VISUALIZATION
+
+11. Cooldown states
+
+Each ability tile must reflect its actual gameplay availability.
+
+When a move enters cooldown, visibly change its corresponding tile.
+
+Use a polished combination of:
+
+* A translucent dark overlay above the ability artwork.
+* A radial cooldown sweep or circular progress indicator.
+* A remaining-seconds label for long cooldowns.
+* Reduced artwork brightness.
+* A subtle ready-state transition when the cooldown finishes.
+
+The input label should remain readable even while the move is unavailable.
+
+Do not hide the ability icon completely.
+
+Long cooldowns
+
+For 3-second and 5-second cooldowns:
+
+Show the remaining seconds prominently.
+
+Examples:
+
+3.0 → 2.9 → 2.8 … → ready.
+
+5.0 → 4.9 → 4.8 … → ready.
+
+Use the existing formatCooldown() utility or an equivalent shared formatter to avoid inconsistent countdown behavior.
+
+Use the actual timer state.
+
+Never simulate a cooldown independently inside the HUD.
+
+Universal 0.5-second repeat delay
+
+Preserve the universal 0.5-second repeat rule described below.
+
+For this short delay, a subtle radial sweep or temporary dimming is sufficient.
+
+Avoid a distracting large numerical timer appearing on every ordinary punch.
+
+However, the card should still indicate momentary cooldown if a player looks at it.
+
+Cooldown completion
+
+When an ability becomes ready:
+
+* Remove the dark overlay.
+* Restore full appropriate brightness.
+* Clear the timer.
+* Optionally use a very subtle 100–180ms highlight.
+
+Avoid large flashing effects or unnecessary particle animations.
+
+Inactive-row cooldowns
+
+Cooldowns must remain visible even when an ability belongs to the smaller, inactive ground/air row.
+
+For example, if a 5-second ground ability is used and the player jumps, its cooldown must continue counting down while that ground ability is displayed in the lower preview row.
+
+When the player lands, the timer must still be accurate.
+
+Changing character state must never reset or restart a cooldown.
+
+12. Distinguish cooldown from other restrictions
+
+Alva also has restrictions such as:
+
+* Ground-only moves.
+* Limited uses per airtime.
+* Free-fall restrictions.
+* Attacks interrupted by other combat states.
+* Missing required animation frames.
+* Energy requirements.
+
+Do not confuse these with cooldowns.
+
+A move unavailable because its airtime usage has been exhausted should have a distinct muted or unavailable appearance.
+
+It must not incorrectly show a cooldown countdown that does not exist.
+
+The HUD should reflect the real combat system’s state, not try to predict ability availability using unrelated UI timers.
+
+⸻
+
+PART C — STRICT NEW COOLDOWN POLICY
+
+13. Exactly two special cooldown lengths
+
+Implement a new global cooldown policy across the entire game.
+
+The only permitted special cooldown lengths are 3 seconds and 5 seconds.
+
+The existing universal 0.5-second repeat delay is excluded from this restriction and must remain intact.
+
+No move may retain an arbitrary extra cooldown duration such as 2, 4, 6, 8, 10, or 12 seconds.
+
+Apply the following rules universally.
+
+Rule 1 — Ten-damage attacks: 5 seconds
+
+Any attack or damaging move that deals 10 damage must have a 5-second cooldown.
+
+This includes damage delivered through:
+
+* Ordinary attacks.
+* Projectiles.
+* Techniques.
+* Summoned entities.
+* Multi-hit attacks with a 10-damage strike or finisher.
+* Other character-specific damaging ability implementations.
+
+Inspect the complete move definition, including nested hit, projectile, finisher, impact, and burst data.
+
+Do not overlook a move simply because its 10-damage hit is delivered indirectly.
+
+If a move has a defined total damage of exactly 10, account for that as well; don’t blindly assume its top-level damage field is always the relevant measure.
+
+The cooldown applies to the move that the fighter activates, not separately to every projectile or hitbox created by it.
+
+Rule 2 — Highly special abilities: 3 seconds
+
+A move that provides a genuinely exceptional gameplay effect must have a 3-second cooldown, unless Rule 1 already requires 5 seconds.
+
+Qualifying examples include:
+
+* Direct healing or restoring Launch Point.
+* Paralysis.
+* A dedicated immobilizing effect.
+* A special hard crowd-control effect that prevents normal character actions.
+* Comparable major effects explicitly defined in the ability’s combat data.
+
+For example, Unlimited Void’s paralysis qualifies.
+
+Mystical Palm Technique’s healing qualifies.
+
+Rule 3 — Ordinary abilities receive no extra cooldown
+
+If a move does not qualify for Rule 1 or Rule 2, it must not have any additional cooldown beyond the universal 0.5-second repeat rule.
+
+Do not assign a cooldown just because an attack:
+
+* Looks powerful.
+* Has impressive visual effects.
+* Has a long animation.
+* Launches enemies.
+* Pushes enemies away.
+* Pulls enemies inward.
+* Homes toward a target.
+* Creates an ordinary projectile.
+* Causes ordinary hitstun or blockstun.
+* Uses a standard quake, bounce, roll, or slam mechanic.
+
+A pull effect is specifically not enough to qualify as highly special.
+
+For example, character #0001’s Blue/Maximum Blue pulling behavior must not receive a 3-second cooldown merely because it draws opponents inward.
+
+Likewise, ordinary combat hitstun should not qualify as special stun. Almost every attack has some hitstun; treating it as an exceptional mechanic would incorrectly give nearly everything a cooldown.
+
+The 3-second category must be reserved for clearly exceptional effects such as actual paralysis, immobilization, and healing.
+
+Rule precedence
+
+When multiple conditions apply:
+
+1. A qualifying 10-damage attack receives 5 seconds.
+2. Otherwise, a highly special move receives 3 seconds.
+3. Otherwise, the move gets no extra cooldown.
+
+Never add the 3-second and 5-second cooldowns together.
+
+Never stack special cooldowns.
+
+The universal 0.5-second repeat behavior remains the game’s normal baseline and is not an additional special cooldown.
+
+14. Audit all three existing fighters
+
+Review every move definition in:
+
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* js/data/characters/0003.js
+
+Important examples to verify:
+
+Character	Ability	New rule
+#0001	Unlimited Void	3 seconds — paralysis
+#0001	Hollow Purple	5 seconds — 10-damage projectile
+#0001	Maximum Blue	No extra cooldown — pull alone does not qualify
+#0001	Blue	No extra cooldown — pull alone does not qualify
+#0002	Whirlwind	5 seconds — 10-damage finisher
+#0003	Mystical Palm Technique	3 seconds — healing
+#0003	Cherry Blossom Impact	No extra cooldown unless inspection identifies a qualifying exceptional effect
+#0003	Heavenly Foot of Pain	No extra cooldown unless inspection identifies a qualifying exceptional effect
+
+Alva currently contains cooldown overrides including:
+
+* Character #0003’s 4-second Cherry Blossom Impact cooldown.
+* Character #0003’s 12-second healing cooldown.
+* Character #0003’s 2-second Heavenly Foot of Pain cooldown.
+
+These must be brought into compliance with the new rule.
+
+Do not simply round existing cooldowns to whichever approved duration is closest.
+
+Reclassify each move based on its actual mechanics.
+
+Also inspect authored Deflect repeat delays, including legacy short values such as 0.05 seconds. Ensure that no unauthorized third cooldown duration remains. Preserve distinct animation timing and input behavior, but do not retain an arbitrary reuse cooldown in violation of the new policy.
+
+15. Enforce cooldown policy centrally
+
+The policy must be implemented in the shared combat/data architecture, not only in the three current character files.
+
+Relevant systems include:
+
+* js/data/cooldowns.js
+* js/game/combat/attacks.js
+* js/game/combat/technique.js
+* js/game/combat/summon.js
+* js/game/combat/combat-state.js
+* js/game/fighters/fighter.js
+
+Create or extend a shared cooldown classification/validation utility.
+
+It must be capable of identifying qualifying damage or exceptional effects across direct attacks, projectiles, multi-hit strikes, techniques, and summons.
+
+Prefer inferring policy from existing structured combat data.
+
+Where inference cannot distinguish an extraordinary mechanic from a routine one, provide a carefully validated, generic semantic classification rather than making decisions from a move’s name or fighter ID.
+
+Future fighters must follow the same policy automatically.
+
+Don’t let a future character declare an arbitrary 8-second cooldown and silently bypass the rule.
+
+Use validation or canonical derived values to ensure the final effective cooldown is permitted.
+
+Preserve current cooldown lifecycle
+
+Alva already distinguishes:
+
+* Ordinary attack reuse timers.
+* Technique and summon ability timers.
+* Movement cooldowns and other movement-state restrictions.
+
+Preserve the existing timing semantics unless a change is necessary to enforce the new policy.
+
+Ordinary attacks currently begin their repeat cooldown when the attack ends or is interrupted.
+
+Techniques and summons begin their cooldown when their activation is accepted.
+
+Keep these behaviors consistent.
+
+Do not accidentally make powerful abilities reusable by cancelling their startup animations.
+
+Cooldowns must continue counting correctly during normal gameplay and character movement.
+
+Do not alter combat damage, frame timing, hitboxes, launch calculations, hitstun durations, or animation sequences as a side effect of this rebalance.
+
+These new rules concern move reuse, not the actual damage or functionality of attacks.
+
+16. Single authoritative cooldown state
+
+The HUD, player input validation, and combat AI must all agree on the same cooldown.
+
+There must never be a situation where:
+
+* The HUD says ready but the attack is on cooldown.
+* The HUD says cooling down but gameplay allows the attack.
+* The CPU uses an ability during a cooldown the player must obey.
+* Switching from grounded to airborne resets a timer.
+* A character swap leaves timers from the old fighter on the interface.
+
+Create a shared read-only interface or helper for the UI to obtain:
+
+* Move ID.
+* Cooldown duration.
+* Remaining time.
+* Recovery progress.
+* Ready/cooling state.
+
+Use the existing CombatState.cooldowns and CombatState.abilityCooldowns as the authoritative sources.
+
+The new HUD must not maintain duplicate gameplay timers.
+
+⸻
+
+PART D — GAMEPLAY INTEGRATION
+
+17. Which game modes show the HUD?
+
+Show the new interface during:
+
+* Quick Battle with a human player.
+* Practice Ground with a human player.
+
+Do not show it during:
+
+* Watch Mode.
+* Character selection.
+* Home screen.
+* Loading screens.
+* Results screens.
+* Other menus where no fighter is actively being controlled.
+
+During pause menus, hide or substantially dim the ability interface so it doesn’t compete with menu content.
+
+The new desktop HUD should not interfere with existing mobile touch buttons.
+
+Prefer enabling it only for non-touch keyboard/controller gameplay, using Alva’s existing device and input behavior.
+
+Retain the mobile touch layout as its own interface.
+
+18. Suggested component architecture
+
+A suitable approach is to create a reusable module such as:
+
+js/ui/ability-hud.js
+
+And a corresponding stylesheet:
+
+css/ability-hud.css
+
+These are suggestions; follow existing repository conventions.
+
+The component should be reusable by both BattleScreen and PracticeGroundScreen.
+
+Suggested responsibilities:
+
+Initialization
+
+* Create the two ground/air groups.
+* Bind to the current fighter definition.
+* Resolve each group’s moves.
+* Build the artwork and input labels.
+
+Presentation
+
+* Render active/inactive styling.
+* Animate ground/air position changes.
+* Update controller or keyboard glyphs.
+* Update cooldown overlays.
+* Update unavailable-move styling.
+
+Lifecycle
+
+* Bind when entering gameplay.
+* Refresh when the player changes fighter.
+* Clean up when leaving the screen.
+* Pause and resume presentation appropriately.
+* Avoid retained listeners or detached DOM references.
+
+Do not recreate every ability tile on every animation frame.
+
+Only update elements when their displayed values change.
+
+Animation should be handled primarily by CSS transforms and opacity transitions, not manual reflows on every frame.
+
+19. Existing world-space cooldown indicators
+
+Alva already draws long cooldown indicators near fighters through js/game/rendering/fighter-status.js.
+
+Account for these existing indicators when introducing the bottom-right HUD.
+
+Do not accidentally make the screen excessively cluttered by displaying two equally prominent versions of the same cooldown information for the human player.
+
+A good arrangement is:
+
+* Bottom-right ability HUD: primary information for the local human player.
+* Existing world-space indicators: useful combat information for opponents, CPU fighters, or modes without the new HUD.
+
+Preserve important combat information while avoiding unnecessary duplication.
+
+The new HUD must not break the existing Energy bar, Launch Point display, match timer, score, or fighter status indicators.
+
+20. Screen positioning and responsive behavior
+
+The HUD must remain anchored to the bottom-right corner.
+
+Respect:
+
+* Screen safe-area insets.
+* Narrow desktop windows.
+* Different screen resolutions.
+* Landscape aspect ratios.
+* Browser zoom.
+* Existing HUD elements.
+* Stage visibility.
+
+Use the existing safe-area CSS variables wherever possible.
+
+The UI must not block the middle of the arena, obscure the player character unnecessarily, or interfere with important gameplay information.
+
+If the fighter has many abilities, adapt tile sizes or spacing rather than letting the row overflow the screen.
+
+Keep both carousel levels visually related and aligned.
+
+The layout should work on the Desert, City, and Practice stages, including light and dark backgrounds.
+
+⸻
+
+PART E — POLISH, ACCESSIBILITY & QUALITY
+
+21. Visual polish requirements
+
+Treat design quality as an important acceptance criterion, not an optional enhancement.
+
+Pay attention to:
+
+* Perfect alignment of ability tiles.
+* Consistent divider thickness.
+* Consistent image fitting.
+* Consistent spacing.
+* Clean rounded corners.
+* Controller glyph readability.
+* Proper keyboard keycap dimensions.
+* Smooth scaling and fading.
+* Natural scroll-wheel movement.
+* No clipped images.
+* No overlapping timers.
+* No text extending beyond tiles.
+* Stable positions when cooldown text changes width.
+
+The result should look intentional and professionally integrated with Alva.
+
+The reference image supplied with this request illustrates the intended general relationship between ability artwork and controls: icons are prominent, with the required input directly beneath them.
+
+Use that inspiration, but create an original interface adapted to Alva.
+
+22. Accessibility and localization
+
+Alva supports English and French.
+
+Any new visible textual labels must use the existing localization infrastructure.
+
+Do not introduce hard-coded English-only labels for Ground, Air, Ready, or other new interface terms.
+
+Use accessible labels for ability artwork, move names, bindings, and cooldown states.
+
+Ensure text contrast remains sufficient over gameplay.
+
+Respect reduced-motion preferences.
+
+The HUD is informational, not an interactive control surface, so it should not introduce unnecessary focusable elements or intercept gameplay inputs.
+
+⸻
+
+PART F — TESTING AND ACCEPTANCE CRITERIA
+
+23. Automated tests
+
+Run:
+
+node --test
+
+Update existing tests that assert old cooldown values and add new tests for the policy.
+
+Cooldown tests
+
+Verify that:
+
+1. A normal 3-damage attack has no extra cooldown beyond the universal 0.5-second repeat.
+2. A 5-damage attack without exceptional effects has no extra cooldown.
+3. A 10-damage attack receives 5 seconds.
+4. A move with a 10-damage projectile receives 5 seconds.
+5. A move whose projectile finisher deals 10 damage receives 5 seconds.
+6. A healing technique receives 3 seconds.
+7. A paralysis or hard-disable ability receives 3 seconds.
+8. A basic pull effect does not qualify for 3 seconds.
+9. Standard hitstun does not qualify for 3 seconds.
+10. A slam, bounce, launch, or quake does not automatically qualify for a longer cooldown.
+11. A move qualifying for both cooldown categories receives 5 seconds, never 8.
+12. Invalid authored cooldown values cannot bypass the universal policy.
+13. A technique interrupted during casting does not improperly escape its accepted cooldown.
+14. The CPU and human players use the same effective cooldown policy.
+
+HUD tests
+
+Verify that:
+
+1. Grounded fighters display ground abilities prominently.
+2. Airborne fighters display airborne abilities prominently.
+3. The inactive group remains visible underneath.
+4. The two groups switch positions when jumping or landing.
+5. Rapid state changes do not break the transition.
+6. Every displayed move has its correct artwork.
+7. Missing sprites use an appropriate fallback.
+8. Ground-only abilities are not presented as usable airborne abilities.
+9. Keyboard inputs match actual configured bindings.
+10. Controller inputs match the selected fighter’s resolved controller profile.
+11. PlayStation and Xbox glyphs are correctly distinguished.
+12. Custom controller mappings appear correctly.
+13. Cooldown timers remain accurate through ground/air switching.
+14. Cooldown presentation clears when a move becomes ready.
+15. Short universal delays receive a subtle visual indication.
+16. Airtime exhaustion does not masquerade as cooldown.
+17. Fighter changes replace the entire appropriate moveset.
+18. Watch Mode does not show a human-player ability HUD.
+19. Mobile touch controls are not obstructed.
+20. Pause, results, and screen exit do not leave stale interface elements.
+
+Test the relevant behavior in both Quick Battle and Practice Ground.
+
+24. Visual verification
+
+After implementation, inspect the HUD in actual gameplay, not only in isolated unit tests.
+
+Check at least:
+
+* #0001 grounded and airborne.
+* #0002 grounded and airborne.
+* #0003 grounded and airborne.
+* A 3-second cooldown actively counting.
+* A 5-second cooldown actively counting.
+* An ordinary 0.5-second repeat delay.
+* A move unavailable due to its airtime limit.
+* Keyboard input display.
+* PlayStation controller display.
+* Xbox controller display.
+* A customized controller mapping.
+* A narrow gameplay viewport.
+* A reduced-motion environment.
+
+If browser screenshot tooling is available, use it to inspect the final result and correct any visual problems.
+
+Do not claim visual verification unless it was actually performed.
+
+25. Documentation
+
+Update the relevant specification and documentation so that they reflect the new HUD and cooldown policy.
+
+At minimum, review:
+
+* ALVA_SPEC.md
+* docs/systems/combat.md
+* docs/systems/input.md
+* docs/gameplay/battle.md
+* docs/gameplay/practice.md
+* Relevant files in docs/characters/
+
+Remove outdated documentation claiming that specific moves have legacy cooldown values.
+
+Keep Alva’s established naming conventions, including the intentional mouvment spelling.
+
+⸻
+
+FINAL DELIVERABLE
+
+Implement the complete feature and provide a concise implementation summary covering:
+
+1. Which files were changed or created.
+2. How the new bottom-right ability HUD works.
+3. How the animated ground/air carousel is implemented.
+4. How keyboard and controller bindings are obtained.
+5. How cooldown overlays read actual combat state.
+6. The final cooldown classification for every existing move that previously had an exceptional cooldown.
+7. How the strict 3-second/5-second policy is enforced for future fighters.
+8. Which automated tests passed.
+9. Any unresolved issues or visual checks that could not be completed.
+
+Non-negotiable requirements
+
+The HUD must look excellent, not merely functional.
+
+Ground and air ability rows must transition smoothly like a vertical scrolling wheel.
+
+Artwork must be authentic to each character and each move.
+
+Input labels must reflect actual keyboard bindings and remappable controller profiles.
+
+Cooldowns must be visible and accurate.
+
+Only 3-second and 5-second special cooldowns are permitted, excluding the universal 0.5-second repeat rule.
+
+Ten-damage attacks get 5 seconds. Exceptional healing or hard-control effects get 3 seconds. Other moves receive no extra cooldown.
+
+No character-specific hacks, duplicated combat timers, broken existing controls, or unfinished placeholder UI.
+
+The final result should feel like the ability HUD was always part of Alva.
