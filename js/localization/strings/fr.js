@@ -202,10 +202,7 @@ export const FR = {
   'mode.select': 'Choisir',
   'mode.details': 'Détails du mode',
   'mode.quickBattle.overview': 'Affrontez un adversaire contrôlé par le CPU. Projetez-le dans le Vide pour marquer des points. Le premier à atteindre 3 points gagne.',
-  'mode.regular.description': 'Choisissez votre combattant et la difficulté. Votre adversaire CPU et l’arène sont tirés au hasard.',
-  'mode.custom.description': 'Personnalisez votre combat en choisissant la difficulté, votre combattant, l’adversaire CPU et l’arène.',
-  'mode.rules.title': 'Règles du combat',
-  'mode.rules.description': 'Les combats durent 7 minutes. En cas d’égalité au score, une prolongation d’une minute commence tandis que le Vide se resserre.',
+  'mode.quickBattle.rules.description': 'En combat rapide, les matchs durent jusqu’à 7 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',
 
   'quickPlay.title': 'Comment voulez-vous jouer ?',
   'quickPlay.custom.name': 'Partie personnalisée',

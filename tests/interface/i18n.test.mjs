@@ -407,13 +407,11 @@ test('Mode details translate every section immediately in place and also render 
   const checkFrench = (panel) => {
     assert.equal(panel.getAttribute('aria-label'), 'Détails du mode');
     assert.deepEqual(panel.querySelectorAll('h3').map((node) => node.textContent), [
-      'Combat rapide', 'Partie classique', 'Partie personnalisée', 'Règles du combat',
+      'Combat rapide',
     ]);
     assert.deepEqual(panel.querySelectorAll('p').map((node) => node.textContent), [
       'Affrontez un adversaire contrôlé par le CPU. Projetez-le dans le Vide pour marquer des points. Le premier à atteindre 3 points gagne.',
-      'Choisissez votre combattant et la difficulté. Votre adversaire CPU et l’arène sont tirés au hasard.',
-      'Personnalisez votre combat en choisissant la difficulté, votre combattant, l’adversaire CPU et l’arène.',
-      'Les combats durent 7 minutes. En cas d’égalité au score, une prolongation d’une minute commence tandis que le Vide se resserre.',
+      'En combat rapide, les matchs durent jusqu’à 7 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',
     ]);
   };
   const off = onLanguageChange(() => localizeTree(mode.el));
@@ -424,7 +422,7 @@ test('Mode details translate every section immediately in place and also render 
     setLanguage('en');
     assert.deepEqual(paragraphs.map((node) => node.textContent), english);
     assert.deepEqual(info.querySelectorAll('h3').map((node) => node.textContent), [
-      'Quick Battle', 'Regular Play', 'Custom Play', 'Match Rules',
+      'Quick Battle',
     ]);
     setLanguage('fr');
     checkFrench(new ModeSelectScreen(fakeApp()).el.querySelector('.mode-info'));

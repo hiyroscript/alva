@@ -367,12 +367,10 @@ test('Home Play shows all Mode details immediately and keeps them through dismis
   const { app, screens } = booted;
   screens.home.actions.play.click();
   const info = screens.mode.el.querySelector('.mode-info');
-  const headings = ['Quick Battle', 'Regular Play', 'Custom Play', 'Match Rules'];
+  const headings = ['Quick Battle'];
   const descriptions = [
     'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
-    'Choose your fighter and difficulty. Your CPU opponent and stage are selected at random.',
-    'Customize your battle by choosing the difficulty, your fighter, the CPU opponent, and the stage.',
-    'Matches last 7 minutes. If the score is tied, a 1-minute overtime begins as the Void closes in.',
+    'Quick Battle matches last up to 7 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
   ];
   const checkDetails = () => {
     assert.equal(current(app), 'mode');
