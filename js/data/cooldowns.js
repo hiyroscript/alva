@@ -11,7 +11,8 @@
 //      can deal one target adding up to 10 or more.
 //   2. Otherwise a move with an exceptional effect waits
 //      EXCEPTIONAL_COOLDOWN (3 s): one listed in EXCEPTIONAL_EFFECTS (a heal
-//      of Launch Point, a paralysis that holds its target in place).
+//      of Launch Point, a paralysis that holds its target in place, a charm
+//      that turns its target's hits into heals).
 //   3. Otherwise it has no cooldown of its own: only the universal repeat
 //      delay, REPEAT_COOLDOWN (0.5 s).
 //
@@ -53,11 +54,12 @@ export const COOLDOWN_CLASSES = Object.freeze({
 
 // The effects that make a move exceptional (rule 2), by the field that
 // carries them: a move's own `heal` (Launch Point it restores to its
-// fighter, see js/game/combat/technique.js) and a hit's `paralyze` (seconds
-// it holds its target in place, unable to act, see
+// fighter, see js/game/combat/technique.js), a hit's `paralyze` (seconds
+// it holds its target in place, unable to act) and a hit's `charm`
+// (seconds its target's hits on the charmer heal it instead; both in
 // js/game/combat/hit-effects.js). A new effect that stops a fighter acting
 // or restores it belongs here.
-export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze']);
+export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm']);
 
 // Every other combat capability a hit or a move may declare, classified as
 // routine: none of them earns a cooldown, however strong it looks. Every
@@ -75,6 +77,7 @@ const sum = (hits) => hits.reduce((total, h) => total + h.damage, 0);
 const hit = (spec, inherited = {}) => ({
   damage: spec?.damage ?? 0,
   paralyze: spec?.paralyze ?? inherited.paralyze ?? 0,
+  charm: spec?.charm ?? inherited.charm ?? 0,
 });
 
 // Every hit projectile `spec` deals one target, in order: its strike once,
@@ -121,7 +124,7 @@ const rank = (impact) => CLASS_RANK[impactClass(impact)];
 // 'exceptional' or 'ordinary', by the first rule that applies.
 export function impactClass({ hits = [], heal = 0 } = {}) {
   if (hits.some((h) => h.damage >= TEN_DAMAGE) || sum(hits) >= TEN_DAMAGE) return 'tenDamage';
-  if (heal > 0 || hits.some((h) => h.paralyze > 0)) return 'exceptional';
+  if (heal > 0 || hits.some((h) => h.paralyze > 0 || h.charm > 0)) return 'exceptional';
   return 'ordinary';
 }
 
@@ -140,7 +143,7 @@ export function policyCooldown(cls = 'ordinary', { exempt = false } = {}) {
 
 const REASONS = Object.freeze({
   tenDamage: 'it deals 10 damage',
-  exceptional: 'it has an exceptional effect (a heal or a paralysis)',
+  exceptional: 'it has an exceptional effect (a heal, a paralysis or a charm)',
   ordinary: 'it deals no 10 damage and has no exceptional effect',
 });
 

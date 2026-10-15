@@ -242,8 +242,12 @@ export class CpuIntelligence {
       const ok = ps.kind === 'shield' ? me.grounded && (me.canAct || me.shielding) && this.clock < ps.until : me.grounded && me.canAct;
       if (ok) this.setPlan(this.planFromAnswer(ps, s), s, `${ps.kind} moment`);
     }
-    // Combos: a hit just landed.
-    if (this.combo && !this.combo.decided && this.plan?.kind !== 'recover') this.followUp(s);
+    // Combos: a hit just landed (never while charmed by the opponent: its
+    // hits would heal it).
+    if (this.combo && !this.combo.decided && this.plan?.kind !== 'recover') {
+      if (me.charmed > 0) this.combo.decided = true;
+      else this.followUp(s);
+    }
     // The plan in progress.
     this.runPlan(s, ex);
     // A new plan when there is none, or when the current one may be
@@ -428,13 +432,17 @@ export class CpuIntelligence {
     return makePlan('strike', { cand: c, reason, wait: 0.15 }, this);
   }
 
-  // The plan the strategy calls for now (see the header).
+  // The plan the strategy calls for now (see the header). Charmed by its
+  // opponent (see `charm` in js/game/combat/hit-effects.js), every hit it
+  // landed on that opponent would heal it: it strikes nothing and keeps its
+  // distance until the charm runs out (see spacing).
   choose(s) {
     const me = s.me;
     const params = this.strategy.params;
     if (me.offstage) return this.recoveryPlan(s);
     const heal = this.healPlan(s);
     if (heal) return heal;
+    if (me.charmed > 0) return this.movePlan(s);
     const list = this.evaluator.candidates(s, this.candidateList, {});
     let best = null;
     let bestV = -Infinity;
@@ -494,10 +502,12 @@ export class CpuIntelligence {
     }, this);
   }
 
-  // The neutral distance the current mode wants.
+  // The neutral distance the current mode wants (charmed, out of the
+  // opponent's reach whatever the mode).
   spacing(s) {
     const poke = s.foeReach.poke;
     const lunge = s.foeReach.lunge;
+    if (s.me.charmed > 0) return Math.min(480, lunge + 90);
     const ideal = this.idealRange(s);
     switch (this.strategy.params.spacing) {
       case 'close': return Math.max(28, ideal - 6);

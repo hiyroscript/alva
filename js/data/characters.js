@@ -2,7 +2,7 @@
 // lookups every other module uses to reach them.
 //
 // Purpose: each fighter's definition lives in a module of its own under
-// js/data/characters/ (0001.js, 0002.js, 0003.js, ...): its animations, body,
+// js/data/characters/ (0001.js, 0002.js, 0003.js, 0004.js, ...): its animations, body,
 // Energy, defense, attacks, projectiles, summons, techniques, touch buttons
 // and ability names. Never its movement: run, jump, the triple jump, the
 // Dash and the air dash are universal (js/data/movement.js). This module only
@@ -79,6 +79,7 @@ import { summonOffense } from '../game/combat/offense.js';
 import { CHARACTER_0001 } from './characters/0001.js';
 import { CHARACTER_0002 } from './characters/0002.js';
 import { CHARACTER_0003 } from './characters/0003.js';
+import { CHARACTER_0004 } from './characters/0004.js';
 
 export { framePath, frames } from './characters/helpers.js';
 
@@ -88,6 +89,7 @@ export const CHARACTERS = [
   CHARACTER_0001,
   CHARACTER_0002,
   CHARACTER_0003,
+  CHARACTER_0004,
 ];
 
 // Any definition by id, available or not; null for an unknown id.

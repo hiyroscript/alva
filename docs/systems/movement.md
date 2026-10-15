@@ -316,5 +316,7 @@ into attacks and jumps. The old values are kept in
   #0002's motion attacks.
 - [`tests/systems/slam.test.mjs`](../../tests/systems/slam.test.mjs) and
   [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs):
-  the `slam` motion (#0003's Heavenly Foot of Pain), whose landing is its
-  recovery, never cancelled.
+  the `slam` motion (#0003's Heavenly Foot of Pain, #0004's Stage Dive),
+  whose landing is its recovery, never cancelled.
+- [`tests/fighters/0004/fighter-0004.test.mjs`](../../tests/fighters/0004/fighter-0004.test.mjs):
+  #0004's `rise` (the Leekspin, carrying its target) and its `slam`.

@@ -94,6 +94,17 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0003.playStyle',
     reviewedSourceHash: '983d12cd2c6b9b1db7bc0d4bd96ae51fffaeb9ac113def4195adb3f84bd8abf4',
   }),
+  // A space controller and setup fighter: notes that turn projectiles back,
+  // a stationary double to place, a long, breakable song whose charm window
+  // must be cashed in, a rising recovery that carries its target and a
+  // dive that is a spike on the stage and a fall off it. Demanding to use
+  // well: its strength comes from placement, timing and exploiting the
+  // charm, not from any one strike.
+  '0004': Object.freeze({
+    difficulty: 4,
+    descriptionKey: 'discover.fighter.0004.playStyle',
+    reviewedSourceHash: 'bb4fd8928440068c525718947646e4c59a92ad4f9705bc42d4e11efddc256efe',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

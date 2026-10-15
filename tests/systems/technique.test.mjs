@@ -2,8 +2,9 @@
 // Techniques (js/game/combat/technique.js), in their one form, the cast: a
 // numbered button whose move the fighter performs standing still, committed
 // to a casting pose, then lets go of all at once: a projectile, a burst
-// round itself, or both. Its timing is its clips', its facing is
-// snapshotted as it starts, it needs the ground throughout, a hit breaks
+// round itself (with art of its own as it goes out), or both. Its timing is
+// its clips', its facing is snapshotted as it starts, it needs the ground
+// throughout, a hit breaks
 // it, and its cooldown runs from its start. Checked on a test-only caster
 // (#0001's body and clips, re-timed, with a technique of its own) through
 // the real Fighter, projectiles and CombatSystem (see
@@ -294,4 +295,109 @@ test('a hit before it lets go breaks it and heals nothing', () => {
   for (let i = 0; i < steps(CAST + RELEASE); i++) d.tick();
   assert.equal(d.attacker.combat.launchPoint, 31, 'only the hit counted');
   assert.ok(d.attacker.combat.abilityCooldowns.active('attack4'), 'its cooldown runs on all the same');
+});
+
+// ---- The burst's art --------------------------------------------------------------------
+
+// The singer: the caster whose burst plays art as it goes out, an
+// effectAnimations clip of its own (named after it, attack4_object...: here
+// #0001's Hollow Purple sphere, borrowed), centred 40 units up and 10 ahead.
+const SINGER = {
+  ...CASTER,
+  id: 'test-singer',
+  effectAnimations: { attack4_object_ring: { ...def.projectileAnimations.attack5_object, loop: false, fps: 10 } },
+  techniques: {
+    attack4: {
+      ...CASTER.techniques.attack4,
+      projectile: null,
+      burst: { ...CASTER.techniques.attack4.burst, effect: { animation: 'attack4_object_ring', offset: { x: 10, y: -40 } } },
+    },
+  },
+};
+const SINGER_SPRITES = fakeSpritesOf(SINGER);
+
+test('a burst may name its art (`effect`): an effect clip of its own, centred at an offset; art only, refused without its art', () => {
+  const t = createTechniqueDefinition({ id: 'attack4', ...SINGER.techniques.attack4 });
+  assert.deepEqual(t.burst.effect, { animation: 'attack4_object_ring', offset: { x: 10, y: -40 } });
+  assert.ok(Object.isFrozen(t.burst.effect) && Object.isFrozen(t.burst.effect.offset));
+  assert.equal(createTechniqueDefinition({ id: 'attack4', ...CASTER.techniques.attack4 }).burst.effect, null, 'none by default');
+  assert.equal(t.cooldownClass, createTechniqueDefinition({ id: 'attack4', ...CASTER.techniques.attack4, projectile: null }).cooldownClass, 'art changes no cooldown');
+  assert.throws(() => createTechniqueDefinition({ id: 'attack4', burst: { ...SINGER.techniques.attack4.burst, effect: { offset: {} } } }), /burst effect needs an animation/);
+  const singer = makeFighter({ character: SINGER, sprites: SINGER_SPRITES }).fighter;
+  assert.equal(techniqueProblem(singer, t), null);
+  const bare = makeFighter({ character: SINGER, sprites: fakeSpritesOf(SINGER, undefined, undefined, []) }).fighter;
+  assert.match(techniqueProblem(bare, t), /burst effect "attack4_object_ring" has no animation frames/);
+});
+
+test('the loadout rules: a burst\'s art is an effectAnimations clip named after its technique', async () => {
+  const { loadoutProblems } = await import('../../js/data/loadout.js');
+  const burstProblems = (d) => loadoutProblems(d).filter((p) => /burst/.test(p));
+  assert.deepEqual(burstProblems(SINGER), []);
+  const missing = { ...SINGER, effectAnimations: {} };
+  assert.ok(burstProblems(missing).some((p) => /burst effect "attack4_object_ring" is not in `effectAnimations`/.test(p)));
+  const misnamed = {
+    ...SINGER,
+    effectAnimations: { attack3_object: SINGER.effectAnimations.attack4_object_ring },
+    techniques: { attack4: { ...SINGER.techniques.attack4, burst: { ...SINGER.techniques.attack4.burst, effect: { animation: 'attack3_object' } } } },
+  };
+  assert.ok(burstProblems(misnamed).some((p) => /burst effect "attack3_object" is not named attack4_object/.test(p)));
+});
+
+test('as it lets go, its fighter hands over the burst\'s art once: its clip, its centre mirrored with the cast\'s facing; a broken cast none', () => {
+  for (const facing of [1, -1]) {
+    const { fighter, step } = makeFighter({ character: SINGER, sprites: SINGER_SPRITES, facing });
+    step(P('attack4'));
+    const given = [];
+    for (let i = 0; i < steps(CAST + RELEASE) + 5; i++) {
+      step({});
+      given.push(...fighter.effects);
+    }
+    assert.deepEqual(given, [{ animation: 'attack4_object_ring', x: fighter.body.x + 10 * facing, y: fighter.body.y - 40, facing }]);
+  }
+  const d = duel({ attackerCharacter: SINGER, attackerSprites: SINGER_SPRITES, gap: 300 });
+  d.tick(P('attack4'));
+  d.tick();
+  new CombatSystem().applyHit(d.target, d.attacker, createAttackDefinition({ id: 'testHit', damage: 1, hitstun: 0.2, hitstop: 0 }));
+  let any = false;
+  for (let i = 0; i < steps(CAST + RELEASE); i++) {
+    d.tick();
+    any ||= d.attacker.effects.length > 0;
+  }
+  assert.equal(any, false, 'broken before it let go: no art');
+});
+
+test('the arena plays a burst\'s art once where it went out, behind the fighters, then drops it', async () => {
+  const { Battle } = await import('../../js/game/battle.js');
+  const { getMap } = await import('../../js/data/maps.js');
+  globalThis.Path2D ??= class {
+    constructor() {
+      return new Proxy(this, { get: (t, k) => (k in t ? t[k] : () => {}) });
+    }
+  };
+  const battle = new Battle({
+    canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: SINGER, p2Def: def,
+    p1Sprites: SINGER_SPRITES, p2Sprites: fakeSpritesOf(def), input: { flush() {}, sample: () => ({}) },
+  });
+  let next = {};
+  battle.p1.controller = { getInput: () => { const n = next; next = {}; return n; } };
+  battle.p2.controller = null;
+  battle.setPhase('fight');
+  next = P('attack4');
+  let seen = 0;
+  let at = null;
+  for (let i = 0; i < steps(CAST + RELEASE + 2); i++) {
+    battle.update(DT);
+    if (battle.castEffects.length) {
+      seen++;
+      at ??= { ...battle.castEffects[0] };
+    }
+  }
+  const clip = SINGER_SPRITES.effect('attack4_object_ring');
+  assert.ok(at, 'played');
+  assert.equal(at.clip, clip);
+  assert.equal(Math.abs(seen - clip.frames.length / clip.fps / DT) <= 1, true, `one pass of its clip (${seen} steps)`);
+  assert.deepEqual(battle.castEffects, [], 'then gone');
+  const arena = readFileSync(new URL('../../js/game/arena.js', import.meta.url), 'utf8');
+  assert.match(arena, /drawCastEffect\(e\)[\s\S]*drawClone\(c\)[\s\S]*this\.drawFighter\(f\)/, 'drawn behind the clones and fighters');
+  battle.destroy();
 });

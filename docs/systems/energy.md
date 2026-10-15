@@ -38,7 +38,8 @@ A fighter's `energy` entry sets one thing, its refill rate:
 | --- | --- | --- |
 | `regen` | 12 | Refill per second, one passive rate whatever the fighter does. |
 
-#0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15. Nothing
+#0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
+`regen` 14. Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost` and `deflectCost` may be left out (and are, by every
 fighter), and declaring

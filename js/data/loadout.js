@@ -185,6 +185,10 @@ export function loadoutProblems(def) {
     }
     const burst = technique.burst;
     if (burst && (!burst.hitbox || !burst.hit)) say(`technique ${id}'s burst needs a hitbox and a hit`);
+    // The art its burst plays as it lets go, if any: an effect named after it.
+    const art = burst?.effect?.animation;
+    if (burst?.effect && !effects[art]) say(`technique ${id}'s burst effect "${art}" is not in \`effectAnimations\``);
+    else if (art && !art.startsWith(objectOf(id))) say(`technique ${id}'s burst effect "${art}" is not named ${objectOf(id)}`);
   };
 
   // ---- Buttons ----------------------------------------------------------------

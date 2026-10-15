@@ -402,8 +402,9 @@ export class Defense {
       }
     }
     // Strike first: break a throw or a cast before it lets go, or hit an
-    // attacker during its startup.
-    if (threat.kind !== 'projectile' && threat.kind !== 'clone') {
+    // attacker during its startup (never while charmed by it: the strike
+    // would heal it).
+    if (threat.kind !== 'projectile' && threat.kind !== 'clone' && !(s.me.charmed > 0)) {
       const strikes = brain.evaluator.candidates(s, brain.scratchList, {});
       for (const c of strikes) {
         if (c.kind !== 'strike' || c.move.kind === 'technique' || c.move.kind === 'summon') continue;
@@ -413,8 +414,9 @@ export class Defense {
         options.push({ score: c.utility * 0.6 + sev * c.p * 0.8 - sev * (1 - c.p), plan: { kind: 'strike', cand: c, why: 'strikes first' }, why: 'strikes first' });
       }
     }
-    // Meet a projectile with an erasing or repelling one of its own.
-    if (threat.kind === 'projectile' || threat.kind === 'throw' || threat.kind === 'technique') {
+    // Meet a projectile with an erasing or repelling one of its own (not
+    // while charmed: flying on, it would heal the opponent).
+    if ((threat.kind === 'projectile' || threat.kind === 'throw' || threat.kind === 'technique') && !(s.me.charmed > 0)) {
       for (const m of s.caps.moves) {
         const shot = m.projectile;
         if (!shot || !(shot.erase || shot.repel) || !moveReady(self, m)) continue;

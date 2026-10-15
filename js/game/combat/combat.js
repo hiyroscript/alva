@@ -49,10 +49,11 @@
 // Beyond damage and launch, a hit may carry the shared hit effects (see
 // js/game/combat/hit-effects.js): `paralyze` (a timed hold on the target,
 // CombatState.paralyze, that a launch ends; never through a Shield),
-// `blockPush` (a Shield that blocks it is shoved back, and nothing more)
-// and `quake` (it reaches only a fighter standing on the ground: every
+// `blockPush` (a Shield that blocks it is shoved back, and nothing more),
+// `quake` (it reaches only a fighter standing on the ground: every
 // place below that a hit meets a fighter asks hitReaches first, so an
-// airborne one is passed by with nothing used up).
+// airborne one is passed by with nothing used up) and `charm` (for a while
+// the target's own hits on the attacker heal it instead: see applyHit).
 // And a Shield may stall the blows it blocks (`defense.stall`, see
 // js/game/combat/defense.js): a melee attacker freezes in it.
 
@@ -140,6 +141,16 @@ const bodyPoint = (target) => ({ x: target.body.x, y: target.body.y - target.bod
 // What a fighter's strike carries its target along at (see `carry`).
 const bodyVelocity = (f) => ({ x: f.body.vx, y: f.body.vy });
 
+// Where a hit came from, and the attack, technique or summon that produced
+// it (a projectile's thrower's, kept when it is turned back): for its event.
+const sourceOf = (def, projectile, summon, technique) => (
+  projectile ? 'projectile' : summon ? 'summon' : technique ? 'technique' : def.deflectProjectiles ? 'deflect' : 'melee'
+);
+const abilityOf = (def, projectile, summon, technique) => (
+  projectile ? projectile.ability ?? null : summon ? summon.def?.id ?? null : technique ? technique.def?.id ?? null : def.id ?? null
+);
+const NO_LAUNCH = Object.freeze({ x: 0, y: 0 });
+
 const scratchHit = {};
 const scratchHurt = {};
 const scratchBurst = {};
@@ -158,11 +169,11 @@ const scratchShot = {};
 // hitbox is used up either way.
 export class CombatSystem {
   constructor() {
-    // { type: 'hit' | 'block', attacker, target, move, damage, energyCost,
-    //   launchPointBefore, launchPointAfter, baseLaunch, directionalLaunch,
-    //   launchStrength, finalLaunch, launchSpeed, hitstun, perfect, point,
-    //   paralysis, stall, projectile, summon, technique, attack, source,
-    //   ability, redirected }
+    // { type: 'hit' | 'block' | 'charmed', attacker, target, move, damage,
+    //   heal, energyCost, launchPointBefore, launchPointAfter, baseLaunch,
+    //   directionalLaunch, launchStrength, finalLaunch, launchSpeed, hitstun,
+    //   perfect, point, paralysis, charm, stall, projectile, summon,
+    //   technique, attack, source, ability, redirected }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
@@ -177,7 +188,8 @@ export class CombatSystem {
     // stun it dealt, a harder launch's longer. `perfect` marks a block by a
     // Shield raised just in time (see Fighter.perfectShield) and `point` is
     // where the hit landed, for the effects. `paralysis` is the hold it put
-    // on its target (seconds, 0 for none) and `stall` how long a melee blow
+    // on its target (seconds, 0 for none), `charm` the charm it put on it
+    // (seconds, 0 for none) and `stall` how long a melee blow
     // the target's Shield blocked froze its attacker (0 for none). `attacker`
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee. `attack` is always
@@ -187,7 +199,9 @@ export class CombatSystem {
     // or 'technique'), `ability` the id of the attack, technique or summon
     // that produced it (a projectile's thrower's, kept when it is turned
     // back) and `redirected` whether it is a projectile that was turned
-    // back. A blocked hit is recorded as a block, never as a hit.
+    // back. A blocked hit is recorded as a block, never as a hit. A charmed
+    // fighter's hit on its charmer is recorded as `charmed` (see applyHit):
+    // `damage` 0, `heal` the Launch Point it took off the charmer instead.
     this.events = [];
     // { fighter, projectile, from, direction }: the projectiles turned back
     // this step (see deflectProjectiles), `from` the owner each one had.
@@ -346,7 +360,7 @@ export class CombatSystem {
         atk.hasHit = true;
         const event = this.applyHit(attacker, target, h, { point, velocity: bodyVelocity(attacker) });
         if (event.type === 'block') atk.blocked = true;
-        else if (!atk.confirmed) {
+        else if (event.type === 'hit' && !atk.confirmed) {
           atk.confirmed = true;
           atk.confirmedAt = atk.time;
         }
@@ -396,7 +410,12 @@ export class CombatSystem {
   // hit with `blockPush` still shoves the Shield along the hit's direction
   // at that speed, and nothing more. And a melee blow the target's Shield
   // blocks stalls in it: the attacker is frozen for at least the Shield's
-  // `stall` (a detached hit stalls nothing).
+  // `stall` (a detached hit stalls nothing). A real hit that `charm`s
+  // charms its target (CombatState.charmBy), whether it launches or not.
+  //
+  // A hit whose attacker is charmed by its target (its charm still running,
+  // see `charm` in hit-effects.js) and that the target does not block is
+  // no hit at all: see charmed. The Shield rule comes first all the same.
   applyHit(attacker, target, def, {
     facing = attacker.facing, projectile = null, summon = null, technique = null,
     detached = !!(projectile || summon || technique), point = bodyPoint(target), velocity = null,
@@ -415,6 +434,7 @@ export class CombatSystem {
       tc.spendEnergy(tc.energySpec.shieldHitCost);
       if (!tc.canShield()) tc.shielding = false;
     }
+    if (!blocked && attacker?.combat?.charmedTo?.(target)) return this.charmed(attacker, target, def, { projectile, summon, technique, point });
     const damage = blocked ? 0 : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
@@ -458,6 +478,7 @@ export class CombatSystem {
     // holds the target.
     if (finalLaunch.x || finalLaunch.y) tc.releaseParalysis();
     else if (!blocked && def.paralyze > 0) tc.paralyze(def.paralyze);
+    if (!blocked && def.charm > 0) tc.charmBy(def.charm, attacker);
     if (blocked && def.blockPush > 0) target.body.vx = facing * def.blockPush;
     if (finalLaunch.x || finalLaunch.y) {
       // A launch replaces the target's sideways speed (a vertical one sends
@@ -480,15 +501,38 @@ export class CombatSystem {
       damage, energyCost, launchPointBefore, launchPointAfter,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
-      paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, stall,
+      paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, charm: blocked ? 0 : def.charm ?? 0, stall,
       projectile, summon, technique, attack: true,
-      source: projectile ? 'projectile' : summon ? 'summon' : technique ? 'technique' : def.deflectProjectiles ? 'deflect' : 'melee',
-      ability: projectile ? projectile.ability ?? null : summon ? summon.def?.id ?? null : technique ? technique.def?.id ?? null : def.id ?? null,
+      source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,
     };
     // The target's own reaction to a real hit (its air jumps back, see
     // Fighter.takeHit).
     if (!blocked) target.takeHit?.(event);
+    this.events.push(event);
+    return event;
+  }
+
+  // A charmed fighter's hit on the fighter that charmed it (see applyHit):
+  // it heals that fighter, its Launch Point taken down by the hit's damage
+  // (never below 0, see CombatState.heal), and does nothing else: no Launch
+  // Point added, no launch, stun, freeze, paralysis, charm or carry, its
+  // technique and Launch Point recovery left as they were, and no reaction
+  // (takeHit). The attack that dealt it is used up as a hit's would be, but
+  // never confirmed. Returns the `charmed` event it recorded.
+  charmed(attacker, target, def, { projectile, summon, technique, point }) {
+    const tc = target.combat;
+    const launchPointBefore = tc.launchPoint;
+    const heal = tc.heal(def.damage ?? 0);
+    const event = {
+      type: 'charmed', attacker, target, move: def.id ?? null,
+      damage: 0, heal, energyCost: 0, launchPointBefore, launchPointAfter: tc.launchPoint,
+      baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength: 0, finalLaunch: NO_LAUNCH,
+      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, charm: 0, stall: 0,
+      projectile, summon, technique, attack: true,
+      source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
+      redirected: !!projectile?.redirected,
+    };
     this.events.push(event);
     return event;
   }

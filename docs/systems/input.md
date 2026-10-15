@@ -311,6 +311,18 @@ chosen for each move, not its attack number:
 | Leaping Kick (air) | Square / X |
 | Heavenly Foot of Pain (air) | Triangle / Y |
 
+| #0004 | Recommended |
+| --- | --- |
+| Dance Combo | Square / X |
+| Leek Swing | Triangle / Y |
+| Crescent Kick | Up + Square / Up + X |
+| Ievan Polkka | R2 + Triangle / RT + Y |
+| World is Mine | L2 + Triangle / LT + Y |
+| Melody | R1 / RB |
+| Air Dance (air) | Square / X |
+| Leekspin (air) | Triangle / Y |
+| Stage Dive (air) | Down + Square / Down + X |
+
 A fighter with no authored layout gets a safe, conflict-free fallback
 (face buttons, then R1, then trigger combinations), flagged in the editor
 as not designed yet; a fighter's layout may never retune the universal
@@ -335,11 +347,12 @@ has none or its file fails to load (`EditorLayer.rowArt`); Movement,
 Defense and Pause rows have none. **Special abilities** holds only the
 moves the fighter itself classifies as Special (its `specialAbilities`,
 [combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
-Purple and #0003's Mystical Palm Technique, each tagged Ground or Air.
+Purple, #0003's Mystical Palm Technique and #0004's World is Mine, each
+tagged Ground or Air.
 Every other move, a projectile, a technique or the Whirlwind's tornado
 included, sits under Ground attacks or Aerial attacks where it is played
-(Red, Maximum Blue, the Whirlwind and Cherry Blossom Impact under Ground
-attacks). A row's category never changes its action id, so no binding
+(Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact and Ievan Polkka
+under Ground attacks). A row's category never changes its action id, so no binding
 moves with it. Choosing an action opens
 the binding dialog, which listens to Player 1's controller (a button, a
 modifier held first, the stick pointing first; for Fast fall a direction

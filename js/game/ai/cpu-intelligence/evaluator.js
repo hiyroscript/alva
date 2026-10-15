@@ -436,6 +436,10 @@ export class Evaluator {
     const freeAt = m.hitCancel != null && !c.projectile && !c.detached ? m.hitCancel : m.total;
     const advantage = (lastStrike?.hitstun ?? 0) + (lastStrike?.paralyze ?? 0) - (c.k0 * STEP + freeAt - tC);
     if (advantage > s.caps.fastest.ground * 0.8 && !hv.ko) vHit += p.comboReliability * (3 + op.lp * 0.06) * Math.min(1, advantage / 0.3);
+    // A charm: for its seconds the opponent's hits only heal the CPU, so
+    // it can press on unanswered (worth little while one is still running).
+    const charm = Math.max(0, ...strikes.map((h) => h.charm ?? 0));
+    if (charm > 0) vHit += charm * (s.op.view.charm > 0 ? 0.5 : 4);
     // What a block costs: the Shield's stall and the recovery left against
     // the blockstun; a block that would exhaust the opponent is a win.
     let vBlock = 0;

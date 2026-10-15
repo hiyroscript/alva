@@ -46,6 +46,7 @@ function strikeOf(h, at, end) {
     at, end, damage: h.damage ?? 0, baseLaunch: h.baseLaunch ?? 0, dir: h.directionalLaunch ?? null,
     hitbox: h.hitbox ?? null, hitstun: h.hitstun ?? 0, blockstun: h.blockstun ?? 0, hitstop: h.hitstop ?? 0,
     paralyze: h.paralyze ?? 0, blockPush: h.blockPush ?? 0, carry: h.carry ?? null, quake: !!h.quake,
+    charm: h.charm ?? 0,
   });
 }
 
@@ -95,17 +96,19 @@ function sumStrikes(strikes) {
   let maxBaseLaunch = 0;
   let hitstun = 0;
   let paralyze = 0;
+  let charm = 0;
   let blockPush = 0;
   for (const s of strikes) {
     damage += s.damage;
     maxBaseLaunch = Math.max(maxBaseLaunch, s.dir ? s.baseLaunch : 0);
     hitstun = Math.max(hitstun, s.hitstun);
     paralyze = Math.max(paralyze, s.paralyze);
+    charm = Math.max(charm, s.charm);
     blockPush = Math.max(blockPush, s.blockPush);
   }
   const last = strikes[strikes.length - 1];
   return {
-    damage, maxBaseLaunch, hitstun, paralyze, blockPush,
+    damage, maxBaseLaunch, hitstun, paralyze, charm, blockPush,
     finisher: last ? { baseLaunch: last.baseLaunch, dir: last.dir } : { baseLaunch: 0, dir: null },
   };
 }
