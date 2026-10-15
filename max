@@ -1,1590 +1,760 @@
-ALVA — ASPERITAS STAGE & 24-STAGE ROSTER OVERHAUL
+ALVA — Special Ability Reclassification, Animation Improvements & Home Screen Web-App Installation
 
-Complete Implementation Specification
+Objective
 
-Primary objective
+Implement two major improvements to Alva:
 
-Implement a complete stage-selection overhaul and introduce a fully playable third stage named Asperitas into the existing Alva game.
+1. Correct the classification of Special abilities, adjust the relevant animations, and add an orange exclamation-mark indicator above a character while performing a Special ability.
+2. Make the Home Screen’s bottom-right Download button functional, with an informative installation dialog, native Add to Home Screen support wherever available, and an attention-catching download icon animation.
 
-This update has two major components:
-
-1. Completely redesign the Stage Selection interface to support a permanent roster of 24 stage slots, including a dedicated Random Stage button.
-2. Create Asperitas, a sky-themed fighting arena consisting of one large stationary cloud platform and two smaller independently behaving cloud-platform hazards.
-
-The two smaller clouds must move, idle, disappear, and reappear according to their own randomized behavior systems. Crucially, when a cloud disappears, it must reappear at a newly randomized position within its permitted region, rather than automatically returning to its previous position.
-
-The three playable cloud platforms must never collide or physically overlap.
-
-This must be implemented as a polished, working expansion to the existing game. Do not deliver a mockup, prototype, or partial implementation.
-
-⸻
-
-1. REPOSITORY ARCHITECTURE
+Inspect the existing architecture before making changes. Implement everything using the game’s current design conventions and data-driven systems. Preserve existing combat mechanics, move identities, controller bindings, UI styling, and responsiveness.
 
 Repository: hiyroscript/alva
 
-Alva is a browser-based 2D platform fighting game using vanilla JavaScript, HTML, CSS, and Canvas 2D. It does not use frameworks or a build system.
-
-Its stages use procedural Canvas art with pseudo-3D perspective, while gameplay collision operates separately through a fixed-timestep physics simulation.
-
-Before making changes, carefully inspect the existing implementation.
-
-Important files
-
-File	Responsibility
-js/data/maps.js	Stage registry, map definitions, platforms, spawns, Void and camera bounds
-js/stages/index.js	Stage-theme registration
-js/stages/stage-theme.js	Shared procedural rendering
-js/stages/perspective.js	Pseudo-3D perspective
-js/stages/desert-theme.js	Desert visual implementation
-js/stages/city-theme.js	City visual implementation
-js/game/physics.js	StageCollision and body physics
-js/game/arena.js	Fixed-step gameplay simulation
-js/game/fighters/fighter.js	Movement, grounding, collision interaction
-js/game/ai/cpu-intelligence/stage-model.js	CPU stage awareness
-js/screens/map-select-screen.js	Stage Selection
-js/ui/stage-preview.js	Stage previews
-js/screens/quick-battle-setup.js	Regular Play stage randomization
-css/setup.css	Stage roster styling
-css/responsive.css	Responsive layout
-js/localization/strings/en.js	English strings
-js/localization/strings/fr.js	French translations
-tests/systems/platform-stage.test.mjs	Stage tests
-
-Also inspect:
-
-* ALVA_SPEC.md
-* README.md
-* docs/gameplay/stages.md
-* docs/development/testing.md
-* docs/architecture/module-responsibilities.md
-
-Respect the existing architecture and coding conventions.
-
-The new functionality must work with the existing engine rather than replacing it.
+Alva is a vanilla JavaScript, HTML, CSS, and Canvas 2D platform fighting game without a framework or build step.
 
 ⸻
 
-PART I — COMPLETE STAGE ROSTER REDESIGN
+PART 1 — Correct the Special Ability Classification
 
-2. Replace the existing two-stage layout
+1.1 What counts as a Special ability?
 
-The current Stage Selection screen contains two large stage cards arranged vertically beside a live stage preview.
+Currently, abilities are sometimes classified as Special simply because they use a projectile, summon, or technique implementation.
 
-This layout must be completely redesigned.
+This is incorrect for the intended player-facing meaning of Special.
 
-Create a 24-slot stage roster inspired by the organization and readability of a modern platform fighting game’s stage-selection screen.
-
-The interface must be designed for 24 stages from the beginning, not just resized to accommodate three.
-
-Required roster structure
-
-There must be 24 stage slots in total.
-
-Initially:
-
-Position	Stage	Status
-01	Desert	Available
-02	City	Available
-03	Asperitas	Available
-04–24	Reserved	Unavailable
-
-The remaining 21 positions are placeholders reserved for future playable stages.
-
-Do not create fake stages or add placeholder maps to MAPS.
-
-Generate the playable entries from the real stage registry and populate the remaining slots through the roster UI.
-
-The number of available stages should grow automatically as actual stages are added in the future.
-
-Visual arrangement
-
-Use a compact multi-column roster grid.
-
-On sufficiently large displays, target a six-column by four-row layout.
-
-Adapt the number of columns and cell dimensions to the available screen space.
-
-On mobile landscape displays, use smaller tiles and a scrollable roster when necessary.
-
-On narrow or tall displays, allow a stacked layout.
-
-The layout should remain organized, readable, and visually balanced.
-
-Stage tile design
-
-Every available stage tile should display:
-
-* A recognizable stage thumbnail.
-* The stage name.
-* A clear focus or hover state.
-* A selected-state indicator.
-
-Unavailable slots should use a subdued appearance with a placeholder or lock symbol.
-
-Do not allow unavailable slots to start battles.
-
-Maintain Alva’s existing UI identity:
-
-* Dark neutral surfaces.
-* Subtle borders.
-* Green selection accents.
-* Clear typography.
-* Consistent rounded corners.
-* Distinct hover and focus feedback.
-
-Avoid excessively large tiles, oversized padding, or wasted space.
-
-Main preview
-
-Keep a prominent large stage preview that displays the currently highlighted stage.
-
-When the player highlights Desert, City, or Asperitas, update the preview accordingly.
-
-Asperitas must display its actual sky and cloud environment.
-
-Prefer static thumbnails for the small roster tiles to avoid running many independent Canvas animations.
-
-The large preview should remain the primary animated presentation.
-
-Preserve the stage name, tagline, and selected-stage information.
-
-Dynamic stage counter
-
-Display a localized counter such as:
-
-3 available / 24 slots
-
-The available count must come from the actual playable stage registry.
-
-The roster must be capable of adding future stages without requiring another layout redesign.
-
-⸻
-
-3. Random Stage button
-
-Add a dedicated Random Stage button to the redesigned Stage Selection screen.
-
-It should have a shuffle-style icon and fit naturally into Alva’s interface.
-
-The button must remain separate from the 24 stage positions.
-
-Random Stage is an action, not a playable stage.
-
-Behavior
-
-When Random Stage is activated:
-
-1. Read the currently playable stages from MAPS.
-2. Randomly select one using an unbiased selection method.
-3. Update the stored selected stage ID.
-4. Highlight the chosen stage tile.
-5. Update the large stage preview.
-6. Keep the player on the Stage Selection screen until they confirm.
-
-Do not automatically launch a battle.
-
-Unavailable roster slots must never be selected.
-
-Practice Ground must not be included, because it is a separate training map rather than a selectable battle stage.
-
-The existing Regular Play random-stage selection must continue to work.
-
-Reuse Alva’s existing random-selection utility where appropriate.
-
-Supported game modes
-
-The redesigned stage roster and Random Stage button must work in:
-
-* Quick Battle — Custom Play.
-* Watch Mode.
-* Change Stage after a match.
-* Other existing workflows that reuse Stage Selection.
-
-Quick Battle and Watch Mode must preserve separate selections.
-
-Controls
-
-Support keyboard, mouse, touch, Xbox controllers, and PlayStation controllers.
-
-Preserve the existing menu navigation system.
-
-Make sure:
-
-* All available tiles are reachable.
-* Random Stage is reachable.
-* Controller focus remains visible.
-* Scrollable grids bring the focused tile into view.
-* Confirmation and Back navigation continue to work.
-* Disabled placeholders cannot be activated.
-
-⸻
-
-PART II — NEW STAGE: ASPERITAS
-
-4. Stage identity
-
-Stage name: Asperitas
-Stage ID: asperitas
-Theme: High-altitude sky and clouds
-Environment: Open atmosphere above an expansive cloud layer
-
-Suggested tagline:
-
-Above the clouds, beyond the horizon
-
-Asperitas must feel completely different from Desert and City.
-
-Desert has a sandstone foundation.
-
-City has a building foundation.
-
-Asperitas has no physical foundation underneath its main platform because the main platform itself is a giant cloud floating high in the sky.
-
-The stage should feel weightless, airy, peaceful, and expansive.
-
-Playable geometry
-
-Asperitas has exactly three playable surfaces:
-
-1. A large, stationary main cloud platform.
-2. A smaller floating cloud hazard above the left region.
-3. A smaller floating cloud hazard above the right region.
-
-There are no additional playable platforms, ground structures, pillars, or solid obstacles.
-
-Decorative background clouds are allowed, but they must not have gameplay collision.
-
-⸻
-
-5. The main cloud platform
-
-The main platform is a large, stationary cloud that serves as the stage’s primary fighting area.
-
-Appearance
-
-Design it as a massive, dense cloud suspended in open sky.
-
-Use overlapping organic cloud shapes rather than a geometric rectangle.
-
-Its upper surface should read clearly as a stable fighting surface.
-
-Suggested visual characteristics:
-
-* Bright white cloud tops.
-* Soft ivory highlights.
-* Pale blue and lavender shadows.
-* Rounded, voluminous edges.
-* Multiple overlapping cloud formations.
-* Gentle shading underneath to create depth.
-* Soft atmospheric edges without making the collision boundary ambiguous.
-
-The cloud should resemble a large floating mass of vapor, not a solid stone platform covered with white paint.
-
-No foundation
-
-This requirement is absolute.
-
-Do not render:
-
-* Stone foundations.
-* Cliffs.
-* Buildings.
-* Pillars.
-* Metal supports.
-* Ground stretching downward.
-* A rectangular vertical platform body extending toward the Void.
-
-Also ensure the gameplay collision geometry respects the visual design.
-
-Alva currently constructs its main-stage floor as a solid block extending from mainStage.top to mainStage.bottom.
-
-Asperitas must not retain a huge invisible collision block beneath its floating cloud.
-
-Use a shallow solid collision representation or another compatible solution that provides proper footing without creating a large invisible foundation.
-
-Preserve existing Desert and City behavior.
-
-Gameplay
-
-The main cloud:
-
-* Never moves.
-* Never disappears.
-* Is not considered a hazard.
-* Always supports normal combat.
-* Has open ledges.
-* Provides safe initial spawn positions for both fighters.
-
-Its width should remain comparable to the existing playable stages.
-
-⸻
-
-PART III — TWO INDEPENDENT CLOUD HAZARDS
-
-6. Hazard classification
-
-The two smaller clouds floating above the main cloud must officially be classified as hazards.
-
-They are not merely decorative objects.
-
-They are dynamic gameplay hazards that players can also stand on.
-
-Their hazardous nature comes from unpredictable movement and temporary disappearance, not from dealing damage on contact.
-
-Hazard designation
-
-Both smaller clouds should have explicit metadata identifying them as hazards.
-
-For example, use appropriate data such as:
-
-* A stable platform ID.
-* A cloud platform type.
-* A hazard classification.
-* A dynamic movement capability.
-* A disappearance capability.
-
-Follow the project’s architecture rather than introducing an unnecessary incompatible data system.
-
-The main cloud must remain ordinary stage terrain.
-
-Stage traits
-
-Asperitas’s stage information should communicate:
-
-Trait	Value
-Terrain	Floating clouds
-Platforms	2 moving cloud platforms
-Hazards	2 shifting cloud hazards
-Obstacles	None
-Lighting	Daylight
-
-The two upper clouds count as both standable platforms and environmental hazards.
-
-They are not four different objects.
-
-There are exactly two upper cloud objects.
-
-Hazard behavior
-
-The hazards do not automatically damage fighters.
-
-They must not stun, launch, or eliminate someone simply because they are touched.
-
-Instead, their randomized movement and disappearance introduce risk.
-
-A player might jump onto a cloud expecting a stable surface, only for it to move or disappear later.
-
-That unpredictability is the hazard mechanic.
-
-⸻
-
-7. Independent cloud controllers
-
-Each cloud hazard must have its own independent behavior system.
-
-They must not share a single behavior state or transition timer.
-
-Each needs its own:
-
-* Random number generator or independent random stream.
-* Current state.
-* State duration.
-* State timer.
-* Movement direction.
-* Movement speed.
-* Movement destination.
-* Movement boundaries.
-* Position.
-* Visibility.
-* Collision availability.
-* Disappearance timer.
-* Reappearance timer.
-
-The two clouds may occasionally perform similar actions by coincidence, but they must never be artificially synchronized.
-
-Example
-
-Cloud A:
-
-HORIZONTAL → IDLE → DISAPPEARING → HIDDEN → REAPPEARING → VERTICAL
-
-Cloud B:
-
-VERTICAL → HORIZONTAL → IDLE → VERTICAL → DISAPPEARING → HIDDEN → REAPPEARING
-
-These are merely illustrative sequences.
-
-No fixed sequence should be imposed.
-
-Every transition should result from that cloud’s own randomized state machine.
-
-⸻
-
-PART IV — CLOUD STATE MACHINE
-
-8. Required states
-
-Each cloud hazard must support these six states:
-
-State	Function
-IDLE	The cloud stays stationary
-HORIZONTAL	The cloud moves left and right
-VERTICAL	The cloud moves up and down
-DISAPPEARING	The cloud fades out
-HIDDEN	The cloud is invisible and has no collision
-REAPPEARING	The cloud fades in at a newly randomized valid position
-
-These states must transition continuously throughout gameplay.
-
-The cloud should never become permanently stuck in one state.
-
-State-transition logic
-
-When an ordinary state finishes, choose a new valid state randomly.
-
-Possible ordinary choices are:
-
-* IDLE.
-* HORIZONTAL.
-* VERTICAL.
-* DISAPPEARING.
-
-The disappearance lifecycle must follow:
-
-DISAPPEARING → HIDDEN → REAPPEARING → next randomized ordinary state
-
-A cloud cannot skip the hidden/reappearance lifecycle once disappearance begins.
-
-The duration of ordinary states should be randomized.
-
-Suggested tuning
-
-Parameter	Starting range
-Idle duration	1.5–4 seconds
-Movement duration	2–5 seconds
-Horizontal travel	60–140 world units
-Vertical travel	35–90 world units
-Disappearance fade	0.5–0.9 seconds
-Hidden duration	1–2.5 seconds
-Reappearance fade	0.5–0.9 seconds
-
-These are initial guidelines.
-
-Tune them against actual fighter movement speeds, jump heights, and platform sizes.
-
-Keep all tuning centralized and configurable.
-
-⸻
-
-9. Horizontal movement state
-
-When a cloud enters HORIZONTAL, it should gently float left or right.
-
-Randomly determine:
-
-* Its direction.
-* Its movement speed.
-* Its travel distance or destination.
-* Its movement duration.
-
-The cloud must remain within its permitted horizontal region.
-
-Use smooth movement and gradual reversals or easing rather than abrupt changes.
-
-The platform should feel like it is being carried by atmospheric currents.
-
-The collision surface must move with the cloud.
-
-Any fighter standing on it must be carried along naturally.
-
-The cloud cannot travel into another playable platform.
-
-⸻
-
-10. Vertical movement state
-
-When a cloud enters VERTICAL, it should gently float upward or downward.
-
-Randomize its vertical travel characteristics independently.
-
-Maintain a safe minimum height above the main cloud.
-
-Do not allow it to rise so high that ordinary gameplay becomes unreasonable or it enters unsafe Void geometry.
-
-A fighter standing on the cloud must rise and descend along with it.
-
-The fighter must not sink through the cloud or hover at its previous height.
-
-Vertical motion must be smooth and mechanically consistent.
-
-⸻
-
-11. Idle state
-
-When a cloud enters IDLE, its gameplay position should remain fixed.
-
-It should not move horizontally or vertically.
-
-Its collision surface must remain stationary.
-
-Minor decorative cloud animation is allowed, but the actual gameplay platform must remain in place.
-
-After a randomized duration, transition to another valid state.
-
-⸻
-
-PART V — DISAPPEARANCE AND RANDOM REAPPEARANCE
-
-12. Disappearing state
-
-Each cloud can randomly enter DISAPPEARING.
-
-When this happens, it must gradually fade away.
-
-Use a smooth opacity transition.
-
-Make the fade noticeable enough that a player standing on the cloud receives a clear visual warning.
-
-Suggested duration: approximately 0.5–0.9 seconds.
-
-Do not instantly erase the cloud without warning.
-
-As the disappearance completes, disable its collision.
-
-The cloud then enters HIDDEN.
-
-Fighter interaction
-
-If a fighter is standing on the cloud when it becomes non-collidable:
-
-* Remove the platform as their ground support.
-* Allow gravity to act normally.
-* Preserve the fighter’s velocity and normal available actions.
-* Do not teleport the fighter.
-* Do not apply artificial damage.
-* Do not apply knockback.
-* Do not immediately eliminate the fighter.
-
-The fighter should simply begin falling.
-
-They can jump, move, or recover according to the game’s existing mechanics.
-
-⸻
-
-13. Hidden state
-
-When the cloud reaches HIDDEN:
-
-* It is completely invisible.
-* It has no active collision.
-* It cannot support fighters.
-* Its previous location is no longer a valid gameplay surface.
-* It remains hidden for a randomized duration.
-
-During HIDDEN, the cloud prepares its next appearance.
-
-Most importantly, it must not automatically return to its previous coordinates.
-
-The next appearance position must be randomized.
-
-Each cloud selects its new location independently.
-
-⸻
-
-14. Random reappearance — mandatory behavior
-
-When a cloud reappears, it must appear at a new randomly selected valid position inside its assigned movement area.
-
-This is a fundamental part of the hazard.
+A Special ability should be reserved for an exceptionally distinctive move with a mechanic that meaningfully changes how combat works.
 
 For example:
 
-A cloud might disappear while positioned toward the far left side of its movement region.
+* An area-wide paralysis that temporarily prevents opponents from acting.
+* An extraordinarily powerful projectile with unusual properties, such as erasing opposing projectiles and passing through fighters.
+* A self-healing ability that restores the character’s Launch Point.
 
-After remaining hidden, it could reappear:
+A conventional projectile, tornado, knockback attack, pull effect, or ground-impact burst should not automatically qualify as Special.
 
-* Farther right.
-* Farther left.
-* Higher.
-* Lower.
-* Near the center of its allowed region.
+Importantly, the execution type of a move must remain independent from its player-facing classification.
 
-Its new location should be selected randomly in two-dimensional world space.
+A move can remain internally implemented as a technique, summon, or projectile-producing attack while being displayed as an ordinary Ground attack.
 
-Do not limit reappearance to the same horizontal or vertical axis the cloud was moving along before disappearing.
+1.2 Exact classification for the current characters
 
-Position selection
+These are the authoritative classifications.
 
-When the cloud is ready to reappear:
+Character	Move	Classification
+#0001	Unlimited Void (attack4)	SPECIAL
+#0001	Hollow Purple (attack5)	SPECIAL
+#0001	Red (attack2)	Normal
+#0001	Maximum Blue (attack3)	Normal
+#0002	Whirlwind (extra_attack)	Normal
+#0003	Mystical Palm Technique (attack4) — Healing	SPECIAL
+#0003	Cherry Blossom Impact (attack3)	Normal
 
-1. Generate a candidate position using its permitted X and Y ranges.
-2. Validate that the candidate is inside its assigned safe region.
-3. Check that it cannot overlap the main cloud.
-4. Check that it cannot overlap the other smaller cloud.
-5. Check that it does not intersect an active fighter.
-6. Ensure it remains within safe camera and Void constraints.
-7. Use the valid candidate as its new reappearance location.
+All other currently existing moves remain non-Special.
 
-Prefer a genuinely different location from its disappearance location.
+Expected result:
 
-Use a configurable minimum relocation distance when the safe region allows it.
+* Character #0001 has exactly 2 Special abilities.
+* Character #0002 has exactly 0 Special abilities.
+* Character #0003 has exactly 1 Special ability.
+* There are exactly 3 Special abilities across the current playable roster.
 
-Do not force a tiny displacement merely to claim the position is random.
+This classification must be consistent everywhere the interface distinguishes Special abilities.
 
-The cloud should visibly demonstrate that it can disappear in one location and return somewhere else.
+1.3 Investigate and fix the current classification logic
 
-Critical transition detail
+Start by inspecting:
 
-The cloud must change its coordinates while fully hidden, not while visible.
+* js/data/controller-profiles.js
+* js/ui/controller-editor.js
+* js/data/loadout.js
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* js/data/characters/0003.js
+* js/data/abilities.js
+* js/ui/ability-hud.js
+* js/ui/mobile-abilities.js
 
-There should never be a visible teleportation.
+In controllerActions() inside js/data/controller-profiles.js, moves currently enter the abilities category if they are techniques, summons, or attacks that throw projectiles.
 
-The transition should look like:
+This means Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact can be classified as Special even though they should not be.
 
-1. Cloud gradually fades out at Position A.
-2. Cloud becomes completely invisible.
-3. A new safe Position B is generated.
-4. Cloud remains hidden for its randomized interval.
-5. Cloud gradually fades in at Position B.
-6. Cloud resumes ordinary randomized behavior.
+Replace that automatic association with a deliberate, explicit Special classification.
 
-The player should recognize that the hazard has relocated.
+Recommended architecture:
 
-Reappearance animation
+Define a character-specific, data-driven classification field, for example:
 
-When entering REAPPEARING:
+// Character #0001
+specialAbilities: ['attack4', 'attack5']
+// Character #0002
+specialAbilities: []
+// Character #0003
+specialAbilities: ['attack4']
 
-* Start at zero opacity.
-* Fade smoothly toward full opacity.
-* Remain stationary during the reappearance fade, unless a carefully implemented cosmetic effect is used.
-* Restore collision only when it is safe.
-* Finish the fade.
-* Select another randomized ordinary state.
+The exact API can differ if a better approach fits the current architecture.
 
-Do not make the cloud appear fully opaque in a single frame.
+Create a shared helper such as:
 
-Reappearance safety
+isSpecialAbility(def, move)
 
-Never reintroduce a solid cloud directly inside a fighter’s collider.
+Use it consistently wherever player-facing Special status is needed.
 
-If the randomly selected location is currently occupied by a fighter, choose another valid position or delay the cloud’s return.
+Requirements:
 
-If the other hazard is moving, account for its current position and permitted movement envelope.
+* Never classify something as Special simply because it is a projectile.
+* Never classify something as Special simply because its execution type is technique or summon.
+* Never use a move’s English display name to determine classification.
+* Never hardcode character IDs into shared combat, rendering, or UI systems.
+* Validate the metadata so nonexistent or unavailable moves cannot accidentally be classified.
+* Make the system easy to extend to future characters without modifying shared classification logic.
+* Keep the existing specialAction() and specialAttacks() execution semantics working wherever combat, AI, or loadout validation depends on them. Their internal meaning is not automatically the same as the new player-facing Special classification.
 
-Do not solve unsafe reappearance by teleporting fighters.
+Controller editor behavior:
 
-A cloud can wait longer in HIDDEN until a safe appearance is possible.
+The existing “Special abilities” category should contain only the three qualifying moves.
 
-If the randomized search fails repeatedly, use a deterministic safe fallback position or continue waiting.
+Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact should move to the appropriate ordinary attack category, normally Ground attacks, while retaining their existing ground-only availability or aerial variants.
 
-The system must never enter an infinite loop.
+Do not create new aerial versions for ground-only techniques.
 
-Example of intended behavior
+Do not change their controller assignments.
 
-Cloud A:
+If a character has no Specials, such as #0002, do not show an empty “Special abilities” category.
 
-* Starts above the left side.
-* Moves vertically.
-* Becomes idle.
-* Begins disappearing.
-* Fully disappears.
-* Remains hidden.
-* Selects a new random position higher and farther right within its region.
-* Fades back into existence.
-* Remains idle briefly.
-* Begins moving horizontally.
+1.4 Preserve gameplay mechanics and cooldowns
 
-Meanwhile, Cloud B might:
+Reclassification is not a combat rebalance.
 
-* Move horizontally.
-* Become idle.
-* Disappear.
-* Reappear at a lower position within its own region.
-* Begin moving vertically.
+Do not remove, simplify, or rewrite the underlying effects of any move.
 
-Neither cloud needs to wait for the other to change states.
+In particular:
+
+* Red must retain its projectile, knockback, and projectile-repelling behavior.
+* Maximum Blue must retain its projectile and pulling behavior.
+* Whirlwind must retain its traveling tornado, multihit behavior, lifting, and finisher.
+* Cherry Blossom Impact must retain its ground eruption, quake behavior, and launch effects.
+* Unlimited Void must retain its paralysis.
+* Hollow Purple must retain its powerful projectile behavior.
+* Mystical Palm Technique must retain its healing and interruptibility.
+
+Do not make cooldown duration depend on the new Special label.
+
+The existing cooldown policy in js/data/cooldowns.js is determined by damage and exceptional effects. That policy is separate from how an ability is presented to players.
+
+For example, #0002’s Whirlwind currently has a longer cooldown because of its damage. Removing its Special label must not unintentionally reduce that cooldown.
+
+Likewise, damage, launch strength, Energy, hitboxes, shielding, CPU behavior, projectile interactions, and input timing should remain unchanged unless a specific animation synchronization adjustment is required.
 
 ⸻
 
-PART VI — ZERO PLATFORM COLLISIONS
+PART 2 — Special Ability Animations
 
-15. The three platforms must NEVER collide
+2.1 Specials must feel more significant
 
-This is an absolute gameplay requirement.
+Special abilities should have noticeably longer, more dramatic animations than ordinary attacks.
 
-The following collisions must always be impossible:
+The game already has a cast/release animation system, so preserve and build upon it rather than replacing it.
 
-* Main cloud with Cloud A.
-* Main cloud with Cloud B.
-* Cloud A with Cloud B.
+The three qualifying Specials should retain their existing deliberate buildup:
 
-This requirement applies at all times, including when clouds move, disappear, or reappear.
+#0001 — Unlimited Void
 
-Safe movement regions
+Maintain its recognizable casting animation and release timing. The ability should feel powerful and deliberate before the paralysis activates.
 
-Assign each smaller cloud a bounded movement region.
+#0001 — Hollow Purple
 
-The left cloud should generally occupy the upper-left part of the arena.
+Maintain its extended buildup and projectile release. This should continue to feel like one of #0001’s most significant moves.
 
-The right cloud should generally occupy the upper-right part.
+#0003 — Mystical Palm Technique
 
-Each region should leave sufficient horizontal and vertical clearance.
+Maintain its longer kneeling healing animation. Its longer vulnerability period is part of the technique’s identity.
 
-The movement regions must be designed so both hazards can move freely without ever physically intersecting.
+These should remain clearly more committed animations than regular attacks.
 
-Separation validation
+Do not arbitrarily slow the three Specials further if the existing timings already achieve the intended effect.
 
-Use actual platform bounds, including platform width, height, and safety margins.
+2.2 Make non-Special abilities faster where necessary
 
-Do not validate separation using only center points.
+Moves that are no longer considered Special should have ordinary-attack pacing.
 
-Account for:
+However, some are already fast enough and must not receive unnecessary speed adjustments.
 
-* Horizontal movement.
-* Vertical movement.
-* Reappearance locations.
-* Movement direction changes.
-* Full collision widths.
-* The main cloud’s upper surface.
-* Relevant visual cloud volume.
+Move	Required animation change
+#0001 Red	Keep existing speed
+#0001 Maximum Blue	Keep existing speed
+#0002 Whirlwind	Keep existing speed
+#0003 Cherry Blossom Impact	Speed up its animation
 
-Recommended guarantee
+Cherry Blossom Impact is the main timing adjustment required.
 
-Prefer mathematically disjoint movement envelopes.
+Currently, its animation clips are defined in js/data/characters/0003.js using:
 
-If both hazards’ complete possible movement envelopes cannot overlap, randomized movement remains safe by construction.
+attack3_cast: 10
+attack3_release: 15
 
-Also validate generated destinations.
+The cast contains four frames, and the release contains five frames.
 
-A random movement destination must be rejected if it violates separation constraints.
+This gives Cherry Blossom Impact a comparatively long total animation.
 
-If no valid movement destination exists, the cloud can temporarily enter IDLE.
+Increase the animation playback rate so that the attack feels quicker and more responsive, while retaining every original sprite frame and its distinctive ground impact.
 
-No sudden corrections
+A reasonable starting point would be:
 
-Never allow a cloud to overlap another platform and then correct the mistake using visible teleportation.
+attack3_cast: 20
+attack3_release: 20
 
-Prevent invalid motion before it occurs.
+This would bring its combined animation duration to approximately 0.45 seconds, rather than approximately 0.73 seconds.
 
-The cloud must not clip into the main platform even for one simulation frame.
+Use the game’s frame-aligned timing conventions. Verify that the eruption still activates at the correct release frame.
 
-Disappeared clouds
+Adjust within a similarly quick range if necessary to preserve smooth gameplay.
 
-A hidden cloud has no gameplay collision.
+Important requirements:
 
-However, its future reappearance region must still be safe.
+* Do not delete animation frames.
+* Do not skip the essential anticipation or impact pose.
+* Keep visual animation and gameplay timing synchronized.
+* Retain its burst, damage, launch, and hit properties.
+* Ensure the character becomes free to act when the animation actually finishes.
+* Ensure interruptions and cooldown behavior remain correct.
 
-Do not rely on the fact that a cloud is hidden to permit an unsafe position that would become invalid when it reappears.
+The attack should still look powerful but no longer require a disproportionately long buildup for a normal move.
+
+2.3 Special animation indicator — Orange Exclamation Mark
+
+Implement a new visual indicator that appears directly above a character’s head while the character performs a genuinely Special ability.
+
+Design:
+
+Display a clearly visible orange exclamation mark:
+
+!
+
+It should visually communicate that the character is executing an exceptionally powerful or unusual ability.
+
+Visual requirements:
+
+* Bright, saturated orange, for example #FF9F1C.
+* Dark outline or shadow for visibility against bright and dark stages.
+* Clean and legible at different screen sizes.
+* Centered horizontally above the active character.
+* Positioned high enough to avoid covering the character’s face or sprite artwork.
+* Avoid overlapping existing player labels, Energy bars, or cooldown indicators.
+* Scale appropriately with the game’s Canvas rendering and device pixel ratio.
+* Maintain a crisp appearance consistent with Alva’s existing visual style.
+
+A very subtle pulse or floating movement is acceptable but not required. The exclamation mark itself is the priority.
+
+It must not become excessively large, flashy, or distracting.
+
+2.4 When the indicator appears
+
+The exclamation mark should appear immediately when a qualifying Special ability successfully begins.
+
+It must remain visible while the Special animation plays, including the casting and release animation phases.
+
+It should disappear as soon as the character finishes performing that Special.
+
+Expected examples:
+
+Unlimited Void
+
+1. Character begins the Unlimited Void cast.
+2. Orange exclamation mark appears above its head.
+3. The mark stays visible throughout the cast and release animation.
+4. The mark disappears once the fighter has finished the Special animation.
+
+Hollow Purple
+
+The mark appears during the buildup, remains through the character’s release animation, and disappears when the animation ends. It must not remain merely because the projectile is still traveling.
+
+Mystical Palm Technique
+
+The mark appears when healing begins, remains throughout the kneeling and healing animation, and disappears once the character finishes.
+
+The indicator must also disappear immediately if an ability is interrupted, canceled, or otherwise terminated.
+
+It must not appear simply because a move is on cooldown.
+
+2.5 When the indicator must NOT appear
+
+Never show the orange exclamation mark during:
+
+* Red
+* Maximum Blue
+* Whirlwind
+* Cherry Blossom Impact
+* Any other non-Special attack
+* Standard movement
+* Jumping or dashing
+* Normal shielding or deflecting
+* Idle animations
+* Cooldown periods after a Special has finished
+
+The indicator is associated with the active Special animation, not the attack’s damage tier, projectile properties, or cooldown.
+
+2.6 Implementation architecture
+
+Investigate:
+
+* js/game/arena.js
+* js/game/rendering/fighter-status.js
+* js/game/fighters/fighter.js
+* js/game/combat/technique.js
+* js/game/rendering/sprite-animator.js
+
+The current game uses a Canvas 2D renderer.
+
+Implement the indicator in the existing rendering pipeline rather than introducing floating DOM elements over the game canvas.
+
+Recommended approach:
+
+1. Use the new shared Special classification helper.
+2. Determine which move the fighter is actively performing.
+3. Check whether that move is classified as Special.
+4. Draw the mark using the fighter’s current rendered position.
+5. Remove the mark automatically when the active Special state ends.
+
+The current fighter.technique state and its active technique ID should provide the necessary information for the three existing Specials.
+
+However, design the helper and rendering logic so future Specials can also use other supported move execution types.
+
+Prefer leveraging markerAnchor(), statusTop(), or related positioning utilities in Arena, rather than creating a separate incompatible positioning system.
+
+The indicator must work for both players and CPU-controlled characters.
+
+It must also work in:
+
+* Regular battles
+* Custom battles
+* Watch Mode
+* Practice Ground
+* Mirror matches
+
+The indicator should render correctly even when both fighters activate Specials around the same time.
+
+Respect reduced-motion preferences if the mark is animated.
 
 ⸻
 
-PART VII — REAL MOVING-PLATFORM PHYSICS
+PART 3 — Functional Home Screen Download Button
 
-16. Extend the current platform physics
+3.1 Existing implementation
 
-Alva currently uses StageCollision and stepBody() for collision resolution.
+The bottom-right Download icon already exists in Alva’s Home Screen footer.
 
-Existing one-way stage platforms are static.
+Relevant files:
 
-Asperitas requires real dynamic platforms.
+* js/screens/home-screen.js
+* css/home.css
+* js/ui/icons.js
+* js/ui/overlays.js
+* js/core/app.js
+* index.html
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-Do not implement the clouds as purely visual objects.
+The button currently has disabled: true and no installation behavior.
 
-Extend the stage system to support moving and temporarily inactive one-way surfaces.
+Enable it and make it fully functional.
 
-Architecture
+Keep its existing footer location, icon identity, button proportions, and overall design language.
 
-Keep separate concepts for:
+3.2 Show an installation dialog
 
-* Immutable stage definitions.
-* Runtime platform objects.
-* Independent hazard state machines.
-* Collision surfaces.
-* Rendering positions.
+Clicking the bottom-right Download button must open an attractive, compact dialog explaining that Alva can be added to the player’s home screen and launched like an application.
 
-Use a stable platform ID for each hazard.
+Suggested English copy:
 
-Avoid mutating global MAPS data during matches.
+Title: Install Alva
 
-Every new battle should initialize its own platform state.
+Description:
 
-Runtime dynamic platform data
+“Want quicker access to Alva?
 
-A dynamic platform should expose sufficient information to determine:
+You can add Alva directly to your home screen and launch it just like an app, without opening your browser and searching for the game every time.
 
-* Current world position.
-* Previous world position.
-* Movement delta.
-* Collision activation.
-* Visibility.
-* One-way collision properties.
-* Stable identification.
-* Movement region.
-* Hazard state.
+Alva is a lightweight web app, so there’s no large game download or traditional app installation required. It uses very little additional storage.
 
-Avoid separate unsynchronized gameplay and rendering positions.
+Add Alva to your home screen for a faster, more convenient way to play!”
 
-Simulation order
+Primary action:
 
-Dynamic platforms must update using Alva’s fixed simulation timestep.
+Add to Home Screen
 
-The appropriate sequence should ensure:
+Secondary action:
 
-1. Hazard behavior advances.
-2. Platform motion updates.
-3. Grounded riders receive platform displacement.
-4. Fighters process their own movement.
-5. Collision resolution uses the updated surfaces.
-6. Support and grounded state are finalized.
+Not Now
 
-Adapt the precise ordering to Alva’s existing simulation architecture.
+Maintain the existing dark, glass-inspired dialog styling.
 
-Carrying fighters
+The interface should feel like a natural part of Alva, not a generic browser alert.
 
-When a cloud moves horizontally, a grounded fighter should be carried horizontally.
+Storage accuracy: A web app may still use some device storage for browser data, icons, or cached files. Do not make a technically false guarantee of literally zero storage. Emphasize that no large conventional app download is required and that the installation is lightweight.
 
-When it moves vertically, the fighter should rise or descend with it.
+3.3 Integrate with the existing dialog system
 
-The fighter must remain correctly grounded while standing on an active platform.
+Reuse the architecture established by:
 
-The fighter should still be able to:
+* ModalDialog
+* InfoDialog
+* ChoiceDialog
+* The application’s menu navigation scopes
 
-* Walk.
-* Run.
-* Jump.
-* Dash.
-* Attack.
-* Shield.
-* Be launched.
-* Fall off the cloud.
+A dedicated install dialog is appropriate because it needs both explanatory content and an actionable installation button.
 
-When the fighter jumps, the cloud must no longer drag them through the air.
+Requirements:
 
-Preserve the game’s existing movement and momentum rules.
+* Keyboard support.
+* Controller/gamepad navigation.
+* Touch compatibility.
+* Appropriate dialog role and accessible title.
+* Correct focus trapping and focus restoration.
+* Escape and controller Back support.
+* Closing the dialog must return focus to the Download button.
+* Existing Home Screen functionality must remain available after dismissal.
+* All displayed text must support Alva’s localization system.
 
-Disappearance collision
+Do not use browser alert() or confirm() as the main UI.
 
-When a cloud becomes fully inactive:
+3.4 Add proper Progressive Web App support
 
-* Remove it from collision queries.
-* Invalidate any fighter’s stale ground reference to it.
-* Clear grounded state when appropriate.
-* Let the fighter continue naturally under gravity.
+Make Alva installable as a Progressive Web App wherever supported.
 
-Do not leave invisible platforms.
+The repository already has some related metadata in index.html, including mobile web-app and Apple web-app configuration.
 
-Reappearance collision
+Complete the installability setup.
 
-When a cloud becomes active again:
+Implement a web app manifest containing appropriate fields such as:
 
-* Ensure its placement is valid.
-* Restore its one-way collision.
-* Allow normal landing behavior.
-* Do not trap or displace fighters who occupy nearby space.
+{
+  "name": "Alva",
+  "short_name": "Alva",
+  "description": "A browser-based platform fighting game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "icons": []
+}
 
-Shadow rendering
+Populate the icons array with actual, valid icon files and dimensions.
 
-Review the fighter shadow system, which queries surfaces below the fighter.
+Use Alva’s existing branding, preferably deriving the required icons from its existing favicon or logo artwork.
 
-Moving clouds must correctly receive shadows and ground markers when active.
+Do not introduce unrelated icon designs.
 
-Hidden clouds must not receive shadows or ground markers.
+Use at least suitable 192×192 and 512×512 icons, with appropriate formats and purposes where supported.
+
+Link the manifest from index.html.
+
+Alva may be deployed under a GitHub Pages repository subpath, so ensure manifest URLs, scope, start URL, icons, and other asset references resolve correctly without assuming the site is hosted at the domain root.
+
+If a service worker is needed for the chosen installability and offline strategy, implement it carefully.
+
+Do not introduce aggressive asset caching that causes unnecessarily high storage usage or stale game versions.
+
+Offline gameplay is not an explicit requirement of this update. Prioritize reliable installation, ordinary online gameplay, and lightweight storage usage.
+
+3.5 Native one-click installation where supported
+
+Implement the browser’s native installation flow using supported web APIs.
+
+On browsers that expose beforeinstallprompt:
+
+1. Listen for the installability event.
+2. Retain the event for a user-initiated installation.
+3. Open the Alva installation dialog when the user clicks Download.
+4. When the player presses Add to Home Screen, trigger the browser’s native installation prompt.
+5. Let the browser display its own install confirmation.
+6. Handle acceptance or dismissal appropriately.
+7. Detect successful installation using appinstalled and update the interface.
+
+The native installation prompt must be triggered in response to a real user interaction.
+
+Do not attempt to bypass the browser’s permission or confirmation flow.
+
+Do not falsely report that installation succeeded until the browser indicates success.
+
+3.6 Unsupported browsers and iOS behavior
+
+Some browsers, including Safari on iPhone and iPad, do not support the same programmable installation prompt.
+
+The Download button must still be functional.
+
+If direct installation is unavailable, display clear instructions rather than silently failing.
+
+For Safari on iPhone or iPad, explain:
+
+“To add Alva to your Home Screen:
+
+1. Open Alva in Safari.
+2. Tap the Share button.
+3. Select Add to Home Screen.
+4. Confirm by tapping Add.”
+
+For supported desktop browsers without a programmable prompt, guide the player to the browser’s Install App or Add to Home Screen menu option where available.
+
+Adapt these instructions to the browser and platform when reasonably detectable.
+
+Do not claim that every device supports one-tap installation.
+
+3.7 Detect when Alva is already installed
+
+Handle a player opening Alva as an installed web app.
+
+Use supported installation-state signals, such as:
+
+* display-mode: standalone
+* navigator.standalone where applicable
+* appinstalled when available
+
+If Alva is already running as an installed app, avoid showing another installation prompt.
+
+Instead, the Download dialog can display a friendly message such as:
+
+Alva is already installed!
+
+“You can launch Alva directly from your Home Screen.”
+
+Keep the interface consistent and ensure this state does not disable unrelated Home Screen features.
 
 ⸻
 
-PART VIII — CPU INTELLIGENCE
+PART 4 — Animate the Home Screen Download Icon
 
-17. Make CPU fighters understand dynamic hazards
+The Download button should become more noticeable.
 
-Alva includes a shared StageModel for CPU stage navigation and recovery.
+The current button is quite small and visually understated, so introduce a tasteful, repeating icon animation.
 
-It currently caches surface information.
+4.1 Recommended animation
 
-This must be adapted for moving and disappearing platforms.
+Create a short download motion:
 
-Required AI awareness
+1. The downward arrow moves slightly upward.
+2. It smoothly travels downward toward the download tray.
+3. It settles into its original position.
+4. The button receives a very subtle glow or emphasis.
+5. The animation pauses briefly before repeating.
 
-CPU fighters should understand:
+The animation should communicate downloading without changing the meaning of the icon.
 
-* The current location of active cloud hazards.
-* Their current collision availability.
-* When a cloud has disappeared.
-* When a cloud reappears.
-* Which platforms are usable.
-* Which routes involve temporary or moving footing.
+Use the existing ICONS.download SVG and adjust its internal SVG structure only as needed to animate the arrow independently of the tray.
 
-Do not let CPUs indefinitely treat a cloud’s starting position as its actual current position.
+Avoid rotating the entire icon or introducing a large bouncing button.
 
-Use live runtime surface data.
+4.2 Visual guidelines
 
-CPU behavior
+* Match Alva’s minimal, dark interface.
+* Keep the animation smooth and polished.
+* Use CSS keyframes wherever practical.
+* Use the existing button dimensions.
+* Add a restrained orange or accent-colored glow if it fits the visual hierarchy.
+* Do not create constant aggressive flashing.
+* Do not interrupt clicks, touch interaction, or controller navigation.
+* Do not cause layout shifts.
+* Make the hover and focus states clear.
+* Stop the animation or replace it with a static icon when reduced motion is enabled.
 
-CPUs do not need supernatural knowledge of future random states.
+An animation cycle of roughly 2–4 seconds, including a resting period, is a reasonable starting point.
 
-They should react to available information.
+Prioritize subtle visual appeal over intensity.
 
-They must not:
-
-* Repeatedly target invisible platforms.
-* Assume disappeared clouds still exist.
-* Become unable to navigate Asperitas.
-* Freeze because platform coordinates changed.
-* Fail to recover simply because their previous target surface vanished.
-
-The main cloud should remain a reliable fallback area.
-
-Avoid hardcoded AI logic that checks map.id === 'asperitas' unless there is a compelling architectural reason.
-
-Prefer generic dynamic-platform support.
-
-The implementation must work in both Quick Battle and Watch Mode.
+When the installation dialog is open, the icon can pause to avoid competing with the dialog.
 
 ⸻
 
-PART IX — PROCEDURAL ASPERITAS ART
+PART 5 — Localization
 
-18. Create a dedicated sky theme
+Alva currently supports English and French.
 
-Implement a new module:
+Any new user-facing text must integrate with the existing localization infrastructure.
 
-js/stages/asperitas-theme.js
+Relevant files:
 
-Register it in:
+* js/localization/i18n.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-js/stages/index.js
+Add proper keys for:
 
-Use the existing StageTheme and Perspective architecture.
+* Install Alva title
+* Main installation explanation
+* Add to Home Screen button
+* Not Now button
+* Browser-specific installation instructions
+* Already installed message
+* Installation unavailable message
+* Any success or confirmation status
 
-No external rendering engines, CSS-based gameplay animations, or new frameworks.
+Provide natural, accurate French translations.
 
-Overall atmosphere
+Do not hardcode English copy directly into components that should be localized.
 
-Asperitas should be visually beautiful.
-
-The player should feel that the fight takes place far above the world, surrounded by an enormous open sky.
-
-The environment should convey height, distance, and atmospheric depth.
-
-Background
-
-Use a layered sky design:
-
-* Rich blue upper atmosphere.
-* Soft cyan and pale blue horizon.
-* Large distant cloud formations.
-* Wispy atmospheric clouds.
-* Subtle sunlight.
-* Gentle light scattering.
-* Multiple cloud layers at different depths.
-
-The lower background should suggest an ocean of distant clouds rather than a visible ground surface.
-
-Parallax
-
-Use the existing layered rendering approach.
-
-Far clouds should move slowly relative to the camera.
-
-Near clouds should provide stronger depth cues.
-
-Keep the foreground relatively subtle to avoid obscuring gameplay.
-
-Main cloud
-
-The main cloud should be the most visually substantial shape.
-
-Use layered rounded formations, smooth shading, and an organic silhouette.
-
-Its playable surface must remain clear.
-
-The underside should read as soft cloud volume, not a rectangular building facade.
-
-Two hazard clouds
-
-The smaller clouds must share the same overall artistic style.
-
-However, each should remain easy to track visually.
-
-Their shapes can differ slightly while maintaining comparable gameplay readability.
-
-Both hazards should clearly communicate movement and disappearance.
-
-Hazard visual feedback
-
-Because the two upper clouds are hazards, players must be able to recognize that they behave differently from the stationary main platform.
-
-Use a restrained visual treatment, such as:
-
-* Slightly more noticeable floating motion.
-* Soft atmospheric movement trails.
-* Distinct but subtle rim shading.
-* A clear fade before disappearance.
-* A soft formation effect during reappearance.
-
-Do not use distracting red warning effects that make the clouds look damaging when they are not.
-
-The stage’s actual hazards are instability, movement, and disappearance.
-
-Visual synchronization
-
-The hazard cloud’s rendered surface must coincide with its real gameplay collision location.
-
-Avoid any situation where the visual cloud moves but the physical collision remains behind.
-
-Use simulation state and interpolation appropriately.
-
-Performance
-
-Use cached Path2D geometry and sensible Canvas rendering practices.
-
-Avoid unnecessary work on every frame.
-
-The stage must remain performant on desktop and landscape mobile browsers.
+The installed application should continue to use the existing language preference.
 
 ⸻
 
-PART X — MAP DATA
-
-19. Add Asperitas to MAPS
-
-Add the third stage definition in js/data/maps.js.
-
-The stage should have:
-
-* A unique ID.
-* English name and tagline.
-* Description.
-* Stage traits.
-* Main-stage geometry.
-* Void bounds.
-* Camera bounds.
-* Two player spawn points.
-* Exactly two dynamic upper cloud platform definitions.
-* No unrelated solid obstacles.
-* Theme key asperitas.
-
-The main cloud should use world dimensions comparable to existing stages.
-
-The two hazard clouds should be positioned above the main cloud in the initial map layout.
-
-Spawn positions
-
-Both fighters spawn on the large main cloud.
-
-Neither fighter should spawn directly on one of the hazards.
-
-The initial positions should provide comfortable separation for standard combat.
-
-Hazard IDs
-
-Use stable unique IDs, for example:
-
-* asperitas-cloud-left
-* asperitas-cloud-right
-
-These IDs identify the runtime hazard objects and their associated platform surfaces.
-
-Hazard metadata
-
-Include suitable fields to identify:
-
-* The object as a one-way platform.
-* The object as a hazard.
-* Its possible movement states.
-* Its movement envelope.
-* Its ability to disappear.
-* Its random reappearance behavior.
-
-Do not create a global generic damage-hazard system if the feature only needs metadata plus dynamic platform behavior.
-
-⸻
-
-PART XI — CAMERA AND VOID
-
-20. Preserve normal camera behavior
-
-The camera should frame Asperitas similarly to the other battle stages.
-
-The main cloud should fit comfortably in normal gameplay.
-
-The two upper hazard clouds should generally be visible during neutral play.
-
-Do not zoom out excessively.
-
-The camera should still track fighters during launches and recovery.
-
-Void
-
-Keep the existing Void system.
-
-Falling from a cloud is not an immediate elimination.
-
-A fighter is only eliminated upon crossing the actual Void boundary.
-
-The main cloud and both hazards must remain within safe stage bounds.
-
-Reappearing cloud hazards must never spawn outside the playable region or inside the Void.
-
-Overtime
-
-Alva’s overtime system closes the Void inward.
-
-Preserve this mechanic.
-
-The hazards must continue to function during overtime.
-
-Their random reappearance rules must remain safe under the current Void boundaries.
-
-If a location is no longer valid because the Void has closed, it must not be selected as a reappearance destination.
-
-Do not allow a hazard to reappear where the active Void immediately invalidates its footing.
-
-⸻
-
-PART XII — LIVE PREVIEW INTEGRATION
-
-21. Update StagePreview
-
-The new Stage Selection interface must provide an accurate Asperitas preview.
-
-The hero preview should show:
-
-* The sky.
-* The main cloud.
-* Both upper clouds.
-* Atmospheric background effects.
-
-Prefer to animate the clouds in the hero preview to demonstrate their behavior.
-
-The preview can use a separate instance of the hazard controller.
-
-It must not modify the actual battle’s platform state.
-
-Preview behavior
-
-The clouds should demonstrate:
-
-* Independent movement.
-* Horizontal and vertical drifting.
-* Idle periods.
-* Disappearance.
-* Reappearance at different positions.
-
-The preview should not depend on a running battle simulation.
-
-Use a lightweight isolated presentation instance or shared behavior implementation as appropriate.
-
-Thumbnails
-
-Roster thumbnails should use a static, recognizable representation of each stage.
-
-Do not run a full independently simulated hazard system inside every thumbnail.
-
-⸻
-
-PART XIII — LOCALIZATION AND ACCESSIBILITY
-
-22. English and French
-
-Update Alva’s existing localization tables.
-
-Include strings for:
-
-* Asperitas.
-* Asperitas’s tagline.
-* Random Stage.
-* Stage-slot counts.
-* Unavailable stage slots.
-* Hazard labeling or descriptions, wherever displayed.
-
-Suggested stage name in both languages:
-
-Asperitas
-
-Ensure the Random Stage button and roster information display correctly in English and French.
-
-Use the existing localization utilities.
-
-Hazard labeling
-
-In any stage information display, identify the two smaller clouds as hazards.
-
-Use the term Hazards in English and an appropriate equivalent in French.
-
-The distinction must remain clear:
-
-* Main cloud: normal stage platform.
-* Two upper clouds: moving and disappearing hazard platforms.
-
-Accessibility
-
-Keep keyboard and controller focus states obvious.
-
-Provide appropriate semantic labels for interactive tiles.
-
-Unavailable placeholders should be recognizable as unavailable.
-
-Support reduced-motion preferences without making gameplay collision and visual positions disagree.
-
-⸻
-
-PART XIV — TESTING
-
-23. Automated tests
-
-Extend existing tests and introduce dedicated hazard tests where appropriate.
+PART 6 — Tests and Regression Protection
+
+Update existing tests where the intended behavior changes and add focused tests for the new features.
+
+Relevant test locations include:
+
+* tests/systems/controller-profiles.test.mjs
+* tests/interface/controller-ui.test.mjs
+* tests/interface/settings.test.mjs
+* tests/systems/loadout.test.mjs
+* tests/systems/technique.test.mjs
+* tests/fighters/0001/
+* tests/fighters/0002/
+* tests/fighters/0003/
+* tests/systems/fighter-status.test.mjs
+
+6.1 Classification tests
+
+Verify that:
+
+* #0001 has precisely Unlimited Void and Hollow Purple classified as Special.
+* #0002 has no Special abilities.
+* #0003 has precisely Mystical Palm Technique classified as Special.
+* Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact appear in the correct ordinary categories.
+* The controller editor displays the expected categories in English and French.
+* Existing input bindings remain unchanged.
+* Moves retain the same availability and execution types.
+* Future character definitions can opt individual moves into Special classification without shared-code changes.
+
+Remember that some existing tests intentionally use specialAction() to mean a technique or summon.
+
+Do not rewrite those expectations incorrectly merely to match the new UI terminology.
+
+6.2 Animation and visual indicator tests
+
+Verify that:
+
+* Every classified Special shows the orange indicator during its execution.
+* Every normal attack does not.
+* The indicator disappears immediately when an execution finishes or is canceled.
+* An active cooldown alone never displays the indicator.
+* The indicator works for player-controlled and CPU-controlled fighters.
+* Cherry Blossom Impact is faster and stays synchronized with its ground impact.
+* The existing Special animation lengths are preserved.
+* No projectile, hitbox, damage, or collision behavior is accidentally altered.
+
+6.3 Download and PWA tests
+
+Verify that:
+
+* The Home Screen Download button is no longer disabled.
+* Clicking it opens the correct dialog.
+* The dialog closes and restores focus correctly.
+* Native installation is requested when supported.
+* The declined-installation path remains usable.
+* Unsupported browsers display appropriate instructions.
+* iOS shows manual Add to Home Screen instructions.
+* Already-installed mode is handled properly.
+* The manifest loads with valid paths and icons.
+* The installed app launches into Alva correctly.
+* Both languages render properly.
+* The download icon animation respects reduced-motion preferences.
+
+6.4 Full regression suite
 
 Run:
 
 node --test
 
-Do not remove valuable existing tests or weaken assertions merely to obtain passing results.
+Fix regressions caused by the implementation.
 
-Stage registration tests
+Also perform browser-level verification on desktop and mobile layouts, including landscape orientation.
 
-Verify:
+Where possible, test with Chrome/Edge installation support and Safari’s manual Add to Home Screen flow.
 
-* Asperitas is registered.
-* getMap('asperitas') succeeds.
-* Its theme can be instantiated.
-* There is exactly one main platform.
-* There are exactly two upper cloud hazards.
-* The main platform is not classified as a hazard.
-* Both upper clouds are classified as hazards.
-* Desert and City remain intact.
-
-24-slot roster tests
-
-Verify:
-
-* Exactly 24 total stage slots.
-* Three available stages.
-* Twenty-one unavailable placeholders.
-* Future registry entries automatically fill slots.
-* Stage selection updates the correct stage ID.
-* Quick Battle and Watch Mode selections remain separate.
-* Confirmation starts battles normally.
-
-Random Stage tests
-
-Verify:
-
-* Only playable maps are selected.
-* Practice Ground is excluded.
-* Placeholders are excluded.
-* Every playable stage is reachable by random selection.
-* Selection and preview update correctly.
-* The button does not immediately launch a battle.
-
-Independent behavior tests
-
-Verify:
-
-* Each hazard has its own current state.
-* Each hazard has its own timer.
-* Random streams are independent.
-* State transitions are valid.
-* Horizontal movement works.
-* Vertical movement works.
-* Idle works.
-* Disappearance works.
-* Hidden state disables collision.
-* Reappearance works.
-* Both hazards can behave differently at the same time.
-
-Random reappearance tests
-
-These are particularly important.
-
-Verify:
-
-* A hidden cloud can reappear at a position different from its disappearance position.
-* Reappearance X coordinates vary within permitted limits.
-* Reappearance Y coordinates vary within permitted limits.
-* Relocation occurs while invisible.
-* No visible teleportation occurs.
-* The new location is validated before the cloud becomes collidable.
-* Reappearance does not intersect the main cloud.
-* Reappearance does not intersect the other hazard.
-* Reappearance does not trap a fighter.
-* An occupied candidate location is rejected or deferred.
-* Failed placement attempts cannot cause an infinite loop.
-* Reappearance remains valid during overtime.
-
-Platform separation stress tests
-
-Run long seeded randomized simulations.
-
-Continuously verify:
-
-* Main cloud and Cloud A never overlap.
-* Main cloud and Cloud B never overlap.
-* Cloud A and Cloud B never overlap.
-* All movement stays within permitted regions.
-* State changes do not violate separation.
-* Random relocation never violates separation.
-
-Include cases where one or both hazards are disappearing or reappearing.
-
-Fighter physics tests
-
-Verify:
-
-* Fighters can land on each cloud.
-* Horizontal movement carries grounded fighters.
-* Vertical movement carries grounded fighters.
-* Jumping releases platform attachment.
-* Running and dashing still work.
-* Falling from a disappearing cloud works correctly.
-* Invisible clouds cannot support fighters.
-* Reappearing clouds do not push fighters unexpectedly.
-* Collision references remain valid.
-* Respawning works.
-* Void elimination works.
-* Overtime works.
-
-Frame-rate independence
-
-Simulate the same seed and sequence using different rendering frame rates.
-
-Fixed-step platform behavior should remain consistent.
-
-Cloud state randomness must not depend on how frequently the screen renders.
-
-CPU tests
-
-Verify CPUs can navigate Asperitas in Quick Battle and Watch Mode.
-
-They must respond to moving and missing platforms without repeatedly targeting stale positions.
+Document any browser behavior that cannot be tested automatically.
 
 ⸻
 
-PART XV — MANUAL GAMEPLAY VERIFICATION
+PART 7 — Architecture and Project Rules
 
-24. Browser testing
+Follow Alva’s established engineering standards.
 
-Launch and inspect the actual game.
+Before editing, review:
 
-Test at:
-
-* 1920 × 1080.
-* 1280 × 720.
-* Compact mobile landscape.
-* Tall or narrow browser windows.
-
-Stage roster
-
-Check that the 24-slot roster looks intentional and polished.
-
-Make sure all controls are visible or accessible through scrolling.
-
-Check Random Stage with mouse, keyboard, and controller navigation.
-
-Asperitas
-
-Start matches on Asperitas.
-
-Watch the hazards over an extended period.
-
-Both clouds should independently:
-
-* Move left and right.
-* Move up and down.
-* Remain idle.
-* Disappear.
-* Remain hidden.
-* Reappear somewhere else.
-* Resume randomized behavior.
-
-Ensure a cloud does not always reappear in the same location.
-
-Check that a cloud can reappear noticeably higher, lower, farther left, or farther right, while respecting its designated safe movement area.
-
-Platform interaction
-
-Stand on a horizontally moving cloud.
-
-Stand on a vertically moving cloud.
-
-Jump from a moving cloud.
-
-Allow a cloud to disappear beneath a fighter.
-
-Observe a cloud reappearing while fighters move nearby.
-
-All interactions must remain smooth and predictable at the physics level, even though hazard behavior is randomized.
-
-Separation
-
-Continuously verify that the three platforms never touch or overlap.
-
-Pay special attention to random reappearance.
-
-The hazard system must not produce clipping or invalid positions.
-
-⸻
-
-PART XVI — DOCUMENTATION AND MAINTAINABILITY
-
-25. Update project documentation
-
-Update the relevant sections of:
-
-* README.md
+* CLAUDE.md
 * ALVA_SPEC.md
-* docs/gameplay/stages.md
-* Related architecture documentation where appropriate.
+* docs/architecture/character-system.md
+* docs/systems/input.md
+* docs/systems/combat.md
+* docs/development/testing.md
+* The individual character specifications in docs/characters/
 
-Document the new 24-slot roster.
+Important constraints:
 
-Explain how a future stage can be added.
-
-Document the Random Stage button.
-
-Describe Asperitas’s three-platform structure.
-
-Document the two dynamic cloud hazards and their randomized behavior.
-
-Explain the six hazard states and how random reappearance works.
-
-Document how moving platforms interact with fighter physics.
-
-Extensibility
-
-Prefer a reusable dynamic-platform implementation.
-
-Future stages should be able to use moving or disappearing platforms without duplicating the entire Asperitas implementation.
-
-However, do not overengineer unrelated features.
-
-Keep the architecture practical and compatible with Alva.
+1. Do not change or reformat the protected character_rule file.
+2. Keep character-specific values and move classifications in the appropriate character data.
+3. Do not introduce fighter-ID checks in the shared engine.
+4. Preserve all original fighter sprites and artwork.
+5. Do not introduce a framework or unnecessary dependencies.
+6. Maintain the existing 60 Hz combat simulation.
+7. Preserve the distinction between visual animation timing and cooldown rules.
+8. Keep controller, keyboard, and touch support working.
+9. Maintain accessibility, localization, and responsive behavior.
+10. Update relevant documentation to reflect the new meaning of the player-facing Special label.
 
 ⸻
 
-PART XVII — ACCEPTANCE CRITERIA
+Final Acceptance Criteria
 
-The update is complete only when every requirement below is satisfied.
+The update is complete only when all of the following are true:
 
-Stage roster
+Special classification
 
-* [ ]	The old two-card layout is replaced.
-* [ ]	The roster supports exactly 24 stage positions.
-* [ ]	Desert occupies slot 1.
-* [ ]	City occupies slot 2.
-* [ ]	Asperitas occupies slot 3.
-* [ ]	The remaining 21 positions are unavailable placeholders.
-* [ ]	The roster is responsive.
-* [ ]	A prominent stage preview remains.
-* [ ]	A separate Random Stage button is present.
-* [ ]	Random Stage selects only real playable stages.
-* [ ]	Random Stage updates the highlighted stage and preview.
-* [ ]	Random Stage does not immediately start a battle.
-* [ ]	Keyboard, mouse, touch, and controller navigation work.
+* #0001 has 2 Specials: Unlimited Void and Hollow Purple.
+* #0002 has 0 Specials.
+* #0003 has 1 Special: Mystical Palm Technique.
+* Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact are no longer labeled Special anywhere in the player-facing UI.
 
-Asperitas environment
+Animations
 
-* [ ]	Asperitas is a fully playable stage.
-* [ ]	The environment is sky-themed.
-* [ ]	The background includes layered atmospheric clouds.
-* [ ]	The main platform is a giant floating cloud.
-* [ ]	The main platform has no visible or extensive invisible foundation.
-* [ ]	The main platform stays stationary.
-* [ ]	There are exactly two smaller cloud platforms above it.
-* [ ]	Both smaller clouds are classified as hazards.
-* [ ]	The main cloud is not classified as a hazard.
+* Special abilities retain their deliberate, longer animations.
+* An orange exclamation mark appears above the performing character throughout a Special animation.
+* The mark disappears immediately when the animation finishes or is interrupted.
+* Cherry Blossom Impact is noticeably faster.
+* Red, Maximum Blue, and Whirlwind retain their existing animation speeds.
+* The original combat mechanics and cooldown policy remain intact.
 
-Cloud hazard behavior
+Home Screen
 
-* [ ]	Cloud A has an independent state machine.
-* [ ]	Cloud B has an independent state machine.
-* [ ]	Both hazards can move horizontally.
-* [ ]	Both hazards can move vertically.
-* [ ]	Both hazards can become idle.
-* [ ]	Both hazards can disappear.
-* [ ]	Both hazards become non-collidable while hidden.
-* [ ]	Both hazards can reappear.
-* [ ]	Every hazard selects a newly randomized valid reappearance position.
-* [ ]	Random reappearance supports both X and Y variation.
-* [ ]	Relocation occurs entirely while hidden.
-* [ ]	Reappearance is smoothly animated.
-* [ ]	Reappearance cannot intersect a fighter.
-* [ ]	The hazards transition continuously between randomized states.
-* [ ]	The hazards are not synchronized.
-* [ ]	The hazards do not cause direct contact damage.
-
-Physics and separation
-
-* [ ]	The three playable platforms never collide.
-* [ ]	The two hazard clouds never overlap.
-* [ ]	Neither hazard intersects the main cloud.
-* [ ]	Random relocation never creates an overlap.
-* [ ]	Fighters are carried by moving clouds.
-* [ ]	Fighters can jump and land normally.
-* [ ]	Disappearing clouds release grounded fighters correctly.
-* [ ]	No invisible collision remains after disappearance.
-* [ ]	Reappearing clouds restore collision safely.
-* [ ]	CPU navigation works with dynamic platforms.
-* [ ]	Void and overtime systems remain functional.
+* The Download button is functional.
+* Clicking it opens a polished installation explanation.
+* The player can initiate native web-app installation when supported.
+* Browsers without direct installation support display useful instructions.
+* Already-installed users are handled correctly.
+* The Download icon has a subtle, attractive repeating animation.
+* The feature works with English, French, keyboard, gamepad, and touch input.
 
 Quality
 
-* [ ]	The stage is visually polished.
-* [ ]	The clouds look organic rather than rectangular.
-* [ ]	Visual movement and physics remain synchronized.
-* [ ]	The interface matches Alva’s design system.
-* [ ]	English and French localization is complete.
-* [ ]	Existing stages remain unchanged and playable.
-* [ ]	Automated tests pass.
-* [ ]	Real browser verification is performed.
-* [ ]	Documentation is updated.
+* The full automated test suite passes.
+* No original gameplay mechanics are broken.
+* No new dependencies or unnecessary rewrites are introduced.
+* The implementation remains compatible with Alva’s existing architecture and deployment.
 
-⸻
+Final Deliverable
 
-FINAL IMPLEMENTATION INSTRUCTIONS
-
-Implement this complete update in the Alva repository.
-
-Do not deliver only a plan, a design mockup, or a partial implementation.
-
-Create the redesigned roster, Random Stage functionality, Asperitas environment, independent cloud-hazard controllers, actual dynamic collision behavior, safe random relocation, and corresponding tests.
-
-Highest-priority rules
-
-Rule 1 — Independent randomness
-
-Cloud A and Cloud B must each control their own states, movement, timers, and disappearance cycles.
-
-Rule 2 — Random reappearance
-
-After disappearing, a cloud must reappear at a newly randomized valid position. It must not be restricted to returning to the position where it disappeared.
-
-Rule 3 — Hazard identity
-
-Both smaller clouds are officially classified as stage hazards because of their unpredictable movement and disappearance. They remain usable platforms and do not inflict contact damage.
-
-Rule 4 — Absolute separation
-
-The three playable cloud platforms must never collide or physically overlap under any circumstances.
-
-Rule 5 — Genuine gameplay physics
-
-All movement, disappearance, and reappearance must affect real platform collision and fighter behavior, not only visual animation.
-
-Rule 6 — Preserve Alva
-
-Keep existing fighter mechanics, game modes, stage behavior, controllers, localization, and design conventions intact.
-
-Expected final delivery
+Implement the complete update in the repository, not just a conceptual proposal.
 
 After implementation, provide:
 
-1. A summary of the changes made.
-2. A list of important modified and added files.
-3. An explanation of how independent hazard state machines work.
-4. An explanation of how new random reappearance locations are selected and validated.
-5. An explanation of how cloud-platform collisions are prevented.
-6. Test results and browser verification findings.
-7. Any remaining limitations.
+1. A summary of what changed.
+2. The important files modified or added.
+3. The exact Special classification used for each character.
+4. The final Cherry Blossom Impact animation timing.
+5. A description of the orange indicator’s lifecycle.
+6. An explanation of how web-app installation works on supported and unsupported browsers.
+7. Test results, including any limitations.
+8. Confirmation that existing combat mechanics, cooldowns, and controller bindings remain unchanged.
 
-The final result must feel like a complete, native Alva expansion: a scalable 24-stage roster and a distinctive third stage where two independently randomized cloud hazards create constantly changing aerial fighting opportunities.
+Prioritize correctness, compatibility, polish, and maintainability. Both the Special ability update and the Home Screen installation feature must be fully addressed.
