@@ -43,6 +43,7 @@
 
 import { NUMBERED_ATTACKS } from '../config.js';
 import { actionType } from './loadout.js';
+import { isSpecialAbility } from './special-abilities.js';
 import { PAD_BUTTONS, DPAD_BUTTONS } from '../core/gamepad-devices.js';
 
 export { PAD_BUTTONS };
@@ -135,7 +136,13 @@ export function moveFor(def, control, place) {
 //
 // `kind` 'attack' for a move (an attack, summon or technique), `place`
 // 'ground', 'air' or 'both'; `move` the move codename it performs (for its
-// name), `special` its summon / technique type.
+// name), `special` its execution type when that is a summon or a technique
+// (null for an ordinary attack). A move's category is where it is played
+// ('ground' or 'air'), or 'abilities' (Special abilities) only for a move the
+// fighter itself classifies as Special (isSpecialAbility,
+// js/data/special-abilities.js): never because it throws a projectile or is
+// a technique or a summon. The category moves a row in the editor and
+// nothing else: the action's id, and so its binding, stays the same.
 export function controllerActions(def = null) {
   const out = [];
   for (const a of UNIVERSAL) {
@@ -157,9 +164,8 @@ export function controllerActions(def = null) {
         if (place === 'air' && attack.groundOnly) continue;
       }
       const special = type === 'summon' || type === 'technique' ? type : null;
-      const throws = !special && !!def.attacks?.[move]?.projectile;
       moves[place].push({
-        id: `${place}:${control}`, kind: 'attack', category: special || throws ? 'abilities' : place, place,
+        id: `${place}:${control}`, kind: 'attack', category: isSpecialAbility(def, move) ? 'abilities' : place, place,
         activations: ['press', 'hold'], directional: true, directionOnly: false, control, move, special,
       });
     }

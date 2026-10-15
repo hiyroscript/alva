@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Alva",
+  "short_name": "Alva",
+  "description": "A browser-based platform fighting game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "categories": ["games"],
+  "icons": [
+    { "src": "./assets/icons/alva-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icons/alva-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icons/alva-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "./assets/icons/alva-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -75,7 +75,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0001': Object.freeze({
     difficulty: 5,
     descriptionKey: 'discover.fighter.0001.playStyle',
-    reviewedSourceHash: '75a833ff40a5601551835cdce2656862c8f135214591ab0d758045959eb2868d',
+    reviewedSourceHash: '89e81f2ea1ec2293b93484f39184f030889f9e1536f6eb5939d3c27209629286',
   }),
   // A momentum rushdown and aerial chaser: a readable core game plan, with
   // mastery in momentum, air uses and free fall, approach angles, trap
@@ -83,7 +83,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0002': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0002.playStyle',
-    reviewedSourceHash: '3a00000c19309045732a39a5ed5b91b3df793ddbf5be41a6337796ac2eb4b3a0',
+    reviewedSourceHash: '3202457e439f57969cb6e7c310d2e04093ef080d8de74dd0e6fe1664f21319c0',
   }),
   // A ground-shattering bruiser and self-healer: a readable core of heavy,
   // telegraphed blows, with mastery in reading who is standing on the
@@ -92,7 +92,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0003': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0003.playStyle',
-    reviewedSourceHash: 'f21bba434abb4a7589f46c273a59c52521c01751a464f4091de5e505425e4186',
+    reviewedSourceHash: '983d12cd2c6b9b1db7bc0d4bd96ae51fffaeb9ac113def4195adb3f84bd8abf4',
   }),
 });
 

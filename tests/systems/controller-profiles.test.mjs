@@ -51,18 +51,21 @@ test('the universal defaults are the comfortable ones and the same for every fig
   }
 });
 
-test('#0001\'s actions are read from its definition: its moves where they really are, specials apart, no slot it lacks', () => {
+test('#0001\'s actions are read from its definition: its moves where they really are, its two Specials apart, no slot it lacks', () => {
   const def = getCharacter('0001');
   assert.deepEqual(ids(def), [
     'move', 'jump', 'dash', 'fastFall', 'shield', 'deflect',
-    'ground:attack1', 'ground:extra_attack',
+    'ground:attack1', 'ground:attack2', 'ground:attack3', 'ground:extra_attack',
     'air:attack1', 'air:attack2', 'air:attack3', 'air:extra_attack',
-    'ground:attack2', 'ground:attack3', 'ground:attack4', 'ground:attack5',
+    'ground:attack4', 'ground:attack5',
     'pause',
   ]);
   const byId = actionMap(controllerActions(def));
-  assert.equal(byId.get('ground:attack2').category, 'abilities', 'Red throws a projectile');
-  assert.equal(byId.get('ground:attack4').special, 'technique');
+  assert.equal(byId.get('ground:attack2').category, 'ground', 'Red throws a projectile, and is an ordinary ground attack for all that');
+  assert.equal(byId.get('ground:attack3').category, 'ground', 'Maximum Blue too');
+  assert.equal(byId.get('ground:attack4').category, 'abilities', 'Unlimited Void: Special');
+  assert.equal(byId.get('ground:attack5').category, 'abilities', 'Hollow Purple: Special');
+  assert.equal(byId.get('ground:attack4').special, 'technique', 'its execution type is unchanged');
   assert.equal(byId.get('air:attack2').move, 'midair_attack2');
   assert.equal(byId.get('air:extra_attack').move, 'extra_attack', 'the High Kick works in the air too');
   assert.ok(!byId.has('ground:transform') && !byId.has('air:attack4'), 'nothing reserved or ground-only in the air');
@@ -72,11 +75,13 @@ test('#0002\'s actions: three ordinary attacks both ways, a ground-only Whirlwin
   const def = getCharacter('0002');
   assert.deepEqual(ids(def), [
     'move', 'jump', 'dash', 'fastFall', 'shield', 'deflect',
-    'ground:attack1', 'ground:attack2', 'ground:attack3',
+    'ground:attack1', 'ground:attack2', 'ground:attack3', 'ground:extra_attack',
     'air:attack1', 'air:attack2', 'air:attack3',
-    'ground:extra_attack',
     'pause',
   ]);
+  const actions = controllerActions(def);
+  assert.equal(actionMap(actions).get('ground:extra_attack').category, 'ground', 'the Whirlwind\'s tornado is an ordinary ground attack');
+  assert.ok(!actions.some((a) => a.category === 'abilities'), 'no Special at all');
 });
 
 test('any loadout gets exactly the actions it has: summons and techniques on the ground only, no Shield or Deflect it lacks', () => {

@@ -9,7 +9,13 @@
 // Play, Watch Mode and Practice Ground each start a match, so they are
 // open only while a fighter is playable: with none, they are disabled and
 // described by a "No fighters available" note under the menu. Discover,
-// Settings, Why Alva? and the credits stay open whatever the roster holds.
+// Settings, Why Alva?, Download and the credits stay open whatever the
+// roster holds. Download (the footer's bottom-right button) opens the
+// install dialog over Home (js/ui/install-dialog.js): how to add Alva to
+// the home screen, with the browser's own installation where it offers one.
+// Its arrow drops into its tray every few seconds to draw the eye (CSS
+// only: still with reduced motion, paused while the dialog is open, and
+// gone once Alva is installed).
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -200,6 +206,16 @@ export class HomeScreen extends Screen {
       this.scrollCredits(delta);
     });
 
+    // Download: the install dialog over Home (js/ui/install-dialog.js),
+    // focus back here when it closes. Reached by Tab, keyboard and
+    // controller navigation like the other Home chrome.
+    this.downloadButton = el('button', {
+      class: 'home-download', type: 'button', 'data-nav': true, 'data-home-download': true, 'aria-haspopup': 'dialog',
+      ...tattr('aria-label', 'home.download'), ...tattr('title', 'install.title'), html: ICONS.download,
+    });
+    this.downloadButton.addEventListener('click', () => app.installDialog?.open({ opener: this.downloadButton }));
+    app.install?.onChange(() => this.syncInstallState());
+
     const whyAlva = el('button', {
       class: 'home-why-alva', type: 'button', 'data-nav': true,
       'aria-haspopup': 'dialog', ...tx('home.whyAlva'),
@@ -231,15 +247,20 @@ export class HomeScreen extends Screen {
           el('span', tx('home.by', { developer: CONFIG.developer })),
           whyAlva,
         ]),
-        el('button', {
-          class: 'home-download', type: 'button', disabled: true,
-          ...tattr('aria-label', 'home.download'), html: ICONS.download,
-        }),
+        this.downloadButton,
       ]),
     );
     this.el.setAttribute('aria-labelledby', 'home-title');
     this.syncMatchActions();
     this.syncControllerStatus();
+    this.syncInstallState();
+  }
+
+  // Once Alva is installed (or running as the installed app) the Download
+  // button stops calling for attention; it still opens the dialog, which
+  // then says so.
+  syncInstallState() {
+    this.downloadButton.classList.toggle('is-installed', this.app.install?.mode === 'installed');
   }
 
   // The controller indicator: one status at a time, its mark and colour,
@@ -286,6 +307,7 @@ export class HomeScreen extends Screen {
     this.lastInteraction = -Infinity;
     this.syncMatchActions();
     this.syncControllerStatus();
+    this.syncInstallState();
   }
 
   exit() {

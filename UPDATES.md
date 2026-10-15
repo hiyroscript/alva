@@ -1773,3 +1773,71 @@ custom properties at the top of `css/ability-hud.css`.
 `deflect`, `combo-assist`, `sample-fighter`, `cpu-intelligence`,
 `fighter-0003`, `moves-0001`, `practice-ground`, `down` and the fixtures
 updated for the policy.
+
+## Special abilities and installing Alva
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: a deliberate, player-facing Special classification in place of the
+automatic one, quicker ordinary-attack pacing for Cherry Blossom Impact, an
+orange exclamation mark over a fighter performing a Special, and a working
+Home Download button that installs Alva as a web app. `character_rule` was
+not touched.
+
+**What it added**
+
+- **The Special classification** (`js/data/special-abilities.js`): each
+  fighter names its own Specials by move codename (`specialAbilities`):
+  #0001 `['attack4', 'attack5']` (Unlimited Void, Hollow Purple), #0002
+  `[]`, #0003 `['attack4']` (the Mystical Palm Technique): three in all.
+  `isSpecialAbility` replaces the controller editor's old automatic rule
+  (`controllerActions` put every technique, summon and projectile-throwing
+  attack under Special abilities), so Red, Maximum Blue, the Whirlwind and
+  Cherry Blossom Impact moved to Ground attacks, their action ids and every
+  binding unchanged; an empty category is not shown (#0002 has none).
+  The registry refuses a list naming anything the fighter cannot perform
+  where it lists it (`assertSpecialAbilities`). `specialAction` and
+  `specialAttacks` keep meaning a summon or technique; cooldowns stay the
+  policy's (the Whirlwind keeps its 5 s).
+- **Cherry Blossom Impact's timing** (#0003): `attack3_cast` 10 → 20 fps,
+  `attack3_release` 15 → 20 fps: 0.4 s + 1/3 s (about 0.73 s) → 0.2 s +
+  0.25 s (0.45 s), every frame kept, three 60 Hz steps a frame, the burst
+  still on the release's first frame. Its damage, launch, quake, hitbox
+  and 0.5 s repeat delay are unchanged. The Specials' own timings, and Red,
+  Maximum Blue and the Whirlwind, are untouched.
+- **The Special ability mark** (`specialMarkRect`, `specialMarkBob`,
+  `drawSpecialMark` in `js/game/rendering/fighter-status.js`;
+  `activeMove` / `activeSpecialAbility` in `js/game/combat/move-status.js`;
+  `Arena.specialMarkRect`): an orange (`#ff9f1c`), dark-outlined
+  exclamation mark over a fighter from the step its Special is accepted to
+  the step it ends (finished, hit, ground lost, reset), above its Energy
+  bar or name tag, bobbing 2 CSS px (still with reduced motion). For
+  players and CPUs alike, both at once if need be.
+- **Installing Alva** (`js/core/web-app-install.js`,
+  `js/ui/install-dialog.js`, `manifest.webmanifest`, `assets/icons/`):
+  Home's Download button is enabled and opens the install dialog: the
+  explanation, the browser's own installation where it offers one
+  (`beforeinstallprompt` kept for the press; success only on
+  `appinstalled`), the manual steps per platform where it does not (Safari
+  on iPhone and iPad, Android browsers, Edge, Chrome, Safari on a Mac,
+  Firefox), and "Alva is already installed!" inside the installed app.
+  A relative manifest (standalone, `./`, `#050506`) and icons from
+  `alvafav.PNG` (192 / 512, any and maskable; a 180 Apple touch icon);
+  no service worker. English and French.
+- **The Download icon's animation** (`css/home.css`, `ICONS.download`'s
+  arrow now its own group): every 3.2 s the arrow lifts and drops into
+  the tray with a faint accent-green glow, then rests; paused under the
+  dialog, stopped once installed, still with reduced motion.
+
+**Where to tune it:** each fighter's `specialAbilities`; Cherry Blossom
+Impact's `FPS_0003.attack3_cast` / `attack3_release`; the mark's colour
+(`SPECIAL_MARK_STYLE`), size and bob in `fighter-status.js`; the install
+copy in `js/localization/strings/en.js` and `fr.js` (`install.*`); the
+Download animation's keyframes and timing in `css/home.css`.
+
+**Tests:** new `tests/systems/special-abilities.test.mjs` and
+`tests/interface/install.test.mjs`; `fighter-status` (the mark on the
+canvas), `controller-profiles`, `controller-ui`, `loadout`,
+`fighter-0003`, `settings`, the Home tests in `empty-roster`,
+`practice-ground` and `watch-mode` updated, and the three Discover
+profiles' review hashes recorded again (their ratings and descriptions
+still hold).

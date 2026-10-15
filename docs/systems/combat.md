@@ -17,6 +17,7 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | Module | Owns |
 | --- | --- |
 | [`js/data/loadout.js`](../../js/data/loadout.js) | The loadout rules and the readers of a fighter's `actions` (`loadoutProblems`, `assertLoadout`, `actionType`, `specialAction`, `specialAttacks`, `describeLoadout`). |
+| [`js/data/special-abilities.js`](../../js/data/special-abilities.js) | The player-facing Special classification, each fighter's own (`specialAbilities` in its definition): `isSpecialAbility`, `specialAbilities`, `performableMoves`, `specialAbilityProblems`, `assertSpecialAbilities`. |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU), and what kind of strike an attack is (`isMeleeAttack`, `isRangedAttack`: one reading for Combat Assist and the CPU's moveset). |
 | [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's rules of measure: `assistsAttack` (melee, never homing), `meleeGap` (an attack's box against a target's hurtboxes), `inReach` (its own reach already covers the target), `reachVector` and `approachMove` (the move still to make, or `REACHED`), `approachClear`, `assistRange` and `assistSpeed` (one Dash's travel, or one air dash's), `ASSIST_MARGIN`. |
 | [`js/game/combat/combo-assist.js`](../../js/game/combat/combo-assist.js) | Combo Assist's rule: `COMBO_PAIRS` (attack1 and attack2) and `comboAction` (the move a fresh press asks for, from the source attack's own repeat cooldown). |
@@ -29,7 +30,7 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/data/cooldowns.js`](../../js/data/cooldowns.js) | The cooldown policy: `REPEAT_COOLDOWN`, `EXCEPTIONAL_COOLDOWN`, `TEN_DAMAGE_COOLDOWN`, `EXCEPTIONAL_EFFECTS` / `ROUTINE_EFFECTS`, `moveImpact`, `cooldownClass`, `policyCooldown`, `resolveCooldown`. |
-| [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A read-only view of a fighter's moves for presentation: `abilityGroups`, `moveCooldown`, `moveRestriction`, `abilityStatus`. |
+| [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A read-only view of a fighter's moves for presentation: `abilityGroups`, `moveCooldown`, `moveRestriction`, `abilityStatus`, `activeMove` and `activeSpecialAbility` (the move being performed now, and whether it is one of its fighter's Specials). |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `attackStartable`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the player's requests (`playerControlled`, `comboAction`, `pressRequest`, `repeatsMove`, `playerMayCut`), the combat input buffer, hit-cancels, attack motion, summon startups, Combat Assist's approach (`combatAssistFor`, `tryCombatAssist`, `assistIntents`, `stepCombatAssist`, `finishCombatAssist`, `cancelCombatAssist`). |
 
@@ -270,6 +271,44 @@ one: `unblockable` and the other `SHIELD_BYPASS_FIELDS` (`ignoreShield`,
 `bypassShield`, `pierceShield`, `guardBreak`...) are refused on any
 attack, strike, projectile, finisher, technique, burst or summon, so no
 character definition can bring a Shield bypass back.
+
+### Special abilities
+
+A third thing again, apart from how a move is executed and whether it is
+an attack: whether the game **presents** it to the player as **Special**.
+A Special ability is an exceptionally distinctive move whose mechanic
+changes how a fight goes, and each fighter says which of its moves are,
+in its own definition, by move codename (`specialAbilities`, read through
+`isSpecialAbility` in
+[`js/data/special-abilities.js`](../../js/data/special-abilities.js)):
+
+| Fighter | `specialAbilities` | Special | Not Special (for all their projectiles, techniques or tornadoes) |
+| --- | --- | --- | --- |
+| #0001 | `['attack4', 'attack5']` | Unlimited Void (a paralysis round it), Hollow Purple (a sphere that erases projectiles and passes through fighters) | Red, Maximum Blue |
+| #0002 | `[]` | none | the Whirlwind |
+| #0003 | `['attack4']` | the Mystical Palm Technique (heals its own Launch Point) | Cherry Blossom Impact |
+
+Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
+technique or a summon is not Special because of what it is, and no name,
+button or fighter id decides it. The list may name only moves the fighter
+can really perform where it lists them (a button performs it there; never
+a ground-only move's air version, an art-only `pending` attack, a button
+it lacks), each once, or the registry refuses the definition
+(`assertSpecialAbilities`); `isSpecialAbility` also ignores anything it
+cannot perform. Leaving the field out means none.
+
+Only presentation reads it: the controller editor's **Special abilities**
+category ([input](input.md#game-controllers)) and the orange mark over a
+fighter performing one ([rendering](rendering.md#the-special-ability-mark)).
+The execution type keeps its own readers (`specialAction` and
+`specialAttacks` still mean "a summon or a technique" for combat, the CPU
+and the loadout rules), and the cooldown keeps the policy's
+([below](#cooldowns)): the Whirlwind keeps its 5 s, the Mystical Palm
+Technique its 3 s, Cherry Blossom Impact its 0.5 s repeat delay, whatever
+their labels. Specials keep their longer, deliberate animations (Unlimited
+Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical Palm
+Technique 1 s + 0.25 s); a move that is not one plays at ordinary-attack
+pace (Cherry Blossom Impact 0.2 s + 0.25 s).
 
 ## Hit resolution
 
@@ -680,6 +719,13 @@ starts the very attack asked for. The rules are
 - [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs):
   the shared rules over every fighter and every kind of hit: the damage
   tiers, the cooldowns, Energy, difficulty and movement.
+- [`tests/systems/special-abilities.test.mjs`](../../tests/systems/special-abilities.test.mjs):
+  the roster's Special classification (three in all), the editor
+  categories and bindings it leaves unchanged, the list's rules, a future
+  fighter opting in with data alone, unchanged execution types and
+  cooldowns, Cherry Blossom Impact's quicker frame-aligned timing, and the
+  mark's lifecycle for every Special and every other move, a CPU's
+  included.
 - [`tests/systems/cooldown-policy.test.mjs`](../../tests/systems/cooldown-policy.test.mjs):
   the cooldown policy: each class and its precedence, every way a move can
   deal 10 or carry an exceptional effect, the routine effects that earn

@@ -94,6 +94,42 @@
   .info-body { font-size: 13px; line-height: 1.45; }
 }
 
+/* The install dialog (Home's Download): a heading beside its close button,
+   the explanation (and, where the browser cannot install by itself, how to
+   do it by hand) in a body that scrolls on a short landscape phone, a
+   status line, then its buttons. The same dark glass as every dialog. */
+.install-panel {
+  width: min(520px, 100%);
+  max-height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+  gap: clamp(10px, 2.2vh, 16px);
+}
+.install-panel [hidden] { display: none; }
+.install-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.install-intro p + p { margin-top: 0.8em; }
+.install-lead { color: var(--text-strong); font-weight: 600; }
+.install-message { color: var(--text); }
+.install-steps { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.install-steps-title { margin-bottom: 6px; color: var(--text-strong); font-size: 1em; font-weight: 600; }
+.install-step-list { display: grid; gap: 4px; margin: 0; padding-left: 1.4em; list-style: decimal; }
+.install-step-list li::marker { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.install-status { color: var(--text); font-size: 13px; line-height: 1.45; }
+.install-actions { margin-top: 0; }
+@media (max-height: 420px) {
+  .install-body { font-size: 13px; line-height: 1.45; }
+  .install-steps { margin-top: 10px; padding-top: 8px; }
+}
+
 /* Match Home Play on the requested surfaces only. Keep shared radius
    tokens, intentional pills, and result-dialog styling unchanged. */
 .screen--mode .btn-back,

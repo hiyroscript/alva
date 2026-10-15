@@ -47,7 +47,11 @@ blocks every attack.
   side of it, and the Mystical Palm Technique, a long kneeling cast that
   heals its own Launch Point). All three Shield on the ground and
   Deflect in the air (a strike that knocks projectiles back at their
-  thrower), and all three Dash on the ground and air dash.
+  thrower), and all three Dash on the ground and air dash. Each fighter
+  marks its own **Special abilities**, its few truly game-changing moves
+  (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
+  Technique): an orange exclamation mark floats over a fighter while it
+  performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then
@@ -85,6 +89,10 @@ blocks every attack.
 - **Combat Assist** for the human player (on by default, in Settings): a
   melee attack pressed just out of reach closes the short gap first, and
   never costs Energy. Never for ranged attacks, never for a CPU.
+- **Add it to your home screen**: Home's Download button explains how to
+  install Alva as a lightweight web app (no large download), using the
+  browser's own installation where it offers one and step-by-step
+  instructions elsewhere (Safari on iPhone and iPad included).
 - **The whole interface in English and French**, Settings, and a
   **Discover** reference with three sections: Fighters, Movement, and Launch.
   Fighters each have one 1–5 difficulty rating and a concise play-style

@@ -13,6 +13,10 @@
   <meta name="format-detection" content="telephone=no">
   <title>ALVA</title>
   <link rel="icon" type="image/png" href="./alvafav.PNG">
+  <!-- Installable web app (js/core/web-app-install.js): every URL relative, so
+       it works under a GitHub Pages project sub-path too. -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
   <style>html { background: #000; }</style>
   <!-- Stylesheet parts, in cascade order: later parts may override earlier ones. -->
   <link rel="stylesheet" href="./css/base.css">
@@ -54,6 +58,7 @@
   <div id="confirm-dialog" class="overlay dialog-overlay" hidden></div>
   <div id="choice-dialog" class="overlay dialog-overlay choice-overlay" hidden></div>
   <div id="info-dialog" class="overlay dialog-overlay info-overlay" hidden></div>
+  <div id="install-dialog" class="overlay dialog-overlay install-overlay" hidden></div>
   <div id="settings-dialog" class="overlay settings-overlay" hidden></div>
   <div id="touch-editor" class="touch-editor" hidden></div>
   <div id="language-dialog" class="overlay language-overlay" hidden></div>

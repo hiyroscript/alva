@@ -14,7 +14,7 @@ import { Battle } from '../../js/game/battle.js';
 import { getMap } from '../../js/data/maps.js';
 import {
   cooldownIndicators, energyBarState, formatCooldown, drawCooldownIndicators, drawEnergyBar, statusOnScreen,
-  COOLDOWN_STYLE, ENERGY_STYLE,
+  drawSpecialMark, specialMarkBob, specialMarkRect, COOLDOWN_STYLE, ENERGY_STYLE, SPECIAL_MARK_STYLE,
 } from '../../js/game/rendering/fighter-status.js';
 import { getCharacter } from '../../js/data/characters.js';
 import { previewFrame } from '../../js/data/ability-preview.js';
@@ -377,6 +377,105 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
   assert.equal(statusOnScreen(-40, 400, view), false);
   assert.equal(statusOnScreen(1330, 400, view), false);
   assert.equal(statusOnScreen(640, -40, view), false);
+});
+
+// ---- The Special ability mark ---------------------------------------------------------------
+
+// A scripted controller: `press` the action on the next step only.
+function scripted() {
+  let next = {};
+  return {
+    getInput: () => {
+      const input = next;
+      next = {};
+      return input;
+    },
+    press(action) { next = { [action]: true, [`${action}Pressed`]: true }; },
+  };
+}
+// The mark's fills: the orange bar and dot, two per mark.
+const markFills = (calls) => calls.filter((c) => c.fn === 'fill' && c.fill === SPECIAL_MARK_STYLE.fill);
+
+test('the orange mark: over both fighters at once while each performs a Special, above its bar and tag, gone as each ends', () => {
+  const { battle, render } = renderedBattle();
+  const { p1, p2 } = battle;
+  const one = scripted();
+  const two = scripted();
+  p1.controller = one;
+  p2.controller = two;
+  battle.update(DT);
+  assert.deepEqual(markFills(render()), [], 'nothing while both stand');
+  // Player 1 casts Unlimited Void and the other Hollow Purple, a step apart.
+  one.press('attack4');
+  battle.update(DT);
+  assert.ok(p1.technique, 'Player 1 casting');
+  let calls = render();
+  assert.equal(markFills(calls).length, 2, 'one mark: its bar and its dot');
+  two.press('attack5');
+  battle.update(DT);
+  calls = render();
+  assert.equal(markFills(calls).length, 4, 'two marks at once');
+  // Where it sits: centred over the fighter, clear above its name tag (and
+  // its Energy bar once that shows), drawn after the Void.
+  for (const f of [p1, p2]) {
+    const mark = battle.specialMarkRect(f);
+    const [x] = battle.markerAnchor(f);
+    assert.ok(Math.abs(mark.x + mark.w / 2 - x) <= 1, 'centred');
+    assert.ok(mark.y + mark.h < battle.markerTop(f), 'above the name tag');
+    assert.equal(battle.statusTop(f), mark.y - 1, 'the top of the status column now');
+    assert.ok(mark.h >= 16 && mark.h <= 34, 'legible, never oversized');
+  }
+  const voidAt = calls.findIndex((c) => c.fn === 'void');
+  assert.ok(calls.findIndex((c) => c.fn === 'fill' && c.fill === SPECIAL_MARK_STYLE.fill) > voidAt, 'over the Void');
+  p1.combat.setEnergy(50);
+  const bar = battle.energyBarRect(p1);
+  assert.ok(battle.specialMarkRect(p1).y + battle.specialMarkRect(p1).h < bar.y, 'above the Energy bar too');
+  // Unlimited Void ends first: its mark goes, Hollow Purple's stays.
+  while (p1.technique) battle.update(DT);
+  assert.ok(p2.technique, 'Hollow Purple still cast');
+  calls = render();
+  assert.equal(markFills(calls).length, 2);
+  assert.equal(battle.specialMarkRect(p1), null);
+  assert.equal(battle.statusTop(p1), bar.y - 1, 'back to the bar');
+  while (p2.technique) battle.update(DT);
+  assert.deepEqual(markFills(render()), [], 'both over: no mark, though both still cool down');
+  assert.ok(p1.combat.abilityCooldowns.active('attack4') && p2.combat.abilityCooldowns.active('attack5'));
+  // An ordinary projectile, Red, draws none (once Player 1 is free again:
+  // Hollow Purple's sphere may have reached it).
+  for (let i = 0; i < 600 && !(p1.canAct() && p1.body.grounded); i++) battle.update(DT);
+  one.press('attack2');
+  battle.update(DT);
+  assert.equal(p1.combat.attack?.def.id, 'attack2');
+  assert.deepEqual(markFills(render()), []);
+  // Off screen: no mark, only the edge pointer.
+  for (let i = 0; i < 40; i++) battle.update(DT);
+  two.press('attack4');
+  battle.update(DT);
+  p2.renderX = battle.view.x + battle.view.w + 400;
+  assert.deepEqual(markFills(render()), []);
+});
+
+test('the mark is an orange exclamation mark with a dark outline, scaled with the world, bobbing gently unless motion is reduced', () => {
+  assert.equal(SPECIAL_MARK_STYLE.fill, '#ff9f1c', 'bright, saturated orange');
+  const rect = specialMarkRect(400, 200, 1.2, 1);
+  assert.equal(rect.y + rect.h <= 196, true, 'a gap above the column');
+  assert.ok(Math.abs(rect.x + rect.w / 2 - 400) <= 1);
+  assert.ok(rect.h > rect.w * 2, 'tall and narrow: an exclamation mark');
+  assert.equal(specialMarkRect(400, 200, 0.3, 1).h, 16, 'never below 16 CSS px');
+  assert.equal(specialMarkRect(400, 200, 0.3, 2).h, 32, 'in device pixels on a dense screen');
+  assert.equal(specialMarkRect(400, 200, 9, 1).h, 34, 'never above 34 CSS px');
+  const { ctx, calls } = recorder();
+  drawSpecialMark(ctx, rect, 1, 0, true);
+  const strokes = calls.filter((c) => c.fn === 'stroke');
+  const fills = calls.filter((c) => c.fn === 'fill');
+  assert.equal(strokes.length, 2, 'outlined: the bar and the dot');
+  assert.ok(strokes.every((c) => c.stroke === SPECIAL_MARK_STYLE.outline && c.lineWidth >= 3));
+  assert.ok(fills.every((c) => c.fill === SPECIAL_MARK_STYLE.fill) && fills.length === 2);
+  assert.equal(calls.filter((c) => c.fn === 'fillText').length, 0, 'drawn as shapes, never a font glyph');
+  for (const t of [0, 0.3, 0.55, 0.9, 2.4]) assert.equal(specialMarkBob(t, 1, true), 0, 'still with reduced motion');
+  const bobs = [0, 0.2, 0.4, 0.55, 0.7, 0.9].map((t) => specialMarkBob(t, 1, false));
+  assert.ok(Math.max(...bobs) > 0 && Math.max(...bobs) <= 2, 'a subtle float of at most 2 CSS px');
+  assert.equal(specialMarkBob(0, 1, false), 0);
 });
 
 test('the rings and bar are canvas-drawn, never DOM in a HUD card', () => {

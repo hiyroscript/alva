@@ -4,8 +4,9 @@
 // (js/game/practice.js) runs Player 1 with a training-dummy CPU and none of
 // them. Both share the Void's respawn wait (updateRespawns). DOM concerns
 // (HUD, menus, overlays) live in each mode's screen; the status drawn over
-// each fighter (Energy bar, name tag, the long move cooldowns)
-// and the Shield round it are drawn here.
+// each fighter (Energy bar, name tag, the long move cooldowns, the orange
+// mark over a fighter performing a Special ability) and the Shield round it
+// are drawn here.
 
 import { CONFIG } from '../config.js';
 import { StageCollision, resolveSolidOverlap } from './physics.js';
@@ -17,7 +18,10 @@ import { spawnClones, updateClones, removeDeadClones } from './combat/summon.js'
 import { applyPulls } from './combat/pull.js';
 import { Camera } from './rendering/camera.js';
 import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
-import { drawEnergyBar, drawCooldownIndicators, energyBarState, statusOnScreen } from './rendering/fighter-status.js';
+import {
+  drawEnergyBar, drawCooldownIndicators, drawSpecialMark, energyBarState, specialMarkRect, statusOnScreen,
+} from './rendering/fighter-status.js';
+import { activeSpecialAbility } from './combat/move-status.js';
 import { drawShield } from './rendering/shield-fx.js';
 import { HIT_FX, HitEffects, whiteFrame } from './rendering/hit-fx.js';
 import { createTheme } from '../stages/index.js';
@@ -402,8 +406,9 @@ export class Arena {
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the
     // off-screen pointers), then each on-screen fighter's Energy bar over
-    // its tag while below full and its long cooldown icons under its feet
-    // while cooling down. A fighter out of play shows none of it.
+    // its tag while below full, its long cooldown icons under its feet
+    // while cooling down and, while it performs a Special ability, the
+    // orange mark over all of it. A fighter out of play shows none of it.
     this.drawMarkers(fighters);
     this.drawStatus(fighters);
     if (this.debug) this.drawDebug();
@@ -543,19 +548,41 @@ export class Arena {
     return { x: Math.round(x - w / 2), y: Math.round(this.markerTop(f) - gap - h), w, h };
   }
 
-  // The highest point of what is drawn over `f`: the top of its Energy
-  // bar's outline while the bar shows, else the top of its name tag, so no
-  // room is kept for a hidden bar. Practice Ground floats its damage numbers
-  // from here.
-  statusTop(f) {
+  // The top of `f`'s tag-and-bar column: the top of its Energy bar's
+  // outline while the bar shows, else the top of its name tag, so no room
+  // is kept for a hidden bar.
+  barTop(f) {
     return energyBarState(f).visible ? this.energyBarRect(f).y - 1 : this.markerTop(f);
   }
 
-  // Energy bars and the long move cooldowns, for the fighters
-  // whose body is on screen (the cooldowns of the fighter the ability HUD
-  // shows are there instead: see hudCooldownsFor): an off-screen fighter
-  // only gets its edge pointer. Each draws only while it has something to show (see
-  // js/game/rendering/fighter-status.js).
+  // Where `f`'s Special ability mark goes (see specialMarkRect in
+  // js/game/rendering/fighter-status.js), in device pixels, while it
+  // performs one of its Special abilities (activeSpecialAbility, read live
+  // every frame: from the step its technique, summon's startup or attack
+  // is accepted to the step it ends, however it ends); null otherwise.
+  // Above its Energy bar or name tag, never over them. Its resting place:
+  // the gentle bob is drawn, not laid out.
+  specialMarkRect(f) {
+    if (!activeSpecialAbility(f)) return null;
+    const [x] = this.markerAnchor(f);
+    return specialMarkRect(x, this.barTop(f), this.view.scale, this.view.dpr);
+  }
+
+  // The highest point of what is drawn over `f`: the top of its Special
+  // ability mark while it shows, else of its Energy bar or name tag (see
+  // barTop). Practice Ground floats its damage numbers from here.
+  statusTop(f) {
+    const mark = this.specialMarkRect(f);
+    return mark ? mark.y - 1 : this.barTop(f);
+  }
+
+  // Energy bars, the long move cooldowns and the Special ability mark, for
+  // the fighters whose body is on screen (the cooldowns of the fighter the
+  // ability HUD shows are there instead: see hudCooldownsFor): an
+  // off-screen fighter only gets its edge pointer. Each draws only while it
+  // has something to show (see js/game/rendering/fighter-status.js); the
+  // mark, for whichever fighters are performing a Special at once, Player 1
+  // or a CPU alike.
   drawStatus(fighters = this.inPlay) {
     const { ctx, view } = this;
     for (const f of fighters) {
@@ -563,6 +590,8 @@ export class Arena {
       if (!statusOnScreen(x, footY, view)) continue;
       drawEnergyBar(ctx, f, this.energyBarRect(f), view.dpr);
       if (f !== this.hudCooldownsFor) drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
+      const mark = this.specialMarkRect(f);
+      if (mark) drawSpecialMark(ctx, mark, view.dpr, this.fxTime, this.reducedMotion);
     }
   }
 

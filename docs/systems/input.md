@@ -321,7 +321,9 @@ conflicting never loads (`assertControllerLayout`).
 controller controls opens the fighter roster (all 48 slots; a locked slot
 never opens), then the chosen fighter's editor: its portrait, name and the
 family the buttons are named for, and every action it has (Movement,
-Defense, Ground attacks, Aerial attacks, Special abilities, Other), each
+Defense, Ground attacks, Aerial attacks, Special abilities, Other; a
+category it has nothing in is left out, so #0002 has no Special
+abilities), each
 with its real name, a line on what it does, its input and activation, and a
 diagram lighting the input of the action in focus. Every move row shows
 the move's own artwork beside its name, the frame its touch button shows
@@ -330,7 +332,15 @@ the ground preview on its ground row, the air one on its aerial row, a
 projectile's, technique's or summon's where authored; mirrored where its
 clip faces left), decorative only, with the touch button's glyph where it
 has none or its file fails to load (`EditorLayer.rowArt`); Movement,
-Defense and Pause rows have none. Choosing an action opens
+Defense and Pause rows have none. **Special abilities** holds only the
+moves the fighter itself classifies as Special (its `specialAbilities`,
+[combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
+Purple and #0003's Mystical Palm Technique, each tagged Ground or Air.
+Every other move, a projectile, a technique or the Whirlwind's tornado
+included, sits under Ground attacks or Aerial attacks where it is played
+(Red, Maximum Blue, the Whirlwind and Cherry Blossom Impact under Ground
+attacks). A row's category never changes its action id, so no binding
+moves with it. Choosing an action opens
 the binding dialog, which listens to Player 1's controller (a button, a
 modifier held first, the stick pointing first; for Fast fall a direction
 alone; for Movement the stick or pad moved) and can also be set in text with

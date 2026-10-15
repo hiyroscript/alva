@@ -278,14 +278,57 @@
 }
 .home-why-alva:hover { color: var(--text); }
 .home-why-alva:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-/* The placeholder fits inside the existing footer, even on short phones. */
+/* Download opens the install dialog (js/ui/install-dialog.js). It keeps its
+   compact square inside the footer, even on short phones. Every 3.2 s its
+   arrow lifts, drops into the tray and settles while a faint glow in the
+   interface's green accent swells and fades round the button, then it
+   rests: noticeable, never a flash. Only transforms and opacity move (no
+   layout shift, nothing in the way of a press); the glow is its own layer,
+   so hover and focus keep their look. The motion pauses while the dialog
+   is open (Home is inert), stops once Alva is installed, and is gone with
+   reduced motion. */
 .home-download {
+  position: relative;
   flex: none;
   width: clamp(28px, 5vh, 40px);
   height: clamp(28px, 5vh, 40px);
   background: var(--surface);
+  cursor: pointer;
 }
 .home-download .icon { font-size: clamp(16px, 2.8vh, 20px); }
+.home-download::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid rgba(47, 191, 99, 0.6);
+  box-shadow: 0 0 10px 1px rgba(47, 191, 99, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  animation: home-download-glow 3.2s ease-in-out infinite;
+}
+.home-download .icon-download-arrow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: home-download-arrow 3.2s var(--ease) infinite;
+}
+.home-download:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
+.home-download:focus { box-shadow: var(--focus-ring); color: var(--text); }
+.home-download:active { transform: translateY(1px); background: var(--surface-muted); }
+.screen--home[inert] .home-download::after,
+.screen--home[inert] .home-download .icon-download-arrow { animation-play-state: paused; }
+.home-download.is-installed::after,
+.home-download.is-installed .icon-download-arrow { animation: none; }
+@keyframes home-download-arrow {
+  0%, 46%, 100% { transform: translateY(0); }
+  8% { transform: translateY(-2.5px); }
+  22% { transform: translateY(2.5px); }
+  32% { transform: translateY(0); }
+}
+@keyframes home-download-glow {
+  0%, 12%, 52%, 100% { opacity: 0; }
+  24% { opacity: 1; }
+}
 
 @media (max-width: 900px) {
   .screen--home { --gutter: clamp(20px, 5vw, 44px); --glass-l: 0.75; --glass-w: 0.48; --credits-pad: 16px; }
@@ -342,9 +385,11 @@
   .home-actions { margin-top: 8px; gap: 4px; }
   .home-action { height: clamp(30px, 10vh, 36px); }
 }
-/* Still credits: one readable copy, clear of the fades, scrollable by hand. */
+/* Still credits: one readable copy, clear of the fades, scrollable by hand.
+   A still Download icon. */
 @media (prefers-reduced-motion: reduce) {
   .screen--home.is-entering .home-intro > * { animation: none; }
+  .home-download::after, .home-download .icon-download-arrow { animation: none; }
   .home-credits-track { will-change: auto; }
   .home-credits-seq { padding-bottom: 24vh; }
   .home-credits-seq[aria-hidden] { display: none; }
