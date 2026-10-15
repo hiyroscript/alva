@@ -16,7 +16,7 @@ import {
   DIRECTIONAL_LAUNCHES,
 } from '../../data/launch.js';
 import { DIFFICULTIES } from '../../data/difficulty.js';
-import { MAPS } from '../../data/maps.js';
+import { MAPS, traitId } from '../../data/maps.js';
 import { abilityName } from '../../data/abilities.js';
 import { CHARACTERS } from '../../data/characters.js';
 
@@ -59,6 +59,10 @@ function registryStrings() {
   for (const map of MAPS) {
     out[`map.${map.id}.name`] = map.name;
     out[`map.${map.id}.tagline`] = map.tagline;
+    for (const [label, value] of map.traits ?? []) {
+      out[`map.trait.${traitId(label)}`] = label;
+      out[`map.${map.id}.trait.${traitId(label)}`] = value;
+    }
   }
   return out;
 }
@@ -215,6 +219,13 @@ export const EN = {
   'map.stages': 'Stages',
   'map.available.one': '{n} available',
   'map.available.other': '{n} available',
+  'map.slotTotal.one': '{n} slot',
+  'map.slotTotal.other': '{n} slots',
+  'map.counter': '{available} / {slots}',
+  'map.roster': 'Stage roster',
+  'map.details': 'Highlighted stage',
+  'map.locked': 'Slot {num}, unavailable',
+  'map.random': 'Random Stage',
   'map.card': '{name}. {tagline}',
   'map.preview': '{name} stage preview',
   'map.start': 'Confirm and start battle',

@@ -84,7 +84,8 @@ Content is data, behaviour is shared code:
 | Loadout rules: `js/data/loadout.js` | the registry (validation), the Fighter, the AI, the touch controls |
 | Universal movement, Launch: `js/data/movement.js`, `js/data/launch.js` | the Fighter, combat, Discover, localization |
 | CPU levels: `js/data/difficulty.js` | the Battle and the combat AI |
-| Stages: `js/data/maps.js`, `js/data/practice-map.js` | physics (collision), the stage themes, Select Stage |
+| Stages: `js/data/maps.js`, `js/data/practice-map.js` | physics (collision), the stage themes, Select Stage (its 24-slot roster) |
+| Platform hazards' tuning: `js/data/platform-hazards.js` | each dynamic platform's state machine (`js/game/platform-hazards.js`) |
 | Codenames, bindings, timing: `js/config.js` | input, combat, the HUD, everything |
 
 How the fighter data and the shared systems divide the work is in

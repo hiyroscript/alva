@@ -154,6 +154,8 @@ export class TrainingAIController {
     let best = null;
     let bestD = Infinity;
     for (const p of [...stage.platforms, ...stage.solids]) {
+      // Never a platform that is not there now (a hazard that vanished).
+      if (p.active === false) continue;
       if (p.y >= y - 40 || p.y < y - 155 || p.y <= foe.lastGroundY + 20) continue;
       const cx = p.x + p.w / 2;
       if (Math.abs(cx - foe.body.x) > 460) continue;

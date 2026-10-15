@@ -24,12 +24,20 @@ export function pickRandom(list, random = Math.random) {
   return list[Math.min(Math.max(i, 0), list.length - 1)];
 }
 
+// A stage at random, every playable one equally likely: one of MAPS (never
+// Practice Ground, which is not one of them, and never a roster
+// placeholder, which is no stage at all). Regular Play's draw and Select
+// Stage's Random Stage both take theirs from here.
+export function randomStage(random = Math.random, maps = MAPS) {
+  return pickRandom(maps, random);
+}
+
 // Regular Play's draw into `selection`: a CPU fighter from the fighters
 // playable now (null while there is none, never a locked one) and a stage
-// from MAPS (never Practice Ground, which is not one of them).
+// (randomStage).
 export function drawRegularPlay(selection, random = Math.random) {
   selection.cpuCharacterId = pickRandom(playableCharacters(), random)?.id ?? null;
-  selection.mapId = pickRandom(MAPS, random).id;
+  selection.mapId = randomStage(random).id;
 }
 
 // What starting a Quick Battle hands the Battle screen.

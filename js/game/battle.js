@@ -60,12 +60,15 @@ export class Battle extends Arena {
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
     combatAssist = true, comboAssist = true,
   }) {
-    super({ canvas, map, input, reducedMotion });
+    // One seed for the battle's randomness: each CPU's and each stage
+    // hazard's its own stream of it.
+    const battleSeed = seed ?? (Date.now() & 0xffff);
+    super({ canvas, map, input, reducedMotion, seed: battleSeed });
     this.onPhase = onPhase || (() => {});
     // Kept for the whole battle: restarts, rematches and respawns keep them.
     this.mode = Object.keys(BATTLE_MODES).includes(mode) ? mode : 'quick-battle';
     this.difficulty = resolveDifficulty(difficulty);
-    this.seed = seed ?? (Date.now() & 0xffff);
+    this.seed = battleSeed;
 
     const sides = BATTLE_MODES[this.mode];
     const controllerFor = (side) => (side.cpu
@@ -101,6 +104,8 @@ export class Battle extends Arena {
     // full Energy and no cooldowns.
     // Both back to 0 points. Every CPU's controller starts over too (nothing
     // held or planned), at the same difficulty, and Player 1 stays Player 1.
+    // Every stage hazard is back where the map puts it first, starting over.
+    this.hazards.reset();
     for (const f of this.fighters) {
       f.reset(this.stage);
       f.controller?.reset?.();

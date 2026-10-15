@@ -88,6 +88,15 @@ export const CONFIG = Object.freeze({
     totalSlots: 48,
   },
 
+  // Select Stage's roster: this many stage slots, laid out for all of them
+  // from the start (six by four on a large display). The playable stages
+  // (js/data/maps.js MAPS, in order) fill the first slots and every other
+  // is an unavailable placeholder, so a new stage simply takes the next
+  // one; the roster grows past this only once the stages outnumber it.
+  stageRoster: {
+    totalSlots: 24,
+  },
+
   // Player 1 keyboard bindings (KeyboardEvent.code), the single source of
   // truth for gameplay keys, keyed by control codename. S / ↓ are the plain
   // `down` direction in battle (the fast fall, and steering a launch

@@ -22,7 +22,7 @@ explains how the code carries them out.
 | [`js/data/movement.js`](../../js/data/movement.js) | The numbers: `BASE_FIGHTER_MOVEMENT`, one frozen object every Fighter reads (`MOVEMENT_FIELDS` lists them). `movementProblems` / `assertUniversalMovement`, which the registry uses to refuse a definition that declares movement of its own. And the Discover copy (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`). |
 | [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
-| [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms. It never knows why a body moves. |
+| [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms, moving ones included (`carryBody` carries a fighter standing on one by exactly its movement before its own step; `releaseGround` lets go of one that has vanished; see [stages](../gameplay/stages.md#platform-hazards)). It never knows why a body moves. |
 
 No fighter definition has a `movement` profile or `powers` any more: the
 registry ([`js/data/characters.js`](../../js/data/characters.js)) refuses
@@ -237,6 +237,13 @@ in its impact clip ([combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)).
 pose only (a fighter without one, like #0002, simply goes to its stance):
 running, or anything of higher priority, goes straight past it, so a land
 clip never makes a fighter less responsive.
+
+On a moving platform (a stage hazard) the rules are the same: a grounded
+fighter is carried by the platform's own movement each step and then
+moves as ever (walking, running and the Dash add to the ride); a jump
+leaves the platform behind with no speed taken from it; a platform that
+vanishes leaves the fighter in the air, falling, with its coyote time,
+air jumps and every action intact.
 
 ## 8. Capabilities by art
 

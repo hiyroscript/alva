@@ -30,7 +30,7 @@
 // (interpolate, spriteFlip) and never feeds back.
 
 import { SpriteAnimator } from '../rendering/sprite-animator.js';
-import { createBody, stepBody, dropThrough, separate } from '../physics.js';
+import { createBody, stepBody, dropThrough, separate, carryBody } from '../physics.js';
 import { startLaunch, bounceLaunch, resolveLaunchBounce } from '../combat/launch-bounce.js';
 import { attackPhase, createAttackDefinition } from '../combat/attacks.js';
 import { createDefenseDefinition } from '../combat/defense.js';
@@ -396,9 +396,12 @@ export class Fighter {
       // can, and so does a Dash asked for (a Dash cancel out of the hit). A
       // Shield press is not: a Deflect starts on its own press or not at
       // all. The body is drawn where it stopped, not between its last two
-      // steps (a rebound freezes it at the surface it struck).
-      body.prevX = body.x;
-      body.prevY = body.y;
+      // steps (a rebound freezes it at the surface it struck). A frozen
+      // fighter standing on a moving platform still rides it (carryBody),
+      // drawn moving with it.
+      carryBody(body);
+      body.prevX = body.x - body.carryX;
+      body.prevY = body.y - body.carryY;
       for (const pressed of COMBAT_ACTIONS) {
         const action = input[`${pressed}Pressed`] ? this.pressRequest(pressed) : null;
         if (action) this.bufferAttack(action, pressPlace(input), pressed);
@@ -761,7 +764,15 @@ export class Fighter {
     // A higher jump's rise falls under its lighter share of gravity, and an
     // attack's motion under its own (none while it holds the fighter up, nor
     // through an air dash).
+    // Standing on a moving platform (a stage hazard), the fighter is first
+    // carried by its movement this step (carryBody: nothing on static
+    // ground, nothing in the air, so a jump leaves it behind), then takes
+    // its own step from there. It is drawn moving from where it was before
+    // the carry, as its platform is.
+    carryBody(body);
     stepBody(body, dt, ctx.stage, ctx.gravity * (this.highJump?.lift ?? 1) * gravityShare, body.maxFall);
+    body.prevX -= body.carryX;
+    body.prevY -= body.carryY;
     // What meeting the ground or a wall does to an attack's motion.
     if (atk && atk === combat.attack) this.motionContact(atk);
 

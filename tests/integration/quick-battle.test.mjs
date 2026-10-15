@@ -271,7 +271,8 @@ const current = (app) => app.screens.current.id;
 const card = (screens) => screens.mode.el.querySelector('.mode-card');
 const cardOf = (screen, id) => screen.cards.find((c) => c.getAttribute('data-difficulty') === id);
 const slotOf = (screen, id) => screen.roster.slots.find((s) => s._def?.id === id);
-const mapCard = (screen, id) => screen.cards.find((c) => c._map.id === id);
+// A stage's tile on Select Stage's roster.
+const mapCard = (screen, id) => screen.tiles.find((c) => c._map.id === id);
 const stepNames = (screen) => screen.el.querySelector('.steps').children.map((li) => li.querySelector('.step-name').textContent);
 const currentStep = (screen) => screen.el.querySelector('.steps').children.findIndex((li) => li.classList.contains('is-current'));
 const byText = (root, text) => root.querySelectorAll('[data-nav]').find((b) => b.textContent === text);

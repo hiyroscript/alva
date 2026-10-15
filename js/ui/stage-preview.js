@@ -4,8 +4,19 @@
 // A preview frames the compact stage itself: the main stage across the
 // width with a little air past each ledge, never mostly open air or the
 // far-off Void.
+//
+// An animated preview of a stage with hazards (dynamic platforms, e.g.
+// Asperitas's clouds) runs them for real, in a little world of its own: its
+// own StageCollision and PlatformHazards, stepped at the simulation's fixed
+// step, so the clouds drift, rest, vanish and form again elsewhere exactly
+// as in a battle, with no battle running and nothing shared with one. A
+// still preview (a roster thumbnail, or reduced motion) draws them where
+// the map starts them.
 
+import { CONFIG } from '../config.js';
 import { createTheme } from '../stages/index.js';
+import { StageCollision } from '../game/physics.js';
+import { PlatformHazards } from '../game/platform-hazards.js';
 import { drawFrame } from '../game/rendering/sprite-normalizer.js';
 import { fitCanvas } from './sprite-art.js';
 
@@ -33,13 +44,47 @@ export class StagePreview {
   }
 
   setMap(map, sprites) {
-    if (!this.themes.has(map.id)) this.themes.set(map.id, createTheme(map, { reducedMotion: this.reducedMotion }));
+    if (!this.themes.has(map.id)) this.themes.set(map.id, this.buildScene(map));
     this.map = map;
     this.sprites = sprites;
-    this.theme = this.themes.get(map.id);
+    const scene = this.themes.get(map.id);
+    this.theme = scene.theme;
+    this.sim = scene.sim;
+    // Each time a stage is shown its hazards start over from the map.
+    this.sim?.hazards.reset();
+    if (this.sim) this.sim.acc = 0;
     this.theme.lastPxW = 0; // force gradient rebuild for this canvas
     this.time = 0;
     this.render(0, true);
+  }
+
+  // `map`'s theme, and its hazards' own little world when they should run
+  // here (an animated preview without reduced motion).
+  buildScene(map) {
+    let sim = null;
+    if (this.animated && !this.reducedMotion && map.platforms.some((p) => p.dynamic)) {
+      const stage = new StageCollision(map);
+      sim = { stage, hazards: new PlatformHazards(stage, { seed: (Date.now() ^ 0x5a17) & 0xffff }), acc: 0 };
+    }
+    const theme = createTheme(map, { reducedMotion: this.reducedMotion, platforms: sim?.stage.platforms });
+    return { theme, sim };
+  }
+
+  // Runs the preview's hazards on by `dt` seconds of fixed steps (never more
+  // steps per frame than a battle takes), then places them between steps.
+  stepHazards(dt) {
+    const sim = this.sim;
+    if (!sim) return;
+    const step = CONFIG.sim.step;
+    sim.acc += Math.min(dt, CONFIG.sim.maxFrameDelta);
+    let steps = 0;
+    while (sim.acc >= step && steps < CONFIG.sim.maxStepsPerFrame) {
+      sim.hazards.update(step);
+      sim.acc -= step;
+      steps++;
+    }
+    if (steps >= CONFIG.sim.maxStepsPerFrame) sim.acc = 0;
+    sim.stage.interpolate(sim.acc / step);
   }
 
   render(dt, force = false) {
@@ -69,7 +114,10 @@ export class StagePreview {
 
     const ctx = this.ctx;
     const theme = this.theme;
-    if (this.animated) theme.update(dt, v);
+    if (this.animated) {
+      this.stepHazards(dt);
+      theme.update(dt, v);
+    }
     theme.prepare(v);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = true;

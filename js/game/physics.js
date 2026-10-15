@@ -17,6 +17,14 @@
 // contact's side in wall / landed / bonked), so a caller that knows why the
 // body was moving can turn it into a rebound (a hard combat launch, see
 // js/game/combat/launch-bounce.js). Physics itself never knows why.
+//
+// One-way platforms may be dynamic (a stage hazard's, see
+// js/game/platform-hazards.js): the same surfaces, moved and switched off
+// and on by their controller between steps, never by physics. Physics only
+// reads where each one is now and was a step ago (`prevX` / `prevY`), and
+// whether it is `active`: a platform switched off is gone from every query
+// and every landing, as if it were not there. A body standing on a moving
+// one is carried along with it (carryBody) before it takes its own step.
 
 const EPS = 0.5;
 // The least a closing Void ever leaves past a ledge or below the main
@@ -36,7 +44,20 @@ export class StageCollision {
     });
     this.groundY = main.top;
     this.centerX = (main.left + main.right) / 2;
-    this.platforms = map.platforms.map((p) => ({ dropThrough: true, ...p, oneWay: true }));
+    // The runtime platforms: this stage's own copies, never the map's
+    // (map.platforms is never written). A static one keeps its place; a
+    // dynamic one (`dynamic`, from the map) is moved and switched off and on
+    // by its controller (js/game/platform-hazards.js). Either way physics
+    // reads `x` / `y` (where it is now), `prevX` / `prevY` (where it was a
+    // step ago: the same for a static one) and `active` (false: gone from
+    // collision). `renderX` / `renderY` are where it is drawn between steps
+    // (interpolate) and `opacity` how visible it is: art only.
+    this.platforms = map.platforms.map((p) => ({
+      dropThrough: true, ...p, oneWay: true,
+      active: true, prevX: p.x, prevY: p.y, renderX: p.x, renderY: p.y, opacity: 1,
+    }));
+    // The dynamic ones among them, in map order.
+    this.dynamicPlatforms = this.platforms.filter((p) => p.dynamic);
     this.solids = [
       this.floor,
       ...map.solids.map((s) => ({ ...s, oneWay: false, dropThrough: false })),
@@ -85,13 +106,26 @@ export class StageCollision {
     return this.void;
   }
 
+  // Where every dynamic platform is drawn, `alpha` (0-1) of the way from
+  // its place a step ago to its place now: the same interpolation the
+  // fighters are drawn with (Fighter.interpolate), so a rider and its cloud
+  // move together on screen.
+  interpolate(alpha) {
+    for (const p of this.dynamicPlatforms) {
+      p.renderX = p.prevX + (p.x - p.prevX) * alpha;
+      p.renderY = p.prevY + (p.y - p.prevY) * alpha;
+    }
+  }
+
   // Highest surface at or below `y` under horizontal span [x0, x1]:
   // { y, ref }, or { y: Infinity, ref: null } with nothing below at all
-  // (past the main floor's edges, over open air).
+  // (past the main floor's edges, over open air). A platform switched off
+  // is not there.
   surfaceBelow(x0, x1, y) {
     let best = Infinity;
     let ref = null;
     for (const p of this.platforms) {
+      if (p.active === false) continue;
       if (p.y >= y - EPS && p.y < best && x1 > p.x && x0 < p.x + p.w) {
         best = p.y;
         ref = p;
@@ -157,10 +191,48 @@ export function createBody({ x, y, width, height, gravityScale = 1, maxFall = 15
     impactVy: 0,
     dropId: null,    // one-way platform currently being dropped through
     dropTimer: 0,
+    // How far the platform it stands on carried it this step (carryBody),
+    // before its own motion: 0 on anything that never moves.
+    carryX: 0,
+    carryY: 0,
   };
 }
 
 const overlapsX = (b, x0, x1) => b.x + b.halfW > x0 && b.x - b.halfW < x1;
+
+// Carries a body standing on a dynamic platform along with it: by exactly
+// the platform's own movement this step (its controller has already moved
+// it), so a rider keeps its footing whichever way the platform goes: never
+// sinking into one that rises or left hovering over one that sinks. Called
+// once per step before the body's own step (stepBody), so its own motion
+// and collision start from where the platform took it. Anything else under
+// a body (the main floor, a solid, a static platform) never moves it. The
+// carry is kept as `carryX` / `carryY`, for whoever draws the body between
+// steps. A body in the air is never dragged: jumping off ends the ride.
+export function carryBody(b) {
+  const g = b.grounded ? b.ground : null;
+  if (!g?.dynamic || g.active === false) {
+    b.carryX = 0;
+    b.carryY = 0;
+    return false;
+  }
+  b.carryX = g.x - g.prevX;
+  b.carryY = g.y - g.prevY;
+  b.x += b.carryX;
+  b.y += b.carryY;
+  return b.carryX !== 0 || b.carryY !== 0;
+}
+
+// Lets go of a platform that is gone from under a body (switched off: a
+// hazard that vanished): no longer its ground, so the body is in the air
+// with whatever velocity it had, and gravity takes it from this step on. No
+// push, no snap, no speed taken or given. True if it let go.
+export function releaseGround(b) {
+  if (!b.ground || b.ground.active !== false) return false;
+  b.grounded = false;
+  b.ground = null;
+  return true;
+}
 
 // One fixed step of a body's motion through the stage. `maxFall` caps this
 // step's fall speed: the body's own unless given (a fighter's slow fall
@@ -210,9 +282,14 @@ export function stepBody(b, dt, stage, gravity, maxFall = b.maxFall) {
   if (b.vy >= 0) {
     let surface = Infinity;
     let ref = null;
+    // A platform that moved this step is landed on if the feet were above
+    // it as it was or as it is now (the lower of its two lines, y growing
+    // down), so one rising into falling feet catches them rather than
+    // passing up through them; for a static one both lines are the same.
     for (const p of stage.platforms) {
-      if (p.id === b.dropId) continue;
-      if (prevBottom <= p.y + EPS && b.y >= p.y - EPS && p.y < surface && overlapsX(b, p.x, p.x + p.w)) {
+      if (p.id === b.dropId || p.active === false) continue;
+      const line = p.prevY > p.y ? p.prevY : p.y;
+      if (prevBottom <= line + EPS && b.y >= p.y - EPS && p.y < surface && overlapsX(b, p.x, p.x + p.w)) {
         surface = p.y;
         ref = p;
       }

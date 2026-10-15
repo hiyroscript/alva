@@ -20,7 +20,7 @@ non-attacking `TrainingAIController` stays in
 | [`cpu-intelligence/brain.js`](../../js/game/ai/cpu-intelligence/brain.js) | the hierarchy | `CpuIntelligence`: runs the layers every fixed step, the decision order, combo follow-ups, recovery and edge-guard plans, the point of no return, launch steering, liveness, the attack orientation, directives for tests. |
 | [`cpu-intelligence/capabilities.js`](../../js/game/ai/cpu-intelligence/capabilities.js) | 1. capabilities | `analyzeCapabilities` (cached per fighter): every move with its timing, reach, strikes, projectile, motion, cooldowns, air uses, Energy and **roles**; the Shield, the Deflect, movement and launch reaction. `moveReady`. |
 | [`cpu-intelligence/perception.js`](../../js/game/ai/cpu-intelligence/perception.js) | 2. perception | `Perception`: the opponent as it was `latency` ago (a ring of snapshots), recognized or lapsed events, the projectiles and clones the CPU has seen. |
-| [`cpu-intelligence/situation.js`](../../js/game/ai/cpu-intelligence/situation.js), [`stage-model.js`](../../js/game/ai/cpu-intelligence/stage-model.js), [`prediction.js`](../../js/game/ai/cpu-intelligence/prediction.js) | 3. world model | `Situation` (rebuilt each step), `StageModel` (ledges, surfaces, the Void in force, read live), and the forward simulation on the game's own rules: paths, jump arcs, move contact, projectile contact, launches and recoveries. |
+| [`cpu-intelligence/situation.js`](../../js/game/ai/cpu-intelligence/situation.js), [`stage-model.js`](../../js/game/ai/cpu-intelligence/stage-model.js), [`prediction.js`](../../js/game/ai/cpu-intelligence/prediction.js) | 3. world model | `Situation` (rebuilt each step), `StageModel` (ledges, surfaces, the Void in force, read live; a stage's moving or vanishing platforms read live too: where each is now, and none while it is hidden or forming, nor as a stepping stone while it fades), and the forward simulation on the game's own rules: paths, jump arcs, move contact, projectile contact, launches and recoveries. |
 | [`cpu-intelligence/opponent-model.js`](../../js/game/ai/cpu-intelligence/opponent-model.js) | 4. opponent model | `OpponentModel`: decaying rates of what the opponent was seen doing (jumps, Shields under threat, projectiles, Dashes, whiffs, attacks within reach, preferred range, repeated moves), trusted as fast as the level adapts. |
 | [`cpu-intelligence/strategy.js`](../../js/game/ai/cpu-intelligence/strategy.js) | 5. strategy | `Strategy`: the mode (rushdown, controlled offense, neutral, counterplay, zoning, trap control, survival, finisher hunt, recovery) re-weighed from both Launch Points, footing, Energy, kit, habits, score and clock, with hysteresis. |
 | [`cpu-intelligence/evaluator.js`](../../js/game/ai/cpu-intelligence/evaluator.js), [`values.js`](../../js/game/ai/cpu-intelligence/values.js) | 6–7. tactics, combos | `Evaluator`: every move now, out of a Dash or out of a jump, scored by expected utility; combo follow-ups on the launch dealt. `LaunchJudge`, `KO_VALUE`: what outcomes are worth. |
@@ -216,6 +216,10 @@ hands it one plan through the same inputs (`{ press }`, `{ jump, dir }`,
   coverage (every move of every fighter in real fights at every level, and
   in an opportunity made for it: recognized, pressed, landed), combat
   correctness, difficulty progression, determinism, the debug trace.
+- [`tests/systems/platform-hazards.test.mjs`](../../tests/systems/platform-hazards.test.mjs):
+  the CPUs on Asperitas, Quick Battle and Watch Mode: following the player
+  onto the drifting clouds, never picking a stale, fading or vanished one,
+  never stuck, no accidental falls.
 - [`tests/systems/combat-ai.test.mjs`](../../tests/systems/combat-ai.test.mjs):
   the controller contract (press edges, perceived facing, reserved
   buttons, the ledge guard, reaction scaling, cooldowns, no writes).

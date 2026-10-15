@@ -56,7 +56,8 @@ reads, what a fighter may leave out, and its tests.
 - [Quick Battle](gameplay/battle.md) (and difficulty)
 - [Watch Mode](gameplay/watch-mode.md)
 - [Practice Ground](gameplay/practice.md)
-- [Stages](gameplay/stages.md) (and adding one)
+- [Stages](gameplay/stages.md) (Select Stage's 24-slot roster and Random
+  Stage, Asperitas and its platform hazards, and adding a stage)
 
 ## Development
 

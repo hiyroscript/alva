@@ -6,8 +6,16 @@
 // floor, one-way platforms, the tops of solid blocks), how much room there
 // is to an edge, how far a point is from the Void in force (overtime's
 // closing Void included: it is read live, never cached), and which surfaces
-// lead to which by a jump or a walk off an edge. Desert, City and any
-// future stage work the same way.
+// lead to which by a jump or a walk off an edge. Desert, City, Asperitas
+// and any future stage work the same way.
+//
+// Moving and vanishing platforms (a stage's hazards, see
+// js/game/platform-hazards.js) are read live, like the Void: a dynamic
+// platform's surface is where it is now, and one switched off (hidden, or
+// still forming) is no surface at all, so a CPU never aims at where a
+// cloud was or at one that is not there. It knows only what anyone can
+// see: never where a hazard will go next. The main floor and every static
+// surface never change, so they are cached.
 //
 // Inputs: a StageCollision. Outputs: StageModel (one per stage, cached).
 // Important constraints: read-only; nothing here assumes a platform drop,
@@ -26,13 +34,40 @@ export class StageModel {
     this.top = floor.y;
     this.centerX = stage.centerX;
     this.width = floor.w;
-    // Every surface a fighter can stand on: the main floor's top, each
+    // The surfaces that never change: the main floor's top, each static
     // one-way platform, each other solid's top.
-    this.surfaces = [
-      { ref: floor, x0: floor.x, x1: floor.x + floor.w, y: floor.y, main: true, oneWay: false },
-      ...stage.platforms.map((p) => ({ ref: p, x0: p.x, x1: p.x + p.w, y: p.y, main: false, oneWay: true })),
-      ...stage.solids.filter((s) => s !== floor).map((s) => ({ ref: s, x0: s.x, x1: s.x + s.w, y: s.y, main: false, oneWay: false })),
+    this.fixed = [
+      { ref: floor, x0: floor.x, x1: floor.x + floor.w, y: floor.y, main: true, oneWay: false, dynamic: false },
+      ...stage.platforms.filter((p) => !p.dynamic).map((p) => ({ ref: p, x0: p.x, x1: p.x + p.w, y: p.y, main: false, oneWay: true, dynamic: false })),
+      ...stage.solids.filter((s) => s !== floor).map((s) => ({ ref: s, x0: s.x, x1: s.x + s.w, y: s.y, main: false, oneWay: false, dynamic: false })),
     ];
+    this.dynamic = stage.platforms.filter((p) => p.dynamic);
+  }
+
+  // Every surface a fighter can stand on right now: the fixed ones, and
+  // each dynamic platform that is solid at this moment, where it is now
+  // (`moving` while it drifts; `hazard` from the map). Read fresh on every
+  // call.
+  get surfaces() {
+    if (!this.dynamic.length) return this.fixed;
+    const out = this.fixed.slice();
+    for (const p of this.dynamic) {
+      if (p.active === false) continue;
+      out.push({
+        ref: p, x0: p.x, x1: p.x + p.w, y: p.y, main: false, oneWay: true, dynamic: true,
+        hazard: !!p.hazard, moving: (p.vx ?? 0) !== 0 || (p.vy ?? 0) !== 0,
+        // Visibly fading out (or not yet fully formed): footing about to
+        // go, or only just back.
+        fading: (p.opacity ?? 1) < 1,
+      });
+    }
+    return out;
+  }
+
+  // Whether `ref` (a body's `ground`, a planned step) is a surface to stand
+  // on now: anything static, or a dynamic platform while it is solid.
+  usable(ref) {
+    return !!ref && ref.active !== false;
   }
 
   static of(stage) {
@@ -49,7 +84,8 @@ export class StageModel {
     return this.stage.void;
   }
 
-  // The surface entry standing on `ref` (a body's `ground`), or null.
+  // The surface entry standing on `ref` (a body's `ground`), or null
+  // (null too for a platform that has just vanished).
   surfaceOf(ref) {
     if (!ref) return null;
     return this.surfaces.find((s) => s.ref === ref) ?? null;
@@ -123,12 +159,13 @@ export class StageModel {
   // A surface to step up to on the way from `fromY` toward a target on the
   // surface at `toY` near `toX`: one within `maxRise` above `fromY` (the
   // jump a fighter has), not below the target, and nearest it. Null when
-  // none is needed or there is none.
+  // none is needed or there is none. Never a platform visibly fading out
+  // from under whoever would land on it.
   stepToward(fromY, toY, toX, x, maxRise, current = null) {
     let best = null;
     let bestScore = Infinity;
     for (const s of this.surfaces) {
-      if (s.ref === current) continue;
+      if (s.ref === current || s.fading) continue;
       const rise = fromY - s.y;
       if (rise < 16 || rise > maxRise || s.y < toY - 20) continue;
       const cx = Math.min(s.x1, Math.max(s.x0, toX));

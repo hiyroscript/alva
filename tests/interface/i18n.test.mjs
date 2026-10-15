@@ -204,6 +204,9 @@ test('French is really French: only proper names, codes and shared words read th
     'hud.pause', // Pause
     'hud.round', // ROUND n
     'map.card', // {name}. {tagline}
+    'map.counter', // {available} / {slots}
+    'map.asperitas.name', // Asperitas, a proper name
+    'map.trait.terrain', 'map.trait.obstacles', // Terrain, Obstacles: the same words
     'mode.index', // Mode 01
     'pad.playstation.north', // Triangle, the PlayStation button's name
     'settings.combat', // Combat
@@ -232,6 +235,11 @@ test('English game copy is the registries\' own, never retyped', () => {
   for (const map of MAPS) {
     assert.equal(STRINGS.en[`map.${map.id}.name`], map.name);
     assert.equal(STRINGS.en[`map.${map.id}.tagline`], map.tagline);
+    for (const [label, value] of map.traits) {
+      const id = label.toLowerCase();
+      assert.equal(STRINGS.en[`map.trait.${id}`], label);
+      assert.equal(STRINGS.en[`map.${map.id}.trait.${id}`], value);
+    }
   }
   assert.equal(STRINGS.en['launch.pointSummary'], launch.LAUNCH_POINT_SUMMARY);
   assert.equal(STRINGS.en['launch.formula'], launch.LAUNCH_FORMULA);
