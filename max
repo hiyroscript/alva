@@ -1,1223 +1,1590 @@
-ALVA — New Stage: Asperitas + Complete Stage Roster Redesign
+ALVA — ASPERITAS STAGE & 24-STAGE ROSTER OVERHAUL
 
-Objective
+Complete Implementation Specification
 
-Implement a major stage-system expansion in the Alva game.
+Primary objective
 
-This update has two primary goals:
+Implement a complete stage-selection overhaul and introduce a fully playable third stage named Asperitas into the existing Alva game.
 
-1. Completely redesign the Stage Selection interface to accommodate 24 stage slots instead of the current two-stage layout, including a Random Stage button.
-2. Create a fully playable third stage named Asperitas, a beautiful sky-themed arena made entirely of clouds, featuring a large central cloud platform and two smaller, independently animated cloud platforms with randomized movement and disappearance states.
+This update has two major components:
 
-This must be a complete, polished implementation integrated into the existing game—not a mockup or an isolated visual demonstration.
+1. Completely redesign the Stage Selection interface to support a permanent roster of 24 stage slots, including a dedicated Random Stage button.
+2. Create Asperitas, a sky-themed fighting arena consisting of one large stationary cloud platform and two smaller independently behaving cloud-platform hazards.
 
-The existing Desert and City stages must remain fully functional, and the new functionality must work across Quick Battle, Watch Mode, and the existing stage-selection flow.
+The two smaller clouds must move, idle, disappear, and reappear according to their own randomized behavior systems. Crucially, when a cloud disappears, it must reappear at a newly randomized position within its permitted region, rather than automatically returning to its previous position.
+
+The three playable cloud platforms must never collide or physically overlap.
+
+This must be implemented as a polished, working expansion to the existing game. Do not deliver a mockup, prototype, or partial implementation.
 
 ⸻
 
-1. Understand the existing architecture before implementation
+1. REPOSITORY ARCHITECTURE
 
 Repository: hiyroscript/alva
 
-Alva is a browser-based 2D platform fighter built with vanilla JavaScript, HTML, CSS, and Canvas 2D. It uses a fixed-step physics simulation and procedural, pseudo-3D stage rendering.
+Alva is a browser-based 2D platform fighting game using vanilla JavaScript, HTML, CSS, and Canvas 2D. It does not use frameworks or a build system.
 
-Study the existing code and follow its architecture.
+Its stages use procedural Canvas art with pseudo-3D perspective, while gameplay collision operates separately through a fixed-timestep physics simulation.
 
-Important existing files:
+Before making changes, carefully inspect the existing implementation.
+
+Important files
 
 File	Responsibility
-js/data/maps.js	Stage definitions, platforms, collision geometry, spawn points, and Void bounds
-js/stages/index.js	Stage theme registry
-js/stages/stage-theme.js	Base procedural rendering system
-js/stages/perspective.js	Shared stage perspective rendering
-js/stages/desert-theme.js	Desert stage rendering
-js/stages/city-theme.js	City stage rendering
-js/game/physics.js	Platform collision and fighter physics
-js/game/arena.js	Fixed-step simulation and rendering
-js/game/fighters/fighter.js	Fighter movement and grounding
-js/game/ai/cpu-intelligence/stage-model.js	CPU understanding of stage geometry
-js/screens/map-select-screen.js	Stage-selection screen
+js/data/maps.js	Stage registry, map definitions, platforms, spawns, Void and camera bounds
+js/stages/index.js	Stage-theme registration
+js/stages/stage-theme.js	Shared procedural rendering
+js/stages/perspective.js	Pseudo-3D perspective
+js/stages/desert-theme.js	Desert visual implementation
+js/stages/city-theme.js	City visual implementation
+js/game/physics.js	StageCollision and body physics
+js/game/arena.js	Fixed-step gameplay simulation
+js/game/fighters/fighter.js	Movement, grounding, collision interaction
+js/game/ai/cpu-intelligence/stage-model.js	CPU stage awareness
+js/screens/map-select-screen.js	Stage Selection
 js/ui/stage-preview.js	Stage previews
-css/setup.css	Stage-selection layout
-css/responsive.css	Responsive layouts
+js/screens/quick-battle-setup.js	Regular Play stage randomization
+css/setup.css	Stage roster styling
+css/responsive.css	Responsive layout
 js/localization/strings/en.js	English strings
 js/localization/strings/fr.js	French translations
-tests/systems/platform-stage.test.mjs	Stage and collision tests
+tests/systems/platform-stage.test.mjs	Stage tests
 
-Read ALVA_SPEC.md, docs/gameplay/stages.md, and the relevant development conventions.
+Also inspect:
 
-Preserve the existing structure wherever practical. Do not introduce frameworks, dependencies, or an entirely different rendering engine.
+* ALVA_SPEC.md
+* README.md
+* docs/gameplay/stages.md
+* docs/development/testing.md
+* docs/architecture/module-responsibilities.md
+
+Respect the existing architecture and coding conventions.
+
+The new functionality must work with the existing engine rather than replacing it.
 
 ⸻
 
-PART I — THE 24-STAGE ROSTER
+PART I — COMPLETE STAGE ROSTER REDESIGN
 
-2. Completely redesign Stage Selection
+2. Replace the existing two-stage layout
 
-The current Stage Selection screen has a large live preview on the left and two vertically stacked stage cards on the right.
+The current Stage Selection screen contains two large stage cards arranged vertically beside a live stage preview.
 
-This design cannot scale to a large number of stages.
+This layout must be completely redesigned.
 
-Replace the two-card presentation with a proper 24-slot stage roster.
+Create a 24-slot stage roster inspired by the organization and readability of a modern platform fighting game’s stage-selection screen.
 
-Layout
+The interface must be designed for 24 stages from the beginning, not just resized to accommodate three.
 
-Create a compact, modern grid that accommodates 24 stage positions.
+Required roster structure
 
-Suggested layout:
-
-* A six-column by four-row grid on sufficiently large screens, when space allows.
-* Adapt the column count and tile dimensions responsively.
-* On compact landscape devices, preserve readable and usable cards within a scrollable roster.
-* On tall or narrow displays, allow the roster and preview to stack.
-* Never allow stage tiles or controls to overflow their containers.
-
-The existing large live stage preview should remain a prominent part of the design.
-
-The screen should feel like a professional fighting game’s stage-selection interface, rather than a simple collection of large buttons.
-
-24 stage positions
-
-There must be exactly 24 reserved stage positions.
+There must be 24 stage slots in total.
 
 Initially:
 
-Slot	Stage	Status
+Position	Stage	Status
 01	Desert	Available
 02	City	Available
 03	Asperitas	Available
-04–24	Future stages	Unavailable placeholders
+04–24	Reserved	Unavailable
 
-The remaining 21 positions must be visually recognizable as empty or upcoming stage slots.
+The remaining 21 positions are placeholders reserved for future playable stages.
 
-They should have subdued styling, such as a subtle lock symbol or placeholder graphic.
+Do not create fake stages or add placeholder maps to MAPS.
 
-Unavailable slots must not be selectable, and they must never be included in random stage selection.
+Generate the playable entries from the real stage registry and populate the remaining slots through the roster UI.
 
-Do not add 21 fake playable stages to the MAPS registry just to fill the roster.
+The number of available stages should grow automatically as actual stages are added in the future.
 
-Instead, generate the roster from the actual stage definitions, then fill the unused positions with presentation-only placeholders.
+Visual arrangement
 
-This design should allow future developers to add stages to the registry without rebuilding the selection interface.
+Use a compact multi-column roster grid.
 
-Stage tiles
+On sufficiently large displays, target a six-column by four-row layout.
 
-Each available stage tile should include:
+Adapt the number of columns and cell dimensions to the available screen space.
 
-* A small stage thumbnail.
-* Its stage name.
-* A clearly visible selected state.
-* A hover/focus state.
-* An indication that the tile is available.
+On mobile landscape displays, use smaller tiles and a scrollable roster when necessary.
 
-Maintain Alva’s existing UI identity, including its dark panels, typography, borders, selected states, and green accent language.
+On narrow or tall displays, allow a stacked layout.
 
-Tiles must remain legible even when compact.
+The layout should remain organized, readable, and visually balanced.
 
-The selected tile should be visibly distinguishable from hovered or focused tiles.
+Stage tile design
 
-Live preview
+Every available stage tile should display:
 
-Retain the large hero preview.
+* A recognizable stage thumbnail.
+* The stage name.
+* A clear focus or hover state.
+* A selected-state indicator.
 
-When highlighting a stage, display its corresponding environment using the existing StagePreview and registered theme.
+Unavailable slots should use a subdued appearance with a placeholder or lock symbol.
 
-Asperitas must display its actual cloud environment.
+Do not allow unavailable slots to start battles.
 
-Avoid generating unnecessarily expensive live animations for all 24 roster positions simultaneously.
+Maintain Alva’s existing UI identity:
 
-The small thumbnails may be static or lightly updated, while the large preview remains animated.
+* Dark neutral surfaces.
+* Subtle borders.
+* Green selection accents.
+* Clear typography.
+* Consistent rounded corners.
+* Distinct hover and focus feedback.
 
-The stage name and tagline should remain available within the selection experience.
+Avoid excessively large tiles, oversized padding, or wasted space.
 
-Stage count
+Main preview
 
-Display useful information such as:
+Keep a prominent large stage preview that displays the currently highlighted stage.
+
+When the player highlights Desert, City, or Asperitas, update the preview accordingly.
+
+Asperitas must display its actual sky and cloud environment.
+
+Prefer static thumbnails for the small roster tiles to avoid running many independent Canvas animations.
+
+The large preview should remain the primary animated presentation.
+
+Preserve the stage name, tagline, and selected-stage information.
+
+Dynamic stage counter
+
+Display a localized counter such as:
 
 3 available / 24 slots
 
-Do not hardcode the available count.
+The available count must come from the actual playable stage registry.
 
-It should automatically reflect changes to MAPS.
-
-The maximum slot count should remain 24 unless intentionally expanded in the future.
+The roster must be capable of adding future stages without requiring another layout redesign.
 
 ⸻
 
-3. Add a Random Stage button
+3. Random Stage button
 
-Add a dedicated Random Stage button to the redesigned roster.
+Add a dedicated Random Stage button to the redesigned Stage Selection screen.
 
-It must be visually integrated with the stage-selection interface but remain separate from the 24 stage slots.
+It should have a shuffle-style icon and fit naturally into Alva’s interface.
 
-Use a recognizable shuffle-style icon consistent with the existing interface.
+The button must remain separate from the 24 stage positions.
 
-Required behavior
+Random Stage is an action, not a playable stage.
 
-When the player activates Random Stage:
+Behavior
 
-1. Collect the currently available playable stages from MAPS.
-2. Randomly select one using a uniform distribution.
-3. Update the stage-selection state with the selected stage’s actual ID.
-4. Highlight the selected stage tile.
+When Random Stage is activated:
+
+1. Read the currently playable stages from MAPS.
+2. Randomly select one using an unbiased selection method.
+3. Update the stored selected stage ID.
+4. Highlight the chosen stage tile.
 5. Update the large stage preview.
-6. Allow the player to confirm and start the battle normally.
+6. Keep the player on the Stage Selection screen until they confirm.
 
-Random Stage must never select unavailable placeholders or Practice Ground.
+Do not automatically launch a battle.
 
-It must not choose an invalid stage ID.
+Unavailable roster slots must never be selected.
 
-The Random Stage button should only choose a stage; it should not immediately launch the battle.
+Practice Ground must not be included, because it is a separate training map rather than a selectable battle stage.
 
-If there is only one available stage, select it safely.
+The existing Regular Play random-stage selection must continue to work.
 
-If the stage list is empty, handle the situation gracefully.
+Reuse Alva’s existing random-selection utility where appropriate.
 
-Compatibility
+Supported game modes
 
-Random Stage must work correctly in:
+The redesigned stage roster and Random Stage button must work in:
 
 * Quick Battle — Custom Play.
 * Watch Mode.
-* Change Stage after a battle, where applicable.
+* Change Stage after a match.
+* Other existing workflows that reuse Stage Selection.
 
-Existing Regular Play already performs its own random stage selection through drawRegularPlay() in js/screens/quick-battle-setup.js.
+Quick Battle and Watch Mode must preserve separate selections.
 
-Preserve this behavior.
+Controls
 
-The new button should reuse an appropriate shared random-selection helper where possible rather than creating unnecessary duplicate implementations.
+Support keyboard, mouse, touch, Xbox controllers, and PlayStation controllers.
 
-Ensure Quick Battle and Watch Mode keep their respective stage-selection values independent.
+Preserve the existing menu navigation system.
 
-Input support
+Make sure:
 
-The entire redesigned roster must support:
-
-* Mouse.
-* Touch.
-* Keyboard.
-* Xbox controllers.
-* PlayStation controllers.
-
-Preserve Alva’s data-nav focus system and controller navigation.
-
-When using a controller or keyboard, navigating through the grid must be intuitive, and the currently focused tile must remain visible when scrolling.
-
-The Random Stage button must also be accessible through the existing navigation system.
-
-All visible controls require appropriate accessible labels and focus states.
+* All available tiles are reachable.
+* Random Stage is reachable.
+* Controller focus remains visible.
+* Scrollable grids bring the focused tile into view.
+* Confirmation and Back navigation continue to work.
+* Disabled placeholders cannot be activated.
 
 ⸻
 
-PART II — ASPERITAS
+PART II — NEW STAGE: ASPERITAS
 
-4. Create the third stage: Asperitas
+4. Stage identity
 
-Name: Asperitas
-ID: asperitas
-Theme: Sky / Clouds / High Altitude
-Identity: A floating arena suspended above a vast cloud-filled sky.
+Stage name: Asperitas
+Stage ID: asperitas
+Theme: High-altitude sky and clouds
+Environment: Open atmosphere above an expansive cloud layer
 
-Asperitas should feel noticeably different from both Desert and City.
+Suggested tagline:
 
-Desert is a solid sandstone mesa.
+Above the clouds, beyond the horizon
 
-City is a rooftop and building environment.
+Asperitas must feel completely different from Desert and City.
 
-Asperitas must have no earth, building, cliff, or other structure supporting its main platform. The platform itself is a giant floating cloud.
+Desert has a sandstone foundation.
 
-The entire arena should feel suspended in the atmosphere.
+City has a building foundation.
 
-Stage composition
+Asperitas has no physical foundation underneath its main platform because the main platform itself is a giant cloud floating high in the sky.
 
-Asperitas has exactly three playable platforms:
+The stage should feel weightless, airy, peaceful, and expansive.
 
-1. One large, stationary main cloud platform.
-2. One smaller floating cloud platform above the left side.
-3. One smaller floating cloud platform above the right side.
+Playable geometry
 
-Do not add extra playable surfaces, solid obstacles, support pillars, or walls.
+Asperitas has exactly three playable surfaces:
 
-Decorative background clouds are allowed but must have no collision.
+1. A large, stationary main cloud platform.
+2. A smaller floating cloud hazard above the left region.
+3. A smaller floating cloud hazard above the right region.
 
-The stage must preserve open ledges, the Void, respawning, camera behavior, and combat rules.
+There are no additional playable platforms, ground structures, pillars, or solid obstacles.
+
+Decorative background clouds are allowed, but they must not have gameplay collision.
 
 ⸻
 
-5. Main cloud platform
+5. The main cloud platform
 
-The central platform should be a large, substantial cloud that serves as the primary fighting surface.
+The main platform is a large, stationary cloud that serves as the stage’s primary fighting area.
 
 Appearance
 
-The cloud should look soft, dense, voluminous, and atmospheric.
+Design it as a massive, dense cloud suspended in open sky.
 
-Its top should be wide and sufficiently flat for comfortable combat.
+Use overlapping organic cloud shapes rather than a geometric rectangle.
 
-Its body should consist of overlapping rounded cloud formations, with soft highlights, shading, and layered volume.
+Its upper surface should read clearly as a stable fighting surface.
 
-Suggested visual palette:
+Suggested visual characteristics:
 
-* Brilliant white.
-* Warm ivory.
-* Very pale blue.
-* Soft lavender shadows.
-* Subtle silver-blue lower edges.
+* Bright white cloud tops.
+* Soft ivory highlights.
+* Pale blue and lavender shadows.
+* Rounded, voluminous edges.
+* Multiple overlapping cloud formations.
+* Gentle shading underneath to create depth.
+* Soft atmospheric edges without making the collision boundary ambiguous.
 
-Use shading and layered shapes to give the cloud volume while keeping the physical collision surface readable.
+The cloud should resemble a large floating mass of vapor, not a solid stone platform covered with white paint.
 
-The platform should visually resemble an enormous cloud floating freely through the sky.
+No foundation
 
-Absolutely no giant rectangular foundation underneath it.
+This requirement is absolute.
 
-No cliff face. No skyscraper. No ground extending downward toward the Void.
+Do not render:
 
-In the existing architecture, StageCollision constructs a solid floor using mainStage.top and mainStage.bottom.
+* Stone foundations.
+* Cliffs.
+* Buildings.
+* Pillars.
+* Metal supports.
+* Ground stretching downward.
+* A rectangular vertical platform body extending toward the Void.
 
-Account for this carefully.
+Also ensure the gameplay collision geometry respects the visual design.
 
-For Asperitas, provide a shallow collision representation or an appropriate stage-specific top-only collision model if needed.
+Alva currently constructs its main-stage floor as a solid block extending from mainStage.top to mainStage.bottom.
 
-The gameplay collision must agree with the appearance.
+Asperitas must not retain a huge invisible collision block beneath its floating cloud.
 
-Do not leave an invisible thousand-unit-deep solid block beneath a cloud that appears to float unsupported.
+Use a shallow solid collision representation or another compatible solution that provides proper footing without creating a large invisible foundation.
 
-Preserve the existing Desert and City floor behavior.
+Preserve existing Desert and City behavior.
 
 Gameplay
 
-The main cloud remains stationary.
+The main cloud:
 
-It must be broad enough for two fighters to engage comfortably.
+* Never moves.
+* Never disappears.
+* Is not considered a hazard.
+* Always supports normal combat.
+* Has open ledges.
+* Provides safe initial spawn positions for both fighters.
 
-Use proportions comparable to existing Alva stages so the normal camera framing, running, jumping, dashing, and combat distances still feel familiar.
-
-Both players must initially spawn safely on the main cloud.
-
-The cloud remains solid and visible throughout the match.
-
-It must never disappear or move.
-
-⸻
-
-6. The two upper cloud platforms
-
-Create exactly two smaller cloud platforms above the main cloud.
-
-They must be accessible using the game’s normal jumping mechanics.
-
-Their initial positions should be separated horizontally, with one toward the left and one toward the right.
-
-Both should sit high enough to introduce vertical gameplay without making them unreachable.
-
-Visual design
-
-Each small platform must have its own rounded cloud silhouette.
-
-They should resemble soft, floating cloud masses rather than rectangular platforms painted white.
-
-Use the same visual language as the main cloud, but with smaller proportions.
-
-Give each enough visible volume that players can clearly identify its playable surface.
-
-Their collision boundaries and visible positions must remain synchronized.
-
-Platform collision
-
-Both clouds must function as actual one-way platforms.
-
-Fighters can jump upward through them from below and land on their top surfaces while descending.
-
-When visible and solid, they must properly support grounded fighters.
-
-When moving, they must carry grounded fighters naturally.
-
-They must work with the existing fighter movement system, including ordinary jumps, air jumps, fast falls, dashes, attack movement, and launch physics.
+Its width should remain comparable to the existing playable stages.
 
 ⸻
 
-PART III — INDEPENDENT CLOUD BEHAVIOR
+PART III — TWO INDEPENDENT CLOUD HAZARDS
 
-7. Every small cloud has its own randomized state machine
+6. Hazard classification
 
-This is the most important part of Asperitas.
+The two smaller clouds floating above the main cloud must officially be classified as hazards.
 
-Each of the two small cloud platforms must have its own independent behavior controller.
+They are not merely decorative objects.
 
-One cloud’s behavior must not determine or synchronize the other’s behavior.
+They are dynamic gameplay hazards that players can also stand on.
 
-Both clouds can coincidentally be in the same state, but they must arrive there independently.
+Their hazardous nature comes from unpredictable movement and temporary disappearance, not from dealing damage on contact.
 
-Required states
+Hazard designation
 
-State	Behavior
-IDLE	Remains stationary at its current position
-HORIZONTAL	Floats smoothly left and right
-VERTICAL	Floats smoothly up and down
-DISAPPEARING	Gradually fades away
-HIDDEN	Completely invisible and non-collidable
-REAPPEARING	Gradually becomes visible again
+Both smaller clouds should have explicit metadata identifying them as hazards.
 
-These states form a continuously transitioning system.
+For example, use appropriate data such as:
 
-They are not permanent behaviors assigned at the start of the match.
+* A stable platform ID.
+* A cloud platform type.
+* A hazard classification.
+* A dynamic movement capability.
+* A disappearance capability.
 
-A cloud must regularly change between states.
+Follow the project’s architecture rather than introducing an unnecessary incompatible data system.
 
-Example behavior
+The main cloud must remain ordinary stage terrain.
 
-Cloud A might follow:
+Stage traits
 
-IDLE → VERTICAL → HORIZONTAL → IDLE → DISAPPEARING → HIDDEN → REAPPEARING → HORIZONTAL
+Asperitas’s stage information should communicate:
 
-Cloud B might independently follow:
+Trait	Value
+Terrain	Floating clouds
+Platforms	2 moving cloud platforms
+Hazards	2 shifting cloud hazards
+Obstacles	None
+Lighting	Daylight
 
-HORIZONTAL → IDLE → DISAPPEARING → HIDDEN → REAPPEARING → VERTICAL → IDLE
+The two upper clouds count as both standable platforms and environmental hazards.
 
-These are examples, not predetermined sequences.
+They are not four different objects.
 
-The actual state progression should be randomized.
+There are exactly two upper cloud objects.
 
-There must be no fixed sequence that both clouds follow every match.
+Hazard behavior
+
+The hazards do not automatically damage fighters.
+
+They must not stun, launch, or eliminate someone simply because they are touched.
+
+Instead, their randomized movement and disappearance introduce risk.
+
+A player might jump onto a cloud expecting a stable surface, only for it to move or disappear later.
+
+That unpredictability is the hazard mechanic.
 
 ⸻
 
-8. Random state transitions
+7. Independent cloud controllers
 
-Create a configurable state-transition system.
+Each cloud hazard must have its own independent behavior system.
 
-Each cloud must independently determine:
+They must not share a single behavior state or transition timer.
 
-* Its next state.
-* The duration of that state.
-* Its movement speed within safe limits.
-* Its movement direction.
-* Its allowed movement target or range.
-* When to stop.
-* When to move again.
-* When to disappear.
-* How long to stay hidden.
+Each needs its own:
 
-Use reasonable randomized intervals so the clouds feel alive without changing behavior every fraction of a second.
+* Random number generator or independent random stream.
+* Current state.
+* State duration.
+* State timer.
+* Movement direction.
+* Movement speed.
+* Movement destination.
+* Movement boundaries.
+* Position.
+* Visibility.
+* Collision availability.
+* Disappearance timer.
+* Reappearance timer.
 
-Suggested initial tuning values:
+The two clouds may occasionally perform similar actions by coincidence, but they must never be artificially synchronized.
 
-Property	Suggested range
+Example
+
+Cloud A:
+
+HORIZONTAL → IDLE → DISAPPEARING → HIDDEN → REAPPEARING → VERTICAL
+
+Cloud B:
+
+VERTICAL → HORIZONTAL → IDLE → VERTICAL → DISAPPEARING → HIDDEN → REAPPEARING
+
+These are merely illustrative sequences.
+
+No fixed sequence should be imposed.
+
+Every transition should result from that cloud’s own randomized state machine.
+
+⸻
+
+PART IV — CLOUD STATE MACHINE
+
+8. Required states
+
+Each cloud hazard must support these six states:
+
+State	Function
+IDLE	The cloud stays stationary
+HORIZONTAL	The cloud moves left and right
+VERTICAL	The cloud moves up and down
+DISAPPEARING	The cloud fades out
+HIDDEN	The cloud is invisible and has no collision
+REAPPEARING	The cloud fades in at a newly randomized valid position
+
+These states must transition continuously throughout gameplay.
+
+The cloud should never become permanently stuck in one state.
+
+State-transition logic
+
+When an ordinary state finishes, choose a new valid state randomly.
+
+Possible ordinary choices are:
+
+* IDLE.
+* HORIZONTAL.
+* VERTICAL.
+* DISAPPEARING.
+
+The disappearance lifecycle must follow:
+
+DISAPPEARING → HIDDEN → REAPPEARING → next randomized ordinary state
+
+A cloud cannot skip the hidden/reappearance lifecycle once disappearance begins.
+
+The duration of ordinary states should be randomized.
+
+Suggested tuning
+
+Parameter	Starting range
 Idle duration	1.5–4 seconds
 Movement duration	2–5 seconds
-Horizontal travel	Approximately 60–140 world units
-Vertical travel	Approximately 35–90 world units
+Horizontal travel	60–140 world units
+Vertical travel	35–90 world units
 Disappearance fade	0.5–0.9 seconds
 Hidden duration	1–2.5 seconds
 Reappearance fade	0.5–0.9 seconds
 
-These values are starting points, not inflexible requirements.
+These are initial guidelines.
 
-Adjust them according to actual gameplay scale, fighter jump height, animation smoothness, and collision safety.
+Tune them against actual fighter movement speeds, jump heights, and platform sizes.
 
-The transitions should feel natural and varied.
-
-Avoid sudden snaps between positions.
-
-Use smooth velocity changes, interpolation, or easing.
-
-The clouds should drift rather than teleport.
-
-Randomness architecture
-
-Do not call Math.random() every rendered frame to select a new movement state.
-
-Choose new states and parameters only when meaningful transitions occur.
-
-Use independent random streams for the two clouds.
-
-Where possible, use the repository’s existing seed utilities so motion sequences can be reproduced in automated tests.
-
-For gameplay, the cloud state machines must advance using the fixed simulation timestep, not the display frame rate.
-
-The results should remain consistent at 30, 60, 120, and 144 Hz rendering rates.
+Keep all tuning centralized and configurable.
 
 ⸻
 
-9. Horizontal movement
+9. Horizontal movement state
 
-When a cloud enters HORIZONTAL:
+When a cloud enters HORIZONTAL, it should gently float left or right.
 
-* Select a safe horizontal direction or destination.
-* Move smoothly toward it.
-* Stay inside its assigned safe movement region.
-* Reverse or settle naturally at its movement limit.
-* Remain above the main cloud.
-* Never enter the other cloud’s protected space.
+Randomly determine:
 
-The cloud should visibly float from side to side.
+* Its direction.
+* Its movement speed.
+* Its travel distance or destination.
+* Its movement duration.
 
-Its collision surface must follow its actual rendered position.
+The cloud must remain within its permitted horizontal region.
 
-A fighter standing on it must move with it.
+Use smooth movement and gradual reversals or easing rather than abrupt changes.
 
-There should be no visible sliding between the cloud and its collision hitbox.
+The platform should feel like it is being carried by atmospheric currents.
 
-⸻
+The collision surface must move with the cloud.
 
-10. Vertical movement
+Any fighter standing on it must be carried along naturally.
 
-When a cloud enters VERTICAL:
-
-* Choose a safe vertical movement direction or target.
-* Move smoothly upward or downward.
-* Respect predetermined height boundaries.
-* Remain reachable from the stage’s intended combat routes.
-* Never descend into the main cloud.
-* Never rise into an unreasonable or unsafe Void position.
-
-Vertical movement must behave correctly with fighter collision.
-
-A grounded fighter should rise or descend with the platform rather than being left behind, continuously detached, or forced through it.
-
-Jumping from a moving cloud should preserve normal gameplay behavior.
-
-Movement should look like a cloud gently riding atmospheric currents.
+The cloud cannot travel into another playable platform.
 
 ⸻
 
-11. Idle behavior
+10. Vertical movement state
 
-When a cloud enters IDLE, stop its gameplay movement.
+When a cloud enters VERTICAL, it should gently float upward or downward.
 
-Keep its collision surface stationary.
+Randomize its vertical travel characteristics independently.
 
-The cloud can retain subtle cosmetic effects such as softly changing highlights, but its actual collision position must remain fixed until the next movement state.
+Maintain a safe minimum height above the main cloud.
 
-After its randomized idle duration, choose another valid behavior.
+Do not allow it to rise so high that ordinary gameplay becomes unreasonable or it enters unsafe Void geometry.
 
-Do not make IDLE a permanent state.
+A fighter standing on the cloud must rise and descend along with it.
 
-⸻
+The fighter must not sink through the cloud or hover at its previous height.
 
-PART IV — DISAPPEARING CLOUDS
-
-12. Implement disappearance and reappearance properly
-
-Both smaller cloud platforms can disappear independently.
-
-Disappearance is a real gameplay mechanic.
-
-It must not be purely cosmetic.
-
-Disappearing
-
-When a cloud enters DISAPPEARING:
-
-1. Begin a smooth visual fade.
-2. Provide enough visual warning that players can recognize the change.
-3. Transition to a fully hidden state.
-4. Disable its platform collision when it becomes unavailable.
-5. Ensure any fighter relying on the platform responds naturally to losing support.
-
-Do not leave an invisible collision surface behind.
-
-A cloud that is gone should no longer be usable as footing.
-
-Hidden
-
-While HIDDEN:
-
-* The cloud is invisible.
-* It cannot support fighters.
-* Fighters and projectiles must not interact with an invisible platform collision surface.
-* Its disappearance must not affect the other cloud.
-* Its state timer continues independently.
-* Its next appearance must be prepared safely.
-
-Reappearing
-
-When the hidden period ends:
-
-1. Validate the intended reappearance position.
-2. Fade the cloud smoothly back into view.
-3. Restore its collision only at an explicitly defined safe point in the transition.
-4. Return to normal randomized behavior.
-
-Avoid suddenly generating solid collision inside a fighter.
-
-A cloud should not trap, teleport, or launch a fighter merely because it reappeared.
-
-If necessary, delay collision restoration until the space is clear.
-
-A fighter already above the newly restored surface should be able to land on it normally.
-
-Fighters standing on disappearing clouds
-
-A disappearing cloud must not cause a physics glitch.
-
-If a fighter is standing on it when its collision turns off:
-
-* Release that fighter’s grounded support cleanly.
-* Allow gravity to take effect.
-* Preserve normal control, velocity, air actions, and fall behavior.
-* Do not teleport the fighter.
-* Do not apply artificial knockback.
-* Do not trigger an immediate Void elimination unless the fighter actually crosses the Void boundary.
-
-The fighter should simply begin falling, with their usual chance to recover.
+Vertical motion must be smooth and mechanically consistent.
 
 ⸻
 
-PART V — ABSOLUTE PLATFORM SEPARATION
+11. Idle state
 
-13. The three playable platforms must NEVER collide
+When a cloud enters IDLE, its gameplay position should remain fixed.
 
-This requirement is mandatory.
+It should not move horizontally or vertically.
 
-The main cloud and both smaller clouds must never overlap or intersect, regardless of random movement states.
+Its collision surface must remain stationary.
 
-The two smaller clouds must also never collide with each other.
+Minor decorative cloud animation is allowed, but the actual gameplay platform must remain in place.
 
-This includes their behavior during:
-
-* Horizontal movement.
-* Vertical movement.
-* Idle periods.
-* Disappearance.
-* Reappearance.
-* State changes.
-* Direction reversals.
-
-Recommended implementation
-
-Give each moving cloud a safe movement envelope.
-
-The left cloud receives a region above the left side of the main cloud.
-
-The right cloud receives a separate region above the right side.
-
-Their regions must remain disjoint, including the platforms’ full widths, heights, and safety margins.
-
-The lowest permitted position of either small cloud must remain safely above the main platform.
-
-Use actual world-space collision bounds, not visual center-point distances alone.
-
-Minimum separation
-
-Introduce a configurable safe distance between platform collision shapes.
-
-Include additional clearance where appropriate for the perspective art.
-
-A cloud’s planned destination must be validated against these restrictions before movement begins.
-
-Also validate each movement step or otherwise mathematically guarantee that the safe movement envelopes make collision impossible.
-
-If a randomized movement would violate a restriction, choose another valid destination or switch to IDLE.
-
-Do not allow the clouds to clip into each other even briefly.
-
-Never resolve cloud-cloud overlap by suddenly teleporting a platform.
-
-Important distinction
-
-Decorative cloud shapes in the background may overlap visually.
-
-However, the three playable cloud platforms must never physically intersect or overlap their gameplay collision volumes.
-
-Visual rendering should also make their separation obvious.
+After a randomized duration, transition to another valid state.
 
 ⸻
 
-PART VI — MOVING PLATFORM PHYSICS
+PART V — DISAPPEARANCE AND RANDOM REAPPEARANCE
 
-14. Extend Alva’s platform system correctly
+12. Disappearing state
 
-The existing StageCollision class converts the platform definitions into one-way collision surfaces, while stepBody() resolves landing and grounding.
+Each cloud can randomly enter DISAPPEARING.
 
-Currently, stage platforms are stationary.
+When this happens, it must gradually fade away.
 
-This update introduces genuinely dynamic platforms.
+Use a smooth opacity transition.
 
-Implement the necessary shared support cleanly.
+Make the fade noticeable enough that a player standing on the cloud receives a clear visual warning.
 
-Required functionality
+Suggested duration: approximately 0.5–0.9 seconds.
 
-Dynamic platforms must have:
+Do not instantly erase the cloud without warning.
 
-* A stable identifier.
-* A current position.
-* A previous position.
-* Their per-step displacement.
-* A visible/active collision state.
-* Movement boundaries.
-* Their own behavior controller when needed.
+As the disappearance completes, disable its collision.
 
-Keep the original map definition separate from live simulation state.
-
-Do not mutate the shared MAPS configuration globally during a match.
-
-Two matches must not accidentally share the same moving-platform state.
-
-Fighter support and movement
-
-When a platform moves and a fighter is grounded on it, apply the appropriate platform displacement before resolving the fighter’s normal movement.
-
-The fighter should remain supported while the platform moves.
-
-Movement must account for both horizontal and vertical displacement.
-
-Avoid accidental double application of displacement, grounded-state flickering, or repeated landing events.
-
-Preserve natural jumping from the platform.
-
-When the fighter jumps away, the platform must not continue dragging the fighter through the air.
-
-If a platform disappears, becomes non-collidable, or moves out from under a fighter, grounding must be cleared correctly.
-
-Collision integration
-
-Review and update all relevant systems:
-
-* StageCollision
-* stepBody()
-* Platform landing checks
-* surfaceBelow()
-* supportsAt()
-* Fighter grounding
-* Platform references stored on fighter bodies
-* Relevant camera and shadow calculations
-
-Ensure inactive cloud platforms are ignored by collision and support queries.
-
-Any moving platform must use its current simulation position in collision calculations.
-
-The physics and visual systems must not maintain unrelated copies of platform positions that can drift apart.
-
-Timing
-
-Advance dynamic platform states before fighter physics on each fixed simulation step.
-
-Ensure the correct order for platform displacement, grounded rider movement, and collision resolution.
-
-Rendering should use the simulation’s actual platform positions, with suitable interpolation when necessary.
-
-Do not implement gameplay movement using CSS animations or independent requestAnimationFrame() position updates.
-
-⸻
-
-15. Update CPU awareness
-
-Alva already includes stage awareness in:
-
-js/game/ai/cpu-intelligence/stage-model.js
-
-Its StageModel currently caches surface geometry.
-
-That approach requires attention when platforms begin moving or disappearing.
-
-Ensure CPU fighters understand the current state of the cloud platforms.
-
-CPU fighters should not permanently assume that a cloud exists at its initial coordinates.
-
-They should recognize:
-
-* Currently active cloud surfaces.
-* Updated positions.
-* Platforms that have disappeared.
-* Platforms that have reappeared.
-* The difference between reliable main-stage footing and temporary moving cloud footing.
-
-Modify or extend the stage model so dynamic surface positions do not become stale cached coordinates.
-
-Avoid hardcoding Asperitas-specific logic into the universal fighter AI.
-
-Use generic platform information where possible.
-
-The CPU does not have to perfectly predict the future, but it must not blindly target nonexistent surfaces or become unable to navigate the stage.
-
-Both Quick Battle and Watch Mode should remain playable.
-
-⸻
-
-PART VII — ASPERITAS VISUAL DESIGN
-
-16. Create js/stages/asperitas-theme.js
-
-Implement a dedicated procedural Canvas theme.
-
-Register it through js/stages/index.js.
-
-Follow the existing StageTheme interface and Perspective rendering architecture.
-
-Artistic direction
-
-Asperitas should feel like an elevated world above the clouds.
-
-It should be bright, airy, beautiful, and peaceful while still being suitable for a fast-paced fighting game.
-
-The environment should feel expansive and high above the ground.
-
-Sky
-
-Create a rich, atmospheric sky background.
-
-Suggested elements:
-
-* A bright blue sky gradient.
-* Very pale cyan near the horizon.
-* White and pearl-colored cloud banks.
-* Distant layers of clouds at different depths.
-* Subtle warm sunlight.
-* Soft atmospheric haze.
-* Gentle cloud shadows.
-* Occasional distant shafts of sunlight.
-
-The sky should never resemble Desert’s rocky environment or City’s night skyline.
-
-Background cloud layers
-
-Add multiple layers of decorative clouds at different depths to create a sense of scale.
-
-Use parallax movement consistent with the existing stage architecture.
-
-The farthest clouds should appear slower and softer.
-
-Nearer clouds may have clearer silhouettes and greater contrast.
-
-Decorative clouds must not be mistaken for playable surfaces.
-
-Maintain strong visual separation between background decoration and the three playable platforms.
-
-Main cloud visual
-
-The main cloud should have an organically shaped silhouette rather than a visible rectangular block.
-
-Build it from overlapping, rounded forms.
-
-Use soft highlights along the upper surface and subtle blue-gray shading underneath.
-
-The upper collision surface must remain visually understandable.
-
-Its lower edge should taper into a soft cloud mass, emphasizing that it is floating in open air.
-
-There must be no stone, dirt, metal, building facade, or physical support structure underneath.
-
-Two small cloud visuals
-
-Each small cloud should look like a smaller version of the main cloud.
-
-Their movement should look smooth and natural.
-
-While disappearing, gradually reduce their opacity.
-
-While reappearing, reverse the effect.
-
-A subtle atmospheric shimmer is acceptable, but avoid excessive bloom or particles that obscure the fighters.
-
-Visual quality
-
-Avoid basic white rectangles, unshaded ellipses, or temporary-looking placeholder art.
-
-Produce carefully layered procedural cloud shapes.
-
-The result should look like an intentional third environment worthy of the existing stage artwork.
-
-Use Alva’s shared pseudo-3D perspective where appropriate.
-
-The visual surface that fighters stand on must align with its physical collision surface.
-
-Performance
-
-Reuse the project’s existing cached geometry approach.
-
-Avoid regenerating complex decorative paths every frame.
-
-Keep particle counts reasonable.
-
-The stage must run smoothly on desktop browsers and mobile devices.
-
-Use Canvas 2D only.
-
-Do not add external rendering libraries.
-
-⸻
-
-PART VIII — STAGE DATA AND CAMERA
-
-17. Register Asperitas in js/data/maps.js
-
-Add a real MAPS entry.
-
-Use:
-
-* id: 'asperitas'
-* name: 'Asperitas'
-* theme: 'asperitas'
-
-Suggested tagline:
-
-“Above the clouds, beyond the horizon”
-
-Provide an appropriate description and stage traits.
-
-Example traits:
-
-* Terrain: Floating clouds.
-* Obstacles: None.
-* Platforms: 2 dynamic.
-* Light: Daylight.
-
-The exact data structure should remain compatible with Alva’s registry.
-
-Geometry
-
-Set up:
-
-* The stationary main cloud.
-* Two upper one-way cloud platforms.
-* Two safe spawn positions.
-* An appropriate voidBounds.
-* Appropriate cameraBounds.
-* No unnecessary solids.
-
-Choose the platform coordinates using actual game-world units and test them against Alva’s movement system.
-
-The clouds must be reachable and usable, with enough vertical headroom for ordinary jumps and aerial attacks.
-
-The main stage should remain comparable in width to Desert and City.
-
-Void rules
-
-Preserve the current Void implementation.
-
-Fighters should still be able to fall off the cloud and attempt recovery.
-
-A fighter is eliminated only after crossing the actual Void boundary.
-
-Ensure the upper Void boundary leaves adequate headroom above the highest reachable cloud platform.
-
-Preserve the existing closing-Void behavior during overtime.
-
-Do not make the Void move because clouds move.
-
-The cloud movement system and the Void system are independent.
-
-Camera
-
-The game camera must frame Asperitas comfortably.
-
-The main platform and moving clouds should be visible during ordinary gameplay.
-
-Keep the existing platform-fighter camera behavior.
-
-Do not zoom so far out that fighters become difficult to see.
-
-⸻
-
-PART IX — PREVIEWS AND UI INTEGRATION
-
-18. Live stage preview behavior
-
-Extend js/ui/stage-preview.js as necessary.
-
-The large Asperitas preview must show:
-
-* The sky background.
-* The large main cloud.
-* Both smaller clouds.
-* The actual appearance of the stage.
-
-Ideally, the two smaller clouds should demonstrate their independent floating behaviors in the animated preview.
-
-However, preview animation must not modify gameplay physics or globally shared map data.
-
-If the preview uses a separate demonstration-state simulation, keep it isolated and deterministic.
-
-Small stage roster thumbnails should render a recognizable snapshot.
-
-Avoid unnecessary complexity or performance overhead when many stage slots are visible.
-
-UI consistency
-
-Make sure the redesigned stage roster works in the existing:
-
-* Select Stage workflow.
-* Quick Battle setup.
-* Watch Mode setup.
-* Change Stage flow.
-* Back navigation.
-* Confirmation flow.
-
-Preserve selected stages when navigating backward and forward through menus.
-
-Do not create different stage-selection interfaces for Quick Battle and Watch Mode.
-
-Both should use the same redesigned component.
-
-⸻
-
-PART X — ACCESSIBILITY AND LOCALIZATION
-
-19. English and French support
-
-Alva supports both English and French.
-
-Add translations for:
-
-* Asperitas’s name.
-* Asperitas’s tagline.
-* Random Stage.
-* Any new roster status text.
-* Any new accessibility labels or instructions.
-
-Use the existing localization system.
-
-The English name of the stage should remain Asperitas.
-
-The French display name can also remain Asperitas.
-
-Make sure the new button updates correctly when the interface language changes.
-
-Do not hardcode visible interface strings when an existing translation mechanism is available.
-
-⸻
-
-20. Reduced motion
-
-Respect reduced-motion preferences for cosmetic animation.
-
-The animated menu preview and decorative atmosphere should become calmer or static where appropriate.
-
-However, gameplay physics must remain consistent.
-
-Do not create mismatches where a platform visually remains stationary but its collision surface continues to move somewhere else.
-
-If gameplay movement remains active with reduced motion, its position must still be accurately communicated to the player.
-
-Accessibility settings must not make the stage visually misleading.
-
-⸻
-
-PART XI — TESTING AND STABILITY
-
-21. Add comprehensive automated tests
-
-Expand the existing stage test coverage.
-
-At minimum, test:
-
-Stage registration
-
-* getMap('asperitas') returns the correct map.
-* The theme can be created.
-* Asperitas contains one main cloud and exactly two smaller playable platforms.
-* Existing Desert and City definitions remain intact.
-* Practice Ground is excluded from selectable battle stages.
-
-Stage roster
-
-* Exactly 24 stage positions exist.
-* Three positions are available.
-* The other 21 are unavailable placeholders.
-* Available stages are generated from the real registry.
-* Adding another stage to the registry fills a previously empty position without manual UI reconstruction.
-* Selected-stage highlighting works.
-* Confirming Asperitas passes the correct stage ID into battle.
-
-Random Stage
-
-* Random Stage chooses only playable stages.
-* Every available stage can be selected.
-* Unavailable placeholders are never selected.
-* The selected stage preview updates.
-* The chosen ID is stored in the correct selection state.
-* Quick Battle and Watch Mode keep their stage choices independent.
-* Random Stage does not automatically start a match.
-
-Cloud state machines
-
-* Both clouds initialize correctly.
-* Both clouds maintain independent state and timers.
-* Horizontal movement works.
-* Vertical movement works.
-* Idle periods work.
-* Disappearance works.
-* Hidden clouds have no collision.
-* Reappearance restores valid collision.
-* All states transition correctly.
-* Random behavior is reproducible using a fixed seed.
-* Different rendering frame rates do not change fixed-step gameplay results.
-
-Platform separation
-
-Run many randomized movement sequences.
-
-Assert continuously that:
-
-* The left cloud never intersects the right cloud.
-* Neither small cloud intersects the main cloud.
-* All safety distances remain valid.
-* Positions stay within their configured movement envelopes.
-* State changes do not teleport platforms into illegal positions.
-* Reappearance never violates platform separation.
+The cloud then enters HIDDEN.
 
 Fighter interaction
 
-Test fighters standing on:
+If a fighter is standing on the cloud when it becomes non-collidable:
 
-* An idle cloud.
-* A horizontally moving cloud.
-* A vertically moving cloud.
+* Remove the platform as their ground support.
+* Allow gravity to act normally.
+* Preserve the fighter’s velocity and normal available actions.
+* Do not teleport the fighter.
+* Do not apply artificial damage.
+* Do not apply knockback.
+* Do not immediately eliminate the fighter.
 
-Verify that fighters are carried correctly and remain grounded when appropriate.
+The fighter should simply begin falling.
 
-Also test:
+They can jump, move, or recover according to the game’s existing mechanics.
 
-* Jumping off moving clouds.
-* Landing on moving clouds.
-* Falling when a cloud disappears.
-* Reappearance near fighters.
-* Respawning.
-* Off-stage recovery.
-* Void elimination.
-* Overtime.
-* CPU navigation.
-* Watch Mode.
+⸻
 
-Regression testing
+13. Hidden state
 
-Run the full existing suite with:
+When the cloud reaches HIDDEN:
+
+* It is completely invisible.
+* It has no active collision.
+* It cannot support fighters.
+* Its previous location is no longer a valid gameplay surface.
+* It remains hidden for a randomized duration.
+
+During HIDDEN, the cloud prepares its next appearance.
+
+Most importantly, it must not automatically return to its previous coordinates.
+
+The next appearance position must be randomized.
+
+Each cloud selects its new location independently.
+
+⸻
+
+14. Random reappearance — mandatory behavior
+
+When a cloud reappears, it must appear at a new randomly selected valid position inside its assigned movement area.
+
+This is a fundamental part of the hazard.
+
+For example:
+
+A cloud might disappear while positioned toward the far left side of its movement region.
+
+After remaining hidden, it could reappear:
+
+* Farther right.
+* Farther left.
+* Higher.
+* Lower.
+* Near the center of its allowed region.
+
+Its new location should be selected randomly in two-dimensional world space.
+
+Do not limit reappearance to the same horizontal or vertical axis the cloud was moving along before disappearing.
+
+Position selection
+
+When the cloud is ready to reappear:
+
+1. Generate a candidate position using its permitted X and Y ranges.
+2. Validate that the candidate is inside its assigned safe region.
+3. Check that it cannot overlap the main cloud.
+4. Check that it cannot overlap the other smaller cloud.
+5. Check that it does not intersect an active fighter.
+6. Ensure it remains within safe camera and Void constraints.
+7. Use the valid candidate as its new reappearance location.
+
+Prefer a genuinely different location from its disappearance location.
+
+Use a configurable minimum relocation distance when the safe region allows it.
+
+Do not force a tiny displacement merely to claim the position is random.
+
+The cloud should visibly demonstrate that it can disappear in one location and return somewhere else.
+
+Critical transition detail
+
+The cloud must change its coordinates while fully hidden, not while visible.
+
+There should never be a visible teleportation.
+
+The transition should look like:
+
+1. Cloud gradually fades out at Position A.
+2. Cloud becomes completely invisible.
+3. A new safe Position B is generated.
+4. Cloud remains hidden for its randomized interval.
+5. Cloud gradually fades in at Position B.
+6. Cloud resumes ordinary randomized behavior.
+
+The player should recognize that the hazard has relocated.
+
+Reappearance animation
+
+When entering REAPPEARING:
+
+* Start at zero opacity.
+* Fade smoothly toward full opacity.
+* Remain stationary during the reappearance fade, unless a carefully implemented cosmetic effect is used.
+* Restore collision only when it is safe.
+* Finish the fade.
+* Select another randomized ordinary state.
+
+Do not make the cloud appear fully opaque in a single frame.
+
+Reappearance safety
+
+Never reintroduce a solid cloud directly inside a fighter’s collider.
+
+If the randomly selected location is currently occupied by a fighter, choose another valid position or delay the cloud’s return.
+
+If the other hazard is moving, account for its current position and permitted movement envelope.
+
+Do not solve unsafe reappearance by teleporting fighters.
+
+A cloud can wait longer in HIDDEN until a safe appearance is possible.
+
+If the randomized search fails repeatedly, use a deterministic safe fallback position or continue waiting.
+
+The system must never enter an infinite loop.
+
+Example of intended behavior
+
+Cloud A:
+
+* Starts above the left side.
+* Moves vertically.
+* Becomes idle.
+* Begins disappearing.
+* Fully disappears.
+* Remains hidden.
+* Selects a new random position higher and farther right within its region.
+* Fades back into existence.
+* Remains idle briefly.
+* Begins moving horizontally.
+
+Meanwhile, Cloud B might:
+
+* Move horizontally.
+* Become idle.
+* Disappear.
+* Reappear at a lower position within its own region.
+* Begin moving vertically.
+
+Neither cloud needs to wait for the other to change states.
+
+⸻
+
+PART VI — ZERO PLATFORM COLLISIONS
+
+15. The three platforms must NEVER collide
+
+This is an absolute gameplay requirement.
+
+The following collisions must always be impossible:
+
+* Main cloud with Cloud A.
+* Main cloud with Cloud B.
+* Cloud A with Cloud B.
+
+This requirement applies at all times, including when clouds move, disappear, or reappear.
+
+Safe movement regions
+
+Assign each smaller cloud a bounded movement region.
+
+The left cloud should generally occupy the upper-left part of the arena.
+
+The right cloud should generally occupy the upper-right part.
+
+Each region should leave sufficient horizontal and vertical clearance.
+
+The movement regions must be designed so both hazards can move freely without ever physically intersecting.
+
+Separation validation
+
+Use actual platform bounds, including platform width, height, and safety margins.
+
+Do not validate separation using only center points.
+
+Account for:
+
+* Horizontal movement.
+* Vertical movement.
+* Reappearance locations.
+* Movement direction changes.
+* Full collision widths.
+* The main cloud’s upper surface.
+* Relevant visual cloud volume.
+
+Recommended guarantee
+
+Prefer mathematically disjoint movement envelopes.
+
+If both hazards’ complete possible movement envelopes cannot overlap, randomized movement remains safe by construction.
+
+Also validate generated destinations.
+
+A random movement destination must be rejected if it violates separation constraints.
+
+If no valid movement destination exists, the cloud can temporarily enter IDLE.
+
+No sudden corrections
+
+Never allow a cloud to overlap another platform and then correct the mistake using visible teleportation.
+
+Prevent invalid motion before it occurs.
+
+The cloud must not clip into the main platform even for one simulation frame.
+
+Disappeared clouds
+
+A hidden cloud has no gameplay collision.
+
+However, its future reappearance region must still be safe.
+
+Do not rely on the fact that a cloud is hidden to permit an unsafe position that would become invalid when it reappears.
+
+⸻
+
+PART VII — REAL MOVING-PLATFORM PHYSICS
+
+16. Extend the current platform physics
+
+Alva currently uses StageCollision and stepBody() for collision resolution.
+
+Existing one-way stage platforms are static.
+
+Asperitas requires real dynamic platforms.
+
+Do not implement the clouds as purely visual objects.
+
+Extend the stage system to support moving and temporarily inactive one-way surfaces.
+
+Architecture
+
+Keep separate concepts for:
+
+* Immutable stage definitions.
+* Runtime platform objects.
+* Independent hazard state machines.
+* Collision surfaces.
+* Rendering positions.
+
+Use a stable platform ID for each hazard.
+
+Avoid mutating global MAPS data during matches.
+
+Every new battle should initialize its own platform state.
+
+Runtime dynamic platform data
+
+A dynamic platform should expose sufficient information to determine:
+
+* Current world position.
+* Previous world position.
+* Movement delta.
+* Collision activation.
+* Visibility.
+* One-way collision properties.
+* Stable identification.
+* Movement region.
+* Hazard state.
+
+Avoid separate unsynchronized gameplay and rendering positions.
+
+Simulation order
+
+Dynamic platforms must update using Alva’s fixed simulation timestep.
+
+The appropriate sequence should ensure:
+
+1. Hazard behavior advances.
+2. Platform motion updates.
+3. Grounded riders receive platform displacement.
+4. Fighters process their own movement.
+5. Collision resolution uses the updated surfaces.
+6. Support and grounded state are finalized.
+
+Adapt the precise ordering to Alva’s existing simulation architecture.
+
+Carrying fighters
+
+When a cloud moves horizontally, a grounded fighter should be carried horizontally.
+
+When it moves vertically, the fighter should rise or descend with it.
+
+The fighter must remain correctly grounded while standing on an active platform.
+
+The fighter should still be able to:
+
+* Walk.
+* Run.
+* Jump.
+* Dash.
+* Attack.
+* Shield.
+* Be launched.
+* Fall off the cloud.
+
+When the fighter jumps, the cloud must no longer drag them through the air.
+
+Preserve the game’s existing movement and momentum rules.
+
+Disappearance collision
+
+When a cloud becomes fully inactive:
+
+* Remove it from collision queries.
+* Invalidate any fighter’s stale ground reference to it.
+* Clear grounded state when appropriate.
+* Let the fighter continue naturally under gravity.
+
+Do not leave invisible platforms.
+
+Reappearance collision
+
+When a cloud becomes active again:
+
+* Ensure its placement is valid.
+* Restore its one-way collision.
+* Allow normal landing behavior.
+* Do not trap or displace fighters who occupy nearby space.
+
+Shadow rendering
+
+Review the fighter shadow system, which queries surfaces below the fighter.
+
+Moving clouds must correctly receive shadows and ground markers when active.
+
+Hidden clouds must not receive shadows or ground markers.
+
+⸻
+
+PART VIII — CPU INTELLIGENCE
+
+17. Make CPU fighters understand dynamic hazards
+
+Alva includes a shared StageModel for CPU stage navigation and recovery.
+
+It currently caches surface information.
+
+This must be adapted for moving and disappearing platforms.
+
+Required AI awareness
+
+CPU fighters should understand:
+
+* The current location of active cloud hazards.
+* Their current collision availability.
+* When a cloud has disappeared.
+* When a cloud reappears.
+* Which platforms are usable.
+* Which routes involve temporary or moving footing.
+
+Do not let CPUs indefinitely treat a cloud’s starting position as its actual current position.
+
+Use live runtime surface data.
+
+CPU behavior
+
+CPUs do not need supernatural knowledge of future random states.
+
+They should react to available information.
+
+They must not:
+
+* Repeatedly target invisible platforms.
+* Assume disappeared clouds still exist.
+* Become unable to navigate Asperitas.
+* Freeze because platform coordinates changed.
+* Fail to recover simply because their previous target surface vanished.
+
+The main cloud should remain a reliable fallback area.
+
+Avoid hardcoded AI logic that checks map.id === 'asperitas' unless there is a compelling architectural reason.
+
+Prefer generic dynamic-platform support.
+
+The implementation must work in both Quick Battle and Watch Mode.
+
+⸻
+
+PART IX — PROCEDURAL ASPERITAS ART
+
+18. Create a dedicated sky theme
+
+Implement a new module:
+
+js/stages/asperitas-theme.js
+
+Register it in:
+
+js/stages/index.js
+
+Use the existing StageTheme and Perspective architecture.
+
+No external rendering engines, CSS-based gameplay animations, or new frameworks.
+
+Overall atmosphere
+
+Asperitas should be visually beautiful.
+
+The player should feel that the fight takes place far above the world, surrounded by an enormous open sky.
+
+The environment should convey height, distance, and atmospheric depth.
+
+Background
+
+Use a layered sky design:
+
+* Rich blue upper atmosphere.
+* Soft cyan and pale blue horizon.
+* Large distant cloud formations.
+* Wispy atmospheric clouds.
+* Subtle sunlight.
+* Gentle light scattering.
+* Multiple cloud layers at different depths.
+
+The lower background should suggest an ocean of distant clouds rather than a visible ground surface.
+
+Parallax
+
+Use the existing layered rendering approach.
+
+Far clouds should move slowly relative to the camera.
+
+Near clouds should provide stronger depth cues.
+
+Keep the foreground relatively subtle to avoid obscuring gameplay.
+
+Main cloud
+
+The main cloud should be the most visually substantial shape.
+
+Use layered rounded formations, smooth shading, and an organic silhouette.
+
+Its playable surface must remain clear.
+
+The underside should read as soft cloud volume, not a rectangular building facade.
+
+Two hazard clouds
+
+The smaller clouds must share the same overall artistic style.
+
+However, each should remain easy to track visually.
+
+Their shapes can differ slightly while maintaining comparable gameplay readability.
+
+Both hazards should clearly communicate movement and disappearance.
+
+Hazard visual feedback
+
+Because the two upper clouds are hazards, players must be able to recognize that they behave differently from the stationary main platform.
+
+Use a restrained visual treatment, such as:
+
+* Slightly more noticeable floating motion.
+* Soft atmospheric movement trails.
+* Distinct but subtle rim shading.
+* A clear fade before disappearance.
+* A soft formation effect during reappearance.
+
+Do not use distracting red warning effects that make the clouds look damaging when they are not.
+
+The stage’s actual hazards are instability, movement, and disappearance.
+
+Visual synchronization
+
+The hazard cloud’s rendered surface must coincide with its real gameplay collision location.
+
+Avoid any situation where the visual cloud moves but the physical collision remains behind.
+
+Use simulation state and interpolation appropriately.
+
+Performance
+
+Use cached Path2D geometry and sensible Canvas rendering practices.
+
+Avoid unnecessary work on every frame.
+
+The stage must remain performant on desktop and landscape mobile browsers.
+
+⸻
+
+PART X — MAP DATA
+
+19. Add Asperitas to MAPS
+
+Add the third stage definition in js/data/maps.js.
+
+The stage should have:
+
+* A unique ID.
+* English name and tagline.
+* Description.
+* Stage traits.
+* Main-stage geometry.
+* Void bounds.
+* Camera bounds.
+* Two player spawn points.
+* Exactly two dynamic upper cloud platform definitions.
+* No unrelated solid obstacles.
+* Theme key asperitas.
+
+The main cloud should use world dimensions comparable to existing stages.
+
+The two hazard clouds should be positioned above the main cloud in the initial map layout.
+
+Spawn positions
+
+Both fighters spawn on the large main cloud.
+
+Neither fighter should spawn directly on one of the hazards.
+
+The initial positions should provide comfortable separation for standard combat.
+
+Hazard IDs
+
+Use stable unique IDs, for example:
+
+* asperitas-cloud-left
+* asperitas-cloud-right
+
+These IDs identify the runtime hazard objects and their associated platform surfaces.
+
+Hazard metadata
+
+Include suitable fields to identify:
+
+* The object as a one-way platform.
+* The object as a hazard.
+* Its possible movement states.
+* Its movement envelope.
+* Its ability to disappear.
+* Its random reappearance behavior.
+
+Do not create a global generic damage-hazard system if the feature only needs metadata plus dynamic platform behavior.
+
+⸻
+
+PART XI — CAMERA AND VOID
+
+20. Preserve normal camera behavior
+
+The camera should frame Asperitas similarly to the other battle stages.
+
+The main cloud should fit comfortably in normal gameplay.
+
+The two upper hazard clouds should generally be visible during neutral play.
+
+Do not zoom out excessively.
+
+The camera should still track fighters during launches and recovery.
+
+Void
+
+Keep the existing Void system.
+
+Falling from a cloud is not an immediate elimination.
+
+A fighter is only eliminated upon crossing the actual Void boundary.
+
+The main cloud and both hazards must remain within safe stage bounds.
+
+Reappearing cloud hazards must never spawn outside the playable region or inside the Void.
+
+Overtime
+
+Alva’s overtime system closes the Void inward.
+
+Preserve this mechanic.
+
+The hazards must continue to function during overtime.
+
+Their random reappearance rules must remain safe under the current Void boundaries.
+
+If a location is no longer valid because the Void has closed, it must not be selected as a reappearance destination.
+
+Do not allow a hazard to reappear where the active Void immediately invalidates its footing.
+
+⸻
+
+PART XII — LIVE PREVIEW INTEGRATION
+
+21. Update StagePreview
+
+The new Stage Selection interface must provide an accurate Asperitas preview.
+
+The hero preview should show:
+
+* The sky.
+* The main cloud.
+* Both upper clouds.
+* Atmospheric background effects.
+
+Prefer to animate the clouds in the hero preview to demonstrate their behavior.
+
+The preview can use a separate instance of the hazard controller.
+
+It must not modify the actual battle’s platform state.
+
+Preview behavior
+
+The clouds should demonstrate:
+
+* Independent movement.
+* Horizontal and vertical drifting.
+* Idle periods.
+* Disappearance.
+* Reappearance at different positions.
+
+The preview should not depend on a running battle simulation.
+
+Use a lightweight isolated presentation instance or shared behavior implementation as appropriate.
+
+Thumbnails
+
+Roster thumbnails should use a static, recognizable representation of each stage.
+
+Do not run a full independently simulated hazard system inside every thumbnail.
+
+⸻
+
+PART XIII — LOCALIZATION AND ACCESSIBILITY
+
+22. English and French
+
+Update Alva’s existing localization tables.
+
+Include strings for:
+
+* Asperitas.
+* Asperitas’s tagline.
+* Random Stage.
+* Stage-slot counts.
+* Unavailable stage slots.
+* Hazard labeling or descriptions, wherever displayed.
+
+Suggested stage name in both languages:
+
+Asperitas
+
+Ensure the Random Stage button and roster information display correctly in English and French.
+
+Use the existing localization utilities.
+
+Hazard labeling
+
+In any stage information display, identify the two smaller clouds as hazards.
+
+Use the term Hazards in English and an appropriate equivalent in French.
+
+The distinction must remain clear:
+
+* Main cloud: normal stage platform.
+* Two upper clouds: moving and disappearing hazard platforms.
+
+Accessibility
+
+Keep keyboard and controller focus states obvious.
+
+Provide appropriate semantic labels for interactive tiles.
+
+Unavailable placeholders should be recognizable as unavailable.
+
+Support reduced-motion preferences without making gameplay collision and visual positions disagree.
+
+⸻
+
+PART XIV — TESTING
+
+23. Automated tests
+
+Extend existing tests and introduce dedicated hazard tests where appropriate.
+
+Run:
 
 node --test
 
-Fix all new failures and investigate existing test assumptions.
+Do not remove valuable existing tests or weaken assertions merely to obtain passing results.
 
-For example, tests/systems/platform-stage.test.mjs currently contains historical Void-margin reference data for Desert, City, and Practice Ground. Extend stage coverage without accidentally leaving assumptions that only those stages exist.
+Stage registration tests
 
-Do not weaken meaningful existing assertions just to make new tests pass.
+Verify:
+
+* Asperitas is registered.
+* getMap('asperitas') succeeds.
+* Its theme can be instantiated.
+* There is exactly one main platform.
+* There are exactly two upper cloud hazards.
+* The main platform is not classified as a hazard.
+* Both upper clouds are classified as hazards.
+* Desert and City remain intact.
+
+24-slot roster tests
+
+Verify:
+
+* Exactly 24 total stage slots.
+* Three available stages.
+* Twenty-one unavailable placeholders.
+* Future registry entries automatically fill slots.
+* Stage selection updates the correct stage ID.
+* Quick Battle and Watch Mode selections remain separate.
+* Confirmation starts battles normally.
+
+Random Stage tests
+
+Verify:
+
+* Only playable maps are selected.
+* Practice Ground is excluded.
+* Placeholders are excluded.
+* Every playable stage is reachable by random selection.
+* Selection and preview update correctly.
+* The button does not immediately launch a battle.
+
+Independent behavior tests
+
+Verify:
+
+* Each hazard has its own current state.
+* Each hazard has its own timer.
+* Random streams are independent.
+* State transitions are valid.
+* Horizontal movement works.
+* Vertical movement works.
+* Idle works.
+* Disappearance works.
+* Hidden state disables collision.
+* Reappearance works.
+* Both hazards can behave differently at the same time.
+
+Random reappearance tests
+
+These are particularly important.
+
+Verify:
+
+* A hidden cloud can reappear at a position different from its disappearance position.
+* Reappearance X coordinates vary within permitted limits.
+* Reappearance Y coordinates vary within permitted limits.
+* Relocation occurs while invisible.
+* No visible teleportation occurs.
+* The new location is validated before the cloud becomes collidable.
+* Reappearance does not intersect the main cloud.
+* Reappearance does not intersect the other hazard.
+* Reappearance does not trap a fighter.
+* An occupied candidate location is rejected or deferred.
+* Failed placement attempts cannot cause an infinite loop.
+* Reappearance remains valid during overtime.
+
+Platform separation stress tests
+
+Run long seeded randomized simulations.
+
+Continuously verify:
+
+* Main cloud and Cloud A never overlap.
+* Main cloud and Cloud B never overlap.
+* Cloud A and Cloud B never overlap.
+* All movement stays within permitted regions.
+* State changes do not violate separation.
+* Random relocation never violates separation.
+
+Include cases where one or both hazards are disappearing or reappearing.
+
+Fighter physics tests
+
+Verify:
+
+* Fighters can land on each cloud.
+* Horizontal movement carries grounded fighters.
+* Vertical movement carries grounded fighters.
+* Jumping releases platform attachment.
+* Running and dashing still work.
+* Falling from a disappearing cloud works correctly.
+* Invisible clouds cannot support fighters.
+* Reappearing clouds do not push fighters unexpectedly.
+* Collision references remain valid.
+* Respawning works.
+* Void elimination works.
+* Overtime works.
+
+Frame-rate independence
+
+Simulate the same seed and sequence using different rendering frame rates.
+
+Fixed-step platform behavior should remain consistent.
+
+Cloud state randomness must not depend on how frequently the screen renders.
+
+CPU tests
+
+Verify CPUs can navigate Asperitas in Quick Battle and Watch Mode.
+
+They must respond to moving and missing platforms without repeatedly targeting stale positions.
 
 ⸻
 
-22. Manual visual testing
+PART XV — MANUAL GAMEPLAY VERIFICATION
 
-Check the actual game in a browser.
+24. Browser testing
 
-Verify the appearance and functionality at multiple screen sizes, including:
+Launch and inspect the actual game.
 
-* 1920 × 1080 desktop.
-* 1280 × 720 laptop.
+Test at:
+
+* 1920 × 1080.
+* 1280 × 720.
 * Compact mobile landscape.
 * Tall or narrow browser windows.
 
-Inspect the complete 24-slot roster.
+Stage roster
 
-Make sure every stage position remains accessible.
+Check that the 24-slot roster looks intentional and polished.
 
-Verify that the Random Stage button stays visible and usable.
+Make sure all controls are visible or accessible through scrolling.
 
-Inspect the large Asperitas preview.
+Check Random Stage with mouse, keyboard, and controller navigation.
 
-Start actual matches on Asperitas.
+Asperitas
 
-Observe the two clouds over an extended period and verify that their behaviors differ and their transitions are clearly visible.
+Start matches on Asperitas.
 
-Check disappearing clouds while fighters are standing on them.
+Watch the hazards over an extended period.
 
-Confirm that platform movement never causes fighters to jitter, teleport, sink into geometry, or remain suspended on invisible platforms.
+Both clouds should independently:
 
-Test CPU-vs-CPU battles as well as human-controlled battles.
+* Move left and right.
+* Move up and down.
+* Remain idle.
+* Disappear.
+* Remain hidden.
+* Reappear somewhere else.
+* Resume randomized behavior.
+
+Ensure a cloud does not always reappear in the same location.
+
+Check that a cloud can reappear noticeably higher, lower, farther left, or farther right, while respecting its designated safe movement area.
+
+Platform interaction
+
+Stand on a horizontally moving cloud.
+
+Stand on a vertically moving cloud.
+
+Jump from a moving cloud.
+
+Allow a cloud to disappear beneath a fighter.
+
+Observe a cloud reappearing while fighters move nearby.
+
+All interactions must remain smooth and predictable at the physics level, even though hazard behavior is randomized.
+
+Separation
+
+Continuously verify that the three platforms never touch or overlap.
+
+Pay special attention to random reappearance.
+
+The hazard system must not produce clipping or invalid positions.
 
 ⸻
 
-PART XII — CODE QUALITY AND DOCUMENTATION
+PART XVI — DOCUMENTATION AND MAINTAINABILITY
 
-23. Maintain Alva’s architecture
+25. Update project documentation
 
-Follow the project’s conventions.
-
-Keep map definitions, runtime platform behavior, physics, AI awareness, and procedural rendering separated appropriately.
-
-Prefer a reusable generic moving-platform system over a large collection of Asperitas-specific conditions scattered throughout the engine.
-
-Future stages should be able to use moving or disappearing platforms without rewriting the physics system.
-
-Avoid creating unnecessary abstractions, duplicated logic, or unrelated refactors.
-
-Do not change universal fighter movement statistics to make Asperitas work.
-
-Do not break existing character abilities, attacks, dashes, jumps, shields, or launch behavior.
-
-Preserve existing controller and touch functionality.
-
-Do not alter the protected character_rule file.
-
-⸻
-
-24. Update documentation
-
-Update the relevant documentation to describe the new stage and systems.
-
-Include:
+Update the relevant sections of:
 
 * README.md
+* ALVA_SPEC.md
 * docs/gameplay/stages.md
-* Relevant parts of ALVA_SPEC.md
-* Other affected architecture documentation, if necessary.
+* Related architecture documentation where appropriate.
 
-Document how future stages are registered and displayed in the 24-slot roster.
+Document the new 24-slot roster.
 
-Explain how dynamic platform behavior is configured and updated.
+Explain how a future stage can be added.
 
-Document the separation between visual cloud rendering and actual collision behavior.
+Document the Random Stage button.
 
-Ensure references to the previous total of two stages are updated where appropriate.
+Describe Asperitas’s three-platform structure.
+
+Document the two dynamic cloud hazards and their randomized behavior.
+
+Explain the six hazard states and how random reappearance works.
+
+Document how moving platforms interact with fighter physics.
+
+Extensibility
+
+Prefer a reusable dynamic-platform implementation.
+
+Future stages should be able to use moving or disappearing platforms without duplicating the entire Asperitas implementation.
+
+However, do not overengineer unrelated features.
+
+Keep the architecture practical and compatible with Alva.
 
 ⸻
 
-PART XIII — FINAL ACCEPTANCE CRITERIA
+PART XVII — ACCEPTANCE CRITERIA
 
-This update is finished only when all of the following are true:
+The update is complete only when every requirement below is satisfied.
 
-* [ ]	The stage-selection screen has been completely redesigned for 24 stage positions.
-* [ ]	The first three slots contain Desert, City, and Asperitas.
-* [ ]	The remaining 21 slots are non-playable placeholders.
-* [ ]	The roster works on desktop, mobile, keyboard, mouse, touch, and gamepad.
-* [ ]	A dedicated Random Stage button works correctly.
-* [ ]	Random selection never chooses unavailable slots.
-* [ ]	Asperitas is playable in Quick Battle.
-* [ ]	Asperitas is playable in Watch Mode.
-* [ ]	Asperitas has a polished sky environment.
-* [ ]	Its main platform is a large floating cloud with no ground or building foundation beneath it.
-* [ ]	Exactly two smaller playable clouds float above the main cloud.
-* [ ]	Both smaller clouds move independently.
-* [ ]	Each cloud can be IDLE, HORIZONTAL, VERTICAL, DISAPPEARING, HIDDEN, and REAPPEARING.
-* [ ]	State transitions are randomized and continuous.
-* [ ]	Platform movement is smooth and physically synchronized.
-* [ ]	Fighters can land on and jump from both smaller clouds.
-* [ ]	Fighters are correctly carried by moving clouds.
-* [ ]	Disappearing clouds stop supporting fighters.
+Stage roster
+
+* [ ]	The old two-card layout is replaced.
+* [ ]	The roster supports exactly 24 stage positions.
+* [ ]	Desert occupies slot 1.
+* [ ]	City occupies slot 2.
+* [ ]	Asperitas occupies slot 3.
+* [ ]	The remaining 21 positions are unavailable placeholders.
+* [ ]	The roster is responsive.
+* [ ]	A prominent stage preview remains.
+* [ ]	A separate Random Stage button is present.
+* [ ]	Random Stage selects only real playable stages.
+* [ ]	Random Stage updates the highlighted stage and preview.
+* [ ]	Random Stage does not immediately start a battle.
+* [ ]	Keyboard, mouse, touch, and controller navigation work.
+
+Asperitas environment
+
+* [ ]	Asperitas is a fully playable stage.
+* [ ]	The environment is sky-themed.
+* [ ]	The background includes layered atmospheric clouds.
+* [ ]	The main platform is a giant floating cloud.
+* [ ]	The main platform has no visible or extensive invisible foundation.
+* [ ]	The main platform stays stationary.
+* [ ]	There are exactly two smaller cloud platforms above it.
+* [ ]	Both smaller clouds are classified as hazards.
+* [ ]	The main cloud is not classified as a hazard.
+
+Cloud hazard behavior
+
+* [ ]	Cloud A has an independent state machine.
+* [ ]	Cloud B has an independent state machine.
+* [ ]	Both hazards can move horizontally.
+* [ ]	Both hazards can move vertically.
+* [ ]	Both hazards can become idle.
+* [ ]	Both hazards can disappear.
+* [ ]	Both hazards become non-collidable while hidden.
+* [ ]	Both hazards can reappear.
+* [ ]	Every hazard selects a newly randomized valid reappearance position.
+* [ ]	Random reappearance supports both X and Y variation.
+* [ ]	Relocation occurs entirely while hidden.
+* [ ]	Reappearance is smoothly animated.
+* [ ]	Reappearance cannot intersect a fighter.
+* [ ]	The hazards transition continuously between randomized states.
+* [ ]	The hazards are not synchronized.
+* [ ]	The hazards do not cause direct contact damage.
+
+Physics and separation
+
+* [ ]	The three playable platforms never collide.
+* [ ]	The two hazard clouds never overlap.
+* [ ]	Neither hazard intersects the main cloud.
+* [ ]	Random relocation never creates an overlap.
+* [ ]	Fighters are carried by moving clouds.
+* [ ]	Fighters can jump and land normally.
+* [ ]	Disappearing clouds release grounded fighters correctly.
+* [ ]	No invisible collision remains after disappearance.
 * [ ]	Reappearing clouds restore collision safely.
-* [ ]	The three playable platforms never collide or overlap.
-* [ ]	CPUs correctly respond to dynamic platform positions and availability.
-* [ ]	Camera, Void, overtime, and respawning remain functional.
+* [ ]	CPU navigation works with dynamic platforms.
+* [ ]	Void and overtime systems remain functional.
+
+Quality
+
+* [ ]	The stage is visually polished.
+* [ ]	The clouds look organic rather than rectangular.
+* [ ]	Visual movement and physics remain synchronized.
+* [ ]	The interface matches Alva’s design system.
 * [ ]	English and French localization is complete.
-* [ ]	Existing Desert and City functionality remains unchanged.
+* [ ]	Existing stages remain unchanged and playable.
 * [ ]	Automated tests pass.
-* [ ]	The implementation is visually inspected in a real browser.
-* [ ]	Relevant documentation is updated.
+* [ ]	Real browser verification is performed.
+* [ ]	Documentation is updated.
 
-Final instructions
+⸻
 
-Implement this update directly in the existing Alva codebase.
+FINAL IMPLEMENTATION INSTRUCTIONS
 
-Do not stop after planning or creating placeholder components.
+Implement this complete update in the Alva repository.
 
-Deliver the actual functioning stage, moving-platform mechanics, redesigned roster, randomized stage selection, procedural artwork, and required tests.
+Do not deliver only a plan, a design mockup, or a partial implementation.
 
-Prioritize three qualities:
+Create the redesigned roster, Random Stage functionality, Asperitas environment, independent cloud-hazard controllers, actual dynamic collision behavior, safe random relocation, and corresponding tests.
 
-1. Visual quality: Asperitas should feel like a completely new, carefully designed environment.
+Highest-priority rules
 
-2. Gameplay integrity: Moving and disappearing platforms must interact reliably with the existing fighter and collision systems.
+Rule 1 — Independent randomness
 
-3. Future scalability: The 24-stage roster and dynamic-platform architecture should be practical foundations for future Alva stages.
+Cloud A and Cloud B must each control their own states, movement, timers, and disappearance cycles.
 
-When the implementation is complete, provide a summary of the changed files, important technical decisions, tests executed and their results, and any remaining limitations.
+Rule 2 — Random reappearance
 
-The final result should feel like a polished, native expansion of Alva—not a separate feature attached to it.
+After disappearing, a cloud must reappear at a newly randomized valid position. It must not be restricted to returning to the position where it disappeared.
+
+Rule 3 — Hazard identity
+
+Both smaller clouds are officially classified as stage hazards because of their unpredictable movement and disappearance. They remain usable platforms and do not inflict contact damage.
+
+Rule 4 — Absolute separation
+
+The three playable cloud platforms must never collide or physically overlap under any circumstances.
+
+Rule 5 — Genuine gameplay physics
+
+All movement, disappearance, and reappearance must affect real platform collision and fighter behavior, not only visual animation.
+
+Rule 6 — Preserve Alva
+
+Keep existing fighter mechanics, game modes, stage behavior, controllers, localization, and design conventions intact.
+
+Expected final delivery
+
+After implementation, provide:
+
+1. A summary of the changes made.
+2. A list of important modified and added files.
+3. An explanation of how independent hazard state machines work.
+4. An explanation of how new random reappearance locations are selected and validated.
+5. An explanation of how cloud-platform collisions are prevented.
+6. Test results and browser verification findings.
+7. Any remaining limitations.
+
+The final result must feel like a complete, native Alva expansion: a scalable 24-stage roster and a distinctive third stage where two independently randomized cloud hazards create constantly changing aerial fighting opportunities.
