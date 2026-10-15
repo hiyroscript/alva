@@ -1,760 +1,574 @@
-ALVA — Special Ability Reclassification, Animation Improvements & Home Screen Web-App Installation
+ALVA — Permanently Remove the Transform Button and Entire Transform System
 
 Objective
 
-Implement two major improvements to Alva:
+Completely and permanently remove the Transform button, action, and all associated functionality from the Alva game.
 
-1. Correct the classification of Special abilities, adjust the relevant animations, and add an orange exclamation-mark indicator above a character while performing a Special ability.
-2. Make the Home Screen’s bottom-right Download button functional, with an informative installation dialog, native Add to Home Screen support wherever available, and an attention-catching download icon animation.
+Transform will never be used in Alva. It is not a planned feature, a reserved ability, or a future mechanic.
 
-Inspect the existing architecture before making changes. Implement everything using the game’s current design conventions and data-driven systems. Preserve existing combat mechanics, move identities, controller bindings, UI styling, and responsiveness.
+This is a permanent feature deletion, not a temporary UI change.
+
+Do not merely hide or disable the button. Remove its underlying implementation and all unnecessary references throughout the codebase.
+
+The finished game must behave as though Transform was never included in its control architecture.
+
+1. Understand the existing architecture
+
+Before making changes, inspect the current repository thoroughly.
 
 Repository: hiyroscript/alva
 
-Alva is a vanilla JavaScript, HTML, CSS, and Canvas 2D platform fighting game without a framework or build step.
+Default branch: main
 
-⸻
+Alva uses vanilla JavaScript ES modules, HTML, CSS, Canvas rendering, and Node’s built-in test runner.
 
-PART 1 — Correct the Special Ability Classification
+Review the game’s existing architecture before modifying it, particularly:
 
-1.1 What counts as a Special ability?
+* CLAUDE.md
+* README.md
+* ALVA_SPEC.md
+* codename_rule
+* docs/architecture/
+* docs/systems/input.md
+* docs/systems/combat.md
+* js/config.js
+* js/core/
+* js/data/
+* js/game/
+* js/ui/
+* js/screens/
+* css/
+* tests/
 
-Currently, abilities are sometimes classified as Special simply because they use a projectile, summon, or technique implementation.
+Respect the project’s existing architecture and conventions.
 
-This is incorrect for the intended player-facing meaning of Special.
+Never modify character_rule. It is a protected project file.
 
-A Special ability should be reserved for an exceptionally distinctive move with a mechanic that meaningfully changes how combat works.
+Use existing systems and coding patterns rather than introducing replacement abstractions.
 
-For example:
+2. Permanently remove the Transform gameplay action
 
-* An area-wide paralysis that temporarily prevents opponents from acting.
-* An extraordinarily powerful projectile with unusual properties, such as erasing opposing projectiles and passing through fighters.
-* A self-healing ability that restores the character’s Launch Point.
+In js/config.js, remove Transform from every gameplay-related definition.
 
-A conventional projectile, tornado, knockback attack, pull effect, or ground-impact burst should not automatically qualify as Special.
+Specifically:
 
-Importantly, the execution type of a move must remain independent from its player-facing classification.
+* Remove transform: ['KeyK'] from gameplay keyboard bindings.
+* Remove 'transform' from COMBAT_BUTTONS.
+* Remove 'transform' from ACTIONS.
+* Remove transform: 'Transform' from ACTION_LABELS.
+* Remove the transform entry from MOVES.
+* Remove obsolete comments describing Transform as reserved or potentially usable.
 
-A move can remain internally implemented as a technique, summon, or projectile-producing attack while being displayed as an ordinary Ground attack.
+The expected combat action vocabulary becomes:
 
-1.2 Exact classification for the current characters
+export const COMBAT_BUTTONS = Object.freeze([
+  'extra_attack',
+  ...NUMBERED_ATTACKS,
+]);
 
-These are the authoritative classifications.
+Keep the existing ordering of all remaining actions.
 
-Character	Move	Classification
-#0001	Unlimited Void (attack4)	SPECIAL
-#0001	Hollow Purple (attack5)	SPECIAL
-#0001	Red (attack2)	Normal
-#0001	Maximum Blue (attack3)	Normal
-#0002	Whirlwind (extra_attack)	Normal
-#0003	Mystical Palm Technique (attack4) — Healing	SPECIAL
-#0003	Cherry Blossom Impact (attack3)	Normal
+Ensure the complete input pipeline no longer generates, consumes, or stores transform or transformPressed gameplay state.
 
-All other currently existing moves remain non-Special.
+Inspect:
 
-Expected result:
+* js/core/input-manager.js
+* js/game/fighters/fighter-controller.js
+* js/game/fighters/fighter.js
+* js/game/combat/move-status.js
+* Any combat, AI, or helper modules deriving their inputs from the action registry.
 
-* Character #0001 has exactly 2 Special abilities.
-* Character #0002 has exactly 0 Special abilities.
-* Character #0003 has exactly 1 Special ability.
-* There are exactly 3 Special abilities across the current playable roster.
+Remove Transform-only comments, state handling, press buffering, and special cases where applicable.
 
-This classification must be consistent everywhere the interface distinguishes Special abilities.
+Important: The K key is also used for the separate menu Back command in CONFIG.menuBindings. Preserve this navigation shortcut. Removing the gameplay Transform binding must not remove or break menu Back.
 
-1.3 Investigate and fix the current classification logic
+Do not change unrelated keyboard bindings.
 
-Start by inspecting:
+3. Physically delete the Transform button from the mobile UI
 
-* js/data/controller-profiles.js
-* js/ui/controller-editor.js
-* js/data/loadout.js
+The main button implementation is in:
+
+js/ui/touch-controls.js
+
+Currently, the action buttons include:
+
+{ action: 'transform', pos: 'transform' }
+
+Remove this entry entirely.
+
+Transform must no longer have:
+
+* A DOM button.
+* A registered pointer handler.
+* A click or keyboard activation handler.
+* An accessible label.
+* A pending/reserved appearance.
+* An icon or sprite.
+* A position in the control cluster.
+* A control ID in internal button collections.
+
+Make sure TouchControls.buttons, actionButtons, allButtons, and the scheme-specific control maps never contain Transform.
+
+This applies to both touch-control schemes:
+
+1. Joystick.
+2. Classic Buttons.
+
+The deletion must apply consistently in Quick Battle, Practice Ground, Watch Mode where relevant, and any other screen using the shared touch controls.
+
+Do not replace Transform with an invisible button, dummy entry, or placeholder.
+
+4. Adjust the mobile combat-button layout
+
+The existing mobile honeycomb places Transform between the numbered attacks and Shield.
+
+Current arrangement:
+
+       [4]    [5]    [EXTRA]
+    [3]   [TRANSFORM] [SHIELD]
+       [1]    [2]    [JUMP]
+
+Remove the Transform slot permanently.
+
+Review the remaining layout and make any necessary adjustments so that the control cluster remains intentional, balanced, and comfortable to use.
+
+Requirements:
+
+* No reserved empty space dedicated to Transform.
+* No invisible element occupying its previous position.
+* No overlapping buttons.
+* No overlapping hit areas.
+* All remaining buttons stay accessible.
+* Numbered attacks retain their correct action identities and order.
+* Shield, Jump, and Extra Attack remain easy to reach.
+* The design works with fighters having two, three, four, or five numbered attacks.
+* The layout works across supported landscape screen sizes and safe-area insets.
+* Custom positions and sizes continue to work.
+
+Modify css/touch-controls.css where necessary.
+
+Remove the .tc-transform selector and any layout assumptions depending on Transform’s existence.
+
+Update the diagram and layout comments to describe the final arrangement.
+
+Do not change gameplay balance, combat mechanics, or unrelated interface styling.
+
+5. Remove Transform from custom touch layouts and their editor
+
+Inspect:
+
+* js/core/touch-layout.js
+* js/ui/touch-layout-editor.js
+* js/core/settings.js
+* js/ui/settings-dialog.js
+
+Remove 'transform' from both arrays in TOUCH_CONTROL_IDS.
+
+The touch layout editor must not offer Transform as a selectable, movable, or resizable control.
+
+Remove any Transform-specific editor UI, icon, label, selection expectation, or placement logic.
+
+Existing user settings must remain safe.
+
+Some players may have stored customized layouts containing a transform entry.
+
+The existing touch-layout sanitization system should discard retired control IDs. Ensure an old saved Transform entry is ignored or cleaned up without damaging other controls.
+
+Preserve all valid saved layout entries, including positions and scales.
+
+Also ensure that restoring default controls produces the updated layout without Transform.
+
+Do not unnecessarily reset user settings or increase the settings version if existing sanitization handles the change safely.
+
+6. Remove Transform-specific mobile ability presentation
+
+Inspect:
+
+* js/ui/mobile-abilities.js
+* js/data/ability-preview.js
+* js/ui/icons.js
+
+Remove Transform from the mobile ability presentation system.
+
+This includes:
+
+* The Transform fallback-icon mapping.
+* Its reserved-button classification.
+* Transform-specific presentation comments.
+* Transform-specific glyph handling.
+* Its associated SVG icon, if no other active feature uses it.
+* Any code whose sole purpose is presenting a reserved Transform ability.
+
+Preserve generic ability-availability logic still required by other attacks.
+
+Ensure ABILITY_ACTIONS contains only actual supported combat controls.
+
+The game should no longer display a dashed Transform button, including when no fighter is selected.
+
+Preserve Jump, Shield, the numbered attacks, and Extra Attack.
+
+7. Remove Transform from every playable character
+
+Inspect all playable character definitions:
+
 * js/data/characters/0001.js
 * js/data/characters/0002.js
 * js/data/characters/0003.js
-* js/data/abilities.js
-* js/ui/ability-hud.js
-* js/ui/mobile-abilities.js
+* js/data/characters/0004.js
 
-In controllerActions() inside js/data/controller-profiles.js, moves currently enter the abilities category if they are techniques, summons, or attacks that throw projectiles.
+They currently contain reserved entries such as:
 
-This means Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact can be classified as Special even though they should not be.
+transform: null, // reserved
 
-Replace that automatic association with a deliberate, explicit Special classification.
+Delete these entries.
 
-Recommended architecture:
+Remove comments describing the button as reserved.
 
-Define a character-specific, data-driven classification field, for example:
+Check for any Transform-related entries in:
 
-// Character #0001
-specialAbilities: ['attack4', 'attack5']
-// Character #0002
-specialAbilities: []
-// Character #0003
-specialAbilities: ['attack4']
+* actions
+* attacks
+* abilityNames
+* abilityDescriptions
+* mobileAbilities
+* Controller layouts
+* Other move-related metadata
 
-The exact API can differ if a better approach fits the current architecture.
+Only remove entries associated with the retired Transform mechanic.
 
-Create a shared helper such as:
+Do not modify any unrelated attack, summon, technique, animation, character statistic, or ability.
 
-isSpecialAbility(def, move)
+Do not blindly delete character artwork. Some assets or poses may visually resemble a transformation without being associated with this control. Retain any artwork that may be used elsewhere.
 
-Use it consistently wherever player-facing Special status is needed.
+The four playable fighters must retain their current playable movesets.
 
-Requirements:
+8. Remove support from the loadout system
 
-* Never classify something as Special simply because it is a projectile.
-* Never classify something as Special simply because its execution type is technique or summon.
-* Never use a move’s English display name to determine classification.
-* Never hardcode character IDs into shared combat, rendering, or UI systems.
-* Validate the metadata so nonexistent or unavailable moves cannot accidentally be classified.
-* Make the system easy to extend to future characters without modifying shared classification logic.
-* Keep the existing specialAction() and specialAttacks() execution semantics working wherever combat, AI, or loadout validation depends on them. Their internal meaning is not automatically the same as the new player-facing Special classification.
+Inspect:
 
-Controller editor behavior:
+js/data/loadout.js
 
-The existing “Special abilities” category should contain only the three qualifying moves.
+Remove Transform from the supported loadout contract.
 
-Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact should move to the appropriate ordinary attack category, normally Ground attacks, while retaining their existing ground-only availability or aerial variants.
+Update validation to recognize only the supported combat buttons.
 
-Do not create new aerial versions for ground-only techniques.
+Remove comments and rules suggesting Transform may eventually become a real move.
 
-Do not change their controller assignments.
+Do not preserve Transform as a recognized but disabled action.
 
-If a character has no Specials, such as #0002, do not show an empty “Special abilities” category.
+New character definitions containing actions.transform should be treated as invalid, just like any other unsupported combat action.
 
-1.4 Preserve gameplay mechanics and cooldowns
+Preserve the existing validation rules for:
 
-Reclassification is not a combat rebalance.
+* Numbered ground attacks.
+* Mid-air attacks.
+* Extra Attack.
+* Summons.
+* Techniques.
+* Ground-only abilities.
 
-Do not remove, simplify, or rewrite the underlying effects of any move.
+Make sure the loadout system remains character-agnostic.
 
-In particular:
+9. Remove Transform from game-controller support
 
-* Red must retain its projectile, knockback, and projectile-repelling behavior.
-* Maximum Blue must retain its projectile and pulling behavior.
-* Whirlwind must retain its traveling tornado, multihit behavior, lifting, and finisher.
-* Cherry Blossom Impact must retain its ground eruption, quake behavior, and launch effects.
-* Unlimited Void must retain its paralysis.
-* Hollow Purple must retain its powerful projectile behavior.
-* Mystical Palm Technique must retain its healing and interruptibility.
+Inspect:
 
-Do not make cooldown duration depend on the new Special label.
+* js/data/controller-profiles.js
+* js/core/controller-resolver.js
+* js/ui/controller-editor.js
+* Related controller settings and validation.
 
-The existing cooldown policy in js/data/cooldowns.js is determined by damage and exceptional effects. That policy is separate from how an ability is presented to players.
+In controller-profiles.js, remove Transform from MOVE_CONTROLS.
 
-For example, #0002’s Whirlwind currently has a longer cooldown because of its damage. Removing its Special label must not unintentionally reduce that cooldown.
+Update ACTION_ID so that the following are no longer accepted:
 
-Likewise, damage, launch strength, Energy, hitboxes, shielding, CPU behavior, projectile interactions, and input timing should remain unchanged unless a specific animation synchronization adjustment is required.
+ground:transform
+air:transform
 
-⸻
+Transform must not be assignable to any PlayStation, Xbox, Nintendo, or generic controller button.
 
-PART 2 — Special Ability Animations
+It should never appear in the controller binding editor.
 
-2.1 Specials must feel more significant
+Stored controller profiles containing obsolete Transform bindings must be sanitized correctly, preserving all remaining valid bindings.
 
-Special abilities should have noticeably longer, more dramatic animations than ordinary attacks.
+Keep the existing controller fallback system, binding conflict detection, controller-specific glyphs, and ground/air bindings working normally.
 
-The game already has a cast/release animation system, so preserve and build upon it rather than replacing it.
+Do not alter existing recommended controller layouts unless directly necessary.
 
-The three qualifying Specials should retain their existing deliberate buildup:
+10. Remove the Transform system from test fixtures
 
-#0001 — Unlimited Void
+This is especially important.
 
-Maintain its recognizable casting animation and release timing. The ability should feel powerful and deliberate before the paralysis activates.
+The repository includes:
 
-#0001 — Hollow Purple
+tests/fighters/fixtures/sample-fighter.mjs
 
-Maintain its extended buildup and projectile release. This should continue to feel like one of #0001’s most significant moves.
+Unlike the real playable roster, this test-only fighter currently implements a genuine Transform attack called Awakening.
 
-#0003 — Mystical Palm Technique
+Remove its Transform functionality entirely.
 
-Maintain its longer kneeling healing animation. Its longer vulnerability period is part of the technique’s identity.
+This includes its:
 
-These should remain clearly more committed animations than regular attacks.
+* Transform animation mapping.
+* actions.transform entry.
+* attacks.transform definition.
+* mobileAbilities.transform descriptor.
+* abilityNames.transform entry.
+* Related test comments and expectations.
 
-Do not arbitrarily slow the three Specials further if the existing timings already achieve the intended effect.
+Preserve the sample fighter’s other special mechanics, including its summon, unique attacks, different ground/air moves, and mobile ability previews.
 
-2.2 Make non-Special abilities faster where necessary
+The test fixture must remain useful for testing Alva’s generic character architecture, without reintroducing a retired action.
 
-Moves that are no longer considered Special should have ordinary-attack pacing.
+Inspect other test fixtures for Transform declarations and remove them where appropriate.
 
-However, some are already fast enough and must not receive unnecessary speed adjustments.
+11. Update the entire automated test suite
 
-Move	Required animation change
-#0001 Red	Keep existing speed
-#0001 Maximum Blue	Keep existing speed
-#0002 Whirlwind	Keep existing speed
-#0003 Cherry Blossom Impact	Speed up its animation
+A complete deletion requires updating all tests that still assume Transform exists.
 
-Cherry Blossom Impact is the main timing adjustment required.
+Pay particular attention to:
 
-Currently, its animation clips are defined in js/data/characters/0003.js using:
+Interface tests
 
-attack3_cast: 10
-attack3_release: 15
-
-The cast contains four frames, and the release contains five frames.
-
-This gives Cherry Blossom Impact a comparatively long total animation.
-
-Increase the animation playback rate so that the attack feels quicker and more responsive, while retaining every original sprite frame and its distinctive ground impact.
-
-A reasonable starting point would be:
-
-attack3_cast: 20
-attack3_release: 20
-
-This would bring its combined animation duration to approximately 0.45 seconds, rather than approximately 0.73 seconds.
-
-Use the game’s frame-aligned timing conventions. Verify that the eruption still activates at the correct release frame.
-
-Adjust within a similarly quick range if necessary to preserve smooth gameplay.
-
-Important requirements:
-
-* Do not delete animation frames.
-* Do not skip the essential anticipation or impact pose.
-* Keep visual animation and gameplay timing synchronized.
-* Retain its burst, damage, launch, and hit properties.
-* Ensure the character becomes free to act when the animation actually finishes.
-* Ensure interruptions and cooldown behavior remain correct.
-
-The attack should still look powerful but no longer require a disproportionately long buildup for a normal move.
-
-2.3 Special animation indicator — Orange Exclamation Mark
-
-Implement a new visual indicator that appears directly above a character’s head while the character performs a genuinely Special ability.
-
-Design:
-
-Display a clearly visible orange exclamation mark:
-
-!
-
-It should visually communicate that the character is executing an exceptionally powerful or unusual ability.
-
-Visual requirements:
-
-* Bright, saturated orange, for example #FF9F1C.
-* Dark outline or shadow for visibility against bright and dark stages.
-* Clean and legible at different screen sizes.
-* Centered horizontally above the active character.
-* Positioned high enough to avoid covering the character’s face or sprite artwork.
-* Avoid overlapping existing player labels, Energy bars, or cooldown indicators.
-* Scale appropriately with the game’s Canvas rendering and device pixel ratio.
-* Maintain a crisp appearance consistent with Alva’s existing visual style.
-
-A very subtle pulse or floating movement is acceptable but not required. The exclamation mark itself is the priority.
-
-It must not become excessively large, flashy, or distracting.
-
-2.4 When the indicator appears
-
-The exclamation mark should appear immediately when a qualifying Special ability successfully begins.
-
-It must remain visible while the Special animation plays, including the casting and release animation phases.
-
-It should disappear as soon as the character finishes performing that Special.
-
-Expected examples:
-
-Unlimited Void
-
-1. Character begins the Unlimited Void cast.
-2. Orange exclamation mark appears above its head.
-3. The mark stays visible throughout the cast and release animation.
-4. The mark disappears once the fighter has finished the Special animation.
-
-Hollow Purple
-
-The mark appears during the buildup, remains through the character’s release animation, and disappears when the animation ends. It must not remain merely because the projectile is still traveling.
-
-Mystical Palm Technique
-
-The mark appears when healing begins, remains throughout the kneeling and healing animation, and disappears once the character finishes.
-
-The indicator must also disappear immediately if an ability is interrupted, canceled, or otherwise terminated.
-
-It must not appear simply because a move is on cooldown.
-
-2.5 When the indicator must NOT appear
-
-Never show the orange exclamation mark during:
-
-* Red
-* Maximum Blue
-* Whirlwind
-* Cherry Blossom Impact
-* Any other non-Special attack
-* Standard movement
-* Jumping or dashing
-* Normal shielding or deflecting
-* Idle animations
-* Cooldown periods after a Special has finished
-
-The indicator is associated with the active Special animation, not the attack’s damage tier, projectile properties, or cooldown.
-
-2.6 Implementation architecture
-
-Investigate:
-
-* js/game/arena.js
-* js/game/rendering/fighter-status.js
-* js/game/fighters/fighter.js
-* js/game/combat/technique.js
-* js/game/rendering/sprite-animator.js
-
-The current game uses a Canvas 2D renderer.
-
-Implement the indicator in the existing rendering pipeline rather than introducing floating DOM elements over the game canvas.
-
-Recommended approach:
-
-1. Use the new shared Special classification helper.
-2. Determine which move the fighter is actively performing.
-3. Check whether that move is classified as Special.
-4. Draw the mark using the fighter’s current rendered position.
-5. Remove the mark automatically when the active Special state ends.
-
-The current fighter.technique state and its active technique ID should provide the necessary information for the three existing Specials.
-
-However, design the helper and rendering logic so future Specials can also use other supported move execution types.
-
-Prefer leveraging markerAnchor(), statusTop(), or related positioning utilities in Arena, rather than creating a separate incompatible positioning system.
-
-The indicator must work for both players and CPU-controlled characters.
-
-It must also work in:
-
-* Regular battles
-* Custom battles
-* Watch Mode
-* Practice Ground
-* Mirror matches
-
-The indicator should render correctly even when both fighters activate Specials around the same time.
-
-Respect reduced-motion preferences if the mark is animated.
-
-⸻
-
-PART 3 — Functional Home Screen Download Button
-
-3.1 Existing implementation
-
-The bottom-right Download icon already exists in Alva’s Home Screen footer.
-
-Relevant files:
-
-* js/screens/home-screen.js
-* css/home.css
-* js/ui/icons.js
-* js/ui/overlays.js
-* js/core/app.js
-* index.html
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-
-The button currently has disabled: true and no installation behavior.
-
-Enable it and make it fully functional.
-
-Keep its existing footer location, icon identity, button proportions, and overall design language.
-
-3.2 Show an installation dialog
-
-Clicking the bottom-right Download button must open an attractive, compact dialog explaining that Alva can be added to the player’s home screen and launched like an application.
-
-Suggested English copy:
-
-Title: Install Alva
-
-Description:
-
-“Want quicker access to Alva?
-
-You can add Alva directly to your home screen and launch it just like an app, without opening your browser and searching for the game every time.
-
-Alva is a lightweight web app, so there’s no large game download or traditional app installation required. It uses very little additional storage.
-
-Add Alva to your home screen for a faster, more convenient way to play!”
-
-Primary action:
-
-Add to Home Screen
-
-Secondary action:
-
-Not Now
-
-Maintain the existing dark, glass-inspired dialog styling.
-
-The interface should feel like a natural part of Alva, not a generic browser alert.
-
-Storage accuracy: A web app may still use some device storage for browser data, icons, or cached files. Do not make a technically false guarantee of literally zero storage. Emphasize that no large conventional app download is required and that the installation is lightweight.
-
-3.3 Integrate with the existing dialog system
-
-Reuse the architecture established by:
-
-* ModalDialog
-* InfoDialog
-* ChoiceDialog
-* The application’s menu navigation scopes
-
-A dedicated install dialog is appropriate because it needs both explanatory content and an actionable installation button.
-
-Requirements:
-
-* Keyboard support.
-* Controller/gamepad navigation.
-* Touch compatibility.
-* Appropriate dialog role and accessible title.
-* Correct focus trapping and focus restoration.
-* Escape and controller Back support.
-* Closing the dialog must return focus to the Download button.
-* Existing Home Screen functionality must remain available after dismissal.
-* All displayed text must support Alva’s localization system.
-
-Do not use browser alert() or confirm() as the main UI.
-
-3.4 Add proper Progressive Web App support
-
-Make Alva installable as a Progressive Web App wherever supported.
-
-The repository already has some related metadata in index.html, including mobile web-app and Apple web-app configuration.
-
-Complete the installability setup.
-
-Implement a web app manifest containing appropriate fields such as:
-
-{
-  "name": "Alva",
-  "short_name": "Alva",
-  "description": "A browser-based platform fighting game.",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#050506",
-  "theme_color": "#050506",
-  "icons": []
-}
-
-Populate the icons array with actual, valid icon files and dimensions.
-
-Use Alva’s existing branding, preferably deriving the required icons from its existing favicon or logo artwork.
-
-Do not introduce unrelated icon designs.
-
-Use at least suitable 192×192 and 512×512 icons, with appropriate formats and purposes where supported.
-
-Link the manifest from index.html.
-
-Alva may be deployed under a GitHub Pages repository subpath, so ensure manifest URLs, scope, start URL, icons, and other asset references resolve correctly without assuming the site is hosted at the domain root.
-
-If a service worker is needed for the chosen installability and offline strategy, implement it carefully.
-
-Do not introduce aggressive asset caching that causes unnecessarily high storage usage or stale game versions.
-
-Offline gameplay is not an explicit requirement of this update. Prioritize reliable installation, ordinary online gameplay, and lightweight storage usage.
-
-3.5 Native one-click installation where supported
-
-Implement the browser’s native installation flow using supported web APIs.
-
-On browsers that expose beforeinstallprompt:
-
-1. Listen for the installability event.
-2. Retain the event for a user-initiated installation.
-3. Open the Alva installation dialog when the user clicks Download.
-4. When the player presses Add to Home Screen, trigger the browser’s native installation prompt.
-5. Let the browser display its own install confirmation.
-6. Handle acceptance or dismissal appropriately.
-7. Detect successful installation using appinstalled and update the interface.
-
-The native installation prompt must be triggered in response to a real user interaction.
-
-Do not attempt to bypass the browser’s permission or confirmation flow.
-
-Do not falsely report that installation succeeded until the browser indicates success.
-
-3.6 Unsupported browsers and iOS behavior
-
-Some browsers, including Safari on iPhone and iPad, do not support the same programmable installation prompt.
-
-The Download button must still be functional.
-
-If direct installation is unavailable, display clear instructions rather than silently failing.
-
-For Safari on iPhone or iPad, explain:
-
-“To add Alva to your Home Screen:
-
-1. Open Alva in Safari.
-2. Tap the Share button.
-3. Select Add to Home Screen.
-4. Confirm by tapping Add.”
-
-For supported desktop browsers without a programmable prompt, guide the player to the browser’s Install App or Add to Home Screen menu option where available.
-
-Adapt these instructions to the browser and platform when reasonably detectable.
-
-Do not claim that every device supports one-tap installation.
-
-3.7 Detect when Alva is already installed
-
-Handle a player opening Alva as an installed web app.
-
-Use supported installation-state signals, such as:
-
-* display-mode: standalone
-* navigator.standalone where applicable
-* appinstalled when available
-
-If Alva is already running as an installed app, avoid showing another installation prompt.
-
-Instead, the Download dialog can display a friendly message such as:
-
-Alva is already installed!
-
-“You can launch Alva directly from your Home Screen.”
-
-Keep the interface consistent and ensure this state does not disable unrelated Home Screen features.
-
-⸻
-
-PART 4 — Animate the Home Screen Download Icon
-
-The Download button should become more noticeable.
-
-The current button is quite small and visually understated, so introduce a tasteful, repeating icon animation.
-
-4.1 Recommended animation
-
-Create a short download motion:
-
-1. The downward arrow moves slightly upward.
-2. It smoothly travels downward toward the download tray.
-3. It settles into its original position.
-4. The button receives a very subtle glow or emphasis.
-5. The animation pauses briefly before repeating.
-
-The animation should communicate downloading without changing the meaning of the icon.
-
-Use the existing ICONS.download SVG and adjust its internal SVG structure only as needed to animate the arrow independently of the tray.
-
-Avoid rotating the entire icon or introducing a large bouncing button.
-
-4.2 Visual guidelines
-
-* Match Alva’s minimal, dark interface.
-* Keep the animation smooth and polished.
-* Use CSS keyframes wherever practical.
-* Use the existing button dimensions.
-* Add a restrained orange or accent-colored glow if it fits the visual hierarchy.
-* Do not create constant aggressive flashing.
-* Do not interrupt clicks, touch interaction, or controller navigation.
-* Do not cause layout shifts.
-* Make the hover and focus states clear.
-* Stop the animation or replace it with a static icon when reduced motion is enabled.
-
-An animation cycle of roughly 2–4 seconds, including a resting period, is a reasonable starting point.
-
-Prioritize subtle visual appeal over intensity.
-
-When the installation dialog is open, the icon can pause to avoid competing with the dialog.
-
-⸻
-
-PART 5 — Localization
-
-Alva currently supports English and French.
-
-Any new user-facing text must integrate with the existing localization infrastructure.
-
-Relevant files:
-
-* js/localization/i18n.js
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-
-Add proper keys for:
-
-* Install Alva title
-* Main installation explanation
-* Add to Home Screen button
-* Not Now button
-* Browser-specific installation instructions
-* Already installed message
-* Installation unavailable message
-* Any success or confirmation status
-
-Provide natural, accurate French translations.
-
-Do not hardcode English copy directly into components that should be localized.
-
-The installed application should continue to use the existing language preference.
-
-⸻
-
-PART 6 — Tests and Regression Protection
-
-Update existing tests where the intended behavior changes and add focused tests for the new features.
-
-Relevant test locations include:
-
-* tests/systems/controller-profiles.test.mjs
-* tests/interface/controller-ui.test.mjs
+* tests/interface/controls-ui.test.mjs
+* tests/interface/touch-layout.test.mjs
+* tests/interface/battle-screen.test.mjs
+* tests/interface/ability-hud.test.mjs
 * tests/interface/settings.test.mjs
+* tests/interface/i18n.test.mjs
+* tests/interface/controller-ui.test.mjs
+
+Gameplay and systems tests
+
+* tests/systems/codenames.test.mjs
 * tests/systems/loadout.test.mjs
-* tests/systems/technique.test.mjs
-* tests/fighters/0001/
-* tests/fighters/0002/
-* tests/fighters/0003/
-* tests/systems/fighter-status.test.mjs
+* tests/systems/sample-fighter.test.mjs
+* tests/systems/ability-names.test.mjs
+* tests/systems/controller-profiles.test.mjs
+* tests/systems/controller-input.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/combo-assist.test.mjs
+* tests/systems/combat-assist.test.mjs
+* tests/systems/attack-classification.test.mjs
+* tests/systems/defense.test.mjs
+* tests/systems/down.test.mjs
 
-6.1 Classification tests
+Fighter and integration tests
 
-Verify that:
+* tests/fighters/0001/fighter-0001.test.mjs
+* tests/fighters/0002/fighter-0002.test.mjs
+* tests/fighters/0003/fighter-0003.test.mjs
+* tests/fighters/0004/fighter-0004.test.mjs
+* tests/integration/watch-mode.test.mjs
+* tests/integration/practice-ground.test.mjs
 
-* #0001 has precisely Unlimited Void and Hollow Purple classified as Special.
-* #0002 has no Special abilities.
-* #0003 has precisely Mystical Palm Technique classified as Special.
-* Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact appear in the correct ordinary categories.
-* The controller editor displays the expected categories in English and French.
-* Existing input bindings remain unchanged.
-* Moves retain the same availability and execution types.
-* Future character definitions can opt individual moves into Special classification without shared-code changes.
+Also search the remaining tests and fixtures for references.
 
-Remember that some existing tests intentionally use specialAction() to mean a technique or summon.
+Update expected arrays, snapshots, button counts, mocked inputs, ability maps, screen tests, and controller profiles.
 
-Do not rewrite those expectations incorrectly merely to match the new UI terminology.
+Do not simply delete tests wholesale to obtain passing results.
 
-6.2 Animation and visual indicator tests
+Replace obsolete assertions with meaningful regression tests demonstrating that Transform is gone.
 
-Verify that:
+Required regression coverage:
 
-* Every classified Special shows the orange indicator during its execution.
-* Every normal attack does not.
-* The indicator disappears immediately when an execution finishes or is canceled.
-* An active cooldown alone never displays the indicator.
-* The indicator works for player-controlled and CPU-controlled fighters.
-* Cherry Blossom Impact is faster and stays synchronized with its ground impact.
-* The existing Special animation lengths are preserved.
-* No projectile, hitbox, damage, or collision behavior is accidentally altered.
+1. ACTIONS, COMBAT_BUTTONS, MOVES, and gameplay bindings contain no Transform.
+2. The input snapshot has no transform or transformPressed fields.
+3. Touch controls have no Transform DOM element in either scheme.
+4. Transform cannot be activated by pointer, keyboard, or controller input.
+5. Neither mobile layout editor displays Transform.
+6. Old custom touch layouts discard their Transform entry but preserve other controls.
+7. Old controller profiles discard ground:transform and air:transform.
+8. All playable fighter definitions validate without Transform.
+9. Character loadout validation rejects an obsolete Transform action.
+10. All remaining combat buttons work on the ground and in the air as appropriate.
+11. Ability HUD and touch previews still display all available moves correctly.
+12. The keyboard K key still performs menu Back.
+13. Existing controller and touch customization continues to work.
 
-6.3 Download and PWA tests
+If removing entries from fighter definitions affects profile-review checks, review and update those fixtures or hashes correctly, following the repository’s testing guidance.
 
-Verify that:
+12. Update localization
 
-* The Home Screen Download button is no longer disabled.
-* Clicking it opens the correct dialog.
-* The dialog closes and restores focus correctly.
-* Native installation is requested when supported.
-* The declined-installation path remains usable.
-* Unsupported browsers display appropriate instructions.
-* iOS shows manual Add to Home Screen instructions.
-* Already-installed mode is handled properly.
-* The manifest loads with valid paths and icons.
-* The installed app launches into Alva correctly.
-* Both languages render properly.
-* The download icon animation respects reduced-motion preferences.
+Alva supports English and French.
 
-6.4 Full regression suite
+Inspect:
 
-Run:
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* js/localization/i18n.js
+
+Remove retired Transform-specific translations and references, including:
+
+control.transform
+
+French:
+
+Transformation
+
+English derives some control labels from ACTION_LABELS, so ensure that removal is reflected correctly in both languages.
+
+Do not change translations involving unrelated visual transformations, animation, or rendering.
+
+Ensure the touch layout editor, controller editor, and combat UI remain fully localized.
+
+13. Update documentation and project specifications
+
+Remove Transform from the game’s current supported-feature documentation.
+
+Review:
+
+* README.md
+* ALVA_SPEC.md
+* docs/systems/input.md
+* docs/systems/combat.md
+* docs/development/conventions.md
+* docs/characters/
+* docs/characters/adding-characters.md
+* codename_rule
+* Any other current documentation mentioning the retired action.
+
+Remove references presenting Transform as:
+
+* A reserved button.
+* A planned feature.
+* A future move slot.
+* A supported codename.
+* An available keyboard action.
+* A customizable controller action.
+* A mobile-control layout element.
+
+Update button diagrams and control tables to match the implemented interface.
+
+The documentation must accurately describe the finished game.
+
+Preserve historical records in UPDATES.md where they genuinely describe past implementations; do not rewrite project history unnecessarily. They must not be mistaken for the current product specification.
+
+Do not modify character_rule.
+
+14. Search for remaining references and eliminate dead code
+
+After implementation, perform a repository-wide search for:
+
+transform
+Transform
+TRANSFORM
+transformation
+Transformation
+control.transform
+ground:transform
+air:transform
+transformPressed
+tc-transform
+
+Investigate every result.
+
+Eliminate remaining references to the retired gameplay action, button, character move, controller binding, and reserved feature.
+
+Important distinction: JavaScript and CSS also use the word transform for legitimate rendering operations.
+
+Do NOT remove or rename unrelated functionality such as:
+
+ctx.setTransform(...)
+
+or:
+
+transform: scaleX(-1);
+transform: translateY(...);
+
+These are graphical operations, not the retired Transform ability.
+
+Also preserve movement transformations, animation transforms, screen transitions, camera rendering, sprite mirroring, and other unrelated mechanics.
+
+Do not perform an indiscriminate string replacement.
+
+15. Preserve the complete existing game
+
+This task is solely a permanent Transform feature removal.
+
+Do not modify the following except when directly required to remove a verified Transform dependency:
+
+* Fighter movement, jumping, dashing, and air movement.
+* Shield and Deflect.
+* Attacks, projectiles, summons, and techniques.
+* Damage, Energy, cooldowns, and Launch mechanics.
+* Combat Assist and Combo Assist.
+* CPU intelligence.
+* Stage rendering and physics.
+* Character selection.
+* Quick Battle.
+* Practice Ground.
+* Watch Mode.
+* Main menus and Settings.
+* Existing valid controller bindings.
+* Existing valid saved touch layouts.
+* English and French localization.
+* Animation systems and rendering pipelines.
+
+Do not introduce feature flags, compatibility stubs, placeholder buttons, or future Transform hooks.
+
+Keep the codebase as simple as possible.
+
+16. Run comprehensive validation
+
+Run the full automated suite:
 
 node --test
 
-Fix regressions caused by the implementation.
+Fix all failures resulting from this deletion.
 
-Also perform browser-level verification on desktop and mobile layouts, including landscape orientation.
+Also run focused tests for input, touch controls, loadouts, controller profiles, and fighter definitions.
 
-Where possible, test with Chrome/Edge installation support and Safari’s manual Add to Home Screen flow.
+Where browser execution is available, manually verify:
 
-Document any browser behavior that cannot be tested automatically.
+* Quick Battle with touch controls.
+* Practice Ground with touch controls.
+* Joystick layout.
+* Classic Buttons layout.
+* The custom touch layout editor.
+* English and French interfaces.
+* Fighters with different attack counts.
+* Keyboard gameplay and menu navigation.
+* Controller bindings and their editor.
+* Different supported mobile viewport sizes.
 
-⸻
+Confirm that Transform is absent everywhere, with no empty functional control, duplicate button, broken layout, or invalid saved setting.
 
-PART 7 — Architecture and Project Rules
+Do not report a test as passed unless it was actually run.
 
-Follow Alva’s established engineering standards.
+17. Completion requirements
 
-Before editing, review:
+The task is complete only when:
 
-* CLAUDE.md
-* ALVA_SPEC.md
-* docs/architecture/character-system.md
-* docs/systems/input.md
-* docs/systems/combat.md
-* docs/development/testing.md
-* The individual character specifications in docs/characters/
+* Transform is no longer a gameplay action.
+* Transform is no longer a supported move.
+* No Transform button is created anywhere.
+* No interface offers Transform.
+* No device can activate Transform.
+* No character defines Transform.
+* No controller layout can bind Transform.
+* No touch layout can customize Transform.
+* No dedicated Transform icon, styling, or placeholder remains.
+* Saved configurations containing it are handled safely.
+* Current documentation no longer advertises it.
+* All relevant tests reflect the new control architecture.
+* Unrelated gameplay remains unchanged.
 
-Important constraints:
+18. Final implementation report
 
-1. Do not change or reformat the protected character_rule file.
-2. Keep character-specific values and move classifications in the appropriate character data.
-3. Do not introduce fighter-ID checks in the shared engine.
-4. Preserve all original fighter sprites and artwork.
-5. Do not introduce a framework or unnecessary dependencies.
-6. Maintain the existing 60 Hz combat simulation.
-7. Preserve the distinction between visual animation timing and cooldown rules.
-8. Keep controller, keyboard, and touch support working.
-9. Maintain accessibility, localization, and responsive behavior.
-10. Update relevant documentation to reflect the new meaning of the player-facing Special label.
+After completing the changes, provide:
 
-⸻
+1. A concise description of how Transform was removed.
+2. The main files modified, grouped by subsystem.
+3. The final mobile control layout and any positioning adjustments.
+4. An explanation of how legacy saved layouts and controller profiles are handled.
+5. Test commands executed and their results.
+6. Any remaining limitations or verification that could not be performed.
 
-Final Acceptance Criteria
+Final instruction:
 
-The update is complete only when all of the following are true:
+Permanently delete Transform as a concept from Alva’s active game architecture.
 
-Special classification
+This must be a complete, clean removal—not a hidden button, disabled action, unfinished migration, or reserved future feature.
 
-* #0001 has 2 Specials: Unlimited Void and Hollow Purple.
-* #0002 has 0 Specials.
-* #0003 has 1 Special: Mystical Palm Technique.
-* Red, Maximum Blue, Whirlwind, and Cherry Blossom Impact are no longer labeled Special anywhere in the player-facing UI.
-
-Animations
-
-* Special abilities retain their deliberate, longer animations.
-* An orange exclamation mark appears above the performing character throughout a Special animation.
-* The mark disappears immediately when the animation finishes or is interrupted.
-* Cherry Blossom Impact is noticeably faster.
-* Red, Maximum Blue, and Whirlwind retain their existing animation speeds.
-* The original combat mechanics and cooldown policy remain intact.
-
-Home Screen
-
-* The Download button is functional.
-* Clicking it opens a polished installation explanation.
-* The player can initiate native web-app installation when supported.
-* Browsers without direct installation support display useful instructions.
-* Already-installed users are handled correctly.
-* The Download icon has a subtle, attractive repeating animation.
-* The feature works with English, French, keyboard, gamepad, and touch input.
-
-Quality
-
-* The full automated test suite passes.
-* No original gameplay mechanics are broken.
-* No new dependencies or unnecessary rewrites are introduced.
-* The implementation remains compatible with Alva’s existing architecture and deployment.
-
-Final Deliverable
-
-Implement the complete update in the repository, not just a conceptual proposal.
-
-After implementation, provide:
-
-1. A summary of what changed.
-2. The important files modified or added.
-3. The exact Special classification used for each character.
-4. The final Cherry Blossom Impact animation timing.
-5. A description of the orange indicator’s lifecycle.
-6. An explanation of how web-app installation works on supported and unsupported browsers.
-7. Test results, including any limitations.
-8. Confirmation that existing combat mechanics, cooldowns, and controller bindings remain unchanged.
-
-Prioritize correctness, compatibility, polish, and maintainability. Both the Special ability update and the Home Screen installation feature must be fully addressed.
+Keep the rest of Alva fully functional and unchanged wherever possible.
