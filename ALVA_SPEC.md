@@ -586,15 +586,40 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 6.5 Select Stage
 
-- Two stages, **Desert** and **City**, with a large live preview (stage
-  artwork only, gentle camera pan) and selectable cards with thumbnails.
+- A large live preview of the highlighted stage (stage artwork only, gentle
+  camera pan) beside the **stage roster**: 24 slots
+  (`CONFIG.stageRoster.totalSlots`), six by four on a large display. The
+  playable stages (`MAPS`, in order) fill the first slots, **01 Desert, 02
+  City, 03 Asperitas**, and the other 21 are reserved, unavailable
+  placeholders: a subdued tile with its number and a lock, not a button,
+  never focused, selected or started, and no stage is made up for one.
+  The slots come from the real registry (`stageSlots`), so a new stage
+  takes the next slot with no layout change; the roster grows past 24 only
+  once the stages outnumber it. Practice Ground is never a slot.
+- A counter beside the roster's title: *3 available / 24 slots*, counted
+  from the registry.
+- Stage tiles show a still thumbnail (no hazard running in it), the stage's
+  number and name, the standard neutral focus ring, hover feedback, and a
+  green check and underline while selected. Highlighting a tile (keyboard,
+  controller, the controller cursor, mouse hover) previews it; a pointer
+  press selects and a second confirms, a keyboard or controller press
+  selects and confirms at once. The highlighted stage's details sit under
+  the roster: name, tagline, a Selected badge while it is the selected
+  stage, and its traits (a stage's hazards called **Hazards**).
+- **Random Stage** (a shuffle icon), apart from the 24 slots: picks one of
+  the playable stages at random, every one equally likely (never a
+  placeholder or Practice Ground; the same pick as Regular Play's draw),
+  stores it, highlights its tile and previews it. It never starts the
+  battle, and focus stays on it to roll again.
 - The preview has no fighters and no text overlay; it carries an accessible
-  stage label instead.
-- Cards show thumbnail, stage name and tagline, with no stage-number label.
-  The selected card keeps its Selected badge but no green outline; focus uses
-  the standard neutral focus ring.
+  stage label instead. An animated preview of a stage with hazards runs
+  them in a world of its own (Asperitas's clouds drift, rest, vanish and
+  form again elsewhere); with reduced motion they hold still.
 - "Confirm and start battle" primary action (same label for every
   stage). No bottom control hints.
+- Responsive: fewer columns on narrower windows, small tiles and a
+  scrolling grid on phones held sideways, the preview stacked over the
+  roster on tall windows; the focused tile is always brought into view.
 - Custom Play's last step (steps Mode · Difficulty · Fighter · CPU · Stage).
   Starting hands the Battle screen the stage, Player 1's fighter, the CPU's
   fighter and the level. Regular Play draws its stage instead and comes here
@@ -1319,12 +1344,13 @@ French, concise game terms).
   kill boundary). There are no side walls, visible or invisible: fighters can
   run, jump or be knocked off either ledge, fall below the stage and drift
   back if they can.
-- Main stages are 1280–1440 units wide (Desert 1360, City 1440, Practice
-  Ground 1280). The Void is a blast zone set by margins around the main
-  stage (`voidAround` in `js/data/maps.js`, data per stage): Desert 360
-  past each ledge, 400 below the stage's top and 760 above it; City 340,
-  420 and 800 (over its highest deck); Practice Ground 380 (its block is the
-  narrowest), 400 and 760. There is room to be knocked off, fight briefly
+- Main stages are 1280–1440 units wide (Desert 1360, City 1440, Asperitas
+  1400, Practice Ground 1280). The Void is a blast zone set by margins
+  around the main stage (`voidAround` in `js/data/maps.js`, data per
+  stage): Desert 360 past each ledge, 400 below the stage's top and 760
+  above it; City 340, 420 and 800 (over its highest deck); Asperitas 360,
+  400 and 840 (over the highest its clouds can rise); Practice Ground 380
+  (its block is the narrowest), 400 and 760. There is room to be knocked off, fight briefly
   and drift back, but a fighter carried on outward is lost soon after; no
   jump (both air jumps of the triple jump included) from any stage's highest footing reaches the upper line. Camera
   bounds are the Void's rectangle plus 140 on every side (`cameraAround`),
@@ -1350,7 +1376,44 @@ French, concise game terms).
   to come down, and so does Quick Battle's combat AI; the training CPU can
   drop through all of them except the water-tower deck. Neither CPU ever
   walks off the roof's edges on its own.
-- Collision comes only from map data, never from art.
+- **Asperitas:** high above the clouds in daylight; a rich blue sky paling
+  to a cyan and white horizon, the sun with soft rays, far cumulus, high
+  cirrus, cloud banks and an endless cloud sea below (no ground anywhere),
+  large clouds drifting by beneath. Exactly three surfaces: **the main
+  cloud** (stationary, never a hazard, both spawns, open ledges; a shallow
+  64-unit solid slab under its flat top with open sky beneath it, drawn as
+  a billowing mass of vapour, no foundation of any kind) and **two smaller
+  drifting clouds** above its left and right halves, one-way platforms
+  classified as **hazards** (`hazard: true`): they never damage, stun,
+  launch or take anyone; their hazard is that they move, rest, fade away
+  from under a fighter and form again somewhere new. No obstacles.
+- **Platform hazards** (any stage; Asperitas's two clouds today): a
+  platform with a `dynamic` block is moved and switched off and on by its
+  own state machine (`js/game/platform-hazards.js`, tuning in
+  `js/data/platform-hazards.js`), each on its own random stream of the
+  battle's seed, sharing no state or timer with any other. States: idle
+  (still, 1.5–4 s), horizontal and vertical (eased moves of 60–140 and
+  35–90 units over 2–5 s, inside its region), disappearing (fades out over
+  0.5–0.9 s, still solid), hidden (1–2.5 s, no collision) and reappearing
+  (fades in over 0.5–0.9 s, still; solid from 55% of the fade once nobody
+  is inside it). Ordinary states follow one another at random;
+  disappearing always runs through hidden and reappearing. While hidden it
+  relocates to a new random place in its region (x and y), at least 120
+  units away where possible, never back where it vanished: validated
+  against the main stage, the other hazard (where it is and is going),
+  every fighter and the Void in force (overtime's included), with a
+  bounded search; failing that it waits hidden and tries again. It never
+  moves while visible except by its eased drift. Each region's whole
+  envelope is disjoint from the main stage's keep-out (110 above its top)
+  and every other region, refused at load otherwise, so platforms never
+  touch. A fighter standing on one is carried by exactly its movement
+  (rising, sinking, across) and keeps every action; jumping leaves it
+  behind; when it vanishes the fighter simply falls (no push, damage or
+  stun). Shadows, landings, the debug overlay and the CPU's stage model
+  read the live platforms; a hidden one is in none of them. Every battle
+  and animated preview builds its own; the map is never written.
+- Collision comes only from map data (and, for a dynamic platform, its
+  controller's live position), never from art.
 - **The Void:** a fighter whose centre leaves the Void in force
   (`StageCollision.inVoid`, testing `stage.void`: the map's `voidBounds`,
   copied once as `baseVoid` and never written; only a battle's overtime,
@@ -3746,7 +3809,13 @@ codename is sent, never what an action does.
 - Visible focus everywhere; focus is managed on every screen and overlay.
 - Never rely on colour alone for focus, selection, availability, errors or
   the current setup step — use borders, check marks, filled indicators, labels
-  and weight.
+  and weight. Select Stage's stage tiles are buttons with the stage's name
+  and tagline as their label and `aria-pressed` for the selection (plus a
+  check mark); its placeholders are labelled unavailable ("Slot 04,
+  unavailable") with a lock and are not interactive.
+- Reduced motion stills stage decoration (drifting clouds, rays, sun glints,
+  waves); a stage's moving platforms still move, fade and form, since they
+  are gameplay, and are always drawn exactly where they collide.
 - Text meets WCAG AA contrast on its surface; touch targets are comfortable
   (≥ 44 px where space allows).
 
@@ -3754,7 +3823,9 @@ codename is sent, never what an action does.
 
 - Target 60 FPS on reasonably modern phones. Cap the canvas backing-store
   device pixel ratio, cache stage geometry, only touch the DOM when HUD values
-  change, and tint menu silhouettes once.
+  change, and tint menu silhouettes once. Stage hazards cache their art
+  (`Path2D`) and run on the fixed step; Select Stage's roster thumbnails are
+  drawn once, still, and only the large preview animates.
 - Keep gameplay in logical world units; separate CSS size from backing-buffer
   size.
 

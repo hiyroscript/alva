@@ -10,11 +10,29 @@
 //               only between `left` and `right`; past either edge there is
 //               nothing to stand on and they fall. Below its top it is a
 //               solid body down to `bottom` (a cliff, facade or block face
-//               the theme draws in depth), collided like a solid.
+//               the theme draws in depth), collided like a solid. A stage
+//               with nothing under its floor (Asperitas's cloud) keeps
+//               `bottom` shallow: a slab, never a hidden foundation.
 // platforms:    one-way surfaces (pass through from below, land from above).
 //               `dropThrough` controls whether the training CPU can drop
 //               through them (the player has no drop control).
 //               `h` is visual slab thickness only; `kind` picks the art.
+//               `hazard: true` marks a stage hazard; `dynamic` makes it
+//               move (see below).
+// dynamic:      on a platform: it is not fixed. Its controller
+//               (js/game/platform-hazards.js) moves it and switches it off
+//               and on, with the behaviour `behavior` names
+//               (js/data/platform-hazards.js); `x` / `y` are only where it
+//               starts. `region` is where its collision slab may ever be
+//               (x from `left` to `right`, its surface y from `top` to
+//               `bottom`); `moves` the axes it drifts on; `disappears`
+//               whether it fades out, hides and forms again;
+//               `reappearance: 'random'` that it forms again anywhere in its
+//               region, never back where it went; `mainClearance` the room
+//               it keeps above the main stage's top. Every region's whole
+//               envelope is disjoint from the main stage's and from every
+//               other hazard's (checked as a stage is built), so platforms
+//               never meet.
 // solids:       full AABB blocks (collide on every side).
 // cameraBounds: where the camera may travel to frame the fight: the stage,
 //               the open air around it and a strip of the Void past its
@@ -27,6 +45,8 @@
 //               little way first; and above it clear of every jump from the
 //               highest footing, so only a launch reaches it.
 // theme:        key into the stage theme registry (js/stages/index.js).
+
+import { CONFIG } from '../config.js';
 
 // The Void's rectangle from margins around `main`: `side` world units past
 // each ledge, `top` above the stage's top and `bottom` below it (measured at
@@ -54,6 +74,31 @@ const CITY_MAIN = Object.freeze({ left: 1080, right: 2520, top: 980, bottom: 212
 // A little more headroom than Desert, over its highest deck (272 above the
 // roof), and a little more fall below the roof.
 const CITY_VOID = voidAround(CITY_MAIN, { side: 340, top: 800, bottom: 420 });
+
+// A cloud slab floating in open sky: its collision is the cloud's dense
+// core, 64 units deep, with nothing at all beneath it.
+const ASPERITAS_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 964 });
+// More headroom than City: the drifting clouds can rise to 290 above the
+// main cloud, and no jump from the highest of them reaches the line.
+const ASPERITAS_VOID = voidAround(ASPERITAS_MAIN, { side: 360, top: 840, bottom: 400 });
+
+// Asperitas's two drifting clouds: hazards because they will not stay put
+// (they drift, rest, fade out from under a fighter and form again
+// elsewhere), never because they hurt. Each keeps to its own half of the
+// sky above the main cloud: 120 units between the two regions (92 between
+// their art), and their lowest art stays 110 above the main cloud's top
+// (room for any fighter to stand beneath).
+const CLOUD = Object.freeze({
+  h: 30, dropThrough: true, kind: 'cloud', hazard: true,
+});
+const cloudHazard = (region) => Object.freeze({
+  behavior: 'cloud-drift',
+  region: Object.freeze(region),
+  moves: Object.freeze(['horizontal', 'vertical']),
+  disappears: true,
+  reappearance: 'random',
+  mainClearance: 110,
+});
 
 export const MAPS = [
   {
@@ -115,8 +160,58 @@ export const MAPS = [
     ],
     theme: 'city',
   },
+  {
+    id: 'asperitas',
+    name: 'Asperitas',
+    tagline: 'Above the clouds, beyond the horizon',
+    description:
+      'One great cloud adrift high above the cloud sea, with two smaller clouds drifting over it. They move, rest, fade away and form again somewhere new.',
+    traits: [
+      ['Terrain', 'Floating clouds'],
+      ['Platforms', '2 moving cloud platforms'],
+      ['Hazards', '2 shifting cloud hazards'],
+      ['Obstacles', 'None'],
+      ['Light', 'Daylight'],
+    ],
+    mainStage: ASPERITAS_MAIN,
+    cameraBounds: cameraAround(ASPERITAS_VOID, 140),
+    voidBounds: ASPERITAS_VOID,
+    spawnPoints: [
+      { x: 1640, facing: 1 },
+      { x: 1960, facing: -1 },
+    ],
+    platforms: [
+      {
+        id: 'asperitas-cloud-left', x: 1290, y: 700, w: 184, ...CLOUD,
+        dynamic: cloudHazard({ left: 1180, right: 1740, top: 610, bottom: 730 }),
+      },
+      {
+        id: 'asperitas-cloud-right', x: 2120, y: 650, w: 170, ...CLOUD,
+        dynamic: cloudHazard({ left: 1860, right: 2420, top: 610, bottom: 730 }),
+      },
+    ],
+    solids: [],
+    theme: 'asperitas',
+  },
 ];
 
 export function getMap(id) {
   return MAPS.find((m) => m.id === id) || null;
 }
+
+// Select Stage's roster: CONFIG.stageRoster.totalSlots slots (more only if
+// the stages outnumber it), in order, each { index, num, map }: the
+// playable stages of `maps` (MAPS: every entry is one; Practice Ground is
+// not among them) in the first slots, and `map` null for every reserved
+// placeholder after them. Nothing about a placeholder is a stage: no map
+// is ever made up for one.
+export function stageSlots(maps = MAPS, total = CONFIG.stageRoster.totalSlots) {
+  const count = Math.max(total, maps.length);
+  return Array.from({ length: count }, (_, index) => ({
+    index, num: String(index + 1).padStart(2, '0'), map: maps[index] ?? null,
+  }));
+}
+
+// A trait's id, from its English label ('Terrain' → 'terrain'): the key
+// its translations go by (map.trait.<id>, map.<map>.trait.<id>).
+export const traitId = (label) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-');

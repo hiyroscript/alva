@@ -2230,7 +2230,7 @@ test('leaving while the fighter dialog is open closes everything', async () => {
 // ---- Stage --------------------------------------------------------------------
 
 test('the training stage is its own map, outside MAPS and so outside Select Stage', () => {
-  assert.deepEqual(MAPS.map((m) => m.id), ['desert', 'city']);
+  assert.deepEqual(MAPS.map((m) => m.id), ['desert', 'city', 'asperitas']);
   assert.ok(!MAPS.includes(PRACTICE_MAP));
   assert.equal(getMap('practice'), null);
   assert.equal(PRACTICE_MAP.theme, 'practice');

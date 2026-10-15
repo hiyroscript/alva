@@ -50,6 +50,11 @@ const OLD_VOID_MARGINS = {
   practice: { side: 860, top: 1160, bottom: 740 },
 };
 
+// The stages that had those old bounds (a stage added since, such as
+// Asperitas, never had them: the margins test above holds it to the same
+// blast-zone rules).
+const HAD_OLD_VOID = ALL_MAPS.filter((m) => m.id in OLD_VOID_MARGINS);
+
 // The Void's margins around a map's main stage.
 const margins = (m) => ({
   left: m.mainStage.left - m.voidBounds.left,
@@ -88,7 +93,8 @@ test('every stage keeps its main stage, camera bounds and Void apart, the Void a
 });
 
 test('the Void is much closer than before on every stage: at least 30% nearer on every side, over half nearer past the ledges', () => {
-  for (const m of ALL_MAPS) {
+  assert.deepEqual(HAD_OLD_VOID.map((m) => m.id).sort(), Object.keys(OLD_VOID_MARGINS).sort(), 'every stage that had them is still here');
+  for (const m of HAD_OLD_VOID) {
     const old = OLD_VOID_MARGINS[m.id];
     const g = margins(m);
     assert.ok(g.left <= old.side * 0.5 && g.right <= old.side * 0.5, `${m.id}: sides ${g.left} / ${g.right} vs ${old.side}`);
@@ -154,7 +160,7 @@ test('on every stage a fighter can leave either ledge and live a moment, but kee
 });
 
 test('falling off a ledge ends in the bottom Void, much sooner than the old bounds would have allowed', () => {
-  for (const m of ALL_MAPS) {
+  for (const m of HAD_OLD_VOID) {
     const stage = new StageCollision(m);
     // A body dropped just past the right ledge, straight down.
     const body = createBody({ x: m.mainStage.right + 40, y: m.mainStage.top, width: 34, height: 80 });

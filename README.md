@@ -59,8 +59,14 @@ blocks every attack.
   included, under the same clock and overtime.
 - **Practice Ground**: a training room with a stand-still dummy, damage
   numbers and fighter swaps.
-- **Two stages**, Desert and City, plus the training room: open ledges,
-  platforms, a Void kill boundary and a platform-fighter camera.
+- **Three stages**, Desert, City and Asperitas, plus the training room:
+  open ledges, platforms, a Void kill boundary and a platform-fighter
+  camera. Asperitas floats high above the clouds: one great cloud to fight
+  on and two smaller cloud hazards that drift, rest, fade away from under
+  you and form again somewhere new.
+- **Select Stage**: a 24-slot stage roster (the playable stages first,
+  reserved slots for the stages to come), a live preview with each
+  stage's details, and **Random Stage**.
 - **Shared mechanics**: universal, momentum-driven movement (a fast run,
   a higher jump, the triple jump, the fast fall, a Dash and an air dash
   that flow straight into attacks and jumps), a held Shield with a perfect
@@ -187,8 +193,10 @@ max                     the owner's working prompt for the current task (not a s
   a play-style description in both languages and a review hash) in
   `js/data/fighter-profiles.js`. No engine code. See [adding a
   fighter](docs/characters/adding-characters.md).
-- **A stage:** an entry in `js/data/maps.js` and a theme in `js/stages/`.
-  See [stages](docs/gameplay/stages.md#adding-a-stage).
+- **A stage:** an entry in `js/data/maps.js` and a theme in `js/stages/`;
+  it takes the next slot of the stage roster by itself, and moving or
+  vanishing platforms are data (a `dynamic` block). See
+  [stages](docs/gameplay/stages.md#adding-a-stage).
 - **A mechanic:** add it to the shared system it belongs to, as data any
   fighter can opt into (never a check for one fighter), document it in
   [`ALVA_SPEC.md`](ALVA_SPEC.md) and its guide in
@@ -199,8 +207,8 @@ max                     the owner's working prompt for the current task (not a s
 
 **ALVA**, created by hiyroscript.
 
-**Original work.** Game design, code, interface, ALVA wordmark, and Desert / City
-stage artwork by hiyroscript.
+**Original work.** Game design, code, interface, ALVA wordmark, and Desert / City /
+Asperitas stage artwork by hiyroscript.
 
 **#0001 sprite source.** Sprite sheet by Finhj on
 [DeviantArt](https://www.deviantart.com/finhj/art/1084627848). Sheet

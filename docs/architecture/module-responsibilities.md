@@ -12,7 +12,7 @@ a module's exports reaches exactly those. The folders' roles:
 | `js/stages/` | Stage themes: procedural Canvas art, perspective, the Void's look. | core |
 | `js/localization/` | The interface languages. | config, core/settings, data (for registry-owned English copy) |
 | `js/screens/` | One module per screen: navigation and the screen's lifecycle. | everything below them |
-| `js/ui/` | Reusable interface pieces (DOM), the HUD and touch controls included. | config, core, data, localization, game (rendering helpers), stages |
+| `js/ui/` | Reusable interface pieces (DOM), the HUD and touch controls included. | config, core, data, localization, game (rendering helpers; the stage preview also its own stage collision and hazards), stages |
 
 There are no import cycles (checked over every module).
 
@@ -57,7 +57,8 @@ There are no import cycles (checked over every module).
 | `difficulty.js` | The four CPU levels and their profiles (`CAPABILITY`: which way each trait improves). | `core/app.js`, `game/battle.js`, `game/ai/cpu-intelligence/brain.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
 | `cooldowns.js` | The cooldown policy every move's reuse delay comes from: the 0.5 s repeat delay, 5 s for a move that deals 10, 3 s for a heal or a paralysis (`moveImpact`, `cooldownClass`, `resolveCooldown`, the exceptional and routine effects). | `game/combat/attacks.js`, `technique.js`, `summon.js`, `move-status.js`, `fighters/fighter.js`, `rendering/fighter-status.js` |
 | `abilities.js` | `abilityName`: a fighter's name for a move, or its neutral name. | `localization/strings/en.js`, `ui/mobile-abilities.js` |
-| `maps.js`, `practice-map.js` | The Quick Battle stages; the training stage (kept out of `MAPS`). | `core/app.js`, the battle, map-select and practice screens, `localization/strings/en.js` |
+| `maps.js`, `practice-map.js` | The Quick Battle stages (Desert, City, Asperitas, each one's platforms and any hazard's `dynamic` block); `stageSlots` (Select Stage's 24-slot roster from the registry); `traitId`; the training stage (kept out of `MAPS`). | `core/app.js`, the battle, map-select and practice screens, `screens/quick-battle-setup.js`, `localization/strings/en.js` |
+| `platform-hazards.js` | The dynamic platforms' tuning by behaviour key (`PLATFORM_BEHAVIORS`, `CLOUD_DRIFT`: state durations, travel, fades, weights, relocation, the volume kept clear) and the hazard states (`HAZARD_STATES`, `ORDINARY_STATES`). | `game/platform-hazards.js` |
 
 ## `js/game/`
 
@@ -66,7 +67,8 @@ There are no import cycles (checked over every module).
 | `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), the camera and all canvas drawing. | `battle.js`, `practice.js` |
 | `battle.js` | `Battle` (Quick Battle and Watch Mode): phases, timer, score, K.O., each side's controller (the player's Combat Assist setting to the player's alone). | `screens/battle-screen.js` |
 | `practice.js` | `PracticeSession`: Player 1 (with the player's Combat Assist setting) and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
-| `physics.js` | Bodies, integration, stage collision (`StageCollision`, with the queries `surfaceBelow`, `supportsAt`, `solidAcross` and `inVoid`; `stepBody`, `separate`, `dropThrough`). | `arena.js`, `fighters/fighter.js`, `rendering/hit-fx.js` |
+| `physics.js` | Bodies, integration, stage collision (`StageCollision`, with its runtime platforms, static and dynamic (`active`, `prevX` / `prevY`, `interpolate`), and the queries `surfaceBelow`, `supportsAt`, `solidAcross` and `inVoid`; `stepBody`, `carryBody` (riding a moving platform), `releaseGround` (letting go of a vanished one), `separate`, `dropThrough`). | `arena.js`, `platform-hazards.js`, `fighters/fighter.js`, `rendering/hit-fx.js`, `ui/stage-preview.js` |
+| `platform-hazards.js` | `PlatformHazards` and `HazardController`: each dynamic platform's own state machine and random stream (idle, horizontal, vertical, disappearing, hidden, reappearing), random reappearance and its validation (`findPlacement`, `clearAt`), separation (`assertHazardLayout`, `hazardEnvelope`, `hazardVolume`, `mainKeepOut`). | `arena.js`, `ui/stage-preview.js` |
 | `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order (Combat Assist's approach included: who has it, its presses, its cancellations); `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
 | `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/cpu-intelligence/prediction.js` |
 | `fighters/fighter-controller.js` | `PlayerController` (the one kind that may carry Combat Assist), `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/cpu-intelligence/executor.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
@@ -90,7 +92,7 @@ There are no import cycles (checked over every module).
 | `ai/cpu-intelligence/brain.js` | `CpuIntelligence`: the layers run every step in their order, plans, recovery, liveness, the attack orientation, test directives (see [CPU Intelligence](../systems/ai.md)). | `ai/combat-ai.js` |
 | `ai/cpu-intelligence/capabilities.js` | `analyzeCapabilities` (each move's timing, reach, strikes and roles), `moveReady`, `MOVE_ROLES`. | the other CPU Intelligence modules |
 | `ai/cpu-intelligence/perception.js` | `Perception`: the opponent as seen `latency` ago, recognized events, seen projectiles and clones. | `ai/cpu-intelligence/brain.js` |
-| `ai/cpu-intelligence/situation.js`, `stage-model.js` | `Situation` (the world model rebuilt each step), `StageModel` (ledges, surfaces, the live Void). | `ai/cpu-intelligence/` |
+| `ai/cpu-intelligence/situation.js`, `stage-model.js` | `Situation` (the world model rebuilt each step), `StageModel` (ledges, surfaces, the live Void, dynamic platforms read live: where they are, whether they are solid or fading). | `ai/cpu-intelligence/` |
 | `ai/cpu-intelligence/prediction.js` | The forward simulation on the game's rules: paths, jump arcs, move and projectile contact, launches, recoveries. | `ai/cpu-intelligence/` |
 | `ai/cpu-intelligence/opponent-model.js` | `OpponentModel`: the opponent's observed habits, decaying. | `ai/cpu-intelligence/brain.js` |
 | `ai/cpu-intelligence/strategy.js` | `Strategy`: the strategic mode with hysteresis. | `ai/cpu-intelligence/brain.js` |
@@ -122,9 +124,11 @@ from Select Fighter), `map-select`, `watch-screens` (Watch Mode's setup,
 built from the setup screens), `battle`, `practice`, `discover`) is
 registered by `core/app.js` and owns its own section of `index.html`.
 `quick-battle-setup.js` is no screen: it is Quick Battle's setup logic
-(Regular Play's random draw, the Battle's start parameters, where Select
-Fighter goes next), used by `character-select-screen.js` and
-`map-select-screen.js`.
+(Regular Play's random draw and `randomStage`, which Select Stage's Random
+Stage shares, the Battle's start parameters, where Select Fighter goes
+next), used by `character-select-screen.js` and `map-select-screen.js`.
+`map-select-screen.js` is Select Stage: the 24-slot stage roster, Random
+Stage, the highlighted stage's details and its live preview.
 
 Discover’s section registry (`js/screens/discover-screen.js`) orders three sections:
 Fighters, Movement and Launch, opening on Fighters. All three use accessible
@@ -142,7 +146,7 @@ registries through English/French translation keys and scroll independently.
 | `fighter-roster.js` | The 48-slot roster (Select Fighter, Quick Battle's Select CPU, Watch Mode's CPU screens, Practice Ground's dialogs), with bottom-right fighter identifiers (`#0001`, etc.) on a translucent strip and small slot indices at the top-left. Shared difficulty stars and play-style modal; the action sits above Confirm, or at the bottom-right when Confirm is absent. Its preview head, status, Confirm and slot activation are hooks a subclass may override. | `screens/character-select-screen.js`, `screens/practice-screen.js`, `fighter-browser.js` |
 | `fighter-browser.js` | `FighterBrowser`: the roster read-only for Discover's Fighters page (no Confirm; a press only selects), each fighter's difficulty stars in the Available badge's place and the Play style description button, using the shared `InfoDialog`. | `screens/discover-screen.js` |
 | `sprite-art.js` | Portrait and preview painting. | `fighter-roster.js`, `hud.js`, `stage-preview.js` |
-| `stage-preview.js` | Select Stage's live preview. | `screens/map-select-screen.js` |
+| `stage-preview.js` | Select Stage's live preview (and still thumbnails); an animated preview of a stage with hazards runs them in its own `StageCollision` and `PlatformHazards`. | `screens/map-select-screen.js` |
 | `overlays.js` | The loading overlay, the confirm dialog (`alertdialog`), and the `role="dialog"` modals built on one shared base (its own navigation scope, the screen beneath inert, focus returned): the choice dialog (Quick Battle's play type) and the information dialog (`InfoDialog`, Discover's play-style description). | `core/app.js` |
 | `settings-dialog.js`, `language-dialog.js` | Settings; the first-launch language chooser. | `core/app.js` |
 | `controller-dialog.js` | Controller Connections (Home's controller button), and the status marks the Home indicator shares. | `core/app.js`, `screens/home-screen.js` |
@@ -154,6 +158,9 @@ registries through English/French translation keys and scroll independently.
 ## `js/stages/`
 
 `index.js` registers the themes (`desert-theme.js`, `city-theme.js`,
-`practice-theme.js`, each built on `stage-theme.js`) for the arena and the
-stage preview; `perspective.js` is the one-point perspective every stage
-shares.
+`asperitas-theme.js`, `practice-theme.js`, each built on `stage-theme.js`)
+for the arena and the stage preview; `perspective.js` is the one-point
+perspective every stage shares. A theme may be handed the live runtime
+platforms (`opts.platforms`, a `StageCollision`'s) to draw a stage's
+moving platforms where they are now; Asperitas's does, and draws its
+clouds from the map where none are handed over (a thumbnail).

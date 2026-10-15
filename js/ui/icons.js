@@ -60,6 +60,8 @@ export const ICONS = {
   plus: svg('<path d="M6 12h12M12 6v12"/>'),
   lock: svg('<rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),
   check: svg('<path d="M5 12.5 10 17.5 19 7"/>'),
+  // Two crossing arrows: Random Stage.
+  shuffle: svg('<path d="M3.5 7h3c2.6 0 4 1.3 5.3 3.5l.9 1.6c1.3 2.2 2.7 3.6 5.3 3.6h2.5"/><path d="M3.5 17h3c1.5 0 2.6-.5 3.5-1.3"/><path d="M14.1 8.3C15 7.5 16.1 7 17.6 7h2.9"/><path d="M18 4.5 20.5 7 18 9.5"/><path d="M18 14.5l2.5 2.2-2.5 2.5"/>'),
   rotate: svg(
     '<rect x="16" y="10" width="18" height="30" rx="3"/><path d="M22 36h6"/>' +
       '<path d="M8 22a18 18 0 0 1 10-14"/><path d="M13 6.5 18 8l-1.8 4.8"/>' +

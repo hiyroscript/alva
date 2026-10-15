@@ -348,66 +348,177 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
 }
 
 /* ---------------------------------------------------------------------
-   Map select
+   Map select: the highlighted stage (live preview and details) beside the
+   stage roster (24 slots: six by four on large displays, fewer columns or
+   a scrolling grid where there is less room) and Random Stage.
    --------------------------------------------------------------------- */
 
-.map-layout { grid-template-columns: minmax(0, 1.7fr) minmax(230px, 1fr); }
-.map-hero {
-  position: relative;
+.map-layout { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); }
+.map-hero, .map-roster {
   min-height: 0;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  overflow: hidden;
-  background: var(--surface-muted);
 }
+.map-hero { position: relative; overflow: hidden; background: var(--surface-muted); }
 .map-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-.map-side { display: flex; flex-direction: column; min-height: 0; }
-.map-cards { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr 1fr; gap: clamp(8px, 1.6vh, 14px); margin-bottom: clamp(8px, 1.6vh, 14px); }
-.map-card {
-  position: relative;
+/* The highlighted stage's details, under the roster. */
+.map-info {
+  flex: none;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 0;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  overflow: hidden;
-  text-align: left;
-  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform var(--dur-fast) var(--ease);
-}
-.map-card:hover { border-color: var(--border-hover); }
-.map-card:focus { box-shadow: var(--focus-ring); }
-.map-card:active { transform: scale(0.99); }
-.map-thumb-wrap { position: relative; min-height: 0; display: block; }
-.map-thumb { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.map-card-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1px;
-  padding: clamp(6px, 1.3vh, 12px) 12px clamp(7px, 1.4vh, 12px);
+  gap: clamp(3px, 0.8vh, 7px);
+  margin-top: auto;
+  margin-bottom: clamp(8px, 1.6vh, 14px);
+  padding-top: clamp(8px, 1.6vh, 14px);
   border-top: 1px solid var(--border);
-  background: var(--surface);
 }
-.map-card-name { font-weight: 700; font-size: clamp(15px, 2.8vh, 22px); letter-spacing: -0.01em; color: var(--text-strong); }
-.map-card-tag { color: var(--text-secondary); font-size: clamp(11px, 1.7vh, 13px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map-card-selected {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: none;
+.map-info-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.map-info-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(17px, 3vh, 24px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+}
+.map-info-badge {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px 4px 7px;
+  padding: 3px 9px 3px 6px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--black);
   font-size: 11px;
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
 }
-.map-card-selected .icon { stroke-width: 3.2; }
-.map-card.is-selected .map-card-selected { display: inline-flex; }
+.map-info-badge[hidden] { display: none; }
+.map-info-badge .icon { stroke-width: 3.2; }
+.map-info-tag { margin: 0; color: var(--text-secondary); font-size: clamp(12px, 1.8vh, 14px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-traits { display: flex; flex-wrap: wrap; gap: 6px; margin: 3px 0 0; }
+.map-traits > div {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 4px 9px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+.map-trait-label, .map-trait-value { margin: 0; }
+.map-trait-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.map-trait-value { font-size: clamp(11px, 1.6vh, 13px); color: var(--text); }
+/* The stage's hazards: called out plainly, never in warning colours. */
+.map-traits > div.is-hazard { border-color: var(--border-strong); }
+.map-trait-label.is-hazard { color: var(--text-secondary); }
+
+.map-roster {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(10px, 2vh, 18px) clamp(10px, 1.4vw, 18px);
+  background: var(--surface);
+}
+.map-roster-head { align-items: center; flex-wrap: wrap; row-gap: 6px; }
+.map-count { margin-right: auto; }
+.btn--random {
+  min-height: clamp(32px, 5vh, 38px);
+  padding: 0 12px 0 10px;
+  gap: 7px;
+  font-size: 13px;
+}
+.btn--random .icon { font-size: 17px; }
+
+.stage-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  margin: -5px -5px clamp(6px, 1.4vh, 12px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  touch-action: pan-y;
+}
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--stage-cols, 6), minmax(0, 1fr));
+  gap: clamp(5px, 0.7vw, 9px);
+}
+.stage-cell { min-width: 0; }
+.stage-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface-subtle);
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms var(--ease), background-color 120ms ease;
+}
+.stage-tile-art { position: relative; display: block; aspect-ratio: 16 / 10.5; background: var(--surface-muted); }
+.stage-tile-thumb { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage-tile-name {
+  display: block;
+  min-height: 1.6em;
+  padding: 3px 7px 4px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  font-size: clamp(10px, 1.6vh, 13px);
+  color: var(--text);
+}
+.stage-tile-num {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  z-index: 1;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgb(5 5 6 / 62%);
+  font-family: var(--font-mono);
+  font-size: clamp(8px, 1.3vh, 10px);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.stage-tile-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: none;
+  place-items: center;
+  width: clamp(15px, 2.4vh, 20px);
+  height: clamp(15px, 2.4vh, 20px);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--black);
+  font-size: clamp(9px, 1.5vh, 12px);
+}
+.stage-tile-check .icon { stroke-width: 3.4; }
+.stage-tile.is-available { border-color: var(--border-strong); }
+.stage-tile.is-available:hover { border-color: var(--border-hover); }
+.stage-tile.is-available:focus { box-shadow: var(--focus-ring); }
+.stage-tile.is-available:active { transform: scale(0.98); }
+.stage-tile.is-selected .stage-tile-check { display: grid; }
+.stage-tile.is-selected .stage-tile-name { color: var(--text-strong); box-shadow: inset 0 -2px 0 var(--accent); }
+/* Reserved slots: subdued, a lock, nothing to press. */
+.stage-tile.is-locked { cursor: default; background: var(--surface-subtle); }
+.stage-tile.is-locked .stage-tile-art {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(135deg, rgb(255 255 255 / 2.5%) 0 6px, transparent 6px 12px),
+    var(--surface-sunken);
+}
+.stage-tile.is-locked .stage-tile-num { background: transparent; color: var(--text-faint); }
+.stage-tile-lock { display: grid; font-size: clamp(13px, 2.4vh, 20px); color: var(--text-faint); }
+.stage-tile.is-locked .stage-tile-name { background: var(--surface-subtle); }
 .btn--start { width: 100%; flex: none; padding-block: 6px; text-align: center; }
 /* The fixed label wraps on compact landscape columns; balance the two lines. */
 .btn--start span { text-wrap: balance; }

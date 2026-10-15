@@ -21,7 +21,7 @@ reload. The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.11.
   #0001, the credited sources) stay as they are.
 - **Registry-owned copy.** The English names and descriptions of game data
   (control names, each fighter's button and ability names, universal movement, Launch,
-  difficulty levels, stages) are not written in the table: `registryStrings`
+  difficulty levels, stages and their traits) are not written in the table: `registryStrings`
   reads them from the registries, so they cannot drift. French translates
   every key, those included.
 - **Fallback.** A key missing from French shows the English string; a key

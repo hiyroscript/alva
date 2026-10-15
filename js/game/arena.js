@@ -9,6 +9,7 @@
 
 import { CONFIG } from '../config.js';
 import { StageCollision, resolveSolidOverlap } from './physics.js';
+import { PlatformHazards } from './platform-hazards.js';
 import { separateFighters } from './fighters/fighter.js';
 import { CombatSystem, worldBox } from './combat/combat.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from './combat/projectile.js';
@@ -29,13 +30,21 @@ const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
 const TECHNIQUE_DEBUG = '#29f0ff';
 
 export class Arena {
-  constructor({ canvas, map, input, reducedMotion = false }) {
+  // `seed` fixes the stage hazards' randomness (each its own stream of it,
+  // see js/game/platform-hazards.js); a mode passes its own (a Battle's).
+  constructor({ canvas, map, input, reducedMotion = false, seed = 0 }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.map = map;
     this.input = input;
     this.stage = new StageCollision(map);
-    this.theme = createTheme(map, { reducedMotion });
+    // The stage's hazards (its dynamic platforms, if any): this arena's own
+    // runtime state, built fresh for every arena from the map, which is
+    // never written.
+    this.hazards = new PlatformHazards(this.stage, { seed });
+    // The theme draws the live platforms (a hazard where it is now, as
+    // solid and as visible as it is now), never a copy of its own.
+    this.theme = createTheme(map, { reducedMotion, platforms: this.stage.platforms });
     // Effects drawn here (the Shield's drifting edge) run on this clock, and
     // hold still with reduced motion.
     this.reducedMotion = reducedMotion;
@@ -160,6 +169,9 @@ export class Arena {
     }
     if (steps >= CONFIG.sim.maxStepsPerFrame) this.acc = 0;
     const alpha = this.acc / this.step;
+    // Platforms and fighters drawn the same share of the way between steps,
+    // so whoever stands on a moving platform stays on it on screen.
+    this.stage.interpolate(alpha);
     for (const f of this.fighters) f.interpolate(alpha);
     for (const p of this.projectiles) p.interpolate(alpha);
     for (const f of this.fighters) this.fx.sampleTrail(f, dt);
@@ -179,7 +191,10 @@ export class Arena {
   // timer) run them first and then call this.
   update(dt) {
     // Any fighter whose respawn wait is over comes back first, and plays
-    // this step. Then the fighters (a technique advances with its
+    // this step. Then the stage's hazards take their step (each moves,
+    // fades or relocates, and anyone standing on one that has just
+    // vanished lets go of it), so every fighter then moves, rides and lands
+    // on the platforms where they are now. Then the fighters (a technique advances with its
     // fighter); then the projectiles they released this step spawn (once
     // each), every projectile moves and those that meet settle it
     // (clashProjectiles). Live clones advance, then the clones summoned this
@@ -189,6 +204,7 @@ export class Arena {
     // Last, any fighter now in the Void is handed to the mode (checkVoid).
     this.updateRespawns(dt);
     const fighters = this.inPlay;
+    this.hazards.update(dt, fighters);
     for (const f of fighters) f.update(dt, this.simCtx);
     // A launch that rebounded off the stage this step shows its impact,
     // and a fighter that healed itself its glow.
@@ -398,15 +414,20 @@ export class Arena {
     return [(x - v.x) * v.scale, (y - v.y) * v.scale];
   }
 
+  // The fighter's shadow and ground ring on the surface under it, solid
+  // ones only: a hazard that has vanished takes none, and one fading out or
+  // forming takes them as faintly as it shows. On a moving platform they
+  // lie on it where it is drawn.
   drawShadow(f) {
     const { ctx, view } = this;
     const b = f.body;
     const surface = this.stage.surfaceBelow(b.x - b.halfW, b.x + b.halfW, f.renderY);
-    const height = Math.max(0, surface.y - f.renderY);
-    const fade = Math.max(0, 1 - height / 220);
+    const surfaceY = surface.ref?.dynamic ? surface.ref.renderY : surface.y;
+    const height = Math.max(0, surfaceY - f.renderY);
+    const fade = Math.max(0, 1 - height / 220) * (surface.ref?.opacity ?? 1);
     if (fade <= 0) return;
     const sh = this.theme.shadow;
-    const [sx, sy] = this.toScreen(f.renderX, surface.y);
+    const [sx, sy] = this.toScreen(f.renderX, surfaceY);
     const rx = 21 * view.scale * (0.6 + 0.4 * fade);
     const ry = 4.5 * view.scale * (0.6 + 0.4 * fade);
     ctx.save();
@@ -603,7 +624,11 @@ export class Arena {
       ctx.strokeStyle = color;
       ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(w * s), Math.round(h * s));
     };
-    for (const p of this.stage.platforms) rect(p.x, p.y, p.w, 2, p.dropThrough ? '#ffffff' : '#ff3b3b');
+    // Solid platforms only (a vanished hazard has no collision to show),
+    // where they are drawn.
+    for (const p of this.stage.platforms) {
+      if (p.active !== false) rect(p.renderX, p.renderY, p.w, 2, p.dropThrough ? '#ffffff' : '#ff3b3b');
+    }
     // Solids, the main floor's block among them (its top the ground).
     for (const so of this.stage.solids) rect(so.x, so.y, so.w, so.h, '#ff3b3b');
     // The Void's fixed kill boundary, dashed: the line gameplay tests, not
@@ -696,6 +721,9 @@ export class Arena {
       `pos ${p.body.x.toFixed(1)}, ${p.body.y.toFixed(1)}  vel ${p.body.vx.toFixed(0)}, ${p.body.vy.toFixed(0)}`,
       `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}${rival}  clones ${this.clones.length}`,
     ];
+    // Each stage hazard's state, solid or not.
+    const hazards = this.hazards.controllers;
+    if (hazards.length) lines.push(`hazards ${hazards.map((c) => `${c.id} ${c.state}${c.platform.active ? '' : ' (no collision)'}`).join('  ')}`);
     const y0 = view.pxH - 12 - lines.length * 16;
     lines.forEach((l, i) => {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
