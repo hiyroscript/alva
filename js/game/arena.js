@@ -11,6 +11,7 @@
 import { CONFIG } from '../config.js';
 import { StageCollision, resolveSolidOverlap } from './physics.js';
 import { PlatformHazards } from './platform-hazards.js';
+import { StageHazards } from './stage-hazards.js';
 import { separateFighters } from './fighters/fighter.js';
 import { CombatSystem, worldBox } from './combat/combat.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from './combat/projectile.js';
@@ -47,9 +48,15 @@ export class Arena {
     // runtime state, built fresh for every arena from the map, which is
     // never written.
     this.hazards = new PlatformHazards(this.stage, { seed });
+    // The stage's other hazards (Adamaris's volcano and its rocks, if any):
+    // also this arena's own, seeded from the same seed on streams of their
+    // own (see js/game/stage-hazards.js).
+    this.stageHazards = new StageHazards(this.stage, map, { seed });
     // The theme draws the live platforms (a hazard where it is now, as
-    // solid and as visible as it is now), never a copy of its own.
-    this.theme = createTheme(map, { reducedMotion, platforms: this.stage.platforms });
+    // solid and as visible as it is now) and the live stage hazards (the
+    // volcano's state, the rocks in flight, their warnings and impacts),
+    // never a copy of its own.
+    this.theme = createTheme(map, { reducedMotion, platforms: this.stage.platforms, hazards: this.stageHazards });
     // Effects drawn here (the Shield's drifting edge) run on this clock, and
     // hold still with reduced motion.
     this.reducedMotion = reducedMotion;
@@ -181,6 +188,7 @@ export class Arena {
     // Platforms and fighters drawn the same share of the way between steps,
     // so whoever stands on a moving platform stays on it on screen.
     this.stage.interpolate(alpha);
+    this.stageHazards.interpolate(alpha);
     for (const f of this.fighters) f.interpolate(alpha);
     for (const p of this.projectiles) p.interpolate(alpha);
     for (const f of this.fighters) this.fx.sampleTrail(f, dt);
@@ -209,8 +217,11 @@ export class Arena {
     // (clashProjectiles). Live clones advance, then the clones summoned this
     // step spawn (once each, on their cloud's first frame). Pulls draw
     // fighters in (applyPulls), then melee, projectile, clone and technique
-    // hits resolve, and spent projectiles and finished clones are dropped.
-    // Last, any fighter now in the Void is handed to the mode (checkVoid).
+    // hits resolve; then the stage hazards' rocks fly on, and those that
+    // land this step strike whoever their impact meets (no attacker: see
+    // StageHazards.resolve), and spent projectiles and finished clones are
+    // dropped. Last, any fighter now in the Void is handed to the mode
+    // (checkVoid).
     this.updateRespawns(dt);
     const fighters = this.inPlay;
     this.updateCastEffects(dt);
@@ -237,6 +248,9 @@ export class Arena {
     spawnClones(fighters, this.clones, this.stage);
     applyPulls(fighters, this.projectiles, dt);
     this.combat.update(fighters, this.projectiles, this.clones);
+    const landed = this.stageHazards.update(dt, { live: this.hazardsLive });
+    for (const r of landed) this.fx.addShake(r.size === 'large' ? 4 : 2);
+    this.stageHazards.resolve(fighters, this.combat);
     this.fx.take(this.combat.events, this);
     removeDeadProjectiles(this.projectiles);
     removeDeadClones(this.clones);
@@ -262,6 +276,12 @@ export class Arena {
     this.castEffects = this.castEffects.filter((e) => e.age < e.clip.frames.length / e.clip.fps - 1e-6);
   }
 
+  // Whether the stage hazards may strike and throw anything new: always,
+  // unless a mode holds them (a Battle, outside its fight).
+  get hazardsLive() {
+    return true;
+  }
+
   // ---- Void and respawn ----------------------------------------------------------
 
   // Every fighter whose centre has crossed the stage's Void boundary in
@@ -270,10 +290,15 @@ export class Arena {
   // out before any is handed on, so two taken on the same step are seen as
   // taken together (see Battle.onVoid). Each bursts where it was taken, in
   // its own colours (HitEffects.addElimination), caught before it leaves
-  // play: the burst lives on in the effects, never on the fighter.
+  // play: the burst lives on in the effects, never on the fighter. And the
+  // Void itself ripples where the fighter's centre crossed its boundary
+  // (voidCrossing, HitEffects.addVoidRipple): first, so the burst plays
+  // over it. Both are paint only: neither touches the boundary, the score
+  // or the respawn.
   checkVoid(fighters) {
     const taken = fighters.filter((f) => !f.lostToVoid && this.stage.inVoid(f.body));
     for (const f of taken) {
+      this.fx.addVoidRipple(voidCrossing(f.body, this.stage.void), f);
       this.fx.addElimination(f);
       f.lostToVoid = true;
     }
@@ -426,7 +451,7 @@ export class Arena {
     // The Void over everything on the stage: whatever falls into it is
     // swallowed by the black. It is drawn at the boundary in force, the
     // very rectangle collision tests (stage.void).
-    theme.drawVoid(ctx, view, this.stage.void);
+    theme.drawVoid(ctx, view, this.stage.void, this.fx.ripples);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // A fighter the Void took bursts over the black where it went in, after
     // it has gone from the stage.
@@ -828,7 +853,55 @@ export class Arena {
     this.projectiles = [];
     this.clones = [];
     this.castEffects = [];
+    // Nothing of the stage hazards outlives the arena: no rock in flight,
+    // impact or warning.
+    this.stageHazards.reset();
   }
+}
+
+// Where body `b` crossed the Void's boundary `v` (the rectangle in force,
+// the one StageCollision.inVoid tests) this step: { side, x, y }, the point
+// on the boundary its centre passed through on its way from where it was a
+// step ago (prevX, prevY) to where it is now, and the side ('left',
+// 'right', 'top' or 'bottom') it crossed first; a diagonal through a corner
+// takes the side it reached first. A centre that was already outside a step
+// ago (a Void that closed over it) is anchored to the nearest point of the
+// boundary to where it is now, on the side it is furthest past.
+export function voidCrossing(b, v) {
+  const x1 = b.x;
+  const y1 = b.y - b.height / 2;
+  const x0 = b.prevX ?? x1;
+  const y0 = (b.prevY ?? b.y) - b.height / 2;
+  const inside = x0 >= v.left && x0 <= v.right && y0 >= v.top && y0 <= v.bottom;
+  if (inside) {
+    let best = null;
+    const cross = (side, line, from, to) => {
+      if (from === to) return;
+      const t = (line - from) / (to - from);
+      if (t < 0 || t > 1 || (best && t >= best.t)) return;
+      best = { side, t };
+    };
+    if (x1 < v.left) cross('left', v.left, x0, x1);
+    if (x1 > v.right) cross('right', v.right, x0, x1);
+    if (y1 < v.top) cross('top', v.top, y0, y1);
+    if (y1 > v.bottom) cross('bottom', v.bottom, y0, y1);
+    if (best) {
+      const x = x0 + (x1 - x0) * best.t;
+      const y = y0 + (y1 - y0) * best.t;
+      return {
+        side: best.side,
+        x: best.side === 'left' ? v.left : best.side === 'right' ? v.right : Math.min(v.right, Math.max(v.left, x)),
+        y: best.side === 'top' ? v.top : best.side === 'bottom' ? v.bottom : Math.min(v.bottom, Math.max(v.top, y)),
+      };
+    }
+  }
+  const past = { left: v.left - x1, right: x1 - v.right, top: v.top - y1, bottom: y1 - v.bottom };
+  const side = Object.keys(past).reduce((a, c) => (past[c] > past[a] ? c : a), 'left');
+  return {
+    side,
+    x: side === 'left' ? v.left : side === 'right' ? v.right : Math.min(v.right, Math.max(v.left, x1)),
+    y: side === 'top' ? v.top : side === 'bottom' ? v.bottom : Math.min(v.bottom, Math.max(v.top, y1)),
+  };
 }
 
 // Device pixels per world unit, chosen so a fighter of the reference height

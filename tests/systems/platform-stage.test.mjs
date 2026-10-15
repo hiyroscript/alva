@@ -135,8 +135,15 @@ test('ordinary jumps never reach the upper Void, even from each stage\'s highest
   }
 });
 
-test('on every stage a fighter can leave either ledge and live a moment, but keeps going into the Void', () => {
-  for (const m of ALL_MAPS) {
+// The stages whose main floor is finite (ledges at both ends), and those
+// whose ground is continuous (Adamaris's beach: no ledge anywhere).
+const continuous = (m) => m.ground?.type === 'continuous';
+const FINITE_MAPS = ALL_MAPS.filter((m) => !continuous(m));
+const CONTINUOUS_MAPS = ALL_MAPS.filter(continuous);
+
+test('on every finite stage a fighter can leave either ledge and live a moment, but keeps going into the Void', () => {
+  assert.ok(FINITE_MAPS.length >= 4, 'Yerma, Sol-Noir, Asperitas and Practice Ground keep their ledges');
+  for (const m of FINITE_MAPS) {
     const stage = new StageCollision(m);
     for (const dir of ['left', 'right']) {
       const sign = dir === 'right' ? 1 : -1;
@@ -157,6 +164,53 @@ test('on every stage a fighter can leave either ledge and live a moment, but kee
       assert.ok(lostAt - offAt >= 15, `${m.id} ${dir}: ${lostAt - offAt} steps off the stage first`);
     }
   }
+});
+
+test('on a continuous ground a fighter runs past the combat area on the sand, never falling, until the side Void takes it', () => {
+  assert.deepEqual(CONTINUOUS_MAPS.map((m) => m.id), ['adamaris']);
+  for (const m of CONTINUOUS_MAPS) {
+    const stage = new StageCollision(m);
+    assert.equal(stage.continuousGround, true);
+    // The ground reaches far past both sides of the Void: its ends are
+    // never reachable.
+    assert.ok(stage.floor.x < m.voidBounds.left - 1000 && stage.floor.x + stage.floor.w > m.voidBounds.right + 1000, `${m.id}: ground past the Void`);
+    assert.equal(stage.floor.y, m.mainStage.top, 'its top is the main stage\'s');
+    for (const dir of ['left', 'right']) {
+      const sign = dir === 'right' ? 1 : -1;
+      const edge = dir === 'right' ? m.mainStage.right : m.mainStage.left;
+      const { fighter, step } = makeFighter({ stage, x: edge - sign * 60, facing: sign });
+      let lostAt = null;
+      let maxDrop = 0;
+      for (let i = 0; i < 60 * 5 && lostAt === null; i++) {
+        step({ [dir === 'right' ? 'runRight' : 'runLeft']: true });
+        assert.equal(fighter.grounded, true, `${m.id} ${dir}: still on the sand at x ${fighter.body.x.toFixed(0)}`);
+        assert.equal(fighter.body.wall, 0, 'no invisible wall');
+        maxDrop = Math.max(maxDrop, fighter.body.y - m.mainStage.top);
+        if (stage.inVoid(fighter.body)) lostAt = i;
+      }
+      assert.ok(lostAt !== null, `${m.id} ${dir}: the side Void took it`);
+      assert.equal(maxDrop, 0, 'never below the sand');
+      assert.ok(sign * (fighter.body.x - (dir === 'right' ? m.voidBounds.right : m.voidBounds.left)) > 0, 'past the Void line');
+      // Dropped well past the Void's line, it lands on sand all the same.
+      const body = createBody({ x: edge + sign * 900, y: m.mainStage.top - 200, width: 34, height: 80 });
+      for (let i = 0; i < 120; i++) stepBody(body, DT, stage, CONFIG.sim.gravity);
+      assert.equal(body.grounded, true, 'sand beyond the Void too');
+      assert.equal(body.y, m.mainStage.top);
+    }
+  }
+  // The finite stages' floors are exactly their main stages.
+  for (const m of FINITE_MAPS) {
+    const stage = new StageCollision(m);
+    assert.equal(stage.continuousGround, false);
+    assert.deepEqual([stage.floor.x, stage.floor.x + stage.floor.w], [m.mainStage.left, m.mainStage.right], m.id);
+  }
+});
+
+test('a ground type is data: an unknown one or a continuous one with no reach is refused', () => {
+  const base = getMap('adamaris');
+  assert.throws(() => new StageCollision({ ...base, ground: { type: 'floating' } }), /unknown ground type/);
+  assert.throws(() => new StageCollision({ ...base, ground: { type: 'continuous' } }), /positive reach/);
+  assert.equal(new StageCollision({ ...base, ground: undefined }).continuousGround, false, 'finite by default');
 });
 
 test('falling off a ledge ends in the bottom Void, much sooner than the old bounds would have allowed', () => {

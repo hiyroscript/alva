@@ -22,7 +22,7 @@ retraces them to Home, landing on each choice.
   Shields, summons and techniques, clones, projectiles, stage physics,
   camera and hit effects (the Void's fighter-coloured burst included) are
   all unchanged.
-- **The same clock and overtime.** 7 minutes, then, with the points level,
+- **The same clock and overtime.** 5 minutes, then, with the points level,
   60 seconds of overtime under the closing Void, then the lower Launch
   Point, and level on that too a tie on the result menu (never a fresh
   battle by itself), exactly as in [Quick Battle](battle.md). The HUD

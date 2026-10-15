@@ -76,7 +76,7 @@ function forceIdle(c, seconds = 60) {
 // ---- Stage registration ------------------------------------------------------------
 
 test('Asperitas is registered as the third stage, with its own theme', () => {
-  assert.deepEqual(MAPS.map((m) => m.id), ['desert', 'city', 'asperitas']);
+  assert.deepEqual(MAPS.map((m) => m.id).slice(0, 3), ['desert', 'city', 'asperitas']);
   const m = getMap('asperitas');
   assert.ok(m);
   assert.equal(m.name, 'Asperitas');

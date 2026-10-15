@@ -2,10 +2,21 @@
 // A fighter's origin is bottom-centre, so spawn/platform `y` values are the
 // surface the feet rest on.
 //
-// Every stage is a finite platform-fighter stage: a compact main stage with
-// open air past both ledges, and the Void a short way beyond: a blast zone,
-// not a distant world edge. Four separate things, each its own field:
+// Every stage is a platform-fighter stage: a compact main stage (the combat
+// area), and the Void a short way beyond it: a blast zone, not a distant
+// world edge. Most have open air past both ledges; a stage whose ground is
+// continuous (Adamaris's beach, `ground`) has none. Separate things, each
+// its own field:
 //
+// ground:       optional, the kind of main floor (js/game/physics.js
+//               resolveGround): { type: 'finite' } (the default: the main
+//               stage below) or { type: 'continuous', reach }, ground at the
+//               main stage's top running `reach` world units past each side
+//               of the Void, so there is no ledge anywhere a fighter can be.
+//               mainStage then stays the combat area the camera frames and
+//               the Void (overtime's closing one included) is set around;
+//               only collision reaches further. A side elimination is the
+//               Void's, as on every stage.
 // mainStage:    the main floor, finite. Fighters stand on its top (`top`)
 //               only between `left` and `right`; past either edge there is
 //               nothing to stand on and they fall. Below its top it is a
@@ -44,6 +55,10 @@
 //               drift back; below the stage's top by enough to fall a
 //               little way first; and above it clear of every jump from the
 //               highest footing, so only a launch reaches it.
+// hazards:      optional stage hazards that are not platforms (see
+//               js/data/stage-hazards.js and js/game/stage-hazards.js): each
+//               { id, behavior, ... } runs its own controller, e.g.
+//               Adamaris's volcano, whose falling rocks strike the beach.
 // theme:        key into the stage theme registry (js/stages/index.js).
 
 import { CONFIG } from '../config.js';
@@ -66,6 +81,8 @@ export function cameraAround(bounds, margin) {
   });
 }
 
+// Yerma (id desert) and Sol-Noir (id city): their ids are the ones they
+// were first given, kept so every reference stays valid.
 const DESERT_MAIN = Object.freeze({ left: 1120, right: 2480, top: 860, bottom: 2000 });
 // No platforms: the rock outcrops are the highest footing.
 const DESERT_VOID = voidAround(DESERT_MAIN, { side: 360, top: 760, bottom: 400 });
@@ -100,10 +117,18 @@ const cloudHazard = (region) => Object.freeze({
   mainClearance: 110,
 });
 
+// Adamaris: a beach. Its sand is the ground itself, continuous past both
+// sides of the Void (no ledge, no slab, nothing to walk off), with the same
+// compact combat area and blast zone as every other stage around it; and
+// there are no platforms or solids on the sand, only open beach. Its top
+// line is 800 above the sand (as City's), well clear of every jump.
+const ADAMARIS_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 1300 });
+const ADAMARIS_VOID = voidAround(ADAMARIS_MAIN, { side: 360, top: 800, bottom: 400 });
+
 export const MAPS = [
   {
     id: 'desert',
-    name: 'Desert',
+    name: 'Yerma',
     tagline: 'Sandstone mesa at golden hour',
     description:
       'A compact sandstone mesa over open desert air. Open footing and clear ledges make it a stage about spacing and movement.',
@@ -129,7 +154,7 @@ export const MAPS = [
   },
   {
     id: 'city',
-    name: 'City',
+    name: 'Sol-Noir',
     tagline: 'Rooftop block after dark',
     description:
       'One rooftop block at night. Vents, girders and catwalks stack into vertical routes above the roof, with the street far below its edges.',
@@ -192,6 +217,36 @@ export const MAPS = [
     ],
     solids: [],
     theme: 'asperitas',
+  },
+  {
+    id: 'adamaris',
+    name: 'Adamaris',
+    tagline: 'A paradise beneath a restless volcano',
+    description:
+      'Golden sands stretch along a tropical sea beneath a towering volcano. Watch the crater carefully: sudden eruptions send volcanic rocks crashing onto the beach.',
+    traits: [
+      ['Terrain', 'Tropical beach'],
+      ['Platforms', 'Continuous ground'],
+      ['Hazards', 'Volcanic rockfall'],
+      ['Obstacles', 'None'],
+      ['Light', 'Tropical daylight'],
+    ],
+    ground: Object.freeze({ type: 'continuous', reach: 2400 }),
+    mainStage: ADAMARIS_MAIN,
+    cameraBounds: cameraAround(ADAMARIS_VOID, 140),
+    voidBounds: ADAMARIS_VOID,
+    spawnPoints: [
+      { x: 1640, facing: 1 },
+      { x: 1960, facing: -1 },
+    ],
+    platforms: [],
+    solids: [],
+    // The volcano in the distance, its rocks landing anywhere across the
+    // beach's combat area (`targets`: x from `left` to `right`).
+    hazards: [
+      Object.freeze({ id: 'adamaris-volcano', behavior: 'volcano', targets: Object.freeze({ left: 1060, right: 2540 }) }),
+    ],
+    theme: 'adamaris',
   },
 ];
 

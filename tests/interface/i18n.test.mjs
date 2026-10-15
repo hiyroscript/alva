@@ -208,6 +208,8 @@ test('French is really French: only proper names, codes and shared words read th
     'map.card', // {name}. {tagline}
     'map.counter', // {available} / {slots}
     'map.asperitas.name', // Asperitas, a proper name
+    'map.desert.name', 'map.city.name', // Yerma, Sol-Noir: proper names
+    'map.adamaris.name', // Adamaris, a proper name
     'map.trait.terrain', 'map.trait.obstacles', // Terrain, Obstacles: the same words
     'mode.index', // Mode 01
     'pad.playstation.north', // Triangle, the PlayStation button's name
@@ -381,14 +383,14 @@ test('marked strings re-read themselves: text, attributes, a label beside an ico
   root.append(title, button, icon, later, labelled);
   assert.equal(title.textContent, 'Settings');
   assert.equal(button.getAttribute('aria-label'), 'Slot 03');
-  assert.equal(labelled.getAttribute('aria-label'), 'City stage preview');
+  assert.equal(labelled.getAttribute('aria-label'), 'Sol-Noir stage preview');
   inFrench(() => {
     localizeTree(root);
     assert.equal(title.textContent, 'Paramètres');
     assert.equal(button.getAttribute('aria-label'), 'Emplacement 03');
     assert.equal(span.textContent, 'Jouer');
     assert.equal(later.textContent, 'Activer le CPU');
-    assert.equal(labelled.getAttribute('aria-label'), 'Aperçu de l’arène Ville');
+    assert.equal(labelled.getAttribute('aria-label'), 'Aperçu de l’arène Sol-Noir');
   });
   localizeTree(root);
   assert.equal(title.textContent, 'Settings');
@@ -421,7 +423,7 @@ test('Mode details translate every section immediately in place and also render 
     ]);
     assert.deepEqual(panel.querySelectorAll('p').map((node) => node.textContent), [
       'Affrontez un adversaire contrôlé par le CPU. Projetez-le dans le Vide pour marquer des points. Le premier à atteindre 3 points gagne.',
-      'En combat rapide, les matchs durent jusqu’à 7 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',
+      'En combat rapide, les matchs durent jusqu’à 5 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',
     ]);
   };
   const off = onLanguageChange(() => localizeTree(mode.el));

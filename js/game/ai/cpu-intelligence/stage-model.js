@@ -6,8 +6,10 @@
 // floor, one-way platforms, the tops of solid blocks), how much room there
 // is to an edge, how far a point is from the Void in force (overtime's
 // closing Void included: it is read live, never cached), and which surfaces
-// lead to which by a jump or a walk off an edge. Desert, City, Asperitas
-// and any future stage work the same way.
+// lead to which by a jump or a walk off an edge, and the danger zones a
+// stage hazard shows. Yerma (desert), Sol-Noir (city), Asperitas, Adamaris
+// (whose ground is continuous: no ledges) and any future stage work the
+// same way.
 //
 // Moving and vanishing platforms (a stage's hazards, see
 // js/game/platform-hazards.js) are read live, like the Void: a dynamic
@@ -29,11 +31,18 @@ export class StageModel {
     this.stage = stage;
     const floor = stage.floor;
     this.floor = floor;
-    this.left = floor.x;
-    this.right = floor.x + floor.w;
+    // The main stage's edges: its ledges on a finite stage; on a continuous
+    // ground (no ledge anywhere), the edges of the combat area, past which
+    // only the side Void lies, so the room a CPU keeps from them is the same
+    // safety margin either way.
+    const main = stage.main ?? { left: floor.x, right: floor.x + floor.w, top: floor.y };
+    this.left = main.left;
+    this.right = main.right;
     this.top = floor.y;
     this.centerX = stage.centerX;
-    this.width = floor.w;
+    this.width = main.right - main.left;
+    // Whether walking past those edges drops a fighter off the stage.
+    this.ledges = !stage.continuousGround;
     // The surfaces that never change: the main floor's top, each static
     // one-way platform, each other solid's top.
     this.fixed = [
@@ -62,6 +71,21 @@ export class StageModel {
       });
     }
     return out;
+  }
+
+  // The danger zones a stage hazard shows right now (a falling rock's red
+  // warning: { id, x, radius, height, timeLeft }, see
+  // js/game/stage-hazards.js), read live. Only visible warnings are ever
+  // here: a CPU never knows where a rock will land before it is shown.
+  get dangerZones() {
+    return this.stage.dangerZones ?? [];
+  }
+
+  // The visible danger zone covering a body of half-width `halfW` at `x`
+  // (feet on the ground), with `margin` to spare, or null.
+  dangerAt(x, halfW, margin = 0) {
+    for (const z of this.dangerZones) if (Math.abs(x - z.x) < z.radius + halfW + margin) return z;
+    return null;
   }
 
   // Whether `ref` (a body's `ground`, a planned step) is a surface to stand

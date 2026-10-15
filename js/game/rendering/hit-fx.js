@@ -25,14 +25,21 @@
 // - A fighter the Void takes bursts where it went in: a flash, a ring and
 //   shards in its own colours (its visual.eliminationPalette, see
 //   eliminationPalette), drawn on after it has gone. Nothing but paint.
+// - And the Void itself reacts where it took the fighter: a ripple at the
+//   very point on its boundary the fighter's centre crossed (see
+//   voidCrossing in js/game/arena.js): a bright pulse, its edge and red rim
+//   rippling out along it from there (a damped wave impulse laid over its
+//   own slow waves, see StageTheme.drawVoid) and rings spreading through the
+//   black. Paint only: the kill boundary never moves for it.
 // - A fighter that heals itself (a technique's heal, see Fighter.heals): a
 //   soft green ring opening round its body and a few plus marks floating up
 //   from it. The same glow on a fighter that a charmed opponent's hit
 //   healed instead (a `charmed` event, see CombatSystem.charmed). Nothing
 //   but paint.
 //
-// With reduced motion there is no shake and no zoom, and an elimination's
-// shards barely travel; the rest stays.
+// With reduced motion there is no shake and no zoom, an elimination's
+// shards barely travel and the Void's ripple is a still, fading pulse with
+// no wave running along its edge; the rest stays.
 
 import { stepBody } from '../physics.js';
 import { bounceLaunch } from '../combat/launch-bounce.js';
@@ -78,6 +85,23 @@ export const HIT_FX = Object.freeze({
     ring: 0.85, // the ring's widest, in fighter heights
     shake: 5, // px, none with reduced motion
     reducedTravel: 0.3, // with reduced motion, this much of the flight
+  },
+  // The Void's ripple where it took a fighter (world units and real
+  // seconds; see StageTheme.drawVoid for how it is drawn).
+  voidRipple: {
+    life: 1.5, // seconds until it has died away
+    amp: 42, // how far the edge first heaves (world units), damped from there
+    speed: 520, // how fast the wave runs out along the edge (units / s)
+    wavelength: 120, // between its crests along the edge
+    width: 110, // how wide the travelling wave packet is
+    decay: 2.1, // per second: how quickly the wave loses strength
+    dip: 30, // the edge's dip right at the point it swallowed the fighter
+    reach: 70, // a side within this of the point ripples too (a corner)
+    rings: 3, // rings spreading through the black
+    ringSpeed: 300, // their spread (units / s)
+    ringGap: 0.13, // seconds between one ring and the next
+    pulse: 70, // the bright pulse's radius at its widest (units)
+    reducedRing: 60, // with reduced motion: one still ring this wide
   },
   lethal: {
     scale: 0.25, // the clock's speed at its slowest
@@ -159,6 +183,7 @@ export class HitEffects {
     this.trails = new Map(); // fighter -> { ghosts: [{ x, y, frame, flip, age }], since }
     this.slow = null; // { time, focus: fighter } while the lethal slow motion runs
     this.eliminations = []; // { slot, x, y, size, palette, age, life, seed }
+    this.ripples = []; // { side, x, y, slot, age, life }
   }
 
   // ---- From the simulation -------------------------------------------------------
@@ -222,6 +247,18 @@ export class HitEffects {
     this.addShake(e.shake);
   }
 
+  // The Void took `f` where its centre crossed the boundary at `crossing`
+  // ({ side, x, y }, see voidCrossing in js/game/arena.js): the Void's own
+  // ripple there, one per elimination (two on one step are two ripples,
+  // neither replacing the other). Paint only.
+  addVoidRipple(crossing, f = null) {
+    if (!crossing) return;
+    this.ripples.push({
+      side: crossing.side, x: crossing.x, y: crossing.y, slot: f?.slot ?? null,
+      age: 0, life: HIT_FX.voidRipple.life,
+    });
+  }
+
   // `f` healed itself this step (`heal`, one of Fighter.heals): its glow,
   // round the middle of its body, a little bigger for a bigger heal.
   addHeal(f, heal) {
@@ -266,6 +303,8 @@ export class HitEffects {
     this.sparks = this.sparks.filter((s) => s.age < s.life);
     for (const e of this.eliminations) e.age += dt;
     this.eliminations = this.eliminations.filter((e) => e.age < e.life);
+    for (const r of this.ripples) r.age += dt;
+    this.ripples = this.ripples.filter((r) => r.age < r.life);
     if (this.slow) {
       this.slow.time += dt;
       const { hold, ease } = HIT_FX.lethal;

@@ -3,6 +3,15 @@
 Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
 `js/data/practice-map.js`) keeps four things apart:
 
+- **Ground** (`ground`, optional): the kind of main floor. `finite` (the
+  default) is the main stage below, with a ledge at each end. `continuous`
+  (Adamaris's beach, `{ type: 'continuous', reach }`) is ground at the main
+  stage's top that runs `reach` world units past each side of the Void
+  (`resolveGround` in `js/game/physics.js`): real collision everywhere a
+  fighter can be, so there is no ledge to walk off, no slab, cliff or wall;
+  the main stage is then the combat area the camera frames and the Void
+  (overtime's closing one included) is set around, exactly as on every
+  other stage, and only the side Void ends a run along the sand.
 - **Main stage** (`mainStage`): the finite main floor. Fighters stand on its
   top only between its `left` and `right` edges; below its top it is a solid
   block (a cliff, facade or block face), drawn and collided exactly alike.
@@ -28,7 +37,12 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   clock), fresh. In Quick Battle each fall is also a point for the opponent,
   and the third point ends the match instead (a short **K.O.** beat, then
   the result). Every fall bursts where the fighter went in, in its own
-  colours (`visual.eliminationPalette`), paint only. On screen
+  colours (`visual.eliminationPalette`), paint only, and the Void itself
+  ripples where the fighter's centre crossed its boundary (every side and
+  corner, overtime's closed edge included): a bright pulse there, its black
+  edge and red rim heaving in a damped wave that runs out along it, the rim
+  burning brighter, and rings spreading through the black; still and fading
+  with reduced motion. Paint only: the kill line never moves for it. On screen
   the Void is one solid black layer with a single gently wavering edge,
   lined on the stage's side by a thin red rim (about 1.5 CSS px, no glow)
   traced from exactly the same points, so the two never drift apart; it
@@ -53,11 +67,14 @@ viewport tall, the whole main stage with some air past its ledges fits across
 a 16:9 view (narrower screens zoom out further, never below 8.8 %), and the
 framing leans toward the stage's centre while it follows the fight.
 
-Desert is a sandstone mesa over open desert air; City a rooftop block over
-the street canyon; Asperitas one great cloud adrift high above the cloud
-sea, with two drifting cloud hazards over it; Practice Ground a training
-block against its gridded wall. All four are drawn in the same pseudo-3D
-perspective, with the Practice Ground's projection shared by every stage.
+Yerma (id `desert`) is a sandstone mesa over open desert air; Sol-Noir (id
+`city`) a rooftop block over the street canyon; Asperitas one great cloud
+adrift high above the cloud sea, with two drifting cloud hazards over it;
+Adamaris a tropical beach under a volcano that throws rocks onto the sand;
+Practice Ground a training block against its gridded wall. All five are
+drawn in the same pseudo-3D perspective, with the Practice Ground's
+projection shared by every stage. (Yerma and Sol-Noir were first called
+Desert and City; their ids, themes and layouts are unchanged.)
 
 The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.1.
 
@@ -83,11 +100,11 @@ highlighted stage beside the **stage roster**: `CONFIG.stageRoster.totalSlots`
 (24) slots, laid out six by four on a large display. `stageSlots()`
 ([`js/data/maps.js`](../../js/data/maps.js)) fills them from the real
 registry: the playable stages (`MAPS`, in order) take the first slots
-(01 Desert, 02 City, 03 Asperitas) and every other slot is a reserved,
+(01 Yerma, 02 Sol-Noir, 03 Asperitas, 04 Adamaris) and every other slot is a reserved,
 unavailable placeholder (a lock, nothing to press, never focused). No
 stage is ever made up for a placeholder, and Practice Ground is never one
 of the slots. A new `MAPS` entry simply takes the next slot (the counter,
-*3 available / 24 slots*, follows), and the roster grows past 24 only once
+*4 available / 24 slots*, follows), and the roster grows past 24 only once
 the stages outnumber it.
 
 Each stage tile has a still thumbnail (the stage as its map lays it out:
@@ -137,6 +154,75 @@ bright white with lavender shadows, the hazards with a gentle cool rim
 and glow beneath (never warning red), a soft breathing of their
 underside, faint trails while they drift, and a fade-out and forming
 effect. Their walkable top is always exactly their collision.
+
+## Adamaris
+
+A tropical beach at midday, a towering volcano across the bay. Its traits:
+Terrain *Tropical beach*, Platforms *Continuous ground*, Hazards *Volcanic
+rockfall*, Obstacles *None*, Light *Tropical daylight*.
+
+- **The beach is the ground** (`ground: { type: 'continuous', reach: 2400 }`):
+  no platform, slab, ledge, cliff or wall; the sand is collision from far
+  past the left Void to far past the right one. The main stage (1400 wide,
+  as Asperitas's) is the combat area: the camera, the Void (360 past each
+  side, 800 above, 400 below) and overtime's closing Void are set round it
+  as on every stage, so the fighters are framed just as large. A fighter
+  who runs or is knocked along the sand is taken by the side Void as it
+  crosses the line; the sand carries on beneath the black.
+- **The volcano** (`hazards: [{ id: 'adamaris-volcano', behavior: 'volcano' }]`,
+  tuned in [`js/data/stage-hazards.js`](../../js/data/stage-hazards.js),
+  run by [`js/game/stage-hazards.js`](../../js/game/stage-hazards.js)) has
+  exactly two states, **dormant** (a little steam, no rocks) and
+  **erupting**. When a period ends the next is drawn at random (an eruption
+  with a 42 % chance, whatever the last one was), so dormant can follow
+  dormant and an eruption an eruption; dormant spells last 6–11 s,
+  eruptions 7–11 s, and every match opens with a dormant spell of 4–7 s.
+  An eruption shows its phases in order: **buildup** (1.4 s, the crater
+  brightening), **burst** (0.6 s, lava and smoke bursting out, the first
+  rocks), **active** (more volleys every 1–1.8 s, one to three rocks each)
+  and **cooldown** (the last 1.8 s, the plume dying down, no new rocks).
+  Rocks already flying finish their flight whatever the volcano does next.
+- **Volcanic rocks** are stage hazards, never projectiles: they are not in
+  the battle's projectiles, so no Deflect (nor any repelling or erasing
+  projectile) can turn one back, take it, erase it or make it anyone's,
+  and their hits have no attacker and credit nobody (`source: 'hazard'`,
+  `attack: false`). Two sizes, each **1 damage**: a small rock has **Base
+  Launch 1**, a large one **Base Launch 2**, both straight up, through the
+  shared Launch rules (the damage joins the Launch Point first, then the
+  launch is Base Launch × that Launch Point). A raised Shield blocks one
+  like any hit. A rock strikes only where it lands, the step it lands: its
+  impact (46 units round for a small rock, 72 for a large one, and 110 /
+  140 up from the sand) against each fighter's hurtboxes, each fighter in
+  it once, both fighters if both are there; nobody high above it.
+- **Random landings**: every rock picks its own landing anywhere across the
+  combat area (x 1060–2540) from the battle's seed, kept clear of the
+  other rocks landing at about the same time; never a fixed list, never
+  aimed at a fighter.
+- **Red warnings**: from 1.1 s (small) or 1.3 s (large) before it lands,
+  each rock's red circle shows on the sand at exactly its landing and
+  exactly its impact's reach: a glowing ring over a translucent red
+  interior, an inner ring closing in and the rock's shadow growing, all
+  brightening as it nears (still, at full strength, with reduced motion).
+  It goes the step the rock lands. Nothing is ever struck by a warning.
+- **Its art** (`js/stages/adamaris-theme.js`): sky and cumulus, the sun,
+  the volcano centred far out on its own island (rocky flanks, gullies,
+  forest, a crater that glows, lava running down, steam or a plume of ash,
+  lava fountaining), islands and green headlands on the horizon, the sea
+  (swells rolling in, glints, the volcano's glow on the water), foam
+  washing over wet sand at the shore, the rippled beach with shells and
+  pebbles, palms leaning in at the sides, sea spray, drifting sand and
+  falling ash. Each rock is drawn flying out of the crater on its own
+  bowed path, growing as it comes, with a glowing trail, and lands in a
+  flash, a shock ring, thrown sand, fragments and dust (bigger for a large
+  rock), with a small shake (none with reduced motion).
+- **CPUs** read only what anyone can see: the warnings showing now
+  (`StageModel.dangerZones`, never a landing before its warning). A CPU
+  standing in one may step out of it after its reaction time; how often it
+  notices depends on its level (often for Brutal, far less for Easy, never
+  every time). The volcano strikes CPUs exactly as it strikes players.
+- **Previews**: the large animated preview runs its own volcano (opening on
+  an eruption, so it shows what the stage does); a thumbnail draws it at
+  rest.
 
 ## Platform hazards
 
@@ -251,5 +337,15 @@ draw it in its theme from the live platforms the Arena hands over
 (Asperitas's data, each hazard's state machine and stream, random
 reappearance, separation over long seeded runs, riding, jumping off and
 falling, battles, frame-rate independence, overtime, the CPUs);
+[`tests/systems/stage-hazards.test.mjs`](../../tests/systems/stage-hazards.test.mjs)
+(the volcano's random states and phases, the rocks' damage and Base
+Launch, no owner and no Deflect, the Shield, one hit per fighter, the
+warnings, random landings, determinism and frame-rate independence,
+restarts and clean-up, the CPUs);
+[`tests/systems/adamaris.test.mjs`](../../tests/systems/adamaris.test.mjs)
+(the stage's registration, its continuous sand, camera, overtime, theme,
+and full matches on it);
+[`tests/systems/void-ripple.test.mjs`](../../tests/systems/void-ripple.test.mjs)
+(the Void's ripple);
 [`tests/interface/stage-select.test.mjs`](../../tests/interface/stage-select.test.mjs)
 (the 24-slot roster, selection, Random Stage, the preview).

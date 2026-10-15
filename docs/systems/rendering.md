@@ -14,7 +14,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark and charm mark drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
-| [`js/stages/`](../../js/stages/) | Stage themes (Desert, City, Asperitas, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it. |
+| [`js/stages/`](../../js/stages/) | Stage themes (Yerma `desert`, Sol-Noir `city`, Asperitas, Adamaris, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it; Adamaris's draws its volcano, rocks, warnings and impacts from the live stage hazards (`opts.hazards`). |
 | [`js/ui/hud.js`](../../js/ui/hud.js), [`js/ui/sprite-art.js`](../../js/ui/sprite-art.js) | The DOM HUD and portraits (interface, not canvas). |
 
 ## Sprites
@@ -54,11 +54,15 @@ any moving platform (`StageCollision.interpolate`), so a fighter riding a
 cloud never lags it on screen. A fighter carried by its platform is drawn
 moving from where it stood before the carry.
 
-`Arena.render`, back to front: the stage's background and terrain,
+`Arena.render`, back to front: the stage's background and terrain (on
+Adamaris the stage hazards' red warnings and flying rocks are part of its
+terrain, behind the fighters, and their impacts' bursts part of its
+foreground),
 shadows, clones, each fighter in play (the CPU, then Player 1 on top: its
 speed trail, the Shield's interior, the fighter, the Shield's rim), the
 technique objects, projectiles, hit sparks, the stage's foreground, the
-Void, the elimination bursts (over the black, where each fighter went in),
+Void (with the ripples where it has just taken a fighter), the elimination
+bursts (over the black, where each fighter went in),
 then each fighter's markers and status over everything, and the debug
 overlay when it is on (`` ` ``: solid platforms where they are drawn, and a
 line naming each stage hazard's state). A fighter's shadow and ground ring
@@ -68,7 +72,7 @@ none.
 
 ## The Void
 
-`StageTheme.drawVoid(ctx, view, bounds)` draws the black and its red rim
+`StageTheme.drawVoid(ctx, view, bounds, ripples)` draws the black and its red rim
 around `bounds`, which the Arena always passes as its stage's Void in force
 (`stage.void`): the map's `voidBounds`, or the closer rectangle of Quick
 Battle's overtime (`StageCollision.closeVoid`). The theme keeps no copy and
@@ -79,6 +83,25 @@ Arena's `voidWaveSpeed` is above 1 (up to 4× through overtime): a change of
 speed never jumps their phase, and their shape, amplitude, rim and black
 never change. `resetVoid` brings them back to normal on a restart. With
 reduced motion they hold still at any speed.
+
+**The ripple.** Whenever the Void takes a fighter, `Arena.checkVoid` finds
+where its centre crossed the boundary this step (`voidCrossing`: the point
+on the line from its centre a step ago to its centre now, on the side it
+reached first; a centre the closing Void passed over is anchored to the
+nearest point of the boundary) and hands it to `HitEffects.addVoidRipple`,
+before the fighter-coloured burst. Each ripple (`HIT_FX.voidRipple`, 1.5 s)
+is laid over the slow waves of its own side, and of a side whose line runs
+within 70 units of it (a corner), by `rippleOffset`: a dip right where the
+fighter went in, a ringing swell there and a damped wave packet running out
+along the edge both ways at 520 units / s, all dying away; the black and the
+rim are traced from the same rippled points, so they heave together.
+`drawVoidRipples` then lights it: a crimson stir and rings spreading through
+the black (clipped to it), the rim burning brighter along the disturbed
+stretch, and a bright pulse at the point. Two eliminations make two
+ripples, each ageing on its own; they expire and a restart clears them.
+With reduced motion only a still dip, a still ring and the pulse show, and
+the elimination shakes nothing. Paint only: the kill line, scoring and
+respawns never read it.
 
 ## Projectile spin
 

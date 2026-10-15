@@ -115,6 +115,9 @@ export class CpuIntelligence {
     this.diDir = 0;
     this.diUntil = 0;
     this.pendingShield = null;
+    // The stage hazards' warnings this life has seen (by id): whether it
+    // will react to each one and from when (see avoidHazards).
+    this.seenZones = new Map();
     this.sees = { opening: true, finisher: true };
     this.lastUsedLife = new Set();
     this.executor.reset();
@@ -233,6 +236,8 @@ export class CpuIntelligence {
     if (me.offstage && !me.inMotion && this.plan?.kind !== 'recover' && !this.safeAerialPlan(s)) {
       this.setPlan(this.recoveryPlan(s), s, 'offstage');
     }
+    // A falling rock's warning under it: out of the circle, if it noticed.
+    this.avoidHazards(s);
     // Threats: the best answer to anything newly recognized.
     this.answerThreats(s);
     // A deferred answer whose moment has come.
@@ -292,6 +297,42 @@ export class CpuIntelligence {
   safeAerialPlan(s) {
     const p = this.plan;
     return !!p && (p.kind === 'jumpStrike' || p.kind === 'strike') && (p.cand?.elim ?? 0) < 0.2 && this.clock - p.start < 0.8 && s.me.airJumps > 0;
+  }
+
+  // ---- Stage hazards ---------------------------------------------------------------
+
+  // A stage hazard's visible warning (a falling rock's red circle, see
+  // StageModel.dangerZones) under the CPU, standing: it steps out of it,
+  // the nearer way unless that way is under another warning, if it noticed
+  // it at all. Whether it does is drawn once per warning, from how well it
+  // reads the stage and how often it lapses (an Easy CPU often stands
+  // there; even a Brutal one sometimes does), and it moves only after its
+  // reaction time. It knows nothing until the warning shows, and nothing a
+  // player could not see.
+  avoidHazards(s) {
+    const me = s.me;
+    const model = s.model;
+    if (!me.grounded || !me.canAct || !model.dangerZones.length) return;
+    if (this.plan?.kind === 'move' && this.plan.dodge) return;
+    const z = model.dangerAt(me.x, me.halfW, 6);
+    if (!z) return;
+    let seen = this.seenZones.get(z.id);
+    if (!seen) {
+      const p = this.profile;
+      const chance = Math.min(0.9, (1 - p.lapse) * (0.3 + 0.7 * p.stageSense));
+      seen = { react: this.rng() < chance, at: this.clock + range(this.rng, p.react[0], p.react[1]) };
+      this.seenZones.set(z.id, seen);
+      if (this.seenZones.size > 24) this.seenZones.delete(this.seenZones.keys().next().value);
+    }
+    if (!seen.react || this.clock < seen.at) return;
+    const v = model.void;
+    const exit = (dir) => z.x + dir * (z.radius + me.halfW + 18);
+    const clear = (dir) => !model.dangerAt(exit(dir), me.halfW, 0) && exit(dir) > v.left + 80 && exit(dir) < v.right - 80;
+    const near = Math.sign(me.x - z.x) || (me.x < model.centerX ? 1 : -1);
+    const dir = clear(near) ? near : clear(-near) ? -near : near;
+    const plan = makePlan('move', { dir, until: this.clock + Math.min(0.9, z.timeLeft + 0.1), reason: 'stepping out of a falling rock\'s warning' }, this);
+    plan.dodge = z.id;
+    this.setPlan(plan, s, 'falling rock');
   }
 
   // ---- Threats ------------------------------------------------------------------------

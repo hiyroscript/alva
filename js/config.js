@@ -53,8 +53,8 @@ export const CONFIG = Object.freeze({
 
   battle: {
     // The normal match clock of every Battle (Quick Battle and Watch Mode
-    // alike): 7 minutes; 0 disables it.
-    matchSeconds: 420,
+    // alike): 5 minutes; 0 disables it.
+    matchSeconds: 300,
     // The normal clock running out with the points level starts this much
     // overtime, the same match played on (scores, Launch Points and
     // everything in play kept) under a closing Void. 0: none, the Launch

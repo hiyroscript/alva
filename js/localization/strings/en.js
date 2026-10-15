@@ -178,7 +178,7 @@ export const EN = {
   'howToPlay.directionalLaunch.heading': 'Directional Launch',
   'howToPlay.directionalLaunch.description': 'Not every hit sends you in the same direction. Depending on the attack, you can be launched sideways, upward, or downward.',
   'howToPlay.overtime.heading': 'Overtime',
-  'howToPlay.overtime.description': 'If both players have the same score when the 7-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.',
+  'howToPlay.overtime.description': 'If both players have the same score when the 5-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.',
   'howToPlay.energy.heading': 'Energy',
   'howToPlay.energy.description': 'Energy is used for dashing, Deflecting, and blocking hits with your Shield. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.',
   'howToPlay.shield.heading': 'Shield',
@@ -188,7 +188,7 @@ export const EN = {
 
   'credits.createdBy': 'Created by {developer}',
   'credits.original.title': 'Original work',
-  'credits.original.line': 'Game design, code, interface, {title} wordmark, and Desert and City stage artwork by {developer}.',
+  'credits.original.line': 'Game design, code, interface, {title} wordmark, and all stages by {developer}.',
   'credits.sprites0001.title': '#0001 sprite source',
   'credits.sprites0001.sheet': 'Sprite sheet by Finhj on DeviantArt',
   'credits.sprites0001.sheetCredits': 'Sheet credits: ZetrasBlack, R0B4N',
@@ -222,7 +222,7 @@ export const EN = {
   'mode.select': 'Select',
   'mode.details': 'Mode details',
   'mode.quickBattle.overview': 'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
-  'mode.quickBattle.rules.description': 'Quick Battle matches last up to 7 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
+  'mode.quickBattle.rules.description': 'Quick Battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
 
   'quickPlay.title': 'How do you want to play?',
   'quickPlay.custom.name': 'Custom Play',
