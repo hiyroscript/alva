@@ -336,9 +336,11 @@ test('Cherry Blossom Impact: a cast, then the ground erupts 150 either side, thr
       assert.equal(e[0].source, 'technique');
     }
     assert.equal(d.attacker.techniqueDefs.attack3.cooldown, 0.5, 'a quake and a launch earn no cooldown: only the repeat delay');
-    assert.equal(d.attacker.combat.abilityCooldowns.active('attack3'), false, 'over before the cast and release are');
+    // The repeat delay runs from the press, so it outlasts the 0.45 s move
+    // by a few steps, like any ordinary attack's.
+    assert.ok(d.attacker.combat.abilityCooldowns.remaining('attack3') <= 0.05 + 1e-9, 'the repeat delay all but over as it ends');
   }
-  assert.ok(Math.abs(cast.frames.length / cast.fps - 0.4) < 1e-9, 'a 0.4 s cast to see it coming');
+  assert.ok(Math.abs(cast.frames.length / cast.fps - 0.2) < 1e-9, 'a 0.2 s cast: ordinary-attack pace, every frame kept');
 });
 
 test('the Mystical Palm Technique heals it of 10 Launch Points as it stands up; a hit while it kneels breaks it', () => {

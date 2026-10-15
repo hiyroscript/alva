@@ -69,8 +69,10 @@ universal movement field is refused) and against the combat rules
 attack's repeat cooldown finite and non-negative, the Deflect's fixed strike, no
 way past a Shield (`unblockable` and every other Shield bypass), any
 `offensive` agreeing with what the move does, a summon's clone performing
-an attack that strikes, and no Energy maximum or cost of its own); one
-that breaks a rule is refused with the problem named.
+an attack that strikes, and no Energy maximum or cost of its own), and
+its `specialAbilities` (`assertSpecialAbilities`: only moves it really
+performs, each once); one that breaks a rule is refused with the problem
+named.
 
 ## What a definition holds
 
@@ -88,6 +90,7 @@ that breaks a rule is refused with the problem named.
 | `attacks`, `projectiles`, `summons`, `techniques` | [combat](../systems/combat.md) | `attacks` for every mapped attack |
 | `mobileAbilities` | touch controls ([input](../systems/input.md#touch-controls)) | no (neutral glyphs and names) |
 | `abilityNames` | localization, touch labels | no (neutral names) |
+| `specialAbilities` | the controller editor's Special abilities category, the Special ability mark ([combat](../systems/combat.md#special-abilities)) | no (none Special); each entry a move it really performs |
 
 Character-specific constants (playback rates, art measurements, shared
 hitboxes) live beside the definition in the same module.

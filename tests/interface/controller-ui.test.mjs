@@ -568,10 +568,11 @@ test('#0001\'s editor: its portrait, name and family, every action by category w
     const names = rows(editor).map(nameOf);
     assert.deepEqual(names, [
       'Movement', 'Jump', 'Dash / air dash', 'Fast fall', 'Shield', 'Deflect',
-      'Jab', 'High Kick', 'Floating Straight', 'Red Kick', 'Blue', 'High Kick',
-      'Red', 'Maximum Blue', 'Unlimited Void', 'Hollow Purple', 'Pause',
+      'Jab', 'Red', 'Maximum Blue', 'High Kick', 'Floating Straight', 'Red Kick', 'Blue', 'High Kick',
+      'Unlimited Void', 'Hollow Purple', 'Pause',
     ]);
-    assert.deepEqual(rows(editor).slice(12, 16).map((r) => text(r.querySelector('.controller-place'))), ['Ground', 'Ground', 'Ground', 'Ground']);
+    assert.deepEqual(rows(editor).slice(14, 16).map((r) => text(r.querySelector('.controller-place'))), ['Ground', 'Ground']);
+    assert.equal(row(editor, 'ground:attack2').querySelector('.controller-place'), null, 'Red: an ordinary ground attack, no place tag');
     const red = row(editor, 'ground:attack2');
     assert.equal(text(red.querySelector('.controller-row-desc')), 'Fires a repelling projectile that pushes enemies away and turns projectiles around.');
     assert.equal(text(red.querySelector('.controller-chip')), 'R2 + Square');

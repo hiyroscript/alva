@@ -295,6 +295,16 @@ directly, and never with its own idea of when a Shield counts.
 - **Ability descriptions:** `abilityDescriptions`, keyed by move codename
   (`attack1: 'A rising punch that launches the opponent upward.'`): one
   short, accurate line per move, shown in the controller editor.
+- **Special abilities:** `specialAbilities`, a list of move codenames
+  (`['attack4']`, or `[]`): the moves the player is shown as Special, only
+  the exceptionally distinctive ones whose mechanic changes how a fight
+  goes ([combat](../systems/combat.md#special-abilities)). Never list a
+  move because it throws a projectile or is a technique or a summon. Each
+  must be a move it really performs where it is listed (the registry
+  refuses anything else). A Special shows in the controller editor's
+  Special abilities category and, while performed, under the orange mark;
+  give it a deliberate, longer animation than its ordinary attacks. The
+  label changes no cooldown, binding or mechanic.
 - **Localization:** the English names are read from `mobileAbilities` and
   `abilityNames`, the descriptions from `abilityDescriptions`; add their
   French translations to

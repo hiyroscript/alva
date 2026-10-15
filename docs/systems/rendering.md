@@ -12,7 +12,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow, the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
-| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar and cooldown rings drawn with each fighter. |
+| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings and Special ability mark drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order and the debug overlay. |
 | [`js/stages/`](../../js/stages/) | Stage themes (Desert, City, Asperitas, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it. |
 | [`js/ui/hud.js`](../../js/ui/hud.js), [`js/ui/sprite-art.js`](../../js/ui/sprite-art.js) | The DOM HUD and portraits (interface, not canvas). |
@@ -124,6 +124,37 @@ no duplicated preview definition. Missing art is not invented.
 Remaining seconds (`4.3`, one decimal rounded up) appear below the ring in
 outlined white text. No internal codename appears. Baseline timers are implicit;
 ready timers draw nothing and leave no gap in the centered row.
+
+### The Special ability mark
+
+While a fighter performs one of its **Special abilities**
+([combat](combat.md#special-abilities): #0001's Unlimited Void and Hollow
+Purple, #0003's Mystical Palm Technique), a bright orange (`#ff9f1c`)
+exclamation mark with a dark outline floats over it, centered above the
+top of its status column (its Energy bar while that shows, else its name
+tag: `Arena.specialMarkRect`, `specialMarkRect` in
+[`fighter-status.js`](../../js/game/rendering/fighter-status.js)), so it
+never covers the fighter's art, its tag, its bar or its cooldown rings. It
+is drawn as shapes (a bar rounded at both ends, wider at the top, over a
+dot), not a font glyph, crisp at any device pixel ratio: 17 world units
+tall at the view's scale, never under 16 nor over 34 CSS pixels. It bobs
+up to 2 CSS pixels on a 1.1 s cycle (`specialMarkBob`), held still with
+reduced motion. `Arena.statusTop` counts it while it shows, so Practice
+Ground's damage numbers float above it.
+
+It shows exactly while the Special is being performed, read live every
+frame (`activeSpecialAbility` in
+[`move-status.js`](../../js/game/combat/move-status.js)): from the step
+its technique (or summon's startup, or attack) is accepted, through the
+cast and the release, to the step it ends, however it ends (finished, a
+hit, the ground lost, a reset). Never for a move that is not Special (Red,
+Maximum Blue, the Whirlwind, Cherry Blossom Impact, any other attack),
+movement, the Shield, the Deflect or a cooldown alone, and never because
+something the Special released (Hollow Purple's sphere) is still flying.
+It works the same for Player 1 and a CPU, in every mode (Quick Battle,
+Watch Mode, Practice Ground, mirror matches), and over both fighters at
+once when both perform one; an off-screen fighter keeps only its edge
+pointer.
 
 ## Hit effects
 

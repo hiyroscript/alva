@@ -72,8 +72,8 @@ const FPS_0003 = Object.freeze({
   midair_attack1: 15,
   attack2: 30,
   midair_attack2: 15,
-  attack3_cast: 10,
-  attack3_release: 15,
+  attack3_cast: 20,
+  attack3_release: 20,
   attack4_cast: 6,
   attack4_release: 4,
   extra_attack: 15,
@@ -282,6 +282,12 @@ export const CHARACTER_0003 = {
     attack4: { type: 'technique', id: 'attack4' }, // the Mystical Palm Technique
   },
 
+  // Its Special abilities (js/data/special-abilities.js): the Mystical Palm
+  // Technique alone, the one move that heals its own Launch Point. Cherry
+  // Blossom Impact is a technique too, but an ordinary ground attack to the
+  // player: a ground eruption, quick to come out.
+  specialAbilities: ['attack4'],
+
   // UI only: a frame of each move's own art (zero-based frames): the
   // straight's trail, the kick, the heel's trail and arc, the glowing fist,
   // the healing palms, the haymaker's arc.
@@ -348,14 +354,17 @@ export const CHARACTER_0003 = {
   // Cherry Blossom Impact only the 0.5 s repeat delay and the Mystical Palm
   // Technique 3 s (its heal).
   techniques: {
-    // Cherry Blossom Impact: 0.4 s to raise the fist, gather the chakra in
-    // it and bring it down; as the fist meets the ground the ground erupts
-    // for 150 units either side of #0003, at foot height: every opponent
+    // Cherry Blossom Impact: a fifth of a second to raise the fist, gather
+    // the chakra in it and bring it down (every frame of it, at ordinary-
+    // attack pace: it is no Special); as the fist meets the ground (the
+    // release's first frame) the ground erupts for 150 units either side
+    // of #0003, at foot height: every opponent
     // standing on the ground there is thrown upward (5, the heavy tier,
     // Base Launch 3: its biggest blow), and one in the air is not touched
     // at all (a quake).
     // A raised Shield blocks it like any attack, and is shoved back. #0003
-    // is free again a third of a second later.
+    // is free again a quarter of a second later, as the release's last
+    // frame ends: 0.45 s in all.
     attack3: {
       castAnimation: 'attack3_cast',
       releaseAnimation: 'attack3_release',

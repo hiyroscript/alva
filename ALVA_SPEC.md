@@ -405,9 +405,60 @@ no header, build label, eyebrow or keyboard hint bar.
   information dialogs retain their behavior. The footer reserves at least
   44 px plus the safe-area inset for both lines,
   also accounted for in the wordmark's available height.
-  Download ("Download" / "Télécharger", decorative `ICONS.download`) is a
-  native disabled placeholder with no activation handler or `data-nav`.
-  Its 28–40 px square fits the existing footer height and safe-area padding.
+  Download ("Download" / "Télécharger", titled "Install Alva" /
+  "Installer Alva", `ICONS.download`) keeps its 28–40 px square in the
+  footer's bottom-right corner, within the footer height and safe-area
+  padding. It is enabled, reachable by Tab, keyboard and controller
+  navigation (`data-nav`, `aria-haspopup="dialog"`), and opens the
+  **install dialog** (`app.installDialog`, `js/ui/install-dialog.js`) over
+  Home, focus returning to it as the dialog closes. Its arrow is its own
+  SVG group: every 3.2 s it lifts, drops into the tray and settles while a
+  faint glow in the green accent swells and fades round the button (a
+  separate layer, CSS keyframes on transforms and opacity only: no layout
+  shift, nothing in the way of a press, hover and focus keep their look),
+  then rests. The motion pauses while the dialog is open (Home inert),
+  stops once Alva is installed (`.is-installed`), and is gone with reduced
+  motion.
+- **Install dialog:** a role="dialog" on the shared `ModalDialog`
+  plumbing, the same dark glass as every dialog: a title beside a close
+  button, a body that scrolls on a short landscape phone (keyboard and
+  D-pad up/down scroll it first), a polite status line, then its buttons.
+  Every word is localized and follows the language while open. It explains
+  that Alva can be added to the home screen and launched like an app ("Want
+  quicker access to Alva?" and three paragraphs: no large download or
+  conventional installation, very little additional storage, never "no
+  storage"), then does what the browser allows (`js/core/web-app-install.js`):
+  where the browser offered its own installation (`beforeinstallprompt`,
+  kept, its mini-infobar prevented) **Not Now** and **Add to Home Screen**
+  (focused), which asks the browser for its own confirmation from that very
+  press; accepted, it reads "Installing Alva…" until the browser's
+  `appinstalled`, then "Alva is installed!"; declined (or refused), it says
+  so ("Alva wasn’t installed. You can add it anytime.") and shows how to
+  install by hand. With no programmable installation it shows the same
+  explanation and the steps for the platform it can tell, with **Got It**:
+  Safari on iPhone and iPad (open Alva in Safari, tap Share, Add to Home
+  Screen, Add), Android browsers (their menu; Samsung Internet's Add page to
+  › Home screen; Firefox's), Edge (Apps › Install this site as an app),
+  Chrome (the address bar's Install icon or its menu), Safari on a Mac
+  (File › Add to Dock), Firefox on a computer (it may not install web apps:
+  another browser, or keep playing here), anything else a general hint.
+  Running as the installed app (display-mode standalone, fullscreen,
+  minimal-ui or window-controls-overlay, or `navigator.standalone`) it
+  says "Alva is already installed!" and offers no prompt. Escape,
+  controller Back, the close button, Not Now, Got It or the dim around the
+  panel close it; Tab cycles inside; Home stays inert while open and works
+  as ever after. Never `alert()` or `confirm()`.
+- **Web app:** `manifest.webmanifest` (linked relatively from `index.html`,
+  beside the existing mobile and Apple web-app metadata and an
+  `apple-touch-icon`): name and short name Alva, `display: standalone`,
+  landscape, `start_url`, `scope` and `id` `./`, background and theme
+  `#050506`, and icons derived from `alvafav.PNG` on that dark tile
+  (`assets/icons/`: 192 and 512 px, `any` rounded and `maskable` within the
+  safe zone; a 180 px Apple touch icon). Every URL is relative, so a GitHub
+  Pages project sub-path works. No service worker: current Chromium
+  browsers install without one, Safari never needed one, and none means no
+  offline cache filling storage or serving a stale game (offline play is
+  not a goal).
 - **Credits strip:** two walls. The back wall is the same near-black as the
   menu; in front of it, a semi-transparent glass strip roughly covers the right
   44% on wide screens, angled 21 degrees and extended beyond the viewport, with
@@ -1229,8 +1280,13 @@ English and French.
   has no designed layout yet. Every action the fighter has, by category —
   **Movement** (Movement, Jump, Dash / air dash, Fast fall), **Defense**
   (Shield, Deflect, where it has them), **Ground attacks**, **Aerial
-  attacks**, **Special abilities** (projectiles, techniques, summons, marked
-  Ground or Air), **Other** (Pause) — each one row (one focus stop, named
+  attacks**, **Special abilities** (only the moves the fighter classifies
+  as Special, its `specialAbilities`, 7.2.1: #0001's Unlimited Void and
+  Hollow Purple, #0003's Mystical Palm Technique, marked Ground or Air;
+  every other move, a projectile, technique or summon included, sits
+  under Ground or Aerial attacks where it is played; a category with
+  nothing in it is left out, so #0002 shows none), **Other** (Pause) —
+  each one row (one focus stop, named
   "Change binding: <name>. <input>, <activation>.") with its real name
   (never "Attack 3"), a one-line description, its input in the family's
   names ("R2 + Square", "Left stick down + X") and its activation (Press,
@@ -1576,6 +1632,27 @@ each fighter's own values are in its character specification (7.2.9).
   are ordinary attacks, `attack3` (Cherry Blossom Impact) and `attack4`
   (the Mystical Palm Technique) techniques, and `extra_attack` is its
   Chakra Haymaker. It has no `attack5` button.
+- **Special abilities** are a player-facing label, apart from how a move
+  is executed and from its cooldown: each fighter names its own in its
+  definition by move codename (`specialAbilities`, read through
+  `isSpecialAbility` in `js/data/special-abilities.js`; leaving it out
+  means none). A Special is an exceptionally distinctive move whose
+  mechanic changes how a fight goes; a projectile, pull, tornado, push or
+  ground eruption is not one because of what it is, nor is a technique or
+  a summon because of how it is executed, and no name, button or fighter
+  id decides it. #0001: Unlimited Void and Hollow Purple; #0002: none;
+  #0003: the Mystical Palm Technique: three across the roster. Red,
+  Maximum Blue, the Whirlwind and Cherry Blossom Impact are ordinary. The
+  list may name only moves the fighter really performs where it lists
+  them, each once, or the registry refuses it (`assertSpecialAbilities`).
+  Only presentation reads it (the controller editor's Special abilities
+  category, 6.10b; the orange mark over a fighter performing one, 7.3);
+  `specialAction` / `specialAttacks` keep meaning a summon or technique for
+  combat, the CPU and the loadout rules, and every cooldown stays the
+  policy's (7.2.4). Specials keep their long, deliberate animations
+  (Unlimited Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical
+  Palm Technique 1 s + 0.25 s); a move that is not one plays at
+  ordinary-attack pace.
 
 #### 7.2.2 States, animation and facing
 
@@ -3242,6 +3319,18 @@ Adding one is described in
   remain visually implicit. With the Energy bar hidden nothing is kept above the
   tag (`Arena.statusTop`). A fighter off screen keeps only its edge
   pointer; one out of play shows none of it.
+  While a fighter performs one of its **Special abilities** (7.2.1), a
+  bright orange (`#ff9f1c`) exclamation mark with a dark outline floats
+  centered over it, just above its Energy bar or name tag (never over
+  them, its art or its rings): drawn as shapes, crisp at any pixel ratio,
+  17 world units tall, never under 16 or over 34 CSS px, bobbing up to
+  2 CSS px on a 1.1 s cycle (still with reduced motion). It appears the
+  step the Special is accepted, stays through its cast and release, and
+  goes the step it ends however it ends (finished, a hit, the ground
+  lost, a reset); never for any other move, movement, the Shield, the
+  Deflect, a cooldown alone or a projectile still flying. Player 1 and a
+  CPU alike, in every mode, both at once when both perform one;
+  `Arena.statusTop` counts it while it shows.
 - Accessibility: the Launch Point number sits in a group labelled "Launch
   Point" (no maximum); each card carries a screen-reader-only Energy description
   in steps of 5 ("Energy 75 of 100", "Energy exhausted, refilling: 40 of

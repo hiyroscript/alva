@@ -7,7 +7,8 @@
 // Settings gear, and the Settings dialog it opens over Home (modal
 // semantics, its navigation scope, focus, exactly the Language, Controls
 // and Combat sections, every choice saved at once),
-// plus the unavailable Help / Controller / Download placeholders. On a minimal
+// plus Home's Help / Controller / Download utilities (the install dialog
+// itself is tests/interface/install.test.mjs). On a minimal
 // fake DOM; layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -869,7 +870,7 @@ test('Home has four menu actions and a top-right Help, Controller, Settings grou
   }
 });
 
-test('Home utilities are localized and navigable; only Download remains unavailable', () => {
+test('Home utilities are localized and navigable, Download included', () => {
   const { app, home, dialog, storage, done } = boot();
   try {
     const [help, controller, settings] = home.utilityButtons.children;
@@ -886,22 +887,22 @@ test('Home utilities are localized and navigable; only Download remains unavaila
     assert.equal(help.hasAttribute('data-nav'), true);
     assert.equal(help.getAttribute('aria-haspopup'), 'dialog');
     assert.ok(app.nav.candidates(home.el).includes(help));
-    for (const button of [download]) {
-      assert.equal(button.tagName, 'BUTTON');
-      assert.equal(button.getAttribute('type'), 'button');
-      assert.equal(button.disabled, true, 'native unavailable semantics');
-      assert.equal(button.hasAttribute('data-nav'), false);
-      assert.equal(app.nav.candidates(home.el).includes(button), false);
-      assert.equal(button.listeners.size, 0, 'no activation or focus handlers');
-      button.click();
-      button.click(0); // keyboard / gamepad-style activation
-      button.dispatch('click'); // even a stale synthetic event has no action
-      button.focus();
-      assert.equal(document.activeElement, focus);
-      assert.equal(app.screens.current, home);
-      assert.equal(dialog.isOpen, false);
-      assert.equal(app.nav.scopes.length, 0);
-    }
+    // Download is a real action now (js/ui/install-dialog.js; see
+    // tests/interface/install.test.mjs): reached like the others, it opens
+    // the install dialog and nothing else.
+    const opened = [];
+    app.installDialog = { open: (opts) => opened.push(opts) };
+    assert.equal(download.tagName, 'BUTTON');
+    assert.equal(download.getAttribute('type'), 'button');
+    assert.equal(download.disabled, false);
+    assert.equal(download.hasAttribute('data-nav'), true);
+    assert.equal(download.getAttribute('aria-haspopup'), 'dialog');
+    assert.ok(app.nav.candidates(home.el).includes(download));
+    download.click();
+    assert.deepEqual(opened, [{ opener: download }], 'the install dialog, focus to come back here');
+    assert.equal(app.screens.current, home);
+    assert.equal(dialog.isOpen, false);
+    assert.equal(document.activeElement, focus);
     assert.equal(storage.writes, before);
     assert.ok(app.nav.candidates(home.el).includes(settings));
     for (const [language, names, downloadLabel] of [
@@ -912,6 +913,7 @@ test('Home utilities are localized and navigable; only Download remains unavaila
       app.settings.set('language', language);
       assert.deepEqual(home.utilityButtons.children.map((b) => b.getAttribute('aria-label')), names);
       assert.equal(download.getAttribute('aria-label'), downloadLabel);
+      assert.equal(download.getAttribute('title'), language === 'fr' ? 'Installer Alva' : 'Install Alva');
     }
   } finally {
     done();
@@ -965,7 +967,8 @@ test('Home footer stacks one enabled Why Alva? button below the attribution, bes
     assert.equal(download.innerHTML, ICONS.download);
     assert.match(ICONS.download, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon">/);
     assert.doesNotMatch(ICONS.download, /#[0-9a-f]{3,8}\b|rgba?\(|\b(fill|stroke)="|<(image|text|use)\b|href=/i);
-    assert.equal(download.hasAttribute('aria-haspopup'), false);
+    assert.equal(download.getAttribute('aria-haspopup'), 'dialog', 'it opens the install dialog');
+    assert.equal(download.disabled, false);
     assert.equal(download.hasAttribute('href'), false);
   } finally { done(); }
 });
@@ -992,6 +995,7 @@ test('keyboard and gamepad open Why Alva? without changing Home, settings or gam
     Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
     place(home.settingsButton, 1180, 20, 44, 44);
     place(why, 80, 550, 100, 16);
+    place(home.downloadButton, 1200, 676, 40, 40);
     const selection = structuredClone(app.selection);
     const stack = [...app.screens.stack];
     const writes = storage.writes;
@@ -1034,6 +1038,7 @@ test('keyboard and gamepad reach Help, Controller and Settings from Home\'s menu
     place(home.utilityButtons.children[0], 1076, 20, 44, 44);
     place(home.utilityButtons.children[1], 1128, 20, 44, 44);
     place(home.el.querySelector('.home-why-alva'), 80, 550, 100, 16);
+    place(home.downloadButton, 1200, 676, 40, 40);
     assert.equal(document.activeElement, home.actions.play, 'Play is still the default');
     // The nearest utility is Help, followed by Controller and Settings.
     app.input.key('ArrowRight');

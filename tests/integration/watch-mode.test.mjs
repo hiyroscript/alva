@@ -371,8 +371,8 @@ test('Home: Watch Mode sits between Play and Practice Ground, styled like the se
   assert.equal(watch.hasAttribute('data-nav-default'), false);
   assert.equal(watch.disabled, false);
   assert.equal(document.activeElement, play, 'Play is still focused by default');
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.helpButton, home.controllerButton, home.settingsButton, home.el.querySelector('.home-why-alva')],
-    'keyboard / gamepad reach all four in order, then Help, Controller, Settings and Why Alva?');
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.helpButton, home.controllerButton, home.settingsButton, home.el.querySelector('.home-why-alva'), home.downloadButton],
+    'keyboard / gamepad reach all four in order, then Help, Controller, Settings, Why Alva? and Download');
   // Practice Ground and Discover still open their screens (their stand-ins).
   assert.ok(practice.html.includes('<span>Practice ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));

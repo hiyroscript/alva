@@ -1,6 +1,9 @@
-// World-space Energy and long cooldown status. Ready moves and baseline
-// repeat delays draw nothing. Each long timer has its shared ability artwork
-// in the center, original colors intact, with remaining seconds underneath.
+// World-space Energy and long cooldown status, and the Special ability
+// mark. Ready moves and baseline repeat delays draw nothing. Each long
+// timer has its shared ability artwork in the center, original colors
+// intact, with remaining seconds underneath. The mark is an orange
+// exclamation mark over a fighter while it performs one of its Special
+// abilities (js/data/special-abilities.js), and only then.
 // Presentation reads simulation state; no DOM dependencies or fighter IDs.
 
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -162,4 +165,76 @@ export function drawCooldownIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
   });
   ctx.restore();
   return list.length;
+}
+
+// The Special ability mark: a bright, saturated orange exclamation mark with
+// a dark outline, so it reads over any stage (Desert's sand, City's night,
+// Practice's pale grid) and against the black Void.
+export const SPECIAL_MARK_STYLE = Object.freeze({
+  fill: '#ff9f1c',
+  outline: '#140b00',
+});
+
+// Seconds of one gentle bob of the mark (up and back), and how far it rises
+// at most, in CSS pixels. Held still with reduced motion.
+const MARK_BOB_PERIOD = 1.1;
+const MARK_BOB_CSS = 2;
+
+// Where the mark goes for a fighter whose status column is centred on
+// device pixel `x` and whose topmost status (its Energy bar, else its name
+// tag: see Arena.statusTop) starts at device pixel `top`: { x, y, w, h },
+// y its top, in device pixels. It sits centred over that column, a small
+// gap above it, so it never covers the fighter's art, its tag, its Energy
+// bar or its cooldown rings (under its feet). It scales with the world,
+// never smaller than 16 CSS pixels tall nor larger than 34.
+export function specialMarkRect(x, top, scale, dpr = 1) {
+  const h = Math.round(Math.min(Math.max(16 * dpr, 17 * scale), 34 * dpr));
+  const w = Math.round(h * 0.42);
+  const gap = Math.round(Math.max(4 * dpr, 4 * scale));
+  return { x: Math.round(x - w / 2), y: Math.round(top - gap - h), w, h };
+}
+
+// How far up the mark is bobbing at `time` (seconds of the arena's effect
+// clock), in device pixels: 0 with reduced motion.
+export function specialMarkBob(time, dpr = 1, reducedMotion = false) {
+  if (reducedMotion) return 0;
+  return Math.round((0.5 - 0.5 * Math.cos((2 * Math.PI * time) / MARK_BOB_PERIOD)) * MARK_BOB_CSS * dpr);
+}
+
+// The mark in `rect` (see specialMarkRect): a bar rounded at both ends,
+// wider at the top, over a round dot, each outlined in the dark tone.
+export function drawSpecialMark(ctx, rect, dpr = 1, time = 0, reducedMotion = false) {
+  const { w, h } = rect;
+  const cx = rect.x + w / 2;
+  const top = rect.y - specialMarkBob(time, dpr, reducedMotion);
+  const bottom = top + h;
+  const outline = Math.max(1.5 * dpr, h * 0.09);
+  const dotR = h * 0.13;
+  const topW = w * 0.74;
+  const lowW = w * 0.46;
+  const barBottom = bottom - dotR * 2 - h * 0.11;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  const bar = () => {
+    ctx.beginPath();
+    ctx.arc(cx, top + topW / 2, topW / 2, Math.PI, 0);
+    ctx.lineTo(cx + lowW / 2, barBottom - lowW / 2);
+    ctx.arc(cx, barBottom - lowW / 2, lowW / 2, 0, Math.PI);
+    ctx.closePath();
+  };
+  const dot = () => {
+    ctx.beginPath();
+    ctx.arc(cx, bottom - dotR, dotR, 0, Math.PI * 2);
+  };
+  // The outline first, twice as wide as it shows: the fill covers its
+  // inner half.
+  ctx.lineWidth = outline * 2;
+  ctx.strokeStyle = SPECIAL_MARK_STYLE.outline;
+  ctx.fillStyle = SPECIAL_MARK_STYLE.fill;
+  for (const shape of [bar, dot]) {
+    shape();
+    ctx.stroke();
+    ctx.fill();
+  }
+  ctx.restore();
 }

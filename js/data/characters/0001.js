@@ -351,6 +351,15 @@ export const CHARACTER_0001 = {
     attack5: { type: 'technique', id: 'attack5' }, // Hollow Purple
   },
 
+  // Its Special abilities (js/data/special-abilities.js): what the game
+  // presents to the player as Special, its two most distinctive moves.
+  // Unlimited Void paralyzes everyone close round it; Hollow Purple's
+  // sphere erases projectiles and passes through fighters. Red and Maximum
+  // Blue are projectiles too, but ordinary attacks for all that. Only the
+  // presentation reads this: the editor's Special abilities category and
+  // the orange mark over #0001 while it performs one.
+  specialAbilities: ['attack4', 'attack5'],
+
   // UI only: a frame of each move's own art, the orb itself for Red, Blue
   // and Hollow Purple (zero-based frames).
   mobileAbilities: {

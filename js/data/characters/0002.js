@@ -346,6 +346,11 @@ export const CHARACTER_0002 = {
     attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Spin Attack / the Blue Tornado
   },
 
+  // Its Special abilities (js/data/special-abilities.js): none. The
+  // Whirlwind's tornado is a projectile with a heavy finisher (and the
+  // cooldown that finisher earns), but an ordinary attack all the same.
+  specialAbilities: [],
+
   // UI only: grounded poses and the matching airborne ball/tornado
   // frames. Whirlwind shows its projectile's full tornado silhouette,
   // with a tornado glyph if that image cannot load.

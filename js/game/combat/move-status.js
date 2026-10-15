@@ -1,13 +1,16 @@
 // Move status: a read-only view of a fighter's moves for presentation (the
-// ability HUD, js/ui/ability-hud.js). Universal: it reads every fighter's
+// ability HUD, js/ui/ability-hud.js; the Special ability mark,
+// js/game/rendering/fighter-status.js). Universal: it reads every fighter's
 // loadout and live combat state the same way, and never names a fighter.
 //
 // Inputs: a Fighter, its definition's loadout (js/data/loadout.js; read
 // with moveFor, js/data/controller-profiles.js) and its combat state
 // (js/game/combat/combat-state.js).
 // Outputs: abilityGroups (which moves each place shows, in control order),
-// moveCooldown (one move's cooldown as the combat state holds it) and
-// abilityStatus (a move's cooldown and any other restriction on it).
+// moveCooldown (one move's cooldown as the combat state holds it),
+// abilityStatus (a move's cooldown and any other restriction on it),
+// activeMove (the move being performed now) and activeSpecialAbility (that
+// move, when the fighter classifies it as Special).
 // Important constraints: nothing here writes or keeps time. Every value is
 // read from the authoritative stores, CombatState.cooldowns (ordinary
 // attacks and the Deflect) and CombatState.abilityCooldowns (summons and
@@ -19,6 +22,7 @@ import { COMBAT_BUTTONS, NUMBERED_ATTACKS } from '../../config.js';
 import { REPEAT_COOLDOWN } from '../../data/cooldowns.js';
 import { moveFor } from '../../data/controller-profiles.js';
 import { specialAction } from '../../data/loadout.js';
+import { isSpecialAbility } from '../../data/special-abilities.js';
 import { summonProblem } from './summon.js';
 import { techniqueProblem } from './technique.js';
 
@@ -120,4 +124,24 @@ export function abilityStatus(fighter, entry, place) {
   const cooldown = moveCooldown(fighter, entry.move, entry.special);
   const restriction = moveRestriction(fighter, entry, place);
   return { ...entry, cooldown, restriction, ready: !cooldown.cooling && !restriction };
+}
+
+// The move `fighter` is performing at this instant, by its codename, or
+// null: its technique, from the first cast frame to the last release frame
+// (Fighter.technique: set as it is accepted, cleared the step it ends,
+// whether it finished, was hit, lost the ground or was reset); its summon's
+// startup (Fighter.pendingSummon); or its ordinary attack
+// (CombatState.attack). What a move left behind (a projectile still flying,
+// a clone, a paralysis) and its cooldown are not the move being performed.
+export function activeMove(fighter) {
+  if (fighter?.technique) return fighter.technique.def?.id ?? null;
+  if (fighter?.pendingSummon) return fighter.pendingSummon.id ?? null;
+  return fighter?.combat?.attack?.def?.id ?? null;
+}
+
+// The Special ability `fighter` is performing at this instant (see
+// activeMove and isSpecialAbility, js/data/special-abilities.js), or null.
+export function activeSpecialAbility(fighter) {
+  const move = activeMove(fighter);
+  return move && isSpecialAbility(fighter.def, move) ? move : null;
 }
