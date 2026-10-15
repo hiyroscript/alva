@@ -2,8 +2,8 @@
 // optional lead line and plain lines, every one a translation key (or
 // [key, params]; see js/localization/i18n.js), so the roll follows the language.
 // Proper names (Finhj, ZetrasBlack, R0B4N, thespriteanimations, DeviantArt,
-// Dazz & Fret, The Spriters Resource) stay as they are in every language. A
-// line may also link to its source:
+// Dazz & Fret, The Spriters Resource, xmaygrrr) stay as they are in every
+// language. A line may also link to its source:
 // { label: key or [key, params], href }, the label still translated and
 // the address never.
 
@@ -23,6 +23,10 @@ const SPRITES_0002 = 'https://www.deviantart.com/thespriteanimations/art/Sprite-
 // Resource, found by the asset's number alone (the page's title is left out
 // of the address: the character behind #0003 is never named).
 const SPRITES_0003 = 'https://www.spriters-resource.com/ds_dsi/jus/asset/20891/';
+// Where #0004's sprite sheet was published: its DeviantArt page, found by
+// the deviation's number alone (the page's title is left out of the
+// address: the character behind #0004 is never named).
+const SPRITES_0004 = 'https://www.deviantart.com/xmaygrrr/art/758846183';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -46,6 +50,11 @@ export const CREDITS = [
   {
     title: 'credits.sprites0003.title',
     lines: [{ label: 'credits.sprites0003.sheet', href: SPRITES_0003 }],
+  },
+  // #0004's sheet, linked to where it was published.
+  {
+    title: 'credits.sprites0004.title',
+    lines: [{ label: 'credits.sprites0004.sheet', href: SPRITES_0004 }],
   },
   {
     title: 'credits.rights.title',

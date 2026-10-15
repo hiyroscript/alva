@@ -20,6 +20,7 @@ import { Camera } from './rendering/camera.js';
 import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
 import {
   drawEnergyBar, drawCooldownIndicators, drawSpecialMark, energyBarState, specialMarkRect, statusOnScreen,
+  charmMarkRect, drawCharmMark,
 } from './rendering/fighter-status.js';
 import { activeSpecialAbility } from './combat/move-status.js';
 import { drawShield } from './rendering/shield-fx.js';
@@ -81,6 +82,10 @@ export class Arena {
     // Live summoned clones (js/game/combat/summon.js), in spawn order. Never
     // fighters: no pushbox, camera, HUD, marker or result role.
     this.clones = [];
+    // The art techniques' bursts let go of (Fighter.effects): { clip,
+    // sprites, x, y, flip, age }, each played once on the simulation clock
+    // where it went out, then dropped. Art only.
+    this.castEffects = [];
     // The fighter whose move cooldowns a screen's ability HUD shows
     // (js/ui/ability-hud.js), or null: its world-space cooldown rings step
     // aside for it, so the same timer is never shown twice as prominently.
@@ -208,12 +213,14 @@ export class Arena {
     // Last, any fighter now in the Void is handed to the mode (checkVoid).
     this.updateRespawns(dt);
     const fighters = this.inPlay;
+    this.updateCastEffects(dt);
     this.hazards.update(dt, fighters);
     for (const f of fighters) f.update(dt, this.simCtx);
     // A launch that rebounded off the stage this step shows its impact,
     // and a fighter that healed itself its glow.
     for (const f of fighters) if (f.bounce) this.fx.takeBounce(f.bounce);
     for (const f of fighters) for (const heal of f.heals) this.fx.addHeal(f, heal);
+    for (const f of fighters) for (const effect of f.effects) this.addCastEffect(f, effect);
     // Pushboxes keep every pair of fighters apart (a lone fighter has none;
     // a ricochet passes, see separateFighters).
     for (let i = 0; i < fighters.length; i++) {
@@ -234,6 +241,25 @@ export class Arena {
     removeDeadProjectiles(this.projectiles);
     removeDeadClones(this.clones);
     this.checkVoid(fighters);
+  }
+
+  // A technique's burst let go of `effect` (see Technique.takeEffect): its
+  // clip, from `f`'s own art, plays once from this step where it went out,
+  // at `f`'s art scale, mirrored with the technique's facing when the clip
+  // faces a way (sourceFacing). Missing art shows nothing.
+  addCastEffect(f, effect) {
+    const clip = f.sprites?.effect(effect.animation);
+    if (!clip?.frames.length) return;
+    const source = clip.sourceFacing ?? 0;
+    this.castEffects.push({ clip, sprites: f.sprites, x: effect.x, y: effect.y, flip: !!source && effect.facing !== source, age: 0 });
+  }
+
+  // Ages the cast effects by one step, dropping each once its clip has
+  // played through.
+  updateCastEffects(dt) {
+    if (!this.castEffects.length) return;
+    for (const e of this.castEffects) e.age += dt;
+    this.castEffects = this.castEffects.filter((e) => e.age < e.clip.frames.length / e.clip.fps - 1e-6);
   }
 
   // ---- Void and respawn ----------------------------------------------------------
@@ -374,6 +400,9 @@ export class Arena {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const f of fighters) this.drawShadow(f);
     ctx.imageSmoothingEnabled = false;
+    // A burst's art behind everything that fights: it goes out round its
+    // fighter, who stays in front of it.
+    for (const e of this.castEffects) this.drawCastEffect(e);
     // Clones and their clouds behind the fighters: a clone stands behind
     // its target, so the real fighter stays in front where they overlap.
     for (const c of this.clones) this.drawClone(c);
@@ -509,6 +538,14 @@ export class Arena {
     }
   }
 
+  // The frame a cast effect is on (one pass of its clip on its own age),
+  // centred where it went out.
+  drawCastEffect(e) {
+    const i = Math.min(Math.floor(e.age * e.clip.fps + 1e-6), e.clip.frames.length - 1);
+    const [sx, sy] = this.toScreen(e.x, e.y);
+    drawCenteredFrame(this.ctx, e.clip.frames[i], sx, sy, this.pxPerArtOf(e.sprites), e.flip);
+  }
+
   // Centred on the projectile's position, at the art scale of the fighter
   // whose art it is (its owner's at release: a projectile turned back keeps
   // its size), spun to its angle (see Projectile.renderAngle).
@@ -568,21 +605,35 @@ export class Arena {
     return specialMarkRect(x, this.barTop(f), this.view.scale, this.view.dpr);
   }
 
-  // The highest point of what is drawn over `f`: the top of its Special
-  // ability mark while it shows, else of its Energy bar or name tag (see
-  // barTop). Practice Ground floats its damage numbers from here.
+  // Where `f`'s charm mark goes (see charmMarkRect in
+  // js/game/rendering/fighter-status.js), in device pixels, for as long as
+  // it is charmed (CombatState.charm, read live every frame); null
+  // otherwise. Above its Special ability mark while that shows, else above
+  // its Energy bar or name tag.
+  charmMarkRect(f) {
+    if (!(f.combat?.charm > 0)) return null;
+    const [x] = this.markerAnchor(f);
+    const special = this.specialMarkRect(f);
+    return charmMarkRect(x, special ? special.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
+  }
+
+  // The highest point of what is drawn over `f`: the top of its charm mark
+  // or its Special ability mark while one shows, else of its Energy bar or
+  // name tag (see barTop). Practice Ground floats its damage numbers from
+  // here.
   statusTop(f) {
-    const mark = this.specialMarkRect(f);
+    const mark = this.charmMarkRect(f) ?? this.specialMarkRect(f);
     return mark ? mark.y - 1 : this.barTop(f);
   }
 
-  // Energy bars, the long move cooldowns and the Special ability mark, for
-  // the fighters whose body is on screen (the cooldowns of the fighter the
-  // ability HUD shows are there instead: see hudCooldownsFor): an
-  // off-screen fighter only gets its edge pointer. Each draws only while it
-  // has something to show (see js/game/rendering/fighter-status.js); the
-  // mark, for whichever fighters are performing a Special at once, Player 1
-  // or a CPU alike.
+  // Energy bars, the long move cooldowns, the Special ability mark and the
+  // charm mark, for the fighters whose body is on screen (the cooldowns of
+  // the fighter the ability HUD shows are there instead: see
+  // hudCooldownsFor): an off-screen fighter only gets its edge pointer.
+  // Each draws only while it has something to show (see
+  // js/game/rendering/fighter-status.js); the marks, for whichever fighters
+  // are performing a Special or are charmed at once, Player 1 or a CPU
+  // alike.
   drawStatus(fighters = this.inPlay) {
     const { ctx, view } = this;
     for (const f of fighters) {
@@ -592,6 +643,8 @@ export class Arena {
       if (f !== this.hudCooldownsFor) drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
       const mark = this.specialMarkRect(f);
       if (mark) drawSpecialMark(ctx, mark, view.dpr, this.fxTime, this.reducedMotion);
+      const charm = this.charmMarkRect(f);
+      if (charm) drawCharmMark(ctx, charm, view.dpr, this.fxTime, this.reducedMotion);
     }
   }
 
@@ -774,6 +827,7 @@ export class Arena {
     this.fighters = [];
     this.projectiles = [];
     this.clones = [];
+    this.castEffects = [];
   }
 }
 

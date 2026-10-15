@@ -46,11 +46,12 @@ const SPECIALS = Object.freeze({
   '0001': ['attack4', 'attack5'],
   '0002': [],
   '0003': ['attack4'],
+  '0004': ['attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly three Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique', () => {
+test('exactly four Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -60,10 +61,14 @@ test('exactly three Specials across the roster: Unlimited Void and Hollow Purple
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 3);
+  assert.equal(total, 4);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
+  assert.deepEqual(specialAbilities(getCharacter('0004')).map((m) => name('0004', m)), ['World is Mine']);
+  // Ievan Polkka is a technique too, and ordinary to the player.
+  assert.equal(actionType(getCharacter('0004'), 'attack4'), 'technique');
+  assert.equal(isSpecialAbility(getCharacter('0004'), 'attack4'), false, 'Ievan Polkka is not Special');
   // The four moves reclassified as ordinary.
   for (const [id, move, label] of [
     ['0001', 'attack2', 'Red'], ['0001', 'attack3', 'Maximum Blue'],
@@ -108,6 +113,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
       air: ['attack1', 'attack2'],
       abilities: ['ground:attack4'],
+    },
+    '0004': {
+      ground: ['attack1', 'attack2', 'attack3', 'attack4', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3'],
+      abilities: ['ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

@@ -15,7 +15,7 @@ The steps below use `0027` as the new fighter's id.
   unique in `CHARACTERS`. It names the art folder, every art file and the
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
-  of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1 and 2 are taken.
+  of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2 and 3 are taken.
 
 ## 2. Add the art
 
@@ -105,6 +105,7 @@ export const CHARACTERS = [
   CHARACTER_0001,
   CHARACTER_0002,
   CHARACTER_0003,
+  CHARACTER_0004,
   CHARACTER_0027,
 ];
 ```
@@ -196,14 +197,15 @@ big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 it moves (`momentum`, `control`, `friction`, `step`), whether a hit
 opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
 policy derives it from what the move does (5 s for 10 damage, 3 s for a
-heal or a paralysis, else the 0.5 s repeat delay; independent of the
+heal, a paralysis or a charm, else the 0.5 s repeat delay; independent of the
 move's phases), and a value it does not give is refused as the registry
 loads ([combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`, `slam`: a plunge that lands with an `impact`),
 `pull`, `airUses`, `freeFall`, `passThrough`, `hurtboxes`, and on any hit
 the shared hit effects (`paralyze`, `blockPush`, `quake`: a hit that
-reaches only fighters standing on the ground)
+reaches only fighters standing on the ground, `charm`: for its seconds the
+target's hits on this fighter heal it instead)
 ([combat](../systems/combat.md#attack-mechanics-beyond-a-timed-hitbox)).
 There is no way past a Shield to author: every attack is blockable, and
 `unblockable` (or any other Shield bypass) is refused as the registry
@@ -216,7 +218,8 @@ An attack whose art is in but whose attributes are not can be
 and its art in `projectileAnimations`
 ([projectiles](../systems/combat.md#projectiles)). It may pierce
 (`pierce`, `finisher`), pull (`pull`), turn other fighters' projectiles
-back (`repel`) or erase them and fly through fighters (`erase`).
+back (`repel`) or erase them and fly through fighters (`erase`). With no
+`speed` it stays where it appears: an obstacle (#0004's dancing double).
 
 **A summon** (a clone of the fighter performing one of its own attacks)
 is a `summons.attackN` entry with its `attack`, its `cloud` (an
@@ -230,10 +233,13 @@ form, the cast: two fighter clips (`castAnimation`, `releaseAnimation`,
 named `attackN_cast` and `attackN_release` by convention; its cooldown is
 the policy's, from what it releases), and what it lets go of
 as the cast ends: a `projectile` (an entry of `projectiles`,
-`attackN_object`), a `burst` round the fighter (a `hitbox` and its `hit`),
-a `heal` (Launch Point taken off its own fighter), or any of them together
+`attackN_object`), a `burst` round the fighter (a `hitbox` and its `hit`,
+and optionally its art as it goes out, `effect: { animation, offset }`, an
+`effectAnimations` clip named `attackN_object...`), a `heal` (Launch Point
+taken off its own fighter), or any of them together
 ([techniques](../systems/combat.md#techniques); #0001's Unlimited Void and
-Hollow Purple, #0003's Cherry Blossom Impact and Mystical Palm Technique).
+Hollow Purple, #0003's Cherry Blossom Impact and Mystical Palm Technique,
+#0004's Ievan Polkka and World is Mine).
 A technique that only heals is no attack. A technique of a different
 shape needs a new form in the runtime first.
 
@@ -251,8 +257,9 @@ never loads; and a summon's clone must perform an attack that strikes.
 **Character-specific mechanics** belong in the definition when the
 shared schema can express them (as #0002's homing dash or plunge are
 `motion` data, #0001's Maximum Blue drawing its target in is a
-projectile's `pull`, and #0003's ground-splitting blows are `quake`
-hits). When it cannot, add the mechanic to the shared system as
+projectile's `pull`, #0003's ground-splitting blows are `quake`
+hits and #0004's song is a burst that charms). When it cannot, add the
+mechanic to the shared system as
 a capability any fighter can opt into, named for what it does, never for
 the fighter or for its button: never a check for `'0027'` in shared code.
 A new mechanic that deals damage reaches fighters only through
@@ -356,8 +363,8 @@ between moves only where the move is about direction. Then:
    or conflicts).
 5. Write each move's line in `abilityDescriptions` (and its French).
 6. Document the layout in its specification, as
-   [#0001](0001.md#controller-layout), [#0002](0002.md#controller-layout)
-   and [#0003](0003.md#controller-layout) do.
+   [#0001](0001.md#controller-layout), [#0002](0002.md#controller-layout),
+   [#0003](0003.md#controller-layout) and [#0004](0004.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (face buttons, then R1, then trigger combinations),
@@ -398,7 +405,7 @@ valid, current one fails
    | 1 | Very easy to learn and comparatively simple to master. | |
    | 2 | An easy core game plan with little extra to master. | |
    | 3 | Approachable fundamentals, with meaningful decision-making and execution depth at higher levels. | #0002: readable rushdown; mastery in momentum, air uses, free fall, approach angles, not overcommitting. #0003: plain, heavy ground game; mastery in timing its long commitments, reading jumps against its quakes, finding room to heal |
-   | 4 | Demanding to use well, with substantial mastery requirements. | |
+   | 4 | Demanding to use well, with substantial mastery requirements. | #0004: a rhythm controller; placement of its stationary double, timing its long, breakable song onto an opponent who cannot get away and cashing in the charm, light and exposed when rushed before its setups are in place |
    | 5 | Difficult both to pilot effectively and to master: highly layered mechanics, situational decisions, setup or resource requirements, punishing commitments. | #0001: a large, contextual space-control and setup toolkit, Energy and cooldown management, punishable long casts |
 
    Judge it; never compute it from move counts, Energy costs or any other

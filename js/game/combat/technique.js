@@ -48,7 +48,11 @@
 //            attack throws one) and its `burst` (`hit` dealt once to every
 //            opponent whose hurtboxes its `hitbox` meets, facing right from
 //            the fighter's origin and mirrored: a box round the fighter
-//            reaches both sides) and its `heal` (that many Launch Points
+//            reaches both sides; its optional `effect`, `{ animation,
+//            offset }`, is the art the burst plays as it goes out, an
+//            `effectAnimations` clip named <attack>_object played once,
+//            centred at `offset` from the fighter, art only: see
+//            takeEffect) and its `heal` (that many Launch Points
 //            taken off its own fighter's, never below 0: see
 //            CombatState.heal). releaseAnimation then plays once, the
 //            fighter still committed.
@@ -121,11 +125,24 @@ export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
     def.projectile = Object.freeze({ id: def.projectile.id, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
   }
   if (def.burst) {
-    def.burst = Object.freeze({ hitbox: Object.freeze({ ...def.burst.hitbox }), hit: createHit(`${spec.id}.burst`, def.burst.hit) });
+    def.burst = Object.freeze({
+      hitbox: Object.freeze({ ...def.burst.hitbox }), hit: createHit(`${spec.id}.burst`, def.burst.hit),
+      effect: resolveBurstEffect(def.burst.effect, owner),
+    });
   }
   if (!(Number.isInteger(def.heal) && def.heal >= 0)) throw new Error(`[Alva] ${owner}'s heal must be a whole number of Launch Points from 0`);
   def.offense = resolveOffense(spec, techniqueOffense(def), owner);
   return Object.freeze(def);
+}
+
+// A burst's frozen `effect` (see the top: the art it plays as it lets go),
+// or null: its effect clip's key and its centre from the fighter's origin
+// (facing right, mirrored with the technique's facing).
+function resolveBurstEffect(spec, owner) {
+  if (!spec) return null;
+  if (typeof spec.animation !== 'string' || !spec.animation) throw new Error(`[Alva] ${owner}'s burst effect needs an animation`);
+  const o = spec.offset ?? {};
+  return Object.freeze({ animation: spec.animation, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
 }
 
 // The fields naming a technique's fighter clips (fighter animations).
@@ -148,6 +165,8 @@ export function techniqueProblem(owner, def) {
     const box = def.burst.hitbox;
     if (!(box?.w > 0 && box?.h > 0)) return 'its burst has no hitbox';
     if (!def.burst.hit) return 'its burst has no hit';
+    const art = def.burst.effect?.animation;
+    if (art && !owner.sprites.effect(art)?.frames.length) return `its burst effect "${art}" has no animation frames`;
   }
   return null;
 }
@@ -164,6 +183,7 @@ export class Technique {
     this.time = 0; // seconds into the current phase (see update)
     this.released = false;
     this.burstDue = false; // the burst, waiting for the CombatSystem
+    this.effectDue = false; // the burst's art, waiting for its fighter (see takeEffect)
     this.healDue = 0; // the heal, waiting for its fighter (see takeHeal)
     this.endReason = null;
     this.castDuration = owner.sprites.duration(def.castAnimation);
@@ -196,7 +216,21 @@ export class Technique {
     const shot = this.def.projectile;
     if (shot) this.owner.releases.push({ id: shot.id, offset: shot.offset, direction: this.facing, ability: this.def.id });
     if (this.def.burst) this.burstDue = true;
+    if (this.def.burst?.effect) this.effectDue = true;
     if (this.def.heal > 0) this.healDue = this.def.heal;
+  }
+
+  // The art its burst plays as it lets go, taken on the step it does (its
+  // fighter hands it to whoever shows it, see Fighter.effects): { animation,
+  // x, y, facing }, the clip's centre in world space (the burst effect's
+  // offset from the fighter, mirrored with the technique's facing), or null.
+  // Art only: nothing in the simulation reads it.
+  takeEffect() {
+    if (!this.effectDue) return null;
+    this.effectDue = false;
+    const f = this.owner;
+    const effect = this.def.burst.effect;
+    return { animation: effect.animation, x: f.body.x + effect.offset.x * this.facing, y: f.body.y + effect.offset.y, facing: this.facing };
   }
 
   // The heal due this step, taken (its fighter applies it, see
@@ -255,6 +289,7 @@ export class Technique {
     this.phase = 'done';
     this.endReason = reason;
     this.burstDue = false;
+    this.effectDue = false;
     this.healDue = 0;
     this.owner = null;
   }

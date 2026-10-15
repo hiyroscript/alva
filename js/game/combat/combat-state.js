@@ -181,6 +181,10 @@ export class CombatState {
     // Seconds this fighter is still held in place by a hit's `paralyze`
     // (see js/game/combat/hit-effects.js and paralyze below).
     this.paralysis = 0;
+    // Seconds this fighter is still charmed by a hit's `charm`, and the
+    // fighter whose hit charmed it (see charmBy below): null when it is not.
+    this.charm = 0;
+    this.charmedBy = null;
   }
 
   get attacking() {
@@ -247,6 +251,32 @@ export class CombatState {
 
   releaseParalysis() {
     this.paralysis = 0;
+  }
+
+  // A real hit of `by`'s charmed this fighter for `seconds` (see `charm` in
+  // js/game/combat/hit-effects.js): until it runs out, every hit this
+  // fighter would land on `by` heals `by` instead (CombatSystem.applyHit).
+  // The longer of what is left and the new charm, by the same fighter; a
+  // charm by another fighter replaces it. It holds nothing in place, and
+  // runs down every step, frozen or not (see update).
+  charmBy(seconds, by) {
+    if (!(seconds > 0) || !by) return;
+    if (by !== this.charmedBy) {
+      this.charmedBy = by;
+      this.charm = seconds;
+    } else if (seconds > this.charm) {
+      this.charm = seconds;
+    }
+  }
+
+  // Whether this fighter is charmed by `fighter` right now (see charmBy).
+  charmedTo(fighter) {
+    return this.charm > 0 && !!fighter && this.charmedBy === fighter;
+  }
+
+  releaseCharm() {
+    this.charm = 0;
+    this.charmedBy = null;
   }
 
   // Free of any attack, stun (a Shield's blockstun included) or paralysis.
@@ -359,6 +389,12 @@ export class CombatState {
     this.updateLaunchRecovery(dt);
     this.abilityCooldowns.update(dt);
     this.movementCooldowns.update(dt);
+    // A charm runs down in real time, through an impact freeze too, to
+    // within the same slack as the freeze.
+    if (this.charm > 0) {
+      this.charm = this.charm - dt <= PHASE_EPSILON ? 0 : this.charm - dt;
+      if (!this.charm) this.charmedBy = null;
+    }
     if (this.hitstop > 0) {
       // To within a little slack, so a freeze a whole number of steps long
       // (0.05 s) lasts exactly that many.

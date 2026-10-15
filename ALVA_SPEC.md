@@ -84,8 +84,8 @@ behave, and how it must look.
   character's id.
 - Each fighter's art lives in `assets/characters/<id>/` and nowhere else
   (none at the repository root): `assets/characters/0001/`,
-  `assets/characters/0002/` and `assets/characters/0003/` are the only
-  fighter art in the repository today, and any future fighter's frames go
+  `assets/characters/0002/`, `assets/characters/0003/` and
+  `assets/characters/0004/` are the only fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
   character specification (7.2.9).
@@ -118,8 +118,8 @@ behave, and how it must look.
   fighter's facing, movement, hurtboxes and hitboxes never change with it.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
-  never mirrored. (All of #0001's, #0002's and #0003's art faces right;
-  #0001's three orbs are direction-neutral.)
+  never mirrored. (All of #0001's, #0002's, #0003's and #0004's art faces
+  right; #0001's three orbs and #0004's note are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -129,7 +129,7 @@ behave, and how it must look.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
-  artwork** (#0001's, #0002's, #0003's or any later fighter's). Do not download
+  artwork** (#0001's, #0002's, #0003's, #0004's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -579,9 +579,9 @@ no header, build label, eyebrow or keyboard hint bar.
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
   (silhouette + lock). No invented names or power ratings.
-- **Today three slots are selectable:** `#0001` in slot 01 (selected and
-  focused by default, as the first playable fighter), `#0002` in slot 02
-  and `#0003` in slot 03; the other 45 are locked. A fighter that is not
+- **Today four slots are selectable:** `#0001` in slot 01 (selected and
+  focused by default, as the first playable fighter), `#0002` in slot 02,
+  `#0003` in slot 03 and `#0004` in slot 04; the other 44 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -748,6 +748,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
     Spriters Resource, as the sheet itself credits them, the line linked
     to the sheet's page (by the asset's number alone, so the address names
     nothing).
+  - **#0004 sprite source** — sprite sheet by xmaygrrr on DeviantArt, the
+    line linked to the sheet's page (by the deviation's number alone, so
+    the address names nothing).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -758,8 +761,8 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   in `js/ui/credits.js`): a new tab, the address never translated, the roll
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
-- The UI does not name the character behind #0001, #0002 or #0003 (or
-  any fighter): each stays `#0001` / `#0002` / `#0003` in game, and
+- The UI does not name the character behind #0001, #0002, #0003 or #0004
+  (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` in game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
@@ -956,7 +959,7 @@ comes from its definition and its profile.
   playable one).
   - **Difficulty:** every roster's preview shares the fighter's one rating:
     exactly five stars, the first ones filled (#0001 ★★★★★, #0002 ★★★☆☆,
-    #0003 ★★★☆☆),
+    #0003 ★★★☆☆, #0004 ★★★★☆),
     above the name at the left. There is no visible "Difficulty" label.
     The rating is one image named "Difficulty: 5 out of 5 stars" (the stars
     themselves hidden from assistive technology, never focusable or a
@@ -979,7 +982,11 @@ comes from its definition and its profile.
     momentum, air uses, free fall, approach angles and not overcommitting);
     #0003 is 3 (a readable core of heavy, telegraphed blows, with mastery in
     reading who stands on the ground for its quakes, the slam's commitment
-    and finding safe room for its long, breakable heal).
+    and finding safe room for its long, breakable heal); #0004 is 4 (a
+    rhythm controller whose strength is placement and timing: its
+    stationary double, its long, breakable song thrown at someone who
+    cannot get away and the charm window cashed in; light and exposed
+    when rushed before its setups are in place).
   - **Read play style:** at the bottom-right of the preview information,
     below the fighter name on its own row, a real `<button type="button">`
     set as 11px underlined secondary text with `aria-haspopup="dialog"`, reached by
@@ -1282,7 +1289,8 @@ English and French.
   (Shield, Deflect, where it has them), **Ground attacks**, **Aerial
   attacks**, **Special abilities** (only the moves the fighter classifies
   as Special, its `specialAbilities`, 7.2.1: #0001's Unlimited Void and
-  Hollow Purple, #0003's Mystical Palm Technique, marked Ground or Air;
+  Hollow Purple, #0003's Mystical Palm Technique, #0004's World is Mine,
+  marked Ground or Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -1549,10 +1557,11 @@ each fighter's own values are in its character specification (7.2.9).
 #### 7.2.1 Roster and the character system
 
 - **Roster and availability.** `CHARACTERS` (the registry,
-  `js/data/characters.js`) holds three definitions today, each in a module
-  of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`): `#0001`
-  in roster slot 01, `#0002` in slot 02 and `#0003` in slot 03, each fully
-  implemented (7.2.9) and playable: `available: true`. All three are
+  `js/data/characters.js`) holds four definitions today, each in a module
+  of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
+  `0004.js`): `#0001` in roster slot 01, `#0002` in slot 02, `#0003` in
+  slot 03 and `#0004` in slot 04, each fully
+  implemented (7.2.9) and playable: `available: true`. All four are
   preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -1631,7 +1640,12 @@ each fighter's own values are in its character specification (7.2.9).
   `attack2` (the Heel Drop; `midair_attack2`, the Heavenly Foot of Pain)
   are ordinary attacks, `attack3` (Cherry Blossom Impact) and `attack4`
   (the Mystical Palm Technique) techniques, and `extra_attack` is its
-  Chakra Haymaker. It has no `attack5` button.
+  Chakra Haymaker. It has no `attack5` button. #0004 has five: `attack1`
+  (the Dance Combo; `midair_attack1`, the Air Dance), `attack2` (the Leek
+  Swing; `midair_attack2`, the Leekspin) and `attack3` (the Crescent Kick;
+  `midair_attack3`, the Stage Dive) are ordinary attacks, `attack4` (Ievan
+  Polkka) and `attack5` (World is Mine) techniques, and `extra_attack` is
+  its Melody.
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -1641,8 +1655,9 @@ each fighter's own values are in its character specification (7.2.9).
   ground eruption is not one because of what it is, nor is a technique or
   a summon because of how it is executed, and no name, button or fighter
   id decides it. #0001: Unlimited Void and Hollow Purple; #0002: none;
-  #0003: the Mystical Palm Technique: three across the roster. Red,
-  Maximum Blue, the Whirlwind and Cherry Blossom Impact are ordinary. The
+  #0003: the Mystical Palm Technique; #0004: World is Mine: four across
+  the roster. Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact and
+  Ievan Polkka are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -1651,8 +1666,8 @@ each fighter's own values are in its character specification (7.2.9).
   combat, the CPU and the loadout rules, and every cooldown stays the
   policy's (7.2.4). Specials keep their long, deliberate animations
   (Unlimited Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical
-  Palm Technique 1 s + 0.25 s); a move that is not one plays at
-  ordinary-attack pace.
+  Palm Technique 1 s + 0.25 s, World is Mine 0.5 s + 1/3 s); a move that
+  is not one plays at ordinary-attack pace.
 
 #### 7.2.2 States, animation and facing
 
@@ -1668,8 +1683,8 @@ each fighter's own values are in its character specification (7.2.9).
   7.2.4a: `mouvment` on the ground, `midair_mouvment` in the air); and its
   projectile and effect art. No invented frames.
   If the airborne, landing or hurt frames fail to load, the fighter holds
-  the frame its `animationFallbacks` names (e.g. #0001's, #0002's and
-  #0003's first idle frame) without stretching or rotating; attacks, the Shield, the
+  the frame its `animationFallbacks` names (e.g. #0001's, #0002's,
+  #0003's and #0004's first idle frame) without stretching or rotating; attacks, the Shield, the
   Deflect, the Dash and the air dash never fall back (7.2.4, 7.2.5). Facing flips the sprite (per clip, against
   that clip's source orientation; see 3).
 - **Facing.** For players it is manual: only
@@ -1756,8 +1771,8 @@ each fighter's own values are in its character specification (7.2.9).
   (a "speedster", a heavy body) never changes them: its identity is its
   moves, and a move may travel in its own way (a homing dash, a roll, a
   plunge, a lift, a hover, a step-in) because that motion is the move.
-  Identical movement-only input from the same start gives #0001, #0002 and
-  #0003 the identical trajectory. Whether a fighter has the Dash and the air dash
+  Identical movement-only input from the same start gives #0001, #0002,
+  #0003 and #0004 the identical trajectory. Whether a fighter has the Dash and the air dash
   at all is its art (`mouvment`, `midair_mouvment`); every playable fighter
   has both.
 - **Movement and game feel.** Movement is immediate, fast, smooth and
@@ -1997,8 +2012,9 @@ each fighter's own values are in its character specification (7.2.9).
        slam's impact, a technique's burst, a summoned clone's attack), or
        everything one use can deal one target adding up to 10 or more;
     2. otherwise **3 s** (`EXCEPTIONAL_COOLDOWN`) for a move with an
-       exceptional effect (`EXCEPTIONAL_EFFECTS`): a heal of Launch Point, or
-       a paralysis that holds its target unable to act;
+       exceptional effect (`EXCEPTIONAL_EFFECTS`): a heal of Launch Point, a
+       paralysis that holds its target unable to act, or a charm that turns
+       its target's hits into heals;
     3. otherwise nothing beyond the 0.5 s repeat delay.
     The first rule that applies decides; the two never add up (a 10-damage
     paralysis is 5 s, never 8). Nothing else earns a cooldown, however strong
@@ -2025,9 +2041,11 @@ each fighter's own values are in its character specification (7.2.9).
     so cancelling or breaking one never escapes its cooldown. The roster:
     #0001 Unlimited Void 3 s (paralysis) and Hollow Purple 5 s (its 10-damage
     sphere); #0002 Whirlwind 5 s (its tornado's 10-damage finisher); #0003
-    Mystical Palm Technique 3 s (its heal); every other move of the three,
-    Red, Blue, Maximum Blue, Cherry Blossom Impact and the Heavenly Foot of
-    Pain included, only the 0.5 s repeat delay. The player, the CPU and the
+    Mystical Palm Technique 3 s (its heal); #0004 Ievan Polkka 5 s (its
+    double's six strikes add up to 10) and World is Mine 3 s (its charm);
+    every other move of the four, Red, Blue, Maximum Blue, Cherry Blossom
+    Impact, the Heavenly Foot of Pain and the Stage Dive included, only the
+    0.5 s repeat delay. The player, the CPU and the
     ability HUD all read the same built definitions and combat state
     (`js/game/combat/move-status.js` for presentation).
     An airborne version that lands
@@ -2186,7 +2204,7 @@ each fighter's own values are in its character specification (7.2.9).
   `js/game/combat/projectile.js`, `js/game/combat/pull.js`,
   `js/game/combat/hit-effects.js`). Each is data on an attack (or a
   projectile), generic, and validated as its definition is built; any
-  fighter may use them (#0001, #0002 and #0003 use them between them today):
+  fighter may use them (#0001, #0002, #0003 and #0004 use them between them today):
   - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live
     in its own window (`at` to `at + active`) and striking at most once,
     with its own `damage`, `baseLaunch` and `directionalLaunch`; its
@@ -2223,7 +2241,7 @@ each fighter's own values are in its character specification (7.2.9).
     cut short by the landing cancel; a real hit of the impact confirms the
     attack, so its hit-cancel can open on the landing. A slam whose active
     phase runs out in the air lands nothing and falls on under gravity (#0003's
-    Heavenly Foot of Pain). `rise` hangs, then rises at `speed` for its active phase and
+    Heavenly Foot of Pain, #0004's Stage Dive). `rise` hangs, then rises at `speed` for its active phase and
     carries on up under gravity. `roll` curls through its startup (sliding
     on), then rolls the way it faces at `speed` plus `keep` × the running
     speed it had, up to `maxSpeed`, losing `friction` per second on the
@@ -2255,7 +2273,23 @@ each fighter's own values are in its character specification (7.2.9).
     not met at all, so nothing is used up: a strike stays live, a
     projectile flies on, a burst passes it by. Jumping clears it, and a
     Shield, raised on the ground, blocks it like any hit; #0003's Heel
-    Drop's crack, Heavenly Foot of Pain's impact and Cherry Blossom Impact).
+    Drop's crack, Heavenly Foot of Pain's impact and Cherry Blossom Impact);
+    `charm` (seconds a real hit charms its target, `CombatState.charmBy`,
+    by the attacker: until it runs out, every hit the charmed fighter
+    would land on whoever charmed it, whatever made it, a strike, a
+    projectile, a clone, a burst, is no hit at all: past the Shield rule
+    (a raised Shield still blocks it, and pays for it, like any hit) it
+    takes the hit's damage off the charmer's Launch Point instead, never
+    below 0, and launches, stuns, freezes, paralyzes, charms and carries
+    nothing, restarts no recovery and breaks no technique
+    (`CombatSystem.charmed`, a `charmed` event with its `heal`); the attack
+    that dealt it is used up but never confirmed. It holds nothing in
+    place: the charmed fighter moves, jumps, Dashes and Shields as ever,
+    and hits anyone else as ever. It runs down in real time, frozen or
+    not; the longer charm by the same fighter wins, another fighter's
+    replaces it, a reset or a respawn clears it, and a blocked hit charms
+    nobody. A pink heart floats over a charmed fighter (7.3), and the
+    charmer glows as each charmed hit heals it; #0004's World is Mine).
     Each defaults to changing nothing, and a value of the wrong kind is
     refused. No hit effect gets past a Shield (above).
   - **Per airtime** (`airUses`): how many times the attack may start before
@@ -2528,8 +2562,8 @@ it names a fighter, an attack or an animation.
   `groundAnimation` (#0001's `shielding`) for as long as it is held;
   lowered on the ground, the optional `groundReleaseAnimation` shows for
   one pass (the `shieldRelease` state) while nothing of higher priority
-  takes over (visual only: movement resumes at once). Neither #0001 nor
-  #0002 has a raise or lower pose; #0003 has both (`prepshield`,
+  takes over (visual only: movement resumes at once). Neither #0001,
+  #0002 nor #0004 has a raise or lower pose; #0003 has both (`prepshield`,
   `releaseshield`, a frame each). While it is up horizontal input moves
   nothing (no walking, running or Dash, the current velocity slowing under
   the normal deceleration), though the direction held turns the fighter.
@@ -2621,12 +2655,12 @@ it names a fighter, an attack or an animation.
   defense never makes it a Shield (above): a blow it does not turn back
   reaches its fighter and lands.
 - **Perfect Shield.** A hit that lands within `defense.perfectWindow`
-  (#0001's, #0002's and #0003's: 0.1 s) of the Shield going up is a perfect block (`Fighter.perfectShield`,
+  (every fighter's today: 0.1 s) of the Shield going up is a perfect block (`Fighter.perfectShield`,
   the event's `perfect`): it deals no blockstun, so the
   fighter can let go and answer at once, while the attacker, whose attack
   was blocked, still has its whole recovery (no hit-cancel). The hit's
   hitstop still freezes both. Only a raise after the Shield has been down
-  for `perfectRearm` (#0001's, #0002's and #0003's: 0.25 s) has that window, so tapping `shield` over and
+  for `perfectRearm` (every fighter's today: 0.25 s) has that window, so tapping `shield` over and
   over never keeps one open; held up longer, or raised again too soon, a
   block is an ordinary one. Perfect or not, a block costs the same 15
   Energy: perfect timing earns no discount, refund or refill. It is drawn as a white ring bursting from the
@@ -2669,7 +2703,7 @@ it names a fighter, an attack or an animation.
   | Running, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 |
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
-  second; 12 when left out; #0001 14, #0002 12, #0003 15). The maximum and every
+  second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14). The maximum and every
   cost are universal: a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
   the registry loads, so no fighter holds more or less Energy, or pays
@@ -2721,7 +2755,9 @@ it names a fighter, an attack or an animation.
   cooldown policy's (7.2.4): #0001 Unlimited Void 3 s (its paralysis),
   Hollow Purple 5 s (its 10-damage sphere), #0003 the Mystical Palm
   Technique 3 s (its heal) and Cherry Blossom Impact only the 0.5 s repeat
-  delay, with cast/release timing, damage and effects unchanged. It is
+  delay, #0004 Ievan Polkka 5 s (its double's strikes add up to 10) and
+  World is Mine 3 s (its charm), with cast/release timing, damage and
+  effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from ordinary attacks' short
   repeat cooldowns in `CombatState.cooldowns`), started the moment the
@@ -2804,7 +2840,11 @@ it names a fighter, an attack or an animation.
   `offset`, exactly as an attack throws one, and its `burst`, whose `hit`
   is dealt once to every opponent its `hitbox` meets, facing right from
   the fighter's origin and mirrored, so a box round the fighter reaches
-  both sides, and its `heal`, a whole number of Launch Points taken off its
+  both sides (with, if it names one, its art as it goes out, `effect: {
+  animation, offset }`: an `effectAnimations` clip named after the
+  technique, played once where it went out, centred at its offset
+  mirrored with the cast's facing, behind the fighters, art only;
+  `Fighter.effects`, `Arena.castEffects`), and its `heal`, a whole number of Launch Points taken off its
   own fighter's at once, never below 0 (`CombatState.heal`: no hit, so the
   passive recovery runs on as it was; `Fighter.heals` records it for the
   effects); then `releaseAnimation` plays once, the fighter still
@@ -2818,13 +2858,15 @@ it names a fighter, an attack or an animation.
   whatever it had not released yet never is (a heal broken before it lets
   go heals nothing), while what it already let go stays (the projectile
   flies on, the burst has landed, the heal is kept). Its cooldown runs
-  from its start whatever happens. Every clip, the projectile's art
+  from its start whatever happens. Every clip, the projectile's and the burst effect's art
   and valid data are required before it starts (`techniqueProblem`):
   anything missing logs a warning and the press does nothing. #0001's
   Unlimited Void (a burst) and Hollow Purple (a projectile) are casts
   (docs/characters/0001.md), and so are #0003's Cherry Blossom Impact (a
   burst that is a quake) and Mystical Palm Technique (a heal,
-  docs/characters/0003.md); a technique of another shape would be a new
+  docs/characters/0003.md), and #0004's Ievan Polkka (a projectile that
+  never moves) and World is Mine (a burst that charms, with its ring of
+  sound as its art, docs/characters/0004.md); a technique of another shape would be a new
   form in the runtime, not a new reading of these fields. The CPU reads a
   technique's lead (its cast), where it lands (its burst's box, its
   projectile's path) and its hit, both to use it and to answer one being
@@ -3236,6 +3278,12 @@ there, and nothing in one is a rule for another fighter.
   Heavenly Foot of Pain, the Cherry Blossom Impact and Mystical Palm
   Technique techniques, the Chakra Haymaker, a guard of crossed arms, and
   its backhand Deflect; its blows split the ground, and it heals itself).
+- **#0004**: [docs/characters/0004.md](docs/characters/0004.md) (the
+  virtual singer: the Dance Combo and Air Dance, the Leek Swing and the
+  Leekspin, the Crescent Kick and the Stage Dive, the Ievan Polkka and
+  World is Mine techniques, the Melody, a raised-hand guard, and its
+  uppercut Deflect; its song charms, turning its opponents' blows into its
+  healing, and its little double dances in their way).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -3250,7 +3298,8 @@ definition changes ("#0001 changed since its Discover profile was
 reviewed. Recheck its difficulty and play-style description, then update
 reviewedSourceHash"), and whenever a playable fighter has no valid profile
 or description in both languages, so every change to a fighter brings its
-profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5.
+profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
+#0004 4/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -3303,7 +3352,8 @@ Adding one is described in
   cooldown rings only for active durations above the 0.5-second baseline
   (the policy's 3 s and 5 s): ordinary attacks as well as summons and
   techniques (#0001 Unlimited Void 3 s, Hollow Purple 5 s, #0002 Whirlwind
-  5 s, #0003 Mystical Palm Technique 3 s). The fighter the ability HUD
+  5 s, #0003 Mystical Palm Technique 3 s, #0004 Ievan Polkka 5 s and World
+  is Mine 3 s). The fighter the ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
   timer never shows twice; the CPU, Watch Mode's fighters and a player on
@@ -3331,6 +3381,13 @@ Adding one is described in
   Deflect, a cooldown alone or a projectile still flying. Player 1 and a
   CPU alike, in every mode, both at once when both perform one;
   `Arena.statusTop` counts it while it shows.
+  While a hit's `charm` holds a fighter (7.2.4), a bright pink (`#ff5fa2`)
+  heart with a dark outline (`#2a0614`) floats centered over it, above its
+  Special mark while that shows, else above its Energy bar or name tag:
+  drawn as shapes, 15 world units tall, never under 14 or over 30 CSS px,
+  a little wider than tall, bobbing like the Special mark (still with
+  reduced motion), for exactly as long as the charm runs, Player 1 and a
+  CPU alike; the charmer shows none. `Arena.statusTop` counts it.
 - Accessibility: the Launch Point number sits in a group labelled "Launch
   Point" (no maximum); each card carries a screen-reader-only Energy description
   in steps of 5 ("Energy 75 of 100", "Energy exhausted, refilling: 40 of
@@ -3367,7 +3424,9 @@ Adding one is described in
     ground the One-Two, Rapid Kicks, Spin Attack and Whirlwind, air the
     Homing Attack, Bounce Attack and Blue Tornado; #0003: ground the Chakra
     Punch, Heel Drop, Cherry Blossom Impact, Mystical Palm Technique and
-    Chakra Haymaker, air the Leaping Kick and Heavenly Foot of Pain.
+    Chakra Haymaker, air the Leaping Kick and Heavenly Foot of Pain; #0004:
+    ground the Dance Combo, Leek Swing, Crescent Kick, Ievan Polkka, World
+    is Mine and Melody, air the Air Dance, Leekspin and Stage Dive.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -3465,7 +3524,14 @@ Adding one is described in
     `Fighter.heals`, handed over by the Arena each step) shows a soft green
     ring opening round the middle of its body and a few green plus marks
     floating up from it, each over a thin dark line, gone after 0.7 s
-    (`HIT_FX.sparks.heal`), a little bigger for a bigger heal. Paint only.
+    (`HIT_FX.sparks.heal`), a little bigger for a bigger heal. The same glow
+    shows on a fighter a charmed opponent's hit heals instead (its
+    `charmed` event), with no shake, flash or impact spark. Paint only.
+  - *A burst's art:* a technique's burst that names its art (`effect`,
+    7.2.6) plays that clip once where it went out, from the step it lets
+    go, on the simulation clock, at its fighter's art-pixel scale, behind
+    the clones and fighters, then is dropped (`Arena.castEffects`). Paint
+    only: the burst's hit has already landed.
   - Reduced motion drops the shake and the zoom (and the burst's shake, its
     shards travelling only about a third as far); the flash, sparks,
     trails, slow motion and the burst's colour flash and fade stay.
@@ -3536,7 +3602,8 @@ Adding one is described in
   (`attack4`) Unlimited Void and `,` (`attack5`) Hollow Purple, pressed
   directly like any numbered button (7.2); for #0002, M and `,` do
   nothing; for #0003, O is Cherry Blossom Impact, M the Mystical Palm
-  Technique and `,` nothing. The input
+  Technique and `,` nothing; for #0004, O is the Crescent Kick (the Stage
+  Dive in the air), M Ievan Polkka and `,` World is Mine. The input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
   auto-repeat), touch and Player 1's controller (7.4a). Run edges
@@ -3636,7 +3703,8 @@ Adding one is described in
   So N numbered buttons use slots 1 to N, whatever kind of move each one
   is: 2 → 1–2, 3 → 1–3 (#0002), 4 → 1–4 (#0003: Cherry Blossom Impact in
   slot 3 and the Mystical Palm Technique in slot 4), 5 → 1–5 (#0001:
-  Unlimited Void in slot 4 and Hollow Purple in slot 5). A summon or technique button is
+  Unlimited Void in slot 4 and Hollow Purple in slot 5; #0004: Ievan Polkka
+  in slot 4 and World is Mine in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -3685,7 +3753,7 @@ Adding one is described in
   generic ones ("Extra Attack", "Attack 1" to "Attack 5"). Valid fighters
   never fall back in play. Transform keeps its glyph: it is reserved until
   a fighter presents its own (with its own `icon`, a key of `ICONS`); with
-  no `transform` entry (none of #0001, #0002 and #0003 has one) it is the neutral star,
+  no `transform` entry (none of #0001, #0002, #0003 and #0004 has one) it is the neutral star,
   labelled "Transform", with a dashed outline. The universal buttons belong
   to the controls and keep their original monochrome SVG glyphs
   (`currentColor`, from `js/ui/icons.js`): **Shield** (the shield outline,
@@ -3862,7 +3930,10 @@ codename is sent, never what an action does.
   Tornado R1; #0003's Chakra Punch Square, Heel Drop Triangle, Cherry
   Blossom Impact R2 + Square, Chakra Haymaker R2 + Triangle, Mystical Palm
   Technique L2 + Triangle, and in the air Leaping Kick Square, Heavenly Foot
-  of Pain Triangle. A fighter without a layout gets a safe, conflict-free
+  of Pain Triangle; #0004's Dance Combo Square, Leek Swing Triangle,
+  Crescent Kick Up + Square, Ievan Polkka R2 + Triangle, World is Mine L2 +
+  Triangle, Melody R1, and in the air Air Dance Square, Leekspin Triangle,
+  Stage Dive Down + Square. A fighter without a layout gets a safe, conflict-free
   fallback, shown as not designed yet; every playable fighter ships its own.
 - **Customization** (6.10b): every action of every fighter, with single
   buttons, two-button combinations, a stick direction and an activation;

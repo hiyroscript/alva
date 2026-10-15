@@ -10,10 +10,10 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the land pose, pending attacks and summon startups; the Dash and the air dash last the universal Dash's length, their clips played once across it), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
-| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow, the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
+| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, or a charmed hit's), the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
-| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings and Special ability mark drawn with each fighter. |
-| [`js/game/arena.js`](../../js/game/arena.js) | The draw order and the debug overlay. |
+| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark and charm mark drawn with each fighter. |
+| [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
 | [`js/stages/`](../../js/stages/) | Stage themes (Desert, City, Asperitas, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it. |
 | [`js/ui/hud.js`](../../js/ui/hud.js), [`js/ui/sprite-art.js`](../../js/ui/sprite-art.js) | The DOM HUD and portraits (interface, not canvas). |
 
@@ -102,8 +102,9 @@ Above each on-screen fighter's name tag, the bright purple **Energy bar**
 shows only below full and turns gray during exhaustion. Under the feet, a
 centered row shows only active cooldowns with a duration **above 0.5 seconds**
 (the cooldown policy's 3 s and 5 s, [combat](combat.md#cooldowns)):
-#0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s) and
-#0003 Mystical Palm Technique (3 s), long ordinary attacks as well as summons
+#0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s),
+#0003 Mystical Palm Technique (3 s), #0004 Ievan Polkka (5 s) and World is
+Mine (3 s), long ordinary attacks as well as summons
 and techniques. The fighter the ability HUD shows
 ([input](input.md#the-ability-hud)) has no rings while that HUD is on show
 (`Arena.hudCooldownsFor`, set by the screen each frame): the HUD carries its
@@ -116,7 +117,9 @@ from `mobileAbilities`: Unlimited Void's `attack4_cast` frame 5, Hollow Purple's
 `projectileAnimations.attack5_object` frame 0, Whirlwind's
 `projectileAnimations.extra_attack_object` frame 2; the Heavenly Foot of
 Pain's `midair_attack2` frame 2, Cherry Blossom Impact's `attack3_cast` frame 2
-and the Mystical Palm Technique's `attack4_cast` frame 3. The renderer uses the
+and the Mystical Palm Technique's `attack4_cast` frame 3; Ievan Polkka's
+`projectileAnimations.attack4_object` frame 0 (the little double) and World is
+Mine's `attack5_release` frame 0. The renderer uses the
 fighter's loaded normalized sprites and `drawCenteredFrame`, preserving colors
 and transparency with smoothing off. There is no dependency on UI/DOM code and
 no duplicated preview definition. Missing art is not invented.
@@ -129,7 +132,7 @@ ready timers draw nothing and leave no gap in the centered row.
 
 While a fighter performs one of its **Special abilities**
 ([combat](combat.md#special-abilities): #0001's Unlimited Void and Hollow
-Purple, #0003's Mystical Palm Technique), a bright orange (`#ff9f1c`)
+Purple, #0003's Mystical Palm Technique, #0004's World is Mine), a bright orange (`#ff9f1c`)
 exclamation mark with a dark outline floats over it, centered above the
 top of its status column (its Energy bar while that shows, else its name
 tag: `Arena.specialMarkRect`, `specialMarkRect` in
@@ -156,6 +159,39 @@ Watch Mode, Practice Ground, mirror matches), and over both fighters at
 once when both perform one; an off-screen fighter keeps only its edge
 pointer.
 
+### The charm mark
+
+While a hit's `charm` holds a fighter ([combat](combat.md#attack-mechanics-beyond-a-timed-hitbox):
+its hits on whoever charmed it heal that fighter instead; #0004's World is
+Mine), a bright pink (`#ff5fa2`) heart with a dark outline (`#2a0614`)
+floats over it (`CHARM_MARK_STYLE`, `charmMarkRect` and `drawCharmMark` in
+[`fighter-status.js`](../../js/game/rendering/fighter-status.js);
+`Arena.charmMarkRect`), so the player sees why its blows heal its opponent.
+It sits centred over the status column like the Special ability mark, above
+that mark while it shows (a charmed fighter performing a Special of its
+own), else above its Energy bar or name tag; drawn as shapes (two lobes
+over a point), 15 world units tall at the view's scale, never under 14 nor
+over 30 CSS pixels, a little wider than tall, bobbing like the Special mark
+(held still with reduced motion). `Arena.statusTop` counts it. It shows for
+exactly as long as the charm runs (`CombatState.charm`, read live every
+frame), for players and CPUs alike; the charmer has none.
+
+## A burst's art
+
+A technique's burst may name the art it plays as it goes out (`burst.effect`,
+[combat](combat.md#techniques)): on the step the burst lets go, its fighter
+hands it over (`Fighter.effects`), and the arena plays that effect clip
+once, from that step, on the simulation clock (`Arena.castEffects`,
+`addCastEffect`, `updateCastEffects`), centred where it went out (the
+fighter's position then, plus its offset mirrored with the cast's facing),
+at the fighter's art-pixel scale, drawn behind the clones and the fighters
+(`drawCastEffect`): it goes out round its fighter, who stays in front. A
+clip with no facing of its own (`sourceFacing` 0) is never mirrored. It
+stays where it went out if the fighter moves, and is dropped once it has
+played through. Art only: the burst's hit has already landed on its step.
+#0004's World is Mine plays its ring of sound this way (39 frames at 30
+fps).
+
 ## Hit effects
 
 Presentation only: they never change a simulation step (a test steps the
@@ -167,7 +203,9 @@ lasts (`trail.dashAlpha`), sparks and a small shake off a rebounding surface, a
 heal glow on a fighter that heals itself (a technique's `heal`, read from
 `Fighter.heals`: a soft green ring opening round the middle of its body and a
 few green plus marks floating up, gone after `sparks.heal`, 0.7 s, a little
-bigger for a bigger heal), and a
+bigger for a bigger heal; the same glow on a fighter that a charmed
+opponent's hit heals, from its `charmed` event, with no shake, flash or
+impact spark), and a
 short slow-motion zoom on a launch predicted to reach the Void. Reduced
 motion drops the shake and the zoom. Tuning: `HIT_FX` (`shake`, `flash`,
 `sparks`, `trail`, `lethal`, `bounce`, `elimination`).
@@ -204,6 +242,11 @@ far; the colour flash and fade stay.
   its life and on a restart, paint only).
 - Normalization against real PNGs: [`tests/fighters/0001/fighter-animation.test.mjs`](../../tests/fighters/0001/fighter-animation.test.mjs),
   [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs),
-  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs).
+  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs),
+  [`tests/fighters/0004/fighter-0004.test.mjs`](../../tests/fighters/0004/fighter-0004.test.mjs).
+- The charm mark and the charmer's glow:
+  [`tests/systems/charm.test.mjs`](../../tests/systems/charm.test.mjs); a
+  burst's art played once behind the fighters:
+  [`tests/systems/technique.test.mjs`](../../tests/systems/technique.test.mjs).
 - The canvas is a recording stand-in in every test: layout, scale and
   paint still need a real browser.

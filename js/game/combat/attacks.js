@@ -219,8 +219,9 @@
 //   deflect: { ..., hitbox: { x: 6, y: -118, w: 44, h: 98 }, deflectProjectiles: true },
 //
 // Every hit may also declare the shared hit effects (see
-// js/game/combat/hit-effects.js): `paralyze`, `blockPush` and `quake` (it
-// reaches only fighters standing on the ground). A multi-hit attack's
+// js/game/combat/hit-effects.js): `paralyze`, `blockPush`, `quake` (it
+// reaches only fighters standing on the ground) and `charm` (for a while
+// its target's hits on this fighter heal it instead). A multi-hit attack's
 // strikes take the attack's own unless they declare theirs. None
 // gets past an active Shield, and nothing may declare a way past one
 // (`unblockable` and the rest of SHIELD_BYPASS_FIELDS in
@@ -299,6 +300,7 @@ const ATTACK_DEFAULTS = {
   paralyze: 0,       // the shared hit effects (js/game/combat/hit-effects.js)
   blockPush: 0,
   quake: false,
+  charm: 0,
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -364,7 +366,7 @@ export function resolvePull(spec, owner) {
 
 // The fields a strike of a multi-hit attack takes from the attack when it
 // does not declare its own, and the ones only the strikes may declare.
-const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake']);
+const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake', 'charm']);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
 // A multi-hit attack's strikes, frozen and validated, and what they make of
@@ -495,7 +497,7 @@ export function attackPhase(def, time) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'paralyze', 'blockPush', 'quake',
+  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).

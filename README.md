@@ -24,14 +24,14 @@ every fighter runs, jumps, triple-jumps and Dashes exactly alike, and
 speed you build carries on through jumps, attacks and landings. Moves are
 mechanics, not just poses with damage: summons, techniques, projectiles
 that pull, repel or erase (and a Deflect that turns them back), paralysis,
-homing dashes, hovers, plunges, rolls, lifts and multi-hit strings are all
+charms, homing dashes, hovers, plunges, rolls, lifts and multi-hit strings are all
 part of the shared engine for any fighter to use. However a move is
 executed, if it can deal damage it is an attack, and a raised Shield
 blocks every attack.
 
 ## What's in it
 
-- **Three playable fighters** on a 48-slot roster:
+- **Four playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -40,18 +40,24 @@ blocks every attack.
   blows it blocks) and
   [#0002](docs/characters/0002.md), the speedster (a lock-on Homing
   Attack, a plunging Bounce Attack, a rolling Spin Attack, a rising Blue
-  Tornado and a travelling Whirlwind), and
+  Tornado and a travelling Whirlwind),
   [#0003](docs/characters/0003.md), the medic brawler (blows that crack the
   ground and reach only fighters standing on it, a heel-first plunge that
   splits the ground where it lands, Cherry Blossom Impact erupting either
   side of it, and the Mystical Palm Technique, a long kneeling cast that
-  heals its own Launch Point). All three Shield on the ground and
+  heals its own Launch Point), and
+  [#0004](docs/characters/0004.md), the virtual singer (World is Mine, a
+  song that charms everyone it reaches, so that for a while their blows
+  heal it instead; Ievan Polkka, a little leek-waving double that dances
+  in place and strikes whoever stays by it; a sung note that turns
+  projectiles back; a rising leek twirl that carries its target up; dance
+  kicks and a stage dive). All four Shield on the ground and
   Deflect in the air (a strike that knocks projectiles back at their
-  thrower), and all three Dash on the ground and air dash. Each fighter
+  thrower), and all four Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
-  Technique): an orange exclamation mark floats over a fighter while it
-  performs one.
+  Technique, #0004's World is Mine): an orange exclamation mark floats over
+  a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then
@@ -142,7 +148,10 @@ for every fighter; #0001's projectiles and Hollow Purple behind R2 / RT and
 Unlimited Void behind L2 / LT; #0002's Spin Attack and Blue Tornado sharing
 R1 / RB on the ground and in the air, its Homing and Bounce Attacks picked
 by the stick; #0003's heel drops on Triangle / Y, Cherry Blossom Impact and
-its Chakra Haymaker behind R2 / RT and its heal behind L2 / LT), and every binding of every fighter can be changed in
+its Chakra Haymaker behind R2 / RT and its heal behind L2 / LT; #0004's dance
+steps on Square / X, its leek on Triangle / Y, the Crescent Kick and Stage
+Dive picked by the stick, the Melody on R1 / RB and its techniques behind
+R2 / RT and L2 / LT), and every binding of every fighter can be changed in
 Settings › Controls › Controller controls. In menus the D-pad moves focus,
 the left stick moves a circular cursor, Cross / A confirms and Circle / B
 goes back. On touch: a joystick (or Left / Right buttons) at the lower left
@@ -227,6 +236,9 @@ credits: ZetrasBlack, R0B4N.
 
 **#0003 sprite source.** Sprite sheet ripped by Dazz & Fret on
 [The Spriters Resource](https://www.spriters-resource.com/ds_dsi/jus/asset/20891/).
+
+**#0004 sprite source.** Sprite sheet by xmaygrrr on
+[DeviantArt](https://www.deviantart.com/xmaygrrr/art/758846183).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

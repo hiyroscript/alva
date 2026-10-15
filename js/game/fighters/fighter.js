@@ -297,6 +297,10 @@ export class Fighter {
     // the Launch Points taken off and the technique), for whoever shows
     // them; cleared as each step starts.
     this.heals = [];
+    // The art a technique of its own let go of this step (its burst's
+    // effect: { animation, x, y, facing }, see Technique.takeEffect), for
+    // whoever shows it; cleared as each step starts.
+    this.effects = [];
     // Summons paid for this step, waiting for the battle to spawn them (see
     // spawnClones in js/game/combat/summon.js): { id, target }.
     this.summons = [];
@@ -351,6 +355,7 @@ export class Fighter {
     this.airJumped = false;
     this.bounce = null;
     this.heals.length = 0;
+    this.effects.length = 0;
     this.steerHeld.x = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
     this.steerHeld.y = (input.down ? 1 : 0) - (input.jump ? 1 : 0);
     this.updateAttackFacing();
@@ -575,6 +580,8 @@ export class Fighter {
         const amount = combat.heal(heal);
         this.heals.push({ amount, ability: this.technique.def.id });
       }
+      const effect = this.technique?.takeEffect();
+      if (effect) this.effects.push(effect);
       if (ended) this.endTechnique(ended);
     }
 

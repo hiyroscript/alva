@@ -115,7 +115,9 @@ path, and scored as expected utility:
 - **Values:** damage weighed by the Launch Point it reaches, the launch
   judged by the real launch rules (a launch that ends a life is worth
   `KO_VALUE`, more at match point; one that leaves the target off the
-  stage an edge-guard), a paralysis as the hits it opens, the combo the
+  stage an edge-guard), a paralysis as the hits it opens, a charm as the
+  seconds of unanswered offence it buys (4 a second, a quarter of that
+  while one is still running), the combo the
   stun leaves time for; a block or a whiff costs what the opponent can
   punish in the window it leaves.
 - **Risks:** an incoming threat that lands first; walking into the live
@@ -150,7 +152,12 @@ in the air), and a slam stands through its landing where it lands. A
 heal is no attack: the CPU casts it when it has taken enough for the
 whole heal to count and the opponent, busy as long as it is and then
 closing in with a Dash and a run, could not reach it before the cast lets
-go (`healPlan`). Movement is universal (`js/data/movement.js`). A new
+go (`healPlan`). Charmed by its opponent (a hit's `charm`: its hits on
+that opponent would heal it), it strikes nothing at it while the charm
+runs: no new plan to attack, no combo follow-up, no strike or projectile
+in answer to a threat; it keeps its distance (out of the opponent's
+reach) and defends, then fights as ever once it runs out (`me.charmed` in
+the situation). Movement is universal (`js/data/movement.js`). A new
 fighter is played well with no CPU change at all.
 
 ## Difficulty
@@ -225,10 +232,12 @@ hands it one plan through the same inputs (`{ press }`, `{ jump, dir }`,
   buttons, the ledge guard, reaction scaling, cooldowns, no writes).
 - [`tests/fighters/0001/cpu-0001.test.mjs`](../../tests/fighters/0001/cpu-0001.test.mjs),
   [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs),
-  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs):
+  [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs),
+  [`tests/fighters/0004/fighter-0004.test.mjs`](../../tests/fighters/0004/fighter-0004.test.mjs):
   the CPU playing, and facing, each fighter; the quake and the slam read
   by the CPU in [`quake.test.mjs`](../../tests/systems/quake.test.mjs) and
-  [`slam.test.mjs`](../../tests/systems/slam.test.mjs).
+  [`slam.test.mjs`](../../tests/systems/slam.test.mjs); a charmed CPU
+  holding its strikes in [`charm.test.mjs`](../../tests/systems/charm.test.mjs).
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle`, and five scripted reference styles.

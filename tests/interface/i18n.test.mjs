@@ -198,6 +198,8 @@ test('French is really French: only proper names, codes and shared words read th
     .filter((k) => typeof STRINGS.en[k] === 'string' && STRINGS.en[k] === STRINGS.fr[k])
     .sort();
   assert.deepEqual(same, [
+    'ability.0004.attack4', // Ievan Polkka, a song's title
+    'ability.0004.attack5', // World is Mine, a song's title
     'brand.title', // ALVA
     'control.pause', // Pause
     'difficulty.brutal.name', // Brutal
@@ -610,7 +612,8 @@ test('every fighter-specific string belongs to a fighter that exists, in either 
     }
     const text = Object.values(table).filter((v) => typeof v === 'string').join('\n');
     for (const name of text.match(/#\d{4}\b/g) ?? []) assert.ok(names.has(name), `${language}: ${name} is no fighter`);
-    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|renatoooferreiraaa/i, `${language}: nothing of an older fighter`);
+    // (xmaygrrr, once an older fighter's credit, is #0004's sheet's artist.)
+    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|renatoooferreiraaa/i, `${language}: nothing of an older fighter`);
   }
   // #0001's own strings stay: its ability names and its sprite credits; and
   // #0002's are there.

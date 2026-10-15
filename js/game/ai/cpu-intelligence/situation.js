@@ -81,6 +81,10 @@ export class Situation {
     me.stun = c.stun;
     me.hitstop = c.hitstop;
     me.paralysis = c.paralysis;
+    // Seconds its opponent's charm has left on it (see `charm` in
+    // js/game/combat/hit-effects.js): while it lasts, its hits on that
+    // opponent heal it, so it strikes nothing (see CpuIntelligence.choose).
+    me.charmed = c.charmedTo?.(foe) ? c.charm : 0;
     me.shielding = c.shielding;
     me.shieldStun = c.shieldStun;
     me.energy = c.energy;

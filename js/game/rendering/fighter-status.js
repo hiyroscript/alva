@@ -1,9 +1,11 @@
-// World-space Energy and long cooldown status, and the Special ability
-// mark. Ready moves and baseline repeat delays draw nothing. Each long
-// timer has its shared ability artwork in the center, original colors
-// intact, with remaining seconds underneath. The mark is an orange
-// exclamation mark over a fighter while it performs one of its Special
-// abilities (js/data/special-abilities.js), and only then.
+// World-space Energy and long cooldown status, the Special ability mark and
+// the charm mark. Ready moves and baseline repeat delays draw nothing. Each
+// long timer has its shared ability artwork in the center, original colors
+// intact, with remaining seconds underneath. The Special ability mark is an
+// orange exclamation mark over a fighter while it performs one of its
+// Special abilities (js/data/special-abilities.js), and only then; the charm
+// mark a pink heart over a fighter while a hit's `charm` holds it
+// (CombatState.charm, see js/game/combat/hit-effects.js), and only then.
 // Presentation reads simulation state; no DOM dependencies or fighter IDs.
 
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -236,5 +238,51 @@ export function drawSpecialMark(ctx, rect, dpr = 1, time = 0, reducedMotion = fa
     ctx.stroke();
     ctx.fill();
   }
+  ctx.restore();
+}
+
+// The charm mark: a bright pink heart with a dark outline, over a fighter
+// for exactly as long as it is charmed (CombatState.charm), so the player
+// sees why its hits heal its opponent. It reads over any stage and the Void.
+export const CHARM_MARK_STYLE = Object.freeze({
+  fill: '#ff5fa2',
+  outline: '#2a0614',
+});
+
+// Where the charm mark goes over a status column centred on device pixel
+// `x` whose topmost status starts at device pixel `top` (its Special
+// ability mark while that shows, else its Energy bar or name tag): { x, y,
+// w, h }, a small gap above it, the size of the Special ability mark's
+// height, a little wider than tall.
+export function charmMarkRect(x, top, scale, dpr = 1) {
+  const h = Math.round(Math.min(Math.max(14 * dpr, 15 * scale), 30 * dpr));
+  const w = Math.round(h * 1.1);
+  const gap = Math.round(Math.max(4 * dpr, 4 * scale));
+  return { x: Math.round(x - w / 2), y: Math.round(top - gap - h), w, h };
+}
+
+// The heart in `rect` (see charmMarkRect): two lobes over a point, outlined
+// in the dark tone, bobbing like the Special ability mark (held still with
+// reduced motion).
+export function drawCharmMark(ctx, rect, dpr = 1, time = 0, reducedMotion = false) {
+  const { w, h } = rect;
+  const cx = rect.x + w / 2;
+  const top = rect.y - specialMarkBob(time, dpr, reducedMotion);
+  const r = w / 4;
+  const lobeY = top + r;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx, top + h);
+  ctx.bezierCurveTo(cx - w * 0.2, top + h * 0.78, cx - w / 2, top + h * 0.62, cx - w / 2, lobeY);
+  ctx.arc(cx - r, lobeY, r, Math.PI, 0);
+  ctx.arc(cx + r, lobeY, r, Math.PI, 0);
+  ctx.bezierCurveTo(cx + w / 2, top + h * 0.62, cx + w * 0.2, top + h * 0.78, cx, top + h);
+  ctx.closePath();
+  ctx.lineWidth = Math.max(1.5 * dpr, h * 0.09) * 2;
+  ctx.strokeStyle = CHARM_MARK_STYLE.outline;
+  ctx.stroke();
+  ctx.fillStyle = CHARM_MARK_STYLE.fill;
+  ctx.fill();
   ctx.restore();
 }

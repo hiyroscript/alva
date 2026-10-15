@@ -21,10 +21,10 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU), and what kind of strike an attack is (`isMeleeAttack`, `isRangedAttack`: one reading for Combat Assist and the CPU's moveset). |
 | [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's rules of measure: `assistsAttack` (melee, never homing), `meleeGap` (an attack's box against a target's hurtboxes), `inReach` (its own reach already covers the target), `reachVector` and `approachMove` (the move still to make, or `REACHED`), `approachClear`, `assistRange` and `assistSpeed` (one Dash's travel, or one air dash's), `ASSIST_MARGIN`. |
 | [`js/game/combat/combo-assist.js`](../../js/game/combat/combo-assist.js) | Combo Assist's rule: `COMBO_PAIRS` (attack1 and attack2) and `comboAction` (the move a fresh press asks for, from the source attack's own repeat cooldown). |
-| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, cooldowns (`CooldownTimers` for summons and techniques). |
+| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, a charm and who put it on (`charmBy`, `charmedTo`), cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
-| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`; it refuses any way past a Shield. |
+| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`, `quake`, `charm`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`, `hitReaches`, `createHit`; it refuses any way past a Shield. |
 | [`js/game/combat/offense.js`](../../js/game/combat/offense.js) | The attack classification: what a definition can do, apart from how it is executed (`attackOffense`, `projectileOffense`, `techniqueOffense`, `summonOffense`, `actionOffense`, `classifyHit`, `isHarmfulHit`, `resolveOffense`), the hit sources events name (`ATTACK_SOURCES`), and the refused Shield bypasses (`SHIELD_BYPASS_FIELDS`, `assertNoShieldBypass`). |
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
@@ -73,7 +73,8 @@ definition that breaks one is refused, every problem named):
 | 5 | `attack1` … `attack5` |
 
 For example, #0001 has five (attack4 and attack5 techniques), #0002
-three ordinary ones and #0003 four (attack3 and attack4 techniques)
+three ordinary ones, #0003 four (attack3 and attack4 techniques) and
+#0004 five (attack4 and attack5 techniques)
 ([character docs](../characters/README.md)).
 
 ## Attacks
@@ -96,7 +97,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
 | `hits`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
-| `paralyze` / `blockPush` | 0 / 0 | The shared hit effects (below). |
+| `paralyze` / `blockPush` / `quake` / `charm` | 0 / 0 / false / 0 | The shared hit effects (below). |
 | `offensive` | — | Optional, and only to agree with what the attack does ([attack classification](#attack-classification)). |
 
 ### From a press to a move
@@ -148,7 +149,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001, #0002 and #0003 use them
+is built, and usable by any fighter (#0001, #0002, #0003 and #0004 use them
 between them today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -207,8 +208,16 @@ between them today):
   it; an airborne one is passed by with nothing used up, so a strike stays
   live for it and a projectile flies on, and jumping clears it; a Shield
   raised on the ground blocks it like any hit; `hitReaches`, asked at
-  every place a hit meets a fighter). A strike inherits its attack's and a
-  finisher its projectile's. Each defaults to changing
+  every place a hit meets a fighter), `charm` (seconds a real hit charms
+  its target, `CombatState.charmBy`: until it runs out, every hit the
+  charmed fighter would land on whoever charmed it, whatever made it, is
+  no hit at all but a heal of that fighter, its damage taken off its
+  Launch Point (`CombatSystem.charmed`, a `charmed` event); it holds
+  nothing in place, it runs down in real time, the longer charm by the
+  same fighter wins and another fighter's replaces it, a blocked hit
+  charms nobody, and a raised Shield still blocks a charmed fighter's
+  hits like any other; #0004's World is Mine). A strike inherits its
+  attack's and a finisher its projectile's. Each defaults to changing
   nothing; a value of the wrong kind is refused. There is no hit effect
   that gets past a Shield: `unblockable` (gone) and every other field of
   `SHIELD_BYPASS_FIELDS` is refused wherever a hit is built, true or
@@ -235,7 +244,7 @@ definition the schemas build carries it as `offense` (`{ attack, defense,
 sources }`), and a Fighter's button is read with `actionOffense`.
 
 An action is an attack when it can deal damage, directly or indirectly: a
-hit of its own that adds Launch Point, paralyzes or launches (`strike`), a
+hit of its own that adds Launch Point, paralyzes, charms or launches (`strike`), a
 multi-hit string (`strikes`), a projectile it releases or is (`projectile`,
 a piercing one's `finisher` too), a technique's burst (`burst`), a slam's
 impact where it lands (`impact`), a summon's clone that strikes (`clone`),
@@ -287,6 +296,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0001 | `['attack4', 'attack5']` | Unlimited Void (a paralysis round it), Hollow Purple (a sphere that erases projectiles and passes through fighters) | Red, Maximum Blue |
 | #0002 | `[]` | none | the Whirlwind |
 | #0003 | `['attack4']` | the Mystical Palm Technique (heals its own Launch Point) | Cherry Blossom Impact |
+| #0004 | `['attack5']` | World is Mine (a charm: its opponents' hits heal it) | Ievan Polkka, the Melody |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -307,8 +317,8 @@ and the loadout rules), and the cooldown keeps the policy's
 Technique its 3 s, Cherry Blossom Impact its 0.5 s repeat delay, whatever
 their labels. Specials keep their longer, deliberate animations (Unlimited
 Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical Palm
-Technique 1 s + 0.25 s); a move that is not one plays at ordinary-attack
-pace (Cherry Blossom Impact 0.2 s + 0.25 s).
+Technique 1 s + 0.25 s, World is Mine 0.5 s + 1/3 s); a move that is not
+one plays at ordinary-attack pace (Cherry Blossom Impact 0.2 s + 0.25 s).
 
 ## Hit resolution
 
@@ -346,13 +356,20 @@ a fighter off the ground, and nothing of it is used up. Then:
    hitstop (the attacker freezes too, unless the hit is detached: a
    projectile's, a clone's or a technique's).
 4. A real hit ends the target's technique and cancels its summon startup
-   (no armour); a block never does.
+   (no armour); a block never does. (Before 2: a hit the target does not
+   block whose attacker it has charmed, its `charm` still running, is no
+   hit at all: `charmed` takes its damage off the target's Launch Point,
+   never below 0, and records a `charmed` event with that `heal`; no
+   launch, stun, freeze, paralysis, charm or carry, no recovery
+   restarted, no technique broken, no reaction, and the attack that dealt
+   it is used up but never confirmed.)
 5. A launch ends any paralysis; a real hit that `paralyze`s and launches
-   nothing holds the target.
+   nothing holds the target; a real hit that `charm`s charms it (by the
+   attacker), launch or not.
 6. The launch replaces the target's velocity, or a `carry` drags it.
 7. One event is recorded (`type` hit or block, attacker, target, move,
    damage, Launch Point before and after, launch values, stun, `perfect`,
-   the point it landed, the `paralysis` it put on and the `stall` it
+   the point it landed, the `paralysis` and the `charm` it put on and the `stall` it
    caused, and the projectile, summon or technique behind it; `attack`
    (always true: a blocked attack is still an attack, recorded as a
    block, never as a hit), `source` (`melee`, `deflect`, `projectile`,
@@ -378,7 +395,8 @@ and the hit effects, and `rotationSpeed` (degrees per second its art
 spins as it flies, clockwise; 0, the default, is none: art only, see
 [rendering](rendering.md#projectile-spin)). A projectile flies straight
 in the direction its
-thrower faced at the release, never turns, hits once by default (a
+thrower faced at the release (one with no `speed` stays where it appears,
+an obstacle: #0004's dancing double), never turns, hits once by default (a
 piercing one up to its `hits`, an erasing one each fighter it hits once,
 flying on through), and is gone on a block (any projectile, an erasing or
 piercing one included: a Shield stops it), at the end of its lifetime, in
@@ -444,8 +462,12 @@ press step if any), *release* (on its first step it releases, exactly
 once, its `projectile: { id, offset }`, thrown the snapshotted way as an
 attack throws one, and its `burst: { hitbox, hit }`, whose hit is dealt
 once to every opponent the box meets, facing right from the fighter and
-mirrored, so a box round the fighter reaches both sides; then
-`releaseAnimation` plays once) and *done*. It may also let go of a
+mirrored, so a box round the fighter reaches both sides, and its art as it
+goes out, if it names any: `effect: { animation, offset }`, an
+`effectAnimations` clip named after the technique (`attackN_object...`),
+handed to its fighter (`Fighter.effects`, `Technique.takeEffect`) and
+played once by the arena where it went out, behind the fighters, art only;
+then `releaseAnimation` plays once) and *done*. It may also let go of a
 `heal` (a whole number of Launch Points): on the release step its own
 fighter's Launch Point drops by that much, never below 0
 (`CombatState.heal`); a heal is no hit, so it neither restarts nor
@@ -459,12 +481,15 @@ Purple (a projectile that erases), each blocked by a raised Shield ([its
 specification](../characters/0001.md#each-move-in-detail)), and #0003's
 Cherry Blossom Impact (a burst that is a quake) and Mystical Palm
 Technique (a heal, no attack; [its
-specification](../characters/0003.md#each-move-in-detail)). Nothing in the
+specification](../characters/0003.md#each-move-in-detail)), and #0004's
+Ievan Polkka (a projectile that never moves) and World is Mine (a burst
+that charms, its ring of sound its `effect`; [its
+specification](../characters/0004.md#each-move-in-detail)). Nothing in the
 runtime reads a fighter or a button; a technique of a different shape
 would be a new form in the runtime with its own fields, not a
 reinterpretation of these.
 
-Any clip missing, the projectile's art missing, nothing to release (no
+Any clip missing, the projectile's or the burst effect's art missing, nothing to release (no
 projectile, burst or heal), or
 invalid data, and the press does nothing (logged, no cooldown). Losing
 the ground or a hit on the fighter end it: whatever it had not released
@@ -500,7 +525,7 @@ special lengths exist beside the universal **0.5-second repeat delay**
 | Class (`cooldownClass`) | When | Cooldown |
 | --- | --- | --- |
 | `tenDamage` | Any one hit of the move deals 10 (a strike, a multi-hit's finisher, its projectile or that projectile's finisher, a slam's `impact`, a technique's `burst`, a summoned clone's attack), or everything one use can deal one target adds up to 10 or more | `TEN_DAMAGE_COOLDOWN`, 5 s |
-| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal`, or any hit's `paralyze` | `EXCEPTIONAL_COOLDOWN`, 3 s |
+| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal`, or any hit's `paralyze` or `charm` | `EXCEPTIONAL_COOLDOWN`, 3 s |
 | `ordinary` | Everything else | 0.5 s (none for an exempt move) |
 
 The first row that applies decides: a move never gets 3 s and 5 s added
@@ -551,7 +576,8 @@ at expiry. Reset/respawn clears all; a live overtime transition preserves them.
 The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
 (paralysis) and Hollow Purple 5 s (a 10-damage sphere); #0002's Whirlwind
 5 s (its tornado's 10-damage finisher); #0003's Mystical Palm Technique 3 s
-(heal). Everything else, Red, Blue and Maximum Blue (a pull earns nothing),
+(heal); #0004's Ievan Polkka 5 s (its double's six strikes add up to 10)
+and World is Mine 3 s (charm). Everything else, Red, Blue and Maximum Blue (a pull earns nothing),
 Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a slam and a
 launch earn nothing) included, has only the 0.5 s repeat delay, and every
 Deflect none.
@@ -720,7 +746,7 @@ starts the very attack asked for. The rules are
   the shared rules over every fighter and every kind of hit: the damage
   tiers, the cooldowns, Energy, difficulty and movement.
 - [`tests/systems/special-abilities.test.mjs`](../../tests/systems/special-abilities.test.mjs):
-  the roster's Special classification (three in all), the editor
+  the roster's Special classification (four in all), the editor
   categories and bindings it leaves unchanged, the list's rules, a future
   fighter opting in with data alone, unchanged execution types and
   cooldowns, Cherry Blossom Impact's quicker frame-aligned timing, and the
@@ -759,11 +785,13 @@ starts the very attack asked for. The rules are
   [`pull.test.mjs`](../../tests/systems/pull.test.mjs),
   [`projectile-clash.test.mjs`](../../tests/systems/projectile-clash.test.mjs),
   [`technique.test.mjs`](../../tests/systems/technique.test.mjs) (the heal
-  included), [`quake.test.mjs`](../../tests/systems/quake.test.mjs),
-  [`slam.test.mjs`](../../tests/systems/slam.test.mjs).
+  and a burst's art included), [`quake.test.mjs`](../../tests/systems/quake.test.mjs),
+  [`slam.test.mjs`](../../tests/systems/slam.test.mjs),
+  [`charm.test.mjs`](../../tests/systems/charm.test.mjs).
 - Each fighter's moves: [`tests/fighters/0001/`](../../tests/fighters/0001/)
   (every move's mechanic, its combos, the CPU playing it),
   [`tests/fighters/0002/`](../../tests/fighters/0002/),
-  [`tests/fighters/0003/`](../../tests/fighters/0003/).
+  [`tests/fighters/0003/`](../../tests/fighters/0003/),
+  [`tests/fighters/0004/`](../../tests/fighters/0004/).
 - Every pairing of playable fighters in a real battle:
   [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs).

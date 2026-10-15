@@ -76,9 +76,9 @@ is optional and the defaults change nothing:
 
 A hit (never a block) also gives the target its air jumps back. Each
 fighter's values are in its character specification (#0001 and #0002 use
-0.2 s per 1000 units/s up to 0.7 s, #0003 0.15 s up to 0.55 s; all three
-tumble from 1100 units/s; #0001 steers a launch up to 18°, #0002 15°,
-#0003 20°).
+0.2 s per 1000 units/s up to 0.7 s, #0003 and #0004 0.15 s up to 0.55 s;
+all four tumble from 1100 units/s; #0001 steers a launch up to 18°, #0002
+15°, #0003 20°, #0004 18°).
 
 A launching hit also ends a paralysis on the spot (a hit's `paralyze`,
 see [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)): a launch

@@ -1841,3 +1841,127 @@ canvas), `controller-profiles`, `controller-ui`, `loadout`,
 `practice-ground` and `watch-mode` updated, and the three Discover
 profiles' review hashes recorded again (their ratings and descriptions
 still hold).
+
+## #0004, the virtual singer
+
+Not a named update (it can become one if the owner names it). Asked for
+as: read `character_rule` and add character #0004 from a supplied sprite
+sheet: abilities with real mechanics based on the character's canon, not
+animations with plain damage; no move the character cannot perform in
+canon; credited to the sheet's page on DeviantArt; never naming the
+character anywhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0004 in roster slot 04, playable: 128 frames cut from
+  the sheet into `assets/characters/0004/` (component-masked 1× crops, the
+  flat purple background (128, 0, 128) made transparent, nothing redrawn
+  or recoloured, every file `0004_<codename>_<frame>.png`): 77 of the
+  fighter, 51 of what its moves create (its notes, its little double, the
+  39-frame ring of sound). Drawn at the roster's art-pixel size (a 49-pixel
+  idle, about 83 units tall); its long twin tails would drag the automatic
+  anchor, so every clip where they, the leek or a kick's trail swing wide
+  authors its own `anchorX`. Movement is the universal one; its Energy
+  refills at 14 a second.
+- **Its buttons:** five numbered attacks, each a button of its own (U, I,
+  O, M, ","; touch slots 1 to 5): three ordinary attacks with mid-air
+  versions and two techniques, plus the extra attack. Transform stays
+  reserved (the sheet's intro, win, lose and cut-in pictures are no move).
+- **Its moves**, from its canon (a singer whose voice is its power, the
+  leek its signature item, a song that charms, a chibi double waving a
+  leek, dancing): the Dance Combo (a swipe that holds, then a punch), the
+  Air Dance (a sweep, then a rising crescent), the Leek Swing (its longest
+  reach, shoving a raised Shield back), the Leekspin (a `rise` that
+  `carry`s its target up and flings it: its way back to the stage), the
+  Crescent Kick (its anti-air), the Stage Dive (a `slam`: a spike on the
+  stage, a crouching landing that pops up whoever is near), Ievan Polkka
+  (a technique: its little double appears in front and stands there
+  waving its leek, a stationary piercing projectile, six strikes and a
+  launch, 5 s), World is Mine (a technique, its Special: half a second of
+  singing, then a ring of sound round it that charms everyone it reaches
+  for 2.5 s, 3 s) and the Melody (a sung note that turns projectiles
+  back). Its Deflect is an uppercut that turns projectiles back.
+- **Engine features they are built on, generic for any fighter:**
+  - `charm`, a hit effect (`js/game/combat/hit-effects.js`; seconds,
+    inherited by strikes and finishers like the other hit effects): a real
+    hit charms its target (`CombatState.charmBy`; a different charmer
+    replaces the charm, the same one keeps the longer). While charmed,
+    every hit the fighter would land on its charmer is no hit
+    (`Combat.charmed`): it heals the charmer by the hit's damage
+    (`CombatState.heal`), launches, stuns and freezes nothing, and comes
+    out as a `charmed` event (never a confirm for a string or Combo
+    Assist). The Shield rule is asked first: a blocked hit charms nobody
+    and a raised Shield still blocks a charmed fighter's hit. Hits on
+    anyone else are untouched. It is an exceptional effect in the cooldown
+    policy (3 s, `EXCEPTIONAL_EFFECTS`). A pink heart (`drawCharmMark`)
+    floats over a charmed fighter, and the charmer's heal glow shows each
+    healing hit.
+  - a technique burst's `effect` (`js/game/combat/technique.js`): art
+    (`{ animation, offset }`, one of the fighter's `effectAnimations`)
+    played once where the burst went out, behind the fighters
+    (`Fighter.effects`, `Arena.addCastEffect`). Art only; the loadout
+    refuses an effect clip that is missing.
+- **The CPU** plays it from the data: a charm is worth 4 a second (0.5
+  while the target is already charmed) in the evaluator, and a charmed
+  CPU plans movement instead of attacks, follows up nothing, answers none
+  of its charmer's threats with a strike or a projectile, and keeps out of
+  its reach until the charm runs out (`me.charmed` in `situation.js`,
+  `brain.js`, `defense.js`).
+- **UI:** its touch buttons (each move's own frame), English and French
+  names and one-line descriptions (the songs keep their titles in both),
+  a recommended controller layout, a Discover profile (4 / 5), and a
+  credit group, "#0004 sprite source": "Sprite sheet by xmaygrrr on
+  DeviantArt", linked to the sheet's page by the deviation's number alone.
+- **Roster:** the credit and name scans no longer flag the sheet's artist
+  as a retired credit (a fighter removed in the [roster
+  reset](#roster-reset) had the same artist): they are #0004's credit now.
+
+**Balance, measured.** Tuned from seeded CPU-vs-CPU matches (full Watch
+Mode battles, first to 3, on Desert and City, 20 matches per cell; points
+#0004 : opponent). Against #0001: Medium 31 : 50, Hard 44 : 45, Brutal
+47 : 37. Against #0002: Medium 38 : 51, Hard 53 : 34, Brutal 54 : 36.
+Against #0003: Medium 35 : 53, Hard 35 : 49, Brutal 43 : 39; 380 : 394 in
+all. The first cut scored 342 : 413: the CPU never sang (a charm valued at
+2 a second, a burst only head high). Fixed by valuing the charm at 4, a
+burst a jump's height high, a quicker launch reaction (0.15 s per 1000
+units/s up to 0.55 s, tumbling from 1100, 18°) and a 14 Energy refill.
+Its Dance Combo's first strike was brought forward to 0.1 s so that a Dash
+attack lands at speed.
+
+**Where to tune it**
+
+- `js/data/characters/0004.js`: each attack's damage, launch, timing,
+  hitbox, `blockPush`, `hits`, `carry`, `motion` (the Leekspin's rise
+  `speed`; the Stage Dive's `fallSpeed`, `DIVE_PLUNGE` and its `impact`),
+  `airUses`; the double's `pierce`, `finisher` and `lifetime`; World is
+  Mine's burst box, `charm` seconds and `effect` offset; the Melody's speed
+  and `repel`; clip rates (`FPS_0004`), anchors, the Deflect,
+  `energy.regen`, `launchReaction` and the body.
+- The new capabilities' defaults: `charm` in
+  `js/game/combat/hit-effects.js`; the CPU's charm value in
+  `js/game/ai/cpu-intelligence/evaluator.js`; the heart's colours and size
+  (`CHARM_MARK_STYLE`, `charmMarkRect`) in
+  `js/game/rendering/fighter-status.js`.
+
+**Code:** `js/data/characters/0004.js`, registered in
+`js/data/characters.js`; `js/data/fighter-profiles.js`;
+`js/data/cooldowns.js`, `js/data/loadout.js` (the burst's art); the charm
+in `js/game/combat/hit-effects.js`, `attacks.js`, `projectile.js`,
+`offense.js`, `combat-state.js` and `combat.js`; the burst's art in
+`js/game/combat/technique.js`, `js/game/fighters/fighter.js` and
+`js/game/arena.js`; the heart in `js/game/rendering/fighter-status.js` and
+`js/game/arena.js`, the heal glow in `js/game/rendering/hit-fx.js`; the
+CPU in `js/game/ai/cpu-intelligence/` (`capabilities`, `perception`,
+`situation`, `evaluator`, `defense`, `brain`); `js/ui/credits.js`,
+`js/localization/`.
+
+**Tests:** new `tests/fighters/0004/fighter-0004.test.mjs` (the real PNGs,
+scale and anchors, every move's mechanic, the CPU, names, credits, and a
+whole-repository check that the source character is named nowhere) and
+`tests/systems/charm.test.mjs`; the burst's art in
+`tests/systems/technique.test.mjs`; `hit-effects`, `launch`,
+`cooldown-policy` and `special-abilities` for the charm and the fourth
+fighter; the roster, credits and screens in
+`tests/integration/empty-roster.test.mjs`, `discover.test.mjs`,
+`settings.test.mjs`, `i18n.test.mjs` and the other fighters' tests (the
+playable list).

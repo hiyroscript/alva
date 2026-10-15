@@ -13,8 +13,9 @@ pages are part of the product specification
 | #0001 | 01 | yes | 5: Jab / Floating Straight, Red / Red Kick, Maximum Blue / Blue, Unlimited Void (technique), Hollow Purple (technique); extra attack: the High Kick | [0001.md](0001.md) |
 | #0002 | 02 | yes | 3: One-Two / Homing Attack, Rapid Kicks / Bounce Attack, Spin Attack / Blue Tornado; extra attack: the Whirlwind | [0002.md](0002.md) |
 | #0003 | 03 | yes | 4: Chakra Punch / Leaping Kick, Heel Drop / Heavenly Foot of Pain, Cherry Blossom Impact (technique), Mystical Palm Technique (technique); extra attack: the Chakra Haymaker | [0003.md](0003.md) |
+| #0004 | 04 | yes | 5: Dance Combo / Air Dance, Leek Swing / Leekspin, Crescent Kick / Stage Dive, Ievan Polkka (technique), World is Mine (technique); extra attack: the Melody | [0004.md](0004.md) |
 
-The other 45 of the 48 roster slots are locked placeholders. #0001 is
+The other 44 of the 48 roster slots are locked placeholders. #0001 is
 the first playable fighter, so it is what startup preloads first, Quick
 Battle's initial pick, both Watch Mode CPUs and the Practice Ground
 default; that is an ordering, not a special role: each of those reads
@@ -26,7 +27,7 @@ Where things are:
 | | |
 | --- | --- |
 | Definitions | [`js/data/characters/<id>.js`](../../js/data/characters/), registered in [`js/data/characters.js`](../../js/data/characters.js) |
-| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
+| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
 | Art | [`assets/characters/<id>/`](../../assets/characters/) |
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | Test-only fighters (never in the game) | [`tests/fighters/fixtures/`](../../tests/fighters/fixtures/): a sample fighter with different moves on the same codenames, the loadout matrix, and screen-test fighters |

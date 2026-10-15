@@ -27,7 +27,9 @@
 //   eliminationPalette), drawn on after it has gone. Nothing but paint.
 // - A fighter that heals itself (a technique's heal, see Fighter.heals): a
 //   soft green ring opening round its body and a few plus marks floating up
-//   from it. Nothing but paint.
+//   from it. The same glow on a fighter that a charmed opponent's hit
+//   healed instead (a `charmed` event, see CombatSystem.charmed). Nothing
+//   but paint.
 //
 // With reduced motion there is no shake and no zoom, and an elimination's
 // shards barely travel; the rest stays.
@@ -165,6 +167,12 @@ export class HitEffects {
   // to judge a lethal launch by.
   take(events, arena) {
     for (const e of events) {
+      // A charmed fighter's hit on its charmer: no impact at all, the
+      // charmer's heal glow instead.
+      if (e.type === 'charmed') {
+        this.addHeal(e.target, { amount: e.heal });
+        continue;
+      }
       if (e.type === 'block') {
         this.addShake(e.perfect ? HIT_FX.shake.perfect : HIT_FX.shake.block);
         this.addSpark(e.perfect ? 'perfect' : 'block', e);

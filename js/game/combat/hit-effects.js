@@ -32,18 +32,32 @@
 //                       stays live, a projectile flies on), so jumping
 //                       clears it. A Shield, raised on the ground, still
 //                       blocks it like any hit.
+//   charm: 2.5          seconds a real hit charms its target (see
+//                       CombatState.charmBy): for that long, every hit the
+//                       charmed fighter would land on whoever charmed it
+//                       (its strikes, its projectiles, its clones, its
+//                       bursts) is no hit at all: it adds no Launch Point,
+//                       launches, stuns and freezes nothing, and heals that
+//                       fighter instead, taking the hit's damage off its
+//                       Launch Point (see CombatSystem.applyHit). It holds
+//                       nothing in place: the charmed fighter moves, jumps,
+//                       Dashes and Shields as ever. The longer charm wins;
+//                       a charm by another fighter replaces it. A blocked
+//                       hit charms nobody, and a raised Shield still blocks
+//                       a charmed fighter's hit like any other.
 //
 // For example:
 //
 //   burst: { hitbox: { ... }, hit: { damage: 3, paralyze: 1.8 } },
 //   attack2_object: { ..., blockPush: 520 },
 //   burst: { hitbox: { x: -150, y: -50, w: 300, h: 54 }, hit: { damage: 5, quake: true } },
+//   burst: { hitbox: { x: -160, y: -110, w: 320, h: 130 }, hit: { damage: 1, charm: 2.5 } },
 
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { assertNoShieldBypass } from './offense.js';
 
 // The fields a hit may declare here, with the value that changes nothing.
-const DEFAULTS = Object.freeze({ paralyze: 0, blockPush: 0, quake: false });
+const DEFAULTS = Object.freeze({ paralyze: 0, blockPush: 0, quake: false, charm: 0 });
 
 export const HIT_EFFECT_FIELDS = Object.freeze(Object.keys(DEFAULTS));
 
@@ -55,10 +69,12 @@ export function resolveHitEffects(spec, owner = 'A hit') {
   const paralyze = spec?.paralyze ?? DEFAULTS.paralyze;
   const blockPush = spec?.blockPush ?? DEFAULTS.blockPush;
   const quake = spec?.quake ?? DEFAULTS.quake;
+  const charm = spec?.charm ?? DEFAULTS.charm;
   if (!(typeof paralyze === 'number' && paralyze >= 0)) throw new Error(`[Alva] ${owner}'s paralyze must be seconds from 0`);
   if (!(typeof blockPush === 'number' && blockPush >= 0)) throw new Error(`[Alva] ${owner}'s blockPush must be a speed from 0`);
   if (typeof quake !== 'boolean') throw new Error(`[Alva] ${owner}'s quake must be true or false`);
-  return { paralyze, blockPush, quake };
+  if (!(typeof charm === 'number' && Number.isFinite(charm) && charm >= 0)) throw new Error(`[Alva] ${owner}'s charm must be seconds from 0`);
+  return { paralyze, blockPush, quake, charm };
 }
 
 // Whether hit `def` can reach `target` at all where it is now: always,
