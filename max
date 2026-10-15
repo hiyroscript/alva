@@ -1,1014 +1,1223 @@
-ALVA — Animated Ability HUD & Universal Cooldown Rebalance
+ALVA — New Stage: Asperitas + Complete Stage Roster Redesign
 
 Objective
 
-Implement a polished, hero-shooter-inspired ability interface for keyboard and controller players during gameplay, together with a strict new universal cooldown policy.
+Implement a major stage-system expansion in the Alva game.
 
-This is an implementation task, not a mockup. Make the changes in the actual game, connect them to the existing gameplay systems, and test everything thoroughly.
+This update has two primary goals:
 
-The desired result should feel like a professionally designed fighting-game HUD, with a smooth, scroll-wheel-style transition between grounded and airborne moves.
+1. Completely redesign the Stage Selection interface to accommodate 24 stage slots instead of the current two-stage layout, including a Random Stage button.
+2. Create a fully playable third stage named Asperitas, a beautiful sky-themed arena made entirely of clouds, featuring a large central cloud platform and two smaller, independently animated cloud platforms with randomized movement and disappearance states.
 
-The implementation must preserve Alva’s identity: pixel-art character abilities, minimal dark UI, clean typography, readable controls, and fluid combat.
+This must be a complete, polished implementation integrated into the existing game—not a mockup or an isolated visual demonstration.
+
+The existing Desert and City stages must remain fully functional, and the new functionality must work across Quick Battle, Watch Mode, and the existing stage-selection flow.
+
+⸻
+
+1. Understand the existing architecture before implementation
 
 Repository: hiyroscript/alva
 
-1. Study the existing architecture first
+Alva is a browser-based 2D platform fighter built with vanilla JavaScript, HTML, CSS, and Canvas 2D. It uses a fixed-step physics simulation and procedural, pseudo-3D stage rendering.
 
-Alva is a browser-based, HTML/CSS/JavaScript platform fighter that renders gameplay with Canvas 2D and uses DOM elements for the HUD.
+Study the existing code and follow its architecture.
 
-Read the repository’s CLAUDE.md, ALVA_SPEC.md, codename_rule, and relevant gameplay documentation before making changes.
+Important existing files:
 
-Pay particular attention to:
+File	Responsibility
+js/data/maps.js	Stage definitions, platforms, collision geometry, spawn points, and Void bounds
+js/stages/index.js	Stage theme registry
+js/stages/stage-theme.js	Base procedural rendering system
+js/stages/perspective.js	Shared stage perspective rendering
+js/stages/desert-theme.js	Desert stage rendering
+js/stages/city-theme.js	City stage rendering
+js/game/physics.js	Platform collision and fighter physics
+js/game/arena.js	Fixed-step simulation and rendering
+js/game/fighters/fighter.js	Fighter movement and grounding
+js/game/ai/cpu-intelligence/stage-model.js	CPU understanding of stage geometry
+js/screens/map-select-screen.js	Stage-selection screen
+js/ui/stage-preview.js	Stage previews
+css/setup.css	Stage-selection layout
+css/responsive.css	Responsive layouts
+js/localization/strings/en.js	English strings
+js/localization/strings/fr.js	French translations
+tests/systems/platform-stage.test.mjs	Stage and collision tests
 
-HUD and gameplay screens
+Read ALVA_SPEC.md, docs/gameplay/stages.md, and the relevant development conventions.
 
-* js/ui/hud.js
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
-* css/battle.css
-* css/battle-overlays.css
-* css/responsive.css
-
-Existing ability artwork
-
-* js/ui/mobile-abilities.js
-* js/data/ability-preview.js
-* js/data/abilities.js
-* js/ui/touch-controls.js
-* js/ui/icons.js
-
-Keyboard and controller systems
-
-* js/config.js
-* js/core/input-manager.js
-* js/core/controller-manager.js
-* js/core/gamepad-devices.js
-* js/core/controller-resolver.js
-* js/data/controller-profiles.js
-* js/ui/controller-glyphs.js
-* js/core/settings.js
-
-Combat and cooldown systems
-
-* js/data/cooldowns.js
-* js/game/combat/combat-state.js
-* js/game/combat/attacks.js
-* js/game/combat/technique.js
-* js/game/combat/summon.js
-* js/game/rendering/fighter-status.js
-* js/game/fighters/fighter.js
-* js/game/combat/offense.js
-* js/data/characters/0001.js
-* js/data/characters/0002.js
-* js/data/characters/0003.js
-
-Reuse these existing systems instead of building a disconnected parallel implementation.
-
-Do not modify the protected character_rule file.
+Preserve the existing structure wherever practical. Do not introduce frameworks, dependencies, or an entirely different rendering engine.
 
 ⸻
 
-PART A — NEW GAMEPLAY ABILITY HUD
+PART I — THE 24-STAGE ROSTER
 
-2. General interface concept
+2. Completely redesign Stage Selection
 
-Create a new ability HUD that appears in the bottom-right corner of the gameplay screen whenever the human player is using a keyboard or game controller.
+The current Stage Selection screen has a large live preview on the left and two vertically stacked stage cards on the right.
 
-It should take visual inspiration from modern hero shooters such as Overwatch, particularly their compact ability icons and clearly identified controls.
+This design cannot scale to a large number of stages.
 
-However, the HUD must fit Alva’s art direction rather than look like an unrelated UI imported from another game.
+Replace the two-card presentation with a proper 24-slot stage roster.
 
-Every available move should have a small ability tile containing:
+Layout
 
-1. The move’s actual character artwork.
-2. A thin horizontal divider beneath the image.
-3. The keyboard key or controller button combination required to execute it.
-4. A clear cooldown indicator when applicable.
-5. An optional compact ability name where space permits.
+Create a compact, modern grid that accommodates 24 stage positions.
 
-The image must be the main attraction. The input should be clearly readable underneath it.
+Suggested layout:
 
-Do not use generic placeholder pictures for attacks when the game already contains the appropriate sprite artwork.
+* A six-column by four-row grid on sufficiently large screens, when space allows.
+* Adapt the column count and tile dimensions responsively.
+* On compact landscape devices, preserve readable and usable cards within a scrollable roster.
+* On tall or narrow displays, allow the roster and preview to stack.
+* Never allow stage tiles or controls to overflow their containers.
 
-3. Appearance and visual direction
+The existing large live stage preview should remain a prominent part of the design.
 
-Use a restrained, premium visual style:
+The screen should feel like a professional fighting game’s stage-selection interface, rather than a simple collection of large buttons.
 
-* Dark, translucent charcoal backgrounds.
-* Thin, subtly illuminated borders.
-* Soft shadows for contrast against stages.
-* Rounded rectangular ability tiles, with modest corner radii.
-* Crisp pixel artwork, retaining original colors.
-* Bright, clearly readable control glyphs.
-* Minimal decorative elements.
-* Smooth animation and carefully controlled opacity.
-* A subtle distinction between active and inactive ability rows.
+24 stage positions
 
-Each active ability tile should have an image area above a slim input-label area.
+There must be exactly 24 reserved stage positions.
 
-The two areas must be separated by a 1px horizontal divider, using a muted white or neutral color.
+Initially:
 
-The visual relationship should be roughly:
+Slot	Stage	Status
+01	Desert	Available
+02	City	Available
+03	Asperitas	Available
+04–24	Future stages	Unavailable placeholders
 
-ABILITY ARTWORK
+The remaining 21 positions must be visually recognizable as empty or upcoming stage slots.
 
-────────────
+They should have subdued styling, such as a subtle lock symbol or placeholder graphic.
 
-REQUIRED INPUT
+Unavailable slots must not be selectable, and they must never be included in random stage selection.
 
-Do not place all inputs in a separate control legend. The input must belong directly to its own ability tile.
+Do not add 21 fake playable stages to the MAPS registry just to fill the roster.
 
-Dimensions
+Instead, generate the roster from the actual stage definitions, then fill the unused positions with presentation-only placeholders.
 
-For standard desktop gameplay, start with approximate targets:
+This design should allow future developers to add stages to the registry without rebuilding the selection interface.
 
-* Active ability tile: 48–62px wide.
-* Active image area: approximately 38–48px.
-* Input region: approximately 17–22px high.
-* Space between cards: 4–7px.
-* Inactive ability tiles: around 65–75% of active size.
-* Active row opacity: 100%.
-* Inactive row opacity: approximately 40–55%.
+Stage tiles
 
-These are design starting points, not rigid values. Tune them based on the actual game viewport.
+Each available stage tile should include:
 
-Use CSS clamp() and viewport-relative sizing where appropriate.
+* A small stage thumbnail.
+* Its stage name.
+* A clearly visible selected state.
+* A hover/focus state.
+* An indication that the tile is available.
 
-The entire interface should remain compact, clean, and unobtrusive.
+Maintain Alva’s existing UI identity, including its dark panels, typography, borders, selected states, and green accent language.
 
-Avoid extremely large panels, excessive bloom, thick borders, or distracting colored effects.
+Tiles must remain legible even when compact.
 
-4. Ground and air ability carousel
+The selected tile should be visibly distinguishable from hovered or focused tiles.
 
-This is the most important visual feature.
+Live preview
 
-The HUD must display two ability groups simultaneously: grounded moves and midair moves.
+Retain the large hero preview.
 
-One group is the active set; the other is the inactive preview.
+When highlighting a stage, display its corresponding environment using the existing StagePreview and registered theme.
 
-When the character is grounded
+Asperitas must display its actual cloud environment.
 
-The layout should be:
+Avoid generating unnecessarily expensive live animations for all 24 roster positions simultaneously.
 
-TOP — Ground abilities
+The small thumbnails may be static or lightly updated, while the large preview remains animated.
 
-* Large and prominent.
-* Full-opacity artwork.
-* Clearly visible input labels.
-* Normal-sized cards.
-* Visually indicated as the current moveset.
+The stage name and tagline should remain available within the selection experience.
 
-BOTTOM — Midair abilities
+Stage count
 
-* Smaller cards.
-* Lower opacity.
-* Slightly recessed appearance.
-* Inputs still visible but less prominent.
-* Clearly identifiable as the moves that become primary when airborne.
+Display useful information such as:
 
-When the character is airborne
+3 available / 24 slots
 
-The groups exchange positions.
+Do not hardcode the available count.
 
-TOP — Midair abilities
+It should automatically reflect changes to MAPS.
 
-* Large and prominent.
-* Full opacity.
-* Their own correct midair artwork.
-* Their correct keyboard or controller inputs.
-
-BOTTOM — Ground abilities
-
-* Smaller.
-* Dimmed.
-* Recessed.
-* Still visible as a preview of what becomes available upon landing.
-
-The top position always represents the player’s current movement state.
-
-The bottom position always represents the opposite state.
-
-Neither group disappears just because it is inactive.
-
-5. Scroll-wheel transition animation
-
-The transition should look like a small vertical carousel or mechanical scrolling wheel.
-
-It must not instantly replace images or snap between layouts.
-
-When a character jumps or becomes airborne:
-
-1. The grounded row smoothly slides downward.
-2. The airborne row moves upward into the main position.
-3. The airborne row scales up toward full size.
-4. Its opacity smoothly increases to 100%.
-5. The grounded row scales down and fades into its preview state.
-6. Both settle cleanly into their new positions.
-
-When the character lands, play the reverse animation.
-
-Animation targets
-
-* Approximate duration: 280–360ms.
-* Smooth ease-in-out or carefully tuned cubic-bezier easing.
-* Animate transform and opacity wherever practical.
-* Small, tasteful vertical movement.
-* Subtle depth or perspective is welcome, but avoid dramatic 3D rotation.
-* No layout jumping, flickering, or sudden card reconstruction.
-
-The movement should feel like two layers rotating through two fixed positions.
-
-Important behavior
-
-The player cannot manually scroll this wheel.
-
-There should be no scroll buttons, mouse-wheel interaction, or controller input dedicated to changing it.
-
-The character’s actual movement state controls the carousel automatically.
-
-Use the existing fighter grounded state rather than inventing a separate gameplay state.
-
-If the player rapidly jumps, lands, bounces, or moves between grounded and airborne states, transitions must remain smooth and reversible.
-
-Avoid queueing several animations that continue after the character has already changed states again.
-
-Retarget an in-progress transition to the latest state.
-
-Respect prefers-reduced-motion by providing an immediate, non-animated transition.
-
-6. Character-specific ability display
-
-Alva currently has three playable fighters, with additional character slots planned.
-
-The HUD must work for every existing fighter and support future fighters automatically.
-
-Use the existing actions loadout mappings.
-
-Do not assume that every fighter has five attacks.
-
-Do not render empty or nonexistent move slots.
-
-Do not display unfinished reserved Transform functionality as though it were a playable ability.
-
-Character #0001
-
-Ground moves include:
-
-* Jab
-* Red
-* Maximum Blue
-* Unlimited Void
-* Hollow Purple
-* High Kick
-
-Midair moves include:
-
-* Floating Straight
-* Red Kick
-* Blue
-* High Kick
-
-Display the correct artwork for each move.
-
-Red and Maximum Blue should use their existing projectile artwork where their mobile previews already do so.
-
-Unlimited Void and Hollow Purple must remain ground-only abilities and should not incorrectly appear as usable midair moves.
-
-Character #0002
-
-Ground moves include:
-
-* One-Two
-* Rapid Kicks
-* Spin Attack
-* Whirlwind
-
-Midair moves include:
-
-* Homing Attack
-* Bounce Attack
-* Blue Tornado
-
-The Bounce Attack is particularly important because its controller binding requires a direction.
-
-Do not incorrectly show it as an ordinary Square/X press if the current binding is Down + Square/X.
-
-Character #0003
-
-Include its existing ground and air attacks, its special techniques, and Mystical Palm Technique.
-
-Use its actual ability mapping and artwork.
-
-Do not duplicate ground-only abilities in the active airborne group.
-
-Future compatibility
-
-The HUD must derive its move list from the character’s data.
-
-A future character with two, three, four, five, or a different combination of available attacks should work without modifying the HUD’s rendering logic.
-
-Do not introduce shared-code special cases based on fighter ID.
-
-7. Reuse existing ability artwork
-
-Alva already provides most of the necessary functionality through:
-
-* mobileAbility()
-* previewFrame()
-* abilityMove()
-* abilityAvailable()
-* controllerActions()
-
-Reuse these utilities or extend their shared presentation layer where necessary.
-
-Use mobileAbilities entries from each fighter definition.
-
-Honor the existing previews.air artwork when a move changes in midair.
-
-The HUD should never incorrectly display a grounded attack animation for a distinct airborne move that has its own artwork.
-
-Preserve image aspect ratios.
-
-Use crisp pixel rendering and never stretch sprites disproportionately.
-
-If artwork is unavailable or fails to load, use the existing neutral fallback glyph system. Do not show a broken image.
-
-Whenever possible, cache image elements or decoded assets rather than reloading artwork every animation frame.
-
-8. Keyboard input presentation
-
-For keyboard players, display the actual action binding from CONFIG.bindings.
-
-The default gameplay controls currently include:
-
-* U — Attack 1
-* I — Attack 2
-* O — Attack 3
-* M — Attack 4
-* , — Attack 5
-* J — Extra Attack
-* L — Shield / Deflect
-
-The HUD must associate these keys with the actual move performed by the selected fighter in the currently displayed ground or air state.
-
-Do not display generic Attack 1, Attack 2 labels in place of the ability artwork.
-
-Show the keyboard key itself in the tile’s bottom region.
-
-Use compact, easy-to-read keycap styling.
-
-The comma key must render correctly.
-
-Support any applicable binding updates rather than permanently hard-coding the displayed labels.
-
-9. Controller input presentation
-
-Controller players must see their actual button bindings.
-
-Support both PlayStation and Xbox controllers using the existing device-detection system.
-
-Use the current fighter’s resolved controller profile, including player-customized layouts.
-
-This is essential because Alva allows different controller mappings for different characters.
-
-For example, character #0001’s recommended bindings include combinations such as:
-
-* R2 + Square for Red (PlayStation).
-* R2 + Circle for Maximum Blue.
-* L2 + Triangle for Unlimited Void.
-* R2 + Triangle for Hollow Purple.
-
-The Xbox display must use the equivalent Xbox button names.
-
-Character #0002’s midair Bounce Attack uses a directional combination and must display that requirement clearly.
-
-For controller bindings, support:
-
-* Single button presses.
-* Modifier + button combinations.
-* Direction + button combinations.
-* Hold activations.
-* Different bindings for ground and air.
-* Saved player remappings.
-
-Use resolveProfile() and existing glyph/label utilities such as bindingText() where appropriate.
-
-Do not create a second independent controller-binding table.
-
-Input device switching
-
-Use the existing InputManager.lastDevice behavior to determine whether to display keyboard keys or controller inputs.
-
-When a player switches from keyboard to gamepad, the visible input labels should update accordingly.
-
-When switching back to keyboard, restore keyboard labels.
-
-Do not rebuild the entire HUD unnecessarily.
-
-Do not mistake a connected but unused controller for proof that the player is actively using it.
-
-The displayed controller button family should match the actual active controller whenever identifiable.
-
-10. Ability ordering and readability
-
-Arrange abilities in a consistent, logical order.
-
-Prefer gameplay/control order or a visually sensible arrangement based on the existing controller profile.
-
-The player should quickly understand which tile corresponds to which move.
-
-Do not rearrange the entire ability row every time a cooldown starts or finishes.
-
-The only major group movement should be the ground/air carousel transition.
-
-For longer input combinations, use compact controller glyphs or a slightly wider tile instead of tiny unreadable text.
-
-Optionally provide a discreet move-name label or accessible descriptive label for clarity.
-
-The interface must not look cluttered.
+The maximum slot count should remain 24 unless intentionally expanded in the future.
 
 ⸻
 
-PART B — COOLDOWN VISUALIZATION
+3. Add a Random Stage button
 
-11. Cooldown states
+Add a dedicated Random Stage button to the redesigned roster.
 
-Each ability tile must reflect its actual gameplay availability.
+It must be visually integrated with the stage-selection interface but remain separate from the 24 stage slots.
 
-When a move enters cooldown, visibly change its corresponding tile.
+Use a recognizable shuffle-style icon consistent with the existing interface.
 
-Use a polished combination of:
+Required behavior
 
-* A translucent dark overlay above the ability artwork.
-* A radial cooldown sweep or circular progress indicator.
-* A remaining-seconds label for long cooldowns.
-* Reduced artwork brightness.
-* A subtle ready-state transition when the cooldown finishes.
+When the player activates Random Stage:
 
-The input label should remain readable even while the move is unavailable.
+1. Collect the currently available playable stages from MAPS.
+2. Randomly select one using a uniform distribution.
+3. Update the stage-selection state with the selected stage’s actual ID.
+4. Highlight the selected stage tile.
+5. Update the large stage preview.
+6. Allow the player to confirm and start the battle normally.
 
-Do not hide the ability icon completely.
+Random Stage must never select unavailable placeholders or Practice Ground.
 
-Long cooldowns
+It must not choose an invalid stage ID.
 
-For 3-second and 5-second cooldowns:
+The Random Stage button should only choose a stage; it should not immediately launch the battle.
 
-Show the remaining seconds prominently.
+If there is only one available stage, select it safely.
 
-Examples:
+If the stage list is empty, handle the situation gracefully.
 
-3.0 → 2.9 → 2.8 … → ready.
+Compatibility
 
-5.0 → 4.9 → 4.8 … → ready.
+Random Stage must work correctly in:
 
-Use the existing formatCooldown() utility or an equivalent shared formatter to avoid inconsistent countdown behavior.
-
-Use the actual timer state.
-
-Never simulate a cooldown independently inside the HUD.
-
-Universal 0.5-second repeat delay
-
-Preserve the universal 0.5-second repeat rule described below.
-
-For this short delay, a subtle radial sweep or temporary dimming is sufficient.
-
-Avoid a distracting large numerical timer appearing on every ordinary punch.
-
-However, the card should still indicate momentary cooldown if a player looks at it.
-
-Cooldown completion
-
-When an ability becomes ready:
-
-* Remove the dark overlay.
-* Restore full appropriate brightness.
-* Clear the timer.
-* Optionally use a very subtle 100–180ms highlight.
-
-Avoid large flashing effects or unnecessary particle animations.
-
-Inactive-row cooldowns
-
-Cooldowns must remain visible even when an ability belongs to the smaller, inactive ground/air row.
-
-For example, if a 5-second ground ability is used and the player jumps, its cooldown must continue counting down while that ground ability is displayed in the lower preview row.
-
-When the player lands, the timer must still be accurate.
-
-Changing character state must never reset or restart a cooldown.
-
-12. Distinguish cooldown from other restrictions
-
-Alva also has restrictions such as:
-
-* Ground-only moves.
-* Limited uses per airtime.
-* Free-fall restrictions.
-* Attacks interrupted by other combat states.
-* Missing required animation frames.
-* Energy requirements.
-
-Do not confuse these with cooldowns.
-
-A move unavailable because its airtime usage has been exhausted should have a distinct muted or unavailable appearance.
-
-It must not incorrectly show a cooldown countdown that does not exist.
-
-The HUD should reflect the real combat system’s state, not try to predict ability availability using unrelated UI timers.
-
-⸻
-
-PART C — STRICT NEW COOLDOWN POLICY
-
-13. Exactly two special cooldown lengths
-
-Implement a new global cooldown policy across the entire game.
-
-The only permitted special cooldown lengths are 3 seconds and 5 seconds.
-
-The existing universal 0.5-second repeat delay is excluded from this restriction and must remain intact.
-
-No move may retain an arbitrary extra cooldown duration such as 2, 4, 6, 8, 10, or 12 seconds.
-
-Apply the following rules universally.
-
-Rule 1 — Ten-damage attacks: 5 seconds
-
-Any attack or damaging move that deals 10 damage must have a 5-second cooldown.
-
-This includes damage delivered through:
-
-* Ordinary attacks.
-* Projectiles.
-* Techniques.
-* Summoned entities.
-* Multi-hit attacks with a 10-damage strike or finisher.
-* Other character-specific damaging ability implementations.
-
-Inspect the complete move definition, including nested hit, projectile, finisher, impact, and burst data.
-
-Do not overlook a move simply because its 10-damage hit is delivered indirectly.
-
-If a move has a defined total damage of exactly 10, account for that as well; don’t blindly assume its top-level damage field is always the relevant measure.
-
-The cooldown applies to the move that the fighter activates, not separately to every projectile or hitbox created by it.
-
-Rule 2 — Highly special abilities: 3 seconds
-
-A move that provides a genuinely exceptional gameplay effect must have a 3-second cooldown, unless Rule 1 already requires 5 seconds.
-
-Qualifying examples include:
-
-* Direct healing or restoring Launch Point.
-* Paralysis.
-* A dedicated immobilizing effect.
-* A special hard crowd-control effect that prevents normal character actions.
-* Comparable major effects explicitly defined in the ability’s combat data.
-
-For example, Unlimited Void’s paralysis qualifies.
-
-Mystical Palm Technique’s healing qualifies.
-
-Rule 3 — Ordinary abilities receive no extra cooldown
-
-If a move does not qualify for Rule 1 or Rule 2, it must not have any additional cooldown beyond the universal 0.5-second repeat rule.
-
-Do not assign a cooldown just because an attack:
-
-* Looks powerful.
-* Has impressive visual effects.
-* Has a long animation.
-* Launches enemies.
-* Pushes enemies away.
-* Pulls enemies inward.
-* Homes toward a target.
-* Creates an ordinary projectile.
-* Causes ordinary hitstun or blockstun.
-* Uses a standard quake, bounce, roll, or slam mechanic.
-
-A pull effect is specifically not enough to qualify as highly special.
-
-For example, character #0001’s Blue/Maximum Blue pulling behavior must not receive a 3-second cooldown merely because it draws opponents inward.
-
-Likewise, ordinary combat hitstun should not qualify as special stun. Almost every attack has some hitstun; treating it as an exceptional mechanic would incorrectly give nearly everything a cooldown.
-
-The 3-second category must be reserved for clearly exceptional effects such as actual paralysis, immobilization, and healing.
-
-Rule precedence
-
-When multiple conditions apply:
-
-1. A qualifying 10-damage attack receives 5 seconds.
-2. Otherwise, a highly special move receives 3 seconds.
-3. Otherwise, the move gets no extra cooldown.
-
-Never add the 3-second and 5-second cooldowns together.
-
-Never stack special cooldowns.
-
-The universal 0.5-second repeat behavior remains the game’s normal baseline and is not an additional special cooldown.
-
-14. Audit all three existing fighters
-
-Review every move definition in:
-
-* js/data/characters/0001.js
-* js/data/characters/0002.js
-* js/data/characters/0003.js
-
-Important examples to verify:
-
-Character	Ability	New rule
-#0001	Unlimited Void	3 seconds — paralysis
-#0001	Hollow Purple	5 seconds — 10-damage projectile
-#0001	Maximum Blue	No extra cooldown — pull alone does not qualify
-#0001	Blue	No extra cooldown — pull alone does not qualify
-#0002	Whirlwind	5 seconds — 10-damage finisher
-#0003	Mystical Palm Technique	3 seconds — healing
-#0003	Cherry Blossom Impact	No extra cooldown unless inspection identifies a qualifying exceptional effect
-#0003	Heavenly Foot of Pain	No extra cooldown unless inspection identifies a qualifying exceptional effect
-
-Alva currently contains cooldown overrides including:
-
-* Character #0003’s 4-second Cherry Blossom Impact cooldown.
-* Character #0003’s 12-second healing cooldown.
-* Character #0003’s 2-second Heavenly Foot of Pain cooldown.
-
-These must be brought into compliance with the new rule.
-
-Do not simply round existing cooldowns to whichever approved duration is closest.
-
-Reclassify each move based on its actual mechanics.
-
-Also inspect authored Deflect repeat delays, including legacy short values such as 0.05 seconds. Ensure that no unauthorized third cooldown duration remains. Preserve distinct animation timing and input behavior, but do not retain an arbitrary reuse cooldown in violation of the new policy.
-
-15. Enforce cooldown policy centrally
-
-The policy must be implemented in the shared combat/data architecture, not only in the three current character files.
-
-Relevant systems include:
-
-* js/data/cooldowns.js
-* js/game/combat/attacks.js
-* js/game/combat/technique.js
-* js/game/combat/summon.js
-* js/game/combat/combat-state.js
-* js/game/fighters/fighter.js
-
-Create or extend a shared cooldown classification/validation utility.
-
-It must be capable of identifying qualifying damage or exceptional effects across direct attacks, projectiles, multi-hit strikes, techniques, and summons.
-
-Prefer inferring policy from existing structured combat data.
-
-Where inference cannot distinguish an extraordinary mechanic from a routine one, provide a carefully validated, generic semantic classification rather than making decisions from a move’s name or fighter ID.
-
-Future fighters must follow the same policy automatically.
-
-Don’t let a future character declare an arbitrary 8-second cooldown and silently bypass the rule.
-
-Use validation or canonical derived values to ensure the final effective cooldown is permitted.
-
-Preserve current cooldown lifecycle
-
-Alva already distinguishes:
-
-* Ordinary attack reuse timers.
-* Technique and summon ability timers.
-* Movement cooldowns and other movement-state restrictions.
-
-Preserve the existing timing semantics unless a change is necessary to enforce the new policy.
-
-Ordinary attacks currently begin their repeat cooldown when the attack ends or is interrupted.
-
-Techniques and summons begin their cooldown when their activation is accepted.
-
-Keep these behaviors consistent.
-
-Do not accidentally make powerful abilities reusable by cancelling their startup animations.
-
-Cooldowns must continue counting correctly during normal gameplay and character movement.
-
-Do not alter combat damage, frame timing, hitboxes, launch calculations, hitstun durations, or animation sequences as a side effect of this rebalance.
-
-These new rules concern move reuse, not the actual damage or functionality of attacks.
-
-16. Single authoritative cooldown state
-
-The HUD, player input validation, and combat AI must all agree on the same cooldown.
-
-There must never be a situation where:
-
-* The HUD says ready but the attack is on cooldown.
-* The HUD says cooling down but gameplay allows the attack.
-* The CPU uses an ability during a cooldown the player must obey.
-* Switching from grounded to airborne resets a timer.
-* A character swap leaves timers from the old fighter on the interface.
-
-Create a shared read-only interface or helper for the UI to obtain:
-
-* Move ID.
-* Cooldown duration.
-* Remaining time.
-* Recovery progress.
-* Ready/cooling state.
-
-Use the existing CombatState.cooldowns and CombatState.abilityCooldowns as the authoritative sources.
-
-The new HUD must not maintain duplicate gameplay timers.
-
-⸻
-
-PART D — GAMEPLAY INTEGRATION
-
-17. Which game modes show the HUD?
-
-Show the new interface during:
-
-* Quick Battle with a human player.
-* Practice Ground with a human player.
-
-Do not show it during:
-
+* Quick Battle — Custom Play.
 * Watch Mode.
-* Character selection.
-* Home screen.
-* Loading screens.
-* Results screens.
-* Other menus where no fighter is actively being controlled.
+* Change Stage after a battle, where applicable.
 
-During pause menus, hide or substantially dim the ability interface so it doesn’t compete with menu content.
+Existing Regular Play already performs its own random stage selection through drawRegularPlay() in js/screens/quick-battle-setup.js.
 
-The new desktop HUD should not interfere with existing mobile touch buttons.
+Preserve this behavior.
 
-Prefer enabling it only for non-touch keyboard/controller gameplay, using Alva’s existing device and input behavior.
+The new button should reuse an appropriate shared random-selection helper where possible rather than creating unnecessary duplicate implementations.
 
-Retain the mobile touch layout as its own interface.
+Ensure Quick Battle and Watch Mode keep their respective stage-selection values independent.
 
-18. Suggested component architecture
+Input support
 
-A suitable approach is to create a reusable module such as:
+The entire redesigned roster must support:
 
-js/ui/ability-hud.js
+* Mouse.
+* Touch.
+* Keyboard.
+* Xbox controllers.
+* PlayStation controllers.
 
-And a corresponding stylesheet:
+Preserve Alva’s data-nav focus system and controller navigation.
 
-css/ability-hud.css
+When using a controller or keyboard, navigating through the grid must be intuitive, and the currently focused tile must remain visible when scrolling.
 
-These are suggestions; follow existing repository conventions.
+The Random Stage button must also be accessible through the existing navigation system.
 
-The component should be reusable by both BattleScreen and PracticeGroundScreen.
-
-Suggested responsibilities:
-
-Initialization
-
-* Create the two ground/air groups.
-* Bind to the current fighter definition.
-* Resolve each group’s moves.
-* Build the artwork and input labels.
-
-Presentation
-
-* Render active/inactive styling.
-* Animate ground/air position changes.
-* Update controller or keyboard glyphs.
-* Update cooldown overlays.
-* Update unavailable-move styling.
-
-Lifecycle
-
-* Bind when entering gameplay.
-* Refresh when the player changes fighter.
-* Clean up when leaving the screen.
-* Pause and resume presentation appropriately.
-* Avoid retained listeners or detached DOM references.
-
-Do not recreate every ability tile on every animation frame.
-
-Only update elements when their displayed values change.
-
-Animation should be handled primarily by CSS transforms and opacity transitions, not manual reflows on every frame.
-
-19. Existing world-space cooldown indicators
-
-Alva already draws long cooldown indicators near fighters through js/game/rendering/fighter-status.js.
-
-Account for these existing indicators when introducing the bottom-right HUD.
-
-Do not accidentally make the screen excessively cluttered by displaying two equally prominent versions of the same cooldown information for the human player.
-
-A good arrangement is:
-
-* Bottom-right ability HUD: primary information for the local human player.
-* Existing world-space indicators: useful combat information for opponents, CPU fighters, or modes without the new HUD.
-
-Preserve important combat information while avoiding unnecessary duplication.
-
-The new HUD must not break the existing Energy bar, Launch Point display, match timer, score, or fighter status indicators.
-
-20. Screen positioning and responsive behavior
-
-The HUD must remain anchored to the bottom-right corner.
-
-Respect:
-
-* Screen safe-area insets.
-* Narrow desktop windows.
-* Different screen resolutions.
-* Landscape aspect ratios.
-* Browser zoom.
-* Existing HUD elements.
-* Stage visibility.
-
-Use the existing safe-area CSS variables wherever possible.
-
-The UI must not block the middle of the arena, obscure the player character unnecessarily, or interfere with important gameplay information.
-
-If the fighter has many abilities, adapt tile sizes or spacing rather than letting the row overflow the screen.
-
-Keep both carousel levels visually related and aligned.
-
-The layout should work on the Desert, City, and Practice stages, including light and dark backgrounds.
+All visible controls require appropriate accessible labels and focus states.
 
 ⸻
 
-PART E — POLISH, ACCESSIBILITY & QUALITY
+PART II — ASPERITAS
 
-21. Visual polish requirements
+4. Create the third stage: Asperitas
 
-Treat design quality as an important acceptance criterion, not an optional enhancement.
+Name: Asperitas
+ID: asperitas
+Theme: Sky / Clouds / High Altitude
+Identity: A floating arena suspended above a vast cloud-filled sky.
 
-Pay attention to:
+Asperitas should feel noticeably different from both Desert and City.
 
-* Perfect alignment of ability tiles.
-* Consistent divider thickness.
-* Consistent image fitting.
-* Consistent spacing.
-* Clean rounded corners.
-* Controller glyph readability.
-* Proper keyboard keycap dimensions.
-* Smooth scaling and fading.
-* Natural scroll-wheel movement.
-* No clipped images.
-* No overlapping timers.
-* No text extending beyond tiles.
-* Stable positions when cooldown text changes width.
+Desert is a solid sandstone mesa.
 
-The result should look intentional and professionally integrated with Alva.
+City is a rooftop and building environment.
 
-The reference image supplied with this request illustrates the intended general relationship between ability artwork and controls: icons are prominent, with the required input directly beneath them.
+Asperitas must have no earth, building, cliff, or other structure supporting its main platform. The platform itself is a giant floating cloud.
 
-Use that inspiration, but create an original interface adapted to Alva.
+The entire arena should feel suspended in the atmosphere.
 
-22. Accessibility and localization
+Stage composition
 
-Alva supports English and French.
+Asperitas has exactly three playable platforms:
 
-Any new visible textual labels must use the existing localization infrastructure.
+1. One large, stationary main cloud platform.
+2. One smaller floating cloud platform above the left side.
+3. One smaller floating cloud platform above the right side.
 
-Do not introduce hard-coded English-only labels for Ground, Air, Ready, or other new interface terms.
+Do not add extra playable surfaces, solid obstacles, support pillars, or walls.
 
-Use accessible labels for ability artwork, move names, bindings, and cooldown states.
+Decorative background clouds are allowed but must have no collision.
 
-Ensure text contrast remains sufficient over gameplay.
-
-Respect reduced-motion preferences.
-
-The HUD is informational, not an interactive control surface, so it should not introduce unnecessary focusable elements or intercept gameplay inputs.
+The stage must preserve open ledges, the Void, respawning, camera behavior, and combat rules.
 
 ⸻
 
-PART F — TESTING AND ACCEPTANCE CRITERIA
+5. Main cloud platform
 
-23. Automated tests
+The central platform should be a large, substantial cloud that serves as the primary fighting surface.
 
-Run:
+Appearance
+
+The cloud should look soft, dense, voluminous, and atmospheric.
+
+Its top should be wide and sufficiently flat for comfortable combat.
+
+Its body should consist of overlapping rounded cloud formations, with soft highlights, shading, and layered volume.
+
+Suggested visual palette:
+
+* Brilliant white.
+* Warm ivory.
+* Very pale blue.
+* Soft lavender shadows.
+* Subtle silver-blue lower edges.
+
+Use shading and layered shapes to give the cloud volume while keeping the physical collision surface readable.
+
+The platform should visually resemble an enormous cloud floating freely through the sky.
+
+Absolutely no giant rectangular foundation underneath it.
+
+No cliff face. No skyscraper. No ground extending downward toward the Void.
+
+In the existing architecture, StageCollision constructs a solid floor using mainStage.top and mainStage.bottom.
+
+Account for this carefully.
+
+For Asperitas, provide a shallow collision representation or an appropriate stage-specific top-only collision model if needed.
+
+The gameplay collision must agree with the appearance.
+
+Do not leave an invisible thousand-unit-deep solid block beneath a cloud that appears to float unsupported.
+
+Preserve the existing Desert and City floor behavior.
+
+Gameplay
+
+The main cloud remains stationary.
+
+It must be broad enough for two fighters to engage comfortably.
+
+Use proportions comparable to existing Alva stages so the normal camera framing, running, jumping, dashing, and combat distances still feel familiar.
+
+Both players must initially spawn safely on the main cloud.
+
+The cloud remains solid and visible throughout the match.
+
+It must never disappear or move.
+
+⸻
+
+6. The two upper cloud platforms
+
+Create exactly two smaller cloud platforms above the main cloud.
+
+They must be accessible using the game’s normal jumping mechanics.
+
+Their initial positions should be separated horizontally, with one toward the left and one toward the right.
+
+Both should sit high enough to introduce vertical gameplay without making them unreachable.
+
+Visual design
+
+Each small platform must have its own rounded cloud silhouette.
+
+They should resemble soft, floating cloud masses rather than rectangular platforms painted white.
+
+Use the same visual language as the main cloud, but with smaller proportions.
+
+Give each enough visible volume that players can clearly identify its playable surface.
+
+Their collision boundaries and visible positions must remain synchronized.
+
+Platform collision
+
+Both clouds must function as actual one-way platforms.
+
+Fighters can jump upward through them from below and land on their top surfaces while descending.
+
+When visible and solid, they must properly support grounded fighters.
+
+When moving, they must carry grounded fighters naturally.
+
+They must work with the existing fighter movement system, including ordinary jumps, air jumps, fast falls, dashes, attack movement, and launch physics.
+
+⸻
+
+PART III — INDEPENDENT CLOUD BEHAVIOR
+
+7. Every small cloud has its own randomized state machine
+
+This is the most important part of Asperitas.
+
+Each of the two small cloud platforms must have its own independent behavior controller.
+
+One cloud’s behavior must not determine or synchronize the other’s behavior.
+
+Both clouds can coincidentally be in the same state, but they must arrive there independently.
+
+Required states
+
+State	Behavior
+IDLE	Remains stationary at its current position
+HORIZONTAL	Floats smoothly left and right
+VERTICAL	Floats smoothly up and down
+DISAPPEARING	Gradually fades away
+HIDDEN	Completely invisible and non-collidable
+REAPPEARING	Gradually becomes visible again
+
+These states form a continuously transitioning system.
+
+They are not permanent behaviors assigned at the start of the match.
+
+A cloud must regularly change between states.
+
+Example behavior
+
+Cloud A might follow:
+
+IDLE → VERTICAL → HORIZONTAL → IDLE → DISAPPEARING → HIDDEN → REAPPEARING → HORIZONTAL
+
+Cloud B might independently follow:
+
+HORIZONTAL → IDLE → DISAPPEARING → HIDDEN → REAPPEARING → VERTICAL → IDLE
+
+These are examples, not predetermined sequences.
+
+The actual state progression should be randomized.
+
+There must be no fixed sequence that both clouds follow every match.
+
+⸻
+
+8. Random state transitions
+
+Create a configurable state-transition system.
+
+Each cloud must independently determine:
+
+* Its next state.
+* The duration of that state.
+* Its movement speed within safe limits.
+* Its movement direction.
+* Its allowed movement target or range.
+* When to stop.
+* When to move again.
+* When to disappear.
+* How long to stay hidden.
+
+Use reasonable randomized intervals so the clouds feel alive without changing behavior every fraction of a second.
+
+Suggested initial tuning values:
+
+Property	Suggested range
+Idle duration	1.5–4 seconds
+Movement duration	2–5 seconds
+Horizontal travel	Approximately 60–140 world units
+Vertical travel	Approximately 35–90 world units
+Disappearance fade	0.5–0.9 seconds
+Hidden duration	1–2.5 seconds
+Reappearance fade	0.5–0.9 seconds
+
+These values are starting points, not inflexible requirements.
+
+Adjust them according to actual gameplay scale, fighter jump height, animation smoothness, and collision safety.
+
+The transitions should feel natural and varied.
+
+Avoid sudden snaps between positions.
+
+Use smooth velocity changes, interpolation, or easing.
+
+The clouds should drift rather than teleport.
+
+Randomness architecture
+
+Do not call Math.random() every rendered frame to select a new movement state.
+
+Choose new states and parameters only when meaningful transitions occur.
+
+Use independent random streams for the two clouds.
+
+Where possible, use the repository’s existing seed utilities so motion sequences can be reproduced in automated tests.
+
+For gameplay, the cloud state machines must advance using the fixed simulation timestep, not the display frame rate.
+
+The results should remain consistent at 30, 60, 120, and 144 Hz rendering rates.
+
+⸻
+
+9. Horizontal movement
+
+When a cloud enters HORIZONTAL:
+
+* Select a safe horizontal direction or destination.
+* Move smoothly toward it.
+* Stay inside its assigned safe movement region.
+* Reverse or settle naturally at its movement limit.
+* Remain above the main cloud.
+* Never enter the other cloud’s protected space.
+
+The cloud should visibly float from side to side.
+
+Its collision surface must follow its actual rendered position.
+
+A fighter standing on it must move with it.
+
+There should be no visible sliding between the cloud and its collision hitbox.
+
+⸻
+
+10. Vertical movement
+
+When a cloud enters VERTICAL:
+
+* Choose a safe vertical movement direction or target.
+* Move smoothly upward or downward.
+* Respect predetermined height boundaries.
+* Remain reachable from the stage’s intended combat routes.
+* Never descend into the main cloud.
+* Never rise into an unreasonable or unsafe Void position.
+
+Vertical movement must behave correctly with fighter collision.
+
+A grounded fighter should rise or descend with the platform rather than being left behind, continuously detached, or forced through it.
+
+Jumping from a moving cloud should preserve normal gameplay behavior.
+
+Movement should look like a cloud gently riding atmospheric currents.
+
+⸻
+
+11. Idle behavior
+
+When a cloud enters IDLE, stop its gameplay movement.
+
+Keep its collision surface stationary.
+
+The cloud can retain subtle cosmetic effects such as softly changing highlights, but its actual collision position must remain fixed until the next movement state.
+
+After its randomized idle duration, choose another valid behavior.
+
+Do not make IDLE a permanent state.
+
+⸻
+
+PART IV — DISAPPEARING CLOUDS
+
+12. Implement disappearance and reappearance properly
+
+Both smaller cloud platforms can disappear independently.
+
+Disappearance is a real gameplay mechanic.
+
+It must not be purely cosmetic.
+
+Disappearing
+
+When a cloud enters DISAPPEARING:
+
+1. Begin a smooth visual fade.
+2. Provide enough visual warning that players can recognize the change.
+3. Transition to a fully hidden state.
+4. Disable its platform collision when it becomes unavailable.
+5. Ensure any fighter relying on the platform responds naturally to losing support.
+
+Do not leave an invisible collision surface behind.
+
+A cloud that is gone should no longer be usable as footing.
+
+Hidden
+
+While HIDDEN:
+
+* The cloud is invisible.
+* It cannot support fighters.
+* Fighters and projectiles must not interact with an invisible platform collision surface.
+* Its disappearance must not affect the other cloud.
+* Its state timer continues independently.
+* Its next appearance must be prepared safely.
+
+Reappearing
+
+When the hidden period ends:
+
+1. Validate the intended reappearance position.
+2. Fade the cloud smoothly back into view.
+3. Restore its collision only at an explicitly defined safe point in the transition.
+4. Return to normal randomized behavior.
+
+Avoid suddenly generating solid collision inside a fighter.
+
+A cloud should not trap, teleport, or launch a fighter merely because it reappeared.
+
+If necessary, delay collision restoration until the space is clear.
+
+A fighter already above the newly restored surface should be able to land on it normally.
+
+Fighters standing on disappearing clouds
+
+A disappearing cloud must not cause a physics glitch.
+
+If a fighter is standing on it when its collision turns off:
+
+* Release that fighter’s grounded support cleanly.
+* Allow gravity to take effect.
+* Preserve normal control, velocity, air actions, and fall behavior.
+* Do not teleport the fighter.
+* Do not apply artificial knockback.
+* Do not trigger an immediate Void elimination unless the fighter actually crosses the Void boundary.
+
+The fighter should simply begin falling, with their usual chance to recover.
+
+⸻
+
+PART V — ABSOLUTE PLATFORM SEPARATION
+
+13. The three playable platforms must NEVER collide
+
+This requirement is mandatory.
+
+The main cloud and both smaller clouds must never overlap or intersect, regardless of random movement states.
+
+The two smaller clouds must also never collide with each other.
+
+This includes their behavior during:
+
+* Horizontal movement.
+* Vertical movement.
+* Idle periods.
+* Disappearance.
+* Reappearance.
+* State changes.
+* Direction reversals.
+
+Recommended implementation
+
+Give each moving cloud a safe movement envelope.
+
+The left cloud receives a region above the left side of the main cloud.
+
+The right cloud receives a separate region above the right side.
+
+Their regions must remain disjoint, including the platforms’ full widths, heights, and safety margins.
+
+The lowest permitted position of either small cloud must remain safely above the main platform.
+
+Use actual world-space collision bounds, not visual center-point distances alone.
+
+Minimum separation
+
+Introduce a configurable safe distance between platform collision shapes.
+
+Include additional clearance where appropriate for the perspective art.
+
+A cloud’s planned destination must be validated against these restrictions before movement begins.
+
+Also validate each movement step or otherwise mathematically guarantee that the safe movement envelopes make collision impossible.
+
+If a randomized movement would violate a restriction, choose another valid destination or switch to IDLE.
+
+Do not allow the clouds to clip into each other even briefly.
+
+Never resolve cloud-cloud overlap by suddenly teleporting a platform.
+
+Important distinction
+
+Decorative cloud shapes in the background may overlap visually.
+
+However, the three playable cloud platforms must never physically intersect or overlap their gameplay collision volumes.
+
+Visual rendering should also make their separation obvious.
+
+⸻
+
+PART VI — MOVING PLATFORM PHYSICS
+
+14. Extend Alva’s platform system correctly
+
+The existing StageCollision class converts the platform definitions into one-way collision surfaces, while stepBody() resolves landing and grounding.
+
+Currently, stage platforms are stationary.
+
+This update introduces genuinely dynamic platforms.
+
+Implement the necessary shared support cleanly.
+
+Required functionality
+
+Dynamic platforms must have:
+
+* A stable identifier.
+* A current position.
+* A previous position.
+* Their per-step displacement.
+* A visible/active collision state.
+* Movement boundaries.
+* Their own behavior controller when needed.
+
+Keep the original map definition separate from live simulation state.
+
+Do not mutate the shared MAPS configuration globally during a match.
+
+Two matches must not accidentally share the same moving-platform state.
+
+Fighter support and movement
+
+When a platform moves and a fighter is grounded on it, apply the appropriate platform displacement before resolving the fighter’s normal movement.
+
+The fighter should remain supported while the platform moves.
+
+Movement must account for both horizontal and vertical displacement.
+
+Avoid accidental double application of displacement, grounded-state flickering, or repeated landing events.
+
+Preserve natural jumping from the platform.
+
+When the fighter jumps away, the platform must not continue dragging the fighter through the air.
+
+If a platform disappears, becomes non-collidable, or moves out from under a fighter, grounding must be cleared correctly.
+
+Collision integration
+
+Review and update all relevant systems:
+
+* StageCollision
+* stepBody()
+* Platform landing checks
+* surfaceBelow()
+* supportsAt()
+* Fighter grounding
+* Platform references stored on fighter bodies
+* Relevant camera and shadow calculations
+
+Ensure inactive cloud platforms are ignored by collision and support queries.
+
+Any moving platform must use its current simulation position in collision calculations.
+
+The physics and visual systems must not maintain unrelated copies of platform positions that can drift apart.
+
+Timing
+
+Advance dynamic platform states before fighter physics on each fixed simulation step.
+
+Ensure the correct order for platform displacement, grounded rider movement, and collision resolution.
+
+Rendering should use the simulation’s actual platform positions, with suitable interpolation when necessary.
+
+Do not implement gameplay movement using CSS animations or independent requestAnimationFrame() position updates.
+
+⸻
+
+15. Update CPU awareness
+
+Alva already includes stage awareness in:
+
+js/game/ai/cpu-intelligence/stage-model.js
+
+Its StageModel currently caches surface geometry.
+
+That approach requires attention when platforms begin moving or disappearing.
+
+Ensure CPU fighters understand the current state of the cloud platforms.
+
+CPU fighters should not permanently assume that a cloud exists at its initial coordinates.
+
+They should recognize:
+
+* Currently active cloud surfaces.
+* Updated positions.
+* Platforms that have disappeared.
+* Platforms that have reappeared.
+* The difference between reliable main-stage footing and temporary moving cloud footing.
+
+Modify or extend the stage model so dynamic surface positions do not become stale cached coordinates.
+
+Avoid hardcoding Asperitas-specific logic into the universal fighter AI.
+
+Use generic platform information where possible.
+
+The CPU does not have to perfectly predict the future, but it must not blindly target nonexistent surfaces or become unable to navigate the stage.
+
+Both Quick Battle and Watch Mode should remain playable.
+
+⸻
+
+PART VII — ASPERITAS VISUAL DESIGN
+
+16. Create js/stages/asperitas-theme.js
+
+Implement a dedicated procedural Canvas theme.
+
+Register it through js/stages/index.js.
+
+Follow the existing StageTheme interface and Perspective rendering architecture.
+
+Artistic direction
+
+Asperitas should feel like an elevated world above the clouds.
+
+It should be bright, airy, beautiful, and peaceful while still being suitable for a fast-paced fighting game.
+
+The environment should feel expansive and high above the ground.
+
+Sky
+
+Create a rich, atmospheric sky background.
+
+Suggested elements:
+
+* A bright blue sky gradient.
+* Very pale cyan near the horizon.
+* White and pearl-colored cloud banks.
+* Distant layers of clouds at different depths.
+* Subtle warm sunlight.
+* Soft atmospheric haze.
+* Gentle cloud shadows.
+* Occasional distant shafts of sunlight.
+
+The sky should never resemble Desert’s rocky environment or City’s night skyline.
+
+Background cloud layers
+
+Add multiple layers of decorative clouds at different depths to create a sense of scale.
+
+Use parallax movement consistent with the existing stage architecture.
+
+The farthest clouds should appear slower and softer.
+
+Nearer clouds may have clearer silhouettes and greater contrast.
+
+Decorative clouds must not be mistaken for playable surfaces.
+
+Maintain strong visual separation between background decoration and the three playable platforms.
+
+Main cloud visual
+
+The main cloud should have an organically shaped silhouette rather than a visible rectangular block.
+
+Build it from overlapping, rounded forms.
+
+Use soft highlights along the upper surface and subtle blue-gray shading underneath.
+
+The upper collision surface must remain visually understandable.
+
+Its lower edge should taper into a soft cloud mass, emphasizing that it is floating in open air.
+
+There must be no stone, dirt, metal, building facade, or physical support structure underneath.
+
+Two small cloud visuals
+
+Each small cloud should look like a smaller version of the main cloud.
+
+Their movement should look smooth and natural.
+
+While disappearing, gradually reduce their opacity.
+
+While reappearing, reverse the effect.
+
+A subtle atmospheric shimmer is acceptable, but avoid excessive bloom or particles that obscure the fighters.
+
+Visual quality
+
+Avoid basic white rectangles, unshaded ellipses, or temporary-looking placeholder art.
+
+Produce carefully layered procedural cloud shapes.
+
+The result should look like an intentional third environment worthy of the existing stage artwork.
+
+Use Alva’s shared pseudo-3D perspective where appropriate.
+
+The visual surface that fighters stand on must align with its physical collision surface.
+
+Performance
+
+Reuse the project’s existing cached geometry approach.
+
+Avoid regenerating complex decorative paths every frame.
+
+Keep particle counts reasonable.
+
+The stage must run smoothly on desktop browsers and mobile devices.
+
+Use Canvas 2D only.
+
+Do not add external rendering libraries.
+
+⸻
+
+PART VIII — STAGE DATA AND CAMERA
+
+17. Register Asperitas in js/data/maps.js
+
+Add a real MAPS entry.
+
+Use:
+
+* id: 'asperitas'
+* name: 'Asperitas'
+* theme: 'asperitas'
+
+Suggested tagline:
+
+“Above the clouds, beyond the horizon”
+
+Provide an appropriate description and stage traits.
+
+Example traits:
+
+* Terrain: Floating clouds.
+* Obstacles: None.
+* Platforms: 2 dynamic.
+* Light: Daylight.
+
+The exact data structure should remain compatible with Alva’s registry.
+
+Geometry
+
+Set up:
+
+* The stationary main cloud.
+* Two upper one-way cloud platforms.
+* Two safe spawn positions.
+* An appropriate voidBounds.
+* Appropriate cameraBounds.
+* No unnecessary solids.
+
+Choose the platform coordinates using actual game-world units and test them against Alva’s movement system.
+
+The clouds must be reachable and usable, with enough vertical headroom for ordinary jumps and aerial attacks.
+
+The main stage should remain comparable in width to Desert and City.
+
+Void rules
+
+Preserve the current Void implementation.
+
+Fighters should still be able to fall off the cloud and attempt recovery.
+
+A fighter is eliminated only after crossing the actual Void boundary.
+
+Ensure the upper Void boundary leaves adequate headroom above the highest reachable cloud platform.
+
+Preserve the existing closing-Void behavior during overtime.
+
+Do not make the Void move because clouds move.
+
+The cloud movement system and the Void system are independent.
+
+Camera
+
+The game camera must frame Asperitas comfortably.
+
+The main platform and moving clouds should be visible during ordinary gameplay.
+
+Keep the existing platform-fighter camera behavior.
+
+Do not zoom so far out that fighters become difficult to see.
+
+⸻
+
+PART IX — PREVIEWS AND UI INTEGRATION
+
+18. Live stage preview behavior
+
+Extend js/ui/stage-preview.js as necessary.
+
+The large Asperitas preview must show:
+
+* The sky background.
+* The large main cloud.
+* Both smaller clouds.
+* The actual appearance of the stage.
+
+Ideally, the two smaller clouds should demonstrate their independent floating behaviors in the animated preview.
+
+However, preview animation must not modify gameplay physics or globally shared map data.
+
+If the preview uses a separate demonstration-state simulation, keep it isolated and deterministic.
+
+Small stage roster thumbnails should render a recognizable snapshot.
+
+Avoid unnecessary complexity or performance overhead when many stage slots are visible.
+
+UI consistency
+
+Make sure the redesigned stage roster works in the existing:
+
+* Select Stage workflow.
+* Quick Battle setup.
+* Watch Mode setup.
+* Change Stage flow.
+* Back navigation.
+* Confirmation flow.
+
+Preserve selected stages when navigating backward and forward through menus.
+
+Do not create different stage-selection interfaces for Quick Battle and Watch Mode.
+
+Both should use the same redesigned component.
+
+⸻
+
+PART X — ACCESSIBILITY AND LOCALIZATION
+
+19. English and French support
+
+Alva supports both English and French.
+
+Add translations for:
+
+* Asperitas’s name.
+* Asperitas’s tagline.
+* Random Stage.
+* Any new roster status text.
+* Any new accessibility labels or instructions.
+
+Use the existing localization system.
+
+The English name of the stage should remain Asperitas.
+
+The French display name can also remain Asperitas.
+
+Make sure the new button updates correctly when the interface language changes.
+
+Do not hardcode visible interface strings when an existing translation mechanism is available.
+
+⸻
+
+20. Reduced motion
+
+Respect reduced-motion preferences for cosmetic animation.
+
+The animated menu preview and decorative atmosphere should become calmer or static where appropriate.
+
+However, gameplay physics must remain consistent.
+
+Do not create mismatches where a platform visually remains stationary but its collision surface continues to move somewhere else.
+
+If gameplay movement remains active with reduced motion, its position must still be accurately communicated to the player.
+
+Accessibility settings must not make the stage visually misleading.
+
+⸻
+
+PART XI — TESTING AND STABILITY
+
+21. Add comprehensive automated tests
+
+Expand the existing stage test coverage.
+
+At minimum, test:
+
+Stage registration
+
+* getMap('asperitas') returns the correct map.
+* The theme can be created.
+* Asperitas contains one main cloud and exactly two smaller playable platforms.
+* Existing Desert and City definitions remain intact.
+* Practice Ground is excluded from selectable battle stages.
+
+Stage roster
+
+* Exactly 24 stage positions exist.
+* Three positions are available.
+* The other 21 are unavailable placeholders.
+* Available stages are generated from the real registry.
+* Adding another stage to the registry fills a previously empty position without manual UI reconstruction.
+* Selected-stage highlighting works.
+* Confirming Asperitas passes the correct stage ID into battle.
+
+Random Stage
+
+* Random Stage chooses only playable stages.
+* Every available stage can be selected.
+* Unavailable placeholders are never selected.
+* The selected stage preview updates.
+* The chosen ID is stored in the correct selection state.
+* Quick Battle and Watch Mode keep their stage choices independent.
+* Random Stage does not automatically start a match.
+
+Cloud state machines
+
+* Both clouds initialize correctly.
+* Both clouds maintain independent state and timers.
+* Horizontal movement works.
+* Vertical movement works.
+* Idle periods work.
+* Disappearance works.
+* Hidden clouds have no collision.
+* Reappearance restores valid collision.
+* All states transition correctly.
+* Random behavior is reproducible using a fixed seed.
+* Different rendering frame rates do not change fixed-step gameplay results.
+
+Platform separation
+
+Run many randomized movement sequences.
+
+Assert continuously that:
+
+* The left cloud never intersects the right cloud.
+* Neither small cloud intersects the main cloud.
+* All safety distances remain valid.
+* Positions stay within their configured movement envelopes.
+* State changes do not teleport platforms into illegal positions.
+* Reappearance never violates platform separation.
+
+Fighter interaction
+
+Test fighters standing on:
+
+* An idle cloud.
+* A horizontally moving cloud.
+* A vertically moving cloud.
+
+Verify that fighters are carried correctly and remain grounded when appropriate.
+
+Also test:
+
+* Jumping off moving clouds.
+* Landing on moving clouds.
+* Falling when a cloud disappears.
+* Reappearance near fighters.
+* Respawning.
+* Off-stage recovery.
+* Void elimination.
+* Overtime.
+* CPU navigation.
+* Watch Mode.
+
+Regression testing
+
+Run the full existing suite with:
 
 node --test
 
-Update existing tests that assert old cooldown values and add new tests for the policy.
+Fix all new failures and investigate existing test assumptions.
 
-Cooldown tests
+For example, tests/systems/platform-stage.test.mjs currently contains historical Void-margin reference data for Desert, City, and Practice Ground. Extend stage coverage without accidentally leaving assumptions that only those stages exist.
 
-Verify that:
-
-1. A normal 3-damage attack has no extra cooldown beyond the universal 0.5-second repeat.
-2. A 5-damage attack without exceptional effects has no extra cooldown.
-3. A 10-damage attack receives 5 seconds.
-4. A move with a 10-damage projectile receives 5 seconds.
-5. A move whose projectile finisher deals 10 damage receives 5 seconds.
-6. A healing technique receives 3 seconds.
-7. A paralysis or hard-disable ability receives 3 seconds.
-8. A basic pull effect does not qualify for 3 seconds.
-9. Standard hitstun does not qualify for 3 seconds.
-10. A slam, bounce, launch, or quake does not automatically qualify for a longer cooldown.
-11. A move qualifying for both cooldown categories receives 5 seconds, never 8.
-12. Invalid authored cooldown values cannot bypass the universal policy.
-13. A technique interrupted during casting does not improperly escape its accepted cooldown.
-14. The CPU and human players use the same effective cooldown policy.
-
-HUD tests
-
-Verify that:
-
-1. Grounded fighters display ground abilities prominently.
-2. Airborne fighters display airborne abilities prominently.
-3. The inactive group remains visible underneath.
-4. The two groups switch positions when jumping or landing.
-5. Rapid state changes do not break the transition.
-6. Every displayed move has its correct artwork.
-7. Missing sprites use an appropriate fallback.
-8. Ground-only abilities are not presented as usable airborne abilities.
-9. Keyboard inputs match actual configured bindings.
-10. Controller inputs match the selected fighter’s resolved controller profile.
-11. PlayStation and Xbox glyphs are correctly distinguished.
-12. Custom controller mappings appear correctly.
-13. Cooldown timers remain accurate through ground/air switching.
-14. Cooldown presentation clears when a move becomes ready.
-15. Short universal delays receive a subtle visual indication.
-16. Airtime exhaustion does not masquerade as cooldown.
-17. Fighter changes replace the entire appropriate moveset.
-18. Watch Mode does not show a human-player ability HUD.
-19. Mobile touch controls are not obstructed.
-20. Pause, results, and screen exit do not leave stale interface elements.
-
-Test the relevant behavior in both Quick Battle and Practice Ground.
-
-24. Visual verification
-
-After implementation, inspect the HUD in actual gameplay, not only in isolated unit tests.
-
-Check at least:
-
-* #0001 grounded and airborne.
-* #0002 grounded and airborne.
-* #0003 grounded and airborne.
-* A 3-second cooldown actively counting.
-* A 5-second cooldown actively counting.
-* An ordinary 0.5-second repeat delay.
-* A move unavailable due to its airtime limit.
-* Keyboard input display.
-* PlayStation controller display.
-* Xbox controller display.
-* A customized controller mapping.
-* A narrow gameplay viewport.
-* A reduced-motion environment.
-
-If browser screenshot tooling is available, use it to inspect the final result and correct any visual problems.
-
-Do not claim visual verification unless it was actually performed.
-
-25. Documentation
-
-Update the relevant specification and documentation so that they reflect the new HUD and cooldown policy.
-
-At minimum, review:
-
-* ALVA_SPEC.md
-* docs/systems/combat.md
-* docs/systems/input.md
-* docs/gameplay/battle.md
-* docs/gameplay/practice.md
-* Relevant files in docs/characters/
-
-Remove outdated documentation claiming that specific moves have legacy cooldown values.
-
-Keep Alva’s established naming conventions, including the intentional mouvment spelling.
+Do not weaken meaningful existing assertions just to make new tests pass.
 
 ⸻
 
-FINAL DELIVERABLE
+22. Manual visual testing
 
-Implement the complete feature and provide a concise implementation summary covering:
+Check the actual game in a browser.
 
-1. Which files were changed or created.
-2. How the new bottom-right ability HUD works.
-3. How the animated ground/air carousel is implemented.
-4. How keyboard and controller bindings are obtained.
-5. How cooldown overlays read actual combat state.
-6. The final cooldown classification for every existing move that previously had an exceptional cooldown.
-7. How the strict 3-second/5-second policy is enforced for future fighters.
-8. Which automated tests passed.
-9. Any unresolved issues or visual checks that could not be completed.
+Verify the appearance and functionality at multiple screen sizes, including:
 
-Non-negotiable requirements
+* 1920 × 1080 desktop.
+* 1280 × 720 laptop.
+* Compact mobile landscape.
+* Tall or narrow browser windows.
 
-The HUD must look excellent, not merely functional.
+Inspect the complete 24-slot roster.
 
-Ground and air ability rows must transition smoothly like a vertical scrolling wheel.
+Make sure every stage position remains accessible.
 
-Artwork must be authentic to each character and each move.
+Verify that the Random Stage button stays visible and usable.
 
-Input labels must reflect actual keyboard bindings and remappable controller profiles.
+Inspect the large Asperitas preview.
 
-Cooldowns must be visible and accurate.
+Start actual matches on Asperitas.
 
-Only 3-second and 5-second special cooldowns are permitted, excluding the universal 0.5-second repeat rule.
+Observe the two clouds over an extended period and verify that their behaviors differ and their transitions are clearly visible.
 
-Ten-damage attacks get 5 seconds. Exceptional healing or hard-control effects get 3 seconds. Other moves receive no extra cooldown.
+Check disappearing clouds while fighters are standing on them.
 
-No character-specific hacks, duplicated combat timers, broken existing controls, or unfinished placeholder UI.
+Confirm that platform movement never causes fighters to jitter, teleport, sink into geometry, or remain suspended on invisible platforms.
 
-The final result should feel like the ability HUD was always part of Alva.
+Test CPU-vs-CPU battles as well as human-controlled battles.
+
+⸻
+
+PART XII — CODE QUALITY AND DOCUMENTATION
+
+23. Maintain Alva’s architecture
+
+Follow the project’s conventions.
+
+Keep map definitions, runtime platform behavior, physics, AI awareness, and procedural rendering separated appropriately.
+
+Prefer a reusable generic moving-platform system over a large collection of Asperitas-specific conditions scattered throughout the engine.
+
+Future stages should be able to use moving or disappearing platforms without rewriting the physics system.
+
+Avoid creating unnecessary abstractions, duplicated logic, or unrelated refactors.
+
+Do not change universal fighter movement statistics to make Asperitas work.
+
+Do not break existing character abilities, attacks, dashes, jumps, shields, or launch behavior.
+
+Preserve existing controller and touch functionality.
+
+Do not alter the protected character_rule file.
+
+⸻
+
+24. Update documentation
+
+Update the relevant documentation to describe the new stage and systems.
+
+Include:
+
+* README.md
+* docs/gameplay/stages.md
+* Relevant parts of ALVA_SPEC.md
+* Other affected architecture documentation, if necessary.
+
+Document how future stages are registered and displayed in the 24-slot roster.
+
+Explain how dynamic platform behavior is configured and updated.
+
+Document the separation between visual cloud rendering and actual collision behavior.
+
+Ensure references to the previous total of two stages are updated where appropriate.
+
+⸻
+
+PART XIII — FINAL ACCEPTANCE CRITERIA
+
+This update is finished only when all of the following are true:
+
+* [ ]	The stage-selection screen has been completely redesigned for 24 stage positions.
+* [ ]	The first three slots contain Desert, City, and Asperitas.
+* [ ]	The remaining 21 slots are non-playable placeholders.
+* [ ]	The roster works on desktop, mobile, keyboard, mouse, touch, and gamepad.
+* [ ]	A dedicated Random Stage button works correctly.
+* [ ]	Random selection never chooses unavailable slots.
+* [ ]	Asperitas is playable in Quick Battle.
+* [ ]	Asperitas is playable in Watch Mode.
+* [ ]	Asperitas has a polished sky environment.
+* [ ]	Its main platform is a large floating cloud with no ground or building foundation beneath it.
+* [ ]	Exactly two smaller playable clouds float above the main cloud.
+* [ ]	Both smaller clouds move independently.
+* [ ]	Each cloud can be IDLE, HORIZONTAL, VERTICAL, DISAPPEARING, HIDDEN, and REAPPEARING.
+* [ ]	State transitions are randomized and continuous.
+* [ ]	Platform movement is smooth and physically synchronized.
+* [ ]	Fighters can land on and jump from both smaller clouds.
+* [ ]	Fighters are correctly carried by moving clouds.
+* [ ]	Disappearing clouds stop supporting fighters.
+* [ ]	Reappearing clouds restore collision safely.
+* [ ]	The three playable platforms never collide or overlap.
+* [ ]	CPUs correctly respond to dynamic platform positions and availability.
+* [ ]	Camera, Void, overtime, and respawning remain functional.
+* [ ]	English and French localization is complete.
+* [ ]	Existing Desert and City functionality remains unchanged.
+* [ ]	Automated tests pass.
+* [ ]	The implementation is visually inspected in a real browser.
+* [ ]	Relevant documentation is updated.
+
+Final instructions
+
+Implement this update directly in the existing Alva codebase.
+
+Do not stop after planning or creating placeholder components.
+
+Deliver the actual functioning stage, moving-platform mechanics, redesigned roster, randomized stage selection, procedural artwork, and required tests.
+
+Prioritize three qualities:
+
+1. Visual quality: Asperitas should feel like a completely new, carefully designed environment.
+
+2. Gameplay integrity: Moving and disappearing platforms must interact reliably with the existing fighter and collision systems.
+
+3. Future scalability: The 24-stage roster and dynamic-platform architecture should be practical foundations for future Alva stages.
+
+When the implementation is complete, provide a summary of the changed files, important technical decisions, tests executed and their results, and any remaining limitations.
+
+The final result should feel like a polished, native expansion of Alva—not a separate feature attached to it.
