@@ -46,7 +46,7 @@ test('down is a gameplay direction on S / ↓, a held control and never a combat
   assert.equal(input.downPressed, false);
   // The gameplay actions are exactly these: nothing else on the left hand.
   assert.deepEqual(ACTIONS, [
-    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
   assert.deepEqual(Object.keys(CONFIG.bindings).sort(), [...ACTIONS, 'mouvementLeft', 'mouvementRight'].sort(), 'held actions and explicit Mouvement bindings');

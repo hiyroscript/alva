@@ -13,7 +13,7 @@ import { CHARACTERS, playableCharacters, getCharacter } from '../../js/data/char
 import {
   controllerActions, recommendedProfile, resolveProfile, fallbackLayout, normalizeBinding, profileConflicts,
   hasBlockingConflict, controllerLayoutProblems, sanitizeStoredProfiles, sanitizeStoredProfile, UNIVERSAL_DEFAULTS,
-  UNIVERSAL_ACTIONS, CATEGORIES, ACTIVATIONS, DIRECTIONS, MOVEMENT_SOURCES, HOLD_THRESHOLD, actionMap, hasAuthoredLayout,
+  UNIVERSAL_ACTIONS, CATEGORIES, ACTIVATIONS, DIRECTIONS, MOVEMENT_SOURCES, HOLD_THRESHOLD, actionMap, hasAuthoredLayout, ACTION_ID,
 } from '../../js/data/controller-profiles.js';
 import { LOADOUT_CASES, WITH_EXTRA } from '../fighters/fixtures/loadout-fighters.mjs';
 import { SAMPLE_FIGHTER } from '../fighters/fixtures/sample-fighter.mjs';
@@ -68,7 +68,7 @@ test('#0001\'s actions are read from its definition: its moves where they really
   assert.equal(byId.get('ground:attack4').special, 'technique', 'its execution type is unchanged');
   assert.equal(byId.get('air:attack2').move, 'midair_attack2');
   assert.equal(byId.get('air:extra_attack').move, 'extra_attack', 'the High Kick works in the air too');
-  assert.ok(!byId.has('ground:transform') && !byId.has('air:attack4'), 'nothing reserved or ground-only in the air');
+  assert.ok(!byId.has('ground:transform') && !byId.has('air:transform') && !byId.has('air:attack4'), 'no Transform, nothing ground-only in the air');
 });
 
 test('#0002\'s actions: three ordinary attacks both ways, a ground-only Whirlwind, no attack4 or attack5', () => {
@@ -186,8 +186,9 @@ test('a new fighter with no layout gets a safe, editable fallback, flagged as no
   assert.ok(bindings['air:attack3']);
   assert.deepEqual(profileConflicts(controllerActions(partial), bindings), []);
   // A layout made for another fighter (a copy's) keeps what fits, fills in
-  // the rest and never conflicts with itself.
-  assert.equal(recommendedProfile(SAMPLE_FIGHTER).authored, false, 'its transform has no input of its own');
+  // the rest and never conflicts with itself. (The sample fighter's moves
+  // all fit the layout it copies.)
+  assert.equal(recommendedProfile(SAMPLE_FIGHTER).authored, true, 'every move it has finds its input in #0001\'s layout');
   for (const def of [SAMPLE_FIGHTER, FUTURE_FIGHTER]) {
     const inherited = recommendedProfile(def);
     assert.deepEqual(profileConflicts(controllerActions(def), inherited.bindings).filter((c) => c.severity === 'error'), [], def.id);
@@ -290,6 +291,30 @@ test('a stored profile is checked entry by entry: malformed bindings and unknown
   });
   for (const junk of [null, undefined, 'x', 3, [], [{}]]) assert.deepEqual(sanitizeStoredProfiles(junk), {});
   assert.deepEqual(sanitizeStoredProfile({ jump: { button: 'south', modifier: 'south', activation: 'continuous' } }), {});
+});
+
+test('a profile saved before Transform was removed loses its ground:transform and air:transform bindings, and keeps every other', () => {
+  const kept = {
+    move: { source: 'dpad' },
+    'ground:attack1': b('r3'),
+    'air:attack1': b('r3'),
+  };
+  const raw = {
+    '0001': { ...kept, 'ground:transform': b('west', { modifier: 'l2' }), 'air:transform': b('north', { modifier: 'l2' }) },
+    '0002': { 'ground:transform': b('r1') },
+  };
+  assert.deepEqual(sanitizeStoredProfiles(raw), { '0001': kept }, 'a profile with nothing else left is gone');
+  for (const id of ['ground:transform', 'air:transform']) assert.equal(ACTION_ID.test(id), false, `${id} is no action id`);
+  for (const id of ['ground:attack1', 'air:extra_attack', 'shield']) assert.equal(ACTION_ID.test(id), true, id);
+  // Resolved against the fighter: its other saved bindings as saved, no
+  // Transform action to bind, offer or conflict with.
+  const def = getCharacter('0001');
+  const p = resolveProfile(def, sanitizeStoredProfile(raw['0001']));
+  for (const [id, binding] of Object.entries(kept)) assert.deepEqual(p.bindings[id], binding, id);
+  assert.equal(p.customized, true);
+  assert.ok(!Object.keys(p.bindings).some((id) => /transform/.test(id)));
+  assert.deepEqual(profileConflicts(controllerActions(def), p.bindings).filter((c) => c.severity === 'error'), []);
+  for (const c of CHARACTERS) assert.ok(controllerActions(c).every((a) => !/transform/.test(a.id)), `#${c.id}: never offered for binding`);
 });
 
 test('a saved profile resolves against the fighter: what fits it is used, what does not falls back to the recommended binding', () => {

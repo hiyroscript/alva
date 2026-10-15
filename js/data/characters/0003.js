@@ -36,7 +36,7 @@
 // Foot of Pain included: a quake, a slam and a launch earn nothing, and
 // neither deals 10) only the universal 0.5 s repeat delay, and the Deflect
 // none. These timers never alter their animation phases. The sheet's
-// sealed-strength poses have no move yet: Transform is reserved.
+// sealed-strength poses are no move.
 
 import { frames, pad } from './helpers.js';
 
@@ -271,11 +271,9 @@ export const CHARACTER_0003 = {
 
   // Four numbered attacks, each a button of its own (see
   // js/data/loadout.js): attack1 and attack2 ordinary attacks with their
-  // mid-air versions, attack3 and attack4 techniques (ground only). The
-  // sheet's sealed-strength art has no move yet: Transform is reserved.
+  // mid-air versions, attack3 and attack4 techniques (ground only).
   actions: {
     extra_attack: 'extra_attack', // the Chakra Haymaker
-    transform: null, // reserved
     attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Chakra Punch / the Leaping Kick
     attack2: { ground: 'attack2', air: 'midair_attack2' }, // the Heel Drop / the Heavenly Foot of Pain
     attack3: { type: 'technique', id: 'attack3' }, // Cherry Blossom Impact

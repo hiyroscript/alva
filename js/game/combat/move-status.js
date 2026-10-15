@@ -27,7 +27,7 @@ import { summonProblem } from './summon.js';
 import { techniqueProblem } from './technique.js';
 
 // The combat buttons in control order: the numbered attacks, then the extra
-// attack, then any other (Transform), as the keyboard lays them out.
+// attack, as the keyboard lays them out.
 export const ABILITY_ORDER = Object.freeze([...NUMBERED_ATTACKS, ...COMBAT_BUTTONS.filter((b) => !NUMBERED_ATTACKS.includes(b))]);
 
 // What `def` shows in each place, in ABILITY_ORDER: { ground, air }, each a

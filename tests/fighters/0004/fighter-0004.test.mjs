@@ -124,7 +124,6 @@ test('five numbered attacks, each a button of its own: three ordinary with mid-a
   assert.deepEqual(loadoutProblems(DEF), []);
   assert.deepEqual(DEF.actions, {
     extra_attack: 'extra_attack',
-    transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { ground: 'attack3', air: 'midair_attack3' },
@@ -181,7 +180,7 @@ test('its in-game names and touch buttons name each move, in English and French,
   for (const a of ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']) {
     assert.ok(existsSync(`${ROOT}${mobileAbility(DEF, a).sprite.url.slice(2)}`), a);
   }
-  assert.equal(mobileAbility(DEF, 'transform').pending, true, 'Transform reserved');
+  assert.equal(mobileAbility(DEF, 'transform'), null, 'no Transform button');
   for (const move of Object.keys(DEF.abilityDescriptions)) {
     assert.equal(typeof STRINGS.fr[`ability.0004.${move}.description`], 'string', `${move}: described in French`);
   }

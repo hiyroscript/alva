@@ -9,10 +9,10 @@
 //   moves       the fighter's own attacks and abilities, one action for
 //               each move it really has, where it has it: `ground:<control>`
 //               on the ground and `air:<control>` in the air, <control> its
-//               combat button codename (attack1 ... attack5, extra_attack,
-//               transform). Each fighter authors its own recommended
-//               buttons for them in its definition (`controller.layout`),
-//               chosen for that move, never for its attack number.
+//               combat button codename (attack1 ... attack5, extra_attack).
+//               Each fighter authors its own recommended buttons for them
+//               in its definition (`controller.layout`), chosen for that
+//               move, never for its attack number.
 //
 // A binding is the physical input of one action:
 //
@@ -108,10 +108,10 @@ const FALLBACK_INPUTS = Object.freeze([
 ]);
 
 // The control codenames a move action may be on.
-const MOVE_CONTROLS = Object.freeze([...NUMBERED_ATTACKS, 'extra_attack', 'transform']);
+const MOVE_CONTROLS = Object.freeze([...NUMBERED_ATTACKS, 'extra_attack']);
 
 // An action id is a universal action or `<place>:<control>`.
-export const ACTION_ID = /^(move|jump|dash|fastFall|shield|deflect|pause|(ground|air):(attack[1-5]|extra_attack|transform))$/;
+export const ACTION_ID = /^(move|jump|dash|fastFall|shield|deflect|pause|(ground|air):(attack[1-5]|extra_attack))$/;
 
 const isObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 

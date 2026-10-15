@@ -9,13 +9,13 @@
 // move names. Ground-only abilities stay visible but marked unavailable in
 // the air. Presentation never changes the input codename or pointer owner.
 //
-// Numbered attack slots, a honeycomb round Transform and Shield, filled in
-// order by the numbered attacks the fighter has (every one a button of its
-// own, see js/data/loadout.js): attack1 always in slot 1 and attack2 in
-// slot 2 (the lower row), then its other buttons in slots 3, 4 and 5:
+// Numbered attack slots, a honeycomb round Shield, filled in order by the
+// numbered attacks the fighter has (every one a button of its own, see
+// js/data/loadout.js): attack1 always in slot 1 and attack2 in slot 2 (the
+// lower row), then its other buttons in slots 3, 4 and 5:
 //
 //                  [4]  [5]  [EXTRA]
-//               [3]  [TRANSFORM] [SHIELD]
+//                    [3]  [SHIELD]
 //                  [1]  [2]  [JUMP]
 //
 //   2 attacks   slots 1 2
@@ -67,15 +67,14 @@ const DPAD = [
 
 // Lower-right cluster, in on-screen order. `ability` marks the combat
 // buttons (their glyphs drawn a little larger); the fighter-specific ones
-// (extra_attack, transform, attack1 to attack5) carry no icon or label
-// here: setCharacter fills them in, and marks a reserved one. Jump always
+// (extra_attack, attack1 to attack5) carry no icon or label here:
+// setCharacter fills them in, and marks a reserved one. Jump always
 // shows its universal arrow and name. `pos` is the
 // button's place in the cluster (its tc-<pos> class); a numbered attack
 // button (`attack`) is also placed by the slot setCharacter gives it
 // (data-slot, see above).
 const ACTION_BUTTONS = [
   { action: 'extra_attack', pos: 'extra_attack', ability: true },
-  { action: 'transform', pos: 'transform' },
   { action: 'shield', label: 'control.shield', icon: ICONS.shield, pos: 'shield', ability: true },
   ...NUMBERED_ATTACKS.map((action) => ({ action, pos: action, attack: true, ability: true })),
   { action: 'jump', label: 'control.jump', icon: ICONS.jump, pos: 'jump' },
@@ -524,14 +523,14 @@ export class TouchControls {
   }
 
   // Shows `def`'s own abilities (its mobileAbilities) on the fighter-specific
-  // buttons: each one's art (a frame of the fighter's own animation, or
-  // Transform's star) and accessible name, and whether it shows as
-  // reserved or unavailable. Jump keeps its arrow. The buttons stay the
+  // buttons: each one's art (a frame of the fighter's own animation, or a
+  // neutral glyph) and accessible name, and whether it shows as reserved or
+  // unavailable. Jump keeps its arrow. The buttons stay the
   // same elements with the same data-action and pointer handling, so input,
   // held state and multi-touch carry on untouched: only what they show is
   // swapped, in place (see showArt). Null (or a fighter that authors none)
-  // gives the neutral glyphs, with Transform reserved. A translated name is
-  // marked to follow the language.
+  // gives the neutral glyphs. A translated name is marked to follow the
+  // language.
   //
   // A button whose ability the fighter does not have at all (see
   // abilityPresence: left out of its `actions`) is hidden: not drawn, not
@@ -609,8 +608,6 @@ export class TouchControls {
       if (slot) b.setAttribute('data-slot', slot);
       else b.removeAttribute('data-slot');
     }
-    // How many numbered attack buttons are on show (the cluster's width).
-    this.root.dataset.attackButtons = String(NUMBERED_ATTACKS.filter((action) => !this.actionButtons.get(action).hidden).length);
     // A button back on show, or one in a new slot: place them again, as the
     // layout says.
     if (shown || moved) this.applyLayout();

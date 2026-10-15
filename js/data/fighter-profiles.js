@@ -75,7 +75,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0001': Object.freeze({
     difficulty: 5,
     descriptionKey: 'discover.fighter.0001.playStyle',
-    reviewedSourceHash: '89e81f2ea1ec2293b93484f39184f030889f9e1536f6eb5939d3c27209629286',
+    reviewedSourceHash: 'b09eb30c074ddcacbf26432698a1d01d0c8e7cc563a097416c5d8b7f4b39076b',
   }),
   // A momentum rushdown and aerial chaser: a readable core game plan, with
   // mastery in momentum, air uses and free fall, approach angles, trap
@@ -83,7 +83,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0002': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0002.playStyle',
-    reviewedSourceHash: '3202457e439f57969cb6e7c310d2e04093ef080d8de74dd0e6fe1664f21319c0',
+    reviewedSourceHash: '2461c03ba598d2e6b883ca7d36ad0ce25f6edde5e70a6c2474e0cad83dbcd911',
   }),
   // A ground-shattering bruiser and self-healer: a readable core of heavy,
   // telegraphed blows, with mastery in reading who is standing on the
@@ -92,7 +92,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0003': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0003.playStyle',
-    reviewedSourceHash: '983d12cd2c6b9b1db7bc0d4bd96ae51fffaeb9ac113def4195adb3f84bd8abf4',
+    reviewedSourceHash: 'b205cf6580bb3f59027b963ff77d809e76231685cf9af8a4771af49f2a3c75cf',
   }),
   // A space controller and setup fighter: notes that turn projectiles back,
   // a stationary double to place, a long, breakable song whose charm window
@@ -103,7 +103,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0004': Object.freeze({
     difficulty: 4,
     descriptionKey: 'discover.fighter.0004.playStyle',
-    reviewedSourceHash: 'bb4fd8928440068c525718947646e4c59a92ad4f9705bc42d4e11efddc256efe',
+    reviewedSourceHash: 'f99af03291950a522aad76b59b63876da23938e7fd9258c3c1d3d60bc6bf71e9',
   }),
 });
 

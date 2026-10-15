@@ -51,7 +51,6 @@ export const FUTURE_FIGHTER = Object.freeze({
 
   actions: {
     extra_attack: 'extra_attack',
-    transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { type: 'summon', id: 'attack3' },

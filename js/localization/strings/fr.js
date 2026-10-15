@@ -15,7 +15,6 @@ export const FR = {
   'control.down': 'Bas',
   'control.jump': 'Saut',
   'control.extra_attack': 'Attaque supplémentaire',
-  'control.transform': 'Transformation',
   'control.shield': 'Bouclier',
   'control.attack1': 'Attaque 1',
   'control.attack2': 'Attaque 2',

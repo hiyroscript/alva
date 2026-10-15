@@ -98,11 +98,13 @@ test('ordinary attack buffering expires during long cooldowns, but a press withi
   assert.equal(f.combat.attack?.def.id, 'attack1', 'documented short buffer fires only once ready');
 });
 
-test('only presses that could start are kept: never transform or one without art; a ground-only one in the air waits for the ground; a technique press never', () => {
-  const { fighter, step } = makeFighter();
+test('only presses that could start are kept: never a reserved button or one without art; a ground-only one in the air waits for the ground; a technique press never', () => {
+  const { fighter, step } = makeFighter({ character: { ...def, actions: { ...def.actions, extra_attack: null } } });
   step(ATTACK1);
-  step(P('transform'));
+  step(KICK);
   assert.equal(fighter.bufferedAttack, null, 'reserved');
+  step(P('transform'));
+  assert.equal(fighter.bufferedAttack, null, 'no such button');
   // A fighter whose High Kick is ground-only: pressed in the air it is
   // kept all the same (it could start once the fighter lands), so pressed
   // just before touchdown it comes out on the ground; pressed long before,

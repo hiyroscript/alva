@@ -132,7 +132,9 @@ test('the Deflect is both an attack and a defense; the Shield is a defense only;
       assert.deepEqual(actionOffense(f, action, false), NOT_AN_ATTACK);
     }
   }
-  assert.deepEqual(actionOffense(built(DEF_0001), 'transform', true), NOT_AN_ATTACK, 'a reserved button');
+  const reserved = { ...DEF_0001, actions: { ...DEF_0001.actions, extra_attack: null } };
+  assert.deepEqual(actionOffense(built(reserved), 'extra_attack', true), NOT_AN_ATTACK, 'a reserved button');
+  assert.deepEqual(actionOffense(built(DEF_0001), 'transform', true), NOT_AN_ATTACK, 'no such button: the retired Transform');
   assert.deepEqual(actionOffense(null, 'attack1'), NOT_AN_ATTACK);
   // A Deflect is always both: one that would not turn projectiles back is refused.
   assert.throws(() => createDeflectDefinition({ ...DEF_0001.deflect, deflectProjectiles: false }), /a Deflect turns projectiles back/);

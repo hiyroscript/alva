@@ -1965,3 +1965,73 @@ fighter; the roster, credits and screens in
 `tests/integration/empty-roster.test.mjs`, `discover.test.mjs`,
 `settings.test.mjs`, `i18n.test.mjs` and the other fighters' tests (the
 playable list).
+
+## Transform removed
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: the Transform button, its action and everything built for it
+deleted for good. No playable fighter ever had a move on it: a reserved
+button (K on the keyboard, a dashed star on touch, mapped to null by all
+four fighters), `transform` since the
+[control codenames](#control-and-move-codenames) and `special` before.
+The game now behaves as though it had never been in its control
+architecture. `character_rule` was not touched.
+
+**What it removed**
+
+- **The action.** `transform` is no longer in `ACTIONS`, `COMBAT_BUTTONS`,
+  `ACTION_LABELS`, `MOVES` or the keyboard `bindings` (`js/config.js`), so
+  no input snapshot carries `transform` / `transformPressed`, the Fighter,
+  the CPU and Combat Assist never see it, and K does nothing in play. K is
+  still menu Back (`CONFIG.menuBindings.back`), as are Esc and Backspace.
+- **The touch button** (`js/ui/touch-controls.js`,
+  `css/touch-controls.css`): no element, handler, name, star glyph
+  (`ICONS.transform`), dashed reserved look or `.tc-transform` place, in
+  either scheme, in battle, Practice Ground or the layout editor. The
+  mobile presentation lost its Transform-only rules
+  (`js/ui/mobile-abilities.js`: the `RESERVED` set, the star fallback, a
+  fighter's own glyph for a non-art button). A combat button mapped to
+  null still shows reserved, dashed.
+- **The cluster.** Slot 3 moved into the place Transform held, beside
+  Shield (`right: 1.5 pitch`, it was 2.5): a compact honeycomb of three
+  rows (three, two and three buttons), one pitch between neighbours, the
+  same size for every fighter, so the rule that widened the cluster for a
+  third numbered button (`data-attack-buttons`) is gone with it. No other
+  button moved; a custom layout's placed controls are where they were.
+- **The fighters.** `transform: null` and its "reserved" comments left
+  #0001 to #0004 (their art untouched); the four Discover profiles' review
+  hashes recorded again (their ratings and descriptions still hold).
+- **The loadout.** An `actions.transform` (reserved or not) is now refused
+  like any other name that is no combat button, and `attacks.transform` as
+  no move codename.
+- **Controllers.** `ground:transform` and `air:transform` are no action ids
+  (`ACTION_ID`, `MOVE_CONTROLS` in `js/data/controller-profiles.js`): never
+  offered, bound or resolved.
+- **Saved settings** stay safe with no settings version change: a saved
+  touch layout's `transform` entry and a saved controller profile's
+  `ground:transform` / `air:transform` bindings are dropped by the
+  sanitizing that already discarded retired ids, every other position,
+  size and binding kept. Reset to defaults gives the new layout.
+- **French:** `control.transform` ("Transformation"); English derives its
+  control names from `ACTION_LABELS`.
+- **The documents:** the specification, the input and combat guides,
+  conventions, the character specifications, adding a fighter, the README
+  and `codename_rule` describe the game without it.
+
+**Where to tune it:** the cluster's places in `css/touch-controls.css`
+(`.tc-shield`, `.tc-attack[data-slot]`, `.tc-extra_attack`, `.tc-jump`).
+
+**Tests:** a guard in `tests/systems/codenames.test.mjs` that no
+Transform control, move, binding, style, glyph or translation is left in
+the code, the stylesheet, the page or the current documents (graphics
+transforms untouched), with K pressing nothing in play; the touch
+controls with no Transform element in either scheme and the 3-2-3
+honeycomb (`controls-ui`); old touch layouts and the editor
+(`touch-layout`, `settings`); old controller profiles
+(`controller-profiles`) and no pad input ever sending it
+(`controller-input`); a definition with one refused (`loadout`); the test
+fighter's own Transform (Awakening) removed from
+`tests/fighters/fixtures/sample-fighter.mjs` and the reserved-button tests
+(`combo`, `combat-assist`, `combat-ai`, `attack-classification`,
+`special-abilities`) driven by a reserved `extra_attack` instead; every
+other test that expected the button updated.

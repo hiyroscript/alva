@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DT, makeFighter, fakeSpritesOf } from '../helpers/fighter-harness.mjs';
-import { CONFIG } from '../../js/config.js';
+import { COMBAT_BUTTONS, CONFIG } from '../../js/config.js';
 import { getCharacter } from '../../js/data/characters.js';
 import { previewFrame } from '../../js/data/ability-preview.js';
 import { resolveProfile } from '../../js/data/controller-profiles.js';
@@ -124,7 +124,7 @@ const air = (fighter, on = true) => { fighter.body.grounded = !on; };
 
 // ---- Which moves, in which row ---------------------------------------------------
 
-test('each fighter\'s rows come from its loadout: every real move once, ground-only moves never in the air, no reserved Transform', () => {
+test('each fighter\'s rows come from its loadout: every real move once, ground-only moves never in the air, nothing else', () => {
   const groups = (def) => {
     const g = abilityGroups(def);
     return { ground: g.ground.map((e) => e.move), air: g.air.map((e) => e.move) };
@@ -141,9 +141,13 @@ test('each fighter\'s rows come from its loadout: every real move once, ground-o
     ground: ['attack1', 'attack2', 'attack3', 'attack4', 'extra_attack'],
     air: ['midair_attack1', 'midair_attack2'],
   }, '#0003: its techniques and its Haymaker are the ground\'s');
-  for (const def of [DEF_0001, DEF_0002, DEF_0003]) {
-    assert.equal(def.actions.transform, null, `#${def.id}: Transform is reserved`);
-    for (const e of [...abilityGroups(def).ground, ...abilityGroups(def).air]) assert.notEqual(e.action, 'transform');
+  // Every row is a combat button the fighter really has: the retired
+  // Transform is nobody's.
+  for (const def of [DEF_0001, DEF_0002, DEF_0003, getCharacter('0004')]) {
+    assert.equal(Object.hasOwn(def.actions, 'transform'), false, `#${def.id}: no Transform`);
+    for (const e of [...abilityGroups(def).ground, ...abilityGroups(def).air]) {
+      assert.ok(COMBAT_BUTTONS.includes(e.action) && Object.hasOwn(def.actions, e.action), `#${def.id}: ${e.action}`);
+    }
   }
   // A fighter nobody has made: two attacks, no extra, nothing else.
   const two = { ...DEF_0002, id: 'test-two', actions: { attack1: DEF_0002.actions.attack1, attack2: DEF_0002.actions.attack2 } };

@@ -210,7 +210,9 @@ test('a list may name only moves the fighter can really perform, each once', () 
   assert.match(specialAbilityProblems(with_(['Unlimited Void']))[0], /not a move codename/, 'never a display name');
   assert.match(specialAbilityProblems(with_(['attack4', 'attack4']))[0], /twice/);
   assert.match(specialAbilityProblems(with_(['midair_attack4']))[0], /cannot perform/, 'a technique has no mid-air version');
-  assert.match(specialAbilityProblems(with_(['transform']))[0], /cannot perform/, 'a reserved button');
+  assert.match(specialAbilityProblems(with_(['transform']))[0], /not a move codename/, 'the retired Transform is no move');
+  const reserved = { ...def, actions: { ...def.actions, extra_attack: null }, specialAbilities: ['extra_attack'] };
+  assert.match(specialAbilityProblems(reserved)[0], /cannot perform/, 'a reserved button');
   const noAir = { ...def, attacks: { ...def.attacks, extra_attack: { ...def.attacks.extra_attack, groundOnly: true } } };
   assert.ok(performableMoves(noAir).has('extra_attack'));
   const ground = getCharacter('0002');

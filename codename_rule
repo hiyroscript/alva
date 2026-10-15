@@ -44,7 +44,7 @@ Attack numbers identify moves; they do not prescribe damage, effects or mechanic
 
 extra_attack is a separate, additional character-specific action. It may be a projectile, throw, utility move or other unique attack. It does not count toward the 2–5 numbered attack limit, so a character may have five numbered attacks plus extra_attack. Its airborne availability is defined by the character's loadout.
 
-Shield, Deflect, movement, mid-air movement, jump, down and transform are not numbered attacks.
+Shield, Deflect, movement, mid-air movement, jump and down are not numbered attacks.
 
 ## Attack launch levels
 
@@ -97,7 +97,7 @@ Two layers, kept apart:
 
 | Layer | What it is | Names |
 | --- | --- | --- |
-| Logical actions | What the combat engine reads: the control codenames (runLeft, runRight, down, jump, shield, extra_attack, transform, attack1 to attack5, pause) and the mouvement requests | Unchanged, the same for every device and character |
+| Logical actions | What the combat engine reads: the control codenames (runLeft, runRight, down, jump, shield, extra_attack, attack1 to attack5, pause) and the mouvement requests | Unchanged, the same for every device and character |
 | Physical bindings | Which controller input sends a logical action, per character: a button (named by position: south, east, west, north, l1, r1, l2, r2, select, start, l3, r3 and the D-pad), an optional held modifier, an optional stick direction, an activation (press, hold, continuous), for the ground or the air | Action ids: the universal move, jump, dash, fastFall, shield, deflect and pause, and each move as ground:<button> or air:<button> (ground:attack2, air:extra_attack) |
 
 A physical binding resolves to exactly one logical action, then the combat engine validates and performs it as ever: a controller never performs a move itself. One press goes to at most one action; a combination is modifier first and never also its plain button; a ground binding is never chosen in the air, nor an air binding on the ground. Ground and air moves of one button may have different inputs, and different buttons may share an input where they never apply together (a ground move and an air move, the Shield and the Deflect).

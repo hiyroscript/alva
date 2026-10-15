@@ -16,7 +16,6 @@ import { abilityName } from '../../../js/data/abilities.js';
 import { describeLoadout, loadoutProblems, specialAttacks } from '../../../js/data/loadout.js';
 import { drawFrame } from '../../../js/game/rendering/sprite-normalizer.js';
 import { mobileAbility, previewFrame } from '../../../js/ui/mobile-abilities.js';
-import { ICONS } from '../../../js/ui/icons.js';
 import { STRINGS, setLanguage } from '../../../js/localization/i18n.js';
 import { CREDITS, creditsText } from '../../../js/ui/credits.js';
 import { ROOT, decodePng, realArt, withFakeCanvas } from '../../helpers/png-art.mjs';
@@ -78,7 +77,6 @@ test('five numbered attacks, each a button of its own: three ordinary with mid-a
   assert.deepEqual(loadoutProblems(DEF), []);
   assert.deepEqual(DEF.actions, {
     extra_attack: 'extra_attack',
-    transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { ground: 'attack3', air: 'midair_attack3' },
@@ -155,8 +153,7 @@ test('its in-game names and touch buttons name each move, in English and French'
     assert.ok(existsSync(`${ROOT}${ability.sprite.url.slice(2)}`), a);
     assert.equal(ability.sprite.mirrored, false, 'drawn facing right, as the buttons read');
   }
-  assert.equal(mobileAbility(DEF, 'transform').pending, true, 'Transform reserved');
-  assert.equal(mobileAbility(DEF, 'transform').icon, ICONS.transform);
+  assert.equal(mobileAbility(DEF, 'transform'), null, 'no Transform button');
 });
 
 test('its sprite sheet is credited, linked to where it was published, without naming what it depicts', () => {

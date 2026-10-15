@@ -110,7 +110,11 @@ Some tests read source files to enforce architecture rules: no fighter id
 or numbered-attack special case in the engine, the AI or the touch
 controls; no language checks outside the translator; nothing but the
 Arena drawing the Shield; no retired codename anywhere (the code, the
-tests, the current documentation); every frame path existing. They scan
+tests, the current documentation), and no trace of the retired transform
+button's control, move, binding, style or name in the code, the stylesheet,
+the page or the current documentation (the word stays where it is a
+graphics operation, `ctx.setTransform` or a CSS `transform`); every frame
+path existing. They scan
 folders recursively, so new modules are covered without editing the
 tests. [`UPDATES.md`](../../UPDATES.md) is the history record and is not
 scanned for retired names.

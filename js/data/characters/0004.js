@@ -41,7 +41,7 @@
 // is Mine 3 s (a charm), every other move only the universal 0.5 s repeat
 // delay, and the Deflect none. These timers never alter their animation
 // phases. The sheet's intro, victory and defeat poses and its full-screen
-// cut-in pictures are no move: Transform is reserved.
+// cut-in pictures are no move.
 
 import { frames, pad } from './helpers.js';
 
@@ -353,7 +353,6 @@ export const CHARACTER_0004 = {
   // mid-air versions, attack4 and attack5 techniques (ground only).
   actions: {
     extra_attack: 'extra_attack', // the Melody
-    transform: null, // reserved
     attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Dance Combo / the Air Dance
     attack2: { ground: 'attack2', air: 'midair_attack2' }, // the Leek Swing / the Leekspin
     attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Crescent Kick / the Stage Dive

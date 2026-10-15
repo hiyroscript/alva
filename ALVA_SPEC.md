@@ -21,8 +21,7 @@ behave, and how it must look.
 - History (what changed when, and why) lives in
   [`UPDATES.md`](UPDATES.md), not here: this document describes the game
   as it is now. The [README](README.md) covers running and deploying it.
-- Nothing here is a future plan. The one capability wired before any
-  fighter uses it, Transform, is marked reserved where it appears.
+- Nothing here is a future plan.
 
 ---
 
@@ -1212,20 +1211,20 @@ gameplay. Every control of the layout can be moved and resized, the joystick
 itself included:
 
 - **Joystick:** Left mouvement (double left arrows), the joystick, Right
-  mouvement (double right arrows), and the actions (Extra Attack, Transform,
-  Shield, Attack 1 through Attack 5, Jump). Every editor control uses neutral
+  mouvement (double right arrows), and the actions (Extra Attack, Shield,
+  Attack 1 through Attack 5, Jump). Every editor control uses neutral
   localized names and universal icons, regardless of the selected fighter:
   one to five pips for the numbered attacks, the ring for Extra Attack, the
-  star for Transform, the shield for Defence and the upward arrow for Jump.
+  shield for Defence and the upward arrow for Jump.
   All five numbered buttons remain available even if a fighter lacks them.
 - **Classic Buttons:** Run Left, Run Right, Mouvement Left, Mouvement Right, and the same actions.
 
 Each control has a stable control id, independent of its translated name
 (`TOUCH_CONTROL_IDS` in `js/core/touch-layout.js`:
 `mouvementLeft`, `stick`, `mouvementRight`, `runLeft`, `runRight`,
-`extra_attack`, `transform`, `shield`, `attack1` to `attack5`, `jump`); ids
-are never shown. A saved layout entry under an id the scheme no longer has
-is dropped when the layout is read.
+`extra_attack`, `shield`, `attack1` to `attack5`, `jump`); ids are never
+shown. A saved layout entry under an id the scheme no longer has is dropped
+when the layout is read, and every other entry is kept as saved.
 
 - **Drag** a control to move it; the preview follows at once, and the
   control always stays whole inside the touch-control area. A press that
@@ -1590,8 +1589,9 @@ each fighter's own values are in its character specification (7.2.9).
 - **Attack loadout** (`js/data/loadout.js`). A fighter's attacks go by
   universal codenames, the same for every character: the numbered attacks
   `attack1` to `attack5`, each one's mid-air version `midair_attack1` to
-  `midair_attack5`, one optional `extra_attack` (a throw, a projectile, a
-  utility move of its own) and the reserved `transform`. What the player
+  `midair_attack5` and one optional `extra_attack` (a throw, a projectile,
+  a utility move of its own). Nothing else is a combat button: a
+  definition with an `actions` entry for any other name is refused. What the player
   calls a move (#0001's Jab, Red, Maximum Blue, Unlimited Void, Hollow
   Purple, High Kick) is its `abilityNames`, never its codename. The rules, checked for every
   definition as `js/data/characters.js` loads (`assertLoadout`; a
@@ -2330,7 +2330,6 @@ each fighter's own values are in its character specification (7.2.9).
   blockstun, hitstop, cooldowns, summon and technique cooldowns,
   paralysis, pulls, typed numbered buttons, summons and techniques) is data-driven: every
   fighter's moves are implemented through it with real artwork (7.2.9),
-  Transform stays reserved (mapped to no attack) until real sprites exist,
   and no attack, projectile, clone or frame is ever fabricated. An attack
   whose frames fail to load is refused (no substitute pose, no invisible
   hitbox), and so is a Shield, a summon whose startup pose, cloud or
@@ -3119,7 +3118,7 @@ it names a fighter, an attack or an animation.
     played well without a CPU change.
   - **Input only.** Like `PlayerController`, it only returns the standard
     input snapshot (`runLeft`, `runRight`, `down`, `jump`, `shield`,
-    `extra_attack`, `transform`, `attack1` to `attack5` and their `…Pressed`
+    `extra_attack`, `attack1` to `attack5` and their `…Pressed`
     edges, each edge true only on the step its button goes down). Attacks,
     projectiles, the Shield, summons and techniques (their own buttons,
     pressed directly), the fast fall (`down`), jumps and the Dash (an
@@ -3417,8 +3416,8 @@ Adding one is described in
     `js/game/combat/move-status.js`), in control order (attack1 to attack5,
     then the extra attack): on the ground every button's ground move (an
     attack, a summon or a technique), in the air every button's air move
-    that is not ground-only. A reserved button (Transform) or one a fighter
-    lacks shows nothing; no fighter is named in the code. #0001: ground the
+    that is not ground-only. A reserved button (mapped to null) or one a
+    fighter lacks shows nothing; no fighter is named in the code. #0001: ground the
     Jab, Red, Maximum Blue, Unlimited Void, Hollow Purple and the High Kick,
     air the Floating Straight, the Red Kick, Blue and the High Kick; #0002:
     ground the One-Two, Rapid Kicks, Spin Attack and Whirlwind, air the
@@ -3571,18 +3570,18 @@ Adding one is described in
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
-  extra attack (`extra_attack`, e.g. #0001's High Kick), K Transform (`transform`, reserved), L Shield (`shield`; held on the ground; a fresh press in the air is the Deflect), U
+  extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
   fighter acts only on the ones it has a button for, 7.2), Esc/P pause
   (`pause`; the Practice menu in Practice Ground). Each control goes by
   that one codename: its key in `CONFIG.bindings` and `ACTIONS`, its field
   in every input snapshot, and for the combat buttons (`COMBAT_BUTTONS`:
-  `extra_attack`, `transform`, `attack1` to `attack5`) its key in a
+  `extra_attack`, `attack1` to `attack5`) its key in a
   character's `actions`. The moves have universal codenames too (`MOVES`
   in `js/config.js`), the same for every character, whatever it calls them
   in game: `attack1` to `attack5`, `midair_attack1` to `midair_attack5`,
-  `extra_attack` and `transform` (reserved), each with a neutral label
+  and `extra_attack`, each with a neutral label
   ("Attack 3", "Mid-air Attack 3", "Extra Attack") and nothing about what
   it does for a character (its loadout decides that, 7.2). A
   character's own ability names (#0001's Jab, Red, Maximum Blue, Unlimited
@@ -3615,7 +3614,10 @@ Adding one is described in
   lasts one sample; `flush()` and `clear()` discard pending requests.
   A touch scheme switch or disabling its controls also clears pending touch
   Mouvement. Touch Mouvement never holds Run. Every controller uses these
-  request fields, including CombatAIController. Menus retain their own mappings.
+  request fields, including CombatAIController. Menus retain their own
+  mappings (`CONFIG.menuBindings`): the arrows or W A S D move, Enter,
+  Space or J confirm, and Esc, Backspace or K go back. K is no gameplay
+  key.
 - Game controllers (PlayStation and Xbox, in the standard mapping), sending
   the same codenames through each fighter's controller layout: see 7.4a.
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
@@ -3682,7 +3684,7 @@ Adding one is described in
 
   ```
              [VOID]  [PURPLE]  [HIGH KICK]
-        [MAX BLUE]   [TRANSFORM] [SHIELD]
+                 [MAX BLUE]  [SHIELD]
                [JAB]  [RED]  [JUMP]
   ```
 
@@ -3690,13 +3692,16 @@ Adding one is described in
   numbered slots (`data-slot`, set by `setCharacter` through
   `attackSlots`): `attack1` is always slot 1 and `attack2` slot 2 (the
   bottom row, where attack1 and attack2 have always been), and the fighter's
-  other numbered buttons fill slots 3, 4 and 5 in order, a honeycomb round
-  Transform and Shield that never overlaps another button and widens the
-  cluster by at most half a pitch:
+  other numbered buttons fill slots 3, 4 and 5 in order: a honeycomb round
+  Shield of three rows (three buttons, two, three), one pitch between
+  neighbours, slot 3 beside Shield in the middle row. No button overlaps
+  another, no place in it is kept empty for anything but a numbered attack
+  the fighter lacks, and the cluster is the same size whatever the fighter
+  shows:
 
   ```
              [4]  [5]  [EXTRA]
-          [3]  [TRANSFORM] [SHIELD]
+               [3]  [SHIELD]
              [1]  [2]  [JUMP]
   ```
 
@@ -3751,10 +3756,7 @@ Adding one is described in
   fallback glyph instead (a ring, one to five pips, or the authored tornado), its
   name and input unchanged; with no `mobileAbilities` the names are the
   generic ones ("Extra Attack", "Attack 1" to "Attack 5"). Valid fighters
-  never fall back in play. Transform keeps its glyph: it is reserved until
-  a fighter presents its own (with its own `icon`, a key of `ICONS`); with
-  no `transform` entry (none of #0001, #0002, #0003 and #0004 has one) it is the neutral star,
-  labelled "Transform", with a dashed outline. The universal buttons belong
+  never fall back in play. The universal buttons belong
   to the controls and keep their original monochrome SVG glyphs
   (`currentColor`, from `js/ui/icons.js`): **Shield** (the shield outline,
   labelled "Shield"; held for as long as the pointer stays on it; while the
@@ -3764,16 +3766,16 @@ Adding one is described in
   Dash buttons (centered, mirrored double directional arrows in both schemes;
   Classic Run keeps single arrows).
   Only the presentation is per fighter: each button's
-  `data-action` is its control codename (`extra_attack`, `transform`,
-  `shield`, `attack1` to `attack5`, `jump`, `runLeft`, `runRight`),
+  `data-action` is its control codename (`extra_attack`, `shield`,
+  `attack1` to `attack5`, `jump`, `runLeft`, `runRight`),
   whatever it looks like, so #0001's Unlimited Void is `attack4` and its
   Hollow Purple `attack5`. The combat glyphs are drawn slightly larger
   (`.tc-ability .icon`); every button shares the pressed state.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular buttons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
-  A reserved button (only Transform, and only while the fighter has none)
-  uses a dashed outline and never shows nagging alerts; the fighter's own
+  A reserved button (a combat button its fighter maps to null) uses a
+  dashed outline and never shows nagging alerts; the fighter's own
   moves and Shield are solid. A button for a move the fighter does not
   have at all (left out of its `actions`, #0002's `attack4` and `attack5`
   and #0003's `attack5` included: `abilityPresence` in `js/ui/mobile-abilities.js`) is hidden:

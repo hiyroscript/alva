@@ -12,7 +12,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getCharacter } from '../../js/data/characters.js';
-import { resolveProfile, HOLD_THRESHOLD } from '../../js/data/controller-profiles.js';
+import { resolveProfile, sanitizeStoredProfile, HOLD_THRESHOLD } from '../../js/data/controller-profiles.js';
+import { PAD_BUTTONS, DPAD_BUTTONS } from '../../js/core/gamepad-devices.js';
 import {
   stickDirection, directionMet, directionHeld, RUN_THRESHOLD, DIRECTION_DEADZONE, DASH_AIM_THRESHOLD,
 } from '../../js/core/controller-resolver.js';
@@ -346,6 +347,39 @@ test('a ground press buffered through a recovery never comes out as the air move
 });
 
 // ---- Custom bindings ---------------------------------------------------------------------------
+
+test('no controller input reaches the retired Transform: a binding saved for it is dropped, and no button or combination sends it', async () => {
+  // A profile saved by an older Alva: Transform on R3 on the ground and
+  // L2 + R3 in the air, beside a binding that still applies.
+  const saved = sanitizeStoredProfile({
+    'ground:transform': b('r3'), 'air:transform': b('r3', { modifier: 'l2' }), 'ground:attack1': b('r3'),
+  });
+  assert.deepEqual(saved, { 'ground:attack1': b('r3') });
+  const profileFor = (def) => resolveProfile(def, def?.id === '0001' ? saved : null);
+  const p = await padFighter(ONE, { profileFor });
+  const seen = [];
+  const sample = p.input.sample.bind(p.input);
+  p.input.sample = (context) => {
+    const out = sample(context);
+    seen.push(Object.keys(out));
+    return out;
+  };
+  // Its other binding plays as saved.
+  p.settle();
+  assert.equal(p.press(['r3']).attack, 'attack1', 'R3: the Jab, as saved');
+  // Every button, alone and after L2, on the ground and in the air.
+  for (const airborne of [false, true]) {
+    for (const button of [...PAD_BUTTONS, ...DPAD_BUTTONS].filter((n) => n !== 'start' && n !== 'l2')) {
+      for (const combo of [[button], ['l2', button]]) {
+        p.settle();
+        if (airborne) p.airborne();
+        p.press(combo);
+      }
+    }
+  }
+  assert.ok(seen.length > 100);
+  assert.ok(seen.every((keys) => !keys.includes('transform') && !keys.includes('transformPressed')), 'no sample ever carries it');
+});
 
 test('custom bindings: a single button, a combination, a direction, hold-to-activate and a continuous Shield on another button', async () => {
   const custom = {
