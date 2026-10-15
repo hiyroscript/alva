@@ -364,7 +364,7 @@ test('what kind of move attack3 to attack5 are is data: the same button is an or
   assert.equal(d.clones.length, 1, 'the same button, now a summon');
   assert.equal(actionType(summoned, 'attack1'), 'attack');
   assert.equal(actionType(summoned, 'attack5'), null, 'no such button');
-  assert.equal(actionType({ actions: { transform: null } }, 'transform'), null, 'reserved');
+  assert.equal(actionType({ actions: { extra_attack: null } }, 'extra_attack'), null, 'reserved');
 });
 
 test('whatever an attack creates is named after it: <attack>_object', () => {
@@ -388,10 +388,22 @@ test('whatever an attack creates is named after it: <attack>_object', () => {
   breaks((d) => { d.effectAnimations.sparkles = d.effectAnimations.attack3_object; }, /effectAnimations\.sparkles is not named after the attack/, E);
 });
 
-test('extra_attack and transform are one move each, or reserved', () => {
+test('extra_attack is one move, or reserved', () => {
   breaks((d) => { d.actions.extra_attack = { ground: 'extra_attack', air: 'midair_extra_attack' }; }, /actions\.extra_attack must be 'extra_attack' or null/);
-  breaks((d) => { d.actions.transform = 'attack1'; }, /actions\.transform must be 'transform' or null/);
-  assert.deepEqual(loadoutProblems({ ...LOADOUT_CASES[0].def, actions: { ...LOADOUT_CASES[0].def.actions, transform: null } }), []);
+  assert.deepEqual(loadoutProblems({ ...LOADOUT_CASES[0].def, actions: { ...LOADOUT_CASES[0].def.actions, extra_attack: null } }), []);
+});
+
+test('Transform is no combat button: an actions.transform, reserved or not, or a transform move is refused like any other', () => {
+  for (const mapping of [null, 'transform', 'attack1']) {
+    breaks((d) => { d.actions.transform = mapping; }, /actions\.transform is not a combat button \(extra_attack, attack1, attack2, attack3, attack4, attack5\)/);
+  }
+  breaks((d) => { d.attacks.transform = { ...d.attacks.attack1 }; }, /attacks\.transform is not a move codename/);
+  // Every playable fighter keeps the rules without one.
+  assert.ok(CHARACTERS.length >= 4);
+  for (const def of CHARACTERS) {
+    assert.equal(Object.hasOwn(def.actions, 'transform'), false, def.id);
+    assert.deepEqual(loadoutProblems(def), [], def.id);
+  }
 });
 
 test('every definition the game loads keeps the rules, and a broken one is refused as the module loads', () => {

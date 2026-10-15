@@ -7,13 +7,13 @@ contract; it applies to every fighter.
 
 - **Controls** have one codename each, the same for every fighter:
   `runLeft`, `runRight`, `down`, `jump`, `shield`, `extra_attack`,
-  `transform`, `attack1` … `attack5`, `pause`, and the touch-only
+  `attack1` … `attack5`, `pause`, and the touch-only
   `mouvementLeft` / `mouvementRight`. Each is the key in
   `CONFIG.bindings`, the field in every input snapshot (with a
   `…Pressed` edge), and for combat buttons the key in a fighter's
   `actions`.
 - **Moves** go by `attack1` … `attack5`, `midair_attack1` …
-  `midair_attack5`, `extra_attack` and the reserved `transform`. A
+  `midair_attack5` and `extra_attack`. A
   number names a move's slot, never its role: whether `attack3` is an
   ordinary attack, a summon or a technique is the fighter's loadout.
   Never name an internal concept after one fighter's ability (a pull is a
@@ -30,7 +30,8 @@ contract; it applies to every fighter.
 - Retired names (listed in
   [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs))
   must not come back; only [`UPDATES.md`](../../UPDATES.md) may mention
-  them, as history.
+  them, as history, and the code and its guides only where older saved
+  settings holding one are read.
 
 ## Code
 

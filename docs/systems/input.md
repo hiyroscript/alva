@@ -34,7 +34,6 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | Left stick down | none |
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
-| Transform (reserved) | `transform` | K | none | dashed button |
 | Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | Circle / B (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | the fighter's own layout (see below) | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Options / Menu | the timer / pause or More button |
@@ -48,6 +47,9 @@ controller layout simply has no action for it. What each fighter's buttons do is
 [character specification](../characters/README.md). The mouvement
 buttons' spelling (`mouvementLeft`) and the Dash clip's (`mouvment`)
 differ on purpose ([conventions](../development/conventions.md#codenames)).
+Menus read their own keys (`CONFIG.menuBindings`): the arrows or W A S D
+move, Enter, Space or J confirm, and Esc, Backspace or K go back. K does
+nothing in play.
 
 ## Touch controls
 
@@ -72,14 +74,19 @@ fields; normal CPU running never Dashes.
 
 Both share the lower-right cluster: the numbered attack buttons fill fixed
 slots, as many as the fighter has numbered attacks (`attackSlots`:
-`attack1` in slot 1, `attack2` in slot 2, then the rest in order), round
-Transform and Shield:
+`attack1` in slot 1, `attack2` in slot 2, then the rest in order), in a
+honeycomb round Shield: three rows of three, two and three buttons, one
+pitch between neighbours, slot 3 beside Shield in the middle row:
 
 ```
           [4]  [5]  [EXTRA]
-       [3]  [TRANSFORM] [SHIELD]
+            [3]  [SHIELD]
           [1]  [2]  [JUMP]
 ```
+
+The cluster is the same size for every fighter (two numbered attacks to
+five): a fighter with fewer leaves only its missing slots empty, and no
+button ever overlaps another.
 
 All action buttons, including Jump and Extra Attack, share the same diameter,
 border, background, shadow and pressed feedback. Reserved/unavailable states
@@ -87,8 +94,8 @@ still communicate ability status. The extra attack and numbered attack buttons s
 fighter's own art, chosen in its `mobileAbilities`
 (`preview: { animation, frame }`, `previews.air` for a distinct airborne
 move, `collection: 'projectileAnimations'` to pick projectile art, an
-optional `fallbackIcon`); Jump, Shield, Transform, the arrows, the joystick
-and the Dash buttons keep their universal glyphs. Jump is an upward arrow
+optional `fallbackIcon`); Jump, Shield, the arrows, the joystick and the
+Dash buttons keep their universal glyphs. Jump is an upward arrow
 without a baseline. Defence always shows the shield glyph, including in the
 air; its accessible name becomes **Deflect** when the fighter has one,
 with the same button still sending `shield`. A button with nothing to
@@ -101,15 +108,17 @@ the editor over a still battle screen: every control can be moved and
 resized (70 % to 180 %), by pointer, keyboard or gamepad, and all five
 numbered buttons always show their matching one-to-five pip icons. Every
 editor control uses a universal icon and a neutral localized name, regardless
-of the selected fighter: Extra Attack uses the ring, Transform the star,
-Defence the shield, Jump the upward arrow, and movement the scheme's arrows
-or joystick. Gameplay keeps each fighter's authored attack artwork.
+of the selected fighter: Extra Attack uses the ring, Defence the shield,
+Jump the upward arrow, and movement the scheme's arrows or joystick. Gameplay keeps each fighter's authored attack artwork.
 Positions are stored as fractions
 of the safe touch area and sizes as scales, keyed by control id, never by
 label or slot; each layout keeps its own arrangement. Both Classic Mouvement
 buttons are independently editable. Older Classic saves retain every existing
 custom control; the new buttons use defaults until customized. Reset restores
-all four directional controls without changing the other scheme.
+all four directional controls without changing the other scheme. A saved
+entry under an id no scheme has any more (the retired `down` and
+`transform`) is dropped as the layout is read, every other entry kept as
+saved, with no settings migration.
 
 **Combat Assist** and **Combo Assist** (Settings → Combat), and the
 player's move cancellation, are not part of the input system: no binding,
@@ -136,8 +145,8 @@ interface, and nothing about them changes.
 - **Moves** come from the fighter's loadout (`abilityGroups`,
   `js/game/combat/move-status.js`), in control order: each button's ground
   move on the ground row, each button's air move that is not ground-only
-  on the air row. A reserved Transform, a button the fighter lacks and a
-  missing move show nothing. Nothing in it names a fighter: a new fighter's
+  on the air row. A reserved button (mapped to null), a button the fighter
+  lacks and a missing move show nothing. Nothing in it names a fighter: a new fighter's
   two to five numbered attacks and extra attack show with no code changed.
 - **Art** is each button's authored touch preview (`previewFrame`), the
   distinct air move's own air artwork in the air row; a missing or failed
@@ -371,13 +380,16 @@ Deflect), a combination beside its plain button, a direction beside none.
 unsaved changes after asking; **Restore defaults** asks, then puts that
 fighter alone back on its recommended layout. Saved layouts load on every
 visit; a malformed stored binding falls back to the recommended one, never
-the rest of the settings.
+the rest of the settings. A stored binding for an action id that no longer
+exists (`ACTION_ID`; the retired `transform` button's, on the ground and in
+the air) is dropped as the settings are read, every other binding kept as
+saved.
 
 ## Tests
 
 - [`tests/interface/ability-hud.test.mjs`](../../tests/interface/ability-hud.test.mjs):
   the ability HUD on real fighters: each fighter's rows (ground-only moves
-  never in the air, no reserved Transform), the wheel and rapid changes of
+  never in the air, nothing but the fighter's own buttons), the wheel and rapid changes of
   place, the art and its fallback, keyboard keys, PlayStation and Xbox
   glyphs, a saved layout, device switching, cooldowns through changes of
   place and on recovery, the repeat delay, airtime restrictions, a fighter

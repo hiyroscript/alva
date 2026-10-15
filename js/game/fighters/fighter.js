@@ -55,7 +55,7 @@ import {
 } from './movement.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
-// extra_attack, transform and attack1 to attack5. Each maps to a move
+// extra_attack and attack1 to attack5. Each maps to a move
 // through the character's `actions` (an attack, or for attack3 to attack5
 // also a summon or a technique; see js/data/loadout.js); a fighter acts
 // only on the ones it has there. shield, jump and the directions (down
@@ -1910,8 +1910,8 @@ export class Fighter {
   // start left for this airtime if it has `airUses`). In the air, a press
   // whose ground attack could start once it lands is kept too, so it comes
   // out on touchdown if that is soon enough (a ground-only extra_attack
-  // pressed just before landing). Never a reserved button (transform), a
-  // button the character does not have, an attack without frames or one
+  // pressed just before landing). Never a reserved button (mapped to null),
+  // a button the character does not have, an attack without frames or one
   // used up until the fighter lands.
   // A press made for one place only (`place`, from a game controller)
   // may start only there.

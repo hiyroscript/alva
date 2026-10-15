@@ -274,7 +274,7 @@ test('only Attack 1 and Attack 2 alternate: Extra Attack and Attack 3 to 5 press
   assert.deepEqual(COMBO_PAIRS, { attack1: 'attack2', attack2: 'attack1' });
   for (const c of playableCharacters()) {
     const f = far(c).player;
-    for (const action of ['extra_attack', 'transform', 'attack3', 'attack4', 'attack5']) {
+    for (const action of ['extra_attack', 'attack3', 'attack4', 'attack5']) {
       const id = f.attackFor(action);
       if (id) f.combat.cooldowns.set(id, 0.4);
       assert.equal(comboAction(f, action), action, `#${c.id} ${action}`);

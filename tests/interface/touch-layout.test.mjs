@@ -144,7 +144,7 @@ const {
 } = await import('../../js/core/touch-layout.js');
 const { TouchControls } = await import('../../js/ui/touch-controls.js');
 const { TouchLayoutEditor } = await import('../../js/ui/touch-layout-editor.js');
-const { Settings, SETTINGS_KEY, MOBILE_CONTROLS } = await import('../../js/core/settings.js');
+const { Settings, SETTINGS_KEY, SETTINGS_VERSION, MOBILE_CONTROLS } = await import('../../js/core/settings.js');
 const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
 const { setLanguage, localizeTree } = await import('../../js/localization/i18n.js');
 const { getCharacter } = await import('../../js/data/characters.js');
@@ -182,11 +182,10 @@ function layOut(tc, scheme = tc.scheme) {
     runLeft: [30, 420, 60, 60],
     runRight: [190, 420, 60, 60],
     extra_attack: [900, 250, 68, 68],
-    transform: [800, 330, 60, 60],
     shield: [880, 330, 60, 60],
     attack1: [760, 420, 60, 60],
     attack2: [840, 420, 60, 60],
-    attack3: [720, 330, 60, 60],
+    attack3: [800, 330, 60, 60],
     attack4: [760, 250, 60, 60],
     attack5: [840, 250, 60, 60],
     jump: [920, 420, 60, 60],
@@ -206,11 +205,11 @@ const centre = (node) => ({ clientX: node.rect.left + node.rect.width / 2, clien
 
 test('every control of both schemes has a stable id, independent of its label', () => {
   assert.deepEqual([...TOUCH_CONTROL_IDS.joystick], [
-    'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'transform', 'shield',
+    'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual([...TOUCH_CONTROL_IDS.classic], [
-    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual(Object.keys(TOUCH_CONTROL_IDS), [...MOBILE_CONTROLS], 'one list per Mobile Controls scheme');
@@ -219,12 +218,12 @@ test('every control of both schemes has a stable id, independent of its label', 
   // Each id is exactly the element on screen for it.
   const joystick = tc.getControlElements('joystick');
   assert.equal(joystick.get('stick'), tc.stick, 'the joystick itself, though it is no button');
-  assert.equal(tc.controlElement('down'), null);
+  for (const retired of ['down', 'transform']) assert.equal(tc.controlElement(retired), null, retired);
   assert.equal(joystick.get('mouvementLeft'), tc.mouvementButtons.get('mouvementLeft'));
   assert.equal(joystick.get('mouvementRight'), tc.mouvementButtons.get('mouvementRight'));
   const classic = tc.getControlElements('classic');
   for (const id of ['runLeft', 'runRight']) assert.equal(classic.get(id), tc.padButtons.get(id), id);
-  for (const id of ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']) {
+  for (const id of ['extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']) {
     assert.equal(joystick.get(id), tc.actionButtons.get(id), `${id}: joystick`);
     assert.equal(classic.get(id), tc.actionButtons.get(id), `${id}: classic, the same element`);
   }
@@ -342,7 +341,7 @@ test('a custom layout moves and sizes each control by id, kept on screen, and a 
   assert.equal(dashLeft.style.translate, '-10.0px -250.0px');
   assert.equal(dashLeft.style.scale ?? '', '');
   // Everything else is left alone.
-  for (const id of ['mouvementRight', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2']) {
+  for (const id of ['mouvementRight', 'extra_attack', 'shield', 'attack1', 'attack2']) {
     assert.equal(tc.controlElement(id).style.translate, '', id);
   }
   // A new window size or orientation: the same fractions on the new screen.
@@ -421,7 +420,7 @@ test('a custom layout never changes what a button sends: every held action, both
     const { tc, calls } = touchControls(scheme);
     layOut(tc);
     scatter(tc);
-    const held = ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'jump'];
+    const held = ['extra_attack', 'shield', 'attack1', 'attack2', 'jump'];
     held.forEach((action, i) => {
       const b = tc.buttons.get(action);
       assert.equal(b.getAttribute('data-action'), action, `${scheme}: ${action} keeps its codename`);
@@ -696,14 +695,13 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
 test('the editor always uses neutral localized icons for every selection, scheme and reopening', () => {
   const { app, editor, storage } = editorApp();
   const icons = {
-    extra_attack: ICONS.ring, transform: ICONS.transform, shield: ICONS.shield, jump: ICONS.jump,
+    extra_attack: ICONS.ring, shield: ICONS.shield, jump: ICONS.jump,
     ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`attack${n}`, ICONS[`pip${n}`]])),
     mouvementLeft: ICONS.mouvementLeft, mouvementRight: ICONS.mouvementRight,
     runLeft: ICONS.left, runRight: ICONS.right,
   };
   const check = (language) => {
     assert.equal(editor.touchRoot.querySelectorAll('.tc-sprite-icon').length, 0);
-    assert.equal(editor.touchRoot.dataset.attackButtons, '5');
     for (const [id, node] of editor.touch.getControlElements()) {
       assert.equal(node.hidden, false, `${id}: available to edit`);
       if (id === 'stick') {
@@ -922,19 +920,57 @@ test('editor and dialog styles: the real controls always shown here, a selection
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\n  \*, \*::before, \*::after \{\n    animation-duration: 0\.001ms !important;/);
 });
 
-test('legacy layouts discard Down alone and keep all other positions and scales, including in the editor', () => {
+test('legacy layouts discard Down and Transform alone and keep all other positions and scales, including in the editor', () => {
   for (const scheme of MOBILE_CONTROLS) {
     const kept = Object.fromEntries(TOUCH_CONTROL_IDS[scheme].map((id, i) => [id, { x: Math.round((0.1 + i * 0.02) * 100) / 100, y: 0.6, scale: 1.2 }]));
-    const legacy = { ...kept, down: { x: 0.3, y: 0.4, scale: 1.7 } };
+    const legacy = { ...kept, down: { x: 0.3, y: 0.4, scale: 1.7 }, transform: { x: 0.55, y: 0.45, scale: 1.4 } };
     assert.deepEqual(sanitizeTouchLayout(scheme, legacy), kept);
     const { tc } = touchControls(scheme);
     tc.setLayout(legacy);
     assert.deepEqual(tc.getLayout(), kept);
-    assert.equal(tc.getControlElements().has('down'), false);
-    assert.equal(tc.controlElement('down'), null);
+    for (const retired of ['down', 'transform']) {
+      assert.equal(tc.getControlElements().has(retired), false, retired);
+      assert.equal(tc.controlElement(retired), null, retired);
+    }
     const { editor } = editorApp();
     editor.open({ scheme });
-    assert.equal(editor.touch.getControlElements().has('down'), false);
+    for (const retired of ['down', 'transform']) assert.equal(editor.touch.getControlElements().has(retired), false, retired);
+    editor.close();
+  }
+});
+
+test('a saved layout from before Transform was removed loads, edits and resets cleanly: only its Transform entry is gone', () => {
+  const { app, editor, storage } = editorApp();
+  // As an older Alva saved them (the same settings version: nothing about
+  // them needed migrating): Transform moved and grown in both schemes,
+  // beside other customised controls.
+  const joystick = { transform: { x: 0.6, y: 0.5, scale: 1.5 }, attack1: { x: 0.7, y: 0.8, scale: 1.3 }, stick: { x: 0.15, y: 0.75, scale: 1.1 } };
+  const classic = { runLeft: { x: 0.1, y: 0.8, scale: 1.2 }, transform: { x: 0.65, y: 0.55, scale: 0.8 }, jump: { x: 0.9, y: 0.85, scale: 1 } };
+  storage.setItem(SETTINGS_KEY, JSON.stringify({ version: SETTINGS_VERSION, mobileControls: 'classic', touchLayouts: { joystick, classic } }));
+  app.settings = new Settings(storage);
+  const { transform: _j, ...joystickKept } = joystick;
+  const { transform: _c, ...classicKept } = classic;
+  assert.deepEqual(app.settings.touchLayout('joystick'), joystickKept);
+  assert.deepEqual(app.settings.touchLayout('classic'), classicKept);
+  assert.equal(app.settings.get('mobileControls'), 'classic', 'every other setting kept');
+  for (const scheme of MOBILE_CONTROLS) {
+    editor.open({ scheme });
+    // Neither editor shows, selects or places it.
+    assert.equal(editor.touch.getControlElements().has('transform'), false, scheme);
+    assert.deepEqual([...editor.touch.getControlElements().keys()], [...TOUCH_CONTROL_IDS[scheme]], scheme);
+    assert.equal(editor.touchRoot.querySelectorAll('button').filter((b) => b.getAttribute('data-action') === 'transform' || b.getAttribute('data-control') === 'transform').length, 0);
+    editor.select('transform');
+    assert.equal(editor.selected, null, `${scheme}: nothing to select`);
+    assert.deepEqual(editor.touch.getLayout(), scheme === 'joystick' ? joystickKept : classicKept, `${scheme}: the rest as saved`);
+    // Editing another control saves the layout without it.
+    editor.select('jump');
+    editor.slider.value = '110';
+    editor.slider.dispatch('input');
+    assert.equal(Object.hasOwn(saved(storage).touchLayouts[scheme], 'transform'), false, `${scheme}: saved without it`);
+    // Reset to defaults: Alva's own layout, which has no Transform.
+    editor.resetButton.click();
+    assert.deepEqual(saved(storage).touchLayouts[scheme], {}, `${scheme}: reset`);
+    assert.equal(editor.touch.getControlElements().has('transform'), false);
     editor.close();
   }
 });

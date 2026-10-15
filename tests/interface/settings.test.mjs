@@ -562,7 +562,7 @@ test('custom layouts are checked: malformed objects, unknown ids, non-finite coo
         shield: { x: 0.5, y: 0.5, scale: 0.1 }, // the smallest size
         attack1: { x: Infinity, y: 0.5, scale: 1 }, // dropped
         attack2: { x: 0.5, y: Number.NaN, scale: 1 }, // (NaN is null in JSON) dropped
-        transform: { x: '0.5', y: 0.5, scale: 1 }, // dropped
+        transform: { x: 0.5, y: 0.5, scale: 1 }, // the retired Transform button: dropped
         extra_attack: { x: 0.5, y: 0.5 }, // no scale: dropped
         runLeft: { x: 0.5, y: 0.5, scale: 1 }, // not a joystick control: dropped
         __proto__: { x: 0.5, y: 0.5, scale: 1 },

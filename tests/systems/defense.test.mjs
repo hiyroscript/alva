@@ -211,7 +211,7 @@ test('the shared input is shield on L; no block, dodge or defense action', () =>
   assert.equal(CONFIG.bindings.defense, undefined, 'no alias for the retired name');
   assert.equal(ACTION_LABELS.shield, 'Shield');
   assert.deepEqual(ACTIONS, [
-    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
 });
