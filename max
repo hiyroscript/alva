@@ -1,574 +1,1068 @@
-ALVA — Permanently Remove the Transform Button and Entire Transform System
+ALVA — Adamaris Stage & Gameplay Update
 
 Objective
 
-Completely and permanently remove the Transform button, action, and all associated functionality from the Alva game.
+Implement a major update to ALVA, introducing a new playable stage called Adamaris, renaming two existing stages, updating the match timer and credits, and creating a dramatic new Void elimination ripple effect.
 
-Transform will never be used in Alva. It is not a planned feature, a reserved ability, or a future mechanic.
+This is an implementation task, not a proposal. Inspect the existing systems, write the code, integrate everything into the game, update the documentation and tests, and verify that the features work.
 
-This is a permanent feature deletion, not a temporary UI change.
+Repository: https://github.com/hiyroscript/alva
 
-Do not merely hide or disable the button. Remove its underlying implementation and all unnecessary references throughout the codebase.
+Follow the existing project’s architecture, visual direction, code conventions, collision rules, and gameplay systems. Preserve existing functionality unless explicitly changed below.
 
-The finished game must behave as though Transform was never included in its control architecture.
+ALVA is a browser-based 2D platform fighter using JavaScript, HTML, CSS, and Canvas 2D with procedural pseudo-3D stage artwork. Do not introduce a new game engine, rendering framework, or unnecessary dependencies.
 
-1. Understand the existing architecture
+⸻
 
-Before making changes, inspect the current repository thoroughly.
+1. NEW STAGE: ADAMARIS
 
-Repository: hiyroscript/alva
+1.1 Overview
 
-Default branch: main
+Create a new stage named Adamaris.
 
-Alva uses vanilla JavaScript ES modules, HTML, CSS, Canvas rendering, and Node’s built-in test runner.
+Adamaris is a beautiful tropical beach featuring a massive volcano in the distant background.
 
-Review the game’s existing architecture before modifying it, particularly:
+The stage should feel like a real coastal environment rather than a small platform floating over empty space.
 
-* CLAUDE.md
-* README.md
-* ALVA_SPEC.md
-* codename_rule
-* docs/architecture/
-* docs/systems/input.md
-* docs/systems/combat.md
-* js/config.js
-* js/core/
-* js/data/
-* js/game/
-* js/ui/
-* js/screens/
-* css/
-* tests/
+Its main distinguishing characteristics are:
 
-Respect the project’s existing architecture and conventions.
+* A large, continuous beach as the fighting surface.
+* Sand stretching beyond the playable area’s visible boundaries.
+* A beautiful ocean and coastal scenery.
+* A giant, highly visible volcano centered in the far background.
+* Random volcanic eruptions that create dangerous falling-rock hazards.
+* Clearly indicated, randomized rock impact locations.
+* Dynamic environmental animation.
 
-Never modify character_rule. It is a protected project file.
+The environment must look polished and visually distinct from all existing ALVA stages.
 
-Use existing systems and coding patterns rather than introducing replacement abstractions.
+1.2 Stage integration
 
-2. Permanently remove the Transform gameplay action
+Register Adamaris in js/data/maps.js, with the stable ID adamaris.
 
-In js/config.js, remove Transform from every gameplay-related definition.
+Add a procedural stage renderer in:
 
-Specifically:
+js/stages/adamaris-theme.js
 
-* Remove transform: ['KeyK'] from gameplay keyboard bindings.
-* Remove 'transform' from COMBAT_BUTTONS.
-* Remove 'transform' from ACTIONS.
-* Remove transform: 'Transform' from ACTION_LABELS.
-* Remove the transform entry from MOVES.
-* Remove obsolete comments describing Transform as reserved or potentially usable.
+Register that renderer in:
 
-The expected combat action vocabulary becomes:
+js/stages/index.js
 
-export const COMBAT_BUTTONS = Object.freeze([
-  'extra_attack',
-  ...NUMBERED_ATTACKS,
-]);
+Adamaris must automatically appear as the fourth playable stage in the existing 24-slot stage roster.
 
-Keep the existing ordering of all remaining actions.
+It must support:
 
-Ensure the complete input pipeline no longer generates, consumes, or stores transform or transformPressed gameplay state.
+* Quick Battle
+* Custom Play
+* Regular Play’s random stage selection
+* Watch Mode
+* Stage thumbnails
+* Animated stage previews
+* Rematches
+* The existing camera and rendering systems
+* English and French localization
 
-Inspect:
+Do not replace an existing stage.
 
-* js/core/input-manager.js
-* js/game/fighters/fighter-controller.js
-* js/game/fighters/fighter.js
-* js/game/combat/move-status.js
-* Any combat, AI, or helper modules deriving their inputs from the action registry.
+1.3 Continuous beach ground — critical requirement
 
-Remove Transform-only comments, state handling, press buffering, and special cases where applicable.
+Unlike Desert, City, and Asperitas, Adamaris must NOT have a small, visibly isolated main platform.
 
-Important: The K key is also used for the separate menu Back command in CONFIG.menuBindings. Preserve this navigation shortcut. Removing the gameplay Transform binding must not remove or break menu Back.
+The beach is the ground itself.
 
-Do not change unrelated keyboard bindings.
+The sand should extend horizontally beyond the Void boundaries and beyond the visible screen, creating the impression that the fighters are standing on a real, continuous coastline.
 
-3. Physically delete the Transform button from the mobile UI
+There must be:
 
-The main button implementation is in:
+* No floating island.
+* No rectangular stage foundation.
+* No visible platform underside.
+* No cliff faces at the left or right.
+* No artificial pedestal or floating slab.
+* No visible abrupt ending to the beach.
 
-js/ui/touch-controls.js
+The ground should remain visually continuous while the camera moves.
 
-Currently, the action buttons include:
+Physics implementation
 
-{ action: 'transform', pos: 'transform' }
+The existing StageCollision system builds a finite solid floor from map.mainStage. Camera framing and overtime Void calculations also depend on that geometry.
 
-Remove this entry entirely.
+Do not simply make mainStage thousands of units wider without checking those dependencies.
 
-Transform must no longer have:
+Instead, implement a clean, data-driven way for stages to support a continuous ground surface.
 
-* A DOM button.
-* A registered pointer handler.
-* A click or keyboard activation handler.
-* An accessible label.
-* A pending/reserved appearance.
-* An icon or sprite.
-* A position in the control cluster.
-* A control ID in internal button collections.
-
-Make sure TouchControls.buttons, actionButtons, allButtons, and the scheme-specific control maps never contain Transform.
-
-This applies to both touch-control schemes:
-
-1. Joystick.
-2. Classic Buttons.
-
-The deletion must apply consistently in Quick Battle, Practice Ground, Watch Mode where relevant, and any other screen using the shared touch controls.
-
-Do not replace Transform with an invisible button, dummy entry, or placeholder.
-
-4. Adjust the mobile combat-button layout
-
-The existing mobile honeycomb places Transform between the numbered attacks and Shield.
-
-Current arrangement:
-
-       [4]    [5]    [EXTRA]
-    [3]   [TRANSFORM] [SHIELD]
-       [1]    [2]    [JUMP]
-
-Remove the Transform slot permanently.
-
-Review the remaining layout and make any necessary adjustments so that the control cluster remains intentional, balanced, and comfortable to use.
+For example, introduce an explicit ground type or separate ground collision extent while retaining a normal-sized combat framing region.
 
 Requirements:
 
-* No reserved empty space dedicated to Transform.
-* No invisible element occupying its previous position.
-* No overlapping buttons.
-* No overlapping hit areas.
-* All remaining buttons stay accessible.
-* Numbered attacks retain their correct action identities and order.
-* Shield, Jump, and Extra Attack remain easy to reach.
-* The design works with fighters having two, three, four, or five numbered attacks.
-* The layout works across supported landscape screen sizes and safe-area insets.
-* Custom positions and sizes continue to work.
+1. The beach must have actual ground collision, not just sand painted behind fighters.
+2. Fighters must be able to run, jump, Dash, land, and attack on the sand normally.
+3. The ground must continue beyond both horizontal Void limits.
+4. The camera must preserve the existing readable fighter scale rather than zooming out excessively.
+5. The Void must remain capable of eliminating fighters who cross its kill boundaries.
+6. Overtime must still close the Void correctly.
+7. No invisible side walls should be added.
+8. Existing finite-platform stages must retain their current collision behavior.
 
-Modify css/touch-controls.css where necessary.
+Important: Adamaris should not expose an ordinary ledge where a fighter can walk off the sand and fall. Side eliminations must still remain possible through the existing Void blast-zone rules, even though the beach visually continues beyond those boundaries.
 
-Remove the .tc-transform selector and any layout assumptions depending on Transform’s existence.
+Use stage capabilities or geometry metadata rather than hard-coding checks against map.id === 'adamaris' throughout the engine.
 
-Update the diagram and layout comments to describe the final arrangement.
+The beach should visually extend naturally at all supported resolutions.
 
-Do not change gameplay balance, combat mechanics, or unrelated interface styling.
+⸻
 
-5. Remove Transform from custom touch layouts and their editor
+2. ADAMARIS VISUAL DESIGN
 
-Inspect:
+2.1 General appearance
 
-* js/core/touch-layout.js
-* js/ui/touch-layout-editor.js
-* js/core/settings.js
-* js/ui/settings-dialog.js
+Create a lush, atmospheric tropical beach with the same quality and depth expected from ALVA’s procedural stage system.
 
-Remove 'transform' from both arrays in TOUCH_CONTROL_IDS.
+The stage should contain:
 
-The touch layout editor must not offer Transform as a selectable, movable, or resizable control.
+Beach and foreground
 
-Remove any Transform-specific editor UI, icon, label, selection expectation, or placement logic.
+* Warm, golden beach sand.
+* Subtle sand patterns, texture, and ripples.
+* A broad, flat, unobstructed fighting surface.
+* Small decorative shells and scattered pebbles.
+* Natural variations in sand color.
+* Occasional coastal vegetation.
+* Beach details that do not interfere with fighter visibility.
 
-Existing user settings must remain safe.
+Sea
 
-Some players may have stored customized layouts containing a transform entry.
+* A clearly visible blue or turquoise ocean.
+* Gentle waves moving toward the shore.
+* Light foam along the shoreline.
+* Animated water highlights and reflections.
+* A visible transition between dry sand, wet sand, and seawater.
+* A natural horizon line.
 
-The existing touch-layout sanitization system should discard retired control IDs. Ensure an old saved Transform entry is ignored or cleaned up without damaging other controls.
+Environment
 
-Preserve all valid saved layout entries, including positions and scales.
+* A bright tropical sky.
+* Atmospheric clouds.
+* Palm trees or coastal vegetation toward the sides.
+* Distant coastal landforms or small islands where appropriate.
+* Subtle environmental particles or sea spray.
+* Proper background depth and parallax.
 
-Also ensure that restoring default controls produces the updated layout without Transform.
+The sea must be unmistakably visible. It should not be represented by a single flat blue rectangle.
 
-Do not unnecessarily reset user settings or increase the settings version if existing sanitization handles the change safely.
+The sand must be unmistakably visible. It should not resemble a painted rooftop or a floating platform.
 
-6. Remove Transform-specific mobile ability presentation
+The visual style should remain consistent with ALVA’s Canvas 2D aesthetic rather than introducing incompatible photorealistic images.
 
-Inspect:
+2.2 The volcano
 
-* js/ui/mobile-abilities.js
-* js/data/ability-preview.js
-* js/ui/icons.js
+Place an enormous volcano in the center of the far background.
 
-Remove Transform from the mobile ability presentation system.
+This volcano is Adamaris’s primary visual landmark and gameplay hazard source.
 
-This includes:
+Requirements:
 
-* The Transform fallback-icon mapping.
-* Its reserved-button classification.
-* Transform-specific presentation comments.
-* Transform-specific glyph handling.
-* Its associated SVG icon, if no other active feature uses it.
-* Any code whose sole purpose is presenting a reserved Transform ability.
+* It must be clearly recognizable as a volcano.
+* Its silhouette must be large and imposing.
+* Its crater must be visible.
+* It must remain visually centered in normal gameplay.
+* It must be visible in the stage selection preview.
+* It should sit behind the beach and ocean, not on the playable fighting surface.
+* It must have appropriate atmospheric depth and parallax.
+* The fighter sprites must remain legible against the background.
 
-Preserve generic ability-availability logic still required by other attacks.
+Give the volcano a detailed silhouette with uneven rocky slopes, crater edges, and subtle terrain shading.
 
-Ensure ABILITY_ACTIONS contains only actual supported combat controls.
+When dormant, it can release small amounts of smoke or steam.
 
-The game should no longer display a dashed Transform button, including when no fighter is selected.
+When erupting, its crater should illuminate with glowing lava and dramatic environmental effects.
 
-Preserve Jump, Shield, the numbered attacks, and Extra Attack.
+The volcano must not be a static decoration.
 
-7. Remove Transform from every playable character
+⸻
 
-Inspect all playable character definitions:
+3. VOLCANO STATE SYSTEM
 
-* js/data/characters/0001.js
-* js/data/characters/0002.js
-* js/data/characters/0003.js
-* js/data/characters/0004.js
+3.1 Two primary states
 
-They currently contain reserved entries such as:
+The Adamaris volcano has exactly two primary gameplay states:
 
-transform: null, // reserved
+State A — Dormant
 
-Delete these entries.
+The volcano is relatively peaceful.
 
-Remove comments describing the button as reserved.
+During this state:
 
-Check for any Transform-related entries in:
+* No volcanic rocks are generated.
+* The crater is dark or minimally illuminated.
+* Small smoke or steam effects may appear.
+* The ocean and beach continue their normal animations.
+* No new landing indicators appear.
 
-* actions
-* attacks
-* abilityNames
-* abilityDescriptions
-* mobileAbilities
-* Controller layouts
-* Other move-related metadata
+The volcano should still appear alive rather than becoming a completely frozen image.
 
-Only remove entries associated with the retired Transform mechanic.
+State B — Erupting
 
-Do not modify any unrelated attack, summon, technique, animation, character statistic, or ability.
+The volcano becomes active.
 
-Do not blindly delete character artwork. Some assets or poses may visually resemble a transformation without being associated with this control. Retain any artwork that may be used elsewhere.
+During this state:
 
-The four playable fighters must retain their current playable movesets.
+* The crater glows intensely.
+* Lava and fire are visibly emitted.
+* Large smoke and ash plumes rise.
+* The eruption animation becomes more dramatic.
+* Volcanic rocks are launched from the crater.
+* Rocks travel through the scene and eventually strike random positions on the beach.
+* Red landing indicators appear before impacts.
+* The environment can respond with subtle lighting and camera effects.
 
-8. Remove support from the loadout system
+The eruption must be clearly visible before, during, and after rocks are launched.
 
-Inspect:
+3.2 Random state selection
 
-js/data/loadout.js
+The volcano must use a randomized state-selection system.
 
-Remove Transform from the supported loadout contract.
+Do not implement a simple automatic Dormant → Erupting → Dormant → Erupting alternation.
 
-Update validation to recognize only the supported combat buttons.
+Instead, after a state period ends, randomly select the next primary state.
 
-Remove comments and rules suggesting Transform may eventually become a real move.
+Both outcomes must be possible at every selection.
 
-Do not preserve Transform as a recognized but disabled action.
+For example, the following sequences must be possible:
 
-New character definitions containing actions.transform should be treated as invalid, just like any other unsupported combat action.
+* Dormant → Dormant → Erupting
+* Erupting → Dormant → Erupting
+* Erupting → Erupting → Dormant
+* Dormant → Erupting → Erupting
 
-Preserve the existing validation rules for:
+Choose sensible, configurable state durations and probabilities so eruptions are noticeable but do not dominate the entire match.
 
-* Numbered ground attacks.
-* Mid-air attacks.
-* Extra Attack.
-* Summons.
-* Techniques.
-* Ground-only abilities.
+Use the project’s existing seeded-randomness conventions so the hazard simulation is reproducible.
 
-Make sure the loadout system remains character-agnostic.
+3.3 Visible eruption phases
 
-9. Remove Transform from game-controller support
+Although the volcano has two primary gameplay states, the erupting state should have recognizable animation phases.
 
-Inspect:
+Implement visual progression such as:
 
-* js/data/controller-profiles.js
-* js/core/controller-resolver.js
-* js/ui/controller-editor.js
-* Related controller settings and validation.
+1. Buildup: crater light intensifies, smoke thickens, and the volcano appears unstable.
+2. Initial eruption: lava and smoke burst from the crater.
+3. Rock launch: glowing volcanic rocks visibly shoot out of the volcano.
+4. Sustained activity: lava, smoke, ash, and additional rock launches may continue.
+5. Cooldown: the volcanic plume diminishes and the crater’s glow settles.
 
-In controller-profiles.js, remove Transform from MOVE_CONTROLS.
+These are animation phases within the erupting state, not additional randomly chosen primary states.
 
-Update ACTION_ID so that the following are no longer accepted:
+The eruption animation must not abruptly jump from a static mountain to rocks appearing in the sky.
 
-ground:transform
-air:transform
+The player should visually understand that the volcano is responsible for the falling rocks.
 
-Transform must not be assignable to any PlayStation, Xbox, Nintendo, or generic controller button.
+The volcano must support combinations of visible activity, including:
 
-It should never appear in the controller binding editor.
+* Dormant with light smoke.
+* Erupting without a rock currently in flight.
+* Erupting while launching rocks.
+* Multiple rocks traveling through the scene.
+* Glowing crater and smoke remaining visible after a volley.
+* Rocks still completing their trajectories as the volcano transitions toward dormancy.
 
-Stored controller profiles containing obsolete Transform bindings must be sanitized correctly, preserving all remaining valid bindings.
+⸻
 
-Keep the existing controller fallback system, binding conflict detection, controller-specific glyphs, and ground/air bindings working normally.
+4. VOLCANIC ROCK HAZARDS
 
-Do not alter existing recommended controller layouts unless directly necessary.
+4.1 General mechanics
 
-10. Remove the Transform system from test fixtures
+The volcanic rocks are stage hazards, not fighter-owned attacks.
 
-This is especially important.
+They originate from the volcano and can damage and launch fighters.
 
-The repository includes:
+There must be two rock sizes.
 
-tests/fighters/fixtures/sample-fighter.mjs
+Rock type	Damage	Base Launch
+Small volcanic rock	1	1
+Large volcanic rock	1	2
 
-Unlike the real playable roster, this test-only fighter currently implements a genuine Transform attack called Awakening.
+Both deal exactly 1 damage.
 
-Remove its Transform functionality entirely.
+The larger rock must NOT deal more damage simply because it is larger.
 
-This includes its:
+Its advantage is its stronger Base Launch.
 
-* Transform animation mapping.
-* actions.transform entry.
-* attacks.transform definition.
-* mobileAbilities.transform descriptor.
-* abilityNames.transform entry.
-* Related test comments and expectations.
+Use ALVA’s existing Launch Point system.
 
-Preserve the sample fighter’s other special mechanics, including its summon, unique attacks, different ground/air moves, and mobile ability previews.
+Damage must increase the target’s Launch Point first, then the launch strength must be calculated using the existing formula:
 
-The test fixture must remain useful for testing Alva’s generic character architecture, without reintroducing a retired action.
+Launch Strength = Base Launch × Updated Launch Point
 
-Inspect other test fixtures for Transform declarations and remove them where appropriate.
+Therefore:
 
-11. Update the entire automated test suite
+* Small rock: Base Launch 1.
+* Large rock: Base Launch 2.
 
-A complete deletion requires updating all tests that still assume Transform exists.
+Use a consistent upward launch direction for ground impacts, allowing the existing launch reaction and steering systems to apply normally.
 
-Pay particular attention to:
+Do not invent an unrelated knockback formula.
 
-Interface tests
+4.2 Rocks cannot be deflected
 
-* tests/interface/controls-ui.test.mjs
-* tests/interface/touch-layout.test.mjs
-* tests/interface/battle-screen.test.mjs
-* tests/interface/ability-hud.test.mjs
-* tests/interface/settings.test.mjs
-* tests/interface/i18n.test.mjs
-* tests/interface/controller-ui.test.mjs
+Neither rock type can be deflected.
 
-Gameplay and systems tests
+This requirement is absolute.
 
-* tests/systems/codenames.test.mjs
-* tests/systems/loadout.test.mjs
-* tests/systems/sample-fighter.test.mjs
-* tests/systems/ability-names.test.mjs
-* tests/systems/controller-profiles.test.mjs
-* tests/systems/controller-input.test.mjs
-* tests/systems/combo.test.mjs
-* tests/systems/combo-assist.test.mjs
-* tests/systems/combat-assist.test.mjs
-* tests/systems/attack-classification.test.mjs
-* tests/systems/defense.test.mjs
-* tests/systems/down.test.mjs
+A fighter’s Deflect ability must never:
 
-Fighter and integration tests
+* Reverse the rock’s trajectory.
+* Redirect it toward the volcano.
+* Transfer ownership of the rock.
+* Turn the rock into a fighter projectile.
+* Erase the hazard merely because a Deflect hitbox overlaps it.
 
-* tests/fighters/0001/fighter-0001.test.mjs
-* tests/fighters/0002/fighter-0002.test.mjs
-* tests/fighters/0003/fighter-0003.test.mjs
-* tests/fighters/0004/fighter-0004.test.mjs
-* tests/integration/watch-mode.test.mjs
-* tests/integration/practice-ground.test.mjs
+Keep stage hazards separate from the normal reflectable projectile collection, or explicitly implement non-deflectable hazard semantics.
 
-Also search the remaining tests and fixtures for references.
+Do not implement the rocks as ordinary fighter projectiles and rely on special-case checks scattered across combat code.
 
-Update expected arrays, snapshots, button counts, mocked inputs, ability maps, screen tests, and controller profiles.
+The existing universal Shield behavior should remain consistent: a raised Shield can block a damaging hit according to ALVA’s normal defense rules, but Deflect must never return a volcanic rock.
 
-Do not simply delete tests wholesale to obtain passing results.
+The hazards must have no fighter owner and must not incorrectly award combat credit.
 
-Replace obsolete assertions with meaningful regression tests demonstrating that Transform is gone.
+4.3 Rock sizes and appearance
 
-Required regression coverage:
+Small rocks
 
-1. ACTIONS, COMBAT_BUTTONS, MOVES, and gameplay bindings contain no Transform.
-2. The input snapshot has no transform or transformPressed fields.
-3. Touch controls have no Transform DOM element in either scheme.
-4. Transform cannot be activated by pointer, keyboard, or controller input.
-5. Neither mobile layout editor displays Transform.
-6. Old custom touch layouts discard their Transform entry but preserve other controls.
-7. Old controller profiles discard ground:transform and air:transform.
-8. All playable fighter definitions validate without Transform.
-9. Character loadout validation rejects an obsolete Transform action.
-10. All remaining combat buttons work on the ground and in the air as appropriate.
-11. Ability HUD and touch previews still display all available moves correctly.
-12. The keyboard K key still performs menu Back.
-13. Existing controller and touch customization continues to work.
+* Smaller impact warning circle.
+* Faster-looking movement.
+* Smaller impact effects.
+* Dark volcanic stone with visible orange cracks.
+* A short glowing trail.
+* Base Launch 1.
 
-If removing entries from fighter definitions affects profile-review checks, review and update those fixtures or hashes correctly, following the repository’s testing guidance.
+Large rocks
 
-12. Update localization
+* Noticeably bigger visual size.
+* Larger impact warning circle.
+* More substantial smoke and debris.
+* Brighter molten cracks or glowing edges.
+* A stronger impact effect.
+* Base Launch 2.
 
-Alva supports English and French.
+Both should look like volcanic material rather than normal brown stones.
 
-Inspect:
+Rock visuals should clearly communicate their different sizes.
 
+4.4 Projectile trajectories
+
+Rocks must visibly originate from the volcano.
+
+They should follow convincing curved trajectories that carry them from the distant crater toward the beach.
+
+The animation may use perspective scaling so rocks grow as they approach the gameplay plane.
+
+Requirements:
+
+* No instant teleportation from volcano to ground.
+* No rocks spawning directly over an impact point without a visible launch.
+* No rock appearing disconnected from the eruption.
+* Every rock has an individual trajectory and destination.
+* Rocks should animate smoothly at different frame rates.
+* Their gameplay impact must correspond to their visible landing time and location.
+
+The rocks should look as though they are being launched out of the volcano and falling toward the fighters.
+
+4.5 Randomized landing positions — critical requirement
+
+Rocks must land at randomized locations across the playable beach.
+
+Do not implement one fixed impact point.
+
+Do not use a hard-coded list of two or three destinations that visibly repeats.
+
+Choose impact coordinates across the usable fighting area using the battle’s seeded RNG.
+
+Landing locations must cover meaningful portions of the arena, including:
+
+* Left side.
+* Center-left.
+* Center.
+* Center-right.
+* Right side.
+
+Across repeated eruptions, all these regions should be reachable.
+
+Prevent obviously broken target selection, such as unreachable locations, positions outside the relevant play area, or every rock landing on exactly the same spot.
+
+It is acceptable for a rock to sometimes land near a fighter, but do not guarantee hits through unfair targeting.
+
+Rocks should not simply lock onto the player’s position at the moment they land.
+
+When multiple rocks are falling, their targets should be generated independently, with sensible spacing where needed to preserve readability.
+
+Allow natural randomness while avoiding repetitive, predictable landing patterns.
+
+4.6 Red landing indicators
+
+Before each volcanic rock lands, display a red circular warning indicator on the beach at the exact destination.
+
+This is mandatory.
+
+Each rock must have its own indicator.
+
+The indicators should:
+
+* Appear before impact.
+* Be bright red and immediately recognizable.
+* Be positioned correctly on the sand.
+* Follow the stage’s perspective.
+* Remain anchored to their world coordinates while the camera moves.
+* Match the corresponding rock’s impact radius.
+* Be visible against the sand.
+* Disappear when their associated impact resolves.
+* Never misrepresent where the rock will land.
+
+A good visual style would include:
+
+* A glowing red outer circle.
+* A translucent red interior.
+* A subtle pulsing or contracting animation.
+* Increasing intensity as impact approaches.
+
+The warning circle should clearly communicate danger without obscuring the fighter sprites.
+
+Give players sufficient reaction time to recognize the circle and move out of it.
+
+Recommended initial tuning: approximately 0.9–1.4 seconds of visible warning before impact, with final values adjustable after gameplay testing.
+
+The timing must be consistent with the rock’s actual trajectory.
+
+Under reduced-motion settings, keep the warning static but clearly visible. Do not eliminate the warning.
+
+4.7 Collision and damage
+
+On impact, check the hazard’s actual world-space area against fighter collision geometry.
+
+If a fighter is struck:
+
+1. Apply 1 damage.
+2. Add that damage to their Launch Point.
+3. Apply the appropriate Base Launch.
+4. Trigger the existing fighter hit reaction.
+5. Produce the correct hit effects.
+
+A fighter must not be damaged merely because a warning circle exists.
+
+A rock must not hit a fighter repeatedly on consecutive frames from one impact.
+
+One rock should resolve one hit per affected fighter.
+
+If both fighters occupy the same impact area, both may be struck.
+
+Do not unintentionally grant either fighter immunity to stage hazards.
+
+Avoid an infinite vertical hitbox that damages characters nowhere near the actual rock.
+
+If midair collision with a traveling rock is supported, it must match the rock’s visible world-space geometry and use the same one-hit resolution.
+
+Do not disrupt existing Shield, Launch Point recovery, stun, respawn, or combat-event rules.
+
+4.8 Impact effects
+
+Each landing should produce a convincing impact.
+
+Include effects such as:
+
+* A brief burst of sand.
+* Small volcanic fragments.
+* A localized dust cloud.
+* A bright flash or molten highlight.
+* A shock ring.
+* Brief impact particles.
+* A stronger visual response for large rocks.
+
+Small and large impacts should feel different.
+
+The impact effects must be synchronized with collision and damage.
+
+Do not make permanent holes or obstacles unless explicitly required by a future update.
+
+All impact effects should automatically expire and clean up.
+
+⸻
+
+5. HAZARD SYSTEM ARCHITECTURE
+
+ALVA already contains dynamic platform hazards for Asperitas, implemented through:
+
+* js/data/platform-hazards.js
+* js/game/platform-hazards.js
+
+Adamaris’s volcano is a different type of hazard: it produces timed damaging projectiles rather than moving collision platforms.
+
+Do not force volcanic projectiles into the drifting-platform controller if doing so creates incorrect abstractions.
+
+Implement a dedicated, reusable stage-hazard controller where appropriate, potentially under a new module such as:
+
+js/game/stage-hazards.js
+
+A separate configuration module may hold Adamaris-specific tuning.
+
+The implementation should:
+
+* Use fixed-timestep simulation.
+* Use deterministic seeded randomness.
+* Keep stage definitions immutable.
+* Maintain per-battle runtime state.
+* Separate collision and game logic from visual rendering.
+* Support initialization and resetting.
+* Support paused gameplay.
+* Support rematches.
+* Avoid leaking projectiles or timers after a match.
+* Use the same underlying behavior in Quick Battle and Watch Mode.
+
+Ensure Arena.update() advances the hazard simulation only when gameplay is supposed to advance.
+
+Integrate with Arena.render() so the volcano’s live state, volcanic rocks, landing warnings, and impact effects are all visible.
+
+The theme should receive the hazard state it needs to render correctly.
+
+Avoid randomizing gameplay positions or eruption decisions inside drawing methods.
+
+Stage previews
+
+Update js/ui/stage-preview.js.
+
+Currently, its animated hazard simulation is built around dynamic platforms.
+
+Extend it so Adamaris can display its own animated volcano and hazard behavior.
+
+The large animated preview should visibly demonstrate the eruption cycle and volcanic rocks.
+
+The small static thumbnail should present a beautiful, readable view of the beach and volcano without requiring active simulation.
+
+Neither preview should affect live battle state.
+
+CPU behavior
+
+Review the CPU’s existing stage awareness, including:
+
+js/game/ai/cpu-intelligence/stage-model.js
+
+CPUs should be able to respond reasonably to visible volcanic landing indicators.
+
+They must not have advance knowledge of random impact coordinates before the warning appears.
+
+Preserve the existing difficulty distinctions and avoid introducing universal perfect dodging.
+
+CPU-controlled fighters must still be affected by rock hazards exactly as player-controlled fighters are.
+
+⸻
+
+6. STAGE RENAMES
+
+Rename two existing stages.
+
+Current name	New name
+City	Sol-Noir
+Desert	Yerma
+
+These are names of the existing stages, not new stages.
+
+Preserve their visuals, layouts, collision, and existing gameplay.
+
+Update their names everywhere user-facing, including:
+
+* Stage selection.
+* Stage details.
+* Stage previews.
+* Relevant UI text.
+* English localization.
+* French localization.
+* Documentation.
+* Any other player-visible references.
+
+Keep the internal IDs city and desert unless changing them is technically necessary. Preserving them is preferable because other game systems and tests already reference those identifiers.
+
+Likewise, the existing city-theme.js and desert-theme.js files do not require renaming simply to change what players see.
+
+Preserve current stage selections and existing references.
+
+Both languages should display the proper names Sol-Noir and Yerma.
+
+⸻
+
+7. CREDITS UPDATE
+
+Update the in-game credits.
+
+Currently the original-work credit identifies individual stage names.
+
+Stop listing stage names individually.
+
+Replace that wording with “all stages”.
+
+The English credit should communicate:
+
+“Game design, code, interface, ALVA wordmark, and all stages by hiyroscript.”
+
+Adapt it to the existing localization placeholders.
+
+Update the French translation with equivalent wording.
+
+Relevant files:
+
+* js/ui/credits.js
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
-* js/localization/i18n.js
+* README.md
 
-Remove retired Transform-specific translations and references, including:
+Do not remove the creator’s name or the existing third-party sprite credits.
 
-control.transform
+The intention is that future stages will already be covered by the general credit without constantly editing the list of stage names.
 
-French:
+⸻
 
-Transformation
+8. MATCH TIMER: FIVE MINUTES
 
-English derives some control labels from ACTION_LABELS, so ensure that removal is reflected correctly in both languages.
+Change the standard battle timer from seven minutes to five minutes.
 
-Do not change translations involving unrelated visual transformations, animation, or rendering.
+The relevant configuration is:
 
-Ensure the touch layout editor, controller editor, and combat UI remain fully localized.
+js/config.js
 
-13. Update documentation and project specifications
+Current value:
 
-Remove Transform from the game’s current supported-feature documentation.
+CONFIG.battle.matchSeconds = 420
 
-Review:
+New value:
+
+CONFIG.battle.matchSeconds = 300
+
+The timer must display 5:00 when a normal match begins.
+
+This applies to:
+
+* Quick Battle.
+* Regular Play.
+* Custom Play.
+* Watch Mode.
+* Rematches.
+
+The countdown must continue using the existing simulation timing, pause behavior, and phase handling.
+
+Do not break overtime.
+
+The current one-minute overtime should remain available when scores are tied at the end of the five-minute regulation period.
+
+Update relevant help text, descriptions, comments, documentation, and automated tests to reflect the new duration.
+
+Ensure no user-visible description continues telling players that regulation lasts seven minutes.
+
+⸻
+
+9. NEW VOID ELIMINATION RIPPLE EFFECT
+
+9.1 Objective
+
+Whenever a fighter is eliminated by the Void, the Void itself must visibly react at the precise point where the fighter crosses its elimination boundary.
+
+Think of dropping an object into water and watching the water react with expanding, energetic ripples.
+
+However, the effect should use ALVA’s existing black-and-red Void aesthetic rather than literally converting the Void into blue water.
+
+This effect applies to all stages, not only Adamaris.
+
+9.2 Existing implementation
+
+Inspect:
+
+* js/game/arena.js
+* js/game/rendering/hit-fx.js
+* js/stages/stage-theme.js
+
+Currently, Arena.checkVoid() detects eliminations and triggers HitEffects.addElimination().
+
+The existing elimination effect includes a fighter-colored burst, flash, particles, and an expanding ring.
+
+Keep that existing elimination burst.
+
+The new Void ripple is an additional effect showing that the Void itself has been disturbed.
+
+It must not simply replace the existing fighter-colored effect with another generic ring.
+
+9.3 Ripple appearance
+
+The new ripple must be vibrant, energetic, and visually substantial.
+
+On elimination:
+
+1. The Void boundary visibly reacts around the contact point.
+2. A bright, localized pulse appears.
+3. Several concentric ripples expand outward.
+4. The nearby black surface appears disturbed.
+5. The red boundary rim becomes more intense locally.
+6. Wave energy travels outward from the impact.
+7. The disturbance loses strength gradually and fades.
+
+The ripples should feel as though they originate from the Void’s surface rather than floating as unrelated particles in front of the screen.
+
+Use layered rings, bright highlights, and animated wave deformation.
+
+The effect should have enough contrast and scale to be unmistakable during fast gameplay.
+
+It must not appear as a weak, nearly invisible outline.
+
+9.4 Actual Void-surface reaction
+
+This is the most important visual requirement.
+
+The Void must genuinely appear to react to the elimination.
+
+Do not implement only a circular particle animation over a completely unchanged black Void.
+
+Add a localized, temporary disturbance to the Void’s rendered boundary or surface.
+
+For example:
+
+* Create an impact centered on the boundary crossing.
+* Calculate an expanding disturbance around that position.
+* Temporarily increase local wave amplitude.
+* Allow that disturbance to propagate along the boundary.
+* Make the nearby red rim ripple along with the black edge.
+* Gradually reduce the disturbance until the Void returns to normal.
+
+A damped wave impulse or similar procedural animation would be appropriate.
+
+Keep the original organic wave behavior as the baseline.
+
+The new impulse should be layered over it.
+
+The Void’s shape should visibly change, but the gameplay kill boundary must never move because of the effect.
+
+The disturbance is visual only.
+
+9.5 Exact elimination position
+
+Calculate the visual impact position from the fighter’s actual crossing of the Void boundary.
+
+Support eliminations through:
+
+* The left Void boundary.
+* The right Void boundary.
+* The upper Void boundary.
+* The lower Void boundary.
+* Corners or diagonal crossings.
+
+Use the crossing side and world-space position to anchor the effect to the Void.
+
+Do not place every ripple in the middle of the screen.
+
+Do not use a fixed stage position.
+
+Do not spawn the ripple at the fighter’s original spawn point.
+
+Use the fighter’s previous and current positions where necessary to identify the actual boundary crossing, rather than depending on an imprecise screen-space approximation.
+
+The effect must remain correctly positioned while the camera moves.
+
+It must also work when the Void is closing during overtime.
+
+9.6 Multiple eliminations
+
+Support multiple simultaneous or closely spaced eliminations.
+
+Each elimination creates its own ripple.
+
+Ripple effects may overlap naturally.
+
+Do not have a second elimination unexpectedly erase the first ripple.
+
+Effects should expire cleanly, without growing arrays indefinitely.
+
+The effect must work for either fighter and must not depend on character-specific code.
+
+9.7 Visual synchronization
+
+Coordinate the new ripple with the existing elimination burst.
+
+The expected sequence:
+
+* Fighter crosses the Void boundary.
+* Fighter is marked eliminated through the existing rules.
+* The Void reacts immediately at that location.
+* The fighter-colored burst appears over the reaction.
+* Ripples spread and fade.
+* Normal gameplay continues or the match transitions to its result.
+
+The ripple must not delay elimination, change scoring, prevent respawning, or interfere with other combat effects.
+
+9.8 Reduced motion
+
+Respect ALVA’s existing reduced-motion behavior.
+
+In reduced-motion mode:
+
+* Keep a clearly visible localized elimination pulse.
+* Reduce or eliminate aggressive traveling distortions.
+* Disable unnecessary screen shake.
+* Preserve the recognizable reaction without intense animation.
+
+Normal mode should show the full vibrant effect.
+
+⸻
+
+10. PERFORMANCE AND RENDERING
+
+All new effects must work with ALVA’s existing Canvas 2D renderer.
+
+Do not introduce WebGL or external animation libraries.
+
+Follow the established stage architecture:
+
+* Cached procedural geometry when appropriate.
+* Layered parallax backgrounds.
+* A common perspective system.
+* World-space visual effects anchored to gameplay coordinates.
+* Fixed-timestep gameplay simulation.
+* Interpolated rendering.
+
+Make Adamaris work on both desktop and mobile landscape layouts.
+
+Avoid unnecessary allocations or expensive full-canvas operations every frame.
+
+Keep the volcano visible without covering fighters or their HUD elements.
+
+Keep red landing indicators readable even when ash particles or other environmental effects overlap.
+
+Test standard, narrow, and high-DPI displays.
+
+Ensure that the added visual effects do not introduce obvious frame-rate instability.
+
+⸻
+
+11. DOCUMENTATION AND LOCALIZATION
+
+Update the project’s current documentation to reflect the new behavior.
+
+Relevant files include:
 
 * README.md
 * ALVA_SPEC.md
-* docs/systems/input.md
-* docs/systems/combat.md
-* docs/development/conventions.md
-* docs/characters/
-* docs/characters/adding-characters.md
-* codename_rule
-* Any other current documentation mentioning the retired action.
+* docs/gameplay/stages.md
+* docs/gameplay/battle.md
+* docs/gameplay/watch-mode.md
+* docs/systems/rendering.md
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-Remove references presenting Transform as:
+Document:
 
-* A reserved button.
-* A planned feature.
-* A future move slot.
-* A supported codename.
-* An available keyboard action.
-* A customizable controller action.
-* A mobile-control layout element.
+* Adamaris and its continuous ground.
+* The volcano’s two randomized states.
+* The rock hazards.
+* Small and large rock damage and Base Launch.
+* The non-deflectable hazard rule.
+* Random landing locations.
+* Red warning circles.
+* The new Void ripple.
+* The stage name changes.
+* The five-minute match timer.
+* The revised credits.
 
-Update button diagrams and control tables to match the implemented interface.
+Add localized stage names, taglines, and traits.
 
-The documentation must accurately describe the finished game.
+Suggested Adamaris stage information:
 
-Preserve historical records in UPDATES.md where they genuinely describe past implementations; do not rewrite project history unnecessarily. They must not be mistaken for the current product specification.
+Name: Adamaris
 
-Do not modify character_rule.
+Tagline: “A paradise beneath a restless volcano”
 
-14. Search for remaining references and eliminate dead code
+Description: “Golden sands stretch along a tropical sea beneath a towering volcano. Watch the crater carefully: sudden eruptions send volcanic rocks crashing onto the beach.”
 
-After implementation, perform a repository-wide search for:
+Traits:
 
-transform
-Transform
-TRANSFORM
-transformation
-Transformation
-control.transform
-ground:transform
-air:transform
-transformPressed
-tc-transform
+Trait	Value
+Terrain	Tropical beach
+Platforms	Continuous ground
+Hazards	Volcanic rockfall
+Obstacles	None
+Light	Tropical daylight
 
-Investigate every result.
+Provide natural French translations, keeping Adamaris as a proper name.
 
-Eliminate remaining references to the retired gameplay action, button, character move, controller binding, and reserved feature.
+Do not rewrite historical update records merely because an old feature description was accurate when written.
 
-Important distinction: JavaScript and CSS also use the word transform for legitimate rendering operations.
+⸻
 
-Do NOT remove or rename unrelated functionality such as:
+12. TESTING REQUIREMENTS
 
-ctx.setTransform(...)
+Add tests for the new systems and update existing tests affected by the changes.
 
-or:
+The repository already uses Node’s built-in test runner.
 
-transform: scaleX(-1);
-transform: translateY(...);
-
-These are graphical operations, not the retired Transform ability.
-
-Also preserve movement transformations, animation transforms, screen transitions, camera rendering, sprite mirroring, and other unrelated mechanics.
-
-Do not perform an indiscriminate string replacement.
-
-15. Preserve the complete existing game
-
-This task is solely a permanent Transform feature removal.
-
-Do not modify the following except when directly required to remove a verified Transform dependency:
-
-* Fighter movement, jumping, dashing, and air movement.
-* Shield and Deflect.
-* Attacks, projectiles, summons, and techniques.
-* Damage, Energy, cooldowns, and Launch mechanics.
-* Combat Assist and Combo Assist.
-* CPU intelligence.
-* Stage rendering and physics.
-* Character selection.
-* Quick Battle.
-* Practice Ground.
-* Watch Mode.
-* Main menus and Settings.
-* Existing valid controller bindings.
-* Existing valid saved touch layouts.
-* English and French localization.
-* Animation systems and rendering pipelines.
-
-Do not introduce feature flags, compatibility stubs, placeholder buttons, or future Transform hooks.
-
-Keep the codebase as simple as possible.
-
-16. Run comprehensive validation
-
-Run the full automated suite:
+Run:
 
 node --test
 
-Fix all failures resulting from this deletion.
+Also verify the game in a real browser, since Canvas rendering quality cannot be fully validated with mocked drawing contexts.
 
-Also run focused tests for input, touch controls, loadouts, controller profiles, and fighter definitions.
+12.1 Adamaris tests
 
-Where browser execution is available, manually verify:
+Verify that:
 
-* Quick Battle with touch controls.
-* Practice Ground with touch controls.
-* Joystick layout.
-* Classic Buttons layout.
-* The custom touch layout editor.
-* English and French interfaces.
-* Fighters with different attack counts.
-* Keyboard gameplay and menu navigation.
-* Controller bindings and their editor.
-* Different supported mobile viewport sizes.
+* Adamaris is registered in the map database.
+* Its theme can be constructed.
+* It appears in the fourth stage roster slot.
+* It is available in Quick Battle and Watch Mode.
+* Random Stage can select it.
+* The normal stage selection UI can select and start it.
+* Its preview renders without errors.
+* Its animated preview updates the volcano.
+* The sand is supported by actual collision.
+* The ground remains continuous beyond the blast-zone edges.
+* Existing stages retain their finite-platform behavior.
+* The camera keeps playable fighters at an appropriate scale.
+* Overtime closes the Void correctly on Adamaris.
+* The new ground configuration does not break CPU movement.
 
-Confirm that Transform is absent everywhere, with no empty functional control, duplicate button, broken layout, or invalid saved setting.
+Review assumptions in tests/systems/platform-stage.test.mjs that currently require every stage to have finite ledges. Update these tests to recognize the new intentional ground type without weakening their existing coverage of other stages.
 
-Do not report a test as passed unless it was actually run.
+12.2 Volcano state tests
 
-17. Completion requirements
+Verify that:
 
-The task is complete only when:
+* The volcano starts in a valid state.
+* Both primary states are reachable.
+* States are selected randomly rather than alternating.
+* Consecutive dormant periods are possible.
+* Consecutive erupting periods are possible.
+* Dormant periods generate no new rocks.
+* Erupting periods generate rocks.
+* State transitions occur on the simulation clock.
+* Replays with the same seed produce the same hazard behavior.
+* Match restarts correctly reset hazard state.
 
-* Transform is no longer a gameplay action.
-* Transform is no longer a supported move.
-* No Transform button is created anywhere.
-* No interface offers Transform.
-* No device can activate Transform.
-* No character defines Transform.
-* No controller layout can bind Transform.
-* No touch layout can customize Transform.
-* No dedicated Transform icon, styling, or placeholder remains.
-* Saved configurations containing it are handled safely.
-* Current documentation no longer advertises it.
-* All relevant tests reflect the new control architecture.
-* Unrelated gameplay remains unchanged.
+12.3 Volcanic rock tests
 
-18. Final implementation report
+Verify that:
 
-After completing the changes, provide:
+* Small rocks deal exactly 1 damage.
+* Large rocks deal exactly 1 damage.
+* Small rocks have Base Launch 1.
+* Large rocks have Base Launch 2.
+* The existing Launch Point formula is respected.
+* Rocks cannot be deflected.
+* Rocks are not assigned fighter ownership.
+* Their collisions work for both fighters.
+* Shields follow the intended universal block rule.
+* One impact does not cause unintended repeated hits.
+* Impact warnings precede impacts.
+* Each warning matches its rock’s landing position.
+* Random landing locations vary over the arena.
+* Rocks and indicators clean up after resolving.
+* Hazard simulation is consistent across different render frame rates.
 
-1. A concise description of how Transform was removed.
-2. The main files modified, grouped by subsystem.
-3. The final mobile control layout and any positioning adjustments.
-4. An explanation of how legacy saved layouts and controller profiles are handled.
-5. Test commands executed and their results.
-6. Any remaining limitations or verification that could not be performed.
+12.4 Void ripple tests
 
-Final instruction:
+Verify that:
 
-Permanently delete Transform as a concept from Alva’s active game architecture.
+* Each Void elimination creates a ripple event.
+* The ripple is positioned at the correct boundary crossing.
+* All four sides are supported.
+* Two simultaneous eliminations produce independent effects.
+* Ripple animations expire.
+* Existing fighter-colored elimination effects still work.
+* Reduced-motion behavior is respected.
+* The ripple never modifies collision or scoring.
+* Overtime’s closing Void remains functional.
 
-This must be a complete, clean removal—not a hidden button, disabled action, unfinished migration, or reserved future feature.
+12.5 Timer and interface tests
 
-Keep the rest of Alva fully functional and unchanged wherever possible.
+Update tests currently expecting 420, 7:00, or seven minutes.
+
+Pay particular attention to:
+
+* tests/integration/overtime.test.mjs
+* tests/integration/watch-mode.test.mjs
+* tests/integration/practice-ground.test.mjs
+* tests/interface/battle-screen.test.mjs
+* tests/interface/stage-select.test.mjs
+* tests/interface/i18n.test.mjs
+
+Verify that the match begins at 5:00, reaches overtime correctly, and retains its original one-minute overtime behavior.
+
+Check English and French credits, stage names, descriptions, and stage selection labels.
+
+⸻
+
+13. ACCEPTANCE CRITERIA
+
+Consider the update complete only when all of the following conditions are satisfied.
+
+Adamaris
+
+* [ ]	Adamaris is a playable fourth stage.
+* [ ]	It clearly resembles a tropical beach.
+* [ ]	Sand, sea, sky, and a large centered volcano are visible.
+* [ ]	The fighting ground extends beyond the Void and has no visible platform foundation.
+* [ ]	Normal camera framing, combat, and eliminations still work.
+* [ ]	The volcano has independently randomized dormant and erupting states.
+* [ ]	Eruptions are visually animated.
+* [ ]	Rocks visibly launch from the volcano.
+* [ ]	Rocks land at different randomized positions.
+* [ ]	Every impact has a visible red warning circle beforehand.
+* [ ]	Small rocks deal 1 damage with Base Launch 1.
+* [ ]	Large rocks deal 1 damage with Base Launch 2.
+* [ ]	Neither rock type can be deflected.
+* [ ]	Rock collision and launch use the existing gameplay rules.
+* [ ]	The stage works in previews, Quick Battle, and Watch Mode.
+
+Other changes
+
+* [ ]	City is displayed as Sol-Noir.
+* [ ]	Desert is displayed as Yerma.
+* [ ]	Existing stage gameplay remains unchanged.
+* [ ]	Credits refer to “all stages” rather than individually naming them.
+* [ ]	Regulation matches last five minutes.
+* [ ]	The match HUD starts at 5:00.
+* [ ]	The existing overtime rules still work.
+* [ ]	All Void eliminations create vibrant, localized ripple effects.
+* [ ]	The Void’s animated surface visibly reacts to elimination.
+* [ ]	Existing elimination particles and scoring are preserved.
+* [ ]	English and French localization are complete.
+* [ ]	Relevant tests and documentation are updated.
+* [ ]	No unrelated systems regress.
+
+⸻
+
+14. IMPLEMENTATION STANDARDS
+
+Read and follow CLAUDE.md, ALVA_SPEC.md, and the relevant architecture documentation before editing.
+
+Do not modify protected character rules.
+
+Do not modify fighter movesets or character statistics unnecessarily.
+
+Avoid introducing special-case checks for particular fighter IDs.
+
+Keep stage-hazard data and behavior separate from fighter move definitions.
+
+Make new tuning parameters easy to adjust.
+
+Use the existing code style and module conventions.
+
+Do not solve visual problems by changing unrelated gameplay physics.
+
+Do not weaken test assertions merely to make tests pass.
+
+Preserve the current controls, HUD, combat flow, audio policy, and platform support.
+
+When finished, provide:
+
+1. A summary of the implemented changes.
+2. The important files added or modified.
+3. Any tuning parameters introduced for Adamaris.
+4. Automated test results.
+5. Browser rendering and gameplay verification results.
+6. Any remaining limitations.
+
+Final priority: This update must be both visually impressive and mechanically correct. Adamaris should feel like a living beach environment dominated by a dangerous, unpredictable volcano. The continuous ground must not look like a conventional floating platform, volcanic hazards must be fair and clearly telegraphed, and Void eliminations must produce an unmistakable reaction from the Void itself.
+
+Do not stop at a basic proof of concept. Implement and integrate the complete feature set.
