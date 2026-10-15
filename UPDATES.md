@@ -2035,3 +2035,56 @@ fighter's own Transform (Awakening) removed from
 (`combo`, `combat-assist`, `combat-ai`, `attack-classification`,
 `special-abilities`) driven by a reserved `extra_attack` instead; every
 other test that expected the button updated.
+
+## Adamaris, the volcano and the Void's ripple
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: a fourth stage, Adamaris, with a continuous beach and a volcano whose
+eruptions throw rocks; Desert and City renamed; the credits' "all stages";
+a five-minute clock; and the Void rippling where it takes a fighter.
+
+**What it added**
+
+- **Continuous ground** (`js/game/physics.js`: `resolveGround`,
+  `GROUND_TYPES`; a map's `ground`): a stage's floor may run `reach` past
+  both sides of the Void instead of ending in ledges. The main stage stays
+  the combat area for the camera, the Void and overtime; every finite stage
+  keeps exactly its collision. The CPU's `StageModel` takes the combat
+  area's edges for ledges there (`ledges` false).
+- **Adamaris** (`js/data/maps.js`, fourth in `MAPS`, slot 04;
+  `js/stages/adamaris-theme.js`): the beach, the sea, the volcano, palms;
+  English and French names, tagline and traits.
+- **Stage hazards** (`js/data/stage-hazards.js`, `js/game/stage-hazards.js`,
+  a map's `hazards`): `StageHazards` and `VolcanoController`, two random
+  states (dormant, erupting) with eruption phases, and volcanic rocks
+  (1 damage each, Base Launch 1 small / 2 large, upward) with red warnings
+  at their exact landings. Rocks are never projectiles and have no owner:
+  `CombatSystem.hazardHit` applies them through `applyHit` with no attacker
+  (`source: 'hazard'`, `attack: false`, `hazard` on the event). The Arena
+  runs them after the fighters' hits each step (only while a Battle's fight
+  is on: `hazardsLive`), the theme draws them, the preview runs its own
+  (opening on an eruption), and the CPU steps out of visible warnings
+  (`avoidHazards` in `brain.js`, `StageModel.dangerZones`).
+- **The Void's ripple** (`voidCrossing` in `js/game/arena.js`,
+  `HitEffects.addVoidRipple` and `HIT_FX.voidRipple`,
+  `StageTheme.rippleOffset` and `drawVoidRipples`): every Void elimination
+  disturbs the drawn edge where the fighter crossed it, on every stage.
+- **Renames:** Desert is shown as **Yerma**, City as **Sol-Noir** (ids,
+  themes and layouts kept).
+- **Credits:** "Game design, code, interface, ALVA wordmark, and all
+  stages by hiyroscript." (and the French), no stage named.
+- **Clock:** `CONFIG.battle.matchSeconds` 420 → 300 (5:00); overtime kept
+  at 60 s.
+
+**Where to tune it:** `VOLCANO` and `VOLCANIC_ROCKS` in
+`js/data/stage-hazards.js`; Adamaris's `ground`, Void margins and rock
+`targets` in `js/data/maps.js`; `HIT_FX.voidRipple` in
+`js/game/rendering/hit-fx.js`; the volcano's size and the beach's depths at
+the top of `js/stages/adamaris-theme.js`.
+
+**Tests:** `tests/systems/stage-hazards.test.mjs`,
+`tests/systems/adamaris.test.mjs`, `tests/systems/void-ripple.test.mjs`;
+continuous and finite ground in `platform-stage`; the roster, Random Stage
+and Adamaris's preview in `stage-select`; names, credits and the clock in
+`i18n`, `overtime`, `battle-screen`, `watch-mode`, `practice-ground`,
+`quick-battle` and `discover`.

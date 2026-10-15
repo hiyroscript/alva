@@ -276,8 +276,8 @@ Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Ena
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
 Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change Stage / Return to Home
-Battle (7:00 over, one fighter ahead on points) → Result → Rematch / Change Stage / Return to Home
-Battle (7:00 over, level on points) → OVERTIME: the same fight 60 s more, the Void closing in from the sides and bottom
+Battle (5:00 over, one fighter ahead on points) → Result → Rematch / Change Stage / Return to Home
+Battle (5:00 over, level on points) → OVERTIME: the same fight 60 s more, the Void closing in from the sides and bottom
 Battle (overtime: a fighter scores its 3rd point) → K.O. → Result
 Battle (overtime over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
 Battle (overtime over, level on points and Launch Point: a tie) → Result (Tie) → Rematch / Change Stage / Return to Home
@@ -285,7 +285,7 @@ Result → Change Stage → Select Stage (Custom Play's own; after Regular Play,
 ```
 
 A Watch Mode battle follows the same Battle lines (pause, points, K.O.,
-7:00, overtime and its closing Void, result, tie); its Change Stage
+5:00, overtime and its closing Void, result, tie); its Change Stage
 returns to Watch Mode's Select Stage.
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
@@ -497,7 +497,7 @@ no header, build label, eyebrow or keyboard hint bar.
 - Mode details panel: its heading and hairline, followed immediately by one
   **Quick Battle** section with a moderately emphasized heading and two muted
   paragraphs: the overview (face a CPU, knock the opponent into the Void to
-  score, first to 3 points wins), then its match rules (up to 7 minutes;
+  score, first to 3 points wins), then its match rules (up to 5 minutes;
   a tied score when time runs out starts 1 minute of overtime as the Void
   closes in). No separate Regular Play, Custom Play or Match Rules sections.
   Regular Play and Custom Play explanations remain in the play-type dialog below.
@@ -639,14 +639,14 @@ no header, build label, eyebrow or keyboard hint bar.
 - A large live preview of the highlighted stage (stage artwork only, gentle
   camera pan) beside the **stage roster**: 24 slots
   (`CONFIG.stageRoster.totalSlots`), six by four on a large display. The
-  playable stages (`MAPS`, in order) fill the first slots, **01 Desert, 02
-  City, 03 Asperitas**, and the other 21 are reserved, unavailable
+  playable stages (`MAPS`, in order) fill the first slots, **01 Yerma, 02
+  Sol-Noir, 03 Asperitas, 04 Adamaris**, and the other 20 are reserved, unavailable
   placeholders: a subdued tile with its number and a lock, not a button,
   never focused, selected or started, and no stage is made up for one.
   The slots come from the real registry (`stageSlots`), so a new stage
   takes the next slot with no layout change; the roster grows past 24 only
   once the stages outnumber it. Practice Ground is never a slot.
-- A counter beside the roster's title: *3 available / 24 slots*, counted
+- A counter beside the roster's title: *4 available / 24 slots*, counted
   from the registry.
 - Stage tiles show a still thumbnail (no hazard running in it), the stage's
   number and name, the standard neutral focus ring, hover feedback, and a
@@ -710,7 +710,7 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   `CombatAIController` on each side and no `PlayerController`; everything
   else, points, Void scoring, respawns, Launch Point, Energy, Shields,
   summons and techniques, clones, projectiles, stage physics, camera, hit effects,
-  the 7-minute clock and overtime with its closing Void, results, rematch
+  the 5-minute clock and overtime with its closing Void, results, rematch
   and restart, is unchanged (7.2.8). Both fighters' sprites load
   through the usual loading overlay (once for a mirror match); a failure of
   either uses the usual error with Retry and Back (to Select Stage).
@@ -735,7 +735,8 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   as they are:
   - **ALVA** — created by hiyroscript.
   - **Original work** — game design, code, interface, ALVA wordmark, and
-    Desert / City stage artwork by hiyroscript.
+    all stages by hiyroscript (no stage is named, so every stage, those to
+    come included, is covered).
   - **#0001 sprite source** — sprite sheet by Finhj on DeviantArt, the
     line linked to the sheet's page (by the deviation's number alone, so
     the address names nothing); the credits the sheet itself gives:
@@ -1406,13 +1407,23 @@ French, concise game terms).
   **camera bounds** (`cameraBounds`) and **the Void** (`voidBounds`, the
   kill boundary). There are no side walls, visible or invisible: fighters can
   run, jump or be knocked off either ledge, fall below the stage and drift
-  back if they can.
-- Main stages are 1280–1440 units wide (Desert 1360, City 1440, Asperitas
-  1400, Practice Ground 1280). The Void is a blast zone set by margins
+  back if they can. A stage may instead have a **continuous ground**
+  (`ground: { type: 'continuous', reach }`, data, read by
+  `resolveGround` in `js/game/physics.js`; Adamaris's beach): real
+  collision at the main stage's top running `reach` world units past each
+  side of the Void, so there is no ledge, slab, cliff or wall anywhere a
+  fighter can be; the main stage is then the combat area that the camera,
+  the Void and overtime's closing Void are set round as on every stage, and
+  only the side Void (the usual kill boundary) ends a run along it. No
+  engine code names a stage: every stage with a finite floor keeps exactly
+  its old collision.
+- Main stages are 1280–1440 units wide (Yerma 1360, Sol-Noir 1440,
+  Asperitas 1400, Adamaris 1400, Practice Ground 1280). The Void is a blast zone set by margins
   around the main stage (`voidAround` in `js/data/maps.js`, data per
-  stage): Desert 360 past each ledge, 400 below the stage's top and 760
-  above it; City 340, 420 and 800 (over its highest deck); Asperitas 360,
-  400 and 840 (over the highest its clouds can rise); Practice Ground 380
+  stage): Yerma 360 past each ledge, 400 below the stage's top and 760
+  above it; Sol-Noir 340, 420 and 800 (over its highest deck); Asperitas 360,
+  400 and 840 (over the highest its clouds can rise); Adamaris 360, 400 and
+  800; Practice Ground 380
   (its block is the narrowest), 400 and 760. There is room to be knocked off, fight briefly
   and drift back, but a fighter carried on outward is lost soon after; no
   jump (both air jumps of the triple jump included) from any stage's highest footing reaches the upper line. Camera
@@ -1425,12 +1436,15 @@ French, concise game terms).
   Practice Ground's projection): a top that recedes in depth, a front face
   with thickness and the side face past whichever ledge the view looks
   beyond, lined up exactly with collision at the fighters' depth.
-- **Desert:** a compact sandstone mesa at golden hour over open desert air;
+- **Stage names.** The first two stages are shown as **Yerma** and
+  **Sol-Noir** in every language (they were first called Desert and City);
+  their ids (`desert`, `city`), themes, layouts and gameplay are unchanged.
+- **Yerma (`desert`):** a compact sandstone mesa at golden hour over open desert air;
   sky, sun, far mesas, dunes, buttes and hoodoos on the desert floor below,
   warm haze thickening beneath the rim, drifting sand; a rippled sandy top, a
   strata-banded cliff face fading into the haze, and two faceted rock
   outcrops to hop onto. No boundary cliffs.
-- **City:** one rooftop block at night over the street canyon; dense skyline,
+- **Sol-Noir (`city`):** one rooftop block at night over the street canyon; dense skyline,
   moon, searchlights, the elevated train, warm neon; a roof with its props,
   a lit facade and seven one-way platforms (racks, catwalks with billboards,
   a girder, the water-tower deck, a scaffold) that fighters jump up through
@@ -1450,6 +1464,52 @@ French, concise game terms).
   classified as **hazards** (`hazard: true`): they never damage, stun,
   launch or take anyone; their hazard is that they move, rest, fade away
   from under a fighter and form again somewhere new. No obstacles.
+- **Adamaris:** a tropical beach at midday, a towering volcano centred far
+  out across the bay. Its sand is a continuous ground (`reach` 2400): no
+  platform, slab, ledge, cliff or wall, nothing to walk off; no platforms or
+  solids on it. Art: sky, cumulus and the sun; the volcano on its own
+  island (rocky flanks, gullies, forested foot, a crater that glows, lava
+  down its channels, steam or an ash plume, lava fountaining), islands and
+  green headlands on the horizon; the sea (deep blue to turquoise, swells
+  rolling in, glints, the volcano's glow on the water), foam washing up and
+  back over wet sand; the rippled golden beach with shells and pebbles
+  running on past every side of the view, palms with beach grass leaning in
+  at its sides; sea spray, drifting sand and, in an eruption, falling ash.
+  Traits: Tropical beach, Continuous ground, Volcanic rockfall, no
+  obstacles, Tropical daylight.
+- **The volcano** (Adamaris's stage hazard: `hazards` on the map, its
+  runtime `js/game/stage-hazards.js`, its tuning `js/data/stage-hazards.js`,
+  on its own random stream of the battle's seed, fixed-step, held outside a
+  battle's fight phase). Two states, **dormant** (steam, no rocks, no
+  warnings) and **erupting**; when a period ends the next is drawn at
+  random (an eruption with 42 %), so either can follow either. Dormant
+  6–11 s, erupting 7–11 s; every match opens dormant for 4–7 s (a preview
+  opens erupting). An eruption runs its visible phases in order: buildup
+  (1.4 s), burst (0.6 s), active, cooldown (the last 1.8 s); volleys of one
+  to three rocks every 1–1.8 s from the burst until the cooldown. Rocks in
+  flight finish whatever the volcano does next.
+- **Volcanic rocks:** stage hazards, never projectiles (no Deflect,
+  repelling or erasing projectile can turn one back, own, erase or meet
+  one) with no owner (their hits credit nobody: `attacker` null, `attack`
+  false, `source` `'hazard'`). Small: 1 damage, Base Launch 1; large: 1
+  damage, Base Launch 2; both upward, through the Launch rules (7.2.7) like
+  any hit, and blocked by a raised Shield like any hit. Each picks its own
+  landing at random across the combat area (x 1060–2540), kept clear of
+  rocks landing about the same time, flies there from the crater on a bowed
+  path in 2.1–2.9 s (drawn growing as it comes, with a glowing trail), and
+  strikes only where it lands, on the step it lands: its impact (radius 46
+  small / 72 large, reaching 110 / 140 up from the sand) against each
+  fighter's hurtboxes, each fighter in it once. Before it lands its **red
+  warning** shows on the sand at exactly its landing and exactly its
+  impact's radius, 1.1 s (small) or 1.3 s (large) ahead: a glowing ring, a
+  translucent red interior, an inner ring closing in and the rock's
+  shadow, brightening as it nears (still and at full strength with reduced
+  motion), gone as it lands; a warning alone strikes nobody. The impact: a
+  flash, a shock ring, sand, fragments and dust (bigger for a large rock)
+  and a small shake (none with reduced motion), all expiring. CPUs see only
+  the warnings showing (never a landing before its warning) and may step
+  out of one after their reaction time, more reliably the higher their
+  level, never every time; rocks strike CPUs and players alike.
 - **Platform hazards** (any stage; Asperitas's two clouds today): a
   platform with a `dynamic` block is moved and switched off and on by its
   own state machine (`js/game/platform-hazards.js`, tuning in
@@ -1505,8 +1565,21 @@ French, concise game terms).
   corner. The wave, rim included, is art only (it wavers around the kill
   line, never moves it) and holds still with reduced motion. The theme
   draws the black around the very rectangle collision tests, handed to it
-  by the Arena each frame (`drawVoid(ctx, view, stage.void)`); it keeps no
+  by the Arena each frame (`drawVoid(ctx, view, stage.void, ripples)`); it keeps no
   copy of its own and never decides the boundary.
+- **The Void's ripple:** whenever the Void takes a fighter (on every stage,
+  through any side or corner, overtime's closed edge included) it reacts
+  where the fighter's centre crossed its boundary, found from where the
+  centre was a step ago and is now (`voidCrossing`). A damped wave impulse
+  is laid over that side's slow waves (and a nearby side's at a corner):
+  the black edge and its red rim dip at the point, swell and ring there,
+  and a wave runs out along the edge both ways, dying away over 1.5 s; the
+  rim burns brighter along the disturbed stretch, rings spread through the
+  black and a bright pulse flares at the point, under the fighter-coloured
+  burst, which stays as it was. Each elimination has its own ripple, two
+  at once two independent ones; they expire and a restart clears them. With
+  reduced motion only a still dip, a still ring and the pulse show, and no
+  shake. Paint only: the kill boundary, scoring and respawns never read it.
 - **Overtime's closing Void** (Quick Battle and Watch Mode, 7.2.8): through
   overtime's 60 seconds the Void closes in, linearly over the whole period
   (`StageCollision.closeVoid`, driven by `Battle.overtimeProgress`, 0 to 1,
@@ -2947,7 +3020,7 @@ it names a fighter, an attack or an animation.
   Mode alike), level on points, the fighter with the lower Launch Point
   wins (a fighter still waiting to respawn counts the Launch Point it fell
   with); equal is a tie, the match over with no winner (7.3). The normal
-  7:00 never goes to the Launch Point:
+  5:00 never goes to the Launch Point:
   level on points there is overtime (7.2.8).
 - **Launch** (`js/data/launch.js`): how a hit sends its target flying.
   Every hit (an attack's, a projectile's, a
@@ -3078,8 +3151,8 @@ it names a fighter, an attack or an animation.
 
 #### 7.2.8 Matches and the combat AI
 
-- Quick Battle: 7 minutes (`CONFIG.battle.matchSeconds`, 420
-  seconds; the HUD starts at `7:00`), then, with the points level, 60
+- Quick Battle: 5 minutes (`CONFIG.battle.matchSeconds`, 300
+  seconds; the HUD starts at `5:00`), then, with the points level, 60
   seconds of overtime (`CONFIG.battle.overtimeSeconds`, below),
   first to `CONFIG.battle.pointsToWin` (3) points, Player 1's fighter
   (`characterId`) against the CPU's own (`cpuCharacterId`: picked on Custom
@@ -3103,7 +3176,7 @@ it names a fighter, an attack or an animation.
   is reproducible and the two never share one sequence, not even in a mirror
   match; unseeded, the seed comes from the clock. Restart and rematch keep
   both controllers and reset their plans. Every rule below is the same as in
-  Quick Battle, the 7-minute clock (`CONFIG.battle.matchSeconds`, one
+  Quick Battle, the 5-minute clock (`CONFIG.battle.matchSeconds`, one
   clock for every Battle) and overtime included.
   - **One intelligence for every fighter and level.** The combat AI is
     CPU Intelligence (`js/game/ai/cpu-intelligence/`, explained in
@@ -3251,7 +3324,7 @@ it names a fighter, an attack or an animation.
   tie (outcome `'draw'`): the match is over, and the result menu says so
   with no winner (7.3). Ahead on points when the normal clock
   runs out, there is no overtime: more points wins (`'points'`). Restart
-  and rematch clear overtime: the normal period, 0–0, `7:00`, the stage's
+  and rematch clear overtime: the normal period, 0–0, `5:00`, the stage's
   own Void and normal waves.
 
 #### 7.2.9 Character specifications
@@ -3462,7 +3535,7 @@ Adding one is described in
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
-  The timer reads minutes and seconds (`7:00`, `1:27`, `0:09`). Both halves
+  The timer reads minutes and seconds (`5:00`, `1:27`, `0:09`). Both halves
   are buttons that pause the game; the timer half is labelled "Pause game,
   M minutes S seconds remaining" (just the minutes or just the seconds when
   the other is 0). Through overtime the round label reads **OVERTIME**
@@ -3553,7 +3626,7 @@ Adding one is described in
   "End of overtime", the title "Tie" and the line "Overtime ended with the
   points and Launch Point equal.", naming no winner, in Quick Battle and
   Watch Mode alike. Nothing restarts by itself: Rematch starts a clean match
-  (0–0, 7:00, no overtime, the stage's own Void).
+  (0–0, 5:00, no overtime, the stage's own Void).
 - **Change Stage** opens the mode's own Select Stage with every other choice
   kept: Custom Play's and Watch Mode's, the screen the Battle was started
   from; after Regular Play, which starts from Select Fighter, the stage

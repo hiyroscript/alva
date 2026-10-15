@@ -371,7 +371,7 @@ test('Home Play shows all Mode details immediately and keeps them through dismis
   const headings = ['Quick Battle'];
   const descriptions = [
     'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
-    'Quick Battle matches last up to 7 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
+    'Quick Battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
   ];
   const checkDetails = () => {
     assert.equal(current(app), 'mode');

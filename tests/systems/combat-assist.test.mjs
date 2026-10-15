@@ -1259,7 +1259,7 @@ test('the setting never changes a CPU: its decisions and movement are the same w
   const run = (combatAssist) => {
     const input = { flush() {}, sample: blankInput };
     const b = new Battle({ canvas, map: getMap('desert'), p1Def: C1, p2Def: C1, p1Sprites: sprites, p2Sprites: sprites, input, seed: 7, combatAssist });
-    b.fx = { take() {}, takeBounce() {}, reset() {}, addElimination() {}, timeScale: 1, sampleTrail() {} };
+    b.fx = { take() {}, takeBounce() {}, reset() {}, addElimination() {}, addVoidRipple() {}, addShake() {}, timeScale: 1, sampleTrail() {} };
     b.setPhase('fight');
     const out = [];
     for (let i = 0; i < 900; i++) {

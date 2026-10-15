@@ -735,7 +735,7 @@ test('a Watch Mode Battle: the combat AI on both sides at the chosen level, each
     assert.equal(battle.p2.opponent, battle.p1);
     // The normal match rules.
     assert.equal(battle.pointsToWin, CONFIG.battle.pointsToWin);
-    assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds, 'the same 7:00 as Quick Battle');
+    assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds, 'the same 5:00 as Quick Battle');
     assert.equal(battle.overtimeSeconds, CONFIG.battle.overtimeSeconds, 'and the same overtime');
     assert.equal(battle.phase, 'intro');
   }
@@ -895,7 +895,7 @@ test('entering Watch Mode loads each fighter once and builds the Battle, HUD and
   assert.equal(hud.left.score.getAttribute('aria-label'), 'CPU 1: 0 of 3 points');
   assert.equal(hud.right.score.getAttribute('aria-label'), 'CPU 2: 0 of 3 points');
   assert.equal(hud.left.dots.length, CONFIG.battle.pointsToWin, 'the normal score dots');
-  assert.equal(hud.timer.textContent, '7:00', 'the normal timer: the same 7 minutes as Quick Battle');
+  assert.equal(hud.timer.textContent, '5:00', 'the normal timer: the same 5 minutes as Quick Battle');
   assert.equal(canvas.getAttribute('aria-label'), 'Watch Mode battle: CPU 1, #9999, against CPU 2, Test A');
   assert.equal(canvas.getAttribute('role'), 'img');
   screens.battle.exit();

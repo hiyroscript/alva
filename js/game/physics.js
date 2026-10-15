@@ -6,10 +6,11 @@
 // is identical at 30/60/120/144 Hz.
 //
 // Nothing holds a body inside the stage: there are no side walls. The main
-// floor is finite (see StageCollision), so a body can run, jump or be
-// knocked past either ledge and fall; only the Void (StageCollision.inVoid),
-// a short way past the ledges, ends that, and the game modes decide what it
-// means.
+// floor is finite on most stages (see StageCollision), so a body can run,
+// jump or be knocked past either ledge and fall; on a stage whose ground is
+// continuous (Adamaris's beach) the ground runs on under it instead. Either
+// way only the Void (StageCollision.inVoid), a short way past the main
+// stage, ends that, and the game modes decide what it means.
 //
 // A collision always stops the body on that axis: a solid's side zeroes vx,
 // a landing or a ceiling zeroes vy. Physics never bounces anything. It
@@ -31,16 +32,46 @@ const EPS = 0.5;
 // stage's top, in world units, whatever its tuning (see closeVoid).
 const MIN_VOID_GAP = 40;
 
+// The kinds of main floor a stage may have (map.ground.type, see
+// js/data/maps.js): `finite` (the default) is the main stage itself, with a
+// ledge at each end; `continuous` is ground that runs on past both sides of
+// the Void (a beach, a plain), so there is no ledge to walk off anywhere a
+// fighter can be.
+export const GROUND_TYPES = Object.freeze(['finite', 'continuous']);
+
+// The extent of `map`'s main floor: { type, left, right }. A finite one is
+// exactly map.mainStage's; a continuous one reaches `reach` world units past
+// each side of the map's own Void (which a closing Void only ever moves in),
+// so its ends are always deep in the black and never reachable. Anything
+// else is refused rather than guessed at.
+export function resolveGround(map) {
+  const main = map.mainStage;
+  const g = map.ground ?? { type: 'finite' };
+  if (!GROUND_TYPES.includes(g.type)) throw new Error(`[Alva] Stage "${map.id}": unknown ground type "${g.type}"`);
+  if (g.type === 'finite') return Object.freeze({ type: 'finite', left: main.left, right: main.right });
+  if (!(Number.isFinite(g.reach) && g.reach > 0)) throw new Error(`[Alva] Stage "${map.id}": a continuous ground needs a positive reach`);
+  const v = map.voidBounds;
+  return Object.freeze({
+    type: 'continuous', left: Math.min(main.left, v.left) - g.reach, right: Math.max(main.right, v.right) + g.reach,
+  });
+}
+
 export class StageCollision {
   constructor(map) {
     const main = map.mainStage;
-    // The main floor: a finite solid block whose top is the ground. It
-    // collides like any other solid, so it supports a body only while the
-    // body overlaps it horizontally, and below its top its sides are the
-    // stage's own cliff faces, not walls around the arena.
+    // The main floor: a solid block whose top is the ground. It collides
+    // like any other solid, so it supports a body only while the body
+    // overlaps it horizontally. A finite one is the main stage (below its
+    // top its sides are the stage's own cliff faces, not walls around the
+    // arena); a continuous one runs far past the Void on both sides (see
+    // resolveGround), so nobody ever reaches its ends: the Void takes them
+    // first. Either way its top is the ground every mode stands on.
+    this.ground = resolveGround(map);
+    // No ledges anywhere a fighter can be (a continuous ground).
+    this.continuousGround = this.ground.type === 'continuous';
     this.floor = Object.freeze({
       id: '__floor', kind: 'floor', oneWay: false, dropThrough: false,
-      x: main.left, y: main.top, w: main.right - main.left, h: main.bottom - main.top,
+      x: this.ground.left, y: main.top, w: this.ground.right - this.ground.left, h: main.bottom - main.top,
     });
     this.groundY = main.top;
     this.centerX = (main.left + main.right) / 2;
@@ -63,8 +94,14 @@ export class StageCollision {
       ...map.solids.map((s) => ({ ...s, oneWay: false, dropThrough: false })),
     ];
     // The main stage's edges, which the Void never closes past (see
-    // closeVoid).
+    // closeVoid): on a continuous ground, the combat area the camera frames
+    // and the Void is set around, not an end of the ground.
     this.main = Object.freeze({ left: main.left, right: main.right, top: main.top });
+    // The danger zones a stage hazard shows right now (its warnings: see
+    // js/game/stage-hazards.js), kept live by its controller for whoever
+    // reads the stage (the CPU's stage model). Only what is visible is ever
+    // here: never where a hazard is going before it shows.
+    this.dangerZones = [];
     // The kill boundary (see inVoid): `baseVoid` is the map's own rectangle,
     // copied once and never changed (map.voidBounds is never written);
     // `void` is the one in force, the same rectangle unless a mode closes

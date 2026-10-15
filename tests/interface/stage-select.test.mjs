@@ -173,15 +173,16 @@ const label = (el) => el.getAttribute('aria-label');
 
 // ---- The roster --------------------------------------------------------------
 
-test('the roster has exactly 24 slots: Desert, City and Asperitas first, then 21 reserved placeholders', () => {
+test('the roster has exactly 24 slots: Yerma, Sol-Noir, Asperitas and Adamaris first, then 20 reserved placeholders', () => {
   assert.equal(CONFIG.stageRoster.totalSlots, 24);
   const { screen } = setup();
   assert.equal(screen.slots.length, 24);
   assert.deepEqual(screen.slots.map((s) => s.querySelector('.stage-tile-num').textContent), Array.from({ length: 24 }, (_, i) => String(i + 1).padStart(2, '0')));
-  assert.deepEqual(screen.tiles.map((t) => t._map.id), ['desert', 'city', 'asperitas']);
-  assert.deepEqual(screen.slots.slice(0, 3).map((t) => t._map?.id), ['desert', 'city', 'asperitas'], 'slots 01, 02 and 03');
-  const locked = screen.slots.slice(3);
-  assert.equal(locked.length, 21);
+  assert.deepEqual(screen.tiles.map((t) => t._map.id), ['desert', 'city', 'asperitas', 'adamaris']);
+  assert.deepEqual(screen.slots.slice(0, 4).map((t) => t._map?.id), ['desert', 'city', 'asperitas', 'adamaris'], 'slots 01 to 04');
+  assert.deepEqual(screen.tiles.map((t) => t.querySelector('.stage-tile-name').textContent), ['Yerma', 'Sol-Noir', 'Asperitas', 'Adamaris']);
+  const locked = screen.slots.slice(4);
+  assert.equal(locked.length, 20);
   for (const tile of locked) {
     assert.equal(tile._map, null);
     assert.ok(tile.classList.contains('is-locked'));
@@ -191,7 +192,7 @@ test('the roster has exactly 24 slots: Desert, City and Asperitas first, then 21
     assert.equal(tile.listeners.size, 0, 'nothing to press');
     assert.ok(tile.querySelector('.stage-tile-lock'), 'a lock');
   }
-  assert.equal(label(locked[0]), 'Slot 04, unavailable');
+  assert.equal(label(locked[0]), 'Slot 05, unavailable');
   for (const tile of screen.tiles) {
     assert.equal(tile.tagName, 'BUTTON');
     assert.ok(tile.hasAttribute('data-nav'));
@@ -207,16 +208,19 @@ test('the roster has exactly 24 slots: Desert, City and Asperitas first, then 21
   assert.ok(!screen.grid.querySelectorAll('[data-nav]').includes(screen.randomBtn));
 });
 
-test('the counter reads the real registry: 3 available / 24 slots, in English and French', () => {
+test('the counter reads the real registry: 4 available / 24 slots, in English and French', () => {
   const { screen } = setup();
-  assert.equal(screen.countEl.textContent, '3 available / 24 slots');
+  assert.equal(screen.countEl.textContent, '4 available / 24 slots');
   setLanguage('fr');
   try {
     screen.localize();
-    assert.equal(screen.countEl.textContent, '3 disponibles / 24 emplacements');
-    assert.equal(screen.infoName.textContent, 'Désert');
+    assert.equal(screen.countEl.textContent, '4 disponibles / 24 emplacements');
+    assert.equal(screen.infoName.textContent, 'Yerma');
     assert.equal(t('map.random'), 'Arène aléatoire');
-    assert.equal(t('map.locked', { num: '04' }), 'Emplacement 04, indisponible');
+    assert.equal(t('map.locked', { num: '05' }), 'Emplacement 05, indisponible');
+    assert.equal(t('map.city.name'), 'Sol-Noir');
+    assert.equal(t('map.adamaris.name'), 'Adamaris');
+    assert.equal(t('map.adamaris.trait.hazards'), 'Chute de roches volcaniques');
     assert.equal(t('map.asperitas.trait.hazards'), '2 nuages instables');
   } finally {
     setLanguage('en');
@@ -232,10 +236,10 @@ test('a new stage in the registry fills the next slot by itself; the roster grow
   assert.equal(slots.length, 24);
   assert.equal(slots.filter((s) => s.map).length, MAPS.length);
   const future = (n) => Array.from({ length: n }, (_, i) => ({ id: `future-${i}` }));
-  const four = stageSlots([...MAPS, ...future(1)]);
-  assert.equal(four.length, 24);
-  assert.equal(four[3].map.id, 'future-0');
-  assert.equal(four.filter((s) => !s.map).length, 20);
+  const five = stageSlots([...MAPS, ...future(1)]);
+  assert.equal(five.length, 24);
+  assert.equal(five[4].map.id, 'future-0');
+  assert.equal(five.filter((s) => !s.map).length, 19);
   const many = stageSlots(future(30));
   assert.equal(many.length, 30, 'never fewer slots than stages');
   assert.ok(many.every((s) => s.map));
@@ -243,10 +247,10 @@ test('a new stage in the registry fills the next slot by itself; the roster grow
   MAPS.push({ ...getMap('desert'), id: 'future-stage', name: 'Future', tagline: 'Soon' });
   try {
     const { screen } = setup();
-    assert.equal(screen.tiles.length, 4);
-    assert.equal(screen.slots[3]._map.id, 'future-stage');
+    assert.equal(screen.tiles.length, 5);
+    assert.equal(screen.slots[4]._map.id, 'future-stage');
     assert.equal(screen.slots.length, 24);
-    assert.equal(screen.countEl.textContent, '4 available / 24 slots');
+    assert.equal(screen.countEl.textContent, '5 available / 24 slots');
   } finally {
     MAPS.pop();
   }
@@ -257,12 +261,12 @@ test('a new stage in the registry fills the next slot by itself; the roster grow
 
 test('a pointer press selects a stage (and its preview); a second press, or a keyboard / controller press, starts the battle', () => {
   const { app, went, screen } = setup();
-  const [desert, city, asperitas] = screen.tiles;
+  const [desert, city, asperitas, adamaris] = screen.tiles;
   assert.equal(app.selection.mapId, 'desert');
   assert.equal(desert.getAttribute('aria-pressed'), 'true');
   city.click(1);
   assert.equal(app.selection.mapId, 'city', 'the stored stage id');
-  assert.deepEqual(screen.tiles.map((t) => t.getAttribute('aria-pressed')), ['false', 'true', 'false']);
+  assert.deepEqual(screen.tiles.map((t) => t.getAttribute('aria-pressed')), ['false', 'true', 'false', 'false']);
   assert.ok(city.classList.contains('is-selected') && !desert.classList.contains('is-selected'));
   assert.equal(screen.heroMap, getMap('city'));
   assert.equal(went.length, 0, 'not started yet');
@@ -275,10 +279,16 @@ test('a pointer press selects a stage (and its preview); a second press, or a ke
   // Confirm starts the selected stage normally.
   screen.startBtn.click();
   assert.deepEqual(went.pop()[1].mapId, 'asperitas');
+  // Adamaris, the fourth slot, selects and starts the same way.
+  adamaris.click(1);
+  assert.equal(app.selection.mapId, 'adamaris');
+  assert.equal(screen.heroMap, getMap('adamaris'));
+  adamaris.click(1);
+  assert.deepEqual(went.pop(), ['battle', { mapId: 'adamaris', characterId: '0001', cpuCharacterId: '0002', difficulty: 'medium' }]);
   // A placeholder can never be selected or started.
   screen.activate(screen.slots[10], { detail: 0 });
   assert.equal(went.length, 0);
-  assert.equal(app.selection.mapId, 'asperitas');
+  assert.equal(app.selection.mapId, 'adamaris');
 });
 
 test('highlighting a tile previews it (the live preview and the details); leaving the grid shows the selected stage again', () => {
@@ -330,6 +340,38 @@ test('the preview runs Asperitas\'s hazards in a world of its own; thumbnails st
   assert.equal(still.hero.sim, null);
 });
 
+test('the preview runs Adamaris\'s volcano in a world of its own: it erupts and throws rocks; thumbnails stay still', () => {
+  const { screen } = setup();
+  screen.tiles[3].focus();
+  flushFrames();
+  assert.equal(screen.heroMap, getMap('adamaris'));
+  const sim = screen.hero.sim;
+  assert.ok(sim, 'its own stage and hazards');
+  const volcano = sim.stageHazards.volcano;
+  assert.ok(volcano, 'the volcano runs');
+  assert.equal(volcano.state, 'erupting', 'a preview opens on an eruption');
+  assert.equal(screen.hero.theme.hazards, sim.stageHazards, 'the theme draws the live volcano');
+  let flying = 0;
+  let warned = 0;
+  for (let i = 0; i < 60 * 12; i++) {
+    screen.hero.render(1 / 60);
+    flying = Math.max(flying, sim.stageHazards.rocks.length);
+    warned = Math.max(warned, sim.stage.dangerZones.length);
+  }
+  assert.ok(volcano.thrown > 0 && flying > 0, 'rocks fly');
+  assert.ok(warned > 0, 'with their warnings');
+  assert.ok(volcano.glow > 0.05);
+  // Nothing of it is the map's, and the thumbnails run nothing.
+  assert.equal(getMap('adamaris').hazards[0].id, 'adamaris-volcano');
+  assert.equal(screen.tiles[3]._preview.sim, null, 'the thumbnail is still');
+  assert.equal(screen.tiles[3]._preview.theme.hazards, null, 'and draws the volcano at rest');
+  // Reduced motion: no simulation, the volcano at rest.
+  const still = setup({ reducedMotion: true }).screen;
+  still.tiles[3].focus();
+  flushFrames();
+  assert.equal(still.hero.sim, null);
+});
+
 test('Quick Battle and Watch Mode keep separate stage choices, and each starts its own battle', () => {
   const quick = setup();
   const watch = setup({}, { Screen: WatchMapScreen });
@@ -353,18 +395,18 @@ test('Quick Battle and Watch Mode keep separate stage choices, and each starts i
 // ---- Random Stage -----------------------------------------------------------------
 
 test('Random Stage picks a playable stage, highlights and previews it, and never starts the battle', () => {
-  const values = [0.9, 0.1, 0.5];
+  const values = [0.9, 0.1, 0.3];
   const { app, went, screen } = setup({}, { random: () => values.shift() });
   screen.randomBtn.focus();
   screen.randomBtn.click(1);
   flushFrames();
-  assert.equal(app.selection.mapId, 'asperitas');
-  assert.ok(screen.tiles[2].classList.contains('is-selected'));
-  assert.equal(screen.tiles[2].getAttribute('aria-pressed'), 'true');
-  assert.equal(screen.heroMap, getMap('asperitas'));
-  assert.equal(screen.hero.map, getMap('asperitas'));
+  assert.equal(app.selection.mapId, 'adamaris');
+  assert.ok(screen.tiles[3].classList.contains('is-selected'));
+  assert.equal(screen.tiles[3].getAttribute('aria-pressed'), 'true');
+  assert.equal(screen.heroMap, getMap('adamaris'));
+  assert.equal(screen.hero.map, getMap('adamaris'));
   assert.equal(screen.infoBadge.hidden, false);
-  assert.ok(screen.tiles[2].scrolledIntoView > 0, 'brought into view');
+  assert.ok(screen.tiles[3].scrolledIntoView > 0, 'brought into view');
   assert.equal(document.activeElement, screen.randomBtn, 'still on Random Stage, to roll again');
   assert.equal(went.length, 0, 'never starts the battle');
   // A keyboard or controller press is the same: still no battle.
@@ -393,11 +435,12 @@ test('Random Stage draws only real playable stages, each equally likely: never P
   assert.equal(randomStage(() => 0), MAPS[0]);
   assert.equal(randomStage(() => 0.9999999), MAPS.at(-1));
   assert.equal(randomStage(() => 0.5, []), null);
-  assert.equal(pickRandom(MAPS, () => 0.5), MAPS[1]);
+  assert.equal(pickRandom(MAPS, () => 0.5), MAPS[2]);
   // Regular Play's own draw goes through the same pick.
   const sel = {};
   drawRegularPlay(sel, () => 0.99);
   assert.equal(sel.mapId, MAPS.at(-1).id);
+  assert.equal(sel.mapId, 'adamaris', 'Regular Play can draw Adamaris');
   // From the screen, with Math.random, only stages ever come out.
   const { app, screen } = setup();
   for (let i = 0; i < 200; i++) {

@@ -1,7 +1,7 @@
 // SELECT STAGE: a large live preview of the highlighted stage with its
 // details, beside the stage roster: CONFIG.stageRoster.totalSlots (24)
 // slots laid out six by four on a large display, the playable stages
-// (MAPS, in order: Desert, City, Asperitas) in the first slots and every
+// (MAPS, in order: Yerma, Sol-Noir, Asperitas, Adamaris) in the first slots and every
 // other slot a reserved, unavailable placeholder (see stageSlots in
 // js/data/maps.js), plus Random Stage. Confirming starts Quick Battle's
 // Battle. It is Custom Play's last step, after Select CPU; Regular Play

@@ -20,6 +20,7 @@
 
 import { Perspective } from './perspective.js';
 import { EDGE_RED, waveOffset } from '../core/organic-edge.js';
+import { HIT_FX } from '../game/rendering/hit-fx.js';
 
 // Reference view the layers are authored for: a typical view height at the
 // platform-fighter zoom, with resting feet at 70% of it (the camera's floor
@@ -119,7 +120,17 @@ export class StageTheme {
   // ever drawn twice. The rim is stroked from the very points the black is
   // filled from, so the two never drift apart. With reduced motion the edge,
   // rim included, holds still.
-  drawVoid(ctx, view, bounds) {
+  //
+  // `ripples` are the Void's reactions to the fighters it has just taken
+  // (HitEffects.ripples: each { side, x, y, age, life }, the point on the
+  // boundary a fighter crossed): each one heaves the edge itself (a damped
+  // wave impulse running out along it from that point, laid over the slow
+  // waves: rippleOffset), so the black and its rim visibly ripple there;
+  // then rings spread through the black from it, the rim burns brighter
+  // there and a bright pulse flares at the point (drawVoidRipples). Art
+  // only: the boundary handed in is never moved. With reduced motion the
+  // edge only dips at the point and a still ring fades there.
+  drawVoid(ctx, view, bounds, ripples = []) {
     const v = bounds;
     if (!v) return;
     const reach = VOID.amp;
@@ -138,7 +149,7 @@ export class StageTheme {
     ctx.setTransform(s, 0, 0, s, -view.x * s, -view.y * s);
     // Far past the view, so each region reaches the screen edge.
     const pad = 40;
-    const regions = sides.map((side) => this.voidEdgePoints(v, side, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad));
+    const regions = sides.map((side) => this.voidEdgePoints(v, side, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad, ripples));
     // The rim first, stroked twice its width along each wavy edge: the black
     // laid over it hides the half on the Void's side, and wherever another
     // side's black covers it (a corner), so what shows is a thin red line
@@ -153,14 +164,162 @@ export class StageTheme {
     ctx.beginPath();
     for (const pts of regions) traceVoidRegion(ctx, pts);
     ctx.fill();
+    if (ripples?.length) this.drawVoidRipples(ctx, view, sides, regions, ripples);
+  }
+
+  // How far the ripples push the edge of `side` (of Void `v`) at `along`
+  // (y on a side, x on the top or bottom), toward the stage when positive.
+  // Each ripple acts on its own side, and on another whose line passes
+  // within `reach` of it (a corner): a dip right where the fighter went in,
+  // a ringing swell there, and a wave packet running out both ways along
+  // the edge, all dying away with its age.
+  rippleOffset(v, side, along, ripples) {
+    const cfg = HIT_FX.voidRipple;
+    const inward = side === 'left' || side === 'top' ? 1 : -1;
+    const vertical = side === 'left' || side === 'right';
+    const line = side === 'left' ? v.left : side === 'right' ? v.right : side === 'top' ? v.top : v.bottom;
+    let sum = 0;
+    for (const r of ripples) {
+      const off = Math.abs((vertical ? r.x : r.y) - line);
+      if (off > cfg.reach) continue;
+      const weight = r.side === side ? 1 : 1 - off / cfg.reach;
+      const d = Math.abs(along - (vertical ? r.y : r.x));
+      const a = r.age;
+      const fade = Math.max(0, 1 - a / r.life);
+      if (this.reducedMotion) {
+        sum -= weight * cfg.dip * fade * Math.exp(-(d * d) / (2 * 60 * 60));
+        continue;
+      }
+      const env = Math.exp(-cfg.decay * a) * fade;
+      const front = cfg.speed * a;
+      const packet = Math.exp(-((d - front) ** 2) / (2 * cfg.width * cfg.width));
+      const wave = Math.cos((2 * Math.PI * (d - front)) / cfg.wavelength);
+      const centre = Math.exp(-(d * d) / (2 * 70 * 70));
+      sum += weight * (
+        cfg.amp * env * packet * wave
+        - cfg.dip * Math.exp(-a * 5) * centre
+        + cfg.amp * 0.45 * env * centre * Math.sin(a * 16)
+      );
+    }
+    return inward * sum;
+  }
+
+  // Each ripple's light over the drawn Void: rings spreading out through
+  // the black from where the fighter went in (clipped to the black, so they
+  // ripple on the Void's own surface) over a dark crimson stir, the rim
+  // along the disturbed stretch of edge burning brighter, and a bright
+  // pulse flaring at the point. All in world units (the transform drawVoid
+  // set), fading out with the ripple's age.
+  drawVoidRipples(ctx, view, sides, regions, ripples) {
+    const cfg = HIT_FX.voidRipple;
+    const s = view.scale;
+    const px = (view.dpr ?? 1) / s;
+    const still = this.reducedMotion;
+    ctx.save();
+    // The rings and the stir, on the black only.
+    ctx.beginPath();
+    for (const pts of regions) traceVoidRegion(ctx, pts);
+    ctx.clip();
+    for (const r of ripples) {
+      const k = Math.min(1, r.age / r.life);
+      const fade = (1 - k) ** 1.4;
+      const stir = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, cfg.pulse * 3);
+      stir.addColorStop(0, `rgba(150, 10, 24, ${0.6 * fade})`);
+      stir.addColorStop(0.5, `rgba(90, 0, 12, ${0.3 * fade})`);
+      stir.addColorStop(1, 'rgba(60, 0, 8, 0)');
+      ctx.fillStyle = stir;
+      ctx.fillRect(r.x - cfg.pulse * 3, r.y - cfg.pulse * 3, cfg.pulse * 6, cfg.pulse * 6);
+      ctx.lineCap = 'round';
+      if (still) {
+        ctx.strokeStyle = EDGE_RED;
+        ctx.globalAlpha = fade;
+        ctx.lineWidth = 3 * px;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, cfg.reducedRing, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      for (let i = 0; i < cfg.rings; i++) {
+        const a = r.age - i * cfg.ringGap;
+        if (a <= 0) continue;
+        const radius = 12 + cfg.ringSpeed * a * (1 - 0.25 * Math.min(1, a / r.life));
+        const ringFade = fade * (1 - i * 0.22);
+        ctx.globalAlpha = Math.max(0, ringFade);
+        ctx.strokeStyle = i % 2 ? '#ff6b5e' : EDGE_RED;
+        ctx.lineWidth = Math.max(1, (4.5 - i) * (1 - 0.5 * k)) * px;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        // A faint second crest just behind each ring.
+        ctx.globalAlpha = Math.max(0, ringFade * 0.35);
+        ctx.lineWidth = 1.5 * px;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, Math.max(1, radius - 16), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    // The rim, brighter along the disturbed stretch of each rippling side.
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const r of ripples) {
+      const k = Math.min(1, r.age / r.life);
+      const fade = (1 - k) ** 1.2;
+      const span = (still ? 90 : cfg.speed * r.age + cfg.width) + 40;
+      sides.forEach((side, i) => {
+        const vertical = side === 'left' || side === 'right';
+        const centre = vertical ? r.y : r.x;
+        const pts = regions[i];
+        ctx.beginPath();
+        let open = false;
+        for (let j = 2; j < pts.length - 2; j += 2) {
+          const along = vertical ? pts[j + 1] : pts[j];
+          if (Math.abs(along - centre) > span) {
+            open = false;
+            continue;
+          }
+          if (open) ctx.lineTo(pts[j], pts[j + 1]);
+          else ctx.moveTo(pts[j], pts[j + 1]);
+          open = true;
+        }
+        for (const [color, width, alpha] of [['#ff2233', 7, 0.4], ['#ff8a7a', 2.5, 0.95]]) {
+          ctx.strokeStyle = color;
+          ctx.globalAlpha = alpha * fade;
+          ctx.lineWidth = width * px;
+          ctx.stroke();
+        }
+      });
+    }
+    // The pulse: a bright flare at the point, swelling and fading fast.
+    for (const r of ripples) {
+      const k = Math.min(1, r.age / 0.6);
+      if (k >= 1) continue;
+      const radius = cfg.pulse * (still ? 0.8 : 0.35 + 0.65 * (1 - (1 - k) ** 3));
+      const g = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, radius);
+      const a = (1 - k) ** 1.5;
+      g.addColorStop(0, `rgba(255, 240, 232, ${0.95 * a})`);
+      g.addColorStop(0.35, `rgba(255, 70, 70, ${0.75 * a})`);
+      g.addColorStop(1, 'rgba(210, 31, 43, 0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // One side of `v`'s region as flat [x, y, ...] points: an outer corner
   // past the view, the wavy edge (every `step` units, `amp` either way of
   // the boundary), then the other outer corner. Every side winds the same
   // way, so where two meet at a corner the nonzero fill covers it once.
-  voidEdgePoints(v, side, t, x0, x1, y0, y1) {
-    const edge = (along) => VOID.amp * waveOffset(VOID.waves, along, t);
+  voidEdgePoints(v, side, t, x0, x1, y0, y1, ripples = null) {
+    const edge = ripples?.length
+      ? (along) => VOID.amp * waveOffset(VOID.waves, along, t) + this.rippleOffset(v, side, along, ripples)
+      : (along) => VOID.amp * waveOffset(VOID.waves, along, t);
     const step = VOID.step;
     const pts = [];
     if (side === 'bottom' || side === 'top') {

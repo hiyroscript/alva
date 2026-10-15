@@ -3,7 +3,7 @@
 // it is Player 1 against the combat AI (js/game/ai/combat-ai.js) at the chosen
 // difficulty; in Watch Mode both fighters are the combat AI, each with its
 // own controller, at the one chosen difficulty (see BATTLE_MODES). Every
-// rule below is the same in both, the 7-minute clock and overtime
+// rule below is the same in both, the 5-minute clock and overtime
 // included. The Arena owns the fixed-timestep world and its Canvas 2D
 // rendering; DOM concerns (HUD, pause, overlays) live in the battle screen.
 //
@@ -106,6 +106,7 @@ export class Battle extends Arena {
     // held or planned), at the same difficulty, and Player 1 stays Player 1.
     // Every stage hazard is back where the map puts it first, starting over.
     this.hazards.reset();
+    this.stageHazards.reset();
     for (const f of this.fighters) {
       f.reset(this.stage);
       f.controller?.reset?.();
@@ -183,6 +184,13 @@ export class Battle extends Arena {
         break;
     }
     super.update(dt);
+  }
+
+  // The stage hazards strike and throw only while the fight is on: never
+  // during the intro, once time is up or once the match is won (rocks
+  // already flying land harmlessly).
+  get hazardsLive() {
+    return this.phase === 'fight';
   }
 
   // Whether the normal clock running out now starts overtime: with the

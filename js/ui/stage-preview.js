@@ -6,17 +6,21 @@
 // far-off Void.
 //
 // An animated preview of a stage with hazards (dynamic platforms, e.g.
-// Asperitas's clouds) runs them for real, in a little world of its own: its
-// own StageCollision and PlatformHazards, stepped at the simulation's fixed
-// step, so the clouds drift, rest, vanish and form again elsewhere exactly
-// as in a battle, with no battle running and nothing shared with one. A
-// still preview (a roster thumbnail, or reduced motion) draws them where
-// the map starts them.
+// Asperitas's clouds; stage hazards, e.g. Adamaris's volcano) runs them for
+// real, in a little world of its own: its own StageCollision,
+// PlatformHazards and StageHazards, stepped at the simulation's fixed step,
+// so the clouds drift, rest, vanish and form again elsewhere and the
+// volcano erupts and throws its rocks (with their warnings) exactly as in a
+// battle, with no battle running, no fighter to strike and nothing shared
+// with one. Its volcano opens with an eruption, so the preview shows what
+// the stage does. A still preview (a roster thumbnail, or reduced motion)
+// draws the platforms where the map starts them and the volcano at rest.
 
 import { CONFIG } from '../config.js';
 import { createTheme } from '../stages/index.js';
 import { StageCollision } from '../game/physics.js';
 import { PlatformHazards } from '../game/platform-hazards.js';
+import { StageHazards } from '../game/stage-hazards.js';
 import { drawFrame } from '../game/rendering/sprite-normalizer.js';
 import { fitCanvas } from './sprite-art.js';
 
@@ -52,6 +56,7 @@ export class StagePreview {
     this.sim = scene.sim;
     // Each time a stage is shown its hazards start over from the map.
     this.sim?.hazards.reset();
+    this.sim?.stageHazards.reset();
     if (this.sim) this.sim.acc = 0;
     this.theme.lastPxW = 0; // force gradient rebuild for this canvas
     this.time = 0;
@@ -62,11 +67,16 @@ export class StagePreview {
   // here (an animated preview without reduced motion).
   buildScene(map) {
     let sim = null;
-    if (this.animated && !this.reducedMotion && map.platforms.some((p) => p.dynamic)) {
+    if (this.animated && !this.reducedMotion && (map.platforms.some((p) => p.dynamic) || map.hazards?.length)) {
       const stage = new StageCollision(map);
-      sim = { stage, hazards: new PlatformHazards(stage, { seed: (Date.now() ^ 0x5a17) & 0xffff }), acc: 0 };
+      const seed = (Date.now() ^ 0x5a17) & 0xffff;
+      sim = {
+        stage, acc: 0,
+        hazards: new PlatformHazards(stage, { seed }),
+        stageHazards: new StageHazards(stage, map, { seed, opening: 'erupting' }),
+      };
     }
-    const theme = createTheme(map, { reducedMotion: this.reducedMotion, platforms: sim?.stage.platforms });
+    const theme = createTheme(map, { reducedMotion: this.reducedMotion, platforms: sim?.stage.platforms, hazards: sim?.stageHazards });
     return { theme, sim };
   }
 
@@ -80,11 +90,13 @@ export class StagePreview {
     let steps = 0;
     while (sim.acc >= step && steps < CONFIG.sim.maxStepsPerFrame) {
       sim.hazards.update(step);
+      sim.stageHazards.update(step);
       sim.acc -= step;
       steps++;
     }
     if (steps >= CONFIG.sim.maxStepsPerFrame) sim.acc = 0;
     sim.stage.interpolate(sim.acc / step);
+    sim.stageHazards.interpolate(sim.acc / step);
   }
 
   render(dt, force = false) {

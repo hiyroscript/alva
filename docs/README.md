@@ -57,7 +57,7 @@ reads, what a fighter may leave out, and its tests.
 - [Watch Mode](gameplay/watch-mode.md)
 - [Practice Ground](gameplay/practice.md)
 - [Stages](gameplay/stages.md) (Select Stage's 24-slot roster and Random
-  Stage, Asperitas and its platform hazards, and adding a stage)
+  Stage, Asperitas and its platform hazards, Adamaris and its volcano, and adding a stage)
 
 ## Development
 

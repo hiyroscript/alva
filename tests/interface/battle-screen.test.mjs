@@ -726,14 +726,14 @@ function playUntil(screen, done, limit = 2000) {
   for (let i = 0; i < limit && !done(); i++) screen.update(DT + 1e-9);
 }
 
-test('Quick Battle\'s HUD starts at 7:00; at a level 0:00 it turns to OVERTIME at 1:00, the fight going on, its time spoken as overtime\'s', () => {
+test('Quick Battle\'s HUD starts at 5:00; at a level 0:00 it turns to OVERTIME at 1:00, the fight going on, its time spoken as overtime\'s', () => {
   const { app, screen } = setup();
   const battle = startRealBattle(screen, app);
   const { hud } = screen;
   hud.update(battle);
-  assert.equal(hud.timer.textContent, '7:00');
+  assert.equal(hud.timer.textContent, '5:00');
   assert.equal(hud.roundLabel.textContent, 'ROUND 1');
-  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 7 minutes remaining');
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 5 minutes remaining');
   battle.setPhase('fight');
   battle.phaseTime = 5;
   battle.score.p1 = 1;
@@ -786,7 +786,7 @@ test('Quick Battle\'s HUD starts at 7:00; at a level 0:00 it turns to OVERTIME a
   }
 });
 
-test('Watch Mode shows the same 7:00, OVERTIME banner and label, and overtime result, naming CPU 1 and CPU 2', () => {
+test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime result, naming CPU 1 and CPU 2', () => {
   const { app, screen } = setup();
   const sprites = fakeSprites();
   const battle = new Battle({
@@ -800,7 +800,7 @@ test('Watch Mode shows the same 7:00, OVERTIME banner and label, and overtime re
   screen.needsResize = false;
   screen.hud.bind(battle.p1, battle.p2);
   screen.hud.update(battle);
-  assert.equal(screen.hud.timer.textContent, '7:00');
+  assert.equal(screen.hud.timer.textContent, '5:00');
   assert.deepEqual([screen.hud.left.tag.textContent, screen.hud.right.tag.textContent], ['CPU 1', 'CPU 2']);
   battle.setPhase('fight');
   battle.phaseTime = 5;
@@ -845,13 +845,13 @@ test('overtime results say overtime decided it: more points, or level on points 
     assert.equal(screen.resultKicker.textContent, 'End of overtime');
     assert.equal(screen.resultTitle.textContent, title);
     assert.equal(screen.resultSub.textContent, sub);
-    // A rematch: no overtime left, the full 7:00 and the map's own Void.
+    // A rematch: no overtime left, the full 5:00 and the map's own Void.
     byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
     assert.equal(battle.overtime, false);
-    assert.equal(battle.timeLeft, 420);
+    assert.equal(battle.timeLeft, 300);
     assert.equal(battle.stage.void, battle.stage.baseVoid);
     assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
-    assert.equal(screen.hud.timer.textContent, '7:00');
+    assert.equal(screen.hud.timer.textContent, '5:00');
   }
 });
 
@@ -897,18 +897,18 @@ test('level on points and Launch Point at the end of overtime: a tie on the resu
       setLanguage('en');
       localizeTree(screen.resultOverlay);
     }
-    // Rematch: 0-0, the full 7:00, no overtime and the map's own Void.
+    // Rematch: 0-0, the full 5:00, no overtime and the map's own Void.
     byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
     assert.equal(screen.resultOverlay.hidden, true);
     assert.equal(battle.phase, 'intro');
     assert.equal(battle.overtime, false);
     assert.deepEqual(battle.score, { p1: 0, p2: 0 });
     assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [0, 0]);
-    assert.equal(battle.timeLeft, 420);
+    assert.equal(battle.timeLeft, 300);
     assert.deepEqual({ ...battle.stage.void }, { ...battle.map.voidBounds });
     assert.equal(battle.voidWaveSpeed, 1);
     screen.hud.update(battle);
-    assert.equal(screen.hud.timer.textContent, '7:00');
+    assert.equal(screen.hud.timer.textContent, '5:00');
     assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
   }
 });

@@ -143,13 +143,18 @@ const bodyVelocity = (f) => ({ x: f.body.vx, y: f.body.vy });
 
 // Where a hit came from, and the attack, technique or summon that produced
 // it (a projectile's thrower's, kept when it is turned back): for its event.
-const sourceOf = (def, projectile, summon, technique) => (
-  projectile ? 'projectile' : summon ? 'summon' : technique ? 'technique' : def.deflectProjectiles ? 'deflect' : 'melee'
+const sourceOf = (def, projectile, summon, technique, hazard = null) => (
+  hazard ? HAZARD_SOURCE : projectile ? 'projectile' : summon ? 'summon' : technique ? 'technique' : def.deflectProjectiles ? 'deflect' : 'melee'
 );
 const abilityOf = (def, projectile, summon, technique) => (
   projectile ? projectile.ability ?? null : summon ? summon.def?.id ?? null : technique ? technique.def?.id ?? null : def.id ?? null
 );
 const NO_LAUNCH = Object.freeze({ x: 0, y: 0 });
+
+// The `source` of a stage hazard's hit (a volcanic rock's, see
+// js/game/stage-hazards.js): no fighter's attack, so not one of
+// ATTACK_SOURCES. It has no attacker and credits nobody.
+export const HAZARD_SOURCE = 'hazard';
 
 const scratchHit = {};
 const scratchHurt = {};
@@ -370,8 +375,24 @@ export class CombatSystem {
     }
   }
 
-  // Shared by melee, projectiles, clones and techniques: every attack's hit
-  // on a fighter comes through here, and only here. `facing` is
+  // A stage hazard's hit (a volcanic rock landing, see
+  // js/game/stage-hazards.js): `box`, its world-space reach, against
+  // `target`'s own hurtboxes, and if it meets them, `def` applied through
+  // applyHit with no attacker at all: nobody owns it, nobody is credited or
+  // frozen for it, and it is never a projectile (nothing turns it back).
+  // The Shield rule holds as for any hit. Its event's `source` is
+  // HAZARD_SOURCE, `attack` false and `hazard` the rock. Null when it
+  // misses.
+  hazardHit(target, def, box, hazard) {
+    if (!hitReaches(def, target)) return null;
+    const point = strikePoint(box, target);
+    if (!point) return null;
+    const facing = Math.sign(target.body.x - (box.x + box.w / 2)) || 1;
+    return this.applyHit(null, target, def, { facing, hazard, point });
+  }
+
+  // Shared by melee, projectiles, clones, techniques and stage hazards:
+  // every hit on a fighter comes through here, and only here. `facing` is
   // the direction the hit travels: the attacker's facing for melee, the
   // projectile's own direction (fixed when thrown), the clone's facing
   // (fixed when summoned) or the technique's (fixed when it started). A
@@ -417,8 +438,8 @@ export class CombatSystem {
   // see `charm` in hit-effects.js) and that the target does not block is
   // no hit at all: see charmed. The Shield rule comes first all the same.
   applyHit(attacker, target, def, {
-    facing = attacker.facing, projectile = null, summon = null, technique = null,
-    detached = !!(projectile || summon || technique), point = bodyPoint(target), velocity = null,
+    facing = attacker?.facing ?? 1, projectile = null, summon = null, technique = null, hazard = null,
+    detached = !!(projectile || summon || technique || hazard), point = bodyPoint(target), velocity = null,
   } = {}) {
     const tc = target.combat;
     // The universal Shield rule: up at contact, it blocks. Nothing about the
@@ -465,7 +486,7 @@ export class CombatSystem {
     if (def.hitstop > 0) tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
     const stall = blocked && !detached ? target.defense?.stall ?? 0 : 0;
-    if (stall > attacker.combat.hitstop) attacker.combat.hitstop = stall;
+    if (stall > 0 && stall > attacker.combat.hitstop) attacker.combat.hitstop = stall;
     // ...and a technique: no armour. A real hit ends it at once (whatever it
     // has not released yet never is), before the launch below moves the
     // fighter. So does a summon's startup: the hurt pose shows on this very
@@ -502,8 +523,8 @@ export class CombatSystem {
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, charm: blocked ? 0 : def.charm ?? 0, stall,
-      projectile, summon, technique, attack: true,
-      source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
+      projectile, summon, technique, hazard, attack: !hazard,
+      source: sourceOf(def, projectile, summon, technique, hazard), ability: hazard ? def.id ?? null : abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,
     };
     // The target's own reaction to a real hit (its air jumps back, see

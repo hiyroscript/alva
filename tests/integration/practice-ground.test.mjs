@@ -2230,7 +2230,7 @@ test('leaving while the fighter dialog is open closes everything', async () => {
 // ---- Stage --------------------------------------------------------------------
 
 test('the training stage is its own map, outside MAPS and so outside Select Stage', () => {
-  assert.deepEqual(MAPS.map((m) => m.id), ['desert', 'city', 'asperitas']);
+  assert.deepEqual(MAPS.map((m) => m.id), ['desert', 'city', 'asperitas', 'adamaris']);
   assert.ok(!MAPS.includes(PRACTICE_MAP));
   assert.equal(getMap('practice'), null);
   assert.equal(PRACTICE_MAP.theme, 'practice');
@@ -2277,7 +2277,7 @@ test('the practice theme is registered and draws without building paths each fra
 
 // ---- Quick Battle is unchanged --------------------------------------------------
 
-test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two-panel HUD, with none of Practice\'s rules', () => {
+test('Quick Battle still creates its AI CPU, round intro, 5-minute timer and two-panel HUD, with none of Practice\'s rules', () => {
   const input = fakeInput();
   const battle = new Battle({
     canvas: new Element('canvas'), map: getMap('desert'),
@@ -2295,7 +2295,7 @@ test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two
   assert.equal(battle.secondary, battle.p2);
   assert.equal(battle.phase, 'intro');
   assert.equal(battle.round, 1);
-  assert.equal(CONFIG.battle.matchSeconds, 420, '7 minutes');
+  assert.equal(CONFIG.battle.matchSeconds, 300, '5 minutes');
   assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds);
   assert.equal(battle.p1.inputLocked, true, 'locked through the intro');
   // Just into the fight (the CPU is active from its first step, so a few
@@ -2316,7 +2316,7 @@ test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two
   assert.equal(root.children.length, 3);
   assert.equal(hud.right.tag.textContent, 'CPU');
   assert.equal(hud.roundLabel.textContent, 'ROUND 1');
-  assert.equal(hud.timer.textContent, '7:00');
+  assert.equal(hud.timer.textContent, '5:00');
   assert.equal(hud.pauseButton.html, ICONS.pause);
 });
 

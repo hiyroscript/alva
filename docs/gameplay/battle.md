@@ -38,8 +38,8 @@ It hides under the pause menu and at the result, never shows in Watch
 Mode, and a touch screen keeps its touch controls instead. While it shows,
 Player 1's cooldown rings under its feet step aside; the CPU keeps its own.
 
-**Scoring.** 7 minutes (`CONFIG.battle.matchSeconds`, 420 s; the
-HUD starts at `7:00`), first to 3 points (`CONFIG.battle.pointsToWin`).
+**Scoring.** 5 minutes (`CONFIG.battle.matchSeconds`, 300 s; the
+HUD starts at `5:00`), first to 3 points (`CONFIG.battle.pointsToWin`).
 Each time a fighter falls into the Void its opponent scores a point at
 once; the one that fell is out of play for 2 seconds
 (`CONFIG.battle.respawnSeconds`, on the simulation clock), then back at its
@@ -49,7 +49,7 @@ overtime too (a short **K.O.** beat, then the result; the loser does not
 come back). If both fall together, or one falls while the other is still
 waiting to come back, that fall scores nothing.
 
-**Time.** When the 7 minutes run out with one side ahead on points, it
+**Time.** When the 5 minutes run out with one side ahead on points, it
 wins (the usual TIME beat, then the result: "Time ran out. More points
 wins the match."). With the points level, the Launch Point decides nothing
 yet: the match goes to **overtime**.
@@ -91,7 +91,7 @@ Level on both (within 1e-6) is a **tie**: the match is over, and the
 result menu says so ("End of overtime", "Tie", "Overtime ended with the
 points and Launch Point equal."), naming no winner, with the usual
 Rematch, Change Stage and Return to Home. Nothing restarts by itself.
-Restart and Rematch clear overtime: 0–0, `7:00`, the stage's own Void and
+Restart and Rematch clear overtime: 0–0, `5:00`, the stage's own Void and
 normal waves.
 
 **Change Stage** opens the mode's own Select Stage with the fighters and
@@ -101,7 +101,7 @@ takes the Battle's place, its steps Mode · Difficulty · Fighter · Stage,
 and Back from it returns to Select Fighter.
 
 **Watch Mode plays the same.** The same `Battle` runs
-[Watch Mode](watch-mode.md), with the same 7-minute clock, overtime,
+[Watch Mode](watch-mode.md), with the same 5-minute clock, overtime,
 closing Void and results, the tie included: there is one match clock for
 every Battle.
 
@@ -171,7 +171,7 @@ How the CPU plays: [CPU Intelligence](../systems/ai.md).
 [`tests/integration/match-score.test.mjs`](../../tests/integration/match-score.test.mjs)
 (scoring, respawns, K.O., time-up),
 [`tests/integration/overtime.test.mjs`](../../tests/integration/overtime.test.mjs)
-(the 7-minute clock, overtime and its results, the closing Void, its waves,
+(the 5-minute clock, overtime and its results, the closing Void, its waves,
 the elimination burst),
 [`tests/integration/difficulty.test.mjs`](../../tests/integration/difficulty.test.mjs),
 [`tests/integration/quick-battle.test.mjs`](../../tests/integration/quick-battle.test.mjs)

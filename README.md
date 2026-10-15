@@ -62,18 +62,23 @@ blocks every attack.
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then
   draws the CPU's fighter and the stage at random; **Custom Play** also
-  picks the CPU's fighter and the stage. Seven minutes; level on points at
+  picks the CPU's fighter and the stage. Five minutes; level on points at
   the end, a minute of overtime while the Void closes in from the sides and
   below, then the lower Launch Point, and a tie if that is level too.
 - **Watch Mode**: CPU against CPU, any two fighters, mirror matches
   included, under the same clock and overtime.
 - **Practice Ground**: a training room with a stand-still dummy, damage
   numbers and fighter swaps.
-- **Three stages**, Desert, City and Asperitas, plus the training room:
-  open ledges, platforms, a Void kill boundary and a platform-fighter
-  camera. Asperitas floats high above the clouds: one great cloud to fight
-  on and two smaller cloud hazards that drift, rest, fade away from under
-  you and form again somewhere new.
+- **Four stages**, Yerma, Sol-Noir, Asperitas and Adamaris, plus the
+  training room: open ledges, platforms, a Void kill boundary and a
+  platform-fighter camera. Asperitas floats high above the clouds: one
+  great cloud to fight on and two smaller cloud hazards that drift, rest,
+  fade away from under you and form again somewhere new. Adamaris is a
+  tropical beach, the sand running on past the Void, under a volcano whose
+  random eruptions rain rocks onto the beach, each landing marked by a red
+  warning circle first.
+- **The Void reacts**: whenever it takes a fighter it ripples where the
+  fighter crossed it.
 - **Select Stage**: a 24-slot stage roster (the playable stages first,
   reserved slots for the stages to come), a live preview with each
   stage's details, and **Random Stage**.
@@ -223,8 +228,8 @@ max                     the owner's working prompt for the current task (not a s
 
 **ALVA**, created by hiyroscript.
 
-**Original work.** Game design, code, interface, ALVA wordmark, and Desert / City /
-Asperitas stage artwork by hiyroscript.
+**Original work.** Game design, code, interface, ALVA wordmark, and all
+stages by hiyroscript.
 
 **#0001 sprite source.** Sprite sheet by Finhj on
 [DeviantArt](https://www.deviantart.com/finhj/art/1084627848). Sheet
