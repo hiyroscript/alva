@@ -1,728 +1,1696 @@
-ALVA — Complete UI consistency, typography, hover and dialogue overhaul
+MASTER IMPLEMENTATION PROMPT — ALVA COMBAT FEEL & RESPONSIVENESS OVERHAUL
 
-Objective
+ROLE AND MISSION
 
-Perform a comprehensive, game-wide UI consistency and bug-fixing update for ALVA.
+You are a senior gameplay engineer, fighting-game systems designer, technical animator, and software quality engineer.
+
+Your task is to comprehensively study, improve, implement, and validate the fighting mechanics of Alva, a 2D sprite-based browser platform fighting game.
 
 Repository: https://github.com/hiyroscript/alva
 
-The objective is to establish a consistent, polished interface across every screen, menu, dialogue, and gameplay overlay.
+Primary objective: Make fighting feel significantly more responsive, intuitive, forgiving, consistent, satisfying, and accessible to beginners while preserving the depth, speed, character identity, and mechanical complexity that experienced players can master.
 
-This is an implementation task, not merely a review. Inspect the existing architecture, make the necessary code changes, update tests, and verify the results.
+This is an implementation task, not simply a request for recommendations.
 
-There are five major requirements:
+Examine the actual repository, understand the mechanics already implemented, make focused improvements, update the relevant documentation, and add thorough automated tests.
 
-1. Correct capitalization and sentence casing throughout the game.
-2. Eliminate unintended button hover, focus, and preselection effects.
-3. Standardize every dialogue using the Controller connections dialogue’s semi-transparent glass appearance.
-4. Give all rectangular menu buttons the same corners as the Home Play button.
-5. Fix dialogue layering so newer dialogues always appear above the dialogues that opened them.
+Do not replace functioning combat systems with simplified approximations.
 
-All five requirements must be applied consistently and verified across the entire game.
+Do not introduce new mechanics merely because they are common in other fighting games. Every modification must solve a real, identifiable problem in Alva.
+
+The result should be a more enjoyable version of Alva, not a fundamentally different fighting game.
 
 ⸻
 
-1. Global typography and capitalization
+PART 1 — NONNEGOTIABLE INSTRUCTIONS
 
-Main rule
+1.1 CPU difficulty is completely out of scope
 
-No ordinary interface text should ever be displayed in all uppercase.
+The developer has explicitly decided:
 
-Additionally, use proper sentence case for user-facing interface labels, button names, menu titles, headings, status descriptions, and other UI copy.
+Do not adjust CPU strength in this update. We will address CPU difficulty another time.
 
-Use sentence case instead of title case for multiword interface phrases.
+Consequently:
+
+* Do not nerf CPU reaction times.
+* Do not reduce CPU accuracy, prediction, aggression, or defensive intelligence.
+* Do not modify Easy, Medium, Hard, or Brutal difficulty settings.
+* Do not change CPU decision-making, punish selection, combos, positioning, or tactical behavior.
+* Do not introduce deliberate CPU mistakes.
+* Do not alter the CPU’s behavior to compensate for player combat changes.
+* Do not introduce dynamic difficulty adjustment.
+* Do not modify AI personality or combat strategy.
+* Do not adjust CPU-specific cooldowns or attack timing.
+
+Preserve the existing CPU system.
+
+Shared combat-mechanics changes may naturally affect both human and CPU fighters. Those effects must be tested, but must not become an excuse for intentional CPU balancing.
+
+If an improvement can reasonably remain exclusive to the human player’s optional assist systems, prefer that approach.
+
+Do not make CPU changes unless they are strictly necessary to repair a regression directly caused by this work. Explain any unavoidable changes.
+
+1.2 Preserve Alva’s identity
+
+Alva is a platform fighter, not a conventional health-bar fighting game.
+
+Its defining mechanics include:
+
+* Launch Point instead of traditional health.
+* Base Launch and Directional Launch.
+* Knockback that increases with accumulated Launch Point.
+* Ring-outs into the Void.
+* Universal baseline movement.
+* Fighter-specific attacks and special mechanics.
+* Ground and aerial attacks.
+* Shield and Deflect.
+* Energy.
+* Hitstop.
+* Attack startup, active, and recovery phases.
+* Hit-cancels and deliberate player cancellations.
+* Dash and air dash.
+* Combat Assist.
+* Combo Assist.
+* Input buffering.
+* Projectiles, summons, techniques, and character-specific attack motions.
+
+These systems should remain recognizable and mechanically consistent.
+
+Improve the fighting experience through precise changes rather than rewriting the game’s fundamental design.
+
+1.3 Respect the repository’s architecture
+
+Alva is implemented using JavaScript ES modules, HTML, CSS, and Canvas 2D.
+
+Preserve:
+
+* Its dependency-light architecture.
+* Its deterministic fixed-step simulation.
+* The existing 60 Hz gameplay timing model.
+* Separation between simulation and rendering.
+* Data-driven fighter definitions.
+* Universal control codenames.
+* Keyboard, controller, and touch compatibility.
+* English and French localization.
+* Existing settings and saved control layouts.
+* Shared mechanics instead of fighter-specific engine branches.
+
+Do not introduce React, Unity, a new physics engine, or an unnecessary framework.
+
+Do not create another combat engine alongside the existing one.
+
+Extend the current architecture.
+
+1.4 Respect authoritative files
+
+Before implementation, read:
+
+* README.md
+* ALVA_SPEC.md
+* docs/README.md
+* docs/architecture/
+* docs/systems/
+* docs/characters/
+* docs/development/
+* UPDATES.md
+* codename_rule
+* character_rule
+
+ALVA_SPEC.md is the authoritative product specification.
+
+However, the requested changes intentionally modify some current behavior, particularly the existing rule that repeated presses during an attack are discarded.
+
+Update the specification wherever the new approved behavior contradicts it.
+
+Do not silently leave code and documentation disagreeing.
+
+Do not edit character_rule. Preserve its protected status.
+
+Honor codename_rule and do not invent incompatible move or animation naming conventions.
+
+⸻
+
+PART 2 — COMPREHENSIVE REPOSITORY AUDIT
+
+Before changing anything, trace the complete path from a player’s physical button press to the attack appearing, connecting, ending, and entering cooldown.
+
+Study at least the following modules.
+
+Input and controls
+
+* js/core/input-manager.js
+* js/game/fighters/fighter-controller.js
+* js/data/controller-profiles.js
+* js/core/settings.js
+* js/config.js
+* The existing keyboard, gamepad, touch, and controller-binding code.
+
+Determine how Pressed edges are generated, how holding differs from pressing, how simultaneous requests are ordered, and whether any device can lose or duplicate combat inputs.
+
+Fighter state and movement
+
+* js/game/fighters/fighter.js
+* js/game/fighters/movement.js
+* js/data/movement.js
+* js/game/physics.js
+
+Map the complete Fighter.update() sequence.
+
+Examine exactly when the game:
+
+1. Reads input.
+2. Advances cooldowns and attack clocks.
+3. Processes hitstop and stun.
+4. Resolves attack and movement requests.
+5. Applies cancellations.
+6. Starts attacks.
+7. Applies movement and collision.
+8. Processes landing.
+9. Updates attack buffers.
+10. Updates the fighter’s visual state.
+
+Pay special attention to operations that occur on the same simulation step.
+
+Combat
+
+* js/game/combat/attacks.js
+* js/game/combat/combat-state.js
+* js/game/combat/combat.js
+* js/game/combat/combat-assist.js
+* js/game/combat/combo-assist.js
+* js/game/combat/move-status.js
+* js/data/cooldowns.js
+* js/game/combat/offense.js
+* js/game/combat/hit-effects.js
+* Relevant projectile, summon, technique, defense, and Deflect modules.
+
+Understand eligibility checks, cooldown lifecycles, hurtboxes, hitboxes, attack phases, hit confirmation, motion attacks, and all ways an attack can terminate.
+
+Presentation and feedback
+
+* js/game/rendering/
+* js/ui/ability-hud.js
+* Relevant interface and input stylesheets.
+* Settings and localization files.
+
+Determine whether the interface communicates the difference between:
+
+* A move that is available.
+* A move on cooldown.
+* A move temporarily blocked by another action.
+* A move that has been buffered.
+* A queued Combo Assist follow-up.
+
+Characters
+
+Inspect every current playable fighter:
+
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* js/data/characters/0003.js
+* js/data/characters/0004.js
+
+Review the corresponding character specifications and tests.
+
+Do not assume that Attack 1 and Attack 2 always mean a basic punch and kick.
+
+Different fighters may have projectiles, multihit strings, plunges, homing attacks, launchers, or other special behavior assigned to those controls.
+
+The improvements must work with actual loadouts rather than assumed attack types.
+
+Testing
+
+Read the existing tests before altering behavior, especially:
+
+* tests/systems/combo-assist.test.mjs
+* tests/systems/combat-assist.test.mjs
+* tests/systems/move-cancel.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/movement.test.mjs
+* tests/systems/cooldown-policy.test.mjs
+* tests/systems/air-mouvment.test.mjs
+* The fighter-specific test directories.
+* tests/integration/roster-matrix.test.mjs
+* Existing control, HUD, physics, and responsiveness-related tests.
+
+Identify which tests encode existing product requirements and which must change because of this requested redesign.
+
+Do not simply remove failing tests.
+
+Replace obsolete assertions with stronger tests for the new behavior.
+
+⸻
+
+PART 3 — THE PROBLEMS WE WANT TO SOLVE
+
+The primary motivation for this update is that fighting can feel difficult or unnecessarily unforgiving, especially for newer players.
+
+A player may understand what attack they want but still struggle because:
+
+1. Their input happens slightly before the game is ready.
+2. They press the same basic attack button again and nothing happens.
+3. They accidentally cancel an attack before it connects.
+4. A move feels like it should reach, but narrowly misses.
+5. They are unsure why one attack can cancel another.
+6. They cannot tell when an attack has finished.
+7. They do not realize their move is unavailable.
+8. Combat Assist and Combo Assist can sometimes feel disconnected from what their buttons are doing.
+9. Landing a hit does not always make the next action feel intuitive.
+10. The number of movement and combat mechanics creates a steep learning curve.
+
+The objective is not to remove the need for timing or positioning.
+
+The objective is to remove unnecessary friction between a reasonable player intention and its expected gameplay outcome.
+
+A good improvement should help a beginner without making experienced players feel that their character is ignoring or overriding deliberate inputs.
+
+⸻
+
+PART 4 — PRIORITY ONE: IMPROVE COMBO ASSIST
+
+This is the most important requested feature.
+
+4.1 Current behavior
+
+Alva currently supports Combo Assist for the human player.
+
+When Attack 1 has finished and is on its own repeat cooldown, pressing Attack 1 again can request Attack 2 instead.
+
+The same applies in reverse.
+
+However, pressing the button corresponding to the attack currently playing is deliberately discarded.
+
+It does not restart, cancel, or queue the attack.
+
+This protects the current animation but can make repeated presses feel unresponsive.
+
+4.2 Desired behavior
+
+Implement one queued alternate attack when the player repeats the button responsible for an attack currently playing.
 
 Examples:
 
-Incorrect	Correct
-ROSTER	Roster
-STAGES	Stages
-SELECT FIGHTER	Select fighter
-CHANGE STAGE	Change stage
-Change Stage	Change stage
-Change Fighter	Change fighter
-Change CPU	Change CPU
-Restart Battle	Restart battle
-Return to Home	Return to home
-Keep Playing	Keep playing
-Random Stage	Random stage
-Quick Battle	Quick battle
-Watch Mode	Watch mode
-Practice Ground	Practice ground
-Player 1 Wins	Player 1 wins
-CPU Wins	CPU wins
-HOLD	Hold
+Example A
 
-These examples illustrate the required capitalization rules, not an exhaustive list.
+* Press Attack 1.
+* Attack 1 begins.
+* Press Attack 1 again near the end of its animation.
+* Attack 1 continues uninterrupted.
+* Attack 1 finishes normally.
+* Attack 2 becomes the next requested attack.
+* If Attack 2 is eligible, it starts using the normal attack-start system.
 
-Explicit exceptions
+Example B
 
-The following text may retain its intended uppercase formatting:
+* Press Attack 2.
+* Attack 2 begins.
+* Press Attack 2 again near its end.
+* Attack 2 finishes.
+* Attack 1 starts when legally available.
 
-* ALVA — all ALVA branding, logos, and wordmarks.
-* CPU — including CPU 1 and CPU 2.
-* P1 — the player identifier.
-* Round and combat announcements — including dramatic battle banners such as ROUND 1, FIGHT, READY, K.O., TIME OVER, and other text that belongs to the same round-announcement system.
+Example C
 
-Do not extend these exceptions to unrelated interface headings or ordinary status labels.
+* Press Attack 1.
+* Attack 1 finishes.
+* Press Attack 1 while its repeat cooldown remains active.
+* Existing Combo Assist behavior requests Attack 2.
 
-For example, a dramatic ROUND 1 animation may retain its uppercase presentation, but an ordinary informational label should use Round 1.
+Example C must continue to work exactly as before.
 
-Proper names and technical notation
+4.3 Exact queue rules
 
-Preserve the established spelling and capitalization of actual proper nouns, fighter names, ability names, and stage names when their capitalization is part of their identity.
+Use these initial rules:
 
-Preserve meaningful controller input notation and button glyphs rather than corrupting control instructions.
+Queue window: 0.20 seconds before the current attack’s natural completion.
 
-Do not mechanically lowercase every letter after the first character. Apply the rules intelligently and grammatically.
+This is a starting design value, not an already implemented setting.
 
-Inspect the actual sources of displayed text
+At 60 Hz, 0.20 seconds is 12 simulation steps.
 
-Review at least:
+A repeated press within that window may queue the opposite attack.
 
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* js/localization/i18n.js
-* js/config.js
-* js/data/
-* js/screens/
-* js/ui/
-* index.html
+A repeated press earlier than the window must not restart the move or cause an unintended future action.
 
-Check both static and dynamically generated UI text.
+There may be only one queued follow-up per running attack.
 
-The English localization contains several title-cased strings, including result.changeStage, practice.changeFighter, pause.restart, and the match-result winner labels. These must be reviewed.
+Repeated presses must not accumulate multiple future actions.
 
-Ensure French remains grammatically correct and follows normal French capitalization conventions.
+Holding an attack button must not continuously generate attacks.
 
-Do not break interpolation placeholders, translation keys, formatting logic, or dynamically generated descriptions.
+Only actual press edges can create a queue.
 
-CSS capitalization
+The player must remain free to make other deliberate choices.
 
-Audit all stylesheets for:
+The queued follow-up must not make Attack 1 or Attack 2 automatically alternate forever.
 
-text-transform: uppercase;
-text-transform: capitalize;
+4.4 Resolve the actual active attack
 
-Known locations include:
+This is critical.
 
-* css/components.css
-* css/setup.css
+A physical Attack 1 press may have started Attack 2 because Combo Assist substituted the move.
 
-Particularly inspect .kicker, .panel-title, .panel-meta, .mode-index, .status-badge, .label, and .map-trait-label.
+Therefore, do not derive the next attack solely from the button’s name.
 
-Remove forced uppercase transformations from ordinary UI elements.
+Resolve the follow-up from:
 
-Do not apply a broad CSS rule that accidentally modifies ALVA branding or battle announcement text.
+* The actual attack definition currently playing.
+* Its source combat input.
+* The fighter’s current loadout.
+* Its ground/air variant.
+* Its original attack instance.
 
-Expected result: capitalization is correct in the underlying content and in the rendered interface. The game must not depend on a CSS workaround that only visually hides incorrect text values.
+If Attack 2 is currently playing because Attack 1 previously substituted it, repeating the responsible button should queue Attack 1.
+
+Avoid implementing a system that accidentally queues Attack 2 again.
+
+4.5 Preserve the complete current animation
+
+A queued follow-up must never:
+
+* Restart the current animation.
+* Set its animation time back to zero.
+* Cancel the current attack early.
+* Skip startup frames.
+* Remove active hitbox frames.
+* Skip recovery.
+* Trigger additional copies of a strike.
+* Release a projectile earlier than intended.
+* Bypass cooldown restrictions.
+
+The current move must finish through its normal lifecycle.
+
+The queued move may then begin on the earliest eligible simulation step.
+
+Do not insert an unnecessary pause after completion.
+
+Also do not give queued follow-ups artificial speed advantages over manually entered follow-ups.
+
+4.6 Respect cooldowns
+
+The existing cooldown system must remain authoritative.
+
+The baseline ordinary move repeat cooldown is 0.5 seconds per move, beginning when that particular move ends, is canceled, or is interrupted.
+
+It is not a universal 0.5-second delay between all attacks.
+
+Exceptional cooldown classes are 3 seconds and 5 seconds under the existing policy.
+
+Never shorten, bypass, overwrite, or prematurely expire these timers.
+
+Before executing the queued attack, validate:
+
+* The destination move exists.
+* The destination move has its required art.
+* The destination move is not cooling down.
+* The destination move can start in its current location.
+* Its airtime-use restrictions are satisfied.
+* The fighter is not stunned, immobilized, or otherwise committed.
+* No higher-priority player request has superseded it.
+
+If the destination move cannot start at natural completion, discard that queued follow-up.
+
+Do not restart the source attack as a fallback.
+
+Do not keep the queued attack waiting until a long cooldown finishes.
+
+4.7 Cancellation rules
+
+Discard the queue when:
+
+* The player is hit and the attack is interrupted.
+* The source attack is manually canceled.
+* A different combat action successfully replaces it.
+* The player executes a higher-priority Jump, Dash, Shield, or Deflect request.
+* A technique or summon takes control.
+* The fighter is eliminated or leaves play.
+* The fighter resets or respawns.
+* Input becomes locked.
+* The battle ends.
+* Combo Assist is unavailable or disabled for that player.
+* The source attack instance is no longer valid.
+* A ground/air transition invalidates the queued destination.
+
+A failed unrelated action should not necessarily erase a valid queue. Preserve a coherent priority policy.
+
+Avoid stale queued attacks after interruptions.
+
+4.8 Handle natural completion accurately
+
+Do not implement completion detection using only the condition that combat.attack has become null.
+
+An attack may disappear because of:
+
+* Natural completion.
+* A successful manual cancel.
+* A hit interruption.
+* Paralysis.
+* Landing cancellation.
+* A motion-specific early ending.
+* Other state transitions.
+
+Read the existing CombatState.endAttack() implementation and every caller.
+
+Use reliable information about how the attack ended.
+
+If necessary, introduce a small, deterministic completion signal or termination reason that distinguishes natural completion from interruption.
+
+Do not infer completion from arbitrary animation state alone.
+
+A landing cancel should not automatically qualify as a complete animation unless its defined behavior genuinely considers that attack finished.
+
+Handle hitstop carefully: the queue should neither expire nor execute during frozen gameplay merely because wall-clock time passes.
+
+4.9 Integrate with Combat Assist
+
+A queued attack that becomes available should enter the same action-resolution path as a normal attack press.
+
+For example, if Combo Assist queues Attack 2 and Combat Assist is enabled, the destination move may use Combat Assist’s existing approach if appropriate.
+
+Do not create a separate, simplified attack launcher.
+
+Use the same eligibility and action-start code.
+
+The result must work with:
+
+* Combat Assist on / Combo Assist on.
+* Combat Assist off / Combo Assist on.
+* Combat Assist on / Combo Assist off.
+* Both assists off.
+
+The assists must remain independent settings.
+
+4.10 Preserve manual control
+
+An explicit Attack 1 → Attack 2 press should retain Alva’s existing legal cancellation behavior.
+
+The new repeat-button queue is distinct from deliberately pressing a different attack button.
+
+Do not replace deliberate manual cancellation with automatic delayed inputs.
+
+Advanced players should retain the ability to perform their intended cancels.
+
+The queue must improve accessibility, not take away player control.
 
 ⸻
 
-2. Fix unintended hover effects and preselected buttons
+PART 5 — PRIORITY TWO: IMPROVE INPUT BUFFERING
 
-Problem
+5.1 Existing input buffer
 
-Buttons throughout ALVA can appear hovered, focused, or visually selected even when the player has not intentionally interacted with them.
+Alva currently uses a 0.15-second combat input buffer.
 
-This must be corrected globally.
+An ordinary attack pressed too early can be remembered until it becomes available.
 
-Required behavior
+At 60 Hz, this is approximately nine simulation frames.
 
-A button’s mouse-hover appearance must activate only when the mouse pointer is physically over that button.
+This is useful, but may be slightly unforgiving for beginners.
 
-The hover appearance must disappear immediately when the pointer leaves.
+5.2 Proposed adjustment
 
-A button must never look hovered simply because:
+Evaluate increasing the ordinary attack buffer from 0.15 seconds to 0.20 seconds.
 
-* A screen was opened.
-* A dialogue appeared.
-* The button is the default navigation target.
-* A previous button retained focus.
-* The user clicked the button earlier.
-* A keyboard or gamepad navigation function assigned DOM focus.
-* The mouse previously occupied that position on another screen.
-* A dialogue closed and restored focus to its opener.
+Treat 0.20 seconds as the preferred initial candidate.
 
-Inspect menu navigation
+Evaluate 0.25 seconds only if reproducible test scenarios show that 0.20 remains unnecessarily strict.
 
-Pay particular attention to:
+Do not increase the buffer just to make the numerical value larger.
 
-* js/core/menu-navigator.js
-* js/core/screen-manager.js
-* js/ui/controller-cursor.js
-* js/screens/home-screen.js
-* js/screens/map-select-screen.js
-* js/screens/mode-select-screen.js
+The change should measurably improve intended input acceptance without causing unwanted delayed attacks.
 
-The existing navigation system uses focusFirst(), focusDefault(), and programmatic .focus() calls.
+5.3 Separate attack buffering from combo queuing
 
-The navigator also focuses elements during mouse pointer interactions.
+The ordinary attack buffer and Combo Assist queue are different mechanisms.
 
-These behaviors currently interact with CSS selectors such as:
+Ordinary input buffer: Keeps a legal attack intention that cannot start immediately.
 
-.btn:focus
-.home-action:focus
-.mode-card:focus
-.settings-choice:focus
+Combo Assist queue: Holds one alternate follow-up until the current attack animation finishes naturally.
 
-Audit every similar selector.
+Do not put both mechanisms into the same ambiguous queue without clearly defined ownership.
 
-Separate four different visual states
+They must not:
 
-Implement a consistent distinction between:
+* Execute the same input twice.
+* Compete unpredictably.
+* Restart attacks.
+* Execute stale requests.
+* Override a newer valid input.
+* Violate action priority.
+* Produce repeated attacks from held buttons.
 
-Default state: The normal resting appearance, with no accidental hover styling.
+5.4 Important existing dependency
 
-Mouse-hover state: A temporary appearance shown only while the actual pointer is over the button.
+Inspect BASE_FIGHTER_MOVEMENT.attackBuffer carefully.
 
-Keyboard/gamepad focus state: A separate, accessible focus indicator that shows which control keyboard or gamepad navigation will activate. It must not be mistaken for a mouse-hover fill.
+The current value is also involved in Dash buffering.
 
-Selected or active state: A persistent state only when the control genuinely represents a selected fighter, stage, language, setting, active tab, or similar value.
+If increasing it would unintentionally change Dash behavior, consider separating ordinary attack-buffer duration from Dash-buffer duration using universal configuration.
 
-Do not confuse selected state with hovered state.
+Do not silently change both systems when only ordinary attack forgiveness was requested.
 
-An option may remain visibly selected because it is the user’s saved choice, but it should not simultaneously display a misleading hover effect.
+Keep the design data-driven, universal, and consistent with the repository’s movement validation.
 
-Input modality
+5.5 Preserve input semantics
 
-Implement reliable mouse, keyboard, gamepad, and touch input-modality handling.
+Preserve:
 
-Programmatic focus alone must not trigger mouse-hover visuals.
+* Latest valid buffered attack taking priority.
+* Correct ordering with buffered jumps.
+* Buffered presses during hitstop not aging through the freeze.
+* Ground/air input context.
+* Attacks with missing sprites being refused.
+* Specials and techniques retaining their current buffering restrictions.
+* Inputs from before a received hit being cleared.
+* Reserved or unmapped controls never creating phantom requests.
+* Same-step precedence.
+* Device-independent behavior.
 
-Default focus may remain internally available for keyboard and controller navigation, but it should not cause unexplained visual highlighting on screen entry.
-
-Keyboard and gamepad users must still have an accessible, clearly visible navigation indicator when using those input methods.
-
-The controller’s circular cursor should produce a hover-equivalent state only when it is actually positioned over the relevant interactive control.
-
-Review .is-cursor-target and remove any stale cursor-hover styling when the cursor moves away, hides, changes scope, or a dialogue closes.
-
-Edge cases
-
-Verify:
-
-1. Opening Home does not create unwanted hover effects.
-2. Opening Settings does not make the first tab appear mouse-hovered.
-3. Opening a confirmation dialogue does not create unintended button highlighting.
-4. Closing a dialogue does not leave its opener visually hovered.
-5. Switching screens clears stale hover styling.
-6. Moving the mouse away restores the default appearance.
-7. Touch input does not leave sticky hover states.
-8. Keyboard/gamepad navigation remains functional and accessible.
-9. Disabled buttons never respond with hover styling.
-10. Actual selected settings, fighters, and stages remain correctly distinguishable.
-
-Do not solve this by globally deleting focus indicators, disabling keyboard navigation, or removing the existing controller navigation system.
+A queued or buffered attack must feel intentional rather than surprising.
 
 ⸻
 
-3. Standardize the glass appearance of every dialogue
+PART 6 — PRIORITY THREE: EXAMINE EARLY ATTACK CANCELLATION
 
-Reference design
+6.1 The problem
 
-Use the existing Controller connections dialogue as the canonical visual reference.
+Alva allows the human player to deliberately cancel an ongoing attack with another eligible request.
 
-Relevant files:
+This can happen during startup, active frames, or recovery.
 
-* js/ui/controller-dialog.js
-* css/controller.css
-* css/battle.css
-* css/base.css
+That gives the player substantial control and makes the game responsive.
 
-The reference panel uses the existing shared classes:
+However, a beginner may press a second attack before the first attack’s hitbox becomes active.
 
-class="dialog-panel controller-panel glass glass--panel"
+The second attack can then replace the first one before it has even struck.
 
-The shared glass system already provides translucent charcoal surfaces, subtle highlights, borders, shadows, and backdrop blur where available.
+This can make fighting feel confusing.
 
-The corresponding glass variables are defined in css/base.css, and .glass / .glass--panel are implemented in css/battle.css.
+A player may believe their attack failed when the real problem is that they accidentally canceled its startup.
 
-Reuse and standardize this system rather than creating another independent glass design.
+6.2 Do not remove manual cancellation
 
-Required appearance
+Alva’s current player-cancellation system is intentional and explicitly documented.
 
-Every dialogue should have:
+Do not globally disable startup cancellation or require every attack to finish before a different attack can start.
 
-* A semi-transparent dark glass background.
-* Consistent backdrop blur.
-* A subtle glass sheen.
-* A restrained translucent border.
-* Consistent glass shadows.
-* Legible white and secondary text.
-* A dimmed background that remains perceptible behind the dialogue.
-* A more opaque fallback when backdrop blur is unsupported.
+That would be a major regression.
 
-The exact reference appearance should be shared across dialogues. Different dialogues may retain their own widths, heights, padding, internal layouts, and scrolling behavior.
+Instead:
 
-Dialogues to audit
+1. Study how often early attack cancellation can occur under realistic input sequences.
+2. Measure whether basic beginners’ input patterns lose intended hitboxes.
+3. Identify the precise cancellation scenarios responsible.
+4. Determine whether Combo Assist queuing solves the most common case.
+5. Preserve explicit different-button cancellation unless a narrowly scoped improvement is demonstrably better.
 
-Inspect and standardize every dialogue, including:
+6.3 Avoid artificial restrictions
 
-* Controller connections.
-* Settings.
-* Controller fighter roster.
-* Controller control editor.
-* Controller binding editor.
-* Restore-controls confirmation.
-* First-launch language selection.
-* General confirmation dialogues.
-* Choice dialogues.
-* Information and Help dialogues.
-* Download/install dialogue.
-* Battle pause menu.
-* Battle results.
-* Practice menu.
-* Change fighter dialogue.
-* Change CPU dialogue.
-* Any other dynamically created modal or dialogue-like panel.
+Do not add a universal recovery lockout between different moves.
 
-Relevant implementation locations include:
+Do not confuse per-move repeat cooldowns with cancellation.
 
-* js/ui/overlays.js
-* js/ui/settings-dialog.js
-* js/ui/language-dialog.js
-* js/ui/install-dialog.js
-* js/ui/controller-editor.js
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
+Do not add arbitrary delays to manual attack switching.
 
-Important existing inconsistencies
+Do not automatically finish a move that an experienced player deliberately canceled.
 
-Review .controller-roster-dialog.glass in css/controller.css, which overrides the shared glass surface with a denser background.
+The preferred approach is to first solve repeated-button behavior through the new Combo Assist queue and improve player feedback.
 
-Also inspect .language-overlay in css/settings.css, which currently uses a fully black backdrop.
+Only propose a further startup-cancellation rule if measurable evidence demonstrates a remaining significant problem.
 
-Determine how these affect perceived consistency and update the dialogue presentation while preserving first-launch usability and readable controls.
-
-Do not indiscriminately make full-screen application surfaces transparent. The requirement concerns dialogues and modal panels, not the underlying gameplay canvas or mandatory full-screen editing workspaces.
-
-Implementation expectations
-
-Create or refine a shared dialogue styling contract.
-
-Avoid duplicating almost identical glass effects across many files.
-
-Ensure individual dialogue-specific CSS does not unexpectedly override the canonical glass appearance.
-
-Never apply opacity to an entire dialogue container in a way that makes its text and buttons transparent.
-
-Use translucent background colors and backdrop filtering on the panel instead.
-
-Test both supported and unsupported backdrop-filter environments.
+Any such additional rule must be explicitly documented and carefully scoped, preferably to a player-assist context instead of replacing the shared combat contract.
 
 ⸻
 
-4. Standardize all menu button corners
+PART 7 — PRIORITY FOUR: AUDIT ATTACK RANGE AND HITBOX ACCURACY
 
-Reference button
+7.1 The problem
 
-Use the Home screen’s Play button as the exact corner reference.
+Some attacks may feel difficult to connect because their strike hitboxes are narrow compared with what a player visually expects.
 
-Its styling is in:
+This can be especially noticeable with quick punches and short-range kicks.
 
-css/home.css
+A game should reward good spacing, but a visually convincing hit should not frequently miss because of unnecessarily strict geometry.
 
-The .home-action class currently uses:
+7.2 Start with #0001’s Jab
 
-border-radius: 3px;
+Inspect #0001’s attack1.
 
-This is the target radius for rectangular menu buttons.
+The reviewed implementation defines:
 
-Required behavior
+hitbox: { x: 12, y: -82, w: 28, h: 26 }
 
-All rectangular menu buttons throughout ALVA must use the same 3px corner radius.
+This puts its forward reach at approximately 40 world units relative to its origin.
 
-This includes:
+Investigate whether that reach appropriately matches the active sprite frames, opponent hurtboxes, and collision spacing.
 
-* Home navigation buttons.
-* Mode-selection buttons.
-* Difficulty-selection buttons.
-* Fighter-selection controls.
-* Stage-selection controls.
-* Back and Confirm buttons.
-* Random stage buttons.
-* Pause-menu actions.
-* Result-screen actions.
-* Settings tabs and action buttons.
-* Language-selection buttons.
-* Dialogue actions.
-* Controller editor menu buttons.
-* Practice-menu buttons.
-* Other comparable rectangular menu controls.
+Do not assume the existing geometry is incorrect.
 
-Existing CSS
+Run reproducible hit/miss tests at measured distances.
 
-Audit at least:
+Check:
 
-* css/components.css
-* css/home.css
-* css/setup.css
-* css/settings.css
-* css/controller.css
-* css/discover.css
-* css/overlays.css
-* css/battle-overlays.css
-* css/practice.css
+* The moment the punch becomes active.
+* Character facing and mid-attack turning.
+* Pushbox separation.
+* Target hurtbox positions.
+* Momentum during the strike.
+* The apparent location of the fist.
+* Combat Assist’s ability to place the attacker in range.
 
-css/components.css currently assigns var(--radius-md) to .btn and .btn-back, while the Play button uses 3px.
+7.3 Examine other fighters too
 
-The end of css/overlays.css already contains a shared override that sets several surfaces and controls to 3px.
-
-Extend or refactor that existing approach into a reliable, maintainable button consistency rule.
-
-Use a shared variable or class where appropriate.
-
-Exceptions
-
-Do not turn genuinely circular or pill-shaped elements into rectangles.
-
-Preserve deliberate geometry for controller cursor indicators, joystick elements, circular HUD markers, touch-control mechanics, and similar non-menu components.
-
-The requirement is consistent corners for rectangular menu controls, not the removal of every circular shape from the game.
-
-Expected result: a player moving between different screens should never encounter arbitrarily rounded rectangular menu buttons.
-
-⸻
-
-5. Fix dialogue layering and nested dialogues
-
-Critical problem
-
-When a dialogue opens another dialogue, the newer dialogue may appear behind the previous one.
-
-This is incorrect.
-
-The most recently opened dialogue must always appear above the dialogue that opened it.
-
-Example
-
-Correct sequence:
-
-1. Player opens Settings.
-2. Player opens controller customization.
-3. Player opens the control editor.
-4. Player opens a confirmation dialogue.
-
-The confirmation dialogue must appear above the editor, which must remain above Settings.
-
-When confirmation closes, the editor must become the active topmost dialogue again.
-
-Existing architecture
-
-Review:
-
-* js/ui/overlays.js
-* js/ui/settings-dialog.js
-* js/ui/controller-editor.js
-* js/core/menu-navigator.js
-* js/core/app.js
-* css/overlays.css
-* css/controller.css
-* css/settings.css
-* index.html
-
-The game currently uses separate overlay roots with fixed z-index values.
+Review the range and timing of common attacks belonging to all four fighters.
 
 Examples include:
 
-* .dialog-overlay
-* .controller-overlay
-* .settings-overlay
-* .controller-roster-overlay
-* .controller-editor-overlay
-* .binding-overlay
-* .language-overlay
+* #0001: Jab and relevant aerial basic attacks.
+* #0002: One-Two, Rapid Kicks, and relevant aerial interactions.
+* #0003: Chakra Punch, Heel Drop, and Leaping Kick.
+* #0004: Dance Combo, Leek Swing, Air Dance, and Leekspin.
 
-There is also a special workaround:
+Do not flatten these into identical attacks.
 
-.dialog-overlay.is-raised {
-  z-index: 80;
-}
+A kick, punch, multihit string, projectile, launcher, and motion attack should retain their distinct strengths.
 
-This is used by the controller editor when opening a confirmation dialogue.
+7.4 Possible targeted tuning
 
-That approach is too specific and does not establish reliable global layering.
+If testing reveals that some ordinary strikes are unnecessarily strict, consider modest individual hitbox corrections.
 
-Required implementation
+Use candidate increases such as:
 
-Introduce a consistent dialogue-stack system or an equivalent centralized layering mechanism.
+* Approximately 5–15% for a genuinely undersized forward strike.
+* Small vertical corrections only when supported by its actual artwork.
+* Carefully measured adjustments rather than adding reach to every move.
 
-It must:
+These percentages are evaluation candidates, not mandatory changes.
 
-1. Track currently open dialogues.
-2. Place each newly opened dialogue above every previously opened dialogue.
-3. Give the newest dialogue the active interaction scope.
-4. Prevent pointer and keyboard interaction with obscured dialogues.
-5. Properly handle inert on lower layers.
-6. Keep focus inside the active dialogue.
-7. Restore focus to the correct previous dialogue when the topmost dialogue closes.
-8. Restore the original opener’s focus when the full dialogue sequence closes.
-9. Support Escape and gamepad Back correctly.
-10. Remove temporary stacking styles when dialogues close.
-11. Avoid leaving hidden overlays with active navigation scopes.
-12. Avoid stale focus, cursor targets, and background interactivity.
+Do not extend hitboxes through walls, beyond the visible attack, or into obviously unintended regions.
 
-Focus and accessibility
+Do not expand hurtboxes globally merely to make hitting easier.
 
-Only the topmost dialogue should behave as the active modal.
+Do not alter high-impact projectile or ultimate ranges under a generic accessibility rule.
 
-Keep appropriate role="dialog", aria-modal, labels, and focus management.
+Preserve attack identity and competitive readability.
 
-The existing MenuNavigator already contains a stack of navigation scopes. Integrate dialogue-layer management with this behavior rather than creating a conflicting second navigation system.
+7.5 Combat Assist is not a substitute for accurate hitboxes
 
-Do not allow a visually obscured dialogue to receive controller commands.
+Combat Assist should remain an approach mechanic.
 
-Nested confirmations
+It should not secretly enlarge an attack’s actual strike box.
 
-Test scenarios such as:
+Treat hitbox geometry and pre-attack positioning as separate systems.
 
-* Battle pause → Return to home → confirmation.
-* Controller editor → Restore recommended controls → confirmation.
-* Settings → Controller controls → Fighter roster → Editor → Binding editor.
-* Any other dialogue-to-dialogue transitions found during the code audit.
-
-Ensure the parent dialogue remains in the correct state while the child dialogue is open.
-
-Closing a child must not accidentally close its parent.
-
-Cancel, Confirm, Back, and outside-click dismissal should each behave according to the existing functionality.
-
-Important
-
-Do not merely raise the global confirmation dialogue to an arbitrary huge z-index.
-
-That would move the problem elsewhere.
-
-The solution must handle arbitrary supported nesting order reliably.
+Avoid fixing a hitbox problem by giving Combat Assist unrealistic travel distance.
 
 ⸻
 
-6. Review every part of the game
+PART 8 — PRIORITY FIVE: IMPROVE COMBAT ASSIST CONSISTENCY
 
-The changes must apply throughout the entire player experience.
+8.1 Preserve the existing design
 
-Perform an audit of these flows:
+Combat Assist is already implemented and enabled by default for the human player.
 
-Startup and Home
+It helps melee attacks close short gaps before attacking.
 
-* Splash and first-launch language selection.
-* Home navigation.
-* Help.
-* Download/install.
-* Controller connections.
-* Settings.
+Preserve the existing principles:
 
-Quick battle
+* Player-controlled fighters only.
+* Ordinary melee attacks only.
+* No assistance for homing attacks that already have their own approach.
+* No special assistance for projectiles, summons, or techniques.
+* No teleportation.
+* No bypassing stage collision.
+* No artificial hitbox expansion.
+* No Energy cost for the assisted approach.
+* No conversion of Combat Assist into a regular Dash.
+* Existing Dash/air-dash distance limits.
+* Correct facing toward the target.
 
-* Mode selection.
-* Custom play and Regular play choices.
-* Difficulty selection.
-* Fighter roster.
-* CPU fighter selection.
-* Stage selection.
-* Battle HUD.
-* Round announcements.
-* Pause menu.
-* Results.
-* Rematch and Change stage.
+8.2 Audit why assisted attacks can still miss
 
-Watch mode
+Examine:
 
-* Difficulty.
-* CPU 1 and CPU 2 selection.
-* Stage selection.
-* Spectator HUD.
-* Pause and results.
+* Opponent movement between the start and completion of an approach.
+* Approach stopping distance.
+* Attack startup after closing the gap.
+* Attack momentum and target motion.
+* Pushbox constraints.
+* Ground height differences.
+* Aerial approach vectors.
+* Platforms, walls, ceilings, and stage boundaries.
+* Facing changes during held Run inputs.
+* Interactions with buffered and queued follow-ups.
 
-Practice ground
+The goal is to avoid situations where Combat Assist reasonably appears to have completed a valid setup, yet the resulting attack misses due to avoidable positioning inconsistencies.
 
-* Practice HUD.
-* Practice menu.
-* Change fighter.
-* Change CPU.
-* Enable/disable CPU.
-* Fighter roster dialogues.
-* Return and confirmation actions.
+Do not introduce aim tracking during the attack’s entire animation.
 
-Settings and customization
+Do not make the opponent incapable of escaping.
 
-* Language.
-* Controls.
-* Combat settings.
-* Touch layout customization.
-* Controller customization.
-* Controller roster.
-* Controller editor.
-* Binding editor.
-* Reset/restore confirmation.
+Do not guarantee attacks connect.
 
-Discover
+Improve consistency while retaining positioning and counterplay.
 
-* All categories.
-* Fighter information.
-* Movement.
-* Launch.
-* Information dialogues.
+8.3 Respect the range contract
 
-Review any additional menus and UI components discovered in the repository.
+An assisted approach must remain bounded by the game’s documented movement and collision rules.
 
-Do not stop after fixing the Home screen or the first dialogue.
+Do not silently increase its maximum range.
+
+If a minor positioning margin adjustment is proven necessary, demonstrate that it improves contact consistency without creating unnatural reach.
+
+8.4 Test queued follow-ups with Combat Assist
+
+A queued Attack 2 may begin from a position where Attack 1 has pushed the opponent away.
+
+That is acceptable.
+
+The queued move should go through the normal Combat Assist pathway.
+
+If the follow-up needs a legal short approach, perform it.
+
+If the opponent is too far away, the action may miss naturally.
+
+Do not warp the player to the opponent or guarantee a combo hit.
 
 ⸻
 
-7. Testing and regression prevention
+PART 9 — PRIORITY SIX: PRESERVE AND IMPROVE COMBAT RHYTHM
 
-ALVA is a framework-free HTML, CSS, and JavaScript game using ES modules and Canvas 2D.
+9.1 Understand the existing attack phases
 
-The repository already has Node.js tests.
+Alva defines attacks using:
 
-Run:
+Startup → Active → Recovery
+
+Preserve the distinction.
+
+Startup indicates the attack is preparing.
+
+Active frames determine when a strike can connect.
+
+Recovery provides commitment and creates opportunities for counterplay.
+
+Do not make all attacks equally fast.
+
+Do not eliminate recovery simply to make controls feel responsive.
+
+9.2 Preserve animation fidelity
+
+Alva’s attack timings are linked to sprite animations.
+
+Any timing adjustment must respect actual frames.
+
+Do not:
+
+* Invent nonexistent animation frames.
+* Skip visually necessary frames.
+* Make hitboxes active during poses that do not depict the strike.
+* Leave a strike active after its apparent contact animation ends.
+* Accelerate every move uniformly.
+* Change damage timing without checking move-specific tests.
+
+Favor improvements in input interpretation and transition timing over indiscriminate animation speed increases.
+
+9.3 Evaluate recovery pacing
+
+Investigate whether any common moves have recovery that feels disproportionate to their function.
+
+Do this per move, not globally.
+
+Consider:
+
+* Is the move meant to be quick or committed?
+* Is it a basic attack, launcher, projectile, or special?
+* Does it already have hit-cancel opportunities?
+* Is its cooldown being misunderstood as recovery?
+* Would shortening recovery accidentally strengthen repeated attacks?
+* Would the change disrupt existing combo routes?
+* Does it remain consistent with the sprite animation?
+
+Only adjust actual timing when there is a specific demonstrated problem.
+
+9.4 Preserve momentum
+
+Alva uses momentum-driven movement and carries speed through different actions.
+
+Preserve that principle.
+
+Attacking while moving should not feel like abruptly switching to an unrelated physics system.
+
+However, do not make every move slide equally.
+
+Review the existing move-specific values:
+
+* momentum
+* airMomentum
+* control
+* airControl
+* friction
+* step
+* motion
+
+Only adjust them when a specific movement problem is demonstrated.
+
+Avoid broad movement retuning as part of this combat-input update.
+
+9.5 Preserve hitstop
+
+Hitstop is important for feedback and impact.
+
+Keep the current distinction between gameplay time and impact freeze.
+
+Queued and buffered inputs must behave predictably during hitstop.
+
+Avoid duplicate inputs when frozen gameplay resumes.
+
+Never execute a queued combo merely because real time has passed during an impact freeze.
+
+⸻
+
+PART 10 — PRIORITY SEVEN: IMPROVE PLAYER FEEDBACK
+
+10.1 Explain combat state through the interface
+
+A player should not have to inspect the source code to understand why an attack failed.
+
+Review the existing ability HUD and combat feedback.
+
+Distinguish between:
+
+1. Ready to use.
+2. On cooldown.
+3. Temporarily unable to start because of another action.
+4. Input buffered.
+5. Combo Assist follow-up queued.
+
+Avoid introducing excessive interface clutter.
+
+The interface should remain compatible with Alva’s visual identity.
+
+10.2 Queued combo feedback
+
+Consider a very subtle visual cue when a combo follow-up is successfully queued.
+
+Examples:
+
+* A small highlight on the next attack’s ability tile.
+* A short-lived queued indicator.
+* A restrained outline using the existing UI design language.
+
+Do not create a giant screen notification for each queued move.
+
+Do not use a full-screen effect.
+
+Do not make the visual indicator determine gameplay timing.
+
+The simulation owns the queue; presentation only reads it.
+
+10.3 Training diagnostics
+
+Consider a development-only or Practice Ground-only diagnostic display that can indicate:
+
+* Attack requested.
+* Attack started.
+* Attack buffered.
+* Combo follow-up queued.
+* Input expired.
+* Attack canceled.
+* Attack blocked by cooldown.
+* Attack blocked by an action restriction.
+
+This should help identify combat responsiveness problems.
+
+Do not add persistent gameplay overhead or flood the production console.
+
+10.4 Localization and accessibility
+
+Any new user-facing text must support English and French.
+
+Preserve accessibility and reduced-motion behavior.
+
+Ensure any visual feedback works appropriately with keyboard, controller, and touch play.
+
+Do not make touch players depend on the desktop ability HUD.
+
+⸻
+
+PART 11 — PRESERVE FUNDAMENTAL BALANCE RULES
+
+This update should not silently change the meaning of combat.
+
+11.1 Damage
+
+Preserve Alva’s allowed individual hit damage tiers:
+
+* 1
+* 3
+* 5
+* 10
+
+Do not introduce arbitrary intermediate damage values.
+
+Do not increase damage merely because an attack feels difficult to land.
+
+11.2 Cooldowns
+
+Preserve the current cooldown policy:
+
+* Ordinary repeat cooldown: 0.5 seconds.
+* Exceptional-effect cooldown: 3 seconds.
+* High-impact 10-damage cooldown class: 5 seconds.
+* Existing exemptions, including Deflect.
+
+These values are separate from startup, active frames, and recovery.
+
+Never add cooldowns together when the policy currently chooses one class.
+
+Never apply the 0.5-second repeat cooldown as a global lockout between different moves.
+
+11.3 Launch Point and knockback
+
+Preserve:
+
+* Launch Point accumulation.
+* Passive Launch Point recovery.
+* Base Launch.
+* Directional Launch.
+* Hitstun.
+* Launch reactions.
+* Stage rebounds.
+* Knockback scaling.
+* Void eliminations.
+
+Do not simplify Alva into a traditional health-bar game.
+
+11.4 Defense and Energy
+
+Preserve:
+
+* Ground Shield.
+* Aerial Deflect.
+* Perfect Shield.
+* Shield protection against all attacks.
+* Existing Energy costs and regeneration.
+* Dash expenditure.
+* Combat Assist’s zero-Energy approach.
+* Existing exhaustion rules.
+
+Do not add unblockable attacks.
+
+Do not create a hidden advantage for queued attacks against Shield.
+
+11.5 Healing
+
+Preserve the existing passive Launch Point recovery system and fighter-specific healing mechanics.
+
+Do not give every fighter a new active healing move.
+
+Do not change #0003’s healing technique as part of improving Combo Assist.
+
+Any changes affecting healing mechanics require separate justification and tests.
+
+11.6 Character uniqueness
+
+Preserve the meaningful differences among:
+
+* #0001’s space-control and projectile mechanics.
+* #0002’s mobility-based offensive moves.
+* #0003’s grounded strikes, plunges, and healing.
+* #0004’s dance attacks, leek-based moves, and charm mechanics.
+
+Do not normalize every attack into a generic three-hit combination.
+
+Combo Assist should facilitate existing attacks, not create new, character-independent animation sequences.
+
+⸻
+
+PART 12 — SPECIAL CASES AND EDGE CONDITIONS
+
+The upgraded system must handle the following correctly.
+
+12.1 Multihit attacks
+
+A multihit attack must complete all its intended strikes when left uninterrupted.
+
+A queued combo must not start after the first strike merely because the first hit connected.
+
+It starts after the source animation naturally completes.
+
+Do not accidentally truncate #0002’s Rapid Kicks or #0004’s Dance Combo.
+
+12.2 Projectiles
+
+An existing projectile release must occur at its authored timing.
+
+A queue must not duplicate projectile spawning.
+
+A projectile already released may continue independently when the fighter moves on.
+
+12.3 Aerial attacks
+
+Aerial Attack 1 and Attack 2 may differ from their ground versions.
+
+Respect:
+
+* Ground/air mapping.
+* Air-use limits.
+* Free fall.
+* Landing.
+* Landing cancellation.
+* Motion-specific attack completion.
+* Remaining aerial movement resources.
+
+Never start a ground-only move in the air because a queued action was stored earlier.
+
+Do not silently turn an intended aerial follow-up into a different ground move.
+
+12.4 Motion attacks
+
+Review interactions with:
+
+* Homing attacks.
+* Bounce attacks.
+* Slams.
+* Rolls.
+* Rising attacks.
+* Hovering attacks.
+* Attacks with motion-driven early termination.
+
+Do not override these mechanics with generic animation-completion assumptions.
+
+12.5 Simultaneous input
+
+Define deterministic behavior for:
+
+* Two attack buttons pressed in the same simulation step.
+* Attack and Dash on the same step.
+* Attack and Jump on the same step.
+* Attack and Shield on the same step.
+* A repeated attack press on the exact step an animation ends.
+* A buffered request and queued follow-up becoming available together.
+* A hit occurring on a frame that also ends an attack.
+
+Preserve Alva’s established action priority whenever possible.
+
+One request must not generate two unintended actions.
+
+12.6 Hitstop and stun
+
+Check what happens when a player repeats a button:
+
+* During startup.
+* During active frames.
+* During recovery.
+* During hitstop.
+* Just before taking a hit.
+* During hitstun.
+* Immediately after recovering from stun.
+
+Do not allow a previously queued attack to emerge after an interruption that should have cleared it.
+
+12.7 Pausing, switching, and restarting
+
+Queues and buffers must not produce unexpected attacks after:
+
+* Pausing or resuming.
+* Returning to Home.
+* Changing the controlled fighter.
+* Starting a new match.
+* Restarting Practice Ground.
+* Respawning.
+* Switching controller devices.
+* Losing focus and having inputs reset.
+* A result or round-ending input lock.
+
+⸻
+
+PART 13 — TESTING REQUIREMENTS
+
+Tests are mandatory.
+
+Run the existing full test suite using:
 
 node --test
 
-Add regression tests
+Also execute focused tests during development.
 
-Add or update tests that cover:
+Do not claim success without reporting actual test results.
 
-Capitalization
+13.1 Combo Assist tests
 
-* Ordinary English interface labels use sentence case.
-* French capitalization remains valid.
-* Uppercase CSS transformations cannot reintroduce the issue.
-* ALVA, CPU, P1, and combat-announcement exceptions are preserved.
-* Dynamic translated labels also use the correct capitalization.
+Test every playable fighter and both Attack 1 and Attack 2 wherever the loadout supports them.
 
-Hover and focus
+Required cases:
 
-* Opening a screen does not create an unintended hover appearance.
-* Programmatic focus does not imitate mouse hover.
-* Pointer entry enables hover.
-* Pointer exit disables hover.
-* Keyboard and controller navigation remain visible and usable.
-* Touch interaction cannot produce sticky hover states.
-* Persistent selection is separate from hover.
+1. Attack 1 repeated during the queue window starts Attack 2 after natural completion.
+2. Attack 2 repeated starts Attack 1.
+3. The current animation is never restarted.
+4. The source attack retains its original lifetime.
+5. Early presses outside the queue window do not unexpectedly queue an action.
+6. Mashing cannot produce an unlimited chain.
+7. Held buttons never become repeated presses.
+8. Cooldowns remain unchanged.
+9. A destination attack on cooldown does not start.
+10. An interrupted source never triggers a stale follow-up.
+11. Another valid action supersedes the queue.
+12. The queued attack respects ground and air restrictions.
+13. Combo Assist disabled preserves old behavior.
+14. CPU-controlled fighters never receive this new player-only queue.
+15. Existing post-completion Combo Assist alternation still works.
+16. A substituted attack resolves the next move from its actual identity.
+17. Missing artwork causes a safe refusal.
+18. Hitstop does not advance attack completion incorrectly.
 
-Glass styling
+13.2 Input buffering tests
 
-* Every relevant dialogue uses the shared glass treatment.
-* Dialogue-specific styles do not replace it with an opaque surface.
-* Backdrop-filter fallback behavior remains supported.
-* Text remains readable.
+Test:
 
-Button geometry
+* 0.20-second ordinary attack buffering.
+* Exact buffer-boundary behavior.
+* Inputs that expire.
+* More recent inputs superseding older ones.
+* Buffer interactions with hitstop.
+* Buffer interactions with recovery.
+* Buffer interactions with cooldowns.
+* Buffer interactions with landing.
+* Buffer interactions with Dash and Jump.
+* No repeated execution from one input.
+* No stale execution after a hit.
 
-* All rectangular menu buttons use the shared 3px corner radius.
-* Deliberately circular controls retain their geometry.
+Verify that modifying attack buffering does not unintentionally modify Dash timing.
 
-Dialogue stacking
+13.3 Cancellation tests
 
-* A newly opened dialogue is always topmost.
-* Only the topmost dialogue is interactive.
-* Parent dialogues become interactive again when children close.
-* Escape, gamepad Back, and focus restoration work correctly.
-* Closing an entire dialogue chain restores the normal screen.
-* No stale z-index, inert, or navigation scope remains.
+Test that:
 
-Existing test files
+* Explicit different-button attack cancellations remain legal.
+* Same-button repetitions never restart the current attack.
+* Canceled attacks start their cooldown exactly once.
+* A canceled attack does not release strikes or projectiles that have not occurred.
+* Existing released projectiles continue normally.
+* Invalid requests do not cancel the current attack.
+* Same-step precedence remains deterministic.
+* Queued follow-ups do not invoke playerMayCut() against their own unfinished source attack.
 
-Review and extend relevant tests in:
+13.4 Combat Assist tests
 
-* tests/interface/settings.test.mjs
-* tests/interface/controller-ui.test.mjs
-* tests/interface/battle-screen.test.mjs
-* tests/interface/i18n.test.mjs
-* tests/interface/controls-ui.test.mjs
-* tests/interface/stage-select.test.mjs
-* tests/interface/discover.test.mjs
+Test:
 
-Add focused tests if the existing files do not cover the required interactions.
+* Normal melee approaches.
+* Queued follow-ups that request approaches.
+* In-range attacks starting without approach.
+* No Energy use for an assisted approach.
+* Correct facing.
+* Run held toward and away from the opponent.
+* Grounded approaches around stage edges.
+* Aerial approaches and airtime usage.
+* Opponents moving during an approach.
+* Targets disappearing before completion.
+* Attacks that already home toward opponents.
+* Approaches canceled by higher-priority actions.
 
-Update assertions that intentionally refer to UI strings whose capitalization has changed.
+13.5 Hitbox and spacing tests
 
-Do not delete meaningful tests to make the suite pass.
+For any modified hitbox, add tests demonstrating:
 
-Browser verification
+* The old failure case.
+* The corrected contact range.
+* The maximum valid new reach.
+* Correct attack phase.
+* Correct left/right mirroring.
+* No hit before startup ends.
+* No hit after active frames.
+* No unexpected reach through stage geometry.
+* No incorrect interaction with Shields.
 
-Serve the game locally:
+Avoid tests that merely assert that the new number equals a chosen constant without validating behavior.
 
-python3 -m http.server 8000
+13.6 Regression tests
 
-Verify the actual rendered UI in a browser where tooling permits.
+Run tests covering:
 
-Test desktop mouse, keyboard navigation, gamepad behavior where available, and mobile/touch layouts.
+* Every playable fighter.
+* Ground and aerial attacks.
+* Special abilities.
+* Projectiles.
+* Summons.
+* Techniques.
+* Shield and Deflect.
+* Energy.
+* Cooldowns.
+* Launch reactions.
+* Stage physics.
+* Respawning.
+* Training mode.
+* Actual roster matchups.
+* Keyboard and controller input.
+* Touch input.
+* The ability HUD.
+* Localization.
+* Determinism.
 
-Check short landscape screens and common desktop sizes.
+13.7 Frame-rate independence
 
-Automated source-code assertions alone are insufficient for validating hover effects, visual layering, and glass transparency. Use actual computed styles and interaction checks where possible.
+The simulation is fixed-step.
+
+Verify that the same deterministic input sequence produces the same gameplay outcome under different rendering frame rates.
+
+Do not use wall-clock timers, setTimeout(), or animation-frame callbacks to decide when queued attacks execute.
+
+Use simulation state and fixed-step timing.
 
 ⸻
 
-8. Preserve existing functionality
+PART 14 — MEASURE WHETHER FIGHTING ACTUALLY IMPROVES
 
-This is a UI refinement and interaction-correctness update.
+A feature being implemented does not automatically mean combat feels better.
 
-Do not unnecessarily alter:
+Create reproducible before-and-after scenarios.
 
-* Combat mechanics.
-* Fighter definitions or abilities.
-* Movement.
-* AI behavior.
-* Stage rendering.
-* Damage, scoring, or match rules.
-* Save data and settings persistence.
-* Controller mappings.
-* Touch-control functionality.
-* Game performance.
+Where practical, measure:
 
-Follow the existing modular architecture.
+Input responsiveness
 
-Read CLAUDE.md, relevant documentation, and the established repository conventions.
+* Press-to-attack acceptance rate.
+* Number of valid early presses lost.
+* Delay between legal attack availability and actual startup.
+* Number of unintended repeated actions.
+* Number of duplicate actions produced by a single press.
 
-Do not modify the protected character_rule file.
+Combo Assist
 
-Prefer small, maintainable shared improvements over repetitive overrides or hacks.
+* Percentage of correctly queued follow-ups.
+* Number of accidental animation restarts.
+* Number of stale attacks after interruption.
+* Number of queued moves that bypassed cooldowns (must be zero).
+* Number of unintended auto-chains (must be zero).
 
-Any refactoring must preserve existing behavior outside the five requested UI changes.
+Attack spacing
 
-⸻
+* Contact success at clearly defined distances.
+* Contact failure outside valid range.
+* Differences between intended sprite contact and hitbox contact.
+* Whether Combat Assist improves short-range approach reliability.
 
-9. Acceptance criteria
+Cancellation
 
-The task is complete only when all of the following are true:
+* Number of attacks canceled before their active frames in standardized novice-style input sequences.
+* Whether repeated-button queuing reduces this specific problem.
+* Whether deliberate different-button cancellations remain immediately responsive.
 
-* [ ]	No ordinary UI text appears fully uppercase.
-* [ ]	All ordinary multiword menu labels follow sentence-case rules.
-* [ ]	ALVA, CPU, P1, and combat announcements retain their intended capitalization.
-* [ ]	English and French localization both work correctly.
-* [ ]	No button appears mouse-hovered without a real cursor hovering over it.
-* [ ]	Screen transitions do not leave buttons accidentally highlighted.
-* [ ]	Keyboard and gamepad navigation remain accessible.
-* [ ]	Every dialogue has a consistent translucent glass appearance matching Controller connections.
-* [ ]	All rectangular menu buttons have the Play button’s 3px corners.
-* [ ]	Newly opened dialogues always appear above earlier dialogues.
-* [ ]	Only the topmost dialogue receives interaction.
-* [ ]	Closing nested dialogues restores the correct previous dialogue and focus.
-* [ ]	Desktop, controller, and touch input remain functional.
-* [ ]	Existing gameplay behavior is preserved.
-* [ ]	All relevant tests pass.
+Use the tests and available simulation harness rather than fabricating statistics.
+
+A useful quality target is to make intended simple two-button sequences more reliable without reducing the importance of spacing, timing, Shield use, movement, and opponent reactions.
+
+Do not guarantee that every attack hits.
 
 ⸻
 
-10. Final deliverables
+PART 15 — IMPLEMENTATION ARCHITECTURE
 
-Implement the changes in the repository.
+Implement the work in an organized manner.
 
-When finished, provide:
+15.1 Separate responsibilities
 
-1. Summary of changes: Explain what was corrected in each of the five areas.
-2. Root causes: Identify the code or style rules responsible for the original issues.
-3. Files modified: List the relevant files and why they were changed.
-4. Verification: Report automated test results and any browser checks performed.
-5. Remaining limitations: Clearly identify anything that could not be verified or completed.
+The preferred conceptual ownership is:
 
-Do not claim functionality has been tested unless it was actually tested.
+combo-assist.js
 
-Do not stop at a proposal, partial CSS adjustment, or isolated fix.
+Owns the general rules for identifying alternate attacks.
 
-The final objective is a game-wide, consistently styled ALVA interface with correct capitalization, precise hover behavior, uniform glass dialogues, consistent button corners, and completely reliable dialogue stacking.
+Keep these rules generic and independent of specific fighters.
+
+fighter.js
+
+Owns transient player-input state, queuing, priority, invalidation, and integration with the existing attack-start pipeline.
+
+combat-state.js
+
+Owns attack state and lifecycle.
+
+If reliable natural-completion reporting is needed, implement it here without confusing normal completion with manual cancellation.
+
+movement.js
+
+Owns universal buffering values when relevant.
+
+Avoid putting fighter-specific responsiveness values in character definitions.
+
+move-status.js
+
+Provides read-only presentation state.
+
+It should not own combat input or queues.
+
+UI modules
+
+Display confirmed combat states without changing them.
+
+15.2 Design a safe queue object
+
+Use a single pending-combo object rather than an unbounded array.
+
+Its state should contain enough information to determine:
+
+* Which attack instance created it.
+* Which input created it.
+* Which destination action was selected.
+* Whether it belongs to ground or air.
+* When it was requested in simulation time.
+* Whether its source attack remains valid.
+
+Store the destination as the resolved action at queue time.
+
+Do not repeatedly reapply Combo Assist and accidentally change its destination.
+
+Do not use a timer that executes actions independently of Fighter.update().
+
+15.3 Avoid race conditions
+
+Do not mix old and new inputs in an ambiguous order.
+
+Review exactly where CombatState.update(dt) ends an attack.
+
+Natural completion and queue execution should fit into the existing fixed-step action ordering.
+
+Do not execute a queued action if a newer valid request already took priority.
+
+Never perform multiple successful move starts on one simulation step.
+
+15.4 Do not duplicate attack-start logic
+
+Queued attacks should use existing eligibility functions and tryAction() or an appropriately refactored common action-start pathway.
+
+Do not implement a second function that ignores restrictions.
+
+A future fighter with a new attack type should work through the same shared system.
+
+15.5 Keep implementation modest
+
+Prefer small, well-factored changes over a giant rewrite of Fighter.update().
+
+Add helper functions where doing so meaningfully clarifies behavior.
+
+Avoid introducing an unnecessarily complicated state machine for a one-action queue.
+
+Every new state variable must have a clearly defined lifecycle.
+
+⸻
+
+PART 16 — REQUIRED DOCUMENTATION UPDATES
+
+Update ALVA_SPEC.md to accurately describe:
+
+* The new Combo Assist queue.
+* Its timing window.
+* Natural-completion requirements.
+* Cancellation and invalidation.
+* Ground and aerial behavior.
+* Interaction with Combat Assist.
+* Interaction with cooldowns.
+* Behavior when Combo Assist is disabled.
+
+The current specification’s absolute prohibition against buffering repeated attacks must be revised intentionally.
+
+Update the relevant sections of:
+
+* docs/systems/combat.md
+* docs/systems/movement.md, if buffering changes.
+* docs/systems/input.md, if user-visible feedback changes.
+* docs/development/testing.md, if new test groups are introduced.
+* README.md, if gameplay features or descriptions need updates.
+* UPDATES.md, following the repository’s conventions.
+
+Avoid duplicating contradictory descriptions.
+
+Keep documentation consistent with actual implementation.
+
+⸻
+
+PART 17 — DEVELOPMENT ORDER
+
+Use this order to minimize regressions.
+
+Phase A — Establish the baseline
+
+1. Read and map the relevant architecture.
+2. Run existing tests.
+3. Document current attack input and cancellation behavior.
+4. Identify the relevant invariants.
+5. Identify obsolete specifications and tests that will intentionally change.
+
+Do not begin with arbitrary hitbox changes.
+
+Phase B — Implement Combo Assist queued follow-ups
+
+1. Implement correct alternate resolution.
+2. Add one queue per human player.
+3. Accept repeated-button presses within the defined window.
+4. Preserve the current animation.
+5. Detect natural completion.
+6. Process the follow-up through normal action eligibility.
+7. Implement queue invalidation.
+8. Integrate Combat Assist.
+9. Update tests and documentation.
+
+Finish and validate this phase before expanding the change.
+
+Phase C — Improve ordinary attack buffering
+
+1. Evaluate the existing 0.15-second duration.
+2. Introduce the 0.20-second candidate.
+3. Preserve or explicitly separate Dash-buffer timing.
+4. Test buffer conflicts and expiry.
+5. Verify no accidental delayed execution.
+6. Update tests and documentation.
+
+Phase D — Audit responsiveness and accidental cancellations
+
+1. Reproduce startup-cancellation problems.
+2. Measure the effects of the new Combo Assist queue.
+3. Preserve advanced cancellation freedom.
+4. Implement only additional improvements justified by evidence.
+
+Phase E — Audit hitbox alignment and Combat Assist
+
+1. Test common attacks across the four playable fighters.
+2. Identify genuinely inaccurate collision geometry.
+3. Apply small move-specific corrections where justified.
+4. Test movement and stage interactions.
+5. Verify the changes do not create excessive reach or unintended balance changes.
+
+Phase F — Refine presentation
+
+1. Add restrained queued-action feedback if useful.
+2. Improve misleading availability feedback where warranted.
+3. Preserve UI performance.
+4. Update both languages.
+5. Check keyboard, controller, and touch behavior.
+
+Phase G — Complete regression testing
+
+1. Run focused tests.
+2. Run all tests.
+3. Verify deterministic simulation.
+4. Inspect all changed files.
+5. Check documented behavior.
+6. Report the final results.
+
+⸻
+
+PART 18 — STRICTLY PROHIBITED SHORTCUTS
+
+Do not:
+
+* Reduce CPU difficulty.
+* Adjust CPU reactions or strategy.
+* Remove hitboxes from any attacks.
+* Make every attack connect automatically.
+* Add aim assist to all projectiles.
+* Teleport fighters to guarantee hits.
+* Restart active attacks from repeated presses.
+* Allow unlimited combo buffering.
+* Create infinite automatic combos.
+* Remove all attack recovery.
+* Make different moves share one global cooldown.
+* Reduce the current repeat cooldown without explicit justification.
+* Bypass long cooldowns through Combo Assist.
+* Change damage tiers.
+* Remove knockback or Launch Point.
+* Add unblockable attacks.
+* Remove Shield or Deflect.
+* Make all fighters play identically.
+* Add per-fighter universal movement values.
+* Hide intentional mechanic changes from the product specification.
+* Delete tests simply because the redesign makes them fail.
+* Fake missing animation frames.
+* Break custom controller layouts.
+* Ignore mobile controls.
+* Add nondeterministic gameplay timers.
+* Put new combat logic exclusively into UI components.
+* Edit character_rule.
+* Refactor unrelated systems without a concrete reason.
+
+Do not confuse making combat easier to control with making the entire game easier to win.
+
+The former is the objective.
+
+CPU balancing will come later.
+
+⸻
+
+PART 19 — ACCEPTANCE CRITERIA
+
+The implementation is successful when all of the following are true.
+
+Combo Assist
+
+A human player with Combo Assist enabled can press Attack 1, then repeat the responsible attack button near the end of the animation, and receive a legal Attack 2 follow-up after Attack 1 naturally completes.
+
+The same works from Attack 2 to Attack 1.
+
+The original attack never restarts, skips frames, or loses its strike because of that repeated press.
+
+No move ignores its cooldown.
+
+No attack starts from a stale queue after interruption.
+
+Manual different-button cancellations still work.
+
+Responsiveness
+
+Ordinary attack presses made slightly early are handled more forgivingly.
+
+New buffering does not produce unexpected delayed attacks.
+
+Attack, Jump, Shield, and Dash priorities remain coherent.
+
+Attack consistency
+
+The most common basic attacks behave consistently with their sprite animations, hitboxes, facing, and positioning.
+
+Any hitbox corrections are targeted and tested.
+
+Assists
+
+Combo Assist and Combat Assist work independently or together.
+
+Both continue to function with every playable fighter.
+
+Both preserve their intended optional nature.
+
+Combat depth
+
+Skilled players retain deliberate cancellations, spacing, movement options, counterplay, and timing advantages.
+
+The game does not become an automatic attack sequence.
+
+CPU
+
+CPU behavior and difficulty remain intentionally unchanged.
+
+Architecture
+
+The fixed-step simulation remains deterministic.
+
+Universal systems remain universal.
+
+Input methods stay consistent.
+
+The repository’s technical architecture remains intact.
+
+Quality
+
+All relevant tests pass, documentation matches implementation, and the finished changes are explained.
+
+⸻
+
+PART 20 — REQUIRED FINAL REPORT
+
+After implementation, provide a comprehensive engineering report with these sections.
+
+A. Initial findings
+
+Explain the concrete causes of the existing responsiveness problems found in the repository.
+
+Separate confirmed issues from hypotheses that were not reproduced.
+
+B. Implemented changes
+
+Describe every meaningful gameplay change.
+
+Explain its purpose and how it works.
+
+C. Before-and-after behavior
+
+Use concrete input sequences, particularly:
+
+* Attack 1 → Attack 1.
+* Attack 2 → Attack 2.
+* Attack 1 → Attack 2.
+* Repeated-button mashing.
+* Input during recovery.
+* Input during hitstop.
+* Queued follow-up after a hit.
+* Queued follow-up after interruption.
+* Combo Assist combined with Combat Assist.
+
+D. Changed files
+
+List the files modified and why.
+
+E. Numerical changes
+
+Provide exact old and new values for any timing or hitbox adjustments.
+
+Do not describe the gameplay as faster if no actual speed value was modified.
+
+F. Validation
+
+Report the exact tests executed and their actual results.
+
+Identify remaining failures, if any.
+
+G. Balance considerations
+
+Explain how the changes preserve cooldowns, Launch Point, Shield, character identity, and advanced player control.
+
+Confirm that CPU difficulty was not intentionally modified.
+
+H. Remaining opportunities
+
+Identify possible future improvements without implementing unrelated changes.
+
+Place CPU strength and difficulty adjustments in a separate deferred-work category.
+
+⸻
+
+FINAL PRODUCT VISION
+
+Alva should be easy to begin playing but rewarding to master.
+
+A beginner should be able to press basic attack buttons and obtain understandable, predictable actions.
+
+An experienced player should still gain an advantage from deliberate timing, accurate spacing, movement, Shield usage, hit confirmation, and manual cancellation.
+
+An attack should not feel unresponsive merely because a reasonable input occurred a few frames early.
+
+A repeated attack press should not unexpectedly restart and cancel an active animation.
+
+Combo Assist should understand the player’s intended sequence and perform a legal follow-up without bypassing the existing attack lifecycle.
+
+Combat Assist should make short-range melee engagement more consistent without guaranteeing hits or invalidating positioning.
+
+Animation, hitbox, and collision behavior should agree as closely as practical.
+
+Cooldowns should remain meaningful but should not be confused with general attack delays.
+
+Above all, the system should make the player feel that their character responds reliably to their intentions while remaining subject to fair and understandable combat rules.
+
+The goal is not to simplify Alva’s mechanics.
+
+The goal is to make those mechanics communicate and cooperate better.
+
+Implement a precise, tested, well-documented combat-feel improvement using Alva’s existing architecture. Prioritize Combo Assist queued follow-ups, input responsiveness, attack consistency, and player feedback. Preserve advanced mechanics and leave CPU difficulty untouched.
+
+Begin by inspecting the latest repository state, establishing a passing baseline, and tracing the existing combat lifecycle. Then implement the improvements in the order specified above, validate them against every currently playable fighter, and provide the requested engineering report.
