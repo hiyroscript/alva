@@ -427,10 +427,10 @@ test('keyboard and gamepad reach Watch Mode on Home and open it', () => {
 test('the app registers the four Watch Mode screens, each with its own labelled section', () => {
   const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
   const expected = {
-    'watch-difficulty': ['screen--difficulty', 'Watch Mode: select difficulty'],
-    'watch-cpu1': ['screen--character', 'Watch Mode: select CPU 1'],
-    'watch-cpu2': ['screen--character', 'Watch Mode: select CPU 2'],
-    'watch-map': ['screen--map', 'Watch Mode: select stage'],
+    'watch-difficulty': ['screen--difficulty', 'Watch mode: select difficulty'],
+    'watch-cpu1': ['screen--character', 'Watch mode: select CPU 1'],
+    'watch-cpu2': ['screen--character', 'Watch mode: select CPU 2'],
+    'watch-map': ['screen--map', 'Watch mode: select stage'],
   };
   for (const [id, [cls, label]] of Object.entries(expected)) {
     const section = html.match(new RegExp(`<section[^>]*data-screen="${id}"[^>]*>`))?.[0];
@@ -462,8 +462,8 @@ test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode
   assert.deepEqual(names(WATCH_SETUP), ['Difficulty', 'CPU 1', 'CPU 2', 'Stage']);
   assert.deepEqual(names(QUICK_BATTLE_CUSTOM_SETUP), ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage']);
   assert.deepEqual(names(QUICK_BATTLE_REGULAR_SETUP), ['Mode', 'Difficulty', 'Fighter']);
-  assert.equal(t(WATCH_SETUP.name), 'Watch Mode');
-  assert.equal(t(QUICK_BATTLE_CUSTOM_SETUP.name), 'Quick Battle');
+  assert.equal(t(WATCH_SETUP.name), 'Watch mode');
+  assert.equal(t(QUICK_BATTLE_CUSTOM_SETUP.name), 'Quick battle');
   const check = (screen, names, step, label) => {
     const list = screen.el.querySelector('.steps');
     assert.equal(list.getAttribute('aria-label'), label, screen.id);
@@ -478,28 +478,28 @@ test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode
     });
   };
   const watch = [
-    [screens.watchDifficulty, 0, 'Select Difficulty'],
+    [screens.watchDifficulty, 0, 'Select difficulty'],
     [screens.watchCpu1, 1, 'Select CPU 1'],
     [screens.watchCpu2, 2, 'Select CPU 2'],
-    [screens.watchMap, 3, 'Select Stage'],
+    [screens.watchMap, 3, 'Select stage'],
   ];
   for (const [screen, step, title] of watch) {
-    check(screen, ['Difficulty', 'CPU 1', 'CPU 2', 'Stage'], step, 'Watch Mode setup');
-    assert.equal(screen.el.querySelector('.kicker').textContent, 'Watch Mode');
+    check(screen, ['Difficulty', 'CPU 1', 'CPU 2', 'Stage'], step, 'Watch mode setup');
+    assert.equal(screen.el.querySelector('.kicker').textContent, 'Watch mode');
     assert.equal(screen.el.querySelector('.screen-title').textContent, title);
     assert.equal(screen.el.querySelector('.screen-title').tagName, 'H1', 'one heading per screen');
     assert.equal(screen.el.querySelector('.btn-back').getAttribute('aria-label'), 'Back');
   }
   // Quick Battle's Custom Play (the play type this app was booted on).
   const quick = [
-    [screens.mode, 0, 'Play'], [screens.difficulty, 1, 'Quick Battle'], [screens.character, 2, 'Quick Battle'],
-    [screens.quickCpu, 3, 'Quick Battle'], [screens.map, 4, 'Quick Battle'],
+    [screens.mode, 0, 'Play'], [screens.difficulty, 1, 'Quick battle'], [screens.character, 2, 'Quick battle'],
+    [screens.quickCpu, 3, 'Quick battle'], [screens.map, 4, 'Quick battle'],
   ];
   for (const [screen, step, kicker] of quick) {
-    check(screen, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], step, 'Quick Battle setup');
+    check(screen, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], step, 'Quick battle setup');
     assert.equal(screen.el.querySelector('.kicker').textContent, kicker);
   }
-  assert.equal(screens.character.el.querySelector('.screen-title').textContent, 'Select Fighter');
+  assert.equal(screens.character.el.querySelector('.screen-title').textContent, 'Select fighter');
   assert.equal(screens.quickCpu.el.querySelector('.screen-title').textContent, 'Select CPU');
   assert.ok(screens.map.startBtn.html.includes('<span>Confirm and start battle</span>'));
   assert.ok(screens.watchMap.startBtn.html.includes('<span>Confirm and watch battle</span>'));
@@ -896,7 +896,7 @@ test('entering Watch Mode loads each fighter once and builds the Battle, HUD and
   assert.equal(hud.right.score.getAttribute('aria-label'), 'CPU 2: 0 of 3 points');
   assert.equal(hud.left.dots.length, CONFIG.battle.pointsToWin, 'the normal score dots');
   assert.equal(hud.timer.textContent, '5:00', 'the normal timer: the same 5 minutes as Quick Battle');
-  assert.equal(canvas.getAttribute('aria-label'), 'Watch Mode battle: CPU 1, #9999, against CPU 2, Test A');
+  assert.equal(canvas.getAttribute('aria-label'), 'Watch mode battle: CPU 1, #9999, against CPU 2, Test A');
   assert.equal(canvas.getAttribute('role'), 'img');
   screens.battle.exit();
 });
@@ -1088,7 +1088,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.isRunning, true, 'the match runs');
   assert.ok(screen.el.classList.contains('is-watch'));
   // No fighter's own ability icons.
-  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra attack');
   assert.equal(screen.touch.buttons.get('attack1').getAttribute('aria-label'), 'Attack 1');
   screen.pause();
   off();
@@ -1149,8 +1149,8 @@ test('pause still works while spectating: P, Esc, gamepad Start and the HUD, wit
 
   app.input.key('KeyP');
   assert.equal(screen.paused, true, 'P pauses');
-  assert.equal(screen.pauseMenuView.querySelector('.kicker').textContent, 'Watch Mode');
-  assert.deepEqual(items(), ['Resume', 'Restart Battle', 'Return to Home'], 'no fighter controls, and no Help');
+  assert.equal(screen.pauseMenuView.querySelector('.kicker').textContent, 'Watch mode');
+  assert.deepEqual(items(), ['Resume', 'Restart battle', 'Return to home'], 'no fighter controls, and no Help');
   assert.equal(document.activeElement.textContent, 'Resume');
   assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
   app.input.key('KeyP');
@@ -1209,7 +1209,7 @@ test('Restart Battle and Rematch keep both CPUs, their fighters, the level, the 
   };
   play();
   screen.pause();
-  byText(screen.pauseMenuView, 'Restart Battle').click();
+  byText(screen.pauseMenuView, 'Restart battle').click();
   check('restart');
   assert.equal(screen.paused, false);
   play();
@@ -1229,13 +1229,13 @@ test('Restart Battle and Rematch keep both CPUs, their fighters, the level, the 
 test('results name CPU 1 and CPU 2 in Watch Mode; Quick Battle\'s wording is unchanged', async () => {
   const cases = [
     // [mode, winner, how, title, line]
-    ['watch', 'p1', 'void', 'CPU 1 Wins', 'CPU 2 fell into the Void for the final point.'],
-    ['watch', 'p2', 'void', 'CPU 2 Wins', 'CPU 1 fell into the Void for the final point.'],
-    ['watch', 'p1', 'points', 'CPU 1 Wins', 'Time ran out. More points wins the match.'],
-    ['watch', 'p2', 'time', 'CPU 2 Wins', 'Time ran out with the points level. Lower Launch Point wins.'],
-    ['quick-battle', 'p1', 'void', 'Player 1 Wins', 'The CPU fell into the Void for the final point.'],
-    ['quick-battle', 'p2', 'void', 'CPU Wins', 'Player 1 fell into the Void for the final point.'],
-    ['quick-battle', 'p2', 'points', 'CPU Wins', 'Time ran out. More points wins the match.'],
+    ['watch', 'p1', 'void', 'CPU 1 wins', 'CPU 2 fell into the Void for the final point.'],
+    ['watch', 'p2', 'void', 'CPU 2 wins', 'CPU 1 fell into the Void for the final point.'],
+    ['watch', 'p1', 'points', 'CPU 1 wins', 'Time ran out. More points wins the match.'],
+    ['watch', 'p2', 'time', 'CPU 2 wins', 'Time ran out with the points level. Lower Launch Point wins.'],
+    ['quick-battle', 'p1', 'void', 'Player 1 wins', 'The CPU fell into the Void for the final point.'],
+    ['quick-battle', 'p2', 'void', 'CPU wins', 'Player 1 fell into the Void for the final point.'],
+    ['quick-battle', 'p2', 'points', 'CPU wins', 'Time ran out. More points wins the match.'],
   ];
   for (const [mode, winner, how, title, line] of cases) {
     const booted = boot();
@@ -1279,7 +1279,7 @@ test('results name CPU 1 and CPU 2 in Watch Mode; Quick Battle\'s wording is unc
   assert.equal(screen.resultTitle.textContent, 'Tie');
   assert.equal(screen.resultSub.textContent, 'Overtime ended with the points and Launch Point equal.');
   assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|The CPU/);
-  assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change Stage', 'Return to Home']);
+  assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change stage', 'Return to home']);
   byText(screen.resultOverlay, 'Rematch').click();
   assert.equal(battle.overtime, false);
   assert.deepEqual(battle.score, { p1: 0, p2: 0 });
@@ -1294,7 +1294,7 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   const battle = await startWatch(booted, { mapId: 'city' });
   battle.score.p1 = CONFIG.battle.pointsToWin;
   screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change Stage').click();
+  byText(screens.battle.resultOverlay, 'Change stage').click();
   assert.equal(current(app), 'watch-map');
   assert.equal(screens.battle.battle, null, 'the battle is over');
   assert.equal(document.activeElement, mapCard(screens.watchMap, 'city'), 'on the stage it was played on');
@@ -1316,7 +1316,7 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   const quick = await startQuickBattle(booted);
   quick.score.p2 = CONFIG.battle.pointsToWin;
   screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change Stage').click();
+  byText(screens.battle.resultOverlay, 'Change stage').click();
   assert.equal(current(app), 'map', 'Quick Battle\'s own Select Stage');
 });
 
@@ -1356,7 +1356,7 @@ test('Return to Home after watching, then a Quick Battle behaves exactly as befo
   const screen = screens.battle;
   await startWatch(booted, { cpu1: DEF_9999, cpu2: DEF_9999, difficulty: 'brutal' });
   screen.pause();
-  byText(screen.pauseMenuView, 'Return to Home').click();
+  byText(screen.pauseMenuView, 'Return to home').click();
   assert.equal(app.dialog.root.hidden, false, 'confirmed first');
   app.dialog.okBtn.click();
   await settle();
@@ -1382,6 +1382,6 @@ test('Return to Home after watching, then a Quick Battle behaves exactly as befo
   assert.equal(app.input.gameplayActive, true);
   assert.equal(screen.touch.enabled, true);
   screen.pause();
-  assert.equal(screen.pauseMenuView.querySelector('.kicker').textContent, 'Quick Battle');
+  assert.equal(screen.pauseMenuView.querySelector('.kicker').textContent, 'Quick battle');
   screen.exit();
 });

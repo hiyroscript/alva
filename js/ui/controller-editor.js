@@ -1,6 +1,7 @@
 // CONTROLLER CONTROLS: Settings › Controls › Customize controller
 // controls. Three layers over the Settings dialog, each modal with its own
-// navigation scope, the layer beneath inert, Esc / Circle / B stepping back
+// navigation scope, stacked by the navigator's dialog stack (each above the
+// one that opened it, the layers beneath inert), Esc / Circle / B stepping back
 // one layer and focus returning to what opened it:
 //
 //   the roster   the shared fighter roster (js/ui/fighter-roster.js), all
@@ -88,7 +89,7 @@ class RosterLayer {
       ...tattr('aria-label', 'controllerRoster.back'), ...iconLabel('common.back', ICONS.back, { iconFirst: true }),
     });
     this.back.addEventListener('click', () => onBack());
-    this.dialog = el('div', { class: 'practice-roster-dialog controller-roster-dialog glass' });
+    this.dialog = el('div', { class: 'practice-roster-dialog controller-roster-dialog glass glass--panel' });
     this.roster = new ControllerFighterRoster(app, { host: this.dialog, previewId: 'controller-preview-name', onConfirm: onChoose });
     this.dialog.replaceChildren(
       el('header', { class: 'screen-header practice-roster-head' }, [
@@ -109,7 +110,6 @@ class RosterLayer {
   open(id) {
     this.isOpen = true;
     this.root.hidden = false;
-    this.root.inert = false;
     this.roster.show(id);
     this.app.nav.pushScope(this.scope);
     if (!this.roster.focusSelected()) this.back.focus({ preventScroll: true });
@@ -119,7 +119,6 @@ class RosterLayer {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.root.hidden = true;
-    this.root.inert = false;
     this.app.nav.popScope(this.scope);
   }
 }
@@ -561,7 +560,6 @@ class EditorLayer {
       if (this.def === def && set?.usable) paintPortrait(this.portrait, set);
     });
     this.root.hidden = false;
-    this.root.inert = false;
     this.app.nav.pushScope(this.scope);
     this.refreshFamily();
     this.renderList();
@@ -573,7 +571,6 @@ class EditorLayer {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.root.hidden = true;
-    this.root.inert = false;
     this.app.nav.popScope(this.scope);
     const done = this.onClose;
     this.onClose = null;
@@ -732,11 +729,9 @@ class EditorLayer {
   // Opens the binding dialog for `action`; a confirmed binding goes into
   // the draft.
   change(action) {
-    this.root.inert = true;
     this.host.binding.open({
       def: this.def, action, binding: this.draft[action.id], draft: this.draft, actions: this.actions, family: this.family,
       onClose: (binding) => {
-        this.root.inert = false;
         if (binding) {
           this.draft = { ...this.draft, [action.id]: binding };
           this.renderList();
@@ -797,18 +792,15 @@ class EditorLayer {
     this.restoreButton.focus({ preventScroll: true });
   }
 
-  // The shared confirmation dialog, raised above this layer.
+  // The shared confirmation dialog: opened last, so the dialog stack puts
+  // it above this layer and keeps this layer inert beneath it.
   async confirm(options) {
     const dialog = this.app.dialog;
     if (!dialog) return true;
     this.confirming = true;
-    this.root.inert = true;
-    dialog.root.classList.add('is-raised');
     try {
       return await dialog.open({ ...options, cancelOutlineOnly: true });
     } finally {
-      dialog.root.classList.remove('is-raised');
-      this.root.inert = false;
       this.confirming = false;
     }
   }
@@ -848,10 +840,8 @@ export class ControllerControls {
   edit(def) {
     if (!isPlayable(def) || this.editor.isOpen) return;
     this.lastId = def.id;
-    this.roster.root.inert = true;
     this.editor.open(def, {
       onClose: () => {
-        this.roster.root.inert = false;
         if (this.roster.isOpen) this.roster.roster.focusSelected();
       },
     });

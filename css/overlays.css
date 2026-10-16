@@ -1,9 +1,8 @@
-/* Global overlays (loading, the confirm and choice dialogs, the rotate
-   prompt), and
-   the shared surface finish that gives menu, battle, practice and dialog
-   surfaces the Home Play look; it overrides the screens above, so it must
-   stay after them. One part of the stylesheet index.html loads in order
-   (css/base.css first; see docs/development/conventions.md). */
+/* Global overlays (loading, the dialogs, the rotate prompt), and the one
+   contract every dialog shares: its dim, its glass and its stacking; it
+   overrides the screens above, so it must stay after them. One part of the
+   stylesheet index.html loads in order (css/base.css first; see
+   docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
    Global overlays: loading, confirm and choice dialogs, rotate
@@ -28,8 +27,33 @@
 .loading-message { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
 .loading-actions { display: flex; gap: 10px; justify-content: center; }
 
-.dialog-overlay { position: fixed; z-index: 60; background: rgba(0, 0, 0, 0.4); animation: dim-in 0.15s ease both; }
-.dialog-overlay > .dialog-panel { animation: fade-in 0.15s ease both; }
+/* Dialogs: every modal overlay over the screen. One dim (the shared
+   scrim, so what is beneath stays perceptible), one glass for the panel
+   (.glass--panel, css/battle.css: the Controller connections look, with
+   its blur and its denser fallback), the menu corners. A dialog's own rules
+   set its size and layout only, never its surface. Top-level overlays
+   start on the dialog layer (60); the navigator's dialog stack raises each
+   one opened over another above it, in the order they open
+   (js/core/menu-navigator.js), so none has a fixed place of its own. */
+.dialog-overlay,
+.controller-overlay,
+.settings-overlay,
+.language-overlay,
+.controller-roster-overlay,
+.controller-editor-overlay,
+.binding-overlay {
+  position: fixed;
+  z-index: 60;
+  background: var(--scrim);
+  animation: dim-in 0.18s ease both;
+}
+.dialog-overlay > .glass--panel,
+.controller-overlay > .glass--panel,
+.settings-overlay > .glass--panel,
+.language-overlay > .glass--panel,
+.controller-roster-overlay > .glass--panel,
+.controller-editor-overlay > .glass--panel,
+.binding-overlay > .glass--panel { animation: fade-in 0.18s ease both; }
 .dialog-panel {
   width: min(480px, 100%);
   display: grid;
@@ -37,7 +61,7 @@
   padding: clamp(16px, 3.4vh, 26px) clamp(16px, 2.4vw, 26px);
   color: var(--text);
   color-scheme: dark;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-menu);
 }
 .dialog-title { font-weight: 700; font-size: clamp(18px, 3.6vh, 24px); letter-spacing: -0.01em; color: var(--text-strong); }
 .dialog-message { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
@@ -130,71 +154,37 @@
   .install-steps { margin-top: 10px; padding-top: 8px; }
 }
 
-/* Match Home Play on the requested surfaces only. Keep shared radius
-   tokens, intentional pills, and result-dialog styling unchanged. */
-.screen--mode .btn-back,
-.screen--difficulty .btn-back,
-.screen--character .btn-back,
-.screen--map .btn-back,
-.screen--discover .btn-back,
-.mode-card,
-.mode-info,
-.mode-cta,
-.difficulty-card,
-.roster-panel,
-.slot,
-.char-preview,
-.btn--confirm,
-.map-hero,
-.map-roster,
-.stage-tile,
-.btn--random,
-.btn--start,
-.hud-side,
-.hud-center,
-.pause-overlay .pause-panel,
-.pause-overlay .pause-btn-item,
-.practice-more,
-.practice-menu-overlay .pause-panel,
-.practice-menu-overlay .pause-btn-item,
-.practice-roster-dialog,
-.practice-roster-dialog .btn-back,
-.dialog-overlay .dialog-panel,
-.dialog-overlay .dialog-actions .btn,
-.dialog-overlay .choice-btn {
-  border-radius: 3px;
-}
-
-/* Square meeting corners inside the single bordered timer/pause holder. */
-.hud-time { border-radius: 2px 2px 0 0; }
-.hud-pause { border-radius: 0 0 2px 2px; }
-
-/* Preserve hover/pressed feedback and distinguish enabled secondary actions. */
+/* Secondary actions in glass panels: transparent at rest, with the usual
+   hover (mouse or controller cursor) and pressed fills. */
 .pause-overlay .pause-btn-item:not(.is-primary):enabled,
 .practice-menu-overlay .pause-btn-item:not(.is-primary):enabled,
 .dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled,
 .dialog-overlay .choice-btn:not(.btn--primary):enabled {
   color: var(--text);
 }
-.pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
-.practice-menu-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
-.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active),
-.dialog-overlay .choice-btn:not(.btn--primary):enabled:not(:hover):not(:active) {
+.pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
+.result-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
+.practice-menu-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
+.dialog-overlay .choice-btn:not(.btn--primary):enabled:not(:hover):not(.is-cursor-target):not(:active) {
   background: transparent;
 }
-/* Outline-only actions (pause Restart Battle / Return to Home, Practice
-   Return, and Keep Playing in Return to Home?): no fill in any state. The
+/* Outline-only actions (pause Restart battle / Return to home, Practice
+   Return, and Keep playing in Return to home?): no fill in any state. The
    focus ring and press scale come from the base rules and are left alone. */
 .pause-overlay .pause-btn-item.is-outline-only,
 .pause-overlay .pause-btn-item.is-outline-only:hover,
+.pause-overlay .pause-btn-item.is-outline-only.is-cursor-target,
 .pause-overlay .pause-btn-item.is-outline-only:focus,
 .pause-overlay .pause-btn-item.is-outline-only:active,
 .practice-menu-overlay .pause-btn-item.is-outline-only,
 .practice-menu-overlay .pause-btn-item.is-outline-only:hover,
+.practice-menu-overlay .pause-btn-item.is-outline-only.is-cursor-target,
 .practice-menu-overlay .pause-btn-item.is-outline-only:focus,
 .practice-menu-overlay .pause-btn-item.is-outline-only:active,
 .dialog-overlay .dialog-actions .btn.is-outline-only,
 .dialog-overlay .dialog-actions .btn.is-outline-only:hover,
+.dialog-overlay .dialog-actions .btn.is-outline-only.is-cursor-target,
 .dialog-overlay .dialog-actions .btn.is-outline-only:focus,
 .dialog-overlay .dialog-actions .btn.is-outline-only:active {
   background: transparent;

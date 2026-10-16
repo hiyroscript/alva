@@ -228,7 +228,7 @@ test('the counter reads the real registry: 4 available / 24 slots, in English an
   screen.localize();
   // The button's label follows the language like every marked label.
   assert.equal(screen.randomBtn.getAttribute('data-i18n-span'), 'map.random');
-  assert.ok(screen.randomBtn.html.includes('Random Stage'));
+  assert.ok(screen.randomBtn.html.includes('Random stage'));
 });
 
 test('a new stage in the registry fills the next slot by itself; the roster grows only past 24', () => {

@@ -102,7 +102,7 @@ test('every registered fighter holds exactly 100 Energy: at the start, after a r
   // So do Practice Ground and a change of fighter in it.
   const canvas = { getContext: () => new Proxy({}, { get: () => () => {} }), getBoundingClientRect: () => ({ width: 800, height: 600, left: 0, top: 0 }) };
   const practice = new PracticeSession({ canvas, map: PRACTICE_MAP, def: a, sprites: fakeSpritesOf(a), input: { flush() {}, sample: () => ({}) } });
-  assert.equal(practice.player.combat.energy, 100, 'Practice Ground');
+  assert.equal(practice.player.combat.energy, 100, 'Practice ground');
   practice.player.combat.spendEnergy(70);
   practice.setFighter(b, fakeSpritesOf(b));
   assert.equal(practice.player.combat.energy, 100, 'Practice Ground, a new fighter');

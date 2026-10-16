@@ -204,7 +204,7 @@ function fakeInput() {
   };
 }
 
-// The Quick Battle setup screens on the real ScreenManager and
+// The Quick battle setup screens on the real ScreenManager and
 // MenuNavigator, with reduced motion so screens swap without timers. The
 // Battle screen is a stand-in that records what it was asked to start.
 class BattleStub extends Screen {
@@ -461,8 +461,8 @@ test('a fresh Quick Battle lands on Medium; coming back lands on the level chose
 test('each card: its index, a four-bar scale with one to four lit, its name and line, named without relying on colour', () => {
   const { screens } = boot();
   const screen = screens.difficulty;
-  assert.equal(screen.el.querySelector('.screen-title').textContent, 'Select Difficulty');
-  assert.equal(screen.el.querySelector('.kicker').textContent, 'Quick Battle');
+  assert.equal(screen.el.querySelector('.screen-title').textContent, 'Select difficulty');
+  assert.equal(screen.el.querySelector('.kicker').textContent, 'Quick battle');
   const group = screen.el.querySelector('.difficulty-scale');
   assert.equal(group.getAttribute('aria-label'), 'Difficulty');
   assert.deepEqual(group.children, screen.cards, 'Easy to Brutal, in order');
@@ -484,7 +484,7 @@ test('each card: its index, a four-bar scale with one to four lit, its name and 
   }
   const css = stylesheet();
   assert.match(css, /\.difficulty-bars i\.is-on \{ background: var\(--accent\)/, 'lit bars in Alva\'s accent');
-  assert.match(css, /\.screen--difficulty \.btn-back,/, 'Back shaped like the other setup screens');
+  assert.match(css, /\n\.btn-back \{[^}]*border-radius: var\(--radius-menu\);/, 'Back shaped like the other setup screens');
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'a 2 x 2 grid on narrow screens');
 });
 
@@ -493,7 +493,7 @@ test('the setup header follows the play type: five steps for Custom Play, three 
     for (const [id, step] of Object.entries(expected)) {
       const items = screens[id].el.querySelector('.steps').children;
       assert.deepEqual(items.map((li) => li.querySelector('.step-name').textContent), names, id);
-      assert.equal(screens[id].el.querySelector('.steps').getAttribute('aria-label'), 'Quick Battle setup');
+      assert.equal(screens[id].el.querySelector('.steps').getAttribute('aria-label'), 'Quick battle setup');
       items.forEach((li, i) => {
         assert.equal(li.classList.contains('is-done'), i < step, `${id} step ${i} done`);
         assert.equal(li.classList.contains('is-current'), i === step, `${id} step ${i} current`);

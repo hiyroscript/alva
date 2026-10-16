@@ -1040,7 +1040,7 @@ test('setCharacter swaps the fighter\'s art and names in place, without rebuildi
   // A fighter that authors nothing: neutral, never another fighter's leftovers.
   tc.setCharacter({ id: '9997' });
   assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'jump'].map((a) => [look(b(a)), b(a).getAttribute('aria-label')]),
-    [[ICONS.ring, 'Extra Attack'], [ICONS.pip1, 'Attack 1'], [ICONS.pip2, 'Attack 2'], [ICONS.jump, 'Jump']]);
+    [[ICONS.ring, 'Extra attack'], [ICONS.pip1, 'Attack 1'], [ICONS.pip2, 'Attack 2'], [ICONS.jump, 'Jump']]);
   assert.ok(SPRITE_BUTTONS.every((a) => spriteOf(b(a)) === null), 'no image left behind');
   // And back.
   tc.setCharacter(DEF_0001);
@@ -1052,7 +1052,7 @@ test('setCharacter swaps the fighter\'s art and names in place, without rebuildi
 test('before any fighter is named the controls are usable and neutral; a held button survives a swap', () => {
   const { tc, calls } = touchControls(null);
   assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')),
-    ['Extra Attack', 'Attack 1', 'Attack 2']);
+    ['Extra attack', 'Attack 1', 'Attack 2']);
   const b = tc.buttons.get('attack1');
   assert.equal(b.innerHTML, ICONS.pip1);
   press(b, 4);
@@ -1083,7 +1083,7 @@ test('keyboard preserves existing controls and adds separate Q/E Mouvement bindi
     pause: ['Escape', 'KeyP'],
   });
   assert.deepEqual({ ...ACTION_LABELS }, {
-    runLeft: 'Move left', runRight: 'Move right', down: 'Down', jump: 'Jump', extra_attack: 'Extra Attack',
+    runLeft: 'Move left', runRight: 'Move right', down: 'Down', jump: 'Jump', extra_attack: 'Extra attack',
     shield: 'Shield', attack1: 'Attack 1', attack2: 'Attack 2', attack3: 'Attack 3', attack4: 'Attack 4', attack5: 'Attack 5',
     pause: 'Pause',
   });
@@ -1562,7 +1562,7 @@ test('a scheme switch keeps the fighter\'s combat buttons and Jump: the same ele
   // setCharacter still works in either layout, and never moves a button.
   tc.setScheme('joystick');
   tc.setCharacter(null);
-  assert.equal(tc.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
+  assert.equal(tc.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra attack');
   assert.equal(tc.joystick.children[0], tc.mouvementButtons.get('mouvementLeft'));
   assert.deepEqual(actionsOf(tc.actions).at(-1), 'jump');
   press(tc.buttons.get('extra_attack'), 1);

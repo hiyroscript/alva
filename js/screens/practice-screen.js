@@ -129,7 +129,7 @@ export class PracticeGroundScreen extends Screen {
     });
     back.addEventListener('click', onBack);
 
-    const dialog = el('div', { class: 'practice-roster-dialog glass' });
+    const dialog = el('div', { class: 'practice-roster-dialog glass glass--panel' });
     const roster = new FighterRoster(this.app, { host: dialog, previewId, onConfirm });
     const heading = el('h2', { class: 'screen-title', id: titleId, ...tx(title) });
     dialog.replaceChildren(
@@ -425,7 +425,6 @@ export class PracticeGroundScreen extends Screen {
     if (!this.menuOpen || this.dialogOpen) return;
     this.rosterOpen = true;
     this.el.classList.add('is-roster-open');
-    this.menuOverlay.inert = true;
     this.hudRoot.inert = true;
     this.rosterOverlay.hidden = false;
     this.roster.show(this.characterId);
@@ -441,7 +440,6 @@ export class PracticeGroundScreen extends Screen {
     this.rosterOpen = false;
     this.rosterOverlay.hidden = true;
     this.el.classList.remove('is-roster-open');
-    this.menuOverlay.inert = false;
     this.hudRoot.inert = false;
     this.app.nav.popScope(this.rosterScope);
     if (!silent) this.changeBtn.focus({ preventScroll: true });
@@ -500,7 +498,6 @@ export class PracticeGroundScreen extends Screen {
     this.disableCpuBtn.hidden = !cpu;
     this.disableCpuBtn.disabled = !cpu;
     this.el.classList.add('is-cpu-roster-open');
-    this.menuOverlay.inert = true;
     this.hudRoot.inert = true;
     this.cpuRosterOverlay.hidden = false;
     this.cpuRoster.show(cpu?.def.id ?? this.characterId);
@@ -515,7 +512,6 @@ export class PracticeGroundScreen extends Screen {
     this.cpuRosterOpen = false;
     this.cpuRosterOverlay.hidden = true;
     this.el.classList.remove('is-cpu-roster-open');
-    this.menuOverlay.inert = false;
     this.hudRoot.inert = false;
     this.app.nav.popScope(this.cpuRosterScope);
     if (!silent) this.cpuBtn.focus({ preventScroll: true });

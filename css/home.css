@@ -89,7 +89,7 @@
   gap: 12px;
   height: clamp(42px, 7.4vh, 58px);
   padding: 0 18px;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: transparent;
   color: var(--text-secondary);
@@ -99,12 +99,12 @@
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 90ms ease;
 }
 .home-action .icon { font-size: 18px; transition: transform var(--dur) var(--ease); }
-.home-action:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
-.home-action:focus { box-shadow: var(--focus-ring); }
-.home-action:hover .icon, .home-action:focus .icon { transform: translateX(2px); }
+:where(html:not(.is-touch-input)) .home-action:hover, .home-action.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
+:where(html:not(.is-pointer-input)) .home-action:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .home-action:hover .icon, .home-action.is-cursor-target .icon, :where(html:not(.is-pointer-input)) .home-action:focus .icon { transform: translateX(2px); }
 .home-action:active { transform: translateY(1px); background: var(--surface-muted); }
 .home-action--primary { background: var(--action); border-color: var(--action); color: var(--white); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
-.home-action--primary:hover { background: var(--action-hover); border-color: var(--action-hover); color: var(--white); }
+:where(html:not(.is-touch-input)) .home-action--primary:hover, .home-action--primary.is-cursor-target { background: var(--action-hover); border-color: var(--action-hover); color: var(--white); }
 .home-action--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
 /* A disabled Home action (the match actions while no fighter is playable):
    quieter outline, readable muted label, no hover or press response. Kept
@@ -136,7 +136,7 @@
   place-items: center;
   width: clamp(40px, 7vh, 48px);
   height: clamp(40px, 7vh, 48px);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: rgba(10, 11, 12, 0.72);
   color: var(--text-secondary);
@@ -146,9 +146,9 @@
 .home-controller img { width: clamp(24px, 4vh, 28px); height: clamp(24px, 4vh, 28px); object-fit: contain; }
 .home-utility-buttons > button:disabled, .home-download:disabled { cursor: default; }
 .home-settings .icon { transition: transform var(--dur) var(--ease); }
-.home-settings:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
-.home-settings:hover .icon, .home-settings:focus .icon { transform: rotate(30deg); }
-.home-settings:focus { box-shadow: var(--focus-ring); color: var(--text); }
+:where(html:not(.is-touch-input)) .home-settings:hover, .home-settings.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
+:where(html:not(.is-touch-input)) .home-settings:hover .icon, .home-settings.is-cursor-target .icon, :where(html:not(.is-pointer-input)) .home-settings:focus .icon { transform: rotate(30deg); }
+:where(html:not(.is-pointer-input)) .home-settings:focus { box-shadow: var(--focus-ring); color: var(--text); }
 .home-settings:active { transform: translateY(1px); background: var(--surface-muted); }
 .screen--home.is-entering .home-utility-buttons { animation: fade-in 0.6s ease both; }
 
@@ -238,9 +238,9 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   overflow-wrap: anywhere;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
 }
-.home-credit-link:hover { color: var(--text-strong); }
+:where(html:not(.is-touch-input)) .home-credit-link:hover { color: var(--text-strong); }
 .home-credit-link:focus { outline: none; }
 .home-credit-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; color: var(--text-strong); }
 
@@ -276,7 +276,7 @@
   text-underline-offset: 3px;
   cursor: pointer;
 }
-.home-why-alva:hover { color: var(--text); }
+:where(html:not(.is-touch-input)) .home-why-alva:hover, .home-why-alva.is-cursor-target { color: var(--text); }
 .home-why-alva:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 /* Download opens the install dialog (js/ui/install-dialog.js). It keeps its
    compact square inside the footer, even on short phones. Every 3.2 s its
@@ -312,8 +312,8 @@
   transform-origin: center;
   animation: home-download-arrow 3.2s var(--ease) infinite;
 }
-.home-download:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
-.home-download:focus { box-shadow: var(--focus-ring); color: var(--text); }
+:where(html:not(.is-touch-input)) .home-download:hover, .home-download.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
+:where(html:not(.is-pointer-input)) .home-download:focus { box-shadow: var(--focus-ring); color: var(--text); }
 .home-download:active { transform: translateY(1px); background: var(--surface-muted); }
 .screen--home[inert] .home-download::after,
 .screen--home[inert] .home-download .icon-download-arrow { animation-play-state: paused; }

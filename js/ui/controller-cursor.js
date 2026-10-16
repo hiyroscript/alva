@@ -9,7 +9,9 @@
 // data-nav-no-hover-focus only highlight), so focus, the cursor and
 // activation stay one selection: Cross / A then activates what the cursor
 // is on, never anything outside the scope (a dialog stops everything
-// beneath it). With the D-pad, focus moves item to item and the cursor
+// beneath it). The item under it wears .is-cursor-target, the cursor's
+// hover look, only while the cursor is over it: it goes as the cursor moves
+// off, hides, or a dialog opens or closes (retarget). With the D-pad, focus moves item to item and the cursor
 // glides after it. The right stick scrolls whatever scrolls under the
 // cursor (or around the focused item).
 //
@@ -186,6 +188,19 @@ export class ControllerCursor {
     if (globalThis.document?.activeElement !== item) item.focus({ preventScroll: true });
   }
 
+  // The stack changed (a dialog opened or closed, the screen changed): the
+  // hover look follows what the cursor is on now, so nothing beneath a new
+  // dialog, and nothing hidden, keeps it.
+  retarget() {
+    if (!this.visible) {
+      this.setTarget(null);
+      return;
+    }
+    this.setTarget(this.itemAt(this.x, this.y));
+  }
+
+  // .is-cursor-target is the cursor's hover look (the same as a mouse
+  // hover's, see css/components.css), on the item under it only.
   setTarget(item) {
     if (item === this.target) return;
     this.target?.classList?.remove('is-cursor-target');

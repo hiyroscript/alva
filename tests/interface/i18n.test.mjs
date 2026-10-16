@@ -282,7 +282,7 @@ test('t fills placeholders, reads nested keys, falls back to English, and shows 
   assert.equal(getLanguage(), 'en');
   assert.equal(t('home.play'), 'Play');
   assert.equal(t('roster.slot', { num: '07' }), 'Slot 07');
-  assert.equal(t('setup.steps', { name: { t: 'setup.watch' } }), 'Watch Mode setup', 'a placeholder holding a key');
+  assert.equal(t('setup.steps', { name: { t: 'setup.watch' } }), 'Watch mode setup', 'a placeholder holding a key');
   assert.equal(t('home.play', undefined, 'fr'), 'Jouer', 'any language on request');
   assert.equal(t('home.play', undefined, 'de'), 'Play', 'an unknown language: English');
   const warn = console.warn;
@@ -299,7 +299,7 @@ test('t fills placeholders, reads nested keys, falls back to English, and shows 
   assert.equal(hasTranslation('ability.9999.attack1'), false);
   inFrench(() => {
     assert.equal(t('home.play'), 'Jouer');
-    assert.equal(t('setup.steps', { name: { t: 'setup.watch' } }), 'Étapes : Mode Spectateur');
+    assert.equal(t('setup.steps', { name: { t: 'setup.watch' } }), 'Étapes : Mode spectateur');
     assert.equal(t('common.loadingName', { name: joinList(['#0001', '#9999']) }), 'Chargement de #0001 et #9999');
     assert.equal(t('common.spritesFailed', { names: ['#0001'], where: 'assets/characters/0001/' }),
       'Les sprites de #0001 n’ont pas pu être chargés. Vérifiez votre connexion et la présence des fichiers dans assets/characters/0001/.');
@@ -434,7 +434,7 @@ test('Mode details translate every section immediately in place and also render 
     setLanguage('en');
     assert.deepEqual(paragraphs.map((node) => node.textContent), english);
     assert.deepEqual(info.querySelectorAll('h3').map((node) => node.textContent), [
-      'Quick Battle',
+      'Quick battle',
     ]);
     setLanguage('fr');
     checkFrench(new ModeSelectScreen(fakeApp()).el.querySelector('.mode-info'));
@@ -463,7 +463,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     stepsLabel: mode.el.querySelector('.steps').getAttribute('aria-label'),
   };
   // Regular Play, the default play type: its three steps.
-  assert.deepEqual(english, { title: 'Select Mode', steps: ['Mode', 'Difficulty', 'Fighter'], stepsLabel: 'Quick Battle setup' });
+  assert.deepEqual(english, { title: 'Select mode', steps: ['Mode', 'Difficulty', 'Fighter'], stepsLabel: 'Quick battle setup' });
 
   const off = onLanguageChange(() => localizeTree(body));
   setLanguage('fr');
@@ -515,7 +515,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
   }
   // And back.
   localizeTree(body);
-  assert.equal(mode.el.querySelector('.screen-title').textContent, 'Select Mode');
+  assert.equal(mode.el.querySelector('.screen-title').textContent, 'Select mode');
   assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Red');
   assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Maximum Blue');
   assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Unlimited Void');

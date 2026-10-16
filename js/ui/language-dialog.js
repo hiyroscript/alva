@@ -76,7 +76,6 @@ export class LanguageDialog {
   open() {
     if (this.resolve) return this.promise;
     this.background = this.app.screens.current;
-    if (this.background) this.background.el.inert = true;
     this.root.hidden = false;
     this.app.nav.pushScope(this.scope);
     this.optionFor(browserLanguage())?.focus({ preventScroll: true });
@@ -95,10 +94,7 @@ export class LanguageDialog {
     const resolve = this.resolve;
     this.resolve = null;
     document.activeElement?.blur?.();
-    if (this.background && this.app.screens.current === this.background) {
-      this.background.el.inert = false;
-      this.background.focusDefault();
-    }
+    if (this.background && this.app.screens.current === this.background) this.background.focusDefault();
     this.background = null;
     resolve(language);
   }

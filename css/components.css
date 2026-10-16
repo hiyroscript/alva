@@ -11,9 +11,8 @@
   font-family: var(--font-mono);
   font-size: clamp(10px, 1.55vh, 12px);
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
-  text-transform: uppercase;
 }
 
 .btn {
@@ -23,7 +22,7 @@
   gap: 10px;
   min-height: clamp(42px, 7vh, 52px);
   padding: 0 20px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
@@ -32,12 +31,12 @@
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
 .btn .icon { font-size: 1.15em; }
-.btn:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
-.btn:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .btn:enabled:hover, .btn.is-cursor-target:enabled { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .btn:focus { box-shadow: var(--focus-ring); }
 .btn:active { transform: scale(0.985); background: var(--surface-muted); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .btn--primary { background: var(--action); border-color: var(--action); color: var(--white); }
-.btn--primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
+:where(html:not(.is-touch-input)) .btn--primary:enabled:hover, .btn--primary.is-cursor-target:enabled { background: var(--action-hover); border-color: var(--action-hover); }
 .btn--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
 
 .btn-back {
@@ -46,7 +45,7 @@
   gap: 6px;
   height: clamp(36px, 6vh, 44px);
   padding: 0 14px 0 10px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -56,8 +55,8 @@
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
 .btn-back .icon { font-size: 18px; }
-.btn-back:hover { background: var(--surface-subtle); border-color: var(--border-strong); }
-.btn-back:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .btn-back:enabled:hover, .btn-back.is-cursor-target:enabled { background: var(--surface-subtle); border-color: var(--border-strong); }
+:where(html:not(.is-pointer-input)) .btn-back:focus { box-shadow: var(--focus-ring); }
 .btn-back:active { transform: scale(0.97); }
 
 kbd {
@@ -100,11 +99,10 @@ html.is-touch .hint-bar { display: none; }
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-secondary);
 }
-.panel-meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.panel-meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-muted); }
 .panel-meta b { color: var(--text-strong); font-weight: 700; }
 .panel-note { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 
@@ -179,6 +177,6 @@ html.is-touch .hint-bar { display: none; }
 .mode-info, .roster-panel, .char-preview {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-menu);
 }
 

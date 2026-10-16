@@ -150,7 +150,7 @@ html.is-touch .ability-hud { display: none; }
   height: calc(var(--ah-input-h) - 4px);
   min-width: calc(var(--ah-input-h) - 4px);
   padding: 0 2px;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
 }
 /* A keycap: a lighter bottom edge, like a key. */
 .ah-chip--key {
@@ -162,7 +162,7 @@ html.is-touch .ability-hud { display: none; }
 /* A face button: round; a modifier (R2, LT): a small capsule. */
 .ah-chip--btn { border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.08); padding: 0; }
 .ah-input[data-family="playstation"] .ah-chip--btn { font-family: var(--font); font-size: calc(var(--ah-input-h) * 0.5); }
-.ah-chip--btn[data-button^="dpad"] { border-radius: 3px; }
+.ah-chip--btn[data-button^="dpad"] { border-radius: var(--radius-menu); }
 .ah-chip--btn[data-button$="1"], .ah-chip--btn[data-button$="2"], .ah-chip--btn[data-button$="3"],
 .ah-chip--btn[data-button="start"], .ah-chip--btn[data-button="select"] { border-radius: 999px; padding: 0 3px; font-size: calc(var(--ah-input-h) * 0.45); }
 .ah-chip--mod {

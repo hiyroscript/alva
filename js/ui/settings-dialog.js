@@ -85,7 +85,6 @@ export class SettingsDialog {
     this.app = app;
     this.open_ = false;
     this.returnFocus = null;
-    this.background = null;
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-labelledby', 'settings-title');
@@ -353,14 +352,13 @@ export class SettingsDialog {
     return this.comboOptions.find((o) => o.getAttribute('data-combo-assist') === (on ? 'on' : 'off'));
   }
 
-  // Opens over the current screen (Home), which goes inert beneath it, and
-  // focuses the Language tab. `returnFocus` gets focus back on close.
+  // Opens over the current screen (Home), which goes inert beneath it (the
+  // navigator's dialog stack), and focuses the Language tab. `returnFocus`
+  // gets focus back on close.
   open({ returnFocus = document.activeElement } = {}) {
     if (this.open_) return;
     this.open_ = true;
     this.returnFocus = returnFocus;
-    this.background = this.app.screens.current?.el ?? null;
-    if (this.background) this.background.inert = true;
     this.markCurrent();
     this.root.hidden = false;
     this.app.nav.pushScope(this.scope);
@@ -375,10 +373,7 @@ export class SettingsDialog {
     this.app.controllerControls?.close({ silent: true });
     this.open_ = false;
     this.root.hidden = true;
-    this.root.inert = false;
     this.app.nav.popScope(this.scope);
-    if (this.background && this.background === this.app.screens.current?.el) this.background.inert = false;
-    this.background = null;
     const target = this.returnFocus;
     this.returnFocus = null;
     if (target?.isConnected !== false) target?.focus?.({ preventScroll: true });
@@ -440,29 +435,19 @@ export class SettingsDialog {
   }
 
   // Controller controls (the roster, then a fighter's editor), over this
-  // dialog.
+  // dialog, which the dialog stack keeps inert beneath them.
   openControllerControls() {
     if (!this.open_ || !this.app.controllerControls) return;
-    this.root.inert = true;
-    this.app.controllerControls.open({
-      returnFocus: this.controllerButton,
-      onClose: () => {
-        this.root.inert = false;
-      },
-    });
+    this.app.controllerControls.open({ returnFocus: this.controllerButton });
   }
 
   // The touch layout editor, over this dialog, for the scheme in use.
   openEditor() {
     if (!this.open_ || !this.app.touchEditor) return;
-    this.root.inert = true;
     this.app.touchEditor.open({
       scheme: this.app.settings.mobileControls,
       returnFocus: this.customizeButton,
-      onClose: () => {
-        this.root.inert = false;
-        this.markCurrent();
-      },
+      onClose: () => this.markCurrent(),
     });
   }
 }

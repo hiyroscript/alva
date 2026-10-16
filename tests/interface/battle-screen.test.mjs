@@ -205,7 +205,7 @@ test('the pause menu is exactly Resume, Restart Battle and Return to Home, in th
   startBattle(screen);
   screen.pause();
   const items = pauseItems(screen);
-  assert.deepEqual(items.map(b => b.textContent), ['Resume', 'Restart Battle', 'Return to Home']);
+  assert.deepEqual(items.map(b => b.textContent), ['Resume', 'Restart battle', 'Return to home']);
   const [resume, restart, home] = items;
   assert.ok(items.every(b => !b.disabled && !b.hidden), 'all three are live');
   assert.equal(document.activeElement, resume);
@@ -264,7 +264,7 @@ test('S and ↓ still move down through menus; gameplay Down leaves menu Down al
 test('pause dialog shows Quick Battle without the stage name', () => {
   const { screen } = setup();
   const kicker = screen.pauseMenuView.querySelector('.kicker');
-  assert.equal(kicker.textContent, 'Quick Battle');
+  assert.equal(kicker.textContent, 'Quick battle');
 });
 
 test('timer and pause halves both run the one pause path, once', () => {
@@ -566,7 +566,7 @@ test('HUD: a rematch shows 0 Launch Point and empty dots again; on time and leve
   battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
   screen.update(1 / 60);
   assert.deepEqual(battle.result, { outcome: 'p1', reason: 'time' }, 'lower Launch Point is better');
-  assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
+  assert.equal(screen.resultTitle.textContent, 'Player 1 wins');
 
   byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
   for (const side of [screen.hud.left, screen.hud.right]) {
@@ -624,7 +624,7 @@ test('a draw is a tie on the result menu: no winner named, nothing restarts unti
 });
 
 test('a winner still gets the result menu', () => {
-  for (const [opts, title] of [[{ p2: 40 }, 'Player 1 Wins'], [{ p1: 30 }, 'CPU Wins']]) {
+  for (const [opts, title] of [[{ p2: 40 }, 'Player 1 wins'], [{ p1: 30 }, 'CPU wins']]) {
     const { app, screen } = setup();
     const battle = startBattle(screen, opts);
     battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
@@ -653,7 +653,7 @@ test('a winner still gets the result menu', () => {
 });
 
 test('the third point plays the K.O. banner with the dots filled, then the result menu names who fell', () => {
-  const cases = [['p1', 'CPU Wins', 'Player 1 fell into the Void for the final point.'], ['p2', 'Player 1 Wins', 'The CPU fell into the Void for the final point.']];
+  const cases = [['p1', 'CPU wins', 'Player 1 fell into the Void for the final point.'], ['p2', 'Player 1 wins', 'The CPU fell into the Void for the final point.']];
   for (const [lost, title, sub] of cases) {
     const { app, screen } = setup();
     const battle = startBattle(screen);
@@ -692,7 +692,7 @@ test('the third point plays the K.O. banner with the dots filled, then the resul
     battle.frame = () => { battle.phase = 'result'; };
     screen.update(1 / 60);
     assert.equal(screen.resultKicker.textContent, 'Time over');
-    assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
+    assert.equal(screen.resultTitle.textContent, 'Player 1 wins');
     assert.equal(screen.resultSub.textContent, 'Time ran out. More points wins the match.');
   }
 });
@@ -732,7 +732,7 @@ test('Quick Battle\'s HUD starts at 5:00; at a level 0:00 it turns to OVERTIME a
   const { hud } = screen;
   hud.update(battle);
   assert.equal(hud.timer.textContent, '5:00');
-  assert.equal(hud.roundLabel.textContent, 'ROUND 1');
+  assert.equal(hud.roundLabel.textContent, 'Round 1', 'an ordinary label, not a banner');
   assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 5 minutes remaining');
   battle.setPhase('fight');
   battle.phaseTime = 5;
@@ -743,7 +743,7 @@ test('Quick Battle\'s HUD starts at 5:00; at a level 0:00 it turns to OVERTIME a
   assert.equal(battle.overtime, true);
   assert.equal(battle.phase, 'fight');
   assert.equal(hud.timer.textContent, '1:00');
-  assert.equal(hud.roundLabel.textContent, 'OVERTIME', 'not a second round');
+  assert.equal(hud.roundLabel.textContent, 'Overtime', 'not a second round');
   assert.ok(hud.roundLabel.classList.contains('is-overtime'));
   assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, overtime, 1 minute remaining');
   assert.equal(hud.timer.classList.contains('is-urgent'), false);
@@ -779,7 +779,7 @@ test('Quick Battle\'s HUD starts at 5:00; at a level 0:00 it turns to OVERTIME a
   try {
     hud.bind(battle.p1, battle.p2);
     hud.update(battle);
-    assert.equal(hud.roundLabel.textContent, 'PROLONGATION');
+    assert.equal(hud.roundLabel.textContent, 'Prolongation');
     assert.match(hud.timeButton.getAttribute('aria-label'), /^Mettre en pause, prolongation, il reste \d+ secondes$/);
   } finally {
     setLanguage('en');
@@ -809,7 +809,7 @@ test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime re
   assert.equal(battle.overtime, true);
   assert.equal(battle.phase, 'fight');
   assert.equal(screen.hud.timer.textContent, '1:00');
-  assert.equal(screen.hud.roundLabel.textContent, 'OVERTIME');
+  assert.equal(screen.hud.roundLabel.textContent, 'Overtime');
   assert.equal(screen.bannerState, 'overtime');
   assert.equal(screen.bannerMain.textContent, 'OVERTIME');
   battle.p1.combat.launchPoint = 70;
@@ -817,14 +817,14 @@ test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime re
   battle.timeLeft = 0.01;
   playUntil(screen, () => !screen.resultOverlay.hidden, 200);
   assert.equal(screen.resultKicker.textContent, 'End of overtime');
-  assert.equal(screen.resultTitle.textContent, 'CPU 2 Wins');
+  assert.equal(screen.resultTitle.textContent, 'CPU 2 wins');
   assert.equal(screen.resultSub.textContent, 'Overtime ran out with the points still level. The lower Launch Point decides it.');
 });
 
 test('overtime results say overtime decided it: more points, or level on points the lower Launch Point', () => {
   const cases = [
-    [{ p1: 2, p2: 1 }, [50, 0], 'Player 1 Wins', 'Overtime ran out. More points wins the match.'],
-    [{ p1: 1, p2: 1 }, [80, 20], 'CPU Wins', 'Overtime ran out with the points still level. The lower Launch Point decides it.'],
+    [{ p1: 2, p2: 1 }, [50, 0], 'Player 1 wins', 'Overtime ran out. More points wins the match.'],
+    [{ p1: 1, p2: 1 }, [80, 20], 'CPU wins', 'Overtime ran out with the points still level. The lower Launch Point decides it.'],
   ];
   for (const [score, [a, b], title, sub] of cases) {
     const { app, screen } = setup();
@@ -850,7 +850,7 @@ test('overtime results say overtime decided it: more points, or level on points 
     assert.equal(battle.overtime, false);
     assert.equal(battle.timeLeft, 300);
     assert.equal(battle.stage.void, battle.stage.baseVoid);
-    assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+    assert.equal(screen.hud.roundLabel.textContent, 'Round 1', 'an ordinary label, not a banner');
     assert.equal(screen.hud.timer.textContent, '5:00');
   }
 });
@@ -879,7 +879,7 @@ test('level on points and Launch Point at the end of overtime: a tie on the resu
     assert.equal(screen.resultTitle.textContent, 'Tie');
     assert.equal(screen.resultSub.textContent, 'Overtime ended with the points and Launch Point equal.');
     assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|CPU/, 'no side is the winner');
-    assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change Stage', 'Return to Home']);
+    assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change stage', 'Return to home']);
     assert.deepEqual(battle.score, { p1: 1, p2: 1 }, 'the match stands as it ended');
     assert.equal(battle.overtime, true);
     // It stays over until the player acts.
@@ -909,7 +909,7 @@ test('level on points and Launch Point at the end of overtime: a tie on the resu
     assert.equal(battle.voidWaveSpeed, 1);
     screen.hud.update(battle);
     assert.equal(screen.hud.timer.textContent, '5:00');
-    assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+    assert.equal(screen.hud.roundLabel.textContent, 'Round 1', 'an ordinary label, not a banner');
   }
 });
 
@@ -917,7 +917,7 @@ test('cancelling Return to Home keeps the pause menu and its focus', async () =>
   const { app, screen } = setup();
   startBattle(screen);
   screen.pause();
-  const home = byText(pauseItems(screen), 'Return to Home');
+  const home = byText(pauseItems(screen), 'Return to home');
   assert.equal(app.dialog.root.children[0].classList.contains('glass'), true);
   home.focus();
   home.click();
@@ -954,13 +954,13 @@ test('Keep Playing is outline-only for Return to Home? alone', async () => {
   const { cancelBtn, okBtn } = app.dialog;
   assert.equal(outlineOnly(cancelBtn), false);
 
-  const home = byText(pauseItems(screen), 'Return to Home');
+  const home = byText(pauseItems(screen), 'Return to home');
   home.focus();
   home.click();
-  assert.equal(cancelBtn.textContent, 'Keep Playing');
+  assert.equal(cancelBtn.textContent, 'Keep playing');
   assert.equal(outlineOnly(cancelBtn), true);
   assert.equal(document.activeElement, cancelBtn);
-  assert.equal(okBtn.textContent, 'Return Home');
+  assert.equal(okBtn.textContent, 'Return home');
   assert.equal(okBtn.classList.contains('btn--primary'), true);
   assert.equal(outlineOnly(okBtn), false);
 
@@ -984,7 +984,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   const { MAPS } = await import('../../js/data/maps.js');
   const touch = screen.touch;
   // Neutral until a fighter is named.
-  assert.equal(touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
+  assert.equal(touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra attack');
   const calls = [];
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };

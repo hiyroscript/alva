@@ -16,10 +16,11 @@
 .battle-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .battle-canvas.is-pixelated { image-rendering: pixelated; }
 
-/* Battle glass: one surface for the HUD, the pause/result panels and the
-   confirm dialog. HUD pieces float over a canvas that repaints every frame,
-   so they skip backdrop blur. Panels sit over a paused, still battle and add
-   a light blur where supported, with a denser fill as the fallback. */
+/* The glass: one surface for the HUD and every dialog (.glass--panel, the
+   look of Controller connections). HUD pieces float over a canvas that
+   repaints every frame, so they skip backdrop blur. Dialog panels add a
+   light blur where supported, with a denser fill as the fallback, and no
+   dialog's own rule replaces that fill (tests/interface/ui-consistency). */
 .glass {
   background: var(--glass-sheen), var(--glass-fill);
   border: 1px solid var(--glass-edge);
@@ -77,7 +78,7 @@
   min-width: 0;
   max-width: 100%;
   padding: 5px 10px 5px 5px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-menu);
 }
 .hud-side.glass { background: var(--glass-sheen), rgba(10, 11, 13, 0.5); }
 /* The CPU's card mirrors the player's: portrait on the outer (right) edge. */
@@ -153,7 +154,7 @@
   display: grid;
   width: max-content;
   min-width: clamp(64px, 8.4vw, 92px);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-menu);
   pointer-events: auto;
 }
 .hud-time, .hud-pause {
@@ -164,22 +165,23 @@
 }
 .hud-time {
   padding: 4px 6px 5px;
-  border-radius: calc(var(--radius-sm) - 1px) calc(var(--radius-sm) - 1px) 0 0;
+  /* Square meeting corners inside the single bordered holder. */
+  border-radius: 2px 2px 0 0;
 }
 .hud-pause {
   align-items: center;
   height: clamp(28px, 5vh, 38px);
   border-top: 1px solid var(--glass-seam);
-  border-radius: 0 0 calc(var(--radius-sm) - 1px) calc(var(--radius-sm) - 1px);
+  border-radius: 0 0 2px 2px;
   font-size: clamp(18px, 3.2vh, 24px);
 }
 .hud-pause .icon { stroke-width: 3; }
 @media (hover: hover) {
-  .hud-time:hover, .hud-pause:hover { background: rgba(255, 255, 255, 0.07); }
+  :where(html:not(.is-touch-input)) .hud-time:hover, :where(html:not(.is-touch-input)) .hud-pause:hover { background: rgba(255, 255, 255, 0.07); }
 }
 .hud-time:active, .hud-pause:active { background: rgba(255, 255, 255, 0.12); }
-.hud-time:focus, .hud-pause:focus { box-shadow: var(--focus-ring-inset); }
-.hud-round { font-family: var(--font-mono); font-size: 9px; font-weight: 600; line-height: 1.3; letter-spacing: 0.16em; color: var(--scrim-text-muted); }
+:where(html:not(.is-pointer-input)) .hud-time:focus, :where(html:not(.is-pointer-input)) .hud-pause:focus { box-shadow: var(--focus-ring-inset); }
+.hud-round { font-family: var(--font-mono); font-size: 9px; font-weight: 600; line-height: 1.3; letter-spacing: 0.06em; color: var(--scrim-text-muted); }
 .hud-round.is-overtime { color: var(--white); }
 .hud-timer {
   font-weight: 700;

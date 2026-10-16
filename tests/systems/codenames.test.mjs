@@ -106,7 +106,7 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
   assert.equal(new Set(keys).size, keys.length, 'every gameplay key is bound once');
   assert.deepEqual(
     ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack'].map((a) => ACTION_LABELS[a]),
-    ['Attack 1', 'Attack 2', 'Attack 3', 'Attack 4', 'Attack 5', 'Extra Attack'],
+    ['Attack 1', 'Attack 2', 'Attack 3', 'Attack 4', 'Attack 5', 'Extra attack'],
   );
   assert.equal(ACTION_LABELS.shield, 'Shield');
   // Menus keep their own directions: menu Left / Right are not runLeft / runRight.
@@ -133,7 +133,7 @@ test('the move codenames are universal and neutral: numbered attacks, their mid-
     assert.deepEqual({ ...MOVES[id] }, { number: i + 1, air: false, label: `Attack ${i + 1}` });
     assert.deepEqual({ ...MOVES[`midair_${id}`] }, { number: i + 1, air: true, label: `Mid-air Attack ${i + 1}` });
   }
-  assert.deepEqual({ ...MOVES.extra_attack }, { number: null, air: false, label: 'Extra Attack' });
+  assert.deepEqual({ ...MOVES.extra_attack }, { number: null, air: false, label: 'Extra attack' });
   // Nothing global says what attack3 or attack4 is for: whether it is an
   // ordinary attack, a summon or a technique is each character's loadout.
   for (const m of Object.values(MOVES)) {

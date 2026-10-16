@@ -368,10 +368,10 @@ test('Home Play shows all Mode details immediately and keeps them through dismis
   const { app, screens } = booted;
   screens.home.actions.play.click();
   const info = screens.mode.el.querySelector('.mode-info');
-  const headings = ['Quick Battle'];
+  const headings = ['Quick battle'];
   const descriptions = [
     'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
-    'Quick Battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
+    'Quick battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
   ];
   const checkDetails = () => {
     assert.equal(current(app), 'mode');
@@ -405,8 +405,8 @@ test('Quick Battle opens a modal choice of Custom Play and Regular Play, Regular
   assert.equal(root.getAttribute('aria-modal'), 'true');
   assert.equal(root.getAttribute('aria-labelledby'), dialog.title.id);
   assert.equal(dialog.title.textContent, 'How do you want to play?');
-  assert.equal(dialog.kicker.textContent, 'Quick Battle');
-  assert.deepEqual(choices(app).map((b) => b.textContent), ['Custom Play', 'Regular Play'], 'exactly the two choices');
+  assert.equal(dialog.kicker.textContent, 'Quick battle');
+  assert.deepEqual(choices(app).map((b) => b.textContent), ['Custom play', 'Regular play'], 'exactly the two choices');
   for (const b of choices(app)) {
     assert.equal(b.tagName, 'BUTTON');
     const desc = root.querySelectorAll('.choice-desc').find((p) => p.id === b.getAttribute('aria-describedby'));
@@ -627,7 +627,7 @@ test('Regular Play\'s Restart Battle and Rematch keep the drawn CPU and stage; a
   // Math.random would now draw something else: nothing may ask it.
   await withRandom([0.01], async () => {
     screen.pause();
-    byText(screen.pauseMenuView, 'Restart Battle').click();
+    byText(screen.pauseMenuView, 'Restart battle').click();
     keep('restart');
     battle.score.p2 = 3;
     screen.finishBattle();
@@ -654,7 +654,7 @@ test('Custom Play: Mode → Difficulty → Fighter → CPU → Stage → Battle;
   assert.equal(current(app), 'quick-cpu');
   assert.deepEqual([stepNames(screens.cpu), currentStep(screens.cpu)], [['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], 3]);
   assert.equal(screens.cpu.el.querySelector('.screen-title').textContent, 'Select CPU');
-  assert.equal(screens.cpu.el.querySelector('.kicker').textContent, 'Quick Battle');
+  assert.equal(screens.cpu.el.querySelector('.kicker').textContent, 'Quick battle');
   screens.cpu.confirm(TEST_A);
   assert.equal(current(app), 'map');
   assert.deepEqual([stepNames(screens.map), currentStep(screens.map)], [['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], 4]);
@@ -795,7 +795,7 @@ test('Change Stage after Regular Play opens Select Stage with both fighters and 
   const battle = await startRegular(booted, { difficulty: 'brutal', fighter: TEST_A, cpu: DEF_9999, mapId: 'city' });
   battle.score.p1 = 3;
   screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change Stage').click();
+  byText(screens.battle.resultOverlay, 'Change stage').click();
   assert.equal(current(app), 'map', 'a stage selector, never Select Fighter');
   assert.equal(screens.battle.battle, null);
   assert.deepEqual(app.screens.stack, ['home', 'mode', 'difficulty', 'character']);
@@ -821,7 +821,7 @@ test('Change Stage after Custom Play and Watch Mode still goes back to their own
   const battle = await startCustom(booted, { fighter: TEST_SAMPLE, cpu: TEST_A, mapId: 'city' });
   battle.score.p2 = 3;
   screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change Stage').click();
+  byText(screens.battle.resultOverlay, 'Change stage').click();
   assert.equal(current(app), 'map');
   assert.deepEqual(app.screens.stack, ['home', 'mode', 'difficulty', 'character', 'quick-cpu']);
   assert.deepEqual([stepNames(screens.map), currentStep(screens.map)], [['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], 4]);
@@ -840,7 +840,7 @@ test('Change Stage after Custom Play and Watch Mode still goes back to their own
   await settle();
   screens.battle.battle.score.p1 = 3;
   screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change Stage').click();
+  byText(screens.battle.resultOverlay, 'Change stage').click();
   assert.equal(current(app), 'watch-map');
   assert.deepEqual(app.screens.stack, ['home', 'watch-difficulty', 'watch-cpu1', 'watch-cpu2']);
 });

@@ -101,5 +101,8 @@ export class ScreenManager {
     document.documentElement.dataset.screen = next.id;
     next.enter(params);
     if (next.navigable) next.focusDefault();
+    // A dialog still open over the change (a loading error) keeps the new
+    // screen beneath it inert.
+    this.app.nav?.syncLayers?.();
   }
 }

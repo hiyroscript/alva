@@ -22,8 +22,8 @@
    --------------------------------------------------------------------- */
 
 .home-controller { position: relative; }
-.home-controller:hover { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
-.home-controller:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .home-controller:hover, .home-controller.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); color: var(--text); }
+:where(html:not(.is-pointer-input)) .home-controller:focus { box-shadow: var(--focus-ring); }
 .home-controller:active { transform: translateY(1px); background: var(--surface-muted); }
 
 /* One status at a time, on the button's bottom-right corner, ringed in the
@@ -58,21 +58,14 @@
    Controller Connections
    --------------------------------------------------------------------- */
 
-.controller-overlay {
-  position: fixed;
-  z-index: 64;
-  background: rgba(0, 0, 0, 0.42);
-  animation: dim-in 0.18s ease both;
-}
 /* Over the shared .dialog-panel (css/overlays.css loads later): wider,
-   and never taller than the screen, its list scrolling inside. */
+   and never taller than the screen, its list scrolling inside. Its glass
+   is the reference every dialog shares (css/overlays.css, Dialogs). */
 .controller-overlay > .controller-panel {
   width: min(560px, 100%);
   max-height: calc(100vh - 24px);
   max-height: calc(100dvh - 24px);
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-radius: 3px;
-  animation: fade-in 0.18s ease both;
 }
 .controller-body {
   display: grid;
@@ -94,7 +87,7 @@
   align-items: flex-start;
   padding: 10px 12px;
   border: 1px solid rgba(240, 140, 26, 0.55);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(240, 140, 26, 0.1);
 }
 .controller-warning[hidden] { display: none; }
@@ -108,7 +101,7 @@
   gap: 6px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(255, 255, 255, 0.03);
 }
 .controller-device.is-player1 { border-color: rgba(47, 191, 99, 0.6); background: rgba(47, 191, 99, 0.08); }
@@ -181,29 +174,12 @@
    Controller controls: the roster
    --------------------------------------------------------------------- */
 
-.controller-roster-overlay {
-  position: fixed;
-  z-index: 67;
-  background: rgba(0, 0, 0, 0.5);
-  animation: dim-in 0.18s ease both;
-}
-.controller-roster-overlay > .controller-roster-dialog { animation: fade-in 0.18s ease both; }
-/* Over the Settings dialog rather than a still stage: a denser fill, so
-   nothing beneath reads through. */
-.controller-roster-dialog.glass { background: var(--glass-sheen), rgba(10, 11, 13, 0.95); }
 .controller-roster-note { flex: none; color: var(--text-secondary); font-size: 13px; line-height: 1.45; margin-top: -4px; }
 
 /* ---------------------------------------------------------------------
    Controller controls: the editor
    --------------------------------------------------------------------- */
 
-.controller-editor-overlay {
-  position: fixed;
-  z-index: 68;
-  background: rgba(0, 0, 0, 0.5);
-  animation: dim-in 0.18s ease both;
-}
-.controller-editor-overlay > .controller-editor-panel { animation: fade-in 0.18s ease both; }
 .controller-editor-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -212,7 +188,7 @@
   height: min(860px, calc(100dvh - 24px));
   color: var(--text);
   color-scheme: dark;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   overflow: hidden;
 }
 .controller-editor-head {
@@ -229,7 +205,7 @@
   width: clamp(44px, 8vh, 64px);
   height: clamp(44px, 8vh, 64px);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
 }
@@ -253,7 +229,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.controller-editor-provisional { padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: 3px; color: var(--text-secondary); font-size: 13px; }
+.controller-editor-provisional { padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius-menu); color: var(--text-secondary); font-size: 13px; }
 .controller-editor-provisional[hidden] { display: none; }
 .controller-actions-list { display: grid; gap: 14px; }
 .controller-category { display: grid; gap: 6px; }
@@ -274,14 +250,14 @@
   min-height: 52px;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   text-align: left;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
-.controller-row:hover, .controller-row.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
-.controller-row:focus { box-shadow: var(--focus-ring); border-color: var(--border-hover); }
+:where(html:not(.is-touch-input)) .controller-row:hover, .controller-row.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .controller-row:focus { box-shadow: var(--focus-ring); border-color: var(--border-hover); }
 .controller-row.is-error { border-color: rgba(214, 58, 58, 0.75); }
 .controller-row.is-warning { border-color: rgba(240, 140, 26, 0.65); }
 .controller-row-text { display: grid; gap: 2px; min-width: 0; }
@@ -303,7 +279,7 @@
   width: var(--controller-art);
   height: var(--controller-art);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(0, 0, 0, 0.28);
   color: var(--text-secondary);
   overflow: hidden;
@@ -320,13 +296,13 @@
 .controller-row-sprite.is-mirrored { transform: scaleX(-1); }
 .controller-row-art.is-glyph .icon { width: 58%; height: 58%; }
 .controller-row-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: var(--text-strong); }
-.controller-place { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; }
+.controller-place { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-menu); padding: 1px 5px; }
 .controller-row-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
 .controller-row-binding { display: grid; justify-items: end; gap: 2px; text-align: right; }
 .controller-chip {
   padding: 3px 8px;
   border: 1px solid var(--border-strong);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(0, 0, 0, 0.35);
   font-weight: 700;
   font-size: 13px;
@@ -366,7 +342,7 @@
   border-top: 1px solid var(--glass-seam);
 }
 .controller-editor-foot-actions { display: flex; gap: 10px; }
-.controller-editor-foot .btn { padding: 0 18px; border-radius: 3px; }
+.controller-editor-foot .btn { padding: 0 18px; }
 .controller-editor-foot .btn.is-outline-only { background: transparent; }
 
 /* ---------------------------------------------------------------------
@@ -389,19 +365,11 @@
    The binding dialog
    --------------------------------------------------------------------- */
 
-.binding-overlay {
-  position: fixed;
-  z-index: 70;
-  background: rgba(0, 0, 0, 0.42);
-  animation: dim-in 0.15s ease both;
-}
 .binding-overlay > .binding-panel {
   width: min(760px, 100%);
   max-height: calc(100vh - 24px);
   max-height: calc(100dvh - 24px);
   overflow-y: auto;
-  border-radius: 3px;
-  animation: fade-in 0.15s ease both;
 }
 .binding-desc { color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
 .binding-desc[hidden] { display: none; }
@@ -414,7 +382,7 @@
   min-height: 44px;
   padding: 8px 12px;
   border: 1px dashed var(--border-strong);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   color: var(--text);
   font-weight: 600;
   font-size: 14px;
@@ -436,15 +404,15 @@
   min-height: 40px;
   padding: 0 6px;
   border: 1px solid var(--border-strong);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-strong);
   font-weight: 600;
   font-size: 13px;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
-.cycler:hover, .cycler.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
-.cycler:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .cycler:enabled:hover, .cycler.is-cursor-target:enabled { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .cycler:focus { box-shadow: var(--focus-ring); }
 .cycler:disabled { cursor: default; opacity: 0.75; }
 .cycler:disabled .cycler-arrow { visibility: hidden; }
 .cycler-value { text-align: center; overflow-wrap: anywhere; }
@@ -454,11 +422,8 @@
 .binding-note[hidden] { display: none; }
 .binding-conflicts { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
 .binding-diagram { align-self: center; }
-.binding-actions .btn { flex: 1 1 140px; border-radius: 3px; }
+.binding-actions .btn { flex: 1 1 140px; }
 .binding-actions .btn.is-outline-only { background: transparent; }
-
-/* The confirmation dialog, opened from the editor, above it. */
-.dialog-overlay.is-raised { z-index: 80; }
 
 /* ---------------------------------------------------------------------
    Smaller screens: one column, the diagram under the list
