@@ -172,7 +172,7 @@ export const ACTION_LABELS = Object.freeze({
   runRight: 'Move right',
   down: 'Down',
   jump: 'Jump',
-  extra_attack: 'Extra Attack',
+  extra_attack: 'Extra attack',
   shield: 'Shield',
   attack1: 'Attack 1',
   attack2: 'Attack 2',
@@ -201,5 +201,5 @@ export const MOVES = Object.freeze({
   midair_attack4: Object.freeze({ number: 4, air: true, label: 'Mid-air Attack 4' }),
   attack5: Object.freeze({ number: 5, air: false, label: 'Attack 5' }),
   midair_attack5: Object.freeze({ number: 5, air: true, label: 'Mid-air Attack 5' }),
-  extra_attack: Object.freeze({ number: null, air: false, label: 'Extra Attack' }),
+  extra_attack: Object.freeze({ number: null, air: false, label: 'Extra attack' }),
 });

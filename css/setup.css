@@ -20,17 +20,17 @@
   gap: 4px 18px;
   align-items: center;
   padding: clamp(12px, 2.6vh, 24px) clamp(16px, 2vw, 28px);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   text-align: left;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
 }
-.mode-card:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
-html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+:where(html:not(.is-touch-input)) .mode-card:hover, .mode-card.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+:where(html:not(.is-pointer-input)) .mode-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
 .mode-card:active { transform: scale(0.997); }
-.mode-index { grid-area: index; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.mode-index { grid-area: index; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); }
 .mode-name {
   grid-area: name;
   font-weight: 700;
@@ -46,13 +46,13 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   align-items: center;
   gap: 8px;
   padding: 11px 16px 11px 18px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-menu);
   background: var(--action);
   color: var(--white);
   font-weight: 600;
   font-size: 14px;
 }
-.mode-card:hover .mode-cta { background: var(--action-hover); }
+:where(html:not(.is-touch-input)) .mode-card:hover .mode-cta, .mode-card.is-cursor-target .mode-cta { background: var(--action-hover); }
 
 /* Same vertical padding as the card so both mono labels share a top line. */
 .mode-info {
@@ -92,13 +92,14 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   min-height: clamp(190px, 46vh, 380px);
   padding: clamp(12px, 2.4vh, 22px) clamp(14px, 1.6vw, 22px);
   border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   text-align: left;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
 }
-.difficulty-card:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
-html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+:where(html:not(.is-touch-input)) .difficulty-card:hover, .difficulty-card.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+:where(html:not(.is-pointer-input)) .difficulty-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
 .difficulty-card:active { transform: scale(0.99); }
 .difficulty-card.is-current { border-color: rgba(47, 191, 99, 0.5); }
 .difficulty-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -111,8 +112,9 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   color: var(--text-faint);
   transition: color var(--dur-fast) ease;
 }
-.difficulty-card:hover .difficulty-index,
-.difficulty-card:focus .difficulty-index,
+:where(html:not(.is-touch-input)) .difficulty-card:hover .difficulty-index,
+.difficulty-card.is-cursor-target .difficulty-index,
+:where(html:not(.is-pointer-input)) .difficulty-card:focus .difficulty-index,
 .difficulty-card.is-current .difficulty-index { color: var(--text-muted); }
 /* Same pill as the selected stage card, so the current level reads by its
    label too, not by its tint. */
@@ -179,12 +181,12 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border);
   overflow: hidden;
   transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms var(--ease), background-color 120ms ease;
 }
-.slot:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-pointer-input)) .slot:focus { box-shadow: var(--focus-ring); }
 .slot.is-locked { background: var(--surface-subtle); cursor: default; }
 .slot.is-locked .slot-art { position: absolute; inset: 22% 18% 0; display: grid; }
 .slot.is-locked .slot-art .icon { width: 100%; height: 100%; fill: var(--surface-sunken); }
@@ -237,7 +239,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
 }
 .slot-check .icon { stroke-width: 3.4; }
 .slot.is-selected .slot-check { display: grid; }
-.slot.is-available:hover { border-color: var(--border-hover); }
+:where(html:not(.is-touch-input)) .slot.is-available:hover, .slot.is-available.is-cursor-target { border-color: var(--border-hover); }
 
 .char-preview {
   display: grid;
@@ -265,8 +267,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid currentColor; }
 .status-badge.is-available { color: var(--text-strong); }
@@ -279,7 +280,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   letter-spacing: -0.02em;
   color: var(--text-strong);
 }
-.label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-muted); }
 .btn--confirm { width: 100%; }
 
 /* The rating (or Locked / Not rated) stays above the fighter name. */
@@ -310,7 +311,7 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   min-height: 32px;
   margin-left: auto;
   padding: 4px 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-menu);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.25;
@@ -321,8 +322,8 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
   color: var(--text-secondary);
   transition: color 120ms ease, box-shadow 120ms ease;
 }
-.text-action:hover { color: var(--text-strong); }
-html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .text-action:hover, .text-action.is-cursor-target { color: var(--text-strong); }
+:where(html:not(.is-pointer-input)) .text-action:focus { color: var(--text-strong); box-shadow: var(--focus-ring); }
 
 .text-action:active { color: var(--text-strong); }
 .play-style-action { justify-self: end; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
@@ -356,7 +357,7 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
 .map-layout { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); }
 .map-hero, .map-roster {
   min-height: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border);
 }
 .map-hero { position: relative; overflow: hidden; background: var(--surface-muted); }
@@ -407,7 +408,7 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
   background: var(--surface-subtle);
 }
 .map-trait-label, .map-trait-value { margin: 0; }
-.map-trait-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.map-trait-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-muted); }
 .map-trait-value { font-size: clamp(11px, 1.6vh, 13px); color: var(--text); }
 /* The stage's hazards: called out plainly, never in warning colours. */
 .map-traits > div.is-hazard { border-color: var(--border-strong); }
@@ -451,7 +452,7 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
   display: flex;
   flex-direction: column;
   width: 100%;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border);
   overflow: hidden;
   background: var(--surface-subtle);
@@ -502,8 +503,8 @@ html:not(.is-pointer-input) .text-action:focus { color: var(--text-strong); box-
 }
 .stage-tile-check .icon { stroke-width: 3.4; }
 .stage-tile.is-available { border-color: var(--border-strong); }
-.stage-tile.is-available:hover { border-color: var(--border-hover); }
-.stage-tile.is-available:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .stage-tile.is-available:hover, .stage-tile.is-available.is-cursor-target { border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .stage-tile.is-available:focus { box-shadow: var(--focus-ring); }
 .stage-tile.is-available:active { transform: scale(0.98); }
 .stage-tile.is-selected .stage-tile-check { display: grid; }
 .stage-tile.is-selected .stage-tile-name { color: var(--text-strong); box-shadow: inset 0 -2px 0 var(--accent); }

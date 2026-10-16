@@ -210,15 +210,44 @@ Nothing in the interface turns blue.
   gray border; hover slightly lightens the surface.
 - **Selected:** green border plus a check mark, filled indicator or underline.
   Small bright-green indicators use dark text for contrast.
-- **Focus:** off-white ring with dark separation; never green alone.
+- **Focus:** off-white ring with dark separation; never green alone. It
+  shows for keyboard and controller navigation only (see Interaction states
+  below).
+- **Interaction states:** four, never confused. *Default*: the resting look;
+  a screen or dialog focuses its default control for the keys and the
+  controller, but nothing looks hovered or focused until the player uses
+  one. *Hover*: only while a real mouse pointer is over a control (or the
+  controller cursor is), gone the moment it leaves; never for touch (no
+  sticky hover after a tap), never on a disabled control. *Focus*: the ring,
+  for keyboard and controller navigation only; focus moved by script, by a
+  press or by the mouse shows nothing. *Selected*: the saved or chosen
+  value (fighter, stage, language, setting, tab), whatever the input,
+  never shown as a hover. The input modality is kept on `<html>`
+  (`js/core/input-modality.js`; `docs/systems/input.md`).
 - **Progress:** green fill on a charcoal track.
 - **Tabs:** active off-white text with green underline; inactive gray.
 - **Setup steps:** done = gray with a check; current = filled green number and
   underline; future = gray.
 - **Panels:** charcoal, translucent light hairlines, established radii and
   restrained neutral shadows. No new textures. Glass appears in two places
-  only: the Home credits strip (6.2) and the battle glass (7.3) used by the
-  battle HUD, the pause/result panels and the Return Home confirmation.
+  only: the Home credits strip (6.2) and the glass (7.3) used by the battle
+  HUD and by every dialog.
+- **Corners:** every rectangular menu control (Home's actions, the setup
+  cards, roster slots and stage tiles, Back, Confirm and Random stage, the
+  pause, result and Practice actions, Settings' tabs and choices, the
+  language buttons, every dialog action and the controller editor's rows)
+  and every dialog panel has the Home Play button's 3 px corners
+  (`--radius-menu`). Pills, badges and circles (the controller cursor,
+  joystick and touch buttons, score dots, check marks) keep their shapes.
+- **Dialogs:** one look for all of them, Controller connections': the
+  translucent dark glass panel (`.glass--panel`: sheen, light edge, glass
+  shadows, a 12 px backdrop blur where supported and a denser fill where
+  not) over one dim (`--scrim`, black at 42 %) that keeps what is beneath
+  perceptible. A dialog sets its own size, padding, layout and scrolling,
+  never its surface. Each dialog opened from another appears above it,
+  everything beneath the newest is inert and out of reach of the pointer,
+  the keys and the controller, and closing it gives the one beneath back
+  its focus (the dialog stack, `js/core/menu-navigator.js`).
 
 ### 5.3 Wordmark and favicon
 
@@ -236,9 +265,19 @@ Nothing in the interface turns blue.
   "Helvetica Neue", Arial, sans-serif`; monospace for small labels.
 - Hierarchy through size and weight (600–700), not effects. No skewed or
   900-weight display text in the interface.
-- Headings and buttons in title case ("Select Fighter", "Start Battle");
-  small metadata labels in tracked monospace capitals.
-- The Select Stage action "Confirm and start battle" is intentionally sentence case.
+- Every interface label (headings, buttons, menu titles, tabs, status and
+  metadata labels) is in sentence case ("Select fighter", "Change stage",
+  "Return to home", "Player 1 wins"), in the underlying strings, never by a
+  CSS case transform; small metadata labels are tracked monospace in the
+  same case. French follows its own conventions ("Mode spectateur").
+- Exceptions: the ALVA wordmark and title, CPU (CPU 1, CPU 2), P1 (J1), and
+  the round announcements (READY, ROUND 1, FIGHT, TIME OVER, K.O.,
+  OVERTIME); the HUD's own round line is an ordinary label (Round 1).
+  Proper names keep their capitals: fighters' ability names, stages, game
+  terms such as Launch Point, Base Launch, the Void, the Shield, the Dash
+  and Energy, and devices and products.
+- This specification names screens and modes as titles ("Select Fighter",
+  "Quick Battle"); the interface shows them in sentence case.
 
 ### 5.5 Motion
 
@@ -723,7 +762,7 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
 - **Names.** The HUD tags, the markers over the fighters and the results
   say **CPU 1** and **CPU 2** ("CPU 1 Wins", "CPU 2 fell into the Void for
   the final point."); the pause dialog's kicker is "Watch Mode"; the canvas
-  is labelled "Watch Mode battle: CPU 1, #0001, against CPU 2, #0001".
+  is labelled "Watch mode battle: CPU 1, #0001, against CPU 2, #0001".
 
 ### 6.6 Credits
 
@@ -865,9 +904,9 @@ A training room, entered straight from Home.
   control. The CPU card shows only while there is a CPU: rebound when it is
   changed, hidden when it is disabled.
 - **Practice menu:** More, Esc / P or a controller's Options / Menu freezes practice
-  (simulation, gameplay input and touch controls stop) and floats a light,
-  translucent glass menu centred under the More button over a lightly
-  dimmed, still stage. It holds exactly **Change Fighter** (green, focused),
+  (simulation, gameplay input and touch controls stop) and floats a small
+  menu in the dialogs' translucent glass (5.2) centred under the More
+  button over the shared dim, the still stage visible beneath. It holds exactly **Change Fighter** (green, focused),
   **Change CPU** (**Enable CPU** once the CPU is disabled) and **Return**
   (outlined).
   More again, Esc / Back, P, Start or a press on the dim resumes. **Return**
@@ -1351,7 +1390,9 @@ French, concise game terms).
 
 - **First launch.** The splash always plays first. With no language chosen yet,
   `App.continueAfterSplash` enters Home with a reset stack and shows a
-  one-time chooser (`js/ui/language-dialog.js`) over Home, after the splash
+  one-time chooser (`js/ui/language-dialog.js`) over Home, in the dialogs'
+  glass over the shared dim (5.2, Home dimly visible and inert beneath),
+  after the splash
   has completed its final black hold: title "Language · Langue", the prompt "Choose your
   language · Choisissez votre langue" and a note that it can be changed in
   Settings, all in both languages at once, and exactly two buttons,
@@ -3380,13 +3421,14 @@ Adding one is described in
 
 - The battle keeps deliberate dark chrome over the stage for legibility, using
   the same neutral hierarchy: white labels, gray secondary text.
-- **Battle glass** (`.glass` in `css/battle.css`): semi-transparent charcoal with a
+- **Glass** (`.glass` in `css/battle.css`): semi-transparent charcoal with a
   faint top sheen, a light translucent hairline and a soft shadow; darker than
   the Home strip so type stays readable over bright and dark stage art. HUD
   pieces float over a canvas that repaints every frame, so they skip backdrop
-  blur. Pause, result and confirmation panels sit over a paused battle and add
-  a light blur where supported, with a denser fill as the fallback. The stage
-  stays dimly visible behind every panel.
+  blur. Every dialog panel (`.glass--panel`: pause, result, Practice menu and
+  rosters, confirmation, Settings, the controller dialogs and every other,
+  5.2) adds a light blur where supported, with a denser fill as the fallback.
+  The stage stays dimly visible behind every panel.
 - HUD fighter cards: P1 (filled white tag) and CPU (outlined tag), in the
   HUD grid's two outer columns but pulled in against the timer (P1's
   `justify-self: end`, the CPU's `start`), so the top reads [P1 card]

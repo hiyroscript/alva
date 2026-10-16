@@ -7,15 +7,9 @@
    and Combat
    --------------------------------------------------------------------- */
 
-/* Home stays visible under a light dim; the glass panel blurs it where
-   backdrop blur is supported (.glass--panel), with a denser fill otherwise. */
-.settings-overlay {
-  position: fixed;
-  z-index: 65;
-  background: rgba(0, 0, 0, 0.42);
-  animation: dim-in 0.18s ease both;
-}
-.settings-overlay > .settings-panel { animation: fade-in 0.18s ease both; }
+/* Home stays visible under the shared dim; the glass panel blurs it where
+   backdrop blur is supported (.glass--panel), with a denser fill otherwise
+   (css/overlays.css, Dialogs). */
 .settings-panel {
   width: min(760px, 100%);
   /* Keep tabs under the pointer when their panels have different heights. */
@@ -27,7 +21,7 @@
   grid-template-rows: auto auto minmax(0, 1fr);
   color: var(--text);
   color-scheme: dark;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   overflow: hidden;
 }
 .settings-header {
@@ -55,15 +49,15 @@
   place-items: center;
   width: clamp(36px, 6vh, 44px);
   height: clamp(36px, 6vh, 44px);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
 .settings-close .icon, .dialog-close .icon { font-size: 20px; }
-.settings-close:hover, .dialog-close:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
-.settings-close:focus, .dialog-close:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .settings-close:hover, :where(html:not(.is-touch-input)) .dialog-close:hover, .settings-close.is-cursor-target, .dialog-close.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .settings-close:focus, :where(html:not(.is-pointer-input)) .dialog-close:focus { box-shadow: var(--focus-ring); }
 .settings-close:active, .dialog-close:active { transform: scale(0.96); }
 /* Header and tabs stay fixed; only the active panel can scroll. The rail
    scrolls horizontally when more categories (or longer labels) need room. */
@@ -82,7 +76,7 @@
   min-height: 44px;
   padding: 0 14px;
   border-bottom: 3px solid transparent;
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--radius-menu) var(--radius-menu) 0 0;
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
@@ -90,9 +84,9 @@
   white-space: nowrap;
   transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
-.settings-tab:hover { color: var(--text-strong); background: var(--surface-subtle); }
+:where(html:not(.is-touch-input)) .settings-tab:hover, .settings-tab.is-cursor-target { color: var(--text-strong); background: var(--surface-subtle); }
 .settings-tab.is-active { color: var(--text-strong); border-bottom-color: var(--accent); background: rgba(47, 191, 99, 0.08); }
-html:not(.is-pointer-input) .settings-tab:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-pointer-input)) .settings-tab:focus { box-shadow: var(--focus-ring); }
 .settings-body { display: grid; min-width: 0; min-height: 0; overflow: hidden; }
 .settings-section {
   display: grid;
@@ -112,8 +106,7 @@ html:not(.is-pointer-input) .settings-tab:focus { box-shadow: var(--focus-ring);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: none;
+  letter-spacing: 0.08em;
   color: var(--text-strong);
 }
 .settings-group-note { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
@@ -133,7 +126,7 @@ html:not(.is-pointer-input) .settings-tab:focus { box-shadow: var(--focus-ring);
   min-height: clamp(44px, 7.4vh, 56px);
   padding: 0 16px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(255, 255, 255, 0.03);
   font-weight: 700;
   font-size: clamp(15px, 2.6vh, 18px);
@@ -141,8 +134,8 @@ html:not(.is-pointer-input) .settings-tab:focus { box-shadow: var(--focus-ring);
   text-align: left;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
-.settings-language:hover, .settings-choice:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
-.settings-language:focus, .settings-choice:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .settings-language:hover, :where(html:not(.is-touch-input)) .settings-choice:hover, .settings-language.is-cursor-target, .settings-choice.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .settings-language:focus, :where(html:not(.is-pointer-input)) .settings-choice:focus { box-shadow: var(--focus-ring); }
 .settings-language:active, .settings-choice:active { transform: scale(0.99); }
 .settings-language-check {
   display: none;
@@ -168,14 +161,14 @@ html:not(.is-pointer-input) .settings-tab:focus { box-shadow: var(--focus-ring);
   gap: clamp(8px, 1.8vh, 16px);
   padding: clamp(10px, 2vh, 18px) clamp(12px, 1.6vw, 18px);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: var(--shadow-sm);
   text-align: left;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
 }
-.settings-option:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
-html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+:where(html:not(.is-touch-input)) .settings-option:hover, .settings-option.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+:where(html:not(.is-pointer-input)) .settings-option:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
 .settings-option:active { transform: scale(0.99); }
 .settings-option.is-current { border-color: rgba(47, 191, 99, 0.5); }
 .settings-option-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -211,8 +204,7 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: none;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
 }
 .settings-option-desc { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
@@ -251,7 +243,7 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 
 /* Customize touch controls, with the scheme it edits beside it. */
 .settings-customize-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
-.settings-customize { justify-content: space-between; min-height: clamp(40px, 6.6vh, 48px); padding: 0 16px; border-radius: 3px; background: rgba(255, 255, 255, 0.04); }
+.settings-customize { justify-content: space-between; min-height: clamp(40px, 6.6vh, 48px); padding: 0 16px; border-radius: var(--radius-menu); background: rgba(255, 255, 255, 0.04); }
 .settings-customize-text { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
 .settings-custom-tag[hidden] { display: none; }
 
@@ -267,22 +259,20 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 }
 
 /* ---------------------------------------------------------------------
-   First launch: the language chooser, over the black start screen
+   First launch: the language chooser, over Home under the shared dim
    --------------------------------------------------------------------- */
 
-.language-overlay { position: fixed; z-index: 90; background: #000; }
 .language-panel {
   width: min(460px, 100%);
   max-height: 100%;
   display: grid;
   gap: clamp(10px, 2.4vh, 18px);
   padding: clamp(18px, 4vh, 32px) clamp(18px, 3vw, 32px);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   color: var(--text);
   color-scheme: dark;
   text-align: center;
   overflow-y: auto;
-  animation: fade-in 0.4s ease both;
 }
 .language-title { font-weight: 700; font-size: clamp(20px, 4.6vh, 30px); letter-spacing: -0.015em; color: var(--text-strong); }
 .language-prompt { color: var(--text-secondary); font-size: clamp(13px, 2.2vh, 16px); }
@@ -290,7 +280,7 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 .language-option {
   min-height: clamp(46px, 8vh, 58px);
   padding: 0 14px;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: rgba(255, 255, 255, 0.04);
   font-weight: 700;
@@ -298,8 +288,8 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
   color: var(--text-strong);
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
-.language-option:hover { background: var(--action); border-color: var(--action); }
-.language-option:focus { box-shadow: var(--focus-ring); border-color: var(--border-hover); }
+:where(html:not(.is-touch-input)) .language-option:hover, .language-option.is-cursor-target { background: var(--action); border-color: var(--action); }
+:where(html:not(.is-pointer-input)) .language-option:focus { box-shadow: var(--focus-ring); border-color: var(--border-hover); }
 .language-option:active { transform: scale(0.99); background: var(--action-pressed); }
 .language-note { color: var(--text-muted); font-size: 12px; line-height: 1.45; }
 
@@ -336,7 +326,7 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
   height: clamp(40px, 8vh, 56px);
   transform: translateX(-50%);
   border: 1px dashed rgba(255, 255, 255, 0.22);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
 }
 /* Always shown here (in battle only on touch devices), never live. */
 .touch-editor .touch-controls { display: block; z-index: 1; }
@@ -346,8 +336,8 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 .touch-editor .is-editor-selected { outline: 2px dashed var(--accent-hi); outline-offset: 4px; }
 .touch-editor .is-editor-selected.is-moving { outline-style: solid; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 0 18px rgba(124, 247, 166, 0.45); }
 .touch-editor .tc-btn:focus, .touch-editor .tc-stick:focus { outline-offset: 4px; }
-html:not(.is-pointer-input) .touch-editor [data-control]:focus:not(.is-editor-selected) { outline: 2px solid var(--white); outline-offset: 4px; }
-html:not(.is-pointer-input) .touch-editor .is-editor-selected:focus { outline-color: var(--white); }
+:where(html:not(.is-pointer-input)) .touch-editor [data-control]:focus:not(.is-editor-selected) { outline: 2px solid var(--white); outline-offset: 4px; }
+:where(html:not(.is-pointer-input)) .touch-editor .is-editor-selected:focus { outline-color: var(--white); }
 
 /* The toolbar: one compact glass bar across the top, out of the way while
    a control is dragged. */
@@ -363,18 +353,17 @@ html:not(.is-pointer-input) .touch-editor .is-editor-selected:focus { outline-co
   align-items: center;
   gap: 8px clamp(10px, 1.8vw, 20px);
   padding: clamp(8px, 1.6vh, 12px) clamp(10px, 1.6vw, 16px);
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   color: var(--text);
   transition: opacity 0.15s ease;
 }
 .touch-editor.is-dragging .touch-editor-bar { opacity: 0.25; pointer-events: none; }
 .touch-editor-head { flex: 1 1 220px; display: grid; gap: 2px; min-width: 0; }
-.touch-editor-scheme { text-transform: none; }
 .touch-editor-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
 .touch-editor-title { font-weight: 700; font-size: clamp(14px, 2.6vh, 18px); color: var(--text-strong); }
 .touch-editor-hint { color: var(--text-secondary); font-size: 12px; line-height: 1.35; }
 .touch-editor-size { flex: 1 1 240px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; }
-.touch-editor-size-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: none; color: var(--text-muted); }
+.touch-editor-size-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: var(--text-muted); }
 .touch-editor-name { font-size: 13px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .touch-editor-size-controls { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
 .touch-editor-step {
@@ -383,24 +372,24 @@ html:not(.is-pointer-input) .touch-editor .is-editor-selected:focus { outline-co
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 3px;
+  border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
 .touch-editor-step .icon { font-size: 18px; stroke-width: 2.6; }
-.touch-editor-step:hover:enabled { background: var(--surface-subtle); border-color: var(--border-hover); }
-.touch-editor-step:focus { box-shadow: var(--focus-ring); }
+:where(html:not(.is-touch-input)) .touch-editor-step:hover:enabled, .touch-editor-step.is-cursor-target:enabled { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .touch-editor-step:focus { box-shadow: var(--focus-ring); }
 .touch-editor-step:active:enabled { transform: scale(0.95); }
 .touch-editor-step:disabled { opacity: 0.4; cursor: not-allowed; }
 .touch-editor-slider { flex: 1; min-width: 80px; height: 36px; margin: 0; accent-color: var(--accent); touch-action: none; cursor: pointer; }
 .touch-editor-slider:disabled { opacity: 0.4; cursor: not-allowed; }
 .touch-editor-slider:focus { outline: none; }
-.touch-editor-slider:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; border-radius: 3px; }
+.touch-editor-slider:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; border-radius: var(--radius-menu); }
 .touch-editor-size-value { flex: none; min-width: 4.2ch; text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .touch-editor-actions { flex: none; display: flex; gap: 8px; margin-left: auto; }
-.touch-editor-actions .btn { min-height: 40px; padding: 0 14px; border-radius: 3px; font-size: 13px; }
+.touch-editor-actions .btn { min-height: 40px; padding: 0 14px; font-size: 13px; }
 .touch-editor-reset { background: rgba(255, 255, 255, 0.04); }
 .touch-editor-live {
   position: absolute;

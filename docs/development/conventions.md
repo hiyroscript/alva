@@ -64,7 +64,7 @@ parts in cascade order:
 | `components.css` | Shared controls, the menu screen frame, panels. |
 | `splash.css`, `home.css`, `setup.css`, `discover.css`, `settings.css` | Their screens (setup: Select Mode, Difficulty, Fighter, CPU and Stage; settings: the dialog, the language chooser and the touch layout editor). |
 | `battle.css`, `touch-controls.css`, `battle-overlays.css`, `practice.css`, `ability-hud.css` | Battle chrome and the HUD; the touch controls; banners and the pause and result panels; Practice Ground; the ability HUD (Player 1's moves in the bottom-right corner). |
-| `overlays.css` | Loading, the confirm and choice dialogs, the rotate prompt, and the shared surface finish that overrides the screens above. |
+| `overlays.css` | Loading, the dialogs' shared contract (one dim, one glass, the dialog layer) and the confirm, choice, information and install dialogs, the rotate prompt. |
 | `responsive.css` | Breakpoint adjustments. Always last. |
 
 Later parts may override earlier ones, so a rule's place matters: add a
@@ -73,6 +73,25 @@ area's after it. Moving a rule to an earlier part can change the cascade.
 No `url()` in the CSS (paths would resolve from `css/`), no preprocessor,
 no framework. [`tests/interface/stylesheets.test.mjs`](../../tests/interface/stylesheets.test.mjs)
 checks that every part is linked once, base first and responsive last.
+
+Shared rules every part follows
+([`tests/interface/ui-consistency.test.mjs`](../../tests/interface/ui-consistency.test.mjs)
+checks them):
+
+- **Case.** No `text-transform`: every label shows its translation as
+  written, in sentence case.
+- **Hover** starts with `:where(html:not(.is-touch-input))` and pairs with
+  `.is-cursor-target` (the controller cursor's hover); a button's hover
+  needs `:enabled`. **The focus ring** starts with
+  `:where(html:not(.is-pointer-input))`. `:where()` keeps the rule's
+  specificity what it would be without the prefix (see
+  [Interaction states](../systems/input.md#interaction-states)).
+- **Corners.** A rectangular menu control or dialog panel uses
+  `var(--radius-menu)` (3 px, the Home Play button's); pills and circles
+  keep theirs.
+- **Dialogs.** A dialog's panel is `.glass .glass--panel` over the shared
+  `var(--scrim)` dim; its own rules set size and layout, never its fill,
+  opacity, blur or z-index (the dialog stack places it).
 
 ## Documentation
 

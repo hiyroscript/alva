@@ -286,7 +286,7 @@ const labels = (root) => root.querySelectorAll('[data-nav]').map((b) => b.textCo
 const slotFor = (screen, id) => screen.roster.slots.find((s) => s._def?.id === id);
 const cpuSlotFor = (screen, id) => screen.cpuRoster.slots.find((s) => s._def?.id === id);
 // The CPU is on from the start, so the menu offers Change CPU.
-const PRACTICE_MENU = ['Change Fighter', 'Change CPU', 'Return'];
+const PRACTICE_MENU = ['Change fighter', 'Change CPU', 'Return'];
 // Simulation steps in a Void respawn wait.
 const RESPAWN_STEPS = Math.round(CONFIG.battle.respawnSeconds / DT);
 
@@ -923,7 +923,7 @@ test('More freezes practice under a translucent menu: Change Fighter, Change CPU
   assert.ok(menuOverlay.children[0].classList.contains('glass'));
   assert.deepEqual(labels(menuOverlay), PRACTICE_MENU);
   assert.deepEqual(app.nav.candidates(menuOverlay), [screen.changeBtn, screen.cpuBtn, screen.returnBtn]);
-  for (const hidden of ['Resume', 'Restart', 'Restart Battle', 'Help', 'Settings', 'Change Stage', 'Allow infinite energy', 'Revoke infinite energy']) {
+  for (const hidden of ['Resume', 'Restart', 'Restart battle', 'Help', 'Settings', 'Change stage', 'Allow infinite energy', 'Revoke infinite energy']) {
     assert.ok(!labels(menuOverlay).includes(hidden), `no ${hidden}`);
   }
   assert.ok(!menuOverlay.textContent.match(/energy/i), 'no Energy anywhere in the menu');
@@ -1025,7 +1025,7 @@ test('Change Fighter opens a large roster dialog over practice instead of naviga
   assert.equal(rosterOverlay.getAttribute('aria-modal'), 'true');
   const titleId = rosterOverlay.getAttribute('aria-labelledby');
   const title = rosterOverlay.querySelectorAll('h2').find((h) => h.id === titleId);
-  assert.equal(title.textContent, 'Change Fighter');
+  assert.equal(title.textContent, 'Change fighter');
   assert.ok(screen.rosterDialog.classList.contains('glass'));
   assert.ok(rosterOverlay.contains(screen.roster.rosterPanel) && rosterOverlay.contains(screen.roster.previewPanel));
 
@@ -1383,7 +1383,7 @@ test('Enable CPU (once the CPU is disabled) opens a second shared roster in its 
   assert.equal(titleId, 'practice-cpu-roster-title');
   const title = overlay.querySelectorAll('h2').find((h) => h.id === titleId);
   assert.equal(title.textContent, 'Select CPU');
-  assert.equal(overlay.querySelector('.kicker').textContent, 'Practice Ground');
+  assert.equal(overlay.querySelector('.kicker').textContent, 'Practice ground');
 
   // Another instance of the same roster, in the same large glass dialog.
   assert.ok(screen.cpuRoster instanceof FighterRoster);
@@ -2315,7 +2315,7 @@ test('Quick Battle still creates its AI CPU, round intro, 5-minute timer and two
   hud.update(battle);
   assert.equal(root.children.length, 3);
   assert.equal(hud.right.tag.textContent, 'CPU');
-  assert.equal(hud.roundLabel.textContent, 'ROUND 1');
+  assert.equal(hud.roundLabel.textContent, 'Round 1', 'an ordinary label, not a banner');
   assert.equal(hud.timer.textContent, '5:00');
   assert.equal(hud.pauseButton.html, ICONS.pause);
 });

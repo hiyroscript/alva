@@ -378,7 +378,7 @@ test('Download opens the install dialog over Home: a labelled modal with its own
       'Add Alva to your home screen for a faster, more convenient way to play!',
     ]);
     assert.doesNotMatch(textOf(dialog.intro), /no storage|zero storage|0 (MB|KB)/i, 'never a false storage claim');
-    assert.deepEqual(buttonsShown(dialog), ['Not Now', 'Add to Home Screen']);
+    assert.deepEqual(buttonsShown(dialog), ['Not now', 'Add to home screen']);
     assert.equal(document.activeElement, dialog.addButton, 'the primary action takes focus');
     assert.equal(dialog.steps.hidden, true, 'no manual steps when the browser can install');
     // Not Now closes it, Home is back and focus is on Download again.
@@ -435,13 +435,13 @@ test('Add to Home Screen asks the browser for its own prompt; accepted, it waits
     assert.equal(textOf(dialog.status), 'Installing Alva…');
     assert.equal(dialog.status.getAttribute('role'), 'status');
     assert.equal(textOf(dialog.title), 'Install Alva', 'no success claimed yet');
-    assert.deepEqual(buttonsShown(dialog), ['Got It']);
+    assert.deepEqual(buttonsShown(dialog), ['Got it']);
     assert.equal(document.activeElement, dialog.gotItButton, 'focus never left on a hidden button');
     win.fire('appinstalled');
     assert.equal(install.mode, 'installed');
     assert.equal(dialog.view, 'installed');
     assert.equal(textOf(dialog.title), 'Alva is installed!');
-    assert.equal(textOf(dialog.message), 'Alva was added to your device. You can now launch it from your Home Screen or app list, just like an app.');
+    assert.equal(textOf(dialog.message), 'Alva was added to your device. You can now launch it from your home screen or app list, just like an app.');
     assert.equal(dialog.status.hidden, true);
     assert.equal(dialog.intro.hidden, true);
     assert.ok(home.downloadButton.classList.contains('is-installed'), 'the Download button stops calling for attention');
@@ -466,7 +466,7 @@ test('declined, the dialog stays usable: it says so and shows how to install lat
     assert.equal(dialog.steps.hidden, false);
     assert.equal(textOf(dialog.stepsHeading), 'How to install Alva');
     assert.match(textOf(dialog.stepsBody), /Install icon at the right of the address bar/);
-    assert.deepEqual(buttonsShown(dialog), ['Got It']);
+    assert.deepEqual(buttonsShown(dialog), ['Got it']);
     assert.equal(document.activeElement, dialog.gotItButton);
     dialog.gotItButton.click();
     assert.equal(app.screens.current, home);
@@ -482,13 +482,13 @@ test('without a programmable prompt: Safari on an iPhone gets the four Add to Ho
     assert.equal(dialog.view, 'manual');
     assert.equal(textOf(dialog.title), 'Install Alva');
     assert.equal(dialog.intro.hidden, false, 'the same explanation');
-    assert.equal(textOf(dialog.stepsHeading), 'To add Alva to your Home Screen:');
+    assert.equal(textOf(dialog.stepsHeading), 'To add Alva to your home screen:');
     const list = dialog.stepsBody.querySelector('ol');
     assert.ok(list, 'numbered steps');
     assert.deepEqual(list.children.map(textOf), [
       'Open Alva in Safari.', 'Tap the Share button.', 'Select Add to Home Screen.', 'Confirm by tapping Add.',
     ]);
-    assert.deepEqual(buttonsShown(dialog), ['Got It'], 'no Add button that could only fail');
+    assert.deepEqual(buttonsShown(dialog), ['Got it'], 'no Add button that could only fail');
     assert.equal(document.activeElement, dialog.gotItButton);
     dialog.close();
   } finally { env.done(); }
@@ -522,8 +522,8 @@ test('opened as the installed app, it says Alva is already installed and offers 
       home.downloadButton.click();
       assert.equal(dialog.view, 'installed');
       assert.equal(textOf(dialog.title), 'Alva is already installed!');
-      assert.equal(textOf(dialog.message), 'You can launch Alva directly from your Home Screen.');
-      assert.deepEqual(buttonsShown(dialog), ['Got It']);
+      assert.equal(textOf(dialog.message), 'You can launch Alva directly from your home screen.');
+      assert.deepEqual(buttonsShown(dialog), ['Got it']);
       assert.equal(dialog.steps.hidden, true);
       dialog.close();
       assert.equal(home.actions.discover.disabled, false, 'the rest of Home is untouched');
@@ -677,6 +677,6 @@ test('the Download icon: its arrow drops into its tray on a loop, a faint accent
   assert.match(css, /\.home-download\.is-installed::after,\s*\.home-download\.is-installed \.icon-download-arrow \{ animation: none; \}/);
   const reduced = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]).join('\n');
   assert.match(reduced, /\.home-download::after, \.home-download \.icon-download-arrow \{ animation: none; \}/);
-  assert.match(css, /\.home-download:hover \{/);
+  assert.match(css, /\.home-download:hover[^{]*\{/);
   assert.match(css, /\.home-download:focus \{[^}]*box-shadow: var\(--focus-ring\)/);
 });

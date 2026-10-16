@@ -676,7 +676,7 @@ test('Read play style is a real, underlined text button at the bottom-right of t
   assert.match(rule, /font-size: 11px;/);
   assert.match(css, /\.play-style-action \{[^}]*justify-self: end;/);
   assert.match(rule, /min-height: 32px;/, 'a comfortable press area');
-  assert.match(css, /html:not\(\.is-pointer-input\) \.text-action:focus \{[^}]*box-shadow: var\(--focus-ring\);/, 'the usual keyboard / gamepad ring');
+  assert.match(css, /:where\(html:not\(\.is-pointer-input\)\) \.text-action:focus \{[^}]*box-shadow: var\(--focus-ring\);/, 'the usual keyboard / gamepad ring');
   assert.match(css, /\.preview-status-row \{[^}]*flex-wrap: wrap;[^}]*justify-content: space-between;/, 'wraps cleanly on narrow previews');
   assert.match(css, /\.preview-status-row > \[hidden\]/, 'hidden parts of the row stay hidden');
   const noConfirm = css.match(/\n\.preview-info--no-confirm \{[^}]*\}/)[0];
@@ -776,7 +776,7 @@ test('How to Play contains exactly the eight approved sections in order in both 
     for (const language of ['en', 'fr', 'en']) {
       setLanguage(language);
       localizeTree(dialog.root);
-      assert.equal(dialog.title.textContent, language === 'en' ? 'How to Play' : 'Comment jouer');
+      assert.equal(dialog.title.textContent, language === 'en' ? 'How to play' : 'Comment jouer');
       assert.equal(dialog.body.children.length, 8);
       nodes.forEach((node, i) => {
         assert.equal(dialog.body.children[i], node, 'language changes preserve section nodes');
@@ -1109,19 +1109,16 @@ test('Movement paragraphs and Launch labels follow English and French, including
   }
 });
 
-test('Discover uses authored capitalization and readable Movement width, without changing shared roster styles', () => {
+test('Discover uses authored capitalization and readable Movement width, like every shared roster style', () => {
   const css = readFileSync(new URL('../../css/discover.css', import.meta.url), 'utf8');
-  for (const selector of ['discover-tab', 'discover-page-title', 'discover-entry-title', 'discover-tier-name']) {
-    const rule = css.match(new RegExp(`\\.${selector} \\{[^}]*\\}`))[0];
-    assert.match(rule, /text-transform: none;/, selector);
-  }
-  assert.match(css, /\.screen--discover \.panel-title,\s*\.screen--discover \.status-badge,\s*\.info-panel \.kicker\[data-i18n="discover.playStyleTitle"\] \{ text-transform: none; \}/);
+  // No case transform anywhere: every label shows its own (sentence case) text.
+  assert.doesNotMatch(css, /text-transform/);
   assert.match(css, /\.discover-page--movement \.discover-entry \{ grid-template-columns: minmax\(0, 1fr\); \}/);
   assert.match(css, /\.discover-page--movement \.discover-entry-text \{ max-width: 72ch; \}/);
   assert.doesNotMatch(css, /\.discover-mark/);
   const all = stylesheet();
-  assert.match(all, /\n\.panel-title \{[^}]*text-transform: uppercase;/);
-  assert.match(all, /\n\.status-badge \{[^}]*text-transform: uppercase;/);
+  assert.doesNotMatch(all.match(/\n\.panel-title \{[^}]*\}/)[0], /text-transform/);
+  assert.doesNotMatch(all.match(/\n\.status-badge \{[^}]*\}/)[0], /text-transform/);
 });
 
 // ---- Launch ---------------------------------------------------------------------

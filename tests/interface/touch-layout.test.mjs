@@ -718,7 +718,7 @@ test('the editor always uses neutral localized icons for every selection, scheme
       assert.equal((node.innerHTML.match(/<circle /g) ?? []).length, n);
     }
     assert.equal(editor.touch.actionButtons.get('extra_attack').getAttribute('aria-label'),
-      language === 'fr' ? 'Attaque supplémentaire' : 'Extra Attack');
+      language === 'fr' ? 'Attaque supplémentaire' : 'Extra attack');
     editor.select('attack5');
     assert.equal(editor.nameEl.textContent, language === 'fr' ? 'Attaque 5' : 'Attack 5');
   };

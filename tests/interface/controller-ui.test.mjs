@@ -807,7 +807,8 @@ test('Restore defaults asks, then puts that fighter alone back on its recommende
     assert.equal(text(row(editor, 'jump').querySelector('.controller-chip')), 'Triangle', 'loaded after a restart');
     assert.equal(text(editor.layoutTag), 'Custom layout');
     editor.restoreButton.click();
-    assert.equal(env.roots.confirm.classList.contains('is-raised'), true, 'the confirmation above the editor');
+    assert.ok(Number(env.roots.confirm.style.zIndex) > Number(env.roots.editor.style.zIndex), 'the confirmation above the editor');
+    assert.equal(env.roots.editor.inert, true, 'the editor inert beneath it');
     assert.equal(text(env.app.dialog.title), 'Restore recommended controls?');
     env.app.dialog.okBtn.click();
     await Promise.resolve();
@@ -912,12 +913,15 @@ test('the editor, the binding dialog and Controller Connections read in French',
   } finally { env.done(); }
 });
 
-test('the controller stylesheet: the dialogs over Settings in order, a responsive editor, a cursor that never takes the pointer', () => {
+test('the controller stylesheet: the dialogs over Settings share one layer (the dialog stack orders them), a responsive editor, a cursor that never takes the pointer', () => {
   const css = stylesheet();
-  const z = (selector) => Number(css.match(new RegExp(`${selector.replace('.', '\\.')} \\{[^}]*z-index: (\\d+)`))?.[1]);
-  assert.ok(z('.controller-roster-overlay') > z('.settings-overlay'));
-  assert.ok(z('.controller-editor-overlay') > z('.controller-roster-overlay'));
-  assert.ok(z('.binding-overlay') > z('.controller-editor-overlay'));
+  const [, selectors, body] = css.match(/\n(\.dialog-overlay,[^{]*)\{([^}]*)\}/);
+  for (const overlay of ['settings-overlay', 'controller-overlay', 'controller-roster-overlay', 'controller-editor-overlay', 'binding-overlay']) {
+    assert.match(selectors, new RegExp(`\\.${overlay}\\b`), overlay);
+    assert.doesNotMatch(css, new RegExp(`(?<!,)\\n\\.${overlay} \\{[^}]*z-index`), `${overlay} has no fixed place of its own`);
+  }
+  assert.match(body, /z-index: 60;/);
+  assert.match(body, /background: var\(--scrim\);/);
   assert.match(css, /\.controller-cursor \{[^}]*pointer-events: none;/);
   assert.match(css, /@media \(max-width: 760px\)[^{]*\{[^}]*\.controller-editor-body \{ grid-template-columns: 1fr;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);

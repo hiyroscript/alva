@@ -149,9 +149,10 @@ export class ConfirmDialog {
 // The modal plumbing every role="dialog" overlay below shares: the root is
 // an aria-modal dialog labelled by its title, with a navigation scope of its
 // own (so Escape and gamepad Back reach `onBack`, and arrows stay inside),
-// the screen beneath inert while it is open, and focus returned on request
-// to what had it (the control that opened it). A press on the dim around
-// the panel dismisses it.
+// stacked above whatever is open and everything beneath it inert while it is
+// open (the navigator's dialog stack, js/core/menu-navigator.js), and focus
+// returned on request to what had it (the control that opened it). A press
+// on the dim around the panel dismisses it.
 export class ModalDialog {
   constructor(root, app, titleId) {
     this.root = root;
@@ -163,7 +164,6 @@ export class ModalDialog {
       if (e.target === root) this.dismiss();
     });
     this.scope = { el: root, onBack: () => this.dismiss() };
-    this.background = null;
     this.returnFocus = null;
   }
 
@@ -171,20 +171,16 @@ export class ModalDialog {
   // later returns to `opener`, else to whatever had it.
   show(target, opener = null) {
     this.returnFocus = opener ?? document.activeElement;
-    this.background = this.app.screens.current;
-    if (this.background) this.background.el.inert = true;
     this.root.hidden = false;
     this.app.nav.pushScope(this.scope);
     target?.focus({ preventScroll: true });
   }
 
-  // Hides it and frees the screen beneath; with `restoreFocus`, focus goes
+  // Hides it, which frees what is beneath; with `restoreFocus`, focus goes
   // back to what had it before.
   hide(restoreFocus) {
     this.root.hidden = true;
     this.app.nav.popScope(this.scope);
-    if (this.background) this.background.el.inert = false;
-    this.background = null;
     if (restoreFocus) this.returnFocus?.focus?.({ preventScroll: true });
   }
 

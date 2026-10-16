@@ -23,7 +23,8 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
 | [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Combat Assist and Combo Assist on or off, and each fighter's saved controller layout (the only module touching storage). |
-| [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges. |
+| [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges. It also owns the dialog stack (see [Dialog layers](#dialog-layers)). |
+| [`js/core/input-modality.js`](../../js/core/input-modality.js) | The input modality (mouse, touch, keyboard or gamepad) on `<html>`, which keeps hover, focus and selection apart (see [Interaction states](#interaction-states)). |
 
 ## Controls
 
@@ -243,7 +244,60 @@ focuses it as a mouse hover does, and Cross / A activates what it is on;
 nothing outside the scope is ever reached, so nothing passes through a
 dialog. With the D-pad the cursor glides onto the newly focused item. It
 shows only while the controller navigates a menu; the keyboard, the mouse,
-touch and play hide it.
+touch and play hide it. The item under it wears `.is-cursor-target`, the
+same look as a mouse hover, only while the cursor is over it: it goes when
+the cursor moves off, hides, or a dialog opens or closes.
+
+## Interaction states
+
+Four states, never confused (`js/core/input-modality.js`, the rules in
+`css/base.css`):
+
+- **Default:** the resting look. Opening a screen or a dialog focuses its
+  default control for the keys and the controller, but that focus shows
+  nothing while the last input was a pointer.
+- **Hover:** only while a real mouse pointer is over a control (CSS
+  `:hover`), or the controller cursor (`.is-cursor-target`); it goes the
+  moment the pointer leaves. Every hover rule starts with
+  `:where(html:not(.is-touch-input))`, so a finger never leaves a sticky
+  hover, and disabled buttons take none.
+- **Focus:** the focus ring shows only for keyboard and controller
+  navigation. Every ring rule starts with
+  `:where(html:not(.is-pointer-input))`: focus moved by script, by a press
+  or by the mouse (the navigator moves focus on hover, invisibly, so the
+  keys pick up where the pointer was) shows nothing.
+- **Selected:** a saved or chosen value (`.is-current`, `.is-selected`,
+  `.is-active`, `aria-checked`), whatever the input.
+
+The modality is `html[data-input]`: `mouse` (a mouse or pen moved or
+pressed: `is-pointer-input`), `touch` (a finger pressed:
+`is-pointer-input is-touch-input`), `keyboard` (any key but a modifier
+alone) or `gamepad` (a controller drove a menu): neither class, so the
+ring shows. A page starts in mouse modality (touch where the primary
+pointer cannot hover), so nothing is ringed until a key or a controller is
+used.
+
+## Dialog layers
+
+The navigator's scopes are the open dialogs, oldest first, and it applies
+them as a stack (`MenuNavigator.syncLayers`):
+
+- each top-level dialog overlay (one outside the screen) sits one layer
+  above the dialog opened before it, from z-index 60 (`LAYER_BASE`), set
+  inline while it is open and removed as it closes; none has a fixed place
+  of its own, so any supported nesting order works (Settings › Controller
+  controls › roster › editor › binding, or the editor's confirmations, or
+  the pause menu's Return to home?);
+- everything beneath the top dialog is inert (pointer, keyboard and
+  assistive technology), the screen included once the top dialog is not
+  part of it; a dialog inside the screen (the pause, result and Practice
+  dialogs) leaves the screen live and stacks by its own stylesheet;
+- commands (arrows, Enter / Cross, Escape / Circle, Start) reach the top
+  dialog alone, and a dialog hidden without closing its scope is dropped;
+- when a dialog closes, the one beneath is live again and, unless the
+  closing code put focus somewhere live, gets back the control it had
+  (else its default); when the last one closes on a navigable screen,
+  focus goes back to what opened it.
 
 **Play.** Each sample is resolved for the fighter being played, as it is
 at that step (on the ground or in the air, its facing), through that
@@ -406,6 +460,10 @@ saved.
   the controller in play on real Fighters: universal controls, every #0001
   and #0002 default, combinations, directions at their boundaries, ground /
   air context, custom bindings, menus, a lost controller, a fighter change.
+- [`tests/interface/ui-consistency.test.mjs`](../../tests/interface/ui-consistency.test.mjs):
+  the interaction states and the input modality, the dialog stack (order,
+  inert layers, Back, focus coming back, stale scopes), and the shared
+  look: sentence case, one glass and dim, the menu corners.
 - [`tests/interface/controller-ui.test.mjs`](../../tests/interface/controller-ui.test.mjs):
   the Home indicator, Controller Connections, the cursor, Settings ›
   Controller controls, the editor (its move art for both fighters, ground

@@ -927,7 +927,7 @@ test('How to Play follows Settings language changes while open and on reopening'
     home.helpButton.click();
     for (const [language, title, first, last] of [
       ['fr', 'Comment jouer', 'Élimination', 'Renvoi'],
-      ['en', 'How to Play', 'Elimination', 'Deflect'],
+      ['en', 'How to play', 'Elimination', 'Deflect'],
     ]) {
       app.settings.set('language', language);
       assert.equal(info.title.textContent, title);
@@ -1100,7 +1100,10 @@ test('the gear opens the Settings dialog over Home: no screen change, a modal wi
     // The panel is translucent glass over a dim, not an opaque screen.
     assert.ok(dialog.panel.classList.contains('glass') && dialog.panel.classList.contains('glass--panel'));
     const css = stylesheet();
-    assert.match(css.match(/\n\.settings-overlay \{([^}]*)\}/)?.[1] ?? '', /background: rgba\(0, 0, 0, 0\.\d+\);/);
+    const [, dialogs, dim] = css.match(/\n(\.dialog-overlay,[^{]*)\{([^}]*)\}/);
+    assert.match(dialogs, /\.settings-overlay\b/, 'the dim every dialog shares');
+    assert.match(dim, /background: var\(--scrim\);/);
+    assert.match(css, /--scrim: rgba\(0, 0, 0, 0\.\d+\);/);
     assert.match(css.match(/\n\.settings-section \{([^}]*)\}/)?.[1] ?? '', /overflow-y: auto;[\s\S]*touch-action: pan-y;/, 'it scrolls on its own');
   } finally {
     done();
@@ -1336,14 +1339,13 @@ test('the selected Shield label keeps its standard translated name and appearanc
   }
 });
 
-test('Settings and the editor preserve translation case, including the shared kicker override', () => {
+test('Settings and the editor show their translations as written: no case transform, the shared kicker included', () => {
   const css = stylesheet();
   const rule = (selector) => css.match(new RegExp(`\\n${selector.replaceAll('.', '\\.')} \\{([^}]*)\\}`))?.[1] ?? '';
-  for (const selector of ['.settings-group-title', '.settings-option-tag', '.touch-editor-size-label', '.touch-editor-scheme']) {
-    assert.match(rule(selector), /text-transform: none;/, selector);
+  for (const selector of ['.settings-group-title', '.settings-option-tag', '.touch-editor-size-label', '.kicker']) {
+    assert.doesNotMatch(rule(selector), /text-transform/, selector);
   }
   assert.doesNotMatch(read('css/settings.css'), /text-transform: (uppercase|capitalize);/);
-  assert.match(rule('.kicker'), /text-transform: uppercase;/, 'shared branding stays unchanged');
 });
 
 test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved at once, in English and French', () => {

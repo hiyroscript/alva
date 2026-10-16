@@ -29,7 +29,8 @@ There are no import cycles (checked over every module).
 | --- | --- | --- |
 | `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's and Watch Mode's), preloading and loading fighters, the language and settings wiring. | `main.js` |
 | `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`). | `app.js`, every screen |
-| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns). | `app.js`, `screens/discover-screen.js` |
+| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns), and the dialog stack (each dialog above the one that opened it, the layers beneath inert, focus restored). | `app.js`, `screens/discover-screen.js`, every dialog |
+| `input-modality.js` | The input modality on `<html>` (mouse, touch, keyboard, gamepad), so hover and the focus ring only show for their own input. | `menu-navigator.js` |
 | `input-manager.js` | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step with press edges, resolved for the fighter being played; the controller's menu commands and cursor stick; binding capture. | `app.js` |
 | `gamepad-devices.js` | Controller identification (PlayStation / Xbox, conservatively), the normalized button names and each family's names for them. | `controller-manager.js`, `data/controller-profiles.js`, `ui/controller-glyphs.js` |
 | `controller-manager.js` | `ControllerManager`: connected controllers, the four-controller limit, the status, Player 1's controller, refresh, and Player 1's buttons and sticks each frame. | `app.js`, `input-manager.js`, `ui/controller-dialog.js`, `screens/home-screen.js`, `ui/controller-editor.js` |

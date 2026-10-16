@@ -290,7 +290,7 @@ test('a saved layout shows as the player set it, a hold included; a change of it
   const stored = { '0001': { 'ground:attack1': { button: 'r1', modifier: null, direction: null, activation: 'hold' } } };
   const { hud, fighter, input, settings } = hudFor(DEF_0001, { device: 'gamepad', stored });
   const jab = tileOf(hud, 'ground', 'attack1');
-  assert.deepEqual(chips(jab), ['R1', 'HOLD']);
+  assert.deepEqual(chips(jab), ['R1', 'Hold']);
   assert.match(jab.el.getAttribute('aria-label'), /R1 \(Hold to activate\)/);
   assert.ok(jab.el.classList.contains('is-long-input'), 'a slightly wider tile, never tiny text');
   stored['0001']['ground:attack1'] = { button: 'south', modifier: 'l1', direction: null, activation: 'press' };
