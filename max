@@ -1,1068 +1,728 @@
-ALVA — Adamaris Stage & Gameplay Update
+ALVA — Complete UI consistency, typography, hover and dialogue overhaul
 
 Objective
 
-Implement a major update to ALVA, introducing a new playable stage called Adamaris, renaming two existing stages, updating the match timer and credits, and creating a dramatic new Void elimination ripple effect.
-
-This is an implementation task, not a proposal. Inspect the existing systems, write the code, integrate everything into the game, update the documentation and tests, and verify that the features work.
+Perform a comprehensive, game-wide UI consistency and bug-fixing update for ALVA.
 
 Repository: https://github.com/hiyroscript/alva
 
-Follow the existing project’s architecture, visual direction, code conventions, collision rules, and gameplay systems. Preserve existing functionality unless explicitly changed below.
+The objective is to establish a consistent, polished interface across every screen, menu, dialogue, and gameplay overlay.
 
-ALVA is a browser-based 2D platform fighter using JavaScript, HTML, CSS, and Canvas 2D with procedural pseudo-3D stage artwork. Do not introduce a new game engine, rendering framework, or unnecessary dependencies.
+This is an implementation task, not merely a review. Inspect the existing architecture, make the necessary code changes, update tests, and verify the results.
 
-⸻
+There are five major requirements:
 
-1. NEW STAGE: ADAMARIS
+1. Correct capitalization and sentence casing throughout the game.
+2. Eliminate unintended button hover, focus, and preselection effects.
+3. Standardize every dialogue using the Controller connections dialogue’s semi-transparent glass appearance.
+4. Give all rectangular menu buttons the same corners as the Home Play button.
+5. Fix dialogue layering so newer dialogues always appear above the dialogues that opened them.
 
-1.1 Overview
-
-Create a new stage named Adamaris.
-
-Adamaris is a beautiful tropical beach featuring a massive volcano in the distant background.
-
-The stage should feel like a real coastal environment rather than a small platform floating over empty space.
-
-Its main distinguishing characteristics are:
-
-* A large, continuous beach as the fighting surface.
-* Sand stretching beyond the playable area’s visible boundaries.
-* A beautiful ocean and coastal scenery.
-* A giant, highly visible volcano centered in the far background.
-* Random volcanic eruptions that create dangerous falling-rock hazards.
-* Clearly indicated, randomized rock impact locations.
-* Dynamic environmental animation.
-
-The environment must look polished and visually distinct from all existing ALVA stages.
-
-1.2 Stage integration
-
-Register Adamaris in js/data/maps.js, with the stable ID adamaris.
-
-Add a procedural stage renderer in:
-
-js/stages/adamaris-theme.js
-
-Register that renderer in:
-
-js/stages/index.js
-
-Adamaris must automatically appear as the fourth playable stage in the existing 24-slot stage roster.
-
-It must support:
-
-* Quick Battle
-* Custom Play
-* Regular Play’s random stage selection
-* Watch Mode
-* Stage thumbnails
-* Animated stage previews
-* Rematches
-* The existing camera and rendering systems
-* English and French localization
-
-Do not replace an existing stage.
-
-1.3 Continuous beach ground — critical requirement
-
-Unlike Desert, City, and Asperitas, Adamaris must NOT have a small, visibly isolated main platform.
-
-The beach is the ground itself.
-
-The sand should extend horizontally beyond the Void boundaries and beyond the visible screen, creating the impression that the fighters are standing on a real, continuous coastline.
-
-There must be:
-
-* No floating island.
-* No rectangular stage foundation.
-* No visible platform underside.
-* No cliff faces at the left or right.
-* No artificial pedestal or floating slab.
-* No visible abrupt ending to the beach.
-
-The ground should remain visually continuous while the camera moves.
-
-Physics implementation
-
-The existing StageCollision system builds a finite solid floor from map.mainStage. Camera framing and overtime Void calculations also depend on that geometry.
-
-Do not simply make mainStage thousands of units wider without checking those dependencies.
-
-Instead, implement a clean, data-driven way for stages to support a continuous ground surface.
-
-For example, introduce an explicit ground type or separate ground collision extent while retaining a normal-sized combat framing region.
-
-Requirements:
-
-1. The beach must have actual ground collision, not just sand painted behind fighters.
-2. Fighters must be able to run, jump, Dash, land, and attack on the sand normally.
-3. The ground must continue beyond both horizontal Void limits.
-4. The camera must preserve the existing readable fighter scale rather than zooming out excessively.
-5. The Void must remain capable of eliminating fighters who cross its kill boundaries.
-6. Overtime must still close the Void correctly.
-7. No invisible side walls should be added.
-8. Existing finite-platform stages must retain their current collision behavior.
-
-Important: Adamaris should not expose an ordinary ledge where a fighter can walk off the sand and fall. Side eliminations must still remain possible through the existing Void blast-zone rules, even though the beach visually continues beyond those boundaries.
-
-Use stage capabilities or geometry metadata rather than hard-coding checks against map.id === 'adamaris' throughout the engine.
-
-The beach should visually extend naturally at all supported resolutions.
+All five requirements must be applied consistently and verified across the entire game.
 
 ⸻
 
-2. ADAMARIS VISUAL DESIGN
+1. Global typography and capitalization
 
-2.1 General appearance
+Main rule
 
-Create a lush, atmospheric tropical beach with the same quality and depth expected from ALVA’s procedural stage system.
+No ordinary interface text should ever be displayed in all uppercase.
 
-The stage should contain:
+Additionally, use proper sentence case for user-facing interface labels, button names, menu titles, headings, status descriptions, and other UI copy.
 
-Beach and foreground
+Use sentence case instead of title case for multiword interface phrases.
 
-* Warm, golden beach sand.
-* Subtle sand patterns, texture, and ripples.
-* A broad, flat, unobstructed fighting surface.
-* Small decorative shells and scattered pebbles.
-* Natural variations in sand color.
-* Occasional coastal vegetation.
-* Beach details that do not interfere with fighter visibility.
+Examples:
 
-Sea
+Incorrect	Correct
+ROSTER	Roster
+STAGES	Stages
+SELECT FIGHTER	Select fighter
+CHANGE STAGE	Change stage
+Change Stage	Change stage
+Change Fighter	Change fighter
+Change CPU	Change CPU
+Restart Battle	Restart battle
+Return to Home	Return to home
+Keep Playing	Keep playing
+Random Stage	Random stage
+Quick Battle	Quick battle
+Watch Mode	Watch mode
+Practice Ground	Practice ground
+Player 1 Wins	Player 1 wins
+CPU Wins	CPU wins
+HOLD	Hold
 
-* A clearly visible blue or turquoise ocean.
-* Gentle waves moving toward the shore.
-* Light foam along the shoreline.
-* Animated water highlights and reflections.
-* A visible transition between dry sand, wet sand, and seawater.
-* A natural horizon line.
+These examples illustrate the required capitalization rules, not an exhaustive list.
 
-Environment
+Explicit exceptions
 
-* A bright tropical sky.
-* Atmospheric clouds.
-* Palm trees or coastal vegetation toward the sides.
-* Distant coastal landforms or small islands where appropriate.
-* Subtle environmental particles or sea spray.
-* Proper background depth and parallax.
+The following text may retain its intended uppercase formatting:
 
-The sea must be unmistakably visible. It should not be represented by a single flat blue rectangle.
+* ALVA — all ALVA branding, logos, and wordmarks.
+* CPU — including CPU 1 and CPU 2.
+* P1 — the player identifier.
+* Round and combat announcements — including dramatic battle banners such as ROUND 1, FIGHT, READY, K.O., TIME OVER, and other text that belongs to the same round-announcement system.
 
-The sand must be unmistakably visible. It should not resemble a painted rooftop or a floating platform.
+Do not extend these exceptions to unrelated interface headings or ordinary status labels.
 
-The visual style should remain consistent with ALVA’s Canvas 2D aesthetic rather than introducing incompatible photorealistic images.
+For example, a dramatic ROUND 1 animation may retain its uppercase presentation, but an ordinary informational label should use Round 1.
 
-2.2 The volcano
+Proper names and technical notation
 
-Place an enormous volcano in the center of the far background.
+Preserve the established spelling and capitalization of actual proper nouns, fighter names, ability names, and stage names when their capitalization is part of their identity.
 
-This volcano is Adamaris’s primary visual landmark and gameplay hazard source.
+Preserve meaningful controller input notation and button glyphs rather than corrupting control instructions.
 
-Requirements:
+Do not mechanically lowercase every letter after the first character. Apply the rules intelligently and grammatically.
 
-* It must be clearly recognizable as a volcano.
-* Its silhouette must be large and imposing.
-* Its crater must be visible.
-* It must remain visually centered in normal gameplay.
-* It must be visible in the stage selection preview.
-* It should sit behind the beach and ocean, not on the playable fighting surface.
-* It must have appropriate atmospheric depth and parallax.
-* The fighter sprites must remain legible against the background.
+Inspect the actual sources of displayed text
 
-Give the volcano a detailed silhouette with uneven rocky slopes, crater edges, and subtle terrain shading.
+Review at least:
 
-When dormant, it can release small amounts of smoke or steam.
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* js/localization/i18n.js
+* js/config.js
+* js/data/
+* js/screens/
+* js/ui/
+* index.html
 
-When erupting, its crater should illuminate with glowing lava and dramatic environmental effects.
+Check both static and dynamically generated UI text.
 
-The volcano must not be a static decoration.
+The English localization contains several title-cased strings, including result.changeStage, practice.changeFighter, pause.restart, and the match-result winner labels. These must be reviewed.
 
-⸻
+Ensure French remains grammatically correct and follows normal French capitalization conventions.
 
-3. VOLCANO STATE SYSTEM
+Do not break interpolation placeholders, translation keys, formatting logic, or dynamically generated descriptions.
 
-3.1 Two primary states
+CSS capitalization
 
-The Adamaris volcano has exactly two primary gameplay states:
+Audit all stylesheets for:
 
-State A — Dormant
+text-transform: uppercase;
+text-transform: capitalize;
 
-The volcano is relatively peaceful.
+Known locations include:
 
-During this state:
+* css/components.css
+* css/setup.css
 
-* No volcanic rocks are generated.
-* The crater is dark or minimally illuminated.
-* Small smoke or steam effects may appear.
-* The ocean and beach continue their normal animations.
-* No new landing indicators appear.
+Particularly inspect .kicker, .panel-title, .panel-meta, .mode-index, .status-badge, .label, and .map-trait-label.
 
-The volcano should still appear alive rather than becoming a completely frozen image.
+Remove forced uppercase transformations from ordinary UI elements.
 
-State B — Erupting
+Do not apply a broad CSS rule that accidentally modifies ALVA branding or battle announcement text.
 
-The volcano becomes active.
-
-During this state:
-
-* The crater glows intensely.
-* Lava and fire are visibly emitted.
-* Large smoke and ash plumes rise.
-* The eruption animation becomes more dramatic.
-* Volcanic rocks are launched from the crater.
-* Rocks travel through the scene and eventually strike random positions on the beach.
-* Red landing indicators appear before impacts.
-* The environment can respond with subtle lighting and camera effects.
-
-The eruption must be clearly visible before, during, and after rocks are launched.
-
-3.2 Random state selection
-
-The volcano must use a randomized state-selection system.
-
-Do not implement a simple automatic Dormant → Erupting → Dormant → Erupting alternation.
-
-Instead, after a state period ends, randomly select the next primary state.
-
-Both outcomes must be possible at every selection.
-
-For example, the following sequences must be possible:
-
-* Dormant → Dormant → Erupting
-* Erupting → Dormant → Erupting
-* Erupting → Erupting → Dormant
-* Dormant → Erupting → Erupting
-
-Choose sensible, configurable state durations and probabilities so eruptions are noticeable but do not dominate the entire match.
-
-Use the project’s existing seeded-randomness conventions so the hazard simulation is reproducible.
-
-3.3 Visible eruption phases
-
-Although the volcano has two primary gameplay states, the erupting state should have recognizable animation phases.
-
-Implement visual progression such as:
-
-1. Buildup: crater light intensifies, smoke thickens, and the volcano appears unstable.
-2. Initial eruption: lava and smoke burst from the crater.
-3. Rock launch: glowing volcanic rocks visibly shoot out of the volcano.
-4. Sustained activity: lava, smoke, ash, and additional rock launches may continue.
-5. Cooldown: the volcanic plume diminishes and the crater’s glow settles.
-
-These are animation phases within the erupting state, not additional randomly chosen primary states.
-
-The eruption animation must not abruptly jump from a static mountain to rocks appearing in the sky.
-
-The player should visually understand that the volcano is responsible for the falling rocks.
-
-The volcano must support combinations of visible activity, including:
-
-* Dormant with light smoke.
-* Erupting without a rock currently in flight.
-* Erupting while launching rocks.
-* Multiple rocks traveling through the scene.
-* Glowing crater and smoke remaining visible after a volley.
-* Rocks still completing their trajectories as the volcano transitions toward dormancy.
+Expected result: capitalization is correct in the underlying content and in the rendered interface. The game must not depend on a CSS workaround that only visually hides incorrect text values.
 
 ⸻
 
-4. VOLCANIC ROCK HAZARDS
+2. Fix unintended hover effects and preselected buttons
 
-4.1 General mechanics
+Problem
 
-The volcanic rocks are stage hazards, not fighter-owned attacks.
+Buttons throughout ALVA can appear hovered, focused, or visually selected even when the player has not intentionally interacted with them.
 
-They originate from the volcano and can damage and launch fighters.
+This must be corrected globally.
 
-There must be two rock sizes.
+Required behavior
 
-Rock type	Damage	Base Launch
-Small volcanic rock	1	1
-Large volcanic rock	1	2
+A button’s mouse-hover appearance must activate only when the mouse pointer is physically over that button.
 
-Both deal exactly 1 damage.
+The hover appearance must disappear immediately when the pointer leaves.
 
-The larger rock must NOT deal more damage simply because it is larger.
+A button must never look hovered simply because:
 
-Its advantage is its stronger Base Launch.
+* A screen was opened.
+* A dialogue appeared.
+* The button is the default navigation target.
+* A previous button retained focus.
+* The user clicked the button earlier.
+* A keyboard or gamepad navigation function assigned DOM focus.
+* The mouse previously occupied that position on another screen.
+* A dialogue closed and restored focus to its opener.
 
-Use ALVA’s existing Launch Point system.
+Inspect menu navigation
 
-Damage must increase the target’s Launch Point first, then the launch strength must be calculated using the existing formula:
+Pay particular attention to:
 
-Launch Strength = Base Launch × Updated Launch Point
+* js/core/menu-navigator.js
+* js/core/screen-manager.js
+* js/ui/controller-cursor.js
+* js/screens/home-screen.js
+* js/screens/map-select-screen.js
+* js/screens/mode-select-screen.js
 
-Therefore:
+The existing navigation system uses focusFirst(), focusDefault(), and programmatic .focus() calls.
 
-* Small rock: Base Launch 1.
-* Large rock: Base Launch 2.
+The navigator also focuses elements during mouse pointer interactions.
 
-Use a consistent upward launch direction for ground impacts, allowing the existing launch reaction and steering systems to apply normally.
+These behaviors currently interact with CSS selectors such as:
 
-Do not invent an unrelated knockback formula.
+.btn:focus
+.home-action:focus
+.mode-card:focus
+.settings-choice:focus
 
-4.2 Rocks cannot be deflected
+Audit every similar selector.
 
-Neither rock type can be deflected.
+Separate four different visual states
 
-This requirement is absolute.
+Implement a consistent distinction between:
 
-A fighter’s Deflect ability must never:
+Default state: The normal resting appearance, with no accidental hover styling.
 
-* Reverse the rock’s trajectory.
-* Redirect it toward the volcano.
-* Transfer ownership of the rock.
-* Turn the rock into a fighter projectile.
-* Erase the hazard merely because a Deflect hitbox overlaps it.
+Mouse-hover state: A temporary appearance shown only while the actual pointer is over the button.
 
-Keep stage hazards separate from the normal reflectable projectile collection, or explicitly implement non-deflectable hazard semantics.
+Keyboard/gamepad focus state: A separate, accessible focus indicator that shows which control keyboard or gamepad navigation will activate. It must not be mistaken for a mouse-hover fill.
 
-Do not implement the rocks as ordinary fighter projectiles and rely on special-case checks scattered across combat code.
+Selected or active state: A persistent state only when the control genuinely represents a selected fighter, stage, language, setting, active tab, or similar value.
 
-The existing universal Shield behavior should remain consistent: a raised Shield can block a damaging hit according to ALVA’s normal defense rules, but Deflect must never return a volcanic rock.
+Do not confuse selected state with hovered state.
 
-The hazards must have no fighter owner and must not incorrectly award combat credit.
+An option may remain visibly selected because it is the user’s saved choice, but it should not simultaneously display a misleading hover effect.
 
-4.3 Rock sizes and appearance
+Input modality
 
-Small rocks
+Implement reliable mouse, keyboard, gamepad, and touch input-modality handling.
 
-* Smaller impact warning circle.
-* Faster-looking movement.
-* Smaller impact effects.
-* Dark volcanic stone with visible orange cracks.
-* A short glowing trail.
-* Base Launch 1.
+Programmatic focus alone must not trigger mouse-hover visuals.
 
-Large rocks
+Default focus may remain internally available for keyboard and controller navigation, but it should not cause unexplained visual highlighting on screen entry.
 
-* Noticeably bigger visual size.
-* Larger impact warning circle.
-* More substantial smoke and debris.
-* Brighter molten cracks or glowing edges.
-* A stronger impact effect.
-* Base Launch 2.
+Keyboard and gamepad users must still have an accessible, clearly visible navigation indicator when using those input methods.
 
-Both should look like volcanic material rather than normal brown stones.
+The controller’s circular cursor should produce a hover-equivalent state only when it is actually positioned over the relevant interactive control.
 
-Rock visuals should clearly communicate their different sizes.
+Review .is-cursor-target and remove any stale cursor-hover styling when the cursor moves away, hides, changes scope, or a dialogue closes.
 
-4.4 Projectile trajectories
+Edge cases
 
-Rocks must visibly originate from the volcano.
+Verify:
 
-They should follow convincing curved trajectories that carry them from the distant crater toward the beach.
+1. Opening Home does not create unwanted hover effects.
+2. Opening Settings does not make the first tab appear mouse-hovered.
+3. Opening a confirmation dialogue does not create unintended button highlighting.
+4. Closing a dialogue does not leave its opener visually hovered.
+5. Switching screens clears stale hover styling.
+6. Moving the mouse away restores the default appearance.
+7. Touch input does not leave sticky hover states.
+8. Keyboard/gamepad navigation remains functional and accessible.
+9. Disabled buttons never respond with hover styling.
+10. Actual selected settings, fighters, and stages remain correctly distinguishable.
 
-The animation may use perspective scaling so rocks grow as they approach the gameplay plane.
-
-Requirements:
-
-* No instant teleportation from volcano to ground.
-* No rocks spawning directly over an impact point without a visible launch.
-* No rock appearing disconnected from the eruption.
-* Every rock has an individual trajectory and destination.
-* Rocks should animate smoothly at different frame rates.
-* Their gameplay impact must correspond to their visible landing time and location.
-
-The rocks should look as though they are being launched out of the volcano and falling toward the fighters.
-
-4.5 Randomized landing positions — critical requirement
-
-Rocks must land at randomized locations across the playable beach.
-
-Do not implement one fixed impact point.
-
-Do not use a hard-coded list of two or three destinations that visibly repeats.
-
-Choose impact coordinates across the usable fighting area using the battle’s seeded RNG.
-
-Landing locations must cover meaningful portions of the arena, including:
-
-* Left side.
-* Center-left.
-* Center.
-* Center-right.
-* Right side.
-
-Across repeated eruptions, all these regions should be reachable.
-
-Prevent obviously broken target selection, such as unreachable locations, positions outside the relevant play area, or every rock landing on exactly the same spot.
-
-It is acceptable for a rock to sometimes land near a fighter, but do not guarantee hits through unfair targeting.
-
-Rocks should not simply lock onto the player’s position at the moment they land.
-
-When multiple rocks are falling, their targets should be generated independently, with sensible spacing where needed to preserve readability.
-
-Allow natural randomness while avoiding repetitive, predictable landing patterns.
-
-4.6 Red landing indicators
-
-Before each volcanic rock lands, display a red circular warning indicator on the beach at the exact destination.
-
-This is mandatory.
-
-Each rock must have its own indicator.
-
-The indicators should:
-
-* Appear before impact.
-* Be bright red and immediately recognizable.
-* Be positioned correctly on the sand.
-* Follow the stage’s perspective.
-* Remain anchored to their world coordinates while the camera moves.
-* Match the corresponding rock’s impact radius.
-* Be visible against the sand.
-* Disappear when their associated impact resolves.
-* Never misrepresent where the rock will land.
-
-A good visual style would include:
-
-* A glowing red outer circle.
-* A translucent red interior.
-* A subtle pulsing or contracting animation.
-* Increasing intensity as impact approaches.
-
-The warning circle should clearly communicate danger without obscuring the fighter sprites.
-
-Give players sufficient reaction time to recognize the circle and move out of it.
-
-Recommended initial tuning: approximately 0.9–1.4 seconds of visible warning before impact, with final values adjustable after gameplay testing.
-
-The timing must be consistent with the rock’s actual trajectory.
-
-Under reduced-motion settings, keep the warning static but clearly visible. Do not eliminate the warning.
-
-4.7 Collision and damage
-
-On impact, check the hazard’s actual world-space area against fighter collision geometry.
-
-If a fighter is struck:
-
-1. Apply 1 damage.
-2. Add that damage to their Launch Point.
-3. Apply the appropriate Base Launch.
-4. Trigger the existing fighter hit reaction.
-5. Produce the correct hit effects.
-
-A fighter must not be damaged merely because a warning circle exists.
-
-A rock must not hit a fighter repeatedly on consecutive frames from one impact.
-
-One rock should resolve one hit per affected fighter.
-
-If both fighters occupy the same impact area, both may be struck.
-
-Do not unintentionally grant either fighter immunity to stage hazards.
-
-Avoid an infinite vertical hitbox that damages characters nowhere near the actual rock.
-
-If midair collision with a traveling rock is supported, it must match the rock’s visible world-space geometry and use the same one-hit resolution.
-
-Do not disrupt existing Shield, Launch Point recovery, stun, respawn, or combat-event rules.
-
-4.8 Impact effects
-
-Each landing should produce a convincing impact.
-
-Include effects such as:
-
-* A brief burst of sand.
-* Small volcanic fragments.
-* A localized dust cloud.
-* A bright flash or molten highlight.
-* A shock ring.
-* Brief impact particles.
-* A stronger visual response for large rocks.
-
-Small and large impacts should feel different.
-
-The impact effects must be synchronized with collision and damage.
-
-Do not make permanent holes or obstacles unless explicitly required by a future update.
-
-All impact effects should automatically expire and clean up.
+Do not solve this by globally deleting focus indicators, disabling keyboard navigation, or removing the existing controller navigation system.
 
 ⸻
 
-5. HAZARD SYSTEM ARCHITECTURE
+3. Standardize the glass appearance of every dialogue
 
-ALVA already contains dynamic platform hazards for Asperitas, implemented through:
+Reference design
 
-* js/data/platform-hazards.js
-* js/game/platform-hazards.js
-
-Adamaris’s volcano is a different type of hazard: it produces timed damaging projectiles rather than moving collision platforms.
-
-Do not force volcanic projectiles into the drifting-platform controller if doing so creates incorrect abstractions.
-
-Implement a dedicated, reusable stage-hazard controller where appropriate, potentially under a new module such as:
-
-js/game/stage-hazards.js
-
-A separate configuration module may hold Adamaris-specific tuning.
-
-The implementation should:
-
-* Use fixed-timestep simulation.
-* Use deterministic seeded randomness.
-* Keep stage definitions immutable.
-* Maintain per-battle runtime state.
-* Separate collision and game logic from visual rendering.
-* Support initialization and resetting.
-* Support paused gameplay.
-* Support rematches.
-* Avoid leaking projectiles or timers after a match.
-* Use the same underlying behavior in Quick Battle and Watch Mode.
-
-Ensure Arena.update() advances the hazard simulation only when gameplay is supposed to advance.
-
-Integrate with Arena.render() so the volcano’s live state, volcanic rocks, landing warnings, and impact effects are all visible.
-
-The theme should receive the hazard state it needs to render correctly.
-
-Avoid randomizing gameplay positions or eruption decisions inside drawing methods.
-
-Stage previews
-
-Update js/ui/stage-preview.js.
-
-Currently, its animated hazard simulation is built around dynamic platforms.
-
-Extend it so Adamaris can display its own animated volcano and hazard behavior.
-
-The large animated preview should visibly demonstrate the eruption cycle and volcanic rocks.
-
-The small static thumbnail should present a beautiful, readable view of the beach and volcano without requiring active simulation.
-
-Neither preview should affect live battle state.
-
-CPU behavior
-
-Review the CPU’s existing stage awareness, including:
-
-js/game/ai/cpu-intelligence/stage-model.js
-
-CPUs should be able to respond reasonably to visible volcanic landing indicators.
-
-They must not have advance knowledge of random impact coordinates before the warning appears.
-
-Preserve the existing difficulty distinctions and avoid introducing universal perfect dodging.
-
-CPU-controlled fighters must still be affected by rock hazards exactly as player-controlled fighters are.
-
-⸻
-
-6. STAGE RENAMES
-
-Rename two existing stages.
-
-Current name	New name
-City	Sol-Noir
-Desert	Yerma
-
-These are names of the existing stages, not new stages.
-
-Preserve their visuals, layouts, collision, and existing gameplay.
-
-Update their names everywhere user-facing, including:
-
-* Stage selection.
-* Stage details.
-* Stage previews.
-* Relevant UI text.
-* English localization.
-* French localization.
-* Documentation.
-* Any other player-visible references.
-
-Keep the internal IDs city and desert unless changing them is technically necessary. Preserving them is preferable because other game systems and tests already reference those identifiers.
-
-Likewise, the existing city-theme.js and desert-theme.js files do not require renaming simply to change what players see.
-
-Preserve current stage selections and existing references.
-
-Both languages should display the proper names Sol-Noir and Yerma.
-
-⸻
-
-7. CREDITS UPDATE
-
-Update the in-game credits.
-
-Currently the original-work credit identifies individual stage names.
-
-Stop listing stage names individually.
-
-Replace that wording with “all stages”.
-
-The English credit should communicate:
-
-“Game design, code, interface, ALVA wordmark, and all stages by hiyroscript.”
-
-Adapt it to the existing localization placeholders.
-
-Update the French translation with equivalent wording.
+Use the existing Controller connections dialogue as the canonical visual reference.
 
 Relevant files:
 
-* js/ui/credits.js
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* README.md
+* js/ui/controller-dialog.js
+* css/controller.css
+* css/battle.css
+* css/base.css
 
-Do not remove the creator’s name or the existing third-party sprite credits.
+The reference panel uses the existing shared classes:
 
-The intention is that future stages will already be covered by the general credit without constantly editing the list of stage names.
+class="dialog-panel controller-panel glass glass--panel"
+
+The shared glass system already provides translucent charcoal surfaces, subtle highlights, borders, shadows, and backdrop blur where available.
+
+The corresponding glass variables are defined in css/base.css, and .glass / .glass--panel are implemented in css/battle.css.
+
+Reuse and standardize this system rather than creating another independent glass design.
+
+Required appearance
+
+Every dialogue should have:
+
+* A semi-transparent dark glass background.
+* Consistent backdrop blur.
+* A subtle glass sheen.
+* A restrained translucent border.
+* Consistent glass shadows.
+* Legible white and secondary text.
+* A dimmed background that remains perceptible behind the dialogue.
+* A more opaque fallback when backdrop blur is unsupported.
+
+The exact reference appearance should be shared across dialogues. Different dialogues may retain their own widths, heights, padding, internal layouts, and scrolling behavior.
+
+Dialogues to audit
+
+Inspect and standardize every dialogue, including:
+
+* Controller connections.
+* Settings.
+* Controller fighter roster.
+* Controller control editor.
+* Controller binding editor.
+* Restore-controls confirmation.
+* First-launch language selection.
+* General confirmation dialogues.
+* Choice dialogues.
+* Information and Help dialogues.
+* Download/install dialogue.
+* Battle pause menu.
+* Battle results.
+* Practice menu.
+* Change fighter dialogue.
+* Change CPU dialogue.
+* Any other dynamically created modal or dialogue-like panel.
+
+Relevant implementation locations include:
+
+* js/ui/overlays.js
+* js/ui/settings-dialog.js
+* js/ui/language-dialog.js
+* js/ui/install-dialog.js
+* js/ui/controller-editor.js
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+
+Important existing inconsistencies
+
+Review .controller-roster-dialog.glass in css/controller.css, which overrides the shared glass surface with a denser background.
+
+Also inspect .language-overlay in css/settings.css, which currently uses a fully black backdrop.
+
+Determine how these affect perceived consistency and update the dialogue presentation while preserving first-launch usability and readable controls.
+
+Do not indiscriminately make full-screen application surfaces transparent. The requirement concerns dialogues and modal panels, not the underlying gameplay canvas or mandatory full-screen editing workspaces.
+
+Implementation expectations
+
+Create or refine a shared dialogue styling contract.
+
+Avoid duplicating almost identical glass effects across many files.
+
+Ensure individual dialogue-specific CSS does not unexpectedly override the canonical glass appearance.
+
+Never apply opacity to an entire dialogue container in a way that makes its text and buttons transparent.
+
+Use translucent background colors and backdrop filtering on the panel instead.
+
+Test both supported and unsupported backdrop-filter environments.
 
 ⸻
 
-8. MATCH TIMER: FIVE MINUTES
+4. Standardize all menu button corners
 
-Change the standard battle timer from seven minutes to five minutes.
+Reference button
 
-The relevant configuration is:
+Use the Home screen’s Play button as the exact corner reference.
 
-js/config.js
+Its styling is in:
 
-Current value:
+css/home.css
 
-CONFIG.battle.matchSeconds = 420
+The .home-action class currently uses:
 
-New value:
+border-radius: 3px;
 
-CONFIG.battle.matchSeconds = 300
+This is the target radius for rectangular menu buttons.
 
-The timer must display 5:00 when a normal match begins.
+Required behavior
 
-This applies to:
+All rectangular menu buttons throughout ALVA must use the same 3px corner radius.
 
-* Quick Battle.
-* Regular Play.
-* Custom Play.
-* Watch Mode.
-* Rematches.
+This includes:
 
-The countdown must continue using the existing simulation timing, pause behavior, and phase handling.
+* Home navigation buttons.
+* Mode-selection buttons.
+* Difficulty-selection buttons.
+* Fighter-selection controls.
+* Stage-selection controls.
+* Back and Confirm buttons.
+* Random stage buttons.
+* Pause-menu actions.
+* Result-screen actions.
+* Settings tabs and action buttons.
+* Language-selection buttons.
+* Dialogue actions.
+* Controller editor menu buttons.
+* Practice-menu buttons.
+* Other comparable rectangular menu controls.
 
-Do not break overtime.
+Existing CSS
 
-The current one-minute overtime should remain available when scores are tied at the end of the five-minute regulation period.
+Audit at least:
 
-Update relevant help text, descriptions, comments, documentation, and automated tests to reflect the new duration.
+* css/components.css
+* css/home.css
+* css/setup.css
+* css/settings.css
+* css/controller.css
+* css/discover.css
+* css/overlays.css
+* css/battle-overlays.css
+* css/practice.css
 
-Ensure no user-visible description continues telling players that regulation lasts seven minutes.
+css/components.css currently assigns var(--radius-md) to .btn and .btn-back, while the Play button uses 3px.
+
+The end of css/overlays.css already contains a shared override that sets several surfaces and controls to 3px.
+
+Extend or refactor that existing approach into a reliable, maintainable button consistency rule.
+
+Use a shared variable or class where appropriate.
+
+Exceptions
+
+Do not turn genuinely circular or pill-shaped elements into rectangles.
+
+Preserve deliberate geometry for controller cursor indicators, joystick elements, circular HUD markers, touch-control mechanics, and similar non-menu components.
+
+The requirement is consistent corners for rectangular menu controls, not the removal of every circular shape from the game.
+
+Expected result: a player moving between different screens should never encounter arbitrarily rounded rectangular menu buttons.
 
 ⸻
 
-9. NEW VOID ELIMINATION RIPPLE EFFECT
+5. Fix dialogue layering and nested dialogues
 
-9.1 Objective
+Critical problem
 
-Whenever a fighter is eliminated by the Void, the Void itself must visibly react at the precise point where the fighter crosses its elimination boundary.
+When a dialogue opens another dialogue, the newer dialogue may appear behind the previous one.
 
-Think of dropping an object into water and watching the water react with expanding, energetic ripples.
+This is incorrect.
 
-However, the effect should use ALVA’s existing black-and-red Void aesthetic rather than literally converting the Void into blue water.
+The most recently opened dialogue must always appear above the dialogue that opened it.
 
-This effect applies to all stages, not only Adamaris.
+Example
 
-9.2 Existing implementation
+Correct sequence:
 
-Inspect:
+1. Player opens Settings.
+2. Player opens controller customization.
+3. Player opens the control editor.
+4. Player opens a confirmation dialogue.
 
-* js/game/arena.js
-* js/game/rendering/hit-fx.js
-* js/stages/stage-theme.js
+The confirmation dialogue must appear above the editor, which must remain above Settings.
 
-Currently, Arena.checkVoid() detects eliminations and triggers HitEffects.addElimination().
+When confirmation closes, the editor must become the active topmost dialogue again.
 
-The existing elimination effect includes a fighter-colored burst, flash, particles, and an expanding ring.
+Existing architecture
 
-Keep that existing elimination burst.
+Review:
 
-The new Void ripple is an additional effect showing that the Void itself has been disturbed.
+* js/ui/overlays.js
+* js/ui/settings-dialog.js
+* js/ui/controller-editor.js
+* js/core/menu-navigator.js
+* js/core/app.js
+* css/overlays.css
+* css/controller.css
+* css/settings.css
+* index.html
 
-It must not simply replace the existing fighter-colored effect with another generic ring.
+The game currently uses separate overlay roots with fixed z-index values.
 
-9.3 Ripple appearance
+Examples include:
 
-The new ripple must be vibrant, energetic, and visually substantial.
+* .dialog-overlay
+* .controller-overlay
+* .settings-overlay
+* .controller-roster-overlay
+* .controller-editor-overlay
+* .binding-overlay
+* .language-overlay
 
-On elimination:
+There is also a special workaround:
 
-1. The Void boundary visibly reacts around the contact point.
-2. A bright, localized pulse appears.
-3. Several concentric ripples expand outward.
-4. The nearby black surface appears disturbed.
-5. The red boundary rim becomes more intense locally.
-6. Wave energy travels outward from the impact.
-7. The disturbance loses strength gradually and fades.
+.dialog-overlay.is-raised {
+  z-index: 80;
+}
 
-The ripples should feel as though they originate from the Void’s surface rather than floating as unrelated particles in front of the screen.
+This is used by the controller editor when opening a confirmation dialogue.
 
-Use layered rings, bright highlights, and animated wave deformation.
+That approach is too specific and does not establish reliable global layering.
 
-The effect should have enough contrast and scale to be unmistakable during fast gameplay.
+Required implementation
 
-It must not appear as a weak, nearly invisible outline.
+Introduce a consistent dialogue-stack system or an equivalent centralized layering mechanism.
 
-9.4 Actual Void-surface reaction
+It must:
 
-This is the most important visual requirement.
+1. Track currently open dialogues.
+2. Place each newly opened dialogue above every previously opened dialogue.
+3. Give the newest dialogue the active interaction scope.
+4. Prevent pointer and keyboard interaction with obscured dialogues.
+5. Properly handle inert on lower layers.
+6. Keep focus inside the active dialogue.
+7. Restore focus to the correct previous dialogue when the topmost dialogue closes.
+8. Restore the original opener’s focus when the full dialogue sequence closes.
+9. Support Escape and gamepad Back correctly.
+10. Remove temporary stacking styles when dialogues close.
+11. Avoid leaving hidden overlays with active navigation scopes.
+12. Avoid stale focus, cursor targets, and background interactivity.
 
-The Void must genuinely appear to react to the elimination.
+Focus and accessibility
 
-Do not implement only a circular particle animation over a completely unchanged black Void.
+Only the topmost dialogue should behave as the active modal.
 
-Add a localized, temporary disturbance to the Void’s rendered boundary or surface.
+Keep appropriate role="dialog", aria-modal, labels, and focus management.
 
-For example:
+The existing MenuNavigator already contains a stack of navigation scopes. Integrate dialogue-layer management with this behavior rather than creating a conflicting second navigation system.
 
-* Create an impact centered on the boundary crossing.
-* Calculate an expanding disturbance around that position.
-* Temporarily increase local wave amplitude.
-* Allow that disturbance to propagate along the boundary.
-* Make the nearby red rim ripple along with the black edge.
-* Gradually reduce the disturbance until the Void returns to normal.
+Do not allow a visually obscured dialogue to receive controller commands.
 
-A damped wave impulse or similar procedural animation would be appropriate.
+Nested confirmations
 
-Keep the original organic wave behavior as the baseline.
+Test scenarios such as:
 
-The new impulse should be layered over it.
+* Battle pause → Return to home → confirmation.
+* Controller editor → Restore recommended controls → confirmation.
+* Settings → Controller controls → Fighter roster → Editor → Binding editor.
+* Any other dialogue-to-dialogue transitions found during the code audit.
 
-The Void’s shape should visibly change, but the gameplay kill boundary must never move because of the effect.
+Ensure the parent dialogue remains in the correct state while the child dialogue is open.
 
-The disturbance is visual only.
+Closing a child must not accidentally close its parent.
 
-9.5 Exact elimination position
+Cancel, Confirm, Back, and outside-click dismissal should each behave according to the existing functionality.
 
-Calculate the visual impact position from the fighter’s actual crossing of the Void boundary.
+Important
 
-Support eliminations through:
+Do not merely raise the global confirmation dialogue to an arbitrary huge z-index.
 
-* The left Void boundary.
-* The right Void boundary.
-* The upper Void boundary.
-* The lower Void boundary.
-* Corners or diagonal crossings.
+That would move the problem elsewhere.
 
-Use the crossing side and world-space position to anchor the effect to the Void.
-
-Do not place every ripple in the middle of the screen.
-
-Do not use a fixed stage position.
-
-Do not spawn the ripple at the fighter’s original spawn point.
-
-Use the fighter’s previous and current positions where necessary to identify the actual boundary crossing, rather than depending on an imprecise screen-space approximation.
-
-The effect must remain correctly positioned while the camera moves.
-
-It must also work when the Void is closing during overtime.
-
-9.6 Multiple eliminations
-
-Support multiple simultaneous or closely spaced eliminations.
-
-Each elimination creates its own ripple.
-
-Ripple effects may overlap naturally.
-
-Do not have a second elimination unexpectedly erase the first ripple.
-
-Effects should expire cleanly, without growing arrays indefinitely.
-
-The effect must work for either fighter and must not depend on character-specific code.
-
-9.7 Visual synchronization
-
-Coordinate the new ripple with the existing elimination burst.
-
-The expected sequence:
-
-* Fighter crosses the Void boundary.
-* Fighter is marked eliminated through the existing rules.
-* The Void reacts immediately at that location.
-* The fighter-colored burst appears over the reaction.
-* Ripples spread and fade.
-* Normal gameplay continues or the match transitions to its result.
-
-The ripple must not delay elimination, change scoring, prevent respawning, or interfere with other combat effects.
-
-9.8 Reduced motion
-
-Respect ALVA’s existing reduced-motion behavior.
-
-In reduced-motion mode:
-
-* Keep a clearly visible localized elimination pulse.
-* Reduce or eliminate aggressive traveling distortions.
-* Disable unnecessary screen shake.
-* Preserve the recognizable reaction without intense animation.
-
-Normal mode should show the full vibrant effect.
+The solution must handle arbitrary supported nesting order reliably.
 
 ⸻
 
-10. PERFORMANCE AND RENDERING
+6. Review every part of the game
 
-All new effects must work with ALVA’s existing Canvas 2D renderer.
+The changes must apply throughout the entire player experience.
 
-Do not introduce WebGL or external animation libraries.
+Perform an audit of these flows:
 
-Follow the established stage architecture:
+Startup and Home
 
-* Cached procedural geometry when appropriate.
-* Layered parallax backgrounds.
-* A common perspective system.
-* World-space visual effects anchored to gameplay coordinates.
-* Fixed-timestep gameplay simulation.
-* Interpolated rendering.
+* Splash and first-launch language selection.
+* Home navigation.
+* Help.
+* Download/install.
+* Controller connections.
+* Settings.
 
-Make Adamaris work on both desktop and mobile landscape layouts.
+Quick battle
 
-Avoid unnecessary allocations or expensive full-canvas operations every frame.
+* Mode selection.
+* Custom play and Regular play choices.
+* Difficulty selection.
+* Fighter roster.
+* CPU fighter selection.
+* Stage selection.
+* Battle HUD.
+* Round announcements.
+* Pause menu.
+* Results.
+* Rematch and Change stage.
 
-Keep the volcano visible without covering fighters or their HUD elements.
+Watch mode
 
-Keep red landing indicators readable even when ash particles or other environmental effects overlap.
+* Difficulty.
+* CPU 1 and CPU 2 selection.
+* Stage selection.
+* Spectator HUD.
+* Pause and results.
 
-Test standard, narrow, and high-DPI displays.
+Practice ground
 
-Ensure that the added visual effects do not introduce obvious frame-rate instability.
+* Practice HUD.
+* Practice menu.
+* Change fighter.
+* Change CPU.
+* Enable/disable CPU.
+* Fighter roster dialogues.
+* Return and confirmation actions.
 
-⸻
+Settings and customization
 
-11. DOCUMENTATION AND LOCALIZATION
+* Language.
+* Controls.
+* Combat settings.
+* Touch layout customization.
+* Controller customization.
+* Controller roster.
+* Controller editor.
+* Binding editor.
+* Reset/restore confirmation.
 
-Update the project’s current documentation to reflect the new behavior.
+Discover
 
-Relevant files include:
+* All categories.
+* Fighter information.
+* Movement.
+* Launch.
+* Information dialogues.
 
-* README.md
-* ALVA_SPEC.md
-* docs/gameplay/stages.md
-* docs/gameplay/battle.md
-* docs/gameplay/watch-mode.md
-* docs/systems/rendering.md
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
+Review any additional menus and UI components discovered in the repository.
 
-Document:
-
-* Adamaris and its continuous ground.
-* The volcano’s two randomized states.
-* The rock hazards.
-* Small and large rock damage and Base Launch.
-* The non-deflectable hazard rule.
-* Random landing locations.
-* Red warning circles.
-* The new Void ripple.
-* The stage name changes.
-* The five-minute match timer.
-* The revised credits.
-
-Add localized stage names, taglines, and traits.
-
-Suggested Adamaris stage information:
-
-Name: Adamaris
-
-Tagline: “A paradise beneath a restless volcano”
-
-Description: “Golden sands stretch along a tropical sea beneath a towering volcano. Watch the crater carefully: sudden eruptions send volcanic rocks crashing onto the beach.”
-
-Traits:
-
-Trait	Value
-Terrain	Tropical beach
-Platforms	Continuous ground
-Hazards	Volcanic rockfall
-Obstacles	None
-Light	Tropical daylight
-
-Provide natural French translations, keeping Adamaris as a proper name.
-
-Do not rewrite historical update records merely because an old feature description was accurate when written.
+Do not stop after fixing the Home screen or the first dialogue.
 
 ⸻
 
-12. TESTING REQUIREMENTS
+7. Testing and regression prevention
 
-Add tests for the new systems and update existing tests affected by the changes.
+ALVA is a framework-free HTML, CSS, and JavaScript game using ES modules and Canvas 2D.
 
-The repository already uses Node’s built-in test runner.
+The repository already has Node.js tests.
 
 Run:
 
 node --test
 
-Also verify the game in a real browser, since Canvas rendering quality cannot be fully validated with mocked drawing contexts.
+Add regression tests
 
-12.1 Adamaris tests
+Add or update tests that cover:
 
-Verify that:
+Capitalization
 
-* Adamaris is registered in the map database.
-* Its theme can be constructed.
-* It appears in the fourth stage roster slot.
-* It is available in Quick Battle and Watch Mode.
-* Random Stage can select it.
-* The normal stage selection UI can select and start it.
-* Its preview renders without errors.
-* Its animated preview updates the volcano.
-* The sand is supported by actual collision.
-* The ground remains continuous beyond the blast-zone edges.
-* Existing stages retain their finite-platform behavior.
-* The camera keeps playable fighters at an appropriate scale.
-* Overtime closes the Void correctly on Adamaris.
-* The new ground configuration does not break CPU movement.
+* Ordinary English interface labels use sentence case.
+* French capitalization remains valid.
+* Uppercase CSS transformations cannot reintroduce the issue.
+* ALVA, CPU, P1, and combat-announcement exceptions are preserved.
+* Dynamic translated labels also use the correct capitalization.
 
-Review assumptions in tests/systems/platform-stage.test.mjs that currently require every stage to have finite ledges. Update these tests to recognize the new intentional ground type without weakening their existing coverage of other stages.
+Hover and focus
 
-12.2 Volcano state tests
+* Opening a screen does not create an unintended hover appearance.
+* Programmatic focus does not imitate mouse hover.
+* Pointer entry enables hover.
+* Pointer exit disables hover.
+* Keyboard and controller navigation remain visible and usable.
+* Touch interaction cannot produce sticky hover states.
+* Persistent selection is separate from hover.
 
-Verify that:
+Glass styling
 
-* The volcano starts in a valid state.
-* Both primary states are reachable.
-* States are selected randomly rather than alternating.
-* Consecutive dormant periods are possible.
-* Consecutive erupting periods are possible.
-* Dormant periods generate no new rocks.
-* Erupting periods generate rocks.
-* State transitions occur on the simulation clock.
-* Replays with the same seed produce the same hazard behavior.
-* Match restarts correctly reset hazard state.
+* Every relevant dialogue uses the shared glass treatment.
+* Dialogue-specific styles do not replace it with an opaque surface.
+* Backdrop-filter fallback behavior remains supported.
+* Text remains readable.
 
-12.3 Volcanic rock tests
+Button geometry
 
-Verify that:
+* All rectangular menu buttons use the shared 3px corner radius.
+* Deliberately circular controls retain their geometry.
 
-* Small rocks deal exactly 1 damage.
-* Large rocks deal exactly 1 damage.
-* Small rocks have Base Launch 1.
-* Large rocks have Base Launch 2.
-* The existing Launch Point formula is respected.
-* Rocks cannot be deflected.
-* Rocks are not assigned fighter ownership.
-* Their collisions work for both fighters.
-* Shields follow the intended universal block rule.
-* One impact does not cause unintended repeated hits.
-* Impact warnings precede impacts.
-* Each warning matches its rock’s landing position.
-* Random landing locations vary over the arena.
-* Rocks and indicators clean up after resolving.
-* Hazard simulation is consistent across different render frame rates.
+Dialogue stacking
 
-12.4 Void ripple tests
+* A newly opened dialogue is always topmost.
+* Only the topmost dialogue is interactive.
+* Parent dialogues become interactive again when children close.
+* Escape, gamepad Back, and focus restoration work correctly.
+* Closing an entire dialogue chain restores the normal screen.
+* No stale z-index, inert, or navigation scope remains.
 
-Verify that:
+Existing test files
 
-* Each Void elimination creates a ripple event.
-* The ripple is positioned at the correct boundary crossing.
-* All four sides are supported.
-* Two simultaneous eliminations produce independent effects.
-* Ripple animations expire.
-* Existing fighter-colored elimination effects still work.
-* Reduced-motion behavior is respected.
-* The ripple never modifies collision or scoring.
-* Overtime’s closing Void remains functional.
+Review and extend relevant tests in:
 
-12.5 Timer and interface tests
-
-Update tests currently expecting 420, 7:00, or seven minutes.
-
-Pay particular attention to:
-
-* tests/integration/overtime.test.mjs
-* tests/integration/watch-mode.test.mjs
-* tests/integration/practice-ground.test.mjs
+* tests/interface/settings.test.mjs
+* tests/interface/controller-ui.test.mjs
 * tests/interface/battle-screen.test.mjs
-* tests/interface/stage-select.test.mjs
 * tests/interface/i18n.test.mjs
+* tests/interface/controls-ui.test.mjs
+* tests/interface/stage-select.test.mjs
+* tests/interface/discover.test.mjs
 
-Verify that the match begins at 5:00, reaches overtime correctly, and retains its original one-minute overtime behavior.
+Add focused tests if the existing files do not cover the required interactions.
 
-Check English and French credits, stage names, descriptions, and stage selection labels.
+Update assertions that intentionally refer to UI strings whose capitalization has changed.
 
-⸻
+Do not delete meaningful tests to make the suite pass.
 
-13. ACCEPTANCE CRITERIA
+Browser verification
 
-Consider the update complete only when all of the following conditions are satisfied.
+Serve the game locally:
 
-Adamaris
+python3 -m http.server 8000
 
-* [ ]	Adamaris is a playable fourth stage.
-* [ ]	It clearly resembles a tropical beach.
-* [ ]	Sand, sea, sky, and a large centered volcano are visible.
-* [ ]	The fighting ground extends beyond the Void and has no visible platform foundation.
-* [ ]	Normal camera framing, combat, and eliminations still work.
-* [ ]	The volcano has independently randomized dormant and erupting states.
-* [ ]	Eruptions are visually animated.
-* [ ]	Rocks visibly launch from the volcano.
-* [ ]	Rocks land at different randomized positions.
-* [ ]	Every impact has a visible red warning circle beforehand.
-* [ ]	Small rocks deal 1 damage with Base Launch 1.
-* [ ]	Large rocks deal 1 damage with Base Launch 2.
-* [ ]	Neither rock type can be deflected.
-* [ ]	Rock collision and launch use the existing gameplay rules.
-* [ ]	The stage works in previews, Quick Battle, and Watch Mode.
+Verify the actual rendered UI in a browser where tooling permits.
 
-Other changes
+Test desktop mouse, keyboard navigation, gamepad behavior where available, and mobile/touch layouts.
 
-* [ ]	City is displayed as Sol-Noir.
-* [ ]	Desert is displayed as Yerma.
-* [ ]	Existing stage gameplay remains unchanged.
-* [ ]	Credits refer to “all stages” rather than individually naming them.
-* [ ]	Regulation matches last five minutes.
-* [ ]	The match HUD starts at 5:00.
-* [ ]	The existing overtime rules still work.
-* [ ]	All Void eliminations create vibrant, localized ripple effects.
-* [ ]	The Void’s animated surface visibly reacts to elimination.
-* [ ]	Existing elimination particles and scoring are preserved.
-* [ ]	English and French localization are complete.
-* [ ]	Relevant tests and documentation are updated.
-* [ ]	No unrelated systems regress.
+Check short landscape screens and common desktop sizes.
+
+Automated source-code assertions alone are insufficient for validating hover effects, visual layering, and glass transparency. Use actual computed styles and interaction checks where possible.
 
 ⸻
 
-14. IMPLEMENTATION STANDARDS
+8. Preserve existing functionality
 
-Read and follow CLAUDE.md, ALVA_SPEC.md, and the relevant architecture documentation before editing.
+This is a UI refinement and interaction-correctness update.
 
-Do not modify protected character rules.
+Do not unnecessarily alter:
 
-Do not modify fighter movesets or character statistics unnecessarily.
+* Combat mechanics.
+* Fighter definitions or abilities.
+* Movement.
+* AI behavior.
+* Stage rendering.
+* Damage, scoring, or match rules.
+* Save data and settings persistence.
+* Controller mappings.
+* Touch-control functionality.
+* Game performance.
 
-Avoid introducing special-case checks for particular fighter IDs.
+Follow the existing modular architecture.
 
-Keep stage-hazard data and behavior separate from fighter move definitions.
+Read CLAUDE.md, relevant documentation, and the established repository conventions.
 
-Make new tuning parameters easy to adjust.
+Do not modify the protected character_rule file.
 
-Use the existing code style and module conventions.
+Prefer small, maintainable shared improvements over repetitive overrides or hacks.
 
-Do not solve visual problems by changing unrelated gameplay physics.
+Any refactoring must preserve existing behavior outside the five requested UI changes.
 
-Do not weaken test assertions merely to make tests pass.
+⸻
 
-Preserve the current controls, HUD, combat flow, audio policy, and platform support.
+9. Acceptance criteria
+
+The task is complete only when all of the following are true:
+
+* [ ]	No ordinary UI text appears fully uppercase.
+* [ ]	All ordinary multiword menu labels follow sentence-case rules.
+* [ ]	ALVA, CPU, P1, and combat announcements retain their intended capitalization.
+* [ ]	English and French localization both work correctly.
+* [ ]	No button appears mouse-hovered without a real cursor hovering over it.
+* [ ]	Screen transitions do not leave buttons accidentally highlighted.
+* [ ]	Keyboard and gamepad navigation remain accessible.
+* [ ]	Every dialogue has a consistent translucent glass appearance matching Controller connections.
+* [ ]	All rectangular menu buttons have the Play button’s 3px corners.
+* [ ]	Newly opened dialogues always appear above earlier dialogues.
+* [ ]	Only the topmost dialogue receives interaction.
+* [ ]	Closing nested dialogues restores the correct previous dialogue and focus.
+* [ ]	Desktop, controller, and touch input remain functional.
+* [ ]	Existing gameplay behavior is preserved.
+* [ ]	All relevant tests pass.
+
+⸻
+
+10. Final deliverables
+
+Implement the changes in the repository.
 
 When finished, provide:
 
-1. A summary of the implemented changes.
-2. The important files added or modified.
-3. Any tuning parameters introduced for Adamaris.
-4. Automated test results.
-5. Browser rendering and gameplay verification results.
-6. Any remaining limitations.
+1. Summary of changes: Explain what was corrected in each of the five areas.
+2. Root causes: Identify the code or style rules responsible for the original issues.
+3. Files modified: List the relevant files and why they were changed.
+4. Verification: Report automated test results and any browser checks performed.
+5. Remaining limitations: Clearly identify anything that could not be verified or completed.
 
-Final priority: This update must be both visually impressive and mechanically correct. Adamaris should feel like a living beach environment dominated by a dangerous, unpredictable volcano. The continuous ground must not look like a conventional floating platform, volcanic hazards must be fair and clearly telegraphed, and Void eliminations must produce an unmistakable reaction from the Void itself.
+Do not claim functionality has been tested unless it was actually tested.
 
-Do not stop at a basic proof of concept. Implement and integrate the complete feature set.
+Do not stop at a proposal, partial CSS adjustment, or isolated fix.
+
+The final objective is a game-wide, consistently styled ALVA interface with correct capitalization, precise hover behavior, uniform glass dialogues, consistent button corners, and completely reliable dialogue stacking.
