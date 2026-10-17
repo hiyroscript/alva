@@ -119,12 +119,6 @@
   font-variant-numeric: tabular-nums;
   color: var(--white);
 }
-/* Passive recovery: the number alone glows. No motion is needed to read
-   the state, including with prefers-reduced-motion. Removal is immediate. */
-.hud-launch-point-value.is-recovering {
-  color: #7cf7a6;
-  text-shadow: 0 0 5px rgba(124, 247, 166, 0.55), 0 0 13px rgba(47, 191, 99, 0.4);
-}
 /* Quick Battle score: one small dot per point the match is played to,
    filled for each point scored. An outlined empty ring and a solid white
    dot, each with a dark edge, so both read on any stage. */

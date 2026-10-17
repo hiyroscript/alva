@@ -310,7 +310,7 @@ Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → 
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
 Home → Discover (Fighters / Movement / Launch reference, opening on Fighters; Back returns Home)
 Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
-Home → Settings gear → Settings dialog over Home (Language / Controls / Combat / Interface; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
+Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
@@ -1101,14 +1101,6 @@ comes from its definition and its profile.
 - A new universal movement appears here once it is added to
   `MOVEMENT_GUIDE`, with no change to the screen.
 
-The shared battle/practice HUD's Launch Point number turns bright green
-with a soft green text glow once the two-second recovery delay ends, and
-stays green between its half-second ticks while above zero. A new unblocked
-hit resets the timer and removes the glow immediately; zero and fighters
-waiting to respawn have no glow. Healing never starts the recovery glow.
-Each card reads its own CombatState timer, independently of cached digits.
-The glow is static, including with reduced motion; recovery timing is unchanged.
-
 ### 6.10 Settings
 
 A translucent glass dialog over Home (`js/ui/settings-dialog.js`), opened by
@@ -1116,9 +1108,9 @@ Home's Settings gear. Home stays visible behind a light dim, blurred where
 backdrop blur is supported, in the same glass as the pause and Practice
 panels (`.glass--panel`); the header holds the kicker "ALVA", the title
 "Settings" and a labelled close button. It holds the player's settings,
-saved on this device, in four sections selected by horizontal tabs
-immediately beneath the header: **Language | Controls | Combat | Interface** (French:
-**Langue | Commandes | Combat | Interface**). Exactly one panel is visible; inactive
+saved on this device, in exactly three sections selected by horizontal tabs
+immediately beneath the header: **Language | Controls | Combat** (French:
+**Langue | Commandes | Combat**). Exactly one panel is visible; inactive
 panels are hidden from rendering, assistive technology and input navigation.
 The selected tab has stronger text, a subtle accent fill and a green bottom
 indicator. Each section keeps its existing settings, in this order:
@@ -1173,28 +1165,6 @@ indicator. Each section keeps its existing settings, in this order:
   the other. French: **Assistance aux combos**, "Une fois l’Attaque 1 ou
   l’Attaque 2 terminée, la presser à nouveau pendant son temps de recharge
   déclenche automatiquement l’autre attaque.", **Activée** / **Désactivée**.
-- **Interface** — four independent On/Off choices, each with a title,
-  description, selected state and Default tag: **Ability HUD** and
-  **Cooldown indicators** default On; **Damage hints** and **Combat hints**
-  default Off. All save immediately and affect presentation only. Disabling
-  Ability HUD hides its entire element; mobile combat buttons stay available.
-  Cooldown indicators controls only the rings under all fighters, preserving
-  Energy, name tags, Special and charm marks. With Ability HUD off and rings
-  on, the player's rings return. Watch Mode never shows a player Ability HUD.
-  Damage hints enables red, outlined `+N` numbers for every resolved damaging
-  hit on either side in Quick Battle and Watch Mode. Practice Ground always
-  keeps its CPU damage numbers, exactly once. Combat hints enables **Blocked**
-  over a defender whose Shield actually blocked, **Deflected** over the
-  projectile at its confirmed redirection (a Deflect or repelling clash), and
-  **Stunned** over a fighter newly paralyzed or whose paralysis was extended.
-  Ordinary hitstun, blockstun, launches, healing, misses, projectile erasures
-  and mere collisions never produce those status messages. Both hint types
-  share outlined, stacked text that rises and fades over 0.8 seconds; reduced
-  motion removes the rise. They use simulation time, pause with play and clear
-  on restart, respawn, fighter removal or session destruction. French labels:
-  **Interface des capacités**, **Indicateurs de recharge**, **Indications de
-  dégâts**, **Indications de combat**; messages **Bloqué**, **Renvoyé**,
-  **Étourdi**.
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
@@ -1240,16 +1210,12 @@ indicator. Each section keeps its existing settings, in this order:
   each change —
 
   ```
-  { "version": 6,
+  { "version": 5,
     "language": "en" | "fr" | null,
     "mobileControls": "joystick" | "classic",
     "touchLayouts": { "joystick": { … }, "classic": { … } },
     "combatAssist": true | false,
     "comboAssist": true | false,
-    "showAbilityHud": true | false,
-    "showCooldownIndicators": true | false,
-    "showDamageHints": true | false,
-    "showCombatHints": true | false,
     "controllerProfiles": { "<fighter id>": { "<action id>": binding, … }, … } }
   ```
 
@@ -1263,9 +1229,7 @@ indicator. Each section keeps its existing settings, in this order:
   Controls and both custom layouts; a version 3 object keeps all of that
   and its Combat Assist; a version 4 object keeps all of that and every
   controller profile. Versions 1 and 2 get Combat Assist on, versions 1 to
-  3 no controller profile, and versions 1–4 Combo Assist on. Version 5 keeps all its existing choices,
-  including Combo Assist. Versions 1–5 receive the four Interface defaults;
-  invalid Interface values also use their own defaults. `controllerProfiles` holds a whole controller layout
+  3 no controller profile, and every older version Combo Assist on. `controllerProfiles` holds a whole controller layout
   (6.10b) for each fighter the player customized, keyed by the fighter's
   stable id (never a roster slot or a name); a fighter with none plays with
   its recommended layout. Every value is checked on load, one by one:

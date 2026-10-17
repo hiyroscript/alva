@@ -294,12 +294,6 @@ export class CombatState {
     this.launchRecoveryRemaining = LAUNCH_RECOVERY_DELAY + LAUNCH_RECOVERY_INTERVAL;
   }
 
-  // The grace period has ended, including the time between recovery ticks.
-  // Healing alone never changes this schedule. Read-only presentation state.
-  get recoveringLaunchPoint() {
-    return this.launchPoint > 0 && this.launchRecoveryRemaining <= LAUNCH_RECOVERY_INTERVAL + PHASE_EPSILON;
-  }
-
   // Seconds until the next whole point: grace + interval after a hit,
   // then just interval. Consume every elapsed tick, retaining the fraction.
   // At zero discard spare time so no overdue recovery can be banked.

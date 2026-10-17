@@ -2088,28 +2088,3 @@ continuous and finite ground in `platform-stage`; the roster, Random Stage
 and Adamaris's preview in `stage-select`; names, credits and the clock in
 `i18n`, `overtime`, `battle-screen`, `watch-mode`, `practice-ground`,
 `quick-battle` and `discover`.
-
-## Interface customization and combat feedback update
-
-Adds Settings > Interface with four independent saved choices: Ability HUD
-and cooldown indicators On by default, damage and combat hints Off. Settings
-schema 6 preserves versions 1–5 and gives each new choice its own default.
-The shared HUD number glows green after passive Launch Point recovery's grace
-period and stops glowing on a new hit or at zero; recovery timing is unchanged.
-
-Practice Ground's damage numbers now share `js/game/rendering/combat-feedback.js`
-with optional battle damage and Blocked, Deflected and Stunned messages.
-Arena consumes resolved combat and hazard events every fixed step. Deflection
-text uses the redirected projectile's captured position, including repelling
-clashes; Stunned requires newly applied or extended paralysis, never hitstun.
-Feedback pauses with play and clears on restart, removal and destruction.
-Both languages, Watch Mode and touch controls are supported.
-
-**Where to tune it:** `FEEDBACK` in `combat-feedback.js` for colors, lifetime,
-rise and fade; `css/battle.css` for the recovery glow; `INTERFACE_DEFAULTS` in
-`js/core/settings.js` for defaults. No fighter definitions or balance changed.
-
-**Tests:** `tests/systems/combat-feedback.test.mjs`, plus Settings, ability HUD,
-battle HUD, localization, Launch and Practice Ground coverage in the existing
-suite. Browser verification covers desktop and landscape touch, both languages,
-Quick Battle, Watch Mode, Practice Ground and reduced motion.

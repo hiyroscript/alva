@@ -531,7 +531,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(115, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
     'ability', 'attack', 'attacker', 'baseLaunch', 'charm', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hazard', 'hitstun',
-    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'paralysis', 'paralysisApplied', 'perfect', 'point',
+    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'paralysis', 'perfect', 'point',
     'projectile', 'redirected', 'source', 'stall', 'summon', 'target', 'technique', 'type',
   ]);
   assert.deepEqual([event.attack, event.source, event.ability, event.redirected], [true, 'melee', 'extra_attack', false],

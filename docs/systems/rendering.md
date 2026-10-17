@@ -11,7 +11,6 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, or a charmed hit's), the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
-| [`js/game/rendering/combat-feedback.js`](../../js/game/rendering/combat-feedback.js) | Shared floating damage and combat messages from resolved events, including Practice Ground. |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark and charm mark drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
@@ -64,7 +63,7 @@ speed trail, the Shield's interior, the fighter, the Shield's rim), the
 technique objects, projectiles, hit sparks, the stage's foreground, the
 Void (with the ripples where it has just taken a fighter), the elimination
 bursts (over the black, where each fighter went in),
-then each fighter's markers and status, floating combat feedback, and the debug
+then each fighter's markers and status over everything, and the debug
 overlay when it is on (`` ` ``: solid platforms where they are drawn, and a
 line naming each stage hazard's state). A fighter's shadow and ground ring
 lie on the solid surface under it (a moving platform where it is drawn,
@@ -134,9 +133,6 @@ and techniques. The fighter the ability HUD shows
 (`Arena.hudCooldownsFor`, set by the screen each frame): the HUD carries its
 cooldowns, so the same timer is never shown twice as prominently. The CPU,
 Watch Mode's fighters and a player on a touch screen keep their rings.
-Settings > Interface can hide all rings independently of the Ability HUD.
-Disabling the Ability HUD restores the player's rings when they are enabled;
-no timer or other status indicator changes.
 
 Each white, black-outlined ring fills clockwise from the top. Its center shows
 the same art as its touch button, selected once by `js/data/ability-preview.js`
@@ -277,38 +273,3 @@ far; the colour flash and fade stay.
   [`tests/systems/technique.test.mjs`](../../tests/systems/technique.test.mjs).
 - The canvas is a recording stand-in in every test: layout, scale and
   paint still need a real browser.
-
-## Floating combat feedback and recovery glow
-
-`CombatFeedback` extracts Practice Ground's `+N` renderer into one shared
-Canvas pipeline, owned by `Arena.feedback`. Once per fixed step, after stage
-hazards resolve, `Arena.updateFeedback` ages entries and consumes every resolved
-hit, block and projectile redirection. Rendering does not consume events or
-advance time. The battle settings enable damage and combat text independently;
-Practice Ground overrides only damage selection, keeping CPU numbers always
-on. `PracticeSession.damageNumbers` is a read-only view of those shared entries.
-
-Damage uses the event's positive resolved damage on a `hit`, never authored
-attack values, healing or blocked damage. A `block` anchors to its target.
-`paralysisApplied` reports an actual increase of the disabling hold in
-`CombatSystem.applyHit`; only that and positive resolved paralysis produce
-Stunned. Ordinary hitstun and repeated frames of the same hold do not.
-`clashProjectiles` returns only genuine repelling redirections; `CombatSystem`
-combines those with its Deflect records and snapshots each object's world
-position. The renderer reads the sprite extent once, then retains no projectile
-reference, so a destroyed projectile cannot break its message.
-
-All kinds share lifetime (0.8 seconds), stacking rows, outline, fade and
-optional upward drift (`FEEDBACK`). Damage stays red; Blocked is light blue,
-Deflected teal and Stunned amber. Fighter entries use `markerAnchor` and
-`statusTop`, clearing Energy, Special and charm marks; projectile entries use
-the captured position through `toScreen`. Nearby screen-space labels are also
-separated. Reduced motion removes drift. Expiry, Void removal, practice swaps,
-restart and destruction clear entries; a new CombatState also invalidates an
-old fighter anchor. English and French text is resolved through `combatHint.*`.
-
-The shared DOM HUD reads `CombatState.recoveringLaunchPoint` independently of
-its digit cache: positive Launch Point and the existing recovery countdown at
-or below one interval (the grace period has elapsed). Its number alone glows
-green, with no animation, until a new hit, zero or removal from play. Neither
-this getter nor any Interface setting changes combat or recovery timing.
