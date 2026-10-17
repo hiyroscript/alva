@@ -1,1504 +1,916 @@
-ALVA — CPU Intelligence Evolution & Humanization Update
+ALVA — Interface Customization & Combat Feedback Update
 
-Mission
+Objective
 
-Perform a major, carefully controlled evolution of CPU Intelligence in the Alva repository.
+Implement a polished interface customization and combat feedback update for Alva, using the existing architecture, visual design, combat systems, and settings infrastructure.
 
-Repository: hiyroscript/alva
+Repository: https://github.com/hiyroscript/alva
 
-This update has two equally important objectives:
+This update has two primary goals:
 
-1. Make CPUs substantially more human-like and appropriately balanced across all four difficulties, especially Easy.
-2. Make CPUs more genuinely intelligent—not simply better at attacking, but better at understanding the entire match, choosing meaningful objectives, adapting their playstyle, positioning, surviving, and knowing when fighting is or is not the correct decision.
+1. Make Launch Point recovery more visually recognizable by making the recovering Launch Point number glow green.
+2. Introduce a new Interface settings category containing four independently configurable options:
+    * Ability HUD
+    * Cooldown indicators
+    * Damage hints
+    * Combat hints
 
-These objectives must coexist.
+Combat hints will display contextual floating messages such as Blocked, Deflected, and Stunned during gameplay.
 
-A smarter CPU must not automatically become a stronger or more frustrating CPU.
-
-An Easy CPU should be capable of making intelligent decisions while still playing like a casual, inexperienced human. Brutal should demonstrate much deeper strategic understanding and better execution, but even Brutal must remain believable as a human-like opponent rather than an omniscient machine.
-
-The single most important design principle is that CPUs must feel human.
-
-I really like the existing CPU Intelligence system. Preserve its architecture, sophistication, universality, and existing features wherever possible.
-
-This is an evolution, not a replacement.
-
-The scope is large. Approach it as a serious AI systems update, with careful investigation, incremental implementation, extensive testing, performance evaluation, and balancing.
+All features must integrate cleanly with the existing engine. Do not introduce duplicate combat systems, change balancing, or redesign unrelated interfaces.
 
 ⸻
 
-1. Investigate the Current Game Before Changing Anything
+1. Launch Point Recovery — Green Glow
 
-Start by inspecting the actual repository and understanding how everything connects.
+Required behavior
 
-Read the following documentation:
+When a fighter’s Launch Point is actively undergoing passive recovery, their Launch Point number in the top HUD must glow green.
 
-* README.md
-* ALVA_SPEC.md, especially the CPU Intelligence and battle requirements
-* docs/systems/ai.md
-* docs/systems/launch.md
-* docs/gameplay/stages.md
-* docs/systems/combat.md
-* docs/development/testing.md
-* CLAUDE.md
-* UPDATES.md
+Alva already implements passive recovery in:
 
-Inspect these existing CPU Intelligence modules:
-
-* js/game/ai/combat-ai.js
-* js/game/ai/cpu-intelligence/brain.js
-* capabilities.js
-* perception.js
-* situation.js
-* stage-model.js
-* prediction.js
-* opponent-model.js
-* strategy.js
-* evaluator.js
-* values.js
-* defense.js
-* plans.js
-* executor.js
-* telemetry.js
-* js/data/difficulty.js
-
-Also inspect the relevant gameplay systems:
-
-* js/game/battle.js
-* js/game/arena.js
-* js/game/fighters/
-* js/game/combat/
-* js/game/physics.js
+* js/game/combat/combat-state.js
 * js/data/launch.js
-* js/data/maps.js
-* Stage and hazard systems
-* Fighter definitions and ability data
 
-Read the existing tests, especially:
+The current behavior is:
 
-* tests/systems/cpu-intelligence.test.mjs
-* tests/systems/combat-ai.test.mjs
-* tests/systems/stage-hazards.test.mjs
-* tests/systems/platform-hazards.test.mjs
-* tests/benchmarks/cpu-benchmark.mjs
-* tests/helpers/cpu-match.mjs
-* tests/helpers/reference-opponents.mjs
+* Receiving an unblocked hit increases Launch Point and resets its recovery timer.
+* Recovery has an initial 2-second delay.
+* After that delay, 1 Launch Point is removed every 0.5 seconds.
+* Recovery stops at 0.
+* Blocking does not reset recovery.
 
-Understand how CPU decisions are made, how plans are selected and interrupted, how fighter inputs work, and how difficulty modifies perception, reasoning, and execution.
+Preserve these rules exactly.
 
-Before implementing, identify which existing behaviors should be preserved, which need improvement, and which assumptions must change.
+Visual implementation
 
-Avoid creating duplicate systems for capabilities already present.
+Modify the HUD in:
 
-2. Preserve CPU Intelligence
+* js/ui/hud.js
+* css/battle.css
 
-The current architecture already includes:
+The Launch Point number should behave as follows:
 
-* Universal fighter capability analysis
-* Delayed perception
-* Opponent modeling
-* Stage and world modeling
-* Combat prediction
-* Strategic modes
-* Tactical evaluation
-* Threat assessment
-* Defensive decision-making
-* Combos and follow-ups
-* Edge-guarding
-* Recovery planning
-* Launch Point evaluation
-* Energy management
-* Difficulty-based humanization
-* Deterministic seeded randomness
-* Debug telemetry
+Normal state
 
-All of these should remain.
+Display the number with its current white appearance.
 
-The AI must continue controlling fighters exclusively through legal player-equivalent inputs.
+Recovery delay
 
-Do not grant CPUs illegal abilities, instant reactions, additional movement options, altered hitboxes, hidden resources, or different combat rules.
+For the initial 2 seconds after receiving damage, the number remains white. Recovery has not actively begun.
 
-Do not modify the physics or damage system merely to balance CPUs.
+Active recovery
 
-Do not special-case particular fighter IDs.
+After the delay expires, while Launch Point is above 0 and passively recovering:
 
-All fighters, including future ones, must benefit from the same intelligence using their actual capability data.
+* Change the number to a clearly readable green.
+* Add a soft green outer glow using CSS text-shadow.
+* Use a restrained, smooth glow effect that fits Alva’s existing interface.
+* Keep the number and its position unchanged.
+* Update its displayed value as recovery progresses.
+* Apply this independently to both fighters.
 
-The improvements should fit the existing architecture.
+Suggested appearance:
+
+* Bright green foreground.
+* Soft, layered green glow.
+* No green background, new bar, or additional HUD element.
+
+Recovery interrupted
+
+When a new unblocked hit resets recovery, immediately remove the green glow and return the number to its normal appearance until recovery resumes.
+
+Fully recovered
+
+Once Launch Point reaches 0, remove the glow entirely.
+
+Technical requirements
+
+Derive the visual recovery state from the existing CombatState recovery timer and Launch Point value.
+
+For example, the relevant state already includes:
+
+* combat.launchPoint
+* combat.launchRecoveryRemaining
+* LAUNCH_RECOVERY_DELAY
+* LAUNCH_RECOVERY_INTERVAL
+
+Do not determine recovery solely by comparing the currently displayed number to its previous value. That would miss the intervals between recovery ticks and could confuse healing effects with passive recovery.
+
+If useful, introduce a clean read-only getter representing active Launch Point recovery.
+
+In js/ui/hud.js, update the existing HUD number’s state class independently of the cached text value, so visual state changes register even when the number stays the same.
+
+Use css/battle.css for the visual styling.
+
+Respect reduced-motion settings. The green color and glow should remain understandable without animation.
+
+The result must work in Quick Battle, Watch Mode, and Practice Ground, using the existing shared HUD.
 
 ⸻
 
-PART I — MAKE CPUs FEEL HUMAN
+2. Add an “Interface” Settings Section
 
-3. Human-Like Behavior Is the Highest Priority
+Existing architecture
 
-The problem with many fighting-game AIs is that they behave like optimization engines instead of players.
+Settings are implemented through:
 
-They constantly move, constantly seek ideal spacing, instantly transition between objectives, and appear relentlessly focused on perfect combat efficiency.
+* js/core/settings.js
+* js/ui/settings-dialog.js
+* css/settings.css
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-This makes them feel artificial, even when their reactions are technically delayed.
+The existing settings categories are:
 
-Alva should be different.
+* Language
+* Controls
+* Combat
 
-A CPU should feel like a human who is actively thinking about the game.
+Add a fourth category:
 
-That means it should sometimes:
+Interface
 
-* Approach aggressively.
-* Play patiently.
-* Maintain a defensive position.
-* Hesitate before committing.
-* Wait for its opponent.
-* Retreat after a dangerous exchange.
-* Take time to recover.
-* Reposition without attacking.
-* Hold its ground.
-* Change its mind when circumstances change.
-* Make imperfect but understandable decisions.
-* Recognize an opportunity and act decisively.
-* Temporarily prioritize survival over dealing damage.
+Place it after Combat.
 
-These behaviors should be driven by context.
+Use the existing SETTINGS_SECTIONS structure instead of creating a separate dialog or settings window.
 
-Humanization must be decision-level humanization, not merely random mistakes inserted into otherwise perfect decisions.
+Interface settings layout
 
-Avoid artificial stupidity, arbitrary input drops, or random movement that has no purpose.
+The new section should contain four options, each with its own title, short description, and On/Off selector.
 
-4. Introduce Purposeful Idling
+Use the existing settings choice components and visual patterns, including selected states, focus behavior, controller navigation, and default indicators.
 
-This is a required change.
+Setting	Default	Description
+Ability HUD	On	Show the ability interface displaying your character’s moves and their availability.
+Cooldown indicators	On	Show cooldown indicators underneath fighters.
+Damage hints	Off	Display floating damage numbers during battles.
+Combat hints	Off	Display floating combat messages for blocks, deflections, and disabling effects.
 
-Currently, the AI’s neutral movement logic intentionally prevents prolonged standing still, and its inactivity monitor treats lengthy inactivity as a problem.
+All four toggles must work independently.
 
-That rule must evolve.
+Persistence
 
-CPUs are allowed to remain idle when standing still is a reasonable decision.
+Extend the existing settings model with appropriate boolean properties, for example:
+
+* showAbilityHud
+* showCooldownIndicators
+* showDamageHints
+* showCombatHints
+
+These names are suggestions; follow the project’s existing conventions.
+
+Requirements:
+
+1. Each preference must save automatically when changed.
+2. Preferences must persist across reloads and game sessions.
+3. Invalid stored values must fall back to their defaults.
+4. The existing language, controls, controller profiles, touch layouts, Combat Assist, and Combo Assist must remain unchanged.
+5. Increment SETTINGS_VERSION and implement a safe migration from the existing version 5, preserving support for older settings versions.
+6. Newly added options must receive their correct defaults during migration.
+7. The saved state must be reflected accurately in the Interface settings UI.
+
+These are display preferences only. They must never change the actual combat simulation.
+
+⸻
+
+3. Ability HUD Toggle
+
+Existing system
+
+The Ability HUD is implemented in:
+
+* js/ui/ability-hud.js
+* css/ability-hud.css
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+
+It displays the player’s available moves, inputs, artwork, cooldowns, and restrictions.
+
+When enabled
+
+Preserve the current Ability HUD behavior exactly.
+
+It should continue to:
+
+* Display the player’s abilities.
+* Show ground and air move variants.
+* Display assigned keyboard/controller bindings.
+* Display ability cooldowns and restrictions.
+* Respond to the currently controlled fighter.
+* Hide wherever it currently hides, including Watch Mode and touch-specific layouts.
+
+When disabled
+
+Completely hide the Ability HUD.
+
+Requirements:
+
+* Remove the entire visual element, not just its contents.
+* Do not leave an empty area or invisible obstruction.
+* Do not interfere with input or ability execution.
+* Do not hide mobile combat buttons or other essential touch controls.
+* Do not affect combat, cooldown calculations, or ability availability.
+
+Important interaction with cooldown indicators
+
+The existing syncAbilityHud() methods use hudCooldownsFor to suppress redundant cooldown indicators beneath a fighter when the Ability HUD already displays those cooldowns.
+
+Update this interaction carefully.
+
+If the Ability HUD is disabled but cooldown indicators are enabled, cooldown indicators beneath the player’s fighter must still work.
+
+Do not accidentally hide both systems simply because the Ability HUD previously controlled the cooldown renderer’s visibility.
+
+⸻
+
+4. Cooldown Indicators Toggle
+
+Existing system
+
+The circular cooldown indicators underneath fighters are implemented in:
+
+* js/game/rendering/fighter-status.js
+* js/game/arena.js
+
+Relevant existing functions and properties include:
+
+* drawCooldownIndicators()
+* cooldownIndicators()
+* Arena.drawStatus()
+* Arena.hudCooldownsFor
+
+When enabled
+
+Preserve the current behavior:
+
+* Show cooldown rings beneath applicable fighters.
+* Display their existing artwork and countdown information.
+* Preserve the current cooldown progress visuals.
+* Continue respecting the existing Ability HUD duplication logic.
+
+When disabled
+
+Hide the cooldown indicators beneath all fighters, including the player and CPU-controlled fighters.
+
+Do not hide:
+
+* Energy bars.
+* Fighter name tags.
+* Special ability indicators.
+* Charm indicators.
+* Shields.
+* Other combat effects.
+
+Only the cooldown indicators beneath fighters should be affected.
+
+Independence from Ability HUD
+
+Both settings must work in every combination:
+
+Ability HUD	Cooldown indicators	Expected result
+On	On	Current behavior, with redundant player cooldown rings suppressed.
+On	Off	Ability HUD remains visible; cooldown rings beneath fighters are hidden.
+Off	On	Ability HUD is hidden; cooldown rings beneath fighters remain available.
+Off	Off	Neither interface is shown.
+
+Cooldowns must continue functioning normally regardless of either setting.
+
+Avoid recalculating or altering timers simply to hide their visualization.
+
+⸻
+
+5. Damage Hints
+
+Objective
+
+Allow players to enable floating damage numbers during actual battles, using the existing Practice Ground damage feedback as the visual reference.
+
+Existing implementation
+
+Practice Ground already has this functionality in:
+
+js/game/practice.js
+
+It uses:
+
+* PracticeSession.damageNumbers
+* updateDamageNumbers(dt)
+* drawDamageNumbers()
+* formatDamage()
+
+The existing implementation:
+
+* Reads resolved damage from this.combat.events.
+* Displays red floating numbers such as +3 and +10.
+* Places them above the damaged fighter.
+* Stacks rapid hits.
+* Moves the numbers upward.
+* Fades them away.
+* Respects reduced-motion preferences.
+
+Reuse and generalize this behavior rather than creating a completely unrelated damage-number system.
+
+When enabled
+
+During Quick Battle, and also Watch Mode where combat is taking place, display damage numbers over whichever fighter receives a successful damaging hit.
 
 Examples:
 
-No immediate reason to move
+* A fighter takes 3 damage → +3
+* A fighter takes 5 damage → +5
+* A fighter takes 10 damage → +10
+* A multi-hit move lands five separate 1-damage strikes → display a +1 for each successful strike.
 
-If the opponent is far away, unavailable, temporarily absent, or presenting no meaningful threat, a CPU may decide to wait.
+Both fighters must receive damage numbers when appropriate.
 
-It should not constantly shuffle left and right just to appear active.
+Visual presentation
 
-Recovering Launch Point
+Preserve the recognizable Practice Ground style:
 
-When its Launch Point is dangerously high, the CPU may move somewhere safe and deliberately avoid combat.
+* Red text.
+* Dark outline for readability.
+* Bold, readable typography.
+* Slight upward movement.
+* Smooth fade-out.
+* Short display duration, approximately 0.8 seconds.
+* Appropriate vertical stacking for rapid consecutive hits.
 
-Once safe, it may stand still, hold Shield when appropriate, or remain ready to react while Launch Point passively recovers.
+Position numbers above the fighter receiving damage, not above the attacker.
 
-Waiting for the opponent
+They must follow the existing stage camera, account for fighter movement, and avoid overlapping important status elements whenever possible.
 
-A defensive CPU may hold a position and allow an aggressive opponent to approach.
+Use Arena.markerAnchor() and Arena.statusTop() where appropriate.
 
-Maintaining an advantageous position
+Important rules
 
-If the CPU already occupies a tactically favorable location, unnecessary movement may make its situation worse.
+Damage numbers must be derived from actual resolved combat events, not attack definitions.
 
-It should recognize that holding position can be optimal.
+This means:
 
-Protecting a match lead
+* Never predict damage before a hit connects.
+* Never show damage just because an attack animation plays.
+* Do not show damage for missed attacks.
+* Do not show positive damage for blocked attacks.
+* Do not treat healing as damage.
+* Do not invent or round up damage.
+* Support projectiles, melee strikes, summons, techniques, and other legitimate damage sources through the shared combat-event system.
+* Support multiple hits occurring in a single simulation step.
 
-When ahead late in a match, temporarily avoiding engagements can be strategically sensible.
+Keep Practice Ground’s existing damage-number behavior intact. It should not suddenly display duplicate numbers because of the new shared implementation.
 
-Waiting for a specific opportunity
+The new setting’s main purpose is to make this existing training-style feedback available during battles.
 
-A CPU might wait for a long recovery animation, an opponent to land, a cooldown, a safe opening, or a stage hazard to finish.
+When disabled
 
-Between engagements
+Do not display battle damage numbers.
 
-A small natural pause after a combo or intense exchange may be appropriate, depending on the CPU’s personality, difficulty, danger, and current objective.
-
-5. Idling Must Always Have a Reason
-
-Do not simply remove the inactivity limit and allow CPUs to freeze.
-
-There must be a meaningful distinction between:
-
-Intentional inactivity
-
-* A chosen strategic behavior.
-* Has a concrete reason.
-* Has an expected duration or exit condition.
-* Continues monitoring the situation.
-* Can be interrupted by urgent events.
-
-Accidental inactivity
-
-* A failed plan.
-* A broken navigation state.
-* An infinite wait.
-* An inability to choose an action.
-* An unhandled state or bug.
-
-Implement an explicit purposeful waiting or holding-position plan, integrated with the existing plan state machines.
-
-Potential reasons include:
-
-* recoverLaunchPoint
-* recoverEnergy
-* holdAdvantage
-* waitForOpponent
-* baitApproach
-* avoidUnnecessaryFight
-* waitForCooldown
-* holdSafePosition
-* observeOpponent
-* protectMatchLead
-
-These are illustrative, not mandatory API names.
-
-Each waiting decision should expose enough information for debugging:
-
-* Why the CPU is waiting.
-* What it expects to accomplish.
-* What condition ends the wait.
-* Whether it is still safe.
-* Which events can interrupt it.
-
-Avoid permanent, unresponsive waiting states.
-
-A waiting CPU must still react appropriately to meaningful threats, environmental danger, disappearing platforms, changing overtime boundaries, or an important match opportunity.
-
-Modify brain.js, plans.js, and telemetry.js so the inactivity monitor only treats unexplained inactivity as a failure.
-
-The current STILL_LIMIT and its associated tests must be reviewed accordingly.
-
-Do not delete liveness protection altogether.
-
-6. Human-Like Movement and Pacing
-
-The existing neutral plan sometimes forces a movement direction even when the desired spacing has been reached.
-
-This creates constant footwork.
-
-Replace the assumption that movement must always occur with more contextual behavior.
-
-Movement should reflect an intention:
-
-* Closing distance
-* Escaping pressure
-* Creating space
-* Approaching a better position
-* Baiting a response
-* Maintaining range
-* Avoiding a stage hazard
-* Pursuing an opponent
-* Recovering from an unfavorable position
-
-A CPU should sometimes remain stationary when already in a good position.
-
-It should sometimes walk instead of Dash, stop short of an opponent, or retreat after advancing.
-
-Preserve responsive movement and momentum.
-
-Do not make movement sluggish or unresponsive.
-
-The objective is natural pacing rather than reduced mechanical capability.
+No gameplay logic should change.
 
 ⸻
 
-PART II — MAKE CPUs UNDERSTAND THE MATCH
+6. Combat Hints
 
-7. Separate Winning a Fight From Winning the Match
+Objective
 
-This is one of the most important intelligence improvements.
+Introduce a new floating combat feedback system, visually similar to damage hints, but displaying short contextual text instead of numerical damage.
 
-A CPU currently evaluates many decisions according to their expected combat value.
+The new Combat hints option should control this system independently of Damage hints.
 
-That is useful but incomplete.
+There are three required messages:
 
-Winning an individual exchange is not always the same as making the decision most likely to win the match.
+* Blocked
+* Deflected
+* Stunned
 
-The AI must understand both levels.
+Do not introduce unnecessary additional messages.
 
-Combat-level decisions
+Use event-driven combat feedback rather than continuously displaying text based on a fighter’s current animation.
 
-These concern the current engagement:
+6.1 — “Blocked”
 
-* Which attack to use
-* Whether to approach
-* Whether to Shield
-* Whether to punish
-* How to position for a combo
-* Whether to continue offensive pressure
+Trigger: A fighter successfully blocks an incoming attack.
 
-Match-level decisions
+Display:
 
-These concern the overall objective:
+Blocked
 
-* Whether fighting is worth the risk
-* Whether protecting a lead is more valuable
-* Whether to prioritize survival
-* Whether time favors the CPU
-* Whether an elimination is urgently needed
-* Whether to preserve a safe stage position
-* Whether to disengage and recover Launch Point
-* Whether a trade is worthwhile
-* Whether to take a calculated risk to avoid losing
-
-The match-level objective should influence combat-level choices.
-
-Implement a clearer hierarchical relationship between long-term strategy and immediate tactics.
-
-Do not create a completely independent second AI.
-
-Extend the existing Strategy, Situation, and Evaluator layers.
-
-8. Improve Match-State Awareness
-
-The AI should understand:
-
-* Its own score
-* The opponent’s score
-* The number of points required to win
-* Whether either fighter is at match point
-* The remaining time
-* Whether regulation or overtime is active
-* The current Launch Points
-* Which fighter is favored if time expires
-* Whether the Void is closing
-* The potential consequences of another elimination
-* Whether the current strategy improves or harms its chances of winning
-
-This information already exists to varying degrees.
-
-Make it more influential in strategic decisions.
-
-Examples
-
-Ahead 2–1 with little time remaining
-
-The CPU should recognize that avoiding elimination is especially valuable.
-
-It may move away, defend, maintain safe stage control, or avoid a risky engagement.
-
-It should not automatically pursue a dangerous combo simply because it has positive expected damage.
-
-Behind 0–2
-
-The CPU needs to find a path back into the match.
-
-It may become more willing to take calculated offensive risks, especially when time is running out.
-
-But it should not blindly attack or repeatedly eliminate itself.
-
-Tied near the end
-
-The CPU should understand whether overtime is likely and what happens afterward.
-
-Tied near the end of overtime
-
-The lower Launch Point can determine the result if points remain tied.
-
-Both fighters’ Launch Points therefore become strategically important, not just their immediate launch danger.
-
-At match point
-
-The CPU should recognize legitimate match-ending opportunities and respond with appropriate urgency.
-
-These decisions must still vary by difficulty.
-
-⸻
-
-PART III — DEEPER LAUNCH POINT INTELLIGENCE
-
-9. Understand Launch Point as Both a Combat and Survival Resource
-
-Alva does not use conventional health.
-
-Launch Point increases after unblocked hits and determines how dangerous future launches become.
-
-The CPU already understands some of this through LaunchJudge, recovery simulations, and strategic danger estimates.
-
-Expand this understanding.
-
-A CPU should evaluate:
-
-* Its own current Launch Point
-* The opponent’s current Launch Point
-* The next hit’s likely Launch Point increase
-* Whether a realistic launch could eliminate either fighter
-* Current distance to Void boundaries
-* The direction a hit would launch a fighter
-* Whether the opponent has a safe recovery route
-* Whether its own movement leaves it vulnerable
-* How much Launch Point can realistically recover before the next engagement
-* The match value of reducing its own Launch Point relative to attacking
-
-Do not treat Launch Point simply as a number that makes the CPU more defensive past a fixed threshold.
-
-Danger is contextual.
-
-A fighter with high Launch Point near the center of a wide safe area may be less endangered than one with lower Launch Point standing near a Void boundary.
-
-10. Implement Deliberate Retreat and Recovery Behavior
-
-CPUs should sometimes realize:
-
-“I’m at dangerous Launch Point. Continuing this fight is not worth it. I should escape, secure a safe position, recover, then return.”
-
-This should become a real multi-step strategy.
-
-Example:
-
-1. The CPU recognizes that its elimination risk has become high.
-2. It evaluates whether retreat is feasible.
-3. It chooses a safe destination.
-4. It escapes the opponent’s effective range.
-5. It stabilizes its position.
-6. It avoids unnecessary combat.
-7. It uses Shield against credible threats when appropriate.
-8. It allows passive Launch Point recovery.
-9. It reassesses whether recovery is still worth the time.
-10. It resumes fighting when conditions justify it.
-
-This must not be reduced to moving backward for a fixed number of seconds.
-
-It should be an intelligent objective with reassessment and exit conditions.
-
-Respect the real recovery mechanics
-
-Inspect js/data/launch.js and js/game/combat/combat-state.js.
-
-Currently, passive Launch Point recovery begins only after the required hit-free delay, then removes Launch Point gradually.
-
-Shielding does not accelerate this recovery.
-
-The CPU must understand that recovery takes time.
-
-It should not assume that waiting for one second instantly restores a large amount of Launch Point.
-
-A retreat is useful only if the expected benefit of recovery, reduced risk, and improved positioning outweighs the time and opportunities sacrificed.
-
-11. Retreating Into Shield
-
-I specifically want CPUs to be capable of running away, isolating themselves, and using Shield defensively while recovering.
-
-However, this must respect the real game.
-
-Shield:
-
-* Is a grounded defense.
-* Blocks attacks while available.
-* Does not directly restore Launch Point.
-* Costs Energy when it blocks a hit.
-* Cannot be used while exhausted.
-
-Therefore, do not teach CPUs to permanently hold Shield without evaluating its value.
-
-A good CPU may retreat to safety and hold Shield during a dangerous approach.
-
-A smarter CPU may also lower Shield when the opponent is outside effective attack range, conserving flexibility and allowing movement.
-
-It should understand when to:
-
-* Retreat before shielding.
-* Shield while an attack is approaching.
-* Hold Shield through an ongoing threat.
-* Release Shield after the threat.
-* Avoid being trapped near a ledge.
-* Reposition again if its safe location becomes unsafe.
-* Stop recovering if the match situation requires immediate action.
-
-Avoid unbreakable-feeling defensive loops or infinite camping behavior.
-
-The CPU must continue playing a real match.
-
-12. Understand the Opponent’s Launch Point
-
-The opponent’s Launch Point should shape not only attack selection but also positioning, approach strategy, and risk tolerance.
-
-For example:
-
-* At low opponent Launch Point, prioritize building advantage through safe exchanges and combos.
-* At moderate Launch Point, look for positioning that creates future elimination opportunities.
-* At high opponent Launch Point, evaluate credible finishers and favorable launch directions.
-* Near an edge, prioritize attacks that launch toward the dangerous boundary.
-* If the opponent is recovering offstage, consider whether maintaining stage control is better than pursuing them.
-* If the opponent is very dangerous and a risky finisher is available, consider whether a safer route would still win.
-
-The strongest CPUs should understand that a good position before a launch can matter more than the damage of the attack itself.
-
-⸻
-
-PART IV — ADVANCED POSITIONING AND STAGE INTELLIGENCE
-
-13. Make Positioning a Major Part of CPU Intelligence
-
-The CPU should understand where it wants to be, not merely how far it should stand from its opponent.
-
-Expand the existing stage and positioning logic so the AI evaluates:
-
-* Stage center control
-* Distance to dangerous boundaries
-* Relative elevation
-* Platform accessibility
-* Safe landing areas
-* Escape routes
-* Opponent approach routes
-* Its preferred attack range
-* The opponent’s preferred attack range
-* Potential launch directions
-* Whether the opponent is cornered
-* Whether the CPU is cornered
-* Whether a position is defendable
-* Whether a retreat will make future recovery harder
-* Whether a position is still useful as the stage changes
-
-The AI should recognize the distinction between a position that is useful for attacking and one that is useful for winning.
-
-Examples
-
-A CPU with dangerous Launch Point may prioritize the central stage even if it temporarily gives up attack range.
-
-A CPU with an opponent near the Void may favor a position that lets its next launch push the opponent outward.
-
-A CPU with strong ranged attacks may prefer distance and reliable escape routes.
-
-A CPU facing an aggressive close-range fighter may hold a location that makes approaches predictable.
-
-A CPU defending a lead may choose a safe area rather than chasing its opponent across the stage.
-
-14. Stage-Specific Understanding Through Universal Rules
-
-Do not hardcode stage names into AI decision branches.
-
-The CPU must understand stage properties through actual collision geometry, stage data, and observable hazard states.
-
-Review the current stages:
-
-Yerma
-
-Understand the main floor, ledges, Void boundaries, and recovery paths.
-
-Sol-Noir
-
-Understand vertical terrain, elevated platforms, approach routes, and the tradeoffs between high and low positions.
-
-Asperitas
-
-Understand moving and disappearing platforms.
-
-Do not plan a retreat onto a platform that is disappearing.
-
-Do not rely on its previous position after it vanishes.
-
-Do not assume future random reappearance locations.
-
-A CPU should recognize when a position that was previously safe is becoming dangerous.
-
-Adamaris
-
-Understand continuous ground versus finite platforms, the Void boundaries, volcanic hazards, and visible landing warnings.
-
-A CPU should react to visible danger without knowing hidden future hazard outcomes.
-
-Overtime
-
-As the Void closes, previously good positions may become unsafe.
-
-The CPU must reevaluate stage control, retreat paths, and survival strategies using the live boundaries.
-
-15. Introduce Better Position Selection
-
-Consider a shared position evaluator that scores potential destinations based on:
-
-* Safety
-* Attack opportunities
-* Opponent access
-* Expected launch risk
-* Retreat options
-* Stage control
-* Visible hazard exposure
-* Match urgency
-* Energy and Launch Point state
-* Travel cost
-
-This could extend StageModel and the strategic layer rather than become a completely separate system.
-
-A destination should be chosen for a concrete objective.
-
-Movement plans should follow that destination and reevaluate when the environment changes.
-
-Do not use computationally expensive searches without justification.
-
-Preserve efficient fixed-step execution.
-
-⸻
-
-PART V — MORE SOPHISTICATED STRATEGIES
-
-16. Expand Strategic Depth Without Replacing Existing Modes
-
-The existing modes include:
-
-* Rushdown
-* Controlled offense
-* Neutral
-* Counterplay
-* Zoning
-* Trap control
-* Survival
-* Finisher hunt
-* Recovery
-
-Keep them.
-
-Improve how they are selected, maintained, and combined with longer-term intentions.
-
-Consider introducing higher-level objectives such as:
-
-* Win the current engagement
-* Build Launch Point advantage
-* Secure a finishing position
-* Force the opponent toward an edge
-* Control a valuable stage area
-* Disengage
-* Recover Launch Point
-* Recover Energy
-* Protect the score lead
-* Force an engagement before time expires
-* Hold position and bait an approach
-* Safely return to neutral
-* Exploit a specific opponent habit
-
-These objectives should influence the existing strategic and tactical layers.
-
-For example:
-
-Objective: Recover Launch Point
-Strategy: Survival
-Plan: Retreat to safe ground, then temporarily defend.
-
-Objective: Force an elimination
-Strategy: Finisher hunt
-Plan: Gain favorable positioning, then execute a credible launch opportunity.
-
-Objective: Protect a lead
-Strategy: Neutral or survival
-Plan: Maintain safe stage control and avoid unnecessary commitments.
-
-17. Strategies Should Persist Long Enough to Feel Intentional
-
-A human does not completely redesign their game plan every few frames.
-
-The existing strategic hysteresis is valuable.
-
-Build upon it.
-
-CPUs should maintain an understandable objective over time unless:
-
-* It has succeeded.
-* It has become impossible.
-* Its expected value has changed significantly.
-* A serious threat demands attention.
-* The match situation has changed.
-* A better opportunity justifies switching.
-
-Avoid rapid strategic oscillation.
-
-But also avoid blindly committing to outdated plans.
-
-The strongest CPUs should be particularly good at recognizing when a strategic switch is warranted.
-
-Lower difficulties may hold an imperfect plan longer, change strategies less efficiently, or take longer to recognize that their objective is no longer valuable.
-
-These differences should feel natural.
-
-18. Improve Adaptation and Opponent Understanding
-
-Build upon opponent-model.js.
-
-The CPU should be able to recognize tendencies such as:
-
-* Frequent aggressive approaches
-* Defensive play
-* Excessive Shield usage
-* Frequent jumping
-* Repeated Dashes
-* Ranged pressure
-* Repeated attacks
-* Predictable landings
-* Habitual retreating
-* Attempts to bait attacks
-* Repeated approaches from the same direction
-* Preference for certain stage areas
-* The opponent becoming more aggressive when behind
-
-Use short-term and longer-term behavioral evidence where appropriate.
-
-The CPU should react differently to different playstyles.
+Position: Directly above the fighter who blocked the attack.
 
 Examples:
 
-An aggressive opponent may encourage counterplay.
+* The player blocks a CPU melee attack with their Shield → Blocked appears above the player.
+* The CPU blocks a projectile → Blocked appears above the CPU.
+* A perfect Shield successfully blocks an attack → Blocked appears above the defender.
 
-A defensive opponent may require more deliberate positioning and controlled pressure.
+Use the combat system’s actual resolved block event:
 
-A projectile-heavy opponent may encourage safer approaches, defensive movement, or Deflect opportunities.
+CombatSystem.applyHit() in js/game/combat/combat.js already produces events with type: 'block'.
 
-An opponent who repeatedly retreats may require smarter space control instead of endless direct pursuit.
+Requirements:
 
-Do not grant perfect behavioral knowledge.
+* Display the hint only when the combat system confirms a block.
+* Position it over event.target.
+* Include perfect blocks, without needing a separate message.
+* Support melee, projectile, summon, and technique attacks.
+* Do not trigger on a Shield being raised without contact.
+* Do not trigger when an attack misses.
+* Do not trigger when a fighter takes an ordinary hit.
 
-The CPU only knows what it could reasonably observe and remember.
+If repeated attacks are blocked rapidly, stack or separate the messages so they remain legible.
 
-19. Make Decisions Less Predictable Without Making Them Random
+6.2 — “Deflected”
 
-Human players do not always choose the mathematically highest-scoring action.
+Trigger: A projectile or other supported deflectable object is successfully redirected by a deflection mechanic.
 
-However, randomness alone is not an adequate solution.
+Display:
 
-Allow several strategically reasonable actions to compete.
+Deflected
 
-For example, in neutral, a CPU may reasonably:
+Position: Directly above the object that was deflected.
 
-* Approach.
-* Hold position.
-* Feint an approach.
-* Retreat slightly.
-* Wait for the opponent.
-* Move toward stage center.
-* Look for a ranged opportunity.
+This placement is particularly important.
 
-Choices should be influenced by objectives, habits, difficulty, and circumstances.
-
-Use controlled variation so CPUs do not repeatedly execute identical sequences.
-
-Preserve existing move variety and opponent adaptation.
-
-Do not add random direction changes just for visual activity.
-
-⸻
-
-PART VI — REBALANCE ALL FOUR DIFFICULTIES
-
-20. Difficulty Must Remain Meaningful
-
-The current CPUs are too strong, especially Easy.
-
-This must be corrected.
-
-Importantly, simply making reaction times longer is not enough.
-
-Difficulty should determine the quality of the CPU’s overall decision-making and execution.
-
-Think in terms of multiple dimensions:
-
-* Perception
-* Strategic understanding
-* Threat recognition
-* Decision consistency
-* Tactical execution
-* Positioning quality
-* Patience
-* Adaptation
-* Recovery judgment
-* Ability to anticipate consequences
-* Ability to manage resources
-* Willingness to take risks
-* Ability to recognize match-winning opportunities
-
-All difficulties should use the same underlying intelligence and legal capabilities.
-
-But they should not use those capabilities equally effectively.
-
-21. Easy — A Believable Casual Human
-
-Easy needs the most attention.
-
-The desired experience is a CPU that feels like someone casually playing Alva.
-
-It should:
-
-* Understand the basic objective.
-* Know how to move and attack.
-* Use its available moves.
-* Attempt to defend.
-* Occasionally perform combos.
-* Sometimes choose good positions.
-* Sometimes retreat.
-* Sometimes wait.
-* Recognize obvious opportunities.
-* Make mistakes naturally.
-* React less consistently.
-* Be less effective at escaping pressure.
-* Fail to capitalize on some openings.
-* Make less accurate distance judgments.
-* Have limited ability to anticipate its opponent.
-* Be more predictable than stronger CPUs.
-
-It should not:
-
-* Constantly execute highly effective offensive sequences.
-* Respond optimally to every situation.
-* Repeatedly punish small mistakes.
-* Maintain relentless pressure.
-* Perfectly optimize its spacing.
-* Consistently make sophisticated match-level decisions.
-* Feel like a tournament player with delayed reactions.
-
-Easy must still be intelligent.
-
-Do not make it intentionally run into the Void, forget how to play, or randomly ignore obvious danger.
-
-Its weaknesses should resemble those of an inexperienced human.
-
-A casual player should have a reasonable opportunity to win.
-
-The existing documented result of Easy winning 98.4% against the balanced reference opponent deserves investigation.
-
-Determine whether the reference opponent is too weak, Easy is overperforming, or both.
-
-Do not blindly tune against that single benchmark.
-
-22. Medium — A Competent, Imperfect Player
-
-Medium should feel like someone who understands Alva and has practiced.
-
-It should:
-
-* Make reasonably good decisions.
-* Use combos.
-* Understand common threats.
-* Adapt to obvious habits.
-* Recognize valuable positioning.
-* Retreat when danger is significant.
-* Use strategies with some consistency.
-* Understand match stakes reasonably well.
-
-However, it should still make mistakes, hesitate at times, and miss some difficult opportunities.
-
-Medium should be noticeably more capable than Easy without feeling oppressive.
-
-23. Hard — A Skilled Competitive Player
-
-Hard should be strong but beatable by a skilled human.
-
-It should:
-
-* Understand advanced positioning.
-* Use stage geometry effectively.
-* Manage Launch Point and Energy well.
-* Recognize and punish more openings.
-* Choose credible finishers.
-* Adapt to opponent behavior.
-* Change strategies when match conditions demand it.
-* Execute difficult plans with reasonable consistency.
-
-It should still make understandable errors.
-
-Avoid robotic precision or constant perfect responses.
-
-24. Brutal — An Elite Human-Like Opponent
-
-Brutal should be the highest difficulty.
-
-It should demonstrate:
-
-* Strong strategic reasoning.
-* Deep situational awareness.
-* Effective spacing.
-* Excellent stage understanding.
-* Good opponent adaptation.
-* Strong combo conversion.
-* Effective survival decisions.
-* Intelligent match management.
-* Sophisticated use of patience, pressure, and retreat.
-
-Brutal should feel like playing against an exceptional human.
-
-Not a machine reading hidden inputs.
-
-Even Brutal must have:
-
-* Nonzero reaction time.
-* Imperfect predictions.
-* Finite information.
-* Occasional judgment errors.
-* Believable decision-making.
-* Human-like pacing.
-
-Brutal should be difficult because it makes strong decisions, not because it cheats.
-
-25. Keep the Difficulty Curve Coherent
-
-Review js/data/difficulty.js.
-
-Retain the existing profile-driven architecture and the CAPABILITY ordering contract.
-
-Expand profiles only where new traits meaningfully express strategic or human behavioral capability.
-
-Avoid adding unnecessary configuration parameters.
-
-Potential dimensions worth evaluating include:
-
-* Strategic awareness
-* Match awareness
-* Retreat judgment
-* Patience
-* Positioning accuracy
-* Commitment discipline
-* Long-term planning
-* Adaptation confidence
-* Objective persistence
-
-Do not add traits merely for the sake of having more traits.
-
-Each parameter should have a clear effect and be testable.
-
-Higher difficulties should generally make stronger choices across representative situations, but a lower difficulty may occasionally make the correct decision.
-
-Make the difference between levels visible during normal play.
-
-⸻
-
-PART VII — IMPROVE DECISION QUALITY
-
-26. Compare the Value of Fighting Against Not Fighting
-
-The evaluator should not treat attacking as the default desirable action.
-
-A new decision should consider more than:
-
-“Which attack has the highest expected utility?”
-
-It should also consider:
-
-“Is initiating an engagement the correct strategic choice right now?”
-
-Possible alternatives include:
-
-* Attack now.
-* Approach without attacking.
-* Hold position.
-* Reposition.
-* Defend.
-* Retreat.
-* Recover.
-* Wait for a better opening.
-
-Compare these choices using reasonable expected benefits and risks.
-
-An attack that could deal significant Launch Point may still be a poor decision if:
-
-* The CPU is likely to be eliminated during the approach.
-* A missed attack would expose it to a finisher.
-* The CPU already has a safe match lead.
-* Its own Launch Point is very high.
-* The intended attack forces it offstage.
-* The opponent has a strong defensive answer.
-* The CPU sacrifices a particularly advantageous position.
-
-Conversely, excessive passivity is also a bad decision when:
-
-* The CPU is behind.
-* Time is running out.
-* The opponent is safely recovering.
-* The opponent can win by maintaining a lead.
-* The CPU has a clear opportunity to take control.
-
-The goal is intelligent decision selection, not universal caution.
-
-27. Better Risk Versus Reward
-
-Improve the calculation of strategic risk.
-
-A decision’s risk should depend on its consequences for the current match, not only the immediate damage.
-
-Examples:
-
-* Losing a life at 2–2 is especially costly.
-* Risking elimination while leading late can be unnecessary.
-* Taking a small risk while behind late may be justified.
-* A low-damage move with strong positional control may be more valuable than a high-damage move that exposes the CPU.
-* A retreat that safely recovers Launch Point may have long-term value.
-* An escape that leaves the CPU trapped at an edge may be worse than holding a safe defensive position.
-
-Ensure strategic preferences influence tactical evaluation without overriding mechanical reality.
-
-28. Smarter Defense
-
-Preserve existing Shield, Deflect, dodge, movement, and interrupt options.
-
-Improve their strategic selection.
-
-A CPU should understand when to:
-
-* Block.
-* Escape.
-* Counterattack.
-* Move out of range.
-* Preserve Energy.
-* Avoid exhausting its Shield resources.
-* Stand its ground.
-* Retreat.
-* Choose not to pursue.
-
-Defense should be more than an emergency response to an imminent hit.
-
-The AI should sometimes proactively place itself somewhere that makes incoming pressure easier to handle.
-
-At the same time, do not let strategic caution suppress necessary defensive reactions.
-
-29. More Natural Engagement Cycles
-
-Implement a believable rhythm between engagements where context justifies it.
+The text must not simply appear above the fighter performing the Deflect.
 
 For example:
 
-Neutral → Approach → Engagement → Disengagement → Reassessment → Re-engagement
+* Fighter #0001 performs an aerial Deflect against an incoming projectile.
+* The projectile is successfully redirected.
+* Deflected appears immediately above that projectile at the moment of redirection.
 
-This should not be a rigid sequence that all CPUs repeat.
+Existing engine integration
 
-The CPU might skip disengagement when it has a strong advantage.
+The relevant system already exists:
 
-It might stay aggressive during a match-critical opportunity.
+js/game/combat/combat.js
 
-It might immediately retreat after a dangerous exchange.
+Specifically:
 
-It might hold its position when the opponent is approaching.
+* CombatSystem.deflectProjectiles()
+* CombatSystem.deflections
 
-The important part is that CPU behavior changes meaningfully as the match develops.
+Each confirmed deflection already records information about the deflecting fighter and the redirected projectile.
 
-⸻
+Use these records.
 
-PART VIII — ARCHITECTURE AND SAFETY
+Also inspect js/game/combat/projectile.js, particularly Projectile.turnBack() and clashProjectiles(), because some projectile abilities can redirect other projectiles through repelling mechanics.
 
-30. Integrate With the Existing Modules
+Where an interaction genuinely redirects a projectile, it should be eligible for the same feedback. Simple projectile collisions, erasures, or destruction must not be labeled as deflections.
 
-Prefer focused extensions.
+Rendering requirements
 
-Suggested ownership:
+* Anchor the message to the actual projectile’s position.
+* Use the existing world-to-screen camera conversion.
+* Position the text slightly above the projectile sprite.
+* Do not use the deflecting fighter’s name tag as the anchor.
+* Avoid displaying duplicate messages for the same redirection.
+* Support multiple projectiles being deflected in quick succession.
+* Ensure the message can finish its animation safely if the projectile subsequently disappears.
 
-situation.js
-Richer derived match and risk context, using real state and perceived information appropriately.
+For the most reliable behavior, capture the deflected object’s position at the moment of the event, then animate the hint from that position. Following the projectile briefly while it remains valid is acceptable, but disappearing or destroyed entities must never cause errors.
 
-strategy.js
-Higher-level objectives, contextual mode selection, long-term decisions, and objective persistence.
+6.3 — “Stunned”
 
-stage-model.js
-Position quality, safe destinations, route awareness, and live stage hazards.
+Trigger: A fighter receives a genuine disabling status effect that temporarily prevents them from acting.
 
-values.js / evaluator.js
-Strategic utility, position value, engagement-versus-disengagement evaluation, and match consequences.
+Display:
 
-opponent-model.js
-Additional observed behavioral patterns where justified.
+Stunned
 
-brain.js
-Coordinating objective selection, tactical plans, survival priorities, interruption, and reassessment.
+Position: Directly above the fighter receiving the effect.
 
-plans.js
-Purposeful waiting, retreating, defensive holding, and other multi-step goals.
+Critical distinction
 
-defense.js
-Threat response integrated with strategic retreat and resource management.
+Ordinary hitstun must NOT trigger the Stunned hint.
 
-telemetry.js
-Explainability and measurement of newly introduced behaviors.
+Alva already has separate combat state fields:
 
-difficulty.js
-Careful balancing and any justified new profile dimensions.
+* combat.stun — ordinary hitstun.
+* combat.shieldStun — blockstun.
+* combat.paralysis — an actual immobilizing status effect.
 
-Do not force this exact structure if a cleaner solution fits the current code better.
+The Stunned hint is intended for exceptional disabling effects such as paralysis, not normal attack reactions.
 
-Avoid creating a monolithic decision function.
+Example — Fighter #0001
 
-Keep the system modular, testable, and maintainable.
+Fighter #0001’s Unlimited Void technique applies a paralysis effect.
 
-31. Preserve Information Fairness
+When that technique successfully paralyzes the opponent:
 
-CPU Intelligence must not cheat.
+* Display Stunned above the affected fighter.
+* Only trigger when the paralysis actually applies.
+* Do not display it if the attack is blocked.
+* Do not display it merely because the fighter is in a hurt animation.
+* Do not continuously spawn new Stunned messages for every simulation frame the paralysis remains active.
 
-Continue using the current perception pipeline for opponent information.
+The combat system already exposes the resolved paralysis value in hit events and stores the status in CombatState.
 
-Do not directly consult hidden future actions or raw player inputs.
+Use those existing values.
 
-Do not use unannounced stage hazard outcomes.
+Future compatibility
 
-Do not let CPUs instantly recognize all actions regardless of difficulty.
+Avoid hardcoding fighter #0001 or Unlimited Void into the rendering system.
 
-Public match facts such as score and remaining time can be known accurately.
+The correct behavior is:
 
-Opponent intentions, precise future movement, and unobserved actions must remain uncertain.
+Any fighter who receives a supported, genuine incapacitating effect should receive the Stunned hint.
 
-Higher difficulty should improve inference and decision-making, not grant supernatural knowledge.
+This makes the system compatible with future fighters and abilities.
 
-32. Preserve Determinism and Performance
+Trigger when the status is newly applied or meaningfully reapplied, not on every frame it remains active.
 
-The game uses fixed-step simulation.
+Do not show Stunned for:
 
-Keep all AI behavior deterministic for the same initial state, seed, and inputs.
-
-Use the existing seeded RNG.
-
-Do not introduce wall-clock-based decisions.
-
-Avoid excessive allocations, expensive full-stage searches every frame, or unnecessarily repeated simulations.
-
-Cache suitable computations.
-
-Use different update frequencies for high-level strategy and urgent tactical responses when appropriate.
-
-Do not delay emergency recovery or defensive reactions merely to preserve a strategic update interval.
-
-Performance must remain suitable for desktop and mobile browsers.
-
-33. Avoid Regressions
-
-Preserve:
-
-* All existing fighter attacks and mechanics.
-* Move coverage at every difficulty.
-* Shield and Deflect functionality.
-* Launch steering.
-* Offstage recovery.
-* Stage navigation.
-* Projectile interactions.
-* Combos.
-* Cooldowns and Energy rules.
-* CPU-versus-CPU Watch Mode.
-* Quick Battle behavior.
-* Deterministic tests.
-* Fighter universality.
-* Legitimate emergency threat responses.
-
-Practice Ground should retain its intended training dummy behavior.
-
-Do not modify character_rule.
-
-Do not change movement, damage, launch, Energy, cooldowns, hitboxes, or other shared combat mechanics merely to create difficulty differences.
-
-Any such unrelated change should be treated as out of scope.
+* Ordinary hitstun.
+* Shield blockstun.
+* Knockback.
+* Tumbling.
+* Normal attack recovery.
+* Cooldown restrictions.
+* A fighter simply standing still.
+* Non-incapacitating effects.
 
 ⸻
 
-PART IX — TESTING AND VALIDATION
+7. Shared Floating Feedback Architecture
 
-34. Update Existing Tests Carefully
+Damage hints and combat hints should use a consistent visual system.
 
-The current CPU tests assert that fighters should not remain idle beyond the existing inactivity limit.
+Avoid independently duplicating every part of the floating-text renderer.
 
-That expectation must change.
+A suitable implementation would introduce a shared rendering utility under:
 
-Replace the unconditional prohibition on idling with tests that distinguish:
+js/game/rendering/
 
-1. Purposeful inactivity.
-2. Accidental inactivity.
-3. Unsafe inactivity.
-4. Failure to leave a completed wait.
-5. Failure to react to urgent danger while waiting.
+For example:
 
-Do not weaken tests simply to make the implementation pass.
+combat-hints.js
 
-Preserve meaningful liveness guarantees.
+The exact filename is flexible.
 
-An intentional wait must be explainable and interruptible.
+Responsibilities
 
-35. Add Scenario-Based Intelligence Tests
+The shared system should:
 
-Create deterministic tests covering at least these situations:
+1. Accept confirmed combat feedback events.
+2. Create floating visual entries.
+3. Store their text, type, position/anchor, age, and stacking information.
+4. Advance their lifetimes through simulation time.
+5. Render them using the existing Canvas 2D pipeline.
+6. Remove expired entries.
+7. Respect interface settings.
+8. Respect reduced-motion settings.
 
-Humanization
+Possible hint categories:
 
-* CPU holds its position when movement is unnecessary.
-* CPU does not constantly shuffle at ideal spacing.
-* CPU waits for a clear reason.
-* CPU eventually leaves a completed waiting state.
-* CPU reacts to danger while waiting.
+* damage
+* blocked
+* deflected
+* stunned
 
-Launch Point
+Use named constants or a small consistent internal model, rather than scattered string comparisons throughout the engine.
 
-* CPU retreats when its elimination risk is high and escape is realistic.
-* CPU does not retreat unnecessarily when safe.
-* CPU prioritizes favorable launch directions.
-* CPU recognizes an opponent’s finishing vulnerability.
-* CPU understands the benefit and actual timing of passive Launch Point recovery.
+Visual consistency
 
-Shield and Energy
+Damage hints should retain their existing red styling.
 
-* CPU uses Shield while defensively recovering when appropriate.
-* CPU does not hold Shield indefinitely without justification.
-* CPU respects Energy exhaustion.
-* CPU releases a defensive position when it becomes unsafe.
+Combat hints should use a consistent but distinguishable color treatment.
 
-Match strategy
+Suggested palette:
 
-* Ahead late: prioritizes preserving a meaningful lead.
-* Behind late: seeks realistic scoring opportunities.
-* Tied near regulation expiry: accounts for overtime.
-* Tied near overtime expiry: understands Launch Point as a tiebreaker.
-* Match point: recognizes increased consequences.
-* Avoids risking elimination for low-value combat actions.
+* Blocked: light blue or cyan.
+* Deflected: cyan or bright teal.
+* Stunned: warm yellow or amber.
 
-Positioning
+These colors are suggestions, not new gameplay mechanics.
 
-* Prefers safe stage control at high Launch Point.
-* Escapes unfavorable corners.
-* Selects useful positions for finishing opportunities.
-* Navigates platforms without becoming stuck.
-* Avoids disappearing or unsafe platforms.
-* Reacts to visible stage hazards.
-* Adjusts positioning as overtime boundaries close.
+The messages should be:
 
-Strategic adaptation
+* Bold.
+* Readable on light and dark stages.
+* Outlined against the background.
+* Compact and unobtrusive.
+* Short-lived.
+* Smoothly animated.
+* Clearly associated with the relevant fighter or projectile.
 
-* Uses different plans against aggressive, defensive, and ranged opponents.
-* Changes objectives when match conditions change.
-* Does not rapidly oscillate between incompatible strategies.
-* Does not become permanently passive.
-* Does not become relentlessly aggressive regardless of circumstances.
+Avoid excessive particle effects, full-screen notifications, or large UI panels.
 
-Difficulty
+Positioning and stacking
 
-* Easy is noticeably less effective than Medium.
-* Medium is less consistent than Hard.
-* Hard remains distinguishable from Brutal.
-* Every level remains capable of basic combat, defense, and recovery.
-* No level receives altered fighter mechanics or illegal inputs.
+Use the existing canvas coordinate system correctly.
 
-36. Evaluate Full Matches
+Fighter-anchored hints should respect:
 
-Run the existing benchmark suite:
+* Fighter position.
+* Camera movement.
+* Camera zoom.
+* Fighter height.
+* Existing fighter name tags.
+* Energy bars.
+* Special ability markers.
+* Charm indicators.
 
-node tests/benchmarks/cpu-benchmark.mjs --seeds 4
+Projectile-anchored hints should respect the object’s world position.
 
-Use larger seed samples and additional stage coverage where practical.
+If a fighter is damaged and receives a status effect simultaneously, the messages must not render directly on top of each other.
 
-Compare results before and after.
+For example, an Unlimited Void hit might produce both:
 
-Evaluate:
++3
 
-* Win rates
-* Point differences
-* Launch Point dealt and taken
-* Accidental eliminations
-* Combo frequency
-* Punish frequency
-* Defensive behavior
-* Recovery success
-* Plan failures
-* Stuck navigation
-* Inactivity incidents
-* Strategic objective distribution
-* Time spent intentionally waiting
-* Time spent retreating
-* Whether waiting actually achieves its objective
+and
 
-Do not use win rate alone as a measure of intelligence.
+Stunned
 
-A CPU that wins more matches but feels robotic has not achieved this update’s goals.
+Both should remain readable when their respective settings are enabled.
 
-Likewise, a CPU that becomes easy to beat only because it randomly stands still has failed.
+Event timing
 
-The benchmark should reflect realistic performance differences between difficulty levels.
+CombatSystem.events and CombatSystem.deflections are reset during the simulation.
 
-Do not preserve previous high win rates as a requirement when those rates conflict with the new balancing objective.
+Ensure the floating feedback system consumes each relevant event exactly once during the appropriate fixed simulation step and stores persistent visual entries for subsequent render frames.
 
-37. Test All Fighters and Stages
+Do not rely on reading only the most recent events from a screen’s variable-rate rendering loop.
 
-Test all four existing playable fighters:
+Make sure stage-hazard events are captured as well, since Arena resolves those after the main combat update.
 
-* #0001
-* #0002
-* #0003
-* #0004
+Pausing and lifecycle
 
-Test all four playable stages:
-
-* Yerma
-* Sol-Noir
-* Asperitas
-* Adamaris
-
-Test Quick Battle and Watch Mode.
-
-Include different score states, Launch Point levels, Energy states, spawn sides, seeds, and match periods.
-
-Verify that fighter-specific capabilities, including healing techniques and special attacks, remain correctly understood through universal data.
-
-Also test CPU-versus-CPU matches where both fighters are defensive.
-
-Two CPUs choosing patience must not cause permanent deadlock or an artificial stalemate unrelated to match strategy.
-
-38. Human-Focused Playtesting
-
-Automated tests cannot fully validate whether CPUs feel human.
-
-If a browser-based runtime or playtesting environment is available, test real matches.
-
-Pay particular attention to:
-
-* Whether Easy feels welcoming.
-* Whether CPUs pause naturally.
-* Whether retreat looks intentional.
-* Whether defensive behavior is believable.
-* Whether CPUs make reasonable positional choices.
-* Whether the same situation always produces the same behavior.
-* Whether higher difficulties are smarter rather than merely more relentless.
-* Whether CPU-versus-CPU matches remain interesting to watch.
-
-Use qualitative findings to guide tuning.
-
-Do not claim that a human-like feeling has been validated solely by passing automated tests.
+* Floating feedback should stop aging while the simulation is paused.
+* A new match must not inherit old hints.
+* A restart/rematch must clear stale hints.
+* Respawns must not leave stale fighter-anchored text floating above a new life.
+* Removing or replacing a Practice Ground CPU must clean up associated hints.
+* Destroyed sessions must release their feedback state.
+* No stale fighter or projectile references should cause crashes.
 
 ⸻
 
-PART X — IMPLEMENTATION PROCESS
+8. Settings Behavior Across Game Modes
 
-39. Make the Update in Controlled Phases
+Implement consistent behavior across the current modes.
 
-This is a large update and must be approached carefully.
+Quick Battle
 
-Phase 1 — Audit and baseline
+* Launch Point recovery glow: enabled automatically.
+* Ability HUD: follows saved preference.
+* Cooldown indicators: follow saved preference.
+* Damage hints: follow saved preference.
+* Combat hints: follow saved preference.
 
-Understand the existing architecture, record baseline test and benchmark results, and identify conflicting assumptions.
+Both the player and the CPU can produce and receive applicable combat hints.
 
-Phase 2 — Purposeful humanization
+Watch Mode
 
-Implement justified waiting, improved neutral pacing, and intentional inactivity without compromising liveness or emergency reactions.
+* Launch Point recovery glow works for both CPUs.
+* Preserve the existing absence of a player Ability HUD.
+* Cooldown indicators follow the Interface setting.
+* Damage hints follow the Interface setting.
+* Combat hints follow the Interface setting.
 
-Phase 3 — Strategic awareness
+The functionality should not depend on whether a fighter is human-controlled.
 
-Improve understanding of match stakes, long-term objectives, Launch Point recovery, disengagement, and risk-versus-reward.
+Practice Ground
 
-Phase 4 — Positioning and stage intelligence
+* Launch Point recovery glow works for both the player and practice CPU.
+* Ability HUD follows its saved preference.
+* Cooldown indicators follow their saved preference.
+* Existing Practice Ground damage numbers continue working.
+* Combat hints may display when applicable combat events occur.
 
-Improve destination evaluation, stage control, launch positioning, survival spaces, platform decisions, and hazard awareness.
+Avoid duplicate practice damage numbers when integrating the shared floating feedback system.
 
-Phase 5 — Strategy integration
+Desktop, controller, and touch
 
-Make strategic objectives influence tactical actions consistently, with appropriate hysteresis and interruption behavior.
+All settings must operate correctly on supported devices.
 
-Phase 6 — Difficulty rebalance
+Disabling the Ability HUD must not disable actual touch-screen attack buttons.
 
-Tune the actual decision-making and execution differences across Easy, Medium, Hard, and Brutal.
-
-Focus heavily on Easy.
-
-Phase 7 — Testing and refinement
-
-Run relevant tests and benchmarks, investigate regressions, examine behavioral traces, and refine outcomes.
-
-Phase 8 — Documentation
-
-Update the relevant product specification, AI documentation, tests, and player-facing difficulty descriptions in both supported languages if their meaning has changed.
-
-Document the new behaviors and where to tune them.
-
-Keep the repository’s established documentation conventions.
-
-Each phase must preserve working behavior from earlier phases.
-
-Do not make an enormous unvalidated rewrite.
-
-40. Add Explainable Strategic Telemetry
-
-The existing telemetry is valuable.
-
-Expand it where needed to expose:
-
-* Current strategic objective
-* Why that objective was selected
-* Why the CPU changed objectives
-* Whether it is trying to win an exchange or protect the match outcome
-* Why it is retreating
-* Why it is waiting
-* Target destination and positional purpose
-* Estimated danger
-* Relevant score and clock context
-* Both Launch Points
-* Whether the last plan succeeded, expired, or failed
-
-Keep the normal execution path efficient.
-
-This information should make it possible to understand CPU behavior without guessing.
-
-If the CPU stands still for several seconds, the debug trace should explain the decision.
-
-If it abandons a recovery strategy and starts attacking, the trace should explain what changed.
+Controller navigation in the Interface settings category must work exactly like the existing categories.
 
 ⸻
 
-FINAL ACCEPTANCE CRITERIA
+9. Localization and Accessibility
 
-The update is successful only when the following are true:
+Alva currently supports English and French.
 
-1. The existing CPU Intelligence system is preserved and meaningfully enhanced.
-2. All four difficulties feel substantially more human.
-3. Easy becomes a believable casual opponent rather than an overly effective combat engine.
-4. Difficulty differences are meaningful and observable.
-5. CPUs can intentionally remain idle for legitimate reasons.
-6. Every intentional wait has a reason, appropriate exit conditions, and continued awareness of danger.
-7. Accidental inactivity and navigation failures remain detectable.
-8. CPUs can deliberately retreat, isolate themselves, defend, and recover Launch Point.
-9. They know when recovery is worth the time and when it is not.
-10. They understand their own Launch Point and their opponent’s Launch Point more deeply.
-11. They use better positioning and stage control.
-12. They distinguish winning an exchange from maximizing their chance of winning the match.
-13. Their strategic behavior changes according to score, clock, danger, opponent habits, and stage conditions.
-14. They preserve legal inputs, deterministic behavior, fighter universality, and existing mechanics.
-15. All important tests pass, and benchmark results are examined rather than assumed.
-16. The implementation remains efficient, maintainable, and appropriately documented.
+Update:
 
-What I Do Not Want
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-Do not:
+Translate:
 
-* Replace CPU Intelligence with a simple state machine.
-* Make every CPU passive.
-* Make every CPU overly defensive.
-* Use random inactivity to artificially weaken Easy.
-* Make CPUs behave identically across difficulties.
-* Give CPUs hidden information.
-* Add fighter-specific AI hardcoding.
-* Modify core combat physics for CPU balance.
-* Remove useful existing intelligence.
-* Force CPUs to constantly move.
-* Make Shield an automatic permanent safety strategy.
-* Build unnecessary overlapping decision systems.
-* Introduce unpredictable non-seeded behavior.
-* Sacrifice performance for excessive simulation.
-* Treat passing existing tests as sufficient proof that the AI feels human.
+* Interface category label.
+* All four option names.
+* All four option descriptions.
+* On/Off labels, reusing existing translations where appropriate.
+* Blocked.
+* Deflected.
+* Stunned.
 
-Final Instruction
+Suggested translations:
 
-Treat this as a major evolution of how Alva CPUs think.
+English	French
+Interface	Interface
+Ability HUD	Interface des capacités
+Cooldown indicators	Indicateurs de recharge
+Damage hints	Indications de dégâts
+Combat hints	Indications de combat
+Blocked	Bloqué
+Deflected	Renvoyé
+Stunned	Étourdi
 
-The main objective is not to produce an AI that always finds the best attack.
+Follow Alva’s existing localization conventions.
 
-It is to produce an AI that understands what it should be trying to achieve at any given moment, why that objective matters, and when it should change its approach.
+Do not hardcode English-only combat messages into rendering logic.
 
-Sometimes that means fighting.
+Accessibility
 
-Sometimes that means defending.
+Preserve existing settings dialog accessibility:
 
-Sometimes that means running away.
+* Proper tab and tabpanel relationships.
+* Keyboard focus.
+* Controller navigation.
+* Correct selected states.
+* Accessible option labels.
+* Consistent focus restoration.
 
-Sometimes that means taking control of the stage.
+Reduced-motion users should receive readable feedback without unnecessary movement or animation.
 
-Sometimes that means sacrificing immediate damage to improve the probability of winning.
+Ensure combat feedback remains legible when displayed against bright stage backgrounds.
 
-And sometimes that means simply standing still because there is genuinely no reason to move.
+⸻
 
-The CPU should know the difference.
+10. Implementation Guidance
 
-The intelligence is what it knows and decides. The difficulty is how consistently and effectively it applies that intelligence. The humanization is how naturally those decisions translate into behavior.
+Investigate these existing modules before making changes.
 
-All three must work together.
+Settings and localization
 
-Take the time to implement this properly. Favor clean, reasoned, incremental improvements over rushed additions. Preserve what already makes CPU Intelligence impressive, while giving Alva opponents more awareness, more strategic depth, more believable personalities, and much better difficulty balance.
+* js/core/settings.js
+* js/ui/settings-dialog.js
+* css/settings.css
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-At completion, provide:
+HUD
 
-1. A summary of the architectural and behavioral changes.
-2. The specific changes made to each difficulty.
-3. How purposeful inactivity and retreat work.
-4. How match-level strategy and stage awareness improved.
-5. Test results and benchmark comparisons.
-6. Any remaining balancing limitations or issues requiring human playtesting.
+* js/ui/hud.js
+* css/battle.css
+* js/ui/ability-hud.js
+* css/ability-hud.css
 
-The ultimate result should be CPUs that feel less like programmed opponents and more like actual people playing Alva—people with different skill levels, different decisions, and a genuine understanding of the match.
+Battle and Practice Ground
+
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+* js/game/battle.js
+* js/game/practice.js
+* js/game/arena.js
+
+Combat and rendering
+
+* js/game/combat/combat.js
+* js/game/combat/combat-state.js
+* js/game/combat/projectile.js
+* js/game/rendering/fighter-status.js
+* js/data/launch.js
+* js/data/characters/0001.js
+
+Also review the corresponding files under docs/ and the repository’s architecture conventions.
+
+Architecture expectations
+
+* Keep the combat system authoritative for combat outcomes.
+* Keep presentation-only preferences separate from fighter mechanics.
+* Prefer shared behavior over fighter-specific implementation.
+* Avoid changing character definitions when not necessary.
+* Reuse the existing rendering and settings patterns.
+* Avoid introducing external libraries.
+* Preserve Alva’s framework-free HTML, CSS, and JavaScript architecture.
+* Ensure the visual features do not affect AI decision-making, hit resolution, cooldowns, Energy, Launch, or performance-critical gameplay behavior.
+
+⸻
+
+11. Automated Testing
+
+Extend the existing test suite rather than replacing it.
+
+Relevant test areas include:
+
+* tests/interface/settings.test.mjs
+* tests/interface/ability-hud.test.mjs
+* tests/interface/battle-screen.test.mjs
+* tests/integration/practice-ground.test.mjs
+* tests/integration/quick-battle.test.mjs
+* tests/integration/watch-mode.test.mjs
+* tests/systems/launch.test.mjs
+* tests/systems/defense.test.mjs
+* tests/systems/deflect.test.mjs
+* tests/systems/hit-effects.test.mjs
+
+Introduce new targeted tests for floating combat hints if appropriate.
+
+Required test cases
+
+Launch Point recovery glow
+
+* No glow at 0 Launch Point.
+* No glow during the initial recovery delay.
+* Glow begins when passive recovery becomes active.
+* Glow remains active between individual recovery ticks.
+* A new damaging hit interrupts the glow.
+* Recovery reaching 0 removes the glow.
+* Healing alone does not incorrectly activate the glow.
+* Both HUD cards behave independently.
+
+Settings
+
+* All four settings have correct defaults.
+* All four settings save and reload.
+* Version 5 settings migrate correctly.
+* Earlier supported settings versions continue migrating.
+* Invalid values fall back safely.
+* Existing preferences are preserved.
+* Interface is reachable through keyboard and controller navigation.
+
+Ability HUD and cooldown indicators
+
+Test every combination of both toggles.
+
+Ensure disabling either display does not alter move execution or cooldown timing.
+
+Damage hints
+
+* Correct number shown for every confirmed hit.
+* No damage number on a successful block.
+* Multiple strikes generate appropriate individual numbers.
+* Both fighters supported.
+* No duplicate numbers in Practice Ground.
+* Disabled setting suppresses battle numbers.
+
+Combat hints
+
+* Successful block generates Blocked above defender.
+* Missed attack does not generate Blocked.
+* Confirmed projectile redirection generates Deflected above projectile.
+* Erased or merely colliding projectiles do not generate false deflections.
+* Paralysis application generates Stunned above affected fighter.
+* Ordinary hitstun does not generate Stunned.
+* Blockstun does not generate Stunned.
+* Repeated simulation frames do not duplicate an ongoing Stunned message.
+* Simultaneous damage and status messages do not overlap excessively.
+* Disabling Combat hints suppresses all three messages.
+
+Lifecycle
+
+* Pausing freezes floating-message progression.
+* Restarting clears old messages.
+* Respawning does not preserve stale messages.
+* Removing a practice CPU cleans up its feedback.
+* Camera movement does not break message placement.
+
+Run the full suite using:
+
+node --test
+
+Fix all regressions introduced by this update.
+
+⸻
+
+12. Final Acceptance Criteria
+
+The implementation is complete only when all the following are true:
+
+1. Launch Point numbers glow green during active passive recovery and return to normal when recovery is interrupted or completed.
+2. A fourth settings category called Interface appears after Combat.
+3. All four interface options can be enabled and disabled independently.
+4. Every preference saves correctly and survives reloading the game.
+5. Disabling Ability HUD completely hides the ability display without affecting player input.
+6. Disabling cooldown indicators hides the under-character cooldown visuals without affecting actual cooldowns.
+7. Damage hints display accurate damage values during real battles, matching the existing Practice Ground style.
+8. Combat hints display Blocked above the blocking fighter.
+9. Combat hints display Deflected above the actual redirected object.
+10. Combat hints display Stunned above a fighter who receives a genuine immobilizing effect, such as #0001’s paralysis, but never for regular hitstun.
+11. Feedback supports both sides of a battle, including CPU fighters and Watch Mode.
+12. Floating messages remain readable, correctly positioned, and free from excessive overlap.
+13. All new text works in English and French.
+14. Existing combat mechanics, controls, visuals, and settings remain intact.
+15. Automated tests pass and the features are verified in a browser.
+
+Final Instructions
+
+Implement this as a cohesive, production-ready interface update.
+
+Do not stop at planning, pseudocode, or placeholder methods. Implement the actual features and integrate them into the existing game.
+
+Read the relevant source before editing. Reuse existing functionality wherever possible, especially Practice Ground’s damage numbers, the combat event system, the projectile deflection records, and Alva’s settings infrastructure.
+
+Avoid unrelated refactors.
+
+After implementation, provide a concise summary of the modified files, the completed features, the tests executed, and any remaining limitations.
+
+The final experience should feel native to Alva: minimal, responsive, readable, and consistent with the game’s existing interface.
