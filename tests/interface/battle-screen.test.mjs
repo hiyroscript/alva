@@ -500,6 +500,47 @@ test('HUD: the Launch Point number follows the fighter, touches the DOM only whe
   assert.equal(formatLaunchPoint(99.6), '100');
 });
 
+test('HUD: passive recovery glows independently of cached digits, healing and the other card', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  const { hud } = screen;
+  const a = battle.p1.combat, b = battle.p2.combat;
+  const glowing = (panel) => panel.launchPointValue.classList.contains('is-recovering');
+  a.launchPoint = 5;
+  b.launchPoint = 8;
+  a.resetLaunchRecovery();
+  b.resetLaunchRecovery();
+  a.updateLaunchRecovery(1.99);
+  hud.update(battle);
+  assert.equal(glowing(hud.left), false);
+  a.updateLaunchRecovery(0.01);
+  hud.update(battle);
+  assert.equal(hud.left.launchPointValue.textContent, '5', 'no tick yet');
+  assert.equal(glowing(hud.left), true, 'state changes even with cached digits');
+  assert.equal(glowing(hud.right), false);
+  a.updateLaunchRecovery(0.5);
+  a.updateLaunchRecovery(0.2);
+  hud.update(battle);
+  assert.equal(hud.left.launchPointValue.textContent, '4');
+  assert.equal(glowing(hud.left), true, 'between ticks');
+  a.resetLaunchRecovery();
+  a.heal(1);
+  hud.update(battle);
+  assert.equal(glowing(hud.left), false, 'a hit interrupts; healing does not start recovery');
+  a.updateLaunchRecovery(2);
+  b.updateLaunchRecovery(2);
+  hud.update(battle);
+  assert.equal(glowing(hud.right), true);
+  a.updateLaunchRecovery(1.5);
+  hud.update(battle);
+  assert.equal(a.launchPoint, 0);
+  assert.equal(glowing(hud.left), false);
+  assert.equal(glowing(hud.right), true);
+  battle.p2.lostToVoid = true;
+  hud.update(battle);
+  assert.equal(glowing(hud.right), false, 'no passive recovery while awaiting respawn');
+});
+
 test('HUD: the card describes Energy to screen readers in steps of 5, exhausted included, never as Stamina', () => {
   const { screen } = setup();
   const battle = startBattle(screen);

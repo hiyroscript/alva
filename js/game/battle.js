@@ -58,12 +58,12 @@ export class Battle extends Arena {
   // Battle's, or either of Watch Mode's) never has either.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
-    combatAssist = true, comboAssist = true,
+    combatAssist = true, comboAssist = true, interfaceSettings = {},
   }) {
     // One seed for the battle's randomness: each CPU's and each stage
     // hazard's its own stream of it.
     const battleSeed = seed ?? (Date.now() & 0xffff);
-    super({ canvas, map, input, reducedMotion, seed: battleSeed });
+    super({ canvas, map, input, reducedMotion, seed: battleSeed, interfaceSettings });
     this.onPhase = onPhase || (() => {});
     // Kept for the whole battle: restarts, rematches and respawns keep them.
     this.mode = Object.keys(BATTLE_MODES).includes(mode) ? mode : 'quick-battle';
@@ -116,6 +116,7 @@ export class Battle extends Arena {
     this.projectiles.length = 0;
     this.clones.length = 0;
     this.fx.reset();
+    this.feedback.clear();
     this.acc = 0;
     // Back to the normal clock at its full length, out of any overtime: the
     // map's own Void, its waves at their normal speed.

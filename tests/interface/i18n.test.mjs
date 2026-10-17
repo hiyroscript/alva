@@ -213,6 +213,7 @@ test('French is really French: only proper names, codes and shared words read th
     'map.trait.terrain', 'map.trait.obstacles', // Terrain, Obstacles: the same words
     'mode.index', // Mode 01
     'pad.playstation.north', // Triangle, the PlayStation button's name
+    'settings.interface', // Interface: the same word
     'settings.combat', // Combat
     'settings.scheme.joystick', // Joystick
     'slot.cpu', 'slot.cpu1', 'slot.cpu2', // CPU

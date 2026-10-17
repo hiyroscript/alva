@@ -1,12 +1,12 @@
 // Run with node --test tests/interface/settings.test.mjs (no dependencies).
-// Settings: the versioned settings store (schema 5: language, Mobile
+// Settings: the versioned settings store (schema 6: language, Mobile
 // Controls, each scheme's custom touch layout, Combat Assist, Combo Assist
-// and the controller profiles; the version 1 to 4 migrations; the safe
+// and the controller profiles, Interface preferences; the version 1 to 5 migrations; the safe
 // fallback for missing, corrupt,
 // foreign or blocked storage), the first-launch language chooser, Home's
 // Settings gear, and the Settings dialog it opens over Home (modal
 // semantics, its navigation scope, focus, exactly the Language, Controls
-// and Combat sections, every choice saved at once),
+// Combat and Interface sections, every choice saved at once),
 // plus Home's Help / Controller / Download utilities (the install dialog
 // itself is tests/interface/install.test.mjs). On a minimal
 // fake DOM; layout and paint still need real-browser verification.
@@ -144,7 +144,7 @@ globalThis.document = {
 
 const {
   Settings, SETTINGS_KEY, SETTINGS_VERSION, DEFAULT_SETTINGS, LANGUAGES, DEFAULT_LANGUAGE, MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS,
-  DEFAULT_COMBAT_ASSIST, DEFAULT_COMBO_ASSIST, readSettings,
+  DEFAULT_COMBAT_ASSIST, DEFAULT_COMBO_ASSIST, INTERFACE_DEFAULTS, readSettings,
 } = await import('../../js/core/settings.js');
 const { t, followSettings, onLanguageChange, localizeTree, getLanguage, setLanguage } = await import('../../js/localization/i18n.js');
 const { ScreenManager, Screen } = await import('../../js/core/screen-manager.js');
@@ -257,9 +257,9 @@ const checked = (options) => options.map((o) => o.getAttribute('aria-checked'));
 
 // ---- The settings store ---------------------------------------------------------
 
-test('schema 5: language (unchosen), Mobile Controls (Joystick), an empty custom layout per scheme, Combat Assist and Combo Assist on and no controller profile by default', () => {
+test('schema 6: language (unchosen), Mobile Controls (Joystick), an empty custom layout per scheme, Combat Assist and Combo Assist on and no controller profile by default', () => {
   assert.equal(SETTINGS_KEY, 'alva.settings');
-  assert.equal(SETTINGS_VERSION, 5);
+  assert.equal(SETTINGS_VERSION, 6);
   assert.equal(DEFAULT_COMBAT_ASSIST, true);
   assert.equal(DEFAULT_COMBO_ASSIST, true);
   assert.deepEqual([...LANGUAGES], ['en', 'fr']);
@@ -267,6 +267,7 @@ test('schema 5: language (unchosen), Mobile Controls (Joystick), an empty custom
   assert.deepEqual([...MOBILE_CONTROLS], ['joystick', 'classic']);
   assert.equal(DEFAULT_MOBILE_CONTROLS, 'joystick');
   assert.deepEqual(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), {
+    ...INTERFACE_DEFAULTS,
     language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true,
     controllerProfiles: {},
   });
@@ -295,7 +296,8 @@ test('choosing English or French is saved as a real choice; a reload keeps it', 
     assert.equal(settings.language, language);
     assert.deepEqual(heard, [['language', language]]);
     assert.deepEqual(stored(storage), {
-      version: 5, language, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {},
+      ...INTERFACE_DEFAULTS,
+      version: 6, language, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {},
     });
     assert.deepEqual([...storage.map.keys()], [SETTINGS_KEY], 'one key, nothing scattered');
     const again = new Settings(storage);
@@ -342,7 +344,8 @@ test('version 1 settings migrate: the Joystick / Classic choice survives, the la
     // The next save writes the current schema, the choice still there.
     settings.set('language', 'fr');
     assert.deepEqual(stored(storage), {
-      version: 5, language: 'fr', mobileControls: scheme, touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true,
+      ...INTERFACE_DEFAULTS,
+      version: 6, language: 'fr', mobileControls: scheme, touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true,
       controllerProfiles: {},
     });
   }
@@ -350,7 +353,7 @@ test('version 1 settings migrate: the Joystick / Classic choice survives, the la
   // found are ignored.
   assert.deepEqual(readSettings({
     version: 1, mobileControls: 'classic', language: 'fr', touchLayouts: { classic: { jump: { x: 0.5, y: 0.5, scale: 1 } } }, combatAssist: false,
-  }), { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {} });
+  }), { ...INTERFACE_DEFAULTS, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {} });
   // And its own value is still checked.
   assert.equal(readSettings({ version: 1, mobileControls: 'dpad' }).mobileControls, 'joystick');
 });
@@ -368,21 +371,22 @@ test('version 2 settings migrate: language, Mobile Controls and both custom layo
   assert.deepEqual(settings.touchLayout('classic'), classic);
   assert.equal(settings.combatAssist, true);
   assert.equal(storage.writes, 0, 'nothing written just by reading');
-  // The next save writes schema 5 with all of it.
+  // The next save writes schema 6 with all of it.
   settings.set('mobileControls', 'joystick');
   assert.deepEqual(stored(storage), {
-    version: 5, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic }, combatAssist: true, comboAssist: true,
+    ...INTERFACE_DEFAULTS,
+    version: 6, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic }, combatAssist: true, comboAssist: true,
     controllerProfiles: {},
   });
   // An unchosen language stays unchosen, and a version 2 object never had
   // Combat Assist: whatever it holds under that name, it is on.
   for (const odd of [false, 'off', 0, null]) {
     assert.deepEqual(readSettings({ version: 2, language: null, mobileControls: 'joystick', combatAssist: odd }),
-      { language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {} }, String(odd));
+      { ...INTERFACE_DEFAULTS, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {} }, String(odd));
   }
   // Its own values are still checked, each on its own.
   assert.deepEqual(readSettings({ version: 2, language: 'de', mobileControls: 'classic', touchLayouts: 'big' }),
-    { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {} });
+    { ...INTERFACE_DEFAULTS, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true, controllerProfiles: {} });
 });
 
 test('Combat Assist is a real boolean: saved, announced and read back; anything else is refused or falls back to on', () => {
@@ -394,7 +398,8 @@ test('Combat Assist is a real boolean: saved, announced and read back; anything 
   assert.equal(settings.combatAssist, false);
   assert.deepEqual(heard, [['combatAssist', false]]);
   assert.deepEqual(stored(storage), {
-    version: 5, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: false, comboAssist: true,
+    ...INTERFACE_DEFAULTS,
+    version: 6, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: false, comboAssist: true,
     controllerProfiles: {},
   });
   assert.equal(new Settings(storage).combatAssist, false, 'off survives a reload');
@@ -445,7 +450,8 @@ test('version 4 settings migrate: language, Mobile Controls, both custom layouts
   assert.equal(storage.writes, 0, 'nothing written just by reading');
   settings.set('mobileControls', 'joystick');
   assert.deepEqual(stored(storage), {
-    version: 5, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, combatAssist: false, comboAssist: true,
+    ...INTERFACE_DEFAULTS,
+    version: 6, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, combatAssist: false, comboAssist: true,
     controllerProfiles: { '0002': profile },
   });
   // A version 4 object never had Combo Assist: whatever it holds under that
@@ -466,7 +472,8 @@ test('Combo Assist is a real boolean, apart from Combat Assist: saved, announced
   assert.equal(settings.combatAssist, true, 'Combat Assist untouched');
   assert.deepEqual(heard, [['comboAssist', false]]);
   assert.deepEqual(stored(storage), {
-    version: 5, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: false,
+    ...INTERFACE_DEFAULTS,
+    version: 6, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: false,
     controllerProfiles: {},
   });
   assert.equal(new Settings(storage).comboAssist, false, 'off survives a reload');
@@ -494,6 +501,38 @@ test('Combo Assist is a real boolean, apart from Combat Assist: saved, announced
   for (const value of [true, false]) {
     const loaded = new Settings(memoryStorage({ [SETTINGS_KEY]: JSON.stringify({ version: 5, comboAssist: value }) }));
     assert.equal(loaded.comboAssist, value, String(value));
+  }
+});
+
+test('Interface preferences: independent booleans, saved and reloaded, invalid values use their own defaults', () => {
+  const storage = memoryStorage();
+  const settings = new Settings(storage);
+  assert.deepEqual(INTERFACE_DEFAULTS, {
+    showAbilityHud: true, showCooldownIndicators: true, showDamageHints: false, showCombatHints: false,
+  });
+  for (const [name, defaultValue] of Object.entries(INTERFACE_DEFAULTS)) {
+    assert.equal(settings[name], defaultValue);
+    settings[name] = !defaultValue;
+    assert.equal(new Settings(storage)[name], !defaultValue);
+    for (const bad of ['false', 'on', 0, 1, null, [], {}]) {
+      assert.equal(settings.set(name, bad), false);
+      assert.equal(readSettings({ version: 6, [name]: bad })[name], defaultValue);
+    }
+  }
+  for (const [name, value] of Object.entries(INTERFACE_DEFAULTS)) assert.equal(new Settings(storage)[name], !value);
+});
+
+test('version 5 migration preserves every existing preference and adds Interface defaults for all supported versions', () => {
+  const storedValues = {
+    version: 5, language: 'fr', mobileControls: 'classic', combatAssist: false, comboAssist: false,
+    touchLayouts: { joystick: {}, classic: { jump: { x: 0.8, y: 0.7, scale: 1.2 } } },
+    controllerProfiles: { '0002': { jump: { button: 'l2', modifier: null, direction: null, activation: 'continuous' } } },
+  };
+  const { version, ...existing } = storedValues;
+  assert.deepEqual(readSettings(storedValues), { ...existing, ...INTERFACE_DEFAULTS });
+  for (let version = 1; version <= 5; version++) {
+    const migrated = readSettings({ ...storedValues, version, showAbilityHud: false, showDamageHints: true });
+    for (const [name, value] of Object.entries(INTERFACE_DEFAULTS)) assert.equal(migrated[name], value);
   }
 });
 
@@ -527,9 +566,9 @@ test('missing, corrupt, foreign or invalid stored settings fall back safely, val
   defaults(load('"classic"'), 'not an object');
   defaults(load('[]'), 'an array');
   defaults(load(JSON.stringify({ mobileControls: 'classic', language: 'fr' })), 'no version');
-  defaults(load(JSON.stringify({ version: 6, mobileControls: 'classic', language: 'fr', combatAssist: false })), 'a future version');
+  defaults(load(JSON.stringify({ version: 7, mobileControls: 'classic', language: 'fr', combatAssist: false })), 'a future version');
   defaults(load(JSON.stringify({ version: '3', mobileControls: 'classic', language: 'fr' })), 'a version that is not a number');
-  for (const raw of [undefined, '{not json', '[]', JSON.stringify({ version: 6, combatAssist: false, comboAssist: false })]) {
+  for (const raw of [undefined, '{not json', '[]', JSON.stringify({ version: 7, combatAssist: false, comboAssist: false })]) {
     assert.equal(load(raw).combatAssist, true, `Combat Assist on: ${raw}`);
     assert.equal(load(raw).comboAssist, true, `Combo Assist on: ${raw}`);
   }
@@ -547,7 +586,8 @@ test('missing, corrupt, foreign or invalid stored settings fall back safely, val
   const storage = memoryStorage({ [SETTINGS_KEY]: '{not json' });
   new Settings(storage).set('mobileControls', 'classic');
   assert.deepEqual(stored(storage), {
-    version: 5, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true,
+    ...INTERFACE_DEFAULTS,
+    version: 6, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: true, comboAssist: true,
     controllerProfiles: {},
   });
 });
@@ -1144,13 +1184,13 @@ test('Esc, gamepad Back, the close button and the dim around the panel close it;
   }
 });
 
-test('exactly three sections, Language, Controls and Combat, and nothing else', () => {
+test('four sections: Language, Controls, Combat and Interface', () => {
   const { dialog, done } = boot();
   try {
     const found = dialog.root.querySelectorAll('.settings-section');
-    assert.deepEqual(found.map((s) => s.getAttribute('data-settings-section')), ['language', 'controls', 'combat']);
-    assert.deepEqual(found.map((s) => s.tagName), ['SECTION', 'SECTION', 'SECTION']);
-    assert.deepEqual(found.map((s) => s.querySelector('.settings-group-title').textContent), ['Language', 'Controls', 'Combat']);
+    assert.deepEqual(found.map((s) => s.getAttribute('data-settings-section')), ['language', 'controls', 'combat', 'interface']);
+    assert.deepEqual(found.map((s) => s.tagName), ['SECTION', 'SECTION', 'SECTION', 'SECTION']);
+    assert.deepEqual(found.map((s) => s.querySelector('.settings-group-title').textContent), ['Language', 'Controls', 'Combat', 'Interface']);
     for (const section of found) {
       const category = dialog.categories.find(({ panel }) => panel === section);
       assert.equal(section.getAttribute('aria-labelledby'), category.tab.getAttribute('id'));
@@ -1184,11 +1224,11 @@ test('Language: English and Français as two radio buttons; picking one saves it
     assert.equal(dialog.isOpen, true, 'the dialog stays open');
     assert.equal(document.documentElement.lang, 'fr');
     assert.equal(dialog.activeSection, 'language');
-    assert.deepEqual(dialog.tabs.map((tab) => tab.textContent), ['Langue', 'Commandes', 'Combat']);
+    assert.deepEqual(dialog.tabs.map((tab) => tab.textContent), ['Langue', 'Commandes', 'Combat', 'Interface']);
     assert.equal(dialog.tablist.getAttribute('aria-label'), 'Catégories des paramètres');
     // Everything visible in it follows at once.
     assert.equal(dialog.root.querySelector('.settings-title').textContent, 'Paramètres');
-    assert.deepEqual(dialog.root.querySelectorAll('.settings-group-title').map((h) => h.textContent), ['Langue', 'Commandes', 'Combat']);
+    assert.deepEqual(dialog.root.querySelectorAll('.settings-group-title').map((h) => h.textContent), ['Langue', 'Commandes', 'Combat', 'Interface']);
     assert.equal(dialog.closeButton.getAttribute('aria-label'), 'Fermer les paramètres');
     assert.equal(schemeNamed(dialog, 'classic').querySelector('.settings-option-name').children[0].textContent, 'Boutons classiques');
     assert.equal(dialog.customizeNote.textContent, 'Joystick : déplacez et redimensionnez chaque commande.');
@@ -1554,15 +1594,17 @@ test('keyboard and gamepad navigate tabs, visible settings and Close inside the 
     app.input.pad('up');
     assert.equal(document.activeElement, dialog.tabs[2]);
     app.input.pad('right');
+    assert.equal(dialog.activeSection, 'interface');
+    app.input.pad('right');
     assert.equal(dialog.activeSection, 'language', 'wraps after the last tab');
     app.input.pad('left');
-    assert.equal(dialog.activeSection, 'combat', 'wraps before the first tab');
+    assert.equal(dialog.activeSection, 'interface', 'wraps before the first tab');
     assert.equal(app.screens.current, home);
     assert.ok(dialog.root.contains(document.activeElement));
     app.input.key('ArrowUp');
     assert.equal(document.activeElement, dialog.closeButton);
     app.input.key('ArrowDown');
-    assert.equal(document.activeElement, dialog.tabs[2]);
+    assert.equal(document.activeElement, dialog.tabs[3]);
     app.input.key('ArrowUp');
     app.input.key('KeyJ');
     assert.equal(dialog.isOpen, false);
@@ -1576,7 +1618,7 @@ test('tabs expose one panel, roving tabindex and valid focus; switching does not
     home.settingsButton.click();
     assert.equal(dialog.tablist.getAttribute('role'), 'tablist');
     assert.equal(dialog.tablist.getAttribute('aria-orientation'), 'horizontal');
-    assert.deepEqual(dialog.tabs.map((tab) => tab.textContent), ['Language', 'Controls', 'Combat']);
+    assert.deepEqual(dialog.tabs.map((tab) => tab.textContent), ['Language', 'Controls', 'Combat', 'Interface']);
     assert.equal(dialog.activeSection, 'language');
     app.settings.set('mobileControls', 'classic');
     app.settings.set('combatAssist', false);
@@ -1618,6 +1660,43 @@ test('tabs expose one panel, roving tabindex and valid focus; switching does not
   } finally { done(); }
 });
 
+test('Interface choices expose saved states, defaults, translations and keyboard/controller navigation', () => {
+  const { app, home, dialog, storage, done } = boot();
+  try {
+    home.settingsButton.click();
+    app.input.key('ArrowLeft');
+    assert.equal(dialog.activeSection, 'interface');
+    let row = 0;
+    for (const [name, options] of dialog.interfaceOptions) {
+      options.forEach((option, i) => place(option, 300 + i * 320, 180 + row * 90, 300, 50));
+      const defaultValue = INTERFACE_DEFAULTS[name];
+      assert.equal(options[defaultValue ? 0 : 1].getAttribute('aria-checked'), 'true');
+      assert.match(options[defaultValue ? 0 : 1].textContent, /Default/);
+      const group = options[0].parentNode;
+      assert.equal(group.getAttribute('role'), 'radiogroup');
+      assert.equal(group.getAttribute('aria-labelledby'), `settings-${name}-title`);
+      assert.equal(group.getAttribute('aria-describedby'), `settings-${name}-desc`);
+      row++;
+    }
+    app.input.pad('down');
+    assert.equal(document.activeElement, dialog.interfaceOptions.get('showAbilityHud')[0]);
+    app.input.pad('right');
+    app.input.pad('confirm');
+    assert.equal(app.settings.showAbilityHud, false);
+    app.input.key('ArrowDown');
+    app.input.key('KeyJ');
+    assert.equal(app.settings.showCooldownIndicators, false);
+    for (const name of ['showDamageHints', 'showCombatHints']) dialog.interfaceOptions.get(name)[0].click();
+    const reload = new Settings(storage);
+    assert.deepEqual(Object.keys(INTERFACE_DEFAULTS).map((name) => reload[name]), [false, false, true, true]);
+    app.settings.language = 'fr';
+    assert.match(dialog.sections.interface.textContent, /Interface des capacités/);
+    assert.match(dialog.sections.interface.textContent, /Indicateurs de recharge/);
+    assert.match(dialog.sections.interface.textContent, /Indications de dégâts/);
+    assert.match(dialog.sections.interface.textContent, /Indications de combat/);
+  } finally { done(); }
+});
+
 test('Tab and Shift+Tab wrap within visible controls, and closing removes its scope only once', () => {
   const { app, home, dialog, done } = boot();
   try {
@@ -1653,7 +1732,7 @@ test('another configured section gets a tab, panel and directional navigation wi
   const { app, home, dialog, done } = boot();
   try {
     home.settingsButton.click();
-    assert.equal(dialog.tabs.length, 4);
+    assert.equal(dialog.tabs.length, 5);
     app.input.pad('left');
     assert.equal(dialog.activeSection, 'test-section');
     assert.equal(dialog.currentSection.panel.hidden, false);
@@ -1661,7 +1740,7 @@ test('another configured section gets a tab, panel and directional navigation wi
     app.input.pad('down');
     assert.equal(document.activeElement, control);
     app.input.pad('up');
-    assert.equal(document.activeElement, dialog.tabs[3]);
+    assert.equal(document.activeElement, dialog.tabs[4]);
     app.input.pad('right');
     assert.equal(dialog.activeSection, 'language');
   } finally {

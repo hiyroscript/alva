@@ -23,6 +23,8 @@
 //             and the reverse (see Fighter.comboAction). Both are read as
 //             each Quick Battle or Practice Ground session starts; no CPU
 //             ever has either.
+//   Interface Ability HUD, cooldown rings, damage hints and combat hints.
+//             Independent display preferences; never combat rules.
 //
 // Every choice saves on this device at once through app.settings
 // (js/core/settings.js). The dialog is modal: role="dialog" with
@@ -35,7 +37,7 @@
 import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
-import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_COMBAT_ASSIST, DEFAULT_COMBO_ASSIST } from '../core/settings.js';
+import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_COMBAT_ASSIST, DEFAULT_COMBO_ASSIST, INTERFACE_DEFAULTS } from '../core/settings.js';
 import { ICONS } from './icons.js';
 
 // A small picture of each layout's lower-left corner, for sighted players
@@ -77,6 +79,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'language', label: 'settings.language', note: 'settings.languageNote', build: (dialog) => dialog.buildLanguage() },
   { id: 'controls', label: 'settings.controls', note: 'settings.controlsNote', build: (dialog) => dialog.buildControls() },
   { id: 'combat', label: 'settings.combat', build: (dialog) => dialog.buildCombat() },
+  { id: 'interface', label: 'settings.interface', build: (dialog) => dialog.buildInterface() },
 ];
 
 export class SettingsDialog {
@@ -276,6 +279,39 @@ export class SettingsDialog {
     return [assistGroup, comboGroup];
   }
 
+  buildInterface() {
+    this.interfaceOptions = new Map();
+    return Object.entries(INTERFACE_DEFAULTS).map(([name, defaultValue]) => {
+      const title = `settings-${name}-title`;
+      const desc = `settings-${name}-desc`;
+      const options = [true, false].map((on) => {
+        const option = el('button', {
+          class: 'settings-choice', type: 'button', role: 'radio', 'aria-checked': 'false',
+          'data-nav': true, 'data-interface-setting': name, 'data-value': String(on),
+        }, [
+          el('span', { class: 'settings-choice-name' }, [
+            el('span', tx(on ? 'settings.combatAssistOn' : 'settings.combatAssistOff')),
+            on === defaultValue ? el('span', { class: 'settings-option-tag', ...tx('common.default') }) : null,
+          ]),
+          el('span', { class: 'settings-language-check', 'aria-hidden': 'true', html: ICONS.check }),
+        ]);
+        option.addEventListener('click', () => {
+          this.app.settings.set(name, on);
+          this.markCurrent();
+        });
+        return option;
+      });
+      this.interfaceOptions.set(name, options);
+      return el('div', { class: 'settings-subgroup settings-interface-group' }, [
+        el('h4', { class: 'settings-subtitle', id: title, ...tx(`settings.${name}`) }),
+        el('p', { class: 'settings-group-note', id: desc, ...tx(`settings.${name}Desc`) }),
+        el('div', {
+          class: 'settings-choices', role: 'radiogroup', 'aria-labelledby': title, 'aria-describedby': desc,
+        }, options),
+      ]);
+    });
+  }
+
   get currentSection() {
     return this.categories.find(({ id }) => id === this.activeSection);
   }
@@ -384,6 +420,13 @@ export class SettingsDialog {
   // in use (with a Custom layout tag once that scheme has one).
   markCurrent() {
     const { language, mobileControls, combatAssist, comboAssist } = this.app.settings;
+    for (const [name, options] of this.interfaceOptions) {
+      for (const option of options) {
+        const on = option.getAttribute('data-value') === String(this.app.settings.get(name));
+        option.classList.toggle('is-current', on);
+        option.setAttribute('aria-checked', String(on));
+      }
+    }
     for (const option of this.languageOptions) {
       const on = option.getAttribute('data-language') === language;
       option.classList.toggle('is-current', on);

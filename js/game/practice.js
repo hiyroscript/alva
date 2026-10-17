@@ -33,38 +33,21 @@ import { Arena } from './arena.js';
 import { Fighter } from './fighters/fighter.js';
 import { PlayerController } from './fighters/fighter-controller.js';
 
-// Floating damage numbers over the CPU: how long each lasts (seconds), how
-// far it rises meanwhile (world units) and when it starts to fade (fraction
-// of its life).
-const DAMAGE_LIFE = 0.8;
-const DAMAGE_RISE = 26;
-const DAMAGE_FADE = 0.45;
-// A number this young (seconds) still holds its row: a new one takes the
-// lowest row free of them, so hits close together stack instead of
-// overlapping.
-const DAMAGE_STACK = 0.2;
-const DAMAGE_COLOR = '#ff3434';
-
-// "+5", "+10", "+2.5": the Launch Point a hit added, with no float noise.
-export function formatDamage(damage) {
-  return `+${Number(damage.toFixed(2))}`;
-}
+// Kept as a public helper for training tools; the renderer is shared.
+export { formatDamage } from './rendering/combat-feedback.js';
 
 export class PracticeSession extends Arena {
   // `combatAssist` and `comboAssist` are the player's Combat Assist and
   // Combo Assist settings (each on unless given false), for Player 1's
   // controller only: the practice CPU has no controller, so it never has
   // either.
-  constructor({ canvas, map, def, sprites, input, reducedMotion = false, combatAssist = true, comboAssist = true }) {
-    super({ canvas, map, input, reducedMotion });
+  constructor({ canvas, map, def, sprites, input, reducedMotion = false, combatAssist = true, comboAssist = true, interfaceSettings = {} }) {
+    super({ canvas, map, input, reducedMotion, interfaceSettings });
     this.reducedMotion = reducedMotion;
     this.combatAssist = combatAssist === true;
     this.comboAssist = comboAssist === true;
     this.player = null;
     this.cpu = null;
-    // Live damage numbers over the CPU, oldest first:
-    // { target, damage, text, age, stack }.
-    this.damageNumbers = [];
     this.setFighter(def, sprites);
   }
 
@@ -77,6 +60,7 @@ export class PracticeSession extends Arena {
   setFighter(def, sprites) {
     const old = this.player;
     if (old) {
+      this.feedback.removeFighter(old);
       old.endTechnique('destroy');
       old.cancelSummon();
       old.cancelCombatAssist();
@@ -131,7 +115,7 @@ export class PracticeSession extends Arena {
     const keep = (e) => e.owner !== cpu && e.target !== cpu;
     this.clones.splice(0, this.clones.length, ...this.clones.filter(keep));
     this.projectiles.splice(0, this.projectiles.length, ...this.projectiles.filter(keep));
-    this.damageNumbers.length = 0;
+    this.feedback.removeFighter(cpu);
     cpu.opponent = null;
     this.cpu = null;
     this.pairFighters();
@@ -158,72 +142,16 @@ export class PracticeSession extends Arena {
   // practice simply carries on.
   onVoid(f) {
     this.detachFromPlay(f, 'void');
-    const numbers = this.damageNumbers;
-    numbers.splice(0, numbers.length, ...numbers.filter((d) => d.target !== f));
     this.scheduleRespawn(f);
   }
 
-  // ---- Loop -------------------------------------------------------------------
-
-  // The shared world step, then this step's hits on the CPU become damage
-  // numbers.
-  update(dt) {
-    super.update(dt);
-    this.updateDamageNumbers(dt);
+  // Practice keeps its always-on CPU damage feedback, independently of the
+  // battle preference. The Arena consumes and draws it once alongside hints.
+  get feedbackOptions() {
+    return { ...super.feedbackOptions, damageHints: true, damageTarget: this.cpu };
   }
 
-  // Ages the numbers already up, then adds one per hit the CPU took this
-  // step, from the Launch Point the CombatSystem's resolved hit added.
-  updateDamageNumbers(dt) {
-    const list = this.damageNumbers;
-    let n = 0;
-    for (const d of list) {
-      d.age += dt;
-      if (d.age < DAMAGE_LIFE) list[n++] = d;
-    }
-    list.length = n;
-    for (const e of this.combat.events) {
-      if (!this.cpu || e.target !== this.cpu || !(e.damage > 0)) continue;
-      let stack = 0;
-      while (list.some((d) => d.age < DAMAGE_STACK && d.stack === stack)) stack++;
-      list.push({ target: e.target, damage: e.damage, text: formatDamage(e.damage), age: 0, stack });
-    }
-  }
-
-  // ---- Rendering --------------------------------------------------------------
-
-  render() {
-    super.render();
-    if (this.view.pxW) this.drawDamageNumbers();
-  }
-
-  // Red, outlined "+N" numbers over the CPU's name tag (and its Energy bar,
-  // while that shows), following it as it moves: each rises a little (not
-  // with reduced motion) and fades out.
-  drawDamageNumbers() {
-    if (!this.damageNumbers.length) return;
-    const { ctx, view } = this;
-    const s = view.scale;
-    const font = Math.max(15, Math.round(15 * s));
-    ctx.save();
-    ctx.font = `800 ${font}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(2, font * 0.2);
-    ctx.strokeStyle = 'rgba(12, 12, 14, 0.85)';
-    ctx.fillStyle = DAMAGE_COLOR;
-    for (const d of this.damageNumbers) {
-      const t = d.age / DAMAGE_LIFE;
-      const [x] = this.markerAnchor(d.target);
-      const rise = this.reducedMotion ? 0 : DAMAGE_RISE * t * s;
-      // Clear of the tag and any Energy bar over it (see Arena.statusTop),
-      // stacked by arrival.
-      const y = this.statusTop(d.target) - 2 - d.stack * font * 0.95 - rise;
-      ctx.globalAlpha = t < DAMAGE_FADE ? 1 : Math.max(0, 1 - (t - DAMAGE_FADE) / (1 - DAMAGE_FADE));
-      ctx.strokeText(d.text, Math.round(x), Math.round(y));
-      ctx.fillText(d.text, Math.round(x), Math.round(y));
-    }
-    ctx.restore();
+  get damageNumbers() {
+    return this.feedback.entries.filter((entry) => entry.kind === 'damage');
   }
 }
