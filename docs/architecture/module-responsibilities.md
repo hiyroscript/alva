@@ -35,7 +35,7 @@ There are no import cycles (checked over every module).
 | `gamepad-devices.js` | Controller identification (PlayStation / Xbox, conservatively), the normalized button names and each family's names for them. | `controller-manager.js`, `data/controller-profiles.js`, `ui/controller-glyphs.js` |
 | `controller-manager.js` | `ControllerManager`: connected controllers, the four-controller limit, the status, Player 1's controller, refresh, and Player 1's buttons and sticks each frame. | `app.js`, `input-manager.js`, `ui/controller-dialog.js`, `screens/home-screen.js`, `ui/controller-editor.js` |
 | `controller-resolver.js` | `ControllerResolver`, `compileProfile`: a controller's presses resolved into control codenames for a fighter and where it is (one owner per press, modifier first, directions, activations); the stick thresholds. | `input-manager.js`, `ui/controller-editor.js` |
-| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Combat Assist, Combo Assist, each fighter's controller layout. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js`, `ui/controller-editor.js` |
+| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Combat Assist, Combo Assist, each fighter's controller layout, the four Interface display preferences. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js`, `ui/controller-editor.js` |
 | `touch-layout.js` | Touch control ids, layout geometry and sanitizing. | `settings.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
 | `asset-loader.js` | Image loading and decoding. | `app.js` |
 | `device.js` | Touch-first detection, orientation, reduced motion. | `app.js` |
@@ -91,6 +91,7 @@ There are no import cycles (checked over every module).
 | `combat/projectile.js` | Projectiles, and what they do to each other (`clashProjectiles`: repel, erase); `turnBack` (shared by repel and the Deflect); the art's spin (`projectileAngle`). | `arena.js`, `fighters/fighter.js` |
 | `combat/summon.js` | The summon system and its clones. | `arena.js`, `fighters/fighter.js`, `ai/moveset.js` |
 | `combat/technique.js` | The technique runtime. | `fighters/fighter.js`, `ai/moveset.js`, `data/loadout.js` |
+| `rendering/combat-feedback.js` | Floating damage, block, deflection and paralysis feedback, with shared timing, stacking and drawing. | `arena.js`, `practice.js` |
 | `combat/launch-bounce.js` | Launch rebounds and their settings. | `fighters/fighter.js`, `rendering/hit-fx.js` |
 | `ai/combat-ai.js` | `CombatAIController`: CPU Intelligence as the modes build it. | `battle.js` |
 | `ai/moveset.js` | `readMoveset`, `hurtExtent`: a definition read raw. | `ai/cpu-intelligence/capabilities.js` |

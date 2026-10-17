@@ -92,6 +92,7 @@ function bindPanel(panel, tag, fighter) {
 
 function updatePanel(panel, fighter) {
   const { combat } = fighter;
+  panel.launchPointValue.classList.toggle('is-recovering', !fighter.lostToVoid && !!combat.recoveringLaunchPoint);
   const text = formatLaunchPoint(combat.launchPoint);
   if (text !== panel.shownLaunchPoint) {
     panel.shownLaunchPoint = text;

@@ -1709,21 +1709,21 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
     { type: 'block', attacker: player, target: cpu, damage: 0 },
     { type: 'hit', attacker: player, target: cpu, damage: 1 },
   );
-  session.updateDamageNumbers(0);
+  session.updateFeedback(0);
   assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['+5', 0], ['+1', 1]]);
-  // Once a number has had a moment to rise, its row is free again.
+  // A number keeps its row until it expires, also with reduced motion.
   session.combat.events.length = 0;
-  session.updateDamageNumbers(0.1);
+  session.updateFeedback(0.1);
   session.combat.events.push({ type: 'hit', attacker: player, target: cpu, damage: 3 });
-  session.updateDamageNumbers(0);
+  session.updateFeedback(0);
   assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['+5', 0], ['+1', 1], ['+3', 2]]);
   session.combat.events.length = 0;
-  session.updateDamageNumbers(0.15);
+  session.updateFeedback(0.15);
   session.combat.events.push({ type: 'hit', attacker: player, target: cpu, damage: 10 });
-  session.updateDamageNumbers(0);
-  assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['+5', 0], ['+1', 1], ['+3', 2], ['+10', 0]]);
+  session.updateFeedback(0);
+  assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['+5', 0], ['+1', 1], ['+3', 2], ['+10', 3]]);
   session.combat.events.length = 0;
-  session.damageNumbers.length = 0;
+  session.feedback.clear();
 
   // A real hit, drawn on a sized 1280 x 720 canvas at a real art scale (the
   // fake art is 1 px tall), with both fighters in view.
@@ -1760,7 +1760,8 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
   let steps = 0;
   while (session.damageNumbers.length && steps < 120) { run(); steps++; }
   assert.ok(steps >= 0.6 * 60 && steps <= 1.0 * 60, `lasts ${steps} steps`);
-  session.damageNumbers.push({ target: cpu, damage: 3, text: '+3', age: 0.7, stack: 0 });
+  session.feedback.add('damage', { target: cpu, damage: 3 });
+  session.feedback.entries.at(-1).age = 0.7;
   const late = draw();
   assert.ok(late.y < first.y, 'drifted up');
   assert.ok(late.alpha < 1, 'fading');
@@ -1802,7 +1803,7 @@ test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () 
   const player = session.player;
   player.combat.launchPoint = 50;
   old.combat.launchPoint = 40;
-  session.damageNumbers.push({ target: old, damage: 5, text: '+5', age: 0, stack: 0 });
+  session.feedback.add('damage', { target: old, damage: 5 });
 
   screen.openMenu();
   assert.equal(screen.cpuBtn.textContent, 'Change CPU');

@@ -430,7 +430,7 @@ Shared buttons that resolve one way are not conflicts: the same button on
 the ground and in the air (Spin Attack and Blue Tornado, the Shield and the
 Deflect), a combination beside its plain button, a direction beside none.
 **Save** stores the whole layout for that fighter alone, under its id
-(`controllerProfiles` in the settings, version 5); **Cancel** discards
+(`controllerProfiles` in the settings, version 6); **Cancel** discards
 unsaved changes after asking; **Restore defaults** asks, then puts that
 fighter alone back on its recommended layout. Saved layouts load on every
 visit; a malformed stored binding falls back to the recommended one, never

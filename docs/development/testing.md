@@ -45,6 +45,21 @@ and check #0001's numbers (frame-exact timings, combo routes). They are
 correct for #0001, and the same rules are covered for every fighter by the
 character-neutral tests above.
 
+## Interface customization and combat feedback
+
+`tests/systems/combat-feedback.test.mjs` covers resolved damage sources,
+blocks, paralysis application versus ordinary hitstun, projectile redirection
+versus erasure, both battle modes, fixed-step hazard timing, pause/lifecycle,
+shared Practice Ground feedback, camera anchoring, localization and reduced
+motion. Settings tests include schema 6 and migrations from versions 1–5;
+HUD tests cover recovery state between ticks and all Ability HUD/ring choices.
+
+Browser verification for this update uses Chromium at desktop and landscape
+touch sizes, in English and French, with reduced motion, across Quick Battle,
+Watch Mode and Practice Ground. Physical controllers and other browser engines
+remain device checks; the existing keyboard/gamepad navigation tests run on
+simulated input.
+
 ## The CPU benchmark
 
 ```sh

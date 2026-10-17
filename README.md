@@ -104,6 +104,10 @@ blocks every attack.
   install Alva as a lightweight web app (no large download), using the
   browser's own installation where it offers one and step-by-step
   instructions elsewhere (Safari on iPhone and iPad included).
+- **Interface settings**: independently show the Ability HUD, cooldown rings,
+  floating damage numbers and combat hints (Blocked, Deflected and Stunned).
+  Launch Point numbers glow green during passive recovery. Practice Ground
+  keeps its training damage numbers.
 - **The whole interface in English and French**, Settings, and a
   **Discover** reference with three sections: Fighters, Movement, and Launch.
   Fighters each have one 1–5 difficulty rating and a concise play-style
