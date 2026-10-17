@@ -28,7 +28,6 @@ import { drawShield } from './rendering/shield-fx.js';
 import { HIT_FX, HitEffects, whiteFrame } from './rendering/hit-fx.js';
 import { createTheme } from '../stages/index.js';
 import { slotLabel } from '../localization/i18n.js';
-import { CombatFeedback } from './rendering/combat-feedback.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
 const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
@@ -39,7 +38,7 @@ const TECHNIQUE_DEBUG = '#29f0ff';
 export class Arena {
   // `seed` fixes the stage hazards' randomness (each its own stream of it,
   // see js/game/platform-hazards.js); a mode passes its own (a Battle's).
-  constructor({ canvas, map, input, reducedMotion = false, seed = 0, interfaceSettings = {} }) {
+  constructor({ canvas, map, input, reducedMotion = false, seed = 0 }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.map = map;
@@ -74,8 +73,6 @@ export class Arena {
     // speed trails and a lethal launch's slow motion. Presentation only:
     // they slow the clock the fixed steps are fed from, never a step.
     this.fx = new HitEffects({ reducedMotion });
-    this.interfaceSettings = interfaceSettings;
-    this.feedback = new CombatFeedback();
     this.shakePx = { x: 0, y: 0 };
     this.gravity = CONFIG.sim.gravity;
     this.step = CONFIG.sim.step;
@@ -246,30 +243,18 @@ export class Arena {
     for (const f of fighters) f.updateAttackFacing();
     spawnProjectiles(fighters, this.projectiles);
     for (const p of this.projectiles) p.update(dt, this.stage);
-    const deflections = clashProjectiles(this.projectiles);
+    clashProjectiles(this.projectiles);
     updateClones(this.clones, dt);
     spawnClones(fighters, this.clones, this.stage);
     applyPulls(fighters, this.projectiles, dt);
-    this.combat.update(fighters, this.projectiles, this.clones, deflections);
+    this.combat.update(fighters, this.projectiles, this.clones);
     const landed = this.stageHazards.update(dt, { live: this.hazardsLive });
     for (const r of landed) this.fx.addShake(r.size === 'large' ? 4 : 2);
     this.stageHazards.resolve(fighters, this.combat);
     this.fx.take(this.combat.events, this);
-    this.updateFeedback(dt);
     removeDeadProjectiles(this.projectiles);
     removeDeadClones(this.clones);
     this.checkVoid(fighters);
-  }
-
-  get feedbackOptions() {
-    return {
-      damageHints: this.interfaceSettings.showDamageHints === true,
-      combatHints: this.interfaceSettings.showCombatHints === true,
-    };
-  }
-
-  updateFeedback(dt) {
-    this.feedback.update(dt, this.combat.events, this.combat.deflections, this.fighters, this.feedbackOptions);
   }
 
   // A technique's burst let go of `effect` (see Technique.takeEffect): its
@@ -373,7 +358,6 @@ export class Arena {
   // go. Its own technique ends with `reason`, and its own summon's startup
   // and approach are cut short.
   detachFromPlay(f, reason) {
-    this.feedback.removeFighter(f);
     f.endTechnique(reason);
     f.cancelSummon();
     f.cancelCombatAssist();
@@ -481,7 +465,6 @@ export class Arena {
     // orange mark over all of it. A fighter out of play shows none of it.
     this.drawMarkers(fighters);
     this.drawStatus(fighters);
-    this.feedback.draw(this);
     if (this.debug) this.drawDebug();
   }
 
@@ -682,9 +665,7 @@ export class Arena {
       const [x, , footY] = this.markerAnchor(f);
       if (!statusOnScreen(x, footY, view)) continue;
       drawEnergyBar(ctx, f, this.energyBarRect(f), view.dpr);
-      if (this.interfaceSettings?.showCooldownIndicators !== false && f !== this.hudCooldownsFor) {
-        drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
-      }
+      if (f !== this.hudCooldownsFor) drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
       const mark = this.specialMarkRect(f);
       if (mark) drawSpecialMark(ctx, mark, view.dpr, this.fxTime, this.reducedMotion);
       const charm = this.charmMarkRect(f);
@@ -861,9 +842,6 @@ export class Arena {
   }
 
   destroy() {
-    this.feedback.clear();
-    this.combat.events.length = 0;
-    this.combat.deflections.length = 0;
     // No technique may keep its owner past the arena, nor a summon's
     // startup its target.
     for (const f of this.fighters) {

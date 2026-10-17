@@ -4,7 +4,7 @@
 
 /* ---------------------------------------------------------------------
    Settings — a translucent glass dialog over Home: Language, Controls
-   Combat and Interface
+   and Combat
    --------------------------------------------------------------------- */
 
 /* Home stays visible under the shared dim; the glass panel blurs it where
@@ -110,10 +110,6 @@
   color: var(--text-strong);
 }
 .settings-group-note { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
-.settings-interface-group + .settings-interface-group {
-  border-top: 1px solid var(--glass-seam);
-  padding-top: clamp(10px, 2vh, 16px);
-}
 /* Match ENERGY_STYLE.fill in js/game/rendering/fighter-status.js. */
 .settings-energy { font-weight: 700; color: #b026ff; }
 .settings-subgroup { display: grid; gap: 8px; }

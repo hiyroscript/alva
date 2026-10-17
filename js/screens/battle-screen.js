@@ -249,7 +249,6 @@ export class BattleScreen extends Screen {
       difficulty,
       combatAssist: app.settings.combatAssist,
       comboAssist: app.settings.comboAssist,
-      interfaceSettings: app.settings,
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.abilityHud.bind(watch ? null : this.battle.p1);
@@ -333,7 +332,7 @@ export class BattleScreen extends Screen {
   // fighter, carries Player 1's cooldowns.
   syncAbilityHud() {
     const battle = this.battle;
-    const playing = !!battle && this.mode !== 'watch' && battle.phase !== 'result' && this.app.settings?.showAbilityHud !== false;
+    const playing = !!battle && this.mode !== 'watch' && battle.phase !== 'result';
     if (playing) this.abilityHud.show(battle.p1);
     else this.abilityHud.setVisible(false);
     if (battle) battle.hudCooldownsFor = this.abilityHud.showing && !this.app.device.touchUI ? battle.p1 : null;

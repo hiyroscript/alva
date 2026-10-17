@@ -461,38 +461,6 @@ test('the screens show it for the player only: Quick Battle and Practice Ground,
   assert.deepEqual(practice.abilityHud.rows.ground.tiles.map((t) => t.entry.move), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack']);
 });
 
-test('all four Ability HUD/cooldown combinations preserve timers and work in battle and practice', () => {
-  const settings = new Settings(null);
-  const p1 = makeFighter({ character: DEF_0001 }).fighter;
-  p1.combat.abilityCooldowns.start('attack4', 3);
-  const p2 = makeFighter({ character: DEF_0003 }).fighter;
-  p2.combat.abilityCooldowns.start('attack4', 3);
-  let arcs = 0;
-  const ctx = new Proxy({}, { get: (_, key) => key === 'arc' ? () => arcs++ : () => {}, set: () => true });
-  const arena = Object.assign(Object.create(Arena.prototype), {
-    p1, player: p1, phase: 'fight', interfaceSettings: settings, ctx,
-    view: { pxW: 1000, pxH: 600, scale: 1, dpr: 1 },
-    markerAnchor: () => [500, 100, 300], energyBarRect: () => ({ x: 0, y: 0, w: 10, h: 2 }),
-  });
-  for (const sync of [BattleScreen.prototype.syncAbilityHud, PracticeGroundScreen.prototype.syncAbilityHud]) {
-    const hud = new AbilityHUD(new Element('div'), { input: fakeInput() });
-    const screen = { battle: arena, session: arena, mode: 'quick-battle', abilityHud: hud, app: { settings, device: { touchUI: false } } };
-    for (const ability of [true, false]) for (const rings of [true, false]) {
-      settings.showAbilityHud = ability;
-      settings.showCooldownIndicators = rings;
-      sync.call(screen);
-      assert.equal(hud.root.hidden, !ability);
-      for (const fighter of [p1, p2]) {
-        arcs = 0;
-        arena.drawStatus([fighter]);
-        assert.equal(arcs > 0, rings && (fighter !== p1 || !ability));
-        assert.equal(fighter.combat.abilityCooldowns.remaining('attack4'), 3, 'drawing never spends cooldown time');
-      }
-    }
-    hud.destroy();
-  }
-});
-
 test('the stylesheet: bottom-right in the safe area, hidden on touch screens and under pause, menus and rosters; never in the pointer\'s way', () => {
   const css = stylesheet();
   assert.match(css, /\.ability-hud \{[^}]*right: max\(var\(--safe-r\)[^}]*bottom: max\(var\(--safe-b\)[^}]*pointer-events: none;/s);

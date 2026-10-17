@@ -188,7 +188,7 @@ test('menu labels, titles and buttons are in sentence case', () => {
   // Names whose capitals are part of them stay: game terms, devices,
   // fighters' own ability names, product names. Any other word after the
   // first in a short label is lowercase.
-  const PROPER = new Set(['Alva', 'ALVA', 'HUD', 'CPU', 'Player', 'Launch', 'Point', 'Base', 'Directional', 'Void', 'Shield',
+  const PROPER = new Set(['Alva', 'ALVA', 'CPU', 'Player', 'Launch', 'Point', 'Base', 'Directional', 'Void', 'Shield',
     'Deflect', 'Dash', 'Energy', 'Attack', 'PlayStation', 'Xbox', 'Nintendo', 'Bluetooth', 'Safari', 'Chrome', 'Edge',
     'Firefox', 'Enter', 'Esc', 'A', 'D-pad', 'Run', 'Discover', 'Settings', 'Quick', 'Watch', 'Practice', 'Custom',
     'Regular', 'Combat', 'Combo', 'Assist', 'Mobile', 'Controls', 'Movement', 'Launch', 'Fighters', 'Up', 'Down', 'Page']);

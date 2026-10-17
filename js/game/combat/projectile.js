@@ -363,7 +363,6 @@ const scratchOther = {};
 // repelling beats neither (see above). A projectile gone, or turned back
 // to the same owner, meets nothing more this step.
 export function clashProjectiles(list) {
-  const deflections = [];
   for (let i = 0; i < list.length; i++) {
     const a = list[i];
     for (let j = i + 1; j < list.length && a.alive; j++) {
@@ -380,23 +379,10 @@ export function clashProjectiles(list) {
       } else {
         const [win, lose] = ra > rb ? [a, b] : [b, a];
         if (win.def.erase) lose.alive = false;
-        else {
-          const from = lose.owner;
-          lose.turnBack(win.owner, win.direction);
-          deflections.push(projectileDeflection(win.owner, lose, from, win.direction));
-        }
+        else lose.turnBack(win.owner, win.direction);
       }
     }
   }
-  return deflections;
-}
-
-// Snapshot a confirmed redirection before its object can move or vanish.
-export function projectileDeflection(fighter, projectile, from, direction) {
-  return {
-    fighter, projectile, from, direction,
-    point: { x: projectile.x, y: projectile.y },
-  };
 }
 
 // Turns every projectile the fighters released this step into a live

@@ -60,7 +60,6 @@
 import { resolveLaunchStrength, resolveDirectionalLaunch } from '../../data/launch.js';
 import { strikeLive } from './attacks.js';
 import { hitReaches } from './hit-effects.js';
-import { projectileDeflection } from './projectile.js';
 
 // How a fighter responds to being launched (the character's
 // `launchReaction`, every field optional; the defaults change nothing):
@@ -179,7 +178,7 @@ export class CombatSystem {
     //   heal, energyCost, launchPointBefore, launchPointAfter, baseLaunch,
     //   directionalLaunch, launchStrength, finalLaunch, launchSpeed, hitstun,
     //   perfect, point, paralysis, charm, stall, projectile, summon,
-    //   technique, attack, source, ability, redirected, paralysisApplied }
+    //   technique, attack, source, ability, redirected }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
@@ -195,9 +194,8 @@ export class CombatSystem {
     // Shield raised just in time (see Fighter.perfectShield) and `point` is
     // where the hit landed, for the effects. `paralysis` is the hold it put
     // on its target (seconds, 0 for none), `charm` the charm it put on it
-    // (seconds, 0 for none). `paralysisApplied` marks a newly applied or
-    // extended hold, rather than one already as long. `stall` is how long a melee
-    // blow the target's Shield blocked froze its attacker (0 for none). `attacker`
+    // (seconds, 0 for none) and `stall` how long a melee blow
+    // the target's Shield blocked froze its attacker (0 for none). `attacker`
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee. `attack` is always
     // true (every hit is an attack's, blocked or not, whatever it did);
@@ -210,15 +208,14 @@ export class CombatSystem {
     // fighter's hit on its charmer is recorded as `charmed` (see applyHit):
     // `damage` 0, `heal` the Launch Point it took off the charmer instead.
     this.events = [];
-    // { fighter, projectile, from, direction, point }: the projectiles turned back
+    // { fighter, projectile, from, direction }: the projectiles turned back
     // this step (see deflectProjectiles), `from` the owner each one had.
     this.deflections = [];
   }
 
-  update(fighters, projectiles = [], clones = [], deflections = []) {
+  update(fighters, projectiles = [], clones = []) {
     this.events.length = 0;
     this.deflections.length = 0;
-    this.deflections.push(...deflections);
     // Before anything strikes: a projectile caught by a live Deflect is the
     // deflecting fighter's own by the time projectiles strike below, so it
     // never hits the fighter that caught it.
@@ -321,7 +318,7 @@ export class CombatSystem {
         const from = p.owner;
         const direction = Math.sign(p.x - f.body.x) || f.facing;
         p.turnBack(f, direction);
-        this.deflections.push(projectileDeflection(f, p, from, direction));
+        this.deflections.push({ fighter: f, projectile: p, from, direction });
       }
     }
   }
@@ -445,7 +442,6 @@ export class CombatSystem {
     detached = !!(projectile || summon || technique || hazard), point = bodyPoint(target), velocity = null,
   } = {}) {
     const tc = target.combat;
-    const paralysisBefore = tc.paralysis;
     // The universal Shield rule: up at contact, it blocks. Nothing about the
     // hit is consulted.
     const blocked = tc.shielding;
@@ -527,7 +523,6 @@ export class CombatSystem {
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, charm: blocked ? 0 : def.charm ?? 0, stall,
-      paralysisApplied: tc.paralysis > paralysisBefore,
       projectile, summon, technique, hazard, attack: !hazard,
       source: sourceOf(def, projectile, summon, technique, hazard), ability: hazard ? def.id ?? null : abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,
@@ -554,7 +549,7 @@ export class CombatSystem {
       type: 'charmed', attacker, target, move: def.id ?? null,
       damage: 0, heal, energyCost: 0, launchPointBefore, launchPointAfter: tc.launchPoint,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength: 0, finalLaunch: NO_LAUNCH,
-      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, paralysisApplied: false, charm: 0, stall: 0,
+      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, charm: 0, stall: 0,
       projectile, summon, technique, attack: true,
       source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,

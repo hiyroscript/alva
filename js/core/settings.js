@@ -8,14 +8,12 @@
 //
 // Stored as
 //
-//   { version: 6,
+//   { version: 5,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
 //     combatAssist: true | false,
 //     comboAssist: true | false,
-//     showAbilityHud: true | false, showCooldownIndicators: true | false,
-//     showDamageHints: true | false, showCombatHints: true | false,
 //     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... } }
 //
 // `language` stays null until the player picks one: the game then speaks
@@ -44,9 +42,8 @@
 // custom layouts; version 3 keeps all of that and its Combat Assist;
 // version 4 keeps all of that and its controller profiles. Versions 1 and 2
 // get Combat Assist on, versions 1 to 3 no controller profile, and every
-// version through 4 Combo Assist on. Version 5 keeps all of those choices;
-// versions 1 through 5 receive the Interface defaults. Missing, blocked or
-// unreadable storage, a stored object of any other version, and every value that is not one of its setting's choices
+// older version Combo Assist on. Missing, blocked or unreadable storage, a stored object of any
+// other version, and every value that is not one of its setting's choices
 // fall back to the defaults, value by value, so the game always starts with
 // a valid set.
 
@@ -72,16 +69,8 @@ export const DEFAULT_COMBAT_ASSIST = true;
 // turned it off.
 export const DEFAULT_COMBO_ASSIST = true;
 
-// Presentation only, in the order shown in Settings > Interface.
-export const INTERFACE_DEFAULTS = Object.freeze({
-  showAbilityHud: true,
-  showCooldownIndicators: true,
-  showDamageHints: false,
-  showCombatHints: false,
-});
-
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 5;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
@@ -89,14 +78,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
   combatAssist: DEFAULT_COMBAT_ASSIST,
   comboAssist: DEFAULT_COMBO_ASSIST,
-  ...INTERFACE_DEFAULTS,
   controllerProfiles: Object.freeze({}),
 });
 
 // The settings that are one choice from a list, and their allowed values.
 const CHOICES = Object.freeze({ language: LANGUAGES, mobileControls: MOBILE_CONTROLS });
 // The settings that are on or off: a real boolean, nothing else.
-const TOGGLES = Object.freeze(['combatAssist', 'comboAssist', ...Object.keys(INTERFACE_DEFAULTS)]);
+const TOGGLES = Object.freeze(['combatAssist', 'comboAssist']);
 
 // Whether `value` is one `name` may take: one of a choice's values, or a
 // boolean for a toggle.
@@ -118,7 +106,6 @@ function readCurrent(stored) {
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     combatAssist: resolveSetting('combatAssist', stored.combatAssist),
     comboAssist: resolveSetting('comboAssist', stored.comboAssist),
-    ...Object.fromEntries(Object.keys(INTERFACE_DEFAULTS).map((name) => [name, resolveSetting(name, stored[name])])),
     controllerProfiles: sanitizeStoredProfiles(stored.controllerProfiles),
   };
 }
@@ -145,10 +132,6 @@ const MIGRATIONS = Object.freeze({
   4: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
     combatAssist: stored.combatAssist, controllerProfiles: stored.controllerProfiles,
-  }),
-  5: (stored) => readCurrent({
-    language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
-    combatAssist: stored.combatAssist, comboAssist: stored.comboAssist, controllerProfiles: stored.controllerProfiles,
   }),
 });
 
@@ -213,7 +196,7 @@ export class Settings {
   }
 
   // Sets choice `name` (language or mobileControls) or toggle
-  // (the assists or Interface preferences) to `value` and saves; an unknown setting or value is
+  // (combatAssist, comboAssist) to `value` and saves; an unknown setting or value is
   // refused (false). Listeners hear about real changes only.
   set(name, value) {
     if (!allowed(name, value)) return false;
@@ -273,18 +256,6 @@ export class Settings {
   set comboAssist(value) {
     this.set('comboAssist', value);
   }
-
-  get showAbilityHud() { return this.values.showAbilityHud; }
-  set showAbilityHud(value) { this.set('showAbilityHud', value); }
-
-  get showCooldownIndicators() { return this.values.showCooldownIndicators; }
-  set showCooldownIndicators(value) { this.set('showCooldownIndicators', value); }
-
-  get showDamageHints() { return this.values.showDamageHints; }
-  set showDamageHints(value) { this.set('showDamageHints', value); }
-
-  get showCombatHints() { return this.values.showCombatHints; }
-  set showCombatHints(value) { this.set('showCombatHints', value); }
 
   // A copy of `scheme`'s custom touch layout ({} for the original one).
   touchLayout(scheme) {

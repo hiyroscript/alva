@@ -246,7 +246,6 @@ export class PracticeGroundScreen extends Screen {
       reducedMotion: app.device.reducedMotion,
       combatAssist: app.settings.combatAssist,
       comboAssist: app.settings.comboAssist,
-      interfaceSettings: app.settings,
     });
     // The CPU is on from the start: the same fighter and the same sprite
     // set (one load for both), at the CPU spawn facing Player 1, paired
@@ -290,7 +289,7 @@ export class PracticeGroundScreen extends Screen {
   // dialogs fade it (css/ability-hud.css).
   syncAbilityHud() {
     const session = this.session;
-    this.abilityHud.show(this.app.settings?.showAbilityHud !== false ? session?.player ?? null : null);
+    this.abilityHud.show(session?.player ?? null);
     if (session) session.hudCooldownsFor = this.abilityHud.showing && !this.app.device.touchUI ? session.player : null;
   }
 
