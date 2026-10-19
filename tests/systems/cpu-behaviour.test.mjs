@@ -463,6 +463,39 @@ test('M: two CPUs that both choose to wait never wait on each other for ever', (
   }
 });
 
+test('M: impatient, or after waiting too long at its spacing, it steps into its own range rather than waiting at the edge of the opponent\'s', () => {
+  for (const difficulty of DIFFICULTY_IDS) {
+    for (const [cpuDef, foeDef] of PAIRS) {
+      const sc = scenario({ difficulty, cpuDef, foeDef, timeLeft: 250, seed: 18, cpuX: 1500, foeX: 2100 });
+      sc.run(0.5);
+      const ai = sc.ai;
+      const s = ai.situation;
+      const own = Math.max(28, ai.idealRange(s) - 6);
+      // Patient, it keeps the spacing its mode wants (here beyond its own
+      // reach: waiting for the opponent to come).
+      ai.objective.impatience = 0;
+      ai.restlessUntil = -Infinity;
+      ai.pressure.resetUntil = -Infinity;
+      const patient = ai.footwork(s).dist;
+      const name = `${difficulty} #${cpuDef.id}`;
+      assert.equal(patient, ai.spacing(s), name);
+      assert.ok(patient > own, `${name}: its spacing (${patient}) beyond its own range (${own})`);
+      // Nothing happening for longer than its patience: it goes in.
+      ai.objective.impatience = 1;
+      ai.plan = null;
+      assert.equal(ai.footwork(s).dist, own, `${name}: impatient`);
+      // A wait at its spacing that ran past WAIT_LIMIT (see liveness): the
+      // same, for a moment.
+      ai.objective.impatience = 0;
+      ai.restlessUntil = ai.clock + 1.5;
+      ai.plan = null;
+      const restless = ai.footwork(s);
+      assert.equal(restless.dist, own, `${name}: restless`);
+      assert.match(restless.reason, /stepping in/, name);
+    }
+  }
+});
+
 // ---- Liveness --------------------------------------------------------------------------
 
 test('liveness: a plan that should move but does not is an incident, by its cause, and a fresh plan follows', () => {

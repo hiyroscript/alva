@@ -791,12 +791,16 @@ export class CpuIntelligence {
 
   // Neutral footwork: the spacing the mode wants (out of the opponent's
   // reach while pressure is being reset), closing in by Dash when the mode
-  // is offensive, settling once there.
+  // is offensive, settling once there. Impatient, or after a wait there
+  // that ran too long (see liveness), it stops waiting at the edge of the
+  // opponent's reach for something to happen and steps into its own.
   footwork(s) {
     const me = s.me;
     const p = this.profile;
     const resetting = this.clock < this.pressure.resetUntil;
-    const dist = resetting ? Math.max(this.spacing(s), s.foeReach.lunge + 30) : this.spacing(s);
+    const pushing = !resetting && !(me.charmed > 0) && (this.clock < this.restlessUntil || this.objective.impatience > 0.5);
+    let dist = resetting ? Math.max(this.spacing(s), s.foeReach.lunge + 30) : this.spacing(s);
+    if (pushing) dist = Math.min(dist, Math.max(28, this.idealRange(s) - 6));
     const mode = this.strategy.mode;
     const offense = !resetting && (mode === 'rushdown' || mode === 'controlledOffense' || mode === 'finisherHunt');
     const dash = s.caps.movement.dash;
@@ -806,7 +810,8 @@ export class CpuIntelligence {
       edgeRoom: me.halfW + 12 + p.stageSense * 30 + (this.strategy.danger > 0.3 ? 80 : 0),
       dashIn: offense && !!dash && this.rng() < 0.35 + p.energySense * 0.4, dashFrom: (dash?.distance ?? 200) + 80,
       dashEnergy: 35 + p.energySense * 35, until: this.clock + 0.7, targetX: s.op.x - s.dir * dist, why: 'holding spacing',
-      reason: resetting ? `${mode}: pressure not working, resetting to ${Math.round(dist)} from the opponent` : `${mode}: keeping ${Math.round(dist)} from the opponent`,
+      reason: resetting ? `${mode}: pressure not working, resetting to ${Math.round(dist)} from the opponent` :
+        pushing ? `${mode}: nothing happening, stepping in to ${Math.round(dist)} from the opponent` : `${mode}: keeping ${Math.round(dist)} from the opponent`,
     }, s);
   }
 
