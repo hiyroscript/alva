@@ -49,7 +49,7 @@ export class Telemetry {
       invalidInputs: 0, expiredPlans: 0, failedPlans: 0, abandonedPlans: 0, stuckNavigation: 0, navigationFailures: 0,
       inactivity: 0, shields: 0, deflects: 0, recoveries: 0, dashes: 0, airDashes: 0, jumps: 0, decisions: 0, combos: 0,
       waits: 0, waitSeconds: 0, longWaits: 0, impatience: 0, retreats: 0, retreatsHeld: 0, retreatsBroken: 0, lpRecovered: 0,
-      disengageDashes: 0, pressureResets: 0, objectiveChanges: 0, threatInterrupts: 0, punishChances: 0, finishChances: 0, footingEscapes: 0,
+      disengageDashes: 0, pressureResets: 0, objectiveChanges: 0, threatInterrupts: 0, punishChances: 0, finishChances: 0, finishesMissed: 0, footingEscapes: 0,
     };
     this.moveUsage = new Map();
     this.plans = new Map();

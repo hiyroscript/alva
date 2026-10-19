@@ -153,8 +153,9 @@ export class ReferenceOpponent {
 //     keeps off the ledge and, cornered, jumps over its opponent;
 //   - offense: one decision every 0.12 s, never two presses within 0.3 s:
 //     a move that reaches (more readily on a stunned opponent, never into a
-//     raised Shield), an anti-air on an opponent above it, a projectile from
-//     far now and then, a jump-in;
+//     raised Shield; its strongest launcher, mostly, once the opponent's
+//     Launch Point is high), an anti-air on an opponent above it, a
+//     projectile from far now and then, a jump-in;
 //   - defense: an attack it sees coming within reach is Shielded half the
 //     time (with the Energy for it) or stepped away from a quarter of the
 //     time, decided once per attack; a whiff it sees is punished;
@@ -280,7 +281,11 @@ export class CompetentOpponent {
       const reaching = melee.filter((m) => reaches(m));
       const anti = !view.grounded && dy < -40 && dist < 120 ? reaching.filter((m) => m.roles.has('antiAir')) : [];
       if (anti.length && this.rng() < 0.5) press(pick(anti));
-      else if (reaching.length && !view.shielding && this.rng() < (view.stunned ? 0.6 : 0.45)) press(pick(reaching));
+      else if (reaching.length && !view.shielding && this.rng() < (view.stunned ? 0.6 : 0.45)) {
+        // A high Launch Point is the time for its strongest launch.
+        const launchers = fc.launchPoint > 60 ? reaching.filter((m) => m.maxBaseLaunch >= 2) : [];
+        press(launchers.length && this.rng() < 0.7 ? launchers.reduce((x, y) => (y.maxBaseLaunch > x.maxBaseLaunch ? y : x)) : pick(reaching));
+      }
       else if (b.grounded && dist > 320) {
         const shots = caps.moves.filter((m) => (m.kind === 'ranged' || m.kind === 'technique') && !(m.heal > 0) && moveReady(self, m));
         if (shots.length && this.rng() < 0.08) press(pick(shots));

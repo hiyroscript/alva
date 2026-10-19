@@ -32,10 +32,12 @@
 // opponent leaving or rejoining play, the clock entering its last stretch,
 // a heavy hit taken) or a clearly better objective changes it sooner. It
 // watches its own progress: a stabilize that keeps getting hit gives way to
-// fighting back. Waiting has a price: the longer nothing happens the more
-// impatient the CPU grows (sooner on a less patient level), unless waiting
-// is itself winning (ahead with the clock running, its Launch Point coming
-// back), so two cautious CPUs never wait on each other for ever.
+// fighting back, and one whose Launch Point is not coming back down (the
+// opponent pressing it the whole time) stops counting as progress. Waiting
+// has a price: the longer nothing happens the more impatient the CPU grows
+// (sooner on a less patient level), unless waiting is itself winning (ahead
+// with the clock running, its Launch Point coming back), so two cautious
+// CPUs never wait on each other for ever.
 //
 // The objective informs the strategy (`bias`: the modes it favours, how
 // much the bar for a commitment moves, how much risk counts, how well
@@ -120,6 +122,9 @@ export class MatchObjective {
     this.failingUntil = -Infinity;
     this.hitsTaken = 0;
     this.lpAt = 0;
+    this.check = { at: 0, lp: 0 };
+    this.stalled = false;
+    this.stallTime = 0;
     this.tiebreak = 0;
     this.winningByWaiting = false;
     this.myExp = 0;
@@ -230,11 +235,26 @@ export class MatchObjective {
     const otLeft = m.overtime ? clamp(1 - timeLeft / 60) : 0;
     // Waiting is winning when ahead with the clock running, or while the
     // Launch Point comes back down; otherwise it wears patience thin.
+    // A break-off must be getting somewhere: its Launch Point coming down
+    // by a few points every 5 s or so. Recovery that is not happening (the
+    // opponent pressing it the whole time) is no reason to keep waiting.
+    if (this.kind === 'stabilize') {
+      const c = this.check;
+      if (brain.clock - c.at > 5) {
+        this.stalled = c.lp - me.lp < 4;
+        c.at = brain.clock;
+        c.lp = me.lp;
+      }
+    } else {
+      this.stalled = false;
+    }
     const winningByWaiting = (lead > 0 && timeLeft < lead * pace * 2) || tiebreak > 0 ||
-      (this.kind === 'stabilize' && me.lp > 0 && myExp > 0.15);
+      (this.kind === 'stabilize' && me.lp > 0 && myExp > 0.15 && !this.stalled);
     this.winningByWaiting = winningByWaiting;
     const grace = this.patienceSeconds;
-    this.impatience = winningByWaiting ? 0 : clamp((idle - grace) / (3 + 3 * p.patience));
+    // A break-off that has stalled wears on patience as surely as a lull.
+    this.stallTime = this.stalled ? this.stallTime + dt : 0;
+    this.impatience = winningByWaiting ? 0 : clamp((Math.max(idle, this.stallTime) - grace) / (3 + 3 * p.patience));
     const failing = brain.clock < this.failingUntil;
     // The scores.
     sc.regroup = -10;
@@ -244,7 +264,7 @@ export class MatchObjective {
     // unhit, then 2 a second) and no comeback to make.
     const recoverable = clamp((Math.min(timeLeft, 60) - LAUNCH_RECOVERY_DELAY) / 20);
     sc.stabilize = ((myExp - foeExp * 0.6) * 1.5 + clamp((me.lp - op.lp) / 150, -0.2, 0.3)) * recoverable -
-      this.impatience * 0.6 - (failing ? 0.6 : 0);
+      this.impatience * 0.6 - (failing ? 0.6 : 0) - (this.stalled ? 0.35 : 0);
     // A break-off under way sees itself through until the Launch Point has
     // come well down (its staying power fades as it does).
     if (this.kind === 'stabilize' && this.lpAt > 0) sc.stabilize += 0.3 * clamp(me.lp / this.lpAt) * (failing ? 0 : 1);
@@ -298,6 +318,9 @@ export class MatchObjective {
     this.entries++;
     this.hitsTaken = 0;
     this.lpAt = brain.situation?.me?.lp ?? 0;
+    this.check.at = brain.clock;
+    this.check.lp = this.lpAt;
+    this.stalled = false;
     brain.telemetry.count('objectiveChanges');
     brain.telemetry.note(brain, `objective ${from} → ${best}`, this.reason);
   }

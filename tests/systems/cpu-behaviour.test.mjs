@@ -110,17 +110,19 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
 
 // ---- C, D. The score and the clock ---------------------------------------------------
 
-// Over every pairing and two seeds, while the CPU holds `objectives`: how
+// Over every pairing and four seeds, while the CPU holds `objectives`: how
 // often it goes in after a free opponent (a Dash-in or a jump-in from the
 // ground: initiating, not countering) and how much of the time it moves
-// toward it, per second; and the Launch Point it takes per second.
+// toward it, per second; and the Launch Point it takes per second. (A
+// higher level goes in from the ground only about once every two seconds,
+// so fewer seeds leave too few to compare.)
 function posture(base, score, timeLeft, objectives) {
   let t = 0;
   let initiate = 0;
   let toward = 0;
   let taken = 0;
   for (const [cpuDef, foeDef] of PAIRS) {
-    for (const seed of [5, 6]) {
+    for (const seed of [5, 6, 7, 8]) {
       const sc = scenario({ ...base, cpuDef, foeDef, seed, score, timeLeft });
       let prev = null;
       let lp = sc.cpu.combat.launchPoint;
@@ -228,30 +230,54 @@ test('K: in late overtime the closing Void makes the stage more dangerous to it,
 
 // ---- E. Recovering Launch Point ------------------------------------------------------
 
-test('E: in danger with room to spare it breaks off, recovers unhit behind its Shield, then comes back to the fight', () => {
+// An opponent that walks up to 260 units and stands there: no pressure.
+const stroller = (n, self) => {
+  const o = self.opponent;
+  if (!o || o.lostToVoid) return {};
+  const dx = o.body.x - self.body.x;
+  return Math.abs(dx) > 260 ? (dx > 0 ? { runRight: true } : { runLeft: true }) : {};
+};
+
+// One break-off at Launch Point 90 with lots of time: when the CPU took up
+// the stabilize objective and when it left it (still alive, and with what
+// Launch Point), and its telemetry.
+function breakOff(difficulty, cpuDef, foeDef, foe) {
+  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: 90, timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
+  const out = { entered: null, left: null, lpLeft: null, scored: false };
+  sc.run(25, (i) => {
+    if (sc.foe.lostToVoid) out.scored = true;
+    if (sc.foe.lostToVoid || sc.cpu.lostToVoid || sc.battle.score.p1 > 0) return false;
+    const stabilizing = sc.ai.objective.kind === 'stabilize';
+    if (stabilizing && out.entered == null) out.entered = i * DT;
+    if (!stabilizing && out.entered != null && out.left == null) {
+      out.left = i * DT;
+      out.lpLeft = sc.cpu.combat.launchPoint;
+    }
+    return true;
+  });
+  out.report = sc.ai.telemetry.report();
+  return out;
+}
+
+test('E: in danger with room to spare it breaks off and recovers; pressed, it guards behind its Shield; left alone, it comes back once recovered', () => {
   for (const difficulty of ['medium', 'hard', 'brutal']) {
+    let shielded = 0;
     let recovered = 0;
     let back = 0;
-    let shielded = 0;
     for (const [cpuDef, foeDef] of PAIRS) {
-      const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: 90, timeLeft: 250, foe: 'ref:competent', seed: 4, cpuX: 1750, foeX: 2000 });
-      let entered = null;
-      let left = null;
-      sc.run(20, (i) => {
-        if (sc.foe.lostToVoid || sc.cpu.lostToVoid) return;
-        const stabilizing = sc.ai.objective.kind === 'stabilize';
-        if (stabilizing && entered == null) entered = i * DT;
-        if (!stabilizing && entered != null && left == null) left = i * DT;
-      });
-      const r = sc.ai.telemetry.report();
-      assert.ok(entered != null && entered < 2, `${difficulty} #${cpuDef.id}: broke off at ${entered} s`);
-      if (r.lpRecovered > 0) recovered++;
-      if (left != null) back++;
-      if (r.shields > 0) shielded++;
+      const pressed = breakOff(difficulty, cpuDef, foeDef, 'ref:competent');
+      assert.ok(pressed.entered != null && pressed.entered < 2, `${difficulty} #${cpuDef.id}: broke off at ${pressed.entered} s`);
+      if (pressed.report.shields > 0) shielded++;
+      if (pressed.report.lpRecovered > 0) recovered++;
+      const alone = breakOff(difficulty, cpuDef, foeDef, stroller);
+      assert.ok(alone.entered != null && alone.entered < 2, `${difficulty} #${cpuDef.id} alone: broke off at ${alone.entered} s`);
+      // Back on the attack: the objective left once recovered, or the
+      // harmless opponent knocked out meanwhile.
+      if ((alone.left != null && alone.lpLeft < 85) || alone.scored) back++;
     }
-    assert.ok(recovered >= 3, `${difficulty}: recovered Launch Point keeping out of the fight in ${recovered} of 4`);
-    assert.ok(back >= 3, `${difficulty}: came back to the fight in ${back} of 4`);
-    assert.ok(shielded >= 2, `${difficulty}: Shielded while recovering in ${shielded} of 4`);
+    assert.ok(shielded >= 3, `${difficulty}: Shielded while pressed in ${shielded} of 4`);
+    assert.ok(recovered >= 2, `${difficulty}: recovered Launch Point keeping out of the fight in ${recovered} of 4`);
+    assert.ok(back >= 3, `${difficulty}: left alone, came back to the fight recovered in ${back} of 4`);
   }
 });
 

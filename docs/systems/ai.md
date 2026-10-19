@@ -5,7 +5,11 @@ Quick Battle's CPU and both of Watch Mode's are one universal intelligence,
 `CombatAIController` every mode builds. It plays whatever fighter it is
 given from that fighter's own data, at the difficulty chosen. There is one
 brain for every fighter and every level: a level changes how well it
-perceives, thinks and executes, never what its fighter can do. The product
+perceives, thinks and executes, never what its fighter can do. It plays a
+match, not only an exchange: it knows what it is after in the match as a
+whole (building an advantage, finishing an exposed opponent, breaking off
+to recover, protecting a lead, forcing a comeback), and it may stand still
+on purpose, knowing why it waits and what will end the wait. The product
 rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.8 and §6.3a.
 
 Practice Ground keeps its training dummy (no controller); the older
@@ -17,17 +21,18 @@ non-attacking `TrainingAIController` stays in
 | Module | Layer | Owns |
 | --- | --- | --- |
 | [`combat-ai.js`](../../js/game/ai/combat-ai.js) | — | `CombatAIController`, the controller the modes build: CPU Intelligence itself. |
-| [`cpu-intelligence/brain.js`](../../js/game/ai/cpu-intelligence/brain.js) | the hierarchy | `CpuIntelligence`: runs the layers every fixed step, the decision order, combo follow-ups, recovery and edge-guard plans, the point of no return, launch steering, liveness, the attack orientation, directives for tests. |
+| [`cpu-intelligence/brain.js`](../../js/game/ai/cpu-intelligence/brain.js) | the hierarchy | `CpuIntelligence`: runs the layers every fixed step, the decision order and its cadence, choosing whether to commit or wait, combo follow-ups and their hit-confirm, breaking off to a safer spot and deliberate waits, recovery and edge-guard plans, the point of no return, launch steering, the intent-aware liveness monitor, the attack orientation, directives for tests. |
 | [`cpu-intelligence/capabilities.js`](../../js/game/ai/cpu-intelligence/capabilities.js) | 1. capabilities | `analyzeCapabilities` (cached per fighter): every move with its timing, reach, strikes, projectile, motion, cooldowns, air uses, Energy and **roles**; the Shield, the Deflect, movement and launch reaction. `moveReady`. |
 | [`cpu-intelligence/perception.js`](../../js/game/ai/cpu-intelligence/perception.js) | 2. perception | `Perception`: the opponent as it was `latency` ago (a ring of snapshots), recognized or lapsed events, the projectiles and clones the CPU has seen. |
 | [`cpu-intelligence/situation.js`](../../js/game/ai/cpu-intelligence/situation.js), [`stage-model.js`](../../js/game/ai/cpu-intelligence/stage-model.js), [`prediction.js`](../../js/game/ai/cpu-intelligence/prediction.js) | 3. world model | `Situation` (rebuilt each step), `StageModel` (ledges, surfaces, the Void in force, read live; a stage's moving or vanishing platforms read live too: where each is now, and none while it is hidden or forming, nor as a stepping stone while it fades; on a continuous ground, the combat area's edges in place of ledges; and a stage hazard's visible warnings, `dangerZones`, never a landing before its warning shows), and the forward simulation on the game's own rules: paths, jump arcs, move contact, projectile contact, launches and recoveries. |
-| [`cpu-intelligence/opponent-model.js`](../../js/game/ai/cpu-intelligence/opponent-model.js) | 4. opponent model | `OpponentModel`: decaying rates of what the opponent was seen doing (jumps, Shields under threat, projectiles, Dashes, whiffs, attacks within reach, preferred range, repeated moves), trusted as fast as the level adapts. |
-| [`cpu-intelligence/strategy.js`](../../js/game/ai/cpu-intelligence/strategy.js) | 5. strategy | `Strategy`: the mode (rushdown, controlled offense, neutral, counterplay, zoning, trap control, survival, finisher hunt, recovery) re-weighed from both Launch Points, footing, Energy, kit, habits, score and clock, with hysteresis. |
+| [`cpu-intelligence/opponent-model.js`](../../js/game/ai/cpu-intelligence/opponent-model.js) | 4. opponent model | `OpponentModel`: decaying rates of what the opponent was seen doing (jumps, Shields under threat and held, projectiles, Dashes, whiffs, attacks within reach, backing off when hurt, moving about, preferred range, repeated moves) and of how the CPU's own attacks fared against it (blocked, whiffed, punished); the habits read from them (`turtling`, `walls`, `punishing`, `mobile`, `recovering`, …), trusted as fast as the level adapts. |
+| [`cpu-intelligence/objective.js`](../../js/game/ai/cpu-intelligence/objective.js) | 5a. match objective | `MatchObjective`: what the CPU is after in the match (build, finish, stabilize, protect, survive, force, regroup) from the score, the clock, overtime's tiebreak and its closing Void, both fighters' exposure and how long nothing has happened; persistence, progress checks, impatience, a seeded temperament. |
+| [`cpu-intelligence/strategy.js`](../../js/game/ai/cpu-intelligence/strategy.js) | 5b. combat strategy | `Strategy`: the launch estimates (`danger`, `finish`, and after another hit or two `dangerSoon`, `finishSoon`; `dangerAt` any spot), and the mode (rushdown, controlled offense, neutral, counterplay, zoning, trap control, survival, finisher hunt, recovery) re-weighed from both Launch Points, footing, Energy, kit, habits and the match objective, with hysteresis. |
 | [`cpu-intelligence/evaluator.js`](../../js/game/ai/cpu-intelligence/evaluator.js), [`values.js`](../../js/game/ai/cpu-intelligence/values.js) | 6–7. tactics, combos | `Evaluator`: every move now, out of a Dash or out of a jump, scored by expected utility; combo follow-ups on the launch dealt. `LaunchJudge`, `KO_VALUE`: what outcomes are worth. |
 | [`cpu-intelligence/defense.js`](../../js/game/ai/cpu-intelligence/defense.js) | threats | `Defense`: recognized threats (melee, projectiles, throws, techniques, clones) and the best answer to each. |
-| [`cpu-intelligence/plans.js`](../../js/game/ai/cpu-intelligence/plans.js) | 8. plans | `makePlan`: each plan kind as a small state machine over steps, with a lifetime and an explicit end. |
+| [`cpu-intelligence/plans.js`](../../js/game/ai/cpu-intelligence/plans.js) | 8. plans | `makePlan`: each plan kind as a small state machine over steps, with a lifetime, an explicit end and its intent (a plan that stands still on purpose says so); footwork with a dead band; `hold` (a deliberate wait and what ends it) and `retreat`; `CONTINUED`, the plans a reassessment carries on rather than restarts. |
 | [`cpu-intelligence/executor.js`](../../js/game/ai/cpu-intelligence/executor.js) | 9. execution | `Executor`: the plan's wishes turned into one legal `FighterInput` snapshot (press edges, jump holds, the Mouvement request, no Shield in the air but the Deflect), with the ledge guard. |
-| [`cpu-intelligence/telemetry.js`](../../js/game/ai/cpu-intelligence/telemetry.js) | 11. telemetry | `Telemetry`: counters, move usage, the debug trace, `STILL_LIMIT`. |
+| [`cpu-intelligence/telemetry.js`](../../js/game/ai/cpu-intelligence/telemetry.js) | 11. telemetry | `Telemetry`: counters, move usage, waits with their reasons and ends, time per objective, inactivity by cause, the debug trace and its events, `STILL_LIMIT`, `WAIT_LIMIT`. |
 | [`js/data/difficulty.js`](../../js/data/difficulty.js) | 10. humanization | The four profiles and `CAPABILITY` (which way each trait improves). |
 
 `js/game/ai/moveset.js` (`readMoveset`, `hurtExtent`) is the raw reading
@@ -46,6 +51,60 @@ exhausted or spawn anything. It never writes to a fighter, never reads the
 player's raw input or the DOM, never uses the wall clock, and never has
 Combat Assist. Every random draw comes from its injected seeded RNG.
 
+## From the match to the buttons
+
+Four layers, each informing the one below and never reaching past it:
+
+1. **The match objective** (`MatchObjective`): what winning the match asks
+   for now, which is not always winning the exchange in front of it.
+2. **The combat strategy** (`Strategy`): the mode that serves it, the bar a
+   commitment must clear, how much risk counts, the spacing.
+3. **The tactical plan**: the move, Dash-in, jump-in, footwork, retreat or
+   wait chosen by expected utility under that strategy (`Evaluator`,
+   `choose`, `movePlan`).
+4. **Legal inputs** (`Executor`): one input snapshot, as a player's.
+
+### Match objectives
+
+| Objective | When | What it asks of the strategy |
+| --- | --- | --- |
+| `build` | Even: nothing more pressing. | The modes as they are, waiting a little for clearer chances; grows as impatience does. |
+| `finish` | The opponent exposed: the CPU's best launch likely to end its life now or after another hit or two (more so off the stage, or at match point). | Finisher hunt and trap control, a lower bar, risk counting a little less, crossing over to launch toward the near ledge. |
+| `stabilize` | The CPU the exposed one, with time to recover (2 s unhit, then 2 Launch Point a second) and no comeback to make. | Survival and counterplay, a higher bar, risk counting more, and breaking off: a safer spot, then a deliberate wait there, Shield ready. |
+| `protect` | Ahead with the clock running down (against how long a point has been taking in this match), or ahead on overtime's tiebreak. | Counterplay and zoning, a higher bar, no needless risk: it lets the opponent come and still counters. |
+| `survive` | Ahead with seconds left. | Running the clock out: a safe spot, no edge-guarding. |
+| `force` | Behind with too little time to wait, or losing (or level on) overtime's tiebreak. | Rushdown and finisher hunt, a much lower bar, risk counting less, no waiting. |
+| `regroup` | The opponent out of play (respawning). | A spot near where it will come back, waiting there (healing itself if it can). |
+
+Each fighter's exposure is read from the real launch rules
+(`Strategy.danger`, `finish` and their "after another hit or two" forms),
+smoothed over about a second, so a step toward a ledge and back changes
+nothing. Overtime's tiebreak is projected to the end of the clock, both
+Launch Points recovering as it runs. The closing Void is in every launch
+prediction, so late overtime makes the stage more dangerous to it.
+
+**Persistence.** An objective has a minimum dwell (1.2 s, plus up to 2.3 s
+with the level's `discipline`) and keeps a bonus while it holds; only an
+important event (a point scored, a respawn, overtime starting, the clock
+entering its last 30 or 12 s, a heavy hit taken, the first look at the
+match) or a clearly better objective changes it sooner. It watches its own
+progress: a `stabilize` that keeps getting hit (2 to 4 hits, by
+discipline) gives way to fighting back for 4 s, and one whose Launch Point
+is not coming down by at least 4 every 5 s (the opponent pressing it the
+whole time) stops counting as progress.
+
+**Impatience** grows once nothing has happened for longer than the level's
+patience (3 s plus up to 8 s, by `patience`), or once a break-off has
+stalled that long, unless waiting is itself winning (ahead with the clock
+running, its Launch Point coming back down). It lowers the bar and lifts
+`build` over the waiting objectives, so two cautious CPUs never wait on
+each other for ever. A little seeded **temperament** (a touch bolder or
+more patient this match) keeps two CPUs of one level from being the same
+player. The level's `awareness` decides how fully all of this is read (a
+casual player half reads the score and the clock), `discipline` how
+reliably it does what the objective asks (whether it heeds a call to break
+off is drawn once per call).
+
 ## The step
 
 Every fixed step, in this order:
@@ -56,15 +115,22 @@ Every fixed step, in this order:
    for the level's latency, or lets it lapse. The situation is rebuilt:
    the CPU's own fighter exactly, its opponent as perceived and carried
    forward by its visible motion (or, off the stage and free, along its
-   likely recovery), both kits, the stage, the projectiles it has seen,
-   the score and clock. The opponent model takes in the events.
+   likely recovery) and shifted by the level's misjudgement of range (a
+   lasting impression that drifts to a fresh one every second or so, never
+   a flicker), both kits, the stage, the projectiles it has seen, the score
+   and clock. The opponent model takes in the events. On the level's
+   reassessment cadence (`think`) the launch estimates, the match objective
+   and the strategy mode are re-weighed, and it draws whether it sees the
+   openings (`punish`) and the finishers (`opportunity`) this time.
 2. **Forced states.** Stunned, frozen or paralysed, it only steers the
    coming launch (as a player may hold a direction).
 3. **Survival.** Off the stage, the recovery plan takes over: several
    routes (when to air jump, whether to air dash, a lift as a last
    resort) are simulated on the real rules and the best one flown, the
    level judging the timing more or less precisely, and routes through
-   the reach of an opponent waiting at the ledge are avoided.
+   the reach of an opponent waiting at the ledge are avoided. A visible
+   hazard warning under it, or a platform starting to fade under it, is
+   stepped out of, as often as the level notices.
 4. **Threats.** A newly recognized threat may interrupt any plan with the
    best answer: a Shield (raised in time, perfect when the level times
    it), a jump over it (timed if it is still far), a step or a Dash out of
@@ -78,24 +144,120 @@ Every fixed step, in this order:
    a cast before it lets go, or Deflecting a shot back, often scores
    better). An answer for later is held until its moment, so the CPU keeps
    playing meanwhile.
-5. **Combos.** When its hit lands, the best follow-up the rules allow is
-   searched against the launch it dealt (hit-cancels, a Dash or a jump
-   after the hit) and pressed in time, or dropped if it no longer
-   connects.
+5. **Combos.** When its hit lands, it knows only once it has seen it land
+   (its hit-confirm: the level's reaction, quicker the more reliable its
+   combos), then searches the best follow-up the rules allow against the
+   launch it dealt (hit-cancels, a Dash or a jump after the hit) and
+   presses it in time, or drops it if it no longer connects or the level
+   fumbles it (`comboReliability`). A dropped combo is not picked up
+   again as a fresh opening.
 6. **The plan.** A committed plan (a Dash-in, a jump-in, a recovery, an
    answer) carries on until its objective is met or it fails. Before a
    strike is pressed it is checked again from where the CPU really is
    (still connects, still leaves a way home), and a jump-in waiting off
    the stage is dropped before the point of no return.
-7. **Strategy and tactics.** On the level's reassessment cadence the
-   strategy mode is re-weighed and, if the plan may be reconsidered, a
-   new one chosen: the attack sequence with the best utility if it
-   clears the mode's bar, else the movement the mode calls for (neutral
-   footwork, navigation to another level, edge-guarding, repositioning).
+7. **Tactics.** If the plan may be reconsidered, a new one is chosen
+   ([choosing to commit](#choosing-to-commit)). A fresh decision comes on
+   the level's reassessment cadence, like the next thing a player decides
+   to do; in between, only an opening it sees is taken at once, and its
+   footwork carries on. The attack sequence with the best utility if it
+   clears the bar, else the movement the objective and mode call for
+   (breaking off to a safer spot or a deliberate wait, navigation to
+   another level, edge-guarding, crossing over to finish, neutral
+   footwork).
 8. **Execute** through the executor, with the ledge guard.
-9. **Liveness.** Free to act in a live match and still for longer than a
-   deliberate pause (`STILL_LIMIT`, 0.45 s), it counts an incident and
-   takes a fresh plan at once (Rule A).
+9. **Liveness**, aware of intent ([waiting on purpose](#waiting-on-purpose)).
+
+## Choosing to commit
+
+Against a free opponent, keeping its options open is worth something: a
+patient player waits for a clearer chance. Each candidate's utility has
+that **value of waiting** taken off before it is compared: `0.4 + 1.6 ×
+patience`, times how selective the objective is, less as impatience grows,
+and less again when waiting would not make the opponent commit (it sits
+behind a raised Shield, turtles by habit, or holds back). An **opening**
+(the opponent still busy when the move lands) pays nothing for it and is
+taken at once. Keeping out of the fight (`stabilize`, `protect`,
+`survive`), even an opening must be a clear one (a hit chance of 0.45 or
+more, and half the wait paid), and going in after the opponent (a Dash-in
+or a jump-in from the ground) pays more again: it lets the opponent come.
+The best candidate (with the level's noise) is taken only if it clears the
+**bar**, `1 − aggro`, `aggro` being the mode's own plus the objective's
+shift and its impatience.
+
+**Pressure that is not working** (attacks on a free opponent that whiffed
+or were blocked, one after another: 2 to 5 tries, by the mode's aggression
+and the level's initiative) is broken off for a moment: back to a spacing
+outside the opponent's reach, taking only an opening, before it presses
+again. A finisher it does not see this time is weighed for everything but
+the life it would end. Its own combo is no fresh opening before it has
+confirmed the hit, nor once it has dropped it.
+
+## Waiting on purpose
+
+Standing still is allowed when it is meant. A plan that stands still on
+purpose has `intent` `'wait'` and a `why`: a `hold` (recovering Launch
+Point, protecting the lead, running out the clock), footwork settled at its
+spacing (its dead band keeps it from twitching round the spot: it sets off
+only once past the band, re-aims only when the opponent has moved past it,
+and lets go a stopping distance early), a ledge guarded, a spot taken while
+the opponent respawns. `controller.waiting` gives the reason.
+
+A **hold** knows the spot it holds (walked back to if it is pushed off),
+whether to keep its Shield ready, and what ends the wait: the opponent
+coming within reach (unless its Shield is up and holding), its patience
+running out (1.4 s plus up to 2.6 s by `patience`, more when waiting suits
+the objective, by temperament), the objective changing, its Launch Point
+down to 40% of where the wait began, the footing fading, a hazard's
+warning, the opponent leaving or rejoining play. Its **Shield** goes up
+only as an opponent on its level closes in or attacks, for a few blocks at
+most (2 to 4, by discipline) and at most 0.9 to 2.3 s at a stretch (by
+patience), then rests 1.2 to 2 s before it may go up again; never without
+the Energy for it. A wait the opponent's reach would end at once is no
+wait: it keeps its footwork, or fights.
+
+The **liveness monitor** tells two kinds of stillness apart. Free to act on
+the ground in a live match, with nothing held, pressed or moving:
+
+- with a plan whose intent is `'wait'`, it is **waiting**: counted with its
+  reason (`telemetry.waitReasons`), never an incident. A wait that runs on
+  unbroken past `WAIT_LIMIT` (10 s) makes it reassess at once and (unless
+  it is running out the clock) move for a moment before it may wait again:
+  a wait is never endless;
+- with no plan, a plan that should be moving but is not, or a walk the
+  ledge guard keeps holding back, it is an **inactivity incident** after
+  `STILL_LIMIT` (0.45 s), counted by cause (`inactivityCauses`; a ledge
+  guard holding it back is a navigation failure too), and a fresh plan is
+  taken at once.
+
+## Breaking off to recover
+
+With the objective `stabilize` (and the level heeding it), `protect` or
+`survive`, the CPU looks for a **safer spot** a couple of times a second: a
+handful of spots on the floor it stands on (where it is, 160 and 320
+further from the opponent, 480 with a good stage sense, the centre), each
+weighed by how likely the opponent's best launch would be to end its life
+there after another hit or two (`Strategy.dangerAt`, the Void in force
+included), the room it leaves to the opponent and to the ledge behind it,
+the way there and its distance from the Void; never past the opponent (no
+way there but through it), never under a hazard's warning, a lower level
+weighing them less exactly. Only a clearly better spot more than 50 away is
+worth a **retreat** (Dashing clear when the opponent is right on it and the
+Energy allows; abandoned, and not tried again at once, when the opponent
+cuts it off, the way is blocked or the spot comes under a warning);
+otherwise it **holds** where it stands. The break-off sees itself through
+until its Launch Point has come well down, and gives way at once when the
+opponent becomes exposed (`finish`), when it keeps getting hit, or when its
+Launch Point is not coming back. The telemetry counts retreats, those that
+held (Launch Point recovered unhit), those a hit broke, and the Launch
+Point recovered meanwhile.
+
+While the opponent is **out of play** (respawning) an attack planned on it
+is dropped before it is pressed (nobody to hit), and the CPU takes up a
+spot on the centre side of where it will reappear, outside its reach, and
+waits there, its Launch Point recovering (a heal of its own is cast if it
+has one); a wait there that runs past `WAIT_LIMIT` takes a fresh spot a
+little nearer the centre.
 
 ## Evaluating an option
 
@@ -128,8 +290,14 @@ path, and scored as expected utility:
   the opponent's best launch ends its life, being hit costs a life.
 - **Costs:** Energy (emptying the bar is worth it only for a life), long
   cooldowns, tempo (the same hit is worth less the longer it takes).
-- **Preferences:** the strategy mode's roles, and variety (a move left
+- **Preferences:** the strategy mode's roles (and the roles the opponent's
+  habits call for: anti-air against a jumper, Shield pressure against a
+  turtle, a counter-projectile against a zoner), and variety (a move left
   unused grows more tempting, more deliberately the higher the level).
+- **The opponent's habits** shift the chances: a block is likelier against
+  one that walls (Shields and holds back), a whiff costs more against one
+  that punishes, and a slow move is likelier to be avoided by one that
+  keeps moving.
 
 ## Universal by construction
 

@@ -525,12 +525,16 @@ const STEPS = {
         plan.high = true;
       }
     } else if (up < -30 && me.grounded && me.ground && me.ground !== s.model.floor) {
-      // Down: walk off the nearer edge of this surface toward the opponent.
+      // Down: walk off the nearer edge of this surface toward the opponent,
+      // one with footing below it (never off the end of the stage).
       const g = s.model.surfaceOf(me.ground);
       if (g) {
         const left = g.x0 - me.halfW - 18;
         const right = g.x1 + me.halfW + 18;
-        tx = s.op.x < g.x0 ? left : s.op.x > g.x1 ? right : me.x - g.x0 < g.x1 - me.x ? left : right;
+        let edge = s.op.x < g.x0 ? left : s.op.x > g.x1 ? right : me.x - g.x0 < g.x1 - me.x ? left : right;
+        const other = edge === left ? right : left;
+        if (!s.model.supported(edge, me.halfW, g.y + 4) && s.model.supported(other, me.halfW, g.y + 4)) edge = other;
+        tx = edge;
       }
     }
     const dx = tx - me.x;

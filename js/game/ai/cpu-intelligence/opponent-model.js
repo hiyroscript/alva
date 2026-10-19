@@ -5,13 +5,13 @@
 // visible picture of its opponent): how often it jumps, attacks on the
 // ground or in the air, throws projectiles, Dashes and Shields; how often it
 // raises its Shield when something comes at it, and how long it sits behind
-// it; how far away it likes to start its attacks; whether it presses forward
-// or backs off, and whether it backs off to recover while its Launch Point is
-// high; which moves it repeats; how often it whiffs; and how the CPU's own
-// attacks fare against it (how many it blocks, how often a whiff of the
-// CPU's gets punished: told by the brain, from its own hits and misses).
-// Every statistic is a rolling rate with
-// exponential decay, so one observation never becomes a permanent
+// it; how much it is on the move; how far away it likes to start its
+// attacks; whether it presses forward or backs off, and whether it backs off
+// to recover while its Launch Point is high; which moves it repeats; how
+// often it whiffs; and how the CPU's own attacks fare against it (how many
+// it blocks, how often a whiff of the CPU's gets punished: told by the
+// brain, from its own hits and misses). Every statistic is a rolling rate
+// with exponential decay, so one observation never becomes a permanent
 // assumption and old habits fade. The level's `adapt` decides how quickly
 // the evidence is trusted (`trust`): an Easy CPU only acts on obvious,
 // repeated habits; a Brutal one adapts fast, but only to what it saw.
@@ -35,7 +35,7 @@ export class OpponentModel {
     this.n = {
       jump: 0, groundAttack: 0, airAttack: 0, projectile: 0, dash: 0, shield: 0, whiff: 0,
       threatened: 0, shieldedThreat: 0, jumpedThreat: 0, approach: 0, retreat: 0, technique: 0,
-      closeTime: 0, closeAttack: 0, shieldHold: 0, hurtRetreat: 0,
+      closeTime: 0, closeAttack: 0, shieldHold: 0, hurtRetreat: 0, moving: 0,
       ourAttacks: 0, ourBlocked: 0, ourWhiffs: 0, punishedUs: 0,
     };
     this.attackDist = 120;
@@ -105,6 +105,7 @@ export class OpponentModel {
     if (threatenedNow) this.n.threatened += dt * 4;
     if (near) this.n.closeTime += dt;
     if (view.shielding) this.n.shieldHold += dt;
+    if (!view.grounded || Math.abs(view.vx) > 60) this.n.moving += dt;
     // Pressing forward (toward the CPU) or backing off, and backing off
     // with a high Launch Point: trying to recover.
     const toward = -Math.sign(dx) * view.vx;
@@ -195,6 +196,17 @@ export class OpponentModel {
     return span > 1 ? this.trust(this.n.shieldHold * 2) * Math.min(1, (this.n.shieldHold / span) * 3) : 0;
   }
 
+  // How much of its time it is on the move (running, jumping, flying): how
+  // readily it would get out of the way of something it sees coming (a
+  // prior of a mobile opponent until seen otherwise).
+  get mobile() {
+    const span = this.evidence;
+    const prior = 0.7;
+    const seen = span > 1 ? Math.min(1, this.n.moving / span) : prior;
+    const w = this.trust(span);
+    return prior * (1 - w) + seen * w;
+  }
+
   // How readily it backs off to recover while its Launch Point is high.
   get recovering() {
     return this.trust(this.n.hurtRetreat * 2) * Math.min(1, this.rate('hurtRetreat') / 0.3);
@@ -222,7 +234,7 @@ export class OpponentModel {
       jumpy: r(this.jumpy), shieldy: r(this.shieldy), zoner: r(this.zoner), aggressive: r(this.aggressive),
       whiffy: r(this.whiffy), dashy: r(this.dashy), pressure: r(this.pressure), range: this.preferredRange && Math.round(this.preferredRange),
       repeats: this.predictableMove, walls: r(this.walls), punishing: r(this.punishing), turtling: r(this.turtling),
-      recovering: r(this.recovering),
+      recovering: r(this.recovering), mobile: r(this.mobile),
     };
   }
 }

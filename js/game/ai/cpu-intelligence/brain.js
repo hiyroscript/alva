@@ -19,12 +19,15 @@
 //                  is re-weighed (objective.js: build, finish, stabilize,
 //                  protect, survive, force, regroup), then the way to fight
 //                  under it (strategy.js), and, when the current plan is not
-//                  committed, a plan is chosen: the best attack sequence if
-//                  its utility clears the bar the mode and the objective set
-//                  (evaluator.js), else the movement they call for (neutral
-//                  footwork that settles at its spacing, navigation to
-//                  another level, edge-guarding, breaking off to a safer
-//                  spot, a deliberate wait there with the Shield ready)
+//                  committed, a plan is chosen (a fresh decision on that
+//                  cadence; in between only an opening it sees is taken):
+//                  the best attack sequence if its utility, less what
+//                  waiting for a clearer chance is worth, clears the bar
+//                  the mode and the objective set (evaluator.js), else the
+//                  movement they call for (neutral footwork that settles
+//                  at its spacing, navigation to another level,
+//                  edge-guarding, breaking off to a safer spot, a
+//                  deliberate wait there with the Shield ready)
 //   8. execute     the executor's legal inputs, with the ledge guard
 //   9. liveness    the intent-aware safety net (telemetry.js): a wait its
 //                  plan means is waiting; stillness nothing means is an
@@ -37,7 +40,8 @@
 // The difficulty profile (js/data/difficulty.js) changes how well each
 // layer works (latency, lapses, cadence, noise, prediction, plan depth,
 // timing, guard, punish and finisher recognition, adaptation, Energy and
-// risk sense, recovery), never what the fighter can do. Every random draw
+// risk sense, recovery, patience, discipline, how fully it reads the
+// match), never what the fighter can do. Every random draw
 // comes from the injected seeded RNG, so a seeded match replays exactly.
 //
 // Inputs: the Fighter it controls (FighterController contract: getInput
@@ -59,7 +63,7 @@ import { makePlan, COMMITTED, CONTINUED } from './plans.js';
 import { Telemetry, STILL_LIMIT, WAIT_LIMIT } from './telemetry.js';
 import { MatchObjective } from './objective.js';
 import { STEP, Track, arcTrack, predictTrack, recoverySim } from './prediction.js';
-import { riseOf } from './values.js';
+import { riseOf, KO_VALUE } from './values.js';
 import { analyzeCapabilities, moveReady } from './capabilities.js';
 import { StageModel } from './stage-model.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
@@ -213,7 +217,7 @@ export class CpuIntelligence {
       this.lastThink = this.clock;
       if (s.present && !this.sees.opening) s.op.busy = Math.min(s.op.busy, 0.05);
       if (s.present && this.sees.opening && s.op.busy > 0.25) this.telemetry.count('punishChances');
-      if (s.present && this.sees.finisher && this.strategy.finish > 0.5) this.telemetry.count('finishChances');
+      if (s.present && this.strategy.finish > 0.5) this.telemetry.count(this.sees.finisher ? 'finishChances' : 'finishesMissed');
     }
     this.telemetry.spent(this.objective.kind, dt);
     this.decide(s, think, ex);
@@ -615,10 +619,16 @@ export class CpuIntelligence {
     c.decided = true;
     let best = null;
     for (const cand of list) {
+      this.unseenFinish(cand, s);
       if (cand.p < 0.4 || cand.utility < 0.4) continue;
       if (!best || cand.utility > best.utility) best = cand;
     }
-    if (!best || this.rng() > p.comboReliability) return;
+    if (!best || this.rng() > p.comboReliability) {
+      // Dropped: the level did not find it, or not in time. The opening it
+      // left is not taken by another way either (see choose).
+      c.dropped = true;
+      return;
+    }
     const plan = this.planFromCandidate(best, 'combo follow-up');
     if (plan) {
       plan.until = this.clock + wait + 0.8;
@@ -637,6 +647,14 @@ export class CpuIntelligence {
     if (c.kind === 'dashStrike') return makePlan('dashStrike', { cand: c, reason, until: this.clock + 0.6 }, this);
     if (c.kind === 'jumpStrike') return makePlan('jumpStrike', { cand: c, reason, until: this.clock + (c.pressK + 30) * STEP }, this);
     return makePlan('strike', { cand: c, reason, wait: 0.15 }, this);
+  }
+
+  // A finisher it does not see this time (the level's `opportunity`, drawn
+  // at each reassessment): the life the launch would end is not part of what
+  // it makes of the move, which it may still choose for what else it does.
+  unseenFinish(c, s) {
+    if (this.sees.finisher || !(c.ko > 0.1)) return;
+    c.utility -= c.p * c.ko * KO_VALUE * s.match.koFor;
   }
 
   // Whether the opponent, as the CPU sees it, is open right now (busy in its
@@ -694,12 +712,19 @@ export class CpuIntelligence {
     // it (a Dash-in, a jump-in from the ground) costs more again.
     const goingIn = guarded ? wait * 0.6 : 0;
     const resetting = this.clock < this.pressure.resetUntil;
+    // The opponent still reeling from its own hit: following that up is a
+    // combo, and a combo is found and confirmed as the level finds and
+    // confirms them (see followUp): not before the hit is confirmed, and
+    // not at all once dropped.
+    const k = this.combo;
+    const ownStun = !!k && this.clock - k.at < k.stun + 0.15 && (this.clock < k.confirmAt || k.dropped);
     let best = null;
     let bestV = -Infinity;
     const noise = p.noise;
     for (const c of list) {
-      if (!this.sees.finisher && c.ko > 0.3) c.utility -= c.ko * 20;
+      this.unseenFinish(c, s);
       if (!c.open && resetting) continue;
+      if (c.open && ownStun) continue;
       if (c.open && guarded && c.p < 0.45) continue;
       const initiates = !c.open && (c.kind === 'dashStrike' || (c.kind === 'jumpStrike' && c.jump && c.jump !== 'air'));
       const v = c.utility - (c.open ? openWait : wait) - (initiates ? goingIn : 0) + (this.rng() * 2 - 1) * noise * (0.6 + Math.abs(c.utility) * 0.35);
@@ -731,7 +756,10 @@ export class CpuIntelligence {
     // Breaking off to recover (the objective's call, the level's
     // discipline whether it heeds it), protecting a lead or running out the
     // clock: the safer spot, then a deliberate wait there.
-    const defensive = obj.bias.retreat ? this.heeds() : obj.kind === 'protect' || obj.kind === 'survive';
+    // (Not for a moment after a wait that ran too long: then it goes back
+    // to the opponent, see liveness.)
+    const restless = this.clock < this.restlessUntil;
+    const defensive = !restless && (obj.bias.retreat ? this.heeds() : obj.kind === 'protect' || obj.kind === 'survive');
     // The opponent on another level: go there (not while keeping clear).
     const foeY = op.grounded ? op.y : op.view.lastGroundY;
     if (!defensive && Math.abs(foeY - me.y) > 40 && (op.grounded || Math.abs(op.vy) < 300) && !op.offstage) {

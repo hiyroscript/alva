@@ -47,7 +47,6 @@ const arg = (name, fallback) => {
   return i >= 0 ? args[i + 1] : fallback;
 };
 const SEEDS = Number(arg('seeds', 2));
-if (process.env.FLAGS) for (const f of process.env.FLAGS.split(',')) globalThis[f] = true;
 const FROM = Number(arg('from', 1));
 const ONLY = arg('only', null);
 const JSON_OUT = arg('json', null);

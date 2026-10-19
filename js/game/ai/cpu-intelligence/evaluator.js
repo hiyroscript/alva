@@ -47,7 +47,7 @@ import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 // what the CPU assumes, since it cannot know.
 const FOE_REACT = 0.2;
 // How often an opponent that could get out of the way does: nobody escapes
-// everything.
+// everything (scaled by how mobile this one has been seen to be).
 const ALERT = 0.8;
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -405,7 +405,7 @@ export class Evaluator {
         const rise = MV.jumpVelocity * esc - 0.5 * s.gravity * esc * esc;
         if (c.marginUp < rise) jumpOut = 0.75;
       }
-      pg = 0.96 * (1 - ALERT * (1 - fit * jumpOut));
+      pg = 0.96 * (1 - ALERT * (0.55 + 0.45 * model.mobile) * (1 - fit * jumpOut));
     }
     // A projectile from far away gives time to see it.
     if (c.projectile && c.flight > 0.3 && busy < tC) pg *= clamp(1.25 - c.flight, 0.35, 1);

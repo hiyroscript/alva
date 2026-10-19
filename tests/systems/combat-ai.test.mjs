@@ -431,16 +431,16 @@ test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own bu
 
 test('left to itself, a high level uses Unlimited Void and Hollow Purple on an open opponent, each from its own button', () => {
   const used = { attack4: 0, attack5: 0 };
-  // An opponent that never guards, never battered (its Launch Point held at
-  // 0, so it stays on the stage): a few steps away, and across the ring
-  // (where a long cast like Hollow Purple has the time it needs; up close
-  // the CPU rightly prefers quicker hits on a free opponent).
-  for (const [seed, foeX] of [0, 1, 2, 3, 4, 5].flatMap((n) => [[n, 900], [n, 1300]])) {
+  // An opponent that never guards, its Launch Point held where it is (so it
+  // stays on the stage): fresh and a few steps away, and battered across the
+  // ring (where a long cast like Hollow Purple is the finisher it is for; on
+  // a fresh opponent up close the CPU rightly prefers quicker hits).
+  for (const [seed, foeX, lp] of [0, 1, 2, 3, 4, 5].flatMap((n) => [[n, 900, 0], [n, 1300, 60]])) {
     const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX, script: () => ({}) });
     let tech = null;
     let cooling = [];
     for (let i = 0; i < seconds(14); i++) {
-      r.foe.combat.launchPoint = 0;
+      r.foe.combat.launchPoint = lp;
       r.step();
       const out = r.log.at(-1);
       const now = [...r.cpu.combat.abilityCooldowns.entries.keys()];

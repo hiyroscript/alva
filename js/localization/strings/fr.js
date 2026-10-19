@@ -125,9 +125,9 @@ export const FR = {
   'launch.direction.reverseVertical.description': 'Éjecte vers le bas.',
 
   'difficulty.easy.name': 'Facile',
-  'difficulty.easy.description': 'Un joueur occasionnel. Battable, jamais passif.',
+  'difficulty.easy.description': 'Un joueur occasionnel. Battable, mais combatif.',
   'difficulty.medium.name': 'Moyen',
-  'difficulty.medium.description': 'Un joueur acharné. Enchaîne, s’adapte, revient.',
+  'difficulty.medium.description': 'Un joueur régulier. Enchaîne, s’adapte, revient.',
   'difficulty.hard.name': 'Difficile',
   'difficulty.hard.description': 'Niveau tournoi. Punit les erreurs.',
   'difficulty.brutal.name': 'Brutal',
