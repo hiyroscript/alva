@@ -54,6 +54,19 @@
 //   recoverySkill how accurately it plans a route back to the stage.
 //   initiative    willingness to take the initiative (start offense) rather
 //                 than wait for the opponent's commitment.
+//   patience      how long it is content to wait on purpose (holding a
+//                 position, letting its Launch Point recover, waiting for
+//                 the opponent to commit) before it grows impatient and
+//                 acts, and how readily it lets a marginal attack go.
+//   discipline    how reliably it carries out what its match objective
+//                 asks: breaking off to recover when it judges it should,
+//                 not chasing small damage while protecting a lead, sticking
+//                 with an objective rather than changing its mind.
+//   awareness     how fully it reads the match: the score and the clock,
+//                 overtime and its Launch Point tiebreak, how exposed each
+//                 fighter is where it stands, so how well its match
+//                 objective (js/game/ai/cpu-intelligence/objective.js) fits
+//                 the situation.
 //
 // Every trait is ordered by level (see CAPABILITY): a higher level never has
 // a slower reaction, a lapse more often or a noisier judgement than a lower
@@ -68,6 +81,7 @@ export const CAPABILITY = Object.freeze({
   react: -1, lapse: -1, think: -1, noise: -1, rangeError: -1, predictError: -1, timing: -1,
   lookahead: 1, planDepth: 1, comboReliability: 1, guard: 1, perfectShield: 1, punish: 1, adapt: 1,
   energySense: 1, riskSense: 1, stageSense: 1, opportunity: 1, diSkill: 1, recoverySkill: 1, initiative: 1,
+  patience: 1, discipline: 1, awareness: 1,
 });
 
 // The reaction windows are the same for every fighter. They are set
@@ -80,24 +94,28 @@ export const CAPABILITY = Object.freeze({
 // faster or slower startup is simply harder or easier to answer.
 const PROFILES = {
   easy: {
-    react: [0.3, 0.46], lapse: 0.3, think: [0.2, 0.34], noise: 0.5, rangeError: 26, predictError: 0.35, timing: 0.07,
-    lookahead: 0.12, planDepth: 1, comboReliability: 0.45, guard: 0.35, perfectShield: 0.04, punish: 0.35, adapt: 0.15,
-    energySense: 0.3, riskSense: 0.3, stageSense: 0.4, opportunity: 0.35, diSkill: 0.2, recoverySkill: 0.55, initiative: 0.5,
+    react: [0.3, 0.46], lapse: 0.33, think: [0.22, 0.36], noise: 0.65, rangeError: 34, predictError: 0.42, timing: 0.085,
+    lookahead: 0.1, planDepth: 1, comboReliability: 0.32, guard: 0.3, perfectShield: 0.03, punish: 0.28, adapt: 0.12,
+    energySense: 0.25, riskSense: 0.25, stageSense: 0.35, opportunity: 0.28, diSkill: 0.15, recoverySkill: 0.5, initiative: 0.45,
+    patience: 0.3, discipline: 0.35, awareness: 0.35,
   },
   medium: {
-    react: [0.19, 0.3], lapse: 0.14, think: [0.11, 0.2], noise: 0.27, rangeError: 14, predictError: 0.2, timing: 0.04,
-    lookahead: 0.25, planDepth: 2, comboReliability: 0.72, guard: 0.6, perfectShield: 0.2, punish: 0.62, adapt: 0.4,
+    react: [0.19, 0.3], lapse: 0.14, think: [0.08, 0.14], noise: 0.32, rangeError: 15, predictError: 0.2, timing: 0.04,
+    lookahead: 0.25, planDepth: 2, comboReliability: 0.64, guard: 0.57, perfectShield: 0.2, punish: 0.58, adapt: 0.4,
     energySense: 0.55, riskSense: 0.55, stageSense: 0.65, opportunity: 0.6, diSkill: 0.5, recoverySkill: 0.8, initiative: 0.6,
+    patience: 0.5, discipline: 0.6, awareness: 0.6,
   },
   hard: {
-    react: [0.15, 0.22], lapse: 0.06, think: [0.065, 0.11], noise: 0.13, rangeError: 7, predictError: 0.1, timing: 0.02,
-    lookahead: 0.4, planDepth: 3, comboReliability: 0.88, guard: 0.82, perfectShield: 0.5, punish: 0.85, adapt: 0.7,
+    react: [0.15, 0.22], lapse: 0.06, think: [0.04, 0.07], noise: 0.13, rangeError: 7, predictError: 0.1, timing: 0.02,
+    lookahead: 0.4, planDepth: 3, comboReliability: 0.86, guard: 0.82, perfectShield: 0.5, punish: 0.85, adapt: 0.7,
     energySense: 0.8, riskSense: 0.8, stageSense: 0.85, opportunity: 0.82, diSkill: 0.8, recoverySkill: 0.93, initiative: 0.68,
+    patience: 0.75, discipline: 0.8, awareness: 0.82,
   },
   brutal: {
     react: [0.07, 0.105], lapse: 0.015, think: [0.034, 0.056], noise: 0.04, rangeError: 2, predictError: 0.04, timing: 0.008,
     lookahead: 0.6, planDepth: 4, comboReliability: 0.98, guard: 0.96, perfectShield: 0.85, punish: 0.98, adapt: 0.95,
     energySense: 0.95, riskSense: 0.96, stageSense: 1, opportunity: 0.97, diSkill: 1, recoverySkill: 1, initiative: 0.72,
+    patience: 0.85, discipline: 0.92, awareness: 0.95,
   },
 };
 
@@ -107,8 +125,8 @@ const freezeProfile = (p) => Object.freeze({ ...p, react: Object.freeze([...p.re
 // the skill each level plays at (js/localization/strings/en.js reads the
 // lines from here; fr.js translates them).
 export const DIFFICULTIES = Object.freeze([
-  { id: 'easy', index: '01', level: 1, name: 'Easy', description: 'A casual player. Beatable, never idle.' },
-  { id: 'medium', index: '02', level: 2, name: 'Medium', description: 'A tryhard. Combos, adapts, recovers.' },
+  { id: 'easy', index: '01', level: 1, name: 'Easy', description: 'A casual player. Beatable, but plays to win.' },
+  { id: 'medium', index: '02', level: 2, name: 'Medium', description: 'A regular player. Combos, adapts, recovers.' },
   { id: 'hard', index: '03', level: 3, name: 'Hard', description: 'Tournament level. Punishes mistakes.' },
   { id: 'brutal', index: '04', level: 4, name: 'Brutal', description: 'Elite. Reads, traps and finishes.' },
 ].map((d) => Object.freeze({ ...d, profile: freezeProfile(PROFILES[d.id]) })));

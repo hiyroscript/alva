@@ -124,19 +124,25 @@ Restart Battle, Rematch and every Void respawn; Practice Ground never reads
 it.
 
 All four levels are one intelligence, CPU Intelligence, using every move,
-the Dash, the air dash, the Shield and the Deflect, and never idle while
-free to act:
+the Dash, the air dash, the Shield and the Deflect. Each plays with a
+purpose: it knows what it is after in the match (building an advantage,
+finishing an exposed opponent, breaking off to let its Launch Point
+recover, protecting a lead, forcing a comeback), and it may stand still
+when waiting is the better play, never as idleness:
 
-- **Easy:** a casual player. Sees things late (or misses them), misjudges
-  ranges, rarely times a punish, recovers loosely; beatable, but always
-  playing.
-- **Medium:** a tryhard. Combos, answers the slower threats, picks up the
-  opponent's habits, recovers reliably.
-- **Hard:** tournament level. Reads the telegraphed moves, punishes whiffs
-  and bad landings, edge-guards, manages Energy and spacing.
+- **Easy:** a casual player. Sees things late (or misses them), decides
+  slowly, misjudges ranges, often drops a combo or misses a finish, reads
+  the score and the clock only now and then, recovers loosely; beatable,
+  but always trying to win.
+- **Medium:** a regular player. Practical combos, answers the slower
+  threats, picks up the opponent's obvious habits, breaks off to recover
+  and protects a lead most of the time, still overcommits now and then.
+- **Hard:** tournament level. Reads the telegraphed moves, punishes
+  whiffs and bad landings, edge-guards, plays the stage and its Launch
+  Point, manages Energy and spacing.
 - **Brutal:** elite. Reacts within a few frames (never instantly),
-  reassesses constantly, adapts fast, finishes when a launch ends a life.
-  It still waits, spaces and retreats when that is the stronger choice.
+  reassesses constantly, adapts fast, waits for its openings, finishes
+  when a launch ends a life, never sees what a player could not.
 
 **Difficulty changes how well the CPU thinks, not what its fighter is
 allowed to do.** `js/data/difficulty.js` holds one profile per level, the
@@ -144,8 +150,9 @@ only place a level is validated (anything unknown is Medium): reaction
 window, lapse chance, reassessment interval, decision noise, range,
 prediction and timing error, lookahead, plan depth, combo reliability,
 guard, perfect Shield timing, punish and opportunity recognition,
-adaptation, Energy, risk and stage sense, launch steering, recovery skill
-and initiative. Every trait is ordered from Easy to Brutal. None of it
+adaptation, Energy, risk and stage sense, launch steering, recovery skill,
+initiative, patience, discipline and match awareness. Every trait is
+ordered from Easy to Brutal. None of it
 touches a fighter: damage, launch, stun, timing, speed, jumps, gravity,
 Dash, Shield, Energy and what anything costs in it, cooldowns, hitboxes,
 respawns and scoring are the character's and the match's own, identical on

@@ -47,7 +47,7 @@ import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 // what the CPU assumes, since it cannot know.
 const FOE_REACT = 0.2;
 // How often an opponent that could get out of the way does: nobody escapes
-// everything.
+// everything (scaled by how mobile this one has been seen to be).
 const ALERT = 0.8;
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -405,7 +405,7 @@ export class Evaluator {
         const rise = MV.jumpVelocity * esc - 0.5 * s.gravity * esc * esc;
         if (c.marginUp < rise) jumpOut = 0.75;
       }
-      pg = 0.96 * (1 - ALERT * (1 - fit * jumpOut));
+      pg = 0.96 * (1 - ALERT * (0.55 + 0.45 * model.mobile) * (1 - fit * jumpOut));
     }
     // A projectile from far away gives time to see it.
     if (c.projectile && c.flight > 0.3 && busy < tC) pg *= clamp(1.25 - c.flight, 0.35, 1);
@@ -421,7 +421,9 @@ export class Evaluator {
     if (blockable && op.shielding) {
       pBlock = busy >= tC - 0.03 || tC <= FOE_REACT ? 1 : 0.85;
     } else if (blockable && busy < tC - 0.03) {
-      const bias = clamp(model.shieldy * 1.5 + 0.1, 0.15, 0.9);
+      // How readily it Shields what comes, and how much of what the CPU
+      // has thrown ended on its Shield.
+      const bias = clamp(model.shieldy * 1.5 + 0.1 + model.walls * 0.3, 0.15, 0.9);
       pBlock = clamp(bias * clamp((tC - 0.1) / 0.2, 0.12, 1), 0, 0.92);
     }
     const pHit = pg * (1 - pBlock);
@@ -459,7 +461,8 @@ export class Evaluator {
     // What being hit costs: the opponent's best quick hit from here, or,
     // at a Launch Point where its best launch ends the CPU's life, that.
     const exposure = Math.max(this.foePunish, brain.strategy.danger * KO_VALUE * s.match.koAgainst * 0.8);
-    let vMiss = -0.4 - punishable * exposure * 0.75;
+    // An opponent that has been punishing its whiffs makes one cost more.
+    let vMiss = (-0.4 - punishable * exposure * 0.75) * (1 + model.punishing * 0.6);
     // Something already on its way to the CPU that lands first: its attack
     // is lost (no attack has armour) and the blow lands, unless the move
     // itself carries it clear.
@@ -516,9 +519,11 @@ export class Evaluator {
     let utility = (pHit * vHit + pBlocked * vBlock * risk + pMiss * vMiss * risk) * (1 - lost) - cost -
       interrupt * exposure * risk - struckFirst * blow * (0.4 + p.riskSense * 0.6) -
       elim * KO_VALUE * s.match.koAgainst * (0.3 + p.riskSense * 0.7);
-    // The strategy's preferred roles, and the CPU's own sense of variety.
+    // The strategy's preferred roles (the mode's, and what the opponent's
+    // habits make worth reaching for), and the CPU's own sense of variety.
     let bonus = 0;
-    for (const role of m.roles) bonus += params.roles[role] ?? 0;
+    const adaptive = brain.strategy.adaptive;
+    for (const role of m.roles) bonus += (params.roles[role] ?? 0) + (adaptive[role] ?? 0);
     utility += bonus * (0.5 + pHit);
     if (pHit > 0.25) utility += brain.variety(m);
     // Tempo: the same hit is worth less the longer it takes to land (the
@@ -526,6 +531,8 @@ export class Evaluator {
     // opening wasted waiting).
     if (utility > 0 && !c.projectile) utility /= 1 + Math.max(0, tC - 0.3) * 0.6;
     c.p = pHit * (1 - lost);
+    // An opening: the opponent still busy (recovering, stunned) when it lands.
+    c.open = busy >= tC - 0.02;
     c.pBlock = pBlocked;
     c.pg = pg;
     c.value = vHit;

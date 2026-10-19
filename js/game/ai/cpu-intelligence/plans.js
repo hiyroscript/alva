@@ -17,9 +17,24 @@
 //   move, dash, jump, airDrift
 //               get out of the way, or reposition
 //   neutral     footwork: hold the strategy's spacing against the
-//               opponent, step in and out of its reach (whiff-baiting,
-//               conditioning), close in by running or Dashing when the
-//               plan calls for offense; never still for long
+//               opponent, closing in by running or Dashing when the plan
+//               calls for offense, and settling once there (it moves again
+//               only when the spacing has drifted past a dead band, so it
+//               never twitches round a spot); when baiting, a deliberate
+//               step in and out of reach every second or so
+//   hold        a deliberate wait (intent 'wait'): it knows why it waits
+//               (`why`), the spot it holds (`holdX`, walked back to if it is
+//               pushed off), whether to keep its Shield ready (`guard`: up as
+//               the opponent closes in or attacks, while the Energy lasts,
+//               for a few blocks at most, never for ever), and what ends the
+//               wait: the opponent coming within reach, its patience running
+//               out, the objective changing, the Launch Point recovered, the
+//               footing fading or a hazard's warning, the opponent back in
+//               play (see holdOver)
+//   retreat     break off toward a safer spot (`targetX`, chosen by the
+//               brain from the real launch rules), Dashing clear when the
+//               opponent is right on it; abandoned if the opponent cuts it off
+//               or the spot turns unsafe
 //   air         airborne control: drift toward a useful landing, fast fall
 //               when landing sooner is safer, never drift off the stage
 //   recover     get back to the stage: hold toward it, space the air
@@ -29,20 +44,77 @@
 //               and jump to it (the higher jump and an air jump if needed),
 //               or walk off a platform's edge (there is no platform drop)
 //   edgeguard   hold the ledge the opponent must come back to, ready
-//   reposition  make for a better spot (the centre, a safe distance from
-//               where an opponent will respawn)
+//   reposition  make for a better spot (a safe distance from where an
+//               opponent will respawn), then wait there
 //
 // Every plan has a lifetime and explicit end: 'run' while it goes on,
 // 'done' when its objective is met, 'fail' when it can no longer be (the
-// brain replans at once, so a failed plan never leaves the CPU idle).
+// brain replans at once, so a failed plan never leaves the CPU idle). A
+// plan standing still on purpose says so (`intent` 'wait', with its `why`):
+// the liveness monitor counts that as waiting, never as inactivity.
 //
 // Inputs: the brain, the situation, the executor. Outputs: makePlan.
 
 import { moveReady } from './capabilities.js';
 import { driftDir, STEP } from './prediction.js';
 import { riseOf } from './values.js';
+import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
 const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
+
+// Footwork toward `tx` with a dead band: it sets off only once more than
+// `band` away and stops within `stop`, so it settles on a spot rather than
+// twitching round it. The way to hold (-1, 0 or 1); the state is the plan's.
+function stepToward(plan, me, tx, band, stop = 6) {
+  if (plan.moving == null) plan.moving = false;
+  const dx = tx - me.x;
+  // Letting go a stopping distance early: it slides to the spot rather
+  // than past it and back.
+  const slide = sign(me.vx) === sign(dx) ? (me.vx * me.vx) / (2 * MV.deceleration) : 0;
+  if (plan.moving) {
+    if (Math.abs(dx) <= stop + slide) plan.moving = false;
+  } else if (Math.abs(dx) > band) {
+    plan.moving = true;
+  }
+  // Still sliding the other way past top speed (out of a Dash): let it run
+  // down rather than fight it.
+  if (plan.moving && sign(me.vx) === -sign(dx) && Math.abs(me.vx) > MV.maxSpeed) return 0;
+  return plan.moving ? sign(dx) : 0;
+}
+
+// The spot `spacing` from the opponent on this side of it, kept on the
+// stage with `room` to spare, re-aimed only once the opponent (as the CPU
+// sees it) has moved on by more than `band` or changed sides: footwork that
+// answers what the opponent does, not each step it takes.
+function aimAt(plan, s, spacing, room, band) {
+  const ox = s.op.x;
+  if (plan.aimX == null || Math.abs(ox - plan.aimFrom) > band || s.dir !== plan.aimDir || Math.abs(spacing - plan.aimSpacing) > band) {
+    plan.aimFrom = ox;
+    plan.aimDir = s.dir;
+    plan.aimSpacing = spacing;
+    plan.aimX = s.model.safeSpot(ox - s.dir * spacing, room);
+  }
+  return plan.aimX;
+}
+
+// What ends a deliberate wait (see `hold` in the header), as a reason, or
+// null while it goes on. Fixed phrases: they are counted by name.
+function holdOver(plan, brain, s) {
+  const me = s.me;
+  if (brain.clock - plan.start > plan.patience) return 'patience ran out';
+  if (plan.objective && brain.objective.kind !== plan.objective) return 'objective changed';
+  if (plan.lpTarget != null && me.lp <= plan.lpTarget) return 'Launch Point recovered';
+  const ground = me.ground ? s.model.surfaceOf(me.ground) : null;
+  if (ground?.fading) return 'footing fading';
+  if (s.model.dangerZones.length && s.model.dangerAt(me.x, me.halfW, 6)) return 'hazard warning';
+  if (plan.absent) return s.present ? 'opponent back in play' : null;
+  if (!s.present) return 'opponent out of play';
+  // The opponent coming within reach: the brain chooses again (a strike, a
+  // Shield, a step away), unless the Shield is up and holding.
+  const reach = s.foeReach.lunge + 30;
+  if (s.dist < reach && !plan.raised) return plan.guard === 'shield' && brain.shieldUsable(s, plan) ? null : 'opponent in reach';
+  return null;
+}
 
 // Whether move `m` started on the fighter's last step (an attack, a
 // technique, a summon's startup or its cooldown starting).
@@ -255,23 +327,110 @@ const STEPS = {
     return 'run';
   },
 
+  hold(plan, brain, s, ex) {
+    const me = s.me;
+    if (!me.grounded) {
+      brain.endWait(plan, 'left the ground');
+      return 'done';
+    }
+    const over = holdOver(plan, brain, s);
+    if (over) {
+      brain.endWait(plan, over);
+      return 'done';
+    }
+    // Blocks taken behind the Shield: a few, then it does something else
+    // (counter the attacker's recovery, slip away) rather than be worn down.
+    if (me.shieldStun > 0 && !(plan.lastStun > 0)) plan.blocks++;
+    plan.lastStun = me.shieldStun;
+    if (plan.blocks >= plan.maxBlocks && me.shieldStun <= 0) {
+      brain.endWait(plan, 'blocked enough');
+      return 'done';
+    }
+    // The Shield, ready: up while the opponent closes in or strikes, down
+    // once it backs off; never held past what the Energy and the level's
+    // patience allow.
+    if (plan.guard === 'shield') {
+      // Only an opponent that could reach it soon: on its level, or above
+      // it close enough to come down on it.
+      const level = Math.abs(s.dy) < s.foeCaps.height + 40;
+      const closing = level && s.dist < s.foeReach.lunge + 40 + Math.max(0, -s.dir * s.op.vx) * 0.25;
+      const striking = level && !!s.op.attackDef && s.op.view.attackPhase !== 'recovery' && s.dist < s.foeReach.lunge + 120;
+      if ((closing || striking || me.shieldStun > 0) && brain.shieldUsable(s, plan)) {
+        if (!plan.raised) {
+          plan.raised = true;
+          brain.telemetry.count('shields');
+        }
+        plan.shieldFor += STEP;
+        ex.shield(true);
+        return 'run';
+      }
+      if (plan.raised && plan.shieldFor > plan.maxShield) {
+        // A long stint behind the Shield: it stays down a while, whatever
+        // comes next (an answer to a real threat aside).
+        brain.shieldRestUntil = brain.clock + 1.2 + (1 - brain.profile.patience) * 0.8;
+        brain.endWait(plan, 'Shield held long enough');
+        return 'done';
+      }
+      plan.raised = false;
+    }
+    // Back to the spot it holds, if pushed off it.
+    ex.dir(stepToward(plan, me, plan.holdX, 30, 8));
+    return brain.clock > plan.until ? (brain.endWait(plan, 'patience ran out'), 'done') : 'run';
+  },
+
+  retreat(plan, brain, s, ex) {
+    const me = s.me;
+    const self = s.self;
+    if (!me.grounded || brain.clock > plan.until) return 'done';
+    const dx = plan.targetX - me.x;
+    if (Math.abs(dx) < 14) return 'done';
+    // Cut off (the opponent now between it and the spot, close), or the
+    // spot gone bad (a hazard's warning over it): a fresh choice.
+    if (s.present && sign(s.op.x - me.x) === sign(dx) && Math.abs(s.op.x - me.x) < Math.abs(dx) && s.dist < 240) {
+      brain.abandon(plan, 'retreat cut off');
+      return 'done';
+    }
+    if (s.model.dangerZones.length && s.model.dangerAt(plan.targetX, me.halfW, 10)) {
+      brain.abandon(plan, 'retreat spot under a warning');
+      return 'done';
+    }
+    // The opponent right on it: Dash clear, if the Energy can spare it.
+    const dash = s.caps.movement.dash;
+    if (plan.dashOk && !plan.dashed && dash && s.present && s.dist < s.foeReach.lunge + 70 && self.canAct() && self.movementReady(false) &&
+        me.energy > 55 && Math.abs(dx) > dash.distance * 0.7) {
+      ex.dash(sign(dx));
+      plan.dashed = true;
+      brain.telemetry.count('dashes');
+      brain.telemetry.count('disengageDashes');
+    }
+    // Not getting anywhere (a wall, the ledge guard): give it up.
+    if (Math.abs(me.x - plan.lastX) > 10) {
+      plan.lastX = me.x;
+      plan.movedAt = brain.clock;
+    } else if (brain.clock - plan.movedAt > 0.5) {
+      brain.telemetry.count('navigationFailures');
+      brain.abandon(plan, 'retreat blocked');
+      return 'done';
+    }
+    ex.dir(sign(dx));
+    return 'run';
+  },
+
   neutral(plan, brain, s, ex) {
     const me = s.me;
     const self = s.self;
     if (!me.grounded) return 'done';
+    // Baiting: a deliberate step into the opponent's reach and back out,
+    // every second or so (never a twitch, never a rhythm it can time).
+    if (plan.baitRange && brain.clock > plan.baitAt) {
+      plan.bait = plan.bait ? 0 : (brain.rng() < 0.5 ? -1 : 1) * plan.baitRange;
+      plan.baitAt = brain.clock + 0.6 + brain.rng() * 0.8;
+    }
     // Where to stand: the strategy's distance from the opponent, on this
     // side of it, kept on the stage.
-    const want = plan.dist + plan.dance;
-    let tx = s.op.x - s.dir * want;
-    tx = s.model.safeSpot(tx, plan.edgeRoom);
-    if (brain.clock > plan.danceAt) {
-      // Step in and out of the opponent's reach: never a standing target,
-      // never a rhythm it can time.
-      plan.dance = (brain.rng() * 2 - 1) * plan.danceRange;
-      plan.danceAt = brain.clock + 0.16 + brain.rng() * 0.3;
-    }
+    const tx = aimAt(plan, s, plan.dist + (plan.bait ?? 0), plan.edgeRoom, plan.band);
     const dx = tx - me.x;
-    let d = Math.abs(dx) > 6 ? sign(dx) : 0;
+    const d = stepToward(plan, me, tx, plan.band, 6);
     // Close in with a Dash when far and the plan wants offense.
     if (plan.dashIn && !plan.dashed && Math.abs(dx) > plan.dashFrom && self.canAct() && self.movementReady(false) &&
         sign(dx) === s.dir && me.energy > plan.dashEnergy) {
@@ -279,9 +438,8 @@ const STEPS = {
       plan.dashed = true;
       brain.telemetry.count('dashes');
     }
-    // Nothing to do here this instant: a small step keeps the spacing alive.
-    if (!d) d = plan.idleDir || (plan.idleDir = brain.rng() < 0.5 ? -s.dir : s.dir);
-    else plan.idleDir = 0;
+    // At its spacing it settles: waiting there on purpose.
+    plan.intent = d ? 'act' : 'wait';
     ex.dir(d);
     return brain.clock > plan.until ? 'done' : 'run';
   },
@@ -289,12 +447,7 @@ const STEPS = {
   air(plan, brain, s, ex) {
     const me = s.me;
     if (me.grounded) return 'done';
-    let tx = plan.targetX;
-    if (s.present) {
-      const spacing = plan.spacing ?? (s.foeReach.poke + 20);
-      tx = s.op.x - s.dir * spacing;
-    }
-    tx = s.model.safeSpot(tx, me.halfW + 30);
+    const tx = s.present ? aimAt(plan, s, plan.spacing ?? (s.foeReach.poke + 20), me.halfW + 30, 24) : s.model.safeSpot(plan.targetX, me.halfW + 30);
     ex.dir(driftDir(me.x, me.vx, tx));
     // Down sooner: only over ground, falling already, and when nothing
     // is coming the CPU's way.
@@ -372,12 +525,16 @@ const STEPS = {
         plan.high = true;
       }
     } else if (up < -30 && me.grounded && me.ground && me.ground !== s.model.floor) {
-      // Down: walk off the nearer edge of this surface toward the opponent.
+      // Down: walk off the nearer edge of this surface toward the opponent,
+      // one with footing below it (never off the end of the stage).
       const g = s.model.surfaceOf(me.ground);
       if (g) {
         const left = g.x0 - me.halfW - 18;
         const right = g.x1 + me.halfW + 18;
-        tx = s.op.x < g.x0 ? left : s.op.x > g.x1 ? right : me.x - g.x0 < g.x1 - me.x ? left : right;
+        let edge = s.op.x < g.x0 ? left : s.op.x > g.x1 ? right : me.x - g.x0 < g.x1 - me.x ? left : right;
+        const other = edge === left ? right : left;
+        if (!s.model.supported(edge, me.halfW, g.y + 4) && s.model.supported(other, me.halfW, g.y + 4)) edge = other;
+        tx = edge;
       }
     }
     const dx = tx - me.x;
@@ -402,24 +559,20 @@ const STEPS = {
     const me = s.me;
     if (!me.grounded) return 'done';
     if (!s.present || !s.op.offstage) return 'done';
-    const dx = plan.targetX + plan.dance - me.x;
-    if (brain.clock > plan.danceAt) {
-      plan.dance = (brain.rng() * 2 - 1) * 14;
-      plan.danceAt = brain.clock + 0.2 + brain.rng() * 0.25;
-    }
-    ex.dir(Math.abs(dx) > 4 ? sign(dx) : -sign(dx || 1));
+    // At the ledge it waits, ready (moving again only if the spot it wants
+    // drifts by more than the dead band).
+    const d = stepToward(plan, me, plan.targetX, 16, 5);
+    plan.intent = d ? 'act' : 'wait';
+    ex.dir(d);
     return brain.clock > plan.until ? 'done' : 'run';
   },
 
   reposition(plan, brain, s, ex) {
     const me = s.me;
     if (!me.grounded) return 'done';
-    if (brain.clock > plan.danceAt) {
-      plan.dance = (brain.rng() * 2 - 1) * (plan.danceRange ?? 40);
-      plan.danceAt = brain.clock + 0.25 + brain.rng() * 0.35;
-    }
-    const dx = plan.targetX + plan.dance - me.x;
-    ex.dir(Math.abs(dx) > 5 ? sign(dx) : sign(plan.dance) || 1);
+    const d = stepToward(plan, me, plan.targetX, 24, 6);
+    plan.intent = d ? 'act' : 'wait';
+    ex.dir(d);
     return brain.clock > plan.until ? 'done' : 'run';
   },
 };
@@ -438,5 +591,11 @@ export function makePlan(kind, spec, brain) {
 }
 
 // Kinds that commit the fighter: a reassessment does not replace them
-// (only a threat or the plan's own end does).
+// (only a threat or the plan's own end does). A hold, a retreat and the
+// footwork are reconsidered on every reassessment (an opening is taken
+// from a wait as from anywhere).
 export const COMMITTED = new Set(['strike', 'press', 'dashStrike', 'jumpStrike', 'shield', 'deflect', 'dash', 'jump', 'recover', 'move', 'airDrift']);
+
+// Kinds a reassessment may carry on with rather than start afresh (their
+// state, such as a dead band or how long a wait has run, is kept).
+export const CONTINUED = new Set(['neutral', 'hold', 'retreat', 'edgeguard', 'reposition']);

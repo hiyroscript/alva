@@ -94,18 +94,19 @@ There are no import cycles (checked over every module).
 | `combat/launch-bounce.js` | Launch rebounds and their settings. | `fighters/fighter.js`, `rendering/hit-fx.js` |
 | `ai/combat-ai.js` | `CombatAIController`: CPU Intelligence as the modes build it. | `battle.js` |
 | `ai/moveset.js` | `readMoveset`, `hurtExtent`: a definition read raw. | `ai/cpu-intelligence/capabilities.js` |
-| `ai/cpu-intelligence/brain.js` | `CpuIntelligence`: the layers run every step in their order, plans, recovery, liveness, the attack orientation, test directives (see [CPU Intelligence](../systems/ai.md)). | `ai/combat-ai.js` |
+| `ai/cpu-intelligence/brain.js` | `CpuIntelligence`: the layers run every step in their order, the choice to commit (the value of waiting, pressure resets, hit-confirm), plans (breaking off to a safer spot, deliberate waits), recovery, the intent-aware liveness, the attack orientation, test directives (see [CPU Intelligence](../systems/ai.md)). | `ai/combat-ai.js` |
 | `ai/cpu-intelligence/capabilities.js` | `analyzeCapabilities` (each move's timing, reach, strikes and roles), `moveReady`, `MOVE_ROLES`. | the other CPU Intelligence modules |
 | `ai/cpu-intelligence/perception.js` | `Perception`: the opponent as seen `latency` ago, recognized events, seen projectiles and clones. | `ai/cpu-intelligence/brain.js` |
 | `ai/cpu-intelligence/situation.js`, `stage-model.js` | `Situation` (the world model rebuilt each step), `StageModel` (ledges, surfaces, the live Void, dynamic platforms read live: where they are, whether they are solid or fading). | `ai/cpu-intelligence/` |
 | `ai/cpu-intelligence/prediction.js` | The forward simulation on the game's rules: paths, jump arcs, move and projectile contact, launches, recoveries. | `ai/cpu-intelligence/` |
-| `ai/cpu-intelligence/opponent-model.js` | `OpponentModel`: the opponent's observed habits, decaying. | `ai/cpu-intelligence/brain.js` |
-| `ai/cpu-intelligence/strategy.js` | `Strategy`: the strategic mode with hysteresis. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/opponent-model.js` | `OpponentModel`: the opponent's observed habits (and how the CPU's own attacks fare against it), decaying. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/objective.js` | `MatchObjective`, `OBJECTIVES`: the match objective (build, finish, stabilize, protect, survive, force, regroup) from the score, the clock, overtime's tiebreak and both fighters' exposure, with dwell, events and impatience. | `ai/cpu-intelligence/brain.js`, `strategy.js` |
+| `ai/cpu-intelligence/strategy.js` | `Strategy`: the strategic mode with hysteresis, under the match objective; the launch estimates now and after another hit (`danger`, `finish`, `dangerSoon`, `finishSoon`, `dangerAt` a spot). | `ai/cpu-intelligence/brain.js`, `objective.js` |
 | `ai/cpu-intelligence/evaluator.js`, `values.js` | `Evaluator` (expected utility of every option), `LaunchJudge`, `KO_VALUE`. | `ai/cpu-intelligence/` |
 | `ai/cpu-intelligence/defense.js` | `Defense`: threats and their answers. | `ai/cpu-intelligence/brain.js` |
-| `ai/cpu-intelligence/plans.js` | `makePlan`, `COMMITTED`: each plan kind's steps. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/plans.js` | `makePlan`, `COMMITTED`, `CONTINUED`: each plan kind's steps (the deliberate `hold` and the `retreat` among them). | `ai/cpu-intelligence/brain.js` |
 | `ai/cpu-intelligence/executor.js` | `Executor`: one legal input snapshot, the ledge guard. | `ai/cpu-intelligence/brain.js` |
-| `ai/cpu-intelligence/telemetry.js` | `Telemetry`, `STILL_LIMIT`: counters, move usage, the debug trace. | `ai/cpu-intelligence/brain.js` |
+| `ai/cpu-intelligence/telemetry.js` | `Telemetry`, `STILL_LIMIT`, `WAIT_LIMIT`: counters, move usage, waits and their reasons, the debug trace and its events. | `ai/cpu-intelligence/brain.js` |
 | `rendering/sprite-normalizer.js` | `SpriteSet`, sprite normalization and drawing. | `arena.js`, `core/app.js`, `ui/stage-preview.js` |
 | `rendering/sprite-animator.js` | `SpriteAnimator`. | `fighters/fighter.js`, `combat/summon.js` |
 | `rendering/camera.js` | The camera. | `arena.js` |

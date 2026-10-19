@@ -576,12 +576,12 @@ no header, build label, eyebrow or keyboard hint bar.
   from Select Fighter returns here.
 - Four large selectable cards in ascending order, inspired by Seren's
   four-level scale but in Alva's charcoal, off-white and green:
-  **01 Easy** "A casual player. Beatable, never idle.", **02 Medium** "A
-  tryhard. Combos, adapts, recovers.", **03 Hard** "Tournament level.
-  Punishes mistakes.", **04 Brutal** "Elite. Reads, traps and finishes."
-  (French: "Un joueur occasionnel. Battable, jamais passif.", "Un joueur
-  acharné. Enchaîne, s’adapte, revient.", "Niveau tournoi. Punit les
-  erreurs.", "Élite. Lit, piège et achève."). Each
+  **01 Easy** "A casual player. Beatable, but plays to win.", **02 Medium**
+  "A regular player. Combos, adapts, recovers.", **03 Hard** "Tournament
+  level. Punishes mistakes.", **04 Brutal** "Elite. Reads, traps and
+  finishes." (French: "Un joueur occasionnel. Battable, mais combatif.",
+  "Un joueur régulier. Enchaîne, s’adapte, revient.", "Niveau tournoi.
+  Punit les erreurs.", "Élite. Lit, piège et achève."). Each
   shows its large mono index, a four-bar ascending scale (1 to 4 bars lit in
   the green accent, the rest hollow outlines, so the level reads by shape and
   label, never by colour alone; Brutal's top bar is a step brighter, the same
@@ -3222,9 +3222,10 @@ it names a fighter, an attack or an animation.
   - **One intelligence for every fighter and level.** The combat AI is
     CPU Intelligence (`js/game/ai/cpu-intelligence/`, explained in
     `docs/systems/ai.md`), one layered brain behind `CombatAIController`:
-    capability analysis, perception, a world model, an opponent model,
-    strategy, tactical evaluation, combos, stage navigation and recovery,
-    execution, difficulty humanization and telemetry. Nothing in it names a
+    capability analysis, perception, a world model, an opponent model, a
+    match objective, combat strategy, tactical evaluation, combos, stage
+    navigation and recovery, execution, difficulty humanization and
+    telemetry. Nothing in it names a
     fighter or branches on its id: every move, with its role (poke,
     approach, combo starter, launcher, finisher, anti-air, zoning, trap,
     area denial, punish, edge-guard, recovery, counter-projectile,
@@ -3258,15 +3259,36 @@ it names a fighter, an attack or an animation.
     first, an erasing or repelling projectile; the Shield weighed against
     every threat, a technique's or a summon's included, since every attack
     is blockable, and never predicted to be hit through); combos (the best follow-up the rules allow, pressed
-    in time); the committed plan; then, on the level's reassessment
-    cadence, the strategic mode (rushdown, controlled offense, neutral,
-    counterplay, zoning, trap control, survival, finisher hunt, recovery,
-    re-weighed from both Launch Points, footing, Energy, kit, the
-    opponent's habits, the score, the clock and overtime, with hysteresis)
-    and a new plan: the attack sequence (a move now, out of a Dash, out of
-    a jump) with the best expected utility, or the movement the mode calls
-    for (neutral footwork, navigation to another level, edge-guarding,
-    repositioning).
+    in time, once it has seen its hit land); the committed plan; then, on
+    the level's reassessment cadence, the match objective, the strategic
+    mode (rushdown, controlled offense, neutral, counterplay, zoning, trap
+    control, survival, finisher hunt, recovery, re-weighed from both Launch
+    Points, footing, Energy, kit, the opponent's habits and the objective,
+    with hysteresis) and a new plan: the attack sequence (a move now, out
+    of a Dash, out of a jump) with the best expected utility if it is worth
+    more than waiting for a clearer chance, or the movement the objective
+    and mode call for (breaking off to a safer spot, a deliberate wait,
+    neutral footwork, navigation to another level, edge-guarding,
+    repositioning). Between reassessments only an opening it sees is taken
+    at once.
+  - **Match objective.** Above the exchange of the moment it knows what it
+    is after in the match (`js/game/ai/cpu-intelligence/objective.js`):
+    building an advantage when even; finishing an opponent whose Launch
+    Point a launch can end; breaking off to let its own dangerous Launch
+    Point recover (stepping to a safer spot, Shield ready, then coming
+    back) when there is time to; protecting a lead, and with seconds left
+    running out the clock; forcing the fight when behind with too little
+    time, or losing overtime's Launch Point tiebreak (projected to the end
+    of the clock, both Launch Points recovering); regrouping while the
+    opponent respawns. It reads only what a player sees (the score, the
+    clock, overtime, both Launch Points, the stage and its closing Void).
+    An objective persists (a minimum dwell, a bonus for the current one)
+    and changes sooner only on an important event (a point, a respawn,
+    overtime, the clock's last stretch, a heavy hit) or a clearly better
+    objective; a break-off that keeps getting hit, or whose Launch Point is
+    not coming back, gives way to fighting back. The objective informs the
+    strategy (the modes it favours, the bar for a commitment, how much risk
+    counts, how well waiting suits it), never the moves.
   - **Expected utility.** Each option is simulated on the game's own rules
     against the opponent's predicted path: its chance to hit, be blocked
     or miss; what a hit is worth by the real launch rules (a launch that
@@ -3278,24 +3300,44 @@ it names a fighter, an attack or an animation.
     grows more tempting). A strike is checked again from where the CPU
     really is before it is pressed, and a jump-in waiting off the stage is
     dropped before the point of no return.
-  - **Always playing (Rule A).** Free to act in a live match, it is never
-    still for longer than a deliberate pause (0.45 s): a liveness monitor
-    counts any longer stillness as an incident and takes a fresh plan at
-    once. While its opponent is out of play it repositions with a purpose
-    (near where its opponent will come back, at a safe distance) and never
-    attacks nobody.
+  - **Waiting on purpose, never stuck (Rule A).** It may stand still when
+    it means to: holding a safer spot while its Launch Point recovers,
+    protecting a lead, running out the clock, keeping its spacing, guarding
+    a ledge, waiting for a respawning opponent. A deliberate wait knows its
+    reason, the spot it holds, whether its Shield is ready (raised only as
+    the opponent closes in or attacks, for a few blocks at most, never
+    without the Energy, then rested) and what ends it (the opponent in
+    reach, its patience running out, the objective changing, the Launch
+    Point recovered, fading footing, a hazard's warning, the opponent
+    leaving or rejoining play). The longer nothing happens the more
+    impatient it grows (unless waiting is itself winning) and, impatient,
+    it steps into its own range rather than waiting at the edge of the
+    opponent's, so two CPUs never wait on each other for ever; a wait that runs on past 10 s
+    (`WAIT_LIMIT`) makes it reassess, and move for a moment unless it is
+    running out the clock. Stillness it does not mean (no plan, a plan that
+    should be moving, a walk the ledge guard keeps holding back) is an
+    incident after 0.45 s (`STILL_LIMIT`), counted by cause, and a fresh
+    plan follows at once. While its opponent is out of play it takes up a
+    spot near where its opponent will come back, at a safe distance, waits
+    there and never attacks nobody.
   - **Difficulty** (`js/data/difficulty.js`) sets only how well it thinks:
     reaction window (`react`: Easy 0.30–0.46 s, Medium 0.19–0.30, Hard
     0.15–0.22, Brutal 0.07–0.105), lapse chance, reassessment interval,
     decision noise, range and prediction error, timing error, lookahead,
     plan depth, combo reliability, guard, perfect Shield timing, punish and
     opportunity recognition, adaptation, Energy, risk and stage sense,
-    launch steering, recovery skill and initiative. Every trait is ordered
-    Easy → Brutal (`CAPABILITY`). Easy is a casual player (late, loose,
-    never idle), Medium a tryhard (combos, adapts, recovers), Hard
-    tournament level (reads, punishes, edge-guards), Brutal elite (fast but
-    never instant, consistent, quick to adapt). Every level uses every
-    move, the Dash, the air dash, the Shield and the Deflect. No level
+    launch steering, recovery skill, initiative, patience (how long it is
+    content to wait, what a clearer chance is worth to it), discipline (how
+    reliably it does what its objective asks) and awareness (how fully it
+    reads the score, the clock and both fighters' exposure). Every trait is
+    ordered Easy → Brutal (`CAPABILITY`). Every level runs the same
+    intelligence with nothing switched off: Easy is a casual player (late,
+    slow to decide, misjudges ranges, loose combos, half reads the match,
+    often trades when it should break off, but plays to win), Medium a
+    regular player (combos, adapts, recovers), Hard tournament level
+    (reads, punishes, edge-guards, plays the clock), Brutal elite (fast but
+    never instant, consistent, quick to adapt, disciplined). Every level
+    uses every move, the Dash, the air dash, the Shield and the Deflect. No level
     changes damage, launch, hitstun, blockstun, startup or recovery,
     animation timing, speed, gravity, jumps, Dash, Shield, Energy or what
     anything costs in it, cooldowns, hitboxes, physics, invulnerability,
@@ -3305,15 +3347,23 @@ it names a fighter, an attack or an animation.
   - **Benchmark.** Brutal's target is a 95% match win rate against a
     defined, varied benchmark (Hard, Medium and five scripted reference
     styles; `tests/benchmarks/cpu-benchmark.mjs`), tracked separately
-    against Hard. The measured results are in `docs/systems/ai.md`; no
-    guarantee against arbitrary human players is claimed.
+    against Hard. A second suite measures every level against a scripted
+    competent player and against itself, with how it played (presses,
+    jumps, Dashes and reversals a minute, stillness and how much of it was
+    meant, Shield time, lulls, objectives). The measured results are in
+    `docs/systems/ai.md`; no guarantee against arbitrary human players is
+    claimed, and how it feels to play against is for human playtesting.
   - **Determinism.** Each CPU draws from its own seeded RNG: the same seed
     and inputs replay the same decisions and the same match.
   - **Debugging.** With `debug`, it keeps a trace of its decisions, each
-    explained from its own data (mode, plan and why, hit chance and value,
-    both Launch Points, danger, Energy, what interrupted the last plan, the
-    opponent's habits); its counters (move usage, invalid inputs,
-    inactivity, stuck navigation, failed plans) always run.
+    explained from its own data (the match objective and why, mode, plan,
+    intent and why, hit chance and value, both Launch Points, danger,
+    Energy, what interrupted the last plan, the opponent's habits) and of
+    notable events (an objective changed, a wait ended and why, a retreat
+    held or broken); its counters (move usage, invalid inputs, inactivity
+    by cause, stuck navigation, failed and abandoned plans, waits and their
+    reasons, retreats, Launch Point recovered, time per objective) always
+    run.
   Practice Ground's CPU is a different thing: a controller-less training
   dummy that never moves or attacks, whatever the Quick Battle difficulty.
   The older non-attacking `TrainingAIController` remains in

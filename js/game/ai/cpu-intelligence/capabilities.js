@@ -279,13 +279,17 @@ export function analyzeCapabilities(f) {
 // that hit or a Dash past its cancel time), its cooldown over, its starts
 // for this airtime not used up, not in free fall, and, for the Deflect,
 // not exhausted. A summon or technique needs the ground, a free fighter and
-// its own cooldown over. The checks mirror the ones the Fighter makes when
+// its own cooldown over; a summon its opponent in play (it appears behind
+// it), and so does any technique that strikes (the CPU attacks nobody), but
+// not a heal of its own. The checks mirror the ones the Fighter makes when
 // the button is pressed, so the CPU never presses what cannot start.
 export function moveReady(self, m) {
   const grounded = self.body.grounded;
   const combat = self.combat;
   if (m.kind === 'technique' || m.kind === 'summon') {
-    return grounded && self.canAct() && !combat.abilityCooldowns.active(m.id) && !self.opponent?.lostToVoid;
+    const gone = !!self.opponent?.lostToVoid;
+    const pureHeal = m.kind === 'technique' && m.heal > 0 && !m.projectile && !m.burst;
+    return grounded && self.canAct() && !combat.abilityCooldowns.active(m.id) && (!gone || pureHeal);
   }
   if (m.air === grounded) return false;
   if (!self.canFollowUp() || combat.cooldowns.has(m.id) || self.airStartBlocked(m.def)) return false;
