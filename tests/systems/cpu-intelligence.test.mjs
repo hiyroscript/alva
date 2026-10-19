@@ -3,7 +3,8 @@
 // behind every fighter at every level, measured through the real Fighter,
 // CombatSystem, projectiles, pulls, clones and physics:
 //
-//   A. core behaviour: only player inputs, never idle while free, it closes
+//   A. core behaviour: only player inputs, still only on purpose (any
+//      stillness while free is a wait it means or a brief pause), it closes
 //      in, handles stage geometry, answers projectiles, uses the Deflect
 //      both ways, meets airborne opponents, gets back from off the stage,
 //      manages Energy, plays its Launch Point and the match situation, and
@@ -34,7 +35,7 @@ import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { CpuIntelligence } from '../../js/game/ai/cpu-intelligence/brain.js';
 import { analyzeCapabilities, MOVE_ROLES } from '../../js/game/ai/cpu-intelligence/capabilities.js';
 import { StageModel } from '../../js/game/ai/cpu-intelligence/stage-model.js';
-import { STILL_LIMIT } from '../../js/game/ai/cpu-intelligence/telemetry.js';
+import { STILL_LIMIT, WAIT_LIMIT } from '../../js/game/ai/cpu-intelligence/telemetry.js';
 import { CAPABILITY, DIFFICULTY_IDS, getDifficultyProfile } from '../../js/data/difficulty.js';
 import { getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { getMap } from '../../js/data/maps.js';
@@ -137,24 +138,41 @@ test('every level, every fighter: a player\'s input snapshot, each press of a he
   }
 });
 
-test('Rule A: free to act, it is never idle for longer than a deliberate pause, at any level', () => {
+test('liveness knows intent: free to act, any stillness is either a wait it means (with its reason) or a brief pause, at every level', () => {
   for (const difficulty of DIFFICULTY_IDS) {
     for (const { log } of fightsAt(difficulty)) {
       for (const [f, steps] of log) {
         let still = 0;
+        let unmeant = 0;
         let worst = 0;
+        let meant = 0;
         let free = 0;
         for (const s of steps) {
-          const acting = INPUT_KEYS.some((k) => s[k]);
-          if (s.free && !acting) still++;
-          else still = 0;
+          const acting = INPUT_KEYS.some((k) => s[k]) || Math.abs(s.vx) > 15;
+          const stillNow = s.free && s.grounded && !acting;
           if (s.free) free++;
-          worst = Math.max(worst, still);
+          if (stillNow && s.waiting) {
+            meant++;
+            still++;
+            unmeant = 0;
+          } else if (stillNow) {
+            unmeant++;
+            still++;
+          } else {
+            still = 0;
+            unmeant = 0;
+          }
+          worst = Math.max(worst, unmeant);
+          // A deliberate wait is never endless: it is reassessed by WAIT_LIMIT.
+          assert.ok(still * DT <= WAIT_LIMIT + 0.5, `${difficulty} #${f.def.id}: still ${(still * DT).toFixed(2)} s in one stretch`);
         }
         assert.ok(free > seconds(5), `${difficulty} #${f.def.id}: it was free to act (${free} steps)`);
-        assert.ok(worst * DT <= STILL_LIMIT + 0.2, `${difficulty} #${f.def.id}: still ${(worst * DT).toFixed(2)} s at most`);
-        assert.ok(f.controller.telemetry.counters.inactivity <= 1, `${difficulty} #${f.def.id}: inactivity incidents ${f.controller.telemetry.counters.inactivity}`);
-        assert.equal(f.controller.telemetry.counters.stuckNavigation, 0, `${difficulty} #${f.def.id}: never stuck`);
+        assert.ok(worst * DT <= STILL_LIMIT + 0.2, `${difficulty} #${f.def.id}: still with no reason ${(worst * DT).toFixed(2)} s at most`);
+        const c = f.controller.telemetry.counters;
+        assert.ok(c.inactivity <= 1, `${difficulty} #${f.def.id}: inactivity incidents ${c.inactivity}`);
+        assert.equal(c.stuckNavigation, 0, `${difficulty} #${f.def.id}: never stuck`);
+        // The waits it reports are the ones it held: intent, not idleness.
+        assert.ok(Math.abs(c.waitSeconds - meant * DT) < 1 + 0.1 * meant * DT, `${difficulty} #${f.def.id}: waited ${c.waitSeconds} s, ${(meant * DT).toFixed(2)} s seen`);
       }
     }
   }
@@ -670,7 +688,8 @@ test('the debug trace explains each decision from its own data, and costs nothin
     assert.ok('danger' in e && 'finish' in e && 'myLP' in e && 'foeLP' in e && 'energy' in e && 'opponent' in e);
   }
   assert.ok(trace.some((e) => e.move && e.hitChance != null && e.reason.includes('lands in')), 'an attack with its hit chance and why');
-  assert.match(r.ai.telemetry.explain(), /^\[\w+\] \w+/);
+  // `[objective · mode] plan move: reason`.
+  assert.match(r.ai.telemetry.explain(), /^\[\w+ · \w+\] \w+/);
   const quiet = arena({ difficulty: 'hard', seed: 3, cpuX: 900, foeX: 1150 });
   quiet.run(seconds(4));
   assert.equal(quiet.ai.telemetry.trace.length, 0);

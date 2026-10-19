@@ -68,7 +68,7 @@ function ring({
     const fighters = world.fighters.filter((f) => !f.lostToVoid);
     for (const f of fighters) {
       f.update(DT, ctx);
-      if (f === cpu) log.push({ ...ai.out, step: n, plan: ai.plan?.kind ?? null });
+      if (f === cpu) log.push({ ...ai.out, step: n, plan: ai.plan?.kind ?? null, waiting: ai.waiting });
     }
     if (fighters.length === 2) separateFighters(fighters[0], fighters[1], stage);
     for (const f of fighters) resolveSolidOverlap(f.body, stage);
@@ -333,8 +333,13 @@ test('while its opponent is lost to the Void it repositions with a purpose, neve
     r.run(seconds(1.5));
     const tail = r.log.slice(-seconds(1.2));
     assert.ok(tail.every((o) => COMBAT.every((a) => !o[`${a}Pressed`])), `${difficulty} does not attack nobody`);
-    assert.ok(tail.some((o) => o.runLeft || o.runRight), `${difficulty} takes up a position rather than standing idle`);
     assert.ok(tail.every((o) => o.plan === null || ['reposition', 'air', 'recover'].includes(o.plan)), `${difficulty}: ${[...new Set(tail.map((o) => o.plan))]}`);
+    // It takes up its spot for the return, then may stand ready there: a
+    // wait it means, with its reason, never idleness.
+    const target = r.ai.plan?.targetX;
+    assert.ok(target != null && Math.abs(r.cpu.body.x - target) < 40, `${difficulty} took up its spot (${Math.round(r.cpu.body.x)} for ${Math.round(target)})`);
+    assert.ok(tail.every((o) => o.runLeft || o.runRight || o.waiting === 'opponent respawning' || o.plan !== 'reposition'), `${difficulty}: any stillness is the wait for the respawn`);
+    assert.equal(r.ai.telemetry.counters.inactivity, 0, `${difficulty}: no inactivity`);
     assert.equal(r.cpu.body.grounded, true, 'on the stage');
     r.foe.lostToVoid = false;
     r.run(seconds(3));
@@ -426,10 +431,12 @@ test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own bu
 
 test('left to itself, a high level uses Unlimited Void and Hollow Purple on an open opponent, each from its own button', () => {
   const used = { attack4: 0, attack5: 0 };
-  for (let seed = 0; seed < 6; seed++) {
-    // An opponent a few steps away that never guards, never battered (its
-    // Launch Point held at 0, so it stays on the stage).
-    const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX: 900, script: () => ({}) });
+  // An opponent that never guards, never battered (its Launch Point held at
+  // 0, so it stays on the stage): a few steps away, and across the ring
+  // (where a long cast like Hollow Purple has the time it needs; up close
+  // the CPU rightly prefers quicker hits on a free opponent).
+  for (const [seed, foeX] of [0, 1, 2, 3, 4, 5].flatMap((n) => [[n, 900], [n, 1300]])) {
+    const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX, script: () => ({}) });
     let tech = null;
     let cooling = [];
     for (let i = 0; i < seconds(14); i++) {
@@ -540,7 +547,7 @@ test('its output is only the player\'s own controls: never a control the fighter
     const r = ring({ difficulty, seed: 9, cpuX: 700, foeX: 1100, script: (n) => (n % 120 < 30 ? { runLeft: true } : {}) });
     r.run(seconds(8));
     for (const out of r.log) {
-      const { step, plan, ...controls } = out;
+      const { step, plan, waiting, ...controls } = out;
       assert.deepEqual(Object.keys(controls).sort(), allowed, `${difficulty}: the same controls a player has`);
     }
     assert.ok(r.log.every((o) => o.plan === null || typeof o.plan === 'string'));

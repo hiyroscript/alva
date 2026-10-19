@@ -243,6 +243,8 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
         ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
         state: f.state, grounded: f.grounded, frame: frameName(f), cooling: [...f.combat.abilityCooldowns.entries.keys()],
         technique: f.technique?.def.id ?? null, free, exhausted: f.combat.energyExhausted,
+        // What the CPU says it is deliberately waiting for, if anything.
+        waiting: f.controller.waiting ?? null, vx: f.body.vx,
       });
       // Back on stage at once if the Void takes one: the fight goes on.
       if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);

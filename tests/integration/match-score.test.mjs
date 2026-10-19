@@ -247,14 +247,21 @@ test('while its opponent is out the Quick Battle CPU repositions with a purpose,
   intoVoid(battle, p1);
   battle.update(DT);
   let moved = 0;
+  let unmeant = 0;
   for (let i = 0; i < RESPAWN_STEPS - 1; i++) {
     battle.update(DT);
     const out = p2.controller.out;
     assert.ok(!['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'].some((a) => out[`${a}Pressed`]), 'no attack at nobody');
     if (p2.moveDir !== 0) moved++;
+    else if (p2.body.grounded && p2.canAct() && !p2.controller.waiting) unmeant++;
     assert.ok(p2.body.grounded || p2.body.y < battle.stage.groundY + 1, 'it stays on the stage');
   }
-  assert.ok(moved > 10, `it takes up a position for the respawn (${moved} steps moving), never standing idle`);
+  // It takes up a position for the respawn and then may wait there, ready:
+  // standing still is a wait it means, never idleness.
+  const spot = p2.controller.plan?.targetX;
+  assert.ok(moved > 10 || (spot != null && Math.abs(p2.body.x - spot) < 40), `it takes up a position for the respawn (${moved} steps moving)`);
+  assert.ok(unmeant * DT < 0.45, `still only on purpose (${(unmeant * DT).toFixed(2)} s without a reason)`);
+  assert.equal(p2.controller.telemetry.counters.inactivity, 0, 'no inactivity');
   assert.equal(p1.lostToVoid, true);
   battle.update(DT);
   assert.equal(p1.lostToVoid, false);

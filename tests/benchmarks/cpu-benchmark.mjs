@@ -1,33 +1,45 @@
 // CPU Intelligence benchmark (not part of `node --test`: run it by hand).
 //
 //   node tests/benchmarks/cpu-benchmark.mjs                 # the standard suite
+//   node tests/benchmarks/cpu-benchmark.mjs --suite behaviour   # levels v the competent reference, and mirrors
+//   node tests/benchmarks/cpu-benchmark.mjs --suite all     # both
 //   node tests/benchmarks/cpu-benchmark.mjs --seeds 6       # more games per cell
 //   node tests/benchmarks/cpu-benchmark.mjs --only brutal:hard
 //   node tests/benchmarks/cpu-benchmark.mjs --from 5 --seeds 4   # seeds 5-8
 //   node tests/benchmarks/cpu-benchmark.mjs --json out.json # raw results too
 //
 // Full, deterministic matches (tests/helpers/cpu-match.mjs: a real Battle
-// in Watch Mode, first to 3 points, the 7-minute clock and overtime) over
+// in Watch Mode, first to 3 points, the 5-minute clock and overtime) over
 // every pairing of the playable fighters (both ways round and mirrored),
-// both stages (Desert and City), both starting sides and a range of seeds,
-// for each matchup of the suite:
+// both stages (Yerma and Sol-Noir), both starting sides and a range of
+// seeds, for each matchup of the suite:
 //
-//   brutal v hard, brutal v medium, hard v medium, medium v easy, hard v easy,
-//   and Brutal against each reference style (aggressive, defensive,
-//   projectile-focused, jump-heavy, balanced: tests/helpers/reference-opponents.mjs)
+//   standard   brutal v hard, brutal v medium, hard v medium, medium v easy,
+//              hard v easy, Brutal against each reference style
+//              (aggressive, defensive, projectile-focused, jump-heavy,
+//              balanced: tests/helpers/reference-opponents.mjs), Easy
+//              against the balanced one
+//   behaviour  every level against the competent reference (a scripted
+//              regular player: CompetentOpponent), and every level against
+//              itself (Watch Mode)
 //
 // It reports, per matchup, the first side's win rate (with its 95% Wilson
 // interval), points, Launch Point dealt and taken, eliminations and
 // accidental self-eliminations, combos, punishes, Shield blocks, Deflects,
 // Energy exhaustion, invalid inputs, inactivity incidents, stuck
-// navigation and failed plans, and every move's usage. The numbers are
-// measured, never assumed: Brutal's 95% target is reported against the
-// composition above, whatever it comes to.
+// navigation and failed plans, and every move's usage; then how it played
+// (per minute in play: attack presses, jumps, Dashes, direction reversals;
+// the share of its time on the ground standing still and how much of that
+// it meant, its longest stillness, Shield time, the longest lull and the
+// longest stretch without contact, stalemates over 20 s, and the time it
+// spent in each match objective). The numbers are measured, never assumed:
+// Brutal's target is reported against the composition above, whatever it
+// comes to.
 
 import { writeFileSync } from 'node:fs';
 import { playableCharacters } from '../../js/data/characters.js';
 import { runMatch } from '../helpers/cpu-match.mjs';
-import { REFERENCE_STYLES } from '../helpers/reference-opponents.mjs';
+import { REFERENCE_STYLES, COMPETENT_STYLE } from '../helpers/reference-opponents.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -41,12 +53,19 @@ const ONLY = arg('only', null);
 const JSON_OUT = arg('json', null);
 const MAPS = (arg('maps', 'desert,city')).split(',');
 const MAX = Number(arg('max', 600));
+const SUITE = arg('suite', 'standard');
 
-const MATCHUPS = [
-  ['brutal', 'hard'], ['brutal', 'medium'], ['hard', 'medium'], ['medium', 'easy'], ['hard', 'easy'],
-  ...REFERENCE_STYLES.map((s) => ['brutal', `ref:${s}`]),
-  ['easy', 'ref:balanced'],
-];
+const LEVELS = ['easy', 'medium', 'hard', 'brutal'];
+const SUITES = {
+  standard: [
+    ['brutal', 'hard'], ['brutal', 'medium'], ['hard', 'medium'], ['medium', 'easy'], ['hard', 'easy'],
+    ...REFERENCE_STYLES.map((s) => ['brutal', `ref:${s}`]),
+    ['easy', 'ref:balanced'],
+  ],
+  behaviour: [...LEVELS.map((l) => [l, `ref:${COMPETENT_STYLE}`]), ...LEVELS.map((l) => [l, l])],
+};
+SUITES.all = [...SUITES.standard, ...SUITES.behaviour];
+const MATCHUPS = SUITES[SUITE] ?? SUITES.standard;
 
 const fighters = playableCharacters();
 const pairs = fighters.flatMap((x) => fighters.map((y) => [x, y]));
@@ -68,6 +87,10 @@ for (const [x, y] of MATCHUPS) {
     games: 0, wins: 0, losses: 0, draws: 0, pointsFor: 0, pointsAgainst: 0, dealt: 0, taken: 0, kos: 0, selfKOs: 0,
     foeSelfKOs: 0, combos: 0, punishes: 0, shieldBlocks: 0, deflects: 0, exhausted: 0, invalid: 0, inactivity: 0, stuck: 0,
     failed: 0, seconds: 0, usage: {},
+    habits: {
+      inPlay: 0, free: 0, still: 0, intended: 0, presses: 0, jumps: 0, dashes: 0, reversals: 0, shield: 0, longestStill: 0,
+      lull: 0, maxLull: 0, noContact: 0, maxNoContact: 0, stalemates: 0, objectives: {},
+    },
   };
   for (const map of MAPS) {
     for (const [defA, defB] of pairs) {
@@ -98,6 +121,25 @@ for (const [x, y] of MATCHUPS) {
           agg.deflects += s.deflects;
           agg.exhausted += s.exhausted;
           agg.seconds += m.seconds;
+          const h = agg.habits;
+          const bh = s.behaviour;
+          const mins = bh.inPlaySeconds / 60;
+          h.inPlay += bh.inPlaySeconds;
+          h.free += bh.freeSeconds;
+          h.still += bh.stillSeconds;
+          h.intended += bh.intendedStill;
+          h.presses += bh.pressesPerMin * mins;
+          h.jumps += bh.jumpsPerMin * mins;
+          h.dashes += bh.dashesPerMin * mins;
+          h.reversals += bh.reversalsPerMin * mins;
+          h.shield += bh.shieldSeconds;
+          h.longestStill = Math.max(h.longestStill, bh.longestStill);
+          h.lull += m.longestLull;
+          h.maxLull = Math.max(h.maxLull, m.longestLull);
+          h.noContact += m.longestNoContact;
+          h.maxNoContact = Math.max(h.maxNoContact, m.longestNoContact);
+          if (m.longestNoContact > 20) h.stalemates++;
+          for (const [k, v] of Object.entries(bh.objectives)) h.objectives[k] = (h.objectives[k] ?? 0) + v;
           const tel = m.telemetry[me];
           if (tel) {
             agg.invalid += tel.invalidInputs;
@@ -122,6 +164,16 @@ for (const [x, y] of MATCHUPS) {
     `selfKO ${agg.selfKOs}/${agg.foeSelfKOs}  combos ${(agg.combos / g).toFixed(1)}  punish ${(agg.punishes / g).toFixed(1)}  ` +
     `shield ${(agg.shieldBlocks / g).toFixed(1)}  deflect ${(agg.deflects / g).toFixed(1)}  exh ${agg.exhausted}  ` +
     `invalid ${agg.invalid}  idle ${agg.inactivity}  stuck ${agg.stuck}  ${(agg.seconds / g).toFixed(0)}s/game`,
+  );
+  const h = agg.habits;
+  const pm = (v) => (v / Math.max(1e-9, h.inPlay / 60)).toFixed(1);
+  const obj = Object.entries(h.objectives).sort((p, q) => q[1] - p[1])
+    .map(([k, v]) => `${k} ${(100 * v / Math.max(1e-9, h.inPlay)).toFixed(0)}%`).join(' ');
+  console.log(
+    `${''.padEnd(24)} per min: press ${pm(h.presses)} jump ${pm(h.jumps)} dash ${pm(h.dashes)} reverse ${pm(h.reversals)}  ` +
+    `still ${(100 * h.still / Math.max(1e-9, h.free)).toFixed(0)}% of ground time (meant ${(100 * h.intended / Math.max(1e-9, h.still)).toFixed(0)}%), ` +
+    `longest ${h.longestStill.toFixed(1)}s  shield ${(h.shield / g).toFixed(1)}s/game  lull ${(h.lull / g).toFixed(1)}s (max ${h.maxLull.toFixed(1)})  ` +
+    `no contact ${(h.noContact / g).toFixed(1)}s (max ${h.maxNoContact.toFixed(1)}, stalemates ${h.stalemates})${obj ? `  ${obj}` : ''}`,
   );
 }
 console.log(`\n${((Date.now() - t0) / 1000).toFixed(0)} s`);

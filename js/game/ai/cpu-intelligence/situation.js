@@ -156,8 +156,14 @@ export class Situation {
       if (this.foeTrack.len) this.foeTrack.origin = Math.min(steps, this.foeTrack.len - 1);
       else predictTrack(this.foeTrack, ctx.stage, this.gravity, st, { steps: steps + 24, horizon: age, velScale: 1, target });
     }
+    // Its spacing misjudgement (the level's rangeError, drawn at each
+    // reassessment): the whole path sits that far off, so its own strikes
+    // are planned against where it believes the opponent is, and as often
+    // fall short or are started too soon as they land.
+    const ex = brain.err.x;
+    if (ex) for (let i = 0; i < this.foeTrack.len; i++) this.foeTrack.x[i] += ex;
     const k = this.foeTrack.i(0);
-    op.x = this.foeTrack.x[k] + brain.err.x;
+    op.x = this.foeTrack.x[k];
     op.y = this.foeTrack.y[k];
     op.vx = this.foeTrack.vx[k];
     op.vy = this.foeTrack.vy[k];

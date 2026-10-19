@@ -56,6 +56,17 @@ export class Executor {
     this.allowEdge = false;
     this.pressed = null;
     this.wantDir = 0;
+    this.heldBack = false;
+  }
+
+  // A plan chosen part-way through a step takes over its inputs: whatever
+  // the plan it replaces had held this step (a direction, the Shield, a
+  // Dash request) is let go, so the two never mix in one snapshot.
+  redo() {
+    for (const k of HELD_CONTROLS) this.held[k] = false;
+    this.mouvement = 0;
+    this.pressed = null;
+    this.wantDir = 0;
   }
 
   // Hold a direction (-1, 0 or 1).
@@ -124,6 +135,9 @@ export class Executor {
       if (!this.groundAhead(self, stage, d, LEDGE_MARGIN + stop)) {
         d = 0;
         this.blocked++;
+        // The plan wanted to walk on and the ledge guard held it back: the
+        // liveness monitor's way of seeing a plan that cannot move.
+        this.heldBack = true;
       }
     }
     if (this.mouvement && b.grounded && !this.allowEdge) {

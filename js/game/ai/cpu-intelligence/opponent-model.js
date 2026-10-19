@@ -4,9 +4,13 @@
 // built only from what the CPU has recognized (perception's events and the
 // visible picture of its opponent): how often it jumps, attacks on the
 // ground or in the air, throws projectiles, Dashes and Shields; how often it
-// raises its Shield when something comes at it; how far away it likes to
-// start its attacks; whether it presses forward or backs off; which moves it
-// repeats; how often it whiffs. Every statistic is a rolling rate with
+// raises its Shield when something comes at it, and how long it sits behind
+// it; how far away it likes to start its attacks; whether it presses forward
+// or backs off, and whether it backs off to recover while its Launch Point is
+// high; which moves it repeats; how often it whiffs; and how the CPU's own
+// attacks fare against it (how many it blocks, how often a whiff of the
+// CPU's gets punished: told by the brain, from its own hits and misses).
+// Every statistic is a rolling rate with
 // exponential decay, so one observation never becomes a permanent
 // assumption and old habits fade. The level's `adapt` decides how quickly
 // the evidence is trusted (`trust`): an Easy CPU only acts on obvious,
@@ -31,7 +35,8 @@ export class OpponentModel {
     this.n = {
       jump: 0, groundAttack: 0, airAttack: 0, projectile: 0, dash: 0, shield: 0, whiff: 0,
       threatened: 0, shieldedThreat: 0, jumpedThreat: 0, approach: 0, retreat: 0, technique: 0,
-      closeTime: 0, closeAttack: 0,
+      closeTime: 0, closeAttack: 0, shieldHold: 0, hurtRetreat: 0,
+      ourAttacks: 0, ourBlocked: 0, ourWhiffs: 0, punishedUs: 0,
     };
     this.attackDist = 120;
     this.attackDistW = 0;
@@ -99,15 +104,33 @@ export class OpponentModel {
     }
     if (threatenedNow) this.n.threatened += dt * 4;
     if (near) this.n.closeTime += dt;
-    // Pressing forward (toward the CPU) or backing off.
+    if (view.shielding) this.n.shieldHold += dt;
+    // Pressing forward (toward the CPU) or backing off, and backing off
+    // with a high Launch Point: trying to recover.
     const toward = -Math.sign(dx) * view.vx;
     if (view.grounded && Math.abs(view.vx) > 60) {
       if (toward > 0) this.n.approach += dt;
-      else this.n.retreat += dt;
+      else {
+        this.n.retreat += dt;
+        if (view.lp > 40) this.n.hurtRetreat += dt;
+      }
     }
     const a = this.n.approach + this.n.groundAttack * 0.4 + this.n.airAttack * 0.4;
     const r = this.n.retreat + this.n.shield * 0.3 + this.n.projectile * 0.3;
     this.aggression = a + r > 0.3 ? a / (a + r) : 0.5;
+  }
+
+  // How one of the CPU's own attacks turned out against this opponent:
+  // 'hit', 'blocked', 'whiff', or 'punished' (a whiff it was hit for).
+  ownOutcome(kind) {
+    const n = this.n;
+    if (kind === 'punished') {
+      n.punishedUs += 1;
+      return;
+    }
+    n.ourAttacks += 1;
+    if (kind === 'blocked') n.ourBlocked += 1;
+    else if (kind === 'whiff') n.ourWhiffs += 1;
   }
 
   // ---- What the CPU makes of it (each 0-1, weighed by trust) ----------------
@@ -153,6 +176,30 @@ export class OpponentModel {
     return prior * (1 - w) + seen * w;
   }
 
+  // How much of what the CPU throws ends on its Shield: a wall to stop
+  // feeding.
+  get walls() {
+    const n = this.n;
+    return this.trust(n.ourAttacks) * Math.min(1, (n.ourBlocked / Math.max(1, n.ourAttacks)) * 1.5);
+  }
+
+  // How surely a whiff of the CPU's gets punished.
+  get punishing() {
+    const n = this.n;
+    return this.trust(n.ourWhiffs) * Math.min(1, n.punishedUs / Math.max(1, n.ourWhiffs));
+  }
+
+  // How much of its time it spends behind its Shield.
+  get turtling() {
+    const span = this.evidence;
+    return span > 1 ? this.trust(this.n.shieldHold * 2) * Math.min(1, (this.n.shieldHold / span) * 3) : 0;
+  }
+
+  // How readily it backs off to recover while its Launch Point is high.
+  get recovering() {
+    return this.trust(this.n.hurtRetreat * 2) * Math.min(1, this.rate('hurtRetreat') / 0.3);
+  }
+
   // How often it Dashes.
   get dashy() {
     return this.trust(this.n.dash) * Math.min(1, this.rate('dash') / 0.5);
@@ -174,7 +221,8 @@ export class OpponentModel {
     return {
       jumpy: r(this.jumpy), shieldy: r(this.shieldy), zoner: r(this.zoner), aggressive: r(this.aggressive),
       whiffy: r(this.whiffy), dashy: r(this.dashy), pressure: r(this.pressure), range: this.preferredRange && Math.round(this.preferredRange),
-      repeats: this.predictableMove,
+      repeats: this.predictableMove, walls: r(this.walls), punishing: r(this.punishing), turtling: r(this.turtling),
+      recovering: r(this.recovering),
     };
   }
 }
