@@ -2088,3 +2088,98 @@ continuous and finite ground in `platform-stage`; the roster, Random Stage
 and Adamaris's preview in `stage-select`; names, credits and the clock in
 `i18n`, `overtime`, `battle-screen`, `watch-mode`, `practice-ground`,
 `quick-battle` and `discover`.
+
+## CPU match play: objectives, deliberate waiting, breaking off
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: make the CPUs play like people of their level rather than tireless
+machines: a match-level strategy above the exchange, deliberate waiting,
+breaking off to recover, intelligent Shield use, no twitching, and a
+rebalance of the four levels with Easy, far too strong, first.
+
+**What it changed.**
+
+- **Why Easy was too strong.** Its range error never reached the
+  simulation of its own strikes (only the opponent's position it reported),
+  so it misjudged nothing that mattered; it followed up hits on the step
+  they landed, with no hit-confirm; it took a fresh decision the moment
+  any action ended (its slow `think` only paced reassessment); it saw
+  finishers nearly as surely as Brutal; and the liveness rule ("never still
+  for more than 0.45 s") with its footwork kept it pressing about 100 times
+  a minute, as often as Brutal.
+- **The match objective** (`js/game/ai/cpu-intelligence/objective.js`,
+  new): build, finish, stabilize, protect, survive, force, regroup, chosen
+  from the score, the clock, overtime's tiebreak and closing Void, both
+  fighters' exposure by the real launch rules, and how long nothing has
+  happened; it persists (dwell, a keep bonus, urgent events), checks its own
+  progress, grows impatient, and informs the strategy (modes, the bar, risk,
+  waiting), never the moves.
+- **Choosing to commit** (`brain.js`): the value of waiting for a clearer
+  chance against a free opponent, openings taken at once, fresh decisions on
+  the level's cadence, a hit-confirm before a combo, pressure that is not
+  working reset, unseen finishers weighed without the life they end.
+- **Deliberate waiting** (`hold` in `plans.js`): a wait with a reason, a
+  spot, a Shield ready (as the opponent closes in on its level, a few
+  blocks, never without Energy, then rested) and explicit exits. Footwork
+  settles with a dead band and a stopping distance, and, impatient, steps
+  into its own range instead of waiting at the edge of the opponent's; the
+  range error is a lasting impression, not a flicker.
+- **Breaking off to recover** (`saferSpot`, `retreat`): a safer spot from
+  the real launch rules (never through the opponent, never under a hazard's
+  warning), Dashing clear when pressed, abandoned when cut off.
+- **Liveness, aware of intent** (`liveness` in `brain.js`, `WAIT_LIMIT` in
+  `telemetry.js`): a wait the plan means is waiting; stillness nothing
+  means is an incident by cause (a walk the ledge guard keeps holding back
+  among them); a wait is never endless. Rule A in `ALVA_SPEC.md` §7.2.8 now
+  says so, in place of "never still".
+- **The opponent model** learns how the CPU's own attacks fare (blocked,
+  whiffed, punished), how long the opponent sits behind its Shield, how much
+  it moves; the evaluator and the strategy read those habits.
+- **Difficulty.** Three new traits (`patience`, `discipline`, `awareness`)
+  and a retuned Easy, Medium and Hard (`js/data/difficulty.js`); Brutal's
+  thinking traits unchanged. Easy and Medium's lines on Select Difficulty
+  (English and French) describe the new players.
+- **Fixes found on the way:** a heal of its own can be cast while the
+  opponent respawns; navigating down to an opponent picks an edge with
+  footing below it; a press and a Shield from two plans never mix in one
+  snapshot (`Executor.redo`).
+
+No mechanic changed: damage, launches, Launch Point recovery, Energy,
+movement, the Shield, the Deflect, hitboxes, timing, cooldowns, Combat
+Assist, scoring, respawns, the match clock, overtime and the stages are as
+they were.
+
+**Where to tune it.** The profiles (and the three new traits) in
+`js/data/difficulty.js`; what each objective asks (`BIAS`), the pace
+prior and the objective scores in `objective.js`; the value of waiting, the
+pressure budget, the hold's patience, blocks and Shield time, and the safer
+spot's weights in `brain.js`; `STILL_LIMIT` and `WAIT_LIMIT` in
+`telemetry.js`.
+
+**Measured** (`node tests/benchmarks/cpu-benchmark.mjs --suite all
+--seeds 4`, 256 games per matchup, against the previous CPU measured the
+same way): Brutal 99.2% against the benchmark composition (98.5% before)
+and 94.5% against Hard alone (91.8%), still short of 95% there; Hard 94.1%
+against Medium (86.3%); Medium 99.2% against Easy (93.0%), Easy scoring
+0.23 points a match (0.86). Against the competent reference Easy presses
+66 times a minute (102 before) and takes 144 Launch Point a match (56).
+Head to head, the new Medium and Hard lose to the old ones (23%, 27%) and
+Brutal is as strong as before (50%). No inactivity or stuck navigation in
+4,864 matches; no stillness past 10 s. Details, the comparison with
+the previous CPU and the limitations in
+[docs/systems/ai.md](./docs/systems/ai.md#benchmark); no human playtesting
+has been done ([the checklist](./docs/systems/ai.md#human-playtesting)).
+
+**Code:** `js/game/ai/cpu-intelligence/objective.js` (new), `brain.js`,
+`plans.js`, `strategy.js`, `telemetry.js`, `evaluator.js`,
+`opponent-model.js`, `executor.js`, `situation.js`, `capabilities.js`;
+`js/data/difficulty.js`, `js/localization/strings/fr.js`.
+
+**Tests:** `tests/systems/cpu-behaviour.test.mjs` and
+`tests/helpers/cpu-scenario.mjs` (new: scenarios A to N, the liveness
+monitor, the telemetry); `CompetentOpponent` in
+`tests/helpers/reference-opponents.mjs` and the behaviour suite in
+`tests/benchmarks/cpu-benchmark.mjs` (new); how each side played in
+`tests/helpers/cpu-match.mjs`; tests that required a CPU never to stand
+still now require that it never stands still without meaning it
+(`cpu-intelligence`, `combat-ai`, `match-score`).

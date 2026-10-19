@@ -189,7 +189,10 @@ shift and its impatience.
 or were blocked, one after another: 2 to 5 tries, by the mode's aggression
 and the level's initiative) is broken off for a moment: back to a spacing
 outside the opponent's reach, taking only an opening, before it presses
-again. A finisher it does not see this time is weighed for everything but
+again. Impatient, or for a moment after a wait at its spacing that ran past
+`WAIT_LIMIT`, its footwork stops waiting at the edge of the opponent's
+reach for something to happen and steps into its own range, where it has
+options. A finisher it does not see this time is weighed for everything but
 the life it would end. Its own combo is no fresh opening before it has
 confirmed the hit, nor once it has dropped it.
 
@@ -336,18 +339,21 @@ A profile (`js/data/difficulty.js`) holds only how well the CPU thinks:
 | --- | --- |
 | `react` | Perception latency window (Easy 0.30–0.46 s, Medium 0.19–0.30, Hard 0.15–0.22, Brutal 0.07–0.105; never zero). |
 | `lapse` | Chance a new opponent action is not recognized. |
-| `think` | Seconds between reassessments (urgent events are looked at at once). |
+| `think` | Seconds between reassessments and fresh decisions (Easy 0.22–0.36 s, Medium 0.08–0.14, Hard 0.04–0.07, Brutal 0.034–0.056); an opening it sees, a threat and a combo are looked at at once. |
 | `noise` | Jitter on every option's utility. |
-| `rangeError`, `predictError` | Spacing misjudgement; error on the projected motion. |
+| `rangeError`, `predictError` | Spacing misjudgement (Easy 34 units, Medium 15, Hard 7, Brutal 2), applied to the whole projected path of the opponent, so it misjudges whether its own moves connect; error on the projected motion. |
 | `timing` | Execution error on a timed press. |
 | `lookahead`, `planDepth` | How far motion is projected; which Dash lengths, jump arcs and targets are weighed. |
-| `comboReliability` | Chance a found follow-up is executed in time. |
+| `comboReliability` | Chance a found follow-up is executed in time (Easy 0.32, Medium 0.64, Hard 0.86, Brutal 0.98), and how quickly it confirms its hit before following up. |
 | `guard`, `perfectShield` | How fully threats are answered; how often a Shield is perfect. |
 | `punish`, `opportunity` | How often an opening, or a finisher, is recognized. |
 | `adapt` | How fast and far observed habits are trusted; how deliberately it varies its moves. |
 | `energySense`, `riskSense`, `stageSense` | Energy management; how fully risks count; ledges, edge-guards, the point of no return. |
 | `diSkill`, `recoverySkill` | Steering launches; accuracy of recovery routes. |
-| `initiative` | Willingness to start offense. |
+| `initiative` | Willingness to start offense; how long it keeps up pressure that is not working. |
+| `patience` | How long it is content to wait on purpose, and what a clearer chance is worth to it (the value of waiting). |
+| `discipline` | How reliably it does what its objective asks (breaking off to recover, not chasing damage while protecting a lead), how firmly it holds an objective, how few blocks it Shields before moving. |
+| `awareness` | How fully it reads the match: the score, the clock, overtime's tiebreak, each fighter's exposure. |
 
 Every trait is ordered Easy → Brutal (`CAPABILITY`). No level changes
 damage, launch, hitstun, blockstun, timing, speed, jumps, gravity, the
@@ -355,42 +361,83 @@ Dash, the Shield, Energy or its costs, cooldowns, hitboxes, physics,
 scoring or respawns: no module of the fighter, the combat engine or the
 physics reads a difficulty.
 
-- **Easy**, a casual player: sees things late, misjudges ranges, rarely
-  times a punish, recovers loosely, but always plays (never idle).
-- **Medium**, a tryhard: combos, adapts to habits, recovers reliably.
+The same intelligence runs on every level (no feature is switched off
+for a lower one); what changes is how well each part of it works:
+
+- **Easy**, a casual player: sees things late and decides slowly (a fresh
+  idea every quarter to third of a second), misjudges ranges (it whiffs,
+  and walks into hits), confirms and finishes combos unreliably, often
+  misses openings and finishers, half reads the score and the clock, often
+  keeps trading when it should break off, and waits only briefly before it
+  goes back in. It plays to win, uses its whole kit, and is beatable.
+- **Medium**, a regular player: combos, adapts to habits, recovers
+  reliably, breaks off and comes back more often than not, reads the match
+  most of the time.
 - **Hard**, tournament level: reads the slower moves, punishes whiffs,
-  edge-guards, manages Energy.
+  edge-guards, manages Energy, plays the score and the clock, and is
+  patient when patience pays.
 - **Brutal**, elite: fast (never instant) reactions and consistent
   judgement, deep jump and Dash searches, precise punishes and recoveries,
-  quick adaptation.
+  quick adaptation, and disciplined match play.
 
 ## Debugging
 
 `new CombatAIController({ difficulty, rng, debug: true })` keeps a ring of
-decision traces (`telemetry.trace`): the mode, the plan and its reason
-(built from the numbers behind it: "Dash into; extra_attack lands in
-417 ms; launches"), the move, hit chance and value, both Launch Points,
-the danger and finishing chances, Energy, what interrupted the last plan,
-and the opponent model's summary. `telemetry.explain()` gives the latest
-in one line. The counters (`telemetry.report()`: invalid inputs, expired
-and failed plans, stuck navigation, inactivity, Shields, Deflects,
-recoveries, Dashes, jumps, decisions, combos, answers by kind, every
-move's usage, plans by kind) always run.
+decision traces (`telemetry.trace`): the match objective and why ("own
+Launch Point dangerous here (62%), the opponent's 8%: breaking off to
+recover; Launch Point 131 to 40, 214 s left"), the mode, the plan, its
+intent and reason (built from the numbers behind it: "Dash into;
+extra_attack lands in 417 ms; launches", "stabilize: moving to safer
+ground (21% a launch ends its life there, 58% here)"), its target, the
+move, hit chance and value, both Launch Points, the danger and finishing
+chances, Energy, what interrupted the last plan, and the opponent model's
+summary; and a ring of the notable events between them
+(`telemetry.events`: an objective changed, a wait that ended and why, a
+retreat abandoned, held or broken, a long wait). `telemetry.explain()`
+gives the latest in one line (`[stabilize · survival] hold: holding here,
+Shield ready, while Launch Point 131 recovers (the opponent 420 away)`). With `debug` off none of this is built. The counters
+(`telemetry.report()`) always run, cheaply: invalid inputs; expired,
+failed and abandoned plans; stuck navigation and navigation failures;
+inactivity by cause; waits (how many, seconds, reasons, what ended them,
+long waits) and impatience; retreats (held, broken, Dashes clear) and the
+Launch Point recovered breaking off; pressure resets; objective changes
+and the seconds spent in each; threats that interrupted a plan; openings
+and finishers recognized and missed; Shields, Deflects, recoveries,
+Dashes, jumps, decisions, combos, answers by kind, every move's usage,
+plans by kind.
 
 For tests, `controller.neutral = false` holds its own offense and footwork
-(it still perceives, defends and recovers), and `controller.command(spec)`
-hands it one plan through the same inputs (`{ press }`, `{ jump, dir }`,
-`{ dash }`, `{ move, seconds }`, `{ shield }`).
+(it still perceives, defends and recovers), `controller.waiting` says what
+it is deliberately waiting for (or null), `controller.objective` is its
+match objective, and `controller.command(spec)` hands it one plan through
+the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
+`{ move, seconds }`, `{ shield }`).
 
 ## Tests and benchmark
 
 - [`tests/systems/cpu-intelligence.test.mjs`](../../tests/systems/cpu-intelligence.test.mjs):
-  inputs and liveness at every level, approach, stage navigation (City),
-  projectiles and the Deflect both ways, anti-air, recovery, Energy,
+  inputs and intent-aware liveness at every level, approach, stage
+  navigation (City), projectiles and the Deflect both ways, anti-air,
+  recovery, Energy,
   Launch Point and match-situation strategy, overtime, punishes, move
   coverage (every move of every fighter in real fights at every level, and
   in an opportunity made for it: recognized, pressed, landed), combat
   correctness, difficulty progression, determinism, the debug trace.
+- [`tests/systems/cpu-behaviour.test.mjs`](../../tests/systems/cpu-behaviour.test.mjs),
+  on [`tests/helpers/cpu-scenario.mjs`](../../tests/helpers/cpu-scenario.mjs)
+  (a CPU on a real `Battle` with the match set up as a scenario needs it):
+  breaking off to recover with a dangerous Launch Point (A), finishing an
+  exposed opponent (B), protecting a lead late and forcing a comeback, and
+  Easy reading the match less fully (C, D), recovering and coming back
+  (E), standing still deliberately when nothing needs doing (F), waiting
+  out a respawn (G), stepping off a fading cloud (H), a retreat never ending
+  under a hazard's warning (I), learning a turtle (J), overtime's tiebreak
+  and its closing Void (K), every fighter through its capabilities (L), two
+  cautious CPUs never waiting on each other for ever, and impatient
+  footwork stepping into its own range (M), a break-off giving way to a
+  finish once (N), the liveness monitor (a broken move plan and a
+  ledge-guarded walk are incidents, a deliberate wait is not), and the
+  telemetry's explanations.
 - [`tests/systems/stage-hazards.test.mjs`](../../tests/systems/stage-hazards.test.mjs):
   the CPU knows a falling rock only by its visible warning, and a CPU in one
   steps out of it often, at every level, never every time (`avoidHazards`
@@ -414,65 +461,167 @@ hands it one plan through the same inputs (`{ press }`, `{ jump, dir }`,
   holding its strikes in [`charm.test.mjs`](../../tests/systems/charm.test.mjs).
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
-  full matches on a real `Battle`, and five scripted reference styles.
+  full matches on a real `Battle` (with how each side played: presses,
+  jumps, Dashes, reversals, stillness and how much of it was meant, Shield
+  time, lulls, objectives), five scripted reference styles, and
+  `CompetentOpponent`, a scripted regular player (it spaces, Shields about
+  half the attacks it sees, punishes whiffs, anti-airs, recovers with its
+  air dash).
 - [`tests/benchmarks/cpu-benchmark.mjs`](../../tests/benchmarks/cpu-benchmark.mjs),
-  run by hand (`node tests/benchmarks/cpu-benchmark.mjs --seeds 4`): the
-  benchmark below.
+  run by hand (`node tests/benchmarks/cpu-benchmark.mjs --suite all
+  --seeds 4`): the benchmark below.
 
 ## Benchmark
 
-Measured on this code with `node tests/benchmarks/cpu-benchmark.mjs
---seeds 4`: 64 deterministic matches per matchup (both fighters each way
-round and mirrored, Desert and City, both starting sides, seeds 1 to 4),
-first to 3 points under the full clock and overtime. Win rates are the
-first side's, with their 95% Wilson interval.
+Measured with `node tests/benchmarks/cpu-benchmark.mjs --suite all
+--seeds 4` (run as four processes, `--from 1` to `--from 4 --seeds 1`):
+256 deterministic matches per matchup (every pairing of the four fighters
+both ways round and mirrored, Yerma and Sol-Noir, both starting sides,
+seeds 1 to 4), first to 3 points under the full clock and overtime. Win
+rates are the first side's, with their 95% Wilson interval. "Before" is the
+previous CPU (commit `65fadc1`) measured by the same harness and recorder.
 
-| Matchup | Win rate | Points | Launch Point dealt : taken (per game) |
-| --- | --- | --- | --- |
-| Brutal v Hard | **85.9%** (55–9) [75–92] | 2.81 : 1.17 | 231 : 147 |
-| Brutal v Medium | 96.9% (62–2) [89–99] | 2.95 : 0.81 | 232 : 121 |
-| Brutal v aggressive reference | 100% (64–0) [94–100] | 3.00 : 0.05 | 218 : 39 |
-| Brutal v defensive reference | 100% (64–0) [94–100] | 3.00 : 0.03 | 173 : 1 |
-| Brutal v projectile reference | 100% (64–0) [94–100] | 3.00 : 0.02 | 155 : 6 |
-| Brutal v jump-heavy reference | 100% (64–0) [94–100] | 3.00 : 0.09 | 215 : 54 |
-| Brutal v balanced reference | 100% (64–0) [94–100] | 3.00 : 0.03 | 189 : 27 |
-| Hard v Medium | 85.9% (55–9) [75–92] | 2.80 : 1.42 | 230 : 173 |
-| Hard v Easy | 98.4% (63–1) [92–100] | 2.97 : 0.48 | 232 : 96 |
-| Medium v Easy | 92.2% (59–5) [83–97] | 2.89 : 1.02 | 240 : 151 |
-| Easy v balanced reference | 98.4% (63–1) [92–100] | 2.98 : 0.39 | 185 : 89 |
+### Standard suite
 
-Re-measured after every attack became blockable (Unlimited Void and
-Hollow Purple included, see [combat](combat.md#attack-classification)) and
-the CPU began weighing its Shield against every threat and predicting no
-hit through a raised Shield. The shifts from the previous measurement are
-within these intervals: over 256 games (seeds 1 to 16), Brutal v Hard is
-89.8% (230–26) [85.5–93.0], against the 91.4% measured before.
+| Matchup | Win rate before | Win rate now | Points now | Launch Point dealt : taken now |
+| --- | --- | --- | --- | --- |
+| Brutal v Hard | 91.8% [87.8–94.6] | **94.5%** (242–14) [91.0–96.7] | 2.93 : 0.83 | 245 : 143 |
+| Brutal v Medium | 97.7% | 100% (256–0) | 3.00 : 0.20 | 219 : 72 |
+| Brutal v aggressive reference | 100% | 100% | 3.00 : 0.04 | 213 : 46 |
+| Brutal v defensive reference | 100% | 100% | 3.00 : 0.07 | 160 : 1 |
+| Brutal v projectile reference | 100% | 100% | 3.00 : 0.05 | 142 : 4 |
+| Brutal v jump-heavy reference | 100% | 100% | 3.00 : 0.09 | 203 : 62 |
+| Brutal v balanced reference | 100% | 100% | 3.00 : 0.06 | 176 : 27 |
+| Hard v Medium | 86.3% | 94.1% (241–15) | 2.91 : 0.84 | 243 : 148 |
+| Hard v Easy | 99.6% (Easy 0.28 points) | 100% (Easy 0.05 points) | 3.00 : 0.05 | 218 : 50 |
+| Medium v Easy | 93.0% (Easy 0.86 points) | 99.2% (Easy 0.23 points) | 2.98 : 0.23 | 239 : 98 |
+| Easy v balanced reference | 99.6% (LP 184 : 100) | 92.2% (236–20) | 2.82 : 0.78 | 183 : 182 |
 
+### Behaviour suite: how each level plays
+
+Against the competent reference (`CompetentOpponent`), per minute in play
+unless stated; "still" is the share of its time free on the ground spent
+standing still, "meant" how much of that was a deliberate wait; ground
+reversals are changes of running direction while free to act.
+
+| Level | Win rate (LP taken) before → now | Attack presses | Ground reversals | Still (meant) | Longest still | Shield s/match | Energy run out |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Easy | 100% (56) → 96.9% (144) | 101.8 → 65.9 | 48.2 → 43.5 | 0% → 21% (100%) | 0.3 → 10.0 s | 0.1 → 2.4 | 64 → 7 |
+| Medium | 100% (33) → 100% (48) | 105.5 → 91.0 | 33.3 → 25.0 | 1% → 14% (96%) | 0.6 → 10.0 s | 0.1 → 0.1 | 65 → 19 |
+| Hard | 100% (24) → 100% (31) | 105.8 → 98.4 | 26.0 → 16.8 | 2% → 14% (82%) | 0.3 → 9.2 s | 0.1 → 0.1 | 36 → 37 |
+| Brutal | 100% (13) → 100% (14) | 106.8 → 101.5 | 20.1 → 11.7 | 4% → 13% (74%) | 0.3 → 1.5 s | 0.1 → 0.1 | 17 → 21 |
+
+Each level against itself (Watch Mode):
+
+| Mirror | Match length | Attack presses | Shield s/match | Longest lull (no attack by either) | Objectives (share of time in play) |
+| --- | --- | --- | --- | --- | --- |
+| Easy | 111 → 186 s | 77.8 → 53.7 | 0.1 → 6.8 | 3.4 → 5.5 s | build 54%, finish 21%, stabilize 20%, force 4% |
+| Medium | 94 → 118 s | 75.6 → 63.1 | 0.1 → 3.6 | 3.9 → 4.6 s | build 52%, finish 25%, stabilize 22% |
+| Hard | 86 → 105 s | 73.2 → 65.8 | 0.2 → 2.8 | 3.5 → 4.7 s | build 48%, finish 28%, stabilize 24% |
+| Brutal | 82 → 98 s | 68.8 → 63.2 | 0.2 → 2.3 | 4.5 → 5.1 s | build 42%, finish 31%, stabilize 26% |
+
+**New level against old level** (both CPUs in one match, the same game
+code; 48 matches each: twelve pairings of the fighters, both stages, both
+sides, seed 1):
+
+| Level | New wins | Points new : old |
+| --- | --- | --- |
+| Easy | 4% | 0.52 : 2.88 |
+| Medium | 23% | 1.54 : 2.60 |
+| Hard | 27% | 1.60 : 2.60 |
+| Brutal | 50% | 2.17 : 2.19 |
+
+### What the numbers say
+
+- **The old CPU's hyperactivity beat patience at the middle levels.** The
+  new Medium and Hard lose to the old ones (23% and 27%): the old CPU
+  decided again the moment an action ended and pressed about 100 times a
+  minute at every level, and that relentless pressure beats a patient
+  player of the same reactions. Brutal, which reassesses fast enough for
+  either, is as strong as before (50%). The new middle levels are meant to
+  be regular and tournament players rather than relentless machines; if
+  they should be as strong as before, `patience` and `think` for Medium and
+  Hard are where to tune.
+- **Easy is no longer a weaker Brutal.** Before, every level pressed about
+  100 times a minute against the competent reference and Easy took 56
+  Launch Point a match from it; now Easy presses 66 times a minute, takes
+  144, and scores against Medium almost never (0.23 points a match, from
+  0.86). The levels are further apart: Hard beats Medium 94% (from 86%),
+  Medium beats Easy 99% (from 93%). That gap is steep; whether Easy is now
+  right for a newcomer is for playtesting.
 - **Brutal's 95% target**, against the benchmark composition (Hard, Medium
-  and the five reference styles, 448 games): **97.5%** (437–11)
-  [95.7–98.6], met. **Against Hard alone it is not met: 85.9%** on these
-  64 games (89.8% over 256 games on seeds 1–16). Brutal and Hard are
-  the same intelligence and the gap is mostly reaction time: Brutal's
-  window was deliberately not pushed below 0.07 s to close it (in a
-  128-game trial, Brutal at 0.05–0.075 s beat a faster Hard, 0.12–0.19 s,
-  96.9% of the time; the specification rules out winning by mechanical
-  precision alone). Hard was set to a tournament player's 0.15–0.22 s.
-- **Every move is used at every level** in these matches. Across Brutal v
-  Hard, #0001's moves range from 2.8% (Hollow Purple) to 21.9% (the Red
-  Kick) of its presses, #0002's from 2.8% (the ground Spin Attack) to
-  28.8% (the Homing Attack in the air); the Deflect is 6.9% and 19.8% of
-  them (most as an aerial strike).
-- **Clean execution:** no inactivity incident or stuck navigation in any
-  of the 704 matches, and two refused presses in all of them (one each in
-  Brutal and Easy against the balanced reference): an Unlimited Void that
-  started and was cut short by its caster losing its footing within the
-  CPU's check, and a Blue Tornado pressed in a recovery while the fighter
-  was still flying from a launch. Falls with no hit in the 3 seconds before
-  (self-eliminations) were rare: Brutal 7 in 448 games, Hard 1 in 128,
-  Medium 0 in 64, Easy 4 in 64. Energy ran out at most 7 times in 64
-  games.
-- **Limitations.** The reference opponents are simple scripts: every level,
-  Easy included, beats them, so they measure robustness against styles,
-  not human skill. No result here is a claim about play against people.
-  Shields that actually block stay rare (about one a game): the CPU
-  prefers to step, jump or strike first against these opponents' attacks.
+  and the five reference styles, 1,792 matches): **99.2%** (1,778–14)
+  [98.7–99.5], from 98.5%: met. **Against Hard alone it is not met: 94.5%**
+  [91.0–96.7], from 91.8%. Review of the target: the composition is mostly
+  scripted styles every level beats, so meeting it says little; the number
+  that matters is Brutal against Hard, the same intelligence with slower
+  reactions and judgement, which the specification does not allow to be won
+  by mechanical precision alone. A target against Hard (or the competent
+  reference) would be the more honest one to keep.
+- **It waits, and means it.** A level now spends 13–21% of its free time on
+  the ground standing still, most of it (71–100% by matchup) a deliberate
+  wait with a reason; the rest is brief settles of footwork. No stillness ran past `WAIT_LIMIT` (10 s), and the longest
+  lull between two CPUs in any matchup is 8.4 s (5.5 s in the mirrors).
+- **Less twitching.** Ground reversals fell at every level (Brutal from 20
+  to 12 a minute).
+- **Clean execution:** no inactivity incident or stuck navigation in any of
+  the 4,864 matches; five refused presses in all of them (three before).
+  Accidental self-eliminations stay rare (Brutal 5 in 512 matches against
+  Hard and Medium, as before).
+- **Every move is used at every level.** The rarest is #0004's Ievan
+  Polkka, cast 5 times in Easy's 32,232 presses (13 in 20,620 before): a
+  heal that needs a safe moment, which a casual player seldom makes.
+- **Performance** (Node, one process, Easy and Brutal mirrors on both
+  stages, every CPU step timed): 108 µs a step on average (99 µs before),
+  1.4 ms at the 99th percentile (1.2 ms), 3.0 ms at the 99.9th (3.2 ms);
+  the rare spikes past a frame (16.7 ms) are there before and after
+  (garbage collection). The debug trace and its events cost nothing with
+  `debug` off. A browser on a phone is slower than Node: check Watch Mode
+  there (see the checklist below).
+
+**Limitations.** The reference opponents, the competent one included, are
+scripts with no strategy: every level beats them, so they measure
+robustness against styles and how the CPU plays, not human skill. Against
+the defensive reference, which never attacks, a CPU ahead on points may let
+the clock run: 5 of its 256 matches had a stretch of more than 20 s with no
+attack by either side (the longest 186 s), the CPU stepping in for a moment
+after each 10-second wait but finding nothing worth committing to. Easy's
+casual misreads mean it sometimes trades when it should not (it heeds a
+call to break off about half the time). No result here is a claim about play
+against people.
+
+## Human playtesting
+
+No result in this document comes from people: the tests and the benchmark
+measure the CPU against scripts and against itself. Whether it feels like
+a human of its level is for human playtesting, which has not been done for
+this version. A session that does it should cover, for each level, at
+least three Quick Battles (different fighters and stages, Asperitas and
+Adamaris among them) and one Watch Mode match, and note for each: level,
+fighters, stage, result, how hard it felt (1–5), and anything that looked
+wrong.
+
+- **Easy.** Can a newcomer win within their first few matches, without it
+  feeling like it lets them? Does it look like a person who is still
+  learning (late reactions, whiffs, dropped combos, trading when it should
+  not) rather than a machine that mashes or one that gives up?
+- **Medium, Hard, Brutal.** Is each a clear step up from the one below? Does
+  Hard punish mistakes and play the clock; does Brutal feel strong without
+  looking inhuman (no frame-perfect reactions to everything)?
+- **Waiting.** When it stands still, can you tell why (a safer spot, Shield
+  ready, its Launch Point coming down; a lead to protect; a respawn to wait
+  for)? Is it ever still for no reason? How long before it comes back: too
+  soon to matter, or so long it is boring?
+- **Breaking off.** With a high Launch Point, does it back away and recover,
+  and can a player exploit that (chasing it into a corner, baiting its
+  Shield until it breaks)? Does it ever camp behind its Shield?
+- **The match.** Ahead late, does it protect the lead without stalling
+  unfairly? Behind late, does it force the fight? In overtime, does it play
+  the Launch Point tiebreak and respect the closing Void?
+- **Movement.** Any left-right twitching on the spot, running back and forth
+  at a ledge, or getting stuck under a platform?
+- **Watch Mode.** Are CPU v CPU matches watchable: no long standoffs where
+  both wait, no endless trading?
+- **Performance.** A steady 60 Hz with two CPUs (Watch Mode) on a phone.
+- **Both languages.** The four difficulty lines on Select Difficulty, in
+  English and French.

@@ -3310,8 +3310,9 @@ it names a fighter, an attack or an animation.
     reach, its patience running out, the objective changing, the Launch
     Point recovered, fading footing, a hazard's warning, the opponent
     leaving or rejoining play). The longer nothing happens the more
-    impatient it grows (unless waiting is itself winning), so two CPUs
-    never wait on each other for ever; a wait that runs on past 10 s
+    impatient it grows (unless waiting is itself winning) and, impatient,
+    it steps into its own range rather than waiting at the edge of the
+    opponent's, so two CPUs never wait on each other for ever; a wait that runs on past 10 s
     (`WAIT_LIMIT`) makes it reassess, and move for a moment unless it is
     running out the clock. Stillness it does not mean (no plan, a plan that
     should be moving, a walk the ledge guard keeps holding back) is an
