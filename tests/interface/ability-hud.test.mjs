@@ -21,6 +21,7 @@ import { Arena } from '../../js/game/arena.js';
 import { Settings } from '../../js/core/settings.js';
 import { setLanguage } from '../../js/localization/i18n.js';
 import { stylesheet } from '../helpers/stylesheet.mjs';
+import { playerRig, press } from '../helpers/player-rig.mjs';
 
 const DEF_0001 = getCharacter('0001');
 const DEF_0002 = getCharacter('0002');
@@ -401,6 +402,46 @@ test('a move spent for this airtime, or in free fall, looks unavailable, never l
   const s = abilityStatus(fighter, abilityGroups(fighter.def).air.find((e) => e.move === 'midair_attack3'), 'air');
   assert.deepEqual([s.restriction, s.cooldown.cooling, s.ready], ['airUses', false, false]);
   assert.match(stylesheet(), /\.ah-tile\[data-state="restricted"\] \{ border-style: dashed;/);
+});
+
+test('Combo Assist\'s queued follow-up lights its own tile while it waits, in its place only, its cooldown still shown; read, never rebuilt', () => {
+  const r = playerRig({ character: DEF_0001, gap: 900, combatAssist: false });
+  const hud = new AbilityHUD(new Element('div'), { input: fakeInput(), settings: new Settings(null) });
+  hud.bind(r.player);
+  hud.setVisible(true);
+  const lit = () => ['ground', 'air'].flatMap((p) => tiles(hud, p).filter((t) => t.el.classList.contains('is-queued')).map((t) => `${p}:${t.entry.move}`));
+  r.tick(press('attack1'));
+  hud.update(r.player);
+  assert.deepEqual(lit(), [], 'nothing queued yet');
+  const red = tileOf(hud, 'ground', 'attack2');
+  const nodes = tiles(hud, 'ground').map((t) => t.el);
+  r.player.combat.cooldowns.set('attack2', 0.1);
+  r.tick(press('attack1'));
+  hud.update(r.player);
+  assert.deepEqual(lit(), ['ground:attack2'], 'Red, on the ground row, and nothing else');
+  assert.equal(red.el.dataset.state, 'repeat', 'its cooldown still shows: queued is never ready');
+  assert.match(red.el.getAttribute('aria-label'), /^Red: .*, queued next$/);
+  // Nothing changed, nothing written.
+  let writes = 0;
+  const setAttribute = red.el.setAttribute.bind(red.el);
+  red.el.setAttribute = (...args) => { writes++; setAttribute(...args); };
+  hud.update(r.player);
+  assert.equal(writes, 0, 'no per-frame rewrite');
+  setLanguage('fr');
+  hud.update(r.player);
+  assert.match(red.el.getAttribute('aria-label'), /enchaînement prévu$/);
+  setLanguage('en');
+  // Gone once Red starts.
+  while (r.player.combat.attack?.def.id === 'attack1') r.tick();
+  hud.update(r.player);
+  assert.equal(r.player.combat.attack?.def.id, 'attack2');
+  assert.deepEqual(lit(), [], 'gone once it starts');
+  assert.deepEqual(tiles(hud, 'ground').map((t) => t.el), nodes, 'the same tiles throughout');
+  // A steady edge: no animation of its own, so reduced motion has nothing to stop.
+  const rule = stylesheet().match(/\.ah-tile\.is-queued \{[^}]*\}/)?.[0];
+  assert.ok(rule, 'styled');
+  assert.doesNotMatch(rule, /animation|transition/);
+  hud.destroy();
 });
 
 test('a fighter swap replaces the whole moveset and its timers; clearing leaves nothing behind', () => {

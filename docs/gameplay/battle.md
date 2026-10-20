@@ -33,7 +33,9 @@ moves sit in the bottom-right corner: each move's own art over the key or
 pad input that performs it, the moves of where the fighter is now on top
 and the other place's smaller beneath, turning like a small wheel as it
 jumps and lands, each with its cooldown (seconds for the 3 s and 5 s ones,
-a faint sweep for the 0.5 s repeat delay) ([input](../systems/input.md#the-ability-hud)).
+a faint sweep for the 0.5 s repeat delay), and the move Combo Assist has
+queued to follow the attack playing lit along its edge
+([input](../systems/input.md#the-ability-hud)).
 It hides under the pause menu and at the result, never shows in Watch
 Mode, and a touch screen keeps its touch controls instead. While it shows,
 Player 1's cooldown rings under its feet step aside; the CPU keeps its own.

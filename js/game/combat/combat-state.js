@@ -168,6 +168,12 @@ export class CombatState {
     // (`struck`, by index) and whether a Shield stopped it (`blocked`); a
     // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;
+    // The attack record that played out in full on this step (its time
+    // reached its total in update), or null. Only update sets it: an attack
+    // cut short, interrupted, landing-cancelled or ended by its motion never
+    // finished. Combo Assist's queued follow-up waits for it (see
+    // Fighter.comboQueue).
+    this.finished = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attack cooldowns (the cooldown policy's, js/data/cooldowns.js:
     // the 0.5 s repeat delay, or 3 s / 5 s): attack id -> seconds left. The
@@ -435,6 +441,7 @@ export class CombatState {
   }
 
   update(dt) {
+    this.finished = null;
     for (const [id, t] of this.cooldowns) {
       if (t - dt <= PHASE_EPSILON) this.cooldowns.delete(id);
       else this.cooldowns.set(id, t - dt);
@@ -477,7 +484,10 @@ export class CombatState {
         // Whatever releases it, the attack that threw it is its ability.
         if (this.stun <= 0) this.release = { ...proj, ability: this.attack.def.id };
       }
-      if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) this.endAttack();
+      if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) {
+        this.finished = this.attack;
+        this.endAttack();
+      }
     }
   }
 }

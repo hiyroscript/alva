@@ -1169,14 +1169,16 @@ indicator. Each section keeps its existing settings, in this order:
   **energy** / **énergie** is lowercase, weight 700 and the exact Energy bar
   fill purple `#b026ff` (`ENERGY_STYLE.fill`), including after live language changes.
   Below it, its own setting, **Combo Assist** (7.2.4b), under the line
-  "Once Attack 1 or Attack 2 has finished, pressing it again during its
-  repeat cooldown automatically performs the other attack.", the same two
+  "Press Attack 1 or Attack 2 again, while it plays or just after, to
+  follow up with the other attack. Each attack keeps its own cooldown.",
+  the same two
   choices the same way (its own `radiogroup`, labelled and described by its
   own name and line): **On** (marked "Default") and **Off**, saved at once,
   read as each session starts, for Player 1 only. Neither choice changes
-  the other. French: **Assistance aux combos**, "Une fois l’Attaque 1 ou
-  l’Attaque 2 terminée, la presser à nouveau pendant son temps de recharge
-  déclenche automatiquement l’autre attaque.", **Activée** / **Désactivée**.
+  the other. French: **Assistance aux combos**, "Appuyez à nouveau sur
+  l’Attaque 1 ou l’Attaque 2, pendant qu’elle se joue ou juste après, pour
+  enchaîner avec l’autre attaque. Chaque attaque garde son propre temps de
+  recharge.", **Activée** / **Désactivée**.
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
@@ -2231,9 +2233,13 @@ each fighter's own values are in its character specification (7.2.9).
     ground attack goes first. A Dash request is buffered the same way
     (7.2.3). The human player's press is kept as the move it asked for as
     it was pressed (Combo Assist, 7.2.4b, applied then, never later), its
-    press for the attack already playing is never kept (below), and a hit
-    on the player drops whatever it had kept, attack, Dash and jump alike:
-    nothing asked for before the hit comes out after the stun.
+    press for the attack already playing is never kept here (below; with
+    Combo Assist it queues that attack's follow-up instead, a separate
+    request that waits for the attack to play out and is never a buffered
+    press: 7.2.4b), and a hit on the player drops whatever it had kept,
+    attack, Dash, jump and queued follow-up alike: nothing asked for before
+    the hit comes out after the stun. The buffer stays 0.15 s; the queued
+    follow-up neither lengthens nor replaces it.
   - *Hit-cancels.* An attack that hits (a Shield's block does not count)
     may be cut short once its time reaches its `hitCancel` (seconds in, or
     null for never; the step its freeze ends at the earliest), by another
@@ -2285,20 +2291,28 @@ each fighter's own values are in its character specification (7.2.9).
     summon's startup, a Dash or air dash before its cancel time, Combat
     Assist's approach (which has its own rules, 7.2.4a). The player's press
     for the attack already playing (its own button, or the button whose
-    press started it) is no request at all: never a cut, a restart or a
-    kept press, whatever its phase, whatever its hit-cancel. **Run is never
+    press started it) is no request for now: never a cut, a restart or a
+    kept press, whatever its phase, whatever its hit-cancel. With Combo
+    Assist on it queues the other attack of the pair to follow once that
+    attack plays out (7.2.4b); off, it is nothing at all. Deliberate
+    cancellation and that queued alternation stay apart: a press of another
+    button is a new request and cuts as above at once; only a repeat waits
+    for the attack's own end. **Run is never
     a request**: holding, turning or pressing a direction (keyboard, touch
     or stick) only steers and turns as ever (an attack still turns to the
     direction held); a Dash is only ever the explicit Mouvement request
     (7.2.3). One step accepts at most one move: the first by the usual
     order (a Deflect, then the combat buttons in order, then a buffered
-    press, then the Dash, the Shield, the jump), and nothing later on that
-    step cuts it.
+    press, then a queued follow-up, then the Dash, the Shield, the jump),
+    and nothing later on that step cuts it.
   - *Hitstop.* Per hit, its own `hitstop`: crisp for light strikes (two
     steps), longer for heavy ones and finishers; a hard rebound off the
     stage freezes its fighter alone for `LAUNCH_BOUNCE.hitstop`. It freezes
-    the fighters, never the controls: presses made during it are kept, and
-    a frozen fighter is drawn still where it stopped. It freezes motion,
+    the fighters, never the controls: presses made during it are kept (a
+    repeat of the attack frozen in it queues that attack's follow-up,
+    7.2.4b, which still waits for the attack to play out after it: nothing
+    starts inside a freeze), and a frozen fighter is drawn still where it
+    stopped. It freezes motion,
     never erases it: a fighter's velocity is held through it and it
     carries on at exactly that speed. A detached hit (a projectile's, a
     clone's, a technique's) freezes only its target.
@@ -2541,7 +2555,9 @@ attack or a button.
   hit-cancel, out of a Dash or air dash past its cancel time, or cutting
   the player's own attack (7.2.4); a press the buffer kept is weighed as it
   comes out, and one Combo Assist turned into the other attack (7.2.4b) is
-  weighed as that attack. What it would cut ends only once the approach (or
+  weighed as that attack, a queued follow-up as it is tried once its attack
+  has played out (the same measured range, collision, facing, travel and
+  airtime rules: no longer approach, no free air dash). What it would cut ends only once the approach (or
   the attack) is accepted. With its opponent in play (not lost to the Void) and its art present
   (Energy never matters: full, partly spent or exhausted, it is the same):
   `mouvment` on the ground,
@@ -2641,53 +2657,117 @@ attack or a button.
 
 Combo Assist (Home › Settings › Combat, 6.10; on by default) turns a
 repeated basic attack into a two-hit string for the human player: Attack 1
-pressed again once its attack is over, while that attack's own repeat
+pressed again while it plays, or once it is over while its own repeat
 cooldown runs, performs Attack 2, and Attack 2 pressed again the same way
-performs Attack 1. The rule is shared (`comboAction` in
-`js/game/combat/combo-assist.js`, read by `Fighter.comboAction`); nothing in
-it names a fighter, an attack or an animation.
+performs Attack 1. An input convenience, never a combat advantage: no move
+is faster, longer, stronger or freer of its cooldown for it, and a follow-up
+can whiff, be blocked or leave the target time to recover like any press.
+The rules are shared (`comboAction` and `followUpAction` in
+`js/game/combat/combo-assist.js`; the queue is `Fighter.comboQueue`, with
+`noteFollowUp` and `queueFollowUp` in `js/game/fighters/fighter.js`);
+nothing in them names a fighter, an attack or an animation.
 
 - **Whose.** The human player's only, by its controller: a
   `PlayerController` given the setting on (`comboAssist`), handed to
   Player 1 alone by `Battle` and `PracticeSession` as each session starts.
   A CPU (Quick Battle, both of Watch Mode's), the practice dummy and any
-  other controller never have it. It is its own setting: Combat Assist on
-  or off never changes it, nor the reverse.
-- **The window.** The source attack's own repeat cooldown
-  (`CombatState.cooldowns`, 7.2.4): the universal 0.5 s, or the cooldown
-  policy's 3 s or 5 s for the attack, which is never shortened or
-  overwritten. No timer of
-  its own. It runs from the attack's end, its cut (7.2.4) or its
-  interruption by a hit, so any of them opens it.
-- **Never during the attack itself.** Attack 1 pressed while Attack 1 still
-  plays (startup, strike or recovery, mashed or not) is no request at all
-  (7.2.4): the attack is never cut, restarted or turned into Attack 2, and
-  nothing is kept to come out afterwards. The same for Attack 2. A press
-  made on the step the attack ends is a press once it is over. A press of
-  the button whose press started the attack in progress (Attack 1 again
-  during the Attack 2 it made) is that same request, so mashing one button
-  alternates whole attacks, each played out.
-- **What it asks for.** Only the attack1 and attack2 buttons alternate
-  (`COMBO_PAIRS`), never the Extra Attack or Attack 3 to 5, and only when
-  both are attacks. Each is resolved through the fighter's own `actions`
-  for where it is (`attackFor`): on the ground the ground attacks, in the
-  air the mid-air ones, so a ground attack cooling down never changes an
-  air press, nor the reverse. The press then becomes an ordinary request
-  for the other attack, through every rule a request goes through: its own
-  cooldown, art, place, starts for the airtime, the player's cancellation
-  rules (7.2.4) and Combat Assist (7.2.4a, which serves it if it is melee).
-- **Unavailable.** When the other attack could not start (its own cooldown
-  running, no art, ground-only in the air, its starts for the airtime used
-  up, free fall), the press stays the ordinary press it was: never forced
-  into a move that cannot start, never silently restarting the cooling one
-  (kept by the buffer as itself, it comes out only if its own cooldown ends
-  within the buffer, as without Combo Assist).
-- **When it is decided.** As the press is made: a press kept by the buffer
-  keeps the move it asked for then. Held buttons make one press (a key, a
-  touch control or a controller button held is never a stream of
-  requests), so holding never strings attacks by itself.
-- **Off**, every press is its own button's, exactly as before Combo Assist
-  existed.
+  other controller never have it: their presses, repeats included, keep
+  the ordinary rules, and no follow-up is ever queued for them. It is its
+  own setting: Combat Assist on or off never changes it, nor the reverse.
+- **A repeat while the attack plays: the queued follow-up.** The player's
+  press for the attack in progress (its own button, or the button whose
+  press started it: 7.2.4), made at any point of it (startup, strike,
+  recovery, an impact freeze, the step before its last), never touches that
+  attack: it is not cut, restarted or replayed, its time, phases, clip,
+  motion, hitbox, strikes, projectile release, hit-confirm and cooldown are
+  its own, it gains no invulnerability. Instead it queues the follow-up:
+  the other attack of the pair (`COMBO_PAIRS`) for the attack **really
+  playing**, never for the button pressed, so Attack 1 pressed during the
+  Attack 2 its own last press made queues Attack 1; resolved through the
+  fighter's own `actions` for where that attack started (`attackFor`: the
+  ground's moves on the ground, the air's in the air, never the other
+  place's in its place). It is kept apart from the combat input buffer (it
+  is never a buffered press, and queuing it drops an older buffered press:
+  the newest press wins, as in the buffer) and keeps no timer: it lives
+  exactly as long as its attack plays, whatever its length, and is never
+  aged by the 0.15 s buffer, a pause or the clock. **One at most**: further
+  repeats during the same attack change nothing, and a held button is one
+  press (a key, a touch control or a controller button held is never a
+  stream of requests), so holding never queues anything. Once the
+  follow-up has started, a fresh repeat during it may queue the next one.
+  None is queued when the follow-up could not start there at all (no art,
+  a ground-only move in the air, its starts for the airtime used up, free
+  fall), or for a button outside the pair (the Extra Attack, Attack 3 to 5,
+  summons, techniques, the Deflect, the Shield, Dash), whose repeats are
+  nothing, as ever.
+- **When it starts.** Only when its attack **plays out in full**: on the
+  very step that attack's time reaches its end (`CombatState.finished`),
+  with no pause, the follow-up is tried once as an ordinary request made
+  when it was pressed (`tryAction`: its own cooldown, art, place, airtime,
+  free fall, the fighter free to act, Combat Assist), through the normal
+  start, from its own first frame. It is that step's last request (after a
+  Deflect, the combat buttons and a buffered press): a jump pressed before
+  it goes first, the Shield held takes the step, and anything started on
+  that step rules it out, so one step still starts at most one move. A
+  press made on the step the attack ends is a press once it is over (the
+  next bullet), which resolves to the same follow-up on the same step:
+  nothing is lost and nothing is doubled.
+- **Unavailable, or overtaken: dropped.** A follow-up that cannot start as
+  its attack ends (its cooldown still running, the fighter stunned or
+  held) is dropped: never retried, kept for later, buffered or swapped for
+  another move, and no timer changes for it. So is a queued follow-up
+  whose attack does not play out: cut by any new request, interrupted by a
+  hit or a paralysis, landing-cancelled, ended by its motion (a bounce, a
+  slam that lands, so the fighter leaves the place it started in) or by a
+  reset; and one overtaken by a newer request of the player's (another
+  combat button the fighter has, a summon or a technique, a jump, a Dash,
+  a Shield press, the Deflect), whether or not that request can start; a
+  repeat made on the same step as such a request queues nothing. Also on
+  a hit, input locked (time up), the Void, a respawn, a reset, a rematch,
+  a replaced fighter and Combo Assist off. Run and every other held
+  direction are never requests: holding or turning them keeps it.
+- **A fresh press once the attack is over.** Pressed again after its
+  attack has ended (finished, cut or interrupted by a hit), while that
+  attack's own repeat cooldown runs (`CombatState.cooldowns`, 7.2.4: the
+  universal 0.5 s, or the cooldown policy's 3 s or 5 s, never shortened or
+  overwritten; any of those ends opens it), Attack 1 asks for Attack 2 and
+  the reverse, decided as the press is made (a press kept by the buffer
+  keeps the move it asked for then). Only when both are attacks, each
+  resolved for where the fighter is, so a ground attack cooling down never
+  changes an air press, nor the reverse. The press then becomes an
+  ordinary request for the other attack, through every rule a request
+  goes through: its own cooldown, art, place, starts for the airtime, the
+  player's cancellation rules (7.2.4) and Combat Assist (7.2.4a, which
+  serves it if it is melee). When the other attack could not start (its
+  own cooldown running, no art, ground-only in the air, its starts for the
+  airtime used up, free fall), the press stays the ordinary press it was:
+  never forced into a move that cannot start, never silently restarting
+  the cooling one (kept by the buffer as itself, it comes out only if its
+  own cooldown ends within the buffer, as without Combo Assist).
+- **Cooldowns.** Every attack keeps its own: the first attack's starts
+  once, at its end, at its full length, as ever; the follow-up's starts at
+  its own end; neither is started, shortened, refreshed or replaced by the
+  other, and nothing global is added between them. Mashing therefore
+  alternates whole attacks, each played out, never faster than the
+  attacks and their cooldowns allow.
+- **With Combat Assist.** A queued melee follow-up out of reach is weighed
+  by Combat Assist as it is tried (7.2.4a): its ordinary approach, never a
+  longer one, no Energy, the air's air dash used up in the air; a ranged,
+  homing, pending or special one never. A repeat during the approach is no
+  repeat (no attack plays yet; the approach's own replacement rule
+  applies), and an approach cancelled leaves nothing queued. All four
+  combinations of the two settings work.
+- **Shown.** With a keyboard or a controller, the ability HUD lights the
+  queued follow-up's tile while it waits (7.3); its cooldown, if any,
+  still shows, so a queued move never looks ready. The touch controls show
+  no live move state, the queue included.
+- **Deliberate play is untouched.** A press of the other button while the
+  attack plays (Attack 2 during Attack 1) is a new request, which cuts at
+  once by the player's cancellation rules (7.2.4); hit-cancels, Dash
+  cancels, the Shield, the Deflect, jumps and every other control keep
+  their rules, and none of them waits for the assist.
+- **Off**, every press is its own button's and a repeat is nothing,
+  exactly as before Combo Assist existed.
 
 #### 7.2.5 Defense and Energy
 
@@ -3656,7 +3736,8 @@ Adding one is described in
     many moves a fighter has); a combination or a hold gets a slightly wider
     tile rather than smaller text. Each tile is named for screen readers:
     its move, its input in words, and Ready, Cooling down or why it is
-    unavailable.
+    unavailable (and "queued next" while it is Combo Assist's queued
+    follow-up).
   - *Moves.* From the loadout alone (`abilityGroups`,
     `js/game/combat/move-status.js`), in control order (attack1 to attack5,
     then the extra attack): on the ground every button's ground move (an
@@ -3704,6 +3785,16 @@ Adding one is described in
     touches it. A move unavailable for another reason (its starts for this
     airtime used up, free fall, missing art) is muted (grey art, dashed
     edge) with no countdown. The input stays readable throughout.
+  - *Queued follow-up.* While Combo Assist has queued a follow-up (7.2.4b:
+    a repeat of the attack playing), that move's tile, in the row of the
+    place it will start in, shows a steady brighter edge and inner ring
+    (`is-queued`, read through `abilityStatus`'s `queued` from
+    `Fighter.queuedFollowUp`), and its name for screen readers adds
+    "queued next" ("enchaînement prévu"). It appears the frame the repeat
+    is accepted and goes the frame the move starts or the queue is dropped.
+    It never stands for readiness: a cooldown on the same tile still
+    shows. No motion, so reduced motion changes nothing; no tile is
+    rebuilt.
   - *Lifecycle.* Bound to Player 1 as play starts (Practice Ground's
     Change Fighter replaces the whole moveset at once), cleared on leaving
     the screen; it writes to the DOM only when a shown value changes.

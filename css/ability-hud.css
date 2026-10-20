@@ -214,6 +214,13 @@ html.is-touch .ability-hud { display: none; }
 .ah-tile[data-state="restricted"] .ah-sprite,
 .ah-tile[data-state="restricted"] .ah-art .icon { filter: grayscale(1) brightness(0.55); opacity: 0.75; }
 .ah-tile[data-state="restricted"] .ah-input { opacity: 0.6; }
+/* Combo Assist's queued follow-up: the move that comes next once the
+   attack in progress plays out. A steady lit edge, no motion; any
+   cooldown still shows over it (queued is never ready). */
+.ah-tile.is-queued {
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
 /* A long cooldown just over: a brief, quiet edge light. */
 .ah-tile.is-recovered { animation: ah-recovered 160ms ease-out; }
 @keyframes ah-recovered {

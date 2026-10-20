@@ -337,6 +337,7 @@ export const EN = {
   'abilityHud.airUses': 'Used up until you land',
   'abilityHud.freeFall': 'Unavailable until you land',
   'abilityHud.art': 'Unavailable',
+  'abilityHud.queued': '{state}, queued next',
   'abilityHud.holdShort': 'Hold',
   'unit.minute.one': '{n} minute',
   'unit.minute.other': '{n} minutes',
@@ -414,7 +415,7 @@ export const EN = {
   'settings.combatAssistOn': 'On',
   'settings.combatAssistOff': 'Off',
   'settings.comboAssist': 'Combo assist',
-  'settings.comboAssistDesc': 'Once Attack 1 or Attack 2 has finished, pressing it again during its repeat cooldown automatically performs the other attack.',
+  'settings.comboAssistDesc': 'Press Attack 1 or Attack 2 again, while it plays or just after, to follow up with the other attack. Each attack keeps its own cooldown.',
   'settings.comboAssistOn': 'On',
   'settings.comboAssistOff': 'Off',
 

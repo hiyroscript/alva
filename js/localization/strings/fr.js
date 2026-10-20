@@ -446,6 +446,7 @@ export const FR = {
   'abilityHud.airUses': 'Épuisé jusqu’à l’atterrissage',
   'abilityHud.freeFall': 'Indisponible jusqu’à l’atterrissage',
   'abilityHud.art': 'Indisponible',
+  'abilityHud.queued': '{state}, enchaînement prévu',
   'abilityHud.holdShort': 'Maint.',
   'unit.minute.one': '{n} minute',
   'unit.minute.other': '{n} minutes',
@@ -520,7 +521,7 @@ export const FR = {
   'settings.combatAssistOn': 'Activée',
   'settings.combatAssistOff': 'Désactivée',
   'settings.comboAssist': 'Assistance aux combos',
-  'settings.comboAssistDesc': 'Une fois l’Attaque 1 ou l’Attaque 2 terminée, la presser à nouveau pendant son temps de recharge déclenche automatiquement l’autre attaque.',
+  'settings.comboAssistDesc': 'Appuyez à nouveau sur l’Attaque 1 ou l’Attaque 2, pendant qu’elle se joue ou juste après, pour enchaîner avec l’autre attaque. Chaque attaque garde son propre temps de recharge.',
   'settings.comboAssistOn': 'Activée',
   'settings.comboAssistOff': 'Désactivée',
 

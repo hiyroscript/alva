@@ -38,7 +38,11 @@
 //     js/data/cooldowns.js) shows its sweep and its seconds
 //     (formatCooldown), the 0.5 s repeat delay only a faint sweep, and a
 //     move spent for this airtime (or missing its art) a muted look with no
-//     countdown.
+//     countdown;
+//   - Combo Assist's queued follow-up (moveQueued, from
+//     Fighter.queuedFollowUp): the move that comes next once the attack in
+//     progress plays out, a steady lit edge on its tile for as long as it
+//     waits. Its cooldown, if any, still shows: queued is never ready.
 //
 // It is information, not a control: nothing in it takes focus or the
 // pointer, and the DOM changes only when a shown value does. Every word is
@@ -213,7 +217,7 @@ export class AbilityHUD {
     const tile = {
       entry, place, el: node, art, sweep, seconds, input,
       name: ability?.label ?? entry.move, glyph: ability?.icon ?? '',
-      shown: { state: null, progress: null, text: null, label: null },
+      shown: { state: null, progress: null, text: null, label: null, queued: null },
       inputText: '',
     };
     this.showArt(tile, sprite);
@@ -325,7 +329,7 @@ export class AbilityHUD {
   // One tile's state: 'ready', 'cooling' (a special cooldown: sweep and
   // seconds), 'repeat' (the 0.5 s repeat delay: a faint sweep) or
   // 'restricted' (spent for this airtime, or missing its art: muted, no
-  // countdown).
+  // countdown); and, apart from it, whether it is queued (is-queued).
   paint(tile, status) {
     const cd = status.cooldown;
     const state = status.restriction ? 'restricted' : cd.cooling ? (cd.special ? 'cooling' : 'repeat') : 'ready';
@@ -343,6 +347,11 @@ export class AbilityHUD {
       shown.progress = progress;
       tile.el.style.setProperty('--ah-progress', String(progress));
     }
+    if (status.queued !== shown.queued) {
+      shown.queued = status.queued;
+      tile.el.classList.toggle('is-queued', status.queued);
+      shown.label = null;
+    }
     const text = state === 'cooling' ? formatCooldown(cd.remaining) : '';
     if (text !== shown.text) {
       shown.text = text;
@@ -350,7 +359,8 @@ export class AbilityHUD {
     }
     if (shown.label === null) {
       const condition = status.restriction ? t(`abilityHud.${status.restriction}`) : state === 'cooling' ? t('abilityHud.cooling') : t('abilityHud.ready');
-      shown.label = t('abilityHud.tile', { name: tile.name, input: tile.inputText, state: condition });
+      const described = status.queued ? t('abilityHud.queued', { state: condition }) : condition;
+      shown.label = t('abilityHud.tile', { name: tile.name, input: tile.inputText, state: described });
       tile.el.setAttribute('aria-label', shown.label);
     }
   }

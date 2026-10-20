@@ -2347,3 +2347,72 @@ fights on two seeds rather than one (the pull's hold changes how #0001 and
 use); the roster, credits and screens in
 `tests/integration/empty-roster.test.mjs`, `discover.test.mjs`,
 `settings.test.mjs` and the other fighters' tests (the playable list).
+
+## Queued Combo Assist
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: make fighting more responsive and beginner-friendly without losing
+commitment or depth, by letting a repeated Attack 1 / Attack 2 press made
+while the attack still plays queue the other attack, instead of being
+thrown away. The CPU, its difficulty levels, every cooldown, Energy,
+Launch Point, movement and every fighter's moves are unchanged.
+
+**What it changed.**
+
+- **The queued follow-up** (Combo Assist on, the human player only).
+  Attack 1 pressed again at any point while Attack 1 plays (startup,
+  strike, recovery, an impact freeze) queues Attack 2 to start on the very
+  step Attack 1 plays out in full, and the reverse. The attack playing is
+  never touched: no cut, restart, replay, second strike or projectile, its
+  cooldown once. The follow-up is read from the attack really playing
+  (Attack 1 repeated during the Attack 2 its own press made queues Attack
+  1), for the place that attack started in, and is tried through the
+  ordinary request path (its cooldown, art, airtime, Combat Assist): if it
+  cannot start then, it is dropped, never retried or swapped. One at most
+  per attack; a held button is one press. Any newer request (another
+  attack, a summon or technique, a jump, a Dash, the Shield, the Deflect),
+  a hit, a paralysis, an attack ended early (a cut, a landing cancel, a
+  bounce, a landed slam), input locked, the Void or a respawn drops it.
+  It keeps no timer and is apart from the 0.15 s input buffer, which is
+  unchanged. **Intentional change:** a repeat during the attack used to be
+  discarded; with Combo Assist off it still is.
+- **Natural completion** is now told apart from every other end of an
+  attack: `CombatState.finished`, set only when an attack's time reaches
+  its end.
+- **The ability HUD** lights the queued move's tile (a steady edge, no
+  motion; "queued next" for screen readers, in English and French) while
+  it waits; its cooldown still shows over it. The touch controls show no
+  live move state, so the queue has no marker on a touch screen.
+- **Settings › Combat**: Combo Assist's line now reads "Press Attack 1 or
+  Attack 2 again, while it plays or just after, to follow up with the other
+  attack. Each attack keeps its own cooldown." (French alike). The saved
+  `comboAssist` setting and schema are unchanged.
+
+**Where to tune it.** Which buttons alternate: `COMBO_PAIRS` in
+`js/game/combat/combo-assist.js`. When a repeat counts and what drops the
+queue: `Fighter.noteFollowUp` and `queueFollowUp`; where it is tried in
+the step: the end of the combat intents in `Fighter.update`. The queued
+tile's look: `.ah-tile.is-queued` in `css/ability-hud.css`.
+
+**Code:** `js/game/combat/combo-assist.js` (`followUpAction`),
+`js/game/combat/combat-state.js` (`finished`),
+`js/game/fighters/fighter.js` (`comboQueue`, `noteFollowUp`,
+`queueFollowUp`, `queuedFollowUp`, the dispatch in `update`, `takeHit`,
+`reset`), `js/game/combat/move-status.js` (`moveQueued`, `abilityStatus`'s
+`queued`), `js/ui/ability-hud.js`, `css/ability-hud.css`, the string
+tables.
+
+**Tests:** new `tests/systems/combo-queue.test.mjs` (every fighter: every
+phase, the attack never touched, the same result as the attack pressed on
+that step, held buttons, mashing against several kinds of target, the
+follow-up read from the attack playing, cooldowns, every early end and
+newer request, one move per step, the air, the four Combat Assist / Combo
+Assist combinations, the HUD's reading, CPUs, determinism);
+`combo-assist`'s test of a press during the attack rewritten for the new
+contract (its protections kept: never cut or restarted, never buffered,
+nothing with the setting off); `request-devices` (keyboard, touch and a
+controller, on the ground and in the air), `ability-hud` (the queued tile)
+and `settings` (the new line). Checked in headless Chromium too: Practice
+Ground with the keyboard (a double press, a held key, a manual cut, the
+Shield after a repeat, mashing; the queued HUD tile) and with touch in
+both mobile layouts in landscape (a double tap, a held button).
