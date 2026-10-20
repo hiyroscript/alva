@@ -746,13 +746,20 @@ Each fixed step, in `Fighter.update`:
    changed, the Shield is held or an earlier jump goes first
    (`jumpFirst(at)`, as for a buffered press), `tryAction(action, held,
    { at, button })` tries it: every eligibility check, Combat Assist and
-   the normal `startAttack`. Success or failure, it is gone.
+   the normal `startAttack`. If it could not start only because its own
+   cooldown runs, with no more than `REPEAT_COOLDOWN` left,
+   `holdFollowUp` puts it in the combat buffer with `hold` (that cooldown)
+   and its `move`: the buffer keeps it `attackBuffer + hold` and retries
+   it every step by its own rules, so it starts the step its cooldown
+   ends. Otherwise it is gone.
 7. The Dash, the Shield and the jump follow, unchanged: anything started
    in step 6 rules them out on that step by their existing checks.
 
 `takeHit` clears it with the player's other kept requests; `reset` (and so
-`respawn`) starts with none. Readers use `queuedFollowUp` (null unless its
-source is still playing and the fighter is in play) through
+`respawn`) starts with none. `noteFollowUp` also drops a held one
+(`bufferedAttack.hold`) on any newer request or input lock. Readers use
+`queuedFollowUp` (the queue while its source still plays, or the held
+buffer entry; null out of play) through
 `moveQueued` / `abilityStatus` in `js/game/combat/move-status.js`; nothing
 else reads or writes it. No timer, no allocation per step (one small object
 per accepted repeat), no event bus.
@@ -781,9 +788,17 @@ starts the very attack asked for. The rules are
   time, the player's own cut); before `startAttack`, `combatAssistFor`
   weighs it: a melee attack with no homing motion (`assistsAttack`: a
   homing dash's own lock-on is its approach, so it is never served,
-  whatever its range), the Shield down, its opponent in play. Already in
-  reach facing its target (`inReach`), it returns `{ direction }`: no
-  approach, the attack faces its target (`startAttack`'s `toward`).
+  whatever its range), the Shield down, its opponent in play. It measures
+  the target twice at most (`assistPlan`): first, for a target sliding
+  helplessly away on the ground (in hitstun, not held), where that slide
+  ends (`assistTarget`, a stand-in moved by `slideStop`: the hitstun
+  friction while the stun lasts, the ordinary deceleration after); if
+  that gives no plan (out of reach and no approach can get there), where
+  it is, exactly as before, so measuring ahead only ever adds an approach.
+  Already in reach facing its target (`inReach`), it returns
+  `{ direction }`: no approach, the attack faces its target
+  (`startAttack`'s `toward`). An approach records which it aims at
+  (`ahead`), and `stepCombatAssist` keeps measuring that one.
   Otherwise the art
   (`mouvment` on the ground, `midair_mouvment` in the air, where an air
   dash must also be left, with no free fall or launch), and
@@ -879,21 +894,29 @@ starts the very attack asked for. The rules are
   Energy at any level of the bar, the newest
   press winning, every cancellation, the stage, Run held (toward, away,
   turned; on the ground and in the air), follow-ups out of a Dash, a
-  hit-cancel, the player's cut and the buffer, and that no CPU ever has
-  it.
+  hit-cancel, the player's cut and the buffer, a target sliding from a hit
+  measured where its slide ends (`slideStop` against real slides, the
+  fallback to where it is), and that no CPU ever has it.
 - [`tests/systems/combo-assist.test.mjs`](../../tests/systems/combo-assist.test.mjs):
   Combo Assist both ways, ground and air, a press during the attack never
   cutting it (queuing its follow-up only with the setting on), mashing,
   Off, the buttons that never alternate, the alternate's own rules, the
   cooldown it reads, who has it, and with Combat Assist and Run held.
+- [`tests/systems/basic-strings.test.mjs`](../../tests/systems/basic-strings.test.mjs):
+  each fighter's two-hit strings from pressing a button twice, at every
+  spacing both moves reach: Attack 1 into Attack 2 up to 60 Launch Point,
+  Attack 2 into Attack 1 up to 30 (15 after a Base Launch 3 fling), and
+  Combat Assist only ever helping.
 - [`tests/systems/combo-queue.test.mjs`](../../tests/systems/combo-queue.test.mjs):
   the queued follow-up on every fighter: every phase and the last step,
   the attack playing never touched (its record, clock, clip, strikes,
   projectile and cooldown), the same result as the attack pressed on that
   step, held buttons, mashing against standing, shielding, airborne,
   high-Launch-Point and ledge targets, the follow-up read from the attack
-  really playing, cooldowns (still cooling, ending on the step, 5 s, the
-  impact freeze), every early end and newer request, one move per step,
+  really playing, cooldowns (waiting out the repeat delay, dropped past it,
+  ending on the step, 5 s, the impact freeze, three presses being three
+  attacks on every fighter), every early end and newer request, one move
+  per step,
   the air (motions, landings, airtime, free fall, a change of place), the
   four Combat Assist / Combo Assist combinations, the HUD's reading, CPUs
   and determinism.

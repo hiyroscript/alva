@@ -2416,3 +2416,91 @@ and `settings` (the new line). Checked in headless Chromium too: Practice
 Ground with the keyboard (a double press, a held key, a manual cut, the
 Shield after a repeat, mashing; the queued HUD tile) and with touch in
 both mobile layouts in landscape (a double tap, a held button).
+
+## Fighting feel: strings, follow-ups and touch
+
+Not a named update (it can become one if the owner names it). Asked for
+as four of the suggestions made after the
+[Queued Combo Assist](#queued-combo-assist) work: make the two-hit string
+land over a chosen Launch Point range, even out the mashing rhythm, show
+cooldowns on the touch buttons, and find the phantom press after a long
+touch hold. No move, cooldown, damage, Energy or movement value changed,
+and the CPU's own play is untouched (every change below is the human
+player's, or the touch interface).
+
+**What it changed.**
+
+- **Combat Assist measures a sliding target where its slide ends.** A
+  target pushed by a hit slides helplessly in hitstun; measured where it
+  was, it was still in reach as the follow-up started and slid out during
+  the startup, so the follow-up whiffed by a few units (the cause of most
+  failed strings). `slideStop` / `assistTarget` in
+  `js/game/combat/combat-assist.js` now measure such a target where its
+  slide ends (hitstun friction while the stun lasts, the ordinary
+  deceleration after; within a few units of the real stop, never short).
+  Strictly additive: when that point is out of reach and no approach can
+  get there, the target is measured where it is, as before.
+- **The chosen ranges** (default settings, every spacing where both moves
+  reach): Attack 1 then Attack 2 lands up to at least 60 Launch Point for
+  every fighter (before: as low as 15 for #0004 and 20 for #0002); Attack
+  2 then Attack 1 up to at least 30 (before: 15 for #0001), except after
+  an Attack 2 that ends in a Base Launch 3 fling meant to end the string
+  (#0005's Long Bite), which only has to land up to 15. Measured worst
+  cases now: #0001 95 / 60, #0002 70 / 35, #0003 90 / 105, #0004 75 / 35,
+  #0005 105 / 15. With Combat Assist off nothing changed (spacing is the
+  player's own); Combat Assist never makes a string worse.
+- **Mashing rhythm.** The same three presses of Attack 1 gave three
+  attacks on #0002 and #0005 but only two on #0001, #0003 and #0004, whose
+  shorter Attack 2 ends before Attack 1's 0.5 s repeat delay: the queued
+  follow-up was dropped. Now a queued follow-up whose own cooldown alone
+  holds it, with no more than the repeat delay left, waits it out in the
+  combat buffer (`Fighter.holdFollowUp`) and starts the first step it may
+  (0.2 s later on #0001, 0.1 s on #0003 and #0004), still shown as
+  queued; any newer request, a hit or input locked drops it, and a longer
+  cooldown (3 s, 5 s) still drops it at once. The pause inside a mashed
+  Attack 1 / Attack 2 cycle (the repeat delay less the shorter attack,
+  16–26 % of the time) is the universal delay's and is kept: retiming an
+  attack could only shorten it by slowing that attack, never quicken the
+  cycle.
+- **Touch buttons show the live move state** (`TouchControls.showStatus`,
+  called each frame by Quick Battle and Practice Ground): a cooldown's
+  sweep, with seconds for a 3 s or 5 s one, the repeat delay as a faint
+  sweep, a move spent for this airtime muted, and Combo Assist's queued
+  follow-up lit, read through `abilityStatus` exactly as the ability HUD
+  does. No animation; only changes are written. The rings over the
+  fighter stay on touch.
+- **One press per touch** (bug). The touch controls took a `click` with
+  no `detail` as an assistive technology's activation and pressed the
+  button again; Chromium's touch emulation sends exactly such a click
+  after every tap and long hold, so every touch button (attacks, Jump,
+  Shield, the Dash buttons, Classic's Run) pressed twice there. A click
+  within 600 ms of a pointer lifting off the controls is now that
+  pointer's own and never a second press; a real assistive activation
+  still taps. Not yet checked on a physical phone.
+
+**Where to tune it.** The slide's projection: `slideStop` (it reads the
+universal `hitstunFriction` and `deceleration`). The chosen ranges:
+`tests/systems/basic-strings.test.mjs` (and ALVA_SPEC.md 7.2.4b). The
+follow-up's wait: `holdFollowUp` (bounded by `REPEAT_COOLDOWN`). The touch
+states: `.tc-btn.is-cooling`, `.is-repeat`, `.is-spent`, `.is-queued` and
+`[data-seconds]` in `css/touch-controls.css`. The click window:
+`POINTER_CLICK_MS` in `js/ui/touch-controls.js`.
+
+**Code:** `js/game/combat/combat-assist.js` (`slideStop`,
+`assistTarget`), `js/game/fighters/fighter.js` (`combatAssistFor`,
+`assistPlan`, the approach's `ahead`, `holdFollowUp`, `queuedFollowUp`,
+`noteFollowUp`, the buffer's `hold`), `js/ui/touch-controls.js`
+(`showStatus`, `paintStatus`, `notePointerEnd`, the assistive click),
+`css/touch-controls.css`, `js/screens/battle-screen.js`,
+`js/screens/practice-screen.js`.
+
+**Tests:** new `tests/systems/basic-strings.test.mjs`; `combat-assist`
+(slideStop's math and against real slides, a sliding target approached
+where it stops, the fallback), `combo-queue` (the wait, three presses
+being three attacks on every fighter, newer requests during the wait; the
+"dropped while cooling" test rewritten for the new contract),
+`controls-ui` (one press per touch, the live move state). Checked in
+headless Chromium too: Practice Ground in both touch layouts at 844×390
+(a single tap one Jab, a double tap the Jab then Red, every button one
+press whatever the hold, the queued and cooling buttons drawn), and an
+assistive activation still pressing.

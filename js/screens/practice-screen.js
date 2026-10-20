@@ -322,6 +322,7 @@ export class PracticeGroundScreen extends Screen {
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     session.frame(dt);
     this.touch.setAirborne(!!session.player && !session.player.grounded);
+    this.touch.showStatus(session.player);
     this.hud.update(session);
     this.syncAbilityHud();
   }

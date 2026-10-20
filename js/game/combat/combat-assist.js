@@ -19,7 +19,8 @@
 // (js/game/combat/attacks.js), its opponent (body, facing, hurtboxes and
 // pushbox) and the stage collision (js/game/physics.js).
 // Outputs: assistsAttack, assistSpeed, assistRange, meleeGap, reachVector,
-// inReach, approachMove, approachClear, REACHED and ASSIST_MARGIN.
+// inReach, approachMove, approachClear, slideStop, assistTarget, REACHED and
+// ASSIST_MARGIN.
 //
 // Important constraints: pure and deterministic, from simulation data only
 // (bodies and definitions, never render positions, the DOM or a clock).
@@ -31,10 +32,15 @@
 // pull's circle) already covers its target needs no approach, and one that
 // gets one stops as soon as that reach does; but how far away an approach
 // may start is measured from the box its strike is drawn with alone, so no
-// attack's assist reaches further for its motion.
+// attack's assist reaches further for its motion. A target sliding
+// helplessly away on the ground (pushed by a hit, in hitstun) is measured
+// where that slide ends (assistTarget), so an attack started while it is
+// still in reach does not whiff once it has slid out; the approach's limit
+// (one Dash) is unchanged.
 
 import { worldBox } from './combat.js';
 import { attackReach, isMeleeAttack } from './attacks.js';
+import { hitstunDrag } from '../fighters/movement.js';
 
 // Whether attack `atk` may be served by an approach at all: a melee attack
 // (isMeleeAttack), unless it homes in on its target by itself (a `homing`
@@ -149,6 +155,40 @@ export function reachVector(fighter, box, target, direction, air = false, strike
 
 // The approach is over: the attack's own reach covers its target.
 export const REACHED = Object.freeze({ dx: 0, dy: 0, length: 0 });
+
+// How far (world units, along x) `target` has still to slide if nothing
+// stops it: a target in hitstun on the ground, not held in place, slides on
+// at the speed a hit gave it, running down at the universal hitstun
+// friction while its stun lasts (hitstunDrag) and at the ordinary ground
+// deceleration after, nothing of its own steering it. 0 for any other
+// target (standing, in the air, held, free to act). An impact freeze only
+// delays the slide, so it changes nothing here.
+export function slideStop(target) {
+  const { body, combat, movement: mv } = target;
+  const speed = Math.abs(body.vx);
+  if (!body.grounded || !(combat.stun > 0) || combat.immobilized || !speed) return 0;
+  const drag = hitstunDrag(mv, true);
+  const stun = combat.stun;
+  let distance;
+  if (!(drag > 0)) distance = speed * stun;
+  else if (speed <= drag * stun) distance = (speed * speed) / (2 * drag);
+  else distance = speed * stun - (drag * stun * stun) / 2;
+  const left = speed - drag * stun;
+  if (left > 0 && mv.deceleration > 0) distance += (left * left) / (2 * mv.deceleration);
+  return Math.sign(body.vx) * distance;
+}
+
+// `target` as Combat Assist measures it for `fighter`: itself, or, while it
+// slides away from `fighter` (slideStop), a stand-in where that slide ends:
+// the same hurtboxes, facing, pushbox and body, further along. Never a
+// target sliding toward `fighter` (it comes into reach by itself).
+export function assistTarget(fighter, target) {
+  const ahead = slideStop(target);
+  if (!ahead || Math.sign(ahead) !== Math.sign(target.body.x - fighter.body.x)) return target;
+  return {
+    body: { ...target.body, x: target.body.x + ahead }, facing: target.facing, def: target.def, hurtboxes: target.hurtboxes,
+  };
+}
 
 // Whether melee attack `atk`'s own reach (attackReach: its box, or where
 // its motion or pull takes it) already covers `target` from where

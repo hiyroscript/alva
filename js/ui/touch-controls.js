@@ -47,6 +47,15 @@
 //
 // Accessible names are translation keys (js/localization/i18n.js), marked so they
 // follow the interface language.
+//
+// Live move state (showStatus): once a frame the screens hand it Player 1's
+// fighter, and each combat button shows what the ability HUD shows on a
+// keyboard or a controller, read the same way (abilityStatus,
+// js/game/combat/move-status.js): a cooldown's sweep over its art, with its
+// seconds for a 3 s or 5 s one, the 0.5 s repeat delay as a faint sweep, a
+// move spent for this airtime muted, and Combo Assist's queued follow-up
+// lit. Paint only: it never changes what a button does, and it writes only
+// what changed.
 
 import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
@@ -54,6 +63,8 @@ import { ICONS } from './icons.js';
 import { NUMBERED_ATTACKS } from '../config.js';
 import { ABILITY_ACTIONS, abilityPresence, abilityAvailable, jumpArt, mobileAbility, mobileAbilityLabelKey } from './mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
+import { abilityGroups, abilityStatus } from '../game/combat/move-status.js';
+import { formatCooldown } from '../game/rendering/fighter-status.js';
 import {
   TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,
 } from '../core/touch-layout.js';
@@ -118,6 +129,12 @@ export function joystickDirection(x, current = null) {
 
 const END_EVENTS = ['pointerup', 'pointercancel', 'lostpointercapture'];
 
+// A click this soon (ms) after a pointer lifted off the controls is that
+// pointer's own click, whatever its `detail` (a browser may report a touch's
+// as 0, like an assistive activation's): its press was taken on pointerdown
+// and is never taken a second time (see the assistive click in build).
+const POINTER_CLICK_MS = 600;
+
 function makeButton(spec, cls) {
   const btn = el('button', {
     type: 'button',
@@ -148,6 +165,9 @@ export class TouchControls {
     this.stickFrame = null;
     this.knobOffset = { x: 0, y: 0 };
     this.mouvementPointers = new Map(); // pointerId -> mouvement button
+    // When a pointer last lifted off the controls (its event's timeStamp),
+    // to tell its own trailing click from an assistive activation.
+    this.lastPointerEnd = -Infinity;
     // Each scheme's custom layout (empty: the stylesheet's own), and where
     // the last applyLayout put every control of the scheme on show.
     this.layouts = sanitizeTouchLayouts(null);
@@ -215,6 +235,7 @@ export class TouchControls {
     this.stick.addEventListener('pointermove', (e) => this.onStickMove(e));
     for (const type of END_EVENTS) {
       this.stick.addEventListener(type, (e) => {
+        this.notePointerEnd(e);
         if (e.pointerId === this.stickPointer) this.releaseStick();
       });
     }
@@ -250,9 +271,13 @@ export class TouchControls {
     }
 
     // Assistive-technology activation (click without a pointer) = short tap.
+    // A pointer's own click is never one, even with no `detail`: it comes
+    // right after that pointer lifted (POINTER_CLICK_MS), and the press it
+    // ends was taken on pointerdown.
     this.root.addEventListener('click', (e) => {
       const b = e.target.closest('.tc-btn');
       if (!b || b.hidden || e.detail !== 0 || !this.enabled) return;
+      if (e.timeStamp - this.lastPointerEnd < POINTER_CLICK_MS) return;
       if (b._direction) {
         this.input.queueTouchMouvement(b._direction);
         return;
@@ -413,6 +438,7 @@ export class TouchControls {
   }
 
   onPointerEnd(e) {
+    this.notePointerEnd(e);
     if (!this.pointers.has(e.pointerId)) return;
     this.assign(e.pointerId, null);
   }
@@ -477,10 +503,17 @@ export class TouchControls {
   // ---- Mouvement buttons ------------------------------------------------------
 
   onMouvementEnd(e) {
+    this.notePointerEnd(e);
     const b = this.mouvementPointers.get(e.pointerId);
     if (!b) return;
     this.mouvementPointers.delete(e.pointerId);
     if (![...this.mouvementPointers.values()].includes(b)) b.classList.remove('is-pressed');
+  }
+
+  // A pointer lifted off a control: its trailing click, if any, is its own
+  // (see POINTER_CLICK_MS).
+  notePointerEnd(e) {
+    if (Number.isFinite(e.timeStamp)) this.lastPointerEnd = e.timeStamp;
   }
 
   // ---- Held actions -------------------------------------------------------------
@@ -547,7 +580,66 @@ export class TouchControls {
   setCharacter(def) {
     this.character = def;
     this.airborne = false;
+    // Each place's moves by button, for showStatus.
+    const groups = def ? abilityGroups(def) : { ground: [], air: [] };
+    this.entries = {
+      ground: new Map(groups.ground.map((e) => [e.action, e])),
+      air: new Map(groups.air.map((e) => [e.action, e])),
+    };
     this.refreshAbilities();
+    this.showStatus(null);
+  }
+
+  // Shows `fighter`'s live move state on its combat buttons (called after
+  // simulation, with Player 1's fighter; null, or a fighter that is not the
+  // one these buttons show, clears it): each button's move for the place
+  // it is in (setAirborne), read through abilityStatus as the ability HUD
+  // reads it. A button with no move there (a ground-only one in the air)
+  // keeps the look refreshAbilities gave it.
+  showStatus(fighter) {
+    const place = this.airborne ? 'air' : 'ground';
+    const own = !!fighter && !!this.character && fighter.def === this.character;
+    for (const action of ABILITY_ACTIONS) {
+      const b = this.actionButtons.get(action);
+      const entry = own && !b.hidden ? this.entries[place].get(action) : null;
+      this.paintStatus(b, entry ? abilityStatus(fighter, entry, place) : null);
+    }
+  }
+
+  // Button `b`'s state from `status` (abilityStatus, or null for none):
+  // is-cooling (a 3 s or 5 s cooldown: the sweep, --tc-progress, and its
+  // seconds, data-seconds), is-repeat (the 0.5 s repeat delay: a faint
+  // sweep), is-spent (spent for this airtime, free fall or missing art) and
+  // is-queued (Combo Assist's queued follow-up), apart from it. Only what
+  // changed is written.
+  paintStatus(b, status) {
+    const cd = status?.cooldown;
+    const state = !status ? 'ready' : status.restriction ? 'spent' : cd.cooling ? (cd.special ? 'cooling' : 'repeat') : 'ready';
+    // A button starts neutral (the stylesheet's own look), so one with
+    // nothing to show is never written to.
+    const shown = b._status ??= { state: 'ready', progress: 1, text: '', queued: false };
+    if (state !== shown.state) {
+      shown.state = state;
+      b.classList.toggle('is-cooling', state === 'cooling');
+      b.classList.toggle('is-repeat', state === 'repeat');
+      b.classList.toggle('is-spent', state === 'spent');
+    }
+    const progress = cd?.cooling ? Math.round(cd.progress * 200) / 200 : 1;
+    if (progress !== shown.progress) {
+      shown.progress = progress;
+      b.style.setProperty('--tc-progress', String(progress));
+    }
+    const text = state === 'cooling' ? formatCooldown(cd.remaining) : '';
+    if (text !== shown.text) {
+      shown.text = text;
+      if (text) b.setAttribute('data-seconds', text);
+      else b.removeAttribute('data-seconds');
+    }
+    const queued = !!status?.queued;
+    if (queued !== shown.queued) {
+      shown.queued = queued;
+      b.classList.toggle('is-queued', queued);
+    }
   }
 
   // Called after simulation. No work at all while the context is unchanged;

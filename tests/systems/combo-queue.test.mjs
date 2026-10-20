@@ -4,10 +4,13 @@
 // The attack playing is never touched (no cut, restart, replay, second
 // strike or projectile, its cooldown once); the follow-up starts on the step
 // that attack plays out in full, through the ordinary request path (its own
-// cooldown, art, airtime, Combat Assist), or not at all. Covered here: every
-// phase and the last step, the follow-up read from the attack really
-// playing, one at most, held buttons, mashing against every kind of target,
-// cooldowns, every way the attack can end early and every newer request,
+// cooldown, art, airtime, Combat Assist); still in its own repeat delay, it
+// waits that out and starts the first step it may; otherwise not at all.
+// Covered here: every phase and the last step, the follow-up read from the
+// attack really playing, one at most, held buttons, mashing against every
+// kind of target, cooldowns (the wait, and three presses being three attacks
+// on every fighter), every way the attack can end early and every newer
+// request,
 // the air (motions, landings, airtime), the four Combat Assist / Combo
 // Assist combinations, the HUD's reading of it, CPUs and determinism.
 // Shared rules: every playable fighter or a fixture, never one fighter's
@@ -273,11 +276,14 @@ test('mashing during one attack queues exactly one follow-up; a new press during
       r.tick(press(first));
       assert.equal(r.player.comboQueue?.source, follow, `${why}: a new press queues the next`);
       assert.equal(r.player.comboQueue.action, first, `${why}: the other of the pair again`);
-      // Let go now: whatever follows comes from that one queue, at most.
+      // Let go now: whatever follows comes from that one queue, at most: the
+      // queued attack, once its own repeat delay allows (holdFollowUp).
       playThrough(r);
+      const waited = r.until(() => r.player.combat.attack, {}, Math.round(0.5 / DT) + 2);
       const third = r.player.combat.attack;
-      if (third) assert.equal(third.def.id, r.player.attackFor(first), `${why}: the queued one or none`);
-      if (third) playThrough(r);
+      assert.equal(third.def.id, r.player.attackFor(first), `${why}: the queued one`);
+      assert.ok(waited * DT <= 0.5 + EPS, `${why}: never longer than its repeat delay (${waited} steps)`);
+      playThrough(r);
       quiet(r, 60, why);
     }
   }
@@ -392,7 +398,43 @@ test('only Attack 1 and Attack 2 queue: the Extra Attack and Attack 3 repeated w
 
 // ---- Group E: cooldowns ------------------------------------------------------------------------
 
-test('the follow-up still cooling as its attack ends never starts: dropped, never retried or swapped, every timer untouched', () => {
+test('one still in its repeat delay as its attack ends waits it out and starts the first step it may; every timer untouched, nothing else in its place', () => {
+  for (const c of playableCharacters()) {
+    for (const [first, second] of PAIRS) {
+      for (const wait of [2, Math.round(0.5 / DT)]) {
+        const why = `#${c.id} ${first}, ${wait} steps of cooldown left`;
+        const r = far(c);
+        const secondId = r.player.attackFor(second);
+        r.tick(press(first));
+        const rec = r.player.combat.attack;
+        r.tick(press(first));
+        assert.ok(r.player.comboQueue, `${why}: queued`);
+        // Still cooling `wait` steps after the first ends (it has n - 1 steps
+        // left to play).
+        r.player.combat.cooldowns.set(secondId, (stepsOf(rec.def) - 1 + wait) * DT);
+        const run = playThrough(r);
+        assert.ok(run.natural, why);
+        assert.equal(run.next, null, `${why}: not yet`);
+        assert.equal(r.player.comboQueue, null);
+        assert.equal(r.player.bufferedAttack?.action, second, `${why}: held for it`);
+        assert.equal(r.player.queuedFollowUp?.move, secondId, `${why}: still shown as queued`);
+        assert.equal(r.player.combat.cooldowns.get(rec.def.id), rec.def.cooldown, `${why}: the first's own, once`);
+        for (let i = 1; i < wait; i++) {
+          r.tick();
+          assert.equal(r.player.combat.attack, null, `${why}: never before its cooldown is over`);
+        }
+        r.tick();
+        assert.equal(attackOf(r.player), secondId, `${why}: the step its cooldown ends`);
+        assert.equal(r.player.combat.attack.button, first, `${why}: the button pressed for it`);
+        assert.equal(r.player.queuedFollowUp, null);
+        playThrough(r);
+        quiet(r, 60, why);
+      }
+    }
+  }
+});
+
+test('one whose cooldown outlasts the repeat delay (3 s, 5 s) is dropped as its attack ends: never retried, nothing in its place, every timer untouched', () => {
   for (const c of playableCharacters()) {
     for (const [first, second] of PAIRS) {
       const why = `#${c.id} ${first}`;
@@ -401,20 +443,75 @@ test('the follow-up still cooling as its attack ends never starts: dropped, neve
       r.tick(press(first));
       const rec = r.player.combat.attack;
       r.tick(press(first));
-      assert.ok(r.player.comboQueue, `${why}: queued`);
-      // Still cooling two steps after the first ends (it has n - 1 steps
-      // left to play).
-      const left = (stepsOf(rec.def) - 1 + 2) * DT;
-      r.player.combat.cooldowns.set(secondId, left);
+      r.player.combat.cooldowns.set(secondId, (stepsOf(rec.def) - 1) * DT + 0.6);
       const run = playThrough(r);
-      assert.ok(run.natural, why);
-      assert.equal(run.next, null, `${why}: ${secondId} cooling: nothing starts`);
+      assert.equal(run.next, null, `${why}: nothing starts`);
       assert.equal(r.player.comboQueue, null, `${why}: dropped`);
-      assert.ok(Math.abs(r.player.combat.cooldowns.get(secondId) - 2 * DT) < 1e-9, `${why}: its cooldown runs on as ever`);
+      assert.equal(r.player.bufferedAttack, null, `${why}: never held`);
+      assert.ok(Math.abs(r.player.combat.cooldowns.get(secondId) - 0.6) < 1e-9, `${why}: its cooldown runs on as ever`);
       assert.equal(r.player.combat.cooldowns.get(rec.def.id), rec.def.cooldown, `${why}: the first's own, once`);
-      assert.equal(r.player.bufferedAttack, null, `${why}: never moved to the buffer`);
       quiet(r, 60, why);
     }
+  }
+});
+
+test('three presses of Attack 1 are three attacks on every fighter, whatever its attack lengths: the third as soon as its repeat delay allows', () => {
+  for (const c of playableCharacters()) {
+    const r = far(c);
+    const a1 = r.player.attackFor('attack1');
+    const a2 = r.player.attackFor('attack2');
+    r.tick(press('attack1'));
+    r.tick();
+    r.tick(press('attack1'));
+    const second = r.player.combat.attack.def.id === a1 ? playThrough(r).next : r.player.combat.attack;
+    assert.equal(second?.def.id, a2, `#${c.id}: Attack 2 second`);
+    r.tick();
+    r.tick(press('attack1'));
+    playThrough(r);
+    const waited = r.until(() => r.player.combat.attack, {}, 60);
+    assert.equal(attackOf(r.player), a1, `#${c.id}: Attack 1 third`);
+    // It waited exactly what was left of Attack 1's repeat delay.
+    const expected = Math.max(0, Math.round((r.player.attacks[a1].cooldown - second.def.total) / DT));
+    assert.ok(Math.abs(waited - expected) <= 1, `#${c.id}: waited ${waited} steps, its cooldown left ${expected}`);
+  }
+});
+
+test('while one waits out its cooldown, any newer request replaces it, a hit drops it, and so does input locked', () => {
+  const requests = {
+    jump: press('jump'),
+    Dash: { mouvementRightPressed: true },
+    Shield: press('shield'),
+    'another attack': press('extra_attack'),
+  };
+  for (const c of playableCharacters()) {
+    const waiting = () => {
+      const r = far(c);
+      const a2 = r.player.attackFor('attack2');
+      r.tick(press('attack1'));
+      const rec = r.player.combat.attack;
+      r.tick(press('attack1'));
+      r.player.combat.cooldowns.set(a2, (stepsOf(rec.def) - 1 + 10) * DT);
+      playThrough(r);
+      assert.equal(r.player.queuedFollowUp?.move, a2, `#${c.id}: waiting`);
+      return { r, a2 };
+    };
+    for (const [name, now] of Object.entries(requests)) {
+      const { r, a2 } = waiting();
+      r.tick(now);
+      assert.equal(r.player.queuedFollowUp, null, `#${c.id} ${name}: replaced`);
+      for (let i = 0; i < 40; i++) {
+        r.tick(name === 'Shield' && i < 15 ? { shield: true } : {});
+        assert.notEqual(attackOf(r.player), a2, `#${c.id} ${name}: never comes`);
+      }
+    }
+    const hit = waiting();
+    hit.r.player.takeHit({ launchSpeed: 0 });
+    assert.equal(hit.r.player.queuedFollowUp, null, `#${c.id}: a hit drops it`);
+    const locked = waiting();
+    locked.r.player.inputLocked = true;
+    locked.r.tick();
+    assert.equal(locked.r.player.queuedFollowUp, null, `#${c.id}: input locked`);
+    for (let i = 0; i < 30; i++) assert.equal(locked.r.tick().combat.attack, null);
   }
 });
 

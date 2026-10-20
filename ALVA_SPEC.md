@@ -2565,7 +2565,19 @@ attack or a button.
   still unused (`airDashUses`), and never in free fall or while still
   flying from a launch.
 - **When.** The attack is measured against the opponent's hurtboxes where
-  they are, facing it (`reachVector`). Already in reach facing its target
+  they are, facing it (`reachVector`), or, for a target sliding helplessly
+  away from the fighter on the ground (in hitstun, pushed by a hit, nothing
+  of its own steering it), where that slide ends (`slideStop` /
+  `assistTarget`: its speed running down at the universal hitstun friction
+  while its stun lasts and at the ordinary deceleration after; a few units
+  past the real stop at most, so the strike only goes deeper): an attack
+  started while such a target is still in reach would otherwise whiff
+  once it has slid out during the startup. Measuring ahead only ever adds
+  an approach: when the slide's end is out of reach and no approach could
+  get there (further than one Dash, a wall the measurement does not know),
+  the target is measured where it is, exactly as before; a target sliding
+  toward the fighter, standing, in the air, held or free to act always is.
+  Already in reach facing its target
   (`inReach`), the attack starts at once, with no approach, turned to its
   target: one in reach behind the fighter, or with Run held away from it,
   is thrown at it, not away. On the ground only hurtboxes at the
@@ -2610,7 +2622,8 @@ attack or a button.
   dash, so a second burst never follows it before landing. Either covers
   only what is left, under ordinary physics: no hitbox, damage or
   invulnerability, never through a wall, a ceiling or its target. It is
-  measured afresh every step (the target may move), its limit of one Dash
+  measured afresh every step (the target may move; one aimed at a slide's
+  end keeps aiming there, `combatAssist.ahead`), its limit of one Dash
   (or air dash) applying to the whole approach. Once the attack reaches, it
   stops where it is (in the air, hanging there, gravity back) and the
   attack starts there by the ordinary rules (`tryAction`): its own phases,
@@ -2712,10 +2725,25 @@ nothing in them names a fighter, an attack or an animation.
   press made on the step the attack ends is a press once it is over (the
   next bullet), which resolves to the same follow-up on the same step:
   nothing is lost and nothing is doubled.
+- **Still cooling: it waits for its own repeat delay.** A follow-up that
+  cannot start as its attack ends only because its own cooldown still runs,
+  with no more than the repeat delay (`REPEAT_COOLDOWN`, 0.5 s) of it left,
+  is kept by the combat input buffer until that cooldown is over and the
+  buffer's own 0.15 s after (`Fighter.holdFollowUp`, the buffered press's
+  `hold`), so it starts the first step it may, exactly as a press made then
+  would; it is still shown as queued. So the same presses give the same
+  string on every fighter, whatever its attack lengths: Attack 1 three
+  times (the third during the Attack 2 the second queued) is three attacks
+  for every fighter, the third as soon as Attack 1's own repeat delay
+  allows (at once when Attack 2 lasts 0.5 s or longer, 0.1–0.2 s later on
+  the fighters whose Attack 2 is shorter). No timer changes for it, and
+  while it waits any newer request of the player's, a hit, input locked or
+  a change of place drops it, as the buffer's rules and the queue's say.
 - **Unavailable, or overtaken: dropped.** A follow-up that cannot start as
-  its attack ends (its cooldown still running, the fighter stunned or
-  held) is dropped: never retried, kept for later, buffered or swapped for
-  another move, and no timer changes for it. So is a queued follow-up
+  its attack ends for any other reason (a longer cooldown, 3 s or 5 s,
+  still running; the fighter stunned or held; its art; the airtime) is
+  dropped: never retried, kept for later or swapped for another move, and
+  no timer changes for it. So is a queued follow-up
   whose attack does not play out: cut by any new request, interrupted by a
   hit or a paralysis, landing-cancelled, ended by its motion (a bounce, a
   slam that lands, so the fighter leaves the place it started in) or by a
@@ -2749,7 +2777,22 @@ nothing in them names a fighter, an attack or an animation.
   its own end; neither is started, shortened, refreshed or replaced by the
   other, and nothing global is added between them. Mashing therefore
   alternates whole attacks, each played out, never faster than the
-  attacks and their cooldowns allow.
+  attacks and their cooldowns allow: each Attack 1 / Attack 2 cycle lasts
+  the longer of the two plus the 0.5 s repeat delay, with a pause of the
+  repeat delay less the shorter one (none when both last 0.5 s or more).
+  That pause is the universal delay's, kept as it is: retiming an attack
+  could only shorten it by slowing that attack down, never make the cycle
+  faster.
+- **Ranges.** The strings a player gets by pressing the same button twice
+  land on a standing target, from every spacing where both moves reach it
+  on their own, with the default settings (Combat Assist on): Attack 1
+  then Attack 2 up to at least 60 Launch Point for every fighter; Attack 2
+  then Attack 1 up to at least 30, except after an Attack 2 that ends in a
+  full launcher (Base Launch 3, a fling meant to end the string: today
+  #0005's Long Bite), which only has to land while launches are short (15).
+  Combat Assist only ever helps a string: whatever lands without it lands
+  with it. Read from each fighter's data (`tests/systems/basic-strings.test.mjs`);
+  with Combat Assist off the spacing is the player's own, as ever.
 - **With Combat Assist.** A queued melee follow-up out of reach is weighed
   by Combat Assist as it is tried (7.2.4a): its ordinary approach, never a
   longer one, no Energy, the air's air dash used up in the air; a ranged,
@@ -3671,7 +3714,9 @@ Adding one is described in
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
   timer never shows twice; the CPU, Watch Mode's fighters and a player on
-  a touch screen keep theirs. In control order, a lone ring is
+  a touch screen keep theirs (a touch player's buttons show their
+  cooldowns too, 7.4, but a thumb covers the one it presses, so the ring
+  over the fighter stays). In control order, a lone ring is
   centered, multiple rings side by side, with no slot kept for ready moves.
   The white, black-outlined ring fills clockwise from the top (`progress =
   1 - remaining / duration`). Its center is the same artwork as the touch
@@ -4088,6 +4133,19 @@ Adding one is described in
   states do no presentation work. Landing restores ground artwork. Air
   labels use localized move names. Ground-only abilities keep their ground
   artwork, dimmed and marked `aria-disabled`, with combat restrictions intact.
+  Then `TouchControls.showStatus(fighter)` paints Player 1's live move
+  state on its combat buttons, read the way the ability HUD reads it
+  (`abilityStatus`, 7.3): a cooldown darkens the art under a clockwise
+  sweep from the top (`--tc-progress`), with its seconds over it for a
+  3 s or 5 s one (`data-seconds`, `formatCooldown`) and only a faint sweep
+  for the 0.5 s repeat delay; a move spent for this airtime (or in free
+  fall, or missing its art) is muted (dashed, dimmed: `is-spent`); Combo
+  Assist's queued follow-up has a steady white ring (`is-queued`, 7.2.4b),
+  its cooldown still showing. Nothing of it moves by itself, so reduced
+  motion has nothing to stop; only what changed is written, and a button
+  with nothing to show is never written to. It never changes what a
+  button does. The rings over Player 1's fighter (7.3) stay on a touch
+  screen, where a thumb covers the button it presses.
   `TouchControls.setCharacter(def)` applies them in place, without
   rebuilding anything: the same buttons, and the same image in each, only
   its source changed (`TouchControls.showArt`). Quick Battle calls it with
@@ -4118,6 +4176,12 @@ Adding one is described in
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular buttons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
+  A press is the pointer going down on a button. A `click` with no
+  `detail` and no pointer before it is an assistive technology's
+  activation, a short tap (or one Dash for a Dash button); a click within
+  600 ms of a pointer lifting off the controls is that pointer's own
+  (a browser may report a touch's click with no `detail` too, a long hold's
+  included) and is never a second press.
   A reserved button (a combat button its fighter maps to null) uses a
   dashed outline and never shows nagging alerts; the fighter's own
   moves and Shield are solid. A button for a move the fighter does not

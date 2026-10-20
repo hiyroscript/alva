@@ -55,6 +55,9 @@ html.is-touch .touch-controls[hidden] { display: none; }
   font-size: calc(var(--tc) * 0.42);
   pointer-events: auto;
   touch-action: none;
+  /* Its own stacking context: the live state drawn over its art stays
+     inside it. */
+  isolation: isolate;
   transition: transform 90ms ease-out, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 .tc-btn .icon { stroke-width: 2.8; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
@@ -102,6 +105,44 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-btn.is-pressed .icon, .tc-btn.is-pressed .tc-sprite-icon { opacity: 1; }
 .tc-act { position: absolute; }
 .tc-btn.is-unavailable { opacity: 0.4; border-style: dashed; }
+/* Live move state (TouchControls.showStatus), read from the fighter each
+   frame as the ability HUD's is: a cooldown's sweep over the art,
+   recovering clockwise from the top (--tc-progress, 0 as it starts, 1
+   ready), with its seconds (data-seconds) for a 3 s or 5 s one; the 0.5 s
+   repeat delay only a faint sweep; a move spent for this airtime muted like
+   an unavailable one; Combo Assist's queued follow-up a steady lit ring.
+   Nothing moves by itself, so reduced motion has nothing to stop. */
+.tc-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: conic-gradient(rgba(5, 6, 8, 0) 0 calc(var(--tc-progress, 1) * 360deg), rgba(5, 6, 8, 0.64) 0);
+}
+.tc-btn.is-cooling::after { opacity: 1; }
+.tc-btn.is-repeat::after { opacity: 0.5; }
+.tc-btn[data-seconds]::before {
+  content: attr(data-seconds);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: calc(var(--tc) * 0.3);
+  font-variant-numeric: tabular-nums;
+  color: var(--white);
+  text-shadow: 0 0 2px #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+  pointer-events: none;
+}
+.tc-btn.is-spent { opacity: 0.4; border-style: dashed; }
+.tc-btn.is-queued {
+  border-color: var(--white);
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
 .tc-jump { right: 0; bottom: 0; }
 .tc-shield { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
 /* Numbered attack buttons, by the slot TouchControls.setCharacter gives the

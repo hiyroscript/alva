@@ -22,7 +22,7 @@ import { readMoveset } from '../../js/game/ai/moveset.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { DEFLECT_ENERGY_COST, DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 import { isMeleeAttack, isRangedAttack, attackReach } from '../../js/game/combat/attacks.js';
-import { assistsAttack, assistRange, meleeGap, ASSIST_MARGIN } from '../../js/game/combat/combat-assist.js';
+import { assistsAttack, assistRange, meleeGap, ASSIST_MARGIN, slideStop, assistTarget } from '../../js/game/combat/combat-assist.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../../js/game/combat/summon.js';
 import { applyPulls } from '../../js/game/combat/pull.js';
@@ -1513,5 +1513,114 @@ test('Combat Assist ignores and never starts Dash timers, but completion still c
     assert.equal(f.combat.attack, null, 'no attack through cooldown');
     assert.equal(f.bufferedAttack, null, 'no delayed attack either');
     assert.equal(f.combat.movementCooldowns.remaining('mouvment'), before);
+  }
+});
+
+// ---- A target sliding from a hit ------------------------------------------------------------------
+
+// Sets the rig's foe sliding helplessly at `vx` (in hitstun for `stun`
+// seconds), on the ground where it stands.
+function slide(r, vx, stun = 0.4) {
+  r.foe.combat.stun = stun;
+  r.foe.body.vx = vx;
+}
+
+test('slideStop: how far a target in hitstun still slides on the ground, and nothing for any other target', () => {
+  const r = rig({ gap: 300 });
+  assert.equal(slideStop(r.foe), 0, 'standing');
+  slide(r, 400);
+  const drag = MV.hitstunFriction;
+  assert.ok(Math.abs(slideStop(r.foe) - (400 * 400) / (2 * drag)) < 1e-9, 'stops within its stun: v² / 2 x hitstun friction');
+  slide(r, -400);
+  assert.ok(slideStop(r.foe) < 0, 'either way');
+  // Its stun over before it stops: the rest at the ordinary deceleration.
+  slide(r, 900, 0.1);
+  const left = 900 - drag * 0.1;
+  const expected = 900 * 0.1 - (drag * 0.01) / 2 + (left * left) / (2 * MV.deceleration);
+  assert.ok(Math.abs(slideStop(r.foe) - expected) < 1e-9, 'piecewise past its stun');
+  // Held, airborne, or free to act: measured where it is.
+  slide(r, 400);
+  r.foe.combat.paralysis = 0.5;
+  assert.equal(slideStop(r.foe), 0, 'held in place');
+  r.foe.combat.paralysis = 0;
+  r.foe.body.grounded = false;
+  assert.equal(slideStop(r.foe), 0, 'in the air');
+  r.foe.body.grounded = true;
+  r.foe.combat.stun = 0;
+  assert.equal(slideStop(r.foe), 0, 'free to act');
+});
+
+test('slideStop matches where a real hit\'s slide ends, for every fighter, never short of it and only a few units past (the steps\' sums)', () => {
+  for (const c of playableCharacters()) {
+    for (const lp of [0, 20, 40, 80]) {
+      const r = rig({ character: c, gap: 20, assist: false });
+      r.player.controller.comboAssist = false;
+      r.foe.combat.launchPoint = lp;
+      r.tick(press('attack1'));
+      r.until(() => r.foe.combat.stun > 0 && r.foe.combat.hitstop <= 0 && Math.abs(r.foe.body.vx) > 0, {}, 60);
+      const predicted = r.foe.body.x + slideStop(r.foe);
+      r.until(() => r.foe.body.vx === 0);
+      const error = predicted - r.foe.body.x;
+      assert.ok(error > -0.5 && error < 10, `#${c.id} at ${lp}: ${error.toFixed(2)} units`);
+    }
+  }
+});
+
+test('a target sliding out of reach is approached where its slide ends: the attack lands where measuring it where it is would whiff', () => {
+  let served = 0;
+  for (const c of playableCharacters()) {
+    for (const { action, id } of groundMelee(c)) {
+      const why = `#${c.id} ${id}`;
+      // In reach by 6 units as pressed, sliding 28 units away.
+      const make = (assist) => {
+        const r = rig({ character: c, gap: 400, assist });
+        r.player.controller.comboAssist = false;
+        placeFoe(r, r.player.attacks[id], -6);
+        slide(r, 300);
+        return r;
+      };
+      const r = make(true);
+      const mark = assistTarget(r.player, r.foe);
+      assert.notEqual(mark, r.foe, `${why}: measured ahead`);
+      assert.ok(Math.abs(mark.body.x - r.foe.body.x - slideStop(r.foe)) < 1e-9);
+      r.tick(press(action));
+      const assist = r.player.combatAssist;
+      if (!assist) continue; // reaches the slide's end by itself (a long box)
+      served++;
+      assert.equal(assist.ahead, true, `${why}: aimed where the slide ends`);
+      r.until(() => r.player.combat.attack?.def.id === id, {}, 60);
+      r.until(() => !r.player.combat.attack, {}, 120);
+      assert.ok(r.events.some((e) => e.attacker === r.player && e.move === id), `${why}: it lands`);
+      assert.equal(r.player.combat.energy, 100, `${why}: no Energy, as ever`);
+    }
+  }
+  assert.ok(served >= 5, `approaches toward a slide's end: ${served}`);
+});
+
+test('measuring ahead only ever adds an approach: a slide past one Dash, toward the player or a standing target are measured as ever', () => {
+  for (const c of playableCharacters()) {
+    const [{ action, id }] = groundMelee(c);
+    // Toward the player: measured where it is.
+    const toward = rig({ character: c, gap: 400 });
+    placeFoe(toward, toward.player.attacks[id], 40);
+    slide(toward, -300);
+    assert.equal(assistTarget(toward.player, toward.foe), toward.foe, `#${c.id}: sliding toward it`);
+    // Too fast to catch within a Dash, out of reach now: the approach goes
+    // for where it is, exactly as before.
+    const far = rig({ character: c, gap: 400 });
+    far.player.controller.comboAssist = false;
+    placeFoe(far, far.player.attacks[id], 40);
+    slide(far, 2400);
+    far.tick(press(action));
+    assert.ok(far.player.combatAssist, `#${c.id}: still an approach`);
+    assert.equal(far.player.combatAssist.ahead, false, `#${c.id}: aimed where it is`);
+    // Too fast, but in reach now: thrown at it at once, as before.
+    const near = rig({ character: c, gap: 400 });
+    near.player.controller.comboAssist = false;
+    placeFoe(near, near.player.attacks[id], -6);
+    slide(near, 2400);
+    near.tick(press(action));
+    assert.equal(near.player.combatAssist, null, `#${c.id}: no approach`);
+    assert.equal(near.player.combat.attack?.def.id, id, `#${c.id}: at once`);
   }
 });

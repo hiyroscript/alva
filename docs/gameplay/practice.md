@@ -40,7 +40,8 @@ unavailable, with Back to Home.
   and air rows on a wheel, cooldowns read from the fighter, Combo
   Assist's queued follow-up lit. The Practice
   menu and its rosters fade it out; Change Fighter replaces its whole
-  moveset at once.
+  moveset at once. On a touch screen the touch buttons show the same
+  cooldowns and queued follow-up instead.
 - **Change Fighter** opens the full roster as a large glass dialog over the
   paused stage. It is the same roster component as Select Fighter
   (`js/ui/fighter-roster.js`). Confirming swaps the fighter in place at the

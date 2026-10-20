@@ -354,6 +354,7 @@ export class BattleScreen extends Screen {
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     battle.frame(dt);
     this.touch.setAirborne(!!battle.primary && !battle.primary.grounded);
+    this.touch.showStatus(battle.primary);
     this.hud.update(battle);
     this.syncAbilityHud();
     // Handled after the frame rather than from inside the simulation step, so
@@ -454,6 +455,7 @@ export class BattleScreen extends Screen {
     if (!this.battle) return;
     this.battle.restart();
     this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
+    this.touch.showStatus(this.battle.primary);
     this.hud.update(this.battle);
     this.setBanner(null);
     this.hideResult();
@@ -531,6 +533,7 @@ export class BattleScreen extends Screen {
     this.hideResult();
     this.battle.restart();
     this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
+    this.touch.showStatus(this.battle.primary);
     this.hud.update(this.battle);
     this.syncAbilityHud();
     this.paused = false;

@@ -104,6 +104,38 @@ show falls back to a neutral glyph with its name and input unchanged.
 Presentation never changes a button's codename or what it sends. In the
 air, ground-only abilities stay visible but dimmed (`aria-disabled`).
 
+### Touch controls' live move state
+
+After each frame the screens call `TouchControls.showStatus(fighter)` with
+Player 1's fighter (`BattleScreen.update`, `restart`, `rematch`;
+`PracticeGroundScreen.update`), right after `setAirborne`. Each combat
+button's move for the current place is read through `abilityStatus`
+exactly as the ability HUD reads it ([below](#the-ability-hud)) and
+painted on the button itself, with no element of its own:
+
+- `is-cooling`: a 3 s or 5 s cooldown, a dark sweep over the art
+  recovering clockwise from the top (`--tc-progress`, the button's
+  `::after`) and its seconds (`data-seconds`, drawn by its `::before`);
+- `is-repeat`: the 0.5 s repeat delay, the same sweep, fainter, no number;
+- `is-spent`: spent for this airtime, free fall or missing art (dashed,
+  dimmed), apart from `is-unavailable` (a ground-only move in the air);
+- `is-queued`: Combo Assist's queued follow-up, a steady white ring, with
+  any cooldown still showing.
+
+Only what changed is written (each button caches what it shows), and a
+button with nothing to show is never written to; nothing animates. Another
+fighter's state, or none, clears it, and `setCharacter` starts clean. The
+rings over Player 1's fighter stay on a touch screen, where a thumb covers
+the button it presses.
+
+**One press per touch.** A press is the pointer going down on a button. A
+`click` with no `detail` is an assistive technology's activation (a short
+tap, or one Dash), except within `POINTER_CLICK_MS` (600 ms) of a pointer
+lifting off the controls (`notePointerEnd`): that click is the pointer's
+own trailing one, which a browser may report with no `detail` (Chromium's
+touch emulation does for every tap and long hold), and counting it would
+press the button a second time.
+
 **Custom layouts.** Settings → Controls → Customize touch controls opens
 the editor over a still battle screen: every control can be moved and
 resized (70 % to 180 %), by pointer, keyboard or gamepad, and all five
@@ -186,10 +218,11 @@ interface, and nothing about them changes.
   `Fighter.queuedFollowUp`): the tile of the move that follows the attack
   in progress, in the row of its place, gets `is-queued` (a steady
   brighter edge and inner ring, no motion) and "queued next" in its
-  accessible name, for as long as it waits. It is apart from the state
-  above, so a cooling move that is queued still shows its sweep. The touch
-  controls show no live move state, so on a touch screen the queue has no
-  marker: the attack that follows is the feedback.
+  accessible name, for as long as it waits (its own repeat delay included,
+  [combat](combat.md#combo-assists-queued-follow-up)). It is apart from the
+  state above, so a cooling move that is queued still shows its sweep. The
+  touch controls show the same states on their own buttons
+  ([below](#touch-controls-live-move-state)).
 - **Screens.** `BattleScreen.syncAbilityHud` and
   `PracticeGroundScreen.syncAbilityHud` show it for Player 1 after each
   frame (`AbilityHUD.show`), hide it at a result and in Watch Mode, and
@@ -502,7 +535,10 @@ saved.
 
 - [`tests/interface/controls-ui.test.mjs`](../../tests/interface/controls-ui.test.mjs):
   both layouts, the art on every button for both fighters, fallbacks, names
-  in both languages, multi-touch.
+  in both languages, multi-touch, one press per touch (a pointer's own
+  trailing click never a second one; assistive activation kept), and the
+  live move state (cooldowns, the repeat delay, a spent move, the queued
+  follow-up; nothing written when nothing changed).
 - [`tests/interface/touch-layout.test.mjs`](../../tests/interface/touch-layout.test.mjs):
   custom layouts and the editor.
 - [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs):
