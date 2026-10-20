@@ -415,7 +415,10 @@ Each fighter's own moves are authored for it in its definition
 (`controller.layout`, see [adding characters](../characters/adding-characters.md#controller-layout)),
 one input a move, no combination and no direction held with a button,
 chosen for what each move looks like and how it is used, never its attack
-number. One language runs through them all: Square / X is the quick strike
+number. These are the **comfort rules**, strict for every fighter now and
+to come ([the rules and why](../characters/adding-characters.md#the-comfort-rules-strict)):
+the registry refuses a layout that breaks a checkable one
+(`comfortProblems`), and a layout is redesigned, never a rule relaxed. One language runs through them all: Square / X is the quick strike
 on the ground and in the air, Triangle / Y and Circle / B the other
 everyday strikes (a string rolls left to right across them), R2 / RT sends
 the ranged move, L2 / LT is the Special, and the right stick holds the
@@ -442,11 +445,11 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0005 air | Claw Rake | Snapping Jaws | Floating Hands | | | |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
-free face buttons, the triggers, the right stick, then the D-pad and the
-stick clicks, one input a move), flagged in the editor as not designed yet;
-a fighter's layout may never retune the universal actions, and a
-registered fighter whose layout is incomplete, invalid or conflicting (a
-warning included) never loads (`assertControllerLayout`).
+comfortable inputs in order, one input a move), flagged in the editor as
+not designed yet; a fighter's layout may never retune the universal
+actions, and a registered fighter whose layout is incomplete, invalid,
+uncomfortable (a comfort rule broken) or conflicting (a warning included)
+never loads (`assertControllerLayout`).
 
 ### Customizing
 

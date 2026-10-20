@@ -2630,3 +2630,41 @@ guarding, #0002's Spin Attack on Circle and its right-stick Blue Tornado
 and Bounce Attack, #0001's Hollow Purple only when pushed forward, and the
 HUD's arrow turning with the fighter. Not yet checked on physical
 controllers.
+
+## Controller comfort rules made strict
+
+Not a named update. Asked for by the owner after the layout redesign above:
+the comfort of the recommended controller layout is a strict rule for
+every fighter, on the roster now and added later, never a preference.
+
+**What it changed.**
+
+- **Written down as a rule** where it governs: `CLAUDE.md`, ALVA_SPEC.md
+  7.4a, [adding characters](./docs/characters/adding-characters.md#the-comfort-rules-strict)
+  (the ten rules and why each exists), the characters index and the input
+  guide. A layout that breaks a rule is redesigned, never the rule relaxed,
+  and the universal inputs are never retuned for one fighter.
+- **Enforced as the registry loads** (`comfortProblems` in
+  `js/data/controller-profiles.js`, run by `controllerLayoutProblems` and
+  so by `assertControllerLayout`): one input a move (no button held first,
+  no direction held with a button, no hold); only the comfortable inputs
+  (`COMFORT_INPUTS`: Square, Triangle, Circle, R2, L2, the right stick up,
+  down or forward); Square never empty on the ground or in the air; a
+  plunge only on the right stick down and a free-fall move only on the right
+  stick; in the air the right stick up only for a move that rises and down
+  only for one that plunges. A definition that breaks one never loads.
+  The rules a machine cannot judge (input by what the player sees, string
+  follow-ups on the face, R2 ranged and L2 Special, the right stick on the
+  ground only for a visible direction, alike moves sharing an input) are
+  listed as just as strict, for review.
+- **The fallback** for a fighter with no designed layout now uses only the
+  comfortable inputs (no D-pad, stick clicks or right stick back).
+
+All five fighters already keep every rule: no layout changed.
+
+**Where to tune it.** Nowhere, on purpose: `COMFORT_INPUTS` and
+`comfortProblems` in `js/data/controller-profiles.js` are the rule.
+
+**Tests:** `controller-profiles` (every rule refused, for the roster's
+fighters and a fighter to come; every playable fighter keeps them all; the
+registry runs them).
