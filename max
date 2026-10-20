@@ -1,1721 +1,990 @@
-ALVA — COMPREHENSIVE COMBAT RESPONSIVENESS, COMBO ASSIST & FIGHTING EXPERIENCE UPDATE
+ALVA — Implement New Stage: Jökull
 
-YOUR ROLE
+Objective
 
-You are a senior fighting-game combat designer, gameplay systems engineer, JavaScript developer, and quality-assurance specialist working directly on Alva, a browser-based 2D sprite platform-fighting game.
+Implement a complete, fully playable fifth stage named Jökull in the existing Alva game.
 
-Repository: https://github.com/hiyroscript/alva
+Repository: hiyroscript/alva
 
-Your assignment is to implement a substantial, carefully designed improvement to Alva’s human-player fighting experience, building on its existing systems rather than replacing them.
+Jökull is a frozen, snow-covered arena built from one enormous glacier-like block of ice. Its defining mechanic is that the apparent single platform actually consists of three perfectly connected sections.
 
-The central goal is:
+The centre section is permanently indestructible. The left and right sections independently accumulate structural damage whenever fighters land on or newly enter them. After approximately 15 qualifying landings per section, that section dramatically fractures, breaks away, and falls into the abyss permanently for the remainder of the match.
 
-Make fighting in Alva more responsive, intuitive, satisfying, and beginner-friendly, without sacrificing the skill, commitment, character identity, or mechanical depth that already exist.
+The stage also features a 25% random blizzard event, creating a temporary whiteout that significantly reduces visibility.
 
-This must be a real, production-quality code change. Do not merely describe a possible solution.
+Both the destructible ice sections and blizzards are official stage hazards.
 
-Study the repository, understand its rules, implement the improvements, update documentation, expand automated tests, and validate the resulting gameplay.
-
-⸻
-
-PART 1 — PROJECT CONTEXT
-
-1. Understand what Alva actually is
-
-Alva is a sprite-based platform fighter built using:
-
-* Vanilla JavaScript ES modules.
-* HTML and CSS.
-* Canvas 2D.
-* A fixed-step simulation running at 60 Hz.
-* Character-specific sprite animations and data-driven abilities.
-* Shared systems for movement, combat, hit resolution, cooldowns, input, defense, and player assists.
-
-There are no frameworks, build tools, or npm dependencies.
-
-Alva currently contains five playable fighters, #0001 through #0005, with distinct move sets and mechanics.
-
-It is a platform fighter, not a conventional health-bar fighter. Every hit adds to a fighter’s Launch Point, which influences subsequent launch strength. Fighters score by knocking opponents into the Void.
-
-Maintain that identity.
-
-Do not introduce traditional health bars, arbitrary damage systems, automatic infinite combos, or movement mechanics from unrelated fighting games.
-
-2. Inspect the repository before coding
-
-Read the current versions of the following authoritative resources.
-
-Product and architecture
-
-* README.md
-* ALVA_SPEC.md
-* UPDATES.md
-* CLAUDE.md
-* codename_rule
-* docs/architecture/overview.md
-* docs/architecture/character-system.md
-* docs/architecture/module-responsibilities.md
-* docs/development/conventions.md
-* docs/development/testing.md
-
-Important: character_rule is protected. Do not modify, move, rename, reformat, or overwrite it.
-
-Combat and movement documentation
-
-* docs/systems/combat.md
-* docs/systems/movement.md
-* docs/systems/input.md
-* docs/systems/defense.md
-* docs/systems/energy.md
-* docs/systems/launch.md
-* docs/systems/rendering.md
-* docs/gameplay/practice.md
-
-Core implementation
-
-* js/game/fighters/fighter.js
-* js/game/fighters/fighter-controller.js
-* js/game/fighters/movement.js
-* js/game/combat/combat-state.js
-* js/game/combat/combat.js
-* js/game/combat/attacks.js
-* js/game/combat/combo-assist.js
-* js/game/combat/combat-assist.js
-* js/game/combat/move-status.js
-* js/data/cooldowns.js
-* js/data/movement.js
-* js/data/loadout.js
-* js/game/rendering/sprite-animator.js
-
-Input, controls and interface
-
-* js/core/input-manager.js
-* js/core/controller-resolver.js
-* js/core/settings.js
-* js/data/controller-profiles.js
-* js/ui/ability-hud.js
-* js/ui/touch-controls.js
-* js/ui/settings-dialog.js
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-
-Game integration
-
-* js/game/battle.js
-* js/game/practice.js
-* js/game/arena.js
-* js/config.js
-
-Inspect every playable fighter’s definition under js/data/characters/ and the relevant character specifications under docs/characters/.
-
-Understand how each fighter’s Attack 1 and Attack 2 behave on the ground and in mid-air.
-
-Study the existing tests, particularly:
-
-* tests/systems/combo-assist.test.mjs
-* tests/systems/combat-assist.test.mjs
-* tests/systems/move-cancel.test.mjs
-* tests/systems/combo.test.mjs
-* tests/systems/request-devices.test.mjs
-* tests/systems/controller-input.test.mjs
-* tests/systems/cooldown-policy.test.mjs
-* tests/systems/movement.test.mjs
-* tests/systems/momentum.test.mjs
-* tests/systems/energy.test.mjs
-* tests/fighters/0001/combos-0001.test.mjs
-
-Also inspect relevant integration and interface tests.
-
-Do not assume an older description remains accurate. Start by checking the current branch HEAD and any changes introduced since the repository version referenced by this request.
-
-3. Preserve recently completed CPU work
-
-The earlier problem of CPU opponents being excessively strong has already been addressed.
-
-The repository has recently undergone significant CPU Intelligence improvements.
-
-This assignment is not another CPU difficulty or intelligence overhaul.
-
-Do not:
-
-* Increase or decrease CPU intelligence.
-* Rewrite CPU decision-making.
-* Change difficulty-specific reaction times.
-* Change CPU combo reliability.
-* Make CPUs artificially miss attacks.
-* Retune Easy, Medium, Hard, or Brutal.
-* Change CPU movement decisions to compensate for player changes.
-* Alter damage or cooldowns to make the CPU easier.
-
-Preserve the current CPU behavior.
-
-Player-assist functionality should remain exclusive to human-controlled fighters unless the existing system explicitly states otherwise.
-
-Run existing CPU regression tests to ensure nothing has unintentionally changed.
+This must be a fully implemented stage, not a mockup, prototype, or visual-only addition.
 
 ⸻
 
-PART 2 — THE PROBLEM WE ARE SOLVING
+1. Inspect and follow Alva’s architecture
 
-4. Current input behavior
+Before implementing anything, review the current repository and understand how these systems interact:
 
-Alva has several independent combat timing systems.
+File	Purpose
+js/data/maps.js	Stage definitions, geometry, spawn points, bounds and traits
+js/stages/index.js	Theme registration
+js/stages/stage-theme.js	Shared stage-rendering interface
+js/stages/perspective.js	Shared pseudo-3D projection
+js/stages/desert-theme.js	Yerma’s solid foundation and surface rendering
+js/stages/city-theme.js	Sol-Noir’s solid rooftop and foundation
+js/stages/asperitas-theme.js	Animated platform-hazard presentation
+js/stages/adamaris-theme.js	Environmental effects and live hazard rendering
+js/game/physics.js	StageCollision, surfaces, grounding, landing and collision
+js/game/arena.js	Fixed-step update and rendering lifecycle
+js/game/platform-hazards.js	Dynamic platform controller patterns
+js/game/stage-hazards.js	Environmental hazard controllers
+js/data/stage-hazards.js	Environmental hazard configuration
+js/game/ai/cpu-intelligence/stage-model.js	CPU understanding of stage geometry and hazards
+js/ui/stage-preview.js	Animated and static stage previews
+js/game/battle.js	Battle lifecycle and restart logic
+js/localization/strings/en.js and fr.js	Localization
 
-Ordinary input buffer
+Also review ALVA_SPEC.md, docs/gameplay/stages.md, and the relevant existing tests.
 
-The universal attack input buffer is currently approximately 0.15 seconds.
+Use the established architecture and naming conventions. Do not create a separate physics engine, rendering pipeline, or standalone minigame.
 
-It remembers an eligible attack press that cannot execute immediately and tries it again until it becomes valid or expires.
+Maintain compatibility with Quick Battle, Watch Mode, Random Stage, Regular Play, rematches, and existing fighters.
 
-This is not a mandatory delay between attacks.
+2. Stage identity and registration
 
-Repeat cooldown
+Register Jökull as the fifth playable stage.
 
-Ordinary attacks have a universal 0.5-second repeat cooldown, unless the move qualifies for a longer cooldown under the existing policy.
+* Internal ID: jokull
+* Display name: Jökull
+* Theme ID: jokull
+* Roster position: slot 05
+* Name must preserve the accented ö.
+* Existing stages must remain in their current order and retain their existing IDs.
 
-This cooldown starts when the attack finishes, is canceled, or is interrupted.
+Suggested stage tagline:
 
-It is a per-move cooldown, not a global delay between different moves.
+“A frozen kingdom on the verge of collapse.”
 
-Do not change its fundamental semantics.
+Suggested description:
 
-Longer ability cooldowns
+“An immense glacier suspended above an endless frozen abyss. Its three ice sections appear united, but the outer edges fracture under repeated landings. Beneath swirling snow and sudden blizzards, every step brings the ice closer to breaking.”
 
-The existing policy also provides:
+Stage traits should accurately communicate:
 
-* 3 seconds for exceptional abilities and effects.
-* 5 seconds for qualifying 10-damage moves.
+* Terrain: Frozen glacier
+* Platforms: Three connected ice sections
+* Hazards: Collapsing ice and blizzards
+* Obstacles: None
+* Light: Polar daylight
 
-Preserve the precise policy in js/data/cooldowns.js, including its existing treatment of healing, paralysis, charm, float, fear and other effects.
+Add complete English and French localization for the new stage’s name, tagline, and trait values.
 
-Manual player cancellation
+The existing stage-selection system uses the MAPS registry and fills its 24-slot roster automatically. Integrate with that system rather than hardcoding an additional selection screen.
 
-A human player can deliberately interrupt an attack by requesting a different valid action.
+3. Core stage geometry — one platform, three sections
 
-The existing engine checks whether that request can start before ending the previous attack.
+This is the most important requirement.
 
-This is intentional and should remain available to skilled players.
+At the beginning of every match, the arena must look and play like one enormous uninterrupted block of ice.
 
-The core beginner problem
+Conceptually:
 
-Consider these inputs:
+         ONE CONTINUOUS WALKABLE ICE SURFACE
+  _______________________________________________
+ |               |                 |             |
+ |               |                 |             |
+ |   LEFT ICE    |   CENTRE ICE    |  RIGHT ICE  |
+ |   BREAKABLE   |  INDESTRUCTIBLE |  BREAKABLE  |
+ |               |                 |             |
+ |_______________|_________________|_____________|
+       ICE              ICE             ICE
+    FOUNDATION       FOUNDATION      FOUNDATION
 
-Attack 1 → Attack 2
+The vertical divisions in this diagram represent internal boundaries for implementation. They must not look like open gaps, separate floating platforms, or large visible seams before damage begins.
 
-This is a different move request. It follows Alva’s normal action and cancellation rules.
+Initial appearance
 
-Attack 1 → Attack 1
+All three sections must:
 
-Currently, if Attack 1 is still playing, the repeated input gets ignored.
+* Be physically adjacent without horizontal gaps.
+* Share exactly the same walkable top elevation.
+* Have matching surface textures and ice thickness.
+* Form a visually continuous top, front face and foundation.
+* Permit seamless walking, running, dashing, jumping, shielding and combat across their joins.
+* Use Alva’s existing one-point perspective.
+* Have no artificial walls, bumps or collision barriers at their internal boundaries.
 
-Ignoring it prevents a serious problem: immediately restarting Attack 1 could terminate the ongoing animation and create unexpected combat behavior.
+The stage must look like a massive frozen landmass, not three small floating rectangles placed side by side.
 
-However, completely discarding that press is also unfriendly.
+Foundation
 
-A beginner often expects that pressing the button twice means:
+Follow the visual principles of Yerma and Sol-Noir.
 
-1. Perform the first attack.
-2. Perform the next attack as soon as possible.
+Jökull must have a substantial visible foundation extending downward beneath the playable ice surface.
 
-The player should not have to understand frame-perfect animation timing just to execute a basic two-attack sequence.
+This foundation should look like a colossal glacier: layered blue-white ice, deep turquoise frozen strata, trapped bubbles, crevasses and darker ancient ice beneath the surface.
 
-We need to retain the animation-restart protection while removing unnecessary lost inputs.
+Unlike Adamaris’s flat continuous ground, the entire ice platform should visibly stand above an open frozen abyss.
 
-⸻
+Each outer section must have its own detachable foundation. When that section collapses, its complete volume breaks away, not just the thin walkable surface.
 
-PART 3 — PRIMARY FEATURE: QUEUED COMBO ASSIST
+Geometry and sizing
 
-5. Expand the existing Combo Assist
+Use the existing stages as the reference for combat scale.
 
-Alva already has Combo Assist, enabled by default for human players and independently configurable from Combat Assist.
+Suggested initial proportions:
 
-Its current basic behavior is:
+* Centre: approximately 60–65% of total initial platform width.
+* Left: approximately 17–20%.
+* Right: approximately 17–20%.
+* All sections share one exact surface height.
+* Spawn both fighters safely on the indestructible centre.
 
-* Attack 1 pressed again after Attack 1 finishes, while its cooldown runs, can become Attack 2.
-* Attack 2 pressed again after Attack 2 finishes, while its cooldown runs, can become Attack 1.
+The exact world coordinates should be tuned to Alva’s existing jump, Dash, recovery, camera and Void rules.
 
-Extend that system so that a repeat press made while the original attack is still playing can schedule the alternate attack to begin once the original animation finishes naturally.
+Important technical distinction: Do not set Jökull to ground: { type: 'continuous' }.
 
-Required example
+In Alva, that setting creates uninterrupted ground beyond the Void. It would leave invisible or unintended support after the glacier wings disappear.
 
-Player presses Attack 1.
+Instead, implement a composite finite stage whose initial footprint contains three contiguous, independently collidable solid sections.
 
-Attack 1 starts.
+The map’s overall combat bounds and Void calculations should still account for the full initial footprint, including both side sections.
 
-Before Attack 1 finishes, the player releases Attack 1 and presses it again.
+If required, introduce a general-purpose composite-floor or destructible-solid extension to StageCollision, preserving every existing stage’s behaviour.
 
-Alva recognizes that the player wants a follow-up.
+4. Structural rules for the three sections
 
-Attack 1 continues playing without restarting, skipping frames, changing its recovery, or being canceled.
+Centre section
 
-When Attack 1 finishes naturally, the game attempts to execute Attack 2.
+The centre is permanent and indestructible.
 
-If Attack 2 is eligible, it begins through the normal attack-start pathway.
+It must:
 
-If Attack 2 is ineligible, the queued request is discarded safely.
+* Never take structural damage.
+* Never crack from gameplay impacts.
+* Never lose collision.
+* Never fall.
+* Never disappear during blizzards.
+* Remain the same size and position throughout the match.
+* Always serve as stable footing and a recovery destination.
 
-The same behavior must work in reverse: Attack 2 → Attack 2 queues Attack 1.
+The centre can have purely decorative ancient ice patterns, but never damage-state cracks that imply it will collapse.
 
-6. The queue must represent player intent, not an animation restart
+Left section
 
-Treat a repeated press as a request for a future action.
+The left section has its own persistent structural integrity.
 
-Do not treat it as an immediate command to replay the current move.
+* Starts fully intact.
+* Accumulates one unit of damage per qualifying new landing or entry event.
+* Reaches destruction after 15 counted contacts by default.
+* Visually develops increasing damage.
+* Eventually breaks completely away.
+* Never reforms during the current match.
 
-A queued follow-up must never:
+Right section
 
-* Reset the current attack’s animation.
-* Skip its startup.
-* Skip its active frames.
-* Skip its recovery.
-* Duplicate a hitbox.
-* Repeat a projectile release.
-* Reset attack hit-confirm state.
-* Reset the attack’s motion.
-* Reapply attack momentum or movement.
-* Reset cooldowns.
-* Bypass cooldown eligibility.
-* Make the player invulnerable.
-* Guarantee that the follow-up connects.
-* Cancel the current attack merely because the repeat was pressed.
+Identical rules to the left, but completely independent.
 
-While the current attack is executing, its existing attack record should remain authoritative.
-
-The queue is a small piece of separate state. It does not become the current attack until the first attack has ended.
-
-7. Accept meaningful repeat presses throughout the attack
-
-A previously discussed idea was a dedicated queue window near the final 0.20 seconds of an animation.
-
-Treat that as a possible tuning concept, not a reason to introduce another unexplained restriction.
-
-Preferred behavior for this update: Accept one genuine repeat press at any point after the original attack has started, across startup, active frames, and recovery.
-
-This best solves the beginner problem.
-
-If a player presses Attack 1 again early, the input should still be remembered.
-
-The queue should last until the originating attack naturally finishes, rather than expiring after the ordinary 0.15-second buffer.
-
-Do not introduce an additional 0.20-second waiting period.
-
-The follow-up should execute at the earliest valid simulation step after natural completion, with no artificial pause.
-
-If a shorter acceptance window proves necessary for gameplay feel, establish that through testing and explicitly document the decision. Do not silently implement a restrictive final-window-only mechanic.
-
-8. One queued follow-up per attack
-
-Alva must never create an unlimited queue from one attack.
+Its landing counter, structural damage, animations and destruction state must not depend on the left section.
 
 Example:
 
-Player presses Attack 1.
+If the left section has received 12 qualifying landings and the right section has received 3, the left must appear heavily cracked while the right remains relatively intact.
 
-While Attack 1 plays, the player repeatedly presses Attack 1 many times.
+If the left collapses, the right must continue functioning normally.
 
-Expected result:
+No damage should propagate across the indestructible centre.
 
-* Attack 1 plays once.
-* Exactly one Attack 2 is queued.
-* Attack 2 begins once Attack 1 finishes.
-* No extra Attack 1 or Attack 2 has been scheduled by those earlier repeated presses.
+5. Define exactly what counts as a landing
 
-Once Attack 2 has actually begun, another genuine new press can queue its own next attack.
+The ice should react to both fighters equally.
 
-Each attack can independently receive one follow-up request.
+The following must count as a qualifying contact when it establishes new footing on a breakable side:
 
-The system must never infer additional presses from a held button.
+* Normal jump landings.
+* High-jump landings.
+* Landings after an air jump.
+* Landings following an air Dash.
+* Landings after being launched or knocked back.
+* Returning to a side platform after previously leaving it.
+* Falling onto it from above.
+* Directly transferring onto a side from another section, including running or dashing across the internal seam, once the fighter’s support transitions to that side.
+* Landing during a blizzard.
+* Any other supported gameplay state that genuinely establishes a new contact.
 
-Holding Attack 1 must still produce only one press edge.
+Do not restrict the mechanic to pressing the Jump button.
 
-9. Resolve the follow-up from the actual playing attack
+Contact counting safeguards
 
-This is especially important because existing Combo Assist can map a physical Attack 1 press to Attack 2.
+Damage must be applied once per new support/contact event, not once per physics frame.
 
-Example:
+A fighter standing still on a side for several seconds must not continuously damage it.
 
-1. Player performs Attack 1.
-2. Player presses Attack 1 during its cooldown.
-3. Combo Assist correctly starts Attack 2.
-4. Attack 2 is recorded as having originated from the Attack 1 button.
-5. Player presses Attack 1 again while that Attack 2 animation is playing.
+Walking around while maintaining support on that same section must not generate repeated hits.
 
-The newly queued follow-up must be Attack 1, because the attack currently performing is Attack 2.
+Use the actual grounded surface identity and contact transitions to determine when a new landing or entry has occurred.
 
-It must not blindly queue Attack 2 again.
+Account for the fact that Alva’s existing body.landed is true for airborne-to-grounded transitions but may not detect a grounded transfer from the centre to another section.
 
-Base follow-up selection on the real current attack definition and the corresponding logical Attack 1 / Attack 2 pairing.
+Explicitly handle these grounded support changes.
 
-Preserve information about which button originated the current action so the existing repeatsMove protection continues to make sense.
+Each fighter should have correctly maintained contact state to prevent false increments from collision jitter.
 
-Do not assume that the button pressed and attack actually playing are always identical.
+A wall collision against the side or underside of the ice must not count as landing on its top.
 
-10. Restrict automatic alternation to Attack 1 and Attack 2
+If two fighters independently land on the same side during the same simulation step, both valid contacts may count, subject to the destruction threshold.
 
-The existing COMBO_PAIRS relationship is:
+Never allow the counter to exceed its configured maximum.
 
-* attack1 → attack2
-* attack2 → attack1
+The system must remain deterministic and independent of rendering frame rate.
 
-Keep it.
+6. Structural damage progression
 
-Do not automatically alternate:
+Default durability:
 
-* Extra Attack.
-* Attack 3.
-* Attack 4.
-* Attack 5.
-* Summons.
-* Techniques.
-* Deflect.
-* Shield.
-* Dash or air dash.
+MAX_ICE_CONTACTS = 15
 
-Those actions should retain their existing individual behavior.
+Make the threshold configurable in one clearly named data module instead of scattering literal values throughout the implementation.
 
-Preserve the ability for the player to explicitly request those actions through their normal controls.
+Every qualifying contact should cause a small physical and visual response.
 
-11. Preserve grounded and airborne attack identities
+Examples of escalating damage:
 
-Alva’s loadout system can map the same logical attack button to different ground and airborne attacks.
+Count	Required visual progression
+0	Clean, intact, thick ice
+1–3	Fine hairline fractures near impact areas
+4–6	More visible branching cracks and small frost fragments
+7–9	Significant cracks spreading across the top and front face
+10–12	Deep fractures, visible internal separation and stronger impact reactions
+13–14	Critical instability, large branching cracks and subtle trembling
+15	Full structural failure and collapse sequence
 
-For example, attack1 and midair_attack1 belong to one input family but may have very different mechanics.
+The damage must be cumulative.
 
-The queued Combo Assist must honor those mappings.
+Do not simply switch between an intact sprite and a broken sprite.
 
-Requirements:
+Create a genuinely progressive cracking system where additional damage becomes increasingly obvious.
 
-* Ground Attack 1 may queue the appropriate ground Attack 2.
-* Air Attack 1 may queue the appropriate airborne Attack 2.
-* Air Attack 2 may queue the appropriate airborne Attack 1.
-* Respect groundOnly, airUses, free fall and launch-state restrictions.
-* Never substitute a ground attack for an unavailable air attack without a deliberate and documented rule.
-* Never fabricate an airborne version of an attack.
-* Never launch an attack using missing animation art.
+Damage visuals
 
-Retain the place/context associated with the queued action and validate it again when the attack would execute.
+A qualifying landing should produce:
 
-If the fighter’s state has changed so that the queued move is no longer appropriate, discard the queue rather than executing an unrelated move.
+* A crisp ice-impact reaction.
+* A new fracture or an extension of existing fractures.
+* Tiny chips or ice crystals bursting outward.
+* A subtle local vibration.
+* A brief icy highlight showing stress spreading from the impact.
+* An appropriate sound cue if it fits the existing audio system.
 
-⸻
+The fracture network must be persistent across frames and must not regenerate randomly on each render.
 
-PART 4 — COOLDOWNS AND ELIGIBILITY
+Use stable, seeded or otherwise deterministic geometry for damage patterns.
 
-12. No cooldown bypasses under any circumstances
+The top surface and visible front foundation should both reflect the section’s actual damage state.
 
-Combo Assist is an input convenience, not a combat advantage that overrides the normal rules.
+Cracks should gradually become darker, wider, longer, and more interconnected as collapse approaches.
 
-When a queued follow-up is ready to execute, it must pass the same eligibility checks as a normal press of that attack.
+They must remain legible even with constant snow particles in the scene.
 
-Check:
+7. Full ice-breaking animation
 
-* The move’s own cooldown.
-* Required animation art.
-* Whether the fighter can act.
-* Ground or air availability.
-* Airtime usage limits.
-* Free fall restrictions.
-* Motion restrictions.
-* Active hitstun.
-* Blockstun.
-* Paralysis.
-* Shield state.
-* Dash commitments.
-* Summon or technique commitments.
-* Match/input lock state.
-* Any other relevant restrictions already enforced by the existing engine.
+When either section receives its fifteenth qualifying contact, initiate a complete, unmistakable breaking sequence.
 
-Use the existing shared attack eligibility logic rather than duplicating it in a second, potentially inconsistent system.
+A simple instant disappearance or opacity fade is unacceptable.
 
-Example: unavailable alternate
+Phase A — critical fracture
 
-Attack 1 is performing.
+Recommended duration: approximately 0.2–0.35 seconds.
 
-The player repeats Attack 1, queuing Attack 2.
+* The section visibly shakes.
+* Major cracks rapidly expand.
+* Fracture lines illuminate with cold white and cyan highlights.
+* Small ice chips jump from the surface.
+* The affected section appears unstable.
+* The centre and opposite side remain unaffected.
 
-Attack 2 is still on cooldown when Attack 1 naturally finishes.
+Phase B — structural separation
 
-Result:
+Recommended duration: approximately 0.2–0.4 seconds.
 
-* Attack 1 completes.
-* Attack 2 does not execute.
-* The queue is cleared.
-* Attack 2’s cooldown remains unchanged.
-* Attack 1’s cooldown remains governed by its ordinary lifecycle.
+* The broken section separates along its inner boundary.
+* Its upper ice slab splits into several larger irregular pieces.
+* Deep fractures extend through the visible foundation.
+* The foundation visibly tears apart, exposing darker blue ice inside.
+* The section begins losing structural coherence.
 
-Do not keep trying indefinitely until Attack 2 becomes available.
+Phase C — collapse
 
-Do not automatically substitute another attack.
+Recommended duration: approximately 0.6–1.2 seconds.
 
-Do not restart Attack 1.
+* The broken section separates completely from the centre.
+* Large chunks rotate and fall downward.
+* Several smaller shards scatter and fall at different speeds.
+* Fine snow and ice particles trail behind the falling chunks.
+* The newly exposed edge of the permanent centre looks naturally broken, not like a hard rectangular cut.
+* The debris descends toward the Void and is eventually culled.
 
-The request simply cannot be fulfilled.
+Use gravity-like acceleration and modest angular motion to make the collapse physically convincing.
 
-13. Preserve the original attack’s cooldown lifecycle
+A small camera shake may accompany the main fracture, respecting reduced-motion settings.
 
-When an attack finishes naturally, its cooldown begins under the current rules.
+Collision requirements
 
-This must happen exactly once.
+The collision must disappear in exact synchronization with the section’s physical separation.
 
-Executing a queued follow-up must not:
+Do not leave invisible ground supporting fighters after the ice visually falls.
 
-* Shorten the original attack’s cooldown.
-* Overwrite it.
-* Clear it.
-* Refresh it unnecessarily.
-* Replace its cooldown with the alternate’s cooldown.
-* Start the alternate’s cooldown before that alternate itself finishes, unless an existing rule specifically requires this.
-* Create a new global 0.5-second combat lockout.
+Do not remove support long before the break becomes visually apparent.
 
-The first attack and second attack have separate cooldown identities.
+During the short critical-fracture anticipation, the section may remain solid. Once structural separation begins, its collision must be disabled and any fighter supported by it must begin falling, unless another active section legitimately supports them.
 
-The queue is not a cooldown timer.
+Use or extend releaseGround as appropriate.
 
-14. Maintain the ordinary 0.15-second buffer independently
+Fighters should retain their normal movement, jumping, air-dash, recovery and combat behaviour during the collapse.
 
-Do not increase or replace BASE_FIGHTER_MOVEMENT.attackBuffer merely to implement this feature.
+Do not automatically eliminate a fighter because an ice section collapsed. The fighter should physically fall and may recover under Alva’s existing rules. Elimination occurs only upon reaching the actual Void boundary.
 
-The ordinary buffer and Combo Assist queue solve different problems.
+The falling pieces are visual debris, not independent damaging projectiles.
 
-Ordinary buffer: A short-lived request that could not execute yet.
+Permanent destruction
 
-Combo Assist queue: A repeat press associated with a specific attack, waiting for that specific attack to finish.
+Once destroyed, a side section must remain destroyed for the rest of the current match.
 
-They must not accidentally trigger each other twice.
+It must not regenerate, reset after a respawn, or automatically reappear after a timer.
 
-A queued Combo Assist input should not also be stored as an ordinary buffered attack that later executes independently.
+After both sides collapse, only the centre section remains playable.
 
-Define clear precedence when both contain requests.
+The resulting gaps must contain genuine open air and must be handled correctly by physics, projectiles, shadows, CPU movement and recoveries.
 
-The latest intentional player action should behave predictably.
+8. Jökull-specific hazard architecture
 
-⸻
+Classify both destructible sections as structural stage hazards.
 
-PART 5 — ANIMATION LIFECYCLE AND SIMULATION TIMING
+However, do not attempt to implement them as ordinary Asperitas cloud hazards.
 
-15. The original animation must complete naturally
+The existing PlatformHazards system assumes that its moving or disappearing platforms remain spatially separated from the main stage and may eventually reform.
 
-Study these existing pieces carefully:
+Jökull deliberately requires the opposite:
 
-* CombatState.update(dt)
-* CombatState.endAttack()
-* CombatState.interruptAttack()
-* Fighter.update(dt, ctx)
-* Fighter.startAttack()
-* Fighter.cutAttack()
-* Fighter.updateState()
-* SpriteAnimator.play()
-* SpriteAnimator.update()
+* Its sections initially touch.
+* They are substantial blocks with foundations.
+* Their collision is aligned with the main surface.
+* They never move before breaking.
+* Their destruction is permanent within the match.
 
-A critical implementation detail is that CombatState.update(dt) advances attack time and may end an attack before the rest of Fighter.update() processes the current frame’s combat requests.
+Implement an appropriate controller, for example IceSectionController, within a dedicated Jökull hazard system or a clean extension of the existing stage-hazard architecture.
 
-Do not ignore this ordering.
+Each breakable section should have explicit runtime state, including:
 
-A repeated press occurring on the same simulation step in which the current attack naturally completes must be handled consistently.
+* Section identity.
+* Current contact count.
+* Maximum contact count.
+* Damage progression.
+* Intact, critical, breaking and destroyed states.
+* Collision activation.
+* Break-animation timing.
+* Generated fracture geometry.
+* Active debris particles.
+* Stable render state.
 
-Capture or resolve repeat intent while the originating attack is still identifiable.
+The map definition must remain immutable. Every Arena and StagePreview should own fresh runtime state.
 
-Then dispatch the follow-up at the correct point in the update lifecycle.
+Ensure section collision identity remains reliable for fighters entering from the central block.
 
-Do not allow the current attack to disappear before the system can recognize the repeat press.
+Update all relevant collision queries, including horizontal solid collision, vertical landing, support detection, shadows, and CPU queries, so destroyed solids are truly inactive everywhere.
 
-16. Distinguish natural completion from early termination
+Never leave stale static-surface cache entries that cause the CPU to plan landings onto destroyed ice.
 
-A queue should execute only when its originating attack genuinely finishes through its normal animation lifecycle.
+9. Blizzard event — 25% random chance
 
-It should not execute merely because combat.attack becomes null.
+Jökull has a second, independent hazard: Blizzard.
 
-An attack can stop because of:
+This is a significant temporary snowstorm that obscures the battlefield and reduces visibility.
 
-* Natural completion.
-* Another attack canceling it.
-* A jump.
-* A Dash.
-* A Shield or Deflect.
-* A technique or summon.
-* Being hit.
-* Paralysis.
-* Ground contact.
-* A landing cancel.
-* A special attack motion completing early.
-* A bounce.
-* A reset, respawn, or match transition.
+Probability
 
-Several of these paths use endAttack().
+Use an exact, configurable probability:
 
-Therefore, an unconditional combat.attack === null check is insufficient.
+BLIZZARD_CHANCE = 0.25
 
-Implement reliable lifecycle detection.
+This represents a 25% chance whenever the weather controller performs an eligible event check.
 
-An explicit completion reason or tightly scoped natural-finish event may be appropriate if the existing architecture needs one.
+Do not roll every rendered frame or fixed simulation step.
 
-Avoid adding a complicated event bus merely for a small local feature.
+Instead, use independent weather-event intervals.
 
-Required invariant: A queued follow-up is released only when its original attack ended by natural completion—not when some other action canceled or interrupted it.
+Recommended initial tuning:
 
-Preserve existing exceptions for attack motions and landing-cancel mechanics.
+* Opening calm: 5–8 seconds.
+* Event checks: once every 12–18 seconds while eligible.
+* Probability per check: 25%.
+* Blizzard duration: approximately 6–9 seconds.
+* Transition buildup: approximately 1–1.5 seconds.
+* Transition out: approximately 1–1.5 seconds.
+* No overlapping blizzards.
 
-Do not force an attack that intentionally ends upon contact to continue executing a fictional full-length animation.
+Adjust the duration and intervals if playtesting indicates a better balance, but retain the exact 25% chance per eligible event check.
 
-17. No animation restarts
+A failed roll leaves the stage in its normal weather state until the next eligible check.
 
-While the first attack remains active:
+A successful roll triggers one blizzard event.
 
-* Its attack record stays the same.
-* Its animation progresses normally.
-* Its time increases only through normal simulation.
-* Its animation frame progression remains uninterrupted.
-* Its active hitboxes remain governed by the original attack.
-* Its projectile-release flags remain intact.
-* Its hit-confirm and multi-hit state remain intact.
+There must be no forced alternation between blizzards and normal weather.
 
-SpriteAnimator.play() should restart only when a genuinely new animation begins or another existing gameplay rule legitimately requires it.
+Weather states
 
-Do not add a restart: true call whenever the player presses a repeated combat button.
+Use a clear deterministic state machine, such as:
 
-The queued alternate is allowed to start at its own first frame after the previous animation has finished.
+calm → warning → blizzard → clearing → calm
 
-That is not restarting the previous animation.
+The controller’s random stream must be seeded using Alva’s existing random utilities.
 
-18. Respect hitstop
+It must not depend on render frequency, animation frames, the CPU’s random stream, or structural-damage counters.
 
-Hitstop freezes attack animation progress.
+Blizzard buildup
 
-A queued Combo Assist follow-up must not execute during hitstop.
+Before the blizzard reaches full strength:
 
-If the player repeats the active attack during a valid hitstop interval, that press may register as the queued follow-up, provided the originating attack is still valid and the player has not been interrupted.
+* Wind intensity gradually increases.
+* Snowflakes begin moving faster and more horizontally.
+* Distant scenery becomes hazier.
+* Cold fog grows across the stage.
+* The atmosphere visibly turns whiter.
+* Wind gusts build toward the main event.
 
-The follow-up waits until the original attack can finish.
+This must feel like an approaching storm, not an instantly appearing white rectangle.
 
-Do not age a combo queue using wall-clock time.
+Full blizzard
 
-Pausing the game must not make the queue expire.
+At peak intensity:
 
-Use deterministic simulation state.
+* Dense snow sweeps across the screen in multiple directions.
+* Snowflakes move strongly with the wind.
+* Large near-camera snow particles streak across the view.
+* Fine distant snow forms a textured white haze.
+* Gusts and drifting snow create layered movement.
+* Visibility is significantly reduced.
+* The sky, mountains and distant scenery become difficult to distinguish.
+* The platforms and fighters remain partially visible through the storm.
 
-19. Respect fixed-step determinism
+The storm should be challenging without becoming completely opaque.
 
-All combat changes must remain compatible with CONFIG.sim.step, currently 1/60 second.
+Target a substantial loss of environmental clarity while preserving enough visibility to avoid making combat unplayable.
 
-Do not use:
+Keep gameplay HUD, score, timer, menus and essential controls readable. Apply the whiteout within the battle Canvas rather than obscuring interface elements unnecessarily.
 
-* setTimeout.
-* setInterval.
-* Wall-clock timestamps.
-* Date.now().
-* performance.now().
-* Unseeded randomness.
-* Animation-frame callbacks as gameplay timers.
+Blizzard clearing
 
-Do not execute extra simulation steps to make a combo happen faster.
+When the event ends:
 
-Equivalent input sequences must produce equivalent combat results regardless of the browser’s rendering frame rate.
+* The strongest gusts diminish.
+* Snow density gradually decreases.
+* Fog begins to clear.
+* Distant background elements reappear.
+* The atmosphere returns smoothly to its ordinary snowfall.
 
-⸻
+Do not abruptly switch from dense whiteout to a clear scene.
 
-PART 6 — PLAYER INTENT AND INPUT PRIORITIES
+Gameplay rules
 
-20. Preserve deliberate manual attacks
+The blizzard itself is a visibility hazard, not a damage attack.
 
-Combo Assist should make repeated input forgiving without taking control away from the player.
+It should not:
 
-Example:
+* Apply fighter damage.
+* Modify Launch Point.
+* Automatically stun fighters.
+* Force fighters into the Void.
+* Change the structural durability of the ice.
 
-Player starts Attack 1.
+The base requirement is increased visual difficulty, not altered movement physics.
 
-Player explicitly presses Attack 2.
+Wind must be clearly represented visually and atmospherically, but do not introduce strong random forces on fighters unless explicitly designed, balanced and justified separately.
 
-That is a new attack request, not a repeated Attack 1 request.
+Blizzards and platform damage must be able to occur simultaneously.
 
-Keep Alva’s existing manual cancellation rules.
+An ice section must still receive damage and break correctly during a blizzard.
 
-If Attack 2 is eligible and the player is allowed to cancel Attack 1 into it, the new request can start immediately.
+The blizzard must not hide critical cracking or collapse cues so completely that players cannot understand what happened.
 
-Do not force that player to wait for Attack 1’s full animation just because Combo Assist is enabled.
+10. Environmental artwork and atmosphere
 
-The new wait-until-complete behavior applies specifically to automatic follow-ups generated from repeated input.
+Create a dedicated procedural Canvas renderer:
 
-Manual combat must remain expressive.
+js/stages/jokull-theme.js
 
-21. Define queue precedence clearly
+Jökull should be visually distinct from every current stage while remaining consistent with Alva’s rendering quality and pseudo-3D style.
 
-The combat engine should have a deterministic distinction between:
+Art direction
 
-1. A fresh deliberate request for a different action.
-2. An existing ordinary buffered request.
-3. A queued Combo Assist follow-up.
-4. Held locomotion directions.
+Imagine an isolated ancient glacier suspended above a vast frozen landscape during a bitter polar day.
 
-The queued follow-up should be a low-priority convenience action.
+The world should feel cold, enormous, beautiful and slightly dangerous.
 
-It must never unexpectedly override a deliberate new attack, defensive action, jump or Dash.
+Use a coordinated palette of:
+
+* Glacial blue.
+* Deep arctic turquoise.
+* Cold cyan.
+* Frost white.
+* Very pale lavender.
+* Desaturated navy shadows.
+* Muted blue-gray atmospheric haze.
+
+Avoid making the stage an entirely flat white scene.
+
+Background
+
+Include several layers of environmental depth:
+
+Far background
+
+* Cold polar sky.
+* Soft, pale sunlight diffused through icy clouds.
+* Immense snow-covered mountain ranges.
+* Distant glacial peaks.
+* Faint atmospheric fog.
+
+Midground
+
+* Frozen cliffs or glaciers.
+* Uneven snowy ridgelines.
+* Broad expanses of ice.
+* Snow-covered valleys or a distant frozen plain.
+* Soft drifting snow.
+
+Near background
+
+* Closer ice formations.
+* Frosty rock faces.
+* Wind-blown snow.
+* Sparse blowing mist and snow clouds.
+
+Use Alva’s established parallax and deterministic procedural-art patterns.
+
+Main glacier
+
+The platform is the visual centrepiece.
+
+Its top should have:
+
+* A thick layer of accumulated snow.
+* Slightly irregular wind-sculpted surface detail.
+* Exposed patches of polished blue ice.
+* Fine frost textures.
+* Small snowdrifts near its edges.
+* Subtle cold highlights.
+* A clearly readable playable surface.
+
+The foundation should feature:
+
+* Large semi-transparent-looking blue ice formations.
+* Geometric frozen layers.
+* Embedded bubbles.
+* Thin ancient fracture patterns.
+* Deep cyan and navy shadows.
+* Jagged natural ice contours.
+* An uneven lower edge.
+
+Use gradients, layered geometry, transparency effects and carefully chosen highlights to make the ice appear substantial and visually rich.
+
+The stage must not look like a simple blue rectangle.
+
+Snowflakes
+
+Implement persistent ambient snowfall.
+
+Use at least three depth layers:
+
+1. Distant tiny flakes, subtle and slow.
+2. Midground flakes with moderate movement.
+3. Foreground flakes, larger and more responsive to wind.
+
+Snow should have slight differences in size, opacity and movement.
+
+Do not make all flakes identical or move at precisely the same speed.
+
+Wind
+
+Even during normal weather, Jökull should have a noticeable ambient wind.
+
+Use:
+
+* Soft horizontal snow drift.
+* Fine streaks of blowing powder.
+* Occasional atmospheric gusts.
+* Gentle movement in background mist.
+
+During a blizzard, intensify these existing systems rather than replacing the scene with an unrelated effect.
+
+Visual polish
+
+Preserve the game’s performance characteristics.
+
+Reuse cached geometry, particle pools or bounded particle collections as appropriate.
+
+Avoid allocating huge particle arrays every frame.
+
+Keep visual state and hazard gameplay state separate, and never let particles control actual collision.
+
+11. Damage visuals and rendering synchronization
+
+The Jökull theme must render directly from the live state of the ice hazard controllers.
+
+It must never maintain an unrelated copy of structural damage.
+
+The visual representation must match collision state.
 
 Examples:
 
-Attack 1 → repeat Attack 1 → Attack 3
+* Left at 4 contacts: mild left-side cracks.
+* Right at 12 contacts: severe right-side cracking.
+* Centre: no structural damage.
+* Left destroyed: no left walkable surface.
+* Right destroyed: no right walkable surface.
+* Both destroyed: only centre remains.
+* Blizzard active: all currently existing ice sections remain rendered beneath the storm.
 
-The repeat queues Attack 2.
+Damage must also correctly affect the front and side faces of the glacier.
 
-The later explicit Attack 3 request takes precedence.
+The theme must not draw a completely intact giant block after one section has already fallen away.
 
-Do not execute Attack 2 unexpectedly after the player has clearly requested Attack 3.
+When an ice section collapses, reveal a naturally broken edge on the remaining glacier, especially at its connection with the permanent centre.
 
-Attack 1 → repeat Attack 1 → Shield
+All fragment and fracture animation coordinates must remain consistent with the game’s world-to-screen transformation and camera movement.
 
-The player requests defense.
+Use simulation-driven destruction events and animation state. Rendering must not modify gameplay damage or trigger additional break events.
 
-The queued Attack 2 must not prevent the Shield from taking effect under existing rules.
+12. Camera, Void and combat integration
 
-Attack 1 → repeat Attack 1 → Jump
+The starting stage should use the same general camera scale and framing principles as Yerma and Sol-Noir.
 
-The jump follows the existing manual-cancellation rules.
+At match start, players should see the full glacier with both side sections and sufficient surrounding air.
 
-The queued Attack 2 should not consume the frame and block the jump.
+Account for the overall starting platform footprint when establishing stage, camera and Void bounds.
 
-Attack 1 → repeat Attack 1 → Dash
+The indestructible centre must remain fully inside the usable Void area, including overtime.
 
-The explicit Dash follows existing movement and Energy rules.
+Ensure that:
 
-The queued attack does not override it.
+* Both intact side sections are playable.
+* Falling off an exterior ledge follows standard Void rules.
+* Falling into a newly created gap follows standard gravity and recovery rules.
+* Fighters can jump back from newly exposed edges if their abilities permit it.
+* No destroyed section creates an invisible wall.
+* No section extends into unintended kill zones at match start.
+* Projectiles and summons continue functioning according to existing rules.
+* Collision and actual drawn surfaces align.
+* Camera framing behaves correctly after one or both sides collapse.
+* Overtime’s closing Void remains compatible with the changing stage topology.
 
-Attack 1 → repeat Attack 1 → Run
+Do not change universal character movement values to compensate for the new stage.
 
-Run is locomotion, not a new combat request.
+Use existing movement and recovery behaviour when balancing the dimensions of the ice sections.
 
-Holding or changing Run direction must not discard the queue.
+13. CPU awareness and hazard intelligence
 
-Preserve the existing principle that Run does not constitute an explicit attack-cancel request.
+Update Alva’s existing stage intelligence so CPUs understand Jökull.
 
-Multiple requests on the same step
+The CPU must recognize:
 
-Alva permits at most one accepted new move per simulation step.
+* The intact central section.
+* Each active breakable side.
+* The currently available landing and walking surfaces.
+* The remaining structural integrity of each outer section, when visually communicated.
+* A side section that is critically cracked.
+* The beginning of a collapse.
+* Permanently missing ice sections.
+* Newly exposed ledges and dangerous gaps.
 
-Keep that invariant.
+The existing StageModel caches static surfaces and derives main-stage ledges from the stage’s original geometry.
 
-Do not allow a queued follow-up and a new manual action to start sequentially on the same simulation step, potentially canceling one another.
+That behaviour must be reviewed carefully because Jökull’s collision topology changes during a match.
 
-Account for the fact that the existing engine processes combat requests, Dash, Shield and jump in separate sections.
+Do not allow permanently destroyed sides to remain cached as valid landing targets or safe walking areas.
 
-Do not allow queue dispatch to steal priority simply because one section executes earlier in the source file.
+Use live collision information where needed.
 
-Refactor local decision ordering if necessary, with regression tests.
+CPU decisions
 
-22. Clear stale queues
+CPUs should still be willing to fight on the outer sections while they exist.
 
-The queue must be cleared when it is no longer valid.
+They should not irrationally avoid the entire stage from the beginning.
 
-This includes:
+However, when a side becomes critically unstable, a CPU should be capable of recognizing the visible danger and attempting to move to safety.
 
-* The originating attack is interrupted.
-* The player is hit.
-* The player successfully cancels into another action.
-* Another fresh incompatible request supersedes the queue.
-* A different attack replaces its original attack.
-* The fighter is eliminated.
-* The fighter falls into the Void.
-* The fighter respawns.
-* A round or match resets.
-* Practice Ground replaces the player fighter.
-* The opponent or session becomes invalid for a required action.
-* Input becomes locked.
-* Combo Assist becomes unavailable.
-* The game leaves active combat.
-* The queued move fails eligibility when its originating attack finishes.
+CPU response should respect existing difficulty and reaction rules.
 
-Do not allow stale requests to survive into a new life, match or fighter.
+The CPU should not receive supernatural advance knowledge of the exact next random blizzard event.
 
-Use a single obvious ownership model for the queued state.
+A blizzard can reduce the player’s visibility without requiring the introduction of new unbalanced CPU penalties.
 
-Avoid scattering unrelated cleanup flags across the engine.
+Both CPUs in Watch Mode must experience the exact same stage destruction and weather state.
 
-⸻
+14. Previews and stage selection
 
-PART 7 — COMBO ASSIST AND COMBAT ASSIST WORKING TOGETHER
+Jökull must have:
 
-23. Preserve Combat Assist as a separate feature
+* A still roster thumbnail.
+* A live animated hero preview.
+* Correct English and French names and trait descriptions.
+* Proper selection, confirmation and Random Stage support.
 
-Alva’s Combat Assist can close a small gap before executing a melee attack.
+Still thumbnail
 
-It is human-player-only and enabled by default.
+Show the complete intact glacier:
 
-It does not cost Energy.
+* All three sections connected.
+* Snow and ice details.
+* Frozen mountain background.
+* No active collapse.
+* A clean, recognizable surface.
 
-It does not extend attack hitboxes or teleport the fighter.
+Animated preview
 
-It should remain a separate setting from Combo Assist.
+The animated hero preview should show environmental activity:
 
-A player should be able to use:
+* Moving ambient snow.
+* Wind.
+* Foreground snowflakes.
+* Frozen atmospheric effects.
+* Occasional blizzard demonstrations.
 
-* Neither assist.
-* Combo Assist only.
-* Combat Assist only.
-* Both assists together.
+The preview may include an isolated demonstration of cracking and collapse so players can understand the stage hazard before playing.
 
-All four combinations must work.
+Any demonstration must use preview-only runtime state. It must never alter battle state or cause a match to begin with damaged platforms.
 
-24. Queued follow-ups must integrate with Combat Assist
+Because the current StagePreview creates its own hazard simulation without live fighters, explicitly design how preview-only break demonstrations are triggered if included.
 
-Example:
+Do not rely on nonexistent fighter landings to make the preview show a collapse.
 
-The player successfully performs Attack 1.
+Reduced-motion or still previews should present clear, stable stage art.
 
-The player repeats Attack 1 to queue Attack 2.
+15. Accessibility and reduced motion
 
-Attack 1 completes.
+Respect Alva’s existing reduced-motion setting.
 
-Attack 2 is a melee move, and the target has moved just beyond its natural reach.
+With reduced motion enabled:
 
-If Combat Assist is enabled and its normal conditions are satisfied, it may start its ordinary short approach before executing Attack 2.
+* Disable or substantially reduce camera shake.
+* Minimize flickering, rapid pulsing and excessive particle movement.
+* Keep fracture progression visible.
+* Show structural failure clearly without intense shaking.
+* Preserve actual collision and destruction timing.
+* Keep blizzard states understandable while substantially reducing distracting particle animation.
+* Do not prevent hazards from functioning.
 
-This must use Combat Assist’s existing measured range, collision restrictions, facing logic, travel limits and airtime rules.
+Reduced motion must change presentation, not gameplay rules.
 
-Do not grant a special extra-long approach because the move came from Combo Assist.
+Ensure ice damage remains discernible through fracture shape and contrast rather than relying solely on flashing.
 
-Do not teleport the fighter into range.
+The blizzard should remain a meaningful visibility hazard, but not create an unnecessarily unreadable or flashing screen.
 
-Do not give it free extra air dashes.
+16. Match lifecycle and deterministic behaviour
 
-Do not apply Combat Assist to projectiles, homing attacks, techniques, summons or other excluded moves.
+All structural damage and weather state must belong to an individual Arena instance.
 
-If Combat Assist is disabled, the attack must use its normal range and may miss.
+On a new battle:
 
-Both assists should complement each other, but neither should override the other’s restrictions.
+* Both side sections are fully intact.
+* Both counters are zero.
+* The centre is untouched.
+* No collapse debris remains.
+* The weather controller starts fresh.
+* The initial weather is calm.
 
-25. Handle Combat Assist’s active approach state
+On a rematch, fully reset the Jökull stage.
 
-Combat Assist has its own in-progress approach state before the actual attack begins.
+On an ordinary fighter respawn within the same match, do not reset the stage.
 
-During that approach, the attack animation is not yet playing.
+Destroyed sections must remain destroyed.
 
-A repeated button press during an approach must not be mistaken for a repeat during the eventual attack animation.
+Damage counters must persist through individual eliminations and respawns.
 
-Preserve the existing approach-replacement and cancellation rules.
+Where appropriate, match freeze, result-screen and restart behaviour should follow the established hazard lifecycle.
 
-The queued follow-up should become available only when a real attack is actually active.
+Random weather decisions must use dedicated seeded streams and be reproducible for the same battle seed and gameplay update sequence.
 
-If an approach is canceled before its attack starts, do not leave a future combo queued for an attack that never occurred.
+The actual weather sequence must not change because the user resizes the screen or because the game renders at a different frame rate.
 
-⸻
+17. Required implementation work
 
-PART 8 — IMPROVING THE OVERALL FIGHTING FEEL
+Implement the necessary changes across the existing architecture.
 
-26. Prioritize responsiveness over unnecessary animation shortcuts
+At minimum, expect work involving:
 
-Alva’s attacks vary in speed because they have different frame counts, frame rates, startup, active phases, recovery, and special motion rules.
-
-Those differences are part of the fighting system.
-
-Do not flatten every attack into an identical animation duration.
-
-A quick basic strike and a powerful finishing attack should not feel the same.
-
-Instead, improve how player inputs transition between those existing moves.
-
-The goal is:
-
-The game should respect the player’s input while respecting the move’s intended commitment.
-
-Good responsiveness does not mean every animation can be canceled for free.
-
-Good responsiveness means the player can predict what will happen when pressing a button.
-
-27. Preserve skill expression
-
-Experienced players should still benefit from:
-
-* Timing their attacks deliberately.
-* Selecting different follow-up attacks.
-* Knowing their character’s real combo routes.
-* Managing cooldowns.
-* Using directional movement.
-* Controlling spacing.
-* Performing Dash cancels.
-* Using hit-confirm opportunities.
-* Choosing when to defend.
-* Using Combat Assist or disabling it.
-* Controlling jumps, fast falls and aerial attacks.
-* Managing Energy and Launch Point.
-
-Combo Assist is an accessibility and usability improvement, not an automatic optimal-combo generator.
-
-Do not introduce a system that chooses the highest-damage attack for the player.
-
-Do not automatically chase opponents indefinitely.
-
-Do not change the attack’s damage or launch strength based on whether Combo Assist was used.
-
-Do not guarantee a true combo.
-
-A mechanically executed follow-up can still miss, be blocked, or leave the opponent time to recover.
-
-28. Avoid creating a button-mashing exploit
-
-A beginner should be able to press Attack 1 repeatedly and see a sensible alternating sequence.
-
-That does not mean each input should grant extra speed or damage.
-
-Test sustained button mashing against:
-
-* A stationary opponent.
-* A shielding opponent.
-* An airborne opponent.
-* An opponent being launched away.
-* A target near a ledge.
-* A high-Launch-Point target.
-
-Ensure that pressing repeatedly does not cause:
-
-* More hitboxes per attack.
-* Shorter cooldowns.
-* Repeated projectile spawning.
-* Skipped recovery.
-* Faster attacks than the definitions allow.
-* Guaranteed loops.
-* Extra Energy.
-* Disappearing commitment frames.
-
-Mashing should become easier to understand, not become inherently superior to skillful play.
-
-29. Review perceived dropped inputs
-
-Once the queued follow-up is implemented, inspect the surrounding ordinary attack and cancellation pathways.
-
-Look for places where a player presses a valid control, receives no obvious response, and cannot understand why.
-
-Focus especially on:
-
-* Input near the final animation frame.
-* Input during recovery.
-* Input during hitstop.
-* Attack requests made while a cooldown is nearly finished.
-* Presses made around landing.
-* Aerial attack restrictions.
-* Inputs during Combat Assist’s approach.
-* Simultaneous actions.
-* Input after a successful hit or block.
-* Input just before being stunned.
-
-Fix demonstrable input-handling problems within this feature’s scope.
-
-Do not turn every unavailable move into a queued action.
-
-Do not make techniques, summons, Shield or movement requests automatically execute much later unless their existing system explicitly supports buffering.
-
-Avoid speculative combat rebalancing.
-
-If an issue would require changing the game’s fundamental combat design, document it separately rather than silently introducing a new rule.
-
-30. Improve clarity without cluttering the battlefield
-
-Consider a subtle indication that Combo Assist has accepted a follow-up.
-
-For example, an unobtrusive queued state on the existing ability HUD’s corresponding move tile.
-
-If implemented, it should:
-
-* Identify the actual queued alternate move.
-* Appear only when a follow-up is genuinely queued.
-* Disappear when executed, rejected or canceled.
-* Never imply that a cooldown has completed when it has not.
-* Reuse the existing interface’s visual language.
-* Avoid distracting effects over the fighters.
-* Work on desktop and touch.
-* Respect reduced-motion preferences.
-* Use English and French localization.
-* Avoid unnecessary per-frame DOM rebuilding.
-
-This feedback should make player intent more understandable.
-
-Do not add a new full-screen overlay or tutorial interruption during combat.
-
-If the existing HUD cannot represent the queue cleanly, prioritize gameplay correctness and explain the UI limitation.
-
-⸻
-
-PART 9 — PRESERVE THE EXISTING GAME
-
-31. Do not unintentionally alter combat fundamentals
-
-Preserve:
-
-* Launch Point accumulation.
-* Passive Launch Point recovery.
-* The Void and match scoring.
-* Base Launch and Directional Launch.
-* Damage tiers of 1, 3, 5 and 10.
-* Existing cooldown policy.
-* Character-specific attacks and abilities.
-* Hitbox dimensions.
-* Hurtboxes.
-* Knockback and launch steering.
-* Hitstun and blockstun.
-* Hitstop.
-* Shields and perfect Shields.
-* Deflect and projectile reflection.
-* Energy costs and regeneration.
-* Projectiles and their release timing.
-* Summons and techniques.
-* Attack classifications.
-* Special ability behavior.
-* Existing human manual cancellation.
-* CPU hit-cancel rules.
-* Universal movement.
-* Momentum and steering.
-* Triple jumps.
-* Fast fall.
-* Ground Dash and air dash.
-* Stage collision.
-* Platform hazards.
-* Void hazards.
-* Match timing and scoring.
-* Existing controller profiles.
-
-Do not rebalance these mechanics to compensate for an implementation error.
-
-Fix the underlying implementation instead.
-
-32. Preserve character identity
-
-Alva deliberately separates shared combat rules from character-specific move definitions.
-
-Respect that architecture.
-
-Do not hard-code character IDs inside the shared Combo Assist implementation.
-
-Use the existing loadout mappings, attack definitions and action classifications.
-
-Do not assume every Attack 1 or Attack 2 has the same range, damage, animation duration, motion or cooldown.
-
-Verify the new feature on every currently playable character.
-
-Do not modify character movesets just to make the new queue easier to implement.
-
-Do not create missing sprites or substitute fake animations.
-
-33. Preserve controls across devices
-
-The improvement must work with:
-
-* Keyboard.
-* PlayStation controllers.
-* Xbox controllers.
-* Customized controller layouts.
-* Touch joystick layout.
-* Touch classic-button layout.
-* Ground/air directional controller mappings.
-
-Use logical combat actions and existing pressed-edge snapshots.
-
-Never implement the mechanic by checking a particular keyboard key or gamepad button inside the Fighter.
-
-Holding a button must not repeatedly queue follow-ups.
-
-Pressing, releasing and pressing again must register as two distinct press events.
-
-Controller input mappings must remain consistent with touch and keyboard.
-
-Do not break menu navigation, gamepad reconnection or controller configuration.
-
-⸻
-
-PART 10 — ENGINEERING APPROACH
-
-34. Use a small, explicit queue state
-
-The design should require no more than one pending Combo Assist follow-up per fighter.
-
-A conceptual representation might contain:
-
-* The originating attack record or a robust attack-instance identifier.
-* The logical action to perform next.
-* The button or request that created it.
-* The ground/air context.
-* Any minimal information needed to resolve the follow-up safely.
-
-Do not introduce a general-purpose sequence engine unless the actual repository architecture demonstrably requires one.
-
-Do not create a queue of unlimited length.
-
-Do not use wall-clock expiry timers.
-
-The queue must be tied to the attack that created it.
-
-35. Keep module responsibilities clear
-
-Preferred ownership:
-
-combo-assist.js
-
-Pure, deterministic rules for selecting an alternate attack and deciding whether a repeated basic attack is eligible for Combo Assist treatment.
-
-fighter.js
-
-Player input interpretation, queue ownership, action priorities, lifecycle integration and follow-up execution.
-
-combat-state.js
-
-Authoritative attack lifecycle, cooldowns and natural-completion identification.
-
-Modify this file only as needed to make lifecycle transitions reliably distinguishable.
-
-attacks.js
-
-Retain existing attack definitions and phase semantics. Do not alter attack timing data to simulate queuing.
-
-combat-assist.js
-
-Reuse existing eligibility and approach logic. Do not duplicate range or movement calculations inside Combo Assist.
-
-UI and localization
-
-Represent the resulting state and explain it to the player when appropriate.
-
-Maintain clean separation between gameplay state and presentation.
-
-36. The critical fixed-step ordering
-
-Design an explicit sequence that handles these events correctly:
-
-1. Obtain the normalized input snapshot.
-2. Identify the attack active when the step began.
-3. Recognize new repeat presses without losing the source attack identity.
-4. Register at most one eligible pending follow-up.
-5. Advance the existing combat simulation and attack lifecycle.
-6. Process any interruption or forced-state conditions.
-7. Distinguish natural completion from cancellation.
-8. Resolve fresh deliberate actions according to existing priorities.
-9. Dispatch the queued follow-up only when the original attack naturally completed and no higher-priority action wins.
-10. Recheck all eligibility using the existing action-start path.
-11. Clear the queue whether execution succeeds or fails.
-12. Advance visuals normally without restarting the original animation.
-
-The order above is a behavioral contract, not a demand for an exact method arrangement. Adapt it to the real update loop.
-
-In particular, do not accidentally consume a terminal-frame repeat as both a queued request and a new direct press.
-
-Do not allow an invalid, stale attack reference to trigger a future move.
-
-37. Prefer correctness over a superficially small patch
-
-A minimal patch is not successful if it:
-
-* Works only for Attack 1.
-* Fails for aerial attacks.
-* Fails during hitstop.
-* Misidentifies natural completion.
-* Bypasses cooldowns.
-* Restarts animations.
-* Breaks manual cancellation.
-* Allows duplicate actions on one frame.
-* Leaves queues after interruption.
-* Makes CPU behavior change.
-* Fails on one input device.
-* Requires arbitrary delays.
-
-You may refactor a small portion of the request-handling code if that produces a clearer, safer implementation.
-
-However, avoid unrelated refactors or large rewrites of the Fighter architecture.
-
-⸻
-
-PART 11 — MANDATORY AUTOMATED TESTS
-
-38. Write meaningful tests, not just superficial assertions
-
-Expand the existing test suite.
-
-Tests should exercise real Fighter, CombatState, CombatSystem, and available simulation harnesses wherever possible.
-
-Do not merely test a helper returning attack2.
-
-Verify what actually happens in simulated combat.
-
-Test group A — Normal queued sequences
-
-* Attack 1 → Attack 1 produces Attack 1 followed by Attack 2.
-* Attack 2 → Attack 2 produces Attack 2 followed by Attack 1.
-* Queuing during startup works.
-* Queuing during active frames works.
-* Queuing during recovery works.
-* Queuing on the animation’s terminal simulation step works consistently.
-* Queuing shortly before completion works.
-* Both attack animations advance through their intended durations.
-* The second attack begins on the earliest eligible step after completion.
-
-Test group B — No restarts
-
-* Repeated input does not replace the original attack record.
-* Animation time never resets during a repeated press.
-* The original attack’s clip is not restarted.
-* A hitbox is never created twice because of input repetition.
-* A projectile is never released twice.
-* Multi-hit attacks do not repeat earlier strikes.
-* The original attack’s cooldown starts once.
-
-Test group C — Input mashing and holding
-
-* Holding Attack 1 generates no additional queued attack.
-* Holding Attack 2 generates no additional queued attack.
-* Repeatedly pressing Attack 1 many times during one attack queues only one follow-up.
-* After that follow-up starts, a genuinely new press may queue the next move.
-* No stale inputs create unexpected third or fourth moves.
-* Rapid input does not cause infinite loops.
-* Same-step duplicate inputs are handled deterministically.
-
-Test group D — Alternation identity
-
-* Direct Attack 1 maps correctly.
-* Direct Attack 2 maps correctly.
-* Attack 1 mapped into Attack 2 during a cooldown retains its originating-button identity.
-* Repeating that originating button during Attack 2 queues Attack 1.
-* Pressing the currently performing move’s own button is handled consistently.
-* No other attack families automatically alternate.
-
-Test group E — Cooldown integrity
-
-* Attack 2 on cooldown cannot execute as a queued follow-up.
-* Attack 1 on cooldown cannot execute as a queued follow-up.
-* The original move’s cooldown remains correct.
-* The alternate move’s cooldown remains correct.
-* Longer cooldowns remain intact.
-* Queues never shorten timers.
-* Unavailable moves are discarded without retrying forever.
-* No global cooldown is introduced.
-* Cooldowns continue their normal progression through hitstop.
-
-Test group F — Interruptions and priorities
-
-* Getting hit clears the queue.
-* Paralysis clears an invalid queue.
-* A valid new attack supersedes the queued follow-up.
-* Jumping prevents a stale follow-up.
-* Dashing prevents a stale follow-up.
-* Shielding prevents an inappropriate follow-up.
-* Deflect retains its priority.
-* An attack interrupted by a summon or technique does not release its queued follow-up.
-* A move canceled before natural completion cannot execute its queued follow-up.
-* Simultaneous queued follow-up and fresh manual input cannot start two moves on the same step.
-* Run held throughout does not discard the queue.
-
-Test group G — Aerial combat
-
-* Air Attack 1 can queue Air Attack 2.
-* Air Attack 2 can queue Air Attack 1.
-* Ground and air definitions remain distinct.
-* A used-up airUses restriction is respected.
-* Free fall is respected.
-* Landing-cancel behavior is preserved.
-* Plunges, bounces, slams, rolls, homing motions and recovery transitions remain correct.
-* Queues cannot produce illegal mid-air moves.
-
-Test group H — Assist integration
-
-Test the full combination matrix:
-
-* Combo Assist on, Combat Assist on.
-* Combo Assist on, Combat Assist off.
-* Combo Assist off, Combat Assist on.
-* Combo Assist off, Combat Assist off.
-
-Verify that a queued melee follow-up can use Combat Assist’s normal approach when eligible.
-
-Verify that ranged moves do not gain an approach.
-
-Verify that no extra Energy is spent by Combat Assist.
-
-Verify that Combat Assist still consumes the appropriate aerial resource.
-
-Verify that an approach cannot create a second buffered copy of an attack.
-
-Test group I — Controllers and touch
-
-Test:
-
-* Keyboard press/release/press.
-* Touch press/release/press.
-* Gamepad press/release/press.
-* Held controls on each device.
-* Customized controller mappings.
-* Context-dependent ground/air controller inputs.
-* No duplicated Pressed edges.
-
-Test group J — Full combat regressions
-
-* The existing player-cancellation tests remain valid apart from requirements intentionally superseded by queued Combo Assist.
-* Hit-cancels remain unchanged.
-* Dash cancels remain unchanged.
-* Shields continue blocking all attacks.
-* Energy remains unchanged.
-* Damage and Launch Point remain unchanged.
-* Projectile behavior remains unchanged.
-* CPU controllers never receive player-only Combo Assist queue behavior.
-* Existing CPU difficulty tests pass.
-* Match, respawn, practice and overtime lifecycle tests pass.
-* Replaying identical input scripts produces identical outcomes.
-
-39. Update superseded tests intentionally
-
-There are existing tests explicitly asserting that repeated attack presses during an animation are never queued.
-
-Those assertions are now intentionally outdated for human players with Combo Assist enabled.
-
-Replace them with the new behavior.
-
-However, retain equivalent protections for:
-
-* Combo Assist disabled.
-* Non-player controllers.
-* No animation restart.
-* No immediate self-cancel.
-* No cooldown bypass.
-
-Do not delete large blocks of tests merely to make the suite pass.
-
-Rewrite affected expectations to express the new gameplay contract.
-
-40. Test across the full roster
-
-Where possible, use playableCharacters() instead of testing only #0001.
-
-Include characters with:
-
-* Short attacks.
-* Long attacks.
-* Melee attacks.
-* Projectile attacks.
-* Ground and mid-air variants.
-* Motion-driven attacks.
-* Limited airborne uses.
-
-Use test fixtures to cover edge cases not presently represented by a playable fighter.
-
-Do not add character-ID special cases to the engine.
-
-⸻
-
-PART 12 — MANUAL GAMEPLAY VALIDATION
-
-41. Verify how the update actually feels
-
-Automated correctness is mandatory but not sufficient.
-
-Where a browser-testing environment is available, run Alva locally over HTTP and test the experience.
-
-Beginner scenario
-
-Choose a fighter.
-
-Press Attack 1 twice without carefully timing the second press.
-
-The expected experience is that the player sees one uninterrupted attack followed by the appropriate alternate, if that alternate is available.
-
-The player should not need to understand animation frame counts.
-
-Intermediate scenario
-
-Start Attack 1 and deliberately press Attack 2.
-
-Confirm that manual attack cancellation behaves as before.
-
-Advanced scenario
-
-Use direct cancels, Dash movement, hit-confirm routes, Shield, air attacks and directional controls.
-
-Confirm that Combo Assist does not override deliberate play.
-
-Combat Assist scenario
-
-Move toward an opponent and begin an attack using Combat Assist.
-
-Queue the next move and verify that ordinary range rules still apply.
-
-Defensive scenario
-
-Queue an attack, then decide to Shield or jump.
-
-The game must not execute a stale follow-up against the player’s newer defensive intent.
-
-Failure scenario
-
-Queue a move that cannot execute because of cooldown, position or airtime restrictions.
-
-The outcome must be predictable: no invalid move, no restart, no surprise later attack.
-
-Mobile scenario
-
-Use both touch layouts in landscape orientation.
-
-Ensure that double tapping is recognized correctly and holding a button does not continuously queue attacks.
-
-Report any scenarios that cannot be validated in the available environment.
-
-Do not claim hardware or browser tests were performed unless they actually were.
-
-⸻
-
-PART 13 — DOCUMENTATION AND INTERFACE UPDATES
-
-42. Update the authoritative specification
-
-ALVA_SPEC.md currently describes the old behavior, including the rule that a repeated attack during its own animation is discarded.
-
-That must change.
-
-Update the relevant sections covering:
-
-* Combat input buffering.
-* Human-player move cancellation.
-* Combo Assist.
-* Natural attack completion.
-* Cooldown preservation.
-* Input precedence.
-* Hitstop.
-* Ground/air attack mapping.
-* Combat Assist interaction.
-
-The specification must distinguish deliberate manual cancellation from queued automatic alternation.
-
-The spec is authoritative. Do not leave the documented rules contradicting the implementation.
-
-43. Update the system guides
-
-Update:
-
-* docs/systems/combat.md
-* docs/systems/input.md
-
-Update other guides only when their behavior genuinely changes.
-
-Describe the queue’s lifecycle, ownership, eligibility checks, and relationship to the existing buffer.
-
-Keep the explanations accurate for future developers.
-
-44. Update the player-facing description
-
-The existing Combo Assist description in Settings explains only that pressing Attack 1 or Attack 2 again after the original finishes performs the alternate.
-
-Revise that description to explain the new behavior.
-
-Suggested meaning:
-
-Combo Assist: Press Attack 1 or Attack 2 again while it is playing to automatically perform the other attack when the current one finishes. Each move still follows its own cooldown.
-
-Use natural, concise language rather than copying that wording mechanically.
-
-Update both English and French.
-
-Ensure that the description remains readable on mobile.
-
-45. Preserve settings compatibility
-
-Reuse the existing comboAssist boolean.
-
-Do not introduce a new setting unless there is a genuine functional requirement.
-
-Avoid changing the saved settings schema or version just because the internal implementation changed.
-
-Existing users who enabled or disabled Combo Assist should retain their preference.
-
-Keep Combat Assist independent.
-
-⸻
-
-PART 14 — PERFORMANCE AND CODE QUALITY
-
-46. Keep runtime overhead minimal
-
-Alva targets smooth 60 FPS gameplay on modern phones.
-
-The queued state should be inexpensive.
-
-Avoid:
-
-* Allocating large objects every simulation step.
-* Repeatedly searching entire character registries.
-* Unnecessary DOM updates.
-* Rendering additional Canvas layers for a simple queue.
-* Ongoing timers.
-* Per-frame logging.
-* Recalculating immutable move metadata unnecessarily.
-
-Keep simulation state small and deterministic.
-
-47. Avoid architecture violations
-
-Maintain:
-
-* Relative module imports.
-* Relative asset URLs.
-* Existing control codenames.
-* Existing character-ID rules.
-* Existing movement data architecture.
-* mouvment and midair_mouvment spellings.
+* Stage registration in js/data/maps.js.
+* Theme registration in js/stages/index.js.
+* New js/stages/jokull-theme.js.
+* A dedicated ice-destruction controller or clean generalized equivalent.
+* Blizzard hazard controller and tuning.
+* Composite floor collision support in js/game/physics.js.
+* Correct hazard update sequencing in js/game/arena.js.
+* Match restart handling in js/game/battle.js.
+* Dynamic topology awareness in CPU stage modelling.
+* Stage preview support.
 * English and French localization.
-* The existing CSS organization.
-* GitHub Pages sub-path compatibility.
-* Existing settings persistence rules.
+* Stage documentation.
+* Automated tests.
 
-Do not introduce a framework or build system.
+Prefer reusable, maintainable extensions rather than hardcoded Jökull-only checks scattered throughout shared physics and AI code.
 
-Do not add dependencies.
+Do not introduce new dependencies unless genuinely necessary.
 
-Do not alter unrelated files.
+Preserve the existing Canvas 2D rendering architecture.
 
-Do not modify protected project rules.
+18. Tests and acceptance criteria
 
-48. Preserve code readability
+Create a dedicated test suite, for example:
 
-The new implementation should be understandable to a future developer.
+tests/systems/jokull.test.mjs
 
-Prefer clearly named functions, such as conceptual equivalents of:
+Extend existing stage, physics, hazard, preview, localization and integration tests as appropriate.
 
-* Detecting a repeat press.
-* Resolving an alternate attack.
-* Registering a queued follow-up.
-* Clearing a queue.
-* Detecting natural completion.
-* Attempting a queued follow-up.
+Geometry tests
 
-These are examples of responsibilities, not mandatory function names.
+Verify that all three sections begin contiguous and share one exact walkable height.
 
-Avoid a large collection of ambiguous booleans inside one update loop.
+Verify that moving across their seams is smooth.
 
-Document invariants rather than commenting every line.
+Verify that the centre is permanently solid.
 
-⸻
+Verify that destroying one side leaves the centre and the other side intact.
 
-PART 15 — REQUIRED WORKFLOW
+Verify that destroyed section collision is absent from every relevant query.
 
-49. Phase 1: Audit
+Damage tests
 
-Before editing:
+Verify:
 
-1. Inspect the current repository HEAD.
-2. Understand the current Combo Assist logic.
-3. Trace same-move input suppression.
-4. Trace normal attack buffering.
-5. Trace player cancellation.
-6. Trace attack completion and interruption.
-7. Trace Combat Assist.
-8. Trace ground and air action mappings.
-9. Trace every place an active attack can end.
-10. Identify tests whose expectations must change.
+* One valid new landing equals one counted contact.
+* Continuous grounded contact does not repeatedly increment damage.
+* Walking from the centre onto a side correctly registers entry.
+* Every supported airborne landing type can count.
+* Both fighters can damage the same side.
+* The two sides have independent counters.
+* Landing on the centre never damages either side.
+* A section remains intact after 14 contacts.
+* The fifteenth qualifying contact triggers its destruction sequence.
+* An already destroyed section cannot accumulate further damage.
+* No side can regenerate during a match.
 
-Establish a baseline by running the existing relevant tests where tooling permits.
+Collapse tests
 
-Do not assume a prior suggested code snippet is production-ready.
+Verify:
 
-The real codebase is the source of truth.
+* The critical phase begins at the correct threshold.
+* Destruction visibly progresses through separation and falling debris.
+* Collision removal is synchronized with structural failure.
+* Grounded fighters lose unsupported footing.
+* Any remaining legitimate support is respected.
+* Falling fighters are not immediately eliminated unless they actually enter the Void.
+* The centre remains intact.
+* Falling debris is cleaned up after its animation.
 
-50. Phase 2: Implement the core behavior
+Blizzard tests
 
-Implement:
+Verify:
 
-* Repeat-press detection.
-* One-entry Combo Assist queue.
-* Actual-attack-based alternation.
-* Safe natural-completion detection.
-* Follow-up execution.
-* Cooldown and eligibility revalidation.
-* Queue cleanup.
-* Deterministic request ordering.
+* The configured event probability is exactly 0.25.
+* Random checks occur at defined eligible intervals, not every frame.
+* A successful check begins the event.
+* Failed checks leave ordinary weather active.
+* Blizzard phases transition correctly.
+* Two blizzards cannot overlap.
+* The event eventually clears.
+* Structural damage continues working during blizzards.
+* The event does not directly damage fighters.
+* Seeded event sequences are deterministic.
+* The event behaves consistently across rendering frame rates.
 
-Keep the initial feature small enough to verify rigorously.
+AI and integration tests
 
-51. Phase 3: Integrate adjacent systems
+Verify:
 
-Validate and adjust, where necessary:
+* CPU stage models recognize intact and destroyed sections.
+* CPUs never plan to stand on permanently missing ice.
+* Recovery and Void interactions remain correct.
+* Overtime works with both wings intact or destroyed.
+* Quick Battle works.
+* Watch Mode works.
+* Random Stage can select Jökull.
+* Stage slot 05 displays Jökull.
+* Existing four stages remain unchanged.
+* Stage previews do not mutate active battles.
+* Rematches fully restore the stage.
+* Individual respawns do not restore it.
 
-* Ordinary attack buffering.
-* Human manual cancellation.
-* Combat Assist.
-* Jumping.
-* Dash and air dash.
-* Shield and Deflect.
-* Hitstop.
-* Landing.
-* Motion attacks.
-* Ground/air input context.
-* Resets and respawns.
+Render tests
 
-Do not change an unrelated system unless the implementation exposes a real integration defect.
+Use the established fake Canvas testing conventions.
 
-52. Phase 4: Combat clarity
+Verify the theme renders without invalid coordinates or exceptions when:
 
-Update the Combo Assist description.
+* Both sides are intact.
+* One side is damaged.
+* Both sides have different damage levels.
+* A section is breaking.
+* One side has permanently disappeared.
+* Both sides are gone.
+* A blizzard is active.
+* Reduced motion is enabled.
+* The theme is rendered without a live hazard controller.
 
-If it materially improves usability without clutter, add subtle feedback for an accepted queue using existing interface components.
-
-Do not allow visual polish to delay or compromise gameplay correctness.
-
-53. Phase 5: Automated verification
-
-Run focused tests first.
-
-Then run the full existing suite:
+Run the full existing test suite using:
 
 node --test
 
-Resolve genuine failures.
+Update existing tests that legitimately assume Alva has exactly four stages, without weakening coverage of existing behaviour.
 
-Do not weaken invariant tests to conceal errors.
+19. Documentation
 
-If a test was designed to enforce the old behavior, replace its outdated expectation while retaining meaningful coverage.
+Update docs/gameplay/stages.md and any relevant architecture documentation to explain:
 
-54. Phase 6: Documentation
+* Jökull’s visual identity.
+* Its three-section floor.
+* Why it uses composite finite collision rather than globally continuous ground.
+* Independent side durability.
+* Landing/contact rules.
+* Structural damage progression.
+* Break-animation phases.
+* Permanent destruction.
+* Blizzard probability and timing.
+* CPU hazard awareness.
+* Preview behaviour.
+* Restart behaviour.
 
-Update the authoritative spec and guides after finalizing the implemented contract.
+Document new configuration fields and controllers clearly.
 
-Do not document proposed or hypothetical behavior as though it already exists.
+20. Non-negotiable final requirements
 
-55. Phase 7: Final review
+The implementation is complete only when all of the following are true:
 
-Review the entire diff.
+1. Jökull exists as the fifth fully playable stage, selectable in Quick Battle and Watch Mode.
+2. The stage looks like one massive contiguous snow-covered ice block with a visible foundation.
+3. Its real collision is divided into left, centre and right sections.
+4. The centre never takes damage and never disappears.
+5. Both side sections independently accumulate structural damage from qualifying landings and entries.
+6. Each side breaks after approximately 15 contacts, with 15 as the default configured threshold.
+7. Players can clearly observe the damage progressing before collapse.
+8. Breaking includes meaningful cracking, separation, falling chunks and debris animation.
+9. Broken sections permanently lose their collision until the match is restarted.
+10. The stage includes persistent snow, snowflakes, ice details and ambient wind.
+11. Random blizzards trigger with exactly 25% probability per eligible weather check.
+12. Blizzards significantly reduce visibility, with smooth transitions into and out of the storm.
+13. Both breakable sides and blizzards are represented as stage hazards.
+14. CPU fighters correctly understand the changing platform layout.
+15. All effects respect existing match lifecycle, seeded simulation and reduced-motion rules.
+16. Existing stages, fighter mechanics, combat systems and game modes remain functional.
+17. The new stage is visually polished and consistent with Alva’s current production-quality artwork.
 
-Check for:
+Definition of done
 
-* Accidental CPU changes.
-* Accidental cooldown changes.
-* Unnecessary character edits.
-* Redundant state.
-* Missed cleanup paths.
-* Incorrect same-step action ordering.
-* Missing animation safeguards.
-* Broken settings compatibility.
-* English/French inconsistencies.
-* Unnecessary scope expansion.
+Do not stop after creating the map entry or rendering an ice-themed background.
 
-⸻
+Implement the complete physics, damage tracking, actual structural destruction, permanent collision removal, environmental particles, blizzard state machine, stage selection integration, CPU compatibility and tests.
 
-PART 16 — ACCEPTANCE CRITERIA
+Avoid placeholder animations, fake damage effects or invisible colliders.
 
-The update is complete only when all of the following are satisfied:
+The final result should feel like a distinctive Alva stage built around a simple but powerful gameplay idea:
 
-* [ ]	The current repository has been studied and the implementation follows its existing architecture.
-* [ ]	Combo Assist retains Attack 1 / Attack 2 alternation.
-* [ ]	Repeating an attack while it is playing can queue its alternate.
-* [ ]	The original attack’s animation is never restarted by the repeat.
-* [ ]	The original attack completes naturally before the queued follow-up starts.
-* [ ]	A repeated press during startup, active frames or recovery is handled correctly.
-* [ ]	A terminal-frame repeat is not lost or duplicated.
-* [ ]	Only one follow-up can be queued per original attack.
-* [ ]	Holding a button never creates automatic additional presses.
-* [ ]	Follow-up selection uses the actual attack being performed.
-* [ ]	Queued moves use the normal attack-start pathway.
-* [ ]	Cooldowns are never bypassed, shortened or overwritten.
-* [ ]	The 0.5-second repeat cooldown is preserved.
-* [ ]	The 0.15-second ordinary input buffer remains independent.
-* [ ]	No artificial global wait is introduced.
-* [ ]	Human manual cancellation remains functional.
-* [ ]	New deliberate inputs correctly supersede queued assistance.
-* [ ]	Hitstop and interruptions are handled safely.
-* [ ]	Ground and air restrictions are respected.
-* [ ]	Combat Assist works correctly with queued follow-ups.
-* [ ]	Combo Assist disabled preserves its expected behavior.
-* [ ]	CPU behavior and difficulty remain unchanged.
-* [ ]	Keyboard, gamepad and touch input behave consistently.
-* [ ]	No extra hitboxes, hits or projectiles are generated.
-* [ ]	Damage, Energy, Launch Point and cooldown policies remain unchanged.
-* [ ]	Tests cover the entire playable roster and relevant edge cases.
-* [ ]	Existing obsolete tests have been updated deliberately.
-* [ ]	ALVA_SPEC.md accurately describes the new behavior.
-* [ ]	Relevant system documentation is updated.
-* [ ]	Player-facing descriptions are correct in English and French.
-* [ ]	The full automated test suite passes, or any remaining failure is explicitly documented with evidence.
-* [ ]	No unrelated AI, character, stage or combat-balance modifications are introduced.
+The centre is safety. The edges are temporary. The storm makes every decision harder.
 
-⸻
-
-PART 17 — REQUIRED FINAL RESPONSE
-
-After implementation, report your work in this format.
-
-1. Summary of improvements
-
-Explain what changed and how it makes Alva easier and more responsive to play.
-
-2. Before and after
-
-Describe these exact cases:
-
-* Attack 1 → Attack 1.
-* Attack 2 → Attack 2.
-* Attack 1 → Attack 2.
-* Repeated button mashing.
-* Holding one attack button.
-* An unavailable queued follow-up.
-* Getting hit while a follow-up is queued.
-* Combo Assist and Combat Assist working together.
-
-3. Implementation details
-
-List the important changed files.
-
-Explain:
-
-* Where queued state lives.
-* How repeats are identified.
-* How natural completion is detected.
-* How input priorities work.
-* How cooldowns are preserved.
-* How invalid queues are cleared.
-
-4. Testing results
-
-Report:
-
-* Focused tests executed.
-* Full suite results.
-* Total tests passing and failing.
-* Additional tests created.
-* Whether real browser or hardware checks were performed.
-* Remaining uncertainties.
-
-Never invent passing test results.
-
-5. Preserved mechanics
-
-Explicitly confirm what remains unchanged, particularly:
-
-* CPU Intelligence and difficulty.
-* Ordinary cooldown policy.
-* Launch Point.
-* Energy.
-* Character moves.
-* Combat Assist range rules.
-* Human manual cancellation.
-* Existing movement physics.
-
-6. Remaining improvement opportunities
-
-If the audit reveals additional issues worth addressing later, give a short, prioritized account.
-
-Separate those from work actually completed.
-
-Do not silently expand this update into a CPU rewrite or an unrelated gameplay overhaul.
-
-⸻
-
-FINAL DIRECTIVE
-
-The ultimate purpose of this update is to solve an important fighting-game usability problem:
-
-Players should not feel that pressing a button was pointless merely because they pressed it slightly earlier than an animation ended.
-
-At the same time:
-
-An attack should never restart, cancel itself, or bypass its recovery simply because the same button was pressed again.
-
-Alva already has the building blocks: fixed-step input, an ordinary input buffer, individual cooldowns, manual cancellation, Combat Assist, and Combo Assist.
-
-Connect them carefully.
-
-A beginner should be able to press Attack 1 twice and understand what happens.
-
-An experienced player should still be able to perform deliberate attack cancels and advanced combos without the assist getting in the way.
-
-A fighter’s animations, cooldowns and mechanical identity must remain trustworthy.
-
-Make Alva more forgiving without making it automatic, more responsive without making it chaotic, and more satisfying without destroying its depth.
-
-Implement the update completely, verify it thoroughly, and deliver a clean, maintainable result.
+Finish by providing a summary of the actual files changed, the implemented mechanics, the tests executed, and any remaining limitations.
