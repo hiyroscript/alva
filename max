@@ -1,1487 +1,1721 @@
-MASTER IMPLEMENTATION PROMPT — ALVA COMBAT FEEL, INPUT RESPONSIVENESS & COMBO ASSIST OVERHAUL
+ALVA — COMPREHENSIVE COMBAT RESPONSIVENESS, COMBO ASSIST & FIGHTING EXPERIENCE UPDATE
 
 YOUR ROLE
 
-You are acting as a senior gameplay programmer, fighting-game systems designer, JavaScript engineer, animation-timing specialist, and quality-assurance engineer working directly on Alva, a sprite-based, browser-based 2D fighting game.
+You are a senior fighting-game combat designer, gameplay systems engineer, JavaScript developer, and quality-assurance specialist working directly on Alva, a browser-based 2D sprite platform-fighting game.
 
 Repository: https://github.com/hiyroscript/alva
 
-Your assignment is to thoroughly inspect the latest repository and implement a carefully controlled improvement to the fighting experience, particularly for human players who are still learning the game.
+Your assignment is to implement a substantial, carefully designed improvement to Alva’s human-player fighting experience, building on its existing systems rather than replacing them.
 
-This is not a request to rebuild combat, invent an entirely different fighting system, or make the CPU weaker.
+The central goal is:
 
-The objective is to make Alva’s existing combat mechanics feel more responsive, forgiving, intuitive, predictable, and satisfying, while preserving the game’s tactical depth, established rules, individual fighter identities, and existing CPU behavior.
+Make fighting in Alva more responsive, intuitive, satisfying, and beginner-friendly, without sacrificing the skill, commitment, character identity, or mechanical depth that already exist.
 
-Do not merely produce an implementation plan. Inspect the actual code, make the appropriate changes, update tests and documentation, and validate the finished result.
+This must be a real, production-quality code change. Do not merely describe a possible solution.
+
+Study the repository, understand its rules, implement the improvements, update documentation, expand automated tests, and validate the resulting gameplay.
 
 ⸻
 
-PART 1 — UNDERSTAND THE GAME BEFORE MAKING CHANGES
+PART 1 — PROJECT CONTEXT
 
-1.1. Mandatory repository investigation
+1. Understand what Alva actually is
 
-Before modifying any code, examine the current repository and establish an accurate understanding of its architecture.
+Alva is a sprite-based platform fighter built using:
 
-Start by reading:
+* Vanilla JavaScript ES modules.
+* HTML and CSS.
+* Canvas 2D.
+* A fixed-step simulation running at 60 Hz.
+* Character-specific sprite animations and data-driven abilities.
+* Shared systems for movement, combat, hit resolution, cooldowns, input, defense, and player assists.
+
+There are no frameworks, build tools, or npm dependencies.
+
+Alva currently contains five playable fighters, #0001 through #0005, with distinct move sets and mechanics.
+
+It is a platform fighter, not a conventional health-bar fighter. Every hit adds to a fighter’s Launch Point, which influences subsequent launch strength. Fighters score by knocking opponents into the Void.
+
+Maintain that identity.
+
+Do not introduce traditional health bars, arbitrary damage systems, automatic infinite combos, or movement mechanics from unrelated fighting games.
+
+2. Inspect the repository before coding
+
+Read the current versions of the following authoritative resources.
+
+Product and architecture
 
 * README.md
 * ALVA_SPEC.md
-* CLAUDE.md
 * UPDATES.md
-* docs/README.md
+* CLAUDE.md
+* codename_rule
 * docs/architecture/overview.md
-* docs/architecture/module-responsibilities.md
 * docs/architecture/character-system.md
-* docs/development/architecture-decisions.md
+* docs/architecture/module-responsibilities.md
+* docs/development/conventions.md
 * docs/development/testing.md
+
+Important: character_rule is protected. Do not modify, move, rename, reformat, or overwrite it.
+
+Combat and movement documentation
+
 * docs/systems/combat.md
-* docs/systems/input.md
 * docs/systems/movement.md
+* docs/systems/input.md
 * docs/systems/defense.md
 * docs/systems/energy.md
+* docs/systems/launch.md
 * docs/systems/rendering.md
 * docs/gameplay/practice.md
 
-Pay particular attention to the existing specification of the player’s move cancellation, Combat Assist, and Combo Assist in ALVA_SPEC.md §7.2.4, §7.2.4a and §7.2.4b.
-
-Then examine the implementation and dependencies of:
+Core implementation
 
 * js/game/fighters/fighter.js
 * js/game/fighters/fighter-controller.js
+* js/game/fighters/movement.js
 * js/game/combat/combat-state.js
+* js/game/combat/combat.js
+* js/game/combat/attacks.js
 * js/game/combat/combo-assist.js
 * js/game/combat/combat-assist.js
-* js/game/combat/attacks.js
-* js/game/combat/combat.js
 * js/game/combat/move-status.js
-* js/game/fighters/movement.js
-* js/game/rendering/sprite-animator.js
-* js/data/movement.js
 * js/data/cooldowns.js
+* js/data/movement.js
 * js/data/loadout.js
-* js/data/characters.js
+* js/game/rendering/sprite-animator.js
+
+Input, controls and interface
+
 * js/core/input-manager.js
 * js/core/controller-resolver.js
 * js/core/settings.js
+* js/data/controller-profiles.js
 * js/ui/ability-hud.js
 * js/ui/touch-controls.js
+* js/ui/settings-dialog.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-Trace how keyboard input, game controllers, and touch controls become combat requests, how those requests are resolved, when an animation begins and ends, and how cooldowns and interruptions are processed.
+Game integration
 
-Inspect the relevant tests before changing anything.
+* js/game/battle.js
+* js/game/practice.js
+* js/game/arena.js
+* js/config.js
 
-The repository included fighters #0001 through #0005 when this task was prepared. Verify the current roster rather than assuming it has remained unchanged.
+Inspect every playable fighter’s definition under js/data/characters/ and the relevant character specifications under docs/characters/.
 
-All combat improvements must apply generically to compatible fighters, including future ones, without introducing fighter-ID-specific logic.
+Understand how each fighter’s Attack 1 and Attack 2 behave on the ground and in mid-air.
 
-1.2. Preserve Alva’s technical architecture
+Study the existing tests, particularly:
 
-Respect these existing constraints:
+* tests/systems/combo-assist.test.mjs
+* tests/systems/combat-assist.test.mjs
+* tests/systems/move-cancel.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/request-devices.test.mjs
+* tests/systems/controller-input.test.mjs
+* tests/systems/cooldown-policy.test.mjs
+* tests/systems/movement.test.mjs
+* tests/systems/momentum.test.mjs
+* tests/systems/energy.test.mjs
+* tests/fighters/0001/combos-0001.test.mjs
 
-1. Vanilla JavaScript and ES modules.
-2. No build step, bundler, framework, or unnecessary dependency.
-3. Deterministic gameplay at a fixed 60 Hz simulation rate.
-4. Rendering must not determine gameplay outcomes.
-5. Universal movement rules shared by every fighter.
-6. Character-specific attacks and animations defined through fighter data.
-7. Strict, existing control and animation codenames.
-8. Real sprite assets only; do not fabricate missing attack animations.
-9. Proper separation between gameplay, interface, and configuration.
-10. A single consistent combat-rule implementation across fighters.
+Also inspect relevant integration and interface tests.
 
-Do not introduce real-time timers such as setTimeout() for combat input queues.
+Do not assume an older description remains accurate. Start by checking the current branch HEAD and any changes introduced since the repository version referenced by this request.
 
-Do not use wall-clock timestamps to decide whether a combo is valid.
+3. Preserve recently completed CPU work
 
-Use simulation time, fixed-step counters, and established combat-state data.
+The earlier problem of CPU opponents being excessively strong has already been addressed.
+
+The repository has recently undergone significant CPU Intelligence improvements.
+
+This assignment is not another CPU difficulty or intelligence overhaul.
+
+Do not:
+
+* Increase or decrease CPU intelligence.
+* Rewrite CPU decision-making.
+* Change difficulty-specific reaction times.
+* Change CPU combo reliability.
+* Make CPUs artificially miss attacks.
+* Retune Easy, Medium, Hard, or Brutal.
+* Change CPU movement decisions to compensate for player changes.
+* Alter damage or cooldowns to make the CPU easier.
+
+Preserve the current CPU behavior.
+
+Player-assist functionality should remain exclusive to human-controlled fighters unless the existing system explicitly states otherwise.
+
+Run existing CPU regression tests to ensure nothing has unintentionally changed.
 
 ⸻
 
 PART 2 — THE PROBLEM WE ARE SOLVING
 
-Alva already has several good combat mechanics.
+4. Current input behavior
 
-Players can rapidly transition between different attacks, cancel an attack with another valid action, buffer slightly early inputs, and use Combat Assist to close small gaps.
+Alva has several independent combat timing systems.
 
-The problem is that repeating the same attack button while its animation is playing is currently discarded.
+Ordinary input buffer
 
-Consider the following example.
+The universal attack input buffer is currently approximately 0.15 seconds.
 
-A beginner presses Attack 1.
+It remembers an eligible attack press that cannot execute immediately and tries it again until it becomes valid or expires.
 
-Attack 1 begins.
+This is not a mandatory delay between attacks.
 
-The beginner presses Attack 1 again because they want to continue fighting.
+Repeat cooldown
 
-Nothing happens.
+Ordinary attacks have a universal 0.5-second repeat cooldown, unless the move qualifies for a longer cooldown under the existing policy.
 
-This is intentional in the current implementation, because restarting the same animation would create serious problems.
+This cooldown starts when the attack finishes, is canceled, or is interrupted.
 
-However, completely discarding the input can also make combat feel unresponsive or confusing.
+It is a per-move cooldown, not a global delay between different moves.
 
-The player believes they requested another attack, but the game gives no follow-up.
+Do not change its fundamental semantics.
 
-Our solution must address that problem without sacrificing the protection provided by the existing rule.
+Longer ability cooldowns
 
-2.1. Why simply allowing the second press is wrong
+The existing policy also provides:
 
-A naïve implementation of Attack 1 → Attack 1 could restart the animation.
+* 3 seconds for exceptional abilities and effects.
+* 5 seconds for qualifying 10-damage moves.
 
-That could:
+Preserve the precise policy in js/data/cooldowns.js, including its existing treatment of healing, paralysis, charm, float, fear and other effects.
 
-* Cancel Attack 1 before its hitbox becomes active.
-* Restart its startup repeatedly.
-* Prevent the existing animation from completing.
-* Cause inconsistent hit registration.
-* Create unintended loops.
-* Interfere with the cooldown policy.
-* Make animation timing difficult to understand.
-* Allow abusive button mashing if other safeguards fail.
+Manual player cancellation
 
-We absolutely do not want this.
+A human player can deliberately interrupt an attack by requesting a different valid action.
 
-The currently playing attack must be protected from a repeated press.
+The existing engine checks whether that request can start before ending the previous attack.
 
-We want the second press to be remembered as a future follow-up request, not executed immediately.
+This is intentional and should remain available to skilled players.
+
+The core beginner problem
+
+Consider these inputs:
+
+Attack 1 → Attack 2
+
+This is a different move request. It follows Alva’s normal action and cancellation rules.
+
+Attack 1 → Attack 1
+
+Currently, if Attack 1 is still playing, the repeated input gets ignored.
+
+Ignoring it prevents a serious problem: immediately restarting Attack 1 could terminate the ongoing animation and create unexpected combat behavior.
+
+However, completely discarding that press is also unfriendly.
+
+A beginner often expects that pressing the button twice means:
+
+1. Perform the first attack.
+2. Perform the next attack as soon as possible.
+
+The player should not have to understand frame-perfect animation timing just to execute a basic two-attack sequence.
+
+We need to retain the animation-restart protection while removing unnecessary lost inputs.
 
 ⸻
 
-PART 3 — THE MAIN FEATURE: SMART COMBO ASSIST QUEUING
+PART 3 — PRIMARY FEATURE: QUEUED COMBO ASSIST
 
-3.1. Core design
+5. Expand the existing Combo Assist
 
-Extend Alva’s existing Combo Assist to support a single queued follow-up attack.
+Alva already has Combo Assist, enabled by default for human players and independently configurable from Combat Assist.
 
-When Combo Assist is enabled and the player repeats the button associated with a basic attack that is already playing, the game may queue the opposite basic attack.
+Its current basic behavior is:
 
-The queued attack executes only after the current attack finishes naturally.
+* Attack 1 pressed again after Attack 1 finishes, while its cooldown runs, can become Attack 2.
+* Attack 2 pressed again after Attack 2 finishes, while its cooldown runs, can become Attack 1.
 
-For the user-facing examples below, 1 and 2 mean the internal actions attack1 and attack2, not necessarily the numeric keyboard keys. Preserve Alva’s current device bindings.
+Extend that system so that a repeat press made while the original attack is still playing can schedule the alternate attack to begin once the original animation finishes naturally.
 
-Example A — Repeating Attack 1
+Required example
 
-1. Player presses Attack 1.
-2. Attack 1 begins normally.
-3. During the eligible queue window, the player presses Attack 1 again.
-4. The existing Attack 1 animation continues uninterrupted.
-5. Alva records one pending Attack 2 request.
-6. Attack 1 reaches the natural end of its complete animation.
-7. Alva checks whether Attack 2 is legally available.
-8. If available, Attack 2 executes automatically without requiring another press.
-9. If unavailable, the queue is discarded without bypassing its restriction.
-
-Example B — Repeating Attack 2
-
-1. Player presses Attack 2.
-2. Attack 2 begins.
-3. Player repeats Attack 2 within the eligible window.
-4. Attack 1 is queued.
-5. Attack 2 completes naturally.
-6. Attack 1 executes if all its normal requirements are satisfied.
-
-Example C — Normal manual attack cancellation
-
-1. Player presses Attack 1.
-2. Attack 1 begins.
-3. Player presses Attack 2 directly.
-4. The existing manual cancellation system determines whether Attack 2 may start immediately.
-5. If accepted, Attack 2 behaves exactly as it did before this feature.
-
-Do not make every attack wait for the preceding animation to finish.
-
-Only the new queued follow-up mechanism must wait.
-
-Alva’s existing deliberate attack-cancellation mechanics must remain available to experienced players.
-
-3.2. Queue acceptance window
-
-Use an initial 0.20-second queue window before natural attack completion.
-
-At 60 Hz, this corresponds to approximately 12 simulation steps.
-
-For example, if an attack lasts 0.50 seconds, a repeat press between approximately 0.30 and 0.50 seconds may request the follow-up.
-
-A repeat press earlier than this window retains the existing no-restart protection and does not create a future attack.
-
-The window is measured against the current attack’s authoritative elapsed simulation time and total duration.
-
-It is not an additional delay after the animation.
-
-Once a valid request has been queued, the queue should remain pending until its associated attack naturally completes or an event invalidates it.
-
-Do not expire a legitimate queued follow-up merely because hitstop temporarily pauses the attack.
-
-Use a named constant, with clear documentation, rather than duplicating the value throughout the code.
-
-Treat 0.20 seconds as the starting gameplay-tuning value. Do not introduce a new Settings option just to expose it.
-
-During validation, evaluate whether the window is forgiving enough for beginners. If playtesting demonstrates that a larger window or full-animation buffering would materially improve usability, document that as a separate tuning recommendation rather than silently changing this specification.
-
-3.3. Exactly one queued follow-up
-
-A fighter may hold at most one queued Combo Assist follow-up at any moment.
-
-Repeated presses must not create an attack backlog.
-
-Example:
+Player presses Attack 1.
 
 Attack 1 starts.
 
-The player presses Attack 1 four additional times during the eligible window.
+Before Attack 1 finishes, the player releases Attack 1 and presses it again.
 
-The result must be:
+Alva recognizes that the player wants a follow-up.
 
-* Attack 1 finishes once.
-* Attack 2 begins once.
-* No further attack is scheduled automatically.
+Attack 1 continues playing without restarting, skipping frames, changing its recovery, or being canceled.
 
-A queued request must not generate another queued request by itself.
+When Attack 1 finishes naturally, the game attempts to execute Attack 2.
 
-Additional chaining requires another genuine player input edge.
+If Attack 2 is eligible, it begins through the normal attack-start pathway.
 
-Holding an attack button must never generate repeated attacks automatically.
+If Attack 2 is ineligible, the queued request is discarded safely.
 
-3.4. Base alternation on the actual active move
+The same behavior must work in reverse: Attack 2 → Attack 2 queues Attack 1.
 
-This is especially important because Alva’s existing Combo Assist can already redirect Attack 1 to Attack 2 when Attack 1 is cooling down.
+6. The queue must represent player intent, not an animation restart
 
-Suppose:
+Treat a repeated press as a request for a future action.
 
-1. The player previously performed Attack 1.
-2. Attack 1 enters cooldown.
-3. The player presses Attack 1 again.
-4. Existing Combo Assist redirects that press into Attack 2.
-5. Attack 2 is now playing, but it was initiated using the Attack 1 button.
-6. The player repeats that button during the new queue window.
+Do not treat it as an immediate command to replay the current move.
 
-The follow-up should be Attack 1, because Attack 2 is the attack actually playing.
+A queued follow-up must never:
 
-Do not blindly infer the next attack from the button’s label.
+* Reset the current attack’s animation.
+* Skip its startup.
+* Skip its active frames.
+* Skip its recovery.
+* Duplicate a hitbox.
+* Repeat a projectile release.
+* Reset attack hit-confirm state.
+* Reset the attack’s motion.
+* Reapply attack momentum or movement.
+* Reset cooldowns.
+* Bypass cooldown eligibility.
+* Make the player invulnerable.
+* Guarantee that the follow-up connects.
+* Cancel the current attack merely because the repeat was pressed.
 
-Use both the current attack’s resolved identity and the originating input where appropriate.
+While the current attack is executing, its existing attack record should remain authoritative.
 
-Honor the existing attack record’s button provenance.
+The queue is a small piece of separate state. It does not become the current attack until the first attack has ended.
 
-Support repeating either the move’s corresponding control or the control that actually initiated the current attack, provided it represents a genuine same-move repeat under the established rules.
+7. Accept meaningful repeat presses throughout the attack
 
-Avoid accidentally starting a third, unrelated attack.
+A previously discussed idea was a dedicated queue window near the final 0.20 seconds of an animation.
 
-3.5. Only basic attacks participate
+Treat that as a possible tuning concept, not a reason to introduce another unexplained restriction.
 
-Queueing is limited to the existing Combo Assist pairing:
+Preferred behavior for this update: Accept one genuine repeat press at any point after the original attack has started, across startup, active frames, and recovery.
+
+This best solves the beginner problem.
+
+If a player presses Attack 1 again early, the input should still be remembered.
+
+The queue should last until the originating attack naturally finishes, rather than expiring after the ordinary 0.15-second buffer.
+
+Do not introduce an additional 0.20-second waiting period.
+
+The follow-up should execute at the earliest valid simulation step after natural completion, with no artificial pause.
+
+If a shorter acceptance window proves necessary for gameplay feel, establish that through testing and explicitly document the decision. Do not silently implement a restrictive final-window-only mechanic.
+
+8. One queued follow-up per attack
+
+Alva must never create an unlimited queue from one attack.
+
+Example:
+
+Player presses Attack 1.
+
+While Attack 1 plays, the player repeatedly presses Attack 1 many times.
+
+Expected result:
+
+* Attack 1 plays once.
+* Exactly one Attack 2 is queued.
+* Attack 2 begins once Attack 1 finishes.
+* No extra Attack 1 or Attack 2 has been scheduled by those earlier repeated presses.
+
+Once Attack 2 has actually begun, another genuine new press can queue its own next attack.
+
+Each attack can independently receive one follow-up request.
+
+The system must never infer additional presses from a held button.
+
+Holding Attack 1 must still produce only one press edge.
+
+9. Resolve the follow-up from the actual playing attack
+
+This is especially important because existing Combo Assist can map a physical Attack 1 press to Attack 2.
+
+Example:
+
+1. Player performs Attack 1.
+2. Player presses Attack 1 during its cooldown.
+3. Combo Assist correctly starts Attack 2.
+4. Attack 2 is recorded as having originated from the Attack 1 button.
+5. Player presses Attack 1 again while that Attack 2 animation is playing.
+
+The newly queued follow-up must be Attack 1, because the attack currently performing is Attack 2.
+
+It must not blindly queue Attack 2 again.
+
+Base follow-up selection on the real current attack definition and the corresponding logical Attack 1 / Attack 2 pairing.
+
+Preserve information about which button originated the current action so the existing repeatsMove protection continues to make sense.
+
+Do not assume that the button pressed and attack actually playing are always identical.
+
+10. Restrict automatic alternation to Attack 1 and Attack 2
+
+The existing COMBO_PAIRS relationship is:
 
 * attack1 → attack2
 * attack2 → attack1
 
-It must not automatically alternate:
+Keep it.
 
-* extra_attack
-* attack3
-* attack4
-* attack5
-* Summons
-* Techniques
-* Deflect
-* Shield
-* Dash
-* Air dash
+Do not automatically alternate:
 
-These actions retain their normal execution and cancellation rules.
+* Extra Attack.
+* Attack 3.
+* Attack 4.
+* Attack 5.
+* Summons.
+* Techniques.
+* Deflect.
+* Shield.
+* Dash or air dash.
 
-Do not assume that every numbered attack is an ordinary melee attack.
+Those actions should retain their existing individual behavior.
 
-The repository supports typed loadouts, including specials mapped to numbered buttons.
+Preserve the ability for the player to explicitly request those actions through their normal controls.
+
+11. Preserve grounded and airborne attack identities
+
+Alva’s loadout system can map the same logical attack button to different ground and airborne attacks.
+
+For example, attack1 and midair_attack1 belong to one input family but may have very different mechanics.
+
+The queued Combo Assist must honor those mappings.
+
+Requirements:
+
+* Ground Attack 1 may queue the appropriate ground Attack 2.
+* Air Attack 1 may queue the appropriate airborne Attack 2.
+* Air Attack 2 may queue the appropriate airborne Attack 1.
+* Respect groundOnly, airUses, free fall and launch-state restrictions.
+* Never substitute a ground attack for an unavailable air attack without a deliberate and documented rule.
+* Never fabricate an airborne version of an attack.
+* Never launch an attack using missing animation art.
+
+Retain the place/context associated with the queued action and validate it again when the attack would execute.
+
+If the fighter’s state has changed so that the queued move is no longer appropriate, discard the queue rather than executing an unrelated move.
 
 ⸻
 
-PART 4 — NATURAL COMPLETION VS INTERRUPTION
+PART 4 — COOLDOWNS AND ELIGIBILITY
 
-This is a critical engineering requirement.
+12. No cooldown bypasses under any circumstances
 
-Alva’s current combat lifecycle can end an attack for several different reasons.
+Combo Assist is an input convenience, not a combat advantage that overrides the normal rules.
 
-Those reasons are not interchangeable.
+When a queued follow-up is ready to execute, it must pass the same eligibility checks as a normal press of that attack.
 
-4.1. Natural completion
+Check:
 
-An attack ends because its own timeline reaches the full duration defined by its animation and phases.
+* The move’s own cooldown.
+* Required animation art.
+* Whether the fighter can act.
+* Ground or air availability.
+* Airtime usage limits.
+* Free fall restrictions.
+* Motion restrictions.
+* Active hitstun.
+* Blockstun.
+* Paralysis.
+* Shield state.
+* Dash commitments.
+* Summon or technique commitments.
+* Match/input lock state.
+* Any other relevant restrictions already enforced by the existing engine.
 
-A queued follow-up may execute after this kind of completion.
+Use the existing shared attack eligibility logic rather than duplicating it in a second, potentially inconsistent system.
 
-4.2. Manual cancellation
+Example: unavailable alternate
 
-A player intentionally replaces the attack with a different valid action.
+Attack 1 is performing.
 
-The original attack is interrupted.
+The player repeats Attack 1, queuing Attack 2.
 
-Its existing cooldown begins.
+Attack 2 is still on cooldown when Attack 1 naturally finishes.
 
-Any queued Combo Assist follow-up attached to the original attack must be discarded.
+Result:
 
-Do not trigger that queued follow-up later.
+* Attack 1 completes.
+* Attack 2 does not execute.
+* The queue is cleared.
+* Attack 2’s cooldown remains unchanged.
+* Attack 1’s cooldown remains governed by its ordinary lifecycle.
 
-4.3. Hit interruption
+Do not keep trying indefinitely until Attack 2 becomes available.
 
-A fighter takes a hit that interrupts its current action.
+Do not automatically substitute another attack.
 
-Any pending queued Combo Assist follow-up must be discarded.
+Do not restart Attack 1.
 
-The queue must not revive after hitstun, paralysis, or recovery.
+The request simply cannot be fulfilled.
 
-4.4. Landing cancellation
+13. Preserve the original attack’s cooldown lifecycle
 
-Some aerial attacks end their recovery early when landing.
+When an attack finishes naturally, its cooldown begins under the current rules.
 
-This is not equivalent to their complete animation naturally finishing.
+This must happen exactly once.
 
-Do not release an unfinished queued attack because a landing cancel ended the source.
+Executing a queued follow-up must not:
 
-4.5. Other forced endings
+* Shorten the original attack’s cooldown.
+* Overwrite it.
+* Clear it.
+* Refresh it unnecessarily.
+* Replace its cooldown with the alternate’s cooldown.
+* Start the alternate’s cooldown before that alternate itself finishes, unless an existing rule specifically requires this.
+* Create a new global 0.5-second combat lockout.
 
-Clear stale queues when their source attack ends because of:
+The first attack and second attack have separate cooldown identities.
 
-* A successful Dash or air dash cancel.
-* A successful jump or air jump cancel.
-* Shield or Deflect taking over.
-* A different valid combat action taking over.
-* A technique or summon beginning.
-* Knockback or other forced combat states.
-* The fighter leaving the active match.
-* Falling into the Void.
-* Respawning or resetting.
-* Changing fighters.
-* Starting a new round or rematch.
-* Battle or practice-session destruction.
-* Input locking or a completed match.
-* Any other existing transition that makes the original attack obsolete.
+The queue is not a cooldown timer.
 
-Do not introduce a single broad clearing rule that accidentally destroys legitimate input buffers.
+14. Maintain the ordinary 0.15-second buffer independently
 
-Distinguish the new Combo Assist queue from the existing ordinary attack buffer.
+Do not increase or replace BASE_FIGHTER_MOVEMENT.attackBuffer merely to implement this feature.
 
-4.6. Implementation requirement
+The ordinary buffer and Combo Assist queue solve different problems.
 
-Study the exact behavior of:
+Ordinary buffer: A short-lived request that could not execute yet.
 
-* CombatState.update()
+Combo Assist queue: A repeat press associated with a specific attack, waiting for that specific attack to finish.
+
+They must not accidentally trigger each other twice.
+
+A queued Combo Assist input should not also be stored as an ordinary buffered attack that later executes independently.
+
+Define clear precedence when both contain requests.
+
+The latest intentional player action should behave predictably.
+
+⸻
+
+PART 5 — ANIMATION LIFECYCLE AND SIMULATION TIMING
+
+15. The original animation must complete naturally
+
+Study these existing pieces carefully:
+
+* CombatState.update(dt)
 * CombatState.endAttack()
 * CombatState.interruptAttack()
-* Fighter.cutAttack()
-* Fighter.update()
+* Fighter.update(dt, ctx)
 * Fighter.startAttack()
-* Landing cancellation
-* Hit processing
+* Fighter.cutAttack()
+* Fighter.updateState()
+* SpriteAnimator.play()
+* SpriteAnimator.update()
 
-Choose a robust mechanism for identifying a genuine natural completion.
+A critical implementation detail is that CombatState.update(dt) advances attack time and may end an attack before the rest of Fighter.update() processes the current frame’s combat requests.
 
-Possible approaches include tracking a completion event or explicitly recording the reason an attack ended.
+Do not ignore this ordering.
 
-Choose the smallest reliable implementation compatible with the current architecture.
+A repeated press occurring on the same simulation step in which the current attack naturally completes must be handled consistently.
 
-Do not use the weak assumption that combat.attack === null always means the animation finished.
+Capture or resolve repeat intent while the originating attack is still identifiable.
 
-Do not use elapsed attack time alone if another action could have interrupted the move at the same boundary.
+Then dispatch the follow-up at the correct point in the update lifecycle.
 
-Ensure the source attack’s entire intended animation, including the final frame’s intended display interval, is preserved.
+Do not allow the current attack to disappear before the system can recognize the repeat press.
 
-The queued follow-up should start on the earliest legal simulation step after that complete natural ending, without an arbitrary additional delay.
+16. Distinguish natural completion from early termination
+
+A queue should execute only when its originating attack genuinely finishes through its normal animation lifecycle.
+
+It should not execute merely because combat.attack becomes null.
+
+An attack can stop because of:
+
+* Natural completion.
+* Another attack canceling it.
+* A jump.
+* A Dash.
+* A Shield or Deflect.
+* A technique or summon.
+* Being hit.
+* Paralysis.
+* Ground contact.
+* A landing cancel.
+* A special attack motion completing early.
+* A bounce.
+* A reset, respawn, or match transition.
+
+Several of these paths use endAttack().
+
+Therefore, an unconditional combat.attack === null check is insufficient.
+
+Implement reliable lifecycle detection.
+
+An explicit completion reason or tightly scoped natural-finish event may be appropriate if the existing architecture needs one.
+
+Avoid adding a complicated event bus merely for a small local feature.
+
+Required invariant: A queued follow-up is released only when its original attack ended by natural completion—not when some other action canceled or interrupted it.
+
+Preserve existing exceptions for attack motions and landing-cancel mechanics.
+
+Do not force an attack that intentionally ends upon contact to continue executing a fictional full-length animation.
+
+17. No animation restarts
+
+While the first attack remains active:
+
+* Its attack record stays the same.
+* Its animation progresses normally.
+* Its time increases only through normal simulation.
+* Its animation frame progression remains uninterrupted.
+* Its active hitboxes remain governed by the original attack.
+* Its projectile-release flags remain intact.
+* Its hit-confirm and multi-hit state remain intact.
+
+SpriteAnimator.play() should restart only when a genuinely new animation begins or another existing gameplay rule legitimately requires it.
+
+Do not add a restart: true call whenever the player presses a repeated combat button.
+
+The queued alternate is allowed to start at its own first frame after the previous animation has finished.
+
+That is not restarting the previous animation.
+
+18. Respect hitstop
+
+Hitstop freezes attack animation progress.
+
+A queued Combo Assist follow-up must not execute during hitstop.
+
+If the player repeats the active attack during a valid hitstop interval, that press may register as the queued follow-up, provided the originating attack is still valid and the player has not been interrupted.
+
+The follow-up waits until the original attack can finish.
+
+Do not age a combo queue using wall-clock time.
+
+Pausing the game must not make the queue expire.
+
+Use deterministic simulation state.
+
+19. Respect fixed-step determinism
+
+All combat changes must remain compatible with CONFIG.sim.step, currently 1/60 second.
+
+Do not use:
+
+* setTimeout.
+* setInterval.
+* Wall-clock timestamps.
+* Date.now().
+* performance.now().
+* Unseeded randomness.
+* Animation-frame callbacks as gameplay timers.
+
+Do not execute extra simulation steps to make a combo happen faster.
+
+Equivalent input sequences must produce equivalent combat results regardless of the browser’s rendering frame rate.
 
 ⸻
 
-PART 5 — COOLDOWNS MUST REMAIN COMPLETELY INTACT
+PART 6 — PLAYER INTENT AND INPUT PRIORITIES
 
-Alva already has a carefully defined cooldown policy.
+20. Preserve deliberate manual attacks
 
-Do not rewrite it.
-
-The existing policy includes:
-
-* Ordinary repeat cooldown: 0.5 seconds.
-* Exceptional ability/effect cooldown: 3 seconds.
-* High-impact 10-damage cooldown: 5 seconds.
-* Existing exceptions such as Deflect.
-
-Cooldowns depend on the actual move and its mechanics.
-
-The Combo Assist queue must never bypass, shorten, reset, or secretly override a cooldown.
-
-5.1. Source attack cooldown
-
-The original attack’s cooldown must begin according to its existing lifecycle rules.
-
-For a naturally completed ordinary attack, this means when its attack ends.
-
-The queue must not cause the cooldown to start early.
-
-It must not start the source cooldown twice.
-
-5.2. Follow-up attack cooldown
-
-The queued alternate retains its own cooldown.
-
-If it is still cooling down when the original attack finishes, it must not execute.
-
-Do not reset its cooldown to zero.
-
-Do not silently wait several seconds and fire later.
-
-An unavailable queued attack should be discarded at execution time.
-
-5.3. Source and alternate are independent
+Combo Assist should make repeated input forgiving without taking control away from the player.
 
 Example:
 
-Attack 1 finishes.
+Player starts Attack 1.
 
-Attack 1’s 0.5-second repeat cooldown begins.
+Player explicitly presses Attack 2.
 
-Attack 2 is ready.
+That is a new attack request, not a repeated Attack 1 request.
 
-Attack 2 executes.
+Keep Alva’s existing manual cancellation rules.
 
-Attack 1 remains on cooldown.
+If Attack 2 is eligible and the player is allowed to cancel Attack 1 into it, the new request can start immediately.
 
-This is valid.
+Do not force that player to wait for Attack 1’s full animation just because Combo Assist is enabled.
 
-The cooldown prevents reusing Attack 1 directly; it does not forbid using a different available attack.
+The new wait-until-complete behavior applies specifically to automatic follow-ups generated from repeated input.
 
-Preserve this distinction.
+Manual combat must remain expressive.
 
-5.4. Do not create a global attack cooldown
+21. Define queue precedence clearly
 
-Cooldowns are not a universal lock that prohibits all offensive actions.
+The combat engine should have a deterministic distinction between:
 
-Do not introduce a global timer between Attack 1 and Attack 2.
+1. A fresh deliberate request for a different action.
+2. An existing ordinary buffered request.
+3. A queued Combo Assist follow-up.
+4. Held locomotion directions.
 
-The new system must remain compatible with Alva’s existing ability to transition rapidly between different moves.
+The queued follow-up should be a low-priority convenience action.
+
+It must never unexpectedly override a deliberate new attack, defensive action, jump or Dash.
+
+Examples:
+
+Attack 1 → repeat Attack 1 → Attack 3
+
+The repeat queues Attack 2.
+
+The later explicit Attack 3 request takes precedence.
+
+Do not execute Attack 2 unexpectedly after the player has clearly requested Attack 3.
+
+Attack 1 → repeat Attack 1 → Shield
+
+The player requests defense.
+
+The queued Attack 2 must not prevent the Shield from taking effect under existing rules.
+
+Attack 1 → repeat Attack 1 → Jump
+
+The jump follows the existing manual-cancellation rules.
+
+The queued Attack 2 should not consume the frame and block the jump.
+
+Attack 1 → repeat Attack 1 → Dash
+
+The explicit Dash follows existing movement and Energy rules.
+
+The queued attack does not override it.
+
+Attack 1 → repeat Attack 1 → Run
+
+Run is locomotion, not a new combat request.
+
+Holding or changing Run direction must not discard the queue.
+
+Preserve the existing principle that Run does not constitute an explicit attack-cancel request.
+
+Multiple requests on the same step
+
+Alva permits at most one accepted new move per simulation step.
+
+Keep that invariant.
+
+Do not allow a queued follow-up and a new manual action to start sequentially on the same simulation step, potentially canceling one another.
+
+Account for the fact that the existing engine processes combat requests, Dash, Shield and jump in separate sections.
+
+Do not allow queue dispatch to steal priority simply because one section executes earlier in the source file.
+
+Refactor local decision ordering if necessary, with regression tests.
+
+22. Clear stale queues
+
+The queue must be cleared when it is no longer valid.
+
+This includes:
+
+* The originating attack is interrupted.
+* The player is hit.
+* The player successfully cancels into another action.
+* Another fresh incompatible request supersedes the queue.
+* A different attack replaces its original attack.
+* The fighter is eliminated.
+* The fighter falls into the Void.
+* The fighter respawns.
+* A round or match resets.
+* Practice Ground replaces the player fighter.
+* The opponent or session becomes invalid for a required action.
+* Input becomes locked.
+* Combo Assist becomes unavailable.
+* The game leaves active combat.
+* The queued move fails eligibility when its originating attack finishes.
+
+Do not allow stale requests to survive into a new life, match or fighter.
+
+Use a single obvious ownership model for the queued state.
+
+Avoid scattering unrelated cleanup flags across the engine.
 
 ⸻
 
-PART 6 — KEEP NORMAL INPUT BUFFERING SEPARATE
+PART 7 — COMBO ASSIST AND COMBAT ASSIST WORKING TOGETHER
 
-Alva already provides an ordinary attack input buffer of 0.15 seconds.
+23. Preserve Combat Assist as a separate feature
 
-This buffer remembers a legitimate attack request that was made slightly before it became executable.
+Alva’s Combat Assist can close a small gap before executing a melee attack.
 
-The proposed Combo Assist queue serves a different purpose.
+It is human-player-only and enabled by default.
 
-Existing input buffer
+It does not cost Energy.
 
-An attack was requested while temporarily unavailable.
+It does not extend attack hitboxes or teleport the fighter.
 
-The request may be retried for the existing buffer duration.
+It should remain a separate setting from Combo Assist.
 
-New Combo Assist queue
+A player should be able to use:
 
-A repeated basic attack requests its alternate, specifically after the currently playing attack completes naturally.
+* Neither assist.
+* Combo Assist only.
+* Combat Assist only.
+* Both assists together.
 
-These are distinct systems.
+All four combinations must work.
 
-Do not combine their timers or make one silently extend the other.
+24. Queued follow-ups must integrate with Combat Assist
 
-6.1. Separation of state
+Example:
 
-Use a dedicated, clearly named queue field or equivalent isolated state.
+The player successfully performs Attack 1.
 
-A suggested conceptual structure is:
+The player repeats Attack 1 to queue Attack 2.
 
-queuedCombo = {
-  sourceRecord,
-  sourceAttackId,
-  requestedAction,
-  originatingButton,
-  originatingPlace,
-  createdStep,
-}
+Attack 1 completes.
 
-Adapt the structure to the actual codebase.
+Attack 2 is a melee move, and the target has moved just beyond its natural reach.
 
-Preserve the reference or identity of the precise source attack instance, not merely its attack ID.
+If Combat Assist is enabled and its normal conditions are satisfied, it may start its ordinary short approach before executing Attack 2.
 
-That prevents a queued request from leaking into a later instance of the same move.
+This must use Combat Assist’s existing measured range, collision restrictions, facing logic, travel limits and airtime rules.
 
-6.2. Newer requests and priority
+Do not grant a special extra-long approach because the move came from Combo Assist.
 
-Preserve the current precedence of genuine player input.
+Do not teleport the fighter into range.
 
-A queued attack is a fallback request, not an action that overrides the player.
+Do not give it free extra air dashes.
 
-If the player deliberately starts another valid action before the original attack completes, the newer action should take priority and the old queue should be removed.
+Do not apply Combat Assist to projectiles, homing attacks, techniques, summons or other excluded moves.
 
-A new queued follow-up must not steal the step from a successful fresh input.
+If Combat Assist is disabled, the attack must use its normal range and may miss.
 
-Do not let a failed or unavailable action randomly cancel a legitimate queue unless the game’s established input-priority rules explicitly require it.
+Both assists should complement each other, but neither should override the other’s restrictions.
 
-An action pressed simultaneously with the natural completion of an attack must be resolved consistently.
+25. Handle Combat Assist’s active approach state
 
-Guarantee that at most one new move can be accepted in a simulation step.
+Combat Assist has its own in-progress approach state before the actual attack begins.
 
-The design must avoid duplicate attack starts caused by the same press being interpreted through both ordinary Combo Assist and the new queue.
+During that approach, the attack animation is not yet playing.
 
-6.3. Never create ghost inputs
+A repeated button press during an approach must not be mistaken for a repeat during the eventual attack animation.
 
-A ghost input is a combat action that activates later when the player reasonably believes the request is gone.
+Preserve the existing approach-replacement and cancellation rules.
 
-The new queue must not produce this behavior.
+The queued follow-up should become available only when a real attack is actually active.
 
-It should be bound to one specific active attack and its natural end.
-
-After the current attack is canceled or the queue is consumed, the old request must be permanently cleared.
-
-Do not let it survive unrelated actions.
+If an approach is canceled before its attack starts, do not leave a future combo queued for an attack that never occurred.
 
 ⸻
 
-PART 7 — PRESERVE ADVANCED ATTACK CANCELLATION
+PART 8 — IMPROVING THE OVERALL FIGHTING FEEL
 
-This is a major design priority.
+26. Prioritize responsiveness over unnecessary animation shortcuts
 
-Alva currently allows human players to intentionally cancel their attacks with other valid actions, even without a confirmed hit, subject to the existing rules.
+Alva’s attacks vary in speed because they have different frame counts, frame rates, startup, active phases, recovery, and special motion rules.
 
-That gives skilled players flexibility and creates a faster combat experience.
+Those differences are part of the fighting system.
 
-Do not remove or unnecessarily restrict this feature.
+Do not flatten every attack into an identical animation duration.
 
-The new Combo Assist queue must not make manual controls slower.
+A quick basic strike and a powerful finishing attack should not feel the same.
 
-For example:
+Instead, improve how player inputs transition between those existing moves.
 
-Attack 1 → Attack 2
+The goal is:
 
-This remains an intentional new-attack request.
+The game should respect the player’s input while respecting the move’s intended commitment.
 
-The current cancellation rules determine its execution.
+Good responsiveness does not mean every animation can be canceled for free.
 
-Attack 1 → Attack 1
+Good responsiveness means the player can predict what will happen when pressing a button.
 
-This must never immediately restart Attack 1.
+27. Preserve skill expression
 
-If Combo Assist is enabled and the repeated press occurs inside the queue window, the alternate is scheduled after full animation completion.
+Experienced players should still benefit from:
 
-Attack 1 → Jump
+* Timing their attacks deliberately.
+* Selecting different follow-up attacks.
+* Knowing their character’s real combo routes.
+* Managing cooldowns.
+* Using directional movement.
+* Controlling spacing.
+* Performing Dash cancels.
+* Using hit-confirm opportunities.
+* Choosing when to defend.
+* Using Combat Assist or disabling it.
+* Controlling jumps, fast falls and aerial attacks.
+* Managing Energy and Launch Point.
 
-Keep the existing jump-cancellation behavior.
+Combo Assist is an accessibility and usability improvement, not an automatic optimal-combo generator.
 
-Attack 1 → Dash
+Do not introduce a system that chooses the highest-damage attack for the player.
 
-Keep the existing Dash-cancellation behavior and Energy costs.
+Do not automatically chase opponents indefinitely.
 
-Attack 1 → Shield
+Do not change the attack’s damage or launch strength based on whether Combo Assist was used.
 
-Keep the existing defensive-cancellation behavior.
+Do not guarantee a true combo.
 
-Attack 1 → Special
+A mechanically executed follow-up can still miss, be blocked, or leave the opponent time to recover.
 
-Keep the existing eligibility and cooldown rules for that special.
+28. Avoid creating a button-mashing exploit
 
-The main distinction is:
+A beginner should be able to press Attack 1 repeatedly and see a sensible alternating sequence.
 
-Different valid action: preserve deliberate cancellation.
+That does not mean each input should grant extra speed or damage.
 
-Same active attack repeated: protect the animation and optionally queue a Combo Assist follow-up.
+Test sustained button mashing against:
 
-Do not introduce universal animation locks or mandatory recovery delays that would make experienced players feel less responsive.
+* A stationary opponent.
+* A shielding opponent.
+* An airborne opponent.
+* An opponent being launched away.
+* A target near a ledge.
+* A high-Launch-Point target.
+
+Ensure that pressing repeatedly does not cause:
+
+* More hitboxes per attack.
+* Shorter cooldowns.
+* Repeated projectile spawning.
+* Skipped recovery.
+* Faster attacks than the definitions allow.
+* Guaranteed loops.
+* Extra Energy.
+* Disappearing commitment frames.
+
+Mashing should become easier to understand, not become inherently superior to skillful play.
+
+29. Review perceived dropped inputs
+
+Once the queued follow-up is implemented, inspect the surrounding ordinary attack and cancellation pathways.
+
+Look for places where a player presses a valid control, receives no obvious response, and cannot understand why.
+
+Focus especially on:
+
+* Input near the final animation frame.
+* Input during recovery.
+* Input during hitstop.
+* Attack requests made while a cooldown is nearly finished.
+* Presses made around landing.
+* Aerial attack restrictions.
+* Inputs during Combat Assist’s approach.
+* Simultaneous actions.
+* Input after a successful hit or block.
+* Input just before being stunned.
+
+Fix demonstrable input-handling problems within this feature’s scope.
+
+Do not turn every unavailable move into a queued action.
+
+Do not make techniques, summons, Shield or movement requests automatically execute much later unless their existing system explicitly supports buffering.
+
+Avoid speculative combat rebalancing.
+
+If an issue would require changing the game’s fundamental combat design, document it separately rather than silently introducing a new rule.
+
+30. Improve clarity without cluttering the battlefield
+
+Consider a subtle indication that Combo Assist has accepted a follow-up.
+
+For example, an unobtrusive queued state on the existing ability HUD’s corresponding move tile.
+
+If implemented, it should:
+
+* Identify the actual queued alternate move.
+* Appear only when a follow-up is genuinely queued.
+* Disappear when executed, rejected or canceled.
+* Never imply that a cooldown has completed when it has not.
+* Reuse the existing interface’s visual language.
+* Avoid distracting effects over the fighters.
+* Work on desktop and touch.
+* Respect reduced-motion preferences.
+* Use English and French localization.
+* Avoid unnecessary per-frame DOM rebuilding.
+
+This feedback should make player intent more understandable.
+
+Do not add a new full-screen overlay or tutorial interruption during combat.
+
+If the existing HUD cannot represent the queue cleanly, prioritize gameplay correctness and explain the UI limitation.
 
 ⸻
 
-PART 8 — COMBAT ASSIST INTEGRATION
+PART 9 — PRESERVE THE EXISTING GAME
 
-Alva has a separate feature named Combat Assist.
+31. Do not unintentionally alter combat fundamentals
 
-Combat Assist helps the human player’s melee attacks connect by closing a short, valid gap before executing the requested attack.
-
-It is independent of Combo Assist.
-
-Both systems can be enabled or disabled separately.
-
-Preserve that independence.
-
-8.1. Queued melee attacks
-
-Suppose Attack 1 finishes and Attack 2 is queued.
-
-If Attack 2 is a melee attack and Combat Assist is enabled:
-
-1. Check that Attack 2 can legally start.
-2. Evaluate its ordinary Combat Assist requirements.
-3. If the opponent is already within range, execute it normally.
-4. If Combat Assist can legally close the gap, begin the existing approach.
-5. Execute Attack 2 after the approach finishes, through its standard pathway.
-
-Do not teleport the fighter.
-
-Do not extend the attack’s hitbox.
-
-Do not increase its damage or tracking strength.
-
-Do not bypass stage collision.
-
-Do not change Combat Assist’s existing Energy behavior.
-
-8.2. Both assists disabled or enabled independently
-
-Test all four combinations:
-
-Combo Assist	Combat Assist	Expected behavior
-On	On	Queued alternate plus normal melee approach eligibility
-On	Off	Queued alternate without assisted approach
-Off	On	Existing Combat Assist; no new combo queue
-Off	Off	Existing manual combat behavior
-
-Do not couple the two settings.
-
-8.3. Preserve facing
-
-Combat Assist currently contains special handling to face the opponent correctly, including while Run is held.
-
-Do not regress that behavior.
-
-A queued follow-up must use the proper attack-start facing and current movement context.
-
-It must not aim in the wrong direction simply because the player is holding Run away from the opponent.
-
-Likewise, do not override deliberate manual facing when Combat Assist is disabled.
-
-⸻
-
-PART 9 — GROUND AND AIR ATTACKS
-
-Alva’s numbered attacks can resolve differently on the ground and in the air.
-
-This must be respected.
-
-9.1. Ground attacks
-
-A queued follow-up from a grounded Attack 1 should resolve to the fighter’s grounded Attack 2 mapping.
-
-Do not hardcode move animation names.
-
-Use the fighter’s actual loadout mapping.
-
-9.2. Air attacks
-
-The same principle applies in the air.
-
-A queued follow-up from an aerial Attack 1 should use the corresponding aerial Attack 2 mapping.
-
-Respect:
-
-* Remaining aerial uses.
-* Free-fall restrictions.
-* Ground-only rules.
-* Motion restrictions.
-* Launch state.
-* Required animation assets.
-* Existing air-dash use limits.
-
-9.3. Changes between ground and air
-
-A queued ground request must not silently turn into a different air attack.
-
-A queued aerial request must not silently turn into a ground attack because the fighter landed.
-
-Use the original action context and the established input-place semantics.
-
-If a location change invalidates the requested move, discard the queue.
-
-Do not fabricate an alternative action.
-
-9.4. Special motion attacks
-
-Include regression coverage for attacks with unusual motion or animation behavior:
-
-* Homing attacks.
-* Roll attacks.
-* Hover attacks.
-* Rising attacks.
-* Plunging attacks.
-* Slam attacks.
-* Multi-hit attacks.
-* Projectile-releasing attacks.
-
-Do not introduce special-case fighter-ID logic to handle them.
-
-Use the existing attack definitions and runtime capabilities.
-
-⸻
-
-PART 10 — MAKE COMBAT MORE UNDERSTANDABLE TO BEGINNERS
-
-The primary mechanical change is queued Combo Assist.
-
-However, its benefits will be limited if a new player cannot understand what happened.
-
-Implement minimal, nonintrusive feedback that makes the interaction clearer.
-
-10.1. Indicate a successfully queued follow-up
-
-When a repeat press successfully queues the alternate, provide subtle visual feedback.
-
-Use Alva’s existing interface conventions.
-
-The player should be able to understand:
-
-* Their repeated press was accepted.
-* The current attack is still playing.
-* Another attack is scheduled next.
-
-Prefer reusing the ability HUD’s existing tiles, artwork and control labels.
-
-A small queued state, restrained highlight, or equivalent presentation treatment is appropriate.
-
-Do not cover the fighters or obscure hit effects.
-
-Do not create a large new combat overlay.
-
-Do not add a loud effect every time someone mashes a button.
-
-10.2. Ensure the indicator is truthful
-
-The indicator must reflect actual queue state.
-
-It must disappear when the queue:
-
-* Executes.
-* Is canceled.
-* Becomes invalid.
-* Is cleared by a reset.
-
-Never show a follow-up as guaranteed if its cooldown or another restriction may ultimately prevent it.
-
-The presentation should distinguish “queued” from “executing” or “guaranteed to hit.”
-
-10.3. Support all input devices
-
-Ensure the mechanic and its feedback work across:
-
-* Keyboard.
-* PlayStation game controllers.
-* Xbox game controllers.
-* Touch controls using the Joystick layout.
-* Touch controls using the Classic Buttons layout.
-* Custom controller bindings.
-* Custom touch-control layouts.
-
-All devices must continue producing the same canonical combat actions.
-
-Do not create a keyboard-only solution.
-
-10.4. Respect accessibility and localization
-
-Any new player-facing text must support Alva’s English and French localization system.
-
-Respect reduced-motion preferences for animated feedback.
-
-Do not rely exclusively on color to indicate a queued input.
-
-Maintain appropriate accessible labels.
-
-The feedback must remain secondary to combat and should have no influence on simulation results.
-
-10.5. Practice Ground usability
-
-Review whether the new behavior can be demonstrated in the existing Practice Ground with a small, contextual instruction.
-
-For example:
-
-“With Combo Assist on, press Attack 1 again near the end of its animation to queue Attack 2.”
-
-Use existing instructional patterns and localization rather than building a separate tutorial framework.
-
-The instruction should accurately match the implemented timing rules.
-
-Do not significantly redesign Practice Ground.
-
-⸻
-
-PART 11 — DO NOT CHANGE CPU INTELLIGENCE OR DIFFICULTY
-
-This requirement is especially important.
-
-The game’s CPU-strength issue was recently addressed separately.
-
-The current task is not about making the CPU weaker or stronger.
-
-Do not alter CPU strength, reaction times, accuracy, combos, decision-making, strategic behavior, or difficulty scaling.
-
-In particular, avoid gameplay changes to:
-
-* js/game/ai/cpu-intelligence/
-* js/game/ai/combat-ai.js
-* js/data/difficulty.js
-
-Preserve the recent CPU improvements.
-
-The new Combo Assist queue must be restricted to eligible human-player controllers.
-
-Do not use slot names, character IDs or labels such as “P1” to decide eligibility.
-
-Use the existing player-controller and Combo Assist eligibility mechanisms.
-
-The CPU must remain governed by its existing attack rules.
-
-Watch Mode must remain unaffected.
-
-The Practice Ground training dummy must remain unaffected.
-
-If regression tests reveal changes in CPU behavior, investigate the underlying shared-system regression instead of modifying CPU intelligence to compensate.
-
-If an unrelated CPU issue is discovered, report it separately.
-
-Do not silently include CPU balancing changes in this work.
-
-⸻
-
-PART 12 — PRESERVE THE REST OF COMBAT BALANCE
-
-This task is about responsiveness and control quality.
-
-It is not a general character balance patch.
-
-Preserve the existing rules governing:
+Preserve:
 
 * Launch Point accumulation.
-* Launch Point recovery and healing.
-* Damage tiers.
+* Passive Launch Point recovery.
+* The Void and match scoring.
 * Base Launch and Directional Launch.
-* Hitstun.
-* Blockstun.
+* Damage tiers of 1, 3, 5 and 10.
+* Existing cooldown policy.
+* Character-specific attacks and abilities.
+* Hitbox dimensions.
+* Hurtboxes.
+* Knockback and launch steering.
+* Hitstun and blockstun.
 * Hitstop.
-* Shield protection.
-* Perfect Shield.
-* Deflect.
-* Energy consumption and regeneration.
-* Dash and air-dash costs.
-* Air-jump and air-attack limits.
-* Projectile behavior.
-* Special abilities.
-* Per-move cooldown classifications.
-* Momentum.
-* Stage geometry and collision.
-* Void elimination rules.
-* Match scoring and overtime.
+* Shields and perfect Shields.
+* Deflect and projectile reflection.
+* Energy costs and regeneration.
+* Projectiles and their release timing.
+* Summons and techniques.
+* Attack classifications.
+* Special ability behavior.
+* Existing human manual cancellation.
+* CPU hit-cancel rules.
+* Universal movement.
+* Momentum and steering.
+* Triple jumps.
+* Fast fall.
+* Ground Dash and air dash.
+* Stage collision.
+* Platform hazards.
+* Void hazards.
+* Match timing and scoring.
+* Existing controller profiles.
 
-Do not add damage bonuses for queued combos.
+Do not rebalance these mechanics to compensate for an implementation error.
 
-Do not make a queued follow-up unblockable.
+Fix the underlying implementation instead.
 
-Do not give players hidden invulnerability.
+32. Preserve character identity
 
-Do not remove the possibility of whiffing an attack.
+Alva deliberately separates shared combat rules from character-specific move definitions.
 
-Do not ensure that two sequential attacks must both hit an opponent.
+Respect that architecture.
 
-Input assistance should make attacks easier to request, not guarantee that they connect.
+Do not hard-code character IDs inside the shared Combo Assist implementation.
 
-A legitimate queued combination can still miss because of opponent movement, range, Shield, knockback or stage position.
+Use the existing loadout mappings, attack definitions and action classifications.
 
-That is intentional.
+Do not assume every Attack 1 or Attack 2 has the same range, damage, animation duration, motion or cooldown.
+
+Verify the new feature on every currently playable character.
+
+Do not modify character movesets just to make the new queue easier to implement.
+
+Do not create missing sprites or substitute fake animations.
+
+33. Preserve controls across devices
+
+The improvement must work with:
+
+* Keyboard.
+* PlayStation controllers.
+* Xbox controllers.
+* Customized controller layouts.
+* Touch joystick layout.
+* Touch classic-button layout.
+* Ground/air directional controller mappings.
+
+Use logical combat actions and existing pressed-edge snapshots.
+
+Never implement the mechanic by checking a particular keyboard key or gamepad button inside the Fighter.
+
+Holding a button must not repeatedly queue follow-ups.
+
+Pressing, releasing and pressing again must register as two distinct press events.
+
+Controller input mappings must remain consistent with touch and keyboard.
+
+Do not break menu navigation, gamepad reconnection or controller configuration.
 
 ⸻
 
-PART 13 — ANIMATION INTEGRITY
+PART 10 — ENGINEERING APPROACH
 
-One of the most important outcomes of this task is that repeated button presses must stop feeling destructive to animations.
+34. Use a small, explicit queue state
 
-The implementation must guarantee:
+The design should require no more than one pending Combo Assist follow-up per fighter.
 
-1. A same-move repeat never restarts the source attack.
-2. A queued follow-up never cancels the source attack.
-3. Source attack animation time advances naturally, including startup, active and recovery.
-4. Valid multi-hit strikes are not accidentally skipped.
-5. A queued request does not erase a pending projectile release.
-6. Previously released projectiles remain governed by normal rules.
-7. An attack’s visual animation and gameplay timeline remain synchronized.
-8. The follow-up begins from its own first frame.
-9. The final frame of the source animation is not accidentally skipped.
-10. An interrupted attack never masquerades as a naturally completed one.
+A conceptual representation might contain:
 
-Study SpriteAnimator and Fighter.updateState() before implementing the handoff.
+* The originating attack record or a robust attack-instance identifier.
+* The logical action to perform next.
+* The button or request that created it.
+* The ground/air context.
+* Any minimal information needed to resolve the follow-up safely.
 
-Do not solve the problem by directly forcing an animator restart or adjusting its frame index.
+Do not introduce a general-purpose sequence engine unless the actual repository architecture demonstrably requires one.
 
-The proper solution is combat-state-controlled sequencing.
+Do not create a queue of unlimited length.
+
+Do not use wall-clock expiry timers.
+
+The queue must be tied to the attack that created it.
+
+35. Keep module responsibilities clear
+
+Preferred ownership:
+
+combo-assist.js
+
+Pure, deterministic rules for selecting an alternate attack and deciding whether a repeated basic attack is eligible for Combo Assist treatment.
+
+fighter.js
+
+Player input interpretation, queue ownership, action priorities, lifecycle integration and follow-up execution.
+
+combat-state.js
+
+Authoritative attack lifecycle, cooldowns and natural-completion identification.
+
+Modify this file only as needed to make lifecycle transitions reliably distinguishable.
+
+attacks.js
+
+Retain existing attack definitions and phase semantics. Do not alter attack timing data to simulate queuing.
+
+combat-assist.js
+
+Reuse existing eligibility and approach logic. Do not duplicate range or movement calculations inside Combo Assist.
+
+UI and localization
+
+Represent the resulting state and explain it to the player when appropriate.
+
+Maintain clean separation between gameplay state and presentation.
+
+36. The critical fixed-step ordering
+
+Design an explicit sequence that handles these events correctly:
+
+1. Obtain the normalized input snapshot.
+2. Identify the attack active when the step began.
+3. Recognize new repeat presses without losing the source attack identity.
+4. Register at most one eligible pending follow-up.
+5. Advance the existing combat simulation and attack lifecycle.
+6. Process any interruption or forced-state conditions.
+7. Distinguish natural completion from cancellation.
+8. Resolve fresh deliberate actions according to existing priorities.
+9. Dispatch the queued follow-up only when the original attack naturally completed and no higher-priority action wins.
+10. Recheck all eligibility using the existing action-start path.
+11. Clear the queue whether execution succeeds or fails.
+12. Advance visuals normally without restarting the original animation.
+
+The order above is a behavioral contract, not a demand for an exact method arrangement. Adapt it to the real update loop.
+
+In particular, do not accidentally consume a terminal-frame repeat as both a queued request and a new direct press.
+
+Do not allow an invalid, stale attack reference to trigger a future move.
+
+37. Prefer correctness over a superficially small patch
+
+A minimal patch is not successful if it:
+
+* Works only for Attack 1.
+* Fails for aerial attacks.
+* Fails during hitstop.
+* Misidentifies natural completion.
+* Bypasses cooldowns.
+* Restarts animations.
+* Breaks manual cancellation.
+* Allows duplicate actions on one frame.
+* Leaves queues after interruption.
+* Makes CPU behavior change.
+* Fails on one input device.
+* Requires arbitrary delays.
+
+You may refactor a small portion of the request-handling code if that produces a clearer, safer implementation.
+
+However, avoid unrelated refactors or large rewrites of the Fighter architecture.
 
 ⸻
 
-PART 14 — HITSTOP, STUN AND FRAME-BOUNDARY EDGE CASES
+PART 11 — MANDATORY AUTOMATED TESTS
 
-The implementation must be reliable at exact simulation boundaries.
+38. Write meaningful tests, not just superficial assertions
 
-14.1. Hitstop
+Expand the existing test suite.
 
-Hitstop freezes the relevant combat motion but does not necessarily stop the player from pressing buttons.
+Tests should exercise real Fighter, CombatState, CombatSystem, and available simulation harnesses wherever possible.
 
-If a legitimate repeat press occurs during hitstop while the source attack remains active, handle it consistently with the queue rules.
+Do not merely test a helper returning attack2.
 
-Do not count frozen animation time as completed time.
+Verify what actually happens in simulated combat.
 
-Do not allow the queued attack to execute while the fighter remains frozen.
+Test group A — Normal queued sequences
 
-If a hit interrupts the source attack, discard the queue.
+* Attack 1 → Attack 1 produces Attack 1 followed by Attack 2.
+* Attack 2 → Attack 2 produces Attack 2 followed by Attack 1.
+* Queuing during startup works.
+* Queuing during active frames works.
+* Queuing during recovery works.
+* Queuing on the animation’s terminal simulation step works consistently.
+* Queuing shortly before completion works.
+* Both attack animations advance through their intended durations.
+* The second attack begins on the earliest eligible step after completion.
 
-Test attacks that hit, miss, and are blocked.
+Test group B — No restarts
 
-14.2. Final-frame input
+* Repeated input does not replace the original attack record.
+* Animation time never resets during a repeated press.
+* The original attack’s clip is not restarted.
+* A hitbox is never created twice because of input repetition.
+* A projectile is never released twice.
+* Multi-hit attacks do not repeat earlier strikes.
+* The original attack’s cooldown starts once.
 
-Pay particular attention to a repeat press on the exact step when an attack reaches its ending boundary.
+Test group C — Input mashing and holding
 
-Depending on the current update order, CombatState.update() may finish the attack before the player’s press is resolved.
+* Holding Attack 1 generates no additional queued attack.
+* Holding Attack 2 generates no additional queued attack.
+* Repeatedly pressing Attack 1 many times during one attack queues only one follow-up.
+* After that follow-up starts, a genuinely new press may queue the next move.
+* No stale inputs create unexpected third or fourth moves.
+* Rapid input does not cause infinite loops.
+* Same-step duplicate inputs are handled deterministically.
 
-Ensure the press is handled once, not lost because of an inconsistent boundary interpretation and not executed twice.
+Test group D — Alternation identity
 
-The final-frame behavior must match the intended Combo Assist semantics.
+* Direct Attack 1 maps correctly.
+* Direct Attack 2 maps correctly.
+* Attack 1 mapped into Attack 2 during a cooldown retains its originating-button identity.
+* Repeating that originating button during Attack 2 queues Attack 1.
+* Pressing the currently performing move’s own button is handled consistently.
+* No other attack families automatically alternate.
 
-14.3. Same-step competing actions
+Test group E — Cooldown integrity
 
-Test a queued follow-up against simultaneous requests involving:
+* Attack 2 on cooldown cannot execute as a queued follow-up.
+* Attack 1 on cooldown cannot execute as a queued follow-up.
+* The original move’s cooldown remains correct.
+* The alternate move’s cooldown remains correct.
+* Longer cooldowns remain intact.
+* Queues never shorten timers.
+* Unavailable moves are discarded without retrying forever.
+* No global cooldown is introduced.
+* Cooldowns continue their normal progression through hitstop.
 
-* Another attack button.
-* Jump.
-* Dash.
-* Shield.
-* Deflect.
-* A special attack.
+Test group F — Interruptions and priorities
 
-Preserve the current combat-input priority.
+* Getting hit clears the queue.
+* Paralysis clears an invalid queue.
+* A valid new attack supersedes the queued follow-up.
+* Jumping prevents a stale follow-up.
+* Dashing prevents a stale follow-up.
+* Shielding prevents an inappropriate follow-up.
+* Deflect retains its priority.
+* An attack interrupted by a summon or technique does not release its queued follow-up.
+* A move canceled before natural completion cannot execute its queued follow-up.
+* Simultaneous queued follow-up and fresh manual input cannot start two moves on the same step.
+* Run held throughout does not discard the queue.
 
-One step must never launch two ordinary attacks because of a queue race.
+Test group G — Aerial combat
 
-14.4. Interrupted queues
+* Air Attack 1 can queue Air Attack 2.
+* Air Attack 2 can queue Air Attack 1.
+* Ground and air definitions remain distinct.
+* A used-up airUses restriction is respected.
+* Free fall is respected.
+* Landing-cancel behavior is preserved.
+* Plunges, bounces, slams, rolls, homing motions and recovery transitions remain correct.
+* Queues cannot produce illegal mid-air moves.
 
-Test source attacks interrupted during:
+Test group H — Assist integration
 
-* Startup.
-* Active frames.
-* Recovery.
+Test the full combination matrix:
+
+* Combo Assist on, Combat Assist on.
+* Combo Assist on, Combat Assist off.
+* Combo Assist off, Combat Assist on.
+* Combo Assist off, Combat Assist off.
+
+Verify that a queued melee follow-up can use Combat Assist’s normal approach when eligible.
+
+Verify that ranged moves do not gain an approach.
+
+Verify that no extra Energy is spent by Combat Assist.
+
+Verify that Combat Assist still consumes the appropriate aerial resource.
+
+Verify that an approach cannot create a second buffered copy of an attack.
+
+Test group I — Controllers and touch
+
+Test:
+
+* Keyboard press/release/press.
+* Touch press/release/press.
+* Gamepad press/release/press.
+* Held controls on each device.
+* Customized controller mappings.
+* Context-dependent ground/air controller inputs.
+* No duplicated Pressed edges.
+
+Test group J — Full combat regressions
+
+* The existing player-cancellation tests remain valid apart from requirements intentionally superseded by queued Combo Assist.
+* Hit-cancels remain unchanged.
+* Dash cancels remain unchanged.
+* Shields continue blocking all attacks.
+* Energy remains unchanged.
+* Damage and Launch Point remain unchanged.
+* Projectile behavior remains unchanged.
+* CPU controllers never receive player-only Combo Assist queue behavior.
+* Existing CPU difficulty tests pass.
+* Match, respawn, practice and overtime lifecycle tests pass.
+* Replaying identical input scripts produces identical outcomes.
+
+39. Update superseded tests intentionally
+
+There are existing tests explicitly asserting that repeated attack presses during an animation are never queued.
+
+Those assertions are now intentionally outdated for human players with Combo Assist enabled.
+
+Replace them with the new behavior.
+
+However, retain equivalent protections for:
+
+* Combo Assist disabled.
+* Non-player controllers.
+* No animation restart.
+* No immediate self-cancel.
+* No cooldown bypass.
+
+Do not delete large blocks of tests merely to make the suite pass.
+
+Rewrite affected expectations to express the new gameplay contract.
+
+40. Test across the full roster
+
+Where possible, use playableCharacters() instead of testing only #0001.
+
+Include characters with:
+
+* Short attacks.
+* Long attacks.
+* Melee attacks.
+* Projectile attacks.
+* Ground and mid-air variants.
+* Motion-driven attacks.
+* Limited airborne uses.
+
+Use test fixtures to cover edge cases not presently represented by a playable fighter.
+
+Do not add character-ID special cases to the engine.
+
+⸻
+
+PART 12 — MANUAL GAMEPLAY VALIDATION
+
+41. Verify how the update actually feels
+
+Automated correctness is mandatory but not sufficient.
+
+Where a browser-testing environment is available, run Alva locally over HTTP and test the experience.
+
+Beginner scenario
+
+Choose a fighter.
+
+Press Attack 1 twice without carefully timing the second press.
+
+The expected experience is that the player sees one uninterrupted attack followed by the appropriate alternate, if that alternate is available.
+
+The player should not need to understand animation frame counts.
+
+Intermediate scenario
+
+Start Attack 1 and deliberately press Attack 2.
+
+Confirm that manual attack cancellation behaves as before.
+
+Advanced scenario
+
+Use direct cancels, Dash movement, hit-confirm routes, Shield, air attacks and directional controls.
+
+Confirm that Combo Assist does not override deliberate play.
+
+Combat Assist scenario
+
+Move toward an opponent and begin an attack using Combat Assist.
+
+Queue the next move and verify that ordinary range rules still apply.
+
+Defensive scenario
+
+Queue an attack, then decide to Shield or jump.
+
+The game must not execute a stale follow-up against the player’s newer defensive intent.
+
+Failure scenario
+
+Queue a move that cannot execute because of cooldown, position or airtime restrictions.
+
+The outcome must be predictable: no invalid move, no restart, no surprise later attack.
+
+Mobile scenario
+
+Use both touch layouts in landscape orientation.
+
+Ensure that double tapping is recognized correctly and holding a button does not continuously queue attacks.
+
+Report any scenarios that cannot be validated in the available environment.
+
+Do not claim hardware or browser tests were performed unless they actually were.
+
+⸻
+
+PART 13 — DOCUMENTATION AND INTERFACE UPDATES
+
+42. Update the authoritative specification
+
+ALVA_SPEC.md currently describes the old behavior, including the rule that a repeated attack during its own animation is discarded.
+
+That must change.
+
+Update the relevant sections covering:
+
+* Combat input buffering.
+* Human-player move cancellation.
+* Combo Assist.
+* Natural attack completion.
+* Cooldown preservation.
+* Input precedence.
 * Hitstop.
-* The last eligible queue frame.
+* Ground/air attack mapping.
+* Combat Assist interaction.
 
-No ghost follow-up should execute.
+The specification must distinguish deliberate manual cancellation from queued automatic alternation.
 
-⸻
+The spec is authoritative. Do not leave the documented rules contradicting the implementation.
 
-PART 15 — IMPLEMENTATION ARCHITECTURE
+43. Update the system guides
 
-Prefer extending existing components rather than introducing several new subsystems.
+Update:
 
-15.1. combo-assist.js
+* docs/systems/combat.md
+* docs/systems/input.md
 
-Keep its main responsibility focused on Combo Assist action selection.
+Update other guides only when their behavior genuinely changes.
 
-Retain the existing cooldown-based alternation behavior.
+Describe the queue’s lifecycle, ownership, eligibility checks, and relationship to the existing buffer.
 
-Add a pure, deterministic way to identify the alternate action for a currently playing eligible attack.
+Keep the explanations accurate for future developers.
 
-Do not duplicate the fighter’s attack mappings.
+44. Update the player-facing description
 
-Use the existing COMBO_PAIRS concept.
+The existing Combo Assist description in Settings explains only that pressing Attack 1 or Attack 2 again after the original finishes performs the alternate.
 
-Avoid character-specific hardcoding.
+Revise that description to explain the new behavior.
 
-15.2. fighter.js
+Suggested meaning:
 
-This should own the runtime queue because the Fighter already owns:
+Combo Assist: Press Attack 1 or Attack 2 again while it is playing to automatically perform the other attack when the current one finishes. Each move still follows its own cooldown.
 
-* Combat requests.
-* Attack buffers.
-* Move cancellation.
-* Combat Assist state.
-* Attack state transitions.
-* Hit reactions.
-* Reset behavior.
+Use natural, concise language rather than copying that wording mechanically.
 
-Add a small dedicated queued-combo state and cohesive methods to:
+Update both English and French.
 
-1. Identify eligible repeats.
-2. Accept one queued follow-up.
-3. Detect natural source completion.
-4. Validate the queued follow-up.
-5. Dispatch it through the ordinary combat action path.
-6. Clear it on invalidation.
+Ensure that the description remains readable on mobile.
 
-Avoid scattering direct modifications to the queue across dozens of unrelated methods.
+45. Preserve settings compatibility
 
-Where possible, centralize lifecycle handling.
+Reuse the existing comboAssist boolean.
 
-15.3. combat-state.js
+Do not introduce a new setting unless there is a genuine functional requirement.
 
-Modify this only where required to reliably distinguish natural completion from cancellation or interruption.
+Avoid changing the saved settings schema or version just because the internal implementation changed.
 
-If introducing an attack-ending reason or event, document its semantics.
+Existing users who enabled or disabled Combo Assist should retain their preference.
 
-Do not change cooldown timing as a side effect.
-
-Do not alter the CPU’s existing action permissions.
-
-15.4. move-status.js and ability HUD
-
-If queue feedback is implemented, expose a read-only view of the state appropriate for presentation.
-
-Keep cooldown status and queued-combo status separate.
-
-The interface must not own authoritative queue timing.
-
-15.5. Settings
-
-Reuse the existing comboAssist setting.
-
-Do not add another setting unless there is a compelling architectural reason.
-
-Preserve stored user preferences and migration behavior.
-
-Do not change the settings version unnecessarily.
+Keep Combat Assist independent.
 
 ⸻
 
-PART 16 — DETAILED EXPECTED BEHAVIOR MATRIX
+PART 14 — PERFORMANCE AND CODE QUALITY
 
-Implement and test at least these scenarios.
+46. Keep runtime overhead minimal
 
-Input scenario	Required outcome
-Attack 1, then repeat Attack 1 during final queue window	Queue Attack 2
-Attack 2, then repeat Attack 2 during final queue window	Queue Attack 1
-Attack 1 repeated too early	No restart and no queue
-Attack 1 repeated after natural completion during cooldown	Existing Combo Assist behavior
-Attack 1 → direct Attack 2	Existing direct cancellation behavior
-Attack 2 → direct Attack 1	Existing direct cancellation behavior
-Attack 1 repeatedly mashed	Only one follow-up per active source
-Attack 1 held down	Only one press, no automatic queue
-Queued Attack 2 on cooldown at execution	Discard queue
-Queued Attack 2 missing required art	Discard queue
-Queued aerial attack has used all airtime starts	Discard queue
-Player changes from ground to air before execution	Honor original action context; do not substitute
-Source attack is manually canceled	Clear queue
-Source attack is interrupted by a hit	Clear queue
-Source attack is landing-canceled before natural completion	Clear queue
-Source attack reaches natural end	Allow legal queued follow-up
-Combo Assist off	Existing behavior unchanged
-Combat Assist on	Queued melee attack may use normal approach
-Combat Assist off	Queued attack has no assisted approach
-CPU repeats Attack 1	Existing CPU behavior unchanged
-Watch Mode	No human Combo Assist queue
-Practice dummy	No human Combo Assist queue
-Reset or respawn	Queue cleared
-Player presses a newer valid action	New action takes precedence
-Player loses input control or match ends	Queue cleared
-Exact final-frame repeat	Handled exactly once
-Replay the same inputs at different rendering rates	Deterministic result
+Alva targets smooth 60 FPS gameplay on modern phones.
 
-Also test longer cooldown moves and fighters with atypical attack durations.
+The queued state should be inexpensive.
+
+Avoid:
+
+* Allocating large objects every simulation step.
+* Repeatedly searching entire character registries.
+* Unnecessary DOM updates.
+* Rendering additional Canvas layers for a simple queue.
+* Ongoing timers.
+* Per-frame logging.
+* Recalculating immutable move metadata unnecessarily.
+
+Keep simulation state small and deterministic.
+
+47. Avoid architecture violations
+
+Maintain:
+
+* Relative module imports.
+* Relative asset URLs.
+* Existing control codenames.
+* Existing character-ID rules.
+* Existing movement data architecture.
+* mouvment and midair_mouvment spellings.
+* English and French localization.
+* The existing CSS organization.
+* GitHub Pages sub-path compatibility.
+* Existing settings persistence rules.
+
+Do not introduce a framework or build system.
+
+Do not add dependencies.
+
+Do not alter unrelated files.
+
+Do not modify protected project rules.
+
+48. Preserve code readability
+
+The new implementation should be understandable to a future developer.
+
+Prefer clearly named functions, such as conceptual equivalents of:
+
+* Detecting a repeat press.
+* Resolving an alternate attack.
+* Registering a queued follow-up.
+* Clearing a queue.
+* Detecting natural completion.
+* Attempting a queued follow-up.
+
+These are examples of responsibilities, not mandatory function names.
+
+Avoid a large collection of ambiguous booleans inside one update loop.
+
+Document invariants rather than commenting every line.
 
 ⸻
 
-PART 17 — COMPREHENSIVE TESTING
+PART 15 — REQUIRED WORKFLOW
 
-The implementation is not complete until the tests demonstrate that the new behavior is correct.
+49. Phase 1: Audit
 
-17.1. Update existing tests
+Before editing:
 
-Inspect and update:
+1. Inspect the current repository HEAD.
+2. Understand the current Combo Assist logic.
+3. Trace same-move input suppression.
+4. Trace normal attack buffering.
+5. Trace player cancellation.
+6. Trace attack completion and interruption.
+7. Trace Combat Assist.
+8. Trace ground and air action mappings.
+9. Trace every place an active attack can end.
+10. Identify tests whose expectations must change.
 
-* tests/systems/combo-assist.test.mjs
-* tests/systems/move-cancel.test.mjs
-* tests/systems/request-devices.test.mjs
-* tests/systems/combat-assist.test.mjs
-* tests/systems/combo.test.mjs
-* tests/systems/cooldown-policy.test.mjs
-* tests/systems/combat-rules.test.mjs
-* tests/systems/movement.test.mjs
-* tests/systems/air-mouvment.test.mjs
-* tests/systems/deflect.test.mjs
+Establish a baseline by running the existing relevant tests where tooling permits.
 
-Update other affected suites as necessary.
+Do not assume a prior suggested code snippet is production-ready.
 
-The current Combo Assist tests contain assertions that repeated inputs during active attacks are never queued.
+The real codebase is the source of truth.
 
-These are explicitly superseded only for the new Combo Assist-enabled queue behavior.
+50. Phase 2: Implement the core behavior
 
-Do not indiscriminately delete old tests.
+Implement:
 
-Preserve their assertions about animation restarts, interruption safety, cooldowns, CPU exclusion and Combo Assist-off behavior.
-
-17.2. Add dedicated queue tests
-
-Create targeted test cases for the new feature.
-
-Verify:
-
-* Correct alternate selection.
-* Complete source animation playback.
-* Correct follow-up animation startup.
-* One-slot queue capacity.
-* No duplicate damage.
-* No lost or duplicated projectile events.
-* Natural completion versus interruption.
-* Exact input timing boundaries.
-* Cooldown enforcement.
+* Repeat-press detection.
+* One-entry Combo Assist queue.
+* Actual-attack-based alternation.
+* Safe natural-completion detection.
+* Follow-up execution.
+* Cooldown and eligibility revalidation.
 * Queue cleanup.
-* Ground and aerial mappings.
-* Hitstop handling.
-* Fresh action priority.
-* Disabled-assist behavior.
+* Deterministic request ordering.
 
-Use deterministic tests based on the existing fighter harness.
+Keep the initial feature small enough to verify rigorously.
 
-17.3. Test the complete roster
+51. Phase 3: Integrate adjacent systems
 
-The mechanic must work using the real data of all currently playable fighters.
+Validate and adjust, where necessary:
 
-Do not test only #0001.
+* Ordinary attack buffering.
+* Human manual cancellation.
+* Combat Assist.
+* Jumping.
+* Dash and air dash.
+* Shield and Deflect.
+* Hitstop.
+* Landing.
+* Motion attacks.
+* Ground/air input context.
+* Resets and respawns.
 
-Include #0002, #0003, #0004, and #0005 where present, and any additional fighters that currently exist.
+Do not change an unrelated system unless the implementation exposes a real integration defect.
 
-Use playableCharacters() or equivalent authoritative roster access.
+52. Phase 4: Combat clarity
 
-Also include a test-only fighter with unusual but legal move mappings and animation durations.
+Update the Combo Assist description.
 
-17.4. Test controllers and touch input
+If it materially improves usability without clutter, add subtle feedback for an accepted queue using existing interface components.
 
-Use the existing device testing infrastructure to verify identical semantic behavior from keyboard, controller and touch inputs.
+Do not allow visual polish to delay or compromise gameplay correctness.
 
-Test press/release/press sequences.
+53. Phase 5: Automated verification
 
-Verify that holding a button does not create a repeated-press edge.
+Run focused tests first.
 
-Confirm that custom bindings still work and that no controller-specific input is interpreted twice.
-
-17.5. Test deterministic simulation
-
-Run equivalent scripted fights under different rendering-frame delivery patterns.
-
-A 30 FPS rendering schedule, a 60 FPS schedule, and a 144 FPS schedule must not produce different combat outcomes from the same simulation inputs.
-
-Queue acceptance and execution must use fixed-step gameplay state, not display-frame timing.
-
-17.6. Run the full test suite
-
-The repository uses Node’s built-in test runner.
-
-Run:
+Then run the full existing suite:
 
 node --test
 
-Also run relevant targeted suites during development.
+Resolve genuine failures.
 
-Investigate failures rather than modifying unrelated expectations until they pass.
+Do not weaken invariant tests to conceal errors.
 
-If environmental limitations prevent a test from running, explain exactly which test could not be executed and why.
+If a test was designed to enforce the old behavior, replace its outdated expectation while retaining meaningful coverage.
 
-Do not claim tests passed without running them.
+54. Phase 6: Documentation
 
-17.7. Protect CPU regressions
+Update the authoritative spec and guides after finalizing the implemented contract.
 
-Run the existing CPU-related tests to confirm that the shared combat changes have not broken CPU behavior.
+Do not document proposed or hypothetical behavior as though it already exists.
 
-Use the CPU benchmark where feasible to compare the same seeds and matchups before and after the change.
+55. Phase 7: Final review
 
-Do not attempt to improve benchmark scores by modifying CPU parameters.
+Review the entire diff.
 
-The benchmark is a regression guard, not a new balancing assignment.
+Check for:
 
-⸻
-
-PART 18 — QUALITY AND GAME FEEL
-
-Once the core mechanics are implemented and tests pass, evaluate the feature as an actual player would.
-
-Ask:
-
-1. Does Attack 1 respond immediately to its first press?
-2. Does a repeated press feel acknowledged?
-3. Does the current animation finish without restarting?
-4. Does the alternate begin at a predictable moment?
-5. Can a beginner repeatedly press one basic-attack button without experiencing broken animation loops?
-6. Does deliberate Attack 1 → Attack 2 timing still reward skill?
-7. Can an experienced player still cancel attacks rapidly?
-8. Does Combat Assist continue helping short-range melee attacks?
-9. Are cooldowns consistent and understandable?
-10. Is it obvious when an attack is queued?
-11. Are there any surprising attacks that execute after the player has changed intentions?
-12. Do hitstop, movement and aerial transitions feel coherent?
-
-Treat perceived responsiveness and predictability as important, but do not conceal gameplay-rule violations in the name of feel.
-
-Avoid unnecessary animation speed changes.
-
-Alva’s different attacks already have different animation rates, startup phases, active windows, recovery durations and cancellation properties.
-
-Those distinctions are part of fighter identity and combat balance.
-
-The goal is to make input handling around those timings more forgiving, not erase every move’s strengths and weaknesses.
+* Accidental CPU changes.
+* Accidental cooldown changes.
+* Unnecessary character edits.
+* Redundant state.
+* Missed cleanup paths.
+* Incorrect same-step action ordering.
+* Missing animation safeguards.
+* Broken settings compatibility.
+* English/French inconsistencies.
+* Unnecessary scope expansion.
 
 ⸻
 
-PART 19 — WHAT NOT TO IMPLEMENT
+PART 16 — ACCEPTANCE CRITERIA
 
-Explicitly avoid the following:
+The update is complete only when all of the following are satisfied:
 
-* No automatic restarting of the currently playing attack.
-* No infinite same-button attack loop.
-* No removal of attack cooldowns.
-* No reduction of cooldowns to make combos easier.
-* No global cooldown between different attacks.
-* No forced guaranteed hits.
-* No automatic target damage.
-* No automatic Shield bypass.
-* No changes to CPU difficulty.
-* No extra CPU hesitation or artificial mistakes.
-* No nerfing character attacks.
-* No sweeping changes to Launch Point recovery.
-* No rewrites of the universal movement system.
-* No new control bindings required to access the feature.
-* No new gameplay libraries or dependencies.
-* No invented character animations.
-* No hardcoded fighter-specific queue behavior.
-* No non-deterministic timers.
-* No permanent combat-buffer extension.
-* No input macros that play full attack sequences without genuine subsequent presses.
-* No replacing the existing manual cancellation mechanic with animation-only chaining.
-
-Resist unrelated refactoring.
-
-If unrelated technical debt is discovered, record it separately unless correcting it is essential for this implementation.
-
-⸻
-
-PART 20 — UPDATE THE DOCUMENTATION
-
-After implementing the system, update the documentation to describe its actual behavior.
-
-At minimum, review and update:
-
-1. ALVA_SPEC.md, especially §7.2.4b.
-2. docs/systems/combat.md.
-3. docs/systems/input.md.
-4. Relevant sections of docs/systems/movement.md.
-5. UPDATES.md, following the repository’s conventions for recording changes.
-6. Any comments in code that still claim active same-move presses are always discarded.
-
-Make the distinction between these three systems extremely clear:
-
-Ordinary input buffering: Remembers a slightly early move request for 0.15 seconds.
-
-Combo Assist queuing: Remembers one eligible repeated basic attack, using the proposed late-animation acceptance window, until the current attack completes naturally.
-
-Repeat cooldown: Controls when a move can be reused, independently of whether an alternate attack is available.
-
-Document that manual attack cancellation remains available.
-
-Document when the queue is discarded.
-
-Document how the behavior differs with Combo Assist disabled.
-
-Use concise gameplay examples.
-
-Do not rewrite historical project documentation in ways that falsely suggest the new mechanic has always existed.
+* [ ]	The current repository has been studied and the implementation follows its existing architecture.
+* [ ]	Combo Assist retains Attack 1 / Attack 2 alternation.
+* [ ]	Repeating an attack while it is playing can queue its alternate.
+* [ ]	The original attack’s animation is never restarted by the repeat.
+* [ ]	The original attack completes naturally before the queued follow-up starts.
+* [ ]	A repeated press during startup, active frames or recovery is handled correctly.
+* [ ]	A terminal-frame repeat is not lost or duplicated.
+* [ ]	Only one follow-up can be queued per original attack.
+* [ ]	Holding a button never creates automatic additional presses.
+* [ ]	Follow-up selection uses the actual attack being performed.
+* [ ]	Queued moves use the normal attack-start pathway.
+* [ ]	Cooldowns are never bypassed, shortened or overwritten.
+* [ ]	The 0.5-second repeat cooldown is preserved.
+* [ ]	The 0.15-second ordinary input buffer remains independent.
+* [ ]	No artificial global wait is introduced.
+* [ ]	Human manual cancellation remains functional.
+* [ ]	New deliberate inputs correctly supersede queued assistance.
+* [ ]	Hitstop and interruptions are handled safely.
+* [ ]	Ground and air restrictions are respected.
+* [ ]	Combat Assist works correctly with queued follow-ups.
+* [ ]	Combo Assist disabled preserves its expected behavior.
+* [ ]	CPU behavior and difficulty remain unchanged.
+* [ ]	Keyboard, gamepad and touch input behave consistently.
+* [ ]	No extra hitboxes, hits or projectiles are generated.
+* [ ]	Damage, Energy, Launch Point and cooldown policies remain unchanged.
+* [ ]	Tests cover the entire playable roster and relevant edge cases.
+* [ ]	Existing obsolete tests have been updated deliberately.
+* [ ]	ALVA_SPEC.md accurately describes the new behavior.
+* [ ]	Relevant system documentation is updated.
+* [ ]	Player-facing descriptions are correct in English and French.
+* [ ]	The full automated test suite passes, or any remaining failure is explicitly documented with evidence.
+* [ ]	No unrelated AI, character, stage or combat-balance modifications are introduced.
 
 ⸻
 
-PART 21 — IMPLEMENTATION SEQUENCE
+PART 17 — REQUIRED FINAL RESPONSE
 
-Complete the work in this order.
+After implementation, report your work in this format.
 
-Phase 1 — Audit
+1. Summary of improvements
 
-Inspect the current repository, trace all relevant call paths, and identify the exact animation-completion and input-priority constraints.
+Explain what changed and how it makes Alva easier and more responsive to play.
 
-Record the existing behavior and any assumptions that need confirmation.
+2. Before and after
 
-Phase 2 — Core queue
-
-Implement the deterministic, single-slot queued follow-up.
-
-Preserve the existing Combo Assist alternation and manual cancellation behavior.
-
-Phase 3 — Lifecycle correctness
-
-Ensure source completion is reliably distinguished from interruption.
-
-Implement all queue invalidation paths.
-
-Handle boundary steps and hitstop.
-
-Phase 4 — Assist and movement integration
-
-Verify Combat Assist, ground/air resolution, directional input, Dash, jump, Shield, Deflect, and special moves.
-
-Correct any regressions introduced by the new feature.
-
-Phase 5 — Feedback
-
-Implement minimal queue feedback using the existing UI architecture.
-
-Keep presentation separate from gameplay logic.
-
-Support localization, accessibility and the relevant control schemes.
-
-Phase 6 — Regression testing
-
-Add and update targeted tests.
-
-Test the full roster and all input devices.
-
-Run the complete test suite.
-
-Check CPU regressions without changing CPU strength.
-
-Phase 7 — Documentation and final review
-
-Update the specification and guides.
-
-Inspect the final diff.
-
-Remove dead code and accidental debug output.
-
-Verify that every new state field has a defined cleanup path.
-
-⸻
-
-PART 22 — NON-NEGOTIABLE ACCEPTANCE CRITERIA
-
-The assignment is successful only if all of the following are true:
-
-A. Animation safety
-
-Repeated input never restarts, cuts short, or corrupts the current attack animation.
-
-B. Correct sequencing
-
-An accepted queued alternate executes only after the previous attack naturally finishes.
-
-C. Single queue
-
-No button-mashing sequence can pre-schedule multiple attacks from one source animation.
-
-D. Cooldown integrity
-
-Every move continues obeying the established cooldown policy.
-
-E. Manual combat preserved
-
-Direct different-action cancellations remain as responsive as before.
-
-F. Combat Assist compatibility
-
-Queued attacks work correctly with Combat Assist both enabled and disabled.
-
-G. Human-only assistance
-
-CPU fighters never receive the player’s new queued Combo Assist behavior.
-
-H. Cross-device consistency
-
-Keyboard, controllers, and touch controls produce equivalent results.
-
-I. Ground and air correctness
-
-Fighter-specific move mappings and aerial restrictions are respected.
-
-J. Interruption safety
-
-Hits, cancels, landing cancellations, reset and match transitions never leave stale queued attacks.
-
-K. Determinism
-
-Equivalent fixed-step input streams produce equivalent outcomes.
-
-L. Existing balance preserved
-
-Damage, Launch Point, Energy, movement values, attack timing, and CPU intelligence remain unchanged unless an independently verified correctness fix is strictly necessary.
-
-M. Test coverage
-
-All relevant existing and new tests pass, with any environmental exceptions clearly reported.
-
-N. Documentation accuracy
-
-The specification, implementation, and tests agree about how the mechanic works.
-
-⸻
-
-PART 23 — FINAL REPORT REQUIRED
-
-After completing the implementation, provide a clear technical report.
-
-Include:
-
-1. Summary
-
-Explain what changed and how it improves combat.
-
-2. Files changed
-
-List the actual modified files and why each modification was necessary.
-
-3. Gameplay examples
-
-Describe what now happens for:
+Describe these exact cases:
 
 * Attack 1 → Attack 1.
 * Attack 2 → Attack 2.
 * Attack 1 → Attack 2.
 * Repeated button mashing.
-* A queued move whose cooldown is active.
-* A queued move canceled by a hit.
-* A queued move used with Combat Assist.
+* Holding one attack button.
+* An unavailable queued follow-up.
+* Getting hit while a follow-up is queued.
+* Combo Assist and Combat Assist working together.
 
-4. Preservation checks
+3. Implementation details
 
-Confirm whether the following remained intact:
+List the important changed files.
 
-* Cooldowns.
-* Manual move cancellation.
-* Hitboxes and damage.
-* Ground/air restrictions.
-* Shield and Deflect.
-* Universal movement.
-* Combat Assist.
-* Input bindings.
-* CPU intelligence and difficulty.
-* Character-specific animations.
+Explain:
 
-5. Test results
+* Where queued state lives.
+* How repeats are identified.
+* How natural completion is detected.
+* How input priorities work.
+* How cooldowns are preserved.
+* How invalid queues are cleared.
 
-Report the commands executed, the results, and any failures or limitations.
+4. Testing results
 
-6. Remaining considerations
+Report:
 
-Identify genuine remaining usability issues or tuning choices, such as whether the 0.20-second queue window is sufficiently forgiving.
+* Focused tests executed.
+* Full suite results.
+* Total tests passing and failing.
+* Additional tests created.
+* Whether real browser or hardware checks were performed.
+* Remaining uncertainties.
 
-Separate these from completed work.
+Never invent passing test results.
 
-Do not claim an optional recommendation was implemented if it was not.
+5. Preserved mechanics
+
+Explicitly confirm what remains unchanged, particularly:
+
+* CPU Intelligence and difficulty.
+* Ordinary cooldown policy.
+* Launch Point.
+* Energy.
+* Character moves.
+* Combat Assist range rules.
+* Human manual cancellation.
+* Existing movement physics.
+
+6. Remaining improvement opportunities
+
+If the audit reveals additional issues worth addressing later, give a short, prioritized account.
+
+Separate those from work actually completed.
+
+Do not silently expand this update into a CPU rewrite or an unrelated gameplay overhaul.
 
 ⸻
 
-FINAL DESIGN PHILOSOPHY
+FINAL DIRECTIVE
 
-Alva should be easy to begin playing but difficult to master.
+The ultimate purpose of this update is to solve an important fighting-game usability problem:
 
-A beginner should be able to press a basic attack button, press it again at the appropriate moment, and understand that the game has accepted a follow-up.
+Players should not feel that pressing a button was pointless merely because they pressed it slightly earlier than an animation ended.
 
-An experienced player should still be able to use precise move selection, manual cancels, spacing, shielding, aerial movement and timing to perform better.
+At the same time:
 
-Combat Assist helps the player reach the opponent.
+An attack should never restart, cancel itself, or bypass its recovery simply because the same button was pressed again.
 
-Combo Assist helps the player select and sequence basic attacks.
+Alva already has the building blocks: fixed-step input, an ordinary input buffer, individual cooldowns, manual cancellation, Combat Assist, and Combo Assist.
 
-Input buffering helps the game recognize slightly early inputs.
+Connect them carefully.
 
-Cooldowns preserve each move’s reuse limits.
+A beginner should be able to press Attack 1 twice and understand what happens.
 
-Manual cancellation preserves the depth of high-skill combat.
+An experienced player should still be able to perform deliberate attack cancels and advanced combos without the assist getting in the way.
 
-These systems should cooperate without overriding each other.
+A fighter’s animations, cooldowns and mechanical identity must remain trustworthy.
 
-The game should never feel unresponsive simply because an input was discarded unnecessarily.
+Make Alva more forgiving without making it automatic, more responsive without making it chaotic, and more satisfying without destroying its depth.
 
-But responsiveness must not come from restarting animations, ignoring cooldowns, producing unintended attacks, or changing CPU intelligence.
-
-The ideal result is a combat experience that feels:
-
-Responsive. Fluid. Predictable. Accessible. Skillful. Fair. Visually coherent.
-
-Implement the improvement carefully, validate it thoroughly, and leave Alva’s existing combat architecture stronger and easier to maintain than before.
-
-Begin by inspecting the latest repository, then implement and test the solution.
+Implement the update completely, verify it thoroughly, and deliver a clean, maintainable result.
