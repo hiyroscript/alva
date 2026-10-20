@@ -538,23 +538,24 @@ export const CHARACTER_0005 = {
       momentum: 0.4,
       friction: 0.9,
     },
-    // Snapping Jaws: the head out (frames 1-2), then three strikes at the
-    // jaws, 64 to 118 units out: the bite (frame 3) and a chew (frame 5),
-    // 1 each, holding its prey; the last chew (frame 7): 5, the heavy
-    // tier, Base Launch 2 sideways. Closed and drawn back (frames 8-10):
-    // half a second in all.
+    // Snapping Jaws: the head out from its face (frames 1-2), then three
+    // strikes all along the shorter neck, from just in front of its face
+    // (16 units) out to the jaws (118), right up close as well as at the
+    // tip: the bite (frame 3) and a chew (frame 5), 1 each, holding its
+    // prey; the last chew (frame 7): 3, Base Launch 2 sideways. Closed and
+    // drawn back (frames 8-10): half a second in all.
     // It steers a little as it drifts.
     midair_attack2: {
       animation: 'midair_attack2',
       recovery: 3 / FPS_0005.midair_attack2,
-      hitbox: { x: 64, y: -84, w: 54, h: 66 },
+      hitbox: { x: 16, y: -84, w: 102, h: 66 },
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 1 / 30,
       hits: [
         { at: 2 / FPS_0005.midair_attack2, active: 1 / FPS_0005.midair_attack2, damage: 1 },
         { at: 4 / FPS_0005.midair_attack2, active: 1 / FPS_0005.midair_attack2, damage: 1 },
-        { at: 6 / FPS_0005.midair_attack2, active: 1 / FPS_0005.midair_attack2, damage: 5, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.4 },
+        { at: 6 / FPS_0005.midair_attack2, active: 1 / FPS_0005.midair_attack2, damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.4 },
       ],
       airMomentum: 0.6,
       airControl: 0.3,
@@ -562,7 +563,7 @@ export const CHARACTER_0005 = {
     // Phantom Hands: the hands drawn back behind it (frame 1, held two
     // frames), then four bursts of them in front (frames 2-5, live: from
     // the head to below the hips, 26 to 116 units out, where the hands
-    // land): 1 each, holding the target, the last 5 at Base Launch 2
+    // land): 1 each, holding the target, the last 3 at Base Launch 2
     // straight up, the hands hurling it into the air; a hand held out
     // (frame 6): 0.58 s in all.
     attack3: {
@@ -576,7 +577,7 @@ export const CHARACTER_0005 = {
         { at: 2 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 1 },
         { at: 3 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 1 },
         { at: 4 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 1 },
-        { at: 5 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 5, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.38 },
+        { at: 5 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.38 },
       ],
       groundOnly: true,
       momentum: 0.6,
@@ -637,9 +638,10 @@ export const CHARACTER_0005 = {
     // within 280 units of its maw is reeled in toward it (`pull`, in front
     // only: one behind it is left where it is; a raised Shield holds its
     // ground and blocks the seizing). Snapped back in (frames 3 and 1):
-    // 0.6 s in all. Once it has seized, a follow-up may cut the snapping
-    // back short; the seized prey is still held as the Deadlights let go,
-    // cast once the tendrils are back, if it faced #0005.
+    // 0.6 s in all. It roots #0005 where it stands: none of the speed it
+    // was moving at is kept. Once it has seized, a follow-up may cut the
+    // snapping back short; the seized prey is still held as the Deadlights
+    // let go, cast once the tendrils are back, if it faced #0005.
     extra_attack: {
       animation: 'extra_attack',
       recovery: 2 / FPS_0005.extra_attack,
@@ -651,8 +653,7 @@ export const CHARACTER_0005 = {
       hitstop: 1 / 30,
       pull: { radius: 280, speed: 1100, offset: { x: 40, y: -55 }, front: true },
       groundOnly: true,
-      momentum: 0.4,
-      friction: 0.9,
+      momentum: 0,
       hitCancel: 7 / FPS_0005.extra_attack,
     },
   },
