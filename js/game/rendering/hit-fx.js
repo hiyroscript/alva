@@ -34,8 +34,10 @@
 // - A fighter that heals itself (a technique's heal, see Fighter.heals): a
 //   soft green ring opening round its body and a few plus marks floating up
 //   from it. The same glow on a fighter that a charmed opponent's hit
-//   healed instead (a `charmed` event, see CombatSystem.charmed). Nothing
-//   but paint.
+//   healed instead (a `charmed` event, see CombatSystem.charmed), and on
+//   one a hit of its own fed, its target frightened of it (an event's
+//   `fed`, see `fear` in js/game/combat/hit-effects.js). Nothing but
+//   paint.
 //
 // With reduced motion there is no shake and no zoom, an elimination's
 // shards barely travel and the Void's ripple is a still, fading pulse with
@@ -198,6 +200,9 @@ export class HitEffects {
         this.addHeal(e.target, { amount: e.heal });
         continue;
       }
+      // A hit on a target frightened of its attacker fed the attacker: its
+      // heal glow, beside the hit's own effects.
+      if (e.fed > 0 && e.attacker) this.addHeal(e.attacker, { amount: e.fed });
       if (e.type === 'block') {
         this.addShake(e.perfect ? HIT_FX.shake.perfect : HIT_FX.shake.block);
         this.addSpark(e.perfect ? 'perfect' : 'block', e);

@@ -21,10 +21,10 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU), and what kind of strike an attack is (`isMeleeAttack`, `isRangedAttack`: one reading for Combat Assist and the CPU's moveset). |
 | [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's rules of measure: `assistsAttack` (melee, never homing), `meleeGap` (an attack's box against a target's hurtboxes), `inReach` (its own reach already covers the target), `reachVector` and `approachMove` (the move still to make, or `REACHED`), `approachClear`, `assistRange` and `assistSpeed` (one Dash's travel, or one air dash's), `ASSIST_MARGIN`. |
 | [`js/game/combat/combo-assist.js`](../../js/game/combat/combo-assist.js) | Combo Assist's rule: `COMBO_PAIRS` (attack1 and attack2) and `comboAction` (the move a fresh press asks for, from the source attack's own repeat cooldown). |
-| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, a charm and who put it on (`charmBy`, `charmedTo`), cooldowns (`CooldownTimers` for summons and techniques). |
+| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, a float (`float`, `afloat`), a charm and who put it on (`charmBy`, `charmedTo`), a fear and who put it on (`frightenBy`, `frightenedOf`), cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
-| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`, `quake`, `charm`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`, `hitReaches`, `createHit`; it refuses any way past a Shield. |
+| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`, `quake`, `charm`, `float`, `fear`, `gaze`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`, `FLOAT_RISE_SPEED`, `hitReaches`, `createHit`; it refuses any way past a Shield. |
 | [`js/game/combat/offense.js`](../../js/game/combat/offense.js) | The attack classification: what a definition can do, apart from how it is executed (`attackOffense`, `projectileOffense`, `techniqueOffense`, `summonOffense`, `actionOffense`, `classifyHit`, `isHarmfulHit`, `resolveOffense`), the hit sources events name (`ATTACK_SOURCES`), and the refused Shield bypasses (`SHIELD_BYPASS_FIELDS`, `assertNoShieldBypass`). |
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
@@ -75,8 +75,9 @@ definition that breaks one is refused, every problem named):
 | 5 | `attack1` … `attack5` |
 
 For example, #0001 has five (attack4 and attack5 techniques), #0002
-three ordinary ones, #0003 four (attack3 and attack4 techniques) and
-#0004 five (attack4 and attack5 techniques)
+three ordinary ones, #0003 four (attack3 and attack4 techniques),
+#0004 five (attack4 and attack5 techniques) and #0005 five (attack4 a
+technique, attack5 a summon)
 ([character docs](../characters/README.md)).
 
 ## Attacks
@@ -99,7 +100,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
 | `hits`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
-| `paralyze` / `blockPush` / `quake` / `charm` | 0 / 0 / false / 0 | The shared hit effects (below). |
+| `paralyze` / `blockPush` / `quake` / `charm` / `float` / `fear` / `gaze` | 0 / 0 / false / 0 / 0 / 0 / false | The shared hit effects (below). |
 | `offensive` | — | Optional, and only to agree with what the attack does ([attack classification](#attack-classification)). |
 
 ### From a press to a move
@@ -151,8 +152,8 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001, #0002, #0003 and #0004 use them
-between them today):
+is built, and usable by any fighter (#0001, #0002, #0003, #0004 and #0005
+use them between them today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
   its own window (`at` to `at + active`) and striking at most once, with
@@ -189,12 +190,15 @@ between them today):
   `attackReach` takes in the plunge and the impact where it would land at
   the furthest. A motion attack keeps its physical facing,
   and never starts while its fighter is still flying from a launch.
-- **Pull** (`pull: { radius, speed, offset }`): while the attack is active
-  it draws every opponent whose middle is within `radius` of its point
-  (`offset`, facing right and mirrored) straight toward it at up to
+- **Pull** (`pull: { radius, speed, offset, front }`): while the attack is
+  active it draws every opponent whose middle is within `radius` of its
+  point (`offset`, facing right and mirrored) straight toward it at up to
   `speed`, never past it, a grounded one along the ground, an airborne one
-  on both axes; a raised Shield, a paralysed fighter and one out of play
-  hold their ground. The same rule runs a projectile's pull, toward its
+  on both axes; a raised Shield, a paralysed (or floating) fighter and one
+  out of play hold their ground. With `front: true` it reaches only the
+  side it faces: an opponent whose middle is behind its fighter (behind a
+  projectile, the way it flies) is left where it is (#0005's Dark
+  Tendrils). The same rule runs a projectile's pull, toward its
   centre (`applyPulls` in [`pull.js`](../../js/game/combat/pull.js), each
   step after everything has moved and before hits resolve, so whoever is
   drawn into a hitbox is struck that step). `attackReach` widens the box
@@ -218,7 +222,25 @@ between them today):
   nothing in place, it runs down in real time, the longer charm by the
   same fighter wins and another fighter's replaces it, a blocked hit
   charms nobody, and a raised Shield still blocks a charmed fighter's
-  hits like any other; #0004's World is Mine). A strike inherits its
+  hits like any other; #0004's World is Mine), `float` (seconds a real hit
+  that launches nothing makes its target float, `CombatState.float`: held
+  exactly as a paralysis holds it, but lifted off the ground and rising
+  at `FLOAT_RISE_SPEED`, 42 units/s, with no gravity, until it runs out
+  and the fighter falls; the longer float wins, it runs down with its
+  paralysis, any hit that launches the target ends it, and a blocked hit
+  floats nobody; #0005's Deadlights), `fear` (seconds a real hit
+  frightens its target, by its attacker, `CombatState.frightenBy`: until
+  it runs out, every real hit the frightener lands on it, whatever made
+  it, lands in full and also feeds the frightener, its damage taken off
+  the frightener's own Launch Point, never below 0, the hit's event
+  saying how much as `fed`; it holds nothing in place, it runs down in
+  real time, the longer fear by the same fighter wins and another
+  fighter's replaces it, and a blocked hit frightens and feeds nobody;
+  #0005's Red Balloon), `gaze` (true or false: a hit that has to be seen,
+  so it reaches only a fighter facing where it comes from; one with its
+  back turned is passed by with nothing used up, as a quake passes a
+  fighter in the air; a Shield raised toward it blocks it like any hit;
+  `hitReaches`; #0005's Deadlights). A strike inherits its
   attack's and a finisher its projectile's. Each defaults to changing
   nothing; a value of the wrong kind is refused. There is no hit effect
   that gets past a Shield: `unblockable` (gone) and every other field of
@@ -246,7 +268,8 @@ definition the schemas build carries it as `offense` (`{ attack, defense,
 sources }`), and a Fighter's button is read with `actionOffense`.
 
 An action is an attack when it can deal damage, directly or indirectly: a
-hit of its own that adds Launch Point, paralyzes, charms or launches (`strike`), a
+hit of its own that adds Launch Point, paralyzes, floats, charms, frightens or
+launches (`strike`), a
 multi-hit string (`strikes`), a projectile it releases or is (`projectile`,
 a piercing one's `finisher` too), a technique's burst (`burst`), a slam's
 impact where it lands (`impact`), a summon's clone that strikes (`clone`),
@@ -299,6 +322,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0002 | `[]` | none | the Whirlwind |
 | #0003 | `['attack4']` | the Mystical Palm Technique (heals its own Launch Point) | Cherry Blossom Impact |
 | #0004 | `['attack5']` | World is Mine (a charm: its opponents' hits heal it) | Ievan Polkka, the Melody |
+| #0005 | `['attack4', 'attack5']` | the Deadlights (whoever faces them floats helpless), the Red Balloon (a phantom that bites from behind, its fear feeding #0005) | Dark Tendrils |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -319,7 +343,8 @@ and the loadout rules), and the cooldown keeps the policy's
 Technique its 3 s, Cherry Blossom Impact its 0.5 s repeat delay, whatever
 their labels. Specials keep their longer, deliberate animations (Unlimited
 Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical Palm
-Technique 1 s + 0.25 s, World is Mine 0.5 s + 1/3 s); a move that is not
+Technique 1 s + 0.25 s, World is Mine 0.5 s + 1/3 s, the Deadlights 0.4 s +
+1/3 s, the Red Balloon's startup 1/3 s); a move that is not
 one plays at ordinary-attack pace (Cherry Blossom Impact 0.2 s + 0.25 s).
 
 ## Hit resolution
@@ -336,7 +361,8 @@ techniques (a burst due on its release step). Every hit goes through one
 attack or technique it is resolving. It is the only place an attack
 reaches a fighter, and the only place a Shield is consulted. Before it,
 every one of those places asks `hitReaches`: a `quake` hit never reaches
-a fighter off the ground, and nothing of it is used up. Then:
+a fighter off the ground and a `gaze` hit never one with its back turned
+to where it comes from, and nothing of it is used up. Then:
 
 1. A target whose Shield is up when the hit reaches it blocks it, from
    any side, whatever made it and however hard it hits: no field of the
@@ -347,7 +373,8 @@ a fighter off the ground, and nothing of it is used up. Then:
    only difference is no blockstun); a hit with `blockPush` shoves it
    back, and a Shield with a `stall` freezes a melee attacker for that
    long ([defense](defense.md)). A blocked hit adds no Launch Point,
-   launches, stuns, paralyzes and carries nothing, and a blocked
+   launches, stuns, paralyzes, floats, charms, frightens and carries
+   nothing, and a blocked
    projectile is stopped there, an erasing or piercing one included.
 2. Otherwise the hit's `damage` is added to the target's Launch Point,
    then its launch strength is `baseLaunch` × that new Launch Point, sent
@@ -365,14 +392,19 @@ a fighter off the ground, and nothing of it is used up. Then:
    launch, stun, freeze, paralysis, charm or carry, no recovery
    restarted, no technique broken, no reaction, and the attack that dealt
    it is used up but never confirmed.)
-5. A launch ends any paralysis; a real hit that `paralyze`s and launches
-   nothing holds the target; a real hit that `charm`s charms it (by the
-   attacker), launch or not.
+5. A launch ends any paralysis (a float with it); a real hit that
+   `paralyze`s or `float`s and launches nothing holds the target
+   (floating, rising); a real hit that `charm`s charms it (by the
+   attacker), launch or not, and one that `fear`s frightens it (by the
+   attacker), launch or not. A real hit on a target that was already
+   frightened of its attacker as it landed feeds the attacker: the hit's
+   damage also comes off the attacker's own Launch Point, never below 0.
 6. The launch replaces the target's velocity, or a `carry` drags it.
 7. One event is recorded (`type` hit or block, attacker, target, move,
    damage, Launch Point before and after, launch values, stun, `perfect`,
-   the point it landed, the `paralysis` and the `charm` it put on and the `stall` it
-   caused, and the projectile, summon or technique behind it; `attack`
+   the point it landed, the `paralysis` (the longer of its paralysis and
+   its float), the `float`, the `charm` and the `fear` it put on, the
+   Launch Point it `fed` its attacker and the `stall` it caused, and the projectile, summon or technique behind it; `attack`
    (always true: a blocked attack is still an attack, recorded as a
    block, never as a hit), `source` (`melee`, `deflect`, `projectile`,
    `summon` or `technique`), `ability` (the attack, technique or summon
@@ -392,7 +424,7 @@ entry. Fields (`PROJECTILE_DEFAULTS`): `animation` (a
 `lifetime` (1 s), `hitbox` (centred, mirrored with its direction),
 `damage`, `baseLaunch`, `directionalLaunch`, `hitstun`, `blockstun`,
 `hitstop`, `carry`, `pierce: { hits, interval }` with an optional
-`finisher` (its last strike), `pull: { radius, speed }`, `repel`, `erase`
+`finisher` (its last strike), `pull: { radius, speed, front }`, `repel`, `erase`
 and the hit effects, and `rotationSpeed` (degrees per second its art
 spins as it flies, clockwise; 0, the default, is none: art only, see
 [rendering](rendering.md#projectile-spin)). A projectile flies straight
@@ -443,9 +475,13 @@ summon whose clone could strike nothing. No opponent in play, or missing
 art, and the press does nothing (no cooldown). The exact rules:
 [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.6.
 
-No fighter in the roster summons today; the loadout matrix's Case D
+#0005's Red Balloon is the roster's summon: a phantom of #0005 rising out
+of a bunch of red balloons 60 units behind its target to bite its back,
+its bite a `fear` ([its
+specification](../characters/0005.md#each-move-in-detail)). The loadout
+matrix's Case D
 ([`tests/fighters/fixtures/loadout-fighters.mjs`](../../tests/fighters/fixtures/loadout-fighters.mjs))
-and the sample fighter keep the system tested.
+and the sample fighter test the system apart from it.
 
 ## Techniques
 
@@ -486,7 +522,9 @@ Technique (a heal, no attack; [its
 specification](../characters/0003.md#each-move-in-detail)), and #0004's
 Ievan Polkka (a projectile that never moves) and World is Mine (a burst
 that charms, its ring of sound its `effect`; [its
-specification](../characters/0004.md#each-move-in-detail)). Nothing in the
+specification](../characters/0004.md#each-move-in-detail)), and #0005's
+Deadlights (a burst that floats whoever faces it, a `gaze`; [its
+specification](../characters/0005.md#each-move-in-detail)). Nothing in the
 runtime reads a fighter or a button; a technique of a different shape
 would be a new form in the runtime with its own fields, not a
 reinterpretation of these.
@@ -527,12 +565,12 @@ special lengths exist beside the universal **0.5-second repeat delay**
 | Class (`cooldownClass`) | When | Cooldown |
 | --- | --- | --- |
 | `tenDamage` | Any one hit of the move deals 10 (a strike, a multi-hit's finisher, its projectile or that projectile's finisher, a slam's `impact`, a technique's `burst`, a summoned clone's attack), or everything one use can deal one target adds up to 10 or more | `TEN_DAMAGE_COOLDOWN`, 5 s |
-| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal`, or any hit's `paralyze` or `charm` | `EXCEPTIONAL_COOLDOWN`, 3 s |
+| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal`, or any hit's `paralyze`, `charm`, `float` or `fear` | `EXCEPTIONAL_COOLDOWN`, 3 s |
 | `ordinary` | Everything else | 0.5 s (none for an exempt move) |
 
 The first row that applies decides: a move never gets 3 s and 5 s added
 (a 10-damage paralysis is 5 s). Everything in `ROUTINE_EFFECTS` (a launch,
-`blockPush`, `pull`, `quake`, `carry`, `repel`, `erase`, `pierce`, a
+`blockPush`, `pull`, `quake`, `gaze`, `carry`, `repel`, `erase`, `pierce`, a
 `motion`, hitstun and blockstun, `airUses`, `freeFall` and the rest) earns
 nothing however strong it looks; every shared hit effect
 (`HIT_EFFECT_FIELDS`) is in one list or the other, checked by the tests,
@@ -579,9 +617,11 @@ The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
 (paralysis) and Hollow Purple 5 s (a 10-damage sphere); #0002's Whirlwind
 5 s (its tornado's 10-damage finisher); #0003's Mystical Palm Technique 3 s
 (heal); #0004's Ievan Polkka 5 s (its double's six strikes add up to 10)
-and World is Mine 3 s (charm). Everything else, Red, Blue and Maximum Blue (a pull earns nothing),
-Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a slam and a
-launch earn nothing) included, has only the 0.5 s repeat delay, and every
+and World is Mine 3 s (charm); #0005's Deadlights 3 s (float) and Red
+Balloon 3 s (its phantom's fear). Everything else, Red, Blue and Maximum
+Blue (a pull earns nothing), Cherry Blossom Impact and the Heavenly Foot of
+Pain (a quake, a slam and a launch earn nothing) and Dark Tendrils (a pull)
+included, has only the 0.5 s repeat delay, and every
 Deflect none.
 
 **Reading cooldowns.** `CombatState.cooldowns` and
@@ -748,7 +788,7 @@ starts the very attack asked for. The rules are
   the shared rules over every fighter and every kind of hit: the damage
   tiers, the cooldowns, Energy, difficulty and movement.
 - [`tests/systems/special-abilities.test.mjs`](../../tests/systems/special-abilities.test.mjs):
-  the roster's Special classification (four in all), the editor
+  the roster's Special classification (six in all), the editor
   categories and bindings it leaves unchanged, the list's rules, a future
   fighter opting in with data alone, unchanged execution types and
   cooldowns, Cherry Blossom Impact's quicker frame-aligned timing, and the
@@ -789,11 +829,15 @@ starts the very attack asked for. The rules are
   [`technique.test.mjs`](../../tests/systems/technique.test.mjs) (the heal
   and a burst's art included), [`quake.test.mjs`](../../tests/systems/quake.test.mjs),
   [`slam.test.mjs`](../../tests/systems/slam.test.mjs),
-  [`charm.test.mjs`](../../tests/systems/charm.test.mjs).
+  [`charm.test.mjs`](../../tests/systems/charm.test.mjs),
+  [`float.test.mjs`](../../tests/systems/float.test.mjs),
+  [`fear.test.mjs`](../../tests/systems/fear.test.mjs),
+  [`gaze.test.mjs`](../../tests/systems/gaze.test.mjs).
 - Each fighter's moves: [`tests/fighters/0001/`](../../tests/fighters/0001/)
   (every move's mechanic, its combos, the CPU playing it),
   [`tests/fighters/0002/`](../../tests/fighters/0002/),
   [`tests/fighters/0003/`](../../tests/fighters/0003/),
-  [`tests/fighters/0004/`](../../tests/fighters/0004/).
+  [`tests/fighters/0004/`](../../tests/fighters/0004/),
+  [`tests/fighters/0005/`](../../tests/fighters/0005/).
 - Every pairing of playable fighters in a real battle:
   [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs).

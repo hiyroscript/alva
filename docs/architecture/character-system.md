@@ -2,8 +2,8 @@
 
 Alva is built around one universal character system: shared game systems
 that work for any fighter, and fighter definitions that supply everything
-that makes a fighter itself. #0001, #0002, #0003 and #0004 are members of the
-roster, not templates: none is the default that shared code falls back
+that makes a fighter itself. #0001, #0002, #0003, #0004 and #0005 are members
+of the roster, not templates: none is the default that shared code falls back
 to, and adding another means writing its definition, not copying one.
 
 **All fighters share universal baseline locomotion. Character identity
@@ -31,7 +31,9 @@ attack) running on the shared motion rules; "#0003's Cherry Blossom
 Impact can be jumped" is a capability (a `quake` on its burst's hit)
 running on the shared rule of what a hit reaches; "#0004's song turns its
 opponent's blows into its healing" is a capability (a `charm` on its
-burst's hit) running on the shared hit resolution; and "an attack keeps its
+burst's hit) running on the shared hit resolution; "#0005's Deadlights
+leave whoever looks into them floating" is a capability (a `float` and a
+`gaze` on its burst's hit) running on the same rules; and "an attack keeps its
 momentum" is a shared rule every fighter's attacks follow with their own
 `momentum` values. "#0002 is faster" is not a thing a definition can say:
 it runs exactly as fast as #0001, and its speed lives in its moves.

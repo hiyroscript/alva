@@ -190,8 +190,10 @@ export class Evaluator {
       const fy = s.foeTrack.y[fk];
       const inX = Math.min(fx + hurt.hw - scratchBox.x, scratchBox.x + scratchBox.w - (fx - hurt.hw));
       const inY = Math.min(fy + hurt.bottom - scratchBox.y, scratchBox.y + scratchBox.h - (fy + hurt.top));
-      // A quake reaches the opponent only standing on the ground.
-      const reaches = !m.burst.hit?.quake || s.foeTrack.g[fk];
+      // A quake reaches the opponent only standing on the ground, and a
+      // gaze only facing the CPU.
+      const side = Math.sign(me.x - fx);
+      const reaches = (!m.burst.hit?.quake || s.foeTrack.g[fk]) && (!m.burst.hit?.gaze || !side || side === s.op.facing);
       if (reaches && inX > 0 && inY > 0) {
         // Toward the nearer side of the box is the way out.
         const out = Math.min(fx - scratchBox.x, scratchBox.x + scratchBox.w - fx) + hurt.hw;
@@ -442,6 +444,13 @@ export class Evaluator {
     // it can press on unanswered (worth little while one is still running).
     const charm = Math.max(0, ...strikes.map((h) => h.charm ?? 0));
     if (charm > 0) vHit += charm * (s.op.view.charm > 0 ? 0.5 : 4);
+    // A fear: for its seconds every hit the CPU lands on the opponent feeds
+    // it, so pressing on pays twice (worth little while one is still
+    // running). And while one runs, what this hit adds comes back off the
+    // CPU's own Launch Point.
+    const fear = Math.max(0, ...strikes.map((h) => h.fear ?? 0));
+    if (fear > 0) vHit += fear * (op.frightened > 0 ? 0.5 : 3);
+    if (op.frightened > 0) vHit += Math.max(0, hv.lp - op.lp) * (1 + s.me.lp / 160) * 0.8;
     // What a block costs: the Shield's stall and the recovery left against
     // the blockstun; a block that would exhaust the opponent is a win.
     let vBlock = 0;
@@ -519,6 +528,13 @@ export class Evaluator {
     let utility = (pHit * vHit + pBlocked * vBlock * risk + pMiss * vMiss * risk) * (1 - lost) - cost -
       interrupt * exposure * risk - struckFirst * blow * (0.4 + p.riskSense * 0.6) -
       elim * KO_VALUE * s.match.koAgainst * (0.3 + p.riskSense * 0.7);
+    // An attack's own pull drags the opponent in toward the CPU, hit or not
+    // (a projectile's goes the way it flies instead): one exposed where it
+    // stands (by a ledge, a launch there likely to end its life) is drawn
+    // back to safety, and the finish it was open to is given up, unless the
+    // move's own blow ends its life.
+    const exposed = brain.strategy.finish;
+    if (m.pull && !m.projectile && exposed > 0.35 && !(hv.ko > 0.3)) utility -= exposed * KO_VALUE * s.match.koFor * 0.4;
     // The strategy's preferred roles (the mode's, and what the opponent's
     // habits make worth reaching for), and the CPU's own sense of variety.
     let bonus = 0;

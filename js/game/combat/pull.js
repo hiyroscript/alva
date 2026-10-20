@@ -21,8 +21,10 @@
 // it (closer than a step's travel, it arrives exactly). A grounded fighter
 // is dragged along the ground and only lifted when the point is above its
 // head; an airborne one is drawn along both axes. Not pulled: the owner,
-// a fighter out of play, one whose Shield is up (it holds its ground) and
-// one held in place (paralyzed).
+// a fighter out of play, one whose Shield is up (it holds its ground), one
+// held in place (paralyzed) and, for a pull that reaches only its `front`,
+// one whose middle is behind it (behind the attack's fighter, the way it
+// faces, or behind the projectile, the way it flies).
 
 const scratch = { x: 0, y: 0 };
 
@@ -34,15 +36,25 @@ export function applyPulls(fighters, projectiles, dt) {
     if (!pull || f.combat.phase !== 'active') continue;
     scratch.x = f.body.x + pull.offset.x * f.facing;
     scratch.y = f.body.y + pull.offset.y;
-    for (const target of fighters) if (target !== f) pullToward(target, scratch.x, scratch.y, pull, dt);
+    for (const target of fighters) {
+      if (target !== f && inFront(pull, target, f.body.x, f.facing)) pullToward(target, scratch.x, scratch.y, pull, dt);
+    }
   }
   for (const p of projectiles) {
     const pull = p.def.pull;
     if (!pull || !p.alive) continue;
     const x = p.x + pull.offset.x * p.direction;
     const y = p.y + pull.offset.y;
-    for (const target of fighters) if (target !== p.owner) pullToward(target, x, y, pull, dt);
+    for (const target of fighters) {
+      if (target !== p.owner && inFront(pull, target, p.x, p.direction)) pullToward(target, x, y, pull, dt);
+    }
   }
+}
+
+// Whether `pull` may reach `target` from `x`, facing `facing`: any pull,
+// unless it reaches only its `front` and the target's middle is behind.
+function inFront(pull, target, x, facing) {
+  return !pull.front || (target.body.x - x) * facing >= 0;
 }
 
 // One step of `pull` drawing fighter `f` toward the point (x, y), if `f`

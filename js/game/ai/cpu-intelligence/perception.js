@@ -35,7 +35,8 @@ function blankSnap() {
   return {
     t: -Infinity, x: 0, y: 0, vx: 0, vy: 0, grounded: true, ground: null, halfW: 0, height: 0, gravityScale: 1, maxFall: 1500,
     facing: 1, state: 'idle', attack: null, attackDef: null, attackTime: 0, attackPhase: null, attackHit: false,
-    attackConfirmed: false, attackMotion: null, stun: 0, hitstop: 0, paralysis: 0, charm: 0, shieldStun: 0, shielding: false,
+    attackConfirmed: false, attackMotion: null, stun: 0, hitstop: 0, paralysis: 0, charm: 0, fear: 0, fearedBy: null,
+    shieldStun: 0, shielding: false,
     energy: 100, exhausted: false, lp: 0, dash: null, dashDir: 0, dashSpeed: 0, dashLeft: 0, dashAir: false,
     technique: null, techniqueDef: null, techniquePhase: null, techniqueReleaseIn: 0, techniqueEndIn: 0, techniqueFacing: 1,
     summon: null, summonLeft: 0, airJumps: 0, airDashes: 0, freeFall: false, launched: false, tumbling: false,
@@ -72,6 +73,9 @@ function snap(s, f, t) {
   s.hitstop = c.hitstop;
   s.paralysis = c.paralysis;
   s.charm = c.charm ?? 0;
+  // A fear it shows (its mark), and whose it is.
+  s.fear = c.fear ?? 0;
+  s.fearedBy = s.fear > 0 ? c.frightenedBy ?? null : null;
   s.shieldStun = c.shieldStun;
   s.shielding = c.shielding;
   s.energy = c.energy;

@@ -18,8 +18,8 @@ import { Fighter } from '../../js/game/fighters/fighter.js';
 import { PlayerController, TrainingAIController, blankInput } from '../../js/game/fighters/fighter-controller.js';
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { COMBO_PAIRS, comboAction } from '../../js/game/combat/combo-assist.js';
-import { isMeleeAttack } from '../../js/game/combat/attacks.js';
-import { assistsAttack } from '../../js/game/combat/combat-assist.js';
+import { attackReach, isMeleeAttack } from '../../js/game/combat/attacks.js';
+import { assistsAttack, meleeGap } from '../../js/game/combat/combat-assist.js';
 import { REPEAT_COOLDOWN } from '../../js/data/cooldowns.js';
 import { Battle } from '../../js/game/battle.js';
 import { PracticeSession } from '../../js/game/practice.js';
@@ -29,6 +29,17 @@ import { PRACTICE_MAP } from '../../js/data/practice-map.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { fakeSpritesOf, DT } from '../helpers/fighter-harness.mjs';
 import { playerRig, press, attackOf, placeFoeAt, FLAT } from '../helpers/player-rig.mjs';
+
+// Puts the rig's foe `gap` units out of `atk`'s reach (its box, motion and
+// pull: attackReach) from where the player stands: just out of reach, and
+// within one Dash, whatever the attack's reach.
+function placeFoeOutOf(r, atk, gap) {
+  // From well clear of it first: a foe nearer than a box that starts out
+  // in front (a long neck's jaws) is in none of it.
+  r.foe.body.x = r.player.body.x + 600;
+  r.foe.body.x += gap - meleeGap(r.player, attackReach(atk), r.foe, 1);
+  r.foe.body.prevX = r.foe.body.x;
+}
 
 // The stage themes a Battle or a PracticeSession builds draw with Path2D:
 // a no-op stand-in, as nothing is drawn here.
@@ -419,7 +430,7 @@ test('integration: running in with Run held throughout, Attack 1 closes in and l
       // During its cooldown, still running: the press is Attack 2.
       assert.ok(r.player.combat.cooldowns.has(firstAtk.id));
       const secondAtk = r.player.attacks[r.player.attackFor(second)];
-      if (isMeleeAttack(secondAtk)) placeFoeAt(r, 150);
+      if (isMeleeAttack(secondAtk)) placeFoeOutOf(r, secondAtk, 40);
       r.tick({ ...run, ...press(first) });
       const assisted = !!r.player.combatAssist;
       assert.ok(assisted || r.player.combat.attack?.def === secondAtk, `${why}: Attack 2 asked for`);

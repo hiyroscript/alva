@@ -47,11 +47,12 @@ const SPECIALS = Object.freeze({
   '0002': [],
   '0003': ['attack4'],
   '0004': ['attack5'],
+  '0005': ['attack4', 'attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly four Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine', () => {
+test('exactly six Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights and the Red Balloon', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -61,11 +62,16 @@ test('exactly four Specials across the roster: Unlimited Void and Hollow Purple,
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 4);
+  assert.equal(total, 6);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
   assert.deepEqual(specialAbilities(getCharacter('0004')).map((m) => name('0004', m)), ['World is Mine']);
+  assert.deepEqual(specialAbilities(getCharacter('0005')).map((m) => name('0005', m)), ['Deadlights', 'Red Balloon']);
+  // The Red Balloon is the roster's first summon; Dark Tendrils pull, and
+  // are ordinary to the player.
+  assert.equal(actionType(getCharacter('0005'), 'attack5'), 'summon');
+  assert.equal(isSpecialAbility(getCharacter('0005'), 'extra_attack'), false, 'Dark Tendrils are not Special');
   // Ievan Polkka is a technique too, and ordinary to the player.
   assert.equal(actionType(getCharacter('0004'), 'attack4'), 'technique');
   assert.equal(isSpecialAbility(getCharacter('0004'), 'attack4'), false, 'Ievan Polkka is not Special');
@@ -118,6 +124,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3', 'attack4', 'extra_attack'],
       air: ['attack1', 'attack2', 'attack3'],
       abilities: ['ground:attack5'],
+    },
+    '0005': {
+      ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3'],
+      abilities: ['ground:attack4', 'ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

@@ -52,8 +52,12 @@
 // `blockPush` (a Shield that blocks it is shoved back, and nothing more),
 // `quake` (it reaches only a fighter standing on the ground: every
 // place below that a hit meets a fighter asks hitReaches first, so an
-// airborne one is passed by with nothing used up) and `charm` (for a while
-// the target's own hits on the attacker heal it instead: see applyHit).
+// airborne one is passed by with nothing used up), `gaze` (likewise, it
+// reaches only a fighter facing where it comes from), `charm` (for a while
+// the target's own hits on the attacker heal it instead: see applyHit),
+// `float` (a paralysis that lifts its target into the air,
+// CombatState.float) and `fear` (for a while the attacker's own hits on the
+// target feed it: see applyHit).
 // And a Shield may stall the blows it blocks (`defense.stall`, see
 // js/game/combat/defense.js): a melee attacker freezes in it.
 
@@ -177,8 +181,8 @@ export class CombatSystem {
     // { type: 'hit' | 'block' | 'charmed', attacker, target, move, damage,
     //   heal, energyCost, launchPointBefore, launchPointAfter, baseLaunch,
     //   directionalLaunch, launchStrength, finalLaunch, launchSpeed, hitstun,
-    //   perfect, point, paralysis, charm, stall, projectile, summon,
-    //   technique, attack, source, ability, redirected }
+    //   perfect, point, paralysis, float, charm, fear, fed, stall,
+    //   projectile, summon, technique, attack, source, ability, redirected }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
@@ -193,8 +197,11 @@ export class CombatSystem {
     // stun it dealt, a harder launch's longer. `perfect` marks a block by a
     // Shield raised just in time (see Fighter.perfectShield) and `point` is
     // where the hit landed, for the effects. `paralysis` is the hold it put
-    // on its target (seconds, 0 for none), `charm` the charm it put on it
-    // (seconds, 0 for none) and `stall` how long a melee blow
+    // on its target (seconds, 0 for none; a float's included), `float` the
+    // float it put on it, `charm` the charm and `fear` the fear (seconds
+    // each, 0 for none), `fed` the Launch Point the hit took off its
+    // attacker because the target was frightened of it (0 for none) and
+    // `stall` how long a melee blow
     // the target's Shield blocked froze its attacker (0 for none). `attacker`
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee. `attack` is always
@@ -232,7 +239,7 @@ export class CombatSystem {
       if (!atk.def.hitbox || atk.hasHit) continue;
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
-        if (target === attacker || !hitReaches(atk.def, target)) continue;
+        if (target === attacker || !hitReaches(atk.def, target, attacker.body.x)) continue;
         const point = strikePoint(hit, target);
         if (!point) continue;
         // One hit per attack, blocked or not; only a real hit (never a
@@ -256,9 +263,9 @@ export class CombatSystem {
         // that hits flies on through. A Shield that blocks any of them
         // stops it there, an erasing one included (see
         // js/game/combat/projectile.js). A quake flies on past a fighter
-        // off the ground.
+        // off the ground, and a gaze past one with its back to it.
         const def = p.nextHit;
-        if (!hitReaches(def, target)) continue;
+        if (!hitReaches(def, target, p.x)) continue;
         const event = this.applyHit(p.owner, target, def, {
           facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 },
         });
@@ -271,7 +278,7 @@ export class CombatSystem {
       const hit = c.hitbox(scratchHit);
       if (!hit) continue;
       for (const target of fighters) {
-        if (target === c.owner || !hitReaches(c.attackDef, target)) continue;
+        if (target === c.owner || !hitReaches(c.attackDef, target, c.x)) continue;
         const point = strikePoint(hit, target);
         if (!point) continue;
         c.hasHit = true;
@@ -289,7 +296,7 @@ export class CombatSystem {
       const box = t?.takeBurst(scratchBurst);
       if (!box) continue;
       for (const target of fighters) {
-        if (target === owner || !hitReaches(t.def.burst.hit, target)) continue;
+        if (target === owner || !hitReaches(t.def.burst.hit, target, owner.body.x)) continue;
         const point = strikePoint(box, target);
         if (point) this.applyHit(owner, target, t.def.burst.hit, { facing: t.facing, technique: t, point });
       }
@@ -335,7 +342,7 @@ export class CombatSystem {
     if (!impact) return;
     const box = worldBox(attacker, impact.hitbox, scratchBurst);
     for (const target of fighters) {
-      if (target === attacker || !hitReaches(impact.hit, target)) continue;
+      if (target === attacker || !hitReaches(impact.hit, target, attacker.body.x)) continue;
       const point = strikePoint(box, target);
       if (!point) continue;
       atk.hasHit = true;
@@ -358,7 +365,7 @@ export class CombatSystem {
       if (atk.struck.has(h.index) || !strikeLive(h, atk.time)) continue;
       const box = worldBox(attacker, h.hitbox, scratchHit);
       for (const target of fighters) {
-        if (target === attacker || !hitReaches(h, target)) continue;
+        if (target === attacker || !hitReaches(h, target, attacker.body.x)) continue;
         const point = strikePoint(box, target);
         if (!point) continue;
         atk.struck.add(h.index);
@@ -384,7 +391,7 @@ export class CombatSystem {
   // HAZARD_SOURCE, `attack` false and `hazard` the rock. Null when it
   // misses.
   hazardHit(target, def, box, hazard) {
-    if (!hitReaches(def, target)) return null;
+    if (!hitReaches(def, target, box.x + box.w / 2)) return null;
     const point = strikePoint(box, target);
     if (!point) return null;
     const facing = Math.sign(target.body.x - (box.x + box.w / 2)) || 1;
@@ -432,7 +439,17 @@ export class CombatSystem {
   // at that speed, and nothing more. And a melee blow the target's Shield
   // blocks stalls in it: the attacker is frozen for at least the Shield's
   // `stall` (a detached hit stalls nothing). A real hit that `charm`s
-  // charms its target (CombatState.charmBy), whether it launches or not.
+  // charms its target (CombatState.charmBy), whether it launches or not. A
+  // real hit that `float`s and launches nothing makes its target float
+  // (CombatState.float: a paralysis that lifts it), and any launch ends
+  // that too. A real hit that `fear`s frightens its target
+  // (CombatState.frightenBy), launch or not.
+  //
+  // A real hit on a target frightened of its attacker (its fear still
+  // running, from before this hit) feeds the attacker: the hit's damage is
+  // also taken off the attacker's own Launch Point, never below 0
+  // (CombatState.heal), whatever made the hit. A blocked hit feeds
+  // nothing.
   //
   // A hit whose attacker is charmed by its target (its charm still running,
   // see `charm` in hit-effects.js) and that the target does not block is
@@ -456,6 +473,8 @@ export class CombatSystem {
       if (!tc.canShield()) tc.shielding = false;
     }
     if (!blocked && attacker?.combat?.charmedTo?.(target)) return this.charmed(attacker, target, def, { projectile, summon, technique, point });
+    // Frightened of its attacker before this hit: the hit feeds it (below).
+    const feeds = !blocked && !!attacker && tc.frightenedOf?.(attacker);
     const damage = blocked ? 0 : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
@@ -497,9 +516,15 @@ export class CombatSystem {
     }
     // A launch ends a paralysis; a hit that paralyzes and launches nothing
     // holds the target.
-    if (finalLaunch.x || finalLaunch.y) tc.releaseParalysis();
-    else if (!blocked && def.paralyze > 0) tc.paralyze(def.paralyze);
+    const launched = !!(finalLaunch.x || finalLaunch.y);
+    if (launched) tc.releaseParalysis();
+    else if (!blocked) {
+      if (def.paralyze > 0) tc.paralyze(def.paralyze);
+      if (def.float > 0) tc.float(def.float);
+    }
     if (!blocked && def.charm > 0) tc.charmBy(def.charm, attacker);
+    if (!blocked && def.fear > 0) tc.frightenBy(def.fear, attacker);
+    const fed = feeds && damage > 0 ? attacker.combat.heal(damage) : 0;
     if (blocked && def.blockPush > 0) target.body.vx = facing * def.blockPush;
     if (finalLaunch.x || finalLaunch.y) {
       // A launch replaces the target's sideways speed (a vertical one sends
@@ -522,7 +547,9 @@ export class CombatSystem {
       damage, energyCost, launchPointBefore, launchPointAfter,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
-      paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, charm: blocked ? 0 : def.charm ?? 0, stall,
+      paralysis: blocked || launched ? 0 : Math.max(def.paralyze ?? 0, def.float ?? 0),
+      float: blocked || launched ? 0 : def.float ?? 0, charm: blocked ? 0 : def.charm ?? 0,
+      fear: blocked ? 0 : def.fear ?? 0, fed, stall,
       projectile, summon, technique, hazard, attack: !hazard,
       source: sourceOf(def, projectile, summon, technique, hazard), ability: hazard ? def.id ?? null : abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,
@@ -549,7 +576,7 @@ export class CombatSystem {
       type: 'charmed', attacker, target, move: def.id ?? null,
       damage: 0, heal, energyCost: 0, launchPointBefore, launchPointAfter: tc.launchPoint,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength: 0, finalLaunch: NO_LAUNCH,
-      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, charm: 0, stall: 0,
+      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, float: 0, charm: 0, fear: 0, fed: 0, stall: 0,
       projectile, summon, technique, attack: true,
       source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,

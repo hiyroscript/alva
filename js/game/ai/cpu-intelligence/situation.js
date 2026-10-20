@@ -85,6 +85,11 @@ export class Situation {
     // js/game/combat/hit-effects.js): while it lasts, its hits on that
     // opponent heal it, so it strikes nothing (see CpuIntelligence.choose).
     me.charmed = c.charmedTo?.(foe) ? c.charm : 0;
+    // Seconds its opponent's fear has left on it (see `fear` in
+    // js/game/combat/hit-effects.js): while it lasts, every hit that
+    // opponent lands on it feeds that opponent, so it keeps its distance
+    // (see CpuIntelligence.spacing).
+    me.frightened = c.frightenedOf?.(foe) ? c.fear : 0;
     me.shielding = c.shielding;
     me.shieldStun = c.shieldStun;
     me.energy = c.energy;
@@ -109,6 +114,9 @@ export class Situation {
     const op = (this.op = this.op ?? {});
     op.view = v;
     op.age = v.age ?? 0;
+    // Seconds the opponent is still frightened of the CPU, as it saw it:
+    // every hit it lands meanwhile feeds it.
+    op.frightened = v.fear > 0 && v.fearedBy === self ? Math.max(0, v.fear - op.age) : 0;
     op.halfW = v.halfW;
     op.height = v.height;
     op.facing = v.facing;

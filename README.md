@@ -31,13 +31,13 @@ blocks every attack.
 
 ## What's in it
 
-- **Four playable fighters** on a 48-slot roster:
+- **Five playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
   its path and flying through every fighter it hits, both blocked by a
   raised Shield like any attack, and Infinity, a Shield that stalls the
-  blows it blocks) and
+  blows it blocks),
   [#0002](docs/characters/0002.md), the speedster (a lock-on Homing
   Attack, a plunging Bounce Attack, a rolling Spin Attack, a rising Blue
   Tornado and a travelling Whirlwind),
@@ -45,18 +45,26 @@ blocks every attack.
   ground and reach only fighters standing on it, a heel-first plunge that
   splits the ground where it lands, Cherry Blossom Impact erupting either
   side of it, and the Mystical Palm Technique, a long kneeling cast that
-  heals its own Launch Point), and
+  heals its own Launch Point),
   [#0004](docs/characters/0004.md), the virtual singer (World is Mine, a
   song that charms everyone it reaches, so that for a while their blows
   heal it instead; Ievan Polkka, a little leek-waving double that dances
   in place and strikes whoever stays by it; a sung note that turns
   projectiles back; a rising leek twirl that carries its target up; dance
-  kicks and a stage dive). All four Shield on the ground and
-  Deflect in the air (a strike that knocks projectiles back at their
-  thrower), and all four Dash on the ground and air dash. Each fighter
+  kicks and a stage dive), and
+  [#0005](docs/characters/0005.md), the dancing clown (the Deadlights, a
+  maw of lights that leaves whoever faces them floating helpless; the Red
+  Balloon, a phantom that rises out of a bunch of balloons behind its prey
+  to bite, leaving it afraid, so that for a while every hit on it heals
+  #0005; black tendrils that reel opponents in; a head that stretches out
+  on a long neck to bite across the stage; claws and ghostly hands). All
+  five Shield on the ground and Deflect in the air (a strike that knocks
+  projectiles back at their thrower), and all five Dash on the ground and
+  air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
-  Technique, #0004's World is Mine): an orange exclamation mark floats over
+  Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon): an
+  orange exclamation mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
@@ -155,7 +163,9 @@ by the stick; #0003's heel drops on Triangle / Y, Cherry Blossom Impact and
 its Chakra Haymaker behind R2 / RT and its heal behind L2 / LT; #0004's dance
 steps on Square / X, its leek on Triangle / Y, the Crescent Kick and Stage
 Dive picked by the stick, the Melody on R1 / RB and its techniques behind
-R2 / RT and L2 / LT), and every binding of every fighter can be changed in
+R2 / RT and L2 / LT; #0005's claws on Square / X and jaws on Triangle / Y,
+its ghostly hands on R1 / RB, its tendrils behind R2 / RT and its two
+Specials behind L2 / LT), and every binding of every fighter can be changed in
 Settings › Controls › Controller controls. In menus the D-pad moves focus,
 the left stick moves a circular cursor, Cross / A confirms and Circle / B
 goes back. On touch: a joystick (or Left / Right buttons) at the lower left
@@ -243,6 +253,10 @@ credits: ZetrasBlack, R0B4N.
 
 **#0004 sprite source.** Sprite sheet by xmaygrrr on
 [DeviantArt](https://www.deviantart.com/xmaygrrr/art/758846183).
+
+**#0005 sprite source.** Sprite sheet posted by imhomiejaydev on
+[DeviantArt](https://www.deviantart.com/imhomiejaydev/art/853407339); the
+sheet's own credit: sprites by regularDor8go.
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

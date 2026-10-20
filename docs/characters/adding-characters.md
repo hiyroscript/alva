@@ -15,7 +15,7 @@ The steps below use `0027` as the new fighter's id.
   unique in `CHARACTERS`. It names the art folder, every art file and the
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
-  of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2 and 3 are taken.
+  of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3 and 4 are taken.
 
 ## 2. Add the art
 
@@ -106,6 +106,7 @@ export const CHARACTERS = [
   CHARACTER_0002,
   CHARACTER_0003,
   CHARACTER_0004,
+  CHARACTER_0005,
   CHARACTER_0027,
 ];
 ```
@@ -225,7 +226,7 @@ is a `summons.attackN` entry with its `attack`, its `cloud` (an
 `effectAnimations` entry named `attackN_object`; its cooldown is the
 policy's, from the attack its clone performs), and
 optionally `startupAnimation` (`attackN_summon`) and `noGround`
-([summons](../systems/combat.md#summons)).
+([summons](../systems/combat.md#summons); #0005's Red Balloon).
 
 **A technique** is a `techniques.attackN` entry. The runtime supports one
 form, the cast: two fighter clips (`castAnimation`, `releaseAnimation`,
@@ -257,7 +258,8 @@ never loads; and a summon's clone must perform an attack that strikes.
 shared schema can express them (as #0002's homing dash or plunge are
 `motion` data, #0001's Maximum Blue drawing its target in is a
 projectile's `pull`, #0003's ground-splitting blows are `quake`
-hits and #0004's song is a burst that charms). When it cannot, add the
+hits, #0004's song is a burst that charms and #0005's Deadlights are a
+burst that floats whoever sees it). When it cannot, add the
 mechanic to the shared system as
 a capability any fighter can opt into, named for what it does, never for
 the fighter or for its button: never a check for `'0027'` in shared code.
@@ -363,7 +365,8 @@ between moves only where the move is about direction. Then:
 5. Write each move's line in `abilityDescriptions` (and its French).
 6. Document the layout in its specification, as
    [#0001](0001.md#controller-layout), [#0002](0002.md#controller-layout),
-   [#0003](0003.md#controller-layout) and [#0004](0004.md#controller-layout) do.
+   [#0003](0003.md#controller-layout), [#0004](0004.md#controller-layout) and
+   [#0005](0005.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (face buttons, then R1, then trigger combinations),
@@ -404,7 +407,7 @@ valid, current one fails
    | 1 | Very easy to learn and comparatively simple to master. | |
    | 2 | An easy core game plan with little extra to master. | |
    | 3 | Approachable fundamentals, with meaningful decision-making and execution depth at higher levels. | #0002: readable rushdown; mastery in momentum, air uses, free fall, approach angles, not overcommitting. #0003: plain, heavy ground game; mastery in timing its long commitments, reading jumps against its quakes, finding room to heal |
-   | 4 | Demanding to use well, with substantial mastery requirements. | #0004: a rhythm controller; placement of its stationary double, timing its long, breakable song onto an opponent who cannot get away and cashing in the charm, light and exposed when rushed before its setups are in place |
+   | 4 | Demanding to use well, with substantial mastery requirements. | #0004: a rhythm controller; placement of its stationary double, timing its long, breakable song onto an opponent who cannot get away and cashing in the charm, light and exposed when rushed before its setups are in place. #0005: a reach-and-setup predator; spacing its jaws' dead zone, landing the Deadlights only on a facing opponent, timing its phantom and cashing in the fear while it lasts, tall and exposed when rushed |
    | 5 | Difficult both to pilot effectively and to master: highly layered mechanics, situational decisions, setup or resource requirements, punishing commitments. | #0001: a large, contextual space-control and setup toolkit, Energy and cooldown management, punishable long casts |
 
    Judge it; never compute it from move counts, Energy costs or any other

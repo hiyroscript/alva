@@ -80,8 +80,8 @@
 // A technique's cooldown starts on acceptance, even if interrupted. It is
 // the cooldown policy's (js/data/cooldowns.js), derived from what the cast
 // releases: 5 s when its burst or its projectile (judged from the fighter's
-// `projectiles`) deals 10 damage, else 3 s when it heals or paralyzes, else
-// the universal 0.5 s repeat delay. An entry may leave it out; one it
+// `projectiles`) deals 10 damage, else 3 s when it heals, paralyzes,
+// charms, floats or frightens, else the universal 0.5 s repeat delay. An entry may leave it out; one it
 // declares must agree. It recovers every fixed step, including hitstop.
 // Phase timing is separate.
 // A horizontal launch travels along the technique's facing.

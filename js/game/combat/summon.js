@@ -13,8 +13,9 @@
 // CombatSystem and removes it once it is done. Behaviour is data on the
 // character (`summons`, keyed by the attack it is; its cloud is that
 // attack's object art), e.g. a clone on a fighter's Attack 3 button that
-// strikes with its attack1 (no fighter in the roster summons today; the
-// loadout tests' Case D does):
+// strikes with its attack1 (as the loadout tests' Case D does; #0005's Red
+// Balloon is the roster's summon, its phantom biting with an attack of its
+// own, its attack5, out of a cloud of red balloons):
 //
 //   summons: {
 //     attack3: {
@@ -67,9 +68,9 @@
 // Its cooldown is the cooldown policy's (js/data/cooldowns.js), derived
 // from the attack its clone performs (the more severe of its attack and its
 // no-ground one, judged from the fighter's `attacks` and `projectiles`): 5 s
-// for one that deals 10 damage, 3 s for one that paralyzes, else the
-// universal 0.5 s repeat delay. An entry may leave it out; one it declares
-// must agree.
+// for one that deals 10 damage, 3 s for one with an exceptional effect (a
+// paralysis, a charm, a float, a fear), else the universal 0.5 s repeat
+// delay. An entry may leave it out; one it declares must agree.
 //
 // A summon is an attack (its definition's `offense`, see
 // js/game/combat/offense.js): the summoning ability, the clone it sends,

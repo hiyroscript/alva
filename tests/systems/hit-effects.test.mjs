@@ -50,12 +50,15 @@ function pair({ shield = false } = {}) {
 // ---- Data ---------------------------------------------------------------------------
 
 test('every effect is optional, and its default changes nothing', () => {
-  assert.deepEqual([...HIT_EFFECT_FIELDS], ['paralyze', 'blockPush', 'quake', 'charm']);
-  assert.deepEqual(resolveHitEffects(undefined), { paralyze: 0, blockPush: 0, quake: false, charm: 0 });
-  assert.deepEqual(resolveHitEffects({ damage: 5 }), { paralyze: 0, blockPush: 0, quake: false, charm: 0 });
-  assert.deepEqual(resolveHitEffects({ paralyze: 1.5, blockPush: 400 }), { paralyze: 1.5, blockPush: 400, quake: false, charm: 0 });
-  assert.deepEqual(resolveHitEffects({ quake: true }), { paralyze: 0, blockPush: 0, quake: true, charm: 0 });
-  assert.deepEqual(resolveHitEffects({ charm: 2.5 }), { paralyze: 0, blockPush: 0, quake: false, charm: 2.5 });
+  assert.deepEqual([...HIT_EFFECT_FIELDS], ['paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze']);
+  const none = { paralyze: 0, blockPush: 0, quake: false, charm: 0, float: 0, fear: 0, gaze: false };
+  assert.deepEqual(resolveHitEffects(undefined), none);
+  assert.deepEqual(resolveHitEffects({ damage: 5 }), none);
+  assert.deepEqual(resolveHitEffects({ paralyze: 1.5, blockPush: 400 }), { ...none, paralyze: 1.5, blockPush: 400 });
+  assert.deepEqual(resolveHitEffects({ quake: true }), { ...none, quake: true });
+  assert.deepEqual(resolveHitEffects({ charm: 2.5 }), { ...none, charm: 2.5 });
+  assert.deepEqual(resolveHitEffects({ float: 1.6, gaze: true }), { ...none, float: 1.6, gaze: true });
+  assert.deepEqual(resolveHitEffects({ fear: 4 }), { ...none, fear: 4 });
   // An attack, a projectile, a technique's burst and a finisher all carry
   // them, resolved the same way.
   assert.equal(hit().unblockable, undefined, 'no hit has a way past a Shield');

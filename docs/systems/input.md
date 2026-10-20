@@ -386,6 +386,18 @@ chosen for each move, not its attack number:
 | Leekspin (air) | Triangle / Y |
 | Stage Dive (air) | Down + Square / Down + X |
 
+| #0005 | Recommended |
+| --- | --- |
+| Claw Swipe | Square / X |
+| Long Bite | Triangle / Y |
+| Phantom Hands | R1 / RB |
+| Deadlights | L2 + Square / LT + X |
+| Red Balloon | L2 + Triangle / LT + Y |
+| Dark Tendrils | R2 + Triangle / RT + Y |
+| Claw Rake (air) | Square / X |
+| Snapping Jaws (air) | Triangle / Y |
+| Floating Hands (air) | R1 / RB |
+
 A fighter with no authored layout gets a safe, conflict-free fallback
 (face buttons, then R1, then trigger combinations), flagged in the editor
 as not designed yet; a fighter's layout may never retune the universal
@@ -410,12 +422,12 @@ has none or its file fails to load (`EditorLayer.rowArt`); Movement,
 Defense and Pause rows have none. **Special abilities** holds only the
 moves the fighter itself classifies as Special (its `specialAbilities`,
 [combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
-Purple, #0003's Mystical Palm Technique and #0004's World is Mine, each
-tagged Ground or Air.
+Purple, #0003's Mystical Palm Technique, #0004's World is Mine and #0005's
+Deadlights and Red Balloon, each tagged Ground or Air.
 Every other move, a projectile, a technique or the Whirlwind's tornado
 included, sits under Ground attacks or Aerial attacks where it is played
-(Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact and Ievan Polkka
-under Ground attacks). A row's category never changes its action id, so no binding
+(Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact, Ievan Polkka and
+Dark Tendrils under Ground attacks). A row's category never changes its action id, so no binding
 moves with it. Choosing an action opens
 the binding dialog, which listens to Player 1's controller (a button, a
 modifier held first, the stick pointing first; for Fast fall a direction

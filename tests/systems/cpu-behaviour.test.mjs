@@ -112,10 +112,11 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
 
 // Over every pairing and four seeds, while the CPU holds `objectives`: how
 // often it goes in after a free opponent (a Dash-in or a jump-in from the
-// ground: initiating, not countering) and how much of the time it moves
-// toward it, per second; and the Launch Point it takes per second. (A
-// higher level goes in from the ground only about once every two seconds,
-// so fewer seeds leave too few to compare.)
+// ground: initiating, not countering, so neither a combo following up its
+// own hit nor striking first against a threat, as in watch above) and how
+// much of the time it moves toward it, per second; and the Launch Point it
+// takes per second. (A higher level goes in from the ground only about once
+// every two seconds, so fewer seeds leave too few to compare.)
 function posture(base, score, timeLeft, objectives) {
   let t = 0;
   let initiate = 0;
@@ -132,7 +133,8 @@ function posture(base, score, timeLeft, objectives) {
         const p = sc.ai.plan;
         if (inside) {
           t += DT;
-          if (p && p !== prev && p.cand && !p.cand.open && (p.cand.kind === 'dashStrike' || (p.cand.kind === 'jumpStrike' && p.cand.jump && p.cand.jump !== 'air'))) initiate++;
+          const fresh = p && p !== prev && p.cand && !p.cand.open && !/^(combo|strikes first)/.test(p.reason ?? '');
+          if (fresh && (p.cand.kind === 'dashStrike' || (p.cand.kind === 'jumpStrike' && p.cand.jump && p.cand.jump !== 'air'))) initiate++;
           if (sc.cpu.body.grounded && sc.cpu.body.vx * Math.sign(sc.foe.body.x - sc.cpu.body.x) > 60) toward += DT;
           taken += Math.max(0, sc.cpu.combat.launchPoint - lp);
         }
@@ -275,9 +277,9 @@ test('E: in danger with room to spare it breaks off and recovers; pressed, it gu
       // harmless opponent knocked out meanwhile.
       if ((alone.left != null && alone.lpLeft < 85) || alone.scored) back++;
     }
-    assert.ok(shielded >= 3, `${difficulty}: Shielded while pressed in ${shielded} of 4`);
-    assert.ok(recovered >= 2, `${difficulty}: recovered Launch Point keeping out of the fight in ${recovered} of 4`);
-    assert.ok(back >= 3, `${difficulty}: left alone, came back to the fight recovered in ${back} of 4`);
+    assert.ok(shielded >= 3, `${difficulty}: Shielded while pressed in ${shielded} of ${PAIRS.length}`);
+    assert.ok(recovered >= 2, `${difficulty}: recovered Launch Point keeping out of the fight in ${recovered} of ${PAIRS.length}`);
+    assert.ok(back >= 3, `${difficulty}: left alone, came back to the fight recovered in ${back} of ${PAIRS.length}`);
   }
 });
 

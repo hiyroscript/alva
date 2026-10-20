@@ -798,7 +798,7 @@ export class CpuIntelligence {
     const me = s.me;
     const p = this.profile;
     const resetting = this.clock < this.pressure.resetUntil;
-    const pushing = !resetting && !(me.charmed > 0) && (this.clock < this.restlessUntil || this.objective.impatience > 0.5);
+    const pushing = !resetting && !(me.charmed > 0) && !(me.frightened > 0) && (this.clock < this.restlessUntil || this.objective.impatience > 0.5);
     let dist = resetting ? Math.max(this.spacing(s), s.foeReach.lunge + 30) : this.spacing(s);
     if (pushing) dist = Math.min(dist, Math.max(28, this.idealRange(s) - 6));
     const mode = this.strategy.mode;
@@ -967,11 +967,13 @@ export class CpuIntelligence {
   }
 
   // The neutral distance the current mode wants (charmed, out of the
-  // opponent's reach whatever the mode).
+  // opponent's reach whatever the mode; frightened, just out of it: every
+  // hit it takes meanwhile feeds the opponent).
   spacing(s) {
     const poke = s.foeReach.poke;
     const lunge = s.foeReach.lunge;
     if (s.me.charmed > 0) return Math.min(480, lunge + 90);
+    if (s.me.frightened > 0) return Math.min(480, lunge + 40);
     const ideal = this.idealRange(s);
     switch (this.strategy.params.spacing) {
       case 'close': return Math.max(28, ideal - 6);

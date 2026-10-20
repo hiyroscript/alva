@@ -2183,3 +2183,149 @@ monitor, the telemetry); `CompetentOpponent` in
 `tests/helpers/cpu-match.mjs`; tests that required a CPU never to stand
 still now require that it never stands still without meaning it
 (`cpu-intelligence`, `combat-ai`, `match-score`).
+
+## #0005, the dancing clown
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add character #0005
+from a supplied sprite sheet: abilities with real mechanics based on the
+character's canon, not animations with plain damage; no move the character
+cannot perform in canon; credited to the sheet's page on DeviantArt; never
+naming the character anywhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0005 in roster slot 05, playable: 80 frames cut from
+  the sheet into `assets/characters/0005/` (1× crops, each tight to its own
+  art, the flat red-orange background (191, 51, 0) made transparent,
+  nothing redrawn or recoloured, every file `0005_<codename>_<frame>.png`):
+  78 of the fighter, 2 of the red balloons its summon appears through.
+  Drawn at the roster's art-pixel size (a 64-pixel idle, about 108 units
+  tall: the tallest of the roster); its claws, neck, tendrils and ghostly
+  hands reach far from its body, so every clip authors its own `anchorX`
+  (and the Claw Rake and the Deflect their `anchorY`). Movement is the
+  universal one; its Energy refills at 14 a second.
+- **Its buttons:** five numbered attacks, each a button of its own (U, I,
+  O, M, ","; touch slots 1 to 5): three ordinary attacks with mid-air
+  versions, a technique and a summon, plus the extra attack (J). The
+  sheet's intro, walk, victory dance and defeat, its transformations, its
+  detached head and the rising bite are no move.
+- **Its moves**, from its canon (a shapeshifter in a clown's shape that
+  hunts by fear and feeds on it, its true self lights that leave whoever
+  sees them floating, appearing wherever it likes with red balloons as the
+  herald, its jaws stretching far beyond a human's): the Claw Swipe and
+  the Claw Rake (a sweep that holds, then a spike), the Long Bite (its head
+  on a long neck, the jaws 120 to 198 units out and nothing closer: three
+  bites that hold, then a fling of 5), Snapping Jaws (a shorter one in the
+  air), Phantom Hands (a barrage of ghostly hands, the last 5 straight up)
+  and Floating Hands (the same barrage as it `hover`s, once per airtime),
+  the Deadlights (a technique, a Special: its maw opens onto the lights,
+  and everyone in front who faces it takes 1 and floats helpless for
+  1.6 s; 3 s), the Red Balloon (a summon, a Special: a phantom of #0005
+  rises out of a bunch of balloons 60 units behind the opponent and bites
+  its back, 3, leaving it afraid for 2.5 s; 3 s) and Dark Tendrils (black
+  tendrils from its maw, 24 to 324 units, seizing whoever they meet and
+  reeling in everyone in front of it). Its guard is a thicket of black
+  tendrils; its Deflect a claw swept round. It throws no projectile and
+  never heals but by feeding on fear.
+- **Engine features they are built on, generic for any fighter:**
+  - `float`, a hit effect (`js/game/combat/hit-effects.js`; seconds,
+    inherited by strikes and finishers): a real hit that launches nothing
+    makes its target float (`CombatState.float`): held exactly as a
+    paralysis holds it, but lifted off the ground and rising at
+    `FLOAT_RISE_SPEED` (42 units/s) with no gravity (`Fighter`'s
+    immobilized step), until it runs out and the fighter falls; a launch
+    ends it at once. Exceptional in the cooldown policy (3 s).
+  - `fear`, a hit effect: a real hit frightens its target, by its attacker
+    (`CombatState.frightenBy`; a different frightener replaces the fear,
+    the same one keeps the longer). While it lasts, every real hit the
+    frightener lands on it lands in full and also feeds the frightener:
+    its damage comes off the frightener's own Launch Point, never below 0
+    (`CombatState.heal`, the hit event's `fed`). A blocked hit frightens
+    and feeds nobody; anyone else's hits feed nobody. Exceptional (3 s). A
+    trembling drop of cold sweat (`drawFearMark`) floats over a frightened
+    fighter, and the frightener's heal glow shows each hit that feeds it.
+  - `gaze`, a hit effect (true or false): the hit reaches only a fighter
+    facing where it comes from (`hitReaches`, now given the source's
+    position at every place a hit meets a fighter); one with its back
+    turned is passed by with nothing used up. A raised Shield still blocks
+    it. Routine (no cooldown of its own).
+  - a pull's `front` (`js/game/combat/pull.js`): a pull that reaches only
+    the side its attack faces (or its projectile flies).
+  - It is the roster's first summon: the summon system was already there,
+    tested on test-only fighters.
+- **The CPU** plays it from the data: a float weighs as the hold it is, a
+  fear as 3 a second (0.5 while one is running) and every hit on an
+  opponent frightened of it by what it would feed; a gaze burst counts on
+  an opponent only if it faces the CPU; an attack's own pull that would
+  reel an opponent it could finish by a ledge back to safety costs it that
+  finish. Frightened itself, it keeps just out of its opponent's reach
+  until the fear runs out (`me.frightened` in `situation.js`, `brain.js`,
+  `evaluator.js`, `capabilities.js`, `perception.js`, `defense.js`).
+- **UI:** its touch buttons (each move's own frame), English and French
+  names and one-line descriptions, a recommended controller layout, a
+  Discover profile (4 / 5), and a credit group, "#0005 sprite source":
+  "Sprite sheet posted by imhomiejaydev on DeviantArt", linked to the
+  sheet's page by the deviation's number alone, with the sheet's own
+  credit, "Sprites by regularDor8go".
+
+**Balance, measured.** Tuned from seeded CPU-vs-CPU matches (full Watch
+Mode battles, first to 3, on Desert and City, 20 matches per cell; points
+#0005 : opponent). Against #0001: Medium 36 : 53, Hard 34 : 52, Brutal
+32 : 49. Against #0002: Medium 42 : 45, Hard 36 : 49, Brutal 46 : 39.
+Against #0003: Medium 40 : 41, Hard 36 : 44, Brutal 43 : 37. Against
+#0004: Medium 54 : 24, Hard 56 : 32, Brutal 55 : 31; 510 : 496 in all. The
+first cut scored 380 : 597 (its hits mostly 1-damage holds, its Long Bite
+and Deadlights punished on most starts). Fixed by a quicker Long Bite (20
+fps, from 15), finishers of 5 on Phantom Hands and Snapping Jaws (from 3),
+a 14 Energy refill and 20° of launch steering. Floating Hands' finisher
+stays 3: at 5 too (521 : 513) the CPU behaviour scenarios no longer held.
+
+**A shared test's count corrected.** `cpu-behaviour`'s lead-protection
+scenario (C, D) counts how often a CPU ahead late goes in after a free
+opponent. It counted a combo following up the CPU's own hit as going in,
+though its comment says "initiating, not countering" and the same file's
+`watch` already leaves combos out; with #0005's Phantom Hands launching
+upward into its air game, that alone failed the scenario at Brutal. It now
+leaves out combo follow-ups and strikes against a threat as `watch` does,
+and every level passes with room to spare. Its failure messages now count
+the pairings it runs (five) instead of saying "of 4".
+
+**Where to tune it**
+
+- `js/data/characters/0005.js`: each attack's damage, launch, timing,
+  hitbox and `hits`; the Long Bite's reach; Floating Hands' `airUses`; the
+  Deadlights' burst box, `float` seconds and cast; the Red Balloon's
+  `behindDistance`, bite and `fear` seconds; Dark Tendrils' `pull`
+  (`radius`, `speed`, `offset`) and hitstun; clip rates (`FPS_0005`),
+  anchors, the Deflect, `energy.regen`, `launchReaction` and the body.
+- The new capabilities' defaults: `float`, `fear`, `gaze` and
+  `FLOAT_RISE_SPEED` in `js/game/combat/hit-effects.js`; the CPU's fear and
+  feeding values and its pull penalty in
+  `js/game/ai/cpu-intelligence/evaluator.js`, its frightened spacing in
+  `brain.js`; the drop's colours, size and tremble (`FEAR_MARK_STYLE`,
+  `fearMarkRect`, `fearMarkTremble`) in
+  `js/game/rendering/fighter-status.js`.
+
+**Code:** `js/data/characters/0005.js`, registered in
+`js/data/characters.js`; `js/data/fighter-profiles.js`;
+`js/data/cooldowns.js`; the float, the fear and the gaze in
+`js/game/combat/hit-effects.js`, `attacks.js`, `projectile.js`,
+`offense.js`, `combat-state.js` and `combat.js`, the float's rise in
+`js/game/fighters/fighter.js`; the front-only pull in `attacks.js` and
+`pull.js`; the drop in `js/game/rendering/fighter-status.js` and
+`js/game/arena.js`, the feeding glow in `js/game/rendering/hit-fx.js`; the
+CPU in `js/game/ai/cpu-intelligence/` (`capabilities`, `perception`,
+`situation`, `evaluator`, `defense`, `brain`); `js/ui/credits.js`,
+`js/localization/`.
+
+**Tests:** new `tests/fighters/0005/fighter-0005.test.mjs` (the real PNGs,
+scale and anchors, every move's mechanic, the tendrils-into-Deadlights
+combo, the CPU against every fighter using every move, names, credits, and
+a whole-repository check that the source character is named nowhere),
+`tests/systems/float.test.mjs`, `fear.test.mjs` and `gaze.test.mjs`;
+`pull`, `hit-effects`, `launch`, `cooldown-policy`, `combat-assist`,
+`combo-assist` and `special-abilities` for the new effects and the fifth
+fighter; `cpu-behaviour`'s lead-protection count (above); the roster, credits and screens in
+`tests/integration/empty-roster.test.mjs`, `discover.test.mjs`,
+`settings.test.mjs` and the other fighters' tests (the playable list).

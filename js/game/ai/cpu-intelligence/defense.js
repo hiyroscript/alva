@@ -245,14 +245,16 @@ export class Defense {
       boxAt(def.burst.hitbox, s.op.x, s.op.y, face, box);
       const me = this.myAt(s, releaseIn);
       this.myBox(s, me.x, me.y, 4, box2);
-      // A quake passes by a CPU off the ground.
+      // A quake passes by a CPU off the ground. (A gaze is answered as any
+      // burst: whichever way the CPU faces as it lets go, stepping out of
+      // it turns its back on it too.)
       if ((!def.burst.hit.quake || me.grounded) && overlaps(box, box2)) {
         const pos = { x: s.me.x, y: s.me.y, grounded: s.me.grounded, halfW: s.me.halfW, height: s.me.height };
         const hit = def.burst.hit;
         const sev = this.brain.evaluator.judge.strikes(s, 'me', [{ ...hit, dir: hit.directionalLaunch }], 1, pos, face, this.hv);
         out.push({
           kind: 'technique', ref: v.technique, contact: releaseIn + STEP, end: releaseIn + 2 * STEP, burst: { x: box.x, y: box.y, w: box.w, h: box.h },
-          top: box.y, from: Math.sign(s.op.x - s.me.x) || -1, severity: sev.value + (hit.paralyze ?? 0) * 8, ko: sev.ko,
+          top: box.y, from: Math.sign(s.op.x - s.me.x) || -1, severity: sev.value + Math.max(hit.paralyze ?? 0, hit.float ?? 0) * 8 + (hit.fear ?? 0) * 2, ko: sev.ko,
           blockPush: hit.blockPush ?? 0, releaseIn, strikesLeft: 1,
         });
       }
