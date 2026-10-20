@@ -524,7 +524,7 @@ const STEPS = {
         jump = true;
         plan.high = true;
       }
-    } else if (up < -30 && me.grounded && me.ground && me.ground !== s.model.floor) {
+    } else if (up < -30 && me.grounded && me.ground && !s.model.isMain(me.ground)) {
       // Down: walk off the nearer edge of this surface toward the opponent,
       // one with footing below it (never off the end of the stage).
       const g = s.model.surfaceOf(me.ground);

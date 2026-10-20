@@ -19,6 +19,17 @@
 // see: never where a hazard will go next. The main floor and every static
 // surface never change, so they are cached.
 //
+// A sectioned main floor (Jökull's glacier, see resolveGround in
+// js/game/physics.js) is read live too: its permanent sections are fixed,
+// but each breakable one is a surface only while it is there, with the
+// damage it shows (its contacts, critically unstable or breaking: see
+// js/game/stage-hazards.js IceSectionController), and the main floor's
+// edges (left, right) are where its footing ends now: past a wing that has
+// started breaking or is gone, the ledge is the centre's own edge. So a CPU
+// never plans to stand on missing ice, nor counts on a wing it can see
+// going; a wing it can see is critically unstable is a danger zone it may
+// step off (dangerZones), as its level reads the stage.
+//
 // Inputs: a StageCollision. Outputs: StageModel (one per stage, cached).
 // Important constraints: read-only; nothing here assumes a platform drop,
 // since no player control has one: the way down from a platform is to walk
@@ -31,26 +42,62 @@ export class StageModel {
     this.stage = stage;
     const floor = stage.floor;
     this.floor = floor;
-    // The main stage's edges: its ledges on a finite stage; on a continuous
-    // ground (no ledge anywhere), the edges of the combat area, past which
-    // only the side Void lies, so the room a CPU keeps from them is the same
-    // safety margin either way.
+    // The main stage's edges as built: its ledges on a finite stage; on a
+    // continuous ground (no ledge anywhere), the edges of the combat area,
+    // past which only the side Void lies, so the room a CPU keeps from them
+    // is the same safety margin either way. Where they are now is `left` /
+    // `right` (a sectioned floor's move in as its wings break).
     const main = stage.main ?? { left: floor.x, right: floor.x + floor.w, top: floor.y };
-    this.left = main.left;
-    this.right = main.right;
+    this.mainLeft = main.left;
+    this.mainRight = main.right;
     this.top = floor.y;
     this.centerX = stage.centerX;
-    this.width = main.right - main.left;
     // Whether walking past those edges drops a fighter off the stage.
     this.ledges = !stage.continuousGround;
-    // The surfaces that never change: the main floor's top, each static
-    // one-way platform, each other solid's top.
+    // Every section of the main floor (the floor alone, undivided), and the
+    // breakable ones among them, read live.
+    this.floors = stage.floors ?? [floor];
+    this.sections = this.floors.filter((f) => f.breakable);
+    // The surfaces that never change: the main floor's top (each permanent
+    // section of a sectioned one, the floor first), each static one-way
+    // platform, each other solid's top.
     this.fixed = [
-      { ref: floor, x0: floor.x, x1: floor.x + floor.w, y: floor.y, main: true, oneWay: false, dynamic: false },
+      ...this.floors.filter((f) => !f.breakable).sort((a, b) => (a === floor ? -1 : b === floor ? 1 : 0))
+        .map((f) => ({ ref: f, x0: f.x, x1: f.x + f.w, y: f.y, main: true, oneWay: false, dynamic: false })),
       ...stage.platforms.filter((p) => !p.dynamic).map((p) => ({ ref: p, x0: p.x, x1: p.x + p.w, y: p.y, main: false, oneWay: true, dynamic: false })),
-      ...stage.solids.filter((s) => s !== floor).map((s) => ({ ref: s, x0: s.x, x1: s.x + s.w, y: s.y, main: false, oneWay: false, dynamic: false })),
+      ...stage.solids.filter((s) => !this.floors.includes(s)).map((s) => ({ ref: s, x0: s.x, x1: s.x + s.w, y: s.y, main: false, oneWay: false, dynamic: false })),
     ];
     this.dynamic = stage.platforms.filter((p) => p.dynamic);
+  }
+
+  // Whether floor section `f` is footing to count on: there, and not
+  // visibly breaking (or broken).
+  static footing(f) {
+    return f.active !== false && !f.broken;
+  }
+
+  // The main floor's left edge now: the main stage's, or on a sectioned
+  // floor the left end of the footing joined to the permanent floor (see
+  // footing).
+  get left() {
+    if (!this.sections.length) return this.mainLeft;
+    const floors = this.floors;
+    let k = floors.indexOf(this.floor);
+    while (k > 0 && StageModel.footing(floors[k - 1])) k--;
+    return floors[k].x;
+  }
+
+  // Its right edge now, likewise.
+  get right() {
+    if (!this.sections.length) return this.mainRight;
+    const floors = this.floors;
+    let k = floors.indexOf(this.floor);
+    while (k < floors.length - 1 && StageModel.footing(floors[k + 1])) k++;
+    return floors[k].x + floors[k].w;
+  }
+
+  get width() {
+    return this.right - this.left;
   }
 
   // Every surface a fighter can stand on right now: the fixed ones, and
@@ -58,8 +105,21 @@ export class StageModel {
   // (`moving` while it drifts; `hazard` from the map). Read fresh on every
   // call.
   get surfaces() {
-    if (!this.dynamic.length) return this.fixed;
+    if (!this.dynamic.length && !this.sections.length) return this.fixed;
     const out = this.fixed.slice();
+    // Each breakable section of the main floor while it is there (its
+    // collision on), with what it shows: how damaged it is (`damage`, a
+    // level of ICE_DAMAGE_LEVELS, and `integrity`, 1 untouched to 0),
+    // whether it is critically `unstable`, and whether its break has begun
+    // (`broken`).
+    for (const f of this.sections) {
+      if (f.active === false) continue;
+      out.push({
+        ref: f, x0: f.x, x1: f.x + f.w, y: f.y, main: true, oneWay: false, dynamic: false, section: true,
+        damage: f.damage ?? 0, integrity: f.maxContacts ? 1 - (f.contacts ?? 0) / f.maxContacts : 1,
+        unstable: !!f.unstable, broken: !!f.broken,
+      });
+    }
     for (const p of this.dynamic) {
       if (p.active === false) continue;
       out.push({
@@ -203,10 +263,17 @@ export class StageModel {
   }
 
   // Whether a solid's side blocks the way between x0 and x1 at a body's
-  // height (feet at `y`).
+  // height (feet at `y`): never the main floor's own sides, nor a solid
+  // that is gone.
   blocked(x0, x1, y, height) {
     const lo = Math.min(x0, x1);
     const hi = Math.max(x0, x1);
-    return this.stage.solids.some((s) => s !== this.floor && y > s.y + 0.5 && y - height < s.y + s.h && hi > s.x && lo < s.x + s.w);
+    return this.stage.solids.some((s) => s.active !== false && !this.floors.includes(s) && y > s.y + 0.5 && y - height < s.y + s.h && hi > s.x && lo < s.x + s.w);
+  }
+
+  // Whether `ref` (a body's `ground`) is part of the main floor, any
+  // section of it.
+  isMain(ref) {
+    return !!ref && this.floors.includes(ref);
   }
 }

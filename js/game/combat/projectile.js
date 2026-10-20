@@ -301,11 +301,12 @@ export class Projectile {
       this.alive = false;
       return;
     }
-    // Gone once it has flown clean into the Void or into a solid block.
+    // Gone once it has flown clean into the Void or into a solid block (one
+    // there now: never a floor section that has broken away).
     const box = this.hitbox(scratch);
     const v = stage.void;
     if (box.x + box.w < v.left || box.x > v.right || box.y + box.h < v.top || box.y > v.bottom) this.alive = false;
-    else if (stage.solids.some((s) => overlaps(box, s))) this.alive = false;
+    else if (stage.solids.some((s) => s.active !== false && overlaps(box, s))) this.alive = false;
   }
 
   // World-space collision box.

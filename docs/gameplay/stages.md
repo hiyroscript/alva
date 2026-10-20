@@ -11,7 +11,12 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   fighter can be, so there is no ledge to walk off, no slab, cliff or wall;
   the main stage is then the combat area the camera frames and the Void
   (overtime's closing one included) is set around, exactly as on every
-  other stage, and only the side Void ends a run along the sand.
+  other stage, and only the side Void ends a run along the sand. A finite
+  floor may be divided into **sections** (`{ type: 'finite', sections }`,
+  Jökull's glacier, see below): contiguous blocks side by side tiling the
+  main stage exactly, at one height, each its own solid; a `breakable` one
+  can be switched off for good by the stage hazard that names it, and the
+  one under the main stage's centre never can.
 - **Main stage** (`mainStage`): the finite main floor. Fighters stand on its
   top only between its `left` and `right` edges; below its top it is a solid
   block (a cliff, facade or block face), drawn and collided exactly alike.
@@ -71,7 +76,9 @@ Yerma (id `desert`) is a sandstone mesa over open desert air; Sol-Noir (id
 `city`) a rooftop block over the street canyon; Asperitas one great cloud
 adrift high above the cloud sea, with two drifting cloud hazards over it;
 Adamaris a tropical beach under a volcano that throws rocks onto the sand;
-Practice Ground a training block against its gridded wall. All five are
+Jökull one great glacier over a frozen abyss, whose two outer sections
+break away under repeated landings, under sudden blizzards;
+Practice Ground a training block against its gridded wall. All six are
 drawn in the same pseudo-3D perspective, with the Practice Ground's
 projection shared by every stage. (Yerma and Sol-Noir were first called
 Desert and City; their ids, themes and layouts are unchanged.)
@@ -100,11 +107,11 @@ highlighted stage beside the **stage roster**: `CONFIG.stageRoster.totalSlots`
 (24) slots, laid out six by four on a large display. `stageSlots()`
 ([`js/data/maps.js`](../../js/data/maps.js)) fills them from the real
 registry: the playable stages (`MAPS`, in order) take the first slots
-(01 Yerma, 02 Sol-Noir, 03 Asperitas, 04 Adamaris) and every other slot is a reserved,
+(01 Yerma, 02 Sol-Noir, 03 Asperitas, 04 Adamaris, 05 Jökull) and every other slot is a reserved,
 unavailable placeholder (a lock, nothing to press, never focused). No
 stage is ever made up for a placeholder, and Practice Ground is never one
 of the slots. A new `MAPS` entry simply takes the next slot (the counter,
-*4 available / 24 slots*, follows), and the roster grows past 24 only once
+*5 available / 24 slots*, follows), and the roster grows past 24 only once
 the stages outnumber it.
 
 Each stage tile has a still thumbnail (the stage as its map lays it out:
@@ -224,6 +231,140 @@ rockfall*, Obstacles *None*, Light *Tropical daylight*.
   an eruption, so it shows what the stage does); a thumbnail draws it at
   rest.
 
+## Jökull
+
+An immense glacier hanging over an endless frozen abyss on a polar day.
+Its traits: Terrain *Frozen glacier*, Platforms *Three connected ice
+sections*, Hazards *Collapsing ice and blizzards*, Obstacles *None*, Light
+*Polar daylight*. Tagline: *A frozen kingdom on the verge of collapse.*
+
+- **One platform, three sections.** The main stage (x 1100–2500, top 900,
+  its ice 330 deep: a real foundation, its jagged underside in view above
+  the Void) is a finite floor in three sections side by side
+  (`ground: { type: 'finite', sections }`, resolved by `resolveGround` in
+  [`js/game/physics.js`](../../js/game/physics.js)): the **west wing**
+  (1100–1360, 19 %), the **centre** (1360–2240, 63 %) and the **east
+  wing** (2240–2500, 19 %). They are three independent solids
+  (`StageCollision.floors`), each its whole block, touching with no gap at
+  exactly one height, so the glacier plays and looks as one: a section's
+  side stops only a body below its top, and the next one's top is level,
+  so running, Dashing, jumping, shielding and fighting cross a seam with
+  no wall, step or lost footing. Of two sections under one body, the one
+  under its centre is its ground (`stepBody`, `surfaceBelow`), so its
+  footing passes from one to the next exactly as its centre crosses the
+  seam. Both spawns are on the centre.
+- **Why not a continuous ground.** Adamaris's `continuous` ground runs on
+  past the Void; here that would leave invisible support where a wing has
+  fallen. A sectioned *finite* floor has real ledges at both ends and,
+  once a wing is gone, real open air in its place. The camera, the Void
+  (360 past each ledge, 420 below the top, 800 above it) and overtime's
+  closing Void are set round the glacier's whole starting footprint, so a
+  broken wing leaves a gap inside the Void to fall through and recover
+  across, and the centre stays wholly inside it, overtime included.
+- **The centre** (`jokull-centre`) is permanent: never cracked, never
+  switched off (a frozen solid with no `active` flag), the same size all
+  match, everyone's footing and recovery target. It shows only decorative
+  ancient ice.
+- **The wings** are stage hazards (`hazards`: `jokull-west-ice` and
+  `jokull-east-ice`, behaviour `ice-section`, tuned by `ICE_SECTION` in
+  [`js/data/stage-hazards.js`](../../js/data/stage-hazards.js), run by
+  `IceSectionController` in
+  [`js/game/stage-hazards.js`](../../js/game/stage-hazards.js)), each with
+  its own counter, cracks, timing and stream: nothing passes from one to
+  the other or across the centre.
+- **What counts as a contact.** One for every new footing a fighter takes
+  on a wing, never one per step: the step its ground becomes that wing (a
+  jump's, a higher jump's, an air jump's or an air dash's landing, a fall
+  onto it from above, a landing after a launch, in a blizzard or not), or
+  its centre crossing the seam from the centre section. The footing lasts
+  while it stays on the ground overlapping the wing, so standing,
+  walking, shielding, fighting or jittering on the seam add nothing; it
+  ends when the fighter leaves the ground or no longer overlaps the wing,
+  after which a new footing counts again. A wall or the underside is never
+  footing, a launch's rebound is no landing, and a body placed by a spawn
+  is not a landing. Both fighters count alike, on the same step too, but a
+  wing never counts past its maximum, and nothing counts outside the fight.
+- **Durability**: `MAX_ICE_CONTACTS` = **15** (`ICE_SECTION.maxContacts`),
+  the one number to change. The damage shows in fifths of it
+  (`ICE_DAMAGE_LEVELS`, `iceDamageLevel`): 0 clean thick ice; 1–3 hairline
+  fractures; 4–6 branching cracks and frost chips; 7–9 cracks across the
+  top and down the front face; 10–12 deep fractures, the inner seam
+  opening; 13–14 critical instability, a tremble, and its whole span a
+  danger zone; 15 failure. The fracture network is cumulative: each
+  contact adds a fracture at its impact or carries an old one further
+  (generated once from the wing's own stream and kept, never redrawn at
+  random), the cracks darker, wider and more joined up as it goes, on the
+  top and the front face alike. Each contact also flashes the ice with
+  cold stress spreading from the impact, throws up chips and jolts the
+  wing a little.
+- **The break** starts on the 15th contact, in three phases:
+  **critical** (0.3 s; phase A: the wing shakes, its cracks race and glow
+  white and cyan, chips jump off it; still solid), **separating** (0.32 s;
+  phase B: torn from the centre along a jagged line, split into its pieces
+  over its dark interior; its collision is off from this phase's very
+  first step) and **collapsing** (1.1 s; phase C: its nine pieces (its top
+  slab and foundation, three by three) and a spray of shards fall, turning,
+  pushed out from the centre, powder streaming behind them), then
+  **destroyed** for the rest of the match. A small shake comes with the
+  fracture and more with the separation (none with reduced motion).
+  Whoever stands on a wing as it separates falls (`releaseGround`) with
+  every move and recovery intact, unless the centre their collider still
+  overlaps holds them up; nobody is taken but by the Void. The pieces are
+  art: never projectiles, hits or collision, dropped once well below the
+  Void. The centre's exposed edge is drawn torn along the wing's tear line,
+  its walkable lip exactly where its collision ends.
+- **Gone is gone.** A destroyed wing is out of every query (landings,
+  walls, ceilings, `surfaceBelow` and so shadows, projectiles, the debug
+  overlay, the CPU), stays gone through falls and respawns, and only a new
+  battle or a rematch (`Battle.restart`, `StageHazards.reset`) builds it
+  whole again. Every battle (and every preview) has its own; the map is
+  never written.
+- **The blizzard** (`jokull-blizzard`, behaviour `blizzard`, tuned by
+  `BLIZZARD`, run by `BlizzardController`): calm, then a weather check
+  after a 5–8 s opening calm and every 12–18 s while calm; each check is
+  one draw with exactly `BLIZZARD_CHANCE` = **0.25** (never per step or
+  frame). A failed check leaves it calm; a successful one starts a storm:
+  **warning** (1–1.5 s, the wind rising, snow thickening, fog drawing in),
+  **blizzard** (6–9 s, the whiteout) and **clearing** (1–1.5 s), back to
+  calm, after which the checks start again. Only calm checks, so storms
+  never overlap, and nothing forces one weather after another. Its clock
+  runs on the fixed step from its own stream of the battle's seed, held
+  outside the fight. It never touches play: no damage, Launch Point,
+  stun, push or pull, and never the ice's durability; the ice cracks and
+  breaks through it as ever.
+- **Its art** ([`js/stages/jokull-theme.js`](../../js/stages/jokull-theme.js)):
+  a pale polar sky, a low sun through icy cloud with its halo, cirrus,
+  snow-covered ranges, a frozen plain with ice shelves, seracs and frosted
+  rock rising out of the abyss, cold haze thickening into the depths; the
+  glacier's snowy top (sastrugi, polished blue ice, frost, drifts at its
+  edges), its front face (snow cap, blue-white ice deepening to turquoise
+  and navy, strata, light shafts, trapped bubbles, ancient fractures) and
+  its toothed underside. Snow falls in three depths on an ambient wind
+  with gusts and powder blowing over the ice. A blizzard strengthens all
+  of it: driving streaks, fog banks on the wind, the distance fading out
+  and a whiteout over the battle canvas (never the HUD) that still leaves
+  the glacier and fighters showing; the cracks of a wing about to break
+  are drawn again over it, so the cue is never lost. The theme draws only
+  the live state (`opts.hazards`): nothing it does changes the ice.
+- **CPUs** read the live floor through their `StageModel`: each wing is a
+  surface while it is there, with the damage it shows (`damage`,
+  `integrity`, `unstable`, `broken`); the main floor's edges (`left`,
+  `right`) move in to the centre's own as soon as a wing starts breaking,
+  so a recovery, a safe spot or a retreat never aims at missing ice. A
+  wing critically unstable or breaking is a danger zone a CPU may step off
+  onto the centre after its reaction time, more reliably the higher its
+  level, never every time; before that the wings are fought on like any
+  footing. The weather is not in what a CPU reads.
+- **Previews**: the large animated preview runs its own ice and weather
+  in a world of its own as a demonstration (`demo`), since no fighter
+  lands there: the wings take contacts on their own timer, crack, break
+  away and (only in a preview) form again after a rest, and the weather
+  brings a storm at every check. A thumbnail, or reduced motion, draws the
+  glacier whole and the weather calm.
+- **Reduced motion** changes only the look: no shaking or jolting, no
+  pulsing glow, slow snow and wind, a steady storm veil; the cracks, the
+  break and its timing are exactly the same.
+
 ## Platform hazards
 
 A **dynamic platform** is a one-way platform whose map entry has a
@@ -321,6 +462,12 @@ translations to
 (`map.<id>.name`, `map.<id>.tagline`, `map.<id>.trait.<trait>`, and
 `map.trait.<trait>` for a trait no stage had before).
 
+A stage whose floor breaks needs no new code either: divide its finite
+`ground` into `sections`, mark the ones that may break `breakable`, and
+give each a stage hazard with `behavior: 'ice-section'` naming it
+(`section`); add a blizzard with `behavior: 'blizzard'`. Its theme draws
+them from `opts.hazards` (`iceFor`, `blizzard`).
+
 A stage with moving or vanishing platforms needs no new code: give a
 platform a `dynamic` block naming a behaviour (`cloud-drift`, or a new
 one added to [`js/data/platform-hazards.js`](../../js/data/platform-hazards.js)),
@@ -345,6 +492,13 @@ restarts and clean-up, the CPUs);
 [`tests/systems/adamaris.test.mjs`](../../tests/systems/adamaris.test.mjs)
 (the stage's registration, its continuous sand, camera, overtime, theme,
 and full matches on it);
+[`tests/systems/jokull.test.mjs`](../../tests/systems/jokull.test.mjs)
+(Jökull's registration, its sectioned glacier and seams, every kind of
+contact and what never counts, the damage levels and cracks, the break's
+phases and collision, the falling pieces, every query of a destroyed
+section, the CPU's live reading and its escape, the blizzard's checks,
+chance, states, harmlessness and determinism, respawns and rematches,
+overtime, full matches and the theme);
 [`tests/systems/void-ripple.test.mjs`](../../tests/systems/void-ripple.test.mjs)
 (the Void's ripple);
 [`tests/interface/stage-select.test.mjs`](../../tests/interface/stage-select.test.mjs)

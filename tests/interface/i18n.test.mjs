@@ -210,6 +210,7 @@ test('French is really French: only proper names, codes and shared words read th
     'map.asperitas.name', // Asperitas, a proper name
     'map.desert.name', 'map.city.name', // Yerma, Sol-Noir: proper names
     'map.adamaris.name', // Adamaris, a proper name
+    'map.jokull.name', // Jökull, a proper name
     'map.trait.terrain', 'map.trait.obstacles', // Terrain, Obstacles: the same words
     'mode.index', // Mode 01
     'pad.playstation.north', // Triangle, the PlayStation button's name

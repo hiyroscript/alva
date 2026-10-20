@@ -77,14 +77,17 @@ blocks every attack.
   included, under the same clock and overtime.
 - **Practice Ground**: a training room with a stand-still dummy, damage
   numbers and fighter swaps.
-- **Four stages**, Yerma, Sol-Noir, Asperitas and Adamaris, plus the
+- **Five stages**, Yerma, Sol-Noir, Asperitas, Adamaris and Jökull, plus the
   training room: open ledges, platforms, a Void kill boundary and a
   platform-fighter camera. Asperitas floats high above the clouds: one
   great cloud to fight on and two smaller cloud hazards that drift, rest,
   fade away from under you and form again somewhere new. Adamaris is a
   tropical beach, the sand running on past the Void, under a volcano whose
   random eruptions rain rocks onto the beach, each landing marked by a red
-  warning circle first.
+  warning circle first. Jökull is one immense glacier over a frozen abyss:
+  its centre holds for ever, but its two outer wings crack with every
+  landing and break away into the abyss on the fifteenth, and a sudden
+  blizzard (one weather check in four) can white out the view.
 - **The Void reacts**: whenever it takes a fighter it ripples where the
   fighter crossed it.
 - **Select Stage**: a 24-slot stage roster (the playable stages first,

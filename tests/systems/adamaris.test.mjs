@@ -61,7 +61,7 @@ function battleOn({ seed = 5, mode, difficulty = 'medium' } = {}) {
 }
 
 test('Adamaris is the fourth stage of the roster, with its own theme, continuous ground and volcano', () => {
-  assert.deepEqual(MAPS.map((m) => m.id), ['desert', 'city', 'asperitas', 'adamaris']);
+  assert.deepEqual(MAPS.map((m) => m.id).slice(0, 4), ['desert', 'city', 'asperitas', 'adamaris'], 'the first four, in order (Jökull is fifth)');
   assert.equal(stageSlots()[3].map, ADAMARIS, 'slot 04');
   assert.equal(stageSlots().length, CONFIG.stageRoster.totalSlots);
   assert.equal(ADAMARIS.name, 'Adamaris');

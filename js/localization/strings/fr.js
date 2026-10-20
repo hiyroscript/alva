@@ -182,6 +182,13 @@ export const FR = {
   'map.adamaris.trait.hazards': 'Chute de roches volcaniques',
   'map.adamaris.trait.obstacles': 'Aucun',
   'map.adamaris.trait.light': 'Plein soleil tropical',
+  'map.jokull.name': 'Jökull',
+  'map.jokull.tagline': 'Un royaume gelé au bord de l’effondrement',
+  'map.jokull.trait.terrain': 'Glacier gelé',
+  'map.jokull.trait.platforms': 'Trois sections de glace reliées',
+  'map.jokull.trait.hazards': 'Glace qui s’effondre et blizzards',
+  'map.jokull.trait.obstacles': 'Aucun',
+  'map.jokull.trait.light': 'Jour polaire',
 
   'common.back': 'Retour',
   'common.selected': 'Sélectionné',

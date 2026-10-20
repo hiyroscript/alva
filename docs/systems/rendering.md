@@ -14,7 +14,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark and fear mark drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
-| [`js/stages/`](../../js/stages/) | Stage themes (Yerma `desert`, Sol-Noir `city`, Asperitas, Adamaris, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it; Adamaris's draws its volcano, rocks, warnings and impacts from the live stage hazards (`opts.hazards`). |
+| [`js/stages/`](../../js/stages/) | Stage themes (Yerma `desert`, Sol-Noir `city`, Asperitas, Adamaris, Jökull `jokull`, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it; Adamaris's draws its volcano, rocks, warnings and impacts from the live stage hazards (`opts.hazards`); Jökull's draws its glacier section by section from them too (each wing's cracks, contacts, break and falling pieces, the centre torn where one went) and its weather (snow, wind and the blizzard's whiteout over the battle canvas, never the HUD). |
 | [`js/ui/hud.js`](../../js/ui/hud.js), [`js/ui/sprite-art.js`](../../js/ui/sprite-art.js) | The DOM HUD and portraits (interface, not canvas). |
 
 ## Sprites
@@ -57,7 +57,9 @@ moving from where it stood before the carry.
 `Arena.render`, back to front: the stage's background and terrain (on
 Adamaris the stage hazards' red warnings and flying rocks are part of its
 terrain, behind the fighters, and their impacts' bursts part of its
-foreground),
+foreground; on Jökull the glacier's cracks, contacts and falling pieces
+are its terrain, and its snow and blizzard its foreground, over the
+fighters),
 shadows, clones, each fighter in play (the CPU, then Player 1 on top: its
 speed trail, the Shield's interior, the fighter, the Shield's rim), the
 technique objects, projectiles, hit sparks, the stage's foreground, the

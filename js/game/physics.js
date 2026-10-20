@@ -26,6 +26,13 @@
 // whether it is `active`: a platform switched off is gone from every query
 // and every landing, as if it were not there. A body standing on a moving
 // one is carried along with it (carryBody) before it takes its own step.
+//
+// A solid may be switched off the same way (`active` false): a breakable
+// section of a sectioned main floor (Jökull's glacier wings, see
+// resolveGround), whose controller (js/game/stage-hazards.js) turns it off
+// as it breaks away. Gone from every query, every landing, every side and
+// every ceiling, as if it were not there: no invisible ground, no invisible
+// wall. Physics never switches anything itself.
 
 const EPS = 0.5;
 // The least a closing Void ever leaves past a ledge or below the main
@@ -36,29 +43,72 @@ const MIN_VOID_GAP = 40;
 // js/data/maps.js): `finite` (the default) is the main stage itself, with a
 // ledge at each end; `continuous` is ground that runs on past both sides of
 // the Void (a beach, a plain), so there is no ledge to walk off anywhere a
-// fighter can be.
+// fighter can be. A finite floor may also be divided into `sections` (see
+// resolveSections): the same main stage, in contiguous blocks side by side.
 export const GROUND_TYPES = Object.freeze(['finite', 'continuous']);
 
-// The extent of `map`'s main floor: { type, left, right }. A finite one is
-// exactly map.mainStage's; a continuous one reaches `reach` world units past
-// each side of the map's own Void (which a closing Void only ever moves in),
-// so its ends are always deep in the black and never reachable. Anything
-// else is refused rather than guessed at.
+// The extent of `map`'s main floor: { type, left, right, sections }. A
+// finite one is exactly map.mainStage's, undivided (`sections` null) or in
+// its sections; a continuous one reaches `reach` world units past each side
+// of the map's own Void (which a closing Void only ever moves in), so its
+// ends are always deep in the black and never reachable, and is never
+// divided. Anything else is refused rather than guessed at.
 export function resolveGround(map) {
   const main = map.mainStage;
   const g = map.ground ?? { type: 'finite' };
   if (!GROUND_TYPES.includes(g.type)) throw new Error(`[Alva] Stage "${map.id}": unknown ground type "${g.type}"`);
-  if (g.type === 'finite') return Object.freeze({ type: 'finite', left: main.left, right: main.right });
+  if (g.type === 'finite') {
+    return Object.freeze({ type: 'finite', left: main.left, right: main.right, sections: resolveSections(map, g.sections) });
+  }
+  if (g.sections != null) throw new Error(`[Alva] Stage "${map.id}": a continuous ground cannot be divided into sections`);
   if (!(Number.isFinite(g.reach) && g.reach > 0)) throw new Error(`[Alva] Stage "${map.id}": a continuous ground needs a positive reach`);
   const v = map.voidBounds;
   return Object.freeze({
-    type: 'continuous', left: Math.min(main.left, v.left) - g.reach, right: Math.max(main.right, v.right) + g.reach,
+    type: 'continuous', left: Math.min(main.left, v.left) - g.reach, right: Math.max(main.right, v.right) + g.reach, sections: null,
   });
 }
+
+// A finite floor's sections (map.ground.sections), left to right, each
+// { id, left, right, breakable }; null for an undivided floor. They must
+// tile the main stage exactly: the first starts at its left edge, each
+// next one where the last ends (no gap, no overlap) and the last ends at
+// its right edge, so the floor is one uninterrupted surface at one height.
+// `breakable` marks a section a stage hazard may switch off (see
+// StageCollision); the one under the main stage's centre never is: it is
+// the floor (StageCollision.floor), the footing that is always there.
+function resolveSections(map, sections) {
+  if (sections == null) return null;
+  const main = map.mainStage;
+  const fail = (why) => {
+    throw new Error(`[Alva] Stage "${map.id}": ${why}`);
+  };
+  if (!Array.isArray(sections) || sections.length < 2) fail('a sectioned floor needs at least two sections');
+  const ids = new Set();
+  let x = main.left;
+  const out = sections.map((s) => {
+    if (typeof s?.id !== 'string' || !s.id || ids.has(s.id)) fail('every floor section needs an id of its own');
+    ids.add(s.id);
+    if (!(Number.isFinite(s.left) && Number.isFinite(s.right) && s.right > s.left)) fail(`floor section "${s.id}" needs a left and a right`);
+    if (s.left !== x) fail(`floor section "${s.id}" must start where the last one ends, at ${x}: no gap, no overlap`);
+    x = s.right;
+    return Object.freeze({ id: s.id, left: s.left, right: s.right, breakable: s.breakable === true });
+  });
+  if (x !== main.right) fail('the floor sections must end at the main stage\'s right edge');
+  const centre = (main.left + main.right) / 2;
+  if (out.find((s) => s.left <= centre && centre <= s.right).breakable) fail('the section under the main stage\'s centre cannot be breakable');
+  return Object.freeze(out);
+}
+
+// Whether surface `s` spans world x `x` (its left edge in, its right out),
+// for choosing between two surfaces at the same height under one body: the
+// one under its centre holds it (see stepBody, surfaceBelow).
+const holds = (s, x) => x >= s.x && x < s.x + s.w;
 
 export class StageCollision {
   constructor(map) {
     const main = map.mainStage;
+    this.groundY = main.top;
+    this.centerX = (main.left + main.right) / 2;
     // The main floor: a solid block whose top is the ground. It collides
     // like any other solid, so it supports a body only while the body
     // overlaps it horizontally. A finite one is the main stage (below its
@@ -69,12 +119,29 @@ export class StageCollision {
     this.ground = resolveGround(map);
     // No ledges anywhere a fighter can be (a continuous ground).
     this.continuousGround = this.ground.type === 'continuous';
-    this.floor = Object.freeze({
-      id: '__floor', kind: 'floor', oneWay: false, dropThrough: false,
-      x: this.ground.left, y: main.top, w: this.ground.right - this.ground.left, h: main.bottom - main.top,
+    const block = (id, left, right, extra) => ({
+      id, kind: 'floor', oneWay: false, dropThrough: false, x: left, y: main.top, w: right - left, h: main.bottom - main.top, ...extra,
     });
-    this.groundY = main.top;
-    this.centerX = (main.left + main.right) / 2;
+    if (this.ground.sections) {
+      // A sectioned floor (Jökull's glacier): one solid per section, side by
+      // side at one height, each its whole block down to the main stage's
+      // bottom. A breakable one is this stage's own runtime copy, `active`
+      // until its stage hazard switches it off (js/game/stage-hazards.js);
+      // a permanent one never changes. A body crossing from one to the next
+      // meets no wall or step: a section's side stops only a body below its
+      // top, and the next one's top is level with it.
+      this.floors = Object.freeze(this.ground.sections.map((s) => (s.breakable
+        ? block(s.id, s.left, s.right, { section: true, breakable: true, active: true })
+        : Object.freeze(block(s.id, s.left, s.right, { section: true, breakable: false })))));
+      // The floor: the permanent section under the main stage's centre.
+      this.floor = this.floors.find((f) => !f.breakable && f.x <= this.centerX && this.centerX <= f.x + f.w);
+    } else {
+      this.floor = Object.freeze(block('__floor', this.ground.left, this.ground.right));
+      this.floors = Object.freeze([this.floor]);
+    }
+    // The sections a stage hazard may switch off, left to right (none on an
+    // undivided floor).
+    this.breakableFloors = this.floors.filter((f) => f.breakable);
     // The runtime platforms: this stage's own copies, never the map's
     // (map.platforms is never written). A static one keeps its place; a
     // dynamic one (`dynamic`, from the map) is moved and switched off and on
@@ -90,7 +157,7 @@ export class StageCollision {
     // The dynamic ones among them, in map order.
     this.dynamicPlatforms = this.platforms.filter((p) => p.dynamic);
     this.solids = [
-      this.floor,
+      ...this.floors,
       ...map.solids.map((s) => ({ ...s, oneWay: false, dropThrough: false })),
     ];
     // The main stage's edges, which the Void never closes past (see
@@ -156,20 +223,24 @@ export class StageCollision {
 
   // Highest surface at or below `y` under horizontal span [x0, x1]:
   // { y, ref }, or { y: Infinity, ref: null } with nothing below at all
-  // (past the main floor's edges, over open air). A platform switched off
-  // is not there.
+  // (past the main floor's edges, over open air). A platform or solid
+  // switched off is not there. Of two at the same height (two sections of
+  // a sectioned floor) the one under the span's centre is the one, as
+  // stepBody lands a body.
   surfaceBelow(x0, x1, y) {
     let best = Infinity;
     let ref = null;
+    const mid = (x0 + x1) / 2;
     for (const p of this.platforms) {
       if (p.active === false) continue;
-      if (p.y >= y - EPS && p.y < best && x1 > p.x && x0 < p.x + p.w) {
+      if (p.y >= y - EPS && (p.y < best || (p.y === best && !holds(ref, mid) && holds(p, mid))) && x1 > p.x && x0 < p.x + p.w) {
         best = p.y;
         ref = p;
       }
     }
     for (const s of this.solids) {
-      if (s.y >= y - EPS && s.y < best && x1 > s.x && x0 < s.x + s.w) {
+      if (s.active === false) continue;
+      if (s.y >= y - EPS && (s.y < best || (s.y === best && !holds(ref, mid) && holds(s, mid))) && x1 > s.x && x0 < s.x + s.w) {
         best = s.y;
         ref = s;
       }
@@ -189,7 +260,12 @@ export class StageCollision {
   // stop that body at, moving across the span. A solid it stands on top of
   // (the main floor included) never counts.
   solidAcross(x0, x1, y, height) {
-    return this.solids.some((s) => y > s.y + EPS && y - height < s.y + s.h && x1 > s.x && x0 < s.x + s.w);
+    return this.solids.some((s) => s.active !== false && y > s.y + EPS && y - height < s.y + s.h && x1 > s.x && x0 < s.x + s.w);
+  }
+
+  // The floor section `id` (a sectioned floor's, see resolveGround), or null.
+  floorSection(id) {
+    return this.floors.find((f) => f.id === id) ?? null;
   }
 
   // Whether a body has crossed into the Void: its centre (half its height
@@ -260,12 +336,22 @@ export function carryBody(b) {
   return b.carryX !== 0 || b.carryY !== 0;
 }
 
-// Lets go of a platform that is gone from under a body (switched off: a
-// hazard that vanished): no longer its ground, so the body is in the air
-// with whatever velocity it had, and gravity takes it from this step on. No
-// push, no snap, no speed taken or given. True if it let go.
-export function releaseGround(b) {
+// Lets go of a surface that is gone from under a body (switched off: a
+// hazard that vanished, a floor section that broke away): no longer its
+// ground, so the body is in the air with whatever velocity it had, and
+// gravity takes it from this step on. No push, no snap, no speed taken or
+// given. True if it let go. Given the stage, a body that another surface
+// still holds up at the very same height (the neighbouring section of a
+// sectioned floor, which its collider still overlaps: the ordinary ledge
+// rule) stands on that one instead, with no fall: that is legitimate
+// footing, not a landing.
+export function releaseGround(b, stage = null) {
   if (!b.ground || b.ground.active !== false) return false;
+  const next = stage?.surfaceBelow(b.x - b.halfW, b.x + b.halfW, b.y);
+  if (next?.ref && Math.abs(next.y - b.y) <= EPS) {
+    b.ground = next.ref;
+    return false;
+  }
   b.grounded = false;
   b.ground = null;
   return true;
@@ -292,11 +378,11 @@ export function stepBody(b, dt, stage, gravity, maxFall = b.maxFall) {
   if (!b.grounded) b.vy = Math.min(b.vy + gravity * b.gravityScale * dt, maxFall);
 
   // ---- Horizontal ----------------------------------------------------------
-  // Solids only (the main floor's body included): nothing else stops a body
-  // sideways, so it can always leave the stage.
+  // Solids only (the main floor's body included, a switched-off one never):
+  // nothing else stops a body sideways, so it can always leave the stage.
   b.x += b.vx * dt;
   for (const s of stage.solids) {
-    if (b.y <= s.y + EPS || b.y - b.height >= s.y + s.h) continue;
+    if (s.active === false || b.y <= s.y + EPS || b.y - b.height >= s.y + s.h) continue;
     if (!overlapsX(b, s.x, s.x + s.w)) continue;
     if (b.prevX <= s.x + s.w / 2) {
       b.x = s.x - b.halfW;
@@ -323,16 +409,23 @@ export function stepBody(b, dt, stage, gravity, maxFall = b.maxFall) {
     // it as it was or as it is now (the lower of its two lines, y growing
     // down), so one rising into falling feet catches them rather than
     // passing up through them; for a static one both lines are the same.
+    // Of two surfaces at the same height under the body (two sections of a
+    // sectioned floor) the one under its centre holds it, so its ground
+    // passes from one section to the next exactly as its centre crosses the
+    // seam between them, and never back and forth while it stays put.
     for (const p of stage.platforms) {
       if (p.id === b.dropId || p.active === false) continue;
       const line = p.prevY > p.y ? p.prevY : p.y;
-      if (prevBottom <= line + EPS && b.y >= p.y - EPS && p.y < surface && overlapsX(b, p.x, p.x + p.w)) {
+      if (prevBottom <= line + EPS && b.y >= p.y - EPS && (p.y < surface || (p.y === surface && !holds(ref, b.x) && holds(p, b.x))) &&
+        overlapsX(b, p.x, p.x + p.w)) {
         surface = p.y;
         ref = p;
       }
     }
     for (const s of stage.solids) {
-      if (prevBottom <= s.y + EPS && b.y >= s.y - EPS && s.y < surface && overlapsX(b, s.x, s.x + s.w)) {
+      if (s.active === false) continue;
+      if (prevBottom <= s.y + EPS && b.y >= s.y - EPS && (s.y < surface || (s.y === surface && !holds(ref, b.x) && holds(s, b.x))) &&
+        overlapsX(b, s.x, s.x + s.w)) {
         surface = s.y;
         ref = s;
       }
@@ -352,6 +445,7 @@ export function stepBody(b, dt, stage, gravity, maxFall = b.maxFall) {
     b.grounded = false;
     b.ground = null;
     for (const s of stage.solids) {
+      if (s.active === false) continue;
       const top = b.y - b.height;
       if (prevTop >= s.y + s.h - EPS && top < s.y + s.h && overlapsX(b, s.x, s.x + s.w)) {
         b.y = s.y + s.h + b.height;
@@ -402,7 +496,7 @@ export function separate(a, b, aHalf, bHalf, stage, aShare = 0.5) {
 // pushbox separation, which moves bodies outside of stepBody).
 export function resolveSolidOverlap(b, stage) {
   for (const s of stage.solids) {
-    if (b.y <= s.y + EPS || b.y - b.height >= s.y + s.h) continue;
+    if (s.active === false || b.y <= s.y + EPS || b.y - b.height >= s.y + s.h) continue;
     if (!overlapsX(b, s.x, s.x + s.w)) continue;
     if (b.x < s.x + s.w / 2) b.x = s.x - b.halfW;
     else b.x = s.x + s.w + b.halfW;

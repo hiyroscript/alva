@@ -198,11 +198,15 @@ test('on a continuous ground a fighter runs past the combat area on the sand, ne
       assert.equal(body.y, m.mainStage.top);
     }
   }
-  // The finite stages' floors are exactly their main stages.
+  // The finite stages' floors are exactly their main stages: one block, or
+  // (Jökull's glacier) sections side by side spanning exactly the same.
   for (const m of FINITE_MAPS) {
     const stage = new StageCollision(m);
     assert.equal(stage.continuousGround, false);
-    assert.deepEqual([stage.floor.x, stage.floor.x + stage.floor.w], [m.mainStage.left, m.mainStage.right], m.id);
+    const floors = stage.floors;
+    assert.deepEqual([floors[0].x, floors.at(-1).x + floors.at(-1).w], [m.mainStage.left, m.mainStage.right], m.id);
+    for (let i = 1; i < floors.length; i++) assert.equal(floors[i].x, floors[i - 1].x + floors[i - 1].w, `${m.id}: no gap between sections`);
+    if (floors.length === 1) assert.equal(stage.floor, floors[0]);
   }
 });
 

@@ -303,7 +303,8 @@ export class CpuIntelligence {
     if (me.offstage && !me.inMotion && this.plan?.kind !== 'recover' && !this.safeAerialPlan(s)) {
       this.setPlan(this.recoveryPlan(s), s, 'offstage');
     }
-    // A falling rock's warning under it: out of the circle, if it noticed.
+    // A stage hazard's warning under it (a falling rock's circle, a
+    // crumbling ice wing): out of it, if it noticed.
     this.avoidHazards(s);
     // A platform fading out from under it: off it, if it noticed.
     this.avoidFadingFooting(s);
@@ -410,14 +411,15 @@ export class CpuIntelligence {
 
   // ---- Stage hazards ---------------------------------------------------------------
 
-  // A stage hazard's visible warning (a falling rock's red circle, see
-  // StageModel.dangerZones) under the CPU, standing: it steps out of it,
-  // the nearer way unless that way is under another warning, if it noticed
-  // it at all. Whether it does is drawn once per warning, from how well it
-  // reads the stage and how often it lapses (an Easy CPU often stands
-  // there; even a Brutal one sometimes does), and it moves only after its
-  // reaction time. It knows nothing until the warning shows, and nothing a
-  // player could not see.
+  // A stage hazard's visible warning (a falling rock's red circle, an ice
+  // wing trembling on the verge of breaking: see StageModel.dangerZones)
+  // under the CPU, standing: it steps out of it, the nearer way unless that
+  // way is under another warning or has no footing (never off a ledge into
+  // the air), if it noticed it at all. Whether it does is drawn once per
+  // warning, from how well it reads the stage and how often it lapses (an
+  // Easy CPU often stands there; even a Brutal one sometimes does), and it
+  // moves only after its reaction time. It knows nothing until the warning
+  // shows, and nothing a player could not see.
   avoidHazards(s) {
     const me = s.me;
     const model = s.model;
@@ -436,12 +438,17 @@ export class CpuIntelligence {
     if (!seen.react || this.clock < seen.at) return;
     const v = model.void;
     const exit = (dir) => z.x + dir * (z.radius + me.halfW + 18);
-    const clear = (dir) => !model.dangerAt(exit(dir), me.halfW, 0) && exit(dir) > v.left + 80 && exit(dir) < v.right - 80;
+    const clear = (dir) => !model.dangerAt(exit(dir), me.halfW, 0) && exit(dir) > v.left + 80 && exit(dir) < v.right - 80 &&
+      model.supported(exit(dir), me.halfW, me.y);
     const near = Math.sign(me.x - z.x) || (me.x < model.centerX ? 1 : -1);
-    const dir = clear(near) ? near : clear(-near) ? -near : near;
-    const plan = makePlan('move', { dir, until: this.clock + Math.min(0.9, z.timeLeft + 0.1), reason: 'stepping out of a falling rock\'s warning' }, this);
+    const dir = clear(near) ? near : clear(-near) ? -near : Math.sign(model.centerX - me.x) || near;
+    const ice = z.kind === 'ice';
+    const plan = makePlan('move', {
+      dir, until: this.clock + Math.min(0.9, z.timeLeft + 0.1),
+      reason: ice ? 'stepping off ice that is about to break' : 'stepping out of a falling rock\'s warning',
+    }, this);
     plan.dodge = z.id;
-    this.setPlan(plan, s, 'falling rock');
+    this.setPlan(plan, s, ice ? 'breaking ice' : 'falling rock');
   }
 
   // A dynamic platform under the CPU visibly fading out (see StageModel

@@ -469,7 +469,7 @@ export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out =
     const px = x0 + dir * p.speed * (j + 1) * STEP;
     boxAt(p.hitbox, px, y0, dir, shotBox);
     if (shotBox.x + shotBox.w < v.left || shotBox.x > v.right) break;
-    if (stage.solids.some((s) => shotBox.x < s.x + s.w && shotBox.x + shotBox.w > s.x && shotBox.y < s.y + s.h && shotBox.y + shotBox.h > s.y)) {
+    if (stage.solids.some((s) => s.active !== false && shotBox.x < s.x + s.w && shotBox.x + shotBox.w > s.x && shotBox.y < s.y + s.h && shotBox.y + shotBox.h > s.y)) {
       out.blocked = true;
       break;
     }
