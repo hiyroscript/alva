@@ -1,1290 +1,1487 @@
-ALVA — Major CPU Intelligence Update: Human Behavior, Difficulty Rebalancing & Advanced Strategic Awareness
+MASTER IMPLEMENTATION PROMPT — ALVA COMBAT FEEL, INPUT RESPONSIVENESS & COMBO ASSIST OVERHAUL
 
-Your mission
+YOUR ROLE
 
-Work directly in the GitHub repository hiyroscript/alva.
+You are acting as a senior gameplay programmer, fighting-game systems designer, JavaScript engineer, animation-timing specialist, and quality-assurance engineer working directly on Alva, a sprite-based, browser-based 2D fighting game.
 
-I want a major, carefully engineered update to CPU Intelligence.
+Repository: https://github.com/hiyroscript/alva
 
-This is one of the most important gameplay updates for Alva. Quality, stability, believable behavior, and preservation of existing systems are more important than speed of implementation.
+Your assignment is to thoroughly inspect the latest repository and implement a carefully controlled improvement to the fighting experience, particularly for human players who are still learning the game.
 
-The current CPU Intelligence is an excellent foundation. I love the new intelligence system, its understanding of combat, its ability to use different fighters, and its existing decision-making. Do not replace, dismantle, or significantly simplify it. Build on what already exists.
+This is not a request to rebuild combat, invent an entirely different fighting system, or make the CPU weaker.
 
-However, there are two major problems:
+The objective is to make Alva’s existing combat mechanics feel more responsive, forgiving, intuitive, predictable, and satisfying, while preserving the game’s tactical depth, established rules, individual fighter identities, and existing CPU behavior.
 
-1. CPUs are currently too strong, especially on Easy. Even Easy can feel excessively efficient and difficult to beat.
-2. CPUs need substantially more strategic intelligence and human-like behavior. They should understand the entire match, make meaningful long-term decisions, use stages intelligently, recognize when to fight versus when to protect themselves, and adapt their playstyle to their actual situation.
-
-The most important requirement is:
-
-CPUs must feel like real human players of different skill levels, not perfect machines, passive dummies, or scripted bots.
-
-A CPU can be very smart without being mechanically perfect or unfairly difficult. The objective is to make CPUs smarter in their decisions, while keeping their actual execution and consistency appropriate to the selected difficulty.
+Do not merely produce an implementation plan. Inspect the actual code, make the appropriate changes, update tests and documentation, and validate the finished result.
 
 ⸻
 
-1. Mandatory repository investigation
+PART 1 — UNDERSTAND THE GAME BEFORE MAKING CHANGES
 
-Before changing anything, thoroughly inspect the repository and understand how Alva actually works.
+1.1. Mandatory repository investigation
 
-Read these sources carefully:
+Before modifying any code, examine the current repository and establish an accurate understanding of its architecture.
 
-Product and gameplay rules
+Start by reading:
 
 * README.md
-* ALVA_SPEC.md, especially sections 6.3a and 7.2.8
-* CLAUDE.md
-* docs/systems/ai.md
-* docs/gameplay/battle.md
-* docs/gameplay/stages.md
-* docs/gameplay/watch-mode.md
-* docs/systems/launch.md
-* docs/systems/defense.md
-* docs/systems/movement.md
-* docs/development/testing.md
-
-Existing intelligence
-
-Inspect the complete js/game/ai/cpu-intelligence/ directory, especially:
-
-* brain.js
-* strategy.js
-* situation.js
-* stage-model.js
-* perception.js
-* opponent-model.js
-* prediction.js
-* evaluator.js
-* values.js
-* plans.js
-* defense.js
-* executor.js
-* capabilities.js
-* telemetry.js
-
-Also examine:
-
-* js/game/ai/combat-ai.js
-* js/game/ai/moveset.js
-* js/data/difficulty.js
-* js/data/launch.js
-* js/data/maps.js
-* js/game/battle.js
-* js/game/arena.js
-* js/game/physics.js
-* js/game/combat/combat-state.js
-* js/game/fighters/fighter.js
-
-Inspect the four existing fighter definitions to understand the variety of movement, attacks, defensive mechanics, and special abilities.
-
-Read the existing CPU tests, integration tests, and benchmark helpers.
-
-Do not assume the existing system lacks something simply because this prompt requests improvements. Many strategic features already exist in partial form.
-
-Identify what is already implemented, what is insufficient, what conflicts with the requested behavior, and what can be safely extended.
-
-Before implementation, establish a baseline using the current tests and CPU benchmarks.
-
-Important existing findings
-
-The repository already provides:
-
-* One universal intelligence for all fighters and difficulties.
-* Perception latency and imperfect observation.
-* Opponent habit modeling.
-* Several strategic modes.
-* Forward simulation, expected attack utility, combos, and recovery routes.
-* Launch Point and match-score awareness.
-* Stage geometry analysis and hazard avoidance.
-* Deterministic seeded behavior.
-* Telemetry and benchmark infrastructure.
-
-Preserve these strengths.
-
-The existing benchmark documentation reports Easy winning 63 of 64 matches against the balanced scripted reference opponent. These references are not equivalent to human players, so investigate the reliability of the benchmark rather than using this number as the sole measure of actual difficulty.
-
-The existing specification also enforces a rule that CPUs must not stay still for longer than approximately 0.45 seconds.
-
-That restriction must be carefully redesigned. Deliberate idleness should be valid behavior. Accidental inactivity must still be detected.
-
-⸻
-
-2. Core design philosophy
-
-The CPU should behave like a person playing Alva with a purpose.
-
-Human players do not constantly execute the mathematically highest-value action. They make decisions based on incomplete information, risk, confidence, momentum, available resources, opponent behavior, and what they need to accomplish to win.
-
-A skilled human can be patient. An inexperienced human can occasionally do something impressive. A player can retreat intelligently, misjudge an opening, hold a position, wait for an opponent, or change their plan after realizing that an aggressive approach is failing.
-
-This is the behavior we want.
-
-Intelligence is not the same as difficulty
-
-Separate these concepts:
-
-Strategic intelligence: Understanding the game, stage, current situation, opponent, available options, and match objectives.
-
-Mechanical skill: How consistently and accurately a CPU executes its intentions.
-
-Human behavior: Whether the CPU’s actions, hesitation, risk-taking, positioning, mistakes, and decision changes look natural and believable.
-
-Every difficulty should have access to the same underlying game knowledge and fundamental capabilities.
-
-Higher difficulties should demonstrate better use of that knowledge through stronger evaluation, execution, adaptation, and consistency.
-
-Easy must still appear to be trying to win. It simply should not operate with the accuracy, awareness, and conversion efficiency of an advanced player.
-
-Do not make Easy weaker by forcing it to stand still randomly, refusing to use important moves, artificially limiting damage, or intentionally ignoring obvious survival needs.
-
-A smart decision performed imperfectly is often more believable than a deliberately stupid decision.
-
-⸻
-
-3. Redesign the AI around two levels of strategy
-
-One of the biggest goals is distinguishing between:
-
-1. Winning the current fight or exchange.
-2. Winning the entire match.
-
-The best decision for an immediate exchange is not necessarily the best decision for winning the match.
-
-The existing Strategy implementation already considers score, clock, Launch Point, Energy, and different combat modes. Extend this foundation into more deliberate, persistent strategic decision-making.
-
-Match-level strategy
-
-The CPU should understand:
-
-* Its current score and the opponent’s score.
-* How many points each fighter needs to win.
-* Whether either fighter is at match point.
-* How much regulation time remains.
-* Whether the match is in overtime.
-* How overtime’s closing Void changes positioning and recovery risk.
-* The Launch Point of both fighters.
-* Whether a Launch Point advantage might matter at the end of overtime.
-* Its own likelihood of surviving the next exchange.
-* The opponent’s likelihood of surviving a potential finisher.
-* The consequences of taking or avoiding an engagement.
-* Whether preserving a lead is more valuable than chasing a risky elimination.
-* Whether aggressive play is required to avoid losing on time.
-
-Create a stable high-level objective such as:
-
-* Build an advantage.
-* Protect an advantage.
-* Recover and stabilize.
-* Seek a finishing opportunity.
-* Force an engagement.
-* Control favorable territory.
-* Deny the opponent a safe recovery.
-* Survive until the clock.
-* Break a defensive stalemate.
-
-These are examples, not a requirement to hardcode a separate rigid controller for each one.
-
-Use a coherent architecture that integrates with the existing strategies.
-
-Exchange-level strategy
-
-Within the current match objective, the CPU should choose how it wants to fight:
-
-* Rushdown.
-* Controlled offense.
-* Counterplay.
-* Punishment.
-* Zoning.
-* Trap control.
-* Defensive spacing.
-* Disengagement.
-* Finisher hunting.
-* Edge guarding.
-* Recovery.
-
-Preserve the existing strategic modes where appropriate.
-
-The important change is that the CPU’s current match objective should influence which combat strategy makes sense.
-
-Example
-
-If the CPU has a dangerous Launch Point, its opponent has almost none, and there are several minutes left, it may be smarter to retreat, defend, and recover rather than continue trading attacks.
-
-But if the CPU is losing 0–2 and only a few seconds remain, staying defensive might effectively guarantee a loss.
-
-The CPU should recognize this distinction.
-
-Strategic continuity
-
-Avoid constantly switching strategies every few frames.
-
-Implement appropriate:
-
-* Strategic commitment.
-* Hysteresis.
-* Minimum dwell times when safe.
-* Objective progress monitoring.
-* Reassessment after important events.
-* Interruptions when survival requires them.
-* Abandonment of plans that have become ineffective.
-
-A CPU should look like it is pursuing an intention, not endlessly changing its mind.
-
-⸻
-
-4. Purposeful idleness — a fundamental new feature
-
-CPUs must be allowed to stay idle.
-
-This is a major requirement and must not be treated as a cosmetic adjustment.
-
-The current AI forces movement when the CPU has reached its desired spacing and uses a liveness monitor to interrupt prolonged stillness.
-
-That behavior can create unnecessary pacing, robotic footwork, and an impression that the CPU must constantly do something.
-
-A good human player sometimes does absolutely nothing because acting would be unnecessary or disadvantageous.
-
-Legitimate reasons to remain idle
-
-A CPU may deliberately stop moving because:
-
-* No opponent is currently present or available.
-* No immediate threat exists.
-* It has already reached a favorable position.
-* It is waiting for an opponent to approach.
-* It is protecting an advantageous position.
-* It is conserving Energy.
-* It is allowing Launch Point to recover.
-* It is waiting for a cooldown.
-* It wants the opponent to commit first.
-* Approaching would expose it to unnecessary danger.
-* Its opponent is recovering and the CPU is holding an advantageous position.
-* A stage hazard makes movement temporarily risky.
-* It is protecting a match lead.
-* It is deciding whether to engage or disengage.
-* The current safest and most useful action is simply to wait.
-
-Idleness should be a valid tactical action with an explicit reason, duration policy, and exit conditions.
-
-Implementation requirements
-
-Introduce an intentional waiting/holding behavior, possibly through new plan kinds such as holdPosition, wait, or defensiveHold.
-
-Integrate it into the existing planner rather than bypassing the intelligence system.
-
-The plan must know:
-
-* Why it is waiting.
-* What position it is protecting.
-* What conditions justify continuing.
-* What events should interrupt it.
-* Whether it should remain unguarded, Shield, or prepare to move.
-* Whether continuing to wait still benefits the current match objective.
-
-Do not choose a random fixed waiting period and blindly follow it.
-
-A waiting plan should be evaluated over time.
-
-Redesign liveness correctly
-
-The current STILL_LIMIT behavior must distinguish:
-
-Intentional inactivity: The CPU is following a valid, meaningful plan that requires no input.
-
-Unintentional inactivity: The CPU has no valid intention, is stuck, failed to navigate, or is otherwise doing nothing due to broken logic.
-
-Intentional waiting must not count as an inactivity incident.
-
-Unintentional inactivity must still trigger appropriate recovery.
-
-Do not simply delete the liveness system or increase the global limit to an enormous number.
-
-Refactor it into an intent-aware safeguard.
-
-Avoid making idleness infinite. A CPU that is accomplishing nothing or allowing itself to lose should eventually reassess and act.
-
-In CPU-versus-CPU matches, two defensive CPUs must not become permanently stuck waiting for each other without meaningful strategic justification.
-
-Natural movement
-
-Remove unnecessary micro-adjustments whose only purpose is to avoid appearing idle.
-
-A CPU that reaches a useful position should sometimes settle there.
-
-Movement should have a recognizable purpose.
-
-Avoid constant left-right oscillation, repetitive pacing, arbitrary jumps, and meaningless Dash usage.
-
-This is extremely important for the human feel.
-
-⸻
-
-5. Advanced defensive recovery and strategic retreat
-
-I want CPUs to understand when to escape a fight, isolate themselves, and recover.
-
-Alva does not use a traditional health bar.
-
-It uses Launch Point. Unblocked damage increases Launch Point, making later launches more dangerous.
-
-Launch Point gradually recovers while the fighter avoids further unblocked hits.
-
-The CPU must understand the actual rules and recovery timing from js/data/launch.js, not invent an HP system.
-
-New retreat-and-recover behavior
-
-When the CPU determines that continuing combat is unnecessarily dangerous, it should be capable of:
-
-1. Recognizing that its Launch Point makes it vulnerable.
-2. Finding a favorable, reachable location.
-3. Disengaging safely.
-4. Creating enough separation to reduce immediate pressure.
-5. Using its Shield when appropriate.
-6. Allowing Launch Point and Energy to recover.
-7. Monitoring whether the opponent approaches.
-8. Repositioning or defending when necessary.
-9. Deciding when recovery has been sufficient.
-10. Returning to offense when the situation is favorable.
-
-This should look like an intentional defensive sequence rather than a repeated series of disconnected actions.
-
-Shield intelligently
-
-The current Shield:
-
-* Works on the ground.
-* Blocks attacks from any direction.
-* Costs Energy when it blocks a hit.
-* Can be held without spending Energy simply for holding it.
-* Cannot remain available while exhausted.
-* Does not prevent Launch Point recovery when it successfully blocks an attack.
-
-Use these properties correctly.
-
-A CPU with dangerous Launch Point might retreat to a safe position and hold Shield while the opponent closes in, recovering Launch Point as long as it avoids unblocked hits.
-
-But Shield is not always the best answer.
-
-The CPU must also consider:
-
-* Whether an attack is likely to arrive.
-* Whether its Shield can rise in time.
-* Whether its Energy is sufficient to sustain blocking.
-* Whether retreating farther is safer.
-* Whether a jump, Dash, or Deflect is better.
-* Whether holding Shield creates a predictable defensive pattern.
-* Whether its opponent can pressure it into exhaustion.
-* Whether the CPU should counterattack rather than continue defending.
-
-Do not make permanent Shield-holding an unbeatable or universal strategy.
-
-Recovery is contextual
-
-Do not use a simplistic rule such as “Launch Point above 50 means run away.”
-
-Evaluate actual danger.
-
-Launch Point becomes threatening depending on position, the enemy’s possible attacks, directional launch, the current Void boundary, available escape routes, Energy, and other factors.
-
-A CPU with moderate Launch Point close to a ledge may be in more danger than one with higher Launch Point safely near the stage center.
-
-An intelligent CPU should recognize that.
-
-Retreat also has an opportunity cost. The CPU may be giving up stage control, losing valuable time, or allowing its opponent to recover.
-
-Account for those tradeoffs.
-
-⸻
-
-6. Greatly improve Launch Point awareness
-
-Both the CPU’s own Launch Point and its opponent’s Launch Point must strongly influence strategic and tactical decisions.
-
-The existing LaunchJudge and strategy threat estimates provide a useful foundation.
-
-Extend them into more comprehensive danger and opportunity awareness.
-
-Own Launch Point
-
-The CPU should understand:
-
-* How vulnerable it is to an immediate launching attack.
-* Which nearby opponent moves are particularly dangerous.
-* Which launch directions are dangerous from its position.
-* How much the current stage affects its survival chances.
-* Whether it has enough recovery resources after being launched.
-* Whether it should avoid trading attacks.
-* Whether it should reduce aggression.
-* Whether a safer position is available.
-* Whether recovering Launch Point is currently worth the time.
-* Whether its match situation allows recovery.
-
-Opponent Launch Point
-
-The CPU should understand:
-
-* Whether its opponent is vulnerable to a finisher.
-* Which available attacks offer meaningful elimination potential.
-* Whether a safer setup can produce a better finisher later.
-* Whether it should force the opponent toward a ledge.
-* Whether its opponent is likely to retreat to recover.
-* Whether it should pursue or deny that recovery.
-* Whether an edge guard is worth its risk.
-* Whether damaging without launching is useful.
-* Whether it should preserve a strong finishing move for a better opportunity.
-
-Fight versus match
-
-A CPU should sometimes stop chasing damage because it has already accomplished its strategic objective.
-
-Conversely, when the opponent is vulnerable and the match can be won, the CPU should recognize an appropriate opportunity to increase pressure.
-
-This judgment must remain difficulty-dependent.
-
-Easy should not consistently recognize and execute the perfect finishing sequence.
-
-Brutal should recognize more opportunities and convert them more reliably, while retaining believable limitations.
-
-⸻
-
-7. Advanced stage and positioning intelligence
-
-Stage knowledge must become an important part of how CPUs play.
-
-The existing StageModel already understands geometry, platforms, ledges, the Void, live hazards, and navigation.
-
-Extend it rather than building unrelated stage-specific decision engines.
-
-Position evaluation
-
-A CPU should be able to evaluate a position using factors such as:
-
-* Distance from dangerous ledges.
-* Distance from the active Void boundary.
-* Available solid ground.
-* Nearby escape routes.
-* Whether the position offers enough room to maneuver.
-* Whether the opponent can easily trap it.
-* Whether the CPU can pressure the opponent toward danger.
-* Relative vertical position.
-* Attack reach and preferred fighting distance.
-* Whether projectiles have a clear path.
-* Whether a nearby surface is reachable.
-* Whether a platform is stable.
-* Whether the CPU can recover if an engagement fails.
-* Whether a position remains favorable after likely enemy movement.
-
-The safest position is not automatically the best position.
-
-The stage center might be good for survival but bad for trapping a vulnerable opponent.
-
-An elevated platform might offer a useful advantage, but leaving stable ground to reach it could be dangerous.
-
-Evaluate positions in relation to the current objective.
-
-Real stage behavior
-
-Support all current stages correctly:
-
-Yerma: Understand finite fighting space, open ledges, and the danger of being launched outward.
-
-Sol-Noir: Understand its vertical layout, multiple surfaces, and the importance of navigating between levels.
-
-Asperitas: Understand drifting clouds and platforms that fade, disappear, and reappear. React to their observable state and avoid relying on unsupported surfaces.
-
-Adamaris: Respect its continuous ground and dangerous volcanic eruptions. A rock must not be predicted before its visible warning appears.
-
-Overtime: Recognize the actual closing Void boundary and adjust movement, positioning, launch predictions, and recovery accordingly.
-
-Positioning behavior
-
-CPUs should be capable of:
-
-* Taking stage control.
-* Holding useful territory.
-* Backing away from dangerous edges.
-* Escaping unfavorable corners.
-* Navigating toward more advantageous platforms.
-* Denying the opponent favorable territory.
-* Creating room for recovery.
-* Setting up launches toward dangerous boundaries.
-* Staying at a useful range for their capabilities.
-* Avoiding routes that are unnecessarily dangerous.
-* Giving up a position when the situation changes.
-
-No stage-specific cheating
-
-Do not hardcode fighter IDs or special-case stage names in the brain’s decision-making.
-
-Use real stage geometry and capability data.
-
-The CPU must only use legitimately available information.
-
-Do not predict random future hazard locations, vanished platform respawn positions, or hidden outcomes that a human player cannot know.
-
-⸻
-
-8. More adaptive and varied match playstyles
-
-The CPU should noticeably change its approach as the match evolves.
-
-A single match should not feel like the CPU is repeating one fixed behavior from beginning to end.
-
-Extend the existing strategy and opponent-modeling systems.
-
-Adapt to the opponent
-
-The CPU should gradually notice and respond to patterns such as:
-
-* Frequent jumping.
-* Constant aggression.
-* Repeated Shield usage.
-* Projectile-heavy play.
-* Repeated Dash approaches.
-* Predictable attack choices.
-* Frequent retreats.
-* Vulnerability after missed attacks.
-* Overcommitment near ledges.
-* Repeated recovery routes.
-* Attempts to recover Launch Point.
-* Habitual use of specific distances or platform levels.
-
-Use observations gathered through the existing perception system.
-
-Do not give the CPU direct access to the human player’s inputs or perfect knowledge of future actions.
-
-Tactical adaptations
-
-Examples include:
-
-* More anti-air behavior against an opponent who repeatedly jumps.
-* Patient punishment against an opponent who constantly attacks.
-* Better approach selection against a projectile-heavy opponent.
-* Maintaining pressure when an opponent retreats to recover.
-* Disengaging when an aggressive opponent is gaining the advantage.
-* Selecting safer moves when the opponent frequently punishes risky attacks.
-* Reducing repeated attacks that are consistently blocked.
-* Controlling the ledge when an opponent repeatedly recovers through it.
-
-Adaptation should be gradual and based on evidence.
-
-A CPU should not discover a flawless counter after seeing one action.
-
-Avoid robotic optimization
-
-The strongest choice should not always be selected with perfect consistency.
-
-Introduce human-like decision variability through reasonable preferences, imperfect confidence, and situational tradeoffs.
-
-However, randomness must not undermine basic survival or produce inexplicable behavior.
-
-Prefer a small set of legitimate options over arbitrary actions.
-
-A good CPU can have recognizable tendencies while remaining flexible.
-
-⸻
-
-9. Rebalance all four difficulties
-
-Easy is the highest balancing priority.
-
-The goal is not merely to make CPUs weaker. It is to make difficulty meaningful, with a believable progression in skill.
-
-All four difficulties must use the same core intelligence.
-
-Easy — Casual human player
-
-Easy should be approachable, forgiving, and genuinely beatable.
-
-Expected behavior:
-
-* Understands basic objectives.
-* Sometimes chooses smart positions.
-* Occasionally retreats to recover.
-* Uses Shield when it recognizes danger.
-* Can perform different attacks and basic combos.
-* Sometimes waits rather than rushing in.
-* Makes recognizable mistakes.
-* Misses punish windows more frequently.
-* Misjudges some ranges.
-* Often fails to capitalize fully on a strong opening.
-* Uses less sophisticated setups.
-* Can struggle against changing opponent patterns.
-* Recovers from dangerous situations imperfectly.
-* Does not execute optimal offense relentlessly.
-
-Crucially, Easy must not feel artificially disabled.
-
-It must still attempt to win and be capable of surprisingly good plays.
-
-Easy should feel like playing against a casual person who understands the game, not a competitive player with slightly slower reactions.
-
-Medium — Competent regular player
-
-Medium should be meaningfully stronger than Easy.
-
-Expected behavior:
-
-* Generally understands neutral positioning.
-* Recognizes common threats.
-* Uses defensive recovery more reliably.
-* Performs practical combos.
-* Understands when to retreat or press an advantage.
-* Adapts to obvious habits.
-* Makes reasonable match-level decisions.
-* Still makes tactical mistakes.
-* Sometimes overcommits or mistimes important actions.
-
-Medium should provide a fair challenge for a typical player familiar with Alva.
-
-Hard — Experienced competitive player
-
-Hard should demonstrate strong situational awareness.
-
-Expected behavior:
-
-* Uses stage positioning strategically.
-* Punishes common mistakes.
-* Understands Launch Point and ring-out opportunities.
-* Protects match leads intelligently.
-* Manages Energy well.
-* Changes between offensive and defensive objectives.
-* Uses appropriate spacing and recovery routes.
-* Understands opponent tendencies.
-* Makes advanced decisions without being mechanically flawless.
-
-Hard should feel experienced and difficult, not supernatural.
-
-Brutal — Elite human-like player
-
-Brutal should remain the strongest difficulty.
-
-Expected behavior:
-
-* Advanced strategic awareness.
-* Excellent stage knowledge.
-* Strong opponent adaptation.
-* Efficient recovery and risk management.
-* Effective finishing setups.
-* Strong combo and punish selection.
-* Sophisticated match-winning decisions.
-* High mechanical consistency.
-* Intelligent use of defensive waiting and retreat.
-
-But Brutal must still behave like an exceptionally skilled human.
-
-It must not react instantly, see hidden information, predict randomness perfectly, or make flawless decisions every time.
-
-Difficulty implementation
-
-Review the existing traits in js/data/difficulty.js.
-
-Preserve the principle that difficulty changes how well the CPU thinks and executes, not the fighter’s capabilities.
-
-Consider whether additional tuning traits are justified for:
-
-* Strategic awareness.
-* Defensive patience.
-* Confidence in predictions.
-* Objective evaluation.
-* Planning commitment.
-* Risk tolerance.
-* Decision consistency.
-* Opponent adaptation.
-* Recovery discipline.
-* Recognition of long-term opportunities.
-
-Do not add redundant parameters unnecessarily.
-
-Tune the complete decision-making pipeline. Changing only reaction latency or attack frequency will not be sufficient.
-
-Maintain a sensible difficulty hierarchy while allowing natural overlap. An Easy CPU can occasionally outperform Medium in a single exchange.
-
-⸻
-
-10. Meaningful human imperfections
-
-Humanization must be systemic.
-
-Do not implement human behavior by inserting arbitrary delays everywhere.
-
-Humans vary in:
-
-* Reaction time.
-* Confidence.
-* Commitment.
-* Spatial judgment.
-* Risk-taking.
-* Attention.
-* Adaptation.
-* Patience.
-* Consistency.
-* Ability to anticipate.
-* Ability to execute an intended plan.
-
-Implement these differences through the AI’s decision and execution systems.
-
-Examples of desirable behavior:
-
-* The CPU approaches, briefly reconsiders, and chooses a safer route.
-* The CPU backs away after recognizing it is losing exchanges.
-* The CPU waits for the opponent to commit.
-* The CPU chooses a reasonable attack but slightly misjudges spacing.
-* The CPU recognizes a finishing opportunity but executes it imperfectly.
-* The CPU takes a risk when it needs to recover a score deficit.
-* The CPU prioritizes survival instead of attacking endlessly.
-* The CPU occasionally gets impatient after unsuccessful defensive play.
-* The CPU uses more deliberate movement at higher skill levels.
-
-Avoid
-
-* Perfect automatic counters to every move.
-* Instant reactions to unseen actions.
-* Constant movement without purpose.
-* Repetitive left-right twitching.
-* Unnecessary random jumping.
-* Frame-perfect precision at every difficulty.
-* Permanent Shield camping.
-* Uninterrupted offensive pressure at Easy.
-* Artificially disabled attacks.
-* Sudden unexplained strategic changes.
-* Random idleness unrelated to circumstances.
-* Perfect predictions of opponent choices.
-
-Behavior should remain reproducible under seeded simulation.
-
-If variation between matches or CPU personalities is introduced, derive it through the existing seeded RNG and constrain it by difficulty.
-
-⸻
-
-11. Improve awareness of combat resources
-
-A smart CPU should understand the relationship between:
-
-* Launch Point.
-* Energy.
-* Cooldowns.
-* Dash and air-dash availability.
-* Remaining air jumps.
-* Shield availability.
-* Current attacks and recovery windows.
-* Stage position.
-* Match time.
-* Opponent pressure.
-
-Examples:
-
-A CPU low on Energy should recognize when continuing to Dash and defend aggressively is unsustainable.
-
-A CPU whose strongest finisher is cooling down might play differently until it becomes available.
-
-A CPU whose Launch Point is dangerous should consider both immediate survival and the amount of safe recovery time available.
-
-A CPU whose opponent is exhausted might appropriately apply pressure.
-
-A CPU holding a score lead should not needlessly risk elimination to deal a small amount of damage.
-
-These decisions should be grounded in the fighter’s actual data and the existing game rules.
-
-⸻
-
-12. Improve the planning architecture without introducing regressions
-
-The current architecture already has a strong separation between perception, situation, strategy, evaluation, planning, and execution.
-
-Preserve that separation.
-
-A possible approach is introducing a small match-objective or decision-context layer that informs the existing Strategy and planner.
-
-The implementation should establish a clear hierarchy:
-
-Match objective → combat strategy → tactical plan → legal controller inputs.
-
-Important properties:
-
-* Each level has a clear responsibility.
-* The current objective can persist over multiple tactical decisions.
-* Plans can finish naturally.
-* Plans can be interrupted by real threats.
-* The CPU remembers why a plan was chosen.
-* Planning failure does not leave the CPU inert.
-* The CPU can abandon objectives that are no longer useful.
-* Tactical survival can override strategic aggression.
-* An urgent match situation can cause appropriate strategic change.
-
-Avoid duplicating world-model calculations across multiple modules.
-
-Reuse the existing capability analysis, prediction utilities, and LaunchJudge.
-
-Keep computational work bounded and suitable for the game’s fixed-step simulation.
-
-Do not introduce a second independent CPU engine or hardcoded character-specific logic.
-
-⸻
-
-13. Concrete scenarios the AI must handle
-
-Create deterministic tests for the following scenarios, using real game systems wherever possible.
-
-Scenario A: Dangerous Launch Point
-
-The CPU has high Launch Point while the opponent has low Launch Point.
-
-There is substantial time remaining.
-
-Expected: Depending on the actual positions and threats, the CPU becomes more protective, considers disengagement, seeks safer territory, and may wait or Shield to recover.
-
-It should not automatically rush into another dangerous exchange.
-
-Scenario B: Opponent vulnerable to elimination
-
-The opponent has high Launch Point near a dangerous boundary.
-
-The CPU has suitable attacks available.
-
-Expected: The CPU considers positioning, launch direction, and finisher opportunities rather than simply using whichever attack deals the most immediate damage.
-
-Scenario C: Protecting a lead
-
-The CPU is ahead 2–1 with little time remaining.
-
-Expected: It prioritizes sensible survival and avoids unnecessary risky aggression.
-
-It may still counterattack when safe.
-
-Scenario D: Desperate comeback
-
-The CPU is losing 0–2 with very little time remaining.
-
-Expected: It recognizes that excessive passivity guarantees defeat and appropriately increases its willingness to take calculated risks.
-
-Scenario E: Recovering Launch Point
-
-The CPU is in danger but has enough stage space to disengage.
-
-Expected: It creates separation, selects a safe area, considers Shield, avoids unnecessary damage, and eventually returns to combat.
-
-The decision should respond to opponent pressure.
-
-Scenario F: No immediate danger
-
-The CPU has reached a safe and useful position, and the opponent is not threatening it.
-
-Expected: The CPU is allowed to remain still without forcing meaningless movement.
-
-Scenario G: Opponent respawning
-
-The opponent is temporarily out of play.
-
-Expected: The CPU repositions, recovers, waits, or prepares for the respawn as appropriate. It does not attack an absent opponent.
-
-Scenario H: Unsafe platform
-
-A platform on Asperitas visibly begins fading.
-
-Expected: The CPU recognizes the changing footing, considers safer surfaces, and avoids treating unavailable geometry as a valid destination.
-
-Scenario I: Stage hazard
-
-A warning appears for an incoming volcanic rock.
-
-Expected: The CPU may react according to its difficulty and awareness, using only information visible after the warning.
-
-Scenario J: Defensive opponent
-
-The opponent repeatedly holds Shield.
-
-Expected: The CPU adapts instead of continuously feeding predictable attacks into the Shield.
-
-It should understand the limitations of the game’s defensive mechanics rather than inventing unblockable options.
-
-Scenario K: Overtime
-
-Scores are tied, overtime is nearly over, and one fighter has lower Launch Point.
-
-Expected: The CPU understands the actual tiebreak rules and chooses offense or survival accordingly.
-
-It must also account for the shrinking Void.
-
-Scenario L: Different fighters
-
-Repeat representative scenarios with all four available fighters and several matchups.
-
-Verify that the logic works through capabilities, not fighter IDs.
-
-Scenario M: CPU versus CPU
-
-Two CPUs choose defensive strategies simultaneously.
-
-Expected: They behave naturally, but do not become stuck in an endless artificial waiting loop.
-
-Scenario N: Changing conditions
-
-The CPU begins retreating, but the opponent becomes vulnerable or a hazard makes its planned position unsafe.
-
-Expected: It reassesses intelligently and changes plans without unnecessary oscillation.
-
-⸻
-
-14. Telemetry, explainability, and debugging
-
-Expand telemetry.js so we can understand why CPUs make decisions.
-
-Track, where practical:
-
-* Current match objective.
-* Current combat strategy.
-* Current plan.
-* Why a plan was selected.
-* Whether a pause is intentional.
-* Reason for waiting.
-* Waiting duration.
-* Why waiting ended.
-* Reasons for retreating.
-* Amount of Launch Point recovered while avoiding combat.
-* Defensive disengagement attempts.
-* Successful and failed retreats.
-* Positioning decisions.
-* Objective changes.
-* Threat interruptions.
-* Meaningful punish opportunities.
-* Finishing opportunities recognized or missed.
-* Plans abandoned or invalidated.
-* Unintentional inactivity and navigation failures.
-
-When debug tracing is enabled, it should be possible to understand behavior such as:
-
-“Retreating because Launch Point is dangerous, opponent is nearby, and a safer position is reachable.”
-
-“Maintaining position because the CPU is ahead with little time remaining.”
-
-“Holding Shield because a recognized threat is approaching while Launch Point recovery continues.”
-
-“Switching to offense because the CPU is behind and running out of time.”
-
-“Leaving a platform because its footing is becoming unsafe.”
-
-Keep telemetry cheap when debug mode is disabled.
-
-Do not create unnecessary per-frame allocations, huge logs, or unbounded historical state.
-
-⸻
-
-15. Benchmarking and playtesting
-
-This update must be evaluated through behavior, not just passing existing tests.
-
-Establish a baseline
-
-Before modifying the CPU:
-
-1. Run the relevant existing tests.
-2. Run the CPU benchmark with multiple seeds.
-3. Record the current difficulty hierarchy.
-4. Record available match statistics.
-5. Identify existing failure cases and patterns of excessive CPU strength.
-
-Improve the benchmark if necessary
-
-The existing reference opponents are scripted and relatively weak. They are useful, but their results cannot establish how difficult the game feels for a person.
-
-Keep the existing benchmark useful for regression comparison.
-
-Consider adding more competent deterministic reference styles or scenarios that expose:
-
-* Overly efficient Easy offense.
-* Excessively accurate defensive reactions.
-* Unnatural attack frequency.
-* Inability to disengage.
-* Poor time management.
-* Inappropriate Shield usage.
-* Failure to recover Launch Point.
-* Failure to take an important finishing opportunity.
-* Overly passive CPU-versus-CPU behavior.
-
-Measure meaningful behavior, not just overall win rate.
-
-Suggested metrics
-
-Track:
-
-* Win rate by difficulty and reference style.
-* Match duration.
-* Points scored and conceded.
-* Launch Point dealt and received.
-* Attack selection diversity.
-* Hit conversion accuracy.
-* Successful combos.
-* Punish success.
-* Shield blocks and Energy exhaustion.
-* Successful recoveries.
-* Self-eliminations.
-* Retreat and re-engagement behavior.
-* Intentional waiting with valid reasons.
-* Unintentional inactivity.
-* Time spent in each strategic objective.
-* CPU-versus-CPU stalemates.
-
-These should help identify CPUs that are technically active and effective but do not feel human.
-
-Difficulty balance
-
-Easy should not routinely dominate reasonable opponents or consistently convert almost every opportunity.
-
-Medium should clearly outperform Easy over enough representative matches.
-
-Hard should demonstrate stronger judgment and execution than Medium.
-
-Brutal should remain the strongest overall without relying on impossible perception or unfair mechanics.
-
-The existing specification includes a 95% Brutal aggregate benchmark target against a particular set of opponents.
-
-Review that target carefully. It is based partly on weak reference scripts and should not become an excuse to preserve excessively strong or unnatural behavior.
-
-If this update changes the intended balance contract, update the specification and explain the rationale rather than silently ignoring or manipulating benchmarks.
-
-Human playtesting
-
-Include a manual playtesting checklist for every difficulty.
-
-Check whether the CPU feels:
-
-* Approachable at Easy.
-* Competent at Medium.
-* Challenging at Hard.
-* Elite but believable at Brutal.
-
-Observe whether behavior appears intentional, whether pauses make sense, whether retreats are recognizable, and whether playstyle changes are noticeable during a match.
-
-Do not claim human playtesting occurred unless real human playtesting was performed.
-
-⸻
-
-16. Regression prevention
-
-This update must not compromise Alva’s current gameplay.
-
-Preserve mechanics
-
-Do not alter the underlying fighter mechanics to rebalance CPUs.
-
-Do not change:
-
-* Damage.
-* Base Launch or Directional Launch.
-* Launch Point recovery rules.
-* Energy costs or regeneration.
-* Movement speed.
-* Jump and air-jump rules.
-* Dash and air-dash physics.
-* Shield mechanics.
-* Deflect mechanics.
-* Attack hitboxes.
-* Attack timing.
-* Cooldowns.
-* Combat Assist.
-* Scoring.
-* Respawns.
-* Match timing.
-* Overtime behavior.
-* Stage physics.
-* Stage hazard rules.
-
-The CPU should become different through its decisions and execution, not through hidden changes to what its fighter can do.
-
-Preserve architecture and functionality
-
-* Keep a single universal CPU Intelligence.
-* Keep all CPU decisions input-based.
-* Preserve the normal FighterInput contract.
-* Preserve deterministic seeded matches.
-* Preserve perception limitations.
-* Preserve support for every fighter.
-* Preserve Quick Battle.
-* Preserve Watch Mode.
-* Preserve mirror matches.
-* Preserve Practice Ground’s training dummy.
-* Preserve stage collision and hazard behavior.
-* Preserve existing character ability availability.
-* Preserve the relevant test and debugging interfaces.
-* Preserve performance at the existing 60 Hz fixed simulation rate.
-
-In particular, a CPU must never modify fighter state directly to achieve a desired outcome.
-
-It must not gain Combat Assist or other player-unavailable advantages.
-
-Existing tests that must be updated
-
-Some tests and documents explicitly require CPUs to never remain idle.
-
-Those requirements conflict with this update.
-
-Update those expectations intentionally, not by weakening all tests or deleting the safety checks.
-
-Replace the simplistic “never idle” requirement with measurable checks that intentional waiting is valid and unintentional inactivity is still detected.
-
-Update any test that depends on the old forced-movement behavior.
-
-Preserve strong assertions covering input correctness, determinism, fighter independence, valid move execution, stage safety, and recovery.
-
-⸻
-
-17. Safe implementation process
-
-Do not attempt this as one uncontrolled rewrite.
-
-Use an incremental approach on a dedicated branch.
-
-Phase 1 — Audit and baseline
-
-Map the existing logic, identify overlaps and limitations, run the tests, and record baseline performance.
-
-Determine exactly why Easy is currently too efficient.
-
-Document the planned architecture before major structural changes.
-
-Phase 2 — Intentional waiting and human movement
-
-Introduce deliberate waiting, eliminate unnecessary movement, redesign the liveness safeguard, and establish clear interruptions and exit conditions.
-
-Verify CPUs do not become permanently passive.
-
-Phase 3 — Defensive recovery and positioning
-
-Implement purposeful retreat, stage-aware safe-position selection, Shield-based defense when appropriate, and Launch Point recovery objectives.
-
-Test the complete disengagement-to-re-engagement sequence.
-
-Phase 4 — Advanced strategic awareness
-
-Extend match-level objectives and connect them to existing strategies.
-
-Improve the distinction between winning an exchange and winning the match.
-
-Support meaningful objective changes based on score, clock, Launch Points, threats, and positional advantage.
-
-Phase 5 — Situational adaptation
-
-Improve stage control, opponent-pattern understanding, resource awareness, positioning, and strategic variety.
-
-Avoid duplicated or competing decision systems.
-
-Phase 6 — Difficulty rebalance
-
-Carefully tune Easy, Medium, Hard, and Brutal using the improved intelligence.
-
-Prioritize Easy’s practical accessibility and preserve human-like decision-making across all levels.
-
-Phase 7 — Validation and refinement
-
-Run all relevant tests and benchmarks.
-
-Add scenario-specific tests.
-
-Fix regressions and pathological behavior.
-
-Evaluate whether the CPU behaves purposefully, not just whether it is winning matches.
-
-Phase 8 — Documentation
-
-Update:
-
 * ALVA_SPEC.md
-* docs/systems/ai.md
-* Relevant gameplay documentation.
-* Difficulty descriptions in js/data/difficulty.js.
-* English and French localization where applicable.
-* Relevant tests and benchmark documentation.
-* UPDATES.md if appropriate.
+* CLAUDE.md
+* UPDATES.md
+* docs/README.md
+* docs/architecture/overview.md
+* docs/architecture/module-responsibilities.md
+* docs/architecture/character-system.md
+* docs/development/architecture-decisions.md
+* docs/development/testing.md
+* docs/systems/combat.md
+* docs/systems/input.md
+* docs/systems/movement.md
+* docs/systems/defense.md
+* docs/systems/energy.md
+* docs/systems/rendering.md
+* docs/gameplay/practice.md
 
-Remove obsolete claims that CPUs must always move or can never deliberately wait.
+Pay particular attention to the existing specification of the player’s move cancellation, Combat Assist, and Combo Assist in ALVA_SPEC.md §7.2.4, §7.2.4a and §7.2.4b.
 
-Keep documentation synchronized with actual behavior.
+Then examine the implementation and dependencies of:
+
+* js/game/fighters/fighter.js
+* js/game/fighters/fighter-controller.js
+* js/game/combat/combat-state.js
+* js/game/combat/combo-assist.js
+* js/game/combat/combat-assist.js
+* js/game/combat/attacks.js
+* js/game/combat/combat.js
+* js/game/combat/move-status.js
+* js/game/fighters/movement.js
+* js/game/rendering/sprite-animator.js
+* js/data/movement.js
+* js/data/cooldowns.js
+* js/data/loadout.js
+* js/data/characters.js
+* js/core/input-manager.js
+* js/core/controller-resolver.js
+* js/core/settings.js
+* js/ui/ability-hud.js
+* js/ui/touch-controls.js
+
+Trace how keyboard input, game controllers, and touch controls become combat requests, how those requests are resolved, when an animation begins and ends, and how cooldowns and interruptions are processed.
+
+Inspect the relevant tests before changing anything.
+
+The repository included fighters #0001 through #0005 when this task was prepared. Verify the current roster rather than assuming it has remained unchanged.
+
+All combat improvements must apply generically to compatible fighters, including future ones, without introducing fighter-ID-specific logic.
+
+1.2. Preserve Alva’s technical architecture
+
+Respect these existing constraints:
+
+1. Vanilla JavaScript and ES modules.
+2. No build step, bundler, framework, or unnecessary dependency.
+3. Deterministic gameplay at a fixed 60 Hz simulation rate.
+4. Rendering must not determine gameplay outcomes.
+5. Universal movement rules shared by every fighter.
+6. Character-specific attacks and animations defined through fighter data.
+7. Strict, existing control and animation codenames.
+8. Real sprite assets only; do not fabricate missing attack animations.
+9. Proper separation between gameplay, interface, and configuration.
+10. A single consistent combat-rule implementation across fighters.
+
+Do not introduce real-time timers such as setTimeout() for combat input queues.
+
+Do not use wall-clock timestamps to decide whether a combo is valid.
+
+Use simulation time, fixed-step counters, and established combat-state data.
 
 ⸻
 
-18. Definition of done
+PART 2 — THE PROBLEM WE ARE SOLVING
 
-This update is complete only when all of the following are true:
+Alva already has several good combat mechanics.
 
-1. Easy is meaningfully more approachable, without becoming a passive or deliberately incompetent opponent.
-2. All four difficulties retain a believable, measurable progression in skill.
-3. CPUs are allowed to remain idle for legitimate strategic reasons.
-4. Intentional waiting no longer triggers false inactivity incidents.
-5. Accidental inactivity, stuck movement, and failed planning are still detected.
-6. CPUs understand when to disengage and recover Launch Point.
-7. CPUs can intelligently use Shield as part of defensive recovery without abusing it indefinitely.
-8. CPUs make more sophisticated decisions using both fighters’ Launch Points.
-9. CPUs distinguish between winning an exchange and winning the match.
-10. CPUs make meaningful strategic adjustments based on match score, clock, and overtime.
-11. CPUs use stage geometry and positioning more intelligently.
-12. CPUs adapt to opponent habits without accessing hidden information.
-13. CPUs demonstrate natural, varied, and purposeful behavior.
-14. All current fighters are supported through the same universal intelligence.
-15. Quick Battle and Watch Mode remain fully functional.
-16. Existing combat mechanics remain unchanged.
-17. Deterministic replay remains intact.
-18. The AI stays efficient in the fixed-step game loop.
-19. Automated tests cover the new behaviors and major failure cases.
-20. Documentation accurately reflects the completed implementation.
+Players can rapidly transition between different attacks, cancel an attack with another valid action, buffer slightly early inputs, and use Combat Assist to close small gaps.
+
+The problem is that repeating the same attack button while its animation is playing is currently discarded.
+
+Consider the following example.
+
+A beginner presses Attack 1.
+
+Attack 1 begins.
+
+The beginner presses Attack 1 again because they want to continue fighting.
+
+Nothing happens.
+
+This is intentional in the current implementation, because restarting the same animation would create serious problems.
+
+However, completely discarding the input can also make combat feel unresponsive or confusing.
+
+The player believes they requested another attack, but the game gives no follow-up.
+
+Our solution must address that problem without sacrificing the protection provided by the existing rule.
+
+2.1. Why simply allowing the second press is wrong
+
+A naïve implementation of Attack 1 → Attack 1 could restart the animation.
+
+That could:
+
+* Cancel Attack 1 before its hitbox becomes active.
+* Restart its startup repeatedly.
+* Prevent the existing animation from completing.
+* Cause inconsistent hit registration.
+* Create unintended loops.
+* Interfere with the cooldown policy.
+* Make animation timing difficult to understand.
+* Allow abusive button mashing if other safeguards fail.
+
+We absolutely do not want this.
+
+The currently playing attack must be protected from a repeated press.
+
+We want the second press to be remembered as a future follow-up request, not executed immediately.
 
 ⸻
 
-19. Final development instructions
+PART 3 — THE MAIN FEATURE: SMART COMBO ASSIST QUEUING
 
-Take this update seriously. It is a major behavioral evolution of CPU Intelligence, not a collection of quick fixes.
+3.1. Core design
 
-Avoid the tempting but incorrect solution of merely lowering Easy’s reaction speed, reducing attack frequency, or adding random delays.
+Extend Alva’s existing Combo Assist to support a single queued follow-up attack.
 
-The true goal is to improve how the CPU understands Alva and how naturally it makes decisions.
+When Combo Assist is enabled and the player repeats the button associated with a basic attack that is already playing, the game may queue the opposite basic attack.
 
-Keep what is already excellent.
+The queued attack executes only after the current attack finishes naturally.
 
-Extend what is incomplete.
+For the user-facing examples below, 1 and 2 mean the internal actions attack1 and attack2, not necessarily the numeric keyboard keys. Preserve Alva’s current device bindings.
 
-Correct what feels unfair or mechanical.
+Example A — Repeating Attack 1
 
-Build a CPU that genuinely understands when to attack, when to defend, when to retreat, when to recover, when to wait, when to control the stage, and when the situation demands changing its entire approach.
+1. Player presses Attack 1.
+2. Attack 1 begins normally.
+3. During the eligible queue window, the player presses Attack 1 again.
+4. The existing Attack 1 animation continues uninterrupted.
+5. Alva records one pending Attack 2 request.
+6. Attack 1 reaches the natural end of its complete animation.
+7. Alva checks whether Attack 2 is legally available.
+8. If available, Attack 2 executes automatically without requiring another press.
+9. If unavailable, the queue is discarded without bypassing its restriction.
 
-Above all:
+Example B — Repeating Attack 2
 
-I want every CPU to feel like a real person playing Alva at the selected difficulty.
+1. Player presses Attack 2.
+2. Attack 2 begins.
+3. Player repeats Attack 2 within the eligible window.
+4. Attack 1 is queued.
+5. Attack 2 completes naturally.
+6. Attack 1 executes if all its normal requirements are satisfied.
 
-Easy should feel like a casual human player.
+Example C — Normal manual attack cancellation
 
-Medium should feel like a competent human player.
+1. Player presses Attack 1.
+2. Attack 1 begins.
+3. Player presses Attack 2 directly.
+4. The existing manual cancellation system determines whether Attack 2 may start immediately.
+5. If accepted, Attack 2 behaves exactly as it did before this feature.
 
-Hard should feel like a highly experienced human player.
+Do not make every attack wait for the preceding animation to finish.
 
-Brutal should feel like an elite human player.
+Only the new queued follow-up mechanism must wait.
 
-Every level should have judgment, imperfections, patience, and strategic purpose.
+Alva’s existing deliberate attack-cancellation mechanics must remain available to experienced players.
 
-Required final report
+3.2. Queue acceptance window
 
-After implementation, provide:
+Use an initial 0.20-second queue window before natural attack completion.
 
-1. An explanation of the original problems and their root causes.
-2. A clear summary of the architecture changes.
-3. A description of the new strategic behaviors.
-4. An explanation of how intentional waiting now works.
-5. An explanation of defensive retreat, Shield usage, and Launch Point recovery.
-6. A breakdown of the new behavior of each difficulty.
-7. Tests added or updated, including their results.
-8. Before-and-after benchmark results, including any limitations.
-9. Any remaining concerns, tradeoffs, or tuning opportunities.
-10. Confirmation of which game mechanics were preserved unchanged.
+At 60 Hz, this corresponds to approximately 12 simulation steps.
 
-Do not declare the update finished just because the code compiles or existing tests pass.
+For example, if an attack lasts 0.50 seconds, a repeat press between approximately 0.30 and 0.50 seconds may request the follow-up.
 
-The result must be demonstrably more strategically aware, appropriately balanced, natural, and reliable.
+A repeat press earlier than this window retains the existing no-restart protection and does not create a future attack.
 
-Final priority order:
+The window is measured against the current attack’s authoritative elapsed simulation time and total duration.
 
-1. Preserve game correctness and existing CPU Intelligence.
-2. Achieve believable, purposeful human behavior.
-3. Make Easy genuinely accessible and preserve fair difficulty scaling.
-4. Deepen situational, stage, Launch Point, and match awareness.
-5. Ensure stability, determinism, performance, and comprehensive testing.
+It is not an additional delay after the animation.
 
-Implement this as a cohesive, carefully validated upgrade to Alva’s existing CPU Intelligence.
+Once a valid request has been queued, the queue should remain pending until its associated attack naturally completes or an event invalidates it.
+
+Do not expire a legitimate queued follow-up merely because hitstop temporarily pauses the attack.
+
+Use a named constant, with clear documentation, rather than duplicating the value throughout the code.
+
+Treat 0.20 seconds as the starting gameplay-tuning value. Do not introduce a new Settings option just to expose it.
+
+During validation, evaluate whether the window is forgiving enough for beginners. If playtesting demonstrates that a larger window or full-animation buffering would materially improve usability, document that as a separate tuning recommendation rather than silently changing this specification.
+
+3.3. Exactly one queued follow-up
+
+A fighter may hold at most one queued Combo Assist follow-up at any moment.
+
+Repeated presses must not create an attack backlog.
+
+Example:
+
+Attack 1 starts.
+
+The player presses Attack 1 four additional times during the eligible window.
+
+The result must be:
+
+* Attack 1 finishes once.
+* Attack 2 begins once.
+* No further attack is scheduled automatically.
+
+A queued request must not generate another queued request by itself.
+
+Additional chaining requires another genuine player input edge.
+
+Holding an attack button must never generate repeated attacks automatically.
+
+3.4. Base alternation on the actual active move
+
+This is especially important because Alva’s existing Combo Assist can already redirect Attack 1 to Attack 2 when Attack 1 is cooling down.
+
+Suppose:
+
+1. The player previously performed Attack 1.
+2. Attack 1 enters cooldown.
+3. The player presses Attack 1 again.
+4. Existing Combo Assist redirects that press into Attack 2.
+5. Attack 2 is now playing, but it was initiated using the Attack 1 button.
+6. The player repeats that button during the new queue window.
+
+The follow-up should be Attack 1, because Attack 2 is the attack actually playing.
+
+Do not blindly infer the next attack from the button’s label.
+
+Use both the current attack’s resolved identity and the originating input where appropriate.
+
+Honor the existing attack record’s button provenance.
+
+Support repeating either the move’s corresponding control or the control that actually initiated the current attack, provided it represents a genuine same-move repeat under the established rules.
+
+Avoid accidentally starting a third, unrelated attack.
+
+3.5. Only basic attacks participate
+
+Queueing is limited to the existing Combo Assist pairing:
+
+* attack1 → attack2
+* attack2 → attack1
+
+It must not automatically alternate:
+
+* extra_attack
+* attack3
+* attack4
+* attack5
+* Summons
+* Techniques
+* Deflect
+* Shield
+* Dash
+* Air dash
+
+These actions retain their normal execution and cancellation rules.
+
+Do not assume that every numbered attack is an ordinary melee attack.
+
+The repository supports typed loadouts, including specials mapped to numbered buttons.
+
+⸻
+
+PART 4 — NATURAL COMPLETION VS INTERRUPTION
+
+This is a critical engineering requirement.
+
+Alva’s current combat lifecycle can end an attack for several different reasons.
+
+Those reasons are not interchangeable.
+
+4.1. Natural completion
+
+An attack ends because its own timeline reaches the full duration defined by its animation and phases.
+
+A queued follow-up may execute after this kind of completion.
+
+4.2. Manual cancellation
+
+A player intentionally replaces the attack with a different valid action.
+
+The original attack is interrupted.
+
+Its existing cooldown begins.
+
+Any queued Combo Assist follow-up attached to the original attack must be discarded.
+
+Do not trigger that queued follow-up later.
+
+4.3. Hit interruption
+
+A fighter takes a hit that interrupts its current action.
+
+Any pending queued Combo Assist follow-up must be discarded.
+
+The queue must not revive after hitstun, paralysis, or recovery.
+
+4.4. Landing cancellation
+
+Some aerial attacks end their recovery early when landing.
+
+This is not equivalent to their complete animation naturally finishing.
+
+Do not release an unfinished queued attack because a landing cancel ended the source.
+
+4.5. Other forced endings
+
+Clear stale queues when their source attack ends because of:
+
+* A successful Dash or air dash cancel.
+* A successful jump or air jump cancel.
+* Shield or Deflect taking over.
+* A different valid combat action taking over.
+* A technique or summon beginning.
+* Knockback or other forced combat states.
+* The fighter leaving the active match.
+* Falling into the Void.
+* Respawning or resetting.
+* Changing fighters.
+* Starting a new round or rematch.
+* Battle or practice-session destruction.
+* Input locking or a completed match.
+* Any other existing transition that makes the original attack obsolete.
+
+Do not introduce a single broad clearing rule that accidentally destroys legitimate input buffers.
+
+Distinguish the new Combo Assist queue from the existing ordinary attack buffer.
+
+4.6. Implementation requirement
+
+Study the exact behavior of:
+
+* CombatState.update()
+* CombatState.endAttack()
+* CombatState.interruptAttack()
+* Fighter.cutAttack()
+* Fighter.update()
+* Fighter.startAttack()
+* Landing cancellation
+* Hit processing
+
+Choose a robust mechanism for identifying a genuine natural completion.
+
+Possible approaches include tracking a completion event or explicitly recording the reason an attack ended.
+
+Choose the smallest reliable implementation compatible with the current architecture.
+
+Do not use the weak assumption that combat.attack === null always means the animation finished.
+
+Do not use elapsed attack time alone if another action could have interrupted the move at the same boundary.
+
+Ensure the source attack’s entire intended animation, including the final frame’s intended display interval, is preserved.
+
+The queued follow-up should start on the earliest legal simulation step after that complete natural ending, without an arbitrary additional delay.
+
+⸻
+
+PART 5 — COOLDOWNS MUST REMAIN COMPLETELY INTACT
+
+Alva already has a carefully defined cooldown policy.
+
+Do not rewrite it.
+
+The existing policy includes:
+
+* Ordinary repeat cooldown: 0.5 seconds.
+* Exceptional ability/effect cooldown: 3 seconds.
+* High-impact 10-damage cooldown: 5 seconds.
+* Existing exceptions such as Deflect.
+
+Cooldowns depend on the actual move and its mechanics.
+
+The Combo Assist queue must never bypass, shorten, reset, or secretly override a cooldown.
+
+5.1. Source attack cooldown
+
+The original attack’s cooldown must begin according to its existing lifecycle rules.
+
+For a naturally completed ordinary attack, this means when its attack ends.
+
+The queue must not cause the cooldown to start early.
+
+It must not start the source cooldown twice.
+
+5.2. Follow-up attack cooldown
+
+The queued alternate retains its own cooldown.
+
+If it is still cooling down when the original attack finishes, it must not execute.
+
+Do not reset its cooldown to zero.
+
+Do not silently wait several seconds and fire later.
+
+An unavailable queued attack should be discarded at execution time.
+
+5.3. Source and alternate are independent
+
+Example:
+
+Attack 1 finishes.
+
+Attack 1’s 0.5-second repeat cooldown begins.
+
+Attack 2 is ready.
+
+Attack 2 executes.
+
+Attack 1 remains on cooldown.
+
+This is valid.
+
+The cooldown prevents reusing Attack 1 directly; it does not forbid using a different available attack.
+
+Preserve this distinction.
+
+5.4. Do not create a global attack cooldown
+
+Cooldowns are not a universal lock that prohibits all offensive actions.
+
+Do not introduce a global timer between Attack 1 and Attack 2.
+
+The new system must remain compatible with Alva’s existing ability to transition rapidly between different moves.
+
+⸻
+
+PART 6 — KEEP NORMAL INPUT BUFFERING SEPARATE
+
+Alva already provides an ordinary attack input buffer of 0.15 seconds.
+
+This buffer remembers a legitimate attack request that was made slightly before it became executable.
+
+The proposed Combo Assist queue serves a different purpose.
+
+Existing input buffer
+
+An attack was requested while temporarily unavailable.
+
+The request may be retried for the existing buffer duration.
+
+New Combo Assist queue
+
+A repeated basic attack requests its alternate, specifically after the currently playing attack completes naturally.
+
+These are distinct systems.
+
+Do not combine their timers or make one silently extend the other.
+
+6.1. Separation of state
+
+Use a dedicated, clearly named queue field or equivalent isolated state.
+
+A suggested conceptual structure is:
+
+queuedCombo = {
+  sourceRecord,
+  sourceAttackId,
+  requestedAction,
+  originatingButton,
+  originatingPlace,
+  createdStep,
+}
+
+Adapt the structure to the actual codebase.
+
+Preserve the reference or identity of the precise source attack instance, not merely its attack ID.
+
+That prevents a queued request from leaking into a later instance of the same move.
+
+6.2. Newer requests and priority
+
+Preserve the current precedence of genuine player input.
+
+A queued attack is a fallback request, not an action that overrides the player.
+
+If the player deliberately starts another valid action before the original attack completes, the newer action should take priority and the old queue should be removed.
+
+A new queued follow-up must not steal the step from a successful fresh input.
+
+Do not let a failed or unavailable action randomly cancel a legitimate queue unless the game’s established input-priority rules explicitly require it.
+
+An action pressed simultaneously with the natural completion of an attack must be resolved consistently.
+
+Guarantee that at most one new move can be accepted in a simulation step.
+
+The design must avoid duplicate attack starts caused by the same press being interpreted through both ordinary Combo Assist and the new queue.
+
+6.3. Never create ghost inputs
+
+A ghost input is a combat action that activates later when the player reasonably believes the request is gone.
+
+The new queue must not produce this behavior.
+
+It should be bound to one specific active attack and its natural end.
+
+After the current attack is canceled or the queue is consumed, the old request must be permanently cleared.
+
+Do not let it survive unrelated actions.
+
+⸻
+
+PART 7 — PRESERVE ADVANCED ATTACK CANCELLATION
+
+This is a major design priority.
+
+Alva currently allows human players to intentionally cancel their attacks with other valid actions, even without a confirmed hit, subject to the existing rules.
+
+That gives skilled players flexibility and creates a faster combat experience.
+
+Do not remove or unnecessarily restrict this feature.
+
+The new Combo Assist queue must not make manual controls slower.
+
+For example:
+
+Attack 1 → Attack 2
+
+This remains an intentional new-attack request.
+
+The current cancellation rules determine its execution.
+
+Attack 1 → Attack 1
+
+This must never immediately restart Attack 1.
+
+If Combo Assist is enabled and the repeated press occurs inside the queue window, the alternate is scheduled after full animation completion.
+
+Attack 1 → Jump
+
+Keep the existing jump-cancellation behavior.
+
+Attack 1 → Dash
+
+Keep the existing Dash-cancellation behavior and Energy costs.
+
+Attack 1 → Shield
+
+Keep the existing defensive-cancellation behavior.
+
+Attack 1 → Special
+
+Keep the existing eligibility and cooldown rules for that special.
+
+The main distinction is:
+
+Different valid action: preserve deliberate cancellation.
+
+Same active attack repeated: protect the animation and optionally queue a Combo Assist follow-up.
+
+Do not introduce universal animation locks or mandatory recovery delays that would make experienced players feel less responsive.
+
+⸻
+
+PART 8 — COMBAT ASSIST INTEGRATION
+
+Alva has a separate feature named Combat Assist.
+
+Combat Assist helps the human player’s melee attacks connect by closing a short, valid gap before executing the requested attack.
+
+It is independent of Combo Assist.
+
+Both systems can be enabled or disabled separately.
+
+Preserve that independence.
+
+8.1. Queued melee attacks
+
+Suppose Attack 1 finishes and Attack 2 is queued.
+
+If Attack 2 is a melee attack and Combat Assist is enabled:
+
+1. Check that Attack 2 can legally start.
+2. Evaluate its ordinary Combat Assist requirements.
+3. If the opponent is already within range, execute it normally.
+4. If Combat Assist can legally close the gap, begin the existing approach.
+5. Execute Attack 2 after the approach finishes, through its standard pathway.
+
+Do not teleport the fighter.
+
+Do not extend the attack’s hitbox.
+
+Do not increase its damage or tracking strength.
+
+Do not bypass stage collision.
+
+Do not change Combat Assist’s existing Energy behavior.
+
+8.2. Both assists disabled or enabled independently
+
+Test all four combinations:
+
+Combo Assist	Combat Assist	Expected behavior
+On	On	Queued alternate plus normal melee approach eligibility
+On	Off	Queued alternate without assisted approach
+Off	On	Existing Combat Assist; no new combo queue
+Off	Off	Existing manual combat behavior
+
+Do not couple the two settings.
+
+8.3. Preserve facing
+
+Combat Assist currently contains special handling to face the opponent correctly, including while Run is held.
+
+Do not regress that behavior.
+
+A queued follow-up must use the proper attack-start facing and current movement context.
+
+It must not aim in the wrong direction simply because the player is holding Run away from the opponent.
+
+Likewise, do not override deliberate manual facing when Combat Assist is disabled.
+
+⸻
+
+PART 9 — GROUND AND AIR ATTACKS
+
+Alva’s numbered attacks can resolve differently on the ground and in the air.
+
+This must be respected.
+
+9.1. Ground attacks
+
+A queued follow-up from a grounded Attack 1 should resolve to the fighter’s grounded Attack 2 mapping.
+
+Do not hardcode move animation names.
+
+Use the fighter’s actual loadout mapping.
+
+9.2. Air attacks
+
+The same principle applies in the air.
+
+A queued follow-up from an aerial Attack 1 should use the corresponding aerial Attack 2 mapping.
+
+Respect:
+
+* Remaining aerial uses.
+* Free-fall restrictions.
+* Ground-only rules.
+* Motion restrictions.
+* Launch state.
+* Required animation assets.
+* Existing air-dash use limits.
+
+9.3. Changes between ground and air
+
+A queued ground request must not silently turn into a different air attack.
+
+A queued aerial request must not silently turn into a ground attack because the fighter landed.
+
+Use the original action context and the established input-place semantics.
+
+If a location change invalidates the requested move, discard the queue.
+
+Do not fabricate an alternative action.
+
+9.4. Special motion attacks
+
+Include regression coverage for attacks with unusual motion or animation behavior:
+
+* Homing attacks.
+* Roll attacks.
+* Hover attacks.
+* Rising attacks.
+* Plunging attacks.
+* Slam attacks.
+* Multi-hit attacks.
+* Projectile-releasing attacks.
+
+Do not introduce special-case fighter-ID logic to handle them.
+
+Use the existing attack definitions and runtime capabilities.
+
+⸻
+
+PART 10 — MAKE COMBAT MORE UNDERSTANDABLE TO BEGINNERS
+
+The primary mechanical change is queued Combo Assist.
+
+However, its benefits will be limited if a new player cannot understand what happened.
+
+Implement minimal, nonintrusive feedback that makes the interaction clearer.
+
+10.1. Indicate a successfully queued follow-up
+
+When a repeat press successfully queues the alternate, provide subtle visual feedback.
+
+Use Alva’s existing interface conventions.
+
+The player should be able to understand:
+
+* Their repeated press was accepted.
+* The current attack is still playing.
+* Another attack is scheduled next.
+
+Prefer reusing the ability HUD’s existing tiles, artwork and control labels.
+
+A small queued state, restrained highlight, or equivalent presentation treatment is appropriate.
+
+Do not cover the fighters or obscure hit effects.
+
+Do not create a large new combat overlay.
+
+Do not add a loud effect every time someone mashes a button.
+
+10.2. Ensure the indicator is truthful
+
+The indicator must reflect actual queue state.
+
+It must disappear when the queue:
+
+* Executes.
+* Is canceled.
+* Becomes invalid.
+* Is cleared by a reset.
+
+Never show a follow-up as guaranteed if its cooldown or another restriction may ultimately prevent it.
+
+The presentation should distinguish “queued” from “executing” or “guaranteed to hit.”
+
+10.3. Support all input devices
+
+Ensure the mechanic and its feedback work across:
+
+* Keyboard.
+* PlayStation game controllers.
+* Xbox game controllers.
+* Touch controls using the Joystick layout.
+* Touch controls using the Classic Buttons layout.
+* Custom controller bindings.
+* Custom touch-control layouts.
+
+All devices must continue producing the same canonical combat actions.
+
+Do not create a keyboard-only solution.
+
+10.4. Respect accessibility and localization
+
+Any new player-facing text must support Alva’s English and French localization system.
+
+Respect reduced-motion preferences for animated feedback.
+
+Do not rely exclusively on color to indicate a queued input.
+
+Maintain appropriate accessible labels.
+
+The feedback must remain secondary to combat and should have no influence on simulation results.
+
+10.5. Practice Ground usability
+
+Review whether the new behavior can be demonstrated in the existing Practice Ground with a small, contextual instruction.
+
+For example:
+
+“With Combo Assist on, press Attack 1 again near the end of its animation to queue Attack 2.”
+
+Use existing instructional patterns and localization rather than building a separate tutorial framework.
+
+The instruction should accurately match the implemented timing rules.
+
+Do not significantly redesign Practice Ground.
+
+⸻
+
+PART 11 — DO NOT CHANGE CPU INTELLIGENCE OR DIFFICULTY
+
+This requirement is especially important.
+
+The game’s CPU-strength issue was recently addressed separately.
+
+The current task is not about making the CPU weaker or stronger.
+
+Do not alter CPU strength, reaction times, accuracy, combos, decision-making, strategic behavior, or difficulty scaling.
+
+In particular, avoid gameplay changes to:
+
+* js/game/ai/cpu-intelligence/
+* js/game/ai/combat-ai.js
+* js/data/difficulty.js
+
+Preserve the recent CPU improvements.
+
+The new Combo Assist queue must be restricted to eligible human-player controllers.
+
+Do not use slot names, character IDs or labels such as “P1” to decide eligibility.
+
+Use the existing player-controller and Combo Assist eligibility mechanisms.
+
+The CPU must remain governed by its existing attack rules.
+
+Watch Mode must remain unaffected.
+
+The Practice Ground training dummy must remain unaffected.
+
+If regression tests reveal changes in CPU behavior, investigate the underlying shared-system regression instead of modifying CPU intelligence to compensate.
+
+If an unrelated CPU issue is discovered, report it separately.
+
+Do not silently include CPU balancing changes in this work.
+
+⸻
+
+PART 12 — PRESERVE THE REST OF COMBAT BALANCE
+
+This task is about responsiveness and control quality.
+
+It is not a general character balance patch.
+
+Preserve the existing rules governing:
+
+* Launch Point accumulation.
+* Launch Point recovery and healing.
+* Damage tiers.
+* Base Launch and Directional Launch.
+* Hitstun.
+* Blockstun.
+* Hitstop.
+* Shield protection.
+* Perfect Shield.
+* Deflect.
+* Energy consumption and regeneration.
+* Dash and air-dash costs.
+* Air-jump and air-attack limits.
+* Projectile behavior.
+* Special abilities.
+* Per-move cooldown classifications.
+* Momentum.
+* Stage geometry and collision.
+* Void elimination rules.
+* Match scoring and overtime.
+
+Do not add damage bonuses for queued combos.
+
+Do not make a queued follow-up unblockable.
+
+Do not give players hidden invulnerability.
+
+Do not remove the possibility of whiffing an attack.
+
+Do not ensure that two sequential attacks must both hit an opponent.
+
+Input assistance should make attacks easier to request, not guarantee that they connect.
+
+A legitimate queued combination can still miss because of opponent movement, range, Shield, knockback or stage position.
+
+That is intentional.
+
+⸻
+
+PART 13 — ANIMATION INTEGRITY
+
+One of the most important outcomes of this task is that repeated button presses must stop feeling destructive to animations.
+
+The implementation must guarantee:
+
+1. A same-move repeat never restarts the source attack.
+2. A queued follow-up never cancels the source attack.
+3. Source attack animation time advances naturally, including startup, active and recovery.
+4. Valid multi-hit strikes are not accidentally skipped.
+5. A queued request does not erase a pending projectile release.
+6. Previously released projectiles remain governed by normal rules.
+7. An attack’s visual animation and gameplay timeline remain synchronized.
+8. The follow-up begins from its own first frame.
+9. The final frame of the source animation is not accidentally skipped.
+10. An interrupted attack never masquerades as a naturally completed one.
+
+Study SpriteAnimator and Fighter.updateState() before implementing the handoff.
+
+Do not solve the problem by directly forcing an animator restart or adjusting its frame index.
+
+The proper solution is combat-state-controlled sequencing.
+
+⸻
+
+PART 14 — HITSTOP, STUN AND FRAME-BOUNDARY EDGE CASES
+
+The implementation must be reliable at exact simulation boundaries.
+
+14.1. Hitstop
+
+Hitstop freezes the relevant combat motion but does not necessarily stop the player from pressing buttons.
+
+If a legitimate repeat press occurs during hitstop while the source attack remains active, handle it consistently with the queue rules.
+
+Do not count frozen animation time as completed time.
+
+Do not allow the queued attack to execute while the fighter remains frozen.
+
+If a hit interrupts the source attack, discard the queue.
+
+Test attacks that hit, miss, and are blocked.
+
+14.2. Final-frame input
+
+Pay particular attention to a repeat press on the exact step when an attack reaches its ending boundary.
+
+Depending on the current update order, CombatState.update() may finish the attack before the player’s press is resolved.
+
+Ensure the press is handled once, not lost because of an inconsistent boundary interpretation and not executed twice.
+
+The final-frame behavior must match the intended Combo Assist semantics.
+
+14.3. Same-step competing actions
+
+Test a queued follow-up against simultaneous requests involving:
+
+* Another attack button.
+* Jump.
+* Dash.
+* Shield.
+* Deflect.
+* A special attack.
+
+Preserve the current combat-input priority.
+
+One step must never launch two ordinary attacks because of a queue race.
+
+14.4. Interrupted queues
+
+Test source attacks interrupted during:
+
+* Startup.
+* Active frames.
+* Recovery.
+* Hitstop.
+* The last eligible queue frame.
+
+No ghost follow-up should execute.
+
+⸻
+
+PART 15 — IMPLEMENTATION ARCHITECTURE
+
+Prefer extending existing components rather than introducing several new subsystems.
+
+15.1. combo-assist.js
+
+Keep its main responsibility focused on Combo Assist action selection.
+
+Retain the existing cooldown-based alternation behavior.
+
+Add a pure, deterministic way to identify the alternate action for a currently playing eligible attack.
+
+Do not duplicate the fighter’s attack mappings.
+
+Use the existing COMBO_PAIRS concept.
+
+Avoid character-specific hardcoding.
+
+15.2. fighter.js
+
+This should own the runtime queue because the Fighter already owns:
+
+* Combat requests.
+* Attack buffers.
+* Move cancellation.
+* Combat Assist state.
+* Attack state transitions.
+* Hit reactions.
+* Reset behavior.
+
+Add a small dedicated queued-combo state and cohesive methods to:
+
+1. Identify eligible repeats.
+2. Accept one queued follow-up.
+3. Detect natural source completion.
+4. Validate the queued follow-up.
+5. Dispatch it through the ordinary combat action path.
+6. Clear it on invalidation.
+
+Avoid scattering direct modifications to the queue across dozens of unrelated methods.
+
+Where possible, centralize lifecycle handling.
+
+15.3. combat-state.js
+
+Modify this only where required to reliably distinguish natural completion from cancellation or interruption.
+
+If introducing an attack-ending reason or event, document its semantics.
+
+Do not change cooldown timing as a side effect.
+
+Do not alter the CPU’s existing action permissions.
+
+15.4. move-status.js and ability HUD
+
+If queue feedback is implemented, expose a read-only view of the state appropriate for presentation.
+
+Keep cooldown status and queued-combo status separate.
+
+The interface must not own authoritative queue timing.
+
+15.5. Settings
+
+Reuse the existing comboAssist setting.
+
+Do not add another setting unless there is a compelling architectural reason.
+
+Preserve stored user preferences and migration behavior.
+
+Do not change the settings version unnecessarily.
+
+⸻
+
+PART 16 — DETAILED EXPECTED BEHAVIOR MATRIX
+
+Implement and test at least these scenarios.
+
+Input scenario	Required outcome
+Attack 1, then repeat Attack 1 during final queue window	Queue Attack 2
+Attack 2, then repeat Attack 2 during final queue window	Queue Attack 1
+Attack 1 repeated too early	No restart and no queue
+Attack 1 repeated after natural completion during cooldown	Existing Combo Assist behavior
+Attack 1 → direct Attack 2	Existing direct cancellation behavior
+Attack 2 → direct Attack 1	Existing direct cancellation behavior
+Attack 1 repeatedly mashed	Only one follow-up per active source
+Attack 1 held down	Only one press, no automatic queue
+Queued Attack 2 on cooldown at execution	Discard queue
+Queued Attack 2 missing required art	Discard queue
+Queued aerial attack has used all airtime starts	Discard queue
+Player changes from ground to air before execution	Honor original action context; do not substitute
+Source attack is manually canceled	Clear queue
+Source attack is interrupted by a hit	Clear queue
+Source attack is landing-canceled before natural completion	Clear queue
+Source attack reaches natural end	Allow legal queued follow-up
+Combo Assist off	Existing behavior unchanged
+Combat Assist on	Queued melee attack may use normal approach
+Combat Assist off	Queued attack has no assisted approach
+CPU repeats Attack 1	Existing CPU behavior unchanged
+Watch Mode	No human Combo Assist queue
+Practice dummy	No human Combo Assist queue
+Reset or respawn	Queue cleared
+Player presses a newer valid action	New action takes precedence
+Player loses input control or match ends	Queue cleared
+Exact final-frame repeat	Handled exactly once
+Replay the same inputs at different rendering rates	Deterministic result
+
+Also test longer cooldown moves and fighters with atypical attack durations.
+
+⸻
+
+PART 17 — COMPREHENSIVE TESTING
+
+The implementation is not complete until the tests demonstrate that the new behavior is correct.
+
+17.1. Update existing tests
+
+Inspect and update:
+
+* tests/systems/combo-assist.test.mjs
+* tests/systems/move-cancel.test.mjs
+* tests/systems/request-devices.test.mjs
+* tests/systems/combat-assist.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/cooldown-policy.test.mjs
+* tests/systems/combat-rules.test.mjs
+* tests/systems/movement.test.mjs
+* tests/systems/air-mouvment.test.mjs
+* tests/systems/deflect.test.mjs
+
+Update other affected suites as necessary.
+
+The current Combo Assist tests contain assertions that repeated inputs during active attacks are never queued.
+
+These are explicitly superseded only for the new Combo Assist-enabled queue behavior.
+
+Do not indiscriminately delete old tests.
+
+Preserve their assertions about animation restarts, interruption safety, cooldowns, CPU exclusion and Combo Assist-off behavior.
+
+17.2. Add dedicated queue tests
+
+Create targeted test cases for the new feature.
+
+Verify:
+
+* Correct alternate selection.
+* Complete source animation playback.
+* Correct follow-up animation startup.
+* One-slot queue capacity.
+* No duplicate damage.
+* No lost or duplicated projectile events.
+* Natural completion versus interruption.
+* Exact input timing boundaries.
+* Cooldown enforcement.
+* Queue cleanup.
+* Ground and aerial mappings.
+* Hitstop handling.
+* Fresh action priority.
+* Disabled-assist behavior.
+
+Use deterministic tests based on the existing fighter harness.
+
+17.3. Test the complete roster
+
+The mechanic must work using the real data of all currently playable fighters.
+
+Do not test only #0001.
+
+Include #0002, #0003, #0004, and #0005 where present, and any additional fighters that currently exist.
+
+Use playableCharacters() or equivalent authoritative roster access.
+
+Also include a test-only fighter with unusual but legal move mappings and animation durations.
+
+17.4. Test controllers and touch input
+
+Use the existing device testing infrastructure to verify identical semantic behavior from keyboard, controller and touch inputs.
+
+Test press/release/press sequences.
+
+Verify that holding a button does not create a repeated-press edge.
+
+Confirm that custom bindings still work and that no controller-specific input is interpreted twice.
+
+17.5. Test deterministic simulation
+
+Run equivalent scripted fights under different rendering-frame delivery patterns.
+
+A 30 FPS rendering schedule, a 60 FPS schedule, and a 144 FPS schedule must not produce different combat outcomes from the same simulation inputs.
+
+Queue acceptance and execution must use fixed-step gameplay state, not display-frame timing.
+
+17.6. Run the full test suite
+
+The repository uses Node’s built-in test runner.
+
+Run:
+
+node --test
+
+Also run relevant targeted suites during development.
+
+Investigate failures rather than modifying unrelated expectations until they pass.
+
+If environmental limitations prevent a test from running, explain exactly which test could not be executed and why.
+
+Do not claim tests passed without running them.
+
+17.7. Protect CPU regressions
+
+Run the existing CPU-related tests to confirm that the shared combat changes have not broken CPU behavior.
+
+Use the CPU benchmark where feasible to compare the same seeds and matchups before and after the change.
+
+Do not attempt to improve benchmark scores by modifying CPU parameters.
+
+The benchmark is a regression guard, not a new balancing assignment.
+
+⸻
+
+PART 18 — QUALITY AND GAME FEEL
+
+Once the core mechanics are implemented and tests pass, evaluate the feature as an actual player would.
+
+Ask:
+
+1. Does Attack 1 respond immediately to its first press?
+2. Does a repeated press feel acknowledged?
+3. Does the current animation finish without restarting?
+4. Does the alternate begin at a predictable moment?
+5. Can a beginner repeatedly press one basic-attack button without experiencing broken animation loops?
+6. Does deliberate Attack 1 → Attack 2 timing still reward skill?
+7. Can an experienced player still cancel attacks rapidly?
+8. Does Combat Assist continue helping short-range melee attacks?
+9. Are cooldowns consistent and understandable?
+10. Is it obvious when an attack is queued?
+11. Are there any surprising attacks that execute after the player has changed intentions?
+12. Do hitstop, movement and aerial transitions feel coherent?
+
+Treat perceived responsiveness and predictability as important, but do not conceal gameplay-rule violations in the name of feel.
+
+Avoid unnecessary animation speed changes.
+
+Alva’s different attacks already have different animation rates, startup phases, active windows, recovery durations and cancellation properties.
+
+Those distinctions are part of fighter identity and combat balance.
+
+The goal is to make input handling around those timings more forgiving, not erase every move’s strengths and weaknesses.
+
+⸻
+
+PART 19 — WHAT NOT TO IMPLEMENT
+
+Explicitly avoid the following:
+
+* No automatic restarting of the currently playing attack.
+* No infinite same-button attack loop.
+* No removal of attack cooldowns.
+* No reduction of cooldowns to make combos easier.
+* No global cooldown between different attacks.
+* No forced guaranteed hits.
+* No automatic target damage.
+* No automatic Shield bypass.
+* No changes to CPU difficulty.
+* No extra CPU hesitation or artificial mistakes.
+* No nerfing character attacks.
+* No sweeping changes to Launch Point recovery.
+* No rewrites of the universal movement system.
+* No new control bindings required to access the feature.
+* No new gameplay libraries or dependencies.
+* No invented character animations.
+* No hardcoded fighter-specific queue behavior.
+* No non-deterministic timers.
+* No permanent combat-buffer extension.
+* No input macros that play full attack sequences without genuine subsequent presses.
+* No replacing the existing manual cancellation mechanic with animation-only chaining.
+
+Resist unrelated refactoring.
+
+If unrelated technical debt is discovered, record it separately unless correcting it is essential for this implementation.
+
+⸻
+
+PART 20 — UPDATE THE DOCUMENTATION
+
+After implementing the system, update the documentation to describe its actual behavior.
+
+At minimum, review and update:
+
+1. ALVA_SPEC.md, especially §7.2.4b.
+2. docs/systems/combat.md.
+3. docs/systems/input.md.
+4. Relevant sections of docs/systems/movement.md.
+5. UPDATES.md, following the repository’s conventions for recording changes.
+6. Any comments in code that still claim active same-move presses are always discarded.
+
+Make the distinction between these three systems extremely clear:
+
+Ordinary input buffering: Remembers a slightly early move request for 0.15 seconds.
+
+Combo Assist queuing: Remembers one eligible repeated basic attack, using the proposed late-animation acceptance window, until the current attack completes naturally.
+
+Repeat cooldown: Controls when a move can be reused, independently of whether an alternate attack is available.
+
+Document that manual attack cancellation remains available.
+
+Document when the queue is discarded.
+
+Document how the behavior differs with Combo Assist disabled.
+
+Use concise gameplay examples.
+
+Do not rewrite historical project documentation in ways that falsely suggest the new mechanic has always existed.
+
+⸻
+
+PART 21 — IMPLEMENTATION SEQUENCE
+
+Complete the work in this order.
+
+Phase 1 — Audit
+
+Inspect the current repository, trace all relevant call paths, and identify the exact animation-completion and input-priority constraints.
+
+Record the existing behavior and any assumptions that need confirmation.
+
+Phase 2 — Core queue
+
+Implement the deterministic, single-slot queued follow-up.
+
+Preserve the existing Combo Assist alternation and manual cancellation behavior.
+
+Phase 3 — Lifecycle correctness
+
+Ensure source completion is reliably distinguished from interruption.
+
+Implement all queue invalidation paths.
+
+Handle boundary steps and hitstop.
+
+Phase 4 — Assist and movement integration
+
+Verify Combat Assist, ground/air resolution, directional input, Dash, jump, Shield, Deflect, and special moves.
+
+Correct any regressions introduced by the new feature.
+
+Phase 5 — Feedback
+
+Implement minimal queue feedback using the existing UI architecture.
+
+Keep presentation separate from gameplay logic.
+
+Support localization, accessibility and the relevant control schemes.
+
+Phase 6 — Regression testing
+
+Add and update targeted tests.
+
+Test the full roster and all input devices.
+
+Run the complete test suite.
+
+Check CPU regressions without changing CPU strength.
+
+Phase 7 — Documentation and final review
+
+Update the specification and guides.
+
+Inspect the final diff.
+
+Remove dead code and accidental debug output.
+
+Verify that every new state field has a defined cleanup path.
+
+⸻
+
+PART 22 — NON-NEGOTIABLE ACCEPTANCE CRITERIA
+
+The assignment is successful only if all of the following are true:
+
+A. Animation safety
+
+Repeated input never restarts, cuts short, or corrupts the current attack animation.
+
+B. Correct sequencing
+
+An accepted queued alternate executes only after the previous attack naturally finishes.
+
+C. Single queue
+
+No button-mashing sequence can pre-schedule multiple attacks from one source animation.
+
+D. Cooldown integrity
+
+Every move continues obeying the established cooldown policy.
+
+E. Manual combat preserved
+
+Direct different-action cancellations remain as responsive as before.
+
+F. Combat Assist compatibility
+
+Queued attacks work correctly with Combat Assist both enabled and disabled.
+
+G. Human-only assistance
+
+CPU fighters never receive the player’s new queued Combo Assist behavior.
+
+H. Cross-device consistency
+
+Keyboard, controllers, and touch controls produce equivalent results.
+
+I. Ground and air correctness
+
+Fighter-specific move mappings and aerial restrictions are respected.
+
+J. Interruption safety
+
+Hits, cancels, landing cancellations, reset and match transitions never leave stale queued attacks.
+
+K. Determinism
+
+Equivalent fixed-step input streams produce equivalent outcomes.
+
+L. Existing balance preserved
+
+Damage, Launch Point, Energy, movement values, attack timing, and CPU intelligence remain unchanged unless an independently verified correctness fix is strictly necessary.
+
+M. Test coverage
+
+All relevant existing and new tests pass, with any environmental exceptions clearly reported.
+
+N. Documentation accuracy
+
+The specification, implementation, and tests agree about how the mechanic works.
+
+⸻
+
+PART 23 — FINAL REPORT REQUIRED
+
+After completing the implementation, provide a clear technical report.
+
+Include:
+
+1. Summary
+
+Explain what changed and how it improves combat.
+
+2. Files changed
+
+List the actual modified files and why each modification was necessary.
+
+3. Gameplay examples
+
+Describe what now happens for:
+
+* Attack 1 → Attack 1.
+* Attack 2 → Attack 2.
+* Attack 1 → Attack 2.
+* Repeated button mashing.
+* A queued move whose cooldown is active.
+* A queued move canceled by a hit.
+* A queued move used with Combat Assist.
+
+4. Preservation checks
+
+Confirm whether the following remained intact:
+
+* Cooldowns.
+* Manual move cancellation.
+* Hitboxes and damage.
+* Ground/air restrictions.
+* Shield and Deflect.
+* Universal movement.
+* Combat Assist.
+* Input bindings.
+* CPU intelligence and difficulty.
+* Character-specific animations.
+
+5. Test results
+
+Report the commands executed, the results, and any failures or limitations.
+
+6. Remaining considerations
+
+Identify genuine remaining usability issues or tuning choices, such as whether the 0.20-second queue window is sufficiently forgiving.
+
+Separate these from completed work.
+
+Do not claim an optional recommendation was implemented if it was not.
+
+⸻
+
+FINAL DESIGN PHILOSOPHY
+
+Alva should be easy to begin playing but difficult to master.
+
+A beginner should be able to press a basic attack button, press it again at the appropriate moment, and understand that the game has accepted a follow-up.
+
+An experienced player should still be able to use precise move selection, manual cancels, spacing, shielding, aerial movement and timing to perform better.
+
+Combat Assist helps the player reach the opponent.
+
+Combo Assist helps the player select and sequence basic attacks.
+
+Input buffering helps the game recognize slightly early inputs.
+
+Cooldowns preserve each move’s reuse limits.
+
+Manual cancellation preserves the depth of high-skill combat.
+
+These systems should cooperate without overriding each other.
+
+The game should never feel unresponsive simply because an input was discarded unnecessarily.
+
+But responsiveness must not come from restarting animations, ignoring cooldowns, producing unintended attacks, or changing CPU intelligence.
+
+The ideal result is a combat experience that feels:
+
+Responsive. Fluid. Predictable. Accessible. Skillful. Fair. Visually coherent.
+
+Implement the improvement carefully, validate it thoroughly, and leave Alva’s existing combat architecture stronger and easier to maintain than before.
+
+Begin by inspecting the latest repository, then implement and test the solution.
