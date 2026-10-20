@@ -5,17 +5,19 @@
 // it only toward a point above its head) and an airborne one along both
 // axes. A raised Shield, a paralysed fighter, the owner and a fighter out
 // of play are never drawn. One rule for attacks (only while active) and
-// projectiles (while they fly). Bespoke pulls on the real Fighter and
-// projectiles (see tests/helpers/fighter-harness.mjs); #0001 is only the
-// body they act on.
+// projectiles (while they fly). A pull never shoves its owner: a fighter it
+// drew in, still carried toward it, stops against its body. Bespoke pulls
+// on the real Fighter and projectiles (see
+// tests/helpers/fighter-harness.mjs); #0001 is only the body they act on.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { applyPulls, pullToward } from '../../js/game/combat/pull.js';
 import { attackReach, createAttackDefinition, resolvePull } from '../../js/game/combat/attacks.js';
 import { createProjectileDefinition, Projectile } from '../../js/game/combat/projectile.js';
-import { def, DT, makeFighter, steps, stageMap } from '../helpers/fighter-harness.mjs';
+import { def, DT, duel, fakeSpritesOf, makeFighter, steps, stageMap } from '../helpers/fighter-harness.mjs';
 import { StageCollision } from '../../js/game/physics.js';
+import { separateFighters } from '../../js/game/fighters/fighter.js';
 
 const PULL = Object.freeze({ radius: 200, speed: 600, offset: { x: 0, y: 0 } });
 const middle = (f) => f.body.y - f.body.height / 2;
@@ -197,4 +199,91 @@ test('a projectile pulls toward its centre for as long as it flies, never its ow
   assert.equal(orb.alive, false);
   applyPulls([owner, target], [orb], DT);
   assert.equal(target.body.vx, 0, 'spent: no pull');
+});
+
+// ---- Never a shove ----------------------------------------------------------------------
+
+test('a fighter a pull drew in stops against the fighter that pulled it: the puller holds its ground', () => {
+  const stage = new StageCollision(stageMap());
+  const puller = standing(500).fighter;
+  const drawn = standing(520).fighter;
+  drawn.combat.stun = 0.4;
+  drawn.body.vx = -600;
+  drawn.drawnBy = puller;
+  separateFighters(puller, drawn, stage);
+  assert.equal(puller.body.x, 500, 'the puller is not pushed');
+  const apart = (puller.def.pushbox.width + drawn.def.pushbox.width) / 2;
+  assert.equal(drawn.body.x, 500 + apart, 'stopped against its body');
+  assert.equal(drawn.body.vx, 0, 'its speed toward it gone');
+  // Anyone else's overlap is split evenly, as ever.
+  const a = standing(500).fighter;
+  const b = standing(520).fighter;
+  separateFighters(a, b, stage);
+  assert.ok(a.body.x < 500 && b.body.x > 520);
+  assert.ok(Math.abs((500 - a.body.x) - (b.body.x - 520)) < 1e-9);
+});
+
+test('drawn by a pull, a fighter is held by it while drawn and while still carried, helpless, toward its puller; free again, it pushes as ever', () => {
+  const { a, t } = pullingDuel(680);
+  a.step({ attack1: true, attack1Pressed: true });
+  for (let i = 0; i < steps(0.1); i++) a.step({});
+  applyPulls([a.fighter, t.fighter], [], DT);
+  assert.equal(t.fighter.drawnBy, a.fighter, 'drawn by its pull');
+  // Carried on toward it, stunned: still held once the pull is over.
+  for (let i = 0; i < steps(0.4); i++) a.step({});
+  assert.equal(a.fighter.combat.attack, null, 'the pull is over');
+  t.fighter.combat.stun = 0.3;
+  t.fighter.body.vx = -300;
+  applyPulls([a.fighter, t.fighter], [], DT);
+  assert.equal(t.fighter.drawnBy, a.fighter);
+  // Moving away, or free to act: done with it.
+  t.fighter.body.vx = 200;
+  applyPulls([a.fighter, t.fighter], [], DT);
+  assert.equal(t.fighter.drawnBy, null, 'moving away');
+  t.fighter.drawnBy = a.fighter;
+  t.fighter.body.vx = -300;
+  t.fighter.combat.stun = 0;
+  applyPulls([a.fighter, t.fighter], [], DT);
+  assert.equal(t.fighter.drawnBy, null, 'free to act');
+  // A projectile's pull holds its target for its owner.
+  const owner = standing(300).fighter;
+  const target = standing(520).fighter;
+  const orb = new Projectile({
+    owner,
+    def: createProjectileDefinition({ id: 'testOrb', damage: 1, speed: 100, lifetime: 0.5, pull: { radius: 200, speed: 400 } }),
+    anim: { frames: [{}], fps: 1, loop: true },
+    x: 400, y: middle(target), direction: 1,
+  });
+  applyPulls([owner, target], [orb], DT);
+  assert.equal(target.drawnBy, owner);
+  target.reset(target.stage);
+  assert.equal(target.drawnBy, null, 'a reset clears it');
+});
+
+test('a pull that lets go of a fighter still rushing in never shoves its owner back: it stops at its body', () => {
+  // A long reach, a brief pull, a seizing stun: let go mid-flight, the
+  // target slides on into the puller.
+  const character = {
+    ...def,
+    attacks: {
+      ...def.attacks,
+      attack1: {
+        ...def.attacks.attack1, startup: 0.1, active: 0.1, recovery: 0.3, hitCancel: null, baseLaunch: 0, directionalLaunch: null,
+        hitbox: { x: 20, y: -100, w: 300, h: 80 }, hitstun: 0.8,
+        pull: { radius: 300, speed: 1100, offset: { x: 40, y: -50 } },
+      },
+    },
+  };
+  const d = duel({ gap: 290, attackerCharacter: character, attackerSprites: fakeSpritesOf(character), pushboxes: true });
+  const x0 = d.attacker.body.x;
+  d.tick({ attack1: true, attack1Pressed: true });
+  let fastest = 0;
+  for (let i = 0; i < steps(1); i++) {
+    d.tick();
+    if (d.attacker.combat.attack?.phase !== 'active') fastest = Math.max(fastest, -d.target.body.vx);
+  }
+  assert.ok(fastest > 500, 'let go while still rushing in');
+  assert.equal(d.attacker.body.x, x0, 'its owner holds its ground');
+  const apart = (d.attacker.def.pushbox.width + d.target.def.pushbox.width) / 2;
+  assert.ok(Math.abs(d.target.body.x - d.attacker.body.x - apart) < 1e-6, 'the target stopped against it');
 });

@@ -2215,8 +2215,8 @@ naming the character anywhere. `character_rule` was not touched.
   sees them floating, appearing wherever it likes with red balloons as the
   herald, its jaws stretching far beyond a human's): the Claw Swipe and
   the Claw Rake (a sweep that holds, then a spike), the Long Bite (its head
-  on a long neck, the jaws 120 to 198 units out and nothing closer: three
-  bites that hold, then a fling of 5), Snapping Jaws (a shorter one in the
+  shot out on a long neck, biting whatever it meets from right in front of
+  its face out to 198 units: three bites that hold, then a fling of 5), Snapping Jaws (a shorter one in the
   air), Phantom Hands (a barrage of ghostly hands, the last 5 straight up)
   and Floating Hands (the same barrage as it `hover`s, once per airtime),
   the Deadlights (a technique, a Special: its maw opens onto the lights,
@@ -2252,6 +2252,14 @@ naming the character anywhere. `character_rule` was not touched.
     it. Routine (no cooldown of its own).
   - a pull's `front` (`js/game/combat/pull.js`): a pull that reaches only
     the side its attack faces (or its projectile flies).
+  - a pull never shoves its owner (`Fighter.drawnBy`, `separateFighters`):
+    a fighter it draws, while drawn and while still carried helpless toward
+    the owner on the pull's speed, stops against the owner's body instead
+    of pushing it back (Dark Tendrils let go of whoever they reel in from
+    their far end while it is still rushing in; it used to shove #0005 back
+    about 160 units). The same holds for #0001's Blue and Maximum Blue.
+    `separate` (`js/game/physics.js`) takes the part of the overlap each
+    body moves.
   - It is the roster's first summon: the summon system was already there,
     tested on test-only fighters.
 - **The CPU** plays it from the data: a float weighs as the hold it is, a
@@ -2271,15 +2279,19 @@ naming the character anywhere. `character_rule` was not touched.
 
 **Balance, measured.** Tuned from seeded CPU-vs-CPU matches (full Watch
 Mode battles, first to 3, on Desert and City, 20 matches per cell; points
-#0005 : opponent). Against #0001: Medium 36 : 53, Hard 34 : 52, Brutal
-32 : 49. Against #0002: Medium 42 : 45, Hard 36 : 49, Brutal 46 : 39.
-Against #0003: Medium 40 : 41, Hard 36 : 44, Brutal 43 : 37. Against
-#0004: Medium 54 : 24, Hard 56 : 32, Brutal 55 : 31; 510 : 496 in all. The
-first cut scored 380 : 597 (its hits mostly 1-damage holds, its Long Bite
-and Deadlights punished on most starts). Fixed by a quicker Long Bite (20
-fps, from 15), finishers of 5 on Phantom Hands and Snapping Jaws (from 3),
-a 14 Energy refill and 20° of launch steering. Floating Hands' finisher
-stays 3: at 5 too (521 : 513) the CPU behaviour scenarios no longer held.
+#0005 : opponent). Against #0001: Medium 43 : 42, Hard 45 : 43, Brutal
+34 : 46. Against #0002: Medium 47 : 35, Hard 47 : 38, Brutal 39 : 45.
+Against #0003: Medium 42 : 42, Hard 39 : 45, Brutal 49 : 38. Against
+#0004: Medium 60 : 19, Hard 41 : 44, Brutal 52 : 36; 538 : 473 in all, even
+at Hard and Brutal and stronger at Medium. The first cut scored 380 : 597
+(its hits mostly 1-damage holds, its Long Bite, then a bite 120 to 198
+units out only, and the Deadlights punished on most starts). Finishers of
+5 on Phantom Hands and Snapping Jaws (from 3), a 14 Energy refill and 20°
+of launch steering, with a 20 fps Long Bite, made it 510 : 496; the Long
+Bite then made to bite up close as well (the owner's report: useless when
+super close) scored 597 : 422 at 20 fps, so it is back at 15 fps (0.87 s).
+Floating Hands' finisher stays 3: at 5 too the CPU behaviour scenarios no
+longer held.
 
 **A shared test's count corrected.** `cpu-behaviour`'s lead-protection
 scenario (C, D) counts how often a CPU ahead late goes in after a free
@@ -2313,7 +2325,9 @@ the pairings it runs (five) instead of saying "of 4".
 `js/game/combat/hit-effects.js`, `attacks.js`, `projectile.js`,
 `offense.js`, `combat-state.js` and `combat.js`, the float's rise in
 `js/game/fighters/fighter.js`; the front-only pull in `attacks.js` and
-`pull.js`; the drop in `js/game/rendering/fighter-status.js` and
+`pull.js`, and the pull's hold on whom it draws in `pull.js`,
+`separateFighters` (`fighter.js`) and `separate` (`js/game/physics.js`);
+the drop in `js/game/rendering/fighter-status.js` and
 `js/game/arena.js`, the feeding glow in `js/game/rendering/hit-fx.js`; the
 CPU in `js/game/ai/cpu-intelligence/` (`capabilities`, `perception`,
 `situation`, `evaluator`, `defense`, `brain`); `js/ui/credits.js`,
@@ -2324,8 +2338,12 @@ scale and anchors, every move's mechanic, the tendrils-into-Deadlights
 combo, the CPU against every fighter using every move, names, credits, and
 a whole-repository check that the source character is named nowhere),
 `tests/systems/float.test.mjs`, `fear.test.mjs` and `gaze.test.mjs`;
-`pull`, `hit-effects`, `launch`, `cooldown-policy`, `combat-assist`,
-`combo-assist` and `special-abilities` for the new effects and the fifth
-fighter; `cpu-behaviour`'s lead-protection count (above); the roster, credits and screens in
+`pull` (the front-only pull, and a pull never shoving its owner),
+`hit-effects`, `launch`, `cooldown-policy`, `combat-assist`, `combo-assist`
+and `special-abilities` for the new effects and the fifth fighter;
+`cpu-behaviour`'s lead-protection count (above); `cpu-intelligence`'s shared
+fights on two seeds rather than one (the pull's hold changes how #0001 and
+#0002 fight, and on one seed Easy's rarest moves came down to a single
+use); the roster, credits and screens in
 `tests/integration/empty-roster.test.mjs`, `discover.test.mjs`,
 `settings.test.mjs` and the other fighters' tests (the playable list).

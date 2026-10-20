@@ -198,7 +198,13 @@ use them between them today):
   out of play hold their ground. With `front: true` it reaches only the
   side it faces: an opponent whose middle is behind its fighter (behind a
   projectile, the way it flies) is left where it is (#0005's Dark
-  Tendrils). The same rule runs a projectile's pull, toward its
+  Tendrils). A pull never shoves its owner: a fighter it draws remembers
+  whose pull it was (`Fighter.drawnBy`) while drawn and, once the pull is
+  over, for as long as it is still carried toward that fighter, helpless
+  (stunned or held), on the speed it was drawn with; meanwhile its pushbox
+  stops against that fighter's (`separateFighters`), its speed toward it
+  gone, rather than pushing it back. Free to act again, or no longer moving
+  toward it, it pushes and is pushed as ever. The same rule runs a projectile's pull, toward its
   centre (`applyPulls` in [`pull.js`](../../js/game/combat/pull.js), each
   step after everything has moved and before hits resolve, so whoever is
   drawn into a hitbox is struck that step). `attackReach` widens the box

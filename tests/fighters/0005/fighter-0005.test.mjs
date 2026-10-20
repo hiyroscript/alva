@@ -292,8 +292,8 @@ test('the Claw Rake: a sweep that holds the target (1), then a blow through the 
   assert.ok(hits[1].finalLaunch.y > 0, 'down');
 });
 
-test('the Long Bite: nothing close to it, the jaws far out (120 to 198 units), three bites that hold, then a heavy fling (5, Base Launch 3)', () => {
-  for (const [gap, lands] of [[60, false], [150, true], [240, false]]) {
+test('the Long Bite: all along its neck, from right up close out to the jaws (16 to 198 units), three bites that hold, then a heavy fling (5, Base Launch 3)', () => {
+  for (const [gap, lands] of [[36, true], [60, true], [150, true], [240, false]]) {
     const d = versus({ gap });
     d.tick(P('attack2'));
     after(d, 0.9);
@@ -306,7 +306,7 @@ test('the Long Bite: nothing close to it, the jaws far out (120 to 198 units), t
     assert.ok(hits[3].finalLaunch.x > 0, 'flung away from it');
   }
   const atk = createAttackDefinition({ id: 'attack2', ...DEF.attacks.attack2 });
-  assert.ok(near(atk.startup, 4 / 20) && near(atk.total, 13 / 20), 'a fifth of a second to see coming, 0.65 s in all');
+  assert.ok(near(atk.startup, 4 / 15) && near(atk.total, 13 / 15), 'a good quarter of a second to see coming, 0.87 s in all');
   assert.equal(atk.cooldown, 0.5, 'its bites add up to 8: no long cooldown');
 });
 
@@ -396,6 +396,19 @@ test('Dark Tendrils seize what they meet in front and reel it in; one behind is 
   after(s, 0.5, {}, { shield: true });
   assert.deepEqual(mine(s, 'extra_attack').map((e) => e.type), ['block']);
   assert.ok(s.target.body.x - s.attacker.body.x > 240, 'it held its ground');
+});
+
+test('Dark Tendrils never shove #0005 back: whoever they reel in from the far end, still rushing in as they let go, stops against its body', () => {
+  for (const target of playableCharacters()) {
+    const d = versus({ gap: 285, pushboxes: true }, target);
+    const x0 = d.attacker.body.x;
+    d.tick(P('extra_attack'));
+    after(d, 1.2);
+    assert.equal(mine(d, 'extra_attack')[0]?.type, 'hit', `#${target.id}: seized`);
+    assert.equal(d.attacker.body.x, x0, `#${target.id}: #0005 holds its ground`);
+    const apart = (DEF.pushbox.width + target.pushbox.width) / 2;
+    assert.ok(d.target.body.x - d.attacker.body.x < apart + 1, `#${target.id}: reeled in to its body`);
+  }
 });
 
 test('the player\'s Deadlights out of Dark Tendrils\' seizing let go while the prey is still held, facing #0005', () => {

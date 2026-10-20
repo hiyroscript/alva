@@ -77,7 +77,7 @@ const FPS_0005 = Object.freeze({
   deflect: 15,
   attack1: 12,
   midair_attack1: 15,
-  attack2: 20,
+  attack2: 15,
   midair_attack2: 20,
   attack3: 12,
   midair_attack3: 12,
@@ -509,20 +509,22 @@ export const CHARACTER_0005 = {
       airControl: 0.5,
       hitCancel: 4 / FPS_0005.midair_attack1,
     },
-    // The Long Bite: crouched, its head stretched out on its neck (frames
-    // 1-4, a fifth of a second to see it coming), then four strikes
-    // at the jaws, from 120 to 198 units out, at head height: the bite as
-    // they open (frame 5) and two chews (frames 6-7), 1 each, no launch, a
-    // stun that holds its prey in the jaws; the last chew (frame 8): 5, the
-    // heavy tier, Base Launch 3 sideways, its prey shaken and flung far
-    // away: its finisher. The jaws shut and the neck drawn back (frames
-    // 9-13, a quarter of a second): 0.65 s in all, its longest ordinary
-    // commitment. The longest reach in the roster, and nothing close to it:
-    // its body is not in the strike.
+    // The Long Bite: crouched, its head shooting out from its face on its
+    // neck (frames 1-4, a good quarter of a second to see it coming), then
+    // four strikes all along the neck's length, from just in front of its
+    // face (16 units) out to the jaws (198), at head height: the jaws close
+    // on whatever the head met on its way out, right up close as well as far
+    // away. The bite as they open (frame 5) and two chews (frames 6-7), 1
+    // each, no launch, a stun that holds its prey in the jaws; the last chew
+    // (frame 8): 5, the heavy tier, Base Launch 3 sideways, its prey shaken
+    // and flung far away: its finisher. The jaws shut and the neck drawn
+    // back (frames 9-13, a third of a second): 0.87 s in all, its longest
+    // ordinary commitment. The longest reach in the roster, and its
+    // slowest ordinary move.
     attack2: {
       animation: 'attack2',
       recovery: 5 / FPS_0005.attack2,
-      hitbox: { x: 120, y: -84, w: 78, h: 64 },
+      hitbox: { x: 16, y: -84, w: 182, h: 64 },
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 1 / 30,

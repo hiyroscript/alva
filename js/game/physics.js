@@ -378,21 +378,24 @@ export function dropThrough(b, time) {
 
 // Keep two fighters from overlapping (fighting-game pushboxes). Only applies
 // when their vertical extents overlap, so jumping over an opponent works.
-// The overlap is split evenly: there are no walls to push against, so a
-// fighter at a ledge can be pushed off it. Solids (the main floor's cliff
-// faces included) are resolved afterwards by resolveSolidOverlap.
-export function separate(a, b, aHalf, bHalf, stage) {
+// The overlap is split evenly unless `aShare` says what part of it `a`
+// takes (0: `a` holds its ground and `b` alone moves out of it): there are
+// no walls to push against, so a fighter at a ledge can be pushed off it.
+// Solids (the main floor's cliff faces included) are resolved afterwards by
+// resolveSolidOverlap. True when the two overlapped and were moved apart.
+export function separate(a, b, aHalf, bHalf, stage, aShare = 0.5) {
   const vertical = a.y - a.height < b.y && b.y - b.height < a.y;
-  if (!vertical) return;
+  if (!vertical) return false;
   const dx = b.x - a.x;
   const overlap = aHalf + bHalf - Math.abs(dx);
-  if (overlap <= 0) return;
+  if (overlap <= 0) return false;
   // Only push while both are near the same footing; airborne crossups pass.
-  if (!a.grounded && !b.grounded) return;
+  if (!a.grounded && !b.grounded) return false;
   // Exactly level: a fixed tie-break by side of the main stage.
   const dir = dx !== 0 ? Math.sign(dx) : a.x < stage.centerX ? 1 : -1;
-  a.x -= (dir * overlap) / 2;
-  b.x += (dir * overlap) / 2;
+  a.x -= dir * overlap * aShare;
+  b.x += dir * overlap * (1 - aShare);
+  return true;
 }
 
 // Push a body horizontally out of any solid it overlaps (used after
