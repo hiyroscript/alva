@@ -6,15 +6,21 @@
 // far-off Void.
 //
 // An animated preview of a stage with hazards (dynamic platforms, e.g.
-// Asperitas's clouds; stage hazards, e.g. Adamaris's volcano) runs them for
-// real, in a little world of its own: its own StageCollision,
-// PlatformHazards and StageHazards, stepped at the simulation's fixed step,
-// so the clouds drift, rest, vanish and form again elsewhere and the
-// volcano erupts and throws its rocks (with their warnings) exactly as in a
-// battle, with no battle running, no fighter to strike and nothing shared
-// with one. Its volcano opens with an eruption, so the preview shows what
-// the stage does. A still preview (a roster thumbnail, or reduced motion)
-// draws the platforms where the map starts them and the volcano at rest.
+// Asperitas's clouds; stage hazards, e.g. Adamaris's volcano, Jökull's ice
+// and weather) runs them for real, in a little world of its own: its own
+// StageCollision, PlatformHazards and StageHazards, stepped at the
+// simulation's fixed step, so the clouds drift, rest, vanish and form again
+// elsewhere and the volcano erupts and throws its rocks (with their
+// warnings) exactly as in a battle, with no battle running, no fighter to
+// strike and nothing shared with one. Its volcano opens with an eruption,
+// so the preview shows what the stage does; and since no fighter lands
+// there, its hazards run their demonstration (`demo`, see
+// js/data/stage-hazards.js): Jökull's wings take contacts on a timer of
+// their own, crack, break away and, only here, form again after a rest,
+// and its weather brings a blizzard at every check. None of it is a
+// battle's: a battle builds its own stage, whole and calm. A still preview
+// (a roster thumbnail, or reduced motion) draws the platforms where the map
+// starts them, the volcano at rest, the glacier whole and the weather calm.
 
 import { CONFIG } from '../config.js';
 import { createTheme } from '../stages/index.js';
@@ -73,7 +79,7 @@ export class StagePreview {
       sim = {
         stage, acc: 0,
         hazards: new PlatformHazards(stage, { seed }),
-        stageHazards: new StageHazards(stage, map, { seed, opening: 'erupting' }),
+        stageHazards: new StageHazards(stage, map, { seed, opening: 'erupting', demo: true }),
       };
     }
     const theme = createTheme(map, { reducedMotion: this.reducedMotion, platforms: sim?.stage.platforms, hazards: sim?.stageHazards });

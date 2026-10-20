@@ -82,11 +82,14 @@ export function hazardEnvelope(p, behavior) {
 }
 
 // What a hazard keeps clear of on the main stage: the main floor's block
-// and `clearance` above its top, room for a fighter standing on the main
-// stage under it, and its art (dynamic.mainClearance on the platform).
+// (every section of a sectioned one, as built, whether or not it is still
+// there) and `clearance` above its top, room for a fighter standing on the
+// main stage under it, and its art (dynamic.mainClearance on the platform).
 export function mainKeepOut(stage, clearance = 0) {
   const f = stage.floor;
-  return { left: f.x, right: f.x + f.w, top: f.y - clearance, bottom: f.y + f.h };
+  const left = Math.min(...stage.floors.map((s) => s.x));
+  const right = Math.max(...stage.floors.map((s) => s.x + s.w));
+  return { left, right, top: f.y - clearance, bottom: f.y + f.h };
 }
 
 // Refuses a stage whose hazards could ever touch: each one's start inside

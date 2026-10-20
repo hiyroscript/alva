@@ -16,7 +16,15 @@
 //               mainStage then stays the combat area the camera frames and
 //               the Void (overtime's closing one included) is set around;
 //               only collision reaches further. A side elimination is the
-//               Void's, as on every stage.
+//               Void's, as on every stage. A finite floor may be divided
+//               into `sections` ({ id, left, right, breakable }, left to
+//               right): contiguous blocks tiling the main stage exactly, one
+//               height, each its own solid down to its bottom, so the floor
+//               plays and looks as one; a `breakable` one is switched off
+//               for good by the stage hazard that names it (`section`, see
+//               `hazards`), and the one under the main stage's centre is
+//               never breakable (Jökull's glacier). Never continuous: past
+//               a broken section there is only open air.
 // mainStage:    the main floor, finite. Fighters stand on its top (`top`)
 //               only between `left` and `right`; past either edge there is
 //               nothing to stand on and they fall. Below its top it is a
@@ -58,7 +66,9 @@
 // hazards:      optional stage hazards that are not platforms (see
 //               js/data/stage-hazards.js and js/game/stage-hazards.js): each
 //               { id, behavior, ... } runs its own controller, e.g.
-//               Adamaris's volcano, whose falling rocks strike the beach.
+//               Adamaris's volcano, whose falling rocks strike the beach,
+//               Jökull's breakable ice sections (`ice-section`, `section`
+//               naming the floor section it breaks) and its blizzard.
 // theme:        key into the stage theme registry (js/stages/index.js).
 
 import { CONFIG } from '../config.js';
@@ -124,6 +134,24 @@ const cloudHazard = (region) => Object.freeze({
 // line is 800 above the sand (as City's), well clear of every jump.
 const ADAMARIS_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 1300 });
 const ADAMARIS_VOID = voidAround(ADAMARIS_MAIN, { side: 360, top: 800, bottom: 400 });
+
+// Jökull: one great glacier block over an open frozen abyss, as wide as
+// Asperitas's cloud and Adamaris's combat area, its ice 330 deep (a real
+// foundation, its underside in view above the Void). Its floor is three
+// sections side by side at one height (see `ground`): the centre, 880 wide
+// (63%), permanent; the two wings, 260 each (19%), breakable. Both spawns
+// are on the centre, and once both wings are gone the centre alone is
+// still wider than any Dash and jump needs. The Void is set around the
+// whole glacier as it starts (360 past each ledge, 420 below its top, 800
+// above it, clear of every jump), so a broken wing leaves open air inside
+// it to fall through and recover across.
+const JOKULL_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 1230 });
+const JOKULL_VOID = voidAround(JOKULL_MAIN, { side: 360, top: 800, bottom: 420 });
+const JOKULL_SECTIONS = Object.freeze([
+  Object.freeze({ id: 'jokull-west', left: 1100, right: 1360, breakable: true }),
+  Object.freeze({ id: 'jokull-centre', left: 1360, right: 2240 }),
+  Object.freeze({ id: 'jokull-east', left: 2240, right: 2500, breakable: true }),
+]);
 
 export const MAPS = [
   {
@@ -247,6 +275,40 @@ export const MAPS = [
       Object.freeze({ id: 'adamaris-volcano', behavior: 'volcano', targets: Object.freeze({ left: 1060, right: 2540 }) }),
     ],
     theme: 'adamaris',
+  },
+  {
+    id: 'jokull',
+    name: 'Jökull',
+    tagline: 'A frozen kingdom on the verge of collapse',
+    description:
+      'An immense glacier suspended above an endless frozen abyss. Its three ice sections appear united, but the outer edges fracture under repeated landings. Beneath swirling snow and sudden blizzards, every step brings the ice closer to breaking.',
+    traits: [
+      ['Terrain', 'Frozen glacier'],
+      ['Platforms', 'Three connected ice sections'],
+      ['Hazards', 'Collapsing ice and blizzards'],
+      ['Obstacles', 'None'],
+      ['Light', 'Polar daylight'],
+    ],
+    // Finite, never continuous: past a wing that has broken away there is
+    // nothing but air.
+    ground: Object.freeze({ type: 'finite', sections: JOKULL_SECTIONS }),
+    mainStage: JOKULL_MAIN,
+    cameraBounds: cameraAround(JOKULL_VOID, 140),
+    voidBounds: JOKULL_VOID,
+    spawnPoints: [
+      { x: 1640, facing: 1 },
+      { x: 1960, facing: -1 },
+    ],
+    platforms: [],
+    solids: [],
+    // Both wings are hazards (each breaks after its own 15 contacts, see
+    // js/data/stage-hazards.js ICE_SECTION), and so is the weather.
+    hazards: [
+      Object.freeze({ id: 'jokull-west-ice', behavior: 'ice-section', section: 'jokull-west' }),
+      Object.freeze({ id: 'jokull-east-ice', behavior: 'ice-section', section: 'jokull-east' }),
+      Object.freeze({ id: 'jokull-blizzard', behavior: 'blizzard' }),
+    ],
+    theme: 'jokull',
   },
 ];
 

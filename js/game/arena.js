@@ -48,9 +48,11 @@ export class Arena {
     // runtime state, built fresh for every arena from the map, which is
     // never written.
     this.hazards = new PlatformHazards(this.stage, { seed });
-    // The stage's other hazards (Adamaris's volcano and its rocks, if any):
-    // also this arena's own, seeded from the same seed on streams of their
-    // own (see js/game/stage-hazards.js).
+    // The stage's other hazards (Adamaris's volcano and its rocks, Jökull's
+    // breakable ice sections and blizzard, if any): also this arena's own,
+    // seeded from the same seed on streams of their own (see
+    // js/game/stage-hazards.js), so every battle starts with them whole and
+    // calm and nothing of one battle reaches another.
     this.stageHazards = new StageHazards(this.stage, map, { seed });
     // The theme draws the live platforms (a hazard where it is now, as
     // solid and as visible as it is now) and the live stage hazards (the
@@ -217,11 +219,13 @@ export class Arena {
     // (clashProjectiles). Live clones advance, then the clones summoned this
     // step spawn (once each, on their cloud's first frame). Pulls draw
     // fighters in (applyPulls), then melee, projectile, clone and technique
-    // hits resolve; then the stage hazards' rocks fly on, and those that
-    // land this step strike whoever their impact meets (no attacker: see
-    // StageHazards.resolve), and spent projectiles and finished clones are
-    // dropped. Last, any fighter now in the Void is handed to the mode
-    // (checkVoid).
+    // hits resolve; then the stage hazards take theirs (an ice section
+    // counts the footings the fighters have just taken and may break away,
+    // letting go of whoever stood on it; the weather moves on), the rocks
+    // fly on, and those that land this step strike whoever their impact
+    // meets (no attacker: see StageHazards.resolve), and spent projectiles
+    // and finished clones are dropped. Last, any fighter now in the Void is
+    // handed to the mode (checkVoid).
     this.updateRespawns(dt);
     const fighters = this.inPlay;
     this.updateCastEffects(dt);
@@ -248,8 +252,14 @@ export class Arena {
     spawnClones(fighters, this.clones, this.stage);
     applyPulls(fighters, this.projectiles, dt);
     this.combat.update(fighters, this.projectiles, this.clones);
-    const landed = this.stageHazards.update(dt, { live: this.hazardsLive });
+    const landed = this.stageHazards.update(dt, { live: this.hazardsLive, fighters });
     for (const r of landed) this.fx.addShake(r.size === 'large' ? 4 : 2);
+    // An ice section's break shakes the view a little as it fractures and
+    // more as it tears away (never with reduced motion: see addShake).
+    for (const e of this.stageHazards.events) {
+      if (e.type === 'critical') this.fx.addShake(3);
+      else if (e.type === 'separating') this.fx.addShake(7);
+    }
     this.stageHazards.resolve(fighters, this.combat);
     this.fx.take(this.combat.events, this);
     removeDeadProjectiles(this.projectiles);
@@ -750,8 +760,9 @@ export class Arena {
     for (const p of this.stage.platforms) {
       if (p.active !== false) rect(p.renderX, p.renderY, p.w, 2, p.dropThrough ? '#ffffff' : '#ff3b3b');
     }
-    // Solids, the main floor's block among them (its top the ground).
-    for (const so of this.stage.solids) rect(so.x, so.y, so.w, so.h, '#ff3b3b');
+    // Solids, the main floor's block among them (its top the ground): only
+    // those there now (a floor section that broke away has no collision).
+    for (const so of this.stage.solids) if (so.active !== false) rect(so.x, so.y, so.w, so.h, '#ff3b3b');
     // The Void's fixed kill boundary, dashed: the line gameplay tests, not
     // the wavering edge drawn over it.
     const v = this.stage.void;

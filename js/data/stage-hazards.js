@@ -3,7 +3,8 @@
 // (`behavior`). Pure data, read by the runtime in js/game/stage-hazards.js,
 // so a future stage reuses a behaviour, or adds one here, without new code.
 // (The drifting platforms a fighter stands on are a different kind of
-// hazard: js/data/platform-hazards.js.)
+// hazard: js/data/platform-hazards.js.) Today: Adamaris's volcano, and
+// Jökull's breakable ice sections and blizzard.
 //
 // Times are seconds of simulation, distances world units (y down), each
 // range [min, max] drawn uniformly from the hazard's own random stream.
@@ -107,7 +108,125 @@ export const VOLCANO = Object.freeze({
   impactSeconds: 0.9,
 });
 
+// ---- Jökull: the breakable ice sections ---------------------------------------
+
+// How many qualifying contacts a breakable ice section takes: the one that
+// reaches it starts the section breaking away. The one number to change to
+// make the ice tougher or more fragile (ICE_SECTION.maxContacts).
+export const MAX_ICE_CONTACTS = 15;
+
+// The states a breakable ice section goes through, in order, never back:
+// it never reforms in a match (only a new match, a rematch, builds it
+// again). Its collision is on through `intact` and `critical`, and off from
+// the very first step of `separating`.
+export const ICE_SECTION_STATES = Object.freeze({
+  intact: 'intact',         // standing, cracking further with each contact
+  critical: 'critical',     // phase A, the critical fracture: shaking, cracks racing; still solid
+  separating: 'separating', // phase B, structural separation: torn from the centre; no collision
+  collapsing: 'collapsing', // phase C, the collapse: its pieces falling into the abyss
+  destroyed: 'destroyed',   // gone for the rest of the match
+});
+
+// The damage a section shows, by how far its contacts have come (art, and
+// what a CPU can read off it), in fifths of its durability: with 15
+// contacts, 0 clean thick ice; 1–3 hairline fractures; 4–6 branching cracks
+// and frost chips; 7–9 cracks across the top and the front face; 10–12 deep
+// fractures and the inner seam opening; 13–14 critical instability (large
+// cracks, trembling, and its whole span a danger zone the CPUs can see);
+// 15 structural failure. Indexed by iceDamageLevel
+// (js/game/stage-hazards.js).
+export const ICE_DAMAGE_LEVELS = Object.freeze(['intact', 'hairline', 'branching', 'spreading', 'deep', 'unstable', 'failure']);
+
+// A breakable ice section (Jökull's two wings): it takes one contact for
+// every new footing a fighter takes on it (a landing of any kind, or
+// stepping onto it from the centre: see IceSectionController), never one
+// per step, and breaks away on its maxContacts-th. Tuned so the break is an
+// unmistakable event that still never takes footing away without warning:
+// a section shows its damage from the first contact, trembles through its
+// last fifth (`unstable`, see ICE_DAMAGE_LEVELS), and once broken shakes for criticalSeconds while still solid
+// (long enough to see and jump), then goes.
+export const ICE_SECTION = Object.freeze({
+  maxContacts: MAX_ICE_CONTACTS,
+  // The break's three phases (seconds of simulation): A, still solid; B,
+  // collision off from its first step; C, the pieces falling.
+  criticalSeconds: 0.3,
+  separationSeconds: 0.32,
+  collapseSeconds: 1.1,
+  // How long one contact's reaction plays (art: the stress highlight, the
+  // local tremor, the chips thrown up).
+  impactSeconds: 0.5,
+  // The pieces it breaks into: `columns` across by three rows (the top
+  // slab, its depth `slabDepth`, then the foundation in two), `shards`
+  // small ones thrown out as it tears.
+  columns: 3,
+  slabDepth: 70,
+  shards: 18,
+  // The falling pieces' gravity (world units / s²), a share of it while
+  // they only sag apart (phase B), how hard they are pushed out from the
+  // centre (world units / s) and spun (radians / s).
+  debrisGravity: 2400,
+  separationGravity: 0.22,
+  pushOut: Object.freeze([30, 110]),
+  spin: Object.freeze([0.25, 1.1]),
+  shardSpeed: Object.freeze([160, 420]),
+  // How far past the Void's bottom a piece falls before it is dropped.
+  cullBelow: 500,
+  // How deep the jagged line it tears along cuts into the centre's face
+  // (world units, never at its top: the walkable edge stays exactly where
+  // the collision ends).
+  tearDepth: 16,
+  // A preview's demonstration (js/ui/stage-preview.js: no fighters there
+  // to land): a contact every `contactSeconds` at a random place on the
+  // section, until it breaks; restSeconds after it has gone, the preview
+  // (never a match) builds it again and starts over.
+  demo: Object.freeze({ contactSeconds: Object.freeze([0.35, 0.8]), restSeconds: 2.6 }),
+});
+
+// ---- Jökull: the blizzard ---------------------------------------------------------
+
+// The chance that a weather check starts a blizzard, exactly: one draw per
+// eligible check (BLIZZARD.checkSeconds apart while the weather is calm),
+// never per step or per frame.
+export const BLIZZARD_CHANCE = 0.25;
+
+// The weather's states, always in this order: a successful check starts
+// the warning, which builds into the blizzard, which clears back to calm.
+// Only `calm` checks for the next one, so two blizzards can never overlap.
+export const WEATHER_STATES = Object.freeze({
+  calm: 'calm',         // ambient snow and wind; a check every checkSeconds
+  warning: 'warning',   // the storm building: wind rising, snow thickening, fog drawing in
+  blizzard: 'blizzard', // the whiteout at full strength
+  clearing: 'clearing', // the storm dying back down to calm
+});
+
+// The blizzard: Jökull's visibility hazard. It never touches play: no
+// damage, Launch Point, stun, push or pull, and it never touches the ice's
+// durability. Only what the battle canvas shows changes (the theme), the
+// HUD never. Tuned so a storm is an event, not the weather: one check in
+// four starts one, a few times a match on average.
+export const BLIZZARD = Object.freeze({
+  chance: BLIZZARD_CHANCE,
+  // The calm a match opens with, before its first check.
+  openingCalmSeconds: Object.freeze([5, 8]),
+  // Between two checks while calm (after a failed check, or a blizzard
+  // that has cleared).
+  checkSeconds: Object.freeze([12, 18]),
+  // The three stages of a storm.
+  warningSeconds: Object.freeze([1, 1.5]),
+  blizzardSeconds: Object.freeze([6, 9]),
+  clearingSeconds: Object.freeze([1, 1.5]),
+  // A preview's demonstration (js/ui/stage-preview.js): a shorter calm and
+  // a storm at every check, so the stage shows what it does. Never a match.
+  demo: Object.freeze({
+    openingCalmSeconds: Object.freeze([2.5, 3.5]),
+    checkSeconds: Object.freeze([8, 11]),
+    chance: 1,
+  }),
+});
+
 // Behaviours by key (a map hazard's `behavior`).
 export const STAGE_HAZARD_BEHAVIORS = Object.freeze({
   volcano: VOLCANO,
+  'ice-section': ICE_SECTION,
+  blizzard: BLIZZARD,
 });

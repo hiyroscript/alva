@@ -683,13 +683,13 @@ no header, build label, eyebrow or keyboard hint bar.
   camera pan) beside the **stage roster**: 24 slots
   (`CONFIG.stageRoster.totalSlots`), six by four on a large display. The
   playable stages (`MAPS`, in order) fill the first slots, **01 Yerma, 02
-  Sol-Noir, 03 Asperitas, 04 Adamaris**, and the other 20 are reserved, unavailable
+  Sol-Noir, 03 Asperitas, 04 Adamaris, 05 Jökull**, and the other 19 are reserved, unavailable
   placeholders: a subdued tile with its number and a lock, not a button,
   never focused, selected or started, and no stage is made up for one.
   The slots come from the real registry (`stageSlots`), so a new stage
   takes the next slot with no layout change; the roster grows past 24 only
   once the stages outnumber it. Practice Ground is never a slot.
-- A counter beside the roster's title: *4 available / 24 slots*, counted
+- A counter beside the roster's title: *5 available / 24 slots*, counted
   from the registry.
 - Stage tiles show a still thumbnail (no hazard running in it), the stage's
   number and name, the standard neutral focus ring, hover feedback, and a
@@ -707,7 +707,9 @@ no header, build label, eyebrow or keyboard hint bar.
 - The preview has no fighters and no text overlay; it carries an accessible
   stage label instead. An animated preview of a stage with hazards runs
   them in a world of its own (Asperitas's clouds drift, rest, vanish and
-  form again elsewhere); with reduced motion they hold still.
+  form again elsewhere; Adamaris's volcano erupts; Jökull's wings crack and
+  break away on a demonstration timer of their own, forming again only
+  there, and a blizzard blows); with reduced motion they hold still.
 - "Confirm and start battle" primary action (same label for every
   stage). No bottom control hints.
 - Responsive: fewer columns on narrower windows, small tiles and a
@@ -1469,16 +1471,23 @@ French, concise game terms).
   side of the Void, so there is no ledge, slab, cliff or wall anywhere a
   fighter can be; the main stage is then the combat area that the camera,
   the Void and overtime's closing Void are set round as on every stage, and
-  only the side Void (the usual kill boundary) ends a run along it. No
-  engine code names a stage: every stage with a finite floor keeps exactly
-  its old collision.
+  only the side Void (the usual kill boundary) ends a run along it. A
+  finite floor may instead be divided into **sections**
+  (`ground: { type: 'finite', sections }`; Jökull's glacier): contiguous
+  solids side by side tiling the main stage exactly at one height, crossed
+  with no wall or step (a body's footing is the section under its centre),
+  a `breakable` one switched off for good by the stage hazard that names
+  it (gone from every collision query at once), the one under the main
+  stage's centre never breakable. No engine code names a stage: every
+  stage with an undivided finite floor keeps exactly its old collision.
 - Main stages are 1280–1440 units wide (Yerma 1360, Sol-Noir 1440,
-  Asperitas 1400, Adamaris 1400, Practice Ground 1280). The Void is a blast zone set by margins
+  Asperitas 1400, Adamaris 1400, Jökull 1400, Practice Ground 1280). The Void is a blast zone set by margins
   around the main stage (`voidAround` in `js/data/maps.js`, data per
   stage): Yerma 360 past each ledge, 400 below the stage's top and 760
   above it; Sol-Noir 340, 420 and 800 (over its highest deck); Asperitas 360,
   400 and 840 (over the highest its clouds can rise); Adamaris 360, 400 and
-  800; Practice Ground 380
+  800; Jökull 360, 420 and 800 (round its whole starting footprint, wings
+  included); Practice Ground 380
   (its block is the narrowest), 400 and 760. There is room to be knocked off, fight briefly
   and drift back, but a fighter carried on outward is lost soon after; no
   jump (both air jumps of the triple jump included) from any stage's highest footing reaches the upper line. Camera
@@ -1565,6 +1574,55 @@ French, concise game terms).
   the warnings showing (never a landing before its warning) and may step
   out of one after their reaction time, more reliably the higher their
   level, never every time; rocks strike CPUs and players alike.
+- **Jökull:** an immense glacier over an endless frozen abyss on a polar
+  day. Its main stage (x 1100–2500, top 900, 330 deep) is one block of
+  snow-capped ice in three sections that look and play as one: the **west
+  wing** (260, 19 %), the **centre** (880, 63 %, permanent: never cracked,
+  never gone, both spawns) and the **east wing** (260, 19 %), finite (never
+  continuous: past a broken wing there is only open air). Art: a pale
+  polar sky, a low sun through icy cloud with its halo, snow-covered
+  ranges, a frozen plain with ice shelves, seracs and frosted rock rising
+  from the abyss, cold haze below; the glacier's wind-sculpted snowy top
+  with blue ice showing through, its layered blue-white to navy face
+  (strata, light shafts, bubbles, ancient fractures) and toothed underside;
+  snow in three depths on an ambient wind with gusts and blowing powder.
+  Traits: Frozen glacier, Three connected ice sections, Collapsing ice and
+  blizzards, no obstacles, Polar daylight.
+- **Breaking ice** (Jökull's two wings, each a stage hazard: `ice-section`,
+  `IceSectionController` in `js/game/stage-hazards.js`, `ICE_SECTION` in
+  `js/data/stage-hazards.js`, each with its own counter, cracks, timing and
+  stream). One **contact** per new footing a fighter takes on a wing (any
+  landing: jump, higher jump, air jump, air dash, a fall, after a launch,
+  in a blizzard; or its centre crossing the seam from the centre), never
+  per step: standing, walking, fighting or jittering on it add nothing; a
+  wall, the underside or a rebound never counts; both fighters count, on
+  the same step too; never past the maximum; only in the fight.
+  **`MAX_ICE_CONTACTS` = 15.** Damage shows cumulatively in fifths
+  (hairline, branching, spreading across top and face, deep with the seam
+  opening, critically unstable with a tremble), each contact flashing,
+  chipping and cracking the ice further from a persistent seeded network.
+  The 15th starts the break: **critical** 0.3 s (shaking, glowing cracks,
+  still solid), **separating** 0.32 s (torn along a jagged line, its
+  collision off from the first step: anyone on it falls unless the centre
+  they overlap holds them), **collapsing** 1.1 s (nine pieces and shards
+  falling and turning into the abyss, then dropped), then **destroyed**
+  for the match (respawns keep it so; a rematch rebuilds it). A small shake
+  goes with the fracture and the separation (none with reduced motion).
+  The centre's exposed edge shows torn. CPUs read the wings live (a wing
+  breaking or gone is never footing they count on; one critically unstable
+  is a danger zone they may step off, by their level).
+- **Blizzard** (Jökull's weather, a stage hazard: `blizzard`,
+  `BlizzardController`, `BLIZZARD`). Calm; a weather check after a 5–8 s
+  opening calm and then every 12–18 s while calm, each one draw with
+  exactly **`BLIZZARD_CHANCE` = 0.25** (never per step or frame). A storm
+  runs **warning** (1–1.5 s), **blizzard** (6–9 s) and **clearing**
+  (1–1.5 s) back to calm; storms never overlap and never alternate by
+  rule. On its own seeded stream, fixed-step, held outside the fight. It
+  is a visibility hazard only: rising wind, driving snow, fog, the
+  distance fading and a whiteout over the battle canvas (never the HUD)
+  through which the glacier, the fighters and a breaking wing's cracks
+  still show; no damage, Launch Point, stun or force, and no effect on the
+  ice. The CPUs never know the next check.
 - **Platform hazards** (any stage; Asperitas's two clouds today): a
   platform with a `dynamic` block is moved and switched off and on by its
   own state machine (`js/game/platform-hazards.js`, tuning in
