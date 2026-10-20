@@ -36,12 +36,8 @@ async function devicePlayer(device) {
     else if (device === 'touch') rig.input.setTouch(control, on);
     else if (control === 'runRight' || control === 'runLeft') rig.stick(on ? (control === 'runRight' ? 1 : -1) : 0, 0);
     else if (control === 'attack1') rig.press('west', on);
-    else {
-      // Maximum Blue: R2 + Circle, the modifier first.
-      if (on) rig.press('r2', true);
-      rig.press('east', on);
-      if (!on) rig.press('r2', false);
-    }
+    // Maximum Blue: Circle / B.
+    else rig.press('east', on);
   };
   const step = () => {
     rig.poll();

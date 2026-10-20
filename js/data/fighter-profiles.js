@@ -75,7 +75,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0001': Object.freeze({
     difficulty: 5,
     descriptionKey: 'discover.fighter.0001.playStyle',
-    reviewedSourceHash: 'b09eb30c074ddcacbf26432698a1d01d0c8e7cc563a097416c5d8b7f4b39076b',
+    reviewedSourceHash: 'f8ebc43487bd3c34f2132a60ff731c399209a2e9fc9d0e0e0335c6345090d3b2',
   }),
   // A momentum rushdown and aerial chaser: a readable core game plan, with
   // mastery in momentum, air uses and free fall, approach angles, trap
@@ -83,7 +83,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0002': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0002.playStyle',
-    reviewedSourceHash: '2461c03ba598d2e6b883ca7d36ad0ce25f6edde5e70a6c2474e0cad83dbcd911',
+    reviewedSourceHash: '5614c5ee60cd40d9c97059da45aa36fd1447170cc58f75cc7a59ae75453c919c',
   }),
   // A ground-shattering bruiser and self-healer: a readable core of heavy,
   // telegraphed blows, with mastery in reading who is standing on the
@@ -92,7 +92,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0003': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0003.playStyle',
-    reviewedSourceHash: 'b205cf6580bb3f59027b963ff77d809e76231685cf9af8a4771af49f2a3c75cf',
+    reviewedSourceHash: 'b43d4b3d09dfc84341ba1367b1ed92c61220b319cd87717d96dcb67d3d25a812',
   }),
   // A space controller and setup fighter: notes that turn projectiles back,
   // a stationary double to place, a long, breakable song whose charm window
@@ -103,7 +103,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0004': Object.freeze({
     difficulty: 4,
     descriptionKey: 'discover.fighter.0004.playStyle',
-    reviewedSourceHash: 'f99af03291950a522aad76b59b63876da23938e7fd9258c3c1d3d60bc6bf71e9',
+    reviewedSourceHash: 'e188217ecd576a695fdba4b577c365bcb331267d624a80d2c9e1807508196fd0',
   }),
   // A predator of reach, setups and attrition: the longest pokes in the
   // roster that are slow to pull back, a pull that reels opponents in from
@@ -116,7 +116,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0005': Object.freeze({
     difficulty: 4,
     descriptionKey: 'discover.fighter.0005.playStyle',
-    reviewedSourceHash: '085e9abf20e891f9f56a49e1de4f15463c5078c86be6da4c0a015e5f2ffb86dd',
+    reviewedSourceHash: '3c07b1fba32022f8fab2d34c5bb4fb7f429f86b1d2b1464d76395d85e45a6637',
   }),
 });
 

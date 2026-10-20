@@ -33,7 +33,7 @@
 // move only the universal 0.5 s repeat delay (Red's push and Blue's pull
 // earn nothing), and the Deflect none. They never alter animation phases.
 
-import { frames, pad } from './helpers.js';
+import { frames, pad, flick, legacyPad } from './helpers.js';
 
 // Height in art pixels of #0001's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -407,30 +407,59 @@ export const CHARACTER_0001 = {
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
-  // its own moves' buttons, chosen for each move rather than its attack
-  // number. The universal actions keep everyone's buttons (the stick, Jump
-  // on Cross / A, Dash on L1 / LB, Circle / B for the Shield and the
-  // Deflect, Options / Menu to pause). Its two basic strikes are single
-  // face buttons: the Jab on Square / X, the High Kick on Triangle / Y. Its
-  // projectiles and its finisher sit behind R2 / RT, the offensive
-  // modifier, on the face button that matches: Red with Square, Maximum
-  // Blue with Circle (never the Shield), Hollow Purple with Triangle;
-  // Unlimited Void behind L2 / LT with Triangle. In the air the punch and
-  // kick stay where they were (the Floating Straight on Square, the Red
-  // Kick on Triangle), Blue takes R1 / RB and the High Kick L2 / LT +
-  // Square.
+  // every move on one input of its own, no combination anywhere, chosen
+  // for what each move does rather than its attack number. The universal
+  // actions keep everyone's inputs (the left stick, Jump on Cross / A, Dash
+  // on R1 / RB, L1 / LB for the Shield and the Deflect, Options / Menu to
+  // pause).
+  //
+  //   Square / X     the Jab, its quickest strike; in the air the Floating
+  //                  Straight, the same punch thrown standing on the air
+  //   Triangle / Y   the High Kick, on the ground and in the air: the Jab's
+  //                  follow-up, a thumb's roll from Square, quick enough to
+  //                  string the launcher on a hit (the right stick would be
+  //                  too slow for it, however upward the kick)
+  //   Circle / B     Blue, on the ground and in the air: Maximum Blue, the
+  //                  slow orb that drags in, and the aerial palm that yanks
+  //                  in: one button, one attraction
+  //   R2 / RT        Red: pull the trigger to fire the quick repelling orb;
+  //                  in the air the Red Kick, the lock-on kick that blasts
+  //                  its target away: #0001 fired at it
+  //   L2 / LT        Unlimited Void, its first Special: a cast that closes
+  //                  round it, no direction to it, on a trigger a beginner
+  //                  never squeezes by accident
+  //   right stick    Hollow Purple: a long chant, then both hands thrust
+  //   forward        forward and the vast sphere crosses the stage the way
+  //                  #0001 faces. The stick pushed the way it flies; its
+  //                  0.8 s chant makes the thumb's reach nothing, and a
+  //                  deliberate push never starts that cast by mistake
   controller: {
     layout: {
       'ground:attack1': pad('west'),
       'ground:extra_attack': pad('north'),
-      'ground:attack2': pad('west', { modifier: 'r2' }),
-      'ground:attack3': pad('east', { modifier: 'r2' }),
-      'ground:attack4': pad('north', { modifier: 'l2' }),
-      'ground:attack5': pad('north', { modifier: 'r2' }),
+      'ground:attack3': pad('east'),
+      'ground:attack2': pad('r2'),
+      'ground:attack4': pad('l2'),
+      'ground:attack5': flick('forward'),
       'air:attack1': pad('west'),
-      'air:attack2': pad('north'),
-      'air:attack3': pad('r1'),
-      'air:extra_attack': pad('west', { modifier: 'l2' }),
+      'air:extra_attack': pad('north'),
+      'air:attack3': pad('east'),
+      'air:attack2': pad('r2'),
+    },
+    // The layout it recommended until the right stick and the bumpers were
+    // redesigned (settings version 5), only to tell which bindings of a
+    // profile saved then were the player's own.
+    previous: {
+      'ground:attack1': legacyPad('west'),
+      'ground:extra_attack': legacyPad('north'),
+      'ground:attack2': legacyPad('west', { modifier: 'r2' }),
+      'ground:attack3': legacyPad('east', { modifier: 'r2' }),
+      'ground:attack4': legacyPad('north', { modifier: 'l2' }),
+      'ground:attack5': legacyPad('north', { modifier: 'r2' }),
+      'air:attack1': legacyPad('west'),
+      'air:attack2': legacyPad('north'),
+      'air:attack3': legacyPad('r1'),
+      'air:extra_attack': legacyPad('west', { modifier: 'l2' }),
     },
   },
 

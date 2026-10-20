@@ -45,7 +45,7 @@
 // spider, the giant face), its detached head and the rising bite are no
 // move.
 
-import { framePath, pad } from './helpers.js';
+import { framePath, pad, flick, legacyPad } from './helpers.js';
 
 // Height in art pixels of #0005's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -385,27 +385,50 @@ export const CHARACTER_0005 = {
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
-  // its own moves' buttons, chosen for each move rather than its attack
-  // number. The universal actions keep everyone's buttons (the stick, Jump
-  // on Cross / A, Dash on L1 / LB, Circle / B for the Shield and the
-  // Deflect, Options / Menu to pause). Its claws are on Square / X and its
-  // jaws on Triangle / Y, the same on the ground and in the air; the ghostly
-  // hands, its barrage, have a shoulder of their own, R1 / RB, the same
-  // everywhere. Dark Tendrils come out of its maw, so they sit with the
-  // jaws behind the offensive trigger: R2 / RT + Triangle. Its two Specials,
-  // rare and never to be pressed by mistake, are behind L2 / LT: the
-  // Deadlights with Square, the Red Balloon with Triangle.
+  // every move on one input of its own, no combination anywhere, chosen
+  // for what each move does rather than its attack number. The universal
+  // actions keep everyone's inputs (the left stick, Jump on Cross / A, Dash
+  // on R1 / RB, L1 / LB for the Shield and the Deflect, Options / Menu to
+  // pause).
+  //
+  //   Square / X     its claws: the Claw Swipe, and in the air the Claw
+  //                  Rake, its basic aerial
+  //   Triangle / Y   its jaws: the Long Bite, and in the air Snapping Jaws
+  //   Circle / B     its ghostly hands: Phantom Hands, and in the air
+  //                  Floating Hands. Claws, jaws, hands: the same three
+  //                  buttons on the ground and in the air
+  //   R2 / RT        Dark Tendrils: pull the trigger to lash them out across
+  //                  the stage and reel the prey in
+  //   L2 / LT        the Deadlights, its first Special: the lights in its
+  //                  maw, on a trigger never squeezed by accident
+  //   right stick    the Red Balloon, its other Special: the bunch of red
+  //   up             balloons that rises behind the opponent, far from
+  //                  #0005 itself: the stick pushed the way the balloons go
   controller: {
     layout: {
       'ground:attack1': pad('west'),
       'ground:attack2': pad('north'),
-      'ground:attack3': pad('r1'),
-      'ground:attack4': pad('west', { modifier: 'l2' }),
-      'ground:attack5': pad('north', { modifier: 'l2' }),
-      'ground:extra_attack': pad('north', { modifier: 'r2' }),
+      'ground:attack3': pad('east'),
+      'ground:extra_attack': pad('r2'),
+      'ground:attack4': pad('l2'),
+      'ground:attack5': flick('up'),
       'air:attack1': pad('west'),
       'air:attack2': pad('north'),
-      'air:attack3': pad('r1'),
+      'air:attack3': pad('east'),
+    },
+    // The layout it recommended until the right stick and the bumpers were
+    // redesigned (settings version 5), only to tell which bindings of a
+    // profile saved then were the player's own.
+    previous: {
+      'ground:attack1': legacyPad('west'),
+      'ground:attack2': legacyPad('north'),
+      'ground:attack3': legacyPad('r1'),
+      'ground:attack4': legacyPad('west', { modifier: 'l2' }),
+      'ground:attack5': legacyPad('north', { modifier: 'l2' }),
+      'ground:extra_attack': legacyPad('north', { modifier: 'r2' }),
+      'air:attack1': legacyPad('west'),
+      'air:attack2': legacyPad('north'),
+      'air:attack3': legacyPad('r1'),
     },
   },
 

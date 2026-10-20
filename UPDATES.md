@@ -2504,3 +2504,129 @@ headless Chromium too: Practice Ground in both touch layouts at 844×390
 (a single tap one Jab, a double tap the Jab then Red, every button one
 press whatever the hold, the queued and cooling buttons drawn), and an
 assistive activation still pressing.
+
+## Controller customization and beginner-first layouts
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: complete controller customization (the right stick configurable on
+its own, every button the browser exposes) and a fresh, beginner-first
+redesign of the universal and every fighter's recommended controller
+layout, without changing any move, mechanic, timing, cooldown, the
+keyboard, touch or the CPU.
+
+**What it changed.**
+
+- **Bindings name their stick.** A binding is now `{ button, modifier,
+  stick, direction, activation }`: a direction is read on the stick it
+  names (left stick, right stick, D-pad, or left stick or D-pad), never on
+  whatever moves the fighter, so the two sticks are configured apart and
+  the stick that does not move is free for actions. A stick pushed on its
+  own can be the input itself (a *stick input*), on any action but Pause and
+  Movement, with or without a button held first; directions gained
+  `forward` and `back`, read against the fighter's facing. The left
+  stick or D-pad source now reads each axis apart (its up never stops
+  a run on the stick).
+- **The resolver reads each stick apart** (`js/core/controller-resolver.js`):
+  a push past half its travel is one press, in the one direction it went
+  out, held until the stick comes back under `STICK_RELEASE` (0.35): never
+  repeated while held, never pressed again by a wobble, drift near the
+  middle never a press, both sticks at once each their own. A held stick
+  input (the Fast fall) is held while its axis is past the run threshold,
+  as before. A stick held through a menu, a fighter change or a new
+  controller is stale until let go, as a button is. A stick input bound to
+  the Dash Dashes the way it was pushed. Modifier first, one owner per
+  press and ground / air context apply to stick inputs too.
+- **Conflicts by physical input** (`profileConflicts`): errors for the same
+  input with the same modifier where both apply and neither is the more
+  specific (now across sticks: the same side of the same stick, a D-pad
+  button beside a stick input on that side, directions on two sticks that
+  can both hold) and for the left or right of what moves the fighter (its
+  up and down are free now); warnings for a modifier that is another
+  action's button and, new, a direction held with a button that is another
+  action's stick input on that stick. A registered fighter's layout must be
+  free of warnings too.
+- **Universal recommended controls**, redesigned together: the left stick
+  moves (down in the air fast-falls), Cross / A jumps, **R1 / RB Dashes**
+  (was L1 / LB: the right index finger, so the left thumb aims and the
+  right thumb never leaves Jump and the attacks), **L1 / LB is the Shield
+  held and the Deflect pressed** (was Circle / B: guarding no longer holds
+  the right thumb off every attack, and a bumper makes the Deflect crisp),
+  Options / Menu pauses. Three face buttons, both triggers and the right
+  stick are left to every fighter.
+- **Every fighter's layout, redesigned move by move**, one input a move,
+  no combination and no direction held with a button: Square / X the quick
+  strike on the ground and in the air, Triangle / Y and Circle / B the
+  other everyday strikes (strings roll left to right), R2 / RT the ranged
+  move, L2 / LT the Special, the right stick up for a move that rises, down
+  for one that drives down or plunges, forward for one sent the way the
+  fighter faces. #0001: Jab □, High Kick △, Maximum Blue ○, Red R2,
+  Unlimited Void L2, Hollow Purple right stick forward; air Floating
+  Straight □, High Kick △, Blue ○, Red Kick R2. #0002: One-Two □, Rapid
+  Kicks △, Spin Attack ○, Whirlwind R2; air Homing Attack □, Blue Tornado
+  right stick up, Bounce Attack right stick down. #0003: Chakra Punch □,
+  Heel Drop △, Chakra Haymaker ○, Cherry Blossom Impact right stick down,
+  Mystical Palm Technique L2; air Leaping Kick □, Heavenly Foot of Pain
+  right stick down. #0004: Dance Combo □, Leek Swing △, Crescent Kick ○,
+  Melody R2, World is Mine L2, Ievan Polkka right stick forward; air Air
+  Dance □, Leekspin right stick up, Stage Dive right stick down. #0005:
+  Claw Swipe □, Long Bite △, Phantom Hands ○, Dark Tendrils R2, Deadlights
+  L2, Red Balloon right stick up; air Claw Rake □, Snapping Jaws △,
+  Floating Hands ○. Each definition explains its choices; each fighter's
+  specification has the table and the reason for every move. The fallback
+  for a fighter with no layout is single inputs only (free face buttons,
+  triggers, the right stick, then the D-pad and stick clicks).
+- **Saved layouts upgraded** (settings version 6): a profile saved under
+  version 4 or 5 has each binding converted (its direction on the stick or
+  pad that moved the fighter then, so it plays as it did); the player's own
+  choices (the bindings that differ from what that fighter recommended
+  then: `LEGACY_UNIVERSAL_DEFAULTS` and each definition's
+  `controller.previous`) are kept and today's layout fills in the rest
+  where that conflicts with nothing, else the whole old layout is kept; a
+  profile with nothing of the player's own is dropped, so an uncustomized
+  fighter plays with today's layout.
+- **Presentation.** The binding dialog captures either stick (a direction
+  as a button goes down, or a stick pushed and let go on its own, a button
+  held through it as its modifier; drift ignored) and has Stick and
+  Direction fields (Button gains None, stick only, for every action that
+  allows it); the diagram lights the left or right stick on its own with
+  its arrow, a stick input lit as the input, the D-pad's sides by their
+  buttons; every phrase names its stick ("Right stick forward", "L2 +
+  Right stick up"); the ability HUD's chips show the stick's mark with the
+  arrow (R↑, L↓ + □), forward drawn as the side the fighter faces (R→
+  turning to R←). New strings in English and French.
+
+**Where to tune it.** The universal defaults (`UNIVERSAL_DEFAULTS`), the
+fallback inputs, the direction vocabulary and the conflict rules in
+`js/data/controller-profiles.js`; each fighter's layout in its definition
+(`controller.layout`; `controller.previous` is history, never tuned); the
+stick thresholds (`DIRECTION_DEADZONE`, `STICK_RELEASE`, `RUN_THRESHOLD`,
+`DASH_AIM_THRESHOLD`) in `js/core/controller-resolver.js`; the stick marks
+and arrows in `js/ui/controller-glyphs.js`.
+
+**Code:** `js/data/controller-profiles.js`, `js/core/controller-resolver.js`,
+`js/core/settings.js` (version 6, the upgrade), `js/data/characters/helpers.js`
+(`pad`, `flick`, `legacyPad`), each `js/data/characters/<id>.js`
+(`controller`), `js/ui/controller-editor.js`, `js/ui/controller-glyphs.js`,
+`js/ui/ability-hud.js`, `css/controller.css`, `css/ability-hud.css`, the
+string tables, `js/data/fighter-profiles.js` (the review hashes: the
+definitions changed, their difficulty and play-style did not).
+
+**Tests:** `controller-profiles` (the new vocabulary, defaults, every
+layout's one-input rule and shared language, bindings on every button and
+either stick, physical inputs, conflicts across sticks, the upgrade of
+saved profiles), `controller-input` (R1 / L1, a Dash into an attack, the
+guard dropped into a strike, every fighter's whole layout and shared
+universal layout played on the pad, the right stick's presses at their
+thresholds, both sticks at once, stick combinations, holds and held stick
+inputs, staleness, every universal action remapped), `controller-ui`
+(capture on either stick, the text fields, the diagram), `ability-hud`
+(stick chips, the facing arrow), `settings` (version 6 and the version 5
+upgrade), and the old assertions in `defense`, `down`, `explicit-mouvement`,
+`loadout`, `request-devices`, `special-abilities`, `i18n` and the fighter
+tests updated to the new layouts. Checked in headless Chromium too, with an
+injected standard-mapping DualSense and Xbox pad: the editor and its
+diagram, a right-stick capture, and in Practice Ground R1 Dashing, L1
+guarding, #0002's Spin Attack on Circle and its right-stick Blue Tornado
+and Bounce Attack, #0001's Hollow Purple only when pushed forward, and the
+HUD's arrow turning with the fighter. Not yet checked on physical
+controllers.

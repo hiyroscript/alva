@@ -125,7 +125,7 @@ test('InputManager samples a held down from S, ↓ and the controller\'s left st
   poll();
 
   // Every other universal binding is its own action and holds no Down.
-  for (const [button, action] of [['south', 'jump'], ['east', 'shield']]) {
+  for (const [button, action] of [['south', 'jump'], ['l1', 'shield']]) {
     press(button);
     f = input.sample();
     assert.equal(f[action], true, button);

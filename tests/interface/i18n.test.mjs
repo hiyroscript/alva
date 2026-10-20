@@ -200,6 +200,7 @@ test('French is really French: only proper names, codes and shared words read th
   assert.deepEqual(same, [
     'ability.0004.attack4', // Ievan Polkka, a song's title
     'ability.0004.attack5', // World is Mine, a song's title
+    'binding.direction', // Direction, the same word
     'brand.title', // ALVA
     'control.pause', // Pause
     'difficulty.brutal.name', // Brutal

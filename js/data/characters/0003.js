@@ -38,7 +38,7 @@
 // none. These timers never alter their animation phases. The sheet's
 // sealed-strength poses are no move.
 
-import { frames, pad } from './helpers.js';
+import { frames, pad, flick, legacyPad } from './helpers.js';
 
 // Height in art pixels of #0003's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -322,25 +322,49 @@ export const CHARACTER_0003 = {
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
-  // its own moves' buttons, chosen for each move rather than its attack
-  // number. The universal actions keep everyone's buttons (the stick, Jump
-  // on Cross / A, Dash on L1 / LB, Circle / B for the Shield and the
-  // Deflect, Options / Menu to pause). Its two strikes are single face
-  // buttons, the same on the ground and in the air: the Chakra Punch /
-  // Leaping Kick on Square / X, the heel drops (the Heel Drop on the ground, the
-  // Heavenly Foot of Pain in the air) on Triangle / Y. Its heavy blows sit
-  // behind R2 / RT, the offensive modifier: Cherry Blossom Impact with
-  // Square, the Chakra Haymaker with Triangle. The Mystical Palm Technique,
-  // rare and never to be pressed by mistake, is L2 / LT + Triangle.
+  // every move on one input of its own, no combination anywhere, chosen
+  // for what each move does rather than its attack number. The universal
+  // actions keep everyone's inputs (the left stick, Jump on Cross / A, Dash
+  // on R1 / RB, L1 / LB for the Shield and the Deflect, Options / Menu to
+  // pause).
+  //
+  //   Square / X     the Chakra Punch; in the air the Leaping Kick, its
+  //                  basic aerial (it rises a little as it kicks: its
+  //                  anti-air, on the button every fighter attacks with in
+  //                  the air)
+  //   Triangle / Y   the Heel Drop
+  //   Circle / B     the Chakra Haymaker: its string reads left to right
+  //                  across the face buttons, Punch, Heel Drop, Haymaker,
+  //                  light to heavy, one thumb rolling over
+  //   right stick    Cherry Blossom Impact: the fist driven down into the
+  //   down           ground; in the air the Heavenly Foot of Pain, the heel
+  //                  driven down into it. Both split the ground: the stick
+  //                  pushed the way the blow goes, and a plunge that can
+  //                  carry #0003 into the Void is never one press of the
+  //                  attack button away
+  //   L2 / LT        the Mystical Palm Technique, its Special: a long
+  //                  kneeling heal, on a trigger never squeezed by accident
   controller: {
     layout: {
       'ground:attack1': pad('west'),
       'ground:attack2': pad('north'),
-      'ground:attack3': pad('west', { modifier: 'r2' }),
-      'ground:attack4': pad('north', { modifier: 'l2' }),
-      'ground:extra_attack': pad('north', { modifier: 'r2' }),
+      'ground:extra_attack': pad('east'),
+      'ground:attack3': flick('down'),
+      'ground:attack4': pad('l2'),
       'air:attack1': pad('west'),
-      'air:attack2': pad('north'),
+      'air:attack2': flick('down'),
+    },
+    // The layout it recommended until the right stick and the bumpers were
+    // redesigned (settings version 5), only to tell which bindings of a
+    // profile saved then were the player's own.
+    previous: {
+      'ground:attack1': legacyPad('west'),
+      'ground:attack2': legacyPad('north'),
+      'ground:attack3': legacyPad('west', { modifier: 'r2' }),
+      'ground:attack4': legacyPad('north', { modifier: 'l2' }),
+      'ground:extra_attack': legacyPad('north', { modifier: 'r2' }),
+      'air:attack1': legacyPad('west'),
+      'air:attack2': legacyPad('north'),
     },
   },
 

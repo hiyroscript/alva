@@ -23,7 +23,7 @@ import { CHARACTERS, getCharacter, playableCharacters } from '../../../js/data/c
 import { abilityName } from '../../../js/data/abilities.js';
 import { describeLoadout, loadoutProblems } from '../../../js/data/loadout.js';
 import { isSpecialAbility } from '../../../js/data/special-abilities.js';
-import { pad } from '../../../js/data/characters/helpers.js';
+import { pad, flick } from '../../../js/data/characters/helpers.js';
 import { createAttackDefinition } from '../../../js/game/combat/attacks.js';
 import { activeSpecialAbility } from '../../../js/game/combat/move-status.js';
 import { CombatSystem } from '../../../js/game/combat/combat.js';
@@ -186,17 +186,17 @@ test('its in-game names and touch buttons name each move, in English and French,
   }
 });
 
-test('its recommended controller layout: dance on Square, the leek on Triangle, the kicks by direction, the note on R1, the techniques behind the triggers', () => {
+test('its recommended controller layout: one input a move, the dance, the leek and the kick on the face, the note on R2, the song on L2, the double forward and the rise and dive on the right stick', () => {
   assert.deepEqual(DEF.controller.layout, {
     'ground:attack1': pad('west'),
     'ground:attack2': pad('north'),
-    'ground:attack3': pad('west', { direction: 'up' }),
-    'ground:attack4': pad('north', { modifier: 'r2' }),
-    'ground:attack5': pad('north', { modifier: 'l2' }),
-    'ground:extra_attack': pad('r1'),
+    'ground:attack3': pad('east'),
+    'ground:extra_attack': pad('r2'),
+    'ground:attack5': pad('l2'),
+    'ground:attack4': flick('forward'),
     'air:attack1': pad('west'),
-    'air:attack2': pad('north'),
-    'air:attack3': pad('west', { direction: 'down' }),
+    'air:attack2': flick('up'),
+    'air:attack3': flick('down'),
   });
 });
 

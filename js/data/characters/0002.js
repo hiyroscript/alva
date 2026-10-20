@@ -16,7 +16,7 @@
 // projectiles back, and it has an air dash of its own (its
 // midair_mouvment), flat out across the air.
 
-import { frames, pad } from './helpers.js';
+import { frames, pad, flick, legacyPad } from './helpers.js';
 
 // Height in art pixels of #0002's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -384,25 +384,47 @@ export const CHARACTER_0002 = {
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js),
-  // built for speed: nothing it moves with needs an awkward combination.
-  // The universal actions keep everyone's buttons (the stick, Jump on
-  // Cross / A, Dash on L1 / LB, Circle / B for the Shield and the Deflect,
-  // Options / Menu to pause). On the ground the One-Two is Square / X and
-  // the Rapid Kicks Triangle / Y; the Spin Attack takes R1 / RB, easy to hit
-  // on the run, and the Whirlwind R2 / RT + Triangle. In the air Square / X
-  // is its Homing Attack whichever way the stick points (the stick's side,
-  // or its facing), except Down + Square, its Bounce Attack, plunging; and
-  // R1 / RB is the Blue Tornado, the Spin Attack's place in the air (one
-  // button, two spins, never both).
+  // built for speed: every move one input, nothing it moves with asks for a
+  // combination or takes the left thumb off steering. The universal actions
+  // keep everyone's inputs (the left stick, Jump on Cross / A, Dash on R1 /
+  // RB, L1 / LB for the Shield and the Deflect, Options / Menu to pause).
+  //
+  //   Square / X     the One-Two; in the air the Homing Attack, its basic
+  //                  aerial, which finds the opponent by itself (or dashes
+  //                  the way the stick points): press it and it goes
+  //   Triangle / Y   the Rapid Kicks, its flurry, a thumb's roll after the
+  //                  One-Two
+  //   Circle / B     the Spin Attack: pressed on the run, the left thumb
+  //                  still holding the way it rolls
+  //   R2 / RT        the Whirlwind: pull the trigger to send the tornado
+  //   right stick    the Blue Tornado, spinning upward: the stick pushed the
+  //   up (air)       way it rises, its way back to the stage. Never a face
+  //                  button: it spends the airtime, so it is never pressed
+  //                  by mistake off a ledge
+  //   right stick    the Bounce Attack, plunging straight down: the stick
+  //   down (air)     pushed the way it dives, while the left thumb keeps the
+  //                  drift and the Fast fall to itself
   controller: {
     layout: {
       'ground:attack1': pad('west'),
       'ground:attack2': pad('north'),
-      'ground:attack3': pad('r1'),
-      'ground:extra_attack': pad('north', { modifier: 'r2' }),
+      'ground:attack3': pad('east'),
+      'ground:extra_attack': pad('r2'),
       'air:attack1': pad('west'),
-      'air:attack2': pad('west', { direction: 'down' }),
-      'air:attack3': pad('r1'),
+      'air:attack3': flick('up'),
+      'air:attack2': flick('down'),
+    },
+    // The layout it recommended until the right stick and the bumpers were
+    // redesigned (settings version 5), only to tell which bindings of a
+    // profile saved then were the player's own.
+    previous: {
+      'ground:attack1': legacyPad('west'),
+      'ground:attack2': legacyPad('north'),
+      'ground:attack3': legacyPad('r1'),
+      'ground:extra_attack': legacyPad('north', { modifier: 'r2' }),
+      'air:attack1': legacyPad('west'),
+      'air:attack2': legacyPad('west', { direction: 'down' }),
+      'air:attack3': legacyPad('r1'),
     },
   },
 

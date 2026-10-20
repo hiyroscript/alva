@@ -148,30 +148,31 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 | Action | Keyboard | Controller (PlayStation / Xbox) |
 | --- | --- | --- |
 | Move | A D or ← → | Left stick |
-| Dash (in the air: air dash) | Q / E (left / right) | L1 / LB (the way the stick points, else the way you face) |
+| Dash (in the air: air dash) | Q / E (left / right) | R1 / RB (the way the left stick points, else the way you face) |
 | Jump (hold a little longer: higher; again in the air: air jump) | W, Space or ↑ | Cross / A |
 | Down (fast fall; steer a launch down) | S or ↓ | Left stick down |
 | Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | each fighter's own layout (below) |
 | Extra attack | J | each fighter's own layout |
-| Shield (hold, on the ground) / Deflect (press, in the air) | L | Circle / B |
+| Shield (hold, on the ground) / Deflect (press, in the air) | L | L1 / LB |
 | Pause | Esc or P | Options / Menu |
 
 What each attack button does is the fighter's own; a fighter with fewer
-than five numbered attacks leaves the rest unused. On a controller each
-fighter has a layout designed for its moves (Square / X its basic punch
-for every fighter; #0001's projectiles and Hollow Purple behind R2 / RT and
-Unlimited Void behind L2 / LT; #0002's Spin Attack and Blue Tornado sharing
-R1 / RB on the ground and in the air, its Homing and Bounce Attacks picked
-by the stick; #0003's heel drops on Triangle / Y, Cherry Blossom Impact and
-its Chakra Haymaker behind R2 / RT and its heal behind L2 / LT; #0004's dance
-steps on Square / X, its leek on Triangle / Y, the Crescent Kick and Stage
-Dive picked by the stick, the Melody on R1 / RB and its techniques behind
-R2 / RT and L2 / LT; #0005's claws on Square / X and jaws on Triangle / Y,
-its ghostly hands on R1 / RB, its tendrils behind R2 / RT and its two
-Specials behind L2 / LT), and every binding of every fighter can be changed in
-Settings › Controls › Controller controls. In menus the D-pad moves focus,
-the left stick moves a circular cursor, Cross / A confirms and Circle / B
-goes back. On touch: a joystick (or Left / Right buttons) at the lower left
+than five numbered attacks leaves the rest unused. On a controller the
+universal actions are the same for every fighter, and each fighter's moves
+have a layout designed for them, every move one input, no combination:
+Square / X is every fighter's quick strike on the ground and in the air,
+Triangle / Y and Circle / B its other strikes, R2 / RT its ranged move
+(#0001's Red, #0002's Whirlwind, #0004's Melody, #0005's Dark Tendrils),
+L2 / LT its Special, and the right stick the moves that go up, down or
+forward the way they look (#0002's Blue Tornado up and Bounce Attack down,
+#0003's ground-splitters down, #0004's Leekspin up, Stage Dive down and
+Ievan Polkka forward, #0001's Hollow Purple forward, #0005's Red Balloon
+up). Every input of every fighter can be changed in Settings › Controls ›
+Controller controls: every button, either stick on its own (a direction
+held with a button, or the stick itself as the input), modifiers, and
+press, hold or held activation. In menus the D-pad moves focus, the left
+stick moves a circular cursor, Cross / A confirms and Circle / B goes
+back. On touch: a joystick (or Left / Right buttons) at the lower left
 and the action buttons at the lower right. Details, the controller layouts
 and the touch layouts in [input](docs/systems/input.md).
 

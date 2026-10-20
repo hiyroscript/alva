@@ -1,6 +1,6 @@
 # Defense
 
-The shared `shield` button (L, Circle / B on a controller by default, the
+The shared `shield` button (L, L1 / LB on a controller by default, the
 touch **Shield** button) is the same for every fighter, and does one thing
 on the ground and another in the air. A controller may give the two
 different inputs (the Shield held, the Deflect pressed: Settings ›

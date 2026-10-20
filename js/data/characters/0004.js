@@ -43,7 +43,7 @@
 // phases. The sheet's intro, victory and defeat poses and its full-screen
 // cut-in pictures are no move.
 
-import { frames, pad } from './helpers.js';
+import { frames, pad, flick, legacyPad } from './helpers.js';
 
 // Height in art pixels of #0004's idle (its reference clip). Its art is 1x
 // (one file pixel per art pixel, cut from one sprite sheet with its flat
@@ -407,29 +407,55 @@ export const CHARACTER_0004 = {
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
-  // its own moves' buttons, chosen for each move rather than its attack
-  // number. The universal actions keep everyone's buttons (the stick, Jump
-  // on Cross / A, Dash on L1 / LB, Circle / B for the Shield and the
-  // Deflect, Options / Menu to pause). Its dance steps are on Square / X on
-  // the ground and in the air, and its leek on Triangle / Y, the same on
-  // the ground and in the air. The kicks that are about a direction take
-  // the stick with Square: Up + Square the Crescent Kick (it kicks up), and
-  // in the air Down + Square the Stage Dive (it dives down). The Melody, its
-  // quick zoning note, has a shoulder of its own, R1 / RB. Its two
-  // techniques sit behind the triggers on the leek's Triangle: Ievan Polkka
-  // with R2 / RT, and World is Mine, its Special, rare and never to be
-  // pressed by mistake, with L2 / LT.
+  // every move on one input of its own, no combination anywhere, chosen
+  // for what each move does rather than its attack number. The universal
+  // actions keep everyone's inputs (the left stick, Jump on Cross / A, Dash
+  // on R1 / RB, L1 / LB for the Shield and the Deflect, Options / Menu to
+  // pause).
+  //
+  //   Square / X     the Dance Combo; in the air the Air Dance, its basic
+  //                  aerial, a dance step too
+  //   Triangle / Y   the Leek Swing, its longest reach
+  //   Circle / B     the Crescent Kick, its launcher: a thumb's roll after
+  //                  the Dance Combo, quick enough to string it (the right
+  //                  stick would be too slow for it, however upward the
+  //                  kick)
+  //   R2 / RT        the Melody: pull the trigger to sing the note across
+  //                  the stage
+  //   L2 / LT        World is Mine, its Special: the ring of sound round
+  //                  it, on a trigger never squeezed by accident
+  //   right stick    Ievan Polkka: the little double appears in front, the
+  //   forward        way #0004 faces; the stick pushed where it will stand
+  //   right stick    the Leekspin, twirling upward: the stick pushed the way
+  //   up (air)       it rises, its way back to the stage
+  //   right stick    the Stage Dive, feet first: the stick pushed the way it
+  //   down (air)     dives, never one press of the attack button away off
+  //                  the stage, where it dives into the Void
   controller: {
     layout: {
       'ground:attack1': pad('west'),
       'ground:attack2': pad('north'),
-      'ground:attack3': pad('west', { direction: 'up' }),
-      'ground:attack4': pad('north', { modifier: 'r2' }),
-      'ground:attack5': pad('north', { modifier: 'l2' }),
-      'ground:extra_attack': pad('r1'),
+      'ground:attack3': pad('east'),
+      'ground:extra_attack': pad('r2'),
+      'ground:attack5': pad('l2'),
+      'ground:attack4': flick('forward'),
       'air:attack1': pad('west'),
-      'air:attack2': pad('north'),
-      'air:attack3': pad('west', { direction: 'down' }),
+      'air:attack2': flick('up'),
+      'air:attack3': flick('down'),
+    },
+    // The layout it recommended until the right stick and the bumpers were
+    // redesigned (settings version 5), only to tell which bindings of a
+    // profile saved then were the player's own.
+    previous: {
+      'ground:attack1': legacyPad('west'),
+      'ground:attack2': legacyPad('north'),
+      'ground:attack3': legacyPad('west', { direction: 'up' }),
+      'ground:attack4': legacyPad('north', { modifier: 'r2' }),
+      'ground:attack5': legacyPad('north', { modifier: 'l2' }),
+      'ground:extra_attack': legacyPad('r1'),
+      'air:attack1': legacyPad('west'),
+      'air:attack2': legacyPad('north'),
+      'air:attack3': legacyPad('west', { direction: 'down' }),
     },
   },
 

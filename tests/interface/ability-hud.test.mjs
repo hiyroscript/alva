@@ -264,27 +264,48 @@ test('keyboard: each tile shows its button\'s key from CONFIG.bindings, the comm
   assert.deepEqual(shown.parts.map((p) => p.glyph), ['Z']);
 });
 
-test('controller: the fighter\'s resolved profile, per place, modifiers and directions included, in its family\'s glyphs', () => {
-  const ps = hudFor(DEF_0001, { device: 'gamepad', family: 'playstation' }).hud;
-  assert.deepEqual(chips(tileOf(ps, 'ground', 'attack1')), ['□'], 'the Jab: Square');
-  assert.deepEqual(chips(tileOf(ps, 'ground', 'attack2')), ['R2', '+', '□'], 'Red: R2 + Square');
-  assert.deepEqual(chips(tileOf(ps, 'ground', 'attack3')), ['R2', '+', '○'], 'Maximum Blue: R2 + Circle');
-  assert.deepEqual(chips(tileOf(ps, 'ground', 'attack4')), ['L2', '+', '△'], 'Unlimited Void: L2 + Triangle');
-  assert.deepEqual(chips(tileOf(ps, 'ground', 'attack5')), ['R2', '+', '△'], 'Hollow Purple: R2 + Triangle');
-  assert.deepEqual(chips(tileOf(ps, 'air', 'midair_attack3')), ['R1'], 'Blue: R1 in the air');
-  assert.deepEqual(chips(tileOf(ps, 'air', 'extra_attack')), ['L2', '+', '□'], 'the High Kick in the air: its own air input');
-  assert.equal(tileOf(ps, 'ground', 'attack2').el.getAttribute('aria-label'), 'Red: R2 + Square. Ready');
+test('controller: the fighter\'s resolved profile, per place, in its family\'s glyphs; a stick named with its direction, forward as the way it faces', () => {
+  const ps = hudFor(DEF_0001, { device: 'gamepad', family: 'playstation' });
+  const hud = ps.hud;
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'attack1')), ['□'], 'the Jab: Square');
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'extra_attack')), ['△'], 'the High Kick: Triangle');
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'attack3')), ['○'], 'Maximum Blue: Circle');
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'attack2')), ['R2'], 'Red: R2');
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'attack4')), ['L2'], 'Unlimited Void: L2');
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'attack5')), ['R→'], 'Hollow Purple: the right stick, forward drawn the way it faces');
+  assert.deepEqual(chips(tileOf(hud, 'air', 'midair_attack3')), ['○'], 'Blue: Circle in the air too');
+  assert.deepEqual(chips(tileOf(hud, 'air', 'midair_attack2')), ['R2'], 'the Red Kick: R2 in the air');
+  assert.deepEqual(chips(tileOf(hud, 'air', 'extra_attack')), ['△'], 'the High Kick in the air');
+  assert.equal(tileOf(hud, 'ground', 'attack2').el.getAttribute('aria-label'), 'Red: R2. Ready');
+  assert.equal(tileOf(hud, 'ground', 'attack5').el.getAttribute('aria-label'), 'Hollow Purple: Right stick forward. Ready');
+  assert.equal(tileOf(hud, 'ground', 'attack5').input.children[0].className, 'ah-chip ah-chip--stick', 'a stick input, drawn as one');
+  // Turned round, the arrow turns with it: it always shows the push that works.
+  ps.fighter.facing = -1;
+  hud.update(ps.fighter);
+  assert.deepEqual(chips(tileOf(hud, 'ground', 'attack5')), ['R←']);
   const xbox = hudFor(DEF_0001, { device: 'gamepad', family: 'xbox', model: 'xboxSeries' }).hud;
-  assert.deepEqual(chips(tileOf(xbox, 'ground', 'attack2')), ['RT', '+', 'X'], 'the Xbox names');
-  assert.deepEqual(chips(tileOf(xbox, 'ground', 'attack4')), ['LT', '+', 'Y']);
-  assert.deepEqual(chips(tileOf(xbox, 'ground', 'attack3')), ['RT', '+', 'B']);
-  // #0002's Bounce Attack is Down + Square, never a plain Square.
+  assert.deepEqual(chips(tileOf(xbox, 'ground', 'attack2')), ['RT'], 'the Xbox names');
+  assert.deepEqual(chips(tileOf(xbox, 'ground', 'attack4')), ['LT']);
+  assert.deepEqual(chips(tileOf(xbox, 'ground', 'attack3')), ['B']);
+  // #0002's spins in the air are the right stick's up and down, never a bare arrow.
   const two = hudFor(DEF_0002, { device: 'gamepad', family: 'playstation' }).hud;
-  assert.deepEqual(chips(tileOf(two, 'air', 'midair_attack2')), ['↓', '+', '□']);
+  assert.deepEqual(chips(tileOf(two, 'air', 'midair_attack2')), ['R↓']);
+  assert.deepEqual(chips(tileOf(two, 'air', 'midair_attack3')), ['R↑']);
   assert.deepEqual(chips(tileOf(two, 'air', 'midair_attack1')), ['□']);
-  assert.match(tileOf(two, 'air', 'midair_attack2').el.getAttribute('aria-label'), /Left stick down \+ Square/);
+  assert.match(tileOf(two, 'air', 'midair_attack2').el.getAttribute('aria-label'), /Right stick down/);
   const twoX = hudFor(DEF_0002, { device: 'gamepad', family: 'xbox' }).hud;
-  assert.deepEqual(chips(tileOf(twoX, 'air', 'midair_attack2')), ['↓', '+', 'X']);
+  assert.deepEqual(chips(tileOf(twoX, 'air', 'midair_attack2')), ['R↓']);
+  // A direction held with a button names its stick too: L for the left, R for the right.
+  const shown = (binding) => abilityInput({ device: 'gamepad', action: 'attack1', binding, family: 'playstation' });
+  const down = { button: 'west', modifier: null, stick: 'leftStick', direction: 'down', activation: 'press' };
+  assert.deepEqual(shown(down).parts.map((x) => x.glyph), ['L↓', '□']);
+  assert.equal(shown(down).text, 'Left stick down + Square');
+  assert.deepEqual(shown({ ...down, stick: 'rightStick' }).parts.map((x) => x.glyph), ['R↓', '□']);
+  assert.equal(shown({ ...down, stick: 'rightStick' }).text, 'Right stick down + Square');
+  const combo = { button: null, modifier: 'l2', stick: 'rightStick', direction: 'up', activation: 'press' };
+  assert.deepEqual(shown(combo).parts.map((x) => [x.kind, x.glyph]), [['mod', 'L2'], ['stick', 'R↑']]);
+  assert.equal(shown(combo).text, 'L2 + Right stick up');
+  assert.deepEqual(shown({ ...combo, modifier: null, direction: 'back' }).parts.map((x) => x.glyph), ['R«'], 'back with no facing known');
 });
 
 test('a saved layout shows as the player set it, a hold included; a change of it redraws the inputs', () => {
@@ -309,10 +330,10 @@ test('the device last used decides: a pad\'s presses show its inputs, a key brin
   assert.deepEqual(chips(tile), ['I']);
   input.lastDevice = 'gamepad';
   hud.update(fighter);
-  assert.deepEqual(chips(tile), ['R2', '+', '□']);
+  assert.deepEqual(chips(tile), ['R2']);
   input.controllers.player1 = { family: 'xbox', model: 'xboxOne', key: 'pad2' };
   hud.update(fighter);
-  assert.deepEqual(chips(tile), ['RT', '+', 'X'], 'the pad\'s own family');
+  assert.deepEqual(chips(tile), ['RT'], 'the pad\'s own family');
   input.lastDevice = 'keyboard';
   hud.update(fighter);
   assert.deepEqual(chips(tile), ['I']);

@@ -359,6 +359,7 @@
 .pad-btn.is-mod rect, .pad-btn.is-mod circle { fill: rgba(240, 140, 26, 0.85); stroke: #ffc27a; }
 .pad-btn.is-mod text { fill: #1b1004; }
 .is-dir > .pad-btn rect, .pad-stick.is-dir > circle { stroke: var(--accent-hi); stroke-width: 2; }
+.pad-btn.is-side rect { fill: rgba(255, 255, 255, 0.16); stroke: var(--accent-hi); stroke-width: 2; }
 .pad-arrow { fill: var(--accent-hi); font-weight: 700; }
 
 /* ---------------------------------------------------------------------
