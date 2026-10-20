@@ -1035,9 +1035,9 @@ comes from its definition and its profile.
     stationary double, its long, breakable song thrown at someone who
     cannot get away and the charm window cashed in; light and exposed
     when rushed before its setups are in place); #0005 is 4 (a predator of
-    reach and setups: spacing its jaws' dead zone, its gaze landed only on
+    reach and setups: spacing its long, slow bite, its gaze landed only on
     an opponent facing it, its phantom timed and the fear cashed in while
-    it lasts; tall and exposed when rushed inside its reach).
+    it lasts; tall and exposed when rushed).
   - **Read play style:** at the bottom-right of the preview information,
     below the fighter name on its own row, a real `<button type="button">`
     set as 11px underlined secondary text with `aria-haspopup="dialog"`, reached by
@@ -1886,7 +1886,9 @@ each fighter's own values are in its character specification (7.2.9).
   jitter. A collision stops the body on that axis and reports the speed it
   stopped; only a launch turns that into a rebound (Launch bounce). Pushboxes
   split an overlap evenly, so a fighter at a ledge can be shoved off it; a
-  fighter flying off a rebound passes through them.
+  fighter flying off a rebound passes through them; and a fighter a pull
+  drew in, still carried helpless toward the pull's owner, stops against
+  that fighter's body and never pushes it (7.2.4, Pull).
 - **Universal movement. All fighters share universal baseline locomotion.
   Character identity changes the moveset, not run/jump/Dash
   fundamentals.** Every playable fighter has exactly the same top speed,
@@ -2397,7 +2399,12 @@ each fighter's own values are in its character specification (7.2.9).
     of play are never drawn, and a pull with `front: true` draws only an
     opponent on the side it faces (the attack's fighter's facing, the way
     the projectile flies): one whose middle is behind is left where it is
-    (#0005's Dark Tendrils). The strike then meets whoever was drawn into it; the CPU
+    (#0005's Dark Tendrils). A pull never shoves its owner: a fighter it
+    draws (`Fighter.drawnBy`), while drawn and, once the pull is over, while
+    still carried toward that fighter, helpless (stunned or held), on the
+    pull's speed, stops against that fighter's body (`separateFighters`),
+    its speed toward it gone, and the owner holds its ground; free to act
+    again, or no longer moving toward it, it pushes and is pushed as ever. The strike then meets whoever was drawn into it; the CPU
     reads a pulling attack's reach as its box widened to the pull's circle.
   - **Hit effects** (on any hit: an attack, a strike, a projectile, a
     finisher, a technique's burst): `paralyze` (seconds a real hit holds

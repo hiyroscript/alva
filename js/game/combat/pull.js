@@ -25,11 +25,27 @@
 // held in place (paralyzed) and, for a pull that reaches only its `front`,
 // one whose middle is behind it (behind the attack's fighter, the way it
 // faces, or behind the projectile, the way it flies).
+//
+// A pull brings its target in; it never shoves the fighter that owns it. A
+// fighter it draws remembers whose pull it was (Fighter.drawnBy) while the
+// pull draws it and, once the pull is over, for as long as it is still
+// carried toward that fighter, helpless (stunned or held), on the speed it
+// was drawn with; it stops against that fighter's body rather than pushing
+// it (separateFighters in js/game/fighters/fighter.js). Free to act again,
+// or no longer moving toward it, it pushes and is pushed as ever.
 
 const scratch = { x: 0, y: 0 };
 
 // Every pull live this step, each drawing `fighters` toward its point.
 export function applyPulls(fighters, projectiles, dt) {
+  // Whoever is free to act again, or no longer carried toward the fighter
+  // that drew it in, is done with that pull (this step's pulls draw anew).
+  for (const f of fighters) {
+    const by = f.drawnBy;
+    if (!by) continue;
+    const helpless = f.combat.stun > 0 || f.combat.immobilized;
+    if (by.lostToVoid || !helpless || !(f.body.vx * Math.sign(by.body.x - f.body.x) > 0)) f.drawnBy = null;
+  }
   for (const f of fighters) {
     const atk = f.combat?.attack;
     const pull = atk?.def.pull;
@@ -37,7 +53,7 @@ export function applyPulls(fighters, projectiles, dt) {
     scratch.x = f.body.x + pull.offset.x * f.facing;
     scratch.y = f.body.y + pull.offset.y;
     for (const target of fighters) {
-      if (target !== f && inFront(pull, target, f.body.x, f.facing)) pullToward(target, scratch.x, scratch.y, pull, dt);
+      if (target !== f && inFront(pull, target, f.body.x, f.facing) && pullToward(target, scratch.x, scratch.y, pull, dt)) target.drawnBy = f;
     }
   }
   for (const p of projectiles) {
@@ -46,7 +62,7 @@ export function applyPulls(fighters, projectiles, dt) {
     const x = p.x + pull.offset.x * p.direction;
     const y = p.y + pull.offset.y;
     for (const target of fighters) {
-      if (target !== p.owner && inFront(pull, target, p.x, p.direction)) pullToward(target, x, y, pull, dt);
+      if (target !== p.owner && inFront(pull, target, p.x, p.direction) && pullToward(target, x, y, pull, dt)) target.drawnBy = p.owner;
     }
   }
 }

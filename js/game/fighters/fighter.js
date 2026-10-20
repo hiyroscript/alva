@@ -97,9 +97,18 @@ const HOMING_BEHIND = 8;
 // never pinned against a body in its way, so it cannot be held in front of
 // an attacker at a wall. So does one in an attack that passes through (see
 // Fighter.passingThrough: #0002's Spin Attack rolls on through its target).
+// A fighter a pull is drawing toward the fighter that owns it, or that is
+// still carried toward it, helpless, on that pull's speed (see
+// Fighter.drawnBy), never pushes that fighter: it stops against its body,
+// its speed toward it gone, and the fighter that drew it in holds its
+// ground.
 export function separateFighters(a, b, stage) {
   if (a.ricocheting || b.ricocheting || a.passingThrough || b.passingThrough) return;
-  separate(a.body, b.body, a.def.pushbox.width / 2, b.def.pushbox.width / 2, stage);
+  const drawn = b.drawnBy === a ? b : a.drawnBy === b ? a : null;
+  const aShare = drawn === b ? 0 : drawn === a ? 1 : 0.5;
+  if (!separate(a.body, b.body, a.def.pushbox.width / 2, b.def.pushbox.width / 2, stage, aShare) || !drawn) return;
+  const puller = drawn === b ? a : b;
+  if (drawn.body.vx * Math.sign(puller.body.x - drawn.body.x) > 0) drawn.body.vx = 0;
 }
 
 export class Fighter {
@@ -198,6 +207,11 @@ export class Fighter {
     // null while there is none (in play, or Quick Battle's final loser).
     this.lostToVoid = false;
     this.respawnTimer = null;
+    // The fighter whose pull is drawing this one in, or drew it and still
+    // carries it, helpless, toward it (see applyPulls in
+    // js/game/combat/pull.js): it stops against that fighter rather than
+    // pushing it (see separateFighters). Null when none.
+    this.drawnBy = null;
     this.facing = spawn.facing || 1;
     this.attackVisualFacing = null;
     this.state = 'idle';

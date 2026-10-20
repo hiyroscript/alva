@@ -100,15 +100,21 @@ function arena({
   return { ai, cpu, foe, world, ctx, events, deflections, step, run, get n() { return n; } };
 }
 
-// Fights between CPUs at one level, every pairing of the playable fighters
-// both ways round, run once and shared by the tests below.
+// Fights between CPUs at one level: the first two playable fighters, both
+// ways round, on each seed, run once and shared by the tests below (each
+// fighter's own tests have it fight the rest of the roster).
 const FIGHT_SECONDS = 50;
+// Two seeds each: a level's rarest moves (Easy's above all) are used a
+// handful of times a fight, so one fight's luck is never what decides.
+const FIGHT_SEEDS = [3, 4];
 const fights = new Map();
 function fightsAt(difficulty) {
   if (!fights.has(difficulty)) {
     const list = [];
     for (const [x, y] of [[0, 1], [1, 0]]) {
-      list.push(cpuFight(FIGHTERS[x], FIGHTERS[y % FIGHTERS.length], { seconds: FIGHT_SECONDS, seed: 3, difficulty }));
+      for (const seed of FIGHT_SEEDS) {
+        list.push(cpuFight(FIGHTERS[x], FIGHTERS[y % FIGHTERS.length], { seconds: FIGHT_SECONDS, seed, difficulty }));
+      }
     }
     fights.set(difficulty, list);
   }

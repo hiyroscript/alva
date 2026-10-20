@@ -292,8 +292,8 @@ test('the Claw Rake: a sweep that holds the target (1), then a blow through the 
   assert.ok(hits[1].finalLaunch.y > 0, 'down');
 });
 
-test('the Long Bite: nothing close to it, the jaws far out (120 to 198 units), three bites that hold, then a heavy fling (5, Base Launch 3)', () => {
-  for (const [gap, lands] of [[60, false], [150, true], [240, false]]) {
+test('the Long Bite: all along its neck, from right up close out to the jaws (16 to 198 units), three bites that hold, then a heavy fling (5, Base Launch 3)', () => {
+  for (const [gap, lands] of [[36, true], [60, true], [150, true], [240, false]]) {
     const d = versus({ gap });
     d.tick(P('attack2'));
     after(d, 0.9);
@@ -306,27 +306,31 @@ test('the Long Bite: nothing close to it, the jaws far out (120 to 198 units), t
     assert.ok(hits[3].finalLaunch.x > 0, 'flung away from it');
   }
   const atk = createAttackDefinition({ id: 'attack2', ...DEF.attacks.attack2 });
-  assert.ok(near(atk.startup, 4 / 20) && near(atk.total, 13 / 20), 'a fifth of a second to see coming, 0.65 s in all');
+  assert.ok(near(atk.startup, 4 / 15) && near(atk.total, 13 / 15), 'a good quarter of a second to see coming, 0.87 s in all');
   assert.equal(atk.cooldown, 0.5, 'its bites add up to 8: no long cooldown');
 });
 
-test('Snapping Jaws: a shorter bite in the air that chews, then flings (1, 1, 5 at Base Launch 2)', () => {
-  const d = versus({ gap: 90 });
-  airborne(d.tick);
-  hold(d.target, d.target.body.y - d.attacker.body.y);
-  d.tick(P('attack2'));
-  after(d, 0.6);
-  const hits = mine(d, 'midair_attack2');
-  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 5]);
-  assert.deepEqual([hits[2].baseLaunch, hits[2].directionalLaunch], [2, 'horizontal']);
+test('Snapping Jaws: a shorter bite in the air, all along its neck from right up close (16 to 118 units), that chews, then flings (1, 1, 3 at Base Launch 2)', () => {
+  for (const [gap, lands] of [[34, true], [90, true], [150, false]]) {
+    const d = versus({ gap });
+    airborne(d.tick);
+    hold(d.target, d.target.body.y - d.attacker.body.y);
+    d.tick(P('attack2'));
+    after(d, 0.6);
+    const hits = mine(d, 'midair_attack2');
+    assert.equal(hits.length > 0, lands, `${gap} away`);
+    if (!lands) continue;
+    assert.deepEqual(hits.map((e) => e.damage), [1, 1, 3], `${gap} away`);
+    assert.deepEqual([hits[2].baseLaunch, hits[2].directionalLaunch], [2, 'horizontal']);
+  }
 });
 
-test('Phantom Hands: four bursts of ghostly hands, the last hurling the target up (5, Base Launch 2 straight up)', () => {
+test('Phantom Hands: four bursts of ghostly hands, the last hurling the target up (3, Base Launch 2 straight up)', () => {
   const d = versus({ gap: 80 });
   d.tick(P('attack3'));
   after(d, 0.7);
   const hits = mine(d, 'attack3');
-  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 1, 5]);
+  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 1, 3]);
   assert.deepEqual([hits[3].baseLaunch, hits[3].directionalLaunch], [2, 'vertical']);
   assert.ok(hits[3].finalLaunch.y < 0, 'up');
 });
@@ -396,6 +400,33 @@ test('Dark Tendrils seize what they meet in front and reel it in; one behind is 
   after(s, 0.5, {}, { shield: true });
   assert.deepEqual(mine(s, 'extra_attack').map((e) => e.type), ['block']);
   assert.ok(s.target.body.x - s.attacker.body.x > 240, 'it held its ground');
+});
+
+test('Dark Tendrils root #0005 where it stands: pressed on the run, either way, it keeps none of its speed', () => {
+  for (const dir of [1, -1]) {
+    const { fighter, step } = solo();
+    const run = dir > 0 ? { runRight: true } : { runLeft: true };
+    for (let i = 0; i < steps(0.6); i++) step(run);
+    assert.ok(Math.abs(fighter.body.vx) > 300, 'running');
+    step({ ...run, ...P('extra_attack') });
+    assert.equal(fighter.combat.attack?.def.id, 'extra_attack');
+    const x0 = fighter.body.x;
+    for (let i = 0; i < steps(0.5); i++) step(run);
+    assert.ok(Math.abs(fighter.body.x - x0) < 1e-6, `${dir > 0 ? 'forward' : 'backward'}: it stays where it pressed it`);
+  }
+});
+
+test('Dark Tendrils never shove #0005 back: whoever they reel in from the far end, still rushing in as they let go, stops against its body', () => {
+  for (const target of playableCharacters()) {
+    const d = versus({ gap: 285, pushboxes: true }, target);
+    const x0 = d.attacker.body.x;
+    d.tick(P('extra_attack'));
+    after(d, 1.2);
+    assert.equal(mine(d, 'extra_attack')[0]?.type, 'hit', `#${target.id}: seized`);
+    assert.equal(d.attacker.body.x, x0, `#${target.id}: #0005 holds its ground`);
+    const apart = (DEF.pushbox.width + target.pushbox.width) / 2;
+    assert.ok(d.target.body.x - d.attacker.body.x < apart + 1, `#${target.id}: reeled in to its body`);
+  }
 });
 
 test('the player\'s Deadlights out of Dark Tendrils\' seizing let go while the prey is still held, facing #0005', () => {
