@@ -8,7 +8,7 @@
 //
 // Stored as
 //
-//   { version: 5,
+//   { version: 6,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
@@ -29,26 +29,35 @@
 //
 // `controllerProfiles` holds the player's own controller layout for each
 // fighter they customized (Settings › Controls › Controller controls), keyed
-// by the fighter's stable id, never a roster slot or a name: the whole
-// layout, every action's binding by action id (js/data/controller-
-// profiles.js). A fighter with none plays with its recommended layout.
-// Each is checked entry by entry: a malformed binding is dropped (that
-// action falls back to its recommended binding), never the profile or the
-// rest of the settings.
+// by the fighter's stable id, never a roster slot or a name: every action's
+// binding by action id (js/data/controller-profiles.js), each directional
+// one naming its stick. A fighter with none plays with its recommended
+// layout, and an action a profile has no binding for plays with its
+// recommended one. Each is checked entry by entry: a malformed binding is
+// dropped (that action falls back to its recommended binding), never the
+// profile or the rest of the settings.
 //
 // Older objects are migrated: version 1 ({ version: 1, mobileControls })
 // keeps its Mobile Controls choice, with no language chosen yet and no
 // custom layout; version 2 keeps its language, Mobile Controls and both
 // custom layouts; version 3 keeps all of that and its Combat Assist;
-// version 4 keeps all of that and its controller profiles. Versions 1 and 2
-// get Combat Assist on, versions 1 to 3 no controller profile, and every
-// older version Combo Assist on. Missing, blocked or unreadable storage, a stored object of any
+// version 4 keeps all of that and its controller profiles; version 5 keeps
+// all of that and its Combo Assist. Versions 1 and 2 get Combat Assist on,
+// versions 1 to 3 no controller profile, and versions 1 to 4 Combo Assist
+// on. A controller profile saved under version 4 or 5 predates the named
+// sticks and today's recommended layouts: it is upgraded for its fighter
+// (upgradeStoredProfiles, js/data/controller-profiles.js): every binding
+// plays as it did, the player's own choices are kept, and the bindings
+// that were only the old recommended ones give way to today's wherever
+// that conflicts with nothing, so a fighter the player never really
+// changed plays with today's layout. Missing, blocked or unreadable storage, a stored object of any
 // other version, and every value that is not one of its setting's choices
 // fall back to the defaults, value by value, so the game always starts with
 // a valid set.
 
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
-import { sanitizeStoredProfile, sanitizeStoredProfiles } from '../data/controller-profiles.js';
+import { sanitizeStoredProfile, sanitizeStoredProfiles, upgradeStoredProfiles } from '../data/controller-profiles.js';
+import { getCharacter } from '../data/characters.js';
 
 // The interface languages (see js/localization/i18n.js). English is the language in
 // use until the player picks one.
@@ -70,7 +79,7 @@ export const DEFAULT_COMBAT_ASSIST = true;
 export const DEFAULT_COMBO_ASSIST = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 6;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
@@ -99,16 +108,22 @@ export function resolveSetting(name, value) {
 }
 
 // Every setting from a stored object of the current version, each checked.
-function readCurrent(stored) {
+// `profiles` reads its controller profiles (an older version's are
+// upgraded first).
+function readCurrent(stored, profiles = sanitizeStoredProfiles) {
   return {
     language: resolveSetting('language', stored.language),
     mobileControls: resolveSetting('mobileControls', stored.mobileControls),
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     combatAssist: resolveSetting('combatAssist', stored.combatAssist),
     comboAssist: resolveSetting('comboAssist', stored.comboAssist),
-    controllerProfiles: sanitizeStoredProfiles(stored.controllerProfiles),
+    controllerProfiles: profiles(stored.controllerProfiles),
   };
 }
+
+// Controller profiles saved under version 4 or 5, upgraded for the fighter
+// each belongs to.
+const upgradeProfiles = (raw) => upgradeStoredProfiles(raw, getCharacter);
 
 // Older versions, each read into the current settings.
 const MIGRATIONS = Object.freeze({
@@ -127,12 +142,16 @@ const MIGRATIONS = Object.freeze({
     combatAssist: stored.combatAssist,
   }),
   // Version 4 had everything but Combo Assist: all of it kept (every
-  // fighter's controller layout included), and Combo Assist on, whatever
+  // fighter's controller layout upgraded), and Combo Assist on, whatever
   // the object may hold under that name.
   4: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
     combatAssist: stored.combatAssist, controllerProfiles: stored.controllerProfiles,
-  }),
+  }, upgradeProfiles),
+  // Version 5 had everything, its controller profiles in the shape they had
+  // before the sticks were named: all of it kept, every fighter's layout
+  // upgraded.
+  5: (stored) => readCurrent(stored, upgradeProfiles),
 });
 
 // The settings a stored value holds: checked if it is the current version,

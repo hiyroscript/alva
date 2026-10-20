@@ -55,8 +55,9 @@ export function stubWindow() {
 
 // A real ControllerManager and InputManager over `pads`, in play (or in
 // the menus with `gameplay: false`), polled once so Player 1's pad is
-// assigned. press(button, down) and stick(x, y) poll after changing it;
-// sample(context) is Player 1's snapshot.
+// assigned. press(button, down), stick(x, y) (the left stick) and
+// rightStick(x, y) poll after changing it; sample(context) is Player 1's
+// snapshot.
 export async function controllerRig({ pads = [fakePad()], gameplay = true, profileFor = null } = {}) {
   const listeners = stubWindow();
   const { ControllerManager } = await import('../../js/core/controller-manager.js');
@@ -84,6 +85,11 @@ export async function controllerRig({ pads = [fakePad()], gameplay = true, profi
     stick(x, y, target = pad) {
       target.axes[0] = x;
       target.axes[1] = y;
+      poll();
+    },
+    rightStick(x, y, target = pad) {
+      target.axes[2] = x;
+      target.axes[3] = y;
       poll();
     },
     sample: (context) => input.sample(context),

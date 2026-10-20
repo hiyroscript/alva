@@ -176,6 +176,7 @@ const { CONFIG } = await import('../../js/config.js');
 const { getCharacter, playableCharacters } = await import('../../js/data/characters.js');
 const { fakePad, setButton, padSource, PAD_IDS } = await import('../helpers/fake-gamepad.mjs');
 const { stylesheet } = await import('../helpers/stylesheet.mjs');
+const { highlight, diagramSVG } = await import('../../js/ui/controller-glyphs.js');
 
 function memoryStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -575,14 +576,19 @@ test('#0001\'s editor: its portrait, name and family, every action by category w
     assert.equal(row(editor, 'ground:attack2').querySelector('.controller-place'), null, 'Red: an ordinary ground attack, no place tag');
     const red = row(editor, 'ground:attack2');
     assert.equal(text(red.querySelector('.controller-row-desc')), 'Fires a repelling projectile that pushes enemies away and turns projectiles around.');
-    assert.equal(text(red.querySelector('.controller-chip')), 'R2 + Square');
-    assert.equal(text(red.querySelector('.controller-row-activation')), 'Modifier + press');
-    assert.equal(red.getAttribute('aria-label'), 'Change binding: Red. R2 + Square, Modifier + press.');
-    assert.equal(text(row(editor, 'shield').querySelector('.controller-chip')), 'Circle');
+    assert.equal(text(red.querySelector('.controller-chip')), 'R2');
+    assert.equal(text(red.querySelector('.controller-row-activation')), 'Press');
+    assert.equal(red.getAttribute('aria-label'), 'Change binding: Red. R2, Press.');
+    assert.equal(text(row(editor, 'shield').querySelector('.controller-chip')), 'L1');
     assert.equal(text(row(editor, 'shield').querySelector('.controller-row-activation')), 'Hold');
+    assert.equal(text(row(editor, 'deflect').querySelector('.controller-chip')), 'L1');
+    assert.equal(text(row(editor, 'dash').querySelector('.controller-chip')), 'R1');
     assert.equal(text(row(editor, 'jump').querySelector('.controller-row-activation')), 'Press (hold to jump higher)');
     assert.equal(text(row(editor, 'fastFall').querySelector('.controller-chip')), 'Left stick down');
-    assert.equal(text(row(editor, 'air:attack3').querySelector('.controller-chip')), 'R1');
+    assert.equal(text(row(editor, 'air:attack3').querySelector('.controller-chip')), 'Circle');
+    const purple = row(editor, 'ground:attack5');
+    assert.equal(text(purple.querySelector('.controller-chip')), 'Right stick forward', 'the right stick, named');
+    assert.equal(text(purple.querySelector('.controller-row-activation')), 'Push');
     assert.equal(text(editor.layoutTag), 'Recommended layout');
     assert.equal(editor.provisional.hidden, true, 'a designed layout');
     assert.equal(text(editor.conflicts), 'No conflicts.');
@@ -590,16 +596,18 @@ test('#0001\'s editor: its portrait, name and family, every action by category w
   } finally { env.done(); }
 });
 
-test('#0002\'s editor in Xbox names: Down + Square is the Bounce Attack, R1 both spins; with no controller the player picks the names', () => {
+test('#0002\'s editor in Xbox names: the right stick down is the Bounce Attack, up the Blue Tornado; with no controller the player picks the names', () => {
   const env = boot({ pads: [fakePad({ id: PAD_IDS.xboxSeries })] });
   try {
     const editor = openEditor(env, '0002');
     assert.equal(text(editor.familyLine), 'Xbox buttons, from your controller.');
-    assert.equal(text(row(editor, 'air:attack2').querySelector('.controller-chip')), 'Left stick down + X');
+    assert.equal(text(row(editor, 'air:attack2').querySelector('.controller-chip')), 'Right stick down');
     assert.equal(nameOf(row(editor, 'air:attack2')), 'Bounce Attack');
-    assert.equal(text(row(editor, 'air:attack3').querySelector('.controller-chip')), 'RB');
-    assert.equal(text(row(editor, 'ground:attack3').querySelector('.controller-chip')), 'RB');
-    assert.equal(text(row(editor, 'ground:extra_attack').querySelector('.controller-chip')), 'RT + Y');
+    assert.equal(text(row(editor, 'air:attack3').querySelector('.controller-chip')), 'Right stick up');
+    assert.equal(text(row(editor, 'ground:attack3').querySelector('.controller-chip')), 'B');
+    assert.equal(text(row(editor, 'ground:extra_attack').querySelector('.controller-chip')), 'RT');
+    assert.equal(text(row(editor, 'dash').querySelector('.controller-chip')), 'RB');
+    assert.equal(text(row(editor, 'shield').querySelector('.controller-chip')), 'LB');
     assert.equal(text(row(editor, 'air:attack3').querySelector('.controller-row-desc')), 'Spins upward into a tornado, carrying opponents into the air.');
     assert.equal(row(editor, 'air:attack4'), null, 'no slot it lacks');
   } finally { env.done(); }
@@ -667,13 +675,13 @@ test('every move row shows its own artwork beside its name, the touch button\'s 
     } finally { env.done(); }
   }
   // The binding and the art are one row: #0001's Red reads
-  // "[art] Red — R2 + Square".
+  // "[art] Red — R2".
   const env = boot({ pads: [fakePad()] });
   try {
     const red = row(openEditor(env, '0001'), 'ground:attack2');
     assert.equal(nameOf(red), 'Red');
-    assert.equal(text(red.querySelector('.controller-chip')), 'R2 + Square');
-    assert.equal(red.getAttribute('aria-label'), 'Change binding: Red. R2 + Square, Modifier + press.');
+    assert.equal(text(red.querySelector('.controller-chip')), 'R2');
+    assert.equal(red.getAttribute('aria-label'), 'Change binding: Red. R2, Press.');
   } finally { env.done(); }
 });
 
@@ -762,8 +770,8 @@ test('a binding changed in text (no controller needed), saved for that fighter a
     // Triangle on the ground is the Rapid Kicks: an error, Confirm off.
     assert.match(text(binding.conflicts), /Jump and Rapid Kicks use the same input \(Triangle\)\./);
     assert.equal(binding.confirmButton.disabled, true);
-    env.key('ArrowRight'); // L1: the Dash's
-    env.key('ArrowRight'); // R1: both spins'
+    env.key('ArrowRight'); // L1: the guard's
+    env.key('ArrowRight'); // R1: the Dash's
     env.key('ArrowRight'); // L2: free
     assert.equal(text(binding.detected), 'Binding: L2 · Press (hold to jump higher)');
     assert.equal(binding.confirmButton.disabled, false);
@@ -783,7 +791,7 @@ test('a binding changed in text (no controller needed), saved for that fighter a
     assert.equal(editor.isOpen, false);
     const stored = JSON.parse(env.storage.map.get('alva.settings')).controllerProfiles;
     assert.deepEqual(Object.keys(stored), ['0002'], 'saved under its id alone');
-    assert.deepEqual(stored['0002'].jump, { button: 'l2', modifier: null, direction: null, activation: 'continuous' });
+    assert.deepEqual(stored['0002'].jump, { button: 'l2', modifier: null, stick: null, direction: null, activation: 'continuous' });
     assert.equal(env.settings.controllerProfile('0001'), null, '#0001 untouched');
     // It plays that way at once (the next sample reads it).
     const profile = env.input.compiledFor(getCharacter('0002'));
@@ -831,7 +839,7 @@ test('the binding dialog listens to the controller: a combination, a direction, 
     env.app.nav.padCommand = (cmd) => { menu.push(cmd); return nav(cmd); };
     row(editor, 'ground:attack2').click();
     const binding = env.app.controllerControls.binding;
-    assert.equal(text(binding.listenText), 'Press your preferred button or combination');
+    assert.equal(text(binding.listenText), 'Press your preferred button or combination, or push a stick');
     assert.ok(binding.listen.classList.contains('is-listening'));
     // L2 held, then Circle (back, in a menu), then both let go.
     setButton(env.pads[0], 'l2', true);
@@ -853,16 +861,30 @@ test('the binding dialog listens to the controller: a combination, a direction, 
     env.pads[0].axes = [0, 0, 0, 0];
     env.poll();
     assert.equal(text(binding.detected), 'Binding: Left stick down + Triangle · Press');
+    // Retry: the right stick held down, then Square: the direction is the
+    // right stick's, named so.
+    binding.retryButton.click();
+    env.pads[0].axes = [0, 0, 0, 0.9];
+    env.poll();
+    press(env, 'west');
+    env.pads[0].axes = [0, 0, 0, 0];
+    env.poll();
+    assert.equal(text(binding.detected), 'Binding: Right stick down + Square · Press');
     // Cancel keeps the binding as it was.
     binding.cancelButton.click();
-    assert.equal(text(row(editor, 'ground:attack2').querySelector('.controller-chip')), 'R2 + Square');
+    assert.equal(text(row(editor, 'ground:attack2').querySelector('.controller-chip')), 'R2');
     // After capture the controller drives the menus again.
     row(editor, 'shield').click();
     press(env, 'r1');
     assert.equal(text(binding.detected), 'Binding: R1 · Hold', 'the Shield stays held');
+    assert.match(text(binding.conflicts), /Dash \/ air dash and Shield use the same input \(R1\)\./, 'R1 Dashes');
+    assert.equal(binding.confirmButton.disabled, true);
+    binding.retryButton.click();
+    press(env, 'r3');
+    assert.equal(text(binding.detected), 'Binding: R3 · Hold');
     press(env, 'south');
     assert.equal(binding.isOpen, false, 'Cross confirmed it');
-    assert.equal(text(row(editor, 'shield').querySelector('.controller-chip')), 'R1');
+    assert.equal(text(row(editor, 'shield').querySelector('.controller-chip')), 'R3');
   } finally { env.done(); }
 });
 
@@ -888,6 +910,114 @@ test('capturing Fast fall takes a stick direction alone; capturing Movement take
     binding.confirmButton.click();
     assert.equal(text(row(editor, 'move').querySelector('.controller-chip')), 'D-pad');
   } finally { env.done(); }
+});
+
+test('capturing a stick input: either stick pushed and let go is the input itself, a button held through it its modifier; the diagram lights that stick', () => {
+  const env = boot({ pads: [fakePad()] });
+  try {
+    const editor = openEditor(env, '0001');
+    row(editor, 'ground:attack3').click();
+    const binding = env.app.controllerControls.binding;
+    // The right stick up and back: Maximum Blue on it.
+    env.pads[0].axes = [0, 0, 0, -0.9];
+    env.poll();
+    env.pads[0].axes = [0, 0, 0, 0];
+    env.poll();
+    assert.equal(text(binding.detected), 'Binding: Right stick up · Push');
+    // L2 held, then the right stick left and back: L2 + Right stick left.
+    binding.retryButton.click();
+    setButton(env.pads[0], 'l2', true);
+    env.poll();
+    env.pads[0].axes = [0, 0, -0.9, 0];
+    env.poll();
+    env.pads[0].axes = [0, 0, 0, 0];
+    env.poll();
+    setButton(env.pads[0], 'l2', false);
+    env.poll();
+    assert.equal(text(binding.detected), 'Binding: L2 + Right stick left · Modifier + push');
+    // Drift never counts: a stick resting off centre and a tap of Triangle is Triangle.
+    binding.retryButton.click();
+    env.pads[0].axes = [0, 0, 0.2, 0.2];
+    env.poll();
+    press(env, 'north');
+    env.pads[0].axes = [0, 0, 0, 0];
+    env.poll();
+    assert.equal(text(binding.detected), 'Binding: Triangle · Press');
+    binding.cancelButton.click();
+    // In text, with no controller: the stick alone, its stick and its direction.
+    row(editor, 'ground:attack4').click();
+    binding.stopListening();
+    const fields = binding.fields;
+    assert.equal(fields.direction.row.hidden, true, 'no direction to choose without a stick');
+    fields.button.button.focus();
+    env.key('ArrowLeft'); // L2 -> R1 ... back to "None (stick only)"
+    while (fields.button.current !== null) env.key('ArrowLeft');
+    assert.equal(text(fields.button.value), 'None (stick only)');
+    assert.equal(fields.direction.row.hidden, false);
+    assert.equal(fields.stick.current, 'rightStick', 'the right stick, by default');
+    fields.direction.button.focus();
+    while (fields.direction.current !== 'down') env.key('ArrowRight');
+    assert.equal(text(binding.detected), 'Binding: Right stick down · Push');
+    binding.confirmButton.click();
+    assert.equal(text(row(editor, 'ground:attack4').querySelector('.controller-chip')), 'Right stick down');
+  } finally { env.done(); }
+});
+
+// A stand-in for the diagram's SVG: its buttons and its sticks (each with
+// its arrow), found by their data attributes as highlight() looks for them.
+function fakeDiagram() {
+  const classes = () => {
+    const set = new Set();
+    return { add: (...c) => c.forEach((x) => set.add(x)), remove: (...c) => c.forEach((x) => set.delete(x)), contains: (c) => set.has(c), set };
+  };
+  const node = (attr, value) => ({ attr, value, classList: classes(), arrow: attr === 'stick' && value !== 'dpad' ? { textContent: '' } : null, querySelector() { return this.arrow; } });
+  const nodes = [
+    ...['south', 'east', 'west', 'north', 'l1', 'r1', 'l2', 'r2', 'dpadUp', 'dpadDown', 'dpadLeft', 'dpadRight'].map((b) => node('button', b)),
+    node('stick', 'leftStick'), node('stick', 'rightStick'), node('stick', 'dpad'),
+  ];
+  return {
+    of: (attr, value) => nodes.find((n) => n.attr === attr && n.value === value),
+    querySelector(sel) {
+      const m = sel.match(/\[data-pad-(button|stick)="(\w+)"\]/);
+      return nodes.find((n) => n.attr === m[1] && n.value === m[2]) ?? null;
+    },
+    querySelectorAll(sel) {
+      if (sel === '.pad-arrow') return nodes.filter((n) => n.arrow).map((n) => n.arrow);
+      return nodes.filter((n) => [...n.classList.set].some((c) => sel.includes(`.${c}`)));
+    },
+  };
+}
+
+test('the diagram lights either stick on its own, with its direction: the right stick never shown as the left', () => {
+  assert.match(diagramSVG('playstation'), /data-pad-stick="leftStick"/);
+  assert.match(diagramSVG('playstation'), /data-pad-stick="rightStick"/);
+  const svg = fakeDiagram();
+  const b = (button, extra = {}) => ({ button, modifier: null, stick: null, direction: null, activation: 'press', ...extra });
+  highlight(svg, b(null, { stick: 'rightStick', direction: 'up' }));
+  assert.ok(svg.of('stick', 'rightStick').classList.contains('is-on'), 'a stick input: the right stick lit as the input');
+  assert.ok(svg.of('stick', 'rightStick').classList.contains('is-dir'));
+  assert.equal(svg.of('stick', 'rightStick').arrow.textContent, '↑');
+  assert.ok(!svg.of('stick', 'leftStick').classList.contains('is-dir'), 'never the left stick');
+  assert.equal(svg.of('stick', 'leftStick').arrow.textContent, '');
+  // A direction held with a button: the button lit, the stick marked with its arrow.
+  highlight(svg, b('west', { modifier: 'r2', stick: 'leftStick', direction: 'down' }));
+  assert.ok(svg.of('button', 'west').classList.contains('is-on'));
+  assert.ok(svg.of('button', 'r2').classList.contains('is-mod'));
+  assert.ok(svg.of('stick', 'leftStick').classList.contains('is-dir'));
+  assert.ok(!svg.of('stick', 'leftStick').classList.contains('is-on'), 'the stick is a condition, not the input');
+  assert.equal(svg.of('stick', 'leftStick').arrow.textContent, '↓');
+  assert.ok(!svg.of('stick', 'rightStick').classList.contains('is-dir'), 'the last binding is cleared');
+  assert.equal(svg.of('stick', 'rightStick').arrow.textContent, '');
+  // Forward, without a fighter to face: »; the D-pad's sides by its buttons.
+  highlight(svg, b(null, { stick: 'rightStick', direction: 'forward' }));
+  assert.equal(svg.of('stick', 'rightStick').arrow.textContent, '»');
+  highlight(svg, b('west', { stick: 'dpad', direction: 'horizontal' }));
+  assert.ok(svg.of('stick', 'dpad').classList.contains('is-dir'));
+  assert.ok(svg.of('button', 'dpadLeft').classList.contains('is-side') && svg.of('button', 'dpadRight').classList.contains('is-side'));
+  // Movement: the source.
+  highlight(svg, { source: 'rightStick' });
+  assert.ok(svg.of('stick', 'rightStick').classList.contains('is-dir'));
+  assert.ok(!svg.of('stick', 'leftStick').classList.contains('is-dir'));
 });
 
 // ---- Languages ------------------------------------------------------------------------------

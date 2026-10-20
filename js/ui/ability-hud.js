@@ -51,7 +51,7 @@
 import { el } from '../core/utils.js';
 import { t, onLanguageChange } from '../localization/i18n.js';
 import { DEFAULT_FAMILY, buttonGlyph } from '../core/gamepad-devices.js';
-import { activationText, bindingText, displayFamily } from './controller-glyphs.js';
+import { activationText, bindingText, displayFamily, stickGlyph } from './controller-glyphs.js';
 import { mobileAbility } from './mobile-abilities.js';
 import { previewFrame } from '../data/ability-preview.js';
 import { abilityGroups, abilityStatus } from '../game/combat/move-status.js';
@@ -77,16 +77,17 @@ export function keyCapLabel(code) {
   return code;
 }
 
-// Stick directions as a small arrow beside the stick.
-const ARROWS = Object.freeze({ left: '←', right: '→', up: '↑', down: '↓', horizontal: '↔' });
-
 // What a tile shows for its input: { device, parts, hold, text }. `parts`
-// are the chips in order, each { kind ('key', 'dir', 'mod', 'btn'), glyph };
-// `hold` whether it activates on a hold; `text` the input in words (its
-// accessible name). Keyboard: the button's first key in `bindings`
-// (CONFIG.bindings). Controller: `binding` (the profile's, for the move's
-// place) on a `family` pad, its direction read on `source`.
-export function abilityInput({ device, action, bindings, binding, family = DEFAULT_FAMILY, model = null, source = 'leftStick' }) {
+// are the chips in order, each { kind ('key', 'dir', 'mod', 'btn',
+// 'stick'), glyph }: a direction always with its stick's mark (R↑ the right
+// stick up, L↓ the left stick down), never a bare arrow, as the condition
+// of a button ('dir') or as the input itself ('stick'); `hold` whether it
+// activates on a hold; `text` the input in words (its accessible name).
+// Keyboard: the button's first key in `bindings` (CONFIG.bindings).
+// Controller: `binding` (the profile's, for the move's place) on a
+// `family` pad, 'forward' and 'back' drawn as the side they are for a
+// fighter facing `facing` (1 right, -1 left; » and « without one).
+export function abilityInput({ device, action, bindings, binding, family = DEFAULT_FAMILY, model = null, facing = null }) {
   if (device !== 'gamepad') {
     const code = bindings?.[action]?.[0];
     const glyph = keyCapLabel(code);
@@ -97,10 +98,12 @@ export function abilityInput({ device, action, bindings, binding, family = DEFAU
     return { device: 'gamepad', parts: [], hold: false, text: t('pad.notBound') };
   }
   const parts = [];
-  if (binding.direction) parts.push({ kind: 'dir', glyph: ARROWS[binding.direction] ?? '' });
+  const stick = () => ({ glyph: stickGlyph(binding.stick, binding.direction, facing), stick: binding.stick });
+  if (binding.button && binding.direction) parts.push({ kind: 'dir', ...stick() });
   if (binding.modifier) parts.push({ kind: 'mod', glyph: buttonGlyph(f, binding.modifier, model) });
   if (binding.button) parts.push({ kind: 'btn', glyph: buttonGlyph(f, binding.button, model), button: binding.button });
-  const words = bindingText(binding, f, source, model);
+  else if (binding.direction) parts.push({ kind: 'stick', ...stick() });
+  const words = bindingText(binding, f, model);
   const hold = binding.activation === 'hold';
   return { device: 'gamepad', parts, hold, text: hold ? `${words} (${activationText(binding, { kind: 'attack' })})` : words };
 }
@@ -137,6 +140,7 @@ export class AbilityHUD {
     this.inputKey = null;
     this.revision = 0;
     this.profile = null;
+    this.facingInputs = false;
     this.unsubscribe = [
       onLanguageChange(() => this.invalidate()),
       settings?.onChange?.((name) => {
@@ -265,21 +269,28 @@ export class AbilityHUD {
     return { device, family, model };
   }
 
-  // Every tile's input, drawn again (the device, the pad's family, a saved
-  // layout or the language changed).
-  drawInputs(ctx) {
-    let profile = null;
-    if (ctx.device === 'gamepad') {
-      if (!this.profile) this.profile = this.input?.profileFor?.(this.def) ?? null;
-      profile = this.profile;
+  // The fighter's controller profile (read once until a saved layout
+  // changes), and whether any of its moves' inputs point 'forward' or
+  // 'back' (their arrows then follow the fighter's facing).
+  controllerProfile() {
+    if (!this.profile) {
+      this.profile = this.input?.profileFor?.(this.def) ?? null;
+      this.facingInputs = Object.values(this.profile?.bindings ?? {}).some((b) => b?.direction === 'forward' || b?.direction === 'back');
     }
-    const source = profile?.bindings?.move?.source ?? 'leftStick';
+    return this.profile;
+  }
+
+  // Every tile's input, drawn again (the device, the pad's family, a saved
+  // layout, the language or, for an input pointing forward or back, the
+  // fighter's facing changed).
+  drawInputs(ctx) {
+    const profile = ctx.device === 'gamepad' ? this.controllerProfile() : null;
     for (const place of PLACES) {
       for (const tile of this.rows[place].tiles) {
         const binding = profile?.bindings?.[`${place}:${tile.entry.action}`] ?? null;
         const shown = abilityInput({
           device: ctx.device, action: tile.entry.action, bindings: this.input?.bindings, binding,
-          family: ctx.family, model: ctx.model, source,
+          family: ctx.family, model: ctx.model, facing: ctx.facing,
         });
         tile.inputText = shown.text;
         tile.input.dataset.device = shown.device;
@@ -316,7 +327,10 @@ export class AbilityHUD {
       this.labelRows();
     }
     const ctx = this.inputContext();
-    const key = `${ctx.device}|${ctx.family}|${ctx.model}|${this.revision}`;
+    ctx.facing = fighter.facing < 0 ? -1 : 1;
+    if (ctx.device === 'gamepad') this.controllerProfile();
+    const facingKey = ctx.device === 'gamepad' && this.facingInputs ? ctx.facing : '';
+    const key = `${ctx.device}|${ctx.family}|${ctx.model}|${this.revision}|${facingKey}`;
     if (key !== this.inputKey) {
       this.inputKey = key;
       this.drawInputs(ctx);

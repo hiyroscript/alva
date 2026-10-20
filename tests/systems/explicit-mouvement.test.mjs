@@ -51,8 +51,8 @@ for (const airborne of [false, true]) {
       const { fighter, step } = makeFighter();
       if (airborne) step({ jump: true, jumpPressed: true });
       if (source === 'keyboard') key(side < 0 ? 'KeyQ' : 'KeyE', true);
-      // The Dash button (L1 / LB), the stick pointing the way.
-      if (source === 'gamepad') { stick(side); button('l1', true); }
+      // The Dash button (R1 / RB), the stick pointing the way.
+      if (source === 'gamepad') { stick(side); button('r1', true); }
       if (source === 'touch') input.queueTouchMouvement(side);
       const frame = input.sample();
       assert.equal(frame[side < 0 ? 'mouvementLeftPressed' : 'mouvementRightPressed'], true);
@@ -76,9 +76,9 @@ test('the Dash button leaves Jump, the Shield, Pause and the menu buttons as the
   const { input, button, poll } = device();
   const menu = [];
   input.onPadMenu((command) => menu.push(command));
-  button('l1', true);
+  button('r1', true);
   input.sample();
-  for (const [name, field] of [['south', 'jumpPressed'], ['east', 'shieldPressed']]) {
+  for (const [name, field] of [['south', 'jumpPressed'], ['l1', 'shieldPressed']]) {
     button(name, true);
     assert.equal(input.sample()[field], true, name);
     button(name, false);
@@ -88,7 +88,7 @@ test('the Dash button leaves Jump, the Shield, Pause and the menu buttons as the
   button('start', true);
   assert.deepEqual(menu, ['start']);
   button('start', false);
-  button('l1', false);
+  button('r1', false);
   // ...and the menus keep their own buttons.
   input.setGameplayActive(false);
   poll();
@@ -109,9 +109,9 @@ test('short keyboard taps survive sampling, releases re-arm, opposing requests c
   step(input.sample());
   assert.equal(fighter.dash, null);
   input.clear();
-  stick(1); button('l1', true);
+  stick(1); button('r1', true);
   assert.equal(input.sample().mouvementRightPressed, true);
-  button('l1', false); button('l1', true);
+  button('r1', false); button('r1', true);
   assert.equal(input.sample().mouvementRightPressed, true);
   assert.equal(input.sample().runRight, true);
   // The controller lost: nothing stays held.

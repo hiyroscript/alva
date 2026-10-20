@@ -12,10 +12,10 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/core/input-manager.js`](../../js/core/input-manager.js) | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step (`sample(context)`, the fighter as it is at that step), with one-step `…Pressed` edges (never key auto-repeat) and one-tap Dash requests (`queueTouchMouvement`); in menus the controller's commands and cursor stick (`onPadMenu`, `onPadCursor`); binding capture (`startCapture`). |
 | [`js/core/gamepad-devices.js`](../../js/core/gamepad-devices.js) | Which pads are PlayStation or Xbox controllers (`identifyController`, conservative), the normalized button names (`PAD_BUTTONS`: `south` is Cross / A) and each family's own names for them. |
 | [`js/core/controller-manager.js`](../../js/core/controller-manager.js) | `ControllerManager`: the physical controllers: up to four active, the status (`connected`, `disconnected`, `tooMany`), Player 1's controller, a real `refresh()`, and Player 1's buttons and sticks each frame (`poll()`). |
-| [`js/data/controller-profiles.js`](../../js/data/controller-profiles.js) | Controller profiles: the actions a fighter can bind (`controllerActions`, from its definition), the universal defaults, each fighter's recommended layout (its own `controller.layout`, else a safe fallback), binding checks, conflicts and stored-profile sanitizing. |
-| [`js/core/controller-resolver.js`](../../js/core/controller-resolver.js) | `ControllerResolver`: Player 1's presses resolved, for the fighter and where it is, into control codenames (combinations, directions, activations, one owner per press). |
+| [`js/data/controller-profiles.js`](../../js/data/controller-profiles.js) | Controller profiles: the actions a fighter can bind (`controllerActions`, from its definition), the binding shape, the universal defaults, each fighter's recommended layout (its own `controller.layout`, else a safe fallback), binding checks, conflicts by physical input, stored-profile sanitizing and the upgrade of profiles saved before the sticks were named (`upgradeStoredProfiles`). |
+| [`js/core/controller-resolver.js`](../../js/core/controller-resolver.js) | `ControllerResolver`: Player 1's presses resolved, for the fighter and where it is, into control codenames (combinations, directions on their own stick, each stick's pushes as presses of their own, activations, one owner per press). |
 | [`js/ui/controller-cursor.js`](../../js/ui/controller-cursor.js) | The circular controller cursor, part of `MenuNavigator`. |
-| [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button names, binding phrases and the controller diagram. |
+| [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button and stick names, binding phrases, chips (`stickGlyph`) and the controller diagram, either stick lit on its own. |
 | [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Combat Assist and Combo Assist settings, and its presses alone may cut its own attack short, see [combat](combat.md#the-players-requests)), `blankInput`, `HELD_CONTROLS`. |
 | [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
 | [`js/ui/ability-hud.js`](../../js/ui/ability-hud.js), [`css/ability-hud.css`](../../css/ability-hud.css) | The ability HUD: Player 1's moves, their art and their keyboard or controller inputs in the bottom-right corner, on a ground / air wheel, with their cooldowns ([below](#the-ability-hud)). |
@@ -31,11 +31,11 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | Action | Codename | Keyboard | Controller (recommended) | Touch |
 | --- | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | A D or ← → | Left stick | Joystick, or Classic ◀ ▶ |
-| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | L1 / LB: the way the stick points, else the way the fighter faces | Both layouts: one tap of **Left movement** / **Right movement** |
+| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Both layouts: one tap of **Left movement** / **Right movement** |
 | Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | Left stick down | none |
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
-| Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | Circle / B (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
+| Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | the fighter's own layout (see below) | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Options / Menu | the timer / pause or More button |
 
@@ -199,12 +199,18 @@ interface, and nothing about them changes.
   through `resolveProfile`, else the recommended one), drawn by
   `abilityInput` in Player 1's pad's family (`buttonGlyph`: □ ✕ ○ △ and
   L2 / R2 on PlayStation, A B X Y and LT / RT on Xbox; the default family
-  with no identified pad): a stick direction as an arrow, then the
-  modifier, then the button, joined by `+`, a hold marked HOLD; the tile's
-  accessible name says it in words (`bindingText`, `activationText`). A
-  change of device or pad family, a saved layout changing
-  (`controllerProfiles`) or the language changing redraws the inputs, never
-  the tiles.
+  with no identified pad): a direction held with the button, then the
+  modifier, then the button, joined by `+`, a hold marked HOLD. A
+  direction always shows its stick (`stickGlyph`): R↑ is the right stick
+  up, L↓ the left stick down, never a bare arrow; a stick that is the input
+  itself is a solid chip (R↓), one held with a button a dashed one;
+  'forward' and 'back' are drawn as the side they are for the fighter's
+  facing now (R→, then R← once it turns), so the chip is always the push
+  that works. The tile's accessible name says it in words (`bindingText`,
+  `activationText`: "Right stick forward"). A change of device or pad
+  family, a saved layout changing (`controllerProfiles`), the language
+  changing, or the fighter turning while one of its inputs points forward
+  or back redraws the inputs, never the tiles.
 - **The wheel** turns with `Fighter.grounded` (`data-place` on the wheel;
   the stylesheet's transforms and opacity do the rest, retargeting a
   change mid-turn, at once with reduced motion).
@@ -293,6 +299,255 @@ touch and play hide it. The item under it wears `.is-cursor-target`, the
 same look as a mouse hover, only while the cursor is over it: it goes when
 the cursor moves off, hides, or a dialog opens or closes.
 
+**What can be bound.** Every button of the standard mapping: the four face
+buttons, L1 / R1, the analog L2 / R2 (pressed past half their travel, let
+go below a third, so a trigger resting half way never flickers), the D-pad's
+four sides, L3 / R3 (the stick clicks), Create / Share / View and
+Options / Menu; and both sticks, each on its own, pushed up, down, left,
+right, left or right, forward (the way the fighter faces) or back. The
+centre button (PS, Xbox, the standard mapping's 17th) and the DualSense's
+touchpad are not offered: the system reserves the first on most platforms
+and the standard mapping does not include the second, so neither can be
+read reliably. Menus keep their own fixed controls whatever the gameplay
+layout says (below), so no layout can lock a player out of a menu; Pause is
+always a button, and Esc, P and the touch pause button always pause.
+
+**A binding** is `{ button, modifier, stick, direction, activation }`
+(`js/data/controller-profiles.js`): the button pressed, or none when a stick
+pushed is the input itself (a *stick input*: "Right stick up"); a button
+held first (`modifier`, for a button or a stick input: "R2 + Square",
+"L2 + Right stick up"); a direction and the stick it is read on, always
+named (`stick`: `leftStick`, `rightStick`, `dpad`, or `leftStickDpad`, the
+left stick or the D-pad), held as the button goes down ("Right stick
+down + Square") or, with no button, pushed; and how it activates. Movement's
+binding is its source alone (`leftStick`, `dpad`, `leftStickDpad`,
+`rightStick`): what moves the fighter, and nothing else. No other binding
+reads it, so changing what moves the fighter never moves an attack's
+direction to another stick, and the stick that does not move is free for
+actions of its own. Which actions take what: every move takes any button,
+a direction, a stick input, a modifier, a press or a hold; Jump, the Shield
+and the Fast fall stay held (continuous), on a button or a stick; the Dash
+takes a button or a stick input (pushed left or right, it Dashes that way)
+but no direction to hold, since its button already reads the movement
+stick; the Deflect a press or a hold; Pause a press of a button.
+
+**Play.** Each sample is resolved for the fighter being played, as it is
+at that step (on the ground or in the air, its facing), through that
+fighter's controller profile (`js/data/controller-profiles.js`: the
+player's saved layout for its id, else its recommended one), into the same
+codenames a keyboard sends (`js/core/controller-resolver.js`). The Fighter
+decides what they do, exactly as for the keyboard. The rules:
+
+- **One owner per press.** Each press (of a button, or of a stick pushed in
+  a direction) goes to at most one action, which owns it until it is let
+  go. A held action (Jump, the Shield, a Fast fall on a button) is held
+  only while its own press is.
+- **Modifier first.** A button pressed, or a stick pushed, while a modifier
+  is held (R2 then Square, or both in the same sample) is that combination
+  and nothing else: a combination's button never raises the Shield, even
+  once the modifier is let go (release and press it again). Where the
+  combination means nothing in this place the press does nothing. A
+  combination is never read back into an earlier press (Square then R2 is
+  Square), and plain presses never wait for a possible modifier: no
+  ordinary action is delayed.
+- **Directions.** A direction is read on its own stick, never on whatever
+  moves the fighter: "Right stick down + Square" is never "Left stick
+  down + Square". Among one press's bindings, a stick direction (forward
+  and back included) beats left-or-right, which beats anywhere. A stick
+  points past `DIRECTION_DEADZONE` (half its travel) the way its dominant
+  axis does; an exact diagonal reads vertical; 'forward' and 'back' are
+  read against the fighter's facing at that step. Running and a
+  continuous stick input (the Fast fall on the stick) need `RUN_THRESHOLD`
+  (0.45) of travel on their axis. A directional press never doubles as a
+  held stick input on the same side of the same stick on its own step.
+- **Stick inputs.** Each stick (and the D-pad) is read apart, so both
+  sticks can be pushed at once, a plunge on the right stick while the left
+  one drifts and fast-falls. A push past `DIRECTION_DEADZONE` is one press,
+  in the one direction its dominant axis gives as it goes out, and stays
+  that press whatever the stick does until it comes back under
+  `STICK_RELEASE` (0.35): a stick held never repeats, a wobble at the edge
+  never presses again, rolling round to another side is still the first
+  push, and drift near the middle never presses at all. A stick input
+  bound to the Dash Dashes the way it was pushed (left or right).
+- **Activation.** `press` acts as the input goes down; `hold` once it has
+  been held `HOLD_THRESHOLD` (a tap does nothing); `continuous` holds its
+  control while held. Nothing repeats while held. The Shield is always held
+  (never a toggle), Jump keeps its higher jump when held, Pause is a press.
+- **Context.** A ground action is never chosen in the air, nor an air
+  action on the ground. A controller's combat presses say where they were
+  made for (`pressedOnGround` / `pressedInAir` in the snapshot), and the
+  Fighter never lets one buffered for the ground come out in the air, or
+  the reverse (`pressPlace`); keyboard, touch and CPU presses make no such
+  claim and behave as ever.
+- **Nothing leaks.** Menus never resolve presses. As play starts or
+  resumes, as the fighter changes (Practice Ground), and as Player 1's
+  controller changes, every button and every stick held is stale until let
+  go (the Cross that confirmed Resume never jumps, a stick held through the
+  pause menu raises no Shield it is bound to; a stick held still moves the
+  fighter), and presses made for another fighter are dropped. The Pause
+  binding asks for the pause menu and never reaches the fighter. In Watch
+  Mode nobody plays: the controller only navigates.
+
+### Universal recommended controls
+
+The same for every fighter, chosen together as one layout for the hands, so
+a player who switches fighters never relearns how to move, jump, Dash or
+defend:
+
+| Action | PlayStation | Xbox | Why |
+| --- | --- | --- | --- |
+| Movement | Left stick | Left stick | The left thumb steers, all the time. |
+| Jump (and air jumps; held a little longer, higher) | Cross | A | The button every platformer jumps on, under the right thumb. |
+| Dash / air dash | R1 | RB | The right index finger: the left thumb aims it (the stick's way, else facing), the right thumb stays on Jump and the attacks, so a Dash flows into a jump or a strike with no hand moved. A bumper's short travel suits a quick, frequent press. |
+| Fast fall | Left stick down (in the air) | Left stick down | Push down to fall faster; it also steers a launch down. |
+| Shield (held, on the ground) / Deflect (pressed, in the air) | L1 | LB | One guard button on a finger of its own: guarding never takes the right thumb off the attacks (let go and strike at once), the left thumb keeps steering and turning while it is held, and a bumper makes the Deflect's timing crisp. |
+| Pause | Options | Menu | The pause button of every game. |
+
+Before, the Dash was on L1 / LB and the guard on Circle / B: guarding held
+the right thumb off every attack, and a face button was spent on it. Now
+the four face buttons are Jump and three attacks, the bumpers the two
+universal tools, and both triggers and the right stick are every fighter's
+own.
+
+### Recommended layouts
+
+Each fighter's own moves are authored for it in its definition
+(`controller.layout`, see [adding characters](../characters/adding-characters.md#controller-layout)),
+one input a move, no combination and no direction held with a button,
+chosen for what each move looks like and how it is used, never its attack
+number. One language runs through them all: Square / X is the quick strike
+on the ground and in the air, Triangle / Y and Circle / B the other
+everyday strikes (a string rolls left to right across them), R2 / RT sends
+the ranged move, L2 / LT is the Special, and the right stick holds the
+moves whose direction the player can see: up for a move that rises, down
+for one that drives down or plunges, forward for one sent the way the
+fighter faces. Each fighter's specification has the full table and why:
+[#0001](../characters/0001.md#controller-layout),
+[#0002](../characters/0002.md#controller-layout),
+[#0003](../characters/0003.md#controller-layout),
+[#0004](../characters/0004.md#controller-layout),
+[#0005](../characters/0005.md#controller-layout).
+
+| | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
+| --- | --- | --- | --- | --- | --- | --- |
+| #0001 ground | Jab | High Kick | Maximum Blue | Red | Unlimited Void | forward: Hollow Purple |
+| #0001 air | Floating Straight | High Kick | Blue | Red Kick | | |
+| #0002 ground | One-Two | Rapid Kicks | Spin Attack | Whirlwind | | |
+| #0002 air | Homing Attack | | | | | up: Blue Tornado; down: Bounce Attack |
+| #0003 ground | Chakra Punch | Heel Drop | Chakra Haymaker | | Mystical Palm Technique | down: Cherry Blossom Impact |
+| #0003 air | Leaping Kick | | | | | down: Heavenly Foot of Pain |
+| #0004 ground | Dance Combo | Leek Swing | Crescent Kick | Melody | World is Mine | forward: Ievan Polkka |
+| #0004 air | Air Dance | | | | | up: Leekspin; down: Stage Dive |
+| #0005 ground | Claw Swipe | Long Bite | Phantom Hands | Dark Tendrils | Deadlights | up: Red Balloon |
+| #0005 air | Claw Rake | Snapping Jaws | Floating Hands | | | |
+
+A fighter with no authored layout gets a safe, conflict-free fallback (the
+free face buttons, the triggers, the right stick, then the D-pad and the
+stick clicks, one input a move), flagged in the editor as not designed yet;
+a fighter's layout may never retune the universal actions, and a
+registered fighter whose layout is incomplete, invalid or conflicting (a
+warning included) never loads (`assertControllerLayout`).
+
+### Customizing
+
+Settings › Controls › Controller controls › Customize controller controls
+opens the fighter roster (all 48 slots; a locked slot never opens), then
+the chosen fighter's editor: its portrait, name and the family the buttons
+are named for, and every action it has (Movement, Defense, Ground attacks,
+Aerial attacks, Special abilities, Other; a category it has nothing in is
+left out, so #0002 has no Special abilities), each with its real name, a
+line on what it does, its input and activation, and a diagram lighting the
+input of the action in focus: its button, its modifier, and its stick
+(left or right, each on its own) with the arrow it points; a stick input's
+stick lit as the input. Every move row shows the move's own artwork beside
+its name, the frame its touch button shows (`mobileAbility` /
+`previewFrame` from the fighter's `mobileAbilities`: the ground preview on
+its ground row, the air one on its aerial row, a projectile's,
+technique's or summon's where authored; mirrored where its clip faces
+left), decorative only, with the touch button's glyph where it has none or
+its file fails to load (`EditorLayer.rowArt`); Movement, Defense and Pause
+rows have none. **Special abilities** holds only the moves the fighter
+itself classifies as Special (its `specialAbilities`,
+[combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
+Purple, #0003's Mystical Palm Technique, #0004's World is Mine and #0005's
+Deadlights and Red Balloon, each tagged Ground or Air. Every other move, a
+projectile, a technique or the Whirlwind's tornado included, sits under
+Ground attacks or Aerial attacks where it is played. A row's category
+never changes its action id, so no binding moves with it.
+
+Choosing an action opens the binding dialog. It listens to Player 1's
+controller: the last button pressed is the button, a button held before it
+the modifier, and whichever stick (left or right) points as the button goes
+down gives the direction, that stick named; a stick pushed out and let go
+with no button pressed meanwhile is a stick input (that stick, the way it
+was pushed; a button held through it its modifier); for Movement, the stick
+or pad used is the source. A stick resting off centre never counts. Every
+part can also be set in text with the D-pad, arrows or a click: the button
+(or **None (stick only)**), the button held first, the stick a direction is
+read on (**None (any direction)** for a button that needs none) and its
+direction (up, down, left, right, left or right, forward, back), and the
+activation; then Retry, Cancel and Confirm. No controller is needed: with
+none connected the dialog says so and the fields do it all. While it
+listens the controller only listens: no menu behind it and no gameplay.
+
+**Conflicts** are checked live (`profileConflicts`), by the physical inputs
+a binding is made of, not by the button names it mentions:
+
+- an **error** keeps Save (and Confirm) off: two actions set off by the
+  same input with the same modifier where both can apply, and nothing
+  making one the more specific (the same button with no direction twice;
+  directions that can be met at once and are as specific as each other,
+  "Left stick down + Square" beside "Right stick up + Square"; the same
+  side of the same stick, "Right stick left" beside "Right stick forward";
+  a D-pad button beside a stick input on that side of the D-pad); or an
+  input the Movement source moves with (the left and right of its stick or
+  D-pad, as a button, a modifier or a stick input; its up and down are
+  free, so the D-pad's up can be Jump while the D-pad moves);
+- a **warning** only informs: a modifier that is also another action's own
+  button (holding it triggers that action first), or a direction held with
+  a button that is, on that stick, another action's stick input (pushing
+  it triggers that action first).
+
+Shared inputs that resolve one way are not conflicts: the same input on the
+ground and in the air, the Shield and the Deflect, a combination beside its
+plain button, a direction beside none, left-or-right beside left, forward
+beside back, up on the left stick beside up on the right one.
+
+**Save** stores the whole layout for that fighter alone, under its id
+(`controllerProfiles` in the settings, version 6); **Cancel** discards
+unsaved changes after asking; **Restore defaults** asks, then puts that
+fighter alone back on its recommended layout, today's. Saved layouts load
+on every visit and play at once; a malformed stored binding falls back to
+the recommended one, never the rest of the settings or another fighter's
+layout. A stored binding for an action id that no longer exists
+(`ACTION_ID`; the retired `transform` button's, on the ground and in the
+air) is dropped as the settings are read, every other binding kept as
+saved.
+
+### Saved layouts
+
+Layouts saved before the sticks were named (settings versions 4 and 5) had
+no `stick`: a direction was read on whatever moved the fighter. Reading
+them, the settings upgrade each fighter's profile for that fighter
+(`upgradeStoredProfiles`):
+
+- every binding takes today's shape, its direction on the stick or pad that
+  moved the fighter in that profile, so it plays exactly as it did;
+- the player's own choices are kept: every binding that differs from what
+  that fighter recommended then (the old universal defaults,
+  `LEGACY_UNIVERSAL_DEFAULTS`, and the fighter's own old layout, kept in
+  its definition as `controller.previous`);
+- the bindings that were only the old recommended ones give way to today's
+  recommended layout, as long as that mix conflicts with nothing; where it
+  would, the whole layout the player played with is kept as it was;
+- a profile with no choice of the player's own is dropped: that fighter
+  plays with today's recommended layout, as does every fighter never
+  customized. A profile for a fighter the game does not know is kept as
+  saved, in today's shape.
+
+One fighter's profile never touches another's, and nothing is written
+until a setting changes.
+
 ## Interaction states
 
 Four states, never confused (`js/core/input-modality.js`, the rules in
@@ -344,158 +599,6 @@ them as a stack (`MenuNavigator.syncLayers`):
   (else its default); when the last one closes on a navigable screen,
   focus goes back to what opened it.
 
-**Play.** Each sample is resolved for the fighter being played, as it is
-at that step (on the ground or in the air, its facing), through that
-fighter's controller profile (`js/data/controller-profiles.js`: the
-player's saved layout for its id, else its recommended one), into the same
-codenames a keyboard sends (`js/core/controller-resolver.js`). The Fighter
-decides what they do, exactly as for the keyboard. The rules:
-
-- **One owner per press.** Each press goes to at most one action, which
-  owns the button until it is let go. A held action (Jump, the Shield, a
-  Fast fall on a button) is held only while its own press is.
-- **Modifier first.** A button pressed while a modifier is held (R2 then
-  Square, or both in the same sample) is that combination and nothing
-  else: R2 + Square is Red, never the Jab; R2 + Circle is Maximum Blue,
-  never the Shield, and its Circle never raises the Shield, even once R2 is
-  let go (release and press Circle again). Where the combination means
-  nothing (R2 + Circle in the air) the press does nothing. A combination is
-  never read back into an earlier press (Square then R2 is the Jab), and
-  plain presses never wait for a possible modifier: no ordinary action is
-  delayed.
-- **Directions.** Among one press's bindings, a stick direction beats
-  left-or-right, which beats anywhere (Down + Square beats Square). The
-  stick points past `DIRECTION_DEADZONE` (half its travel) the way its
-  dominant axis does; an exact diagonal reads vertical. A directional press
-  never doubles as the Fast fall on its own step. Running and a Fast fall
-  on the stick need `RUN_THRESHOLD` (0.45) of travel on their axis.
-- **Activation.** `press` acts as the input goes down; `hold` once it has
-  been held `HOLD_THRESHOLD` (a tap does nothing); `continuous` holds its
-  control while held. Nothing repeats while held. The Shield is always held
-  (never a toggle), Jump keeps its higher jump when held, Pause is a press.
-- **Context.** A ground action is never chosen in the air, nor an air
-  action on the ground. A controller's combat presses say where they were
-  made for (`pressedOnGround` / `pressedInAir` in the snapshot), and the
-  Fighter never lets one buffered for the ground come out in the air, or
-  the reverse (`pressPlace`); keyboard, touch and CPU presses make no such
-  claim and behave as ever.
-- **Nothing leaks.** Menus never resolve presses. As play starts or
-  resumes, as the fighter changes (Practice Ground), and as Player 1's
-  controller changes, every button held is stale until let go (the Cross
-  that confirmed Resume never jumps), and presses made for another fighter
-  are dropped. Options / Menu (the Pause binding) asks for the pause menu
-  and never reaches the fighter. In Watch Mode nobody plays: the controller
-  only navigates.
-
-**Universal recommended controls**, the same for every fighter: the left
-stick moves; Cross / A jumps; L1 / LB is the Dash and air dash (the right
-thumb never leaves the attack buttons); the stick pushed down fast-falls
-and steers a launch down; Circle / B held is the Shield on the ground and a
-fresh press of it the Deflect in the air; Options / Menu pauses. Each
-fighter's own moves are authored for it in its definition
-(`controller.layout`, see [adding characters](../characters/adding-characters.md#controller-layout)),
-chosen for each move, not its attack number:
-
-| #0001 | Recommended | | #0002 | Recommended |
-| --- | --- | --- | --- | --- |
-| Jab | Square / X | | One-Two | Square / X |
-| High Kick | Triangle / Y | | Rapid Kicks | Triangle / Y |
-| Red | R2 + Square / RT + X | | Spin Attack | R1 / RB |
-| Maximum Blue | R2 + Circle / RT + B | | Whirlwind | R2 + Triangle / RT + Y |
-| Unlimited Void | L2 + Triangle / LT + Y | | Homing Attack (air) | Square / X (any way but down; starts the stick's way, else its facing) |
-| Hollow Purple | R2 + Triangle / RT + Y | | Bounce Attack (air) | Down + Square / Down + X |
-| Floating Straight (air) | Square / X | | Blue Tornado (air) | R1 / RB |
-| Red Kick (air) | Triangle / Y | | | |
-| Blue (air) | R1 / RB | | | |
-| High Kick (air) | L2 + Square / LT + X | | | |
-
-| #0003 | Recommended |
-| --- | --- |
-| Chakra Punch | Square / X |
-| Heel Drop | Triangle / Y |
-| Cherry Blossom Impact | R2 + Square / RT + X |
-| Chakra Haymaker | R2 + Triangle / RT + Y |
-| Mystical Palm Technique | L2 + Triangle / LT + Y |
-| Leaping Kick (air) | Square / X |
-| Heavenly Foot of Pain (air) | Triangle / Y |
-
-| #0004 | Recommended |
-| --- | --- |
-| Dance Combo | Square / X |
-| Leek Swing | Triangle / Y |
-| Crescent Kick | Up + Square / Up + X |
-| Ievan Polkka | R2 + Triangle / RT + Y |
-| World is Mine | L2 + Triangle / LT + Y |
-| Melody | R1 / RB |
-| Air Dance (air) | Square / X |
-| Leekspin (air) | Triangle / Y |
-| Stage Dive (air) | Down + Square / Down + X |
-
-| #0005 | Recommended |
-| --- | --- |
-| Claw Swipe | Square / X |
-| Long Bite | Triangle / Y |
-| Phantom Hands | R1 / RB |
-| Deadlights | L2 + Square / LT + X |
-| Red Balloon | L2 + Triangle / LT + Y |
-| Dark Tendrils | R2 + Triangle / RT + Y |
-| Claw Rake (air) | Square / X |
-| Snapping Jaws (air) | Triangle / Y |
-| Floating Hands (air) | R1 / RB |
-
-A fighter with no authored layout gets a safe, conflict-free fallback
-(face buttons, then R1, then trigger combinations), flagged in the editor
-as not designed yet; a fighter's layout may never retune the universal
-actions, and a registered fighter whose layout is incomplete, invalid or
-conflicting never loads (`assertControllerLayout`).
-
-**Customizing.** Settings › Controls › Controller controls › Customize
-controller controls opens the fighter roster (all 48 slots; a locked slot
-never opens), then the chosen fighter's editor: its portrait, name and the
-family the buttons are named for, and every action it has (Movement,
-Defense, Ground attacks, Aerial attacks, Special abilities, Other; a
-category it has nothing in is left out, so #0002 has no Special
-abilities), each
-with its real name, a line on what it does, its input and activation, and a
-diagram lighting the input of the action in focus. Every move row shows
-the move's own artwork beside its name, the frame its touch button shows
-(`mobileAbility` / `previewFrame` from the fighter's `mobileAbilities`:
-the ground preview on its ground row, the air one on its aerial row, a
-projectile's, technique's or summon's where authored; mirrored where its
-clip faces left), decorative only, with the touch button's glyph where it
-has none or its file fails to load (`EditorLayer.rowArt`); Movement,
-Defense and Pause rows have none. **Special abilities** holds only the
-moves the fighter itself classifies as Special (its `specialAbilities`,
-[combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
-Purple, #0003's Mystical Palm Technique, #0004's World is Mine and #0005's
-Deadlights and Red Balloon, each tagged Ground or Air.
-Every other move, a projectile, a technique or the Whirlwind's tornado
-included, sits under Ground attacks or Aerial attacks where it is played
-(Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact, Ievan Polkka and
-Dark Tendrils under Ground attacks). A row's category never changes its action id, so no binding
-moves with it. Choosing an action opens
-the binding dialog, which listens to Player 1's controller (a button, a
-modifier held first, the stick pointing first; for Fast fall a direction
-alone; for Movement the stick or pad moved) and can also be set in text with
-the D-pad, arrows or a click (button, held modifier, stick direction,
-activation), with Retry, Cancel and Confirm. While it listens the
-controller only listens: no menu behind it and no gameplay. Conflicts are
-checked live (`profileConflicts`): two actions on the same input where both
-apply, or a button the Movement source moves with, is an error that keeps
-Save off; a modifier that is also another action's own button is a warning.
-Shared buttons that resolve one way are not conflicts: the same button on
-the ground and in the air (Spin Attack and Blue Tornado, the Shield and the
-Deflect), a combination beside its plain button, a direction beside none.
-**Save** stores the whole layout for that fighter alone, under its id
-(`controllerProfiles` in the settings, version 5); **Cancel** discards
-unsaved changes after asking; **Restore defaults** asks, then puts that
-fighter alone back on its recommended layout. Saved layouts load on every
-visit; a malformed stored binding falls back to the recommended one, never
-the rest of the settings. A stored binding for an action id that no longer
-exists (`ACTION_ID`; the retired `transform` button's, on the ground and in
-the air) is dropped as the settings are read, every other binding kept as
-saved.
-
 ## Tests
 
 - [`tests/interface/ability-hud.test.mjs`](../../tests/interface/ability-hud.test.mjs):
@@ -513,12 +616,21 @@ saved.
   Reconnect, no or blocked Gamepad API, focus loss, triggers.
 - [`tests/systems/controller-profiles.test.mjs`](../../tests/systems/controller-profiles.test.mjs):
   the actions from each definition, the universal defaults, every playable
-  fighter's authored layout, the fallback, bindings, conflicts and valid
-  reuse, stored profiles, and no fighter named in the shared engine.
+  fighter's authored layout (one input a move, the shared button language),
+  the fallback, bindings (every button, either stick, stick inputs,
+  modifiers), physical inputs, conflicts and valid reuse, stored profiles,
+  the upgrade of profiles saved before, and no fighter named in the shared
+  engine.
 - [`tests/systems/controller-input.test.mjs`](../../tests/systems/controller-input.test.mjs):
-  the controller in play on real Fighters: universal controls, every #0001
-  and #0002 default, combinations, directions at their boundaries, ground /
-  air context, custom bindings, menus, a lost controller, a fighter change.
+  the controller in play on real Fighters: universal controls (R1 Dashing,
+  L1 guarding, a Dash into an attack, the guard dropped into a strike),
+  every #0001 and #0002 default, every playable fighter's whole layout and
+  shared universal layout, the right stick (one press per push, deadzone,
+  release, wobble, forward by facing, both sticks at once), combinations on
+  buttons and sticks, directions read on their own stick at their
+  boundaries, ground / air context, custom bindings and every universal
+  action remapped, menus (sticks included), a lost controller, a fighter
+  change.
 - [`tests/interface/ui-consistency.test.mjs`](../../tests/interface/ui-consistency.test.mjs):
   the interaction states and the input modality, the dialog stack (order,
   inert layers, Back, focus coming back, stale scopes), and the shared
@@ -526,7 +638,10 @@ saved.
 - [`tests/interface/controller-ui.test.mjs`](../../tests/interface/controller-ui.test.mjs):
   the Home indicator, Controller Connections, the cursor, Settings ›
   Controller controls, the editor (its move art for both fighters, ground
-  and air, mirroring and fallbacks) and binding capture, in both languages.
+  and air, mirroring and fallbacks), binding capture (combinations, a
+  direction on either stick, a stick input, a stick input with a modifier,
+  drift ignored, the fields with no controller), the diagram lighting
+  either stick on its own, in both languages.
 - [`tests/systems/request-devices.test.mjs`](../../tests/systems/request-devices.test.mjs):
   the keyboard, touch and a controller making the same requests: a held
   button is one press, Combo Assist (its queued follow-up included, on the

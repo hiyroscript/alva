@@ -1,10 +1,11 @@
 // How controller inputs read on screen: each button by the name its own
 // family gives it (Cross and Circle on a PlayStation pad, A and B on an
 // Xbox pad, never one family's names for the other's buttons), a binding as
-// one phrase ("R2 + Square", "Left stick down + Square"), its activation,
-// and a small original controller diagram that lights the buttons a
-// binding uses. Presentation only: bindings themselves are normalized
-// (js/data/controller-profiles.js).
+// one phrase ("R2 + Square", "Left stick down + Square", "Right stick up"),
+// always naming the stick a direction is read on, its activation, and a
+// small original controller diagram that lights the buttons and the stick
+// (either one, with its direction) a binding uses. Presentation only:
+// bindings themselves are normalized (js/data/controller-profiles.js).
 
 import { t, hasTranslation } from '../localization/i18n.js';
 import { buttonCode, buttonLabelKey, buttonGlyph, DEFAULT_FAMILY, FAMILIES } from '../core/gamepad-devices.js';
@@ -24,33 +25,59 @@ export function buttonName(family, button, model = null) {
   return t(buttonLabelKey(f, button, model));
 }
 
-// The Movement source's name ('Left stick', 'D-pad').
+// A stick's (or the Movement source's) name ('Left stick', 'Right stick',
+// 'D-pad').
 export const sourceName = (source) => t(`pad.source.${source}`);
+export const stickName = sourceName;
 
-// `direction` of `source` ('Left stick down', 'Left stick left or right').
-export const directionName = (direction, source) => t(`pad.direction.${direction}`, { source: sourceName(source) });
+// `direction` of `stick` ('Left stick down', 'Right stick forward').
+export const directionName = (direction, stick) => t(`pad.direction.${direction}`, { source: sourceName(stick ?? 'leftStick') });
 
-// A binding as one phrase: its direction, its modifier and its button,
-// joined by "+" ("Left stick down + Square", "R2 + Circle"). `source` is
-// the Movement source its direction reads.
-export function bindingText(binding, family, source = 'leftStick', model = null) {
+// A binding as one phrase, joined by "+": its direction (on its own
+// stick), its modifier and its button ("Left stick down + Square", "R2 +
+// Circle"), or for a stick input its modifier and the stick pushed ("Right
+// stick up", "L2 + Right stick up").
+export function bindingText(binding, family, model = null) {
   if (!binding) return t('pad.notBound');
   if ('source' in binding) return sourceName(binding.source);
   const parts = [];
-  if (binding.direction) parts.push(directionName(binding.direction, source));
+  if (binding.button && binding.direction) parts.push(directionName(binding.direction, binding.stick));
   if (binding.modifier) parts.push(buttonName(family, binding.modifier, model));
   if (binding.button) parts.push(buttonName(family, binding.button, model));
+  else if (binding.direction) parts.push(directionName(binding.direction, binding.stick));
   return parts.join(' + ');
 }
 
 // How `binding` activates, for `action` ({ kind }), as the editor says it:
-// Press, Modifier + press, Hold to activate, Hold; Jump's press-and-hold.
+// Press (Push for a stick), Modifier + press, Hold to activate, Hold;
+// Jump's press-and-hold.
 export function activationText(binding, action) {
   if (!binding || 'source' in binding) return '';
-  if (action?.kind === 'jump') return t('pad.activation.jump');
-  if (binding.activation === 'press' && binding.modifier) return t('pad.activation.modifierPress');
+  if (action?.kind === 'jump' && binding.button) return t('pad.activation.jump');
+  const stick = binding.button === null && !!binding.direction;
+  if (binding.activation === 'press' && binding.modifier) return t(stick ? 'pad.activation.modifierPush' : 'pad.activation.modifierPress');
+  if (binding.activation === 'press' && stick) return t('pad.activation.push');
   return t(`pad.activation.${binding.activation}`);
 }
+
+// Arrows for directions: 'forward' and 'back' as their side for a fighter
+// facing `facing` (1 right, -1 left), or as » and « without one.
+const ARROWS = Object.freeze({ left: '←', right: '→', up: '↑', down: '↓', horizontal: '↔', forward: '»', back: '«' });
+export function directionArrow(direction, facing = null) {
+  if ((direction === 'forward' || direction === 'back') && (facing === 1 || facing === -1)) {
+    const right = direction === 'forward' ? facing > 0 : facing < 0;
+    return right ? '→' : '←';
+  }
+  return ARROWS[direction] ?? '';
+}
+
+// A stick's short mark on a chip: L or R for the sticks, ✚ for the D-pad.
+const STICK_MARKS = Object.freeze({ leftStick: 'L', rightStick: 'R', dpad: '✚', leftStickDpad: 'L✚' });
+export const stickMark = (stick) => STICK_MARKS[stick] ?? '';
+
+// A stick direction as a chip shows it: its stick's mark and its arrow
+// ("R↑", "L↓").
+export const stickGlyph = (stick, direction, facing = null) => `${stickMark(stick)}${directionArrow(direction, facing)}`;
 
 // An action's name: a universal action's own, a move's by its fighter
 // (`def`), in the interface language where there is a translation.
@@ -106,29 +133,40 @@ ${stick('l3', left, 'leftStick')}${stick('r3', right, 'rightStick')}
 </svg>`;
 }
 
-const ARROWS = Object.freeze({ left: '←', right: '→', up: '↑', down: '↓', horizontal: '↔' });
+// The diagram parts a stick is (the left stick and the D-pad for either).
+const STICK_PARTS = Object.freeze({
+  leftStick: ['leftStick'], rightStick: ['rightStick'], dpad: ['dpad'], leftStickDpad: ['leftStick', 'dpad'],
+});
+// The D-pad buttons a direction points with.
+const DPAD_SIDES = Object.freeze({
+  up: ['dpadUp'], down: ['dpadDown'], left: ['dpadLeft'], right: ['dpadRight'],
+  horizontal: ['dpadLeft', 'dpadRight'], forward: ['dpadLeft', 'dpadRight'], back: ['dpadLeft', 'dpadRight'],
+});
 
-// Lights `binding`'s buttons in `svg` (a diagramSVG element): its button
-// and modifier, and its direction on the Movement source (`source`).
-export function highlight(svg, binding, source = 'leftStick') {
+// Lights `binding`'s inputs in `svg` (a diagramSVG element): its button
+// and modifier, and its direction on its own stick (left or right, each
+// apart, an arrow in it; the D-pad's sides), a stick input's stick lit as
+// the input it is. For Movement, the source.
+export function highlight(svg, binding) {
   if (!svg?.querySelectorAll) return;
-  for (const node of svg.querySelectorAll('.is-on, .is-mod, .is-dir')) node.classList.remove('is-on', 'is-mod', 'is-dir');
+  for (const node of svg.querySelectorAll('.is-on, .is-mod, .is-dir, .is-side')) node.classList.remove('is-on', 'is-mod', 'is-dir', 'is-side');
   for (const arrow of svg.querySelectorAll('.pad-arrow')) arrow.textContent = '';
   if (!binding) return;
   const lit = (button, cls) => svg.querySelector(`[data-pad-button="${button}"]`)?.classList.add(cls);
   if ('source' in binding) {
-    const stick = binding.source === 'rightStick' ? 'rightStick' : binding.source === 'dpad' ? 'dpad' : 'leftStick';
-    svg.querySelector(`[data-pad-stick="${stick}"]`)?.classList.add('is-dir');
-    if (binding.source === 'leftStickDpad') svg.querySelector('[data-pad-stick="dpad"]')?.classList.add('is-dir');
+    for (const part of STICK_PARTS[binding.source] ?? []) svg.querySelector(`[data-pad-stick="${part}"]`)?.classList.add('is-dir');
     return;
   }
   if (binding.button) lit(binding.button, 'is-on');
   if (binding.modifier) lit(binding.modifier, 'is-mod');
-  if (binding.direction) {
-    const stick = source === 'rightStick' ? 'rightStick' : source === 'dpad' ? 'dpad' : 'leftStick';
-    const node = svg.querySelector(`[data-pad-stick="${stick}"]`);
-    node?.classList.add('is-dir');
-    const arrow = node?.querySelector?.('.pad-arrow');
-    if (arrow) arrow.textContent = ARROWS[binding.direction] ?? '';
+  if (binding.direction && binding.stick) {
+    for (const part of STICK_PARTS[binding.stick] ?? []) {
+      const node = svg.querySelector(`[data-pad-stick="${part}"]`);
+      node?.classList.add('is-dir');
+      if (!binding.button) node?.classList.add('is-on');
+      const arrow = node?.querySelector?.('.pad-arrow');
+      if (arrow) arrow.textContent = directionArrow(binding.direction);
+      if (part === 'dpad') for (const side of DPAD_SIDES[binding.direction] ?? []) lit(side, 'is-side');
+    }
   }
 }

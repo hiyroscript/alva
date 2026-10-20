@@ -26,9 +26,11 @@
 //                (asking first); Restore defaults asks, then puts this
 //                fighter alone back on its recommended layout.
 //   the binding  one action's input: it listens to Player 1's controller
-//                (the combination pressed, a modifier held first, the stick
-//                pointing first) and shows what it heard; every part can
-//                also be chosen in text (button, held modifier, stick
+//                (the combination pressed, a modifier held first, either
+//                stick pointing first; or a stick pushed and let go on its
+//                own, the stick itself the input) and shows what it heard,
+//                naming the stick; every part can also be chosen in text
+//                (button or stick only, held modifier, stick, its
 //                direction, activation) with the D-pad, arrows or a click,
 //                so no controller and no diagram is needed. Retry listens
 //                again, Cancel leaves the binding as it was, Confirm takes
@@ -39,10 +41,10 @@ import { el } from '../core/utils.js';
 import { t, tx, tattr, iconLabel, setText } from '../localization/i18n.js';
 import { CHARACTERS, isPlayable, getPlayableCharacter } from '../data/characters.js';
 import {
-  CATEGORIES, DIRECTIONS, MOVEMENT_SOURCES, PAD_BUTTONS, resolveProfile, recommendedProfile, profileConflicts,
+  CATEGORIES, DIRECTIONS, MOVEMENT_SOURCES, STICKS, PAD_BUTTONS, resolveProfile, recommendedProfile, profileConflicts,
   hasBlockingConflict, normalizeBinding, sameBinding, hasAuthoredLayout,
 } from '../data/controller-profiles.js';
-import { stickDirection, movementVector, RUN_THRESHOLD } from '../core/controller-resolver.js';
+import { stickDirection, movementVector, DIRECTION_DEADZONE, STICK_RELEASE } from '../core/controller-resolver.js';
 import { FighterRoster } from './fighter-roster.js';
 import { paintPortrait } from './sprite-art.js';
 import { ICONS } from './icons.js';
@@ -51,6 +53,10 @@ import {
   FAMILY_NAMES, displayFamily, buttonName, bindingText, activationText, actionName, actionDescription,
   diagramSVG, highlight, sourceName, directionName,
 } from './controller-glyphs.js';
+
+// The sticks a capture listens to for a direction (the D-pad's buttons are
+// heard as buttons).
+const CAPTURE_STICKS = Object.freeze(['leftStick', 'rightStick']);
 
 // Keeps Tab and Shift+Tab inside `root` while it is the navigator's scope.
 function trapTab(root, app) {
@@ -201,6 +207,7 @@ class BindingLayer {
       source: new Cycler({ id: 'binding-source', labelKey: 'binding.source', onChange: update }),
       button: new Cycler({ id: 'binding-button', labelKey: 'binding.button', onChange: update }),
       modifier: new Cycler({ id: 'binding-modifier', labelKey: 'binding.modifier', onChange: update }),
+      stick: new Cycler({ id: 'binding-stick', labelKey: 'binding.stick', onChange: update }),
       direction: new Cycler({ id: 'binding-direction', labelKey: 'binding.direction', onChange: update }),
       activation: new Cycler({ id: 'binding-activation', labelKey: 'binding.activation', onChange: update }),
     };
@@ -300,36 +307,40 @@ class BindingLayer {
     done?.(result && !sameBinding(result, this.original) ? result : null);
   }
 
-  get source() {
-    return this.draft.move?.source ?? 'leftStick';
-  }
-
-  // The fields' choices for this action, set to the binding.
+  // The fields' choices for this action, set to the binding: the button
+  // (or the stick alone, where the action takes a stick input), the button
+  // held first, the stick a direction is read on (none, for a button that
+  // needs no direction) and its direction, the activation.
   setFields() {
     const a = this.action;
     const b = this.binding;
     const f = this.fields;
     const isMove = a.kind === 'move';
     f.source.row.hidden = !isMove;
-    for (const name of ['button', 'modifier', 'direction', 'activation']) f[name].row.hidden = isMove;
+    for (const name of ['button', 'modifier', 'stick', 'direction', 'activation']) f[name].row.hidden = isMove;
     this.dashNote.hidden = a.kind !== 'dash';
+    if (a.kind === 'dash') setText(this.dashNote, b.button === null ? 'binding.dashStick' : 'binding.dashDirection');
     if (isMove) {
       f.source.set(MOVEMENT_SOURCES.map((s) => ({ value: s, text: sourceName(s) })), b.source);
       return;
     }
     const name = (button) => buttonName(this.family, button);
     const buttons = PAD_BUTTONS.map((p) => ({ value: p, text: name(p) }));
-    f.button.set(a.directionOnly ? [{ value: null, text: t('binding.stickOnly') }, ...buttons] : buttons, b.button);
+    f.button.set(a.stickInput ? [{ value: null, text: t('binding.stickOnly') }, ...buttons] : buttons, b.button);
     f.modifier.set([{ value: null, text: t('binding.none') }, ...PAD_BUTTONS.filter((p) => p !== b.button).map((p) => ({ value: p, text: name(p) }))], b.modifier);
-    if (b.button === null) f.modifier.set([{ value: null, text: t('binding.none') }], null);
-    f.direction.set(a.directional
-      ? [{ value: null, text: t('binding.anyDirection') }, ...DIRECTIONS.map((d) => ({ value: d, text: directionName(d, this.source) }))]
-      : [{ value: null, text: t('binding.ownDirection') }], b.direction);
-    f.activation.set(a.activations.map((v) => ({ value: v, text: activationText({ activation: v, modifier: null }, a) })), b.activation);
+    const sticks = STICKS.map((s) => ({ value: s, text: sourceName(s) }));
+    if (b.button === null) f.stick.set(sticks, b.stick);
+    else if (a.directional) f.stick.set([{ value: null, text: t('binding.noStick') }, ...sticks], b.stick);
+    else f.stick.set([{ value: null, text: t('binding.ownDirection') }], null);
+    f.direction.row.hidden = !b.stick;
+    if (b.stick) f.direction.set(DIRECTIONS.map((d) => ({ value: d, text: directionName(d, b.stick) })), b.direction);
+    else f.direction.set([], null);
+    f.activation.set(a.activations.map((v) => ({ value: v, text: activationText({ button: b.button, direction: b.direction, activation: v, modifier: null }, a) })), b.activation);
   }
 
   // The fields read back into a binding (normalized; an impossible mix
-  // keeps the last valid one).
+  // keeps the last valid one). A stick chosen with no direction yet points
+  // up; a stick input always has one.
   fromFields() {
     const f = this.fields;
     let next;
@@ -337,14 +348,15 @@ class BindingLayer {
       next = { source: f.source.current };
     } else {
       const button = f.button.current;
+      let stick = f.stick.current;
+      if (button === null && stick === null) stick = 'rightStick';
       next = normalizeBinding(this.action, {
         button,
-        modifier: button === null || f.modifier.current === button ? null : f.modifier.current,
-        direction: f.direction.current,
+        modifier: f.modifier.current === button ? null : f.modifier.current,
+        stick,
+        direction: stick ? f.direction.current ?? 'up' : null,
         activation: f.activation.current,
       });
-      // A direction alone needs a direction.
-      if (!next && button === null) next = normalizeBinding(this.action, { button: null, modifier: null, direction: 'down', activation: f.activation.current });
     }
     if (next) this.binding = next;
     this.setFields();
@@ -354,12 +366,12 @@ class BindingLayer {
   // Shows the binding: its phrase, the diagram, its conflicts.
   render() {
     const b = this.binding;
-    setText(this.detected, 'binding.current', { input: bindingText(b, this.family, this.source), activation: activationText(b, this.action) || '—' });
-    highlight(this.diagram.firstElementChild, b, this.action.kind === 'move' ? b.source : this.source);
+    setText(this.detected, 'binding.current', { input: bindingText(b, this.family), activation: activationText(b, this.action) || '—' });
+    highlight(this.diagram.firstElementChild, b);
     const draft = { ...this.draft, [this.action.id]: b };
     const mine = profileConflicts(this.actions, draft).filter((c) => c.actions.includes(this.action.id));
     this.conflicts.replaceChildren(...mine.map((c) => el('li', {
-      class: `binding-conflict is-${c.severity}`, text: conflictText(c, this.def, this.actions, this.family, this.source),
+      class: `binding-conflict is-${c.severity}`, text: conflictText(c, this.def, this.actions, this.family),
     })));
     this.confirmButton.disabled = hasBlockingConflict(mine);
   }
@@ -376,17 +388,18 @@ class BindingLayer {
 
   // Listens to Player 1's controller until a press (or combination) is let
   // go: the last button pressed is the button, a button held before it the
-  // modifier, the stick's direction as it went down the direction. A stick
-  // pushed out and back alone is a direction-only binding where the action
-  // takes one (Fast fall); for Movement, the stick or pad used is the
-  // source.
+  // modifier, and whichever stick (left or right) points as it goes down
+  // gives the direction, that stick named. A stick pushed out and let go
+  // with no button pressed meanwhile is a stick input where the action
+  // takes one (that stick, its direction; a button held through it its
+  // modifier). For Movement, the stick or pad used is the source.
   startListening() {
     this.stopListening();
     if (!this.app.controllers?.player1) {
       this.renderListen();
       return;
     }
-    const capture = { last: null, modifier: null, direction: null, stick: null, held: new Set() };
+    const capture = { last: null, modifier: null, stick: null, direction: null, flick: null, used: new Set(), held: new Set() };
     this.stopCapture = this.app.input.startCapture((state) => this.listenStep(capture, state));
     this.renderListen();
   }
@@ -412,25 +425,50 @@ class BindingLayer {
       }
       return;
     }
-    const [x, y] = movementVector(this.source, held, axes);
+    // Each stick's direction now (dominant axis, past the deadzone), and
+    // whether it is back near the middle.
+    const sticks = CAPTURE_STICKS.map((stick) => {
+      const [x, y] = movementVector(stick, held, axes);
+      return { stick, side: stickDirection(x, y), size: Math.hypot(x, y) };
+    });
     for (const button of pressed) {
       const others = [...capture.held].filter((b) => b !== button);
       capture.last = button;
       capture.modifier = others.at(-1) ?? null;
-      capture.direction = stickDirection(x, y);
+      // The stick pointing furthest as it goes down is its direction; that
+      // stick, pushed for it, is no stick input of its own.
+      const pointing = sticks.filter((s) => s.side).sort((p, q) => q.size - p.size)[0] ?? null;
+      capture.stick = pointing?.stick ?? null;
+      capture.direction = pointing?.side ?? null;
+      for (const s of sticks) if (s.side) capture.used.add(s.stick);
+      if (capture.flick && capture.used.has(capture.flick.stick)) capture.flick = null;
     }
     for (const button of pressed) capture.held.add(button);
     for (const button of [...capture.held]) if (!held.has(button)) capture.held.delete(button);
-    if (!capture.last && a.directionOnly) {
-      const out = Math.abs(x) > RUN_THRESHOLD || Math.abs(y) > RUN_THRESHOLD;
-      if (out) capture.stick = stickDirection(x, y) ?? capture.stick;
-      else if (capture.stick) {
-        this.finish({ button: null, modifier: null, direction: capture.stick });
-        return;
+    if (a.stickInput) {
+      for (const s of sticks) {
+        if (s.size < STICK_RELEASE) {
+          capture.used.delete(s.stick);
+          if (capture.flick?.stick === s.stick) {
+            // Pushed and let go with no button pressed meanwhile: the stick
+            // itself, a button held as it was pushed its modifier.
+            this.finish({ button: null, modifier: capture.flick.modifier, stick: s.stick, direction: capture.flick.side });
+            return;
+          }
+        } else if (s.side && !capture.used.has(s.stick) && s.size >= DIRECTION_DEADZONE) {
+          if (!capture.flick || capture.flick.stick === s.stick) {
+            const modifier = capture.flick?.modifier ?? ([...capture.held].at(-1) ?? null);
+            capture.flick = { stick: s.stick, side: capture.flick?.side ?? s.side, modifier };
+          }
+        }
       }
     }
-    if (capture.last && held.size === 0) {
-      this.finish({ button: capture.last, modifier: capture.modifier, direction: a.directional ? capture.direction : null });
+    if (capture.last && held.size === 0 && !capture.flick) {
+      const directed = a.directional && capture.direction;
+      this.finish({
+        button: capture.last, modifier: capture.modifier,
+        stick: directed ? capture.stick : null, direction: directed ? capture.direction : null,
+      });
     }
   }
 
@@ -441,7 +479,7 @@ class BindingLayer {
     const keep = this.binding.activation;
     const next = normalizeBinding(a, { ...input, activation: keep }) ??
       normalizeBinding(a, { ...input, activation: a.activations[0] }) ??
-      normalizeBinding(a, { ...input, direction: null, activation: a.activations[0] });
+      normalizeBinding(a, { ...input, stick: null, direction: null, activation: a.activations[0] });
     if (next) this.binding = next;
     this.stopListening();
     this.setFields();
@@ -450,11 +488,12 @@ class BindingLayer {
   }
 }
 
-// A conflict in words.
-export function conflictText(conflict, def, actions, family, source) {
+// A conflict in words: the input in question is its button, or its stick
+// and direction ("Right stick up").
+export function conflictText(conflict, def, actions, family) {
   const byId = new Map(actions.map((a) => [a.id, a]));
   const name = (id) => actionName(def, byId.get(id));
-  const input = conflict.button ? buttonName(family, conflict.button) : directionName('down', source);
+  const input = conflict.button ? buttonName(family, conflict.button) : directionName(conflict.direction, conflict.stick);
   const [a, b] = conflict.actions;
   return t(`controllerEditor.conflict.${conflict.type}`, { a: name(a), b: b ? name(b) : '', input });
 }
@@ -535,10 +574,6 @@ class EditorLayer {
   // the player's pick, else the default.
   get family() {
     return displayFamily(this.app.controllers?.family ?? this.familyChoice);
-  }
-
-  get source() {
-    return this.draft?.move?.source ?? 'leftStick';
   }
 
   open(def, { onClose } = {}) {
@@ -636,7 +671,7 @@ class EditorLayer {
     const name = actionName(this.def, action);
     const description = actionDescription(this.def, action);
     const descId = `controller-row-desc-${action.id.replace(':', '-')}`;
-    const input = bindingText(b, this.family, this.source);
+    const input = bindingText(b, this.family);
     const activation = activationText(b, action);
     const placeTag = action.kind === 'attack' && action.category === 'abilities'
       ? el('span', { class: 'controller-place', ...tx(`controllerEditor.place.${action.place}`) }) : null;
@@ -708,8 +743,8 @@ class EditorLayer {
     const b = this.draft[a.id];
     this.detailName.textContent = actionName(this.def, a);
     const activation = activationText(b, a);
-    this.detailBinding.textContent = activation ? `${bindingText(b, this.family, this.source)} · ${activation}` : bindingText(b, this.family, this.source);
-    highlight(this.diagram.firstElementChild, b, a.kind === 'move' ? b.source : this.source);
+    this.detailBinding.textContent = activation ? `${bindingText(b, this.family)} · ${activation}` : bindingText(b, this.family);
+    highlight(this.diagram.firstElementChild, b);
   }
 
   renderConflicts(conflicts) {
@@ -720,7 +755,7 @@ class EditorLayer {
     this.conflicts.replaceChildren(
       el('p', { class: 'controller-conflicts-title', ...tx('controllerEditor.conflicts') }),
       el('ul', {}, conflicts.map((c) => el('li', {
-        class: `controller-conflict is-${c.severity}`, text: conflictText(c, this.def, this.actions, this.family, this.source),
+        class: `controller-conflict is-${c.severity}`, text: conflictText(c, this.def, this.actions, this.family),
       }))),
       hasBlockingConflict(conflicts) ? el('p', { class: 'controller-conflict-block', ...tx('controllerEditor.blocked') }) : null,
     );

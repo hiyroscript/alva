@@ -2,9 +2,11 @@
 // Controller profiles: the actions a controller can give each fighter,
 // read from its definition (never its id); the universal defaults, the same
 // for every fighter; each playable fighter's own authored layout (complete,
-// valid and free of conflicts) and the fallback a new fighter gets;
-// bindings and their checks; conflicts (and the shared buttons that are
-// not conflicts); stored profiles, malformed data included; and the shared
+// valid, free of conflicts, every move one input) and the fallback a new
+// fighter gets; bindings and their checks (each direction naming its own
+// stick, stick inputs, either stick); conflicts (and the shared inputs that
+// are not conflicts); stored profiles, malformed data included, and the
+// upgrade of profiles saved before the sticks were named; and the shared
 // controller engine never naming a fighter.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,36 +15,53 @@ import { CHARACTERS, playableCharacters, getCharacter } from '../../js/data/char
 import {
   controllerActions, recommendedProfile, resolveProfile, fallbackLayout, normalizeBinding, profileConflicts,
   hasBlockingConflict, controllerLayoutProblems, sanitizeStoredProfiles, sanitizeStoredProfile, UNIVERSAL_DEFAULTS,
-  UNIVERSAL_ACTIONS, CATEGORIES, ACTIVATIONS, DIRECTIONS, MOVEMENT_SOURCES, HOLD_THRESHOLD, actionMap, hasAuthoredLayout, ACTION_ID,
+  UNIVERSAL_ACTIONS, CATEGORIES, ACTIVATIONS, DIRECTIONS, MOVEMENT_SOURCES, STICKS, HOLD_THRESHOLD, actionMap, hasAuthoredLayout, ACTION_ID,
+  upgradeStoredProfile, upgradeStoredProfiles, LEGACY_UNIVERSAL_DEFAULTS, stickAtoms, directionsMeet, movementButtons,
 } from '../../js/data/controller-profiles.js';
+import { PAD_BUTTONS } from '../../js/core/gamepad-devices.js';
 import { LOADOUT_CASES, WITH_EXTRA } from '../fighters/fixtures/loadout-fighters.mjs';
 import { SAMPLE_FIGHTER } from '../fighters/fixtures/sample-fighter.mjs';
 import { FUTURE_FIGHTER } from '../fighters/fixtures/offense-fighters.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
-const b = (button, { modifier = null, direction = null, activation = 'press' } = {}) => ({ button, modifier, direction, activation });
+const b = (button, { modifier = null, stick = null, direction = null, activation = 'press' } = {}) => ({ button, modifier, stick, direction, activation });
+// A stick input: `stick` (the right stick by default) pushed `direction`.
+const flick = (direction, { stick = 'rightStick', modifier = null, activation = 'press' } = {}) => b(null, { modifier, stick, direction, activation });
+// A binding as profiles saved before the sticks were named stored it.
+const legacy = (button, { modifier = null, direction = null, activation = 'press' } = {}) => ({ button, modifier, direction, activation });
 const ids = (def) => controllerActions(def).map((a) => a.id);
 
 // ---- The actions -------------------------------------------------------------------------
 
-test('the vocabulary: universal actions, editor categories, activations, directions and movement sources', () => {
+test('the vocabulary: universal actions, editor categories, activations, directions, sticks and movement sources', () => {
   assert.deepEqual([...UNIVERSAL_ACTIONS], ['move', 'jump', 'dash', 'fastFall', 'shield', 'deflect', 'pause']);
   assert.deepEqual([...CATEGORIES], ['movement', 'defense', 'ground', 'air', 'abilities', 'other']);
   assert.deepEqual([...ACTIVATIONS], ['press', 'hold', 'continuous']);
-  assert.deepEqual([...DIRECTIONS], ['left', 'right', 'up', 'down', 'horizontal']);
+  assert.deepEqual([...DIRECTIONS], ['up', 'down', 'left', 'right', 'horizontal', 'forward', 'back']);
   assert.deepEqual([...MOVEMENT_SOURCES], ['leftStick', 'dpad', 'leftStickDpad', 'rightStick']);
+  assert.deepEqual([...STICKS], ['leftStick', 'dpad', 'leftStickDpad', 'rightStick'], 'either stick, the D-pad, or both of the left ones');
   assert.ok(HOLD_THRESHOLD > 0 && HOLD_THRESHOLD <= 0.3, 'a short hold');
+  // Every button the standard mapping names is a button a player can bind.
+  assert.deepEqual([...PAD_BUTTONS], [
+    'south', 'east', 'west', 'north', 'l1', 'r1', 'l2', 'r2', 'select', 'start', 'l3', 'r3', 'dpadUp', 'dpadDown', 'dpadLeft', 'dpadRight',
+  ]);
 });
 
-test('the universal defaults are the comfortable ones and the same for every fighter', () => {
+test('the universal defaults are chosen together, and the same for every fighter', () => {
   assert.deepEqual(UNIVERSAL_DEFAULTS.move, { source: 'leftStick' });
   assert.deepEqual(UNIVERSAL_DEFAULTS.jump, b('south', { activation: 'continuous' }), 'Cross / A, held for the higher jump');
-  assert.deepEqual(UNIVERSAL_DEFAULTS.dash, b('l1'), 'L1 / LB: the right thumb stays on the attacks');
-  assert.deepEqual(UNIVERSAL_DEFAULTS.fastFall, b(null, { direction: 'down', activation: 'continuous' }), 'the stick down');
-  assert.deepEqual(UNIVERSAL_DEFAULTS.shield, b('east', { activation: 'continuous' }), 'Circle / B held');
-  assert.deepEqual(UNIVERSAL_DEFAULTS.deflect, b('east'), 'Circle / B pressed, in the air');
+  assert.deepEqual(UNIVERSAL_DEFAULTS.dash, b('r1'), 'R1 / RB: the right index finger, the left thumb aiming, the right thumb free');
+  assert.deepEqual(UNIVERSAL_DEFAULTS.fastFall, flick('down', { stick: 'leftStick', activation: 'continuous' }), 'the left stick down');
+  assert.deepEqual(UNIVERSAL_DEFAULTS.shield, b('l1', { activation: 'continuous' }), 'L1 / LB held');
+  assert.deepEqual(UNIVERSAL_DEFAULTS.deflect, b('l1'), 'L1 / LB pressed, in the air: one guard button');
   assert.deepEqual(UNIVERSAL_DEFAULTS.pause, b('start'), 'Options / Menu');
+  // No two universal actions on one finger where both apply, and no face
+  // button taken but Jump's: three are left to every fighter's moves.
+  const universal = controllerActions(null);
+  assert.deepEqual(profileConflicts(universal, UNIVERSAL_DEFAULTS), []);
+  const faces = new Set(Object.values(UNIVERSAL_DEFAULTS).map((x) => x.button).filter((x) => ['west', 'north', 'east', 'south'].includes(x)));
+  assert.deepEqual([...faces], ['south']);
   for (const def of playableCharacters()) {
     const { bindings } = recommendedProfile(def);
     for (const id of UNIVERSAL_ACTIONS) {
@@ -114,29 +133,62 @@ test('every playable fighter ships a complete, valid, conflict-free layout desig
   }
 });
 
-test('#0001\'s recommended layout: punch and kick on single face buttons, projectiles behind R2, Void behind L2, Blue on R1 in the air', () => {
-  const { bindings } = recommendedProfile(getCharacter('0001'));
-  assert.deepEqual(bindings['ground:attack1'], b('west'), 'Jab: Square');
-  assert.deepEqual(bindings['ground:extra_attack'], b('north'), 'High Kick: Triangle');
-  assert.deepEqual(bindings['ground:attack2'], b('west', { modifier: 'r2' }), 'Red: R2 + Square');
-  assert.deepEqual(bindings['ground:attack3'], b('east', { modifier: 'r2' }), 'Maximum Blue: R2 + Circle');
-  assert.deepEqual(bindings['ground:attack4'], b('north', { modifier: 'l2' }), 'Unlimited Void: L2 + Triangle');
-  assert.deepEqual(bindings['ground:attack5'], b('north', { modifier: 'r2' }), 'Hollow Purple: R2 + Triangle');
-  assert.deepEqual(bindings['air:attack1'], b('west'), 'Floating Straight: Square');
-  assert.deepEqual(bindings['air:attack2'], b('north'), 'Red Kick: Triangle');
-  assert.deepEqual(bindings['air:attack3'], b('r1'), 'Blue: R1');
-  assert.deepEqual(bindings['air:extra_attack'], b('west', { modifier: 'l2' }), 'aerial High Kick: L2 + Square');
+test('every recommended move is one input: no combination, no direction to hold with a button, the right stick only for a move\'s own direction', () => {
+  for (const def of playableCharacters()) {
+    const { bindings } = recommendedProfile(def);
+    for (const a of controllerActions(def).filter((x) => x.kind === 'attack')) {
+      const x = bindings[a.id];
+      assert.equal(x.modifier, null, `#${def.id} ${a.id}: no button to hold first`);
+      assert.equal(x.activation, 'press', `#${def.id} ${a.id}: it acts as it goes down`);
+      if (x.button !== null) assert.equal(x.direction, null, `#${def.id} ${a.id}: a button alone`);
+      else {
+        assert.equal(x.stick, 'rightStick', `#${def.id} ${a.id}: the right stick, never the stick that moves`);
+        assert.ok(['up', 'down', 'forward'].includes(x.direction), `#${def.id} ${a.id}: up, down or forward`);
+      }
+      assert.ok(!['south', 'r1', 'l1', 'start'].includes(x.button), `#${def.id} ${a.id}: never a universal action's button`);
+    }
+  }
 });
 
-test('#0002\'s recommended layout: Square and Triangle on the ground, R1 for both spins, the stick picking Homing or Bounce', () => {
+test('the same buttons mean the same kind of move across the roster: Square the quick strike everywhere, the right stick up rising, down driving down', () => {
+  for (const def of playableCharacters()) {
+    const { bindings } = recommendedProfile(def);
+    assert.deepEqual(bindings['ground:attack1'], b('west'), `#${def.id}: its quick strike on Square / X`);
+    assert.deepEqual(bindings['air:attack1'], b('west'), `#${def.id}: its basic aerial on Square / X`);
+    for (const [id, x] of Object.entries(bindings)) {
+      if (x?.button !== null || !x?.direction) continue;
+      const [place, control] = id.split(':');
+      const move = def.attacks?.[def.actions[control]?.[place] ?? def.actions[control]];
+      const motion = move?.motion?.type;
+      if (x.direction === 'up' && place === 'air') assert.equal(motion, 'rise', `#${def.id} ${id}: up in the air rises`);
+      if (x.direction === 'down' && place === 'air') assert.ok(['slam', 'bounce'].includes(motion), `#${def.id} ${id}: down in the air plunges`);
+    }
+  }
+});
+
+test('#0001\'s recommended layout: the Jab and the High Kick on the face, Blue on Circle and Red on R2 both ways, Unlimited Void on L2, Hollow Purple forward on the right stick', () => {
+  const { bindings } = recommendedProfile(getCharacter('0001'));
+  assert.deepEqual(bindings['ground:attack1'], b('west'), 'Jab: Square');
+  assert.deepEqual(bindings['ground:extra_attack'], b('north'), 'High Kick: Triangle, the Jab\'s follow-up');
+  assert.deepEqual(bindings['ground:attack3'], b('east'), 'Maximum Blue: Circle');
+  assert.deepEqual(bindings['ground:attack2'], b('r2'), 'Red: R2, fired');
+  assert.deepEqual(bindings['ground:attack4'], b('l2'), 'Unlimited Void: L2');
+  assert.deepEqual(bindings['ground:attack5'], flick('forward'), 'Hollow Purple: the right stick forward, the way the sphere flies');
+  assert.deepEqual(bindings['air:attack1'], b('west'), 'Floating Straight: Square');
+  assert.deepEqual(bindings['air:extra_attack'], b('north'), 'aerial High Kick: Triangle');
+  assert.deepEqual(bindings['air:attack3'], b('east'), 'Blue: Circle, the attraction both ways');
+  assert.deepEqual(bindings['air:attack2'], b('r2'), 'Red Kick: R2, Red\'s trigger in the air');
+});
+
+test('#0002\'s recommended layout: three strikes on the face, the Whirlwind on R2, the right stick up and down for its rising and plunging spins', () => {
   const { bindings } = recommendedProfile(getCharacter('0002'));
   assert.deepEqual(bindings['ground:attack1'], b('west'), 'One-Two: Square');
   assert.deepEqual(bindings['ground:attack2'], b('north'), 'Rapid Kicks: Triangle');
-  assert.deepEqual(bindings['ground:attack3'], b('r1'), 'Spin Attack: R1');
-  assert.deepEqual(bindings['ground:extra_attack'], b('north', { modifier: 'r2' }), 'Whirlwind: R2 + Triangle');
-  assert.deepEqual(bindings['air:attack1'], b('west'), 'Homing Attack: Square, any direction');
-  assert.deepEqual(bindings['air:attack2'], b('west', { direction: 'down' }), 'Bounce Attack: Down + Square');
-  assert.deepEqual(bindings['air:attack3'], b('r1'), 'Blue Tornado: R1, the Spin Attack\'s button in the air');
+  assert.deepEqual(bindings['ground:attack3'], b('east'), 'Spin Attack: Circle, pressed on the run');
+  assert.deepEqual(bindings['ground:extra_attack'], b('r2'), 'Whirlwind: R2');
+  assert.deepEqual(bindings['air:attack1'], b('west'), 'Homing Attack: Square, whatever the stick says');
+  assert.deepEqual(bindings['air:attack3'], flick('up'), 'Blue Tornado: the right stick up');
+  assert.deepEqual(bindings['air:attack2'], flick('down'), 'Bounce Attack: the right stick down');
 });
 
 test('a layout that is incomplete, names a move the fighter lacks, retunes a universal action or conflicts is refused', () => {
@@ -150,6 +202,11 @@ test('a layout that is incomplete, names a move the fighter lacks, retunes a uni
     [{ layout: { ...layout, jump: b('north') } }, /not one of its moves|universal/],
     [{ layout: { ...layout, 'ground:attack1': b('zz') } }, /not a valid binding/],
     [{ layout: { ...layout, 'ground:attack3': b('north') } }, /conflict/],
+    [{ layout: { ...layout, 'ground:attack1': b('north', { modifier: 'east' }) } }, /conflict \(modifier\)/],
+    [{ layout: { ...layout, 'air:attack2': flick('up') } }, /conflict/],
+    [{ layout: { ...layout, 'air:attack2': flick('left', { stick: 'leftStick' }) } }, /conflict \(movement\)/],
+    [{ layout: { ...layout, 'ground:attack1': legacy('west', { direction: 'down' }) } }, /not a valid binding/],
+    [{ layout, previous: 'old' }, /previous must be an object/],
     [{ layout, colour: 'blue' }, /unknown field/],
     ['layout', /must be an object/],
   ];
@@ -172,15 +229,17 @@ test('a new fighter with no layout gets a safe, editable fallback, flagged as no
     assert.equal(authored, false, `${def.id}: a fallback, not a design`);
     for (const a of actions) assert.ok(bindings[a.id], `${def.id}: ${a.id} has an input`);
     assert.deepEqual(profileConflicts(actions, bindings).filter((c) => c.severity === 'error'), [], `${def.id}: no conflict`);
-    // Never a universal default's input in the same place.
+    assert.deepEqual(profileConflicts(actions, bindings), [], `${def.id}: not even a warning`);
+    // Never a universal default's input, and every move one input.
     const fallback = fallbackLayout(def);
     for (const [id, binding] of Object.entries(fallback)) {
-      assert.ok(!(binding.button === 'south' && !binding.modifier), `${id}: not Jump's button`);
-      assert.ok(!(binding.button === 'l1' && !binding.modifier), `${id}: not the Dash's`);
+      assert.ok(!['south', 'r1', 'l1', 'start'].includes(binding.button), `${id}: not Jump's, the Dash's, the guard's or Pause's button`);
+      assert.equal(binding.modifier, null, `${id}: no combination`);
+      assert.ok(binding.button !== null || binding.stick === 'rightStick', `${id}: a stick input only on the stick that does not move`);
     }
   }
   // Partly authored: the rest falls back, around the authored inputs.
-  const partial = { ...getCharacter('0002'), controller: { layout: { 'ground:attack1': b('north'), 'air:attack1': b('r1') } } };
+  const partial = { ...getCharacter('0002'), controller: { layout: { 'ground:attack1': b('north'), 'air:attack1': b('r3') } } };
   const { bindings, authored } = recommendedProfile(partial);
   assert.equal(authored, false);
   assert.ok(bindings['air:attack3']);
@@ -197,31 +256,62 @@ test('a new fighter with no layout gets a safe, editable fallback, flagged as no
 
 // ---- Bindings --------------------------------------------------------------------------------
 
-test('a binding is checked against its action: buttons, modifiers, directions and activations it allows', () => {
+test('a binding is checked against its action: buttons, modifiers, sticks, directions and activations it allows', () => {
   const actions = actionMap(controllerActions(getCharacter('0001')));
   const red = actions.get('ground:attack2');
   assert.deepEqual(normalizeBinding(red, b('west', { modifier: 'r2' })), b('west', { modifier: 'r2' }));
-  assert.deepEqual(normalizeBinding(red, b('west', { direction: 'left', activation: 'hold' })), b('west', { direction: 'left', activation: 'hold' }));
+  assert.deepEqual(normalizeBinding(red, b('west', { stick: 'leftStick', direction: 'left', activation: 'hold' })), b('west', { stick: 'leftStick', direction: 'left', activation: 'hold' }));
+  assert.deepEqual(normalizeBinding(red, b('west', { stick: 'rightStick', direction: 'forward' })), b('west', { stick: 'rightStick', direction: 'forward' }), 'a direction on the right stick, facing-relative');
+  // Every physical button, on any move.
+  for (const button of PAD_BUTTONS) assert.ok(normalizeBinding(red, b(button)), button);
+  // Either stick alone, any direction, with or without a modifier.
+  for (const stick of STICKS) {
+    for (const direction of DIRECTIONS) assert.deepEqual(normalizeBinding(red, flick(direction, { stick })), flick(direction, { stick }), `${stick} ${direction}`);
+  }
+  assert.deepEqual(normalizeBinding(red, flick('up', { modifier: 'l2' })), flick('up', { modifier: 'l2' }), 'L2 + Right stick up');
   for (const bad of [
-    b('nope'), b('west', { modifier: 'west' }), b('west', { modifier: 'x' }), b('west', { direction: 'diagonal' }),
-    b('west', { activation: 'continuous' }), b(null), null, 'west', [],
+    b('nope'), b('west', { modifier: 'west' }), b('west', { modifier: 'x' }), b('west', { stick: 'leftStick', direction: 'diagonal' }),
+    b('west', { direction: 'down' }), // a direction never reads "whatever moves": it names its stick
+    b('west', { stick: 'leftStick' }), // a stick with no direction
+    b('west', { stick: 'thirdStick', direction: 'up' }),
+    b('west', { activation: 'continuous' }), b(null), b(null, { modifier: 'l2' }), null, 'west', [],
   ]) {
     assert.equal(normalizeBinding(red, bad), null, JSON.stringify(bad));
   }
-  // The Shield stays held, Jump keeps its held higher jump, Pause stays a press.
+  // The Shield stays held, Jump keeps its held higher jump, Pause stays a press of a button.
   assert.equal(normalizeBinding(actions.get('shield'), b('east')), null);
   assert.ok(normalizeBinding(actions.get('shield'), b('l2', { activation: 'continuous' })));
+  assert.ok(normalizeBinding(actions.get('shield'), flick('down', { activation: 'continuous' })), 'or a stick held');
   assert.equal(normalizeBinding(actions.get('jump'), b('south', { activation: 'hold' })), null);
+  assert.ok(normalizeBinding(actions.get('jump'), flick('up', { stick: 'leftStick', activation: 'continuous' })), 'up on the stick, if the player wants it');
   assert.equal(normalizeBinding(actions.get('pause'), b('start', { activation: 'continuous' })), null);
-  // The Dash takes its direction from the stick: no direction of its own.
-  assert.equal(normalizeBinding(actions.get('dash'), b('l1', { direction: 'left' })), null);
-  // Only the Fast fall may be a direction alone.
-  assert.ok(normalizeBinding(actions.get('fastFall'), b(null, { direction: 'down', activation: 'continuous' })));
+  assert.equal(normalizeBinding(actions.get('pause'), flick('down')), null, 'Pause is a button');
+  // The Dash takes its direction from the stick: no direction to hold with
+  // its button, but a stick pushed may be its input (it then goes that way).
+  assert.equal(normalizeBinding(actions.get('dash'), b('r1', { stick: 'leftStick', direction: 'left' })), null);
+  assert.ok(normalizeBinding(actions.get('dash'), flick('horizontal')));
+  // The Fast fall: the stick down, or a button.
+  assert.ok(normalizeBinding(actions.get('fastFall'), flick('down', { stick: 'leftStick', activation: 'continuous' })));
   assert.ok(normalizeBinding(actions.get('fastFall'), b('r1', { activation: 'continuous' })), 'or a button');
-  assert.equal(normalizeBinding(red, b(null, { direction: 'down' })), null);
   // Movement: a source.
   assert.deepEqual(normalizeBinding(actions.get('move'), { source: 'dpad' }), { source: 'dpad' });
   assert.equal(normalizeBinding(actions.get('move'), { source: 'mouse' }), null);
+});
+
+test('physical inputs: a stick direction is its stick\'s sides (the D-pad\'s are its buttons); forward and back meet left and right, never each other', () => {
+  assert.deepEqual(stickAtoms('rightStick', 'up'), ['rightStick:up']);
+  assert.deepEqual(stickAtoms('leftStick', 'horizontal'), ['leftStick:left', 'leftStick:right']);
+  assert.deepEqual(stickAtoms('dpad', 'down'), ['dpadDown']);
+  assert.deepEqual(stickAtoms('leftStickDpad', 'down'), ['leftStick:down', 'dpadDown']);
+  assert.deepEqual(stickAtoms('rightStick', 'forward'), ['rightStick:left', 'rightStick:right']);
+  assert.equal(directionsMeet('forward', 'left'), true);
+  assert.equal(directionsMeet('forward', 'back'), false);
+  assert.equal(directionsMeet('horizontal', 'back'), true);
+  assert.equal(directionsMeet('up', 'forward'), false);
+  assert.equal(directionsMeet('left', 'right'), false);
+  // What moves the fighter takes only its left and right.
+  assert.deepEqual(movementButtons('dpad'), ['dpadLeft', 'dpadRight']);
+  assert.deepEqual(movementButtons('leftStick'), []);
 });
 
 // ---- Conflicts --------------------------------------------------------------------------------
@@ -231,37 +321,85 @@ test('conflicts: the same input twice where both apply is an error; a modifier t
   const actions = controllerActions(def);
   const { bindings } = recommendedProfile(def);
   // Two ground attacks on Square.
-  let c = profileConflicts(actions, { ...bindings, 'ground:extra_attack': b('west') });
-  assert.deepEqual(c.map((x) => [x.severity, x.type, x.actions.sort().join('+'), x.button]), [['error', 'same', 'ground:attack1+ground:extra_attack', 'west']]);
+  let c = profileConflicts(actions, { ...bindings, 'ground:attack3': b('west') });
+  assert.deepEqual(c.map((x) => [x.severity, x.type, x.actions.sort().join('+'), x.button]), [['error', 'same', 'ground:attack1+ground:attack3', 'west']]);
   assert.equal(hasBlockingConflict(c), true);
   // Jump (everywhere) on an air attack's button.
-  c = profileConflicts(actions, { ...bindings, jump: b('r1', { activation: 'continuous' }) });
-  assert.ok(c.some((x) => x.type === 'same' && x.actions.includes('air:attack3')));
-  // A D-pad button while the D-pad moves.
-  c = profileConflicts(actions, { ...bindings, move: { source: 'dpad' }, 'air:attack3': b('dpadUp') });
-  assert.deepEqual(c.map((x) => [x.type, x.actions[0], x.button]), [['movement', 'air:attack3', 'dpadUp']]);
-  // R2 held for Red while R2 alone is the Spin... warning only.
-  c = profileConflicts(actions, { ...bindings, 'ground:extra_attack': b('r2') });
-  assert.ok(c.length && c.every((x) => x.severity === 'warning' && x.type === 'modifier'));
+  c = profileConflicts(actions, { ...bindings, jump: b('r2', { activation: 'continuous' }) });
+  assert.ok(c.some((x) => x.type === 'same' && x.actions.includes('air:attack2')));
+  // A side of the D-pad while the D-pad moves; its up and down move nothing.
+  c = profileConflicts(actions, { ...bindings, move: { source: 'dpad' }, 'air:attack2': b('dpadLeft') });
+  assert.deepEqual(c.map((x) => [x.type, x.actions[0], x.button]), [['movement', 'air:attack2', 'dpadLeft']]);
+  assert.deepEqual(profileConflicts(actions, { ...bindings, move: { source: 'dpad' }, 'air:attack2': b('dpadUp') }), [], 'D-pad up is free');
+  assert.deepEqual(profileConflicts(actions, { ...bindings, move: { source: 'leftStickDpad' }, jump: b('dpadUp', { activation: 'continuous' }) }), []);
+  // The moving stick's own left or right as an input: every run would set it off.
+  c = profileConflicts(actions, { ...bindings, dash: flick('horizontal', { stick: 'leftStick' }) });
+  assert.deepEqual(c.map((x) => [x.severity, x.type, x.stick, x.direction]), [['error', 'movement', 'leftStick', 'horizontal']]);
+  assert.deepEqual(profileConflicts(actions, {
+    ...bindings, move: { source: 'rightStick' }, dash: flick('horizontal', { stick: 'leftStick' }), 'ground:attack5': b('r3'),
+  }), [], 'free once the right stick moves (and the right stick then moves, Hollow Purple elsewhere)');
+  c = profileConflicts(actions, { ...bindings, move: { source: 'rightStick' } });
+  assert.deepEqual(c.map((x) => [x.type, x.actions[0]]), [['movement', 'ground:attack5']], 'a right stick input while the right stick moves');
+  // A modifier that is another action's button: a warning only.
+  c = profileConflicts(actions, { ...bindings, 'ground:attack5': b('west', { modifier: 'r2' }) });
+  assert.ok(c.length && c.every((x) => x.severity === 'warning' && x.type === 'modifier' && x.button === 'r2'));
   assert.equal(hasBlockingConflict(c), false);
+  // A direction held with a button that is, on that stick, another action's stick input.
+  c = profileConflicts(actions, { ...bindings, jump: flick('up', { stick: 'leftStick', activation: 'continuous' }), 'ground:attack1': b('west', { stick: 'leftStick', direction: 'up' }) });
+  assert.deepEqual(c.map((x) => [x.severity, x.type, x.actions.join('+'), x.stick, x.direction]), [['warning', 'direction', 'ground:attack1+jump', 'leftStick', 'up']]);
 });
 
-test('shared buttons that resolve one way are not conflicts', () => {
-  const two = getCharacter('0002');
-  const one = getCharacter('0001');
-  // Spin Attack and Blue Tornado on R1 (ground / air); the Shield and the
-  // Deflect on Circle; Whirlwind's R2 + Triangle beside Triangle; Bounce's
-  // Down + Square beside Square.
-  assert.deepEqual(profileConflicts(controllerActions(two), recommendedProfile(two).bindings), []);
+test('conflicts between stick inputs and stick directions: the same side of the same stick, never the other stick', () => {
+  const def = getCharacter('0002');
+  const actions = controllerActions(def);
+  const { bindings } = recommendedProfile(def);
+  // Right stick up twice in the air.
+  let c = profileConflicts(actions, { ...bindings, 'air:attack1': flick('up') });
+  assert.deepEqual(c.map((x) => [x.type, x.actions.sort().join('+'), x.stick, x.direction]), [['same', 'air:attack1+air:attack3', 'rightStick', 'up']]);
+  // Left and forward: the same when facing left.
+  c = profileConflicts(actions, { ...bindings, 'ground:attack1': flick('left'), 'ground:attack2': flick('forward') });
+  assert.ok(hasBlockingConflict(c));
+  // Forward and back never meet; left-or-right beside left: the more specific wins.
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'ground:attack1': flick('back'), 'ground:attack2': flick('forward') }), []);
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'ground:attack1': flick('horizontal'), 'ground:attack2': flick('left') }), []);
+  // Up on the left stick beside up on the right stick: two inputs.
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'air:attack1': flick('up', { stick: 'leftStick' }) }), []);
+  // A stick input beside the same with a modifier: the combination wins when held.
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'air:attack1': flick('up', { modifier: 'l2' }) }), []);
+  // The left stick or D-pad down beside the left stick down: the same push.
+  c = profileConflicts(actions, { ...bindings, 'air:attack1': flick('down', { stick: 'leftStickDpad' }) });
+  assert.ok(c.some((x) => x.type === 'same' && x.actions.includes('fastFall')));
+  // A D-pad button beside the D-pad pushed that way.
+  c = profileConflicts(actions, { ...bindings, 'ground:attack1': b('dpadUp'), 'ground:attack2': flick('up', { stick: 'dpad' }) });
+  assert.ok(c.some((x) => x.type === 'same' && x.severity === 'error'));
+  // Square with a direction on each stick, as specific as each other and both able to hold: ambiguous.
+  c = profileConflicts(actions, {
+    ...bindings, 'ground:attack1': b('west', { stick: 'leftStick', direction: 'down' }), 'ground:attack2': b('west', { stick: 'rightStick', direction: 'up' }),
+  });
+  assert.ok(hasBlockingConflict(c));
+  // ...but up and down on one stick never are.
+  assert.deepEqual(profileConflicts(actions, {
+    ...bindings, 'ground:attack1': b('west', { stick: 'rightStick', direction: 'down' }), 'ground:attack2': b('west', { stick: 'rightStick', direction: 'up' }),
+  }), []);
+});
+
+test('shared inputs that resolve one way are not conflicts', () => {
+  for (const def of playableCharacters()) {
+    // The same face buttons on the ground and in the air, the Shield and the
+    // Deflect on L1, the right stick down on the ground and in the air.
+    assert.deepEqual(profileConflicts(controllerActions(def), recommendedProfile(def).bindings), [], `#${def.id}`);
+  }
   // A combination beside its plain button, and a direction beside none.
+  const one = getCharacter('0001');
   const actions = controllerActions(one);
   const { bindings } = recommendedProfile(one);
-  assert.deepEqual(profileConflicts(actions, { ...bindings, 'ground:extra_attack': b('west', { direction: 'up' }) }), []);
-  assert.deepEqual(profileConflicts(actions, { ...bindings, 'air:attack2': b('west', { direction: 'horizontal' }) }), [],
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'ground:attack3': b('west', { stick: 'leftStick', direction: 'up' }) }), []);
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'ground:attack3': b('west', { modifier: 'r3' }) }), []);
+  assert.deepEqual(profileConflicts(actions, { ...bindings, 'air:attack2': b('west', { stick: 'leftStick', direction: 'horizontal' }) }), [],
     'left-or-right beside anywhere: the more specific wins');
   // The same direction is ambiguous again.
   assert.ok(hasBlockingConflict(profileConflicts(actions, {
-    ...bindings, 'air:attack2': b('west', { direction: 'down' }), 'air:attack1': b('west', { direction: 'down' }),
+    ...bindings, 'air:attack2': b('west', { stick: 'leftStick', direction: 'up' }), 'air:attack1': b('west', { stick: 'leftStick', direction: 'up' }),
   })));
 });
 
@@ -277,6 +415,9 @@ test('a stored profile is checked entry by entry: malformed bindings and unknown
       dash: { button: 'east', activation: 'sometimes' },
       move: { source: 'dpad' },
       shield: 'circle',
+      'ground:attack1': legacy('west', { direction: 'down' }), // a direction with no stick: whose?
+      'ground:attack3': flick('up'),
+      'air:attack1': b('west', { stick: 'rightStick', direction: 'forward' }),
     },
     '0002': 'not an object',
     'bad id!': { jump: b('south', { activation: 'continuous' }) },
@@ -287,6 +428,8 @@ test('a stored profile is checked entry by entry: malformed bindings and unknown
       jump: b('north', { activation: 'continuous' }),
       'ground:attack2': b('west', { modifier: 'l2' }),
       move: { source: 'dpad' },
+      'ground:attack3': flick('up'),
+      'air:attack1': b('west', { stick: 'rightStick', direction: 'forward' }),
     },
   });
   for (const junk of [null, undefined, 'x', 3, [], [{}]]) assert.deepEqual(sanitizeStoredProfiles(junk), {});
@@ -332,6 +475,76 @@ test('a saved profile resolves against the fighter: what fits it is used, what d
   assert.equal(resolveProfile(def, null).customized, false);
   assert.equal(resolveProfile(def, recommended).customized, false, 'a saved copy of the recommended layout is not custom');
   assert.equal(p.character, '0001');
+});
+
+// ---- Profiles saved before the sticks were named ----------------------------------------
+
+// #0001's whole layout as the editor saved it under settings version 5,
+// with `changes` made by the player.
+function savedThen(def, changes = {}) {
+  const out = { ...LEGACY_UNIVERSAL_DEFAULTS };
+  for (const [id, binding] of Object.entries(def.controller.previous)) out[id] = binding;
+  for (const id of Object.keys(out)) if (!controllerActions(def).some((a) => a.id === id)) delete out[id];
+  return { ...out, ...changes };
+}
+
+test('a profile saved before: nothing of the player\'s own, and the fighter plays with today\'s recommended layout', () => {
+  for (const def of playableCharacters()) {
+    assert.ok(def.controller.previous, `#${def.id} keeps the layout it recommended then`);
+    assert.deepEqual(upgradeStoredProfile(def, savedThen(def)), {}, `#${def.id}: an untouched layout gives way`);
+  }
+});
+
+test('a profile saved before keeps the player\'s own choices, and today\'s layout fills in the rest where nothing conflicts', () => {
+  const def = getCharacter('0005');
+  // The player moved the Long Bite to R3 and Pause to Create.
+  const upgraded = upgradeStoredProfile(def, savedThen(def, { 'ground:attack2': legacy('r3'), pause: legacy('select') }));
+  assert.deepEqual(upgraded, { 'ground:attack2': b('r3'), pause: b('select') });
+  const p = resolveProfile(def, upgraded);
+  assert.deepEqual(p.bindings.dash, UNIVERSAL_DEFAULTS.dash, 'today\'s Dash');
+  assert.deepEqual(p.bindings.shield, UNIVERSAL_DEFAULTS.shield, 'today\'s guard');
+  assert.deepEqual(p.bindings['ground:attack5'], recommendedProfile(def).bindings['ground:attack5'], 'today\'s Red Balloon');
+  assert.deepEqual(profileConflicts(p.actions, p.bindings), []);
+});
+
+test('a profile saved before whose choices would clash with today\'s layout is kept whole, exactly as it played', () => {
+  const def = getCharacter('0001');
+  // The Shield held on R2 (it was R2 + face buttons' modifier then, a
+  // warning the player accepted): today R2 fires Red, so the mix would
+  // clash; the whole old layout stays theirs.
+  const then = savedThen(def, { shield: legacy('r2', { activation: 'continuous' }) });
+  const upgraded = upgradeStoredProfile(def, then);
+  assert.deepEqual(upgraded.shield, b('r2', { activation: 'continuous' }));
+  assert.deepEqual(upgraded.dash, b('l1'), 'the Dash where it was');
+  assert.deepEqual(upgraded.deflect, b('east'), 'the Deflect where it was');
+  assert.deepEqual(upgraded['ground:attack2'], b('west', { modifier: 'r2' }), 'Red where it was');
+  const p = resolveProfile(def, upgraded);
+  assert.equal(hasBlockingConflict(profileConflicts(p.actions, p.bindings)), false);
+  for (const a of p.actions) assert.ok(upgraded[a.id], `${a.id}: every binding kept, nothing of today mixed in`);
+});
+
+test('a profile saved before reads its directions on what moved the fighter then: they play exactly as they did', () => {
+  const def = getCharacter('0002');
+  // The D-pad moved it, so the old Down + Square and the Fast fall were the D-pad's.
+  const upgraded = upgradeStoredProfile(def, savedThen(def, { move: { source: 'dpad' } }));
+  assert.deepEqual(upgraded.move, { source: 'dpad' });
+  assert.deepEqual(upgraded.fastFall, b(null, { stick: 'dpad', direction: 'down', activation: 'continuous' }), 'the D-pad down, as it was');
+  assert.deepEqual(upgraded['air:attack2'], b('west', { stick: 'dpad', direction: 'down' }));
+  // A fighter the game does not know: every binding kept, in today's shape.
+  assert.deepEqual(upgradeStoredProfile(null, { move: { source: 'rightStick' }, fastFall: legacy(null, { direction: 'down', activation: 'continuous' }) }), {
+    move: { source: 'rightStick' }, fastFall: b(null, { stick: 'rightStick', direction: 'down', activation: 'continuous' }),
+  });
+  // Malformed entries drop; one fighter's never touches another's.
+  const all = upgradeStoredProfiles({
+    '0001': savedThen(getCharacter('0001')),
+    '0003': { 'ground:attack1': legacy('r3'), 'ground:attack2': { button: 'zz', activation: 'press' } },
+    'bad id!': { jump: legacy('north', { activation: 'continuous' }) },
+    '0099': { jump: legacy('north', { activation: 'continuous' }) },
+  }, getCharacter);
+  assert.deepEqual(all, { '0003': { 'ground:attack1': b('r3') }, '0099': { jump: b('north', { activation: 'continuous' }) } });
+  for (const junk of [null, 'x', 3, []]) assert.deepEqual(upgradeStoredProfiles(junk, getCharacter), {});
+  assert.deepEqual(upgradeStoredProfiles({ '0001': { jump: legacy('north', { activation: 'continuous' }) } }, () => { throw new Error('no registry'); }),
+    { '0001': { jump: b('north', { activation: 'continuous' }) } }, 'a lookup that fails keeps the profile as saved');
 });
 
 // ---- The shared engine is generic --------------------------------------------------------

@@ -20,7 +20,7 @@ import { ROOT, decodePng, realArt, withFakeCanvas } from '../../helpers/png-art.
 import { CHARACTERS, getCharacter, playableCharacters } from '../../../js/data/characters.js';
 import { abilityName } from '../../../js/data/abilities.js';
 import { describeLoadout, loadoutProblems } from '../../../js/data/loadout.js';
-import { pad } from '../../../js/data/characters/helpers.js';
+import { pad, flick } from '../../../js/data/characters/helpers.js';
 import { createAttackDefinition } from '../../../js/game/combat/attacks.js';
 import { CombatSystem } from '../../../js/game/combat/combat.js';
 import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
@@ -158,15 +158,15 @@ test('its in-game names and touch buttons name each move, in English and French,
   }
 });
 
-test('its recommended controller layout: the strikes on single face buttons, the heavy blows behind R2, the heal behind L2', () => {
+test('its recommended controller layout: one input a move, the string across the face buttons, the ground-splitters down on the right stick, the heal on L2', () => {
   assert.deepEqual(DEF.controller.layout, {
     'ground:attack1': pad('west'),
     'ground:attack2': pad('north'),
-    'ground:attack3': pad('west', { modifier: 'r2' }),
-    'ground:attack4': pad('north', { modifier: 'l2' }),
-    'ground:extra_attack': pad('north', { modifier: 'r2' }),
+    'ground:extra_attack': pad('east'),
+    'ground:attack3': flick('down'),
+    'ground:attack4': pad('l2'),
     'air:attack1': pad('west'),
-    'air:attack2': pad('north'),
+    'air:attack2': flick('down'),
   });
 });
 

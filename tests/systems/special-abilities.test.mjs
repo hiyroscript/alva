@@ -150,12 +150,14 @@ test('the controller editor\'s categories follow the classification; every bindi
   assert.ok(!ids('0003').includes('air:attack3'), 'Cherry Blossom Impact: still ground only');
   assert.ok(!ids('0002').includes('air:extra_attack'), 'the Whirlwind: still ground only');
   assert.ok(ids('0001').includes('air:attack2') && ids('0001').includes('air:attack3'), 'Red and Blue keep their own aerials');
-  // The four reclassified moves keep their inputs.
+  // The four ordinary moves that are projectiles or techniques have the
+  // inputs their fighters authored for them, whatever their category.
   const binding = (id, action) => recommendedProfile(getCharacter(id)).bindings[action];
-  assert.deepEqual(binding('0001', 'ground:attack2'), { button: 'west', modifier: 'r2', direction: null, activation: 'press' }, 'Red');
-  assert.deepEqual(binding('0001', 'ground:attack3'), { button: 'east', modifier: 'r2', direction: null, activation: 'press' }, 'Maximum Blue');
-  assert.deepEqual(binding('0002', 'ground:extra_attack'), { button: 'north', modifier: 'r2', direction: null, activation: 'press' }, 'Whirlwind');
-  assert.deepEqual(binding('0003', 'ground:attack3'), { button: 'west', modifier: 'r2', direction: null, activation: 'press' }, 'Cherry Blossom Impact');
+  const input = (button, extra = {}) => ({ button, modifier: null, stick: null, direction: null, activation: 'press', ...extra });
+  assert.deepEqual(binding('0001', 'ground:attack2'), input('r2'), 'Red');
+  assert.deepEqual(binding('0001', 'ground:attack3'), input('east'), 'Maximum Blue');
+  assert.deepEqual(binding('0002', 'ground:extra_attack'), input('r2'), 'Whirlwind');
+  assert.deepEqual(binding('0003', 'ground:attack3'), input(null, { stick: 'rightStick', direction: 'down' }), 'Cherry Blossom Impact');
 });
 
 test('execution types and the loadout\'s own special semantics are untouched', () => {

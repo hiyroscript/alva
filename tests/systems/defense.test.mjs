@@ -216,7 +216,7 @@ test('the shared input is shield on L; no block, dodge or defense action', () =>
   ]);
 });
 
-test('InputManager exposes shield / shieldPressed from L and the controller\'s Circle / B; other pad buttons are not the Shield', async () => {
+test('InputManager exposes shield / shieldPressed from L and the controller\'s L1 / LB; other pad buttons are not the Shield', async () => {
   const listeners = {};
   globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
   globalThis.document = { addEventListener() {}, hidden: false };
@@ -240,21 +240,21 @@ test('InputManager exposes shield / shieldPressed from L and the controller\'s C
   key('keyup', 'KeyL');
   assert.equal(input.sample().shield, false);
 
-  // A controller: Circle / B, held, is the Shield (the universal default),
-  // one press edge per press; RB / RT and every other default button are
-  // not.
+  // A controller: L1 / LB, held, is the Shield (the universal default),
+  // one press edge per press; Circle / B, RB / RT and every other default
+  // button are not.
   const { controllerRig } = await import('../helpers/fake-gamepad.mjs');
   const rig = await controllerRig();
-  rig.press('east');
+  rig.press('l1');
   f = rig.sample();
-  assert.equal(f.shield, true, 'Circle / B');
+  assert.equal(f.shield, true, 'L1 / LB');
   assert.equal(f.shieldPressed, true);
   f = rig.sample();
   assert.equal(f.shield, true, 'held');
   assert.equal(f.shieldPressed, false, 'one press edge per press');
-  rig.press('east', false);
+  rig.press('l1', false);
   assert.equal(rig.sample().shield, false);
-  for (const [button, action] of [['south', 'jump'], ['r1', null], ['r2', null], ['l1', null], ['north', null]]) {
+  for (const [button, action] of [['south', 'jump'], ['r1', null], ['r2', null], ['east', null], ['north', null]]) {
     rig.press(button);
     f = rig.sample();
     if (action) assert.equal(f[action], true, `${button} -> ${action}`);

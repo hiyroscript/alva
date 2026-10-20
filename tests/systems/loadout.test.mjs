@@ -214,14 +214,16 @@ test('keyboard O, M and , press attack3, attack4 and attack5, and a controller r
   const ground = { grounded: true, facing: 1, character: getCharacter('0001') };
   input.sample(ground); // the fighter's first step: its layout from here on
   for (const [inputs, action] of [
-    [['west'], 'attack1'], [['r2', 'west'], 'attack2'], [['r2', 'east'], 'attack3'],
-    [['l2', 'north'], 'attack4'], [['r2', 'north'], 'attack5'], [['north'], 'extra_attack'],
+    [['west'], 'attack1'], [['r2'], 'attack2'], [['east'], 'attack3'],
+    [['l2'], 'attack4'], [['rightStick:forward'], 'attack5'], [['north'], 'extra_attack'],
   ]) {
-    for (const b of inputs) rig.press(b);
+    // A button, or the right stick pushed forward (the way it faces).
+    const set = (b, on) => (b === 'rightStick:forward' ? rig.rightStick(on ? 0.9 : 0, 0) : rig.press(b, on));
+    for (const b of inputs) set(b, true);
     const f = input.sample(ground);
     assert.deepEqual(COMBAT_ACTIONS.filter((a) => f[`${a}Pressed`]), [action], inputs.join(' + '));
     assert.equal(f.pressedOnGround, true);
-    for (const b of inputs) rig.press(b, false);
+    for (const b of inputs) set(b, false);
     input.sample(ground);
   }
 });

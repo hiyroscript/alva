@@ -329,50 +329,77 @@ another fighter's: `controller: { layout: { ... } }` in its definition,
 one binding per move it really has, each keyed by its action id
 (`ground:attack1`, `air:attack2`, `ground:attack4` for a summon or
 technique, `air:extra_attack` if its extra attack works in the air), built
-with the `pad` helper from
+with the `pad` (a button) and `flick` (a stick pushed: the right stick
+unless named) helpers from
 [`js/data/characters/helpers.js`](../../js/data/characters/helpers.js):
 
 ```js
 controller: {
   layout: {
-    'ground:attack1': pad('west'),                       // Square / X
-    'ground:attack2': pad('west', { modifier: 'r2' }),   // R2 + Square / RT + X
+    'ground:attack1': pad('west'),     // Square / X
+    'ground:attack2': pad('r2'),       // R2 / RT
+    'ground:attack3': flick('forward'), // the right stick pushed the way it faces
     'air:attack1': pad('west'),
-    'air:attack2': pad('west', { direction: 'down' }),   // Down + Square
+    'air:attack2': flick('down'),       // the right stick down
   },
 },
 ```
 
-The universal actions (movement, Jump on Cross / A, the Dash on L1 / LB,
-Circle / B for the Shield and the Deflect, Options / Menu) keep everyone's
-buttons: a layout never names them. For each move ask how often it is
-used, how fast it must come out, whether it is thrown while moving or
-jumping, whether it needs a direction or a hold, whether it follows another
-move, and whether its input could set off something else: frequent, fast
-moves on single face buttons; powerful or rare ones behind a trigger
-modifier (R2 / RT, L2 / LT); a ground move and an air move may share a
-button (one is never chosen where the other applies); a direction picks
-between moves only where the move is about direction. Then:
+The universal actions keep everyone's inputs and a layout never names
+them: the left stick moves (and down in the air fast-falls), Cross / A
+jumps, R1 / RB Dashes, L1 / LB is the Shield and the Deflect, Options /
+Menu pauses. That leaves every fighter Square / X, Triangle / Y,
+Circle / B, both triggers and the right stick. Design for someone who has
+never played: what the player sees the move do decides its input, then how
+comfortable it is to press while doing what that move is pressed during,
+never its attack number or how strong it is.
+
+- **Square / X** is its quick, everyday strike, on the ground and in the
+  air (every fighter's first button); Triangle / Y and Circle / B its other
+  everyday strikes. A move that follows another in a string goes on the
+  face, a thumb's roll from it.
+- **R2 / RT** sends its ranged move, if it has one; **L2 / LT** is its
+  (first) Special: a deliberate trigger, never squeezed by accident.
+- **The right stick** is for moves whose whole point is a direction the
+  player can see: up for a move that rises, down for one that drives down
+  or plunges (and so is never one press away off the stage), forward for
+  one sent out the way it faces. A move's launch direction is not its
+  direction: a kick that sends its target up is not a rising move unless
+  the fighter rises with it. A move with no direction of its own never goes
+  on the stick for symmetry's sake.
+- **One input a move.** No combination and no direction held with a
+  button in a recommended layout: players who want them can make them.
+  A ground move and an air move may share an input (one is never chosen
+  where the other applies), and should when they are alike.
+
+Then:
 
 1. Identify its universal actions (a Shield, a Deflect?).
-2. List every move it has, where (ground, air), and what each does.
-3. Choose each input for comfort, as above.
+2. List every move it has, where (ground, air), and what each does: what
+   moves, which way, and what the player sees.
+3. Choose each input as above.
 4. Check there is no conflict:
    [`js/data/controller-profiles.js`](../../js/data/controller-profiles.js)
    `controllerLayoutProblems` (the registry refuses a layout that is
    incomplete, names a move the fighter lacks, retunes a universal action
-   or conflicts).
+   or conflicts, a warning included).
 5. Write each move's line in `abilityDescriptions` (and its French).
-6. Document the layout in its specification, as
-   [#0001](0001.md#controller-layout), [#0002](0002.md#controller-layout),
-   [#0003](0003.md#controller-layout), [#0004](0004.md#controller-layout) and
-   [#0005](0005.md#controller-layout) do.
+6. Document the layout in its specification, a table of every move with
+   its place, input and why, as [#0001](0001.md#controller-layout),
+   [#0002](0002.md#controller-layout), [#0003](0003.md#controller-layout),
+   [#0004](0004.md#controller-layout) and [#0005](0005.md#controller-layout)
+   do.
 
 A fighter registered with no layout still works: it gets a safe,
-conflict-free fallback (face buttons, then R1, then trigger combinations),
-which the editor flags as not designed yet; it is a placeholder, never a
-finished layout. Every playable fighter must ship one designed for it
+conflict-free fallback (the free face buttons, the triggers, the right
+stick, then the D-pad and the stick clicks, one input a move), which the
+editor flags as not designed yet; it is a placeholder, never a finished
+layout. Every playable fighter must ship one designed for it
 ([`tests/systems/controller-profiles.test.mjs`](../../tests/systems/controller-profiles.test.mjs)).
+A fighter whose layout is later redesigned keeps its old one as
+`controller.previous` (built with `legacyPad`), so a profile a player
+saved then is upgraded rather than lost (see
+[input](../systems/input.md#saved-layouts)).
 - **Credits:** add a credit group for its sprite source to
   [`js/ui/credits.js`](../../js/ui/credits.js), its lines as translation
   keys with their English and French strings, exactly as the source was
