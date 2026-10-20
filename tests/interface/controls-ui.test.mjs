@@ -29,7 +29,7 @@ class Element extends Node {
   listeners = new Map();
   dataset = {};
   html = '';
-  style = {};
+  style = { setProperty(name, value) { this[name] = value; } };
   rect = { left: 0, top: 0, width: 40, height: 40 };
   constructor(tag) {
     super();
@@ -91,6 +91,8 @@ const { SAMPLE_FIGHTER } = await import('../fighters/fixtures/sample-fighter.mjs
 const { TEST_MOVELESS } = await import('../fighters/fixtures/test-fighters.mjs');
 const { LOADOUT_CASES, WITH_EXTRA } = await import('../fighters/fixtures/loadout-fighters.mjs');
 const { attackSlots } = await import('../../js/ui/touch-controls.js');
+const { playerRig, press: pressed } = await import('../helpers/player-rig.mjs');
+const { DT } = await import('../helpers/fighter-harness.mjs');
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -1481,6 +1483,113 @@ test('assistive technology: activating a Dash button asks for one Dash; activati
   assert.deepEqual(calls.at(-1), ['shield', true]);
   click(tc.buttons.get('attack3'));
   assert.deepEqual(calls.at(-1), ['attack3', true]);
+});
+
+test('a pointer\'s own trailing click is never a second press, whatever its detail (a long hold included); an assistive activation still taps', () => {
+  for (const scheme of ['joystick', 'classic']) {
+    const { tc, calls } = touchControls(DEF_0001, { scheme });
+    const click = (target, timeStamp) => tc.root.dispatch('click', { detail: 0, timeStamp, target: { closest: () => target } });
+    let t = 1000;
+    for (const action of ['attack1', 'jump', 'shield']) {
+      for (const hold of [80, 1500]) {
+        const b = tc.buttons.get(action);
+        const before = calls.length;
+        b.dispatch('pointerdown', { pointerId: 7, timeStamp: t, preventDefault() {} });
+        b.dispatch('pointerup', { pointerId: 7, timeStamp: t + hold });
+        // The browser's click for that touch, reported with no detail.
+        click(b, t + hold + 5);
+        assert.deepEqual(calls.slice(before), [[action, true], [action, false]], `${scheme} ${action} held ${hold} ms: one press`);
+        t += 5000;
+      }
+    }
+    // A Dash button: one Dash, never a second from its click.
+    const dash = tc.mouvementButtons.get('mouvementRight');
+    const before = calls.length;
+    dash.dispatch('pointerdown', { pointerId: 8, timeStamp: t, preventDefault() {} });
+    dash.dispatch('pointerup', { pointerId: 8, timeStamp: t + 900 });
+    click(dash, t + 905);
+    assert.deepEqual(calls.slice(before), [['mouvement', 1]], `${scheme}: one Dash`);
+    // Activated with no pointer anywhere near it: still a tap.
+    click(tc.buttons.get('attack1'), t + 5000);
+    assert.deepEqual(calls.at(-1), ['attack1', true], `${scheme}: assistive technology still taps`);
+  }
+});
+
+// ---- Live move state ---------------------------------------------------------------
+
+test('the combat buttons show the fighter\'s live state as the ability HUD does: cooldowns, the repeat delay, a spent move, the queued follow-up', () => {
+  const r = playerRig({ character: DEF_0001, gap: 900, combatAssist: false });
+  const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
+  const btn = (action) => tc.buttons.get(action);
+  const looks = (action) => ['is-cooling', 'is-repeat', 'is-spent', 'is-queued'].filter((c) => btn(action).classList.contains(c));
+  tc.showStatus(r.player);
+  for (const action of ABILITY_ACTIONS) assert.deepEqual(looks(action), [], `${action}: ready`);
+  // Hollow Purple's 5 s: the sweep from its start and its seconds.
+  r.tick(pressed('attack5'));
+  tc.showStatus(r.player);
+  assert.deepEqual(looks('attack5'), ['is-cooling']);
+  assert.equal(btn('attack5').getAttribute('data-seconds'), '5.0');
+  assert.equal(btn('attack5').style['--tc-progress'], '0');
+  r.until(() => !r.player.technique);
+  for (let i = 0; i < Math.round(1 / DT); i++) r.tick();
+  tc.showStatus(r.player);
+  const left = r.player.combat.abilityCooldowns.remaining('attack5');
+  assert.ok(Number(btn('attack5').getAttribute('data-seconds')) > 0 && Math.abs(Number(btn('attack5').style['--tc-progress']) - (1 - left / 5)) <= 0.005, 'it runs down with the timer');
+  // The Jab, then pressed again: Red queued while the Jab plays, then the
+  // Jab's 0.5 s repeat delay as a faint sweep, no number.
+  r.tick(pressed('attack1'));
+  r.tick(pressed('attack1'));
+  tc.showStatus(r.player);
+  assert.deepEqual(looks('attack2'), ['is-queued'], 'Red, queued');
+  assert.equal(btn('attack1').classList.contains('is-queued'), false, 'only the move that follows');
+  r.until(() => r.player.combat.attack?.def.id === 'attack2');
+  tc.showStatus(r.player);
+  assert.deepEqual(looks('attack1'), ['is-repeat']);
+  assert.equal(btn('attack1').getAttribute('data-seconds'), null, 'no number for the repeat delay');
+  assert.equal(btn('attack2').classList.contains('is-queued'), false, 'gone once it starts');
+  // In the air: a move spent for this airtime is muted; the ground-only
+  // buttons keep their own unavailable look.
+  r.player.airAttacks.set('midair_attack2', 1);
+  Object.assign(r.player.body, { grounded: false });
+  tc.setAirborne(true);
+  tc.showStatus(r.player);
+  assert.deepEqual(looks('attack2'), ['is-spent']);
+  assert.ok(btn('attack4').classList.contains('is-unavailable'), 'Unlimited Void: ground only');
+  assert.equal(btn('attack4').classList.contains('is-cooling'), false, 'nothing of its ground state painted over it');
+  // Another fighter's state, or none, clears it.
+  tc.showStatus(null);
+  for (const action of ABILITY_ACTIONS) assert.deepEqual(looks(action), [], `${action}: cleared`);
+});
+
+test('the live state writes only what changed, and nothing at all for a button with nothing to show', () => {
+  const r = playerRig({ character: DEF_0001, gap: 900, combatAssist: false });
+  const { tc } = touchControls(DEF_0001, { scheme: 'classic' });
+  let writes = 0;
+  for (const b of tc.buttons.values()) {
+    const set = b.setAttribute.bind(b);
+    b.setAttribute = (...a) => { if (a[0] === 'data-seconds') writes++; set(...a); };
+    const style = b.style;
+    const prop = style.setProperty.bind(style);
+    style.setProperty = (...a) => { writes++; prop(...a); };
+  }
+  for (let i = 0; i < 10; i++) {
+    r.tick();
+    tc.showStatus(r.player);
+  }
+  assert.equal(writes, 0, 'idle: nothing written');
+  r.tick(pressed('attack5'));
+  tc.showStatus(r.player);
+  const after = writes;
+  tc.showStatus(r.player);
+  assert.equal(writes, after, 'the same state again: nothing written');
+  // The stylesheet: a sweep and seconds over the art, a muted spent move, a
+  // lit queued one; nothing that moves by itself.
+  for (const rule of ['.tc-btn::after', '.tc-btn.is-cooling::after', '.tc-btn.is-repeat::after', '.tc-btn[data-seconds]::before', '.tc-btn.is-spent', '.tc-btn.is-queued']) {
+    const body = CSS.match(new RegExp(`${rule.replace(/[.[\]()*:]/g, '\\$&')} \\{[^}]*\\}`))?.[0];
+    assert.ok(body, rule);
+    assert.doesNotMatch(body, /animation|transition/, rule);
+  }
+  assert.match(CSS, /conic-gradient\(rgba\(5, 6, 8, 0\) 0 calc\(var\(--tc-progress, 1\) \* 360deg\)/);
 });
 
 // ---- Joystick: Down left of the stick --------------------------------------------

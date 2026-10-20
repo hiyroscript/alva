@@ -37,7 +37,8 @@ a faint sweep for the 0.5 s repeat delay), and the move Combo Assist has
 queued to follow the attack playing lit along its edge
 ([input](../systems/input.md#the-ability-hud)).
 It hides under the pause menu and at the result, never shows in Watch
-Mode, and a touch screen keeps its touch controls instead. While it shows,
+Mode, and a touch screen keeps its touch controls instead, whose buttons
+show the same cooldowns and queued follow-up. While it shows,
 Player 1's cooldown rings under its feet step aside; the CPU keeps its own.
 
 **Scoring.** 5 minutes (`CONFIG.battle.matchSeconds`, 300 s; the
