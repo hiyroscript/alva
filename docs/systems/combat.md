@@ -20,8 +20,8 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | [`js/data/special-abilities.js`](../../js/data/special-abilities.js) | The player-facing Special classification, each fighter's own (`specialAbilities` in its definition): `isSpecialAbility`, `specialAbilities`, `performableMoves`, `specialAbilityProblems`, `assertSpecialAbilities`. |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU), and what kind of strike an attack is (`isMeleeAttack`, `isRangedAttack`: one reading for Combat Assist and the CPU's moveset). |
 | [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's rules of measure: `assistsAttack` (melee, never homing), `meleeGap` (an attack's box against a target's hurtboxes), `inReach` (its own reach already covers the target), `reachVector` and `approachMove` (the move still to make, or `REACHED`), `approachClear`, `assistRange` and `assistSpeed` (one Dash's travel, or one air dash's), `ASSIST_MARGIN`. |
-| [`js/game/combat/combo-assist.js`](../../js/game/combat/combo-assist.js) | Combo Assist's rule: `COMBO_PAIRS` (attack1 and attack2) and `comboAction` (the move a fresh press asks for, from the source attack's own repeat cooldown). |
-| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, a float (`float`, `afloat`), a charm and who put it on (`charmBy`, `charmedTo`), a fear and who put it on (`frightenBy`, `frightenedOf`), cooldowns (`CooldownTimers` for summons and techniques). |
+| [`js/game/combat/combo-assist.js`](../../js/game/combat/combo-assist.js) | Combo Assist's rules: `COMBO_PAIRS` (attack1 and attack2), `comboAction` (the move a fresh press asks for, from the source attack's own repeat cooldown) and `followUpAction` (the follow-up a repeat queues, read from the attack really playing). |
+| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock (and `finished`, the attack that played out in full this step: only `update` sets it, never a cut, an interruption, a landing cancel or a motion's end), stun, blockstun, hitstop, paralysis, a float (`float`, `afloat`), a charm and who put it on (`charmBy`, `charmedTo`), a fear and who put it on (`frightenBy`, `frightenedOf`), cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
 | [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`paralyze`, `blockPush`, `quake`, `charm`, `float`, `fear`, `gaze`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`, `FLOAT_RISE_SPEED`, `hitReaches`, `createHit`; it refuses any way past a Shield. |
@@ -30,9 +30,9 @@ the player's move cancellation included), §7.2.4a (Combat Assist), §7.2.4b
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/data/cooldowns.js`](../../js/data/cooldowns.js) | The cooldown policy: `REPEAT_COOLDOWN`, `EXCEPTIONAL_COOLDOWN`, `TEN_DAMAGE_COOLDOWN`, `EXCEPTIONAL_EFFECTS` / `ROUTINE_EFFECTS`, `moveImpact`, `cooldownClass`, `policyCooldown`, `resolveCooldown`. |
-| [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A read-only view of a fighter's moves for presentation: `abilityGroups`, `moveCooldown`, `moveRestriction`, `abilityStatus`, `activeMove` and `activeSpecialAbility` (the move being performed now, and whether it is one of its fighter's Specials). |
+| [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A read-only view of a fighter's moves for presentation: `abilityGroups`, `moveCooldown`, `moveRestriction`, `moveQueued`, `abilityStatus`, `activeMove` and `activeSpecialAbility` (the move being performed now, and whether it is one of its fighter's Specials). |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `attackStartable`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the player's requests (`playerControlled`, `comboAction`, `pressRequest`, `repeatsMove`, `playerMayCut`), the combat input buffer, hit-cancels, attack motion, summon startups, Combat Assist's approach (`combatAssistFor`, `tryCombatAssist`, `assistIntents`, `stepCombatAssist`, `finishCombatAssist`, `cancelCombatAssist`). |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `attackStartable`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the player's requests (`playerControlled`, `comboAction`, `pressRequest`, `repeatsMove`, `playerMayCut`), Combo Assist's queued follow-up (`comboQueue`, `noteFollowUp`, `queueFollowUp`, `queuedFollowUp`), the combat input buffer, hit-cancels, attack motion, summon startups, Combat Assist's approach (`combatAssistFor`, `tryCombatAssist`, `assistIntents`, `stepCombatAssist`, `finishCombatAssist`, `cancelCombatAssist`). |
 
 ## Loadouts
 
@@ -606,7 +606,9 @@ Ordinary attacks use `CombatState.cooldowns`, starting on their end, a hit-cance
 the player's own cut or interruption. An attack may cut itself short only after its
 hit-cancel has been open for its repeat delay (never the player's: its press for
 the attack playing is no request). Deflect retains its old interruption behavior.
-Combo Assist reads these same timers as its window and never starts one of its own.
+Combo Assist reads these same timers as its window and never starts one of its own;
+its queued follow-up keeps no timer at all (it lasts as long as its attack plays) and is
+tried through `tryAction`, so it never bypasses, starts, shortens or replaces a cooldown.
 The existing 0.15-second ordinary input buffer remains: early presses expire;
 a press within the last buffer window may start only once the timer is ready.
 Combat Assist rechecks its requested attack at completion and never bypasses it.
@@ -669,7 +671,9 @@ move cancellation*), §7.2.4a and §7.2.4b.
 3. **Same move** (`repeatsMove`, via `pressRequest`): the resolved
    action's attack is the attack in progress, or the button is the one
    whose press started it (`combat.attack.button`). Then the press is no
-   request: dropped, never cut, restarted or buffered.
+   request for now: never cut, restarted or buffered. With Combo Assist it
+   is a **repeat**, which may queue that attack's follow-up (below);
+   without, it is dropped.
 4. **Eligibility and cancellation** (`tryAction`, `tryDeflect`,
    `trySpecial`, `tryMouvment`, the jump and the Shield in `update`): every
    check of the new move runs first; the attack in progress may be cut only
@@ -688,11 +692,70 @@ move cancellation*), §7.2.4a and §7.2.4b.
    requests.
 
 Same-step precedence is the existing one (a Deflect, the combat buttons in
-`COMBAT_BUTTONS` order, the buffered press, the Dash, the Shield, the
-jump); a move started on a step is never cut on that step. Every other
-fighter (a CPU, the practice dummy, a bare controller in a test) keeps the
-old rules exactly: only hit-cancels and Dash cancels cut its attacks, and
-its presses are never resolved or dropped.
+`COMBAT_BUTTONS` order, the buffered press, the queued follow-up, the Dash,
+the Shield, the jump); a move started on a step is never cut on that step.
+Every other fighter (a CPU, the practice dummy, a bare controller in a
+test) keeps the old rules exactly: only hit-cancels and Dash cancels cut
+its attacks, its presses are never resolved or dropped, and it never has a
+queued follow-up.
+
+### Combo Assist's queued follow-up
+
+The rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4b; here is how
+the code does it. One small piece of state on the Fighter, owned there and
+nowhere else:
+
+```js
+fighter.comboQueue = { source, action, move, button, place, at } | null
+// source  the attack record it waits on (CombatState.attack, by identity)
+// action  attack1 / attack2: the pair's other one for that attack
+// move    its attack id there (for readers: the ability HUD)
+// button  the combat button pressed (the new attack's `button`)
+// place   'ground' / 'air': where `source` started (its `airborne`)
+// at      the step the repeat was pressed on (a request's `at`)
+```
+
+Each fixed step, in `Fighter.update`:
+
+1. `CombatState.update` advances the attack in progress and, if its time
+   reaches its end, ends it and records it as `combat.finished` (the only
+   writer; reset to null at the start of every update). Cuts
+   (`cutAttack`), interruptions (`interruptAttack`), the landing cancel
+   and motion ends (a bounce) go through `endAttack` without it, so
+   "the attack ended" is never mistaken for "it played out".
+2. A stun or a paralysis interrupts the attack, as ever.
+3. `noteFollowUp(input)` (before the impact-freeze branch, so presses made
+   in a freeze count): without Combo Assist (not the player's, or the
+   setting off) it clears the queue and stops. A stale queue goes: its
+   `source` is neither `combat.attack` nor `combat.finished`, the fighter
+   is no longer in its `place`, or input is locked. Then this step's
+   presses (those made for the other place, `pressPlace`, are skipped as
+   everywhere): any other request (a combat button the fighter has whose
+   `pressRequest` is not null, a jump, a Dash request, a Shield press)
+   clears it; otherwise a repeat (`pressRequest` null) calls
+   `queueFollowUp`.
+4. `queueFollowUp(pressed)` registers one only if none waits on this
+   attack already, `followUpAction` names a partner for it, the fighter is
+   still where the attack started, and `attackStartsWhere` (the buffer's
+   own test: art, ground-only, airtime) allows the partner there. It drops
+   an older `bufferedAttack` (the newest press wins), so the buffer and the
+   queue never both hold a request.
+5. The combat intents run as ever (a Deflect, fresh presses, the buffer).
+6. Last among them, if `comboQueue.source === combat.finished`, the queue
+   is cleared and, unless something already started this step, the place
+   changed, the Shield is held or an earlier jump goes first
+   (`jumpFirst(at)`, as for a buffered press), `tryAction(action, held,
+   { at, button })` tries it: every eligibility check, Combat Assist and
+   the normal `startAttack`. Success or failure, it is gone.
+7. The Dash, the Shield and the jump follow, unchanged: anything started
+   in step 6 rules them out on that step by their existing checks.
+
+`takeHit` clears it with the player's other kept requests; `reset` (and so
+`respawn`) starts with none. Readers use `queuedFollowUp` (null unless its
+source is still playing and the fighter is in play) through
+`moveQueued` / `abilityStatus` in `js/game/combat/move-status.js`; nothing
+else reads or writes it. No timer, no allocation per step (one small object
+per accepted repeat), no event bus.
 
 ## Combat Assist
 
@@ -819,9 +882,21 @@ starts the very attack asked for. The rules are
   hit-cancel, the player's cut and the buffer, and that no CPU ever has
   it.
 - [`tests/systems/combo-assist.test.mjs`](../../tests/systems/combo-assist.test.mjs):
-  Combo Assist both ways, ground and air, never during the attack, mashing,
+  Combo Assist both ways, ground and air, a press during the attack never
+  cutting it (queuing its follow-up only with the setting on), mashing,
   Off, the buttons that never alternate, the alternate's own rules, the
   cooldown it reads, who has it, and with Combat Assist and Run held.
+- [`tests/systems/combo-queue.test.mjs`](../../tests/systems/combo-queue.test.mjs):
+  the queued follow-up on every fighter: every phase and the last step,
+  the attack playing never touched (its record, clock, clip, strikes,
+  projectile and cooldown), the same result as the attack pressed on that
+  step, held buttons, mashing against standing, shielding, airborne,
+  high-Launch-Point and ledge targets, the follow-up read from the attack
+  really playing, cooldowns (still cooling, ending on the step, 5 s, the
+  impact freeze), every early end and newer request, one move per step,
+  the air (motions, landings, airtime, free fall, a change of place), the
+  four Combat Assist / Combo Assist combinations, the HUD's reading, CPUs
+  and determinism.
 - [`tests/systems/move-cancel.test.mjs`](../../tests/systems/move-cancel.test.mjs):
   the player's move cancellation: every request kind, cleanup, requests
   that cannot start, same-step precedence, forced states and commitments,

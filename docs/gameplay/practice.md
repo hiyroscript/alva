@@ -37,7 +37,8 @@ unavailable, with Back to Home.
 - **Ability HUD.** With a keyboard or a controller, the practice
   fighter's moves show in the bottom-right corner, as in Quick Battle
   ([input](../systems/input.md#the-ability-hud)): art over input, ground
-  and air rows on a wheel, cooldowns read from the fighter. The Practice
+  and air rows on a wheel, cooldowns read from the fighter, Combo
+  Assist's queued follow-up lit. The Practice
   menu and its rosters fade it out; Change Fighter replaces its whole
   moveset at once.
 - **Change Fighter** opens the full roster as a large glass dialog over the

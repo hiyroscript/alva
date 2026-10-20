@@ -129,7 +129,11 @@ per press (a key held, a touch control held or a controller button held is
 one press, never a stream: holding never strings attacks), and the Fighter
 decides what each press asks for, whether it cuts the player's attack and
 whether a melee press closes in, while the player's controller carries the
-settings ([combat](combat.md#the-players-requests)). `runLeft` /
+settings ([combat](combat.md#the-players-requests)). So Combo Assist's
+queued follow-up works identically on every device: a press released and
+made again is two edges (a repeat queues the follow-up), a held control is
+one, and a controller's ground / air resolution (`pressedOnGround` /
+`pressedInAir`) decides the place a repeat counts in, as for any press. `runLeft` /
 `runRight` (the keys, the touch Run buttons and joystick, the stick) only
 hold a direction: their press edges request nothing, so Run never cancels
 an attack or Combat Assist's approach.
@@ -178,6 +182,14 @@ interface, and nothing about them changes.
   repeat delay: a faint sweep), `restricted` (spent for this airtime, free
   fall or missing art: muted, no countdown) or `ready`. Only changed values
   reach the DOM.
+- **Combo Assist's queued follow-up** (`abilityStatus(...).queued`, from
+  `Fighter.queuedFollowUp`): the tile of the move that follows the attack
+  in progress, in the row of its place, gets `is-queued` (a steady
+  brighter edge and inner ring, no motion) and "queued next" in its
+  accessible name, for as long as it waits. It is apart from the state
+  above, so a cooling move that is queued still shows its sweep. The touch
+  controls show no live move state, so on a touch screen the queue has no
+  marker: the attack that follows is the feedback.
 - **Screens.** `BattleScreen.syncAbilityHud` and
   `PracticeGroundScreen.syncAbilityHud` show it for Player 1 after each
   frame (`AbilityHUD.show`), hide it at a result and in Watch Mode, and
@@ -458,8 +470,10 @@ saved.
   never in the air, nothing but the fighter's own buttons), the wheel and rapid changes of
   place, the art and its fallback, keyboard keys, PlayStation and Xbox
   glyphs, a saved layout, device switching, cooldowns through changes of
-  place and on recovery, the repeat delay, airtime restrictions, a fighter
-  swap, which screens show it, its stylesheet and the arena's rings.
+  place and on recovery, the repeat delay, airtime restrictions, Combo
+  Assist's queued follow-up (its tile only, its cooldown still shown, both
+  languages, nothing rewritten), a fighter swap, which screens show it, its
+  stylesheet and the arena's rings.
 - [`tests/systems/controller-devices.test.mjs`](../../tests/systems/controller-devices.test.mjs):
   identification across browsers, button names, zero / one / four / five
   controllers, unsupported devices, disconnection, reconnection, Player 1,
@@ -482,8 +496,9 @@ saved.
   and air, mirroring and fallbacks) and binding capture, in both languages.
 - [`tests/systems/request-devices.test.mjs`](../../tests/systems/request-devices.test.mjs):
   the keyboard, touch and a controller making the same requests: a held
-  button is one press, Combo Assist and move cancellation from each, Run
-  never a request.
+  button is one press, Combo Assist (its queued follow-up included, on the
+  ground and in the air) and move cancellation from each, Run never a
+  request.
 
 - [`tests/interface/controls-ui.test.mjs`](../../tests/interface/controls-ui.test.mjs):
   both layouts, the art on every button for both fighters, fallbacks, names

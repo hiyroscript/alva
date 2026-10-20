@@ -5,12 +5,13 @@
 // player's controller with the setting on; never a CPU, the dummy or a bare
 // controller, in any mode), the alternation both ways on the ground and in
 // the air from each fighter's own loadout, that a press made while the
-// attack still plays never cuts, restarts or turns into the other one (now
-// or later), mashing, Off, the buttons that never alternate, the
-// alternate's own rules (cooldown, art, airtime, place) and the cooldown it
-// reads (the attack's own, however long), and an integration with Combat
-// Assist and Run held throughout. Shared rules: every playable fighter or a
-// fixture, never one fighter's numbers.
+// attack still plays never cuts, restarts or turns into the other one (it
+// queues the other to follow it, Combo Assist on only; the queue itself is
+// tests/systems/combo-queue.test.mjs), mashing, Off, the buttons that never
+// alternate, the alternate's own rules (cooldown, art, airtime, place) and
+// the cooldown it reads (the attack's own, however long), and an
+// integration with Combat Assist and Run held throughout. Shared rules:
+// every playable fighter or a fixture, never one fighter's numbers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -176,9 +177,9 @@ test('ground and air are each their own: a ground attack cooling down never alte
   }
 });
 
-test('Attack 1 pressed while Attack 1 plays (any phase, mashed every step) is never cut, restarted or turned into Attack 2, now or later; the same for Attack 2', () => {
+test('Attack 1 pressed while Attack 1 plays (any phase, mashed every step) never cuts, restarts or turns it into Attack 2: it plays out in full; then Attack 2 follows with Combo Assist (once), nothing without; the same for Attack 2', () => {
   for (const c of playableCharacters()) {
-    for (const action of Object.keys(COMBO_PAIRS)) {
+    for (const [action, partner] of Object.entries(COMBO_PAIRS)) {
       for (const comboAssist of [true, false]) {
         const why = `#${c.id} ${action}, Combo Assist ${comboAssist ? 'on' : 'off'}`;
         const r = far(c, { comboAssist });
@@ -192,15 +193,20 @@ test('Attack 1 pressed while Attack 1 plays (any phase, mashed every step) is ne
           assert.ok(record.time > last, `${why}: never restarted`);
           last = record.time;
           r.tick(press(action));
-          assert.equal(r.player.bufferedAttack, null, `${why}: nothing kept for later`);
+          assert.equal(r.player.bufferedAttack, null, `${why}: never kept in the buffer`);
+          assert.equal(!!r.player.comboQueue, comboAssist, `${why}: queued only with Combo Assist (js/game/fighters/fighter.js noteFollowUp)`);
         }
         assert.equal(r.player.combat.attack, record, `${why}: still the same attack`);
         r.tick();
-        assert.equal(r.player.combat.attack, null, `${why}: it played out in full, on its own`);
-        // After it, nothing it never asked for: no scheduled Attack 2.
+        assert.ok(record.time >= record.def.total - EPS, `${why}: it played out in full, on its own`);
+        assert.equal(attackOf(r.player), comboAssist ? r.player.attackFor(partner) : null,
+          `${why}: ${comboAssist ? `${partner} follows on the step it ends` : 'nothing follows'}`);
+        // After it, nothing it never asked for: one follow-up at most, never
+        // a restart of the first.
+        if (comboAssist) r.until(() => !r.player.combat.attack);
         for (let i = 0; i < 40; i++) {
           r.tick();
-          assert.equal(r.player.combat.attack, null, `${why}: nothing comes out later`);
+          assert.equal(r.player.combat.attack, null, `${why}: nothing more comes out later`);
         }
       }
     }

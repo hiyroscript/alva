@@ -1440,7 +1440,7 @@ test('Combat: Combo Assist On (the default) and Off below Combat Assist, its own
     const desc = section.querySelectorAll('.settings-group-note')[1];
     assert.equal(desc.getAttribute('id'), 'settings-combo-desc');
     assert.equal(desc.textContent,
-      'Once Attack 1 or Attack 2 has finished, pressing it again during its repeat cooldown automatically performs the other attack.');
+      'Press Attack 1 or Attack 2 again, while it plays or just after, to follow up with the other attack. Each attack keeps its own cooldown.');
     const group = section.querySelectorAll('.settings-choices')[1];
     assert.equal(group.getAttribute('role'), 'radiogroup');
     assert.equal(group.getAttribute('aria-labelledby'), 'settings-combo-title');
@@ -1476,7 +1476,7 @@ test('Combat: Combo Assist On (the default) and Off below Combat Assist, its own
     dialog.tabs[2].click();
     assert.equal(title.textContent, 'Assistance aux combos');
     assert.equal(desc.textContent,
-      'Une fois l’Attaque 1 ou l’Attaque 2 terminée, la presser à nouveau pendant son temps de recharge déclenche automatiquement l’autre attaque.');
+      'Appuyez à nouveau sur l’Attaque 1 ou l’Attaque 2, pendant qu’elle se joue ou juste après, pour enchaîner avec l’autre attaque. Chaque attaque garde son propre temps de recharge.');
     assert.match(on.textContent, /^Activée/);
     assert.match(on.textContent, /Par défaut/);
     assert.match(off.textContent, /^Désactivée/);

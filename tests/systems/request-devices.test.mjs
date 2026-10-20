@@ -1,8 +1,8 @@
 // Run with node --test tests/systems/request-devices.test.mjs (no dependencies).
 // The player's requests from every device: the keyboard, the touch controls
 // and a game controller reach the Fighter through one InputManager as the
-// same press edges, so Combo Assist, move cancellation and Run behave the
-// same whichever is used. Each device's own semantics are kept: a key or a
+// same press edges, so Combo Assist (its queued follow-up included), move
+// cancellation and Run behave the same whichever is used. Each device's own semantics are kept: a key or a
 // controller button held makes one press (never a stream of requests), a
 // touch tap is one press, the stick and the Run keys and buttons only hold
 // a direction. On a real InputManager over stubbed window events and a
@@ -79,6 +79,40 @@ test('every device: Attack 1 held through the Jab is one press (never a restart 
     p.fighter.combat.cooldowns.set('attack1', 0.4);
     p.tap('attack1');
     assert.equal(p.fighter.combat.attack?.def.id, 'attack2', `${device}: Combo Assist`);
+  }
+});
+
+test('every device: Attack 1 pressed, let go and pressed again during the Jab queues Red, which follows the Jab as it plays out; in the air the air moves, from the press resolved there', async () => {
+  for (const device of DEVICES) {
+    for (const air of [false, true]) {
+      const why = `${device}${air ? ', in the air' : ''}`;
+      const p = await devicePlayer(device);
+      if (air) {
+        Object.assign(p.fighter.body, { y: 300, prevY: 300, vy: 0, grounded: false, ground: null });
+        p.fighter.coyote = 0;
+      }
+      p.tap('attack1');
+      const first = p.fighter.combat.attack;
+      assert.equal(first?.def.id, air ? 'midair_attack1' : 'attack1', why);
+      p.step();
+      p.tap('attack1');
+      assert.equal(p.fighter.combat.attack, first, `${why}: never cut or restarted`);
+      assert.equal(p.fighter.comboQueue?.move, air ? 'midair_attack2' : 'attack2', `${why}: queued`);
+      // Held now: still the one press, nothing more queued.
+      p.hold('attack1', true);
+      const q = p.fighter.comboQueue;
+      while (p.fighter.combat.attack === first) {
+        p.step();
+        if (p.fighter.combat.attack === first) assert.equal(p.fighter.comboQueue, q, `${why}: held, one queue`);
+      }
+      assert.equal(p.fighter.combat.attack?.def.id, air ? 'midair_attack2' : 'attack2', `${why}: the follow-up`);
+      const second = p.fighter.combat.attack;
+      while (p.fighter.combat.attack === second) p.step();
+      for (let i = 0; i < 30; i++) {
+        p.step();
+        assert.equal(p.fighter.combat.attack, null, `${why}: held, nothing more`);
+      }
+    }
   }
 });
 

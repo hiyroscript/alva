@@ -5,8 +5,9 @@
 // Purpose: the one runtime fighter every mode uses, for every character.
 // It owns the fighter's state (its body, Dash and air dash, jumps, Shield,
 // attack in progress (its Deflect included), Combat Assist's approach,
-// summon startup, technique, launch sequence) and the order in which each
-// fixed step updates it (Fighter.update).
+// Combo Assist's queued follow-up, summon startup, technique, launch
+// sequence) and the order in which each fixed step updates it
+// (Fighter.update).
 // Inputs: a character definition (js/data/characters/<id>.js), its loaded
 // SpriteSet (clip lengths time the land pose, pending attacks and summon
 // startups; the Dash and the air dash need their art), the universal
@@ -44,7 +45,7 @@ import { Technique, createTechniqueDefinition, techniqueProblem } from '../comba
 import {
   assistsAttack, assistSpeed, assistRange, approachMove, approachClear, inReach, REACHED,
 } from '../combat/combat-assist.js';
-import { comboAction } from '../combat/combo-assist.js';
+import { comboAction, followUpAction } from '../combat/combo-assist.js';
 import { REPEAT_COOLDOWN } from '../../data/cooldowns.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
@@ -271,6 +272,11 @@ export class Fighter {
     // yet ({ direction, age, at }), tried again every step for the same
     // movement.attackBuffer (see the Dash in update), or null.
     this.bufferedDash = null;
+    // Combo Assist's queued follow-up: the attack that follows the human
+    // player's attack in progress once it plays out, asked for by repeating
+    // it ({ source, action, move, button, place, at }; see queueFollowUp),
+    // or null.
+    this.comboQueue = null;
     // How many times each attack with `airUses` has started since the
     // fighter was last on the ground or hit: attack id -> count.
     this.airAttacks = new Map();
@@ -392,6 +398,10 @@ export class Fighter {
     // here, on the fighter's next step, so two attacks that connect on the
     // same step still trade.
     if (combat.attack && (combat.stun > 0 || combat.immobilized)) combat.interruptAttack();
+    // Combo Assist's queued follow-up waits on its own attack alone, and this
+    // step's presses have their say on it before anything acts on them (an
+    // impact freeze included): see noteFollowUp.
+    this.noteFollowUp(input);
     // ---- Projectile release ----------------------------------------------
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
@@ -503,11 +513,14 @@ export class Fighter {
     // action-resolution path for every device (see "The player's requests",
     // after bufferAttack): the raw press, the move it asks for (Combo Assist:
     // comboAction), whether it is only the press for the move already
-    // playing (repeatsMove: no request at all, the move plays on), whether
-    // that move may start now (tryAction's own checks), whether starting it
-    // cuts the player's attack short (playerMayCut: only a request made
-    // after that attack began, and only once the new move is known to
-    // start), and otherwise the buffer. Run is never a request.
+    // playing (repeatsMove: no request for now, the move plays on; with
+    // Combo Assist it queues the other attack to follow it, see
+    // noteFollowUp), whether that move may start now (tryAction's own
+    // checks), whether starting it cuts the player's attack short
+    // (playerMayCut: only a request made after that attack began, and only
+    // once the new move is known to start), and otherwise the buffer. Run
+    // is never a request. A queued follow-up is the step's last request,
+    // tried only on the step its attack plays out in full.
     const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0 && !this.freeFall);
     const jumpFirst = (at) =>
       this.jumpBuffer > 0 && canJump && this.jumpPressedAt < at &&
@@ -545,6 +558,21 @@ export class Fighter {
         const { action } = waiting;
         if (this.tryAction(action, held, { at: waiting.at, button: waiting.button })) this.bufferedAttack = null;
         else if (!this.attackMayStart(action, waiting.place)) this.bufferedAttack = null;
+      }
+      // Combo Assist's queued follow-up, last: the attack it waits on played
+      // out in full on this step (CombatState.finished), so it is tried now,
+      // once, as an ordinary request made when it was pressed (tryAction:
+      // its cooldown, art, airtime, the fighter free, Combat Assist), in the
+      // place that attack started in (see noteFollowUp), unless the Shield is
+      // held or a jump pressed before it goes first (as for a buffered
+      // press). Started or not, it is gone: never kept, retried or swapped
+      // for another move.
+      const queued = this.comboQueue;
+      if (queued && queued.source === combat.finished) {
+        this.comboQueue = null;
+        if (!started && queued.place === here && !shieldHeld && !jumpFirst(queued.at)) {
+          this.tryAction(queued.action, held, { at: queued.at, button: queued.button });
+        }
       }
     }
 
@@ -950,7 +978,8 @@ export class Fighter {
   //
   // Four parts, kept apart, cooperate on one press (see the combat intents
   // in update):
-  //   Combo Assist   which move the press asks for (comboAction).
+  //   Combo Assist   which move the press asks for (comboAction), and the
+  //                  follow-up a repeat queues (noteFollowUp).
   //   Cancellation   whether that move, once it may start, replaces the
   //                  player's attack in progress (playerMayCut).
   //   Combat Assist  whether a melee attack that may start closes the gap
@@ -997,13 +1026,87 @@ export class Fighter {
   // attack (where it is now: its ground or mid-air move) is that attack, or
   // `button` is the button that asked for it (Attack 1 pressed again during
   // the Attack 2 its last press made, with Combo Assist). Such a press never
-  // cuts, restarts or queues that attack: it plays on, whatever its phase,
-  // and the press is gone. Never a CPU's (its presses go through the
-  // ordinary rules, unchanged).
+  // cuts, restarts or buffers that attack: it plays on, whatever its phase.
+  // With Combo Assist it queues the other attack to follow it (see
+  // noteFollowUp); without, the press is gone. Never a CPU's (its presses go
+  // through the ordinary rules, unchanged).
   repeatsMove(action, button = action) {
     const a = this.combat.attack;
     if (!a || !this.playerControlled) return false;
     return this.attackFor(action) === a.def.id || (a.button != null && a.button === button);
+  }
+
+  // ---- Combo Assist's queued follow-up ------------------------------------
+  //
+  // The human player's repeat (repeatsMove) never touches the attack in
+  // progress: no cut, restart, replay or second strike, its time, phases,
+  // motion, hits, release and cooldown its own. With Combo Assist it asks
+  // for that attack's partner to follow it (followUpAction in
+  // js/game/combat/combo-assist.js), kept in `comboQueue`: the attack
+  // record it waits on (`source`), the action and attack to start, the
+  // button pressed (the new attack's `button`, see repeatsMove), the place
+  // its source started in and the step it was pressed on. One at most:
+  // further repeats during the same attack change nothing, and a held
+  // button is a single press. It keeps no timer: it lasts exactly as long
+  // as its source plays and is tried once, on the step that attack plays
+  // out in full (CombatState.finished), as that step's last request (see
+  // update). Anything else ends it unused: its source cut, interrupted,
+  // landing-cancelled or ended by its motion, a newer request, a hit, input
+  // locked, a reset or a respawn.
+
+  // This step's presses, for the queued follow-up. A stale one goes first:
+  // its source neither playing nor played out this step, the fighter out of
+  // the place that attack started in (a ground attack carried off a ledge,
+  // a slam landed), input locked or Combo Assist off. Then any other
+  // request (a combat button the fighter has, other than a repeat; a jump;
+  // a Dash; a Shield press, the Deflect in the air) replaces it, and a
+  // repeat made with none queues one (queueFollowUp). A press made for the
+  // other place (pressPlace) is nothing here, as everywhere.
+  noteFollowUp(input) {
+    if (!this.comboAssistOn) {
+      this.comboQueue = null;
+      return;
+    }
+    const place = pressPlace(input);
+    const here = this.body.grounded ? 'ground' : 'air';
+    const q = this.comboQueue;
+    const live = q && (q.source === this.combat.attack || q.source === this.combat.finished);
+    if (q && (!live || q.place !== here || this.inputLocked)) this.comboQueue = null;
+    let other = !!(input.jumpPressed || input.shieldPressed || this.dashAsked(input));
+    let repeated = null;
+    for (const pressed of COMBAT_ACTIONS) {
+      if (!input[`${pressed}Pressed`] || (place && place !== here)) continue;
+      if (!this.pressRequest(pressed)) repeated ??= pressed;
+      else if (this.def.actions?.[pressed] != null) other = true;
+    }
+    if (other) this.comboQueue = null;
+    else if (repeated) this.queueFollowUp(repeated);
+  }
+
+  // Queues the follow-up to the attack in progress for a repeat of button
+  // `pressed`, unless one is queued for it already: its partner
+  // (followUpAction) for the place it started in, with the fighter still
+  // there, and an attack that could start there at all (attackStartsWhere,
+  // the combat buffer's own test: art, ground-only, the airtime; its
+  // cooldown and every other rule are checked as it is tried). The newest
+  // press wins, as in the buffer: an older buffered press is dropped.
+  queueFollowUp(pressed) {
+    const source = this.combat.attack;
+    if (!source || this.comboQueue?.source === source) return;
+    const grounded = !source.airborne;
+    const action = followUpAction(this, source);
+    if (!action || grounded !== this.body.grounded || !this.attackStartsWhere(action, grounded)) return;
+    this.comboQueue = {
+      source, action, move: this.attackFor(action, grounded), button: pressed, place: grounded ? 'ground' : 'air', at: this.steps,
+    };
+    this.bufferedAttack = null;
+  }
+
+  // The follow-up queued now (comboQueue), for readers (the ability HUD):
+  // while its attack still plays and the fighter is in play, else null.
+  get queuedFollowUp() {
+    const q = this.comboQueue;
+    return q && q.source === this.combat.attack && !this.lostToVoid ? q : null;
   }
 
   // Whether the human player's request made on step `at` may cut its
@@ -1047,12 +1150,13 @@ export class Fighter {
       this.cancelCombatAssist();
       this.updateState(0);
     }
-    // The human player's requests made before the hit are stale: none of
-    // them comes out after the stun (presses made from now on are kept as
-    // ever).
+    // The human player's requests made before the hit are stale (a queued
+    // follow-up included): none of them comes out after the stun (presses
+    // made from now on are kept as ever).
     if (this.playerControlled) {
       this.bufferedAttack = null;
       this.bufferedDash = null;
+      this.comboQueue = null;
       this.jumpBuffer = 0;
     }
     this.airJumps = this.movement.airJumps;
