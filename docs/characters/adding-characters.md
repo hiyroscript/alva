@@ -349,40 +349,76 @@ The universal actions keep everyone's inputs and a layout never names
 them: the left stick moves (and down in the air fast-falls), Cross / A
 jumps, R1 / RB Dashes, L1 / LB is the Shield and the Deflect, Options /
 Menu pauses. That leaves every fighter Square / X, Triangle / Y,
-Circle / B, both triggers and the right stick. Design for someone who has
-never played: what the player sees the move do decides its input, then how
-comfortable it is to press while doing what that move is pressed during,
-never its attack number or how strong it is.
+Circle / B, both triggers and the right stick.
 
-- **Square / X** is its quick, everyday strike, on the ground and in the
-  air (every fighter's first button); Triangle / Y and Circle / B its other
-  everyday strikes. A move that follows another in a string goes on the
-  face, a thumb's roll from it.
-- **R2 / RT** sends its ranged move, if it has one; **L2 / LT** is its
-  (first) Special: a deliberate trigger, never squeezed by accident.
-- **The right stick** is for moves whose whole point is a direction the
-  player can see: up for a move that rises, down for one that drives down
-  or plunges (and so is never one press away off the stage), forward for
-  one sent out the way it faces. A move's launch direction is not its
-  direction: a kick that sends its target up is not a rising move unless
-  the fighter rises with it. A move with no direction of its own never goes
-  on the stick for symmetry's sake.
-- **One input a move.** No combination and no direction held with a
-  button in a recommended layout: players who want them can make them.
-  A ground move and an air move may share an input (one is never chosen
-  where the other applies), and should when they are alike.
+#### The comfort rules (strict)
+
+The comfort of the recommended controller layout is **a strict rule, for
+every fighter on the roster and every fighter added later**, never a
+preference to trade away. Someone who has never played Alva must be able
+to pick up a controller, choose any fighter and play it without fighting
+the controls. A layout that breaks a rule is not finished: redesign it; never
+relax a rule, or the shared universal inputs, to fit one fighter.
+
+Checked by the registry as it loads (`comfortProblems` in
+[`js/data/controller-profiles.js`](../../js/data/controller-profiles.js),
+through `assertControllerLayout`): a definition that breaks one never
+loads.
+
+1. **One input a move.** A single button, or the right stick pushed. No
+   button held first, no direction held with a button, no hold to
+   activate: every move comes out as its input goes down. (Players who want
+   combinations can make them in Settings; a recommended layout never
+   asks for one.)
+2. **Only the comfortable inputs** (`COMFORT_INPUTS`): Square / X,
+   Triangle / Y, Circle / B, R2 / RT, L2 / LT, the right stick up, down or
+   forward. Never a universal action's input, the left stick, the D-pad, a
+   stick click, Create / View, nor the right stick left, right,
+   left-or-right or back (a direction on the screen, not of the fighter).
+   Eight inputs for at most six moves in a place.
+3. **Square / X is never empty.** Wherever the fighter has a move, on the
+   ground and in the air, Square / X performs one: every fighter attacks
+   with Square first.
+4. **Never one press of an attack button away from the Void.** A move
+   that plunges (motion `slam` or `bounce`) is the right stick down; a
+   move that spends the airtime (`freeFall`) is on the right stick.
+5. **In the air the right stick points the way the move goes**: up only
+   for a move that rises (motion `rise`), down only for one that plunges.
+
+Just as strict, checked when the layout is reviewed (a machine cannot
+judge them):
+
+6. **What the player sees decides the input**, never the attack number,
+   its damage, its cooldown or its category. A move's launch direction is
+   not its direction: a kick that sends its target up is not a rising move
+   unless the fighter rises with it.
+7. **Frequent and fast moves get the most comfortable inputs.** Square /
+   X is its quick, everyday strike; Triangle / Y and Circle / B its other
+   everyday strikes. A move that follows another in a string is a face
+   button a thumb's roll from it, never a reach to the right stick.
+8. **One language across the roster.** R2 / RT sends its ranged move, if it
+   has one; L2 / LT is its (first) Special: a deliberate trigger, never
+   squeezed by accident.
+9. **The right stick only for a direction the player can see**, on the
+   ground too: up for a move that rises or sends something up, down for one
+   driven down into the ground, forward for one sent out the way the
+   fighter faces. A move with no direction of its own never goes on the
+   stick for symmetry's sake.
+10. **Related moves share an input.** A ground move and an air move may
+    share one (one is never chosen where the other applies), and should
+    when they are alike.
 
 Then:
 
 1. Identify its universal actions (a Shield, a Deflect?).
 2. List every move it has, where (ground, air), and what each does: what
    moves, which way, and what the player sees.
-3. Choose each input as above.
-4. Check there is no conflict:
+3. Choose each input by the comfort rules.
+4. Check it:
    [`js/data/controller-profiles.js`](../../js/data/controller-profiles.js)
    `controllerLayoutProblems` (the registry refuses a layout that is
-   incomplete, names a move the fighter lacks, retunes a universal action
-   or conflicts, a warning included).
+   incomplete, names a move the fighter lacks, retunes a universal action,
+   breaks a comfort rule or conflicts, a warning included).
 5. Write each move's line in `abilityDescriptions` (and its French).
 6. Document the layout in its specification, a table of every move with
    its place, input and why, as [#0001](0001.md#controller-layout),
@@ -391,10 +427,10 @@ Then:
    do.
 
 A fighter registered with no layout still works: it gets a safe,
-conflict-free fallback (the free face buttons, the triggers, the right
-stick, then the D-pad and the stick clicks, one input a move), which the
-editor flags as not designed yet; it is a placeholder, never a finished
-layout. Every playable fighter must ship one designed for it
+conflict-free fallback (the comfortable inputs in order, one input a
+move), which the editor flags as not designed yet; it is a placeholder,
+never a finished layout. Every playable fighter must ship one designed for
+it by the comfort rules
 ([`tests/systems/controller-profiles.test.mjs`](../../tests/systems/controller-profiles.test.mjs)).
 A fighter whose layout is later redesigned keeps its old one as
 `controller.previous` (built with `legacyPad`), so a profile a player

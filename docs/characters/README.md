@@ -33,6 +33,7 @@ Where things are:
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | Test-only fighters (never in the game) | [`tests/fighters/fixtures/`](../../tests/fighters/fixtures/): a sample fighter with different moves on the same codenames, the loadout matrix, and screen-test fighters |
 | How fighters are built | [the character system](../architecture/character-system.md) |
+| Controller layout: the comfort rules, strict for every fighter now and to come | [adding-characters.md](adding-characters.md#the-comfort-rules-strict), enforced as the registry loads (`comfortProblems`) |
 | Adding one | [adding-characters.md](adding-characters.md) |
 
 Credits for each fighter's sprite source are in the game's credits roll

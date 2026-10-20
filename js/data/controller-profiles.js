@@ -129,16 +129,19 @@ export const UNIVERSAL_DEFAULTS = Object.freeze({
   pause: binding('start'),
 });
 
-// The inputs a move with no authored binding is given, in order: the face
-// buttons, the triggers, the right stick, the D-pad and the stick clicks,
-// all single inputs. Each is taken only where it conflicts with nothing
-// already in the layout (see fillLayout).
-const FALLBACK_INPUTS = Object.freeze([
+// The comfortable inputs, the only ones a recommended layout may give a
+// move (see the comfort rules, below): the three face buttons Jump leaves,
+// both triggers, and the right stick pushed up, down or forward. Eight for
+// at most six moves in a place (five numbered attacks and the extra one).
+export const COMFORT_INPUTS = Object.freeze([
   binding('west'), binding('north'), binding('east'), binding('r2'), binding('l2'),
-  flick('rightStick', 'up'), flick('rightStick', 'down'), flick('rightStick', 'forward'), flick('rightStick', 'back'),
-  binding('dpadUp'), binding('dpadDown'), binding('dpadLeft'), binding('dpadRight'),
-  binding('l3'), binding('r3'), binding('select'),
+  flick('rightStick', 'up'), flick('rightStick', 'down'), flick('rightStick', 'forward'),
 ]);
+
+// The inputs a move with no authored binding is given, in order: the
+// comfortable ones, each taken only where it conflicts with nothing already
+// in the layout (see fillLayout).
+const FALLBACK_INPUTS = COMFORT_INPUTS;
 
 // The control codenames a move action may be on.
 const MOVE_CONTROLS = Object.freeze([...NUMBERED_ATTACKS, 'extra_attack']);
@@ -633,14 +636,86 @@ export function profileConflicts(actions, bindings) {
 // Whether `conflicts` include one that keeps a profile from being saved.
 export const hasBlockingConflict = (conflicts) => conflicts.some((c) => c.severity === 'error');
 
+// ---- The comfort rules ----------------------------------------------------------------
+//
+// STRICT for the recommended layout of every fighter, those on the roster
+// now and every one to come: the registry refuses a definition whose
+// layout breaks one (controllerLayoutProblems, run by assertControllerLayout
+// as js/data/characters.js loads). They exist so a player who has never
+// played Alva can pick up a controller, choose any fighter and play it
+// without fighting the controls (docs/characters/adding-characters.md
+// #controller-layout has the reasons, ALVA_SPEC.md 7.4a the rules):
+//
+//   1. One input a move: a single button, or the right stick pushed. No
+//      button held first, no direction held with a button, no hold to
+//      activate: every move comes out as its input goes down.
+//   2. Only the comfortable inputs (COMFORT_INPUTS): Square / X,
+//      Triangle / Y, Circle / B, R2 / RT, L2 / LT, the right stick up,
+//      down or forward. Never a universal action's input (Cross / A,
+//      R1 / RB, L1 / LB, Options / Menu, the left stick), the D-pad, a stick
+//      click, Create / View, nor the right stick left, right, left-or-right
+//      or back.
+//   3. Square / X is never empty: wherever the fighter has a move, on the
+//      ground and in the air, Square / X performs one of them.
+//   4. Never one press of an attack button away from the Void: a move that
+//      plunges (motion 'slam' or 'bounce') is the right stick down, and a
+//      move that spends the airtime (`freeFall`) is on the right stick.
+//   5. In the air the right stick points the way the move goes: up only for
+//      a move that rises (motion 'rise'), down only for one that plunges.
+//
+// The rules a machine cannot judge are just as strict, and checked when a
+// layout is reviewed (adding-characters.md lists them): a move's input is
+// chosen for what the player sees it do, never its attack number; a move
+// that follows another in a string is a face button a thumb's roll from
+// it; on the ground the right stick holds only a move whose own direction
+// the player can see.
+
+const comfortKey = (b) => `${b.button ?? ''}|${b.stick ?? ''}|${b.direction ?? ''}`;
+const COMFORT_KEYS = new Set(COMFORT_INPUTS.map(comfortKey));
+
+// Every way the authored bindings `layout` (by action id) of `def` break
+// the comfort rules, one sentence each.
+export function comfortProblems(def, layout) {
+  const problems = [];
+  const moves = controllerActions(def).filter((a) => a.kind === 'attack');
+  const bindingOf = (a) => normalizeBinding(a, layout?.[a.id]);
+  for (const a of moves) {
+    const b = bindingOf(a);
+    if (!b) continue;
+    const at = `controller.layout.${a.id}`;
+    if (b.modifier) problems.push(`${at}: one input a move, no button held first (comfort rule 1)`);
+    if (b.button !== null && b.direction !== null) problems.push(`${at}: one input a move, no direction held with a button (comfort rule 1)`);
+    if (b.activation !== 'press') problems.push(`${at}: every move comes out as its input goes down, no hold (comfort rule 1)`);
+    if (!COMFORT_KEYS.has(comfortKey({ ...b, modifier: null }))) {
+      problems.push(`${at}: only Square, Triangle, Circle, R2, L2 or the right stick up, down or forward (comfort rule 2)`);
+    }
+    const attack = a.special ? null : def.attacks?.[a.move];
+    const motion = attack?.motion?.type ?? null;
+    const plunge = motion === 'slam' || motion === 'bounce';
+    const onStick = b.button === null && b.stick === 'rightStick';
+    if (plunge && !(onStick && b.direction === 'down')) problems.push(`${at}: a plunge is the right stick down, never a button (comfort rule 4)`);
+    if (attack?.freeFall && !onStick) problems.push(`${at}: a move that spends the airtime is on the right stick, never a button (comfort rule 4)`);
+    if (a.place === 'air' && onStick && b.direction === 'up' && motion !== 'rise') problems.push(`${at}: in the air the right stick up is only for a move that rises (comfort rule 5)`);
+    if (a.place === 'air' && onStick && b.direction === 'down' && !plunge) problems.push(`${at}: in the air the right stick down is only for a move that plunges (comfort rule 5)`);
+  }
+  for (const place of ['ground', 'air']) {
+    const here = moves.filter((a) => a.place === place);
+    if (here.length && !here.some((a) => bindingOf(a)?.button === 'west' && !bindingOf(a)?.modifier)) {
+      problems.push(`controller.layout: Square / X performs none of its ${place} moves (comfort rule 3)`);
+    }
+  }
+  return problems;
+}
+
 // ---- A definition's own layout --------------------------------------------------------
 
 // Every way `def`'s authored `controller` breaks the rules, one sentence
 // each (empty when it keeps them, or authors none): every entry of its
 // `layout` names a move action the fighter has, with a binding that action
-// allows, and the whole recommended profile is free of conflicts, not even
-// a warning. `previous`, the layout it recommended before (for profiles
-// saved then, see upgradeStoredProfile), is an object of move bindings.
+// allows, the layout keeps every comfort rule (above), and the whole
+// recommended profile is free of conflicts, not even a warning.
+// `previous`, the layout it recommended before (for profiles saved then,
+// see upgradeStoredProfile), is an object of move bindings.
 export function controllerLayoutProblems(def) {
   const problems = [];
   if (def?.controller === undefined) return problems;
@@ -663,6 +738,7 @@ export function controllerLayoutProblems(def) {
   for (const action of actions.values()) {
     if (action.kind === 'attack' && !Object.hasOwn(layout, action.id)) problems.push(`controller.layout has no binding for ${action.id}`);
   }
+  if (!problems.length) problems.push(...comfortProblems(def, layout));
   if (!problems.length) {
     const { bindings } = recommendedProfile(def);
     for (const c of profileConflicts([...actions.values()], bindings)) {

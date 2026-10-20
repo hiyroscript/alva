@@ -17,6 +17,7 @@ import {
   hasBlockingConflict, controllerLayoutProblems, sanitizeStoredProfiles, sanitizeStoredProfile, UNIVERSAL_DEFAULTS,
   UNIVERSAL_ACTIONS, CATEGORIES, ACTIVATIONS, DIRECTIONS, MOVEMENT_SOURCES, STICKS, HOLD_THRESHOLD, actionMap, hasAuthoredLayout, ACTION_ID,
   upgradeStoredProfile, upgradeStoredProfiles, LEGACY_UNIVERSAL_DEFAULTS, stickAtoms, directionsMeet, movementButtons,
+  COMFORT_INPUTS, comfortProblems, assertControllerLayout,
 } from '../../js/data/controller-profiles.js';
 import { PAD_BUTTONS } from '../../js/core/gamepad-devices.js';
 import { LOADOUT_CASES, WITH_EXTRA } from '../fighters/fixtures/loadout-fighters.mjs';
@@ -202,9 +203,12 @@ test('a layout that is incomplete, names a move the fighter lacks, retunes a uni
     [{ layout: { ...layout, jump: b('north') } }, /not one of its moves|universal/],
     [{ layout: { ...layout, 'ground:attack1': b('zz') } }, /not a valid binding/],
     [{ layout: { ...layout, 'ground:attack3': b('north') } }, /conflict/],
-    [{ layout: { ...layout, 'ground:attack1': b('north', { modifier: 'east' }) } }, /conflict \(modifier\)/],
-    [{ layout: { ...layout, 'air:attack2': flick('up') } }, /conflict/],
-    [{ layout: { ...layout, 'air:attack2': flick('left', { stick: 'leftStick' }) } }, /conflict \(movement\)/],
+    // A combination, or the stick that moves, never gets as far as a
+    // conflict: the comfort rules refuse it first.
+    [{ layout: { ...layout, 'ground:attack1': b('north', { modifier: 'east' }) } }, /comfort rule 1/],
+    [{ layout: { ...layout, 'ground:attack3': flick('forward'), 'ground:extra_attack': flick('forward') } }, /conflict \(same\)/],
+    [{ layout: { ...layout, 'air:attack2': flick('up') } }, /comfort rule 5/],
+    [{ layout: { ...layout, 'air:attack2': flick('left', { stick: 'leftStick' }) } }, /comfort rule 2/],
     [{ layout: { ...layout, 'ground:attack1': legacy('west', { direction: 'down' }) } }, /not a valid binding/],
     [{ layout, previous: 'old' }, /previous must be an object/],
     [{ layout, colour: 'blue' }, /unknown field/],
@@ -216,6 +220,58 @@ test('a layout that is incomplete, names a move the fighter lacks, retunes a uni
   }
   // No layout at all is not a problem: the fighter gets the fallback.
   assert.deepEqual(controllerLayoutProblems({ ...base, controller: undefined }), []);
+});
+
+// ---- The comfort rules ---------------------------------------------------------------------
+
+test('the comfort rules are strict: the comfortable inputs are eight single ones, and every playable fighter keeps every rule', () => {
+  assert.deepEqual(COMFORT_INPUTS.map((x) => (x.button ?? `${x.stick} ${x.direction}`)), [
+    'west', 'north', 'east', 'r2', 'l2', 'rightStick up', 'rightStick down', 'rightStick forward',
+  ]);
+  for (const def of playableCharacters()) assert.deepEqual(comfortProblems(def, def.controller.layout), [], `#${def.id}`);
+  // The registry runs them: they are part of the layout rules every
+  // definition must pass to load.
+  assert.match(read('js/data/controller-profiles.js'), /if \(!problems\.length\) problems\.push\(\.\.\.comfortProblems\(def, layout\)\);/);
+  assert.match(read('js/data/characters.js'), /assertControllerLayout\(def\);/);
+});
+
+test('a layout that breaks a comfort rule is refused, for any fighter, now or to come', () => {
+  const rule = (n) => new RegExp(`comfort rule ${n}`);
+  const refused = (base, changes, n, why) => {
+    const def = { ...base, controller: { layout: { ...base.controller.layout, ...changes } } };
+    const problems = controllerLayoutProblems(def);
+    assert.ok(problems.some((p) => rule(n).test(p)), `${why}: ${problems.join('; ') || 'accepted'}`);
+    assert.throws(() => assertControllerLayout(def), /breaks the controller layout rules/, why);
+  };
+  const one = getCharacter('0001');
+  const two = getCharacter('0002');
+  const three = getCharacter('0003');
+  const four = getCharacter('0004');
+  // 1. One input a move.
+  refused(one, { 'ground:attack2': b('r2', { modifier: 'l2' }) }, 1, 'a button held first');
+  refused(one, { 'ground:attack2': b('r2', { stick: 'leftStick', direction: 'up' }) }, 1, 'a direction held with a button');
+  refused(one, { 'ground:attack2': b('r2', { activation: 'hold' }) }, 1, 'a hold to activate');
+  refused(one, { 'ground:attack5': flick('forward', { modifier: 'l2' }) }, 1, 'a stick with a button held first');
+  // 2. Only the comfortable inputs.
+  for (const bad of [b('dpadUp'), b('r3'), b('l3'), b('select'), flick('back'), flick('left'), flick('horizontal')]) {
+    refused(one, { 'ground:attack5': bad }, 2, JSON.stringify(bad));
+  }
+  refused(one, { 'ground:attack5': flick('up', { stick: 'leftStick' }) }, 2, 'the left stick, the one that moves');
+  // 3. Square never empty.
+  refused(two, { 'air:attack1': flick('forward') }, 3, 'nothing on Square in the air');
+  refused(one, { 'ground:attack1': b('l2'), 'ground:attack4': b('west', { modifier: 'r2' }) }, 3, 'Square only as part of a combination');
+  // 4. Never one press away from the Void.
+  refused(three, { 'air:attack2': b('north') }, 4, 'a plunge on a button');
+  refused(four, { 'air:attack3': flick('forward') }, 4, 'a plunge on the stick, but not down');
+  refused(two, { 'air:attack3': b('east') }, 4, 'a move that spends the airtime on a button');
+  // 5. In the air the stick points the way the move goes.
+  refused(two, { 'air:attack3': flick('down'), 'air:attack2': flick('up') }, 5, 'rise and plunge swapped');
+  // A fighter to come, with moves of its own, is held to them as well.
+  const future = {
+    ...SAMPLE_FIGHTER, id: 'future-comfort',
+    controller: { layout: Object.fromEntries(controllerActions(SAMPLE_FIGHTER).filter((a) => a.kind === 'attack').map((a, i) => [a.id, b('west', { modifier: i ? 'r2' : null })])) },
+  };
+  assert.ok(comfortProblems(future, future.controller.layout).some((p) => rule(1).test(p)), 'a future fighter of combinations is refused');
 });
 
 test('a new fighter with no layout gets a safe, editable fallback, flagged as not designed yet', () => {

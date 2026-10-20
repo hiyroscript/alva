@@ -4438,11 +4438,28 @@ codename is sent, never what an action does.
   face buttons, both triggers and the right stick are each fighter's.
 - **Each fighter's recommended controls** are its own, authored in its
   definition (`controller.layout`, validated as the registry loads:
-  complete, only moves it has, never a universal action, no conflict and no
-  warning), chosen for what each move looks like and how it is used rather
-  than its attack number, one input a move with no combination and no
-  direction held with a button, and documented in its specification
-  (7.2.9) with the reason for each. One language runs through them: Square
+  complete, only moves it has, never a universal action, the comfort rules
+  kept, no conflict and no warning), chosen for what each move looks like
+  and how it is used rather than its attack number, and documented in its
+  specification (7.2.9) with the reason for each.
+- **The comfort rules are strict**, for every fighter on the roster and
+  every one added later: the comfort of the recommended layout is never
+  traded away, and a layout that breaks a rule is redesigned, never the
+  rule relaxed. Checked as the registry loads (a definition that breaks one
+  never loads): (1) one input a move, no button held first, no direction
+  held with a button, no hold; (2) only Square / X, Triangle / Y,
+  Circle / B, R2 / RT, L2 / LT or the right stick up, down or forward; (3)
+  Square / X performs a move wherever the fighter has one, on the ground
+  and in the air; (4) a plunge is the right stick down and a move that
+  spends the airtime is on the right stick, never one press of an attack
+  button away from the Void; (5) in the air the right stick up is only for
+  a move that rises, down only for one that plunges. Checked when a layout
+  is reviewed: the input follows what the player sees the move do (never
+  its attack number, damage, cooldown or category, and never its launch
+  direction); frequent moves and string follow-ups on the face buttons; R2
+  / RT the ranged move, L2 / LT the Special; the right stick only for a
+  direction the player can see; alike ground and air moves on one input
+  (docs/characters/adding-characters.md has each rule's reason). One language runs through them: Square
   / X the quick strike on the ground and in the air, Triangle / Y and
   Circle / B the other everyday strikes (a string rolls left to right
   across them), R2 / RT the ranged move, L2 / LT the Special, the right
