@@ -1,990 +1,867 @@
-ALVA — Implement New Stage: Jökull
+ALVA — Complete Controller Customization and Beginner-First Recommended Controls Redesign
 
-Objective
+Mission
 
-Implement a complete, fully playable fifth stage named Jökull in the existing Alva game.
+Perform a comprehensive redesign and improvement of ALVA’s controller controls, with two primary objectives:
 
-Repository: hiyroscript/alva
+1. Give players complete freedom to customize their controller inputs, including full right-joystick customization and all physically supported controller buttons.
+2. Completely reevaluate and redesign the recommended controller layouts for every playable fighter, making them exceptionally natural, intuitive, comfortable, and accessible to new and casual players.
 
-Jökull is a frozen, snow-covered arena built from one enormous glacier-like block of ice. Its defining mechanic is that the apparent single platform actually consists of three perfectly connected sections.
+The central design philosophy is:
 
-The centre section is permanently indestructible. The left and right sections independently accumulate structural damage whenever fighters land on or newly enter them. After approximately 15 qualifying landings per section, that section dramatically fractures, breaks away, and falls into the abyss permanently for the remainder of the match.
+ALVA’s controller controls should feel so natural that someone playing the game for the first time can intuitively understand how to perform a move by observing what that move actually does.
 
-The stage also features a 25% random blizzard event, creating a temporary whiteout that significantly reduces visibility.
+The player should not have to memorize arbitrary input combinations, struggle with uncomfortable finger movements, or understand the game’s internal attack numbering to enjoy playing.
 
-Both the destructible ice sections and blizzards are official stage hazards.
+Our ambition is not merely to make the controller layouts usable. We want them to feel exceptionally well designed, fluid, effortless, and satisfying.
 
-This must be a fully implemented stage, not a mockup, prototype, or visual-only addition.
+IMPORTANT: You, the implementing agent, must independently determine every recommended controller binding. This task deliberately does not prescribe any specific controller button or joystick direction for any action. Do not treat existing bindings as preferred choices. Investigate the actual game and make your own decisions using the requirements below.
 
 ⸻
 
-1. Inspect and follow Alva’s architecture
+1. Explore and understand ALVA before making changes
 
-Before implementing anything, review the current repository and understand how these systems interact:
+Repository: hiyroscript/alva
 
-File	Purpose
-js/data/maps.js	Stage definitions, geometry, spawn points, bounds and traits
-js/stages/index.js	Theme registration
-js/stages/stage-theme.js	Shared stage-rendering interface
-js/stages/perspective.js	Shared pseudo-3D projection
-js/stages/desert-theme.js	Yerma’s solid foundation and surface rendering
-js/stages/city-theme.js	Sol-Noir’s solid rooftop and foundation
-js/stages/asperitas-theme.js	Animated platform-hazard presentation
-js/stages/adamaris-theme.js	Environmental effects and live hazard rendering
-js/game/physics.js	StageCollision, surfaces, grounding, landing and collision
-js/game/arena.js	Fixed-step update and rendering lifecycle
-js/game/platform-hazards.js	Dynamic platform controller patterns
-js/game/stage-hazards.js	Environmental hazard controllers
-js/data/stage-hazards.js	Environmental hazard configuration
-js/game/ai/cpu-intelligence/stage-model.js	CPU understanding of stage geometry and hazards
-js/ui/stage-preview.js	Animated and static stage previews
-js/game/battle.js	Battle lifecycle and restart logic
-js/localization/strings/en.js and fr.js	Localization
+Before implementation, thoroughly inspect the existing game, its systems, its fighters, and the complete controller configuration architecture.
 
-Also review ALVA_SPEC.md, docs/gameplay/stages.md, and the relevant existing tests.
+Start by reviewing:
 
-Use the established architecture and naming conventions. Do not create a separate physics engine, rendering pipeline, or standalone minigame.
+* README.md
+* ALVA_SPEC.md
+* CLAUDE.md
+* docs/systems/input.md
+* docs/systems/movement.md
+* docs/systems/combat.md
+* docs/systems/defense.md
+* docs/characters/
+* js/data/characters/
+* js/data/controller-profiles.js
+* js/data/loadout.js
+* js/core/controller-resolver.js
+* js/core/input-manager.js
+* js/core/controller-manager.js
+* js/core/gamepad-devices.js
+* js/core/settings.js
+* js/ui/controller-editor.js
+* js/ui/controller-glyphs.js
+* js/ui/ability-hud.js
+* js/game/fighters/
+* js/game/combat/
+* The existing controller, fighter, input, UI, and integration tests.
 
-Maintain compatibility with Quick Battle, Watch Mode, Random Stage, Regular Play, rematches, and existing fighters.
+Inspect any additional files necessary to understand the complete interaction between controller input, movement, combat, animations, interface navigation, and persisted settings.
 
-2. Stage identity and registration
+When possible, launch ALVA in the browser and examine the actual gameplay and controller interface.
 
-Register Jökull as the fifth playable stage.
+Do not rely solely on written move descriptions. Inspect the animations, sprite frames, movement code, combat behavior, attack hitboxes, projectile behavior, and contextual restrictions.
 
-* Internal ID: jokull
-* Display name: Jökull
-* Theme ID: jokull
-* Roster position: slot 05
-* Name must preserve the accented ö.
-* Existing stages must remain in their current order and retain their existing IDs.
+If interactive gameplay testing is unavailable, investigate the implementation and animation resources as thoroughly as possible and document what could not be verified visually.
 
-Suggested stage tagline:
+Do not start designing recommended bindings until you understand what every available move actually does.
 
-“A frozen kingdom on the verge of collapse.”
+⸻
 
-Suggested description:
+2. Make controller customization genuinely complete
 
-“An immense glacier suspended above an endless frozen abyss. Its three ice sections appear united, but the outer edges fracture under repeated landings. Beneath swirling snow and sudden blizzards, every step brings the ice closer to breaking.”
+The current controller system already supports per-fighter customization, normalized PlayStation/Xbox buttons, single-button inputs, modifiers, directional conditions, and different activation types.
 
-Stage traits should accurately communicate:
+Preserve these capabilities while removing unnecessary restrictions and extending the system.
 
-* Terrain: Frozen glacier
-* Platforms: Three connected ice sections
-* Hazards: Collapsing ice and blizzards
-* Obstacles: None
-* Light: Polar daylight
+The objective is to allow players to build highly personalized controller layouts without being restricted to the game’s recommended control philosophy.
 
-Add complete English and French localization for the new stage’s name, tagline, and trait values.
+2.1 Full right-joystick customization
 
-The existing stage-selection system uses the MAPS registry and fills its 24-slot roster automatically. Integrate with that system rather than hardcoding an additional selection screen.
+The right joystick must become a fully configurable input source, with capabilities comparable to the left joystick.
 
-3. Core stage geometry — one platform, three sections
+It must not be limited to functioning as an alternative movement source.
 
-This is the most important requirement.
+Players should be able to configure how the right joystick participates in gameplay, including independent directional inputs and combinations with other controls where appropriate.
 
-At the beginning of every match, the arena must look and play like one enormous uninterrupted block of ice.
+Investigate and implement support for:
 
-Conceptually:
+* Configuring the left and right joysticks independently.
+* Recognizing directional movement from either joystick.
+* Binding supported gameplay actions to individual joystick directions.
+* Using either joystick’s directional state as part of a combined input.
+* Supporting appropriate press, hold, and continuous behaviors for joystick-driven actions.
+* Allowing one joystick to handle movement while the other performs separately configured actions.
+* Correctly handling simultaneous input from both joysticks.
+* Supporting joystick-based actions independently of the currently selected movement source.
+* Applying appropriate deadzones, directional thresholds, edge detection, and neutral-position resetting.
+* Preventing unintended actions from stick drift, slight analog movements, or repeated activation while a stick is held.
+* Giving users clear visual feedback showing exactly which joystick and direction are assigned to each action.
 
-         ONE CONTINUOUS WALKABLE ICE SURFACE
-  _______________________________________________
- |               |                 |             |
- |               |                 |             |
- |   LEFT ICE    |   CENTRE ICE    |  RIGHT ICE  |
- |   BREAKABLE   |  INDESTRUCTIBLE |  BREAKABLE  |
- |               |                 |             |
- |_______________|_________________|_____________|
-       ICE              ICE             ICE
-    FOUNDATION       FOUNDATION      FOUNDATION
+Where directional stick movement triggers an action, ensure that the resulting behavior is intentional, predictable, and context-aware.
 
-The vertical divisions in this diagram represent internal boundaries for implementation. They must not look like open gaps, separate floating platforms, or large visible seams before damage begins.
+A directional action should not repeatedly activate simply because the player continues holding the stick unless continuous activation is specifically appropriate.
 
-Initial appearance
+Investigate the existing movementVector, stickDirection, directionMet, directionHeld, compileProfile, and ControllerResolver implementations.
 
-All three sections must:
+The current implementation derives directional conditions from the selected movement source. Remove the architectural coupling where it prevents independent joystick configuration.
 
-* Be physically adjacent without horizontal gaps.
-* Share exactly the same walkable top elevation.
-* Have matching surface textures and ice thickness.
-* Form a visually continuous top, front face and foundation.
-* Permit seamless walking, running, dashing, jumping, shielding and combat across their joins.
-* Use Alva’s existing one-point perspective.
-* Have no artificial walls, bumps or collision barriers at their internal boundaries.
+Design an extensible input representation that explicitly distinguishes the relevant joystick, direction, activation, and any modifiers.
 
-The stage must look like a massive frozen landmass, not three small floating rectangles placed side by side.
+Both joysticks must remain fully usable together without interfering with each other.
 
-Foundation
+2.2 Allow customization of every controller button
 
-Follow the visual principles of Yerma and Sol-Noir.
+Every physical controller button exposed by the supported Gamepad API mapping should be eligible for customization.
 
-Jökull must have a substantial visible foundation extending downward beneath the playable ice surface.
+This includes all supported categories of inputs:
 
-This foundation should look like a colossal glacier: layered blue-white ice, deep turquoise frozen strata, trapped bubbles, crevasses and darker ancient ice beneath the surface.
+* Face buttons.
+* Shoulder buttons.
+* Analog triggers.
+* Directional pad inputs.
+* Joystick-click buttons.
+* Menu and secondary buttons exposed by the browser.
+* Both joysticks’ supported directional inputs.
 
-Unlike Adamaris’s flat continuous ground, the entire ice platform should visibly stand above an open frozen abyss.
+Do not artificially exclude an input simply because the current recommended layout or existing input system uses it for a particular function.
 
-Each outer section must have its own detachable foundation. When that section collapses, its complete volume breaks away, not just the thin walkable surface.
+Allow players to reassign gameplay actions using the complete available input vocabulary.
 
-Geometry and sizing
+Preserve compatibility with ALVA’s supported PlayStation and Xbox controller families and their normalized button representation.
 
-Use the existing stages as the reference for combat scale.
+Respect the actual capabilities and limitations of the browser’s Gamepad API. Do not claim that inaccessible hardware, operating-system-reserved inputs, or controller-specific extra buttons are remappable when they cannot be reliably detected.
 
-Suggested initial proportions:
+2.3 Customization must include universal actions
 
-* Centre: approximately 60–65% of total initial platform width.
-* Left: approximately 17–20%.
-* Right: approximately 17–20%.
-* All sections share one exact surface height.
-* Spawn both fighters safely on the indestructible centre.
+Every gameplay action available through the controller should be customizable.
 
-The exact world coordinates should be tuned to Alva’s existing jump, Dash, recovery, camera and Void rules.
+This includes movement, jumping, Dash/air dash, fast fall, defensive actions, the fighter’s actual attacks, Special abilities, and relevant system actions.
 
-Important technical distinction: Do not set Jökull to ground: { type: 'continuous' }.
+Users must not be forced to retain ALVA’s recommended universal bindings.
 
-In Alva, that setting creates uninterrupted ground beyond the Void. It would leave invisible or unintended support after the glacier wings disappear.
+Distinguish between two concepts:
 
-Instead, implement a composite finite stage whose initial footprint contains three contiguous, independently collidable solid sections.
+* Recommended layouts: Universal actions must use consistent recommended controls across every fighter.
+* Custom layouts: Players must remain free to override those recommended inputs individually.
 
-The map’s overall combat bounds and Void calculations should still account for the full initial footprint, including both side sections.
+A player customizing one fighter must not unintentionally alter another fighter’s saved profile.
 
-If required, introduce a general-purpose composite-floor or destructible-solid extension to StageCollision, preserving every existing stage’s behaviour.
+2.4 Preserve and improve the binding editor
 
-4. Structural rules for the three sections
+Expand the existing Controller controls editor rather than introducing a disconnected customization system.
 
-Centre section
+The editor should make advanced customization understandable even for players who are unfamiliar with controller remapping.
 
-The centre is permanent and indestructible.
+Ensure the interface clearly communicates:
 
-It must:
+* Which action is being edited.
+* Which physical input triggers it.
+* Whether the input comes from the left or right joystick.
+* Any required joystick direction.
+* Any button modifiers.
+* The action’s activation behavior.
+* Whether the binding applies on the ground, in the air, or both.
+* Any conflicts with other bindings.
 
-* Never take structural damage.
-* Never crack from gameplay impacts.
-* Never lose collision.
-* Never fall.
-* Never disappear during blizzards.
-* Remain the same size and position throughout the match.
-* Always serve as stable footing and a recovery destination.
+Maintain both methods of customization: directly detecting controller input and manually selecting an input through the interface.
 
-The centre can have purely decorative ancient ice patterns, but never damage-state cracks that imply it will collapse.
+Players without a connected controller should still be able to configure their layouts.
 
-Left section
+Update the controller diagram so either joystick can be highlighted independently, including directional indications.
 
-The left section has its own persistent structural integrity.
+Keep input labels correct for the currently selected controller family.
 
-* Starts fully intact.
-* Accumulates one unit of damage per qualifying new landing or entry event.
-* Reaches destruction after 15 counted contacts by default.
-* Visually develops increasing damage.
-* Eventually breaks completely away.
-* Never reforms during the current match.
+Make the editing experience straightforward. The additional flexibility must not make basic customization confusing or cumbersome.
 
-Right section
+2.5 Conflicts and input resolution
 
-Identical rules to the left, but completely independent.
+Reevaluate ALVA’s binding conflict detection.
 
-Its landing counter, structural damage, animations and destruction state must not depend on the left section.
+It must correctly understand independent joystick sources, physical buttons, modifiers, activation modes, and gameplay context.
 
-Example:
+Avoid false conflicts where two bindings can safely coexist.
 
-If the left section has received 12 qualifying landings and the right section has received 3, the left must appear heavily cracked while the right remains relatively intact.
+Also prevent genuinely ambiguous configurations from silently activating the wrong action.
 
-If the left collapses, the right must continue functioning normally.
+Preserve and improve contextual input reuse, including the distinction between ground and aerial actions.
 
-No damage should propagate across the indestructible centre.
+A binding conflict is not determined solely by whether two bindings mention the same button. It depends on whether their complete activation conditions can overlap in actual gameplay.
 
-5. Define exactly what counts as a landing
+Ensure simultaneous controller inputs are handled deterministically.
 
-The ice should react to both fighters equally.
+Preserve ALVA’s existing safety behavior concerning stale inputs, paused gameplay, disconnected controllers, fighter switching, and buffered actions.
 
-The following must count as a qualifying contact when it establishes new footing on a breakable side:
+Do not allow controller customization to create stuck movement, permanently active defenses, repeated unintended attacks, or gameplay inputs leaking out of menus.
 
-* Normal jump landings.
-* High-jump landings.
-* Landings after an air jump.
-* Landings following an air Dash.
-* Landings after being launched or knocked back.
-* Returning to a side platform after previously leaving it.
-* Falling onto it from above.
-* Directly transferring onto a side from another section, including running or dashing across the internal seam, once the fighter’s support transitions to that side.
-* Landing during a blizzard.
-* Any other supported gameplay state that genuinely establishes a new contact.
+Keep menu navigation reliable regardless of customized gameplay bindings. If menu controls themselves are made customizable, provide a dependable recovery mechanism that prevents users from locking themselves out of the interface.
 
-Do not restrict the mechanic to pressing the Jump button.
+⸻
 
-Contact counting safeguards
+3. Redesign the recommended layouts around beginners
 
-Damage must be applied once per new support/contact event, not once per physics frame.
+This is the most important game-design component of the task.
 
-A fighter standing still on a side for several seconds must not continuously damage it.
+Reevaluate the recommended controller layout for every currently playable fighter.
 
-Walking around while maintaining support on that same section must not generate repeated hits.
+The objective is not to create traditional fighting-game controls, preserve familiar conventions at any cost, or organize inputs according to internal attack numbers.
 
-Use the actual grounded surface identity and contact transitions to determine when a new landing or entry has occurred.
+The objective is to create controls that make sense naturally to someone who has never played ALVA.
 
-Account for the fact that Alva’s existing body.landed is true for airborne-to-grounded transitions but may not detect a grounded transfer from the centre to another section.
+The player’s intuition, physical comfort, and ability to understand the move should determine the recommended input.
 
-Explicitly handle these grounded support changes.
+Every fighter must receive a carefully designed layout based on its actual moves.
 
-Each fighter should have correctly maintained contact state to prevent false increments from collision jitter.
+3.1 Do not use arbitrary or mechanical assignment rules
 
-A wall collision against the side or underside of the ice must not count as landing on its top.
+Do not blindly assign moves based on:
 
-If two fighters independently land on the same side during the same simulation step, both valid contacts may count, subject to the destruction threshold.
+* Their internal attack number.
+* Their order in a fighter definition.
+* Their damage or power alone.
+* Their cooldown alone.
+* Their category alone.
+* Their internal animation identifier.
+* The current recommended layout.
+* Whether another fighter happens to have a superficially similar move.
 
-Never allow the counter to exceed its configured maximum.
+These characteristics may inform a decision where genuinely relevant, but they must not determine the layout automatically.
 
-The system must remain deterministic and independent of rendering frame rate.
+Instead, investigate each move individually and choose its recommended input based on its specific mechanics, observed appearance, and practical controller ergonomics.
 
-6. Structural damage progression
+3.2 Prioritize the visible direction of the move
 
-Default durability:
+Directional intuition should be central to the recommended layout design.
 
-MAX_ICE_CONTACTS = 15
+However, a critical distinction must be maintained:
 
-Make the threshold configurable in one clearly named data module instead of scattering literal values throughout the implementation.
+The visible direction of a move is not the same thing as its Directional Launch.
 
-Every qualifying contact should cause a small physical and visual response.
+Directional Launch describes where the opponent is sent after being hit. It must not be mistaken for the visual trajectory, physical motion, or directional meaning of the move itself.
 
-Examples of escalating damage:
+Analyze what the player actually sees.
 
-Count	Required visual progression
-0	Clean, intact, thick ice
-1–3	Fine hairline fractures near impact areas
-4–6	More visible branching cracks and small frost fragments
-7–9	Significant cracks spreading across the top and front face
-10–12	Deep fractures, visible internal separation and stronger impact reactions
-13–14	Critical instability, large branching cracks and subtle trembling
-15	Full structural failure and collapse sequence
+Consider:
 
-The damage must be cumulative.
+* The direction in which the fighter physically moves while executing the attack.
+* The direction in which a limb, weapon, or other attacking object travels.
+* Whether the fighter rises, descends, lunges, spins, dives, charges, or remains stationary.
+* Whether the attack is aimed toward an opponent, an area, or a fixed direction.
+* Whether the move creates a projectile, persistent object, environmental effect, or summon.
+* Whether the move’s visible motion clearly communicates a directional intention.
+* Whether the move’s animation changes depending on facing or other contextual information.
+* Whether any visual direction is incidental rather than meaningful to the attack’s actual execution.
 
-Do not simply switch between an intact sprite and a broken sprite.
+A move that sends its opponent upward is not necessarily an upward-moving attack.
 
-Create a genuinely progressive cracking system where additional damage becomes increasingly obvious.
+A downward-launching attack is not necessarily a downward-moving attack.
 
-Damage visuals
+A projectile’s travel direction, a fighter’s movement direction, and the resulting knockback direction may all be different.
 
-A qualifying landing should produce:
+Do not confuse them.
 
-* A crisp ice-impact reaction.
-* A new fracture or an extension of existing fractures.
-* Tiny chips or ice crystals bursting outward.
-* A subtle local vibration.
-* A brief icy highlight showing stress spreading from the impact.
-* An appropriate sound cue if it fits the existing audio system.
+The input should reflect the most intuitive interpretation of the actual visible action and mechanic, not merely its hit result.
 
-The fracture network must be persistent across frames and must not regenerate randomly on each render.
+Also recognize when a move has no meaningful directional association. Do not force a directional input onto an otherwise straightforward action merely to make the layout appear systematic.
 
-Use stable, seeded or otherwise deterministic geometry for damage patterns.
+3.3 Evaluate the complete mechanics of every move
 
-The top surface and visible front foundation should both reflect the section’s actual damage state.
+A move’s mechanics can dramatically change how comfortable or intuitive its input feels.
 
-Cracks should gradually become darker, wider, longer, and more interconnected as collapse approaches.
+For every move, investigate:
 
-They must remain legible even with constant snow particles in the scene.
+Execution and motion: Whether it is an immediate strike, multihit sequence, moving attack, projectile, trap, summon, technique, homing maneuver, rising attack, plunge, roll, hover, healing action, or another mechanic.
 
-7. Full ice-breaking animation
+Commitment: Whether the fighter can move freely during the move, whether it changes momentum, requires a charge or cast, locks the fighter in place, or introduces an extended recovery period.
 
-When either section receives its fifteenth qualifying contact, initiate a complete, unmistakable breaking sequence.
+Timing: Whether it requires immediate reactions, precise timing, frequent repetition, sustained holding, or deliberate activation.
 
-A simple instant disappearance or opacity fade is unacceptable.
+Movement interaction: Whether players are likely to perform it while running, jumping, falling, turning, Dashing, or recovering near the edge of a stage.
 
-Phase A — critical fracture
+Targeting: Whether it follows an opponent, travels according to facing, affects a surrounding area, creates an effect at a target location, or interacts with nearby objects.
 
-Recommended duration: approximately 0.2–0.35 seconds.
+Frequency and purpose: Whether it is a commonly used neutral action, a combo tool, a movement/recovery option, a defensive response, an occasional utility action, or a powerful Special ability.
 
-* The section visibly shakes.
-* Major cracks rapidly expand.
-* Fracture lines illuminate with cold white and cyan highlights.
-* Small ice chips jump from the surface.
-* The affected section appears unstable.
-* The centre and opposite side remain unaffected.
+Risk: Whether unintended activation could be especially disruptive, such as consuming a critical resource, interrupting movement, causing an unwanted plunge, or beginning a lengthy cast.
 
-Phase B — structural separation
+Visual presentation: Whether its animation offers an intuitive connection to a particular kind of input or control gesture.
 
-Recommended duration: approximately 0.2–0.4 seconds.
+Make the final recommendation through a holistic evaluation of these factors.
 
-* The broken section separates along its inner boundary.
-* Its upper ice slab splits into several larger irregular pieces.
-* Deep fractures extend through the visible foundation.
-* The foundation visibly tears apart, exposing darker blue ice inside.
-* The section begins losing structural coherence.
+Do not allow one consideration to override the actual play experience without justification.
 
-Phase C — collapse
+3.4 Favor physical comfort and minimal effort
 
-Recommended duration: approximately 0.6–1.2 seconds.
+Recommended controls must be physically comfortable on supported PlayStation and Xbox controllers.
 
-* The broken section separates completely from the centre.
-* Large chunks rotate and fall downward.
-* Several smaller shards scatter and fall at different speeds.
-* Fine snow and ice particles trail behind the falling chunks.
-* The newly exposed edge of the permanent centre looks naturally broken, not like a hard rectangular cut.
-* The debris descends toward the Void and is eventually culled.
+Consider the player’s hands and fingers, not just the logical arrangement of inputs.
 
-Use gravity-like acceleration and modest angular motion to make the collapse physically convincing.
+Evaluate:
 
-A small camera shake may accompany the main fracture, respecting reduced-motion settings.
+* Whether the player can move and attack comfortably at the same time.
+* Whether a frequent action requires repositioning a thumb unnecessarily.
+* Whether a directional input conflicts physically with movement.
+* Whether a combination is awkward to execute.
+* Whether the player can respond quickly while already holding a movement input.
+* Whether a commonly used action requires too much coordination.
+* Whether the recommended inputs are comfortable during repeated use.
+* Whether the controls feel natural during fast-paced combat.
+* Whether players can chain movement, defense, jumps, and attacks without unnecessary hand repositioning.
+* Whether adjacent actions produce an understandable physical control pattern.
 
-Collision requirements
+Avoid unnecessary simultaneous inputs, awkward chords, and gestures that demand more coordination than the move deserves.
 
-The collision must disappear in exact synchronization with the section’s physical separation.
+Basic and frequently used actions should be exceptionally accessible.
 
-Do not leave invisible ground supporting fighters after the ice visually falls.
+More deliberate inputs may be appropriate when the move’s actual mechanics justify them, but do not make powerful or unusual moves difficult merely because they are powerful or unusual.
 
-Do not remove support long before the break becomes visually apparent.
+Ease of execution matters more than creating artificially complicated inputs.
 
-During the short critical-fracture anticipation, the section may remain solid. Once structural separation begins, its collision must be disabled and any fighter supported by it must begin falling, unless another active section legitimately supports them.
+3.5 Create an intuitive control language
 
-Use or extend releaseGround as appropriate.
+Although each fighter should receive individually designed attack bindings, the overall recommended system should feel coherent.
 
-Fighters should retain their normal movement, jumping, air-dash, recovery and combat behaviour during the collapse.
+Look for meaningful relationships between input gestures and move behavior.
 
-Do not automatically eliminate a fighter because an ice section collapsed. The fighter should physically fall and may recover under Alva’s existing rules. Elimination occurs only upon reaching the actual Void boundary.
+When two moves have similar visual or mechanical purposes, consider whether their inputs should share an intuitive relationship.
 
-The falling pieces are visual debris, not independent damaging projectiles.
+When their behavior differs substantially, do not force them into the same control pattern solely to preserve consistency.
 
-Permanent destruction
+Ground and aerial moves require special consideration.
 
-Once destroyed, a side section must remain destroyed for the rest of the current match.
+The same physical input can perform different actions depending on whether the fighter is grounded or airborne, but that relationship must be understandable.
 
-It must not regenerate, reset after a respawn, or automatically reappear after a timer.
+Contextual reuse can make a layout much simpler if it feels logical.
 
-After both sides collapse, only the centre section remains playable.
+It can also confuse players if the two actions have no intuitive relationship.
 
-The resulting gaps must contain genuine open air and must be handled correctly by physics, projectiles, shadows, CPU movement and recoveries.
+Make these decisions deliberately.
 
-8. Jökull-specific hazard architecture
+Do not sacrifice a fighter’s natural control feel merely to impose identical attack arrangements across the roster.
 
-Classify both destructible sections as structural stage hazards.
+The recommended layouts should feel related through a consistent design philosophy, not through an arbitrary universal attack template.
 
-However, do not attempt to implement them as ordinary Asperitas cloud hazards.
+⸻
 
-The existing PlatformHazards system assumes that its moving or disappearing platforms remain spatially separated from the main stage and may eventually reform.
+4. Universal movement and defense must be consistent
 
-Jökull deliberately requires the opposite:
+ALVA has universal baseline movement mechanics. Its fighters share the same fundamental locomotion.
 
-* Its sections initially touch.
-* They are substantial blocks with foundations.
-* Their collision is aligned with the main surface.
-* They never move before breaking.
-* Their destruction is permanent within the match.
+Reflect this in the recommended controls.
 
-Implement an appropriate controller, for example IceSectionController, within a dedicated Jökull hazard system or a clean extension of the existing stage-hazard architecture.
+The following actions must have a consistent recommended input or input gesture across every fighter that supports them:
 
-Each breakable section should have explicit runtime state, including:
+* Movement.
+* Jump and aerial jumps.
+* Dash and air dash.
+* Fast fall.
+* Shield.
+* Deflect.
+* Other genuinely universal gameplay actions.
 
-* Section identity.
-* Current contact count.
-* Maximum contact count.
-* Damage progression.
-* Intact, critical, breaking and destroyed states.
-* Collision activation.
-* Break-animation timing.
-* Generated fracture geometry.
-* Active debris particles.
-* Stable render state.
+These controls must not change unexpectedly when the player selects a different fighter.
 
-The map definition must remain immutable. Every Arena and StagePreview should own fresh runtime state.
+A player should be able to switch characters and immediately understand how to move, jump, Dash, fall, and defend.
 
-Ensure section collision identity remains reliable for fighters entering from the central block.
+The identity of each fighter should be expressed through its distinctive attacks and abilities, not through unnecessarily different fundamental controls.
 
-Update all relevant collision queries, including horizontal solid collision, vertical landing, support detection, shadows, and CPU queries, so destroyed solids are truly inactive everywhere.
+4.1 Reconsider the recommended Dash input
 
-Never leave stale static-surface cache entries that cause the CPU to plan landings onto destroyed ice.
+The current recommended Dash binding is not automatically the best choice.
 
-9. Blizzard event — 25% random chance
+Conduct a fresh ergonomic review of Dash and air dash.
 
-Jökull has a second, independent hazard: Blizzard.
+Choose a new recommended Dash input.
 
-This is a significant temporary snowstorm that obscures the battlefield and reduces visibility.
+Evaluate how the action interacts with the full movement system, including directional Dashing, normal movement, jumping, attacks, defensive reactions, and aerial recovery.
 
-Probability
+The chosen input should make Dash feel effortless and immediately accessible during actual play.
 
-Use an exact, configurable probability:
+Dash is a fundamental movement ability and should not require awkward hand repositioning or unnecessary coordination.
 
-BLIZZARD_CHANCE = 0.25
+Use the same recommended Dash control for every fighter.
 
-This represents a 25% chance whenever the weather controller performs an eligible event check.
+Preserve the established Dash and air-dash gameplay mechanics. This task concerns controller mapping and usability, not fighter movement balance.
 
-Do not roll every rendered frame or fixed simulation step.
+4.2 Reconsider the recommended Defense input
 
-Instead, use independent weather-event intervals.
+The existing recommended Defense binding must also be reevaluated rather than automatically preserved.
 
-Recommended initial tuning:
+Choose a new recommended Defense input or coherent defensive input arrangement.
 
-* Opening calm: 5–8 seconds.
-* Event checks: once every 12–18 seconds while eligible.
-* Probability per check: 25%.
-* Blizzard duration: approximately 6–9 seconds.
-* Transition buildup: approximately 1–1.5 seconds.
-* Transition out: approximately 1–1.5 seconds.
-* No overlapping blizzards.
+ALVA has context-dependent defensive mechanics, including a held Shield on the ground and Deflect in the air.
 
-Adjust the duration and intervals if playtesting indicates a better balance, but retain the exact 25% chance per eligible event check.
+Study their actual behavior and how players use them.
 
-A failed roll leaves the stage in its normal weather state until the next eligible check.
+Consider:
 
-A successful roll triggers one blizzard event.
+* Fast defensive reactions.
+* Comfort while holding Shield.
+* Immediate transitions between offense and defense.
+* Deflect timing.
+* Ground-to-air transitions.
+* Finger availability during movement and attacks.
+* Accidental defensive activation.
+* Consistency across different fighters.
 
-There must be no forced alternation between blizzards and normal weather.
+The result should make defensive actions intuitive and easy to access during combat.
 
-Weather states
+Every fighter must share the same recommended defensive arrangement.
 
-Use a clear deterministic state machine, such as:
+The underlying mechanics of Shield and Deflect must remain unchanged.
 
-calm → warning → blizzard → clearing → calm
+4.3 Optimize universal controls together
 
-The controller’s random stream must be seeded using Alva’s existing random utilities.
+Do not select universal actions independently without checking how they interact.
 
-It must not depend on render frequency, animation frames, the CPU’s random stream, or structural-damage counters.
+Movement, Jump, Dash, Fast fall, and Defense form a connected control system.
 
-Blizzard buildup
+Evaluate them as a whole.
 
-Before the blizzard reaches full strength:
+The final universal layout should allow common combinations of movement and defensive or offensive actions to feel fluid.
 
-* Wind intensity gradually increases.
-* Snowflakes begin moving faster and more horizontally.
-* Distant scenery becomes hazier.
-* Cold fog grows across the stage.
-* The atmosphere visibly turns whiter.
-* Wind gusts build toward the main event.
+In particular, a player should not have to fight the controller to perform ordinary movement sequences.
 
-This must feel like an approaching storm, not an instantly appearing white rectangle.
+Treat the universal layout as the ergonomic foundation for every fighter’s attack layout.
 
-Full blizzard
+4.4 Important distinction about customization
 
-At peak intensity:
+Universal consistency applies to the recommended defaults.
 
-* Dense snow sweeps across the screen in multiple directions.
-* Snowflakes move strongly with the wind.
-* Large near-camera snow particles streak across the view.
-* Fine distant snow forms a textured white haze.
-* Gusts and drifting snow create layered movement.
-* Visibility is significantly reduced.
-* The sky, mountains and distant scenery become difficult to distinguish.
-* The platforms and fighters remain partially visible through the storm.
+It must not impose a restriction on individual custom controller profiles.
 
-The storm should be challenging without becoming completely opaque.
+Players who want different configurations for different fighters must be allowed to create them.
 
-Target a substantial loss of environmental clarity while preserving enough visibility to avoid making combat unplayable.
+⸻
 
-Keep gameplay HUD, score, timer, menus and essential controls readable. Apply the whiteout within the battle Canvas rather than obscuring interface elements unnecessarily.
+5. Analyze every existing fighter individually
 
-Blizzard clearing
+Do not redesign the recommended layouts through a single shared template.
 
-When the event ends:
+Perform a complete move-by-move analysis of the five currently playable fighters.
 
-* The strongest gusts diminish.
-* Snow density gradually decreases.
-* Fog begins to clear.
-* Distant background elements reappear.
-* The atmosphere returns smoothly to its ordinary snowfall.
+Use each fighter’s definition, documented mechanics, move animations, and actual combat implementation.
 
-Do not abruptly switch from dense whiteout to a clear scene.
+Fighter #0001 — Limitless sorcerer
 
-Gameplay rules
+Inspect its strikes, kicks, ranged techniques, repelling and attracting projectiles, paralysis effect, projectile-erasing technique, homing aerial attack, hovering attacks, Shield behavior, and Deflect.
 
-The blizzard itself is a visibility hazard, not a damage attack.
+Pay particular attention to the difference between visible projectile behavior, fighter motion, and the resulting launch effects.
 
-It should not:
+Fighter #0002 — Speedster
 
-* Apply fighter damage.
-* Modify Launch Point.
-* Automatically stun fighters.
-* Force fighters into the Void.
-* Change the structural durability of the ice.
+Inspect its multihit attacks, rolling Spin Attack, homing aerial movement, downward Bounce Attack, rising Blue Tornado, and travelling Whirlwind.
 
-The base requirement is increased visual difficulty, not altered movement physics.
+Movement-heavy attacks require special attention because their input should feel natural while the player is already maneuvering through the stage.
 
-Wind must be clearly represented visually and atmospherically, but do not introduce strong random forces on fighters unless explicitly designed, balanced and justified separately.
+Fighter #0003 — Medic brawler
 
-Blizzards and platform damage must be able to occur simultaneously.
+Inspect its strikes, rising aerial kick, descending heel attacks, ground-quake effects, Cherry Blossom Impact, heavy melee attack, and healing technique.
 
-An ice section must still receive damage and break correctly during a blizzard.
+Distinguish carefully between attacks that visually descend, attacks that create ground effects, and attacks that launch opponents in a particular direction.
 
-The blizzard must not hide critical cracking or collapse cues so completely that players cannot understand what happened.
+Fighter #0004 — Virtual singer
 
-10. Environmental artwork and atmosphere
+Inspect its dance attacks, leek-based strikes, high kick, rising aerial attack, descending Stage Dive, ranged Melody, stationary double, and area charm technique.
 
-Create a dedicated procedural Canvas renderer:
+Consider the relationship between the visible physical action and the mechanic that the move ultimately produces.
 
-js/stages/jokull-theme.js
+Fighter #0005 — Dancing clown
 
-Jökull should be visually distinct from every current stage while remaining consistent with Alva’s rendering quality and pseudo-3D style.
+Inspect its claw attacks, extending bite, floating hands, gaze-based Deadlights, Red Balloon summon, pulling tendrils, and aerial variations.
 
-Art direction
+Account for unusual attacks where the visible effect occurs away from the fighter, follows a target, or interacts with an opponent from an unexpected direction.
 
-Imagine an isolated ancient glacier suspended above a vast frozen landscape during a bitter polar day.
+Required fighter analysis
 
-The world should feel cold, enormous, beautiful and slightly dangerous.
+For every actual move available in the current roster, establish:
 
-Use a coordinated palette of:
+1. Its real player-facing name.
+2. Its internal move and action identifiers.
+3. Whether it is available on the ground, in the air, or both.
+4. Its actual gameplay mechanic.
+5. Its visually observable direction or movement, if meaningful.
+6. Its distinction from Directional Launch.
+7. Its likely combat usage and frequency.
+8. Its interaction with movement and other controller inputs.
+9. Its ergonomic requirements.
+10. The recommended binding you ultimately select, with a concise explanation.
 
-* Glacial blue.
-* Deep arctic turquoise.
-* Cold cyan.
-* Frost white.
-* Very pale lavender.
-* Desaturated navy shadows.
-* Muted blue-gray atmospheric haze.
+Cover normal attacks, extra attacks, aerial variations, Special abilities, techniques, summons, and other genuinely playable actions.
 
-Avoid making the stage an entirely flat white scene.
+Do not create bindings for reserved, nonexistent, or unavailable moves.
 
-Background
+Do not accidentally omit a move because it is categorized as a technique or summon rather than an ordinary attack.
 
-Include several layers of environmental depth:
+Use each fighter’s real action list as the source of truth.
 
-Far background
+⸻
 
-* Cold polar sky.
-* Soft, pale sunlight diffused through icy clouds.
-* Immense snow-covered mountain ranges.
-* Distant glacial peaks.
-* Faint atmospheric fog.
+6. Make the recommended layouts exceptionally beginner-friendly
 
-Midground
+Evaluate every proposed recommended layout from the perspective of someone who has never played ALVA.
 
-* Frozen cliffs or glaciers.
-* Uneven snowy ridgelines.
-* Broad expanses of ice.
-* Snow-covered valleys or a distant frozen plain.
-* Soft drifting snow.
+Do not assume familiarity with traditional fighting-game conventions.
 
-Near background
+A new player should be able to:
 
-* Closer ice formations.
-* Frosty rock faces.
-* Wind-blown snow.
-* Sparse blowing mist and snow clouds.
+* Understand the fundamental actions quickly.
+* Find basic attacks without memorizing complicated combinations.
+* Discover a reasonable relationship between their input and the action on screen.
+* Perform common attacks comfortably while moving.
+* Execute movement-heavy moves without fighting their controls.
+* Defend instinctively.
+* Transition between ground and aerial combat without unnecessary confusion.
+* Explore an unfamiliar fighter without having to relearn universal actions.
+* Gradually discover advanced techniques without the basics feeling difficult.
 
-Use Alva’s established parallax and deterministic procedural-art patterns.
+Avoid designing the default controls primarily for expert players or optimized competitive execution.
 
-Main glacier
+Expert-level freedom should come from the complete customization system.
 
-The platform is the visual centrepiece.
+The recommended layouts should primarily serve beginners and casual players, while remaining responsive and practical for experienced users.
 
-Its top should have:
+6.1 Establish a clear decision hierarchy
 
-* A thick layer of accumulated snow.
-* Slightly irregular wind-sculpted surface detail.
-* Exposed patches of polished blue ice.
-* Fine frost textures.
-* Small snowdrifts near its edges.
-* Subtle cold highlights.
-* A clearly readable playable surface.
+When choosing between candidate bindings, prioritize:
 
-The foundation should feature:
+1. Immediate beginner comprehension.
+2. Physical comfort and ease of execution.
+3. Intuitive correspondence with the move’s visible behavior.
+4. Compatibility with the move’s mechanics and typical use.
+5. Smooth interaction with universal movement and defense.
+6. Low accidental-activation risk.
+7. Coherent ground/air contextual behavior.
+8. Overall consistency and ease of learning.
+9. Suitability for repeated real gameplay.
 
-* Large semi-transparent-looking blue ice formations.
-* Geometric frozen layers.
-* Embedded bubbles.
-* Thin ancient fracture patterns.
-* Deep cyan and navy shadows.
-* Jagged natural ice contours.
-* An uneven lower edge.
+Do not optimize primarily for elegance in the configuration data or symmetry in the controller diagram.
 
-Use gradients, layered geometry, transparency effects and carefully chosen highlights to make the ice appear substantial and visually rich.
+A layout that looks systematic but feels awkward is not a successful layout.
 
-The stage must not look like a simple blue rectangle.
+6.2 Avoid unnecessary complexity
 
-Snowflakes
+Question every binding that involves multiple simultaneous inputs or a direction modifier.
 
-Implement persistent ambient snowfall.
+Ask whether the complexity contributes meaningfully to understanding the move or whether it merely makes the control harder to use.
 
-Use at least three depth layers:
+Do not assume that powerful attacks should require complicated inputs.
 
-1. Distant tiny flakes, subtle and slow.
-2. Midground flakes with moderate movement.
-3. Foreground flakes, larger and more responsive to wind.
+Do not assume that rare actions must be difficult.
 
-Snow should have slight differences in size, opacity and movement.
+Do not assume that all moves should have the same number of input components.
 
-Do not make all flakes identical or move at precisely the same speed.
+Each binding should earn its complexity through a clear gameplay or ergonomic benefit.
 
-Wind
+6.3 Be creative, but not gimmicky
 
-Even during normal weather, Jökull should have a noticeable ambient wind.
+You have freedom to substantially reorganize the recommended controls.
 
-Use:
+Do not be afraid to depart from the existing layouts.
 
-* Soft horizontal snow drift.
-* Fine streaks of blowing powder.
-* Occasional atmospheric gusts.
-* Gentle movement in background mist.
+However, creativity should produce greater comfort and clarity, not additional complexity.
 
-During a blizzard, intensify these existing systems rather than replacing the scene with an unrelated effect.
+Use the possibilities of the controller intelligently, including contextual bindings and both analog sticks, when they genuinely improve the experience.
 
-Visual polish
+There is no requirement to use every available button or direction in a recommended layout.
 
-Preserve the game’s performance characteristics.
+Full customizability and optimal beginner defaults are separate objectives.
 
-Reuse cached geometry, particle pools or bounded particle collections as appropriate.
+The best default is not necessarily the one that uses the most controller features.
 
-Avoid allocating huge particle arrays every frame.
+⸻
 
-Keep visual state and hazard gameplay state separate, and never let particles control actual collision.
+7. Implement the redesigned recommendations correctly
 
-11. Damage visuals and rendering synchronization
+After completing the analysis, update the actual recommended controller profiles.
 
-The Jökull theme must render directly from the live state of the ice hazard controllers.
+The recommendation system must continue to work independently for each fighter.
 
-It must never maintain an unrelated copy of structural damage.
+Maintain ALVA’s existing character-driven architecture:
 
-The visual representation must match collision state.
+* Fighter definitions own their individual move layouts.
+* Shared input systems must remain fighter-agnostic.
+* Universal recommended actions must come from shared configuration rather than being copied independently into fighter-specific code.
+* A fighter’s recommended layout must cover every actual bindable action it possesses.
+* Unsupported actions must not appear.
+* Every recommended profile must be validated.
+* New fighters must remain supported by an appropriate fallback mechanism.
 
-Examples:
+Update the profile validation rules if necessary to support the expanded input model.
 
-* Left at 4 contacts: mild left-side cracks.
-* Right at 12 contacts: severe right-side cracking.
-* Centre: no structural damage.
-* Left destroyed: no left walkable surface.
-* Right destroyed: no right walkable surface.
-* Both destroyed: only centre remains.
-* Blizzard active: all currently existing ice sections remain rendered beneath the storm.
+Make sure recommended profiles cannot introduce ambiguous or unusable bindings.
 
-Damage must also correctly affect the front and side faces of the glacier.
+If the redesigned controller architecture changes the shape of a binding, update all readers and validators consistently.
 
-The theme must not draw a completely intact giant block after one section has already fallen away.
+Do not introduce fighter-ID-specific exceptions into the shared input resolver.
 
-When an ice section collapses, reveal a naturally broken edge on the remaining glacier, especially at its connection with the permanent centre.
+Ensure the final recommendation is actually used by the game, not merely displayed in the editor.
 
-All fragment and fracture animation coordinates must remain consistent with the game’s world-to-screen transformation and camera movement.
+⸻
 
-Use simulation-driven destruction events and animation state. Rendering must not modify gameplay damage or trigger additional break events.
+8. Preserve existing saved profiles and behavior
 
-12. Camera, Void and combat integration
+The controller settings system stores custom layouts per fighter.
 
-The starting stage should use the same general camera scale and framing principles as Yerma and Sol-Noir.
+Existing users must not unnecessarily lose their customized controls when this redesign is introduced.
 
-At match start, players should see the full glacier with both side sections and sufficient surrounding air.
+Inspect js/core/settings.js and the current controller profile serialization and sanitization logic.
 
-Account for the overall starting platform footprint when establishing stage, camera and Void bounds.
+Implement any necessary schema updates and migrations.
 
-The indestructible centre must remain fully inside the usable Void area, including overtime.
+Requirements:
 
-Ensure that:
+* Existing valid custom bindings should remain valid and usable wherever possible.
+* New recommended layouts should apply to players who have not customized a fighter.
+* New defaults must not silently overwrite intentional player customizations.
+* Malformed individual bindings should recover gracefully.
+* A problem with one fighter’s profile must not corrupt another fighter’s configuration.
+* Settings should persist reliably across reloads.
+* Resetting a fighter’s controls should apply that fighter’s newly recommended layout.
+* Restoring defaults for one fighter must not reset other fighters.
+* Switching fighters should immediately use the appropriate active profile.
+* Keyboard and touch controls must continue working normally.
 
-* Both intact side sections are playable.
-* Falling off an exterior ledge follows standard Void rules.
-* Falling into a newly created gap follows standard gravity and recovery rules.
-* Fighters can jump back from newly exposed edges if their abilities permit it.
-* No destroyed section creates an invisible wall.
-* No section extends into unintended kill zones at match start.
-* Projectiles and summons continue functioning according to existing rules.
-* Collision and actual drawn surfaces align.
-* Camera framing behaves correctly after one or both sides collapse.
-* Overtime’s closing Void remains compatible with the changing stage topology.
+Preserve ALVA’s existing combat behavior, input buffering, attack ownership, and contextual action restrictions unless an input-layer change is strictly necessary to meet this task.
 
-Do not change universal character movement values to compensate for the new stage.
+Do not change attack damage, launch properties, movement balance, cooldowns, fighter abilities, or other unrelated game mechanics.
 
-Use existing movement and recovery behaviour when balancing the dimensions of the ice sections.
+⸻
 
-13. CPU awareness and hazard intelligence
+9. Update all controller-related presentation
 
-Update Alva’s existing stage intelligence so CPUs understand Jökull.
+The actual control configuration must be reflected consistently throughout ALVA.
 
-The CPU must recognize:
+Review and update:
 
-* The intact central section.
-* Each active breakable side.
-* The currently available landing and walking surfaces.
-* The remaining structural integrity of each outer section, when visually communicated.
-* A side section that is critically cracked.
-* The beginning of a collapse.
-* Permanently missing ice sections.
-* Newly exposed ledges and dangerous gaps.
+* The Controller controls editor.
+* The binding capture dialog.
+* The controller diagram.
+* All action/input descriptions.
+* Ground and aerial action displays.
+* The ability HUD.
+* Controller-family-specific glyphs and labels.
+* Recommended/custom layout indicators.
+* Restore-default behavior.
+* Input conflict messages.
+* Any relevant help text or instructions.
 
-The existing StageModel caches static surfaces and derives main-stage ledges from the stage’s original geometry.
+Ensure the HUD always displays the binding that will actually activate the move.
 
-That behaviour must be reviewed carefully because Jökull’s collision topology changes during a match.
+A directional binding involving the right joystick must not be displayed as a left-joystick input or as an ambiguous generic direction.
 
-Do not allow permanently destroyed sides to remain cached as valid landing targets or safe walking areas.
+Preserve the ability to configure controls with a keyboard or mouse when no controller is connected.
 
-Use live collision information where needed.
+Keep the presentation clean, readable, responsive, and accessible.
 
-CPU decisions
+Support both English and French consistently.
 
-CPUs should still be willing to fight on the outer sections while they exist.
+Do not leave outdated recommended-binding descriptions in user-facing content.
 
-They should not irrationally avoid the entire stage from the beginning.
+⸻
 
-However, when a side becomes critically unstable, a CPU should be capable of recognizing the visible danger and attempting to move to safety.
+10. Test the actual player experience
 
-CPU response should respect existing difficulty and reaction rules.
+Do not consider this task complete merely because the new configuration passes static validation.
 
-The CPU should not receive supernatural advance knowledge of the exact next random blizzard event.
+Test controller behavior as a coherent interactive system.
 
-A blizzard can reduce the player’s visibility without requiring the introduction of new unbalanced CPU penalties.
+10.1 Joystick customization tests
 
-Both CPUs in Watch Mode must experience the exact same stage destruction and weather state.
+Verify that:
 
-14. Previews and stage selection
+* Both joysticks can be configured independently.
+* The right joystick can activate supported bound actions.
+* Left and right joystick directional conditions are distinguished correctly.
+* Either joystick can be used as a movement source.
+* A joystick not used for movement can still provide independent action inputs.
+* Simultaneous joystick inputs behave correctly.
+* Returning a stick to neutral releases or resets its directional state appropriately.
+* Deadzones prevent accidental activation.
+* Press, hold, and continuous actions behave as intended.
+* Directional bindings work with supported modifiers.
+* Analog input does not produce unintended repeated actions.
+* Configuration persists after saving and reloading.
 
-Jökull must have:
+10.2 Complete button customization tests
 
-* A still roster thumbnail.
-* A live animated hero preview.
-* Correct English and French names and trait descriptions.
-* Proper selection, confirmation and Random Stage support.
+Verify that every supported physical button can be selected as an input and functions correctly when assigned.
 
-Still thumbnail
+Test appropriate combinations, contextual reuse, conflict detection, input capture, and menu safety.
 
-Show the complete intact glacier:
+Verify that remapping a universal action actually changes the gameplay input.
 
-* All three sections connected.
-* Snow and ice details.
-* Frozen mountain background.
-* No active collapse.
-* A clean, recognizable surface.
+Do not confuse an input being displayed in the editor with an input being successfully supported by the runtime.
 
-Animated preview
+10.3 Recommended layout tests
 
-The animated hero preview should show environmental activity:
+Verify every playable fighter’s recommended profile.
 
-* Moving ambient snow.
-* Wind.
-* Foreground snowflakes.
-* Frozen atmospheric effects.
-* Occasional blizzard demonstrations.
+Each fighter must have:
 
-The preview may include an isolated demonstration of cracking and collapse so players can understand the stage hazard before playing.
+* A complete set of valid bindings.
+* No missing playable moves.
+* No bindings for nonexistent actions.
+* No unresolved conflicts.
+* Consistent universal actions.
+* Correct ground and aerial behavior.
+* A layout genuinely authored around its move mechanics.
 
-Any demonstration must use preview-only runtime state. It must never alter battle state or cause a match to begin with damaged platforms.
+Test the newly chosen universal Dash and Defense inputs during actual gameplay.
 
-Because the current StagePreview creates its own hazard simulation without live fighters, explicitly design how preview-only break demonstrations are triggered if included.
+Test common movement, jumping, attacking, defending, and recovery sequences for physical usability.
 
-Do not rely on nonexistent fighter landings to make the preview show a collapse.
+10.4 Regression tests
 
-Reduced-motion or still previews should present clear, stable stage art.
+Preserve or appropriately update the existing test coverage for:
 
-15. Accessibility and reduced motion
+* Controller devices and connection management.
+* Controller input resolution.
+* Controller profiles and conflicts.
+* Controller settings and persistence.
+* Controller editor UI.
+* Controller-based ability HUD.
+* Fighter-specific controller expectations.
+* Universal movement.
+* Dash and air dash.
+* Shield and Deflect.
+* Combat input buffering.
+* Practice Ground fighter switching.
+* Pause menus and controller navigation.
+* Ground/air action restrictions.
+* Focus loss and controller disconnection.
+* Localization.
 
-Respect Alva’s existing reduced-motion setting.
+Update tests that explicitly assert obsolete recommended bindings.
 
-With reduced motion enabled:
+Do not weaken tests merely to make a new implementation pass.
 
-* Disable or substantially reduce camera shake.
-* Minimize flickering, rapid pulsing and excessive particle movement.
-* Keep fracture progression visible.
-* Show structural failure clearly without intense shaking.
-* Preserve actual collision and destruction timing.
-* Keep blizzard states understandable while substantially reducing distracting particle animation.
-* Do not prevent hazards from functioning.
+Add coverage for new behavior and discovered edge cases.
 
-Reduced motion must change presentation, not gameplay rules.
+Run the full repository test suite using node --test and report the results accurately.
 
-Ensure ice damage remains discernible through fracture shape and contrast rather than relying solely on flashing.
+Where interactive browser or hardware testing is possible, include it.
 
-The blizzard should remain a meaningful visibility hazard, but not create an unnecessarily unreadable or flashing screen.
+⸻
 
-16. Match lifecycle and deterministic behaviour
+11. Update the documentation
 
-All structural damage and weather state must belong to an individual Arena instance.
+Once implementation is complete, update all documentation that describes controller behavior or specific recommended layouts.
 
-On a new battle:
+Pay particular attention to:
 
-* Both side sections are fully intact.
-* Both counters are zero.
-* The centre is untouched.
-* No collapse debris remains.
-* The weather controller starts fresh.
-* The initial weather is calm.
+* ALVA_SPEC.md
+* README.md
+* docs/systems/input.md
+* The individual fighter documentation in docs/characters/
+* docs/characters/adding-characters.md
+* Relevant architecture and developer documentation.
 
-On a rematch, fully reset the Jökull stage.
+The documentation must accurately explain:
 
-On an ordinary fighter respawn within the same match, do not reset the stage.
+* Full right-joystick customization.
+* Which physical inputs can be customized.
+* The supported types of bindings.
+* How independent joystick inputs behave.
+* The revised universal recommended actions.
+* Every fighter’s newly designed recommended layout.
+* Conflict handling.
+* Custom-profile persistence and resetting.
+* The controller editor’s updated behavior.
 
-Destroyed sections must remain destroyed.
+Follow existing ALVA conventions, naming requirements, and protected-file restrictions.
 
-Damage counters must persist through individual eliminations and respawns.
+In particular, do not modify the protected character_rule file.
 
-Where appropriate, match freeze, result-screen and restart behaviour should follow the established hazard lifecycle.
+⸻
 
-Random weather decisions must use dedicated seeded streams and be reproducible for the same battle seed and gameplay update sequence.
+12. Required implementation quality
 
-The actual weather sequence must not change because the user resizes the screen or because the game renders at a different frame rate.
+Prefer a cohesive solution over scattered patches.
 
-17. Required implementation work
+The controller system should remain understandable, reusable, and maintainable as ALVA grows.
 
-Implement the necessary changes across the existing architecture.
+Avoid hardcoding behavior for individual fighters inside shared input modules.
 
-At minimum, expect work involving:
+Avoid duplicating controller-binding logic across the editor, resolver, HUD, and settings.
 
-* Stage registration in js/data/maps.js.
-* Theme registration in js/stages/index.js.
-* New js/stages/jokull-theme.js.
-* A dedicated ice-destruction controller or clean generalized equivalent.
-* Blizzard hazard controller and tuning.
-* Composite floor collision support in js/game/physics.js.
-* Correct hazard update sequencing in js/game/arena.js.
-* Match restart handling in js/game/battle.js.
-* Dynamic topology awareness in CPU stage modelling.
-* Stage preview support.
-* English and French localization.
-* Stage documentation.
-* Automated tests.
+Use a consistent binding representation and shared utilities where appropriate.
 
-Prefer reusable, maintainable extensions rather than hardcoded Jökull-only checks scattered throughout shared physics and AI code.
+Keep changes focused on controller configuration, input resolution, recommended profiles, and the associated interfaces and tests.
 
-Do not introduce new dependencies unless genuinely necessary.
+The result should support future fighters and future controller customization improvements without another architectural overhaul.
 
-Preserve the existing Canvas 2D rendering architecture.
+Do not merely add new configuration options while leaving the input resolver unable to use them.
 
-18. Tests and acceptance criteria
+Do not merely update recommended profile data without reevaluating how those controls feel during real gameplay.
 
-Create a dedicated test suite, for example:
+Both objectives—complete player customization and excellent beginner-friendly recommended layouts—are equally mandatory.
 
-tests/systems/jokull.test.mjs
+⸻
 
-Extend existing stage, physics, hazard, preview, localization and integration tests as appropriate.
+13. Final deliverables
 
-Geometry tests
+Complete the implementation, not just a design proposal.
 
-Verify that all three sections begin contiguous and share one exact walkable height.
+At the end, provide:
 
-Verify that moving across their seams is smooth.
+A. Implementation summary
 
-Verify that the centre is permanently solid.
+Explain the controller customization improvements, the revised input architecture, and the UI changes.
 
-Verify that destroying one side leaves the centre and the other side intact.
+B. Universal recommended layout
 
-Verify that destroyed section collision is absent from every relevant query.
+Present the final universal controls you selected, including the newly chosen Dash and Defense inputs.
 
-Damage tests
+Explain why these choices improve ease of use, comfort, and beginner accessibility.
 
-Verify:
+C. Per-fighter recommended layouts
 
-* One valid new landing equals one counted contact.
-* Continuous grounded contact does not repeatedly increment damage.
-* Walking from the centre onto a side correctly registers entry.
-* Every supported airborne landing type can count.
-* Both fighters can damage the same side.
-* The two sides have independent counters.
-* Landing on the centre never damages either side.
-* A section remains intact after 14 contacts.
-* The fifteenth qualifying contact triggers its destruction sequence.
-* An already destroyed section cannot accumulate further damage.
-* No side can regenerate during a match.
+For each of the five playable fighters, provide a complete table containing:
 
-Collapse tests
+* Move name.
+* Ground or air context.
+* Final recommended input.
+* Visible movement or directional interpretation.
+* Relevant mechanic.
+* Brief ergonomic and intuitive justification.
 
-Verify:
+The tables should demonstrate that every binding was deliberately chosen for the actual move.
 
-* The critical phase begins at the correct threshold.
-* Destruction visibly progresses through separation and falling debris.
-* Collision removal is synchronized with structural failure.
-* Grounded fighters lose unsupported footing.
-* Any remaining legitimate support is respected.
-* Falling fighters are not immediately eliminated unless they actually enter the Void.
-* The centre remains intact.
-* Falling debris is cleaned up after its animation.
+D. Design rationale
 
-Blizzard tests
+Explain the overall recommended control philosophy and how the decisions support first-time players.
 
-Verify:
+Identify any difficult tradeoffs and explain how you resolved them.
 
-* The configured event probability is exactly 0.25.
-* Random checks occur at defined eligible intervals, not every frame.
-* A successful check begins the event.
-* Failed checks leave ordinary weather active.
-* Blizzard phases transition correctly.
-* Two blizzards cannot overlap.
-* The event eventually clears.
-* Structural damage continues working during blizzards.
-* The event does not directly damage fighters.
-* Seeded event sequences are deterministic.
-* The event behaves consistently across rendering frame rates.
+E. Technical changes
 
-AI and integration tests
+Summarize the primary modules modified, any changes to the binding representation, and how compatibility with saved profiles was maintained.
 
-Verify:
+F. Testing results
 
-* CPU stage models recognize intact and destroyed sections.
-* CPUs never plan to stand on permanently missing ice.
-* Recovery and Void interactions remain correct.
-* Overtime works with both wings intact or destroyed.
-* Quick Battle works.
-* Watch Mode works.
-* Random Stage can select Jökull.
-* Stage slot 05 displays Jökull.
-* Existing four stages remain unchanged.
-* Stage previews do not mutate active battles.
-* Rematches fully restore the stage.
-* Individual respawns do not restore it.
+Report automated tests, browser or controller tests performed, any failed tests, and remaining limitations.
 
-Render tests
+Distinguish verified behavior from behavior that could not be tested.
 
-Use the established fake Canvas testing conventions.
+⸻
 
-Verify the theme renders without invalid coordinates or exceptions when:
+14. Definition of success
 
-* Both sides are intact.
-* One side is damaged.
-* Both sides have different damage levels.
-* A section is breaking.
-* One side has permanently disappeared.
-* Both sides are gone.
-* A blizzard is active.
-* Reduced motion is enabled.
-* The theme is rendered without a live hazard controller.
+The redesign succeeds when:
 
-Run the full existing test suite using:
+A new player can pick up a controller, select any ALVA fighter, and quickly begin moving, attacking, jumping, Dashing, and defending without feeling that the controls are complicated or arbitrary.
 
-node --test
+The player should be able to recognize a move’s visual or mechanical character and find its input natural to execute.
 
-Update existing tests that legitimately assume Alva has exactly four stages, without weakening coverage of existing behaviour.
+Switching fighters should introduce new abilities, not force the player to relearn basic movement and defense.
 
-19. Documentation
+An experienced player should then be able to customize the controller deeply—including both joysticks and every available physical button—without arbitrary limitations.
 
-Update docs/gameplay/stages.md and any relevant architecture documentation to explain:
+The controller configuration interface should make this freedom easy to understand rather than intimidating.
 
-* Jökull’s visual identity.
-* Its three-section floor.
-* Why it uses composite finite collision rather than globally continuous ground.
-* Independent side durability.
-* Landing/contact rules.
-* Structural damage progression.
-* Break-animation phases.
-* Permanent destruction.
-* Blizzard probability and timing.
-* CPU hazard awareness.
-* Preview behaviour.
-* Restart behaviour.
+There should be no unnecessary friction between what a player intends to do and what their fingers must do.
 
-Document new configuration fields and controllers clearly.
+Final guiding principle:
 
-20. Non-negotiable final requirements
+ALVA should not require the player to adapt to an awkward control scheme. Its recommended controls should adapt intelligently to the game’s actual moves, the physical controller, and the natural expectations of a new player.
 
-The implementation is complete only when all of the following are true:
+Make the recommended layouts feel exceptionally intuitive, physically comfortable, responsive, and effortless.
 
-1. Jökull exists as the fifth fully playable stage, selectable in Quick Battle and Watch Mode.
-2. The stage looks like one massive contiguous snow-covered ice block with a visible foundation.
-3. Its real collision is divided into left, centre and right sections.
-4. The centre never takes damage and never disappears.
-5. Both side sections independently accumulate structural damage from qualifying landings and entries.
-6. Each side breaks after approximately 15 contacts, with 15 as the default configured threshold.
-7. Players can clearly observe the damage progressing before collapse.
-8. Breaking includes meaningful cracking, separation, falling chunks and debris animation.
-9. Broken sections permanently lose their collision until the match is restarted.
-10. The stage includes persistent snow, snowflakes, ice details and ambient wind.
-11. Random blizzards trigger with exactly 25% probability per eligible weather check.
-12. Blizzards significantly reduce visibility, with smooth transitions into and out of the storm.
-13. Both breakable sides and blizzards are represented as stage hazards.
-14. CPU fighters correctly understand the changing platform layout.
-15. All effects respect existing match lifecycle, seeded simulation and reduced-motion rules.
-16. Existing stages, fighter mechanics, combat systems and game modes remain functional.
-17. The new stage is visually polished and consistent with Alva’s current production-quality artwork.
+Think independently, evaluate every fighter and every action, choose all bindings yourself, implement the improvements comprehensively, and verify the finished experience.
 
-Definition of done
-
-Do not stop after creating the map entry or rendering an ice-themed background.
-
-Implement the complete physics, damage tracking, actual structural destruction, permanent collision removal, environmental particles, blizzard state machine, stage selection integration, CPU compatibility and tests.
-
-Avoid placeholder animations, fake damage effects or invisible colliders.
-
-The final result should feel like a distinctive Alva stage built around a simple but powerful gameplay idea:
-
-The centre is safety. The edges are temporary. The storm makes every decision harder.
-
-Finish by providing a summary of the actual files changed, the implemented mechanics, the tests executed, and any remaining limitations.
+The priority is not to preserve the existing layout. The priority is to deliver the best possible controller experience for ALVA’s players.
