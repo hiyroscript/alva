@@ -105,6 +105,19 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0004.playStyle',
     reviewedSourceHash: 'f99af03291950a522aad76b59b63876da23938e7fd9258c3c1d3d60bc6bf71e9',
   }),
+  // A predator of reach, setups and attrition: the longest pokes in the
+  // roster that are slow to pull back, a pull that reels opponents in from
+  // across the stage, a cast that leaves whoever faces it floating
+  // helpless (and fails on a turned back), a phantom sent behind the
+  // opponent whose fear must then be cashed in, its hits healing it while
+  // it lasts. Demanding to use well: its pay-off lies in placing its
+  // setups and converting them, and its tall body and long commitments are
+  // punished when it misjudges.
+  '0005': Object.freeze({
+    difficulty: 4,
+    descriptionKey: 'discover.fighter.0005.playStyle',
+    reviewedSourceHash: '7fee42e78bbadb31f6a3fa85dc311d3aca294e78e4f837495936e447a11c04fb',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

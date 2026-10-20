@@ -1,6 +1,7 @@
 // Per-fighter combat state: Launch Point, Energy, the attack in progress
-// and its phase clock, hitstun, blockstun and impact freeze, paralysis, and
-// every cooldown. Universal: one CombatState per fighter, whoever it is.
+// and its phase clock, hitstun, blockstun and impact freeze, paralysis (and
+// a float), a charm and a fear, and every cooldown. Universal: one
+// CombatState per fighter, whoever it is.
 //
 // Inputs: the fighter's resolved Energy settings (resolveEnergy, from its
 // definition's `energy` entry).
@@ -185,6 +186,14 @@ export class CombatState {
     // fighter whose hit charmed it (see charmBy below): null when it is not.
     this.charm = 0;
     this.charmedBy = null;
+    // Seconds of a hit's `float` still lifting this fighter (see float
+    // below): its paralysis holds it, and while this runs too it rises.
+    this.floating = 0;
+    // Seconds this fighter is still frightened by a hit's `fear`, and the
+    // fighter whose hit frightened it (see frightenBy below): null when it
+    // is not.
+    this.fear = 0;
+    this.frightenedBy = null;
   }
 
   get attacking() {
@@ -251,6 +260,51 @@ export class CombatState {
 
   releaseParalysis() {
     this.paralysis = 0;
+    this.floating = 0;
+  }
+
+  // A real hit made the fighter float for `seconds` (see `float` in
+  // js/game/combat/hit-effects.js): held exactly as a paralysis holds it
+  // (see paralyze), and for as long as the float lasts lifted, rising in
+  // the air (see Fighter.update). The longer of what is left and the new
+  // float. A launching hit ends it with the paralysis (see
+  // releaseParalysis).
+  float(seconds) {
+    if (!(seconds > 0)) return;
+    if (seconds > this.paralysis) this.paralysis = seconds;
+    if (seconds > this.floating) this.floating = seconds;
+  }
+
+  // Held floating right now (see float).
+  get afloat() {
+    return this.floating > 0 && this.paralysis > 0;
+  }
+
+  // A real hit of `by`'s frightened this fighter for `seconds` (see `fear`
+  // in js/game/combat/hit-effects.js): until it runs out, every real hit
+  // `by` lands on this fighter feeds `by` (CombatSystem.applyHit). The
+  // longer of what is left and the new fear, by the same fighter; a fear by
+  // another fighter replaces it. It holds nothing in place, and runs down
+  // every step, frozen or not (see update).
+  frightenBy(seconds, by) {
+    if (!(seconds > 0) || !by) return;
+    if (by !== this.frightenedBy) {
+      this.frightenedBy = by;
+      this.fear = seconds;
+    } else if (seconds > this.fear) {
+      this.fear = seconds;
+    }
+  }
+
+  // Whether this fighter is frightened of `fighter` right now (see
+  // frightenBy).
+  frightenedOf(fighter) {
+    return this.fear > 0 && !!fighter && this.frightenedBy === fighter;
+  }
+
+  releaseFear() {
+    this.fear = 0;
+    this.frightenedBy = null;
   }
 
   // A real hit of `by`'s charmed this fighter for `seconds` (see `charm` in
@@ -395,6 +449,11 @@ export class CombatState {
       this.charm = this.charm - dt <= PHASE_EPSILON ? 0 : this.charm - dt;
       if (!this.charm) this.charmedBy = null;
     }
+    // ...and so does a fear.
+    if (this.fear > 0) {
+      this.fear = this.fear - dt <= PHASE_EPSILON ? 0 : this.fear - dt;
+      if (!this.fear) this.frightenedBy = null;
+    }
     if (this.hitstop > 0) {
       // To within a little slack, so a freeze a whole number of steps long
       // (0.05 s) lasts exactly that many.
@@ -406,6 +465,8 @@ export class CombatState {
     // To within a little slack, like the freeze: a hold a whole number of
     // steps long lasts exactly that many.
     if (this.paralysis > 0) this.paralysis = this.paralysis - dt <= PHASE_EPSILON ? 0 : this.paralysis - dt;
+    // A float runs down with the paralysis that holds it, and ends with it.
+    if (this.floating > 0) this.floating = this.floating - dt <= PHASE_EPSILON || !this.paralysis ? 0 : this.floating - dt;
     if (this.attack) {
       this.attack.time += dt;
       // One-shot release: the step the attack's time crosses `spawnAt`. A

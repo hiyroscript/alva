@@ -280,9 +280,13 @@ path, and scored as expected utility:
 - **Values:** damage weighed by the Launch Point it reaches, the launch
   judged by the real launch rules (a launch that ends a life is worth
   `KO_VALUE`, more at match point; one that leaves the target off the
-  stage an edge-guard), a paralysis as the hits it opens, a charm as the
+  stage an edge-guard), a paralysis (or a float, which holds as one does)
+  as the hits it opens, a charm as the
   seconds of unanswered offence it buys (4 a second, a quarter of that
-  while one is still running), the combo the
+  while one is still running), a fear as the seconds of feeding it buys (3
+  a second, a sixth of that while one is still running) and, while an
+  opponent is frightened of it, every hit by what it would feed (its damage,
+  more the higher the CPU's own Launch Point), the combo the
   stun leaves time for; a block or a whiff costs what the opponent can
   punish in the window it leaves.
 - **Risks:** an incoming threat that lands first; walking into the live
@@ -290,7 +294,11 @@ path, and scored as expected utility:
   an opponent free in time (it reacting, or up close pressing a quicker
   strike first, by its observed habit); the CPU's own elimination (a
   recovery simulated from where the move ends); at a Launch Point where
-  the opponent's best launch ends its life, being hit costs a life.
+  the opponent's best launch ends its life, being hit costs a life; an
+  attack's own pull, reeling an opponent the CPU could likely finish where
+  it stands (its `finish` estimate over 0.35: by a ledge, say) back to
+  safety, gives that finish up, unless the move's own blow is likely to
+  end its life.
 - **Costs:** Energy (emptying the bar is worth it only for a life), long
   cooldowns, tempo (the same hit is worth less the longer it takes).
 - **Preferences:** the strategy mode's roles (and the roles the opponent's
@@ -315,11 +323,12 @@ are attacks to the CPU too, the Deflect a defense as well), its role
 `heal`; none gets past a Shield), its reach swept along its motion (a
 slam's to where it would land, with its impact), its projectile's range
 and pull, its technique's burst and heal, its summon's clone, whether a
-hit is a quake, its cooldowns and air uses. The forward simulation follows
-the same rules as combat: a quake strike, burst or impact meets only a
-fighter its path has standing on the ground (so the CPU counts on none
-against an airborne opponent, and fears none while its own path keeps it
-in the air), and a slam stands through its landing where it lands. A
+hit is a quake or a gaze, its cooldowns and air uses. The forward
+simulation follows the same rules as combat: a quake strike, burst or
+impact meets only a fighter its path has standing on the ground (so the CPU
+counts on none against an airborne opponent, and fears none while its own
+path keeps it in the air), a gaze burst only an opponent facing the CPU,
+and a slam stands through its landing where it lands. A
 heal is no attack: the CPU casts it when it has taken enough for the
 whole heal to count and the opponent, busy as long as it is and then
 closing in with a Dash and a run, could not reach it before the cast lets
@@ -328,7 +337,11 @@ that opponent would heal it), it strikes nothing at it while the charm
 runs: no new plan to attack, no combo follow-up, no strike or projectile
 in answer to a threat; it keeps its distance (out of the opponent's
 reach) and defends, then fights as ever once it runs out (`me.charmed` in
-the situation). Movement is universal (`js/data/movement.js`). A new
+the situation). Frightened by its opponent (a hit's `fear`: every hit that
+opponent lands on it feeds that opponent), it keeps just out of the
+opponent's reach and never presses in until the fear runs out
+(`me.frightened`); it sees an opponent frightened of it as long as the
+fear it saw has left (`op.frightened`). Movement is universal (`js/data/movement.js`). A new
 fighter is played well with no CPU change at all.
 
 ## Difficulty
@@ -458,7 +471,11 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   the CPU playing, and facing, each fighter; the quake and the slam read
   by the CPU in [`quake.test.mjs`](../../tests/systems/quake.test.mjs) and
   [`slam.test.mjs`](../../tests/systems/slam.test.mjs); a charmed CPU
-  holding its strikes in [`charm.test.mjs`](../../tests/systems/charm.test.mjs).
+  holding its strikes in [`charm.test.mjs`](../../tests/systems/charm.test.mjs);
+  a float weighed as the hold it is in
+  [`float.test.mjs`](../../tests/systems/float.test.mjs);
+  [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs):
+  the CPU playing #0005 against each fighter, every move used.
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle` (with how each side played: presses,

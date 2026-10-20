@@ -162,6 +162,7 @@ or `groundOnly`.
 | [#0002](../characters/0002.md#defense-energy-and-launch-reaction) | A guard; perfect Shield 0.1 s after 0.25 s down. | The swat: 1 / 2 / 2 frames at 20 fps (1/4 s), the front from the head to the knees out to 38 units, launching sideways; a no cooldown (the cooldown policy gives a Deflect none). |
 | [#0003](../characters/0003.md#defense-energy-and-launch-reaction) | A guard of crossed arms; perfect Shield 0.1 s after 0.25 s down. | The rising backhand sweep: 1 / 2 / 2 frames at 20 fps (1/4 s), the front from the feet to over the head out to 46 units, launching upward; no cooldown. |
 | [#0004](../characters/0004.md#defense-energy-and-launch-reaction) | A raised hand; perfect Shield 0.1 s after 0.25 s down. | The uppercut: 2 / 2 / 1 frames at 20 fps (1/4 s), the front from below the knees to over the head out to 40 units, launching upward; no cooldown. |
+| [#0005](../characters/0005.md#defense-energy-and-launch-reaction) | A thicket of black tendrils before its face, sprouting and withdrawn on two frames each; perfect Shield 0.1 s after 0.25 s down. | The claw swept round: 1 / 2 / 1 frames at 15 fps (4/15 s), the front from the feet to over the head out to 52 units, launching sideways; no cooldown. |
 
 ## Tests
 
@@ -201,3 +202,8 @@ or `groundOnly`.
   and [`tests/systems/charm.test.mjs`](../../tests/systems/charm.test.mjs):
   #0004's Deflect, its song blocked by a raised Shield (no charm), and a
   charmer's raised Shield blocking a charmed fighter's hits like any other.
+- [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs)
+  and [`tests/systems/gaze.test.mjs`](../../tests/systems/gaze.test.mjs):
+  #0005's Deflect, its phantom's bite blocked from behind by a raised
+  Shield (no fear), and a Shield raised toward a hit that must be seen
+  blocking it like any other.

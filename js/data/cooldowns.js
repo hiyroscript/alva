@@ -12,7 +12,9 @@
 //   2. Otherwise a move with an exceptional effect waits
 //      EXCEPTIONAL_COOLDOWN (3 s): one listed in EXCEPTIONAL_EFFECTS (a heal
 //      of Launch Point, a paralysis that holds its target in place, a charm
-//      that turns its target's hits into heals).
+//      that turns its target's hits into heals, a float that lifts its
+//      target helpless into the air, a fear that makes its own hits on its
+//      target heal it).
 //   3. Otherwise it has no cooldown of its own: only the universal repeat
 //      delay, REPEAT_COOLDOWN (0.5 s).
 //
@@ -55,11 +57,13 @@ export const COOLDOWN_CLASSES = Object.freeze({
 // The effects that make a move exceptional (rule 2), by the field that
 // carries them: a move's own `heal` (Launch Point it restores to its
 // fighter, see js/game/combat/technique.js), a hit's `paralyze` (seconds
-// it holds its target in place, unable to act) and a hit's `charm`
-// (seconds its target's hits on the charmer heal it instead; both in
+// it holds its target in place, unable to act), a hit's `charm` (seconds
+// its target's hits on the charmer heal it instead), a hit's `float`
+// (seconds it holds its target helpless, rising in the air) and a hit's
+// `fear` (seconds its fighter's own hits on its target feed it; all four in
 // js/game/combat/hit-effects.js). A new effect that stops a fighter acting
 // or restores it belongs here.
-export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm']);
+export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm', 'float', 'fear']);
 
 // Every other combat capability a hit or a move may declare, classified as
 // routine: none of them earns a cooldown, however strong it looks. Every
@@ -68,7 +72,7 @@ export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm']);
 // cooldown tests check it), so a new one has to be classified on purpose.
 export const ROUTINE_EFFECTS = Object.freeze([
   'damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'blockstun', 'hitstop',
-  'blockPush', 'quake', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
+  'blockPush', 'quake', 'gaze', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
   'motion', 'step', 'hits', 'projectile', 'burst', 'deflectProjectiles', 'passThrough', 'hurtboxes',
   'airUses', 'freeFall', 'groundOnly', 'hitCancel',
 ]);
@@ -78,6 +82,8 @@ const hit = (spec, inherited = {}) => ({
   damage: spec?.damage ?? 0,
   paralyze: spec?.paralyze ?? inherited.paralyze ?? 0,
   charm: spec?.charm ?? inherited.charm ?? 0,
+  float: spec?.float ?? inherited.float ?? 0,
+  fear: spec?.fear ?? inherited.fear ?? 0,
 });
 
 // Every hit projectile `spec` deals one target, in order: its strike once,
@@ -124,7 +130,7 @@ const rank = (impact) => CLASS_RANK[impactClass(impact)];
 // 'exceptional' or 'ordinary', by the first rule that applies.
 export function impactClass({ hits = [], heal = 0 } = {}) {
   if (hits.some((h) => h.damage >= TEN_DAMAGE) || sum(hits) >= TEN_DAMAGE) return 'tenDamage';
-  if (heal > 0 || hits.some((h) => h.paralyze > 0 || h.charm > 0)) return 'exceptional';
+  if (heal > 0 || hits.some((h) => h.paralyze > 0 || h.charm > 0 || h.float > 0 || h.fear > 0)) return 'exceptional';
   return 'ordinary';
 }
 
@@ -143,7 +149,7 @@ export function policyCooldown(cls = 'ordinary', { exempt = false } = {}) {
 
 const REASONS = Object.freeze({
   tenDamage: 'it deals 10 damage',
-  exceptional: 'it has an exceptional effect (a heal, a paralysis or a charm)',
+  exceptional: 'it has an exceptional effect (a heal, a paralysis, a charm, a float or a fear)',
   ordinary: 'it deals no 10 damage and has no exceptional effect',
 });
 

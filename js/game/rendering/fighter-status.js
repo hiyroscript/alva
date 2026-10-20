@@ -1,11 +1,14 @@
-// World-space Energy and long cooldown status, the Special ability mark and
-// the charm mark. Ready moves and baseline repeat delays draw nothing. Each
+// World-space Energy and long cooldown status, the Special ability mark, the
+// charm mark and the fear mark. Ready moves and baseline repeat delays draw
+// nothing. Each
 // long timer has its shared ability artwork in the center, original colors
 // intact, with remaining seconds underneath. The Special ability mark is an
 // orange exclamation mark over a fighter while it performs one of its
 // Special abilities (js/data/special-abilities.js), and only then; the charm
 // mark a pink heart over a fighter while a hit's `charm` holds it
-// (CombatState.charm, see js/game/combat/hit-effects.js), and only then.
+// (CombatState.charm, see js/game/combat/hit-effects.js), and only then; the
+// fear mark a trembling pale-blue drop of cold sweat over a fighter while a
+// hit's `fear` holds it (CombatState.fear), and only then.
 // Presentation reads simulation state; no DOM dependencies or fighter IDs.
 
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -283,6 +286,69 @@ export function drawCharmMark(ctx, rect, dpr = 1, time = 0, reducedMotion = fals
   ctx.strokeStyle = CHARM_MARK_STYLE.outline;
   ctx.stroke();
   ctx.fillStyle = CHARM_MARK_STYLE.fill;
+  ctx.fill();
+  ctx.restore();
+}
+
+// The fear mark: a drop of cold sweat, pale icy blue with a dark outline,
+// over a fighter for exactly as long as it is frightened (CombatState.fear),
+// so the player sees why its opponent's hits on it heal that opponent. It
+// trembles where the other marks bob, and reads over any stage and the
+// Void.
+export const FEAR_MARK_STYLE = Object.freeze({
+  fill: '#a8dcff',
+  shine: '#ffffff',
+  outline: '#06182a',
+});
+
+// Seconds a tremble of the fear mark takes, and how far it shakes (CSS
+// pixels, either side).
+const FEAR_TREMBLE_PERIOD = 0.12;
+const FEAR_TREMBLE_CSS = 1.5;
+
+// Where the fear mark goes over a status column centred on device pixel
+// `x` whose topmost status starts at device pixel `top` (its charm mark or
+// Special ability mark while one shows, else its Energy bar or name tag):
+// { x, y, w, h }, a small gap above it, as tall as the other marks and a
+// little narrower than tall.
+export function fearMarkRect(x, top, scale, dpr = 1) {
+  const h = Math.round(Math.min(Math.max(14 * dpr, 15 * scale), 30 * dpr));
+  const w = Math.round(h * 0.72);
+  const gap = Math.round(Math.max(4 * dpr, 4 * scale));
+  return { x: Math.round(x - w / 2), y: Math.round(top - gap - h), w, h };
+}
+
+// How far the fear mark is shaken sideways at `time` (device pixels): a
+// quick tremble, held still with reduced motion.
+export function fearMarkTremble(time, dpr = 1, reducedMotion = false) {
+  if (reducedMotion) return 0;
+  return Math.round(Math.sin((2 * Math.PI * time) / FEAR_TREMBLE_PERIOD) * FEAR_TREMBLE_CSS * dpr);
+}
+
+// The drop in `rect` (see fearMarkRect): pointed at the top, round below,
+// outlined in the dark tone, a glint on its lower left.
+export function drawFearMark(ctx, rect, dpr = 1, time = 0, reducedMotion = false) {
+  const { w, h } = rect;
+  const cx = rect.x + w / 2 + fearMarkTremble(time, dpr, reducedMotion);
+  const top = rect.y;
+  const r = w / 2;
+  const cy = top + h - r;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx, top);
+  ctx.bezierCurveTo(cx + r * 0.35, top + h * 0.3, cx + r, cy - r * 0.55, cx + r, cy);
+  ctx.arc(cx, cy, r, 0, Math.PI);
+  ctx.bezierCurveTo(cx - r, cy - r * 0.55, cx - r * 0.35, top + h * 0.3, cx, top);
+  ctx.closePath();
+  ctx.lineWidth = Math.max(1.5 * dpr, h * 0.09) * 2;
+  ctx.strokeStyle = FEAR_MARK_STYLE.outline;
+  ctx.stroke();
+  ctx.fillStyle = FEAR_MARK_STYLE.fill;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.38, cy + r * 0.12, Math.max(1, r * 0.22), 0, Math.PI * 2);
+  ctx.fillStyle = FEAR_MARK_STYLE.shine;
   ctx.fill();
   ctx.restore();
 }

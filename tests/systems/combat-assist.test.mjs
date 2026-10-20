@@ -1412,7 +1412,15 @@ test('a melee follow-up right after another move still gets its approach: out of
     r.player.controller.comboAssist = false;
     r.foe.combat.launchPoint = 100;
     r.tick(press('attack1'));
-    const follow = groundMelee(c).find((m) => m.action !== 'attack1' && r.player.attacks[m.id].motion?.type !== 'roll');
+    // The follow-up with the shortest reach (no roll), so the first attack's
+    // launch carries its target out of it.
+    const front = (m) => {
+      const reach = attackReach(r.player.attacks[m.id]);
+      return reach.x + reach.w;
+    };
+    const follow = groundMelee(c)
+      .filter((m) => m.action !== 'attack1' && r.player.attacks[m.id].motion?.type !== 'roll')
+      .reduce((best, m) => (!best || front(m) < front(best) ? m : best), null);
     const fatk = r.player.attacks[follow.id];
     r.until(() => r.player.combat.cancellable && meleeGap(r.player, attackReach(fatk), r.foe, 1) > 0);
     const first = r.player.combat.attack;

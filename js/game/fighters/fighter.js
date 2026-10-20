@@ -36,6 +36,7 @@ import { attackPhase, createAttackDefinition } from '../combat/attacks.js';
 import { createDefenseDefinition } from '../combat/defense.js';
 import { createDeflectDefinition } from '../combat/deflect.js';
 import { CombatState, resolveEnergy } from '../combat/combat-state.js';
+import { FLOAT_RISE_SPEED } from '../combat/hit-effects.js';
 import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
@@ -647,6 +648,15 @@ export class Fighter {
       body.vx = 0;
     } else if (combat.immobilized) {
       body.vx = 0;
+      // Floating (a hit's `float`, see CombatState.float): lifted off the
+      // ground and rising slowly, with no gravity, for as long as the float
+      // lasts; once it ends the paralysis' last moments, if any, fall.
+      if (combat.afloat) {
+        body.vy = -FLOAT_RISE_SPEED;
+        body.grounded = false;
+        body.ground = null;
+        gravityShare = 0;
+      }
     } else if (combat.stun > 0) {
       // Launched or pushed: the speed runs down at the fighter's own hitstun
       // rates, whatever is held.

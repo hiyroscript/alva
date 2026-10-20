@@ -198,6 +198,9 @@ export const EN = {
   'credits.sprites0003.sheet': 'Sprite sheet ripped by Dazz & Fret on The Spriters Resource',
   'credits.sprites0004.title': '#0004 sprite source',
   'credits.sprites0004.sheet': 'Sprite sheet by xmaygrrr on DeviantArt',
+  'credits.sprites0005.title': '#0005 sprite source',
+  'credits.sprites0005.sheet': 'Sprite sheet posted by imhomiejaydev on DeviantArt',
+  'credits.sprites0005.sheetCredits': 'Sprites by regularDor8go',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -375,6 +378,7 @@ export const EN = {
   'discover.fighter.0002.playStyle': 'An aggressive, momentum-driven fighter who pressures opponents up close and pursues them through the air. Strong at sustaining close-range offense and chasing escapes, but vulnerable to predictable approaches and overcommitting.',
   'discover.fighter.0003.playStyle': 'A deliberate powerhouse who wins exchanges with heavy, well-timed blows that shake the ground and drive guards back, and who can heal when given room. Strong at punishing grounded opponents, but vulnerable to airborne approaches and to being rushed during long commitments.',
   'discover.fighter.0004.playStyle': 'A rhythmic space controller who fills the stage with song, a dancing decoy and long-reaching swings, and whose voice can turn an opponent’s offense into its own healing. Dangerous once its traps are in place, but light, slow to get going and exposed when rushed at close range.',
+  'discover.fighter.0005.playStyle': 'A creeping predator that strikes from far away and from behind, reeling opponents in, leaving them helpless in the air and feeding on their fear to heal itself. Its biggest moves are slow, readable commitments, and its tall body is easy to hit up close.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

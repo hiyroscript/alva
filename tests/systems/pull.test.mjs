@@ -25,9 +25,11 @@ const standing = (x = 600) => makeFighter({ x, facing: -1 });
 
 // ---- Data ---------------------------------------------------------------------------
 
-test('a pull needs a positive radius and speed; its point defaults to the origin', () => {
+test('a pull needs a positive radius and speed; its point defaults to the origin, and it reaches both sides unless it says front', () => {
   assert.equal(resolvePull(null, 'x'), null);
-  assert.deepEqual(resolvePull({ radius: 100, speed: 300 }, 'x'), { radius: 100, speed: 300, offset: { x: 0, y: 0 } });
+  assert.deepEqual(resolvePull({ radius: 100, speed: 300 }, 'x'), { radius: 100, speed: 300, front: false, offset: { x: 0, y: 0 } });
+  assert.equal(resolvePull({ radius: 100, speed: 300, front: true }, 'x').front, true);
+  assert.throws(() => resolvePull({ radius: 100, speed: 300, front: 'yes' }, 'x'), /front must be true or false/);
   assert.ok(Object.isFrozen(resolvePull({ radius: 1, speed: 1, offset: { x: 3 } }, 'x').offset));
   assert.throws(() => resolvePull({ radius: 0, speed: 300 }, 'Attack "a"'), /Attack "a"'s pull needs a positive radius and speed/);
   assert.throws(() => resolvePull({ radius: 100 }, 'x'), /positive radius and speed/);
@@ -104,15 +106,15 @@ test('a raised Shield holds its ground, and so does a paralysed fighter or one o
 // ---- Attacks and projectiles -----------------------------------------------------------
 
 // A fighter whose attack1 is a pulling strike, at x 500 facing right, and a
-// target at `x`.
-function pullingDuel(x) {
+// target at `x`; with `front`, a pull that reaches only the side it faces.
+function pullingDuel(x, front = false) {
   const character = {
     ...def,
     attacks: {
       ...def.attacks,
       attack1: {
         ...def.attacks.attack1, startup: 0.1, active: 0.2, recovery: 0.1, hitCancel: 0,
-        pull: { radius: 220, speed: 800, offset: { x: 40, y: -50 } },
+        pull: { radius: 220, speed: 800, offset: { x: 40, y: -50 }, ...(front ? { front: true } : {}) },
       },
     },
   };
@@ -139,6 +141,42 @@ test('an attack pulls only while its active phase is open, toward its own point,
   assert.ok(pulled.every((phase) => phase === 'active'), 'only while active');
   assert.ok(xs.filter(([phase]) => phase === 'startup' || phase === 'recovery').every(([, vx]) => vx === 0));
   assert.ok(t.fighter.body.x < 680, 'it came closer');
+});
+
+test('a pull that reaches only its front leaves an opponent behind it where it is, and draws one ahead as ever', () => {
+  for (const [x, drawn] of [[380, false], [680, true]]) {
+    const plain = pullingDuel(x);
+    const front = pullingDuel(x, true);
+    for (const d of [plain, front]) {
+      d.a.step({ attack1: true, attack1Pressed: true });
+      for (let i = 0; i < steps(0.1); i++) d.a.step({});
+      assert.equal(d.a.fighter.combat.phase, 'active');
+      d.t.fighter.body.vx = 0;
+      applyPulls([d.a.fighter, d.t.fighter], [], DT);
+    }
+    assert.notEqual(plain.t.fighter.body.vx, 0, `x ${x}: a pull reaches both sides`);
+    assert.equal(front.t.fighter.body.vx !== 0, drawn, `x ${x}: ${drawn ? 'ahead, drawn' : 'behind, left alone'}`);
+  }
+  // Its reach, for the CPU, is the circle's front half and the box.
+  const atk = createAttackDefinition({
+    id: 'testFront', damage: 1, hitbox: { x: 10, y: -60, w: 30, h: 30 }, pull: { radius: 100, speed: 500, offset: { x: 40, y: -50 }, front: true },
+  });
+  assert.deepEqual(attackReach(atk), { x: 0, y: -150, w: 140, h: 200 });
+});
+
+test('a projectile\'s front-only pull reaches only the way it flies', () => {
+  const owner = standing(300).fighter;
+  const ahead = standing(520).fighter;
+  const behind = standing(330).fighter;
+  const orb = new Projectile({
+    owner,
+    def: createProjectileDefinition({ id: 'testOrb', damage: 1, speed: 100, lifetime: 0.5, pull: { radius: 200, speed: 400, front: true } }),
+    anim: { frames: [{}], fps: 1, loop: true },
+    x: 400, y: middle(ahead), direction: 1,
+  });
+  applyPulls([owner, ahead, behind], [orb], DT);
+  assert.equal(ahead.body.vx, -400, 'ahead of it: drawn back to it');
+  assert.equal(behind.body.vx, 0, 'behind it: left alone');
 });
 
 test('a projectile pulls toward its centre for as long as it flies, never its owner, and stops once spent', () => {

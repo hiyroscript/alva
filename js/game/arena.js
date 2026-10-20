@@ -21,7 +21,7 @@ import { Camera } from './rendering/camera.js';
 import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
 import {
   drawEnergyBar, drawCooldownIndicators, drawSpecialMark, energyBarState, specialMarkRect, statusOnScreen,
-  charmMarkRect, drawCharmMark,
+  charmMarkRect, drawCharmMark, fearMarkRect, drawFearMark,
 } from './rendering/fighter-status.js';
 import { activeSpecialAbility } from './combat/move-status.js';
 import { drawShield } from './rendering/shield-fx.js';
@@ -642,23 +642,35 @@ export class Arena {
     return charmMarkRect(x, special ? special.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
   }
 
-  // The highest point of what is drawn over `f`: the top of its charm mark
-  // or its Special ability mark while one shows, else of its Energy bar or
-  // name tag (see barTop). Practice Ground floats its damage numbers from
-  // here.
+  // Where `f`'s fear mark goes (see fearMarkRect in
+  // js/game/rendering/fighter-status.js), in device pixels, for as long as
+  // it is frightened (CombatState.fear, read live every frame); null
+  // otherwise. Above its charm mark or Special ability mark while one
+  // shows, else above its Energy bar or name tag.
+  fearMarkRect(f) {
+    if (!(f.combat?.fear > 0)) return null;
+    const [x] = this.markerAnchor(f);
+    const below = this.charmMarkRect(f) ?? this.specialMarkRect(f);
+    return fearMarkRect(x, below ? below.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
+  }
+
+  // The highest point of what is drawn over `f`: the top of its fear mark,
+  // charm mark or Special ability mark while one shows, else of its Energy
+  // bar or name tag (see barTop). Practice Ground floats its damage numbers
+  // from here.
   statusTop(f) {
-    const mark = this.charmMarkRect(f) ?? this.specialMarkRect(f);
+    const mark = this.fearMarkRect(f) ?? this.charmMarkRect(f) ?? this.specialMarkRect(f);
     return mark ? mark.y - 1 : this.barTop(f);
   }
 
-  // Energy bars, the long move cooldowns, the Special ability mark and the
-  // charm mark, for the fighters whose body is on screen (the cooldowns of
-  // the fighter the ability HUD shows are there instead: see
-  // hudCooldownsFor): an off-screen fighter only gets its edge pointer.
+  // Energy bars, the long move cooldowns, the Special ability mark, the
+  // charm mark and the fear mark, for the fighters whose body is on screen
+  // (the cooldowns of the fighter the ability HUD shows are there instead:
+  // see hudCooldownsFor): an off-screen fighter only gets its edge pointer.
   // Each draws only while it has something to show (see
   // js/game/rendering/fighter-status.js); the marks, for whichever fighters
-  // are performing a Special or are charmed at once, Player 1 or a CPU
-  // alike.
+  // are performing a Special or are charmed or frightened at once, Player 1
+  // or a CPU alike.
   drawStatus(fighters = this.inPlay) {
     const { ctx, view } = this;
     for (const f of fighters) {
@@ -670,6 +682,8 @@ export class Arena {
       if (mark) drawSpecialMark(ctx, mark, view.dpr, this.fxTime, this.reducedMotion);
       const charm = this.charmMarkRect(f);
       if (charm) drawCharmMark(ctx, charm, view.dpr, this.fxTime, this.reducedMotion);
+      const fear = this.fearMarkRect(f);
+      if (fear) drawFearMark(ctx, fear, view.dpr, this.fxTime, this.reducedMotion);
     }
   }
 

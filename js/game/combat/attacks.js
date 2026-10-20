@@ -203,10 +203,14 @@
 // moved toward that point at up to `speed` world units / s, straight
 // there, never past it. A raised Shield holds its ground (it is not
 // pulled), and so does a fighter held in place (paralyzed) or out of play.
-// The attack's own hitbox then meets whoever was drawn into it. The same
-// rule runs a projectile's `pull` (see js/game/combat/projectile.js).
+// With `front: true` it reaches only the side it faces: an opponent whose
+// middle is behind its fighter is left where it is. The attack's own
+// hitbox then meets whoever was drawn into it. The same rule runs a
+// projectile's `pull` (see js/game/combat/projectile.js), its front the
+// way it flies.
 //
 //   midair_attack3: { ..., pull: { radius: 150, speed: 900, offset: { x: 44, y: -60 } } },
+//   extra_attack: { ..., pull: { radius: 300, speed: 900, offset: { x: 30, y: -60 }, front: true } },
 //
 // `deflectProjectiles: true` turns projectiles back: while the attack's
 // active phase is open, any other fighter's projectile its hitbox meets is
@@ -220,8 +224,11 @@
 //
 // Every hit may also declare the shared hit effects (see
 // js/game/combat/hit-effects.js): `paralyze`, `blockPush`, `quake` (it
-// reaches only fighters standing on the ground) and `charm` (for a while
-// its target's hits on this fighter heal it instead). A multi-hit attack's
+// reaches only fighters standing on the ground), `charm` (for a while
+// its target's hits on this fighter heal it instead), `float` (it lifts
+// its target, held helpless, into the air), `fear` (for a while this
+// fighter's hits on its target feed it) and `gaze` (it reaches only a
+// fighter facing it). A multi-hit attack's
 // strikes take the attack's own unless they declare theirs. None
 // gets past an active Shield, and nothing may declare a way past one
 // (`unblockable` and the rest of SHIELD_BYPASS_FIELDS in
@@ -301,6 +308,9 @@ const ATTACK_DEFAULTS = {
   blockPush: 0,
   quake: false,
   charm: 0,
+  float: 0,
+  fear: 0,
+  gaze: false,
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -356,17 +366,20 @@ function resolveImpact(spec, owner, id) {
 
 // The frozen pull (see `pull` above) of `owner` from its `pull` entry, or
 // null. Its radius and speed must be positive; its point defaults to the
-// fighter's origin.
+// fighter's origin, and it reaches both sides unless it says `front`.
 export function resolvePull(spec, owner) {
   if (!spec) return null;
   if (!(spec.radius > 0) || !(spec.speed > 0)) throw new Error(`[Alva] ${owner}'s pull needs a positive radius and speed`);
+  if (spec.front !== undefined && typeof spec.front !== 'boolean') throw new Error(`[Alva] ${owner}'s pull front must be true or false`);
   const o = spec.offset ?? {};
-  return Object.freeze({ ...spec, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
+  return Object.freeze({ ...spec, front: !!spec.front, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
 }
 
 // The fields a strike of a multi-hit attack takes from the attack when it
 // does not declare its own, and the ones only the strikes may declare.
-const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake', 'charm']);
+const STRIKE_INHERITS = Object.freeze([
+  'hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze',
+]);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
 // A multi-hit attack's strikes, frozen and validated, and what they make of
@@ -467,7 +480,7 @@ export function isMeleeAttack(def) {
 function pullReach(def, hb) {
   const p = def.pull;
   if (!p) return hb;
-  const x0 = Math.min(hb.x, p.offset.x - p.radius);
+  const x0 = Math.min(hb.x, p.front ? Math.max(0, p.offset.x - p.radius) : p.offset.x - p.radius);
   const y0 = Math.min(hb.y, p.offset.y - p.radius);
   const x1 = Math.max(hb.x + hb.w, p.offset.x + p.radius);
   const y1 = Math.max(hb.y + hb.h, p.offset.y + p.radius);
@@ -497,7 +510,7 @@ export function attackPhase(def, time) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm',
+  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).

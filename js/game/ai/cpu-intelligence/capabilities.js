@@ -45,8 +45,11 @@ function strikeOf(h, at, end) {
   return Object.freeze({
     at, end, damage: h.damage ?? 0, baseLaunch: h.baseLaunch ?? 0, dir: h.directionalLaunch ?? null,
     hitbox: h.hitbox ?? null, hitstun: h.hitstun ?? 0, blockstun: h.blockstun ?? 0, hitstop: h.hitstop ?? 0,
-    paralyze: h.paralyze ?? 0, blockPush: h.blockPush ?? 0, carry: h.carry ?? null, quake: !!h.quake,
-    charm: h.charm ?? 0,
+    // A float holds its target as a paralysis does (and lifts it): weighed
+    // as one.
+    paralyze: Math.max(h.paralyze ?? 0, h.float ?? 0), float: h.float ?? 0,
+    blockPush: h.blockPush ?? 0, carry: h.carry ?? null, quake: !!h.quake, gaze: !!h.gaze,
+    charm: h.charm ?? 0, fear: h.fear ?? 0,
   });
 }
 
@@ -97,6 +100,7 @@ function sumStrikes(strikes) {
   let hitstun = 0;
   let paralyze = 0;
   let charm = 0;
+  let fear = 0;
   let blockPush = 0;
   for (const s of strikes) {
     damage += s.damage;
@@ -104,11 +108,12 @@ function sumStrikes(strikes) {
     hitstun = Math.max(hitstun, s.hitstun);
     paralyze = Math.max(paralyze, s.paralyze);
     charm = Math.max(charm, s.charm);
+    fear = Math.max(fear, s.fear);
     blockPush = Math.max(blockPush, s.blockPush);
   }
   const last = strikes[strikes.length - 1];
   return {
-    damage, maxBaseLaunch, hitstun, paralyze, charm, blockPush,
+    damage, maxBaseLaunch, hitstun, paralyze, charm, fear, blockPush,
     finisher: last ? { baseLaunch: last.baseLaunch, dir: last.dir } : { baseLaunch: 0, dir: null },
   };
 }
