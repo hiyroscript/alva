@@ -2,8 +2,8 @@
 
 Alva is built around one universal character system: shared game systems
 that work for any fighter, and fighter definitions that supply everything
-that makes a fighter itself. #0001, #0002, #0003, #0004 and #0005 are members
-of the roster, not templates: none is the default that shared code falls back
+that makes a fighter itself. #0001, #0002, #0003, #0004, #0005 and #0006 are
+members of the roster, not templates: none is the default that shared code falls back
 to, and adding another means writing its definition, not copying one.
 
 **All fighters share universal baseline locomotion. Character identity
@@ -83,14 +83,15 @@ named.
 | Field | Read by | Required |
 | --- | --- | --- |
 | `id`, `displayName`, `rosterSlot`, `available` | registry, roster, HUD | yes |
-| `sourceFacing`, `animations`, `projectileAnimations`, `effectAnimations`, `animationFallbacks`, `visual` | sprite normalization, Fighter, renderers, roster | `animations` (with the states it needs) and `visual` |
+| `sourceFacing`, `animations`, `projectileAnimations`, `effectAnimations`, `animationFallbacks`, `visual` | sprite normalization, Fighter, renderers, roster | `animations` (with the states it needs; `{}` for an ensemble) and `visual` |
+| `ensemble` | [ensembles](#ensembles-one-fighter-several-members): the registry (`assertEnsemble`), the loadout rules, the renderers | no (an ordinary fighter: one body drawn as one) |
 | `collider`, `pushbox`, `hurtboxes` | physics, combat, the AI | yes |
 | `movement`, `powers` | nobody: refused ([movement](../systems/movement.md)) | never (movement is universal) |
 | `energy` | [Energy](../systems/energy.md) | no: only its `regen` is its own (default 12); the bar and every cost are universal |
 | `launchReaction`, `launchBounce` | [launch](../systems/launch.md) | no (defaults) |
 | `defense` | [defense](../systems/defense.md) | no (none: the Shield button does nothing on the ground) |
 | `deflect` | [defense: the Deflect](../systems/defense.md#the-deflect) | no (none: the Shield button does nothing in the air) |
-| `actions` | Fighter, the AI, touch controls, input | yes (`attack1`, `attack2` at least) |
+| `actions` | Fighter, the AI, touch controls, input | yes (`attack1`, `attack2` at least), but for an unplayable fighter whose moves are still to come |
 | `attacks`, `projectiles`, `summons`, `techniques` | [combat](../systems/combat.md) | `attacks` for every mapped attack |
 | `mobileAbilities` | touch controls ([input](../systems/input.md#touch-controls)) | no (neutral glyphs and names) |
 | `abilityNames` | localization, touch labels | no (neutral names) |
@@ -98,6 +99,48 @@ named.
 
 Character-specific constants (playback rates, art measurements, shared
 hitboxes) live beside the definition in the same module.
+
+## Ensembles: one fighter, several members
+
+A fighter may be a group: several bodies seen together that move, fight
+and get hurt as one (#0006, three sisters). Its `ensemble`
+([`js/data/ensemble.js`](../../js/data/ensemble.js)) is presentation and
+performance data, never more fighters:
+
+| One, as every fighter | Its own, per member |
+| --- | --- |
+| definition, roster slot, `Fighter`, controller, input | an `id` (lowercase, in its file names) |
+| body (position, velocity, ground, facing), collider, pushbox | a `home` in the group (art pixels from the origin, facing right, mirrored with facing) |
+| hurtbox (round the group), Launch Point, Energy, Shield, cooldowns, stun, hitstop, launch | its own clips (`animations`, `<id>_<codename>_<member>_<frame>.png`) |
+| the combat state: what it is doing | its own animator, playing the fighter's state in its own clip |
+
+Every member plays the fighter's state on the same fixed step (the clips
+the whole group plays, `GROUP_CLIPS`, are every member's), so one jump, one
+Dash, one hit, one launch is all of them. A move names who performs it
+(`members` on an attack, a technique and the Deflect: one member is the
+ordinary case, the Deflect exactly one, two or three only for a combination
+written as one move); the performer steps to the fighter's origin, the
+others step back behind it, and everyone glides home after. A move is one
+move however many perform it: one press, one cooldown, the strikes it
+authors and nothing more. The registry refuses a broken ensemble with every
+problem named (`assertEnsemble`), and a move of an ordinary fighter may name
+no members.
+
+At runtime ([`js/game/rendering/ensemble.js`](../../js/game/rendering/ensemble.js),
+[rendering: ensembles](../systems/rendering.md#ensembles)) the fighter's
+sprites are an `EnsembleSprites` and its animator an `EnsembleAnimator`,
+answering the Fighter as a `SpriteSet` and a `SpriteAnimator` do; the shared
+systems never ask which they have. The renderers draw `fighterParts(f)`:
+one part for an ordinary fighter, one per member for an ensemble. Nothing
+of it reaches movement, collision or combat.
+
+## A fighter whose moves are still to come
+
+A fighter's art and body may come before its moves (#0006). Unplayable
+(`available: false`) and without a single move (no `actions`, `attacks`,
+`summons`, `techniques` or `projectiles`), its loadout is not checked yet:
+the moment it has one move, or is made playable, every loadout rule
+applies. Nothing is invented to fill its buttons.
 
 ## The Discover profile, beside the definition
 
@@ -129,7 +172,8 @@ itself.
 Shared code may *mention* a fighter in a comment as an example ("e.g.
 #0001's Hollow Purple"), but never branches on one. The tests enforce it:
 no module of the engine, the AI, the touch controls or the status display
-contains a fighter id or special-cases a numbered attack
+contains a fighter id or special-cases a numbered attack (an ensemble is a
+capability like any other: `isEnsemble(def)`, never an id)
 ([`tests/systems/loadout.test.mjs`](../../tests/systems/loadout.test.mjs)),
 the loadout rules name no fighter, combat names no attack, and simulation code never reads presentation metadata. Canvas status and touch
 buttons share the DOM-independent `js/data/ability-preview.js` selector.

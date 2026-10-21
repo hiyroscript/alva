@@ -9,6 +9,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | --- | --- |
 | [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the land pose, pending attacks and summon startups; the Dash and the air dash last the universal Dash's length, their clips played once across it), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
+| [`js/game/rendering/ensemble.js`](../../js/game/rendering/ensemble.js) | A fighter drawn as several members ([ensembles](#ensembles)): `EnsembleSprites` (its members' sprite sets as one), `EnsembleAnimator` (every member playing the fighter's state, its formation, glide and idle float), `fighterParts` (what is drawn of any fighter), `buildFighterSprites` and `createAnimator` (the factories every mode builds fighters' art with), `idlePose` (a menu's idle). |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
@@ -45,6 +46,43 @@ otherwise) on a Dash's run-on; the Dash's and the air dash's clips are
 played once across the universal Dash, whatever their frame count; the
 land clip is a pose that running goes straight past. No frame is ever
 invented or interpolated: the art's own frames, played faster.
+
+## Ensembles
+
+A fighter drawn as several members (its `ensemble`,
+[`js/data/ensemble.js`](../../js/data/ensemble.js); #0006) is one fighter
+drawn as several parts. Its sprites are an `EnsembleSprites`: one
+`SpriteSet` per member, built from the member's own clips, every member at
+the one art-pixel size its `visual.height` (the whole group's height at
+home) gives; it answers the Fighter as a sprite set does (`has` a clip when
+every member whose definition has it loaded it, `duration` the longest
+member's pass, the reference member's projectile and effect art). Its
+animator is an `EnsembleAnimator`: each member has her own `SpriteAnimator`
+and her own place, and on every fixed step
+
+- every member plays the fighter's visual state (Fighter.updateState) in
+  her own clip, or, while a move names some of them (`members`), the
+  performers play it and the others their `asideAnimation`;
+- every member moves toward her place for that state at most `glide` art
+  pixels a second (never a jump): home with no performers, a single
+  performer at the fighter's origin, several centred on it, the others
+  lined up behind the rearmost performer (`retreat`, then `spacing`
+  apart), a move's own `formation` over all of it; places are turned the
+  way the art faces (Fighter.visualFacing), so a turn glides the group over
+  to its mirrored places;
+- a member playing her idle clip floats, up to `float.height` off her place
+  and back every `float.period`, each on her own beat, faded in and out.
+
+Between steps `Fighter.interpolate` places each member between her last two
+places, as it does the body, so the group looks the same at any frame rate.
+The renderers draw `fighterParts(f)`: an ordinary fighter's one frame, or
+each member's frame at the fighter's interpolated position plus her place,
+mirrored by her own clip's `sourceFacing`, back to front (the performers of
+a move in front). The Arena draws a fighter, its hit flash and its speed
+trail from those parts; the roster's preview, Select Stage's preview and
+the HUD portrait draw the group (`idlePose`, `EnsembleSprites.makePortrait`:
+every member at home, cropped by `visual.portrait`, its `size` a share of
+the group's width). Nothing of it reaches the body, collision or a hitbox.
 
 ## Draw order
 
@@ -293,7 +331,13 @@ far; the colour flash and fade stay.
   [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs),
   [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs),
   [`tests/fighters/0004/fighter-0004.test.mjs`](../../tests/fighters/0004/fighter-0004.test.mjs),
-  [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs).
+  [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs),
+  [`tests/fighters/0006/fighter-0006.test.mjs`](../../tests/fighters/0006/fighter-0006.test.mjs)
+  (three members, one scale).
+- Ensembles: [`tests/systems/ensemble.test.mjs`](../../tests/systems/ensemble.test.mjs)
+  (every member on the fighter's state on the same step, the formation,
+  gliding, the float, the facing, determinism at any frame rate, the parts
+  drawn).
 - The charm mark and the charmer's glow:
   [`tests/systems/charm.test.mjs`](../../tests/systems/charm.test.mjs); the
   fear mark and the frightener's glow:

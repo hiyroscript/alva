@@ -54,9 +54,16 @@
 //
 // loadoutProblems checks a definition against every one of these rules;
 // js/data/characters.js refuses to load one that breaks any.
+//
+// One fighter is not held to them yet: one whose moves are still to come,
+// unplayable (`available: false`) and with no moves at all (no `actions`,
+// `attacks`, `summons`, `techniques` or `projectiles`). Its art and its body
+// can be in before anyone has designed what it does; the moment it has a
+// move, or is made playable, every rule above applies.
 
 import { COMBAT_BUTTONS, MOVES, NUMBERED_ATTACKS } from '../config.js';
 import { TECHNIQUE_CLIPS } from '../game/combat/technique.js';
+import { hasClip, isEnsemble } from './ensemble.js';
 
 export { NUMBERED_ATTACKS };
 
@@ -138,9 +145,13 @@ export function describeLoadout(def) {
 export function loadoutProblems(def) {
   const problems = [];
   const say = (text) => problems.push(text);
+  if (movesToCome(def)) return problems;
   const actions = isObject(def?.actions) ? def.actions : {};
   const attacks = def?.attacks ?? {};
-  const animations = def?.animations ?? {};
+  // Where a clip must be: the fighter's `animations`, or for a fighter drawn
+  // as several members (js/data/ensemble.js) those of every member
+  // performing the move.
+  const clipHome = isEnsemble(def) ? 'the `animations` of every member performing it' : '`animations`';
   const effects = def?.effectAnimations ?? {};
   const projectileArt = def?.projectileAnimations ?? {};
   if (!isObject(def?.actions)) say('it has no `actions`');
@@ -174,7 +185,7 @@ export function loadoutProblems(def) {
     }
     for (const field of TECHNIQUE_CLIPS) {
       const key = technique[field];
-      if (!animations[key]) say(`technique ${id}'s ${field} "${key}" is not in \`animations\``);
+      if (!hasClip(def, key, technique.members)) say(`technique ${id}'s ${field} "${key}" is not in ${clipHome}`);
       else if (!key.startsWith(`${id}_`)) say(`technique ${id}'s ${field} "${key}" is not named ${id}_...`);
     }
     if (!technique.projectile && !technique.burst && !(technique.heal > 0)) say(`technique ${id} releases nothing (no projectile, no burst and no heal)`);
@@ -245,10 +256,10 @@ export function loadoutProblems(def) {
       say(`attacks.${id} is not a move codename (${Object.keys(MOVES).join(', ')})`);
       continue;
     }
-    if (atk.animation && !animations[atk.animation]) say(`attack "${id}" plays "${atk.animation}", which is not in \`animations\``);
+    if (atk.animation && !hasClip(def, atk.animation, atk.members)) say(`attack "${id}" plays "${atk.animation}", which is not in ${clipHome}`);
     // A slam's landing clip, if it names one: the attack's own art.
     const landing = atk.motion?.impact?.animation;
-    if (landing && !animations[landing]) say(`attack "${id}"'s impact plays "${landing}", which is not in \`animations\``);
+    if (landing && !hasClip(def, landing, atk.members)) say(`attack "${id}"'s impact plays "${landing}", which is not in ${clipHome}`);
     else if (landing && !landing.startsWith(`${id}_`)) say(`attack "${id}"'s impact plays "${landing}": it is not named ${id}_...`);
     const shot = atk.projectile;
     if (!shot) continue;
@@ -270,6 +281,13 @@ export function loadoutProblems(def) {
     }
   }
   return problems;
+}
+
+// Whether `def`'s moves are still to come (see the top of this module):
+// unplayable, and no move of any kind yet.
+function movesToCome(def) {
+  if (!def || def.available) return false;
+  return ['actions', 'attacks', 'summons', 'techniques', 'projectiles'].every((table) => def[table] === undefined);
 }
 
 // Throws, naming every problem, if `def` breaks the loadout rules (see

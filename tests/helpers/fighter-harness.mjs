@@ -12,6 +12,7 @@ import { spawnClones, updateClones, removeDeadClones } from '../../js/game/comba
 import { applyPulls } from '../../js/game/combat/pull.js';
 import { StageCollision, resolveSolidOverlap } from '../../js/game/physics.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
+import { EnsembleSprites } from '../../js/game/rendering/ensemble.js';
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { CONFIG } from '../../js/config.js';
@@ -57,13 +58,27 @@ export function fakeSprites(
 }
 
 // The same for any character: every clip, projectile and effect it
-// declares has art unless the keys say otherwise.
+// declares has art unless the keys say otherwise. A fighter drawn as
+// several members (an `ensemble`) gets one such set per member, its clips
+// (those of `keys`, when given) from the member's own `animations`, put
+// together as the game puts them (EnsembleSprites); the reference member
+// carries its projectiles and effects.
 export function fakeSpritesOf(
   character,
-  keys = Object.keys(character.animations),
+  keys,
   projectileKeys = Object.keys(character.projectileAnimations ?? {}),
   effectKeys = Object.keys(character.effectAnimations ?? {}),
 ) {
+  if (character.ensemble) {
+    const ref = character.ensemble.referenceMember ?? character.ensemble.members[0].id;
+    const sets = character.ensemble.members.map((m) => {
+      const own = Object.keys(m.animations).filter((k) => !keys || keys.includes(k));
+      const member = { ...character, ensemble: undefined, animations: m.animations };
+      return fakeSpritesOf(member, own, m.id === ref ? projectileKeys : [], m.id === ref ? effectKeys : []);
+    });
+    return new EnsembleSprites(character, sets);
+  }
+  keys ??= Object.keys(character.animations);
   const set = new SpriteSet(character);
   for (const key of keys) {
     const anim = character.animations[key];

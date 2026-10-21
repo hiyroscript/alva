@@ -30,7 +30,7 @@
 // simulation is fixed-step and deterministic; rendering reads it
 // (interpolate, spriteFlip) and never feeds back.
 
-import { SpriteAnimator } from '../rendering/sprite-animator.js';
+import { createAnimator } from '../rendering/ensemble.js';
 import { createBody, stepBody, dropThrough, separate, carryBody } from '../physics.js';
 import { startLaunch, bounceLaunch, resolveLaunchBounce } from '../combat/launch-bounce.js';
 import { attackPhase, createAttackDefinition } from '../combat/attacks.js';
@@ -119,7 +119,10 @@ export class Fighter {
     this.slot = slot;
     this.label = label;
     this.controller = controller;
-    this.animator = new SpriteAnimator(sprites);
+    // Its clips' player: one animator, or for a fighter drawn as several
+    // members (an `ensemble`, js/data/ensemble.js) every member's at once,
+    // still one fighter (see js/game/rendering/ensemble.js).
+    this.animator = createAnimator(sprites);
     // The universal movement values (js/data/movement.js): the same object
     // for every fighter, whatever its definition says. Nothing about how a
     // fighter runs, jumps or Dashes is its own.
@@ -343,6 +346,8 @@ export class Fighter {
     this.renderX = this.body.x;
     this.renderY = this.body.y;
     this.animator.play('idle', { restart: true });
+    // An ensemble's members start in formation, the way it faces.
+    this.animator.snap?.(this.facing);
   }
 
   // Back at its own spawn after the Void's wait (see Arena.updateRespawns):
@@ -2258,7 +2263,8 @@ export class Fighter {
       this.stateTime += dt;
     }
 
-    this.animator.play(this.animationFor(next), { restart });
+    const move = this.performedMove(next);
+    this.animator.play(this.animationFor(next), { restart, performers: move?.members ?? null, formation: move?.formation ?? null });
     if (next === 'run') {
       // The clip's own rate at top speed, following the speed: down to its
       // minSpeedScale, and faster still above top speed (a Dash's burst run
@@ -2279,7 +2285,18 @@ export class Fighter {
     } else {
       this.animator.setSpeed(1);
     }
-    this.animator.update(dt);
+    this.animator.update(dt, this.visualFacing);
+  }
+
+  // The move `state` shows, when it is one some of an ensemble's members
+  // perform and not the whole group (js/data/ensemble.js): its attack (its
+  // Deflect included) or its technique, whose `members` and `formation` say
+  // who performs it and where everyone stands. Null for every other state:
+  // the whole group plays it. An ordinary fighter's moves name no members.
+  performedMove(state) {
+    if (state === 'attack') return this.combat.attack.def;
+    if (state === 'technique') return this.technique.def;
+    return null;
   }
 
   // Animation key for a visual state. An attack plays its own clip for its
@@ -2341,14 +2358,23 @@ export class Fighter {
   // unaffected.
   get spriteFlip() {
     const sourceFacing = this.animator.anim?.sourceFacing ?? this.def.sourceFacing ?? 1;
-    const attacking = this.combat.attack || this.technique || this.pendingSummon;
-    return (attacking ? this.attackVisualFacing ?? this.facing : this.facing) !== sourceFacing;
+    return this.visualFacing !== sourceFacing;
   }
 
-  // Interpolated position for rendering between fixed steps.
+  // The way its art faces: its facing, or while it attacks, casts or
+  // summons the way its combat controller turned the art (see
+  // updateAttackFacing). Rendering only, as spriteFlip.
+  get visualFacing() {
+    const attacking = this.combat.attack || this.technique || this.pendingSummon;
+    return attacking ? this.attackVisualFacing ?? this.facing : this.facing;
+  }
+
+  // Interpolated position for rendering between fixed steps (an ensemble's
+  // members' places too).
   interpolate(alpha) {
     const b = this.body;
     this.renderX = b.prevX + (b.x - b.prevX) * alpha;
     this.renderY = b.prevY + (b.y - b.prevY) * alpha;
+    this.animator.interpolate?.(alpha);
   }
 }

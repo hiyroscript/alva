@@ -42,13 +42,14 @@ reads, what a fighter may leave out, and its tests.
   their editor, game controllers (PlayStation and Xbox: connections, the
   menu cursor, each fighter's controller layout and its editor).
 - [Rendering](systems/rendering.md): sprites, the camera, effects, the
-  status drawn with each fighter.
+  status drawn with each fighter, and a fighter drawn as several members
+  (an ensemble).
 - [Localization](systems/localization.md): English and French.
 
 ## Characters
 
 - [The roster](characters/README.md)
-- [#0001](characters/0001.md), [#0002](characters/0002.md), [#0003](characters/0003.md), [#0004](characters/0004.md), [#0005](characters/0005.md)
+- [#0001](characters/0001.md), [#0002](characters/0002.md), [#0003](characters/0003.md), [#0004](characters/0004.md), [#0005](characters/0005.md), [#0006](characters/0006.md) (not playable yet)
 - [Adding a fighter](characters/adding-characters.md)
 
 ## Gameplay

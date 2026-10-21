@@ -13,6 +13,15 @@ export const framePath = (id, codename, frame) => `./assets/characters/${id}/${i
 export const frames = (id, codename, count, from = 1) =>
   Array.from({ length: count }, (_, i) => framePath(id, codename, from + i));
 
+// Frames of one member of a fighter drawn as several (its `ensemble`, see
+// js/data/ensemble.js): the member's id goes after the codename, as a child
+// key, and the frame stays last: 0006_idle_red_2.png is the member red's
+// idle, frame 2.
+export const memberFramePath = (id, codename, member, frame) => framePath(id, `${codename}_${member}`, frame);
+
+// Frames `from` to `from + count - 1` of member `member`'s `codename`.
+export const memberFrames = (id, codename, member, count, from = 1) => frames(id, `${codename}_${member}`, count, from);
+
 // One binding of a fighter's recommended controller layout (its
 // `controller.layout`, see js/data/controller-profiles.js): `button`, a
 // normalized pad button ('west' is Square / X, 'r2' is R2 / RT), pressed;

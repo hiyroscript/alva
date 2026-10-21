@@ -47,6 +47,7 @@ import { stepBody } from '../physics.js';
 import { bounceLaunch } from '../combat/launch-bounce.js';
 import { approach } from '../../core/utils.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
+import { fighterParts } from './ensemble.js';
 
 // All tuning in one place. Times are real seconds; sizes are CSS pixels
 // unless noted (scaled by the view's device-pixel ratio when drawn).
@@ -381,10 +382,13 @@ export class HitEffects {
     for (const g of trail.ghosts) g.age += dt;
     trail.ghosts = trail.ghosts.filter((g) => g.age < HIT_FX.trail.life);
     trail.since += dt;
-    const frame = f.animator.frame;
-    if (fast && frame && trail.since >= HIT_FX.trail.every) {
+    // Everything drawn of it (every member of a fighter drawn as several);
+    // the first part also stands for the whole.
+    const parts = fighterParts(f);
+    if (fast && parts.length && trail.since >= HIT_FX.trail.every) {
       trail.since = 0;
-      trail.ghosts.push({ x: f.renderX, y: f.renderY, frame, flip: f.spriteFlip, age: 0, dash: !tumbling });
+      const [{ frame, flip }] = parts;
+      trail.ghosts.push({ x: f.renderX, y: f.renderY, frame, flip, parts, age: 0, dash: !tumbling });
       if (trail.ghosts.length > HIT_FX.trail.count) trail.ghosts.shift();
     }
     if (!fast && !trail.ghosts.length) this.trails.delete(f);

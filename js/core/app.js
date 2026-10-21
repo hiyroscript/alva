@@ -28,7 +28,7 @@ import { ControllerControls } from '../ui/controller-editor.js';
 import { getCharacter, getPlayableCharacter, playableCharacters, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
-import { SpriteSet } from '../game/rendering/sprite-normalizer.js';
+import { buildFighterSprites } from '../game/rendering/ensemble.js';
 
 import { SplashScreen } from '../screens/splash-screen.js';
 import { HomeScreen } from '../screens/home-screen.js';
@@ -118,7 +118,7 @@ export class App {
 
     this.selection = initialSelection();
 
-    this.spriteSets = new Map();   // characterId -> SpriteSet
+    this.spriteSets = new Map();   // characterId -> SpriteSet or EnsembleSprites
     this.spritePromises = new Map();
 
     this.lastTime = 0;
@@ -178,9 +178,10 @@ export class App {
     for (const def of playableCharacters()) this.loadCharacter(def.id);
   }
 
-  // Loads + normalizes a fighter's frames once. Resolves to a SpriteSet
-  // (possibly unusable if every frame failed), or to null without loading
-  // anything for an id that is not playable (unknown or disabled).
+  // Loads + normalizes a fighter's frames once. Resolves to a SpriteSet (an
+  // EnsembleSprites for a fighter drawn as several members; possibly
+  // unusable if every frame failed), or to null without loading anything
+  // for an id that is not playable (unknown or disabled).
   loadCharacter(id, onProgress) {
     if (!getPlayableCharacter(id)) return Promise.resolve(null);
     if (this.spriteSets.has(id)) {
@@ -204,7 +205,7 @@ export class App {
     }
     const def = getCharacter(id);
     const promise = this.assets.loadAll(characterFramePaths(def), onProgress).then(({ failed }) => {
-      const set = SpriteSet.build(def, (url) => this.assets.get(url));
+      const set = buildFighterSprites(def, (url) => this.assets.get(url));
       if (failed.length) console.error(`[Alva] ${def.displayName}: ${failed.length} frame(s) failed to load`, failed);
       if (!set.usable) console.error(`[Alva] ${def.displayName} has no usable frames.`);
       this.spriteSets.set(id, set);

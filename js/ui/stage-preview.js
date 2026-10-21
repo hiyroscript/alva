@@ -28,6 +28,7 @@ import { StageCollision } from '../game/physics.js';
 import { PlatformHazards } from '../game/platform-hazards.js';
 import { StageHazards } from '../game/stage-hazards.js';
 import { drawFrame } from '../game/rendering/sprite-normalizer.js';
+import { idlePose } from '../game/rendering/ensemble.js';
 import { fitCanvas } from './sprite-art.js';
 
 // View width as a multiple of the main stage's width.
@@ -48,8 +49,8 @@ export class StagePreview {
     this.map = null;
     this.sprites = null;
     this.time = 0;
+    // Seconds into the fighters' idle (see drawFighters).
     this.frameTime = 0;
-    this.frameIndex = 0;
     this.view = { ctx: this.ctx, x: 0, y: 0, w: 0, h: 0, scale: 1, pxW: 0, pxH: 0 };
   }
 
@@ -148,13 +149,9 @@ export class StagePreview {
   drawFighters(dt) {
     const set = this.sprites;
     if (!set?.usable) return;
-    const idle = set.animations.idle;
+    // Its idle (a group's every member, each at its place: see idlePose).
     this.frameTime += dt;
-    if (this.frameTime > 1 / idle.fps) {
-      this.frameTime = 0;
-      this.frameIndex = (this.frameIndex + 1) % idle.frames.length;
-    }
-    const frame = idle.frames[this.frameIndex];
+    const parts = idlePose(set, this.frameTime);
     const v = this.view;
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -169,7 +166,9 @@ export class StagePreview {
       ctx.ellipse(sx, sy, 20 * v.scale, 4 * v.scale, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
-      drawFrame(ctx, frame, sx, sy, pxPerArt, i === 1);
+      // The second spawn's fighter faces the first: mirrored, its group too.
+      const flip = i === 1;
+      for (const p of parts) drawFrame(ctx, p.frame, sx + (flip ? -p.dx : p.dx) * pxPerArt, sy + p.dy * pxPerArt, pxPerArt, flip);
     });
     ctx.imageSmoothingEnabled = true;
   }

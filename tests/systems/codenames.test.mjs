@@ -15,7 +15,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { def, fakeSprites, makeFighter, startupSteps, STAGE } from '../helpers/fighter-harness.mjs';
 import { ACTIONS, ACTION_LABELS, COMBAT_BUTTONS, CONFIG, MOVES, NUMBERED_ATTACKS } from '../../js/config.js';
-import { CHARACTERS, characterFramePaths, framePath, frames } from '../../js/data/characters.js';
+import { CHARACTERS, characterFramePaths, framePath, frames, memberFramePath, memberFrames } from '../../js/data/characters.js';
+import { memberClips } from '../../js/data/ensemble.js';
 import { actionType, loadoutProblems, specialAction } from '../../js/data/loadout.js';
 import { SAMPLE_FIGHTER } from '../fighters/fixtures/sample-fighter.mjs';
 import { COMBAT_ACTIONS, Fighter } from '../../js/game/fighters/fighter.js';
@@ -282,11 +283,15 @@ test('the combat AI discovers the moveset by its canonical names, and reaches at
 
 // ---- Files ------------------------------------------------------------------
 
-test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and the frame helpers build exactly that', () => {
+test('every fighter frame is <id>_<codename>_<frame>.png in its own folder (a member\'s <id>_<codename>_<member>_<frame>.png), and the frame helpers build exactly that', () => {
   assert.equal(framePath('0027', 'attack2', 3), './assets/characters/0027/0027_attack2_3.png');
   assert.equal(framePath('0027', 'idle', 1), './assets/characters/0027/0027_idle_1.png');
   assert.deepEqual(frames('0027', 'midair_attack2', 2), [
     './assets/characters/0027/0027_midair_attack2_1.png', './assets/characters/0027/0027_midair_attack2_2.png',
+  ]);
+  assert.equal(memberFramePath('0027', 'idle', 'red', 2), './assets/characters/0027/0027_idle_red_2.png');
+  assert.deepEqual(memberFrames('0027', 'midair_mouvment', 'red', 2), [
+    './assets/characters/0027/0027_midair_mouvment_red_1.png', './assets/characters/0027/0027_midair_mouvment_red_2.png',
   ]);
   assert.deepEqual(frames('0027', 'attack4_object', 2, 10), [
     './assets/characters/0027/0027_attack4_object_10.png', './assets/characters/0027/0027_attack4_object_11.png',
@@ -305,6 +310,16 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and 
           if (c === SAMPLE_FIGHTER) continue;
           assert.ok(key === codename || key.startsWith(`${codename}_`), `${table}.${key} plays ${codename} frames`);
         }
+      }
+    }
+    // A fighter drawn as several members (js/data/ensemble.js): each
+    // member's clips, the member's id a child key after the codename and
+    // the frame still last.
+    for (const { member, key, clip } of memberClips(c)) {
+      for (const url of clip.frames) {
+        const m = pattern.exec(url);
+        assert.ok(m, `${member}.${key}: ${url} follows <id>_<codename>_<member>_<frame>.png`);
+        assert.equal(m[1], `${key}_${member}`, `${member}.${key} plays its own ${key} frames`);
       }
     }
     for (const url of characterFramePaths(c)) assert.ok(existsSync(new URL(url.slice(2), ROOT)), `${url} exists`);
