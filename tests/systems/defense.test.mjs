@@ -8,29 +8,38 @@
 // physics, priority, the Energy cost of each blocked hit (and nothing
 // else), full-circle blocking on the fighter's own hurtboxes, the
 // low-Energy and exhaustion rules, missing-art safety, the Shield's
-// black-and-red circle and the training CPU. The stall a Shield may put on
-// a blow it blocks is in hit-effects.test.mjs. Uses the real Fighter,
-// CombatSystem, physics and InputManager (see
+// black-and-red circle and the training CPU. And the Shield holding its
+// fighter still (A to M below): raised standing or at a run (the run
+// stopped on that step), either direction, let go and running again,
+// jumped out of, in blockstun, under a block's push and a pull's drag, on
+// a moving cloud, for every playable fighter (#0006's ensemble included),
+// for the CPU, from the keyboard, touch and a controller alike, and at
+// any frame rate; its ring waving at the Arena's own pace. The stall a
+// Shield may put on a blow it blocks is in hit-effects.test.mjs. Uses the
+// real Fighter, CombatSystem, physics and InputManager (see
 // tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { characterFramePaths, getCharacter } from '../../js/data/characters.js';
+import { characterFramePaths, getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { COMBAT_ACTIONS } from '../../js/game/fighters/fighter.js';
 import { createDefenseDefinition } from '../../js/game/combat/defense.js';
 import { BLOCK_ENERGY_COST, CombatState, resolveEnergy } from '../../js/game/combat/combat-state.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import {
-  SHIELD_SHAPE, SHIELD_STYLE, SHIELD_WALK_WAVE_RATE, drawShield, shieldCenter, shieldOutline, shieldRadius, shieldWaveTime,
+  SHIELD_SHAPE, SHIELD_STYLE, drawShield, shieldCenter, shieldOutline, shieldRadius,
 } from '../../js/game/rendering/shield-fx.js';
+import { fighterParts } from '../../js/game/rendering/ensemble.js';
+import { applyPulls } from '../../js/game/combat/pull.js';
+import { StageCollision } from '../../js/game/physics.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../js/data/movement.js';
 import { EDGE_RED } from '../../js/core/organic-edge.js';
 import { energyBarState, ENERGY_STYLE } from '../../js/game/rendering/fighter-status.js';
 import { ACTIONS, ACTION_LABELS, CONFIG } from '../../js/config.js';
 import {
-  def, DT, BASE, SIM_CTX, fakeSprites, fakeSpritesOf, makeFighter, frameName, stepUntil, steps, duel,
+  def, DT, BASE, MOVEMENT, STAGE, SIM_CTX, fakeSprites, fakeSpritesOf, makeFighter, frameName, probeHit, stepUntil, steps, duel,
 } from '../helpers/fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -344,113 +353,572 @@ test('holding the Shield costs nothing: 3 s held at full stays at 100, and a low
   assert.equal(low.fighter.combat.shielding, true);
 });
 
-test('shield walking: a direction held behind a raised Shield walks the fighter slowly, turning it; no Dash; Jump jumps straight out of it', () => {
-  const mv = BASE_FIGHTER_MOVEMENT;
-  assert.ok(mv.shieldWalkSpeed > 0 && mv.shieldWalkSpeed < mv.maxSpeed / 2, 'slower than walking, well under the run');
-  const { fighter, step } = makeFighter();
-  stepUntil(step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
-  // Raised at a run, held on: the run eases down to the Shield's walk
-  // under the normal deceleration, never at once.
-  step({ ...SHIELD, ...RIGHT });
-  assert.equal(fighter.combat.shielding, true);
-  assert.ok(Math.abs(fighter.body.vx - (fighter.maxSpeed - mv.deceleration * DT)) < 1e-9, 'eased, not stopped dead');
-  for (let i = 0; i < 20; i++) step({ ...HOLD, ...RIGHT });
-  assert.equal(fighter.body.vx, mv.shieldWalkSpeed, 'walking behind it');
-  assert.equal(fighter.shieldWalking, true);
-  assert.equal(fighter.state, 'shield', 'the held Shield pose: no walk of its own');
-  assert.equal(fighter.animator.anim.key, def.defense.groundAnimation);
-  let x = fighter.body.x;
-  for (let i = 0; i < 30; i++) step({ ...HOLD, ...RIGHT });
-  assert.ok(Math.abs(fighter.body.x - x - mv.shieldWalkSpeed * 30 * DT) < 1e-6, 'steadily, at its own speed');
-  // Let go of the direction: it stops as a walk does.
-  for (let i = 0; i < 10; i++) step(HOLD);
-  assert.equal(fighter.body.vx, 0, 'stopped');
-  assert.equal(fighter.shieldWalking, false);
-  assert.equal(fighter.combat.shielding, true, 'the Shield still up');
-  // The other way: it turns at once and walks that way.
-  x = fighter.body.x;
-  step({ ...HOLD, runLeft: true });
-  assert.equal(fighter.facing, -1, 'turns at once, behind its Shield');
-  for (let i = 0; i < 30; i++) step({ ...HOLD, runLeft: true });
-  assert.ok(fighter.body.x < x, 'walking left');
-  assert.equal(fighter.body.vx, -mv.shieldWalkSpeed);
-  // No Dash: a Dash asked for while shielding starts nothing and costs nothing.
-  step({ ...HOLD, runRight: true, mouvementRightPressed: true });
-  assert.equal(fighter.dash, null);
-  assert.equal(fighter.combat.energy, 100);
-  // Walking costs nothing either.
-  assert.equal(fighter.combat.energy, 100);
-  // Jump: straight out of the Shield, the walk's speed going up with it.
-  for (let i = 0; i < 20; i++) step({ ...HOLD, ...RIGHT });
-  step({ ...HOLD, ...RIGHT, ...JUMP });
-  assert.equal(fighter.grounded, false, 'jumped out of it');
-  assert.equal(fighter.combat.shielding, false, 'the Shield dropped');
-  assert.equal(fighter.body.vx, mv.shieldWalkSpeed, 'its walk carried up');
-  assert.ok(fighter.body.vy < 0);
-  // Shield still held in the air: no Shield there, and no Deflect without a fresh press.
-  step({ ...HOLD, ...RIGHT });
-  assert.equal(fighter.combat.shielding, false);
-  assert.equal(fighter.combat.attack, null);
+// ---- The Shield holds still ------------------------------------------------------
+// A raised ground Shield plants its fighter: no direction held walks or
+// runs it, on any device or for the CPU, and it only turns. Raised at a run
+// it stops the run on its very step; let go, the run starts again from
+// rest. What other mechanics do to the body (a block's push, a pull, a
+// moving platform) still happens to it.
+
+const LEFT = { runLeft: true };
+const BOTH = { runLeft: true, runRight: true };
+
+// The Battle and the maps, loaded once a canvas Path2D stand-in is there.
+async function battleModules() {
+  globalThis.Path2D ??= class {
+    constructor() {
+      return new Proxy(this, { get: (t, k) => (k in t ? t[k] : () => {}) });
+    }
+  };
+  const [{ Battle }, { getMap }] = await Promise.all([import('../../js/game/battle.js'), import('../../js/data/maps.js')]);
+  return { Battle, getMap };
+}
+
+// Steps harness `h` ({ fighter, step }) `n` times with `held`, the Shield
+// up throughout, asserting the fighter neither moves nor gains a speed on
+// any of them (on static ground).
+function holdsStill(h, held, n, what) {
+  const { fighter, step } = h;
+  const x = fighter.body.x;
+  for (let i = 0; i < n; i++) {
+    step(held);
+    assert.equal(fighter.combat.shielding, true, `${what}: still up (step ${i})`);
+    assert.equal(fighter.body.vx, 0, `${what}: no speed (step ${i})`);
+    assert.equal(fighter.body.x, x, `${what}: not a unit moved (step ${i})`);
+  }
+}
+
+test('A: raised standing, the Shield holds its fighter still: Left or Right held for seconds walks it nowhere, and only turns it', () => {
+  const h = makeFighter();
+  h.step(SHIELD);
+  assert.equal(h.fighter.combat.shielding, true);
+  holdsStill(h, { ...HOLD, ...RIGHT }, steps(2), 'Right held');
+  assert.equal(h.fighter.facing, 1);
+  holdsStill(h, { ...HOLD, ...LEFT }, steps(2), 'Left held');
+  assert.equal(h.fighter.facing, -1, 'turned to face it, where it stands');
+  holdsStill(h, { ...HOLD, ...BOTH }, 30, 'both held');
+  // Its held Shield pose throughout: no run and no walk of its own.
+  assert.equal(h.fighter.state, 'shield');
+  assert.equal(h.fighter.animator.anim.key, def.defense.groundAnimation);
+  assert.equal(h.fighter.moveDir, 0, 'no locomotion asked of the run');
+  // Nothing is left to walk with: no walking speed, no walking state.
+  assert.equal('shieldWalkSpeed' in BASE_FIGHTER_MOVEMENT, false);
+  assert.equal(Object.keys(BASE_FIGHTER_MOVEMENT).some((k) => /shield/i.test(k)), false, 'no Shield movement value at all');
+  assert.equal('shieldWalking' in h.fighter, false);
 });
 
-test('blockstun holds the Shield still: no walking and no jump until the block\'s stun is over, then both at once', () => {
+test('B: raised at a run, the Shield stops the run on its very step, never a slide; the run still held walks it nowhere', () => {
+  const h = makeFighter();
+  stepUntil(h.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
+  const x = h.fighter.body.x;
+  h.step({ ...SHIELD, ...RIGHT });
+  assert.equal(h.fighter.combat.shielding, true, 'up on the press step');
+  assert.equal(h.fighter.body.vx, 0, 'stopped on that very step');
+  assert.equal(h.fighter.body.x, x, 'not a unit on from where it went up');
+  assert.equal(h.fighter.state, 'shield');
+  holdsStill(h, { ...HOLD, ...RIGHT }, steps(1), 'the run held on');
+  // Running left, the direction held since long before the press: the same.
+  const back = makeFighter({ x: 900, facing: -1 });
+  for (let i = 0; i < 30; i++) back.step(LEFT);
+  assert.equal(back.fighter.body.vx, -MOVEMENT.maxSpeed);
+  back.step({ ...SHIELD, ...LEFT });
+  assert.equal(back.fighter.body.vx, 0);
+  holdsStill(back, { ...HOLD, ...LEFT }, 30, 'the leftward run held on');
+  // A Dash's burst, above top speed: the Shield held through the Dash goes
+  // up the step it ends, and the burst stops there.
+  const dash = makeFighter();
+  dash.step({ ...RIGHT, mouvementRightPressed: true });
+  assert.ok(dash.fighter.dash, 'dashing');
+  let burst = 0;
+  while (dash.fighter.dash) {
+    burst = dash.fighter.body.vx;
+    dash.step({ ...HOLD, ...RIGHT });
+  }
+  assert.ok(burst > MOVEMENT.maxSpeed, `a burst (${burst})`);
+  assert.equal(dash.fighter.combat.shielding, true, 'up the step the Dash ended');
+  assert.equal(dash.fighter.body.vx, 0, 'the burst stopped');
+  holdsStill(dash, { ...HOLD, ...RIGHT }, 20, 'after the Dash');
+});
+
+test('B: a Shield press that raises nothing stops nothing: stunned, exhausted, mid-Dash or without its art, the speed goes on', () => {
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const run = (h) => stepUntil(h.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
+    const noArt = fakeSprites(Object.keys(def.animations).filter((k) => !/shield/i.test(k)));
+    const cases = [
+      ['stunned', {}, (h) => { run(h); h.fighter.combat.stun = 0.3; }],
+      ['exhausted', {}, (h) => { run(h); h.fighter.combat.setEnergy(0); }],
+      ['mid-Dash', {}, (h) => { h.step({ ...RIGHT, mouvementRightPressed: true }); h.step(RIGHT); }],
+      ['without its art', { sprites: noArt }, run],
+    ];
+    for (const [what, opts, setup] of cases) {
+      // Twice, on the same inputs but for the Shield: the same speed and
+      // place on every step.
+      const shielded = makeFighter(opts);
+      const plain = makeFighter(opts);
+      setup(shielded);
+      setup(plain);
+      for (let i = 0; i < 4; i++) {
+        shielded.step(i === 0 ? SHIELD : HOLD);
+        plain.step();
+        assert.equal(shielded.fighter.combat.shielding, false, `${what}: no Shield`);
+        assert.equal(shielded.fighter.body.vx, plain.fighter.body.vx, `${what}: the speed it had (step ${i})`);
+        assert.equal(shielded.fighter.body.x, plain.fighter.body.x, `${what}: where it would be`);
+      }
+      assert.ok(plain.fighter.body.vx > 0, `${what}: still moving`);
+    }
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test('B: speed an outside force gave it is not stopped: a pull\'s drag runs down behind the Shield it raises', () => {
+  // Drawn in by a pull (the drag pullToward sets), then the Shield raised:
+  // the drag is the pull's, not the fighter's own, so it runs down under
+  // the normal deceleration; the pull draws it no further.
+  const pulled = makeFighter({ x: 600, facing: -1 });
+  const owner = makeFighter({ x: 300 });
+  pulled.fighter.opponent = owner.fighter;
+  owner.fighter.opponent = pulled.fighter;
+  pulled.step();
+  const pull = { radius: 600, speed: 360, offset: { x: 0, y: 0 } };
+  const shot = { alive: true, owner: owner.fighter, x: 400, y: pulled.fighter.body.y - 40, direction: 1, def: { pull } };
+  applyPulls([owner.fighter, pulled.fighter], [shot], DT);
+  assert.equal(pulled.fighter.body.vx, -pull.speed, 'dragged');
+  pulled.step({ ...SHIELD, ...RIGHT });
+  assert.equal(pulled.fighter.combat.shielding, true);
+  assert.equal(pulled.fighter.body.vx, -pull.speed + MOVEMENT.deceleration * DT, 'running down, not stopped dead');
+  applyPulls([owner.fighter, pulled.fighter], [shot], DT);
+  assert.equal(pulled.fighter.body.vx, -pull.speed + MOVEMENT.deceleration * DT, 'a raised Shield is drawn no further');
+  let n = 0;
+  while (pulled.fighter.body.vx !== 0 && n++ < 30) pulled.step({ ...HOLD, ...RIGHT });
+  assert.ok(n < 10, 'soon at rest');
+  holdsStill(pulled, { ...HOLD, ...RIGHT }, 20, 'once the drag is spent');
+});
+
+test('C: directions changed again and again behind the Shield never move it; each only turns it, and no Dash starts', () => {
+  const h = makeFighter();
+  h.step(SHIELD);
+  const x = h.fighter.body.x;
+  const taps = [RIGHT, LEFT, {}, LEFT, RIGHT, BOTH, RIGHT, {}, LEFT, LEFT, RIGHT, BOTH, {}];
+  for (let round = 0; round < 12; round++) {
+    for (const [i, dir] of taps.entries()) {
+      const prev = taps[i - 1] ?? {};
+      // Fresh presses too (the run's own press edges), as a player mashing
+      // the directions makes them.
+      const edges = { runLeftPressed: !!dir.runLeft && !prev.runLeft, runRightPressed: !!dir.runRight && !prev.runRight };
+      const facing = h.fighter.facing;
+      h.step({ ...HOLD, ...dir, ...edges });
+      assert.equal(h.fighter.combat.shielding, true, 'turning never drops it');
+      assert.equal(h.fighter.body.vx, 0, `round ${round}, step ${i}: no speed`);
+      assert.equal(h.fighter.body.x, x, `round ${round}, step ${i}: not a unit moved`);
+      const want = (dir.runRight ? 1 : 0) - (dir.runLeft ? 1 : 0);
+      assert.equal(h.fighter.facing, want || facing, 'faces the way held; with none (or both), the way it did');
+    }
+  }
+  // No Dash behind it either: one asked for starts nothing and costs nothing.
+  h.step({ ...HOLD, ...RIGHT, mouvementRightPressed: true });
+  h.step({ ...HOLD, ...LEFT, mouvementLeftPressed: true });
+  assert.equal(h.fighter.dash, null);
+  assert.equal(h.fighter.combat.energy, 100);
+  assert.equal(h.fighter.body.x, x);
+});
+
+test('D: let go with the direction still held, it runs again from rest, exactly as a run from a standstill does', () => {
+  const h = makeFighter();
+  h.step({ ...SHIELD, ...RIGHT });
+  holdsStill(h, { ...HOLD, ...RIGHT }, 20, 'held');
+  const plain = makeFighter();
+  const x = h.fighter.body.x;
+  const px = plain.fighter.body.x;
+  for (let i = 0; i < 20; i++) {
+    h.step(RIGHT);
+    plain.step(RIGHT);
+    assert.equal(h.fighter.combat.shielding, false, 'down from the release step');
+    assert.equal(h.fighter.body.vx, plain.fighter.body.vx, `step ${i}: the run's own acceleration`);
+    assert.equal(h.fighter.body.x - x, plain.fighter.body.x - px);
+  }
+  assert.equal(h.fighter.body.vx, MOVEMENT.maxSpeed, 'up to the full run');
+  assert.equal(h.fighter.state, 'run');
+});
+
+test('E: Jump jumps straight out of the Shield: it drops, no walk goes up with it, and the air steers as ever', () => {
+  const h = makeFighter();
+  stepUntil(h.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
+  h.step({ ...SHIELD, ...RIGHT });
+  holdsStill(h, { ...HOLD, ...RIGHT }, 20, 'Right held');
+  const x = h.fighter.body.x;
+  // Beside it, the same jump from a standstill with nothing held.
+  const plain = makeFighter({ x });
+  h.step({ ...HOLD, ...RIGHT, ...JUMP });
+  plain.step(JUMP);
+  assert.equal(h.fighter.grounded, false, 'jumped out of it');
+  assert.equal(h.fighter.combat.shielding, false, 'the Shield dropped');
+  assert.ok(h.fighter.body.vy < 0);
+  assert.equal(h.fighter.body.vy, plain.fighter.body.vy, 'the normal jump');
+  assert.equal(h.fighter.body.vx, 0, 'straight up: nothing carried from behind the Shield');
+  assert.equal(h.fighter.body.x, x);
+  // From there the air steers it exactly as it steers that jump; the
+  // Shield still held does nothing there (no Shield in the air, and no
+  // Deflect without a fresh press).
+  for (let i = 0; i < 15; i++) {
+    h.step({ ...HOLD, ...RIGHT });
+    plain.step(RIGHT);
+    assert.equal(h.fighter.combat.shielding, false);
+    assert.equal(h.fighter.combat.attack, null, 'no Deflect');
+    assert.equal(h.fighter.body.vx, plain.fighter.body.vx, `step ${i}: the air's own steering`);
+    assert.equal(h.fighter.body.x, plain.fighter.body.x);
+    assert.equal(h.fighter.body.y, plain.fighter.body.y);
+  }
+  assert.ok(h.fighter.body.vx > 0, 'steering on');
+});
+
+test('F: in blockstun the Shield holds still and a jump waits in its buffer; once the stun is over it still walks nowhere', () => {
+  // A block in play first: the stun holds it up, no walk, no jump.
   const d = duel();
   raiseShield(d);
-  const [event] = blockedAttack(d);
+  assert.equal(def.attacks.attack1.blockPush ?? 0, 0, 'a blow with no push: nothing else moves it');
+  const x = d.target.body.x;
+  const [event] = blockedAttack(d, ATTACK1, { ...HOLD, ...LEFT });
   assert.equal(event.type, 'block');
   assert.ok(d.target.combat.shieldStun > 0, 'blocked: in blockstun');
-  // Held away, with Jump pressed: the stun holds it, no walk, no jump.
-  let walked = false;
   let n = 0;
-  d.tick({}, { ...HOLD, ...RIGHT, ...JUMP });
   while ((d.target.combat.shieldStun > 0 || d.target.combat.hitstop > 0) && n++ < 120) {
-    assert.equal(d.target.grounded, true, 'no jump out of blockstun');
-    walked ||= d.target.shieldWalking;
-    d.tick({}, { ...HOLD, ...RIGHT });
+    d.tick({}, { ...HOLD, ...(n % 6 < 3 ? LEFT : RIGHT) });
+    assert.equal(d.target.body.vx, 0);
+    assert.equal(d.target.body.x, x, 'still in blockstun');
   }
-  assert.equal(walked, false, 'no walking in blockstun');
-  // Over: walking at once, and a fresh Jump jumps out of it.
-  d.tick({}, { ...HOLD, ...RIGHT });
-  assert.equal(d.target.shieldWalking, true, 'walking again once the stun is over');
-  d.tick({}, { ...HOLD, ...JUMP });
-  assert.equal(d.target.grounded, false, 'and jumping out of it');
+  for (let i = 0; i < 30; i++) {
+    d.tick({}, { ...HOLD, ...RIGHT });
+    assert.equal(d.target.combat.shielding, true);
+    assert.equal(d.target.body.x, x, 'still once the stun is over');
+  }
+
+  // A long blockstun (a bespoke blow): a Jump pressed early is gone by the
+  // time it ends; one pressed within the jump buffer of its end jumps the
+  // first step it is over, never before.
+  const block = probeHit({ id: 'testBlock', damage: 0, hitstun: 0.2, blockstun: 0.5, hitstop: 0 });
+  for (const late of [false, true]) {
+    const t = makeFighter({ x: 540, facing: -1 });
+    const a = makeFighter({ x: 500 });
+    t.fighter.opponent = a.fighter;
+    a.fighter.opponent = t.fighter;
+    t.step(SHIELD);
+    for (let i = 0; i < steps(def.defense.perfectWindow) + 2; i++) t.step(HOLD);
+    assert.equal(new CombatSystem().applyHit(a.fighter, t.fighter, block, { facing: 1 }).type, 'block');
+    const tx = t.fighter.body.x;
+    let pressed = false;
+    let stunned = 0;
+    for (let i = 0; i < 60 && t.fighter.grounded; i++) {
+      const press = !pressed && (late ? t.fighter.combat.shieldStun <= MOVEMENT.jumpBuffer - 2 * DT : true);
+      pressed ||= press;
+      t.step({ ...HOLD, ...(i % 4 < 2 ? RIGHT : LEFT), ...(press ? JUMP : {}) });
+      if (t.fighter.combat.shieldStun > 0) {
+        stunned++;
+        assert.equal(t.fighter.grounded, true, 'no jump out of blockstun');
+        assert.equal(t.fighter.body.x, tx, 'no walk in blockstun');
+      }
+    }
+    assert.ok(stunned > steps(0.4), 'held through the stun');
+    if (late) {
+      assert.equal(t.fighter.grounded, false, 'the press waited in the buffer and jumped as the stun ended');
+      assert.equal(t.fighter.body.vx, 0, 'straight up');
+    } else {
+      assert.equal(t.fighter.grounded, true, 'an early press is gone: no jump');
+      assert.equal(t.fighter.combat.shielding, true);
+      assert.equal(t.fighter.body.x, tx, 'and no walk after the stun');
+    }
+  }
 });
 
-test('the Shield\'s ring waves faster while its fighter walks, on its own clock, never a jump in its waves', () => {
-  assert.ok(SHIELD_WALK_WAVE_RATE >= 3, 'way faster');
-  const walker = makeFighter();
-  const stander = makeFighter();
-  walker.step(SHIELD);
-  stander.step(SHIELD);
-  // Each fighter's clock starts where the Arena's is.
-  assert.equal(shieldWaveTime(walker.fighter, 1), 1);
-  assert.equal(shieldWaveTime(stander.fighter, 1), 1);
-  walker.step({ ...HOLD, ...RIGHT });
-  stander.step(HOLD);
-  assert.equal(walker.fighter.shieldWalking, true);
-  assert.equal(stander.fighter.shieldWalking, false);
-  const w = shieldWaveTime(walker.fighter, 1.5);
-  const t = shieldWaveTime(stander.fighter, 1.5);
-  assert.ok(Math.abs(w - (1 + 0.5 * SHIELD_WALK_WAVE_RATE)) < 1e-9, `walking: ${w}`);
-  assert.ok(Math.abs(t - 1.5) < 1e-9, 'standing: the Arena\'s pace');
-  // Drawn twice in a frame (interior and rim): the same clock both times.
-  assert.equal(shieldWaveTime(walker.fighter, 1.5), w);
-  // Stopping slows it from where it is: no jump back.
-  walker.step(HOLD);
-  walker.step(HOLD);
-  assert.ok(Math.abs(shieldWaveTime(walker.fighter, 1.6) - (w + 0.1)) < 1e-9);
+test('G: a block\'s push still shoves the Shield and runs down under the normal deceleration; a direction held adds nothing', () => {
+  // #0003's Chakra Punch shoves a Shield it meets (`blockPush`).
+  const C3 = getCharacter('0003');
+  const push = C3.attacks.attack1.blockPush;
+  assert.ok(push > 0 && push < MOVEMENT.maxSpeed, `a push (${push})`);
+  const shove = (held) => {
+    const d = duel({ attackerCharacter: C3, attackerSprites: fakeSpritesOf(C3) });
+    raiseShield(d);
+    const x0 = d.target.body.x;
+    const [event] = blockedAttack(d, ATTACK1, { ...HOLD, ...held });
+    assert.equal(event.type, 'block', 'blocked');
+    assert.equal(d.target.combat.launchPoint, 0);
+    assert.equal(d.target.body.vx, push, 'shoved away from the blow at its push');
+    const log = [];
+    let slowed = 0;
+    for (let i = 0; i < 40; i++) {
+      const vx = d.target.body.vx;
+      d.tick({}, { ...HOLD, ...held });
+      assert.equal(d.target.combat.shielding, true);
+      // Frozen in the impact it keeps its speed; after, it slows by the
+      // ground's deceleration a step, whatever is held.
+      const v = d.target.body.vx;
+      const slow = Math.max(0, vx - MOVEMENT.deceleration * DT);
+      assert.ok(v === vx || Math.abs(v - slow) < 1e-9, `step ${i}: ${vx} → ${v}`);
+      if (v < vx) slowed++;
+      log.push([d.target.body.x, v]);
+    }
+    assert.equal(slowed, Math.ceil(push / (MOVEMENT.deceleration * DT)), 'slowed step by step until spent');
+    assert.equal(d.target.body.vx, 0, 'the push spent');
+    assert.ok(d.target.body.x - x0 > 10, `shoved back ${d.target.body.x - x0} units`);
+    return log;
+  };
+  const still = shove({});
+  // Held toward the blow or away from it: the very same push, step for step.
+  assert.deepEqual(shove(LEFT), still);
+  assert.deepEqual(shove(RIGHT), still);
 });
 
-for (const c of [getCharacter('0001'), getCharacter('0002'), getCharacter('0003'), getCharacter('0004'), getCharacter('0005')]) {
-  test(`#${c.id}: shield walks at the one universal speed, in its own held Shield pose`, () => {
-    const h = makeFighter({ character: c, sprites: fakeSpritesOf(c) });
-    h.step(SHIELD);
-    for (let i = 0; i < 20; i++) h.step({ ...HOLD, ...RIGHT });
+test('H: on a moving cloud the Shield rides it as anyone does, and a direction held walks it nowhere along it', async () => {
+  const { getMap } = await battleModules();
+  const { PlatformHazards } = await import('../../js/game/platform-hazards.js');
+  const { HAZARD_STATES: S } = await import('../../js/data/platform-hazards.js');
+  const stage = new StageCollision(getMap('asperitas'));
+  const hazards = new PlatformHazards(stage, { seed: 1 });
+  // Every cloud held still, then the left one sent drifting right.
+  for (const c of hazards.controllers) Object.assign(c, { state: S.idle, time: 0, duration: 60 });
+  const cloud = hazards.get('asperitas-cloud-left');
+  const p = cloud.platform;
+  const h = makeFighter({ stage, x: p.x + p.w / 2, y: p.y - 0.5 });
+  assert.equal(h.fighter.body.ground, p);
+  const tick = (held) => {
+    hazards.update(DT, [h.fighter]);
+    return h.step(held);
+  };
+  tick(SHIELD);
+  Object.assign(cloud, { state: S.horizontal, from: { x: p.x, y: p.y }, to: { x: p.x + 120, y: p.y }, time: 0, duration: 2 });
+  const gap = h.fighter.body.x - p.x;
+  for (let i = 0; i < 100; i++) {
+    tick({ ...HOLD, ...(i % 40 < 20 ? LEFT : RIGHT) });
     assert.equal(h.fighter.combat.shielding, true);
-    assert.equal(h.fighter.body.vx, BASE_FIGHTER_MOVEMENT.shieldWalkSpeed);
+    assert.equal(h.fighter.body.ground, p, 'on the cloud');
+    assert.equal(h.fighter.body.y, p.y);
+    assert.equal(h.fighter.body.vx, 0, 'no walking of its own');
+    assert.ok(Math.abs(h.fighter.body.x - p.x - gap) < 1e-6, `step ${i}: carried exactly, not a unit along it`);
+  }
+  assert.ok(p.x > cloud.from.x + 60, 'the cloud really moved, the fighter with it');
+  // Let go: it runs along the cloud as ever.
+  for (let i = 0; i < 10; i++) tick(RIGHT);
+  assert.ok(h.fighter.body.x - p.x > gap + 20, 'runs along it again');
+});
+
+// Every playable fighter whose `defense` is a ground Shield with its art.
+const SHIELDED = playableCharacters().filter((c) => c.defense?.type === 'shield' && c.defense.groundAnimation);
+
+test('I: the whole roster has a ground Shield to hold still behind, #0006 (an ensemble) among them', () => {
+  assert.ok(SHIELDED.length >= 6, SHIELDED.map((c) => c.id).join(', '));
+  assert.ok(SHIELDED.some((c) => c.id === '0006' && c.ensemble));
+});
+
+for (const c of SHIELDED) {
+  test(`I: #${c.id}: raised at a run it stops dead, and holds still whatever is held, in its own held Shield pose`, () => {
+    const h = makeFighter({ character: c, sprites: fakeSpritesOf(c) });
+    stepUntil(h.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
+    const x = h.fighter.body.x;
+    h.step({ ...SHIELD, ...RIGHT });
+    assert.equal(h.fighter.combat.shielding, true);
+    assert.equal(h.fighter.body.vx, 0, 'stopped on the press step');
+    assert.equal(h.fighter.body.x, x);
+    holdsStill(h, { ...HOLD, ...RIGHT }, 30, 'Right held');
+    holdsStill(h, { ...HOLD, ...LEFT }, 30, 'Left held');
+    assert.equal(h.fighter.facing, -1, 'turned');
     assert.equal(h.fighter.animator.anim.key, c.defense.groundAnimation);
+    if (!c.ensemble) return;
+    // An ensemble: every member in its own held Shield pose, gathered round
+    // the one planted body, and the group settles there, drawn still.
+    const members = h.fighter.animator.members;
+    assert.ok(members.length > 1);
+    for (const m of members) assert.equal(m.animator.anim?.key, c.defense.groundAnimation, `${m.id} holds its Shield`);
+    const drawn = () => {
+      h.fighter.interpolate(1);
+      return fighterParts(h.fighter).map((part) => [part.x, part.y]);
+    };
+    for (let i = 0; i < 60; i++) h.step({ ...HOLD, ...LEFT });
+    const settled = drawn();
+    for (let i = 0; i < 30; i++) {
+      h.step({ ...HOLD, ...(i % 10 < 5 ? LEFT : BOTH) });
+      assert.deepEqual(drawn(), settled, `step ${i}: the group drawn where it stands`);
+    }
+    assert.equal(h.fighter.body.x, x);
   });
 }
+
+test('J: the CPU\'s inputs obey the same rule: its Shield held with a run held walks it nowhere', async () => {
+  const { Executor } = await import('../../js/game/ai/cpu-intelligence/executor.js');
+  const ex = new Executor();
+  const h = makeFighter();
+  stepUntil(h.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
+  const x = h.fighter.body.x;
+  for (let i = 0; i < steps(2); i++) {
+    ex.begin(i * DT);
+    ex.shield(h.fighter.body.grounded);
+    ex.dir(i % 40 < 20 ? 1 : -1);
+    const out = ex.finish(h.fighter, STAGE);
+    assert.ok(out.shield && (out.runLeft || out.runRight), 'its snapshot holds the Shield and a run');
+    h.step({ ...out });
+    assert.equal(h.fighter.combat.shielding, true);
+    assert.equal(h.fighter.body.vx, 0, `step ${i}: no speed`);
+    assert.equal(h.fighter.body.x, x, `step ${i}: not a unit moved`);
+  }
+  // Let go of the Shield: its run moves it again.
+  ex.begin(steps(2) * DT);
+  ex.dir(1);
+  for (let i = 0; i < 10; i++) h.step({ ...ex.finish(h.fighter, STAGE) });
+  assert.ok(h.fighter.body.x > x + 20, 'moving again');
+});
+
+test('J: CPUs fighting raise their Shields and hold still behind them, then lower them, move and attack again: never stuck', async () => {
+  const { Battle, getMap } = await battleModules();
+  let stints = 0;
+  let shielders = 0;
+  let movers = 0;
+  for (const c of SHIELDED) {
+    const battle = new Battle({
+      canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'watch', seed: 7, difficulty: 'hard',
+      p1Def: c, p2Def: c, p1Sprites: fakeSpritesOf(c), p2Sprites: fakeSpritesOf(c),
+      input: { flush() {}, sample: () => ({}) },
+    });
+    battle.setPhase('fight');
+    const watch = new Map();
+    let n = 0;
+    for (const f of battle.fighters) {
+      const w = { stint: 0, longest: 0, stints: 0, ends: [], acted: -1, movedAfter: false };
+      watch.set(f, w);
+      const update = f.update.bind(f);
+      f.update = (dt, ctx) => {
+        const was = f.combat.shielding;
+        const vx = f.body.vx;
+        const x = f.body.x;
+        update(dt, ctx);
+        if (f.combat.shielding && was) {
+          // Behind the Shield it never speeds up of its own (a block's push
+          // only runs down), whatever its CPU holds.
+          assert.ok(Math.abs(f.body.vx) <= Math.abs(vx) + 1e-9, `#${c.id}: ${vx} → ${f.body.vx} behind its Shield`);
+          if (vx === 0) assert.equal(f.body.x, x, `#${c.id}: still, ${f.controller.out.runLeft || f.controller.out.runRight ? 'a run held' : 'nothing held'}`);
+        }
+        if (f.combat.shielding) {
+          w.stint += dt;
+          w.longest = Math.max(w.longest, w.stint);
+        } else if (was) {
+          w.stints++;
+          w.stint = 0;
+          w.ends.push(n);
+        }
+        // Doing something with its Shield down: a move, a run, a jump, a
+        // Dash, a technique.
+        const running = f.body.grounded && Math.abs(f.body.vx) > 100;
+        if (!f.combat.shielding && (f.combat.attack || f.technique || f.dash || !f.body.grounded || running)) w.acted = n;
+        if (w.ends.length && !f.combat.shielding && running) w.movedAfter = true;
+      };
+    }
+    for (; n < steps(25) && battle.phase === 'fight'; n++) battle.update(DT);
+    for (const w of watch.values()) {
+      stints += w.stints;
+      assert.ok(w.longest < 4, `#${c.id}: never stuck behind its Shield (longest ${w.longest.toFixed(2)} s)`);
+      // Every Shield it lowered with time left to act, it acted after.
+      const last = w.ends.filter((e) => e < n - steps(2)).at(-1);
+      if (last != null) assert.ok(w.acted > last, `#${c.id}: acts again after lowering its Shield`);
+      if (w.stints) {
+        shielders++;
+        if (w.movedAfter) movers++;
+      }
+    }
+  }
+  assert.ok(stints >= SHIELDED.length, `the CPUs really shielded (${stints} times)`);
+  // A CPU holding a spot may fight on from it, but most run again.
+  assert.ok(movers > shielders / 2, `${movers} of the ${shielders} CPUs that shielded ran again after`);
+});
+
+test('L: keyboard, touch and a controller all reach the same Fighter: each holds still behind its Shield, step for step alike', async () => {
+  const { controllerRig } = await import('../helpers/fake-gamepad.mjs');
+  const { PlayerController } = await import('../../js/game/fighters/fighter-controller.js');
+  const { Fighter } = await import('../../js/game/fighters/fighter.js');
+  // Each device's way of holding (or letting go of) Right, Left and Shield.
+  const devices = {
+    keyboard: (rig) => {
+      const key = (code, down) => rig.listeners[down ? 'keydown' : 'keyup'][0]({ code, repeat: false, preventDefault() {} });
+      return { right: (d) => key('KeyD', d), left: (d) => key('KeyA', d), shield: (d) => key('KeyL', d) };
+    },
+    touch: (rig) => ({
+      right: (d) => rig.input.setTouch('runRight', d), left: (d) => rig.input.setTouch('runLeft', d), shield: (d) => rig.input.setTouch('shield', d),
+    }),
+    controller: (rig) => ({
+      right: (d) => rig.stick(d ? 0.9 : 0, 0), left: (d) => rig.stick(d ? -0.9 : 0, 0), shield: (d) => rig.press('l1', d),
+    }),
+  };
+  // Run right, raise the Shield with Right still held, hold, turn to Left,
+  // let go of the Shield with Left held.
+  const script = [
+    [20, { right: true }], [1, { shield: true }], [30, {}], [1, { right: false }], [1, { left: true }], [30, {}], [1, { shield: false }], [15, {}],
+  ];
+  const logs = {};
+  for (const [name, make] of Object.entries(devices)) {
+    const rig = await controllerRig();
+    const hands = make(rig);
+    const fighter = new Fighter({
+      def, sprites: fakeSprites(), stage: STAGE, slot: 0, label: 'P1', controller: new PlayerController(rig.input), spawn: { x: 500, facing: 1 },
+    });
+    const log = [];
+    for (const [n, change] of script) {
+      for (const [k, d] of Object.entries(change)) hands[k](d);
+      for (let i = 0; i < n; i++) {
+        rig.poll();
+        fighter.update(DT, SIM_CTX);
+        log.push([fighter.body.x, fighter.body.vx, fighter.facing, fighter.combat.shielding]);
+      }
+    }
+    logs[name] = log;
+    // Behind the Shield (steps 20 to 82): still, whatever was held.
+    const behind = log.slice(20, 83);
+    assert.ok(behind.every((s) => s[3]), `${name}: the Shield up throughout`);
+    assert.ok(behind.every((s) => s[0] === behind[0][0] && s[1] === 0), `${name}: not a unit moved`);
+    assert.equal(log[19][1], MOVEMENT.maxSpeed, `${name}: ran first`);
+    assert.equal(behind.at(-1)[2], -1, `${name}: turned`);
+    assert.equal(log.at(-1)[1], -MOVEMENT.maxSpeed, `${name}: running left once it is down`);
+  }
+  assert.deepEqual(logs.touch, logs.keyboard, 'touch, as the keyboard');
+  assert.deepEqual(logs.controller, logs.keyboard, 'a controller, as the keyboard');
+});
+
+test('M: the frame rate never changes it: at 30, 60 and 144 fps the Shield stops and holds the fighter on the same fixed steps', async () => {
+  const { Battle, getMap } = await battleModules();
+  // Player 1's inputs by fixed step: a run, the Shield raised at it and
+  // held while the direction swaps, then let go running the other way.
+  const at = (n) => {
+    if (n < 30) return { runRight: true };
+    if (n < 150) return { shield: true, shieldPressed: n === 30, ...((n >> 4) % 2 ? { runLeft: true } : { runRight: true }) };
+    return { runLeft: true };
+  };
+  const paced = (fps) => {
+    let n = 0;
+    const input = { flush() {}, sample: () => at(n++) };
+    const battle = new Battle({
+      canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input,
+    });
+    battle.p2.controller = null;
+    battle.setPhase('fight');
+    const log = [];
+    const update = battle.update.bind(battle);
+    battle.update = (dt) => {
+      update(dt);
+      const f = battle.p1;
+      log.push([f.body.x, f.body.vx, f.facing, f.combat.shielding]);
+    };
+    for (let t = 0; t < 3.5; t += 1 / fps) battle.frame(1 / fps);
+    return log;
+  };
+  const runs = [30, 60, 144].map(paced);
+  const n = 200;
+  for (const log of runs) assert.ok(log.length >= n, `${log.length} steps`);
+  assert.deepEqual(runs[0].slice(0, n), runs[1].slice(0, n), '30 and 60 fps');
+  assert.deepEqual(runs[2].slice(0, n), runs[1].slice(0, n), '144 and 60 fps');
+  const log = runs[1];
+  assert.ok(log[29][1] > 0, 'running');
+  const behind = log.slice(30, 150);
+  assert.ok(behind.every((s) => s[3] && s[1] === 0 && s[0] === log[29][0]), 'stopped on the raise step and held there');
+  assert.ok(log[199][1] < 0, 'running the other way once it is down');
+});
 
 // ---- No Shield in the air --------------------------------------------------------
 
@@ -989,6 +1457,41 @@ test('the Shield\'s drawn waves follow the drift clock, and hold still with redu
   const b = radii(black);
   assert.ok(Math.max(...b) - Math.min(...b) > 0.1 * shieldRadius(def), 'still wavy');
   radii(red).forEach((d, i) => assert.ok(d > b[i]));
+});
+
+test('K: the ring waves at the Arena\'s own pace, a direction held or not: no faster waves, the interior and rim on one wave', async () => {
+  // Shield walking's faster waves are gone, and with them any clock of the
+  // ring's own: what the module offers is the look and its geometry.
+  const fx = await import('../../js/game/rendering/shield-fx.js');
+  assert.deepEqual(Object.keys(fx).sort(), ['SHIELD_SHAPE', 'SHIELD_STYLE', 'drawShield', 'shieldCenter', 'shieldOutline', 'shieldRadius']);
+  const still = makeFighter();
+  const held = makeFighter();
+  still.step(SHIELD);
+  held.step({ ...SHIELD, ...RIGHT });
+  const view = { x: 0, y: 0, scale: 1.2, dpr: 1 };
+  const drawn = (fighter, time, reducedMotion = false) => {
+    const { ctx, calls } = recorder();
+    // As the Arena draws them: the interior, then (over the sprite) the rim.
+    assert.equal(drawShield(ctx, fighter, view, 'interior', time, reducedMotion), true);
+    assert.equal(drawShield(ctx, fighter, view, 'rim', time, reducedMotion), true);
+    return tracedPaths(calls).map((p) => p.pts.flat());
+  };
+  const [cx, cy] = shieldCenter(still.fighter);
+  for (const time of [0, 0.7, 2.5, 9.25]) {
+    for (let i = 0; i < 10; i++) {
+      still.step(HOLD);
+      held.step({ ...HOLD, ...(i % 2 ? LEFT : RIGHT) });
+    }
+    const a = drawn(still.fighter, time);
+    const b = drawn(held.fighter, time);
+    assert.deepEqual(b, a, `${time}: the same waves, whatever is held`);
+    assert.deepEqual(a[1], shieldOutline(cx, cy, shieldRadius(def), time), 'the outline at the Arena\'s own time');
+    assert.deepEqual(a[0], a[1], 'the interior fills exactly the rim\'s shape, drawn apart');
+    assert.deepEqual(drawn(held.fighter, time), b, 'drawn again at that time: the very same, no clock of its own');
+  }
+  // Moving with the Arena's clock, and still with reduced motion, held or not.
+  assert.notDeepEqual(drawn(held.fighter, 1), drawn(held.fighter, 1 + DT));
+  assert.deepEqual(drawn(held.fighter, 5, true), drawn(still.fighter, 0, true));
 });
 
 test('no gameplay code reads the Shield\'s look: only the Arena\'s renderer imports it', () => {

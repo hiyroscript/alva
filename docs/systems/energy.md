@@ -28,7 +28,7 @@ The same for every fighter, written once in `combat-state.js`:
 | A Deflect | 15, once, as it starts, whatever it meets | `DEFLECT_ENERGY_COST` (`deflectCost`) |
 | A hit the Shield blocks, a perfect block included | 15, per block | `BLOCK_ENERGY_COST` (`shieldHitCost`) |
 | Combat Assist's approach | 0, ever | — |
-| Running, Shield walking, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 | — |
+| Running, holding the Shield up, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 | — |
 
 The Dash was 25 until the combat-feel overhaul ([UPDATES.md](../../UPDATES.md#combat-feel-overhaul-and-shield-walking)):
 at 20 a Dash fits beside the blocks and Deflects a fight also pays for

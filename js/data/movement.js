@@ -97,12 +97,6 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   // How long an attack press the fighter cannot act on yet is kept.
   attackBuffer: 0.15,
 
-  // ---- The Shield ---------------------------------------------------------------
-  // Shield walking: a direction held behind a raised Shield walks the
-  // fighter at this speed (about a third of the run), with the run's own
-  // acceleration and braking; never in blockstun.
-  shieldWalkSpeed: 130,
-
   // ---- Stunned ------------------------------------------------------------------
   // How a launch or push runs down while stunned, whatever is held: the
   // rates Launch Point is tuned against (js/data/launch.js).
@@ -159,11 +153,6 @@ export const MOVEMENT_GUIDE = Object.freeze([
     description: 'Two more jumps in mid-air. Landing or being hit gives them back.',
   }),
   Object.freeze({ id: 'fastFall', name: 'Fast fall', description: 'Hold Down while falling to drop faster.' }),
-  Object.freeze({
-    id: 'shieldWalk',
-    name: 'Shield walk',
-    description: 'Hold a direction behind the Shield to walk slowly while guarding. Jump straight out of it when not blocking.',
-  }),
   Object.freeze({
     id: 'dash',
     name: 'Dash',

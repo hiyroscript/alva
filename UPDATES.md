@@ -2671,6 +2671,11 @@ registry runs them).
 
 ## Combat feel overhaul and shield walking
 
+> **Shield walking is superseded**: removed for good in
+> [Shield walking removed](#shield-walking-removed), where a raised ground
+> Shield holds its fighter still. What follows records the walk as it was
+> when it was added.
+
 Not a named update (it can become one if the owner names it). Asked for in
 `max`: make fighting feel responsive, fluid and continuous (attacks that
 no longer plant the fighter, momentum kept through every legal change of
@@ -3141,4 +3146,97 @@ feet are on it (`cpu-intelligence`). Checked in headless Chromium: every
 move in Practice Ground (beam, gale and freeze, wave, tornado, the Triple
 Strike on the ground and in the air), the ability tiles and the phone
 layout's touch buttons showing each sister's art; no page errors. Not yet
+played by hand.
+
+## Shield walking removed
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: remove Shield walking for good, for every fighter, every device and
+the CPU, so that raising the ground Shield plants the fighter until it is
+lowered (the stationary guard asked of Warriors of the Universe), without
+touching anything else about the Shield, combat, movement or physics. It
+undoes the walk added in [Combat feel overhaul and shield
+walking](#combat-feel-overhaul-and-shield-walking). `character_rule` was
+not touched.
+
+**What it removed.**
+
+- **The walk** (`js/game/fighters/fighter.js`): the Shield's movement
+  branch no longer steers toward a share of top speed; a raised Shield
+  steers with no direction (`moveHorizontal(0, …)`), whatever is held.
+  `Fighter.shieldWalking` is gone, with its resets and the jump's.
+- **Its value** (`js/data/movement.js`): `shieldWalkSpeed` (130) and its
+  section, so `MOVEMENT_FIELDS` and the registry's refusals no longer know
+  it; nothing replaces it (no zero, no other speed).
+- **Its look** (`js/game/rendering/shield-fx.js`): `SHIELD_WALK_WAVE_RATE`,
+  `shieldWaveTime` and its per-fighter `WeakMap`. The ring waves on the
+  Arena's effects clock as it did before the walk, its interior and rim on
+  the same waves, still with reduced motion.
+- **Its copy**: Discover's Shield walk card (`MOVEMENT_GUIDE`'s
+  `shieldWalk`) and its French (`movement.shieldWalk.name` /
+  `.description`).
+
+**What it changed.**
+
+- **The raise plants the fighter.** The step the Shield goes up, the
+  fighter's own sideways speed stops (a run, a Dash's burst, an attack's
+  slide): no slide behind it. Its own means the fighter was free on its
+  last step and nothing has hit it or drawn it in since (`ownSpeed` in
+  `Fighter.update`); speed an outside force gave it (a pull's drag, a
+  launch's or a stun's slide) runs down behind the Shield instead, as a
+  block's push does. Without that distinction a Shield raised while a
+  pull drags its fighter stopped dead, and a perfect Shield against
+  #0001's Maximum Blue came too late (`shield-protection` caught it). A
+  Shield press that raises nothing (a stun, exhaustion, no art, a Dash,
+  the air) stops nothing.
+- **Kept as it was**: a block's push (`blockPush`, set after the Shield is
+  up) shoves it and runs down under the normal deceleration, pushboxes
+  still part fighters, a moving platform carries it (its carry is not
+  velocity), turning behind it, the jump out of it (now straight up, with
+  only what is left of a push), the jump buffer through blockstun, the
+  perfect Shield, its Energy costs, blockstun, hitstop, the stall, every
+  pose and the aerial Deflect. The CPU needed no change: it never held a
+  direction behind its Shield.
+- **Copy**: How to Play's Shield and the controller's Shield line now say
+  that a raised Shield holds you in place (release it to move, or jump out
+  of it); English and French.
+- **Documents**: the specification (universal movement, momentum, the
+  Shield, its look, the Energy table, the controls), defense, movement
+  (its Shield section is now "The Shield holds still", and the Shield is
+  named as the one deliberate stop among the momentum rules), Energy,
+  input and testing.
+
+**Where to tune it.** Nowhere, on purpose: there is no Shield movement
+value. The push a blow gives a Shield is its `blockPush`; how fast that
+runs down is the universal `deceleration`.
+
+**Code:** `js/game/fighters/fighter.js`, `js/game/fighters/movement.js`
+(a comment), `js/data/movement.js`, `js/game/rendering/shield-fx.js`,
+`js/game/arena.js` (a comment), `js/localization/strings/en.js` and
+`fr.js`, and the documents above.
+
+**Tests:** `defense` replaces the walk's tests with A to M: the Shield
+raised standing (seconds of Left, Right and both, turning only), raised at
+a run (stopped on that step, either way, a Dash's burst too), presses that
+raise nothing stopping nothing, a pull's drag running down, directions
+mashed, let go into a run from rest, the jump out of it and the air after
+it, blockstun with a jump pressed early and within the buffer, a block's
+push alike with a direction held either way, a moving cloud carrying it,
+every playable fighter (#0006's ensemble drawn still round it), the CPU's
+own inputs and six seeded CPU fights (never stuck, acting again after
+every Shield), the keyboard, touch and a controller step for step alike,
+30, 60 and 144 fps alike, and the ring (no faster waves, no clock of its
+own, interior and rim on one wave). Against the old code 19 of them fail.
+`momentum` now names the Shield the one deliberate stop (its overspeed
+check no longer runs a Shield); `discover` and `i18n` read the new copy
+and the card's absence. `jokull`'s full matches check five seeded matches
+instead of three: with the CPUs' paths moved by this change, none of the
+three broke the ice, though over twelve other seeds as much ice broke
+before and after (7 sections each). Checked in headless Chromium too: in
+Practice Ground, run, raise the Shield with the run still held, hold
+Right then Left, let go, with the keyboard (L, D, A, then Space out of
+it), a stubbed DualSense (L1, the left stick) and real touches on a
+phone-sized page (the stick and the Shield button): the run stopped on
+the raise, not a unit moved in two seconds, the fighter turned, it ran
+again once the Shield was down, the ring drawn; no page errors. Not yet
 played by hand.

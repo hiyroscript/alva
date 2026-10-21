@@ -20,10 +20,12 @@
 // step; it calls these. Values are read on every call, never cached.
 //
 // Momentum is state worth keeping: nothing here zeroes, clamps or replaces
-// a velocity because the fighter changed what it is doing. Speed above top
-// speed bleeds off at a rate (overspeed), never at once; a jump, an air
-// jump, an attack's start (all of its speed, unless the attack's own data
-// keeps less) and a landing keep the sideways speed they find.
+// a velocity because the fighter changed what it is doing (the one stop a
+// player chooses, the ground Shield going up, is the Fighter's: see the
+// Shield in Fighter.update). Speed above top speed bleeds off at a rate
+// (overspeed), never at once; a jump, an air jump, an attack's start (all
+// of its speed, unless the attack's own data keeps less) and a landing
+// keep the sideways speed they find.
 
 import { approach, sign } from '../../core/utils.js';
 

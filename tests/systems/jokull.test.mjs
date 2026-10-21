@@ -840,7 +840,13 @@ test('overtime closes the Void round the glacier with both wings or neither: the
 test('Quick Battle and Watch Mode play full matches on Jökull: the CPUs fight on the wings while they last, the ice breaks, nobody stands on missing ice', () => {
   let contacts = 0;
   let broken = 0;
-  for (const [mode, seed, difficulty] of [['watch', 4, 'medium'], ['watch', 9, 'brutal'], ['quick-battle', 21, 'hard']]) {
+  // Five seeded matches: where a fight goes is chaotic (any change to how
+  // fighters move sends it elsewhere), and a match or two may never stay on
+  // a wing long enough to break it.
+  const matches = [
+    ['watch', 4, 'medium'], ['watch', 9, 'brutal'], ['quick-battle', 21, 'hard'], ['watch', 2, 'medium'], ['watch', 10, 'brutal'],
+  ];
+  for (const [mode, seed, difficulty] of matches) {
     const battle = battleOn({ mode, seed, difficulty });
     if (mode === 'quick-battle') battle.p1.controller = null;
     battle.setPhase('fight');

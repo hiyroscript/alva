@@ -35,7 +35,7 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | Down (fast fall in the air; steer a launch down; a fresh press on a one-way platform drops through it) | `down` | S or ↓ | Left stick down | both layouts: the small **Down** button at the far left of the lower-left cluster |
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
-| Shield (on the ground, held: a direction held with it walks behind it, Jump jumps out of it) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
+| Shield (on the ground, held: it holds the fighter still, a direction held with it only turns it, Jump jumps out of it) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | the fighter's own layout (see below) | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Options / Menu | the timer / pause or More button |
 

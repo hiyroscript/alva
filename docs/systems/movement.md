@@ -47,8 +47,8 @@ advances; the Shield goes up or down (on the ground only); then
 horizontal movement is chosen, in priority: standing still (a summon's
 startup, a technique's cast, a paralysis), the hitstun drift, the Dash's
 or the air dash's speed (an air dash also holds the fall off), Combat
-Assist's approach, the Shield walk (a stand in blockstun), an attack's own
-motion, an attack's steering, or normal steering.
+Assist's approach, the Shield's stand (no steering at all), an attack's
+own motion, an attack's steering, or normal steering.
 Then the jump (buffered, with coyote time), the air jump, the higher
 jump's lift and the fast fall; then the body is integrated and collided;
 then launch rebounds, landing resets (air jumps, air dashes, per-airtime
@@ -92,7 +92,6 @@ plays every pairing at 30, 60 and 144 fps and compares every step).
 | `airDashSpeed` / `airDashDuration` / `airDashUses` | 1250 / 1/6 / 1 | The air dash, once per airtime; landing or a hit gives it back. |
 | `dashRepeat` | 0.4 | A Dash (or, on its own timer, an air dash) may start again this long after the last one started. |
 | `attackBuffer` | 0.15 | How long an attack press (and a Dash request) the fighter cannot act on yet is kept. |
-| `shieldWalkSpeed` | 130 | Shield walking: a direction held behind a raised Shield walks the fighter at this speed (about a third of the run), with the run's acceleration and braking. |
 | `hitstunFriction` / `hitstunAirDrag` | 1600 / 210 | How a launch or push runs down while stunned, whatever is held: the rates Launch Point is tuned against. |
 | `dropThroughTime` | 0.28 | How long a platform drop (a fresh Down press on a one-way platform, or the training CPU's own drop) ignores that platform. |
 
@@ -131,6 +130,11 @@ away:
   ground's rules carry on from it.
 - **The impact freeze.** Hitstop freezes the body, never its velocity:
   after it, exactly the same speed.
+- **The Shield.** The one stop a player chooses: raising the ground Shield
+  ends the fighter's own sideways speed on that step (a run, a Dash's
+  burst, an attack's slide), never a slide behind it; speed an outside
+  force gave it (a pull's drag, a stun's slide) runs down instead
+  ([below](#the-shield-holds-still)).
 - **Overspeed.** Top speed is what locomotion builds toward, not a cap.
   Above it the excess bleeds off at a rate, never at once: on the ground
   gently while the fighter holds the way it moves
@@ -323,18 +327,28 @@ CPU asks for the same drop with its own `dropPressed`; Quick Battle's
 combat AI never presses Down on the ground (it plans no drop and walks off
 an edge instead).
 
-## Shield walking
+## The Shield holds still
 
-Behind a raised Shield a held direction walks the fighter at the universal
-`shieldWalkSpeed` (130 units/s, about a third of the run), with the run's
-own acceleration and braking (`steer` toward that share of top speed), and
-turns it as ever: a run the Shield is raised in eases down to the walk,
-never at once. In blockstun it stands, the block's push running down under
-the normal deceleration. Jump jumps straight out of a raised Shield (never
-out of blockstun: the press waits in the jump buffer), carrying the walk's
-speed. No running and no Dash behind it. The rules are the Shield's
-([defense](defense.md)); the walk has no pose of its own, and the
-Shield's ring waves faster instead.
+A raised Shield plants its fighter: there is no walking behind it, and no
+movement value for it. The step the Shield goes up, the fighter's own
+sideways speed (a run, a Dash's burst, an attack's slide) stops at once.
+Its own means it was free on its last step and nothing has hit it or
+drawn it in since (`ownSpeed` in `Fighter.update`); speed an outside
+force gave it (a pull's drag, a stun's slide) runs down behind the Shield
+instead, as a block's push does. A Shield press that raises nothing (a
+stun, exhaustion, no art, a Dash, the air) stops nothing.
+
+While it is up the held direction is ignored for movement (it still turns
+the fighter), on every device and for the CPU alike: the body steers with
+nothing held (`steer` with no direction), so a block's push (`blockPush`,
+set after the Shield is up) shoves it and runs down under the normal
+deceleration, and a moving platform carries it as it carries anyone (its
+carry is not velocity). No running and no Dash behind it. Jump jumps
+straight out of a raised Shield (never out of blockstun: the press waits
+in the jump buffer), with whatever push is still running and nothing
+else; the ordinary air control takes over from there. Let go of the
+Shield and the held direction runs as ever, from rest. The rules are the
+Shield's ([defense](defense.md)).
 
 ## Repeat cooldowns
 

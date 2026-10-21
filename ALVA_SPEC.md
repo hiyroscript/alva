@@ -2047,7 +2047,7 @@ each fighter's own values are in its character specification (7.2.9).
   air acceleration, drag and turning, jump speed and higher jump, air jumps
   (count and strength), gravity, fall speed, fast fall, coyote time, jump
   and combat input buffers, Dash speed, length, input window and repeat
-  delay, air dash speed, length and uses, and the Shield walk's speed: one
+  delay, and air dash speed, length and uses: one
   frozen set of values
   (`BASE_FIGHTER_MOVEMENT`, `js/data/movement.js`; docs/systems/movement.md
   lists them) that the Fighter reads for everyone. No fighter definition
@@ -2094,7 +2094,9 @@ each fighter's own values are in its character specification (7.2.9).
     the impact freeze holds a velocity without losing it. Only real forces
     change momentum: a hit, a launch, a carry, a pull, a rebound, a wall, a
     move whose own mechanic redirects the body (a motion, a step-in, a
-    technique's or summon's planted cast, a paralysis), the Void.
+    technique's or summon's planted cast, a paralysis), the Void; and the
+    one stop a player chooses, the ground Shield going up, which ends the
+    fighter's own sideways speed on that step (7.2.5).
   - *Jump.* Its strength is the universal `jumpVelocity` (920 units/s,
     about 170 units high); it is buffered (`jumpBuffer`) and has coyote time
     (`coyoteTime`). Takeoff is on the press step, and the jump only sets
@@ -3039,9 +3041,10 @@ nothing in them names a fighter, an attack or an animation.
   attack pressed meanwhile is buffered and comes out the step the Shield
   is let go, if that is soon enough; a summon or technique pressed
   meanwhile is not kept). **Jump out of Shield:** a jump press drops the
-  Shield and jumps on that very step, carrying the walk's speed, unless a
-  block holds it up (blockstun): then the press waits in the jump buffer
-  and jumps the first step the stun is over, if that is soon enough. On
+  Shield and jumps on that very step, straight up from where the Shield
+  planted it (ordinary air control from there), unless a block holds it
+  up (blockstun): then the press waits in the jump buffer and jumps the
+  first step the stun is over, if that is soon enough. On
   the ground it shows its
   optional `groundStartAnimation` for one pass as it goes up, then
   `groundAnimation` (#0001's `shielding`) for as long as it is held;
@@ -3050,18 +3053,26 @@ nothing in them names a fighter, an attack or an animation.
   takes over (visual only: movement resumes at once). Neither #0001,
   #0002 nor #0004 has a raise or lower pose; #0003 has both (`prepshield`,
   `releaseshield`, a frame each), and so has #0005 (two frames each).
-  **Shield walking:** while it is up a direction held walks the fighter
-  slowly behind it, at the universal `shieldWalkSpeed` (130 units/s, about
-  a third of the run) with the run's acceleration and braking (a run it
-  was raised in eases down to the walk, never at once), and turns it, as
-  ever (the Shield guards every side, so a turn costs nothing); no
-  running and no Dash. It has no pose of its own: the held Shield pose
-  stays, and the Shield's waving ring runs `SHIELD_WALK_WAVE_RATE` (4)
-  times faster while it walks (below). In blockstun it stands: the
-  block's push slows under the normal deceleration, whatever is held.
-  Walking costs no Energy. Walked off a ledge, the Shield drops as the
-  fighter leaves the ground. Held through a jump, nothing is up in the
-  air; it rises as the fighter lands, with its raise pose. A missing held clip refuses the Shield
+  **The Shield holds still:** holding Shield on the ground blocks
+  incoming attacks and prevents movement. The step it goes up, the
+  fighter's own sideways speed (a run, a Dash's burst, an attack's slide)
+  stops at once, never sliding on behind it; speed an outside force gave
+  it (a pull's drag, a stun's slide: anything since a pull drew it or
+  while it was stunned) is not its own and runs down instead, as a
+  block's push does. A Shield press that does not raise it (a stun,
+  exhaustion, no art, a Dash, the air) stops nothing. While it is up no direction held walks or runs the fighter,
+  on any device or for the CPU, and there is no Dash; the direction held
+  still turns it (the Shield guards every side, so a turn costs nothing,
+  moves nothing and never drops it). There is no walking behind it and
+  no movement value for it. What other mechanics do to the body stays: a
+  block's push (`blockPush`) shoves it and slows under the normal
+  deceleration, whatever is held, pushboxes still part fighters, a moving
+  platform carries it, and gravity, ledges and hazards are as ever.
+  Release Shield to move again (from rest, the run's acceleration as
+  ever), or Jump to leave it when allowed (above). Pushed off a ledge,
+  the Shield drops as the fighter leaves the ground. Held through a jump,
+  nothing is up in the air; it rises as the fighter lands, with its raise
+  pose. A missing held clip refuses the Shield
   (logged once per clip); missing raise or lower poses are simply skipped.
 - **Blocking.** The Shield is a full circle: while it is up, every hit
   that reaches the fighter's own hurtboxes (the same `CombatSystem`
@@ -3178,10 +3189,8 @@ nothing in them names a fighter, an attack or an animation.
   whole-number sine waves round the circle (so it always closes and its
   mean radius never changes: it wavers like the Void's edge, never pulses)
   drifting slowly on the Arena's effects clock, traced at 96 points so the
-  curve stays smooth; while its fighter walks behind it the waves drift
-  `SHIELD_WALK_WAVE_RATE` (4) times as fast, each fighter's ring keeping
-  the lead it gains so slowing again never makes the waves jump
-  (`shieldWaveTime`); with reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
+  curve stays smooth, the interior and the rim on the same waves; with
+  reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
   the Void, name tags and status, and never used by collision. The debug
   overlay labels a shielding fighter `shield`; its hurtboxes are drawn as
   usual.
@@ -3196,7 +3205,7 @@ nothing in them names a fighter, an attack or an animation.
   | A Deflect (`DEFLECT_ENERGY_COST`) | 15, as it starts, hit or whiff |
   | A blocked hit, a perfect block's included (`BLOCK_ENERGY_COST`) | 15, per block |
   | Combat Assist's approach | 0, ever |
-  | Running, Shield walking, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 |
+  | Running, holding the Shield up, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 |
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
@@ -4177,7 +4186,7 @@ Adding one is described in
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, as a hit lands, steering the launch downward, and pressed on a one-way platform, a drop through it), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
-  extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground, a direction held with it walks behind it and Jump jumps out of it; a fresh press in the air is the Deflect), U
+  extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground, it holds the fighter still, a direction held with it only turning it, and Jump jumps out of it; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
   fighter acts only on the ones it has a button for, 7.2), Esc/P pause

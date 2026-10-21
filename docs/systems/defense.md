@@ -60,25 +60,20 @@ value.
 - It takes the step: while it is held no attack, summon, technique or
   Dash starts (an attack pressed meanwhile is buffered for the release; a
   summon or technique is not kept). **Jump jumps out of it**: a jump press
-  drops the Shield and jumps on that very step, carrying the walk's speed,
-  unless a block holds it up (blockstun): then the press waits in the jump
-  buffer and jumps the step the stun is over, if that is soon enough.
-- **Shield walking**: a held direction walks the fighter slowly behind it,
-  at the universal `shieldWalkSpeed` (130 units/s, about a third of the
-  run; [movement](movement.md#shield-walking)), with the run's
-  acceleration and braking, and turns it (the circle guards every side,
-  so a turn costs nothing). No running and no Dash. In blockstun it
-  stands, the block's push running down under the normal deceleration,
-  whatever is held. Walking costs no Energy. Leaving the ground (a block's
-  push or a walk off a ledge) drops it.
-- The walk has no pose of its own: the held Shield pose stays, and the
-  Shield's waving ring drifts `SHIELD_WALK_WAVE_RATE` (4) times as fast
-  while the fighter walks (`shieldWaveTime` in
-  [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js):
-  each fighter's ring keeps the lead it gains, so slowing again never
-  makes its waves jump; with reduced motion it holds still, as ever). The
-  Fighter only says whether it walks (`Fighter.shieldWalking`); the look
-  stays the renderer's.
+  drops the Shield and jumps on that very step, straight up from where the
+  Shield planted it, unless a block holds it up (blockstun): then the
+  press waits in the jump buffer and jumps the step the stun is over, if
+  that is soon enough. Air control is the ordinary air's from there.
+- **It plants the fighter** ([movement](movement.md#the-shield-holds-still)):
+  the step it goes up, the fighter's own sideways speed (a run, a Dash's
+  burst, an attack's slide) stops (speed an outside force gave it, a
+  pull's drag or a stun's slide, runs down instead), and while it is up
+  no held direction walks or runs it, on any device or for the CPU. The held
+  direction still turns it (the circle guards every side, so a turn costs
+  nothing). Speed it is given behind it, a block's push
+  (`blockPush`), shoves it and runs down under the normal deceleration;
+  a moving platform still carries it. Let go of the Shield to move again.
+  Leaving the ground (a block's push off a ledge) drops it.
 - It is a full circle: every hit that reaches the fighter's own
   hurtboxes, from any side, is blocked (never a bigger circle: the drawn
   ring is art only), whatever made it: a melee strike, each strike of a
@@ -187,9 +182,11 @@ or `groundOnly`.
   the shared input and the Shield, run with #0001's `defense` (its art,
   poses, costs and perfect Shield; no Shield in the air for #0001 or
   #0002, and the refused air fields) and fixtures for raise and
-  lower poses, Shield walking (its speed for every fighter, its held pose,
-  the ring's faster waves, no walk or jump in blockstun) and the jump out
-  of it, plus the rule that only the Arena draws the Shield's look.
+  lower poses, the Shield holding its fighter still (raised standing or
+  at a run, either direction, any device, for every fighter and the CPU,
+  in blockstun, under a block's push and on a moving platform, at any frame
+  rate), moving again once it is let go, and the jump out of it, plus the
+  ring's look and the rule that only the Arena draws it.
 - [`tests/systems/deflect.test.mjs`](../../tests/systems/deflect.test.mjs):
   the Deflect for both fighters: the press, its length, the 3 / Base
   Launch 2 rule, its 15 Energy, that it is no Shield, the projectiles it turns back (only

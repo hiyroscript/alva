@@ -488,7 +488,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(discover.el.querySelector('.screen-title').textContent, 'Découvrir');
     const tierNames = discover.el.querySelectorAll('.discover-tier-name').map((n) => n.textContent);
     const movementNames = discover.el.querySelectorAll('strong').map((n) => n.textContent);
-    assert.deepEqual(movementNames, ['Course', 'Saut', 'Triple saut', 'Chute rapide', 'Marche sous Bouclier', 'Sprint', 'Sprint aérien']);
+    assert.deepEqual(movementNames, ['Course', 'Saut', 'Triple saut', 'Chute rapide', 'Sprint', 'Sprint aérien']);
     assert.ok(tierNames.includes('Éjection de base 2'));
     assert.ok(discover.el.querySelectorAll('.discover-formula')[0].textContent.startsWith('Force d’éjection'));
     // The HUD's spoken labels.
