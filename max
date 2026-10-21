@@ -1,508 +1,538 @@
-ALVA — Implement Character #0006: A True 3-in-1 Synchronized Fighter
+ALVA — Completely Remove Shield Walking and Make Ground Shield Stationary
 
-Task
+Objective
 
-Inspect the entire Alva repository and implement a new character, #0006, using the sprite sheet attached to this conversation.
+Implement a complete removal of the Shield Walking mechanic in the Alva fighting game.
 
-Character #0006 is fundamentally different from the existing roster. It is THREE characters functioning together as ONE playable fighter.
+Desired behavior: Match the stationary guarding behavior requested from Warriors of the Universe. When a fighter raises their Shield, they must be unable to walk or voluntarily move horizontally until they lower it.
 
-This is not a character that summons two companions. It is not a character that switches between three forms. It is not three independently controlled fighters.
+This must be a permanent, universal gameplay change for every playable fighter, every control method, and the CPU.
 
-The player controls all three simultaneously, using exactly one controller, one movement system, one shared combat state, one Launch Point, and one shared defensive hitbox.
+Do not merely reduce the Shield’s movement speed or hide its animation. Remove the underlying feature, its configuration, its dedicated state, its visual enhancements, and its active documentation.
 
-All three must be visibly present in the arena together throughout gameplay.
+Preserve all unrelated Shield, combat, movement, and physics systems.
 
-This request focuses on defining and implementing the synchronized three-in-one character system. Do not invent, enumerate, or describe individual attacks. Their specific designs can be established separately.
+1. Understand the Existing Architecture
 
-⸻
+Repository: hiyroscript/alva
 
-1. The fundamental concept: THREE bodies, ONE fighter
+Before modifying anything, inspect the actual implementations and their interactions.
 
-Think of #0006 as a single fighter whose visual body consists of three individual characters.
+Important files:
 
-The three individuals must each have their own appearance, animation frames, relative position, and capacity to participate in attacks.
+* js/game/fighters/fighter.js — Main Fighter update loop, Shield state transitions, movement priorities, jumping, facing and animation.
+* js/game/fighters/movement.js — Universal steering, braking, acceleration and momentum.
+* js/data/movement.js — Universal movement configuration and Discover movement guide.
+* js/game/combat/defense.js — Ground Shield definition.
+* js/game/combat/combat-state.js — Shield state, blockstun and Energy.
+* js/game/combat/combat.js — Hit handling and blockPush.
+* js/game/physics.js — Physics integration, collisions, pushboxes and moving platforms.
+* js/game/rendering/shield-fx.js — Shield visual effects.
+* js/game/ai/cpu-intelligence/ — CPU defending, movement planning and input execution.
+* tests/systems/defense.test.mjs — Current Shield Walking and defense tests.
 
-However, gameplay must recognize them collectively as exactly one fighter.
+Read CLAUDE.md, ALVA_SPEC.md, and the relevant system documentation before editing.
 
-The correct conceptual structure is:
+Follow the existing modular architecture, fixed-step simulation, and universal character-system rules.
 
-* ONE selectable character: #0006.
-* ONE player or CPU controller.
-* ONE logical Fighter instance.
-* ONE shared position and movement state.
-* ONE shared Launch Point.
-* ONE defensive hurtbox and collision body.
-* ONE shared Energy system.
-* ONE shared combat state, including stun, cooldowns, attack commitment, and hitstop.
-* THREE independently rendered sprites that belong to that same fighter.
-* THREE coordinated animation tracks controlled by the same gameplay state.
+Do not change character_rule.
 
-Do not create three separate Fighter instances.
+2. New Ground Shield Behavior
 
-Do not give each individual their own health, Launch Point, physics body, collision box, or autonomous decision-making.
+A. Completely stationary voluntary movement
 
-The player must never need to manually select which individual they are controlling.
+While combat.shielding === true:
 
-All three are always controlled as one unit.
+* Holding Left must not walk the fighter left.
+* Holding Right must not walk the fighter right.
+* Holding a joystick in any horizontal direction must not cause walking.
+* Holding a direction before raising the Shield must not bypass this restriction.
+* Pressing movement inputs repeatedly must not produce creeping or positional drift.
+* Direction changes must not introduce acceleration or walking.
+* A fighter must remain stationary on static ground unless another legitimate game mechanic physically moves them.
 
-2. Permanent presence
+This must apply equally to keyboard, touch controls, game controllers, and CPU-controlled fighters.
 
-All three individuals must remain present together for the entire duration that #0006 is in play.
+There must be no special combination of inputs that allows normal locomotion while the Shield is up.
 
-This is non-negotiable.
+B. Immediately stop when raising the Shield
 
-When #0006 spawns, all three appear.
+Currently, a fighter can raise the Shield during a run and gradually decelerate to the Shield Walking speed.
 
-When #0006 stands idle, all three remain visible.
+Remove this behavior.
 
-When #0006 moves, all three move.
+New behavior:
 
-When #0006 attacks, all three remain present, even when only one performs the attack.
+1. The fighter runs normally.
+2. The fighter successfully raises their ground Shield.
+3. Their existing voluntary horizontal running momentum stops immediately on that simulation step.
+4. The Shield remains raised.
+5. Continued directional input does not move the fighter.
 
-When #0006 gets hurt, all three react.
+Do not allow the fighter to slide forward from their previous run just because the Shield has activated.
 
-When #0006 is launched, all three are launched together.
+Apply the stop only when the Shield actually becomes active. A Shield input rejected due to stun, exhaustion, missing art, an active Dash, or another restriction must not incorrectly cancel the fighter’s momentum.
 
-When #0006 respawns, all three return together.
+C. Preserve externally forced movement
 
-An individual must never disappear simply because another individual is performing an action.
+Stationary guarding means no player-controlled walking, not immunity to physics.
 
-No character switching, temporary despawning, replacing one sprite with another, or summon behavior.
+Do not break:
 
-The three should have recognizable spacing, preserving the impression that they are three distinct individuals standing together.
+* blockPush from attacks that shove a raised Shield.
+* Physical pushbox separation between fighters.
+* Moving platforms carrying a guarding fighter.
+* Stage collision and hazards.
+* Hitstop and blockstun.
+* Normal gravity, falling, and ledge behavior.
+* Existing momentum rules outside the Shield state.
 
-They can change their relative positions and animation poses when necessary, but must remain part of one cohesive formation.
+In particular, CombatSystem.applyHit currently applies blockPush directly to the defender’s horizontal velocity.
 
-3. Synchronized movement
+Do not erase this legitimate forced movement by indiscriminately setting body.vx = 0 on every Shield frame.
 
-Every universal movement action applies to all three at the same time.
+Instead, distinguish between horizontal momentum cleared when voluntarily raising a Shield and horizontal velocity subsequently introduced by an external gameplay effect.
 
-This includes:
+The existing grounded braking behavior may continue reducing forced blockPush momentum.
 
-* Idle and turning.
-* Running and stopping.
-* Jumping, including subsequent air jumps.
-* Falling and fast-falling.
-* Landing.
-* Ground Dash.
-* Air Dash.
-* Hurt and aerial hurt.
-* Hitstun and knockback.
-* Ground shielding.
-* Shield preparation and release.
-* Recovery from launches.
-* Respawning and elimination.
+A blocking character must remain stationary against ordinary directional input but still react correctly when physically shoved.
 
-When the player presses Jump, all three jump simultaneously.
+3. Modify the Fighter Update Loop
 
-When the player runs right, all three run right.
+File: js/game/fighters/fighter.js
 
-When the player changes direction, all three turn with the formation.
+Locate the Shield state-transition logic in Fighter.update, especially:
 
-When the player Dashes, all three Dash in synchronization.
+* wasShielding
+* combat.shielding
+* The combat.shielding horizontal movement branch
+* shieldWalking
+* The movement and jumping priority logic
 
-When the fighter falls off a platform, all three fall together.
+Currently, the shielding branch uses:
 
-They must not jump independently, follow each other with delayed physics, or require different movement inputs.
+this.moveHorizontal(walk, 1, 1, dt, mv.shieldWalkSpeed / mv.maxSpeed);
 
-Their animations can be different because they have different sprite artwork, but their underlying movement states and state transitions must be synchronized.
+Remove that Shield Walking implementation.
 
-For example, during a jump, all three can display their own jump animations while sharing the exact same jump velocity, gravity, and landing event.
+Recommended design:
 
-Do not implement the three individuals as a leader and two followers that must catch up.
+On Shield activation:
 
-Instead, implement one shared physics body with three visual representations positioned relative to it.
+When combat.shielding changes from false to true, eliminate existing voluntary horizontal running momentum so the fighter stops immediately.
 
-The three sprites can have configurable local offsets and formation animations, but those offsets must not create separate gameplay movement.
+While Shield is active:
 
-Respect Alva’s existing universal movement rules. Character #0006 must not override the baseline running, jumping, Dash, or air-dash physics.
+Ignore held horizontal input for locomotion. Use neutral horizontal steering or an equivalent existing grounded braking mechanism to maintain stationary guarding while permitting forced knockback to decay naturally.
 
-4. Formation and positioning
+For example, the Shield movement branch may use neutral steering without any Shield-specific speed:
 
-The three individuals must appear as a coordinated group.
+this.moveHorizontal(0, 1, 1, dt);
 
-Their positions should be derived from the single fighter’s world position, using relative formation offsets.
+However, ensure this works together with the activation-time stop and preserves blockPush.
 
-The formation must support:
+Use the simplest correct implementation consistent with Alva’s existing physics architecture.
 
-* A natural default idle arrangement.
-* Maintaining recognizable separation while running.
-* Synchronized airborne positioning.
-* Formation adjustments for attacks.
-* Members stepping backward while another attacks.
-* Smooth returns to the normal formation.
-* Correct horizontal mirroring when changing facing direction.
+Do not introduce a second movement system, a separate Shield physics controller, or per-character special cases.
 
-They must not overlap permanently into what looks like a single sprite.
+Remove the dedicated Shield Walking state
 
-They must not spread apart into completely independent entities.
+Find and remove the obsolete this.shieldWalking state and its assignments from the Fighter’s initialization, reset, per-frame update, and jump logic.
 
-Use a stable formation anchor so the trio’s movement remains understandable to the player.
+Update all related comments so they describe stationary guarding rather than walking.
 
-Relative positioning is visual coordination, not separate physics.
+Do not replace shieldWalking with another redundant state that serves the same purpose.
 
-Avoid abrupt teleportation between formation arrangements. Position changes should be visually smooth and deterministic.
+4. Fully Remove Shield Walking Configuration
 
-5. Attack coordination — critically important
+File: js/data/movement.js
 
-Although they collectively function as one fighter, all three individuals are capable of performing attacks.
+Delete the obsolete universal movement property:
 
-However, this does NOT mean they all automatically attack whenever the player presses an attack button.
+shieldWalkSpeed: 130
 
-Standard single-member attacks
+Remove its dedicated comments and description.
 
-For an attack assigned to one individual:
+Because MOVEMENT_FIELDS is derived from BASE_FIGHTER_MOVEMENT, verify that removing the property also removes it from the universal movement-field registry.
 
-1. The designated individual performs the attack animation.
-2. The other two do not perform that attack.
-3. The other two move backward relative to the direction the formation is facing, creating space for the attacking individual.
-4. Both non-attacking individuals remain visible and synchronized with the group.
-5. After the attack, the three smoothly return to their normal arrangement.
+Do not replace it with:
 
-The non-attacking members are not idle summons, and they are not acting independently. Their backward movement is a coordinated part of the group’s animation.
+* shieldWalkSpeed: 0
+* A new guardMoveSpeed
+* A hidden multiplier
+* A fighter-specific Shield speed
+* An optional Shield Walking setting
 
-Two-member combination attacks
+Shield Walking must no longer exist as a configurable movement mechanic.
 
-The system must also support an attack that intentionally involves TWO members.
+Keep all normal movement parameters unchanged.
 
-In this case:
+Remove the Discover entry
 
-* Both designated members participate in the attack.
-* The third member moves backward and remains present.
-* The two participants coordinate their action as one logical attack.
-* The entire trio remains controlled by the same player and shared combat state.
+In MOVEMENT_GUIDE, remove the entire entry with:
 
-Three-member combination attacks
+id: 'shieldWalk'
 
-The system must also support an attack involving ALL THREE members.
+Do not leave an obsolete Shield Walking card describing a removed feature.
 
-In this case:
+The normal Run, Jump, Dash, and Air Dash guide entries must remain.
 
-* All three participate in the same coordinated action.
-* Each individual can have its own animation sequence.
-* All three sequences belong to one logical move.
-* The move follows Alva’s normal combat rules.
+5. Remove Shield Walking Visual Logic
 
-Essential distinction
+File: js/game/rendering/shield-fx.js
 
-One, two, or three members may participate in a move, but every move still belongs to one fighter.
+Alva currently speeds up the Shield’s wavy black-and-red ring when a fighter walks while shielding.
 
-Do not implement attacks as three independently triggered combat actions.
+This is implemented with:
 
-The system should support specifying which members participate in any given attack using reusable, declarative character data.
+* SHIELD_WALK_WAVE_RATE
+* shieldWaveTime
+* waveLeads
+* References to fighter.shieldWalking
 
-Single-member attacks are the normal behavior. Two-member and three-member participation must occur only when explicitly defined.
+Remove the Shield Walking-specific visual acceleration system.
 
-No automatic simultaneous attacking by all three.
+The Shield should keep its existing appearance:
 
-No independent attack cooldowns for individual members.
+* Black translucent interior
+* Black wavy perimeter
+* Thin red outer accent
+* Existing dimensions and positioning
+* Normal continuous wave animation
+* Existing reduced-motion support
 
-No autonomous attacks by non-participating members.
+Without Shield Walking, the ring should animate at its normal rate using the Arena’s existing effects time.
 
-No extra damage simply because multiple sprites are visible.
+Keep the Shield’s interior and rim synchronized, including when they are drawn separately.
 
-A combination attack is one coordinated move, with whatever strike events are explicitly authored for that move.
+Remove unnecessary WeakMap bookkeeping if its only purpose was storing extra wave movement time.
 
-Do not design the individual moves in this task. Implement the participation and coordination system so that later attack definitions can use it.
+Do not remove or redesign the Shield itself.
 
-6. One Launch Point, one hurtbox, one physics body
+Update relevant comments in js/game/arena.js and the Shield renderer.
 
-This is the most important gameplay requirement after synchronization.
+6. Preserve Shield Combat Mechanics
 
-All three share exactly ONE Launch Point.
+The purpose of this task is to remove walking while defending, not to rebalance the Shield.
 
-If an opponent lands a hit on #0006, the damage is applied to the shared fighter, not to a specific individual.
+Preserve:
 
-All three react to that hit together.
+* Holding Shield to guard on the ground.
+* Blocking attacks from every direction.
+* Existing full-circle blocking behavior.
+* Perfect Shield timing and rearm behavior.
+* Blockstun and hitstop.
+* Existing Shield Energy costs.
+* Exhaustion restrictions.
+* Blocking melee attacks, projectiles, techniques, summons and other supported hit sources.
+* Existing guard animation, raising animation and release animation.
+* Existing attack-buffering and action-priority rules.
+* Normal hit detection and hurtboxes.
+* Existing Shield release timing.
+* Existing Shield stall effects and blockPush.
+* The shared Shield button’s aerial Deflect behavior.
 
-There must be:
+Do not change fighter attack data or introduce special behavior for particular character IDs.
 
-* No separate Launch Point for each individual.
-* No individual damage accumulation.
-* No individual deaths or knockouts.
-* No separate hitstun timers.
-* No independent knockback velocities.
-* No ability for the opponent to eliminate only one member.
+All characters must use the same stationary Shield rule.
 
-Use ONE shared defensive hurtbox for the entire trio, positioned around the group’s logical body.
+7. Preserve Jumping Out of Shield
 
-The opponent is fighting character #0006, not three targets.
+Alva currently allows a player to jump directly out of an active ground Shield when not prevented by blockstun.
 
-The formation’s extra visible bodies must not create additional independent vulnerable collision regions.
+Keep that mechanic.
 
-Hitting the shared hurtbox triggers one normal hit event, with one application of damage, Launch Point, hitstun, and launch physics.
+Expected sequence:
 
-Do not triple damage because three characters are shown.
+1. Player raises Shield.
+2. Fighter becomes stationary.
+3. Player holds Left or Right while shielding.
+4. The fighter does not walk.
+5. Player presses Jump.
+6. The Shield immediately drops and the fighter jumps, subject to the existing rules.
+7. Normal airborne movement and steering become available.
 
-Do not let one area attack hit all three separately.
+Because ordinary Shield Walking has been removed, jumping from a stationary guard should no longer inherit Shield Walking momentum.
 
-Do not create three pushboxes or three platform-collision bodies.
+Do not introduce an artificial sideways jump impulse.
 
-The shared hitbox requirement concerns the trio’s defensive collision and vulnerability. Individual moves may still have their normal offensive hitboxes, following Alva’s existing attack definitions.
+Normal air steering after the jump should remain fully functional.
 
-When a member performs a move, its offensive effects must line up with its visible animation and position, without creating an additional vulnerable Fighter entity.
+If the fighter is experiencing legitimate external momentum from blockPush, preserve existing physics rules unless doing so would violate an established combat invariant.
 
-Keep the game’s combat rules consistent.
+Jump presses during blockstun must still obey the current jump buffer.
 
-7. Shared hurt and launch synchronization
+8. Preserve Facing and Direction Changes
 
-When the shared fighter takes a hit:
+Alva’s Shield already protects from both sides, and the Fighter can update its facing while guarding.
 
-All three must respond to that same hit.
+Preserve facing changes if they are part of the existing input rules.
 
-They should enter the appropriate hurt animation on the same simulation step.
+A player may change which direction their fighter faces without physically translating their position.
 
-If the hit launches the fighter, all three travel together under one velocity and one launch calculation.
+Changing facing must never restart movement, alter the Shield’s collision logic, or unintentionally drop guard.
 
-They may use different hurt poses, but they must never become separated into three independently launched bodies.
+Do not confuse turning with walking.
 
-The same applies to:
+9. Update CPU Behavior
 
-* Ground hitstun.
-* Aerial hitstun.
-* Tumbling.
-* Hitstop.
-* Launch rebounds.
-* Being pushed or pulled.
-* Recovery.
-* Falling into the Void.
-* Elimination.
-* Respawning.
+Inspect:
 
-Any gameplay event that normally affects an entire fighter must affect the complete trio.
+* js/game/ai/cpu-intelligence/defense.js
+* js/game/ai/cpu-intelligence/plans.js
+* js/game/ai/cpu-intelligence/executor.js
+* Related CPU movement and liveness logic
 
-8. Shield synchronization
+CPU-controlled fighters must obey exactly the same stationary Shield mechanics as human players.
 
-Ground shielding is a synchronized defensive action.
+A CPU holding Shield must not travel horizontally through ordinary run inputs.
 
-When the player activates the Shield, all three must visibly react to the shielding state.
+Ensure defensive planning still works:
 
-All three should adopt appropriate defensive or guarding animations.
+* Raise Shield when appropriate.
+* Hold position during defense.
+* Release Shield when movement is required.
+* Resume normal movement after releasing it.
+* Jump or use another permitted action when appropriate.
+* Correctly process incoming blockPush.
+* Avoid getting trapped in a plan that assumes shielding permits walking.
 
-They share one Shield state, one protection calculation, one Energy bar, and one hit/block resolution.
+Do not unnecessarily rewrite CPU Intelligence.
 
-Do not give them three independent Shields.
+Only adjust its logic where an actual dependency on Shield Walking exists.
 
-Do not make the opponent break through the Shield by attacking a different visual member.
+10. Update Documentation and Localization
 
-When Shield is released, all three return to their normal shared state.
+Remove Shield Walking as an active game feature from all relevant documentation.
 
-Use Alva’s existing Shield mechanics, including its existing Energy rules, perfect-block behavior, and restrictions.
+Inspect and update:
 
-9. Deflect is different
-
-Deflect must be performed by only ONE designated individual at a time.
-
-This is an intentional exception to the shared-action animation behavior.
-
-When the player uses the aerial Deflect input:
-
-* One designated member performs the Deflect.
-* The other two remain visible.
-* The other two can assume appropriate coordinated non-attacking poses or shift backward.
-* The Deflect uses ONE logical combat action.
-* Only the designated participant visually executes the Deflect.
-* Its hitbox and projectile interaction use Alva’s existing Deflect rules.
-
-Do not automatically make all three Deflect simultaneously.
-
-Do not create three overlapping Deflect hitboxes.
-
-Do not spend Energy three times.
-
-The Deflect still belongs to the complete #0006 fighter, even though only one member visibly performs it.
-
-10. Sprite sheet and animation implementation
-
-Use the image attached to this conversation as the source of character #0006’s sprite artwork.
-
-The sheet contains three distinct visual characters organized into their respective sections:
-
-* The upper pink/red-themed character.
-* The middle blue-themed character.
-* The lower green-themed character.
-
-Treat these as the three permanent members of the fighter.
-
-Extract their existing sprites precisely, preserving their original pixel-art style, colors, silhouettes, and details.
-
-The uploaded image has a solid gray background. Remove the background carefully when extracting sprites so the final frames have proper transparency.
-
-Do not include labels, sheet headings, credits text, or unrelated illustrated creatures in ordinary character frames.
-
-Do not redraw, recolor, smooth, or generate replacement artwork. Preserve the source sprite art.
-
-All three need their own animation handling.
-
-The renderer must support three simultaneously active sprite animations belonging to one Fighter instance.
-
-This is particularly important for attacks because one member may be executing an animation while the other two execute coordinated retreat or standby animations.
-
-For ordinary movement, the three animation tracks should change state together while playing their corresponding individual artwork.
-
-Ensure consistent scaling, anchoring, facing, and pixel-perfect rendering.
-
-If the sheet lacks a necessary animation, identify that limitation rather than fabricating artwork or silently substituting unrelated sprites.
-
-Follow Alva’s existing asset naming contract, using assets/characters/0006/ and the required codenames, including mouvment and midair_mouvment.
-
-You may introduce a reusable per-member sprite structure where necessary, without breaking existing asset discovery or validation.
-
-11. Integration with Alva’s architecture
-
-Before implementing, inspect:
-
-* CLAUDE.md
 * ALVA_SPEC.md
-* character_rule
-* codename_rule
-* docs/characters/adding-characters.md
-* docs/architecture/character-system.md
-* js/data/characters.js
-* js/data/characters/
-* js/game/fighters/fighter.js
-* js/game/rendering/sprite-animator.js
-* js/game/rendering/sprite-normalizer.js
-* js/game/arena.js
-* js/game/combat/
-* js/game/physics.js
+* docs/systems/defense.md
+* docs/systems/movement.md
+* docs/systems/energy.md
+* js/data/movement.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* Any relevant controls, Discover, or gameplay explanations.
 
-Pay particular attention to how a Fighter instance owns its body, combat state, sprite animator, hit detection, and launch response.
+In particular, remove the outdated French localization keys:
 
-Character #0006 must use id: '0006', displayName: '#0006', and roster slot index 5 (the sixth roster slot).
+* movement.shieldWalk.name
+* movement.shieldWalk.description
 
-Preserve the existing character architecture.
+Remove references to Shield Walking speed, walking under the Shield, carrying Shield Walking momentum into a jump, and accelerated shield-wave animation.
 
-Do not rewrite Alva’s core gameplay to accommodate three separate fighters.
+Where relevant, replace the old explanation with:
 
-Instead, introduce the smallest clean, reusable extension needed for a fighter to have multiple coordinated visual members.
+English: “Holding Shield on the ground blocks incoming attacks and prevents movement. Release Shield to move again, or Jump to leave the Shield when allowed.”
 
-Prefer a general-purpose, optional multi-member presentation and action-participation capability, configured through character data.
+French: “Maintenir le Bouclier au sol bloque les attaques et empêche les déplacements. Relâchez le Bouclier pour vous déplacer à nouveau, ou sautez pour quitter la garde lorsque cela est permis.”
 
-Do not special-case the string '0006' in shared engine modules.
+Adapt the wording to existing terminology and UI space.
 
-Existing characters #0001–#0005 must continue behaving exactly as before.
+Keep historical records in UPDATES.md accurate. If they describe the previously introduced Shield Walking feature, mark it as superseded or add a new note describing its removal rather than falsifying historical implementation details.
 
-Do not change universal movement physics, Energy costs, combat damage tiers, Launch Point rules, or input conventions.
+Update all affected current specifications so they describe the new behavior consistently.
 
-Respect the repository’s protected files and its rules about character naming, credits, sprite usage, and controller comfort.
+11. Replace Old Tests and Add Regression Coverage
 
-12. UI, CPU and other game modes
+File: tests/systems/defense.test.mjs
 
-Character #0006 must be treated as ONE selectable character throughout the game.
+Existing tests explicitly expect Shield Walking, including the 130-unit-per-second movement, gradual deceleration from running, carried jump momentum, and accelerated Shield waves.
 
-It should occupy one roster slot and appear once in character selection.
+These expectations must be removed or replaced.
 
-Its portrait or preview should visually represent the trio, rather than accidentally portraying it as one independent fighter.
+Do not simply delete the tests and leave behavior untested.
 
-It must have one player indicator, one Launch Point display, one Energy bar, and one set of cooldown indicators.
+Implement focused automated tests covering:
 
-The camera must track the shared fighter anchor.
+Test A — Shield while standing
 
-The CPU should control the trio through the same single-fighter interface as the human player.
+Raise Shield while stationary.
 
-The CPU must not issue independent movement or attack commands to the three members.
+Hold Left and Right separately for many simulation frames.
 
-Quick Battle, Watch Mode, Practice Ground, touch controls, the controller editor, and other applicable systems should recognize it as one fighter.
+Verify that horizontal velocity and position do not change from voluntary movement.
 
-The formation must render correctly for either player slot and when facing either direction.
+Test B — Shield while running
 
-13. State architecture
+Reach normal maximum running speed.
 
-Maintain a clear distinction between gameplay state and visual-member state.
+Raise Shield while still holding the running direction.
 
-Shared gameplay state: position, velocity, ground contact, movement, facing, Launch Point, Energy, stun, Shield, cooldowns, input, attack state, launch, and elimination.
+Verify the fighter immediately stops on the successful Shield activation step.
 
-Per-member visual state: animation clip, animation frame, local formation offset, visual facing, participation in the currently executing move, and coordinated transitions.
+Verify it remains stationary for subsequent frames.
 
-Per-member state must never secretly introduce separate combat rules.
+Test C — Both directions
 
-There should be one authoritative simulation state, with three visual actors responding to it.
+Try Left, Right, opposite directional inputs and repeated directional changes while shielding.
 
-All transitions must remain deterministic under Alva’s fixed-step simulation.
+Verify that none cause horizontal translation.
 
-Formation movement and animation should not drift out of sync across frame rates.
+Verify permitted facing changes still work.
 
-14. Tests and acceptance requirements
+Test D — Shield release
 
-Add character-specific tests in tests/fighters/0006/ and any necessary tests for a reusable multi-member capability.
+Hold Shield and a direction.
 
-Verify that:
+Confirm the fighter is stationary.
 
-1. Exactly one Fighter instance represents #0006.
-2. Exactly three member sprites are visible while the fighter is in play.
-3. All three move, jump, fall, Dash, and air dash together.
-4. All three react together to being hit and launched.
-5. The trio has exactly one Launch Point and one defensive hurtbox.
-6. A single incoming attack cannot deal damage three times because there are three visible members.
-7. A standard single-member attack animates one participant while the other two move backward.
-8. Explicit two-member and three-member participation works within one logical attack.
-9. The aerial Deflect is visually performed by one member only.
-10. Ground shielding synchronizes all three while preserving one shared Shield.
-11. Formation changes remain stable when facing left or right.
-12. Falling into the Void, being eliminated, and respawning affect the trio as one fighter.
-13. The roster, CPU, HUD, and camera treat #0006 as one character.
-14. Existing fighters are not affected.
-15. The result remains deterministic at different render frame rates.
+Release Shield while continuing to hold that direction.
 
-Run the full test suite with node --test.
+Verify movement resumes normally under existing acceleration rules.
 
-Also verify the final appearance in a browser, since unit tests cannot fully validate pixel-art extraction, sprite anchoring, formation spacing, or animation coordination.
+Test E — Jump out of Shield
 
-15. Completing the integration
+Raise Shield while holding Right.
 
-Follow the repository’s normal fighter-registration process.
+Verify no walking.
 
-Create the character module, assets, documentation, and tests necessary for the new fighter architecture.
+Press Jump.
 
-Update the fighter registry and relevant roster documentation.
+Verify the Shield drops and jumping works.
 
-Respect the existing Discover profile, localization, controller-layout, and credit requirements.
+Verify no artificial Shield Walking momentum is inherited.
 
-Do not modify the protected character_rule file.
+Verify ordinary airborne control remains available.
 
-Do not invent individual attack concepts or assign arbitrary attacks merely to satisfy the registry. Where actual attack content is not yet specified, use the repository’s supported pending/unavailable approach and identify what remains incomplete.
+Test F — Blockstun
 
-Do not mark the fighter as fully playable until it satisfies Alva’s existing playable-character requirements.
+While Shield is raised, block an attack that causes blockstun.
 
-The synchronized three-member system itself must be implemented and tested, not merely described in comments.
+Verify movement inputs do not produce walking during or after blockstun while the Shield remains raised.
 
-Final clarification — what 3-in-1 actually means
+Verify jumping remains restricted and buffered according to existing rules.
 
-The most important thing to understand is the difference between three characters controlled together and three separate characters following one controller.
+Test G — BlockPush
 
-I want the first.
+Use an attack with nonzero blockPush.
 
-There must be three distinct individuals visually present and capable of participating in combat, but the underlying game must fundamentally understand them as one character.
+Verify a raised Shield still blocks the attack.
 
-One input moves all three.
+Verify the defender experiences the expected external displacement and its existing deceleration.
 
-One Jump makes all three jump.
+Verify held directional input does not add Shield Walking velocity.
 
-One Dash makes all three Dash.
+Test H — Moving platforms
 
-One hit hurts all three.
+Place a shielding fighter on a moving platform.
 
-One launch sends all three flying.
+Verify it is carried by the platform.
 
-One Shield protects the shared fighter.
+Verify it cannot walk relative to the platform while guarding.
 
-One Deflect makes one designated member perform the Deflect.
+Ensure the platform system is not broken.
 
-One regular attack involves one member while the others step back.
+Test I — All fighters
 
-One specifically defined combination attack may involve two or three members.
+Verify stationary Shield behavior across every registered playable fighter with a valid ground Shield.
 
-One Launch Point tracks the entire trio.
+Include fighter #0006 and its ensemble rendering/physics behavior.
 
-One defensive hitbox represents the entire trio.
+Do not hardcode different Shield speeds or behavior by fighter.
 
-THREE visible characters. ONE playable fighter. ONE unified gameplay entity.
+Test J — CPU controls
 
-Do not solve this by implementing companions, followers, AI teammates, summons, character switching, or three overlapping Fighter instances.
+Verify CPU Shield actions do not cause walking.
 
-The goal is for #0006 to genuinely feel like the player is controlling three synchronized characters as one unified fighting character.
+Verify CPUs can release Shield, move, attack, and defend without deadlock.
 
-Prioritize getting this fundamental architecture correct before implementing or proposing any specific attack designs.
+Test K — Shield visuals
 
-Also a nice detail would be to make them have a little floating animation when they are idle.
+Verify the normal Shield outline and animation still render.
+
+Verify the removed Shield Walking wave-speed feature is no longer present.
+
+Check interior/rim synchronization and reduced-motion behavior.
+
+Test L — Different input devices
+
+Verify that keyboard, touch and gamepad inputs all produce the same stationary guarding behavior through the shared Fighter system.
+
+Existing universal movement and control bindings must remain functional.
+
+Test M — Frame-rate determinism
+
+Verify that shielding behavior is consistent across Alva’s fixed-step simulation regardless of rendering frame rate.
+
+12. Audit for Remaining Shield Walking References
+
+Search the entire repository for:
+
+* shieldWalk
+* shieldWalking
+* shieldWalkSpeed
+* SHIELD_WALK_WAVE_RATE
+* shieldWaveTime
+* "Shield walking"
+* "shield walk"
+* "Marche sous Bouclier"
+* Any equivalent obsolete wording
+
+Inspect every match.
+
+Remove active implementation, configuration, visual enhancement, localization, and test dependencies associated exclusively with Shield Walking.
+
+Historical changelog mentions may remain if they are clearly historical or superseded.
+
+Do not leave unused exports, dead branches, meaningless constants, outdated tests, or obsolete UI guidance.
+
+13. Verification
+
+Run the focused defense tests first:
+
+node --test tests/systems/defense.test.mjs
+
+Then run related movement, controls, physics, combat and AI tests.
+
+Finally run the complete test suite:
+
+node --test
+
+Fix any regressions caused by the removal.
+
+Do not weaken unrelated tests or change expected combat behavior merely to make the suite pass.
+
+If browser testing is available, manually test a real Battle in Alva using keyboard, touch and gamepad where supported.
+
+Verify that holding the Shield produces the intended stationary guarding feel.
+
+14. Acceptance Criteria
+
+The implementation is complete only when all of these are true:
+
+* Every valid ground Shield is stationary against voluntary horizontal movement.
+* Raising Shield while running stops voluntary horizontal momentum immediately.
+* Directional input cannot walk or creep while shielding.
+* Movement resumes normally after Shield is lowered.
+* Jumping out of Shield still works.
+* Aerial Deflect remains unchanged.
+* BlockPush and moving platforms still work.
+* Perfect Shield, Energy costs, blockstun, defensive hit detection, and Shield animations remain functional.
+* Shield Walking’s movement parameter, Fighter state, visual acceleration system, Discover entry and active localization have been removed.
+* CPUs use the same stationary rules.
+* The product specification and system documentation accurately describe stationary guarding.
+* Tests cover the new behavior and the complete suite passes.
+
+Important: Do not solve this by setting shieldWalkSpeed to zero. The goal is to remove Shield Walking as a mechanic entirely.
+
+Keep the implementation minimal, clean, universal, and consistent with the existing architecture.
+
+15. Final Delivery
+
+After implementing the change, report:
+
+1. The files changed and why.
+2. How the stationary Shield behavior is implemented.
+3. How voluntary movement is distinguished from external blockPush.
+4. Which obsolete Shield Walking components were removed.
+5. Which existing combat and movement mechanics were preserved.
+6. Which tests were added or updated.
+7. The test commands run and their actual results.
+8. Any remaining issues or limitations.
+
+Do not report tests as passed unless they were executed successfully.
+
+Final gameplay goal: In Alva, raising the ground Shield means planting your feet and defending. You cannot walk until you drop the Shield, just as requested from Warriors of the Universe.
