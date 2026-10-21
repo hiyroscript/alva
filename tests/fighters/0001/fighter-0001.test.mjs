@@ -70,7 +70,7 @@ test('#0001 is a real CHARACTERS entry: available, first, in roster slot 01', ()
   assert.equal(DEF.displayName, '#0001');
   assert.equal(DEF.available, true);
   assert.equal(DEF.rosterSlot, 0);
-  assert.deepEqual(playableCharacters().map((c) => c.id), ['0001', '0002', '0003', '0004', '0005']);
+  assert.deepEqual(playableCharacters().map((c) => c.id), ['0001', '0002', '0003', '0004', '0005', '0006']);
 });
 
 test('five numbered attacks, each a button of its own: three ordinary with mid-air versions, two techniques; plus the High Kick', () => {

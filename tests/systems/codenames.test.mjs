@@ -314,12 +314,14 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder (a me
     }
     // A fighter drawn as several members (js/data/ensemble.js): each
     // member's clips, the member's id a child key after the codename and
-    // the frame still last.
+    // the frame still last; a clip plays its own codename's frames, or
+    // those of the move it is a part of (attack4_cast plays attack4_red_*).
     for (const { member, key, clip } of memberClips(c)) {
       for (const url of clip.frames) {
         const m = pattern.exec(url);
-        assert.ok(m, `${member}.${key}: ${url} follows <id>_<codename>_<member>_<frame>.png`);
-        assert.equal(m[1], `${key}_${member}`, `${member}.${key} plays its own ${key} frames`);
+        assert.ok(m && m[1].endsWith(`_${member}`), `${member}.${key}: ${url} follows <id>_<codename>_<member>_<frame>.png`);
+        const codename = m[1].slice(0, -member.length - 1);
+        assert.ok(key === codename || key.startsWith(`${codename}_`), `${member}.${key} plays ${codename} frames`);
       }
     }
     for (const url of characterFramePaths(c)) assert.ok(existsSync(new URL(url.slice(2), ROOT)), `${url} exists`);

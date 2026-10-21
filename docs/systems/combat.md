@@ -66,12 +66,6 @@ definition that breaks one is refused, every problem named):
   a button wired but reserved; a button left out of `actions` does nothing
   for that fighter (its touch button is hidden and the CPU never presses
   it).
-- A fighter whose moves are still to come is not held to them yet:
-  unplayable (`available: false`) and without a single move (no `actions`,
-  `attacks`, `summons`, `techniques` or `projectiles`), its art and body may
-  be in before its moves are designed (#0006). The moment it has a move, or
-  is made playable, every rule above applies; nothing is invented to fill
-  its buttons.
 - A fighter drawn as several members (an `ensemble`,
   [rendering](rendering.md#ensembles)) names on each of its moves (an
   attack, a technique, its Deflect) who performs it, `members`, and each
@@ -89,8 +83,9 @@ definition that breaks one is refused, every problem named):
 
 For example, #0001 has five (attack4 and attack5 techniques), #0002
 three ordinary ones, #0003 four (attack3 and attack4 techniques),
-#0004 five (attack4 and attack5 techniques) and #0005 five (attack4 a
-technique, attack5 a summon)
+#0004 five (attack4 and attack5 techniques), #0005 five (attack4 a
+technique, attack5 a summon) and #0006 five (attack3 to attack5
+techniques)
 ([character docs](../characters/README.md)).
 
 ## Attacks
@@ -166,8 +161,8 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001, #0002, #0003, #0004 and #0005
-use them between them today):
+is built, and usable by any fighter (#0001 to #0006 use them between them
+today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
   its own window (`at` to `at + active`) and striking at most once, with
@@ -343,6 +338,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0003 | `['attack4']` | the Mystical Palm Technique (heals its own Launch Point) | Cherry Blossom Impact |
 | #0004 | `['attack5']` | World is Mine (a charm: its opponents' hits heal it) | Ievan Polkka, the Melody |
 | #0005 | `['attack4', 'attack5']` | the Deadlights (whoever faces them floats helpless), the Red Balloon (a phantom that bites from behind, its fear feeding #0005) | Dark Tendrils |
+| #0006 | `['attack4']` | Ice Breath (a gale that freezes whoever it reaches) | Heat Vision, the Sonic Scream, the Triple Strike |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -364,7 +360,8 @@ Technique its 3 s, Cherry Blossom Impact its 0.5 s repeat delay, whatever
 their labels. Specials keep their longer, deliberate animations (Unlimited
 Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical Palm
 Technique 1 s + 0.25 s, World is Mine 0.5 s + 1/3 s, the Deadlights 0.4 s +
-1/3 s, the Red Balloon's startup 1/3 s); a move that is not
+1/3 s, the Red Balloon's startup 1/3 s, Ice Breath 1/3 s + 7/15 s); a move
+that is not
 one plays at ordinary-attack pace (Cherry Blossom Impact 0.2 s + 0.25 s).
 
 ## Hit resolution
@@ -640,11 +637,13 @@ The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
 5 s (its tornado's 10-damage finisher); #0003's Mystical Palm Technique 3 s
 (heal); #0004's Ievan Polkka 5 s (its double's six strikes add up to 10)
 and World is Mine 3 s (charm); #0005's Deadlights 3 s (float) and Red
-Balloon 3 s (its phantom's fear). Everything else, Red, Blue and Maximum
-Blue (a pull earns nothing), Cherry Blossom Impact and the Heavenly Foot of
-Pain (a quake, a slam and a launch earn nothing) and Dark Tendrils (a pull)
-included, has only the 0.5 s repeat delay, and every
-Deflect none.
+Balloon 3 s (its phantom's fear); #0006's Ice Breath 3 s (a freeze, its
+paralysis). Everything else, Red, Blue and Maximum Blue (a pull earns
+nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
+slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
+Spin (a pull and a carry), Heat Vision and Sonic Scream (a carry, a repel,
+a block push) included, has only the 0.5 s repeat delay, and every Deflect
+none.
 
 **Reading cooldowns.** `CombatState.cooldowns` and
 `CombatState.abilityCooldowns` are the only stores. The player's presses,

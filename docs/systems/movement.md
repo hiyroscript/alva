@@ -417,7 +417,10 @@ into attacks and jumps. The old values are kept in
 - [`tests/fighters/0004/fighter-0004.test.mjs`](../../tests/fighters/0004/fighter-0004.test.mjs):
   #0004's `rise` (the Leekspin, carrying its target) and its `slam`.
 - [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs):
-  #0005's `hover` (Floating Hands, once per airtime); and
+  #0005's `hover` (Floating Hands, once per airtime);
+  [`tests/fighters/0006/fighter-0006.test.mjs`](../../tests/fighters/0006/fighter-0006.test.mjs):
+  #0006's `homing` on the ground as well as once per airtime (the Triple
+  Strike) and its `roll` (the Tornado Spin); and
   [`tests/systems/float.test.mjs`](../../tests/systems/float.test.mjs):
   a floating fighter held off the ground, rising at `FLOAT_RISE_SPEED`
   with no gravity, then falling.

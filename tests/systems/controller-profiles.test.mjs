@@ -544,8 +544,17 @@ function savedThen(def, changes = {}) {
   return { ...out, ...changes };
 }
 
+// The fighters playable when settings version 5 saved profiles: a fighter
+// added since (#0006) recommended nothing then, so it keeps no layout of
+// then.
+const PLAYABLE_THEN = Object.freeze(['0001', '0002', '0003', '0004', '0005']);
+
 test('a profile saved before: nothing of the player\'s own, and the fighter plays with today\'s recommended layout', () => {
   for (const def of playableCharacters()) {
+    if (!PLAYABLE_THEN.includes(def.id)) {
+      assert.equal(def.controller.previous, undefined, `#${def.id} came after: no layout of then`);
+      continue;
+    }
     assert.ok(def.controller.previous, `#${def.id} keeps the layout it recommended then`);
     assert.deepEqual(upgradeStoredProfile(def, savedThen(def)), {}, `#${def.id}: an untouched layout gives way`);
   }

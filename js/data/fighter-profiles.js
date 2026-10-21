@@ -118,6 +118,17 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0005.playStyle',
     reviewedSourceHash: '9e141c2f313c7abbe3990d96705bd46db9fc9633b0b34477e267e3436942a826',
   }),
+  // A versatile all-rounder in three bodies: quick strikes and a lock-on
+  // rush up close, a long beam and a wave of sound that turns shots back
+  // from afar, and a freezing breath to convert. Approachable: every tool
+  // is simple on its own; the depth is in picking the right sister's move
+  // for the range, converting the freeze, and not whiffing the tornado or
+  // being caught rooted in a cast.
+  '0006': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0006.playStyle',
+    reviewedSourceHash: 'b341e295c7b6552fa98e7303f5076ec09f71fe1fa19765217591469c3697ea82',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

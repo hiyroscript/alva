@@ -136,7 +136,20 @@ function meleeButtons(character, air) {
     return !!atk && isMeleeAttack(atk) && !(air && atk.groundOnly);
   }).map((action) => ({ action, id: f.attackFor(action, !air) }));
 }
-const groundMelee = (character) => meleeButtons(character, false);
+// Every ground melee button Combat Assist serves: a homing dash never is,
+// its own lock-on is its approach (tested below).
+const groundMelee = (character) => {
+  const f = rig({ character }).player;
+  return meleeButtons(character, false).filter(({ id }) => assistsAttack(f.attacks[id]));
+};
+
+// The file `character`'s `key` clip starts on, as drawn: for an ensemble,
+// its reference member's, the one a clip the whole group plays shows.
+function firstFile(character, key) {
+  const e = character.ensemble;
+  const clips = e ? e.members.find((m) => m.id === (e.referenceMember ?? e.members[0].id)).animations : character.animations;
+  return clips[key].frames[0].split('/').pop();
+}
 
 // The player a little way into a jump (rising, two steps after the press),
 // at the height its mid-air attacks meet a standing foe.
@@ -223,7 +236,7 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
       assert.equal(player.combat.attack, null, `${why}: no attack, no hitbox yet`);
       assert.equal(player.state, 'assist', why);
       assert.equal(player.animator.anim.key, 'mouvment', `${why}: the Dash's own clip`);
-      assert.equal(frameName(player), `${c.id}_mouvment_1.png`, `${why}: from its first frame`);
+      assert.equal(frameName(player), firstFile(c, 'mouvment'), `${why}: from its first frame`);
       assert.equal(player.facing, 1, `${why}: facing its target`);
       assert.equal(player.combat.energy, max, `${why}: free, nothing paid`);
       assert.ok(Math.abs(player.body.vx - MV.dashSpeed) < EPS, `${why}: at the Dash's speed`);
@@ -497,7 +510,7 @@ test('in the air, a melee press out of reach closes in straight at the target, f
         assert.equal(a.attack, atk);
         assert.equal(player.state, 'assist');
         assert.equal(player.animator.anim.key, 'midair_mouvment', `${why}: the air dash's own clip`);
-        assert.equal(frameName(player), `${c.id}_midair_mouvment_1.png`, `${why}: from its first frame`);
+        assert.equal(frameName(player), firstFile(c, 'midair_mouvment'), `${why}: from its first frame`);
         assert.equal(player.combat.energy, max, `${why}: free, nothing paid`);
         assert.equal(player.airDashes, airDashes - 1, `${why}: it uses the airtime's air dash`);
         while (player.combatAssist) {
@@ -1421,6 +1434,7 @@ test('a melee follow-up right after another move still gets its approach: out of
   }
   // Out of a hit-cancel: the first attack sent its target out of reach;
   // the follow-up closes in, the first attack's cooldown starting.
+  let tried = 0;
   for (const c of playableCharacters()) {
     const r = rig({ character: c, gap: 40 });
     r.player.controller.comboAssist = false;
@@ -1435,6 +1449,10 @@ test('a melee follow-up right after another move still gets its approach: out of
     const follow = groundMelee(c)
       .filter((m) => m.action !== 'attack1' && r.player.attacks[m.id].motion?.type !== 'roll')
       .reduce((best, m) => (!best || front(m) < front(best) ? m : best), null);
+    // (A fighter whose other ground melee moves are all rolls or homing
+    // dashes has none to try.)
+    if (!follow) continue;
+    tried++;
     const fatk = r.player.attacks[follow.id];
     r.until(() => r.player.combat.cancellable && meleeGap(r.player, attackReach(fatk), r.foe, 1) > 0);
     const first = r.player.combat.attack;
@@ -1443,6 +1461,7 @@ test('a melee follow-up right after another move still gets its approach: out of
     assert.equal(r.player.combatAssist.attack, fatk);
     assert.ok(r.player.combat.cooldowns.has(first.def.id), 'the cut attack\'s cooldown');
   }
+  assert.ok(tried >= 5, `tried on most of the roster (${tried})`);
 });
 
 test('after another move the approach keeps every rule: a ranged or homing attack never gets one, nor one further than a Dash, nor through a wall', () => {

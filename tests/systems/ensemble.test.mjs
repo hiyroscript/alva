@@ -100,15 +100,15 @@ test('an ensemble is data: the definitions keep its rules, and every broken shap
   assert.equal(hasClip(DEF_0001, 'attack1'), true, 'an ordinary fighter\'s own animations');
 });
 
-test('a fighter whose moves are still to come: unplayable and moveless, its loadout waits; one move, or playable, and every rule applies', () => {
-  const waiting = clone(getCharacter('0006'));
-  assert.equal(waiting.available, false);
-  for (const table of ['actions', 'attacks', 'summons', 'techniques', 'projectiles']) assert.equal(waiting[table], undefined, table);
-  assert.deepEqual(loadoutProblems(waiting), []);
-  const playable = loadoutProblems({ ...waiting, available: true });
-  assert.ok(playable.some((p) => /no `actions`/.test(p)) && playable.some((p) => /attack1 needs a button/.test(p)), 'made playable, it needs its moves');
-  assert.ok(loadoutProblems({ ...waiting, attacks: {} }).some((p) => /no `actions`/.test(p)), 'a move table, and the rules apply');
-  assert.ok(loadoutProblems({ ...waiting, actions: {} }).length, 'an empty `actions` is a loadout, held to the rules');
+test('an ensemble is held to the loadout rules as any fighter is: no moves, or one, is refused, playable or not', () => {
+  const moveless = { ...clone(ENS), actions: undefined, attacks: undefined };
+  const problems = loadoutProblems(moveless);
+  assert.ok(problems.some((p) => /no `actions`/.test(p)) && problems.some((p) => /attack1 needs a button/.test(p)), problems.join(' | '));
+  assert.equal(moveless.available, false, 'unplayable, and refused all the same');
+  const one = clone(ENS);
+  delete one.actions.attack2;
+  assert.ok(loadoutProblems(one).some((p) => /attack2/.test(p)), 'one numbered attack is not enough');
+  assert.ok(loadoutProblems({ ...clone(ENS), actions: {} }).length, 'an empty `actions` is refused');
 });
 
 // ---- The formation --------------------------------------------------------------

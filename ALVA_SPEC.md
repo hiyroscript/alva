@@ -629,11 +629,10 @@ no header, build label, eyebrow or keyboard hint bar.
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
   (silhouette + lock). No invented names or power ratings.
-- **Today five slots are selectable:** `#0001` in slot 01 (selected and
+- **Today six slots are selectable:** `#0001` in slot 01 (selected and
   focused by default, as the first playable fighter), `#0002` in slot 02,
-  `#0003` in slot 03, `#0004` in slot 04 and `#0005` in slot 05; the other
-  43 are locked, `#0006`'s slot 06 among them (registered, but not
-  playable until its moves are designed, 7.2.1). A fighter that is not
+  `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05 and `#0006` in
+  slot 06; the other 42 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -1376,7 +1375,8 @@ English and French.
   attacks**, **Special abilities** (only the moves the fighter classifies
   as Special, its `specialAbilities`, 7.2.1: #0001's Unlimited Void and
   Hollow Purple, #0003's Mystical Palm Technique, #0004's World is Mine,
-  #0005's Deadlights and Red Balloon, marked Ground or Air;
+  #0005's Deadlights and Red Balloon, #0006's Ice Breath, marked Ground or
+  Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -1790,11 +1790,9 @@ each fighter's own values are in its character specification (7.2.9).
   `js/data/characters.js`) holds six definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
   `0004.js`, `0005.js`, `0006.js`): `#0001` in roster slot 01, `#0002` in
-  slot 02, `#0003` in slot 03, `#0004` in slot 04 and `#0005` in slot 05,
-  each fully implemented (7.2.9) and playable: `available: true`; and
-  `#0006` in slot 06, drawn and moving but with its moves still to come,
-  so not playable (`available: false`) until they are designed. The five
-  playable ones are preloaded at startup, and #0001, the first
+  slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05 and
+  `#0006` in slot 06, each fully implemented (7.2.9) and playable:
+  `available: true`. All six are preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
   (`getCharacter`, which the engine and its tests build fighters from) is
@@ -1807,12 +1805,6 @@ each fighter's own values are in its character specification (7.2.9).
   roster slot then locked), and a new fighter is a new definition with its
   own art folder, definition module, `rosterSlot` and `available: true`
   (docs/characters/adding-characters.md).
-- **A fighter whose moves are still to come.** A fighter's art and body may
-  be registered before its moves are designed: unplayable and without a
-  single move (no `actions`, `attacks`, `summons`, `techniques` or
-  `projectiles`), the loadout rules below wait for its moves; the moment it
-  has one, or is made playable, every rule applies. Nothing is invented to
-  fill its buttons (#0006 today).
 - **Ensembles: one fighter drawn as several members.** A fighter may be a
   group of bodies seen together (#0006: three sisters). Its `ensemble`
   (`js/data/ensemble.js`) lists its members, back to front, each with an
@@ -1820,7 +1812,7 @@ each fighter's own values are in its character specification (7.2.9).
   right, mirrored with its facing) and clips of her own; the fighter has
   none of its own. It is still ONE fighter: one definition, roster slot,
   `Fighter`, controller and input; one body, collider, pushbox and hurtbox
-  (round the group); one Launch Point, Energy bar, Shield, set of
+  (a single fighter's size, over the middle of the group); one Launch Point, Energy bar, Shield, set of
   cooldowns, stun, hitstop and launch; one HUD card, name tag, Energy bar
   and set of cooldown indicators; the camera frames its one body. Never
   several fighters, companions, followers or summons, and no member has a
@@ -1937,9 +1929,10 @@ each fighter's own values are in its character specification (7.2.9).
   a summon because of how it is executed, and no name, button or fighter
   id decides it. #0001: Unlimited Void and Hollow Purple; #0002: none;
   #0003: the Mystical Palm Technique; #0004: World is Mine; #0005: the
-  Deadlights and the Red Balloon: six across the roster. Red, Maximum
-  Blue, the Whirlwind, Cherry Blossom Impact, Ievan Polkka and Dark
-  Tendrils are ordinary. The
+  Deadlights and the Red Balloon; #0006: Ice Breath: seven across the
+  roster. Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact, Ievan
+  Polkka, Dark Tendrils, Heat Vision, the Sonic Scream and the Triple
+  Strike are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -1949,8 +1942,8 @@ each fighter's own values are in its character specification (7.2.9).
   policy's (7.2.4). Specials keep their long, deliberate animations
   (Unlimited Void 0.5 s + 1/3 s, Hollow Purple 5/6 s + 1/3 s, the Mystical
   Palm Technique 1 s + 0.25 s, World is Mine 0.5 s + 1/3 s, the
-  Deadlights 0.4 s + 1/3 s, the Red Balloon's startup 1/3 s); a move that
-  is not one plays at ordinary-attack pace.
+  Deadlights 0.4 s + 1/3 s, the Red Balloon's startup 1/3 s, Ice Breath
+  1/3 s + 7/15 s); a move that is not one plays at ordinary-attack pace.
 
 #### 7.2.2 States, animation and facing
 
@@ -2345,9 +2338,10 @@ each fighter's own values are in its character specification (7.2.9).
     Mystical Palm Technique 3 s (its heal); #0004 Ievan Polkka 5 s (its
     double's six strikes add up to 10) and World is Mine 3 s (its charm);
     #0005 the Deadlights 3 s (its float) and the Red Balloon 3 s (its
-    phantom's fear); every other move of the five, Red, Blue, Maximum Blue,
-    Cherry Blossom Impact, the Heavenly Foot of Pain, the Stage Dive and
-    Dark Tendrils included, only the 0.5 s repeat delay. The player, the CPU and the
+    phantom's fear), #0006 Ice Breath 3 s (its freeze); every other move of
+    the six, Red, Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly
+    Foot of Pain, the Stage Dive, Dark Tendrils, the Tornado Spin, Heat
+    Vision and the Sonic Scream included, only the 0.5 s repeat delay. The player, the CPU and the
     ability HUD all read the same built definitions and combat state
     (`js/game/combat/move-status.js` for presentation).
     An airborne version that lands
@@ -3260,7 +3254,9 @@ nothing in them names a fighter, an attack or an animation.
   Technique 3 s (its heal) and Cherry Blossom Impact only the 0.5 s repeat
   delay, #0004 Ievan Polkka 5 s (its double's strikes add up to 10) and
   World is Mine 3 s (its charm), #0005 the Deadlights 3 s (its float) and
-  the Red Balloon 3 s (its phantom's fear), with cast/release timing,
+  the Red Balloon 3 s (its phantom's fear), #0006 Ice Breath 3 s (its
+  freeze) and Heat Vision and the Sonic Scream only the 0.5 s repeat delay,
+  with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from ordinary attacks' short
@@ -3853,9 +3849,11 @@ there, and nothing in one is a rule for another fighter.
 - **#0006**: [docs/characters/0006.md](docs/characters/0006.md) (three
   flying sisters who are one fighter, the roster's first ensemble: pink
   hovering in the middle, green behind and blue in front, moving, guarding
-  in three force-field bubbles, getting hurt and flying off together, and
-  green alone whirling for its Deflect. Not playable yet: its moves are
-  still to come).
+  in three force-field bubbles, getting hurt and flying off together; each
+  move performed by the sister whose power it is: pink's Power Punch,
+  Heat Vision and Ice Breath (its Special, a freeze), green's Tornado Spin,
+  Flying Punch and whirling Deflect, blue's Flying Kick and Sonic Scream,
+  and the Triple Strike of all three, locking on together).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -3926,7 +3924,8 @@ Adding one is described in
   (the policy's 3 s and 5 s): ordinary attacks as well as summons and
   techniques (#0001 Unlimited Void 3 s, Hollow Purple 5 s, #0002 Whirlwind
   5 s, #0003 Mystical Palm Technique 3 s, #0004 Ievan Polkka 5 s and World
-  is Mine 3 s, #0005 Deadlights 3 s and Red Balloon 3 s). The fighter the
+  is Mine 3 s, #0005 Deadlights 3 s and Red Balloon 3 s, #0006 Ice Breath
+  3 s). The fighter the
   ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
@@ -4016,7 +4015,9 @@ Adding one is described in
     is Mine and Melody, air the Air Dance, Leekspin and Stage Dive; #0005:
     ground the Claw Swipe, Long Bite, Phantom Hands, Deadlights, Red
     Balloon and Dark Tendrils, air the Claw Rake, Snapping Jaws and
-    Floating Hands.
+    Floating Hands; #0006: ground the Power Punch, Tornado Spin, Heat
+    Vision, Ice Breath, Sonic Scream and Triple Strike, air the Flying Kick,
+    Flying Punch and Triple Strike.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -4210,7 +4211,8 @@ Adding one is described in
   Technique and `,` nothing; for #0004, O is the Crescent Kick (the Stage
   Dive in the air), M Ievan Polkka and `,` World is Mine; for #0005, O is
   Phantom Hands (Floating Hands in the air), M the Deadlights and `,` the
-  Red Balloon. The input
+  Red Balloon; for #0006, O is Heat Vision, M Ice Breath and `,` the Sonic
+  Scream. The input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
   auto-repeat), touch and Player 1's controller (7.4a). Run edges
@@ -4326,7 +4328,8 @@ Adding one is described in
   slot 3 and the Mystical Palm Technique in slot 4), 5 → 1–5 (#0001:
   Unlimited Void in slot 4 and Hollow Purple in slot 5; #0004: Ievan Polkka
   in slot 4 and World is Mine in slot 5; #0005: the Deadlights in slot 4
-  and the Red Balloon in slot 5). A summon or technique button is
+  and the Red Balloon in slot 5; #0006: Heat Vision in slot 3, Ice Breath
+  in slot 4 and the Sonic Scream in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -4626,7 +4629,10 @@ codename is sent, never what an action does.
   Stage Dive the right stick down. #0005: Claw Swipe Square, Long Bite
   Triangle, Phantom Hands Circle, Dark Tendrils R2, Deadlights L2, Red
   Balloon the right stick up; in the air Claw Rake Square, Snapping Jaws
-  Triangle, Floating Hands Circle. A fighter without a layout gets a safe,
+  Triangle, Floating Hands Circle. #0006: Power Punch Square, Tornado Spin
+  Triangle, Triple Strike Circle, Heat Vision R2, Ice Breath L2, Sonic
+  Scream the right stick forward; in the air Flying Kick Square, Flying
+  Punch Triangle, Triple Strike Circle. A fighter without a layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter
   ships its own.
 - **Customization** (6.10b): every action of every fighter, the universal

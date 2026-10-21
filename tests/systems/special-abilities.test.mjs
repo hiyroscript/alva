@@ -48,11 +48,12 @@ const SPECIALS = Object.freeze({
   '0003': ['attack4'],
   '0004': ['attack5'],
   '0005': ['attack4', 'attack5'],
+  '0006': ['attack4'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly six Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights and the Red Balloon', () => {
+test('exactly seven Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon and Ice Breath', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -62,12 +63,18 @@ test('exactly six Specials across the roster: Unlimited Void and Hollow Purple, 
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 6);
+  assert.equal(total, 7);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
   assert.deepEqual(specialAbilities(getCharacter('0004')).map((m) => name('0004', m)), ['World is Mine']);
   assert.deepEqual(specialAbilities(getCharacter('0005')).map((m) => name('0005', m)), ['Deadlights', 'Red Balloon']);
+  assert.deepEqual(specialAbilities(getCharacter('0006')).map((m) => name('0006', m)), ['Ice Breath']);
+  // Heat Vision and the Sonic Scream are techniques too, and ordinary.
+  for (const move of ['attack3', 'attack5']) {
+    assert.equal(actionType(getCharacter('0006'), move), 'technique');
+    assert.equal(isSpecialAbility(getCharacter('0006'), move), false, `${name('0006', move)} is not Special`);
+  }
   // The Red Balloon is the roster's first summon; Dark Tendrils pull, and
   // are ordinary to the player.
   assert.equal(actionType(getCharacter('0005'), 'attack5'), 'summon');
@@ -129,6 +136,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
       air: ['attack1', 'attack2', 'attack3'],
       abilities: ['ground:attack4', 'ground:attack5'],
+    },
+    '0006': {
+      ground: ['attack1', 'attack2', 'attack3', 'attack5', 'extra_attack'],
+      air: ['attack1', 'attack2', 'extra_attack'],
+      abilities: ['ground:attack4'],
     },
   };
   for (const def of playableCharacters()) {

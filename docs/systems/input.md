@@ -442,7 +442,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0002](../characters/0002.md#controller-layout),
 [#0003](../characters/0003.md#controller-layout),
 [#0004](../characters/0004.md#controller-layout),
-[#0005](../characters/0005.md#controller-layout).
+[#0005](../characters/0005.md#controller-layout),
+[#0006](../characters/0006.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -456,6 +457,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0004 air | Air Dance | | | | | up: Leekspin; down: Stage Dive |
 | #0005 ground | Claw Swipe | Long Bite | Phantom Hands | Dark Tendrils | Deadlights | up: Red Balloon |
 | #0005 air | Claw Rake | Snapping Jaws | Floating Hands | | | |
+| #0006 ground | Power Punch | Tornado Spin | Triple Strike | Heat Vision | Ice Breath | forward: Sonic Scream |
+| #0006 air | Flying Kick | Flying Punch | Triple Strike | | | |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -485,8 +488,9 @@ its file fails to load (`EditorLayer.rowArt`); Movement, Defense and Pause
 rows have none. **Special abilities** holds only the moves the fighter
 itself classifies as Special (its `specialAbilities`,
 [combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
-Purple, #0003's Mystical Palm Technique, #0004's World is Mine and #0005's
-Deadlights and Red Balloon, each tagged Ground or Air. Every other move, a
+Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
+Deadlights and Red Balloon and #0006's Ice Breath, each tagged Ground or
+Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

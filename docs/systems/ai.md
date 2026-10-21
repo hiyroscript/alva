@@ -475,7 +475,9 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   a float weighed as the hold it is in
   [`float.test.mjs`](../../tests/systems/float.test.mjs);
   [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs):
-  the CPU playing #0005 against each fighter, every move used.
+  the CPU playing #0005 against each fighter, every move used;
+  [`tests/fighters/0006/fighter-0006.test.mjs`](../../tests/fighters/0006/fighter-0006.test.mjs):
+  the CPU playing #0006's whole kit through its one fighter.
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle` (with how each side played: presses,

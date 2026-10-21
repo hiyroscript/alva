@@ -310,7 +310,8 @@ test('off the stage it gets back, at every level, from below the ledge, far out 
           r.step();
           if (r.cpu.body.y > 1500) break;
         }
-        if (r.cpu.body.grounded && r.cpu.body.x <= ledge) back++;
+        // Standing on the stage: its feet on it, however wide they are.
+        if (r.cpu.body.grounded && r.cpu.body.x - r.cpu.body.halfW < ledge) back++;
       }
       const need = difficulty === 'easy' ? 2 : 3;
       assert.ok(back >= need, `#${cpuDef.id} ${difficulty}: back ${back}/${starts.length}`);

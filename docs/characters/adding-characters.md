@@ -184,16 +184,6 @@ ensemble: {
 - No summons yet (a clone of a group has no form). The registry refuses a
   broken ensemble with every problem named (`assertEnsemble`).
 
-### A fighter whose moves are still to come
-
-A fighter's art and body may be in before anyone has designed its moves.
-Leave it unplayable (`available: false`) with no `actions`, `attacks`,
-`summons`, `techniques` or `projectiles` at all, and the loadout rules wait:
-the moment it has one move, or is made playable, every rule applies again.
-Never invent placeholder attacks to satisfy the loadout. Its controller
-layout can be `{}` (nothing to bind yet); its Deflect, a universal action,
-may already be in. #0006 is registered this way.
-
 ## 4. Movement: nothing to write
 
 **All fighters share universal baseline locomotion. Character identity
@@ -267,7 +257,8 @@ ordinary cast, `'heavy'` for a deliberate commitment, `'planted'` for a
 move that roots its fighter; chosen for what the move does, never its
 name, slot, damage or length, with a comment saying why), plus only the
 movement fields its own mechanic needs over the tier's (`momentum`,
-`control`, `topSpeed`, `friction` and their air versions, `step`; a
+`control`, `topSpeed`, `friction` and their air versions, `step`, a
+step-in that moves its fighter only on the ground; a
 plunge or lift writes its `airTopSpeed` equal to its `airControl`:
 [attack movement](../systems/movement.md#5-attack-movement)); and
 whether a hit opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
@@ -295,6 +286,10 @@ and its art in `projectileAnimations`
 (`pierce`, `finisher`), pull (`pull`), turn other fighters' projectiles
 back (`repel`) or erase them and fly through fighters (`erase`). With no
 `speed` it stays where it appears: an obstacle (#0004's dancing double).
+Keep its box clear of the floor where it appears (its `offset` up at least
+half its box's height): a shot that meets a solid block, the main floor
+included, is gone (#0006's Sonic Scream, a wave as tall as a fighter,
+leaves her mouth with its middle 56 up).
 
 **A summon** (a clone of the fighter performing one of its own attacks)
 is a `summons.attackN` entry with its `attack`, its `cloud` (an

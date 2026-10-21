@@ -12,8 +12,8 @@
 //
 // Inputs: a character definition (js/data/characters/<id>.js).
 // Outputs: isEnsemble, ensembleMembers, memberIds, memberClips, hasClip,
-// ensembleFramePaths, ensembleProblems, assertEnsemble, GROUP_CLIPS,
-// MIN_MEMBERS, ENSEMBLE_DEFAULTS.
+// clipFor, ensembleFramePaths, ensembleProblems, assertEnsemble,
+// GROUP_CLIPS, MIN_MEMBERS, ENSEMBLE_DEFAULTS.
 //
 // The shape (the formation is in art pixels, facing right from the
 // fighter's origin, mirrored with its facing):
@@ -120,6 +120,22 @@ export function hasClip(def, key, performers = null) {
   const who = performers ?? memberIds(def);
   const members = ensembleMembers(def);
   return who.length > 0 && who.every((id) => !!members.find((m) => m.id === id)?.animations?.[key]);
+}
+
+// `def`'s clip `key` as one picture of it shows it: for an ordinary
+// fighter, from its `animations`; for an ensemble, the clip of the first of
+// `performers` that has it (a move's own performers), else of its
+// reference member, else of any member. Null when nobody has it.
+export function clipFor(def, key, performers = null) {
+  if (!isEnsemble(def)) return def?.animations?.[key] ?? null;
+  const members = ensembleMembers(def);
+  const ref = def.ensemble.referenceMember ?? members[0]?.id;
+  const order = [...(performers ?? []), ref, ...members.map((m) => m.id)];
+  for (const id of order) {
+    const clip = members.find((m) => m.id === id)?.animations?.[key];
+    if (clip) return clip;
+  }
+  return null;
 }
 
 // Every frame its members' clips need, each once.

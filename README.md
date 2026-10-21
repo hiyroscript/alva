@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Five playable fighters** on a 48-slot roster:
+- **Six playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -51,27 +51,27 @@ blocks every attack.
   heal it instead; Ievan Polkka, a little leek-waving double that dances
   in place and strikes whoever stays by it; a sung note that turns
   projectiles back; a rising leek twirl that carries its target up; dance
-  kicks and a stage dive), and
+  kicks and a stage dive),
   [#0005](docs/characters/0005.md), the dancing clown (the Deadlights, a
   maw of lights that leaves whoever faces them floating helpless; the Red
   Balloon, a phantom that rises out of a bunch of balloons behind its prey
   to bite, leaving it afraid, so that for a while every hit on it heals
   #0005; black tendrils that reel opponents in; a head that stretches out
-  on a long neck to bite across the stage; claws and ghostly hands). All
-  five Shield on the ground and Deflect in the air (a strike that knocks
-  projectiles back at their thrower), and all five Dash on the ground and
-  air dash. Each fighter
+  on a long neck to bite across the stage; claws and ghostly hands), and
+  [#0006](docs/characters/0006.md), three flying sisters who are one
+  fighter, drawn as three members (an **ensemble**: one body, one hurtbox,
+  one Launch Point, one Shield; all three move, guard, get hurt and fly off
+  together, and each move is performed by the sister whose power it is
+  while the others step back: pink's heat-vision beam and freezing breath,
+  green's tornado, blue's sonic scream, and all three streaking at their
+  foe together). All six Shield on the ground and Deflect in the air (a
+  strike that knocks projectiles back at their thrower), and all six Dash
+  on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
-  Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon): an
-  orange exclamation mark floats over
+  Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
+  #0006's Ice Breath): an orange exclamation mark floats over
   a fighter while it performs one.
-- **#0006 on the way**: [three flying sisters who are one
-  fighter](docs/characters/0006.md), registered in slot 06 and drawn as
-  three members (an **ensemble**: one body, one hurtbox, one Launch Point,
-  one Shield; all three move, guard, get hurt and fly off together, and a
-  move names who performs it while the others step back). Not playable
-  until its moves are designed.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then

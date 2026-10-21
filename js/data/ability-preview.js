@@ -1,6 +1,7 @@
 // Shared ability artwork selection for touch buttons and canvas status.
 import { NUMBERED_ATTACKS } from '../config.js';
 import { specialAction } from './loadout.js';
+import { clipFor } from './ensemble.js';
 
 // Extra and numbered attacks use fighter art; Jump keeps its glyph.
 export const SPRITE_BUTTONS = Object.freeze(['extra_attack', ...NUMBERED_ATTACKS]);
@@ -38,7 +39,10 @@ export function previewFrame(def, action, airborne = false) {
   const preview = own?.previews?.[context] ?? (context === 'ground' ? own?.preview : null);
   if (!preview || !SPRITE_BUTTONS.includes(action)) return null;
   const collection = preview.collection ?? 'animations';
-  const clip = ['animations', 'projectileAnimations'].includes(collection) ? def[collection]?.[preview.animation] : null;
+  // An ensemble's clips are its members': the one performing the move.
+  const performers = def.attacks?.[move ?? ground]?.members ?? def.techniques?.[move ?? ground]?.members ?? null;
+  const clip = !['animations', 'projectileAnimations'].includes(collection) ? null
+    : collection === 'animations' ? clipFor(def, preview.animation, performers) : def[collection]?.[preview.animation];
   const url = Number.isInteger(preview.frame) ? clip?.frames?.[preview.frame] : undefined;
   if (typeof url !== 'string') {
     const key = `${def.id}.${action}.${context}.${collection}.${preview.animation}.${preview.frame}`;

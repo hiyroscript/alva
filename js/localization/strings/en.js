@@ -383,6 +383,7 @@ export const EN = {
   'discover.fighter.0003.playStyle': 'A deliberate powerhouse who wins exchanges with heavy, well-timed blows that shake the ground and drive guards back, and who can heal when given room. Strong at punishing grounded opponents, but vulnerable to airborne approaches and to being rushed during long commitments.',
   'discover.fighter.0004.playStyle': 'A rhythmic space controller who fills the stage with song, a dancing decoy and long-reaching swings, and whose voice can turn an opponent’s offense into its own healing. Dangerous once its traps are in place, but light, slow to get going and exposed when rushed at close range.',
   'discover.fighter.0005.playStyle': 'A creeping predator that strikes from far away and from behind, reeling opponents in, leaving them helpless in the air and feeding on their fear to heal itself. Its biggest moves are slow, readable commitments, and its tall body is easy to hit up close.',
+  'discover.fighter.0006.playStyle': 'A quick, versatile trio that fights at every range: fast strikes up close, a lock-on rush, a long beam and a wave of sound from afar, and a freezing breath that leaves opponents open. Its ranged attacks root it in place, and its spinning attack is easy to punish when it misses.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

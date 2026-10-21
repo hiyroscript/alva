@@ -15,6 +15,7 @@ import {
   BASE_FIGHTER_MOVEMENT, MOVEMENT_FIELDS, movementProblems, assertUniversalMovement,
 } from '../../js/data/movement.js';
 import { CHARACTERS, getCharacter, playableCharacters } from '../../js/data/characters.js';
+import { hasClip } from '../../js/data/ensemble.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { CONFIG } from '../../js/config.js';
 import { DT, MOVEMENT, harnessFor, stageMap, steps } from '../helpers/fighter-harness.mjs';
@@ -98,7 +99,8 @@ test('a definition that declares movement anyway changes nothing: the Fighter on
 test('every fighter is built on the very same values; every playable one has the Dash and the air dash', () => {
   for (const c of PLAYABLE) {
     for (const clip of ['mouvment', 'midair_mouvment']) {
-      assert.ok(c.animations[clip]?.frames.length > 0, `${c.displayName}: its ${clip} art, so it has the universal ${clip === 'mouvment' ? 'Dash' : 'air dash'}`);
+      // (An ensemble's: every member's.)
+      assert.ok(hasClip(c, clip), `${c.displayName}: its ${clip} art, so it has the universal ${clip === 'mouvment' ? 'Dash' : 'air dash'}`);
     }
   }
   for (const c of PLAYABLE) {
@@ -166,7 +168,7 @@ function measure(c) {
     out.jumps = heights;
     out.airJumpsLeft = fighter.airJumps;
   }
-  if (c.animations.mouvment && c.animations.midair_mouvment) {
+  if (hasClip(c, 'mouvment') && hasClip(c, 'midair_mouvment')) {
     // The Dash and the air dash: speed, length, distance.
     const { fighter, step } = makeFighter();
     step({ ...RIGHT, runRightPressed: true });
