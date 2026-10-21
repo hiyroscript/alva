@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { characterFramePaths } from '../../js/data/characters.js';
-import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
+import { buildFighterSprites } from '../../js/game/rendering/ensemble.js';
 
 export const ROOT = new URL('../../', import.meta.url).pathname;
 
@@ -86,10 +86,11 @@ export function withFakeCanvas(fn) {
   }
 }
 
-// `character`'s every frame decoded (url -> image), and the SpriteSet the
-// game builds from them.
+// `character`'s every frame decoded (url -> image), and the sprites the
+// game builds from them (a SpriteSet, or for a fighter drawn as several
+// members an EnsembleSprites).
 export function realArt(character) {
   const images = new Map(characterFramePaths(character).map((url) => [url, decodePng(ROOT + url.slice(2))]));
-  const sprites = withFakeCanvas(() => SpriteSet.build(character, (url) => images.get(url)));
+  const sprites = withFakeCanvas(() => buildFighterSprites(character, (url) => images.get(url)));
   return { images, sprites };
 }

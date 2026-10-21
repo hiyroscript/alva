@@ -66,6 +66,19 @@ definition that breaks one is refused, every problem named):
   a button wired but reserved; a button left out of `actions` does nothing
   for that fighter (its touch button is hidden and the CPU never presses
   it).
+- A fighter whose moves are still to come is not held to them yet:
+  unplayable (`available: false`) and without a single move (no `actions`,
+  `attacks`, `summons`, `techniques` or `projectiles`), its art and body may
+  be in before its moves are designed (#0006). The moment it has a move, or
+  is made playable, every rule above applies; nothing is invented to fill
+  its buttons.
+- A fighter drawn as several members (an `ensemble`,
+  [rendering](rendering.md#ensembles)) names on each of its moves (an
+  attack, a technique, its Deflect) who performs it, `members`, and each
+  performer has the move's clip among her own; the loadout reads a move's
+  clips from its performers. A move is one move however many members
+  perform it: one press, one cooldown, the strikes it authors and nothing
+  more; hit anywhere on its one hurtbox, the fighter takes the hit once.
 
 | Numbered attacks | Buttons (touch slots in order) |
 | --- | --- |

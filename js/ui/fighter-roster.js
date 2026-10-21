@@ -24,6 +24,7 @@ import { ICONS } from './icons.js';
 import { CHARACTERS, isPlayable, getPlayableCharacter } from '../data/characters.js';
 import { getFighterProfile, DIFFICULTY_MAX } from '../data/fighter-profiles.js';
 import { fitCanvas, drawFrameAt, paintPortrait } from './sprite-art.js';
+import { idlePose, poseBounds } from '../game/rendering/ensemble.js';
 
 const STAR_FILLED = '★';
 const STAR_EMPTY = '☆';
@@ -36,7 +37,6 @@ export class FighterRoster {
     this.onConfirm = onConfirm;
     this.slots = [];
     this.focusedSlot = null;
-    this.previewIndex = 0;
     this.previewTime = 0;
     this.previewSprites = null;
     this.selectedId = null;
@@ -262,7 +262,6 @@ export class FighterRoster {
     this.name.setAttribute('data-i18n', '');
     const set = this.app.getSprites(def.id);
     this.previewSprites = set?.usable ? set : null;
-    this.previewIndex = 0;
     this.previewTime = 0;
     this.updateConfirm();
     if (!this.previewSprites) this.clearPreview();
@@ -287,24 +286,29 @@ export class FighterRoster {
     this.previewCanvas.getContext('2d').clearRect(0, 0, w, h);
   }
 
-  // Advances and draws the idle preview of the previewed fighter.
+  // Advances and draws the idle preview of the previewed fighter: its idle
+  // clip, or for a fighter drawn as several members the whole group, each
+  // member on its own idle at its place (see idlePose).
   update(dt) {
     const set = this.previewSprites;
     if (!set) return;
-    const anim = set.animations.idle;
     this.previewTime += dt;
-    const step = 1 / anim.fps;
-    while (this.previewTime >= step) {
-      this.previewTime -= step;
-      this.previewIndex = (this.previewIndex + 1) % anim.frames.length;
-    }
-    const frame = anim.frames[this.previewIndex % anim.frames.length];
+    const parts = idlePose(set, this.previewTime);
+    if (!parts.length) return;
     const { w, h } = fitCanvas(this.previewCanvas);
     const ctx = this.previewCanvas.getContext('2d');
     ctx.clearRect(0, 0, w, h);
     ctx.imageSmoothingEnabled = false;
-    // Integer scale from the reference height keeps normalized frames consistent.
-    const n = Math.max(1, Math.floor((h * 0.84) / set.refArtHeight));
-    drawFrameAt(ctx, frame, w / 2, Math.round(h * 0.94), n, false);
+    // Integer scale from the reference height keeps normalized frames
+    // consistent; a group is also kept inside the canvas's width.
+    let n = Math.max(1, Math.floor((h * 0.84) / set.refArtHeight));
+    let cx = w / 2;
+    if (parts.length > 1) {
+      const box = poseBounds(parts);
+      n = Math.max(1, Math.min(n, Math.floor((w * 0.9) / (box.right - box.left))));
+      cx -= ((box.left + box.right) / 2) * n;
+    }
+    const footY = Math.round(h * 0.94);
+    for (const p of parts) drawFrameAt(ctx, p.frame, cx + p.dx * n, footY + p.dy * n, n, false);
   }
 }

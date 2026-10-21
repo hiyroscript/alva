@@ -19,6 +19,7 @@ import { spawnClones, updateClones, removeDeadClones } from './combat/summon.js'
 import { applyPulls } from './combat/pull.js';
 import { Camera } from './rendering/camera.js';
 import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
+import { fighterParts } from './rendering/ensemble.js';
 import {
   drawEnergyBar, drawCooldownIndicators, drawSpecialMark, energyBarState, specialMarkRect, statusOnScreen,
   charmMarkRect, drawCharmMark, fearMarkRect, drawFearMark,
@@ -526,13 +527,17 @@ export class Arena {
     ctx.restore();
   }
 
+  // Its frame, or a fighter drawn as several members every member's, each
+  // at its place round the fighter (see fighterParts). Mirroring follows
+  // the playing clip's own source orientation. Just hit, it shows for one
+  // frame as a white silhouette of the same pose (all of it: one fighter).
   drawFighter(f) {
-    const frame = f.animator.frame;
-    if (!frame) return;
-    const [sx, sy] = this.toScreen(f.renderX, f.renderY);
-    // Mirroring follows the playing clip's own source orientation. Just
-    // hit, it shows for one frame as a white silhouette of the same pose.
-    drawFrame(this.ctx, this.fx.flashing(f) ? whiteFrame(frame) : frame, sx, sy, this.pxPerArtOf(f.sprites), f.spriteFlip);
+    const flashing = this.fx.flashing(f);
+    const pxPerArt = this.pxPerArtOf(f.sprites);
+    for (const part of fighterParts(f)) {
+      const [sx, sy] = this.toScreen(part.x, part.y);
+      drawFrame(this.ctx, flashing ? whiteFrame(part.frame) : part.frame, sx, sy, pxPerArt, part.flip);
+    }
   }
 
   // Device pixels per art pixel for art from `sprites`: each fighter's art
@@ -552,8 +557,10 @@ export class Arena {
     ctx.save();
     for (const g of ghosts) {
       ctx.globalAlpha = g.alpha;
-      const [sx, sy] = this.toScreen(g.x, g.y);
-      drawFrame(ctx, g.frame, sx, sy, this.pxPerArtOf(f.sprites), g.flip);
+      for (const part of g.parts) {
+        const [sx, sy] = this.toScreen(part.x, part.y);
+        drawFrame(ctx, part.frame, sx, sy, this.pxPerArtOf(f.sprites), part.flip);
+      }
     }
     ctx.restore();
   }

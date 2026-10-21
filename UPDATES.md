@@ -2947,3 +2947,108 @@ with the stick's or the arrows' middle; a touch on it drops #0001 through
 the overpass to the rooftop below, and the water-tower deck holds; on a
 desktop, S drops it through the scaffold and no touch controls show; no
 page errors. Not yet played by hand on a phone or a controller.
+
+## #0006, three sisters as one fighter, and ensembles
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and `max`, and add
+character #0006 from a supplied sprite sheet. `max` asked for a fighter
+that is three characters functioning together as ONE: one controller, one
+body, one hurtbox, one Launch Point, one Energy bar, one Shield, one combat
+state, three individually drawn and animated members always present
+together; a move performed by one member while the other two step back,
+two- and three-member combinations only when written as such, the Deflect
+by one member alone; no companions, followers, summons or switching. It
+also said not to design any attack yet, to leave the fighter unplayable
+until it meets the playable-character requirements, and to identify what
+remains. `character_rule` was not touched; the characters are named
+nowhere.
+
+**What it added**
+
+- **Ensembles**, a shared capability any fighter may opt into: a fighter
+  drawn as several members (`ensemble` in its definition;
+  `js/data/ensemble.js` for its data and rules, `js/game/rendering/ensemble.js`
+  for its art at runtime). Members, back to front, each with an id, a
+  `home` in the group and clips of her own (`<id>_<codename>_<member>_<frame>.png`);
+  every member plays the fighter's state on the same fixed step; a move
+  names who performs it (`members` on an attack, a technique or the
+  Deflect), a single performer stepping to the fighter's origin while the
+  others line up behind and everyone glides home after (`retreat`,
+  `spacing`, `glide`, a move's own `formation`); an idle float on each
+  member's own beat. One fighter throughout: one Fighter, body, hurtbox,
+  combat state and controller; a move is one move however many perform it.
+  Presentation only, advanced on fixed steps and drawn between them. The
+  registry refuses a broken ensemble (`assertEnsemble`).
+- **The Fighter, the Arena and the menus** build and draw any fighter the
+  same way: `buildFighterSprites` and `createAnimator` (a SpriteSet and a
+  SpriteAnimator, or an EnsembleSprites and an EnsembleAnimator),
+  `fighterParts` (what is drawn: one part, or one per member) for the
+  fighter, its hit flash and its speed trail; the roster's preview,
+  Select Stage's preview and the HUD portrait draw the group. The Fighter
+  passes each step's performers (`performedMove`), its art's facing
+  (`visualFacing`) and its interpolation to the animator. An ordinary
+  fighter is drawn exactly as before.
+- **A fighter whose moves are still to come**: an unplayable fighter with
+  no move at all (no `actions`, `attacks`, `summons`, `techniques` or
+  `projectiles`) is not held to the loadout rules yet; the moment it has a
+  move, or is made playable, every rule applies.
+- **#0006** in roster slot 06, `available: false`: three members, pink in
+  the middle hovering 14 art pixels over her sisters, green 19 behind and
+  blue 19 in front; 72 frames cut at 1× from the sheet (the flat grey
+  background (70, 71, 71) made transparent, nothing redrawn), every
+  universal clip for each (idle, a low flight for the run, a rise, a drop,
+  a landing, a dazed hurt, a spinning mid-air hurt, a force-field bubble
+  for the Shield, the Dash and the air dash), green's whirl for the
+  Deflect, which she alone performs. One collider (40 × 84), pushbox (52)
+  and hurtbox (`{ -30, -92, 60, 92 }`) round the group; the group 57 art
+  pixels (96.5 units) tall at home. No moves, ability names, touch buttons
+  or Discover profile yet; its controller layout is `{}`. Credited to the
+  sheet's maker, NotEverything123, linked to where it was found, with the
+  credits the sheet gives (Cosbydaf, Kenshin Himura, Misse-the-cat).
+- **The naming contract** (`codename_rule`) gained the member child key.
+
+**What remains before #0006 is playable**: its moves (from its canon, at
+least attack1 and attack2 with their mid-air versions, each naming its
+performer(s), their art cut from the sheet under each performer's own
+codenames), its controller layout by the comfort rules, its touch buttons,
+ability names and descriptions in both languages, its Discover profile, and
+its balance against the roster.
+
+**Where to tune it.** The formation and its motion: `ensemble` in
+`js/data/characters/0006.js` (`home` per member, `retreat` 18, `spacing`
+18, `glide` 260, `float` 3 art pixels every 1.4 s); the shared defaults
+`ENSEMBLE_DEFAULTS` in `js/data/ensemble.js`; how fast the float fades
+(`FLOAT_FADE`) in `js/game/rendering/ensemble.js`. Its body and Deflect:
+`collider`, `pushbox`, `hurtboxes` and `deflect` in its definition.
+
+**Code:** `js/data/ensemble.js` and `js/game/rendering/ensemble.js` (new),
+`js/data/characters/0006.js` (new), `js/data/characters.js` (registration,
+`assertEnsemble`, member frames), `js/data/characters/helpers.js`
+(`memberFramePath`, `memberFrames`), `js/data/loadout.js` (clips read from
+a move's performers; moves still to come), `js/game/fighters/fighter.js`,
+`js/game/arena.js`, `js/game/rendering/hit-fx.js`, `js/core/app.js`,
+`js/ui/fighter-roster.js`, `js/ui/stage-preview.js`, `js/ui/credits.js`,
+the English and French strings, and the specification and guides
+(`ALVA_SPEC.md`, `docs/characters/0006.md`, the character system,
+rendering, combat, adding a fighter, testing, module responsibilities).
+
+**Tests:** `ensemble` (new: the rules and every broken shape refused, the
+loadout waiting for moves still to come, the formation, one Fighter and one
+combat state, every member on the fighter's state on the same step, moves
+of one, two and three members as one move, the Deflect of one, a wide
+strike landing once, the idle float, the facing, determinism at 30, 60,
+75 and 144 Hz, the parts drawn, an ordinary fighter untouched), on a
+test-only fighter (`tests/fighters/fixtures/ensemble-fighter.mjs`);
+`fighter-0006` (new: registration, the real PNGs, all three always drawn
+and moving together, hurt and launched together, one hurtbox, the Shield,
+green's Deflect turning a projectile back, both facings, the Void and the
+respawn in a real Battle, the camera, the CPU, credits, the characters
+named nowhere); `codenames` (member file names), and `empty-roster`,
+`settings`, `i18n`, `loadout`, `combat-rules` and `cooldown-policy`
+updated for a sixth registered fighter with no moves yet. Checked in
+headless Chromium too: idle, run, jump, fall, Dash, Shield, turning, a
+single performer, a pair, all three, green's Deflect, a hit and a launch,
+and (in a throwaway local copy with #0006 made playable with test moves)
+the roster slot and preview, the HUD card and Practice Ground; no page
+errors. Not yet played by hand.

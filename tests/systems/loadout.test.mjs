@@ -403,7 +403,7 @@ test('Transform is no combat button: an actions.transform, reserved or not, or a
   // Every playable fighter keeps the rules without one.
   assert.ok(CHARACTERS.length >= 4);
   for (const def of CHARACTERS) {
-    assert.equal(Object.hasOwn(def.actions, 'transform'), false, def.id);
+    assert.equal(Object.hasOwn(def.actions ?? {}, 'transform'), false, def.id);
     assert.deepEqual(loadoutProblems(def), [], def.id);
   }
 });
@@ -414,7 +414,7 @@ test('every definition the game loads keeps the rules, and a broken one is refus
     assert.doesNotThrow(() => assertLoadout(def));
   }
   const source = readFileSync(new URL('../../js/data/characters.js', import.meta.url), 'utf8');
-  assert.match(source, /for \(const def of CHARACTERS\) \{\s*assertLoadout\(def\);\s*assertUniversalMovement\(def\);\s*assertCombatRules\(def\);\s*assertControllerLayout\(def\);\s*assertSpecialAbilities\(def\);\s*\}/, 'the registry validates every definition it loads');
+  assert.match(source, /for \(const def of CHARACTERS\) \{\s*assertLoadout\(def\);\s*assertEnsemble\(def\);\s*assertUniversalMovement\(def\);\s*assertCombatRules\(def\);\s*assertControllerLayout\(def\);\s*assertSpecialAbilities\(def\);\s*\}/, 'the registry validates every definition it loads');
   // The rules are generic: nothing in them names a character.
   const rules = readFileSync(new URL('../../js/data/loadout.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(rules, /'000\d'|#000\d|displayName|Punch|Kick|Shuriken|Clone|Sphere/);

@@ -66,6 +66,12 @@ blocks every attack.
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon): an
   orange exclamation mark floats over
   a fighter while it performs one.
+- **#0006 on the way**: [three flying sisters who are one
+  fighter](docs/characters/0006.md), registered in slot 06 and drawn as
+  three members (an **ensemble**: one body, one hurtbox, one Launch Point,
+  one Shield; all three move, guard, get hurt and fly off together, and a
+  move names who performs it while the others step back). Not playable
+  until its moves are designed.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then
@@ -261,6 +267,11 @@ credits: ZetrasBlack, R0B4N.
 **#0005 sprite source.** Sprite sheet posted by imhomiejaydev on
 [DeviantArt](https://www.deviantart.com/imhomiejaydev/art/853407339); the
 sheet's own credit: sprites by regularDor8go.
+
+**#0006 sprite source.** Sprite sheet by NotEverything123
+([where it was found](https://share.google/uwRM2BMytKaaK3Ycf)); the sheet's
+own credits: Cosbydaf (NGC sprites), Kenshin Himura (rip), Misse-the-cat
+(revamped sprites).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

@@ -78,13 +78,19 @@ behave, and how it must look.
   - anything an attack creates (a projectile, a clone's cloud, a sphere):
     `<attack>_object`, e.g. `extra_attack_object`, `attack3_object`,
     `attack4_object`.
+  A fighter drawn as several members (an ensemble, 7.2.1) names each
+  member's frames with the member's id after the codename, as a child key,
+  the frame still last: `<id>_<codename>_<member>_<frame>.png`
+  (`0006_idle_pink_1.png`, `0006_deflect_green_2.png`), built with
+  `memberFramePath` / `memberFrames`; a member id is lowercase letters.
   The code builds every path with
   one helper (`frames` / `framePath` in `js/data/characters/helpers.js`), from the
   character's id.
 - Each fighter's art lives in `assets/characters/<id>/` and nowhere else
   (none at the repository root): `assets/characters/0001/`,
   `assets/characters/0002/`, `assets/characters/0003/`,
-  `assets/characters/0004/` and `assets/characters/0005/` are the only
+  `assets/characters/0004/`, `assets/characters/0005/` and
+  `assets/characters/0006/` (its three members' frames) are the only
   fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
@@ -99,7 +105,10 @@ behave, and how it must look.
   convention every fighter's art pixel is the same world size, 88 / 52
   units (the roster's common art-pixel size): a fighter's `visual.height`
   is its reference clip's art height × 88 / 52, so fighters stand at their
-  own true heights side by side. Its optional `visual.eliminationPalette`
+  own true heights side by side. A fighter drawn as several members takes
+  the group's height at home instead (from its origin to the top of the
+  highest member's reference clip, lifted by her place), and every member
+  is drawn at the one art-pixel size it gives. Its optional `visual.eliminationPalette`
   (3–5 CSS colours picked from its art) is what the Void's burst is drawn
   in when it is taken (7.3); without one the burst is a neutral white,
   grey and amber.
@@ -118,8 +127,8 @@ behave, and how it must look.
   fighter's facing, movement, hurtboxes and hitboxes never change with it.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
-  never mirrored. (All of #0001's, #0002's, #0003's, #0004's and #0005's
-  art faces right; #0001's three orbs, #0004's note and #0005's balloons
+  never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's and
+  #0006's art faces right; #0001's three orbs, #0004's note and #0005's balloons
   are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
@@ -130,8 +139,8 @@ behave, and how it must look.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
-  artwork** (#0001's, #0002's, #0003's, #0004's, #0005's or any later
-  fighter's). Do not download
+  artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's or any
+  later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -623,7 +632,8 @@ no header, build label, eyebrow or keyboard hint bar.
 - **Today five slots are selectable:** `#0001` in slot 01 (selected and
   focused by default, as the first playable fighter), `#0002` in slot 02,
   `#0003` in slot 03, `#0004` in slot 04 and `#0005` in slot 05; the other
-  43 are locked. A fighter that is not
+  43 are locked, `#0006`'s slot 06 among them (registered, but not
+  playable until its moves are designed, 7.2.1). A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -800,6 +810,11 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
     DeviantArt, the line linked to the sheet's page (by the deviation's
     number alone, so the address names nothing); the credit the sheet
     itself gives: sprites by regularDor8go.
+  - **#0006 sprite source** — sprite sheet by NotEverything123, the line
+    linked to where it was found (a share link that names nothing); the
+    credits the sheet itself gives: Cosbydaf (NGC sprites), Kenshin Himura
+    (rip), Misse-the-cat (revamped sprites), each one's part said without
+    the name of the work they come from.
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -810,9 +825,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   in `js/ui/credits.js`): a new tab, the address never translated, the roll
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
-- The UI does not name the character behind #0001, #0002, #0003, #0004 or
-  #0005 (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` /
-  `#0005` in game, and
+- The UI does not name the character behind #0001, #0002, #0003, #0004,
+  #0005 or #0006 (or any fighter): each stays `#0001` / `#0002` / `#0003` /
+  `#0004` / `#0005` / `#0006` in game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
@@ -1772,12 +1787,14 @@ each fighter's own values are in its character specification (7.2.9).
 #### 7.2.1 Roster and the character system
 
 - **Roster and availability.** `CHARACTERS` (the registry,
-  `js/data/characters.js`) holds five definitions today, each in a module
+  `js/data/characters.js`) holds six definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
-  `0004.js`, `0005.js`): `#0001` in roster slot 01, `#0002` in slot 02,
-  `#0003` in slot 03, `#0004` in slot 04 and `#0005` in slot 05, each fully
-  implemented (7.2.9) and playable: `available: true`. All five are
-  preloaded at startup, and #0001, the first
+  `0004.js`, `0005.js`, `0006.js`): `#0001` in roster slot 01, `#0002` in
+  slot 02, `#0003` in slot 03, `#0004` in slot 04 and `#0005` in slot 05,
+  each fully implemented (7.2.9) and playable: `available: true`; and
+  `#0006` in slot 06, drawn and moving but with its moves still to come,
+  so not playable (`available: false`) until they are designed. The five
+  playable ones are preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
   (`getCharacter`, which the engine and its tests build fighters from) is
@@ -1790,6 +1807,49 @@ each fighter's own values are in its character specification (7.2.9).
   roster slot then locked), and a new fighter is a new definition with its
   own art folder, definition module, `rosterSlot` and `available: true`
   (docs/characters/adding-characters.md).
+- **A fighter whose moves are still to come.** A fighter's art and body may
+  be registered before its moves are designed: unplayable and without a
+  single move (no `actions`, `attacks`, `summons`, `techniques` or
+  `projectiles`), the loadout rules below wait for its moves; the moment it
+  has one, or is made playable, every rule applies. Nothing is invented to
+  fill its buttons (#0006 today).
+- **Ensembles: one fighter drawn as several members.** A fighter may be a
+  group of bodies seen together (#0006: three sisters). Its `ensemble`
+  (`js/data/ensemble.js`) lists its members, back to front, each with an
+  id, a `home` in the group (art pixels from the fighter's origin, facing
+  right, mirrored with its facing) and clips of her own; the fighter has
+  none of its own. It is still ONE fighter: one definition, roster slot,
+  `Fighter`, controller and input; one body, collider, pushbox and hurtbox
+  (round the group); one Launch Point, Energy bar, Shield, set of
+  cooldowns, stun, hitstop and launch; one HUD card, name tag, Energy bar
+  and set of cooldown indicators; the camera frames its one body. Never
+  several fighters, companions, followers or summons, and no member has a
+  body, a hurtbox, a Launch Point or a controller of her own.
+  - Every member plays the fighter's state on the same fixed step, each in
+    her own clip: the clips the whole group plays (`GROUP_CLIPS`: idle,
+    run, jump, fall, land, hurt, mid-air hurt, the Shield's three, the
+    Dash's and the air dash's) are every member's. One jump, one Dash, one
+    hit, one launch, one fall into the Void, one respawn is all of them.
+  - Each move names who performs it (`members` on an attack, a technique
+    and the Deflect): one member is the ordinary case, the Deflect exactly
+    one, two or three only for a combination written as one move; each
+    performer has the move's clip. A single performer steps to the
+    fighter's origin (so its hitbox, measured from her art, lines up), the
+    others step back behind the performers and stay visible, idling, and
+    everyone glides home after; a move may place anyone itself
+    (`formation`). A move is one move however many perform it: one press,
+    one cooldown, the strikes it authors and nothing more; a hit anywhere
+    on its one hurtbox is one hit, its damage added once.
+  - Members never jump between places: each moves toward hers at most
+    `glide` art pixels a second, a turn gliding the group over to its
+    mirrored places. Idle, each floats a little, up off her place and back
+    (`float`), on her own beat. All of it is presentation, advanced on the
+    fixed steps and drawn between them (deterministic, the same at any
+    frame rate), never feeding back into movement, collision or combat.
+  - The registry refuses a broken ensemble with every problem named
+    (`assertEnsemble`); a move of an ordinary fighter names no members; an
+    ensemble has no summons yet. The rendering is in
+    docs/systems/rendering.md (Ensembles).
 - **Shared systems, per-fighter values.** Everything in 7.2.2 to 7.2.8 is
   one rule for every fighter. A fighter supplies only data: its art and
   clips, body, Energy refill rate (the bar and every cost are universal,
@@ -3790,6 +3850,12 @@ there, and nothing in one is a rule for another fighter.
   Red Balloon summon, Dark Tendrils, a guard of black tendrils, and its
   clawing Deflect; whoever faces its lights floats helpless, its phantom
   bites from behind, and the fear it leaves feeds it).
+- **#0006**: [docs/characters/0006.md](docs/characters/0006.md) (three
+  flying sisters who are one fighter, the roster's first ensemble: pink
+  hovering in the middle, green behind and blue in front, moving, guarding
+  in three force-field bubbles, getting hurt and flying off together, and
+  green alone whirling for its Deflect. Not playable yet: its moves are
+  still to come).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the

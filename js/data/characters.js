@@ -2,16 +2,19 @@
 // lookups every other module uses to reach them.
 //
 // Purpose: each fighter's definition lives in a module of its own under
-// js/data/characters/ (0001.js, 0002.js, 0003.js, 0004.js, 0005.js, ...): its animations, body,
-// Energy, defense, attacks, projectiles, summons, techniques, touch buttons
-// and ability names. Never its movement: run, jump, the triple jump, the
-// Dash and the air dash are universal (js/data/movement.js). This module only
-// collects them, validates each one and answers "which fighters exist" and
-// "which may be played". It holds no fighter's data itself.
+// js/data/characters/ (0001.js, 0002.js, 0003.js, 0004.js, 0005.js,
+// 0006.js, ...): its animations (each member's, for a fighter drawn as
+// several: its `ensemble`), body, Energy, defense, attacks, projectiles,
+// summons, techniques, touch buttons and ability names. Never its
+// movement: run, jump, the triple jump, the Dash and the air dash are
+// universal (js/data/movement.js). This module only collects them,
+// validates each one and answers "which fighters exist" and "which may be
+// played". It holds no fighter's data itself.
 //
 // Outputs: CHARACTERS (the list, in roster order of registration),
 // getCharacter, isPlayable, getPlayableCharacter, playableCharacters,
-// characterFramePaths, assertCombatRules, and the asset-path helpers framePath / frames (from
+// characterFramePaths, assertCombatRules, and the asset-path helpers
+// framePath / frames / memberFramePath / memberFrames (from
 // js/data/characters/helpers.js, re-exported here so callers keep one
 // import).
 //
@@ -21,9 +24,10 @@
 //     and splice them out again (tests/fighters/fixtures/test-fighters.mjs).
 //     Never freeze it or replace it.
 //   - Every definition passes assertLoadout (js/data/loadout.js),
-//     assertUniversalMovement (js/data/movement.js) and assertCombatRules
-//     (below), assertControllerLayout (js/data/controller-profiles.js)
-//     and assertSpecialAbilities (js/data/special-abilities.js) as this
+//     assertEnsemble (js/data/ensemble.js), assertUniversalMovement
+//     (js/data/movement.js) and assertCombatRules (below),
+//     assertControllerLayout (js/data/controller-profiles.js) and
+//     assertSpecialAbilities (js/data/special-abilities.js) as this
 //     module loads, every problem named; one that breaks the
 //     loadout rules, declares movement of its own (a `movement` profile,
 //     `powers`), deals damage off the tiers (1, 3, 5, 10), declares a
@@ -66,6 +70,7 @@
 // js/game/combat/attacks.js).
 
 import { assertLoadout } from './loadout.js';
+import { assertEnsemble, ensembleFramePaths } from './ensemble.js';
 import { assertControllerLayout } from './controller-profiles.js';
 import { assertSpecialAbilities } from './special-abilities.js';
 import { assertUniversalMovement } from './movement.js';
@@ -81,8 +86,9 @@ import { CHARACTER_0002 } from './characters/0002.js';
 import { CHARACTER_0003 } from './characters/0003.js';
 import { CHARACTER_0004 } from './characters/0004.js';
 import { CHARACTER_0005 } from './characters/0005.js';
+import { CHARACTER_0006 } from './characters/0006.js';
 
-export { framePath, frames } from './characters/helpers.js';
+export { framePath, frames, memberFramePath, memberFrames } from './characters/helpers.js';
 
 // Every registered definition. Order is registration order only; where a
 // fighter sits on the roster is its own `rosterSlot`.
@@ -92,6 +98,7 @@ export const CHARACTERS = [
   CHARACTER_0003,
   CHARACTER_0004,
   CHARACTER_0005,
+  CHARACTER_0006,
 ];
 
 // Any definition by id, available or not; null for an unknown id.
@@ -116,11 +123,12 @@ export function playableCharacters() {
   return CHARACTERS.filter(isPlayable);
 }
 
-// Every frame a character needs before battle: fighter poses, projectiles
-// and effects, each file once (a clip may play one more than once, e.g.
-// #0002's attack2, and two clips may share one).
+// Every frame a character needs before battle: fighter poses (every
+// member's, for a fighter drawn as several: js/data/ensemble.js),
+// projectiles and effects, each file once (a clip may play one more than
+// once, e.g. #0002's attack2, and two clips may share one).
 export function characterFramePaths(def) {
-  const out = [];
+  const out = [...ensembleFramePaths(def)];
   for (const anim of Object.values(def.animations)) out.push(...anim.frames);
   for (const anim of Object.values(def.projectileAnimations || {})) out.push(...anim.frames);
   for (const anim of Object.values(def.effectAnimations || {})) out.push(...anim.frames);
@@ -161,12 +169,14 @@ export function assertCombatRules(def) {
   resolveEnergy(def?.energy, who);
 }
 
-// No definition that breaks the attack loadout rules, declares movement of
-// its own, breaks a combat rule, authors an invalid or conflicting
-// controller layout or classifies as Special a move it cannot perform is
-// ever loaded.
+// No definition that breaks the attack loadout rules or the ensemble rules
+// (a fighter drawn as several members: who performs each move, every
+// member's group clips), declares movement of its own, breaks a combat
+// rule, authors an invalid or conflicting controller layout or classifies
+// as Special a move it cannot perform is ever loaded.
 for (const def of CHARACTERS) {
   assertLoadout(def);
+  assertEnsemble(def);
   assertUniversalMovement(def);
   assertCombatRules(def);
   assertControllerLayout(def);

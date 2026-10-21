@@ -3,7 +3,8 @@
 // [key, params]; see js/localization/i18n.js), so the roll follows the language.
 // Proper names (Finhj, ZetrasBlack, R0B4N, thespriteanimations, DeviantArt,
 // Dazz & Fret, The Spriters Resource, xmaygrrr, imhomiejaydev,
-// regularDor8go) stay as they are in every language. A line may also link to its source:
+// regularDor8go, NotEverything123, Cosbydaf, Kenshin Himura,
+// Misse-the-cat) stay as they are in every language. A line may also link to its source:
 // { label: key or [key, params], href }, the label still translated and
 // the address never.
 
@@ -31,6 +32,9 @@ const SPRITES_0004 = 'https://www.deviantart.com/xmaygrrr/art/758846183';
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0005 is never named).
 const SPRITES_0005 = 'https://www.deviantart.com/imhomiejaydev/art/853407339';
+// Where #0006's sprite sheet was found: the share link it came with, which
+// names nothing (the characters behind #0006 are never named).
+const SPRITES_0006 = 'https://share.google/uwRM2BMytKaaK3Ycf';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -65,6 +69,13 @@ export const CREDITS = [
   {
     title: 'credits.sprites0005.title',
     lines: [{ label: 'credits.sprites0005.sheet', href: SPRITES_0005 }, 'credits.sprites0005.sheetCredits'],
+  },
+  // #0006's sheet, linked to where it was found, with its maker and the
+  // credits the sheet itself gives (each one's part said without the name
+  // of the work they come from).
+  {
+    title: 'credits.sprites0006.title',
+    lines: [{ label: 'credits.sprites0006.sheet', href: SPRITES_0006 }, 'credits.sprites0006.sheetCredits'],
   },
   {
     title: 'credits.rights.title',

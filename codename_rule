@@ -34,6 +34,12 @@ Use lowercase codenames and underscores. Numbered frames start at 1 and play in 
 
 Replace N with the attack number, from 1 through 5. Preserve the codename spelling mouvment for animation keys and assets, including midair_mouvment.
 
+A fighter drawn as several members (one fighter whose art is a group of bodies, its ensemble) names each member's frames with the member's id after the animation codename, as a child key, the frame still last:
+
+<id>_<animation>_<member>_<frame>.png
+
+For example 0006_idle_pink_1.png or 0006_midair_mouvment_green_1.png. A member id is lowercase letters, never a move's or a character's name. Each member's animations use the same codenames as any fighter's.
+
 ## Numbered attacks and airborne versions
 
 A character has at least 2 and at most 5 numbered attack families: attack1 through attack5. Numbers must be sequential, with no gaps. Ground and mid-air versions belong to the same attack family, and summons and techniques count toward the numbered total.

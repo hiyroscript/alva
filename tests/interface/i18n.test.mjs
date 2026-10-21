@@ -256,7 +256,7 @@ test('English game copy is the registries\' own, never retyped', () => {
     for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) {
       assert.equal(STRINGS.en[`ability.${def.id}.${action}`], own.label, `${def.id} ${action}`);
     }
-    assert.equal(def.mobileAbilities.jump?.label, undefined, `#${def.id}: Jump keeps its name`);
+    assert.equal(def.mobileAbilities?.jump?.label, undefined, `#${def.id}: Jump keeps its name`);
     assert.equal(STRINGS.en[`ability.${def.id}.jump`], undefined);
   }
   // The game data itself stays in English: its tests and gameplay are untouched.

@@ -15,7 +15,8 @@ The steps below use `0027` as the new fighter's id.
   unique in `CHARACTERS`. It names the art folder, every art file and the
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
-  of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3 and 4 are taken.
+  of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4 and 5 are
+  taken.
 
 ## 2. Add the art
 
@@ -38,6 +39,14 @@ frame). Lowercase with underscores.
 Art is never redrawn, recoloured or generated: use the frames as supplied.
 A clip can reuse another's file (the same path in both clips), never a
 copy on disk. No fighter art goes at the repository root.
+
+A fighter drawn as several members (an ensemble, see [below](#a-fighter-of-several-members))
+names each member's frames with the member's id as a child key after the
+codename, the frame still last: `0027_<codename>_<member>_<frame>.png`
+(`0027_idle_red_1.png`, `0027_attack1_red_3.png`), built with
+`memberFramePath` / `memberFrames` from
+[`js/data/characters/helpers.js`](../../js/data/characters/helpers.js).
+Member ids are lowercase letters.
 
 Art may come at any scale. If the frames are upscaled pixel art the grid
 is detected automatically (`visual.pixelSize: 'auto'`); if they are 1×
@@ -126,6 +135,64 @@ size, never fitted to the fighter's height. `animationFallbacks` names a
 still frame for the airborne, landing and hurt clips if their frames fail
 to load; attacks, the Shield, the Deflect, the Dash and the air dash never
 fall back.
+
+### A fighter of several members
+
+Some fighters are a group: several bodies seen together that move, fight
+and get hurt as one (#0006). Give such a fighter an `ensemble`
+([`js/data/ensemble.js`](../../js/data/ensemble.js)) instead of clips of its
+own (its `animations` stays `{}`): its `members`, back to front (the order
+they are drawn in), each with an `id`, a `home` (art pixels from the
+fighter's origin, facing right) and its own `animations`, keyed by the
+universal codenames. It is still ONE fighter, with one definition, body,
+collider, pushbox, hurtbox (round the group), Launch Point, Energy bar,
+Shield, set of cooldowns and controller: never several fighters,
+companions or summons.
+
+```js
+animations: {},
+ensemble: {
+  referenceMember: 'gold',         // carries its projectile and effect art
+  retreat: 18, spacing: 18,        // where the others stand while some perform a move
+  glide: 260,                      // art pixels a second a member moves between places
+  asideAnimation: 'idle',          // what the others play meanwhile
+  float: { height: 3, period: 1.4 }, // the idle float (art pixels, seconds)
+  members: [
+    { id: 'red', home: { x: -19, y: 0 }, animations: { idle: {...}, run: {...}, ... } },
+    { id: 'gold', home: { x: 0, y: -14 }, animations: { ... } },
+    { id: 'teal', home: { x: 19, y: 0 }, animations: { ... } },
+  ],
+},
+```
+
+- Every member has every clip the group plays together (`GROUP_CLIPS`:
+  idle, run, jump, fall, land, hurt, midair_hurt, the Shield's three, the
+  Dash's and the air dash's), or none does. All of them play the fighter's
+  state on the same step, each in her own clip.
+- Each move names who performs it, `members: ['red']` for the ordinary
+  case, two or three only for a combination written as one move (on an
+  attack, a technique and the Deflect, which names exactly one), and each
+  performer has the move's clip. A single performer steps to the fighter's
+  origin, so measure its hitbox from her art as for any fighter; the others
+  step back behind; a move may place anyone itself (`formation: { red: {
+  x, y } }`). A move is one move however many perform it: one press, one
+  cooldown, the strikes it authors.
+- `visual.height` is the whole group's at home (the origin to the top of
+  the highest member's reference clip, lifted by her home), which sets the
+  one art-pixel size every member is drawn at; `visual.portrait` crops the
+  group (its `size` a share of the group's width).
+- No summons yet (a clone of a group has no form). The registry refuses a
+  broken ensemble with every problem named (`assertEnsemble`).
+
+### A fighter whose moves are still to come
+
+A fighter's art and body may be in before anyone has designed its moves.
+Leave it unplayable (`available: false`) with no `actions`, `attacks`,
+`summons`, `techniques` or `projectiles` at all, and the loadout rules wait:
+the moment it has one move, or is made playable, every rule applies again.
+Never invent placeholder attacks to satisfy the loadout. Its controller
+layout can be `{}` (nothing to bind yet); its Deflect, a universal action,
+may already be in. #0006 is registered this way.
 
 ## 4. Movement: nothing to write
 
