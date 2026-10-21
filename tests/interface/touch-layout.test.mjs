@@ -176,6 +176,7 @@ function touchControls(scheme = 'joystick', def = DEF_0001) {
 // right. Returns the boxes it gave.
 function layOut(tc, scheme = tc.scheme) {
   const boxes = {
+    down: [0, 425, 28, 28],
     mouvementLeft: [90, 330, 40, 40],
     stick: [80, 360, 120, 120],
     mouvementRight: [170, 330, 40, 40],
@@ -205,11 +206,11 @@ const centre = (node) => ({ clientX: node.rect.left + node.rect.width / 2, clien
 
 test('every control of both schemes has a stable id, independent of its label', () => {
   assert.deepEqual([...TOUCH_CONTROL_IDS.joystick], [
-    'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'shield',
+    'down', 'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual([...TOUCH_CONTROL_IDS.classic], [
-    'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'shield',
+    'down', 'runLeft', 'runRight', 'mouvementLeft', 'mouvementRight', 'extra_attack', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual(Object.keys(TOUCH_CONTROL_IDS), [...MOBILE_CONTROLS], 'one list per Mobile Controls scheme');
@@ -218,7 +219,9 @@ test('every control of both schemes has a stable id, independent of its label', 
   // Each id is exactly the element on screen for it.
   const joystick = tc.getControlElements('joystick');
   assert.equal(joystick.get('stick'), tc.stick, 'the joystick itself, though it is no button');
-  for (const retired of ['down', 'transform']) assert.equal(tc.controlElement(retired), null, retired);
+  assert.equal(tc.controlElement('transform'), null, 'retired');
+  assert.equal(joystick.get('down'), tc.downButton, 'Down, in either scheme the same element');
+  assert.equal(tc.getControlElements('classic').get('down'), tc.downButton);
   assert.equal(joystick.get('mouvementLeft'), tc.mouvementButtons.get('mouvementLeft'));
   assert.equal(joystick.get('mouvementRight'), tc.mouvementButtons.get('mouvementRight'));
   const classic = tc.getControlElements('classic');
@@ -669,7 +672,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
     assert.equal(node.getAttribute('data-control'), id, `${id}: its stable id, never shown`);
   }
   assert.equal(editor.touch.stick.getAttribute('role'), 'button', 'the joystick, pressed like a button here');
-  assert.equal(document.activeElement, editor.touch.padButtons.get('runLeft'), 'focus on the first control');
+  assert.equal(document.activeElement, editor.touch.downButton, 'focus on the first control (Down, at the far left)');
   // No control ids on show anywhere.
   assert.doesNotMatch(root.textContent, /runLeft|mouvement[LR]|extra_attack|attack\d/);
   // Nothing selected yet: the size controls wait.
@@ -698,7 +701,7 @@ test('the editor always uses neutral localized icons for every selection, scheme
     extra_attack: ICONS.ring, shield: ICONS.shield, jump: ICONS.jump,
     ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`attack${n}`, ICONS[`pip${n}`]])),
     mouvementLeft: ICONS.mouvementLeft, mouvementRight: ICONS.mouvementRight,
-    runLeft: ICONS.left, runRight: ICONS.right,
+    runLeft: ICONS.left, runRight: ICONS.right, down: ICONS.down,
   };
   const check = (language) => {
     assert.equal(editor.touchRoot.querySelectorAll('.tc-sprite-icon').length, 0);
@@ -920,21 +923,25 @@ test('editor and dialog styles: the real controls always shown here, a selection
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\n  \*, \*::before, \*::after \{\n    animation-duration: 0\.001ms !important;/);
 });
 
-test('legacy layouts discard Down and Transform alone and keep all other positions and scales, including in the editor', () => {
+test('legacy layouts discard Transform alone and keep all other positions and scales, a Down saved with the old down arrow included, in the editor too', () => {
   for (const scheme of MOBILE_CONTROLS) {
-    const kept = Object.fromEntries(TOUCH_CONTROL_IDS[scheme].map((id, i) => [id, { x: Math.round((0.1 + i * 0.02) * 100) / 100, y: 0.6, scale: 1.2 }]));
-    const legacy = { ...kept, down: { x: 0.3, y: 0.4, scale: 1.7 }, transform: { x: 0.55, y: 0.45, scale: 1.4 } };
-    assert.deepEqual(sanitizeTouchLayout(scheme, legacy), kept);
+    const others = TOUCH_CONTROL_IDS[scheme].filter((id) => id !== 'down');
+    const kept = Object.fromEntries(others.map((id, i) => [id, { x: Math.round((0.1 + i * 0.02) * 100) / 100, y: 0.6, scale: 1.2 }]));
+    const oldDown = { x: 0.3, y: 0.4, scale: 1.7 };
+    const legacy = { ...kept, down: oldDown, transform: { x: 0.55, y: 0.45, scale: 1.4 } };
+    // In the scheme's own order, Down first: where the player once put it.
+    const expected = { down: oldDown, ...kept };
+    assert.deepEqual(sanitizeTouchLayout(scheme, legacy), expected);
     const { tc } = touchControls(scheme);
     tc.setLayout(legacy);
-    assert.deepEqual(tc.getLayout(), kept);
-    for (const retired of ['down', 'transform']) {
-      assert.equal(tc.getControlElements().has(retired), false, retired);
-      assert.equal(tc.controlElement(retired), null, retired);
-    }
+    assert.deepEqual(tc.getLayout(), expected);
+    assert.equal(tc.getControlElements().has('transform'), false);
+    assert.equal(tc.controlElement('transform'), null);
+    assert.equal(tc.getControlElements().get('down'), tc.downButton, 'Down is a control again');
     const { editor } = editorApp();
     editor.open({ scheme });
-    for (const retired of ['down', 'transform']) assert.equal(editor.touch.getControlElements().has(retired), false, retired);
+    assert.equal(editor.touch.getControlElements().has('transform'), false);
+    assert.ok(editor.touch.getControlElements().has('down'));
     editor.close();
   }
 });

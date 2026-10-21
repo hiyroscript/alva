@@ -11,6 +11,8 @@ export const ICONS = {
   mouvementRight: svg('<path d="M4 6 10 12 4 18"/><path d="M14 6 20 12 14 18"/>'),
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
+  // The touch Down button (the fast fall, a drop through a platform).
+  down: svg('<path d="M4.5 9 12 16.5 19.5 9"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/>'),
   // The universal Defence glyph, on the ground and in the air. A
   // fighter's own combat buttons show frames of its own art instead (see

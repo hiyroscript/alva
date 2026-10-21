@@ -2813,10 +2813,11 @@ CPU is back at 0.62-0.74. The test now asks for a majority.
 **Not done, and why.**
 
 - **Player platform drop-through**: Down is the natural input, but touch
-  has no Down by the owner's design (the joystick reads sideways only and
-  the mobile Down button was removed), so it would be a keyboard- and
-  controller-only privilege. Left for the owner to decide (a touch Down,
-  or another one-input gesture).
+  had no Down (the joystick reads sideways only and the mobile Down
+  button was removed), so it would have been a keyboard- and
+  controller-only privilege. Left for the owner, who asked for a touch
+  Down button: done in [Touch Down button and platform
+  drop](#touch-down-button-and-platform-drop).
 - **Directional air dashes**: a direction held with the Dash button breaks
   the controller comfort rules and has no clean touch form; the flat air
   dash is kept.
@@ -2867,3 +2868,82 @@ behind its Shield at 130 units/s in its held pose with the ring drawn,
 Space jumps straight out of it, and a running Jab with D held keeps 420
 units/s throughout; no page errors. Not yet played by hand, on a
 controller or on a phone.
+
+## Touch Down button and platform drop
+
+Not a named update (it can become one if the owner names it). Asked for
+by the owner after the combat feel overhaul: "Add a down button for touch
+controls", which unlocks the player platform drop that overhaul had left
+undone, and a decision on the CPU's ledge statistic (below).
+
+**What it changed.**
+
+- **A touch Down button** in both touch layouts: a small round button with
+  a down chevron at the far left of the lower-left cluster, level with the
+  stick's middle (Joystick) or the Left / Right arrows' (Classic Buttons),
+  the place the owner chose for the Joystick layout's down arrow before it
+  was removed. Held, it holds `down` exactly as S / ↓ or the left stick
+  held down: the fast fall in the air, and on a platform the drop below.
+  The joystick still reads sideways only. Classic's sliding Run arrows
+  never take its pointer, and it never slides into them. The cluster
+  moves right by the button's width and a gap (`--tc-down-room`). The
+  touch layout editor lists it in both schemes (id `down`): a layout
+  saved while the old down arrow existed gets its old position back.
+  Labelled Down / Bas.
+- **The platform drop**: a fresh Down press while standing on a one-way
+  platform drops the fighter through it (S / ↓, the left stick pushed
+  down or the player's own Fast fall binding, the touch Down button: one
+  press, never a combination). Held
+  Down never drops: a fast fall that lands on a platform stands on it,
+  and Down must be let go and pressed again to drop. It needs a fighter
+  free to act and not behind its Shield (no drop out of an attack, a stun,
+  a paralysis, the Shield or a Dash); a jump pressed on the same step
+  jumps. The main floor, solids and a platform whose `dropThrough` is
+  false (Sol-Noir's water-tower deck) never drop; Asperitas's moving
+  clouds do. The platform is ignored for `dropThroughTime` (0.28 s, as
+  before), then solid from above again. Movement is unchanged otherwise:
+  held Down still never slows or stops a walk, a run or a Dash.
+- **The CPU** never presses Down on the ground: it plans no drop (it
+  walks off a platform's edge instead, as before), so its route-finding
+  and predictions are untouched. It still fast-falls in the air.
+
+**The CPU ledge statistic, left as it is.** After the combat feel
+overhaul, the CPU's share of launching moves when its opponent is near
+the ledge dropped from about 0.65 to 0.58 in the automated benchmark.
+The CPU itself did not get worse: with the scripted test opponent's
+strikes played unsteered (as before the overhaul) it is back at 0.62 to
+0.74. What changed is the opponent, whose own strikes now steer it out
+of the corner. Teaching the CPU to predict steered attacks would mean
+reworking its prediction layer (a large, risky AI change) for a
+statistic about a scripted opponent, so it was left alone; the test asks
+for a majority.
+
+**Where to tune it.** The button's size and place: `.tc-down` and
+`--tc-down-room` in `css/touch-controls.css`; its icon `ICONS.down` in
+`js/ui/icons.js`. How long a dropped platform stays ignored:
+`dropThroughTime` in `js/data/movement.js`. Which platforms allow it:
+each platform's `dropThrough` in `js/data/maps.js`.
+
+**Code:** `js/ui/touch-controls.js` (the button, both schemes, the
+editor's `controlElement`, Classic's pointer guard),
+`css/touch-controls.css`, `js/ui/icons.js`, `js/core/touch-layout.js`
+(`down` in both schemes' ids), `js/game/fighters/fighter.js` (the drop on
+a fresh press), `js/game/ai/cpu-intelligence/executor.js` (no Down on the
+ground), comments in `js/core/input-manager.js`, `js/data/maps.js`,
+`js/data/movement.js`, `fighter-controller.js` and `stage-model.js`, and
+the specification and guides (`ALVA_SPEC.md`, `docs/systems/input.md`,
+`docs/systems/movement.md#platform-drop`, `docs/gameplay/stages.md`).
+
+**Tests:** `drop-through` (new: every playable fighter dropping to the
+floor, held Down never dropping, the floor, a deck that forbids it and a
+solid never dropping, no drop out of an attack, a stun, a paralysis, the
+Shield or a Dash, a jump pressed with it, the drop's window, a moving
+cloud, every device on the real InputManager, the CPU never pressing Down
+on the ground), and `down`, `controls-ui`, `touch-layout`, `battle-screen`,
+`practice-ground` and `i18n` updated for the button. Checked in headless
+Chromium too, on a phone-sized touch screen in a Quick Battle on
+Sol-Noir: in both layouts the Down button sits at the far left, level
+with the stick's or the arrows' middle; a touch on it drops #0001 through
+the overpass to the rooftop below, and the water-tower deck holds; on a
+desktop, S drops it through the scaffold and no touch controls show; no
+page errors. Not yet played by hand on a phone or a controller.

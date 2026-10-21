@@ -32,7 +32,7 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | --- | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | A D or ← → | Left stick | Joystick, or Classic ◀ ▶ |
 | Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Both layouts: one tap of **Left movement** / **Right movement** |
-| Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | Left stick down | none |
+| Down (fast fall in the air; steer a launch down; a fresh press on a one-way platform drops through it) | `down` | S or ↓ | Left stick down | both layouts: the small **Down** button at the far left of the lower-left cluster |
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
 | Shield (on the ground, held: a direction held with it walks behind it, Jump jumps out of it) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
@@ -60,10 +60,21 @@ where nobody plays, hides them. Two layouts, chosen under Settings →
 Controls → Mobile Controls:
 
 - **Joystick** (the default): one round joystick holding `runLeft` /
-  `runRight` past a small deadzone (digital, like every other input), with
-  two one-tap Mouvement/Dash buttons with double directional arrows above it.
+  `runRight` past a small deadzone (digital, like every other input; up and
+  down on it hold nothing), with two one-tap Mouvement/Dash buttons with
+  double directional arrows above it.
 - **Classic Buttons**: single Left and Right Run arrows with thumb sliding,
   with smaller double-arrow Mouvement buttons directly above their matching Run buttons.
+
+Both put a small **Down** button (a downward chevron, the Dash buttons'
+size) at the far left of the lower-left cluster, level with the middle of
+the stick or of the Run arrows; the cluster starts that much further in
+(`--tc-down-room` in
+[`css/touch-controls.css`](../../css/touch-controls.css)). Held, it holds
+`down` exactly as S / ↓ or the left stick down do: the fast fall in the
+air, and pressed while standing on a one-way platform, a drop through it
+([movement](movement.md#platform-drop)). Its press stops at the button, so
+Classic's sliding Run container never takes it for a Run arrow.
 
 Run presses and joystick flicks never request Mouvement. Keyboard and controller
 requests are rising edges, never auto-repeat or held actions: one press of the
@@ -149,9 +160,11 @@ label or slot; each layout keeps its own arrangement. Both Classic Mouvement
 buttons are independently editable. Older Classic saves retain every existing
 custom control; the new buttons use defaults until customized. Reset restores
 all four directional controls without changing the other scheme. A saved
-entry under an id no scheme has any more (the retired `down` and
-`transform`) is dropped as the layout is read, every other entry kept as
-saved, with no settings migration.
+entry under an id no scheme has any more (the retired `transform`) is
+dropped as the layout is read, every other entry kept as saved, with no
+settings migration. `down` is a control again (Down, first in each scheme's
+list): an entry saved while the old down arrow existed puts it back where
+the player had it.
 
 **Combat Assist** and **Combo Assist** (Settings → Combat), and the
 player's move cancellation, are not part of the input system: no binding,

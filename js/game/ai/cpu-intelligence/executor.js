@@ -161,13 +161,16 @@ export class Executor {
     }
     held.runLeft = d < 0;
     held.runRight = d > 0;
+    // A fresh Down press on a platform drops through it; the CPU plans no
+    // drop (it walks off a platform instead), so it never holds Down on the
+    // ground, where Down does nothing else.
+    if (b.grounded) held.down = false;
     const out = this.out;
     for (const k of HELD_CONTROLS) {
       out[k] = held[k];
       out[`${k}Pressed`] = held[k] && !this.prev[k];
       this.prev[k] = held[k];
     }
-    // No player control drops through a platform, so the CPU never does.
     out.dropPressed = false;
     out.mouvementLeftPressed = this.mouvement === -1;
     out.mouvementRightPressed = this.mouvement === 1;

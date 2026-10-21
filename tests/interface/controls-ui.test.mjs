@@ -943,7 +943,7 @@ test('the lower-right cluster keeps its order and slots; nothing is reserved; no
   // The buttons send the controls' own codenames: every held control but
   // the mouvement requests.
   assert.deepEqual([...tc.buttons.keys()].sort(), [
-    'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'runLeft', 'runRight', 'shield',
+    'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'extra_attack', 'jump', 'runLeft', 'runRight', 'shield',
   ]);
 });
 
@@ -1110,15 +1110,35 @@ function layoutDpad(tc) {
   return (action) => ({ clientX: ['runLeft', 'runRight'].indexOf(action) * 50 + 20, clientY: 20 });
 }
 
-test('neither layout creates Down, including detached controls and lookup', () => {
+test('both layouts have one Down button at the far left: held, it holds Down; Classic\'s Run arrows never take its pointer', () => {
   for (const scheme of ['classic', 'joystick']) {
-    const { tc } = touchControls(DEF_0001, { scheme });
-    assert.equal(tc.buttons.has('down'), false);
-    assert.equal(tc.padButtons.has('down'), false);
-    assert.equal(tc.controlElement('down', scheme), null);
-    assert.ok(tc.allButtons.every((b) => b.getAttribute('data-action') !== 'down'));
-    assert.deepEqual(actionsOf(tc.dpad).filter(Boolean), ['runLeft', 'runRight']);
-    assert.equal(tc.joystick.children.length, scheme === 'joystick' ? 3 : 1);
+    const { tc, calls } = touchControls(DEF_0001, { scheme });
+    const down = tc.downButton;
+    assert.equal(tc.buttons.get('down'), down);
+    assert.equal(tc.padButtons.has('down'), false, 'no Run arrow');
+    assert.equal(tc.controlElement('down', scheme), down);
+    assert.ok(tc.allButtons.includes(down));
+    assert.equal(down.tagName, 'BUTTON');
+    assert.equal(down.getAttribute('data-action'), 'down');
+    assert.equal(down.getAttribute('aria-label'), 'Down');
+    assert.equal(down.innerHTML, ICONS.down);
+    assert.ok(down.classList.contains('tc-down'));
+    // In the lower-left cluster, first: left of the stick or the Run arrows.
+    const cluster = scheme === 'joystick' ? tc.joystick : tc.dpad;
+    assert.ok(cluster.children.includes(down));
+    assert.deepEqual(actionsOf(tc.dpad).filter(Boolean), scheme === 'classic' ? ['runLeft', 'runRight', 'down'] : ['runLeft', 'runRight'], 'one Down, in the cluster on show');
+    // Held for the whole pointer hold, and let go with it.
+    let stopped = false;
+    down.dispatch('pointerdown', { pointerId: 5, preventDefault() {}, stopPropagation() { stopped = true; } });
+    assert.deepEqual(calls, [['down', true]]);
+    assert.ok(down.classList.contains('is-pressed'));
+    assert.ok(stopped, 'its pointer never reaches the Run container');
+    down.dispatch('pointerup', { pointerId: 5 });
+    assert.deepEqual(calls, [['down', true], ['down', false]]);
+    // Disabled controls take nothing.
+    tc.setEnabled(false);
+    down.dispatch('pointerdown', { pointerId: 7, preventDefault() {}, stopPropagation() {} });
+    assert.deepEqual(calls.at(-1), ['down', false]);
   }
 });
 
@@ -1216,11 +1236,11 @@ test('Joystick is the default scheme; setScheme switches layouts and anything un
 test('Classic Buttons has Run and Mouvement Left / Right at the lower left, the actions at the lower right', () => {
   const { tc } = touchControls(DEF_0001, { scheme: 'classic' });
   assert.deepEqual(tc.root.children, [tc.dpad, tc.actions]);
-  assert.deepEqual(actionsOf(tc.dpad).filter(Boolean), ['runLeft', 'runRight']);
-  assert.deepEqual(tc.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Left movement', 'Right movement']);
+  assert.deepEqual(actionsOf(tc.dpad).filter(Boolean), ['runLeft', 'runRight', 'down']);
+  assert.deepEqual(tc.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Down', 'Left movement', 'Right movement']);
   assert.equal(tc.dpad.getAttribute('aria-label'), 'Movement');
   assert.deepEqual(actionsOf(tc.actions), ['extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']);
-  assert.equal(tc.buttons.has('down'), false);
+  assert.equal(tc.buttons.get('down'), tc.downButton);
   // Nothing of the Joystick scheme is on screen.
   assert.equal(tc.root.querySelectorAll('.tc-stick').length, 0);
   assert.equal(tc.root.querySelectorAll('.tc-dash').length, 2);
@@ -1238,8 +1258,9 @@ test('Classic Buttons has Run and Mouvement Left / Right at the lower left, the 
 test('the Joystick scheme: a movement joystick between Left movement and Right movement', () => {
   const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
   assert.deepEqual(tc.root.children, [tc.joystick, tc.actions]);
-  const [mouvementLeft, stick, mouvementRight] = tc.joystick.children;
-  assert.equal(tc.joystick.children.length, 3);
+  const [down, mouvementLeft, stick, mouvementRight] = tc.joystick.children;
+  assert.equal(tc.joystick.children.length, 4);
+  assert.equal(down, tc.downButton, 'Down at its far left');
   assert.equal(stick, tc.stick);
   assert.equal(stick.getAttribute('role'), 'group');
   assert.equal(stick.getAttribute('aria-label'), 'Movement joystick');
@@ -1268,9 +1289,9 @@ test('the Joystick scheme: a movement joystick between Left movement and Right m
   // The old cluster is gone from the screen.
   assert.equal(tc.root.querySelectorAll('.tc-dpad').length, 0);
   assert.deepEqual(tc.root.querySelectorAll('.tc-text'), [], 'no letter anywhere');
-  assert.equal(tc.buttons.has('down'), false);
+  assert.equal(tc.buttons.get('down'), tc.downButton);
   // The same held inputs, no left / right buttons: the stick holds those.
-  assert.deepEqual([...tc.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'shield']);
+  assert.deepEqual([...tc.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'extra_attack', 'jump', 'shield']);
 });
 
 // ---- Joystick: steering --------------------------------------------------------
@@ -1672,7 +1693,8 @@ test('a scheme switch keeps the fighter\'s combat buttons and Jump: the same ele
   tc.setScheme('joystick');
   tc.setCharacter(null);
   assert.equal(tc.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra attack');
-  assert.equal(tc.joystick.children[0], tc.mouvementButtons.get('mouvementLeft'));
+  assert.equal(tc.joystick.children[0], tc.downButton);
+  assert.equal(tc.joystick.children[1], tc.mouvementButtons.get('mouvementLeft'));
   assert.deepEqual(actionsOf(tc.actions).at(-1), 'jump');
   press(tc.buttons.get('extra_attack'), 1);
   assert.deepEqual(calls, [['extra_attack', true]]);
@@ -1681,8 +1703,16 @@ test('a scheme switch keeps the fighter\'s combat buttons and Jump: the same ele
 test('the Joystick layout\'s geometry: the stick at the lower left with Dash buttons above its top corners', () => {
   const rule = (selector) => CSS.match(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[2] ?? '';
   // The same corner as the Classic cluster, safe areas included.
-  assert.match(rule('.tc-dpad'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw\);/);
-  assert.match(rule('.tc-joystick'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw\);/);
+  // Both start in from it by Down's room (a Dash button and a gap): Down sits
+  // at their far left.
+  assert.match(rule('.tc-dpad'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw \+ var\(--tc-down-room\)\);/);
+  assert.match(rule('.tc-joystick'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw \+ var\(--tc-down-room\)\);/);
+  assert.match(CSS, /--tc-down-room: calc\(var\(--tc-dash\) \+ var\(--tc-gap\)\);/);
+  const down = rule('.tc-down');
+  assert.match(down, /left: calc\(var\(--tc-down-room\) \* -1\);/);
+  assert.match(down, /width: var\(--tc-dash\);/);
+  assert.match(rule('.tc-joystick .tc-down'), /bottom: calc\(\(var\(--tc-stick\) - var\(--tc-dash\)\) \/ 2\);/, 'level with the stick\'s middle');
+  assert.match(rule('.tc-dpad .tc-down'), /bottom: calc\(\(var\(--tc\) - var\(--tc-dash\)\) \/ 2\);/, 'level with the Run arrows\' middle');
   assert.match(rule('.tc-cluster'), /bottom: var\(--tc-bottom\);/);
   assert.match(CSS, /--tc-bottom: calc\(max\(var\(--safe-b\), 10px\) \+ 1\.6vh\);/);
   // A round, translucent base that takes the pointer and never scrolls or zooms.
@@ -1693,7 +1723,7 @@ test('the Joystick layout\'s geometry: the stick at the lower left with Dash but
   assert.match(rule('.tc-stick-knob'), /pointer-events: none;/);
   // No arrows drawn on the base.
   assert.doesNotMatch(CSS, /\.tc-stick-arrow/);
-  assert.doesNotMatch(CSS, /--tc-down|--tc-stick-left|\.tc-stick-down/);
+  assert.doesNotMatch(CSS, /--tc-stick-left|\.tc-stick-down/);
   assert.match(stick, /left: 0;/);
   assert.match(rule('.tc-joystick'), /width: var\(--tc-stick\);/);
   // Dash buttons: small, above the stick (whose top is at 1.92 --tc), at its left and right.

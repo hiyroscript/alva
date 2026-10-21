@@ -25,7 +25,8 @@ export const HELD_CONTROLS = Object.freeze(ACTIONS.filter((action) => action !==
 // a game controller resolves each press for the ground or the air, and a
 // press buffered for one never comes out in the other; neither, from a
 // keyboard, touch or a CPU, makes no such claim) and the training CPU's
-// platform drop.
+// platform drop (`dropPressed`: a player asks for the same drop with a
+// fresh Down press, see Fighter.update).
 export function blankInput() {
   const input = {};
   for (const control of HELD_CONTROLS) input[control] = false;
@@ -74,8 +75,9 @@ export class PlayerController {
 // combat buttons (extra_attack and attack1 to attack5 included, so it never
 // throws a projectile, summons or casts), Down or Shield (so it never
 // shields), so the player can practise on it.
-// It drops through one-way platforms with `dropPressed`, an intent no player
-// control produces. It never walks off the main floor's edges into open air
+// It drops through one-way platforms with `dropPressed`, its own intent (a
+// player drops with a fresh Down press instead, which this controller never
+// makes). It never walks off the main floor's edges into open air
 // on its own (see atLedge): it only leaves the stage when knocked off.
 export class TrainingAIController {
   constructor({ rng = Math.random } = {}) {

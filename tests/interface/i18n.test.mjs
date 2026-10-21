@@ -496,14 +496,14 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(hud.timeButton.getAttribute('aria-label'), 'Mettre en pause');
     assert.equal(hudRoot.querySelector('.hud-launch-point').getAttribute('aria-label'), 'Point d’éjection');
     // Touch-control names, the fighter's own included; the codenames never.
-    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Aller à droite', 'Mouvement à gauche', 'Mouvement à droite']);
+    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Aller à droite', 'Bas', 'Mouvement à gauche', 'Mouvement à droite']);
     assert.equal(touch.dpad.getAttribute('aria-label'), 'Déplacement');
     assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Rouge');
     assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Bleu maximal');
     assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Vide infini');
     assert.equal(touch.buttons.get('attack5').getAttribute('aria-label'), 'Violet creux');
     assert.equal(touch.buttons.get('shield').getAttribute('aria-label'), 'Bouclier');
-    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action') || b.getAttribute('data-mouvement')), ['runLeft', 'runRight', 'mouvementLeft', 'mouvementRight']);
+    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action') || b.getAttribute('data-mouvement')), ['runLeft', 'runRight', 'down', 'mouvementLeft', 'mouvementRight']);
     // Keyboard hints, keycaps too.
     assert.deepEqual(hints.querySelectorAll('.hint-label').map((l) => l.textContent), ['Naviguer', 'Sélectionner', 'Retour']);
     assert.deepEqual(hints.querySelectorAll('kbd').slice(-2).map((k) => k.textContent), ['Entrée', 'Échap']);
@@ -587,7 +587,7 @@ test('Settings labels use sentence case and dynamic editor copy preserves locali
 test('internal identifiers never change with the language', () => {
   inFrench(() => {
     const touch = new TouchControls(new Element('div'), { setTouch: noop, queueTouchMouvement: noop });
-    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'shield']);
+    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'extra_attack', 'jump', 'shield']);
     assert.deepEqual([...touch.mouvementButtons.keys()], ['mouvementLeft', 'mouvementRight']);
     assert.equal(touch.scheme, 'joystick');
     const app = fakeApp();

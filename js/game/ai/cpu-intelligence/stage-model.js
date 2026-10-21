@@ -31,9 +31,10 @@
 // step off (dangerZones), as its level reads the stage.
 //
 // Inputs: a StageCollision. Outputs: StageModel (one per stage, cached).
-// Important constraints: read-only; nothing here assumes a platform drop,
-// since no player control has one: the way down from a platform is to walk
-// off its edge.
+// Important constraints: read-only; nothing here plans a platform drop (a
+// player's fresh Down press on a platform, which the CPU never makes: see
+// Executor.finish): the CPU's way down from a platform is to walk off its
+// edge.
 
 const CACHE = new WeakMap();
 

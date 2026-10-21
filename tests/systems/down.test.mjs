@@ -1,10 +1,12 @@
 // Run with node --test tests/systems/down.test.mjs (no dependencies).
-// Down: a plain directional gameplay input (`down`), on S / ↓, D-pad down
-// and the left stick held down (no mobile Down button). It does exactly
-// two things, both in the air or as a hit lands: the fast fall, and
-// steering a launch downward. On the ground it is nothing: no state, no
-// pose, no lock on movement or the Dash, no faster Energy or cooldowns, and
-// no change to what any button does. Menus keep their own Down. Uses the
+// Down: a plain directional gameplay input (`down`), on S / ↓, the left
+// stick held down and the touch Down button. It does exactly three things:
+// in the air the fast fall, as a hit lands steering a launch downward, and
+// a fresh press while standing on a one-way platform drops the fighter
+// through it (tests/systems/drop-through.test.mjs). Otherwise, on the
+// ground, it is nothing: no state, no pose, no lock on movement or the
+// Dash, no faster Energy or cooldowns, and no change to what any button
+// does; held, never a drop. Menus keep their own Down. Uses the
 // real Fighter, CombatSystem, physics and InputManager (see
 // tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
@@ -151,19 +153,22 @@ test('holding Down never stops or slows normal movement: running, turning and wa
   const script = (i) => (i < 40 ? { runRight: true } : i < 70 ? { runLeft: true } : {});
   assert.deepEqual(trace((i) => ({ ...script(i), down: true }), 100), trace(script, 100));
   // On the harness ledge (x 900 - 1100), walking right off its edge with
-  // Down held walks off it exactly as ever (Down is no drop-through either);
+  // Down held walks off it exactly as ever (held Down is no drop-through);
   // once falling, Down is the fast fall.
   const off = (held) => trace(() => ({ runRight: true, ...held }), steps(1.5), { x: 1080, y: 600 });
   const onLedge = (log) => log.slice(0, log.findIndex(([, y]) => y !== 600) + 1);
   assert.deepEqual(onLedge(off(DOWN)), onLedge(off({})), 'the same walk to the edge, the same step off it');
   const landed = (log) => log.findIndex(([, y]) => y === 800);
   assert.ok(landed(off(DOWN)) < landed(off({})), 'then falling faster, to the floor sooner');
-  // And standing on it with Down held, nothing drops through.
+  // And standing on it with Down held from before (no fresh press), nothing
+  // drops through; only a fresh press does.
   const { fighter, step } = makeFighter({ x: 1000, y: 600 });
-  for (let i = 0; i < steps(1); i++) step(i % 20 === 0 ? { down: true, downPressed: true } : DOWN);
+  for (let i = 0; i < steps(1); i++) step(DOWN);
   assert.equal(fighter.body.ground.id, 'ledge');
   assert.equal(fighter.body.y, 600);
   assert.equal(fighter.state, 'idle');
+  step({ down: true, downPressed: true });
+  assert.equal(fighter.grounded, false, 'a fresh press: through the platform');
 });
 
 test('holding Down never prevents a Dash: an explicit request with it held dashes exactly as without', () => {

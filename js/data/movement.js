@@ -109,7 +109,8 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   hitstunFriction: 1600,
   hitstunAirDrag: 210,
 
-  // How long a platform drop ignores the platform (the training CPU's).
+  // How long a platform drop (a fresh Down press on a one-way platform, or
+  // the training CPU's own) ignores the platform.
   dropThroughTime: 0.28,
 });
 
