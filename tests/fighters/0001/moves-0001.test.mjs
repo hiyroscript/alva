@@ -76,16 +76,32 @@ test('a Jab that hits can be cut short into a High Kick, but never an immediate 
   assert.equal(whiff.fighter.combat.attack?.def.id, 'attack1', 'still in its own recovery');
 });
 
-test('a running Jab slides on with the run, never steered', () => {
+test('a running Jab is a quick strike: the run carries on through it while held, and it slides on when let go', () => {
+  assert.equal(A.attack1.mobility, 'quick');
   const { fighter, step } = solo({ x: 300 });
+  const jab = fighter.attacks.attack1;
   for (let i = 0; i < 40; i++) step({ runRight: true });
   const speed = fighter.body.vx;
   step({ runRight: true, ...P('attack1') });
-  assert.equal(A.attack1.momentum, 1, 'all of it');
-  const kept = speed * A.attack1.momentum - MOVEMENT.deceleration * A.attack1.friction * DT;
-  assert.ok(Math.abs(fighter.body.vx - kept) < 1e-9, `the run carried in (${fighter.body.vx})`);
-  step({ runLeft: true });
-  assert.ok(fighter.body.vx > 0, 'held back the other way: no steering');
+  assert.equal(jab.momentum, 1, 'all of it');
+  assert.equal(fighter.body.vx, speed, 'the run carried in, whole');
+  while (fighter.combat.attack) {
+    step({ runRight: true });
+    assert.equal(fighter.body.vx, speed, 'held: the whole run, never braked');
+  }
+  // Let go: it slides on under its friction, never stopped at once.
+  const slide = solo({ x: 300 });
+  for (let i = 0; i < 40; i++) slide.step({ runRight: true });
+  slide.step({ runRight: true, ...P('attack1') });
+  const before = slide.fighter.body.vx;
+  slide.step({});
+  const kept = before - MOVEMENT.deceleration * jab.friction * DT;
+  assert.ok(jab.friction < 1 && Math.abs(slide.fighter.body.vx - kept) < 1e-9, `slides on (${slide.fighter.body.vx})`);
+  // Held back: it turns (a direction held turns an attack) and steers the
+  // new way with its share of the steering, braking first.
+  slide.step({ runLeft: true });
+  assert.equal(slide.fighter.facing, -1, 'turned');
+  assert.ok(slide.fighter.body.vx < kept, 'steered back');
 });
 
 // ---- Standing on the air -------------------------------------------------------------

@@ -13,8 +13,9 @@
 // MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares with).
 // Important constraints: definitions are frozen and validated once; a
 // field this schema does not know is carried along untouched, never
-// guessed at. Defaults below are the planted attack: changing one changes
-// every fighter that leaves the field out.
+// guessed at. Defaults below (and an attack's mobility tier, see
+// js/data/attack-mobility.js) change every fighter that leaves the field
+// out.
 //
 //
 // Attacks are pure data on the character definition; Fighter turns each entry
@@ -71,21 +72,30 @@
 // (bottom-centre) and mirrored automatically.
 //
 // Every attack also says how the fighter moves while it plays (see
-// steer in js/game/fighters/movement.js). Normal locomotion is off, but that is not the
-// same as standing still: the attack keeps a share of the speed the fighter
-// carried into it (`momentum` on the ground, `airMomentum` in the air; on
-// the ground never more than that share of the fighter's top speed), lets the fighter
-// steer with a share of its normal acceleration and top speed (`control`,
-// `airControl`: 0 is none, 1 is all), and lets the rest of that speed run
-// down under `friction` x the ground deceleration (the air drag in the air).
+// steerAttack in js/game/fighters/movement.js). Normal locomotion is off,
+// but that is not the same as standing still: the attack keeps a share of
+// the speed the fighter carried into it (`momentum` on the ground,
+// `airMomentum` in the air), lets the fighter steer with a share of its
+// normal steering authority (`control`, `airControl`: how quickly the
+// held direction changes its velocity, 0 none, 1 all) toward a share of
+// its top speed (`topSpeed`, `airTopSpeed`), and lets the speed it is not
+// steering run down under `friction` x the ground deceleration (the air
+// drag in the air). Authority and speed are apart on purpose: a quick
+// strike with 0.8 of the steering still holds the whole run.
+//
+// An attack names its mobility tier (`mobility`: 'quick', 'medium',
+// 'heavy' or 'planted', see js/data/attack-mobility.js) and the tier
+// supplies those six numbers; a field it writes itself wins over the
+// tier's. One that names none is 'medium': no attack stands its fighter
+// still unless its own data says so ('planted', or a `momentum` of 0).
 // A `step` is movement the attack makes itself: as its time crosses `at`,
 // the fighter's forward speed is raised to at least `speed` (on the ground
-// only). The defaults are a planted attack: all the speed kept, no steering,
-// normal friction.
+// only).
 //
-//   attack2: { ..., momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 } },
-//   midair_attack1: { ..., airMomentum: 1, airControl: 0.6 },
-//   extra_attack: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
+//   attack1: { ..., mobility: 'quick' },
+//   attack2: { ..., mobility: 'heavy', step: { at: 0, speed: 280 } },
+//   extra_attack: { ..., mobility: 'planted', momentum: 0 },
+//   midair_attack2: { ..., mobility: 'heavy', motion: { type: 'slam', ... }, airControl: 0.4, airTopSpeed: 0.4 },
 //
 // `hitCancel` (seconds into the attack, or null for never) is how a
 // connected attack makes room for a follow-up: once it has hit (a Shield's
@@ -258,13 +268,15 @@
 // them). Its length is one pass of its clip (the fighter's art decides it:
 // see createAttackDefinition's `clipDuration`), all of it recovery, so the
 // fighter is committed and harmless for exactly as long as the art plays.
-// The baseline repeat cooldown, no hit-cancel; it moves like any planted attack (the
-// defaults below). Nothing about it names a fighter: any fighter whose art
-// arrives before its attributes can use it.
+// The baseline repeat cooldown, no hit-cancel; it moves by its mobility
+// tier like any attack (the default one unless it names its own). Nothing
+// about it names a fighter: any fighter whose art arrives before its
+// attributes can use it.
 //
 //   attack1: { animation: 'attack1', pending: true },
 
 import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { resolveMobility } from '../../data/attack-mobility.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { createHit, resolveHitEffects } from './hit-effects.js';
 import { assertNoShieldBypass, attackOffense, resolveOffense } from './offense.js';
@@ -281,14 +293,11 @@ const ATTACK_DEFAULTS = {
   hitstop: 0.06,
   cooldown: REPEAT_COOLDOWN,
   groundOnly: false,
-  // The attack governs the fighter's movement while it plays (see the
-  // fields below). False leaves normal locomotion on throughout.
+  // The attack governs the fighter's movement while it plays: its mobility
+  // tier's momentum, airMomentum, control, airControl, topSpeed,
+  // airTopSpeed and friction (js/data/attack-mobility.js), each overridden
+  // by the attack's own. False leaves normal locomotion on throughout.
   lockMovement: true,
-  momentum: 1,       // x the horizontal speed kept as it starts on the ground
-  airMomentum: 1,    // the same, starting in the air
-  control: 0,        // share (0-1) of normal steering kept on the ground
-  airControl: 0,     // the same in the air
-  friction: 1,       // x the ground deceleration while it is not steered
   step: null,        // { at, speed }: forward speed raised to `speed` as its time crosses `at`
   hitCancel: null,   // seconds in: from then on, once it has hit, an attack, a jump or a Dash may cut it short
   baseLaunch: 0,
@@ -530,7 +539,7 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
       throw new Error(`[Alva] Attack "${spec.id}" is pending but declares ${declared.join(', ')}: drop \`pending\` to author it`);
     }
     const def = {
-      ...ATTACK_DEFAULTS, ...spec,
+      ...ATTACK_DEFAULTS, ...spec, ...resolveMobility(spec, owner),
       pending: true, startup: 0, active: 0, recovery: Math.max(0, clipDuration), hitbox: null, projectile: null,
     };
     def.total = def.recovery;
@@ -539,8 +548,8 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
     return Object.freeze(def);
   }
   const def = spec.hits
-    ? { ...ATTACK_DEFAULTS, ...spec }
-    : { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, owner) };
+    ? { ...ATTACK_DEFAULTS, ...spec, ...resolveMobility(spec, owner) }
+    : { ...ATTACK_DEFAULTS, ...spec, ...resolveMobility(spec, owner), ...resolveHitLaunch(spec, owner) };
   Object.assign(def, resolveHitEffects(spec, owner));
   if (spec.hits) Object.assign(def, resolveStrikes(spec, def));
   else if (def.hitbox) def.damage = resolveHitDamage(spec.damage, owner);

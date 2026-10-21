@@ -172,8 +172,9 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
     motion: atk.motion?.type ?? null, motionSpec: atk.motion ?? null, pull: atk.pull ?? projectile?.pull ?? null,
     cooldown: atk.cooldown, abilityCooldown: 0, airUses: atk.airUses, freeFall: !!atk.freeFall,
     groundOnly: !!atk.groundOnly, hitCancel: atk.hitCancel, energyCost,
-    lockMovement: atk.lockMovement, momentum: atk.momentum, airMomentum: atk.airMomentum,
-    control: atk.control, airControl: atk.airControl, friction: atk.friction, step: atk.step,
+    lockMovement: atk.lockMovement, mobility: atk.mobility, momentum: atk.momentum, airMomentum: atk.airMomentum,
+    control: atk.control, airControl: atk.airControl, topSpeed: atk.topSpeed, airTopSpeed: atk.airTopSpeed,
+    friction: atk.friction, step: atk.step,
     passThrough: !!atk.passThrough, deflectProjectiles: !!atk.deflectProjectiles, carry: atk.carry,
   };
 }
@@ -199,7 +200,8 @@ function techniqueMove(f, special, sprites) {
     blockstun: burstHit?.blockstun ?? 0, hitstop: burstHit?.hitstop ?? 0, reach: t.burst ? { ...t.burst.hitbox } : null,
     hitbox: t.burst?.hitbox ?? null, motion: null, motionSpec: null, pull: projectile?.pull ?? null,
     cooldown: 0, abilityCooldown: t.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
-    energyCost: 0, lockMovement: true, momentum: 0, airMomentum: 0, control: 0, airControl: 0, friction: 1, step: null,
+    energyCost: 0, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
+    topSpeed: 0, airTopSpeed: 0, friction: 1, step: null,
     passThrough: false, deflectProjectiles: false, carry: null,
   };
 }
@@ -219,7 +221,8 @@ function summonMove(f, special, entry) {
     burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, impact: null, heal: 0, ...sum,
     blockstun: atk.blockstun, hitstop: atk.hitstop, reach: null, hitbox: atk.hitbox, motion: null, motionSpec: null,
     pull: null, cooldown: 0, abilityCooldown: s.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
-    energyCost: 0, lockMovement: true, momentum: 0, airMomentum: 0, control: 0, airControl: 0, friction: 1, step: null,
+    energyCost: 0, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
+    topSpeed: 0, airTopSpeed: 0, friction: 1, step: null,
     passThrough: false, deflectProjectiles: false, carry: null,
   };
 }

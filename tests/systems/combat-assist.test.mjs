@@ -248,10 +248,16 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
       assert.equal(player.combatAssist, null);
       assert.equal(JSON.stringify(atk), before, `${why}: the attack is unchanged`);
       assert.ok(Object.isFrozen(atk));
-      // It stopped where the attack reaches, having covered only that.
+      // It reached where the attack reaches, having covered only that, and
+      // went into the attack running: top speed handed on (never the Dash's
+      // own), the attack's share of it carrying it one step on already.
       const gap = meleeGap(player, attackReach(atk), foe, 1);
-      assert.ok(gap < 0 && gap >= -ASSIST_MARGIN - EPS, `${why}: in reach at ${gap}`);
-      assert.ok(Math.abs(player.body.x - x0 - (60 + ASSIST_MARGIN)) < 1e-3, `${why}: 61 units covered`);
+      assert.ok(gap < 0, `${why}: in reach at ${gap}`);
+      const covered = player.body.x - x0;
+      const handed = MV.maxSpeed * atk.momentum;
+      assert.ok(covered > 60 + ASSIST_MARGIN - 1e-3 && covered <= 60 + ASSIST_MARGIN + handed * DT + 1e-3, `${why}: ${covered} units covered`);
+      // (A planted attack that keeps none of its speed stands where it is.)
+      assert.ok(handed > 0 ? player.body.vx > 0 && player.body.vx <= handed + EPS : player.body.vx === 0, `${why}: into its attack at a run, never stopped dead (${player.body.vx})`);
       assert.ok(started <= Math.ceil((60 + ASSIST_MARGIN) / (MV.dashSpeed * DT)) + 1, why);
       // Nothing paid at any point.
       assert.equal(player.combat.energy, max, why);
@@ -259,7 +265,7 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
   }
 });
 
-test('from its first step the assisted attack is exactly the attack thrown in reach: its frames, timing, hits and effect', () => {
+test('from its first step the assisted attack is exactly the attack thrown in reach at a run: its frames, timing, hits, movement and effect', () => {
   for (const c of playableCharacters()) {
     for (const { action, id } of groundMelee(c)) {
       const why = `#${c.id} ${action}`;
@@ -268,10 +274,14 @@ test('from its first step the assisted attack is exactly the attack thrown in re
       assisted.tick(press(action));
       untilAttack(assisted);
       const box = assisted.player.attacks[id].hitbox;
-      const at = meleeGap(assisted.player, box, assisted.foe, 1);
-      // The same attack, Combat Assist off, thrown from that very spot.
+      // Where it began: the step it started on already carried it on by
+      // that step's speed.
+      const at = meleeGap(assisted.player, box, assisted.foe, 1) + assisted.player.body.vx * DT;
+      // The same attack, Combat Assist off, thrown from that very spot by a
+      // fighter running at it at top speed.
       const plain = rig({ character: c, assist: false });
       placeFoe(plain, plain.player.attacks[id], at, box);
+      plain.player.body.vx = MV.maxSpeed;
       plain.tick(press(action));
       assert.ok(plain.player.combat.attack, why);
       const record = (r) => {
@@ -529,7 +539,9 @@ test('at the target\'s height, low in a jump, the mid-air approach is the air da
   assert.equal(player.combat.attack?.def, atk);
   assert.ok(player.body.x - x0 < 30 + atk.hitbox.w, 'only into reach, never far past it');
   assert.ok(meleeGap(player, atk.hitbox, foe, 1) < -ASSIST_MARGIN, 'well into reach, not at its edge');
-  assert.equal(player.body.vx, 0, 'stopped where it reached');
+  // Into the attack at a run, flat across (top speed, the attack's share of
+  // it, easing under the air's drag), never the air dash's own speed.
+  assert.ok(Math.abs(player.body.vx - (MV.maxSpeed * atk.airMomentum - MV.airDeceleration * DT)) < EPS, `handed on at a run (${player.body.vx})`);
   assert.equal(player.body.vy, 0);
 });
 
@@ -890,7 +902,7 @@ test('a replacement re-measures the approach: its own reach decides where it sto
   assert.equal(player.combatAssist, null);
   assert.equal(player.combat.attack?.def.id, 'extra_attack', 'on that very step');
   assert.equal(player.combat.attack.time, 0);
-  assert.ok(player.body.x - x < 1, 'no further approach');
+  assert.ok(player.body.x - x <= MV.maxSpeed * DT + EPS, 'no further approach: only the run it goes into its attack with');
 });
 
 test('a replacement that cannot start (its cooldown) ends the approach with nothing, never the older attack', () => {
@@ -1070,7 +1082,7 @@ test('in a mode: the Void, a removed or replaced practice CPU, the arena going a
     for (const k of Object.keys(held)) delete held[k];
     assert.ok(player.combatAssist, 'closing in');
   };
-  const session = new PracticeSession({ canvas, map: PRACTICE_MAP, def: C1, sprites, input });
+  const session = new PracticeSession({ canvas, map: PRACTICE_MAP, def: C1, sprites, input, combatAssist: true });
   session.setCPU(C1, sprites);
   start(session, session.player, session.cpu);
   session.removeCPU();
@@ -1089,7 +1101,7 @@ test('in a mode: the Void, a removed or replaced practice CPU, the arena going a
   const player = session.player;
   session.destroy();
   assert.equal(player.combatAssist, null, 'the arena going');
-  const battle = new Battle({ canvas, map: getMap('desert'), p1Def: C1, p2Def: C1, p1Sprites: sprites, p2Sprites: sprites, input, seed: 4 });
+  const battle = new Battle({ canvas, map: getMap('desert'), p1Def: C1, p2Def: C1, p1Sprites: sprites, p2Sprites: sprites, input, seed: 4, combatAssist: true });
   battle.p2.controller = null;
   battle.setPhase('fight');
   start(battle, battle.p1, battle.p2);
@@ -1196,9 +1208,10 @@ test('while closing in it strikes nothing, never passes through its target and i
 // ---- Who has it ---------------------------------------------------------------------------------
 
 test('only a player\'s controller with the setting on has it: never by slot, label or fighter, never a CPU', () => {
-  const on = new PlayerController({ sample: blankInput });
+  assert.equal(new PlayerController({ sample: blankInput }).combatAssist, false, 'off by default, as the setting');
+  const on = new PlayerController({ sample: blankInput }, { combatAssist: true });
   assert.equal(on.kind, 'player');
-  assert.equal(on.combatAssist, true, 'on by default, as the setting');
+  assert.equal(on.combatAssist, true, 'on once the player turns it on');
   assert.equal(new PlayerController({ sample: blankInput }, { combatAssist: false }).combatAssist, false);
   assert.equal(new PlayerController({ sample: blankInput }, { combatAssist: 'yes' }).combatAssist, false, 'only a real true');
   const sprites = fakeSpritesOf(C1);
@@ -1224,8 +1237,9 @@ test('Quick Battle gives it to Player 1 only, as saved; Watch Mode to nobody; Pr
   const sprites = fakeSpritesOf(C1);
   const input = { flush() {}, sample: blankInput };
   const battle = (opts) => new Battle({ canvas, map: getMap('desert'), p1Def: C1, p2Def: C1, p1Sprites: sprites, p2Sprites: sprites, input, seed: 2, ...opts });
-  const quick = battle({});
-  assert.equal(quick.p1.combatAssistOn, true, 'on by default');
+  assert.equal(battle({}).p1.combatAssistOn, false, 'off by default, as the setting');
+  const quick = battle({ combatAssist: true });
+  assert.equal(quick.p1.combatAssistOn, true, 'on as saved');
   assert.equal(quick.p2.combatAssistOn, false, 'never the CPU');
   assert.ok(quick.p2.controller instanceof CombatAIController);
   const off = battle({ combatAssist: false });
@@ -1250,7 +1264,7 @@ test('Quick Battle gives it to Player 1 only, as saved; Watch Mode to nobody; Pr
     session.setFighter(getCharacter('0002'), fakeSpritesOf(getCharacter('0002')));
     assert.equal(session.player.combatAssistOn, combatAssist, 'Change Fighter keeps it');
   }
-  assert.equal(new PracticeSession({ canvas, map: PRACTICE_MAP, def: C1, sprites, input }).player.combatAssistOn, true, 'on by default');
+  assert.equal(new PracticeSession({ canvas, map: PRACTICE_MAP, def: C1, sprites, input }).player.combatAssistOn, false, 'off by default, as the setting');
 });
 
 test('the setting never changes a CPU: its decisions and movement are the same with the player\'s Combat Assist on or off', () => {

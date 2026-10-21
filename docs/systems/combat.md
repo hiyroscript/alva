@@ -95,7 +95,8 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `hitstun` / `blockstun` / `hitstop` | 0.2 / 0.12 / 0.06 s | |
 | `cooldown` | policy | Per-move repeat delay after ending or interruption: derived by the [cooldown policy](#cooldowns); leave it out. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
-| `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): by default it keeps all the speed it starts with (a Dash's burst included), unsteered, under the normal friction. |
+| `mobility` | `'medium'` | Its mobility tier (`quick`, `medium`, `heavy`, `planted`: [`js/data/attack-mobility.js`](../../js/data/attack-mobility.js)), chosen for what the move does; it supplies the six numbers below. Every roster attack names its own. |
+| `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `topSpeed`, `airTopSpeed`, `friction`, `step` | true, its tier's, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): the share of its speed it keeps, the share of the steering authority it leaves and, apart from it, the share of top speed it steers toward, the friction on what is not steered; each written field wins over the tier's. |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
@@ -766,8 +767,10 @@ per accepted repeat), no event bus.
 
 ## Combat Assist
 
-The human player's option (Home › Settings › Combat, on by default; the
-store is [`js/core/settings.js`](../../js/core/settings.js)): a melee
+The human player's option (Home › Settings › Combat, off for a new
+player, an aid they turn on; a player whose settings were saved before
+version 7 keeps what they had; the store is
+[`js/core/settings.js`](../../js/core/settings.js)): a melee
 press made just out of reach closes the gap first, straight across with
 the Dash's `mouvment` clip on the ground or straight at the target (down,
 up or across) with the air dash's `midair_mouvment` in the air, then
@@ -828,9 +831,13 @@ starts the very attack asked for. The rules are
   anything else, a homing attack included, cancels and is tried by
   `tryAction` at once, a reserved button does nothing).
   Then `stepCombatAssist` checks it may go on, measures again and either
-  finishes (`finishCombatAssist`: stop, then `tryAction(action, held,
-  { assist: false, toward: direction })`, never another approach, the
-  attack facing the way the approach went) or plans this step's move (`need`),
+  finishes (`finishCombatAssist`: the fighter goes into its attack at a
+  run, top speed toward its target, the horizontal share of the last
+  move's heading in the air, never stopped dead and never at the
+  approach's own Dash speed; then `tryAction(action, held, { assist:
+  false, toward: direction })`, never another approach, the attack facing
+  the way the approach went and keeping its share of the run as any attack
+  does) or plans this step's move (`need`),
   which the movement turns into `dashSpeed` across (`airDashSpeed` along
   the move, gravity held off, in the air) or less. After the body moves,
   leaving the ground (in the air, meeting it) or a wall cancels it; a hit cancels it in
@@ -846,10 +853,11 @@ starts the very attack asked for. The rules are
 - **Run held.** Held directions never cancel it (`assistIntents` reads
   presses only). The attack it serves records the direction held as it
   starts (`combat.attack.turnHold`); `updateFacing` never turns it while
-  that direction is still held, and lets any other direction turn it as
-  ever. (Before this update the finished approach started its attack facing
-  the held direction, so running away made an assisted attack whiff:
-  fixed.)
+  that direction is still held, and `attackSteer` never steers it with
+  that stale direction either (it would walk the fighter out of its own
+  strike); any other direction turns and steers it as ever. (Before this
+  update the finished approach started its attack facing the held
+  direction, so running away made an assisted attack whiff: fixed.)
 
 ## What a fighter may leave out
 

@@ -312,6 +312,10 @@ export class Fighter {
     this.shieldUpTime = 0;
     this.shieldDownTime = Infinity;
     this.shieldPerfectReady = false;
+    // Walking behind its Shield this step (see the Shield in update); the
+    // Shield's look reads it (its ring waves faster: see
+    // js/game/rendering/shield-fx.js).
+    this.shieldWalking = false;
     // A fresh combat state: 0 Launch Point, full Energy, Shield down and
     // every cooldown ready.
     this.combat = new CombatState(this.energyDef);
@@ -377,6 +381,7 @@ export class Fighter {
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
     this.steps++;
     this.fastFalling = false;
+    this.shieldWalking = false;
     this.airJumped = false;
     this.bounce = null;
     this.heals.length = 0;
@@ -732,13 +737,19 @@ export class Fighter {
         gravityShare = 0;
       }
     } else if (combat.shielding) {
-      // A Shield locks it: no walking or running, the current speed running
-      // down under the normal deceleration.
-      this.moveHorizontal(0, 0, 1, dt);
+      // Shield walking: a direction held behind a raised Shield walks the
+      // fighter at movement.shieldWalkSpeed (the run's acceleration and
+      // braking, toward that share of top speed; a faster run it raised the
+      // Shield in eases down to it), turning it as ever (the Shield guards
+      // both sides). In blockstun it stands: the block's push runs down
+      // under the normal deceleration, whatever is held.
+      const walk = combat.shieldStun > 0 ? 0 : held;
+      this.shieldWalking = walk !== 0;
+      this.moveHorizontal(walk, 1, 1, dt, mv.shieldWalkSpeed / mv.maxSpeed);
     } else if (atk?.motion && !atk.motion.done) {
-      gravityShare = this.moveMotion(atk, dir, dt);
+      gravityShare = this.moveMotion(atk, this.attackSteer(atk, dir), dt);
     } else if (atk?.def.lockMovement) {
-      this.moveAttack(atk, dir, dt);
+      this.moveAttack(atk, this.attackSteer(atk, dir), dt);
     } else {
       this.moveHorizontal(dir, 1, 1, dt);
     }
@@ -750,7 +761,9 @@ export class Fighter {
     if (body.grounded) this.coyote = mv.coyoteTime;
     else this.coyote = Math.max(0, this.coyote - dt);
 
-    // A held Shield outranks a jump: let go of the Shield to jump. A jump may
+    // A jump out of a raised Shield drops it and jumps (the Shield guards
+    // nothing in the air), unless a block holds it up (blockstun): then the
+    // press waits in the jump buffer for the stun to end. A jump may
     // also cut short an attack that hit (see CombatState.cancellable), the
     // human player's attack when Jump was pressed after it began (see
     // playerMayCut), and a Dash or an air dash past its cancel time (see
@@ -760,11 +773,13 @@ export class Fighter {
     // full gravity from this step. A tap is the normal jump; Jump held a
     // little longer makes it the higher jump (see below).
     const free = (canAct || combat.cancellable || this.dashCancellable || this.playerMayCut(this.jumpPressedAt)) &&
-      !combat.shielding;
+      !(combat.shielding && combat.shieldStun > 0);
     let jumped = false;
     if (this.jumpBuffer > 0 && this.coyote > 0 && free) {
       this.cutAttack();
       if (this.dash) this.endDash();
+      combat.shielding = false;
+      this.shieldWalking = false;
       gravityShare = 1;
       this.highJump = { time: 0, fromY: body.y, lift: null };
       body.vy = -this.jumpVelocity;
@@ -949,11 +964,12 @@ export class Fighter {
   }
 
   // One step of horizontal steering, with `control` (0-1) of the normal
-  // steering and `friction` x the ground deceleration while it is not
-  // steering: the shared rule (steer in js/game/fighters/movement.js) with
-  // the universal movement values and this fighter's burst.
-  moveHorizontal(dir, control, friction, dt) {
-    steer(this.body, this.movement, dir, control, friction, dt, this.burst);
+  // steering authority toward `speed` (0-1) of top speed, and `friction` x
+  // the ground deceleration while it is not steering: the shared rule
+  // (steer in js/game/fighters/movement.js) with the universal movement
+  // values and this fighter's burst.
+  moveHorizontal(dir, control, friction, dt, speed = 1) {
+    steer(this.body, this.movement, dir, control, friction, dt, this.burst, speed);
   }
 
   // One step of an attack's own movement: its step-in, then steering with
@@ -961,6 +977,15 @@ export class Fighter {
   // js/game/fighters/movement.js).
   moveAttack(atk, dir, dt) {
     steerAttack(this.body, this.movement, this.facing, atk, dir, dt, this.burst);
+  }
+
+  // The direction attack record `atk` is steered with this step: the one
+  // held, unless it is the run held since before Combat Assist faced the
+  // attack at its target (`turnHold`, see startAttack): a direction that may
+  // not turn the attack away from its target may not walk it away either.
+  // Once another is held (or none), it steers as ever.
+  attackSteer(atk, dir) {
+    return atk.turnHold != null && dir === atk.turnHold ? 0 : dir;
   }
 
   // The horizontal speed an attack starting now keeps of `vx` (see
@@ -1308,7 +1333,9 @@ export class Fighter {
     return Math.max(speed, this.body.vx * direction);
   }
 
-  // Per-action reuse readiness, shared by input and CPU planning.
+  // Per-action reuse readiness, shared by input and CPU planning: a Dash
+  // (or an air dash) may start again movement.dashRepeat after the last one
+  // started.
   movementReady(air = !this.body.grounded) {
     return !this.combat.movementCooldowns.active(air ? 'midair_mouvment' : 'mouvment');
   }
@@ -1356,7 +1383,7 @@ export class Fighter {
     // Every Dash plays its clip from the first frame, even straight after
     // another one.
     this.animator.play('mouvment', { restart: true });
-    this.combat.movementCooldowns.start('mouvment', REPEAT_COOLDOWN);
+    this.combat.movementCooldowns.start('mouvment', this.movement.dashRepeat);
     return true;
   }
 
@@ -1396,7 +1423,7 @@ export class Fighter {
     this.body.vx = direction * burst;
     this.body.vy = 0;
     this.animator.play('midair_mouvment', { restart: true });
-    this.combat.movementCooldowns.start('midair_mouvment', REPEAT_COOLDOWN);
+    this.combat.movementCooldowns.start('midair_mouvment', this.movement.dashRepeat);
     return true;
   }
 
@@ -1610,18 +1637,24 @@ export class Fighter {
     a.move = move;
   }
 
-  // The approach is over, its target reached or as close as it gets: it
-  // stops where it is (in the air, where it hangs, gravity back from this
-  // step) and the attack it served starts there by the ordinary rules
-  // (tryAction, never another approach): its own timing, hitbox and
-  // motion, facing the way the approach went (toward its target), never
-  // turned back by the direction held as it starts (a run held through the
-  // whole request, toward the target or away: see startAttack's `toward`).
-  // One that cannot start now is not started, nor kept for later.
+  // The approach is over, its target reached or as close as it gets: the
+  // fighter goes into the attack it served running, never stopped dead: at
+  // top speed toward its target (the horizontal share of the way it was
+  // heading, in the air, where it hangs, gravity back from this step), the
+  // approach's own Dash speed spent (it was the assist's, not the
+  // player's). The attack then starts by the ordinary rules (tryAction,
+  // never another approach) and keeps its share of that speed exactly as
+  // an attack thrown at a run does (see attackStartSpeed): its own timing,
+  // hitbox and motion, facing the way the approach went (toward its
+  // target), never turned back by the direction held as it starts (a run
+  // held through the whole request, toward the target or away: see
+  // startAttack's `toward`). One that cannot start now is not started, nor
+  // kept for later; the fighter runs on from there as ever.
   finishCombatAssist(held) {
-    const { action, air, direction, button } = this.combatAssist;
+    const { action, air, direction, button, move } = this.combatAssist;
     this.combatAssist = null;
-    this.body.vx = 0;
+    const heading = move?.length > 0 ? move.dx / move.length : 1;
+    this.body.vx = direction * this.maxSpeed * heading;
     if (air) this.body.vy = 0;
     if (this.tryAction(action, held, { assist: false, toward: direction, button })) this.bufferedAttack = null;
   }
@@ -2186,6 +2219,9 @@ export class Fighter {
   // The land and Shield-release poses never hold anyone: running (a
   // direction held, or sliding fast) goes straight past them, and anything
   // of higher priority (a jump, an attack, a Dash, the Shield) ends them.
+  // Walking behind the Shield has no pose of its own: the held Shield pose
+  // stays (the Shield's waving ring runs faster instead: see
+  // js/game/rendering/shield-fx.js).
   updateState(dt) {
     const { body, combat } = this;
     const running = (this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140;

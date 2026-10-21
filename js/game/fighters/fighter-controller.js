@@ -50,13 +50,13 @@ export function jumpTapHold(self) {
 // Fighter.playerMayCut), and the one that may have Combat Assist (see
 // Fighter.tryCombatAssist) and Combo Assist (see Fighter.comboAction), each
 // only while its own setting (`combatAssist`, `comboAssist`: Home ›
-// Settings › Combat, read as the mode starts) is on. Both are on by
-// default, as the settings are.
+// Settings › Combat, read as the mode starts) is on. As in the settings,
+// Combat Assist is off and Combo Assist on unless said otherwise.
 // Each sample is taken for the fighter as it is at that step (on the ground
 // or not, its facing, which fighter it is), so a game controller resolves
 // through that fighter's own controller profile (js/core/input-manager.js).
 export class PlayerController {
-  constructor(input, { combatAssist = true, comboAssist = true } = {}) {
+  constructor(input, { combatAssist = false, comboAssist = true } = {}) {
     this.input = input;
     this.kind = 'player';
     this.combatAssist = combatAssist === true;

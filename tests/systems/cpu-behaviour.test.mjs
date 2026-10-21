@@ -104,7 +104,13 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
       }
       assert.ok(kos >= 2, `${difficulty} #${cpuDef.id}: finished ${kos} of 3`);
     }
-    assert.ok(launches / commits > 0.6, `${difficulty}: ${launches} of ${commits} commitments were launches that can end a life`);
+    // Most of them: since attacks steer (js/data/attack-mobility.js), the
+    // competent opponent's own strikes carry it out of the corner more
+    // often, so the fight runs on into neutral pokes after a launch misses
+    // (seeds 3-10: 0.58-0.59 at every level, against 0.63-0.69 when attacks
+    // could not be steered; with the opponent's strikes unsteered the CPU's
+    // own share is back to 0.62-0.74). Its finishing is checked above.
+    assert.ok(launches / commits > 0.5, `${difficulty}: ${launches} of ${commits} commitments were launches that can end a life`);
   }
 });
 

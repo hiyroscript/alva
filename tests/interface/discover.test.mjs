@@ -1098,7 +1098,7 @@ test('Movement paragraphs and Launch labels follow English and French, including
       const paragraphs = movement.panel.querySelectorAll('p');
       assert.deepEqual(paragraphs.map(text), [strings['movement.summary'],
         MOVEMENT_GUIDE.map((m) => `${strings[`movement.${m.id}.name`]}. ${strings[`movement.${m.id}.description`]}`).join(' ')]);
-      assert.equal(paragraphs[1].querySelectorAll('strong').length, 6);
+      assert.equal(paragraphs[1].querySelectorAll('strong').length, MOVEMENT_GUIDE.length);
       assert.deepEqual(launch.panel.querySelectorAll('.discover-entry-title').map(text),
         ['launchPointTitle', 'baseLaunchTitle', 'directionalLaunchTitle'].map((key) => strings[`discover.${key}`]));
       assert.deepEqual(launch.panel.querySelectorAll('.discover-tier-name').slice(4).map(text),

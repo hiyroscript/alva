@@ -331,8 +331,8 @@ export const CHARACTER_0004 = {
   // fist raised a frame more. Every Deflect's 3, Base Launch 2, here
   // upward, the way the uppercut goes; while the arc is live it turns the
   // other fighter's projectiles back at their thrower, now #0004's. A
-  // quarter of a second in all, keeping the whole of its drift; no
-  // cooldown of its own.
+  // quarter of a second in all, keeping the whole of its drift, steered as
+  // a medium strike (js/data/attack-mobility.js); no cooldown of its own.
   deflect: {
     animation: 'deflect',
     startup: 2 / FPS_0004.deflect,
@@ -343,8 +343,7 @@ export const CHARACTER_0004 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    airMomentum: 1,
-    airControl: 0.4,
+    mobility: 'medium',
     deflectProjectiles: true,
   },
 
@@ -500,14 +499,17 @@ export const CHARACTER_0004 = {
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). Each has only the universal 0.5-second repeat
   // delay (the cooldown policy's: none deals 10, paralyzes or charms),
-  // independent of its phases and of other moves' cooldowns.
+  // independent of its phases and of other moves' cooldowns. Each moves by
+  // the mobility tier its role gives it (js/data/attack-mobility.js): its
+  // dance strings quick, so they flow with the run and the drift, its swings
+  // and the Melody medium, the Stage Dive heavy.
   attacks: {
     // The Dance Combo: the crouch and the spin (frames 1-2), then two
     // strikes. The backhand swipe (frames 3-4): 1 and no launch, a stun
     // long enough to hold the target for the next. The punch (frame 6): 3,
     // Base Launch 1 sideways. Back on frame 7: 0.35 s in all. It opens a
-    // follow-up once the punch is thrown, and keeps all the speed it starts
-    // with (a Dash's included), under 0.6 of the ground deceleration.
+    // follow-up once the punch is thrown. A quick strike: it keeps all the
+    // speed it starts with (a Dash's included) and the run on through it.
     attack1: {
       animation: 'attack1',
       recovery: 1 / FPS_0004.attack1,
@@ -519,15 +521,15 @@ export const CHARACTER_0004 = {
         { at: 5 / FPS_0004.attack1, active: 1 / FPS_0004.attack1, hitbox: { x: 8, y: -62, w: 28, h: 18 }, damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal' },
       ],
       groundOnly: true,
-      momentum: 1,
-      friction: 0.6,
+      mobility: 'quick',
       hitCancel: 6 / FPS_0004.attack1,
     },
     // The Air Dance: a knee and a leg swung back (frames 1-2), then two
     // strikes. The low sweep (frame 3): its trail under the body, 1, no
     // launch. The rising crescent and the high kick (frames 4-5): 3, Base
-    // Launch 2 upward. Back on frames 6-7: 0.35 s in all. It steers half as
-    // well as it drifts, and a hit opens a follow-up from frame 6.
+    // Launch 2 upward. Back on frames 6-7: 0.35 s in all. A quick strike,
+    // steered almost as well as it drifts, and a hit opens a follow-up from
+    // frame 6.
     midair_attack1: {
       animation: 'midair_attack1',
       recovery: 2 / FPS_0004.midair_attack1,
@@ -538,15 +540,15 @@ export const CHARACTER_0004 = {
         { at: 2 / FPS_0004.midair_attack1, active: 1 / FPS_0004.midair_attack1, hitbox: { x: -6, y: -34, w: 52, h: 36 }, damage: 1 },
         { at: 3 / FPS_0004.midair_attack1, active: 2 / FPS_0004.midair_attack1, hitbox: { x: 0, y: -84, w: 46, h: 62 }, damage: 3, baseLaunch: 2, directionalLaunch: 'vertical' },
       ],
-      airMomentum: 1,
-      airControl: 0.5,
+      mobility: 'quick',
       hitCancel: 5 / FPS_0004.midair_attack1,
     },
     // The Leek Swing: the leek raised overhead (frame 1), then brought down
     // through a wide arc (frame 2, live: from over the head to the ground
     // in front, out to 48 units, its longest reach), and held low (frame 3,
     // two frames). 3, Base Launch 2 sideways; a Shield that blocks it is
-    // shoved back (280 units/s). 0.4 s in all, no follow-up.
+    // shoved back (280 units/s). 0.4 s in all, no follow-up. A medium
+    // strike.
     attack2: {
       animation: 'attack2',
       startup: 1 / FPS_0004.attack2,
@@ -561,8 +563,7 @@ export const CHARACTER_0004 = {
       hitstop: 0.05,
       blockPush: 280,
       groundOnly: true,
-      momentum: 0.6,
-      friction: 0.8,
+      mobility: 'medium',
     },
     // The Leekspin: the leek gathered up (frame 1, a hang), then it rises at
     // 480 units/s as the leek twirls (frames 2-4, about 96 units, and on up
@@ -571,7 +572,8 @@ export const CHARACTER_0004 = {
     // and whoever they catch is carried up with it (`carry`, at its own
     // speed). The swing down (frame 4): 3, Base Launch 2 sideways, flung
     // away from the top of the climb. Drifting on frame 5. Once per
-    // airtime; it steers a little.
+    // airtime; a medium strike, its lift steered a little (0.4 of the
+    // steering, toward 0.4 of top speed).
     midair_attack2: {
       animation: 'midair_attack2',
       recovery: 1 / FPS_0004.midair_attack2,
@@ -586,15 +588,18 @@ export const CHARACTER_0004 = {
       ],
       airUses: 1,
       motion: { type: 'rise', speed: 480 },
+      mobility: 'medium',
       airMomentum: 0.6,
       airControl: 0.4,
+      airTopSpeed: 0.4,
     },
     // The Crescent Kick: the stance and the knee drawn up (frames 1-3),
     // then the spin and the high kick (frames 4-6, live: the arc the leg
     // sweeps over and before it, from the chest to well over the head, out
     // to 42 units): 3, Base Launch 2 straight up, its anti-air. The leg
     // coming down and back (frames 7-8): 0.4 s in all. A hit opens a
-    // follow-up from frame 7 (a jump after it, into the air).
+    // follow-up from frame 7 (a jump after it, into the air). A medium
+    // strike.
     attack3: {
       animation: 'attack3',
       startup: 3 / FPS_0004.attack3,
@@ -608,8 +613,7 @@ export const CHARACTER_0004 = {
       blockstun: 0.14,
       hitstop: 0.05,
       groundOnly: true,
-      momentum: 0.8,
-      friction: 0.8,
+      mobility: 'medium',
       hitCancel: 6 / FPS_0004.attack3,
     },
     // The Stage Dive: tucked (frame 1, a hang of 1/15 s), then the dive,
@@ -621,7 +625,8 @@ export const CHARACTER_0004 = {
     // off the ground is popped up too). Then a crouch on landing and up
     // again (its impact clip, 3/15 s), a follow-up open from its second
     // frame once anything has been hit. Once per airtime, never while
-    // flying from a launch; off the stage it dives into the Void.
+    // flying from a launch; off the stage it dives into the Void. Heavy, its
+    // dive's drift its own (half the steering, toward half of top speed).
     midair_attack3: {
       animation: 'midair_attack3',
       startup: DIVE_HANG_0004,
@@ -644,13 +649,16 @@ export const CHARACTER_0004 = {
           animation: 'midair_attack3_impact',
         },
       },
+      mobility: 'heavy',
       airMomentum: 0.5,
       airControl: 0.5,
+      airTopSpeed: 0.5,
       hitCancel: DIVE_HANG_0004 + DIVE_PLUNGE_0004 + 1 / FPS_0004.midair_attack3,
     },
     // The Melody (extra_attack): a breath and a fist raised (frames 1-3),
     // then the arm thrown out and the note sung (frame 4: its projectile,
-    // from the hand), held two frames more: 0.4 s in all. Ground only.
+    // from the hand), held two frames more: 0.4 s in all. Ground only. A
+    // medium cast: singing never roots it, but it slows it a little.
     extra_attack: {
       animation: 'extra_attack',
       startup: 3 / FPS_0004.extra_attack,
@@ -659,8 +667,7 @@ export const CHARACTER_0004 = {
       hitbox: null,
       projectile: { id: 'extra_attack_object', spawnAt: 3 / FPS_0004.extra_attack, offset: { x: 34, y: -52 } },
       groundOnly: true,
-      momentum: 0.5,
-      friction: 0.8,
+      mobility: 'medium',
     },
   },
 };

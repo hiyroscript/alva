@@ -107,8 +107,9 @@ test('Quick Battle and Practice Ground give it to Player 1 only, as saved; Watch
   assert.equal(battle({}).p2.comboAssistOn, false, 'never the CPU');
   const off = battle({ comboAssist: false });
   assert.equal(off.p1.comboAssistOn, false);
-  assert.equal(off.p1.combatAssistOn, true, 'Combat Assist is its own setting');
-  assert.equal(battle({ combatAssist: false }).p1.comboAssistOn, true, 'and the reverse');
+  assert.equal(off.p1.combatAssistOn, false, 'Combat Assist is its own setting (off by default)');
+  assert.equal(battle({ comboAssist: false, combatAssist: true }).p1.combatAssistOn, true, 'whatever Combo Assist is');
+  assert.equal(battle({ combatAssist: true }).p1.comboAssistOn, true, 'and the reverse');
   for (const comboAssist of [true, false]) {
     const watch = battle({ mode: 'watch', comboAssist });
     assert.equal(watch.p1.comboAssistOn || watch.p2.comboAssistOn, false, 'Watch Mode: two CPUs');

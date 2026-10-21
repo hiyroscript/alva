@@ -114,8 +114,10 @@ export const FR = {
   'movement.airJumps.description': 'Deux sauts de plus en l’air. Atterrir ou être touché les rend.',
   'movement.fastFall.name': 'Chute rapide',
   'movement.fastFall.description': 'Maintenez Bas en tombant pour descendre plus vite.',
+  'movement.shieldWalk.name': 'Marche sous Bouclier',
+  'movement.shieldWalk.description': 'Maintenez une direction derrière le Bouclier pour avancer lentement en vous protégeant. Sautez directement depuis le Bouclier quand vous ne bloquez pas.',
   'movement.dash.name': 'Sprint',
-  'movement.dash.description': 'Appuyez sur Q/E, sur le bouton de sprint de la manette (la gâchette haute gauche par défaut), ou sur un bouton de mouvement pour un élan de vitesse. Une attaque ou un saut peut l’interrompre après un instant.',
+  'movement.dash.description': 'Appuyez sur Q/E, sur le bouton de sprint de la manette (la gâchette haute droite par défaut), ou sur un bouton de mouvement pour un élan de vitesse. Une attaque ou un saut peut l’interrompre après un instant.',
   'movement.airDash.name': 'Sprint aérien',
   'movement.airDash.description': 'Le sprint en l’air, à l’horizontale, une fois avant de retoucher le sol.',
 

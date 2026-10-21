@@ -1,6 +1,6 @@
 // Run with node --test tests/systems/energy.test.mjs (no dependencies).
 // Energy: the one resource, the same bar (100) and the same prices for
-// every fighter, spent only by the Dash and the air dash (25 as either
+// every fighter, spent only by the Dash and the air dash (20 as either
 // starts, a Dash cancel included), the Deflect (15 as it starts) and the
 // Shield (15 for each hit it blocks, a perfect block's included); never by
 // Combat Assist. Its rules, clamping, its one passive
@@ -33,18 +33,18 @@ const dash = (step, dir = 'runRight') => {
   return step({ [dir === 'runRight' ? 'mouvementRightPressed' : 'mouvementLeftPressed']: true, [dir]: true });
 };
 
-test('the Energy rules are universal: 100 full, 25 per Dash, air dash or Dash cancel, 15 per Deflect, 15 per blocked hit; a fighter sets only its refill', () => {
-  assert.deepEqual([MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST], [100, 25, 15, 15]);
+test('the Energy rules are universal: 100 full, 20 per Dash, air dash or Dash cancel, 15 per Deflect, 15 per blocked hit; a fighter sets only its refill', () => {
+  assert.deepEqual([MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST], [100, 20, 15, 15]);
   assert.deepEqual(def.energy, { regen: 14 }, '#0001 declares its refill rate, and nothing else');
   assert.equal(def.stamina, undefined, 'the old name is gone');
-  const RULES = { max: 100, dashCost: 25, dashCancelCost: 25, shieldHitCost: 15, deflectCost: 15 };
+  const RULES = { max: 100, dashCost: 20, dashCancelCost: 20, shieldHitCost: 15, deflectCost: 15 };
   assert.deepEqual({ ...resolveEnergy(undefined) }, { ...RULES, regen: 12 }, 'the default refill');
   assert.deepEqual({ ...resolveEnergy({ regen: 14 }) }, { ...RULES, regen: 14 });
   // Every universal field may be left out, or declared as the rule says;
   // any other value, or a field the schema does not know, is refused.
   assert.deepEqual({ ...resolveEnergy({ ...RULES, regen: 9 }) }, { ...RULES, regen: 9 });
   for (const [field, value] of [
-    ['max', 80], ['max', 120], ['dashCost', 12], ['dashCost', 15], ['dashCancelCost', 35], ['dashCancelCost', 40],
+    ['max', 80], ['max', 120], ['dashCost', 12], ['dashCost', 25], ['dashCancelCost', 35], ['dashCancelCost', 40],
     ['shieldHitCost', 20], ['shieldHitCost', 25], ['shieldHitCost', 0], ['deflectCost', 0],
   ]) {
     assert.throws(() => resolveEnergy({ [field]: value }, 'Character "x"'), new RegExp(`Character "x" declares Energy ${field} ${value}: it is ${RULES[field]} for every fighter`));
@@ -151,7 +151,7 @@ test('it refills at one passive rate only, whatever is held: standing, holding D
   near(c.energy, 6, 'updateEnergy(dt) takes nothing else into account (the default 12 / s)');
 });
 
-test('a Dash spends exactly its cost (25) as it starts, and only then; spending the last of it exhausts', () => {
+test('a Dash spends exactly its cost (20) as it starts, and only then; spending the last of it exhausts', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   dash(step);
@@ -229,7 +229,7 @@ test('exhaustion lockout: from 0, Dash and Shield stay locked through 25, 50 and
 });
 
 test('too little left still pays: a Dash or a block with less than it costs takes all of it, and the bar turns gray until full', () => {
-  // A Dash on 5 (it costs 25).
+  // A Dash on 5 (it costs 20).
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   c.setEnergy(5);

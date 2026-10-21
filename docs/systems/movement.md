@@ -20,7 +20,8 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/data/movement.js`](../../js/data/movement.js) | The numbers: `BASE_FIGHTER_MOVEMENT`, one frozen object every Fighter reads (`MOVEMENT_FIELDS` lists them). `movementProblems` / `assertUniversalMovement`, which the registry uses to refuse a definition that declares movement of its own. And the Discover copy (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`). |
-| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
+| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed; a share of the steering authority and, apart from it, a share of top speed to steer toward), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
+| [`js/data/attack-mobility.js`](../../js/data/attack-mobility.js) | How much movement an attack leaves its fighter: `ATTACK_MOBILITY`, the four tiers (quick, medium, heavy, planted) every attack names (`mobility`), and `resolveMobility` (its tier's numbers, with the attack's own in their place). See [attack movement](#5-attack-movement). |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms, moving ones included (`carryBody` carries a fighter standing on one by exactly its movement before its own step; `releaseGround` lets go of one that has vanished; see [stages](../gameplay/stages.md#platform-hazards)). It never knows why a body moves. |
 
@@ -45,8 +46,9 @@ ground) or an air dash (in the air) is tried, or buffered; a technique
 advances; the Shield goes up or down (on the ground only); then
 horizontal movement is chosen, in priority: standing still (a summon's
 startup, a technique's cast, a paralysis), the hitstun drift, the Dash's
-or the air dash's speed (an air dash also holds the fall off), a Shield's
-stand, an attack's own motion, an attack's steering, or normal steering.
+or the air dash's speed (an air dash also holds the fall off), Combat
+Assist's approach, the Shield walk (a stand in blockstun), an attack's own
+motion, an attack's steering, or normal steering.
 Then the jump (buffered, with coyote time), the air jump, the higher
 jump's lift and the fast fall; then the body is integrated and collided;
 then launch rebounds, landing resets (air jumps, air dashes, per-airtime
@@ -88,7 +90,9 @@ plays every pairing at 30, 60 and 144 fps and compares every step).
 | `dashSpeed` / `dashDuration` | 1250 / 1/6 | The Dash: a burst at this speed for this long (about 208 units). |
 | `dashCancelTime` | 0.05 | From this far into a Dash or air dash, an attack, a Deflect or a jump may cut it short. |
 | `airDashSpeed` / `airDashDuration` / `airDashUses` | 1250 / 1/6 / 1 | The air dash, once per airtime; landing or a hit gives it back. |
+| `dashRepeat` | 0.4 | A Dash (or, on its own timer, an air dash) may start again this long after the last one started. |
 | `attackBuffer` | 0.15 | How long an attack press (and a Dash request) the fighter cannot act on yet is kept. |
+| `shieldWalkSpeed` | 130 | Shield walking: a direction held behind a raised Shield walks the fighter at this speed (about a third of the run), with the run's acceleration and braking. |
 | `hitstunFriction` / `hitstunAirDrag` | 1600 / 210 | How a launch or push runs down while stunned, whatever is held: the rates Launch Point is tuned against. |
 | `dropThroughTime` | 0.28 | How long a platform drop ignores the platform (the training CPU's drop only; no player control drops through). |
 
@@ -109,10 +113,16 @@ away:
   speed carries straight through it, and steering the other way bends it
   round as the air allows (`airTurnBoost`), never in one step.
 - **Attacks.** An attack keeps its `momentum` share of the speed it starts
-  with (`airMomentum` in the air), which is all of it unless the attack
-  says otherwise, never capped at top speed: a Dash's burst carries on
-  into the attack. A planted attack is a choice its data makes (a low
-  `momentum`, a high `friction`), never the default.
+  with (`airMomentum` in the air: its mobility tier's, all of it for a
+  quick strike), never capped at top speed: a Dash's burst carries on
+  into the attack. The player then steers it on from there, as its tier
+  allows. A planted attack is a choice its data makes (the `planted`
+  tier, a `momentum` of 0), never the default.
+- **Combat Assist.** Its approach hands its fighter into the attack at a
+  run (top speed toward the target, the horizontal share of its heading in
+  the air), never stopped dead: the approach's own Dash speed is the
+  assist's and is spent; the attack keeps its share of the run as any
+  attack does.
 - **Dashes.** A Dash or air dash goes at its speed or at the fighter's own
   speed that way if that is faster: it never slows anyone down. When it
   ends (run out, cut short, or stopped by a wall or the ground) the
@@ -155,15 +165,55 @@ both. Free fall (after a move that spends the airtime) rules them out.
 ## 5. Attack movement
 
 Each attack also says how its fighter moves while it plays
-([combat](combat.md#attacks)): `momentum` / `airMomentum` (the share of
-the speed it started with that it keeps, all of it by default),
-`control` / `airControl` (a share of normal steering), `friction` (× the
-ground deceleration on what is not steered; above top speed the overspeed
-brake applies instead) and `step: { at, speed }` (a step-in that never
-slows a fighter already going faster). `lockMovement: false` keeps normal
-locomotion throughout. An attack with a `motion` of its own (a homing
-dash, a plunge, a lift, a roll, a hover) owns the body instead
+([combat](combat.md#attacks)), and the player keeps control of it:
+
+- `momentum` / `airMomentum`: the share of the speed it started with that
+  it keeps;
+- `control` / `airControl`: the share of the normal **steering authority**
+  it leaves, how quickly the held direction changes its velocity (the
+  acceleration, and the turn's braking);
+- `topSpeed` / `airTopSpeed`: the share of top speed that steering builds
+  toward, **apart from the authority**: a quick strike steers with 0.8 of
+  the authority but may hold the whole run; a heavy one with 0.2 of it
+  toward a quarter of the run;
+- `friction`: × the ground deceleration on what is not steered (above top
+  speed the overspeed brake applies instead; the air drag in the air);
+- `step: { at, speed }`: a step-in that never slows a fighter already
+  going faster.
+
+Writing those numbers on every attack would invite forty slightly
+different guesses, so an attack names its **mobility tier** (`mobility`)
+and the tier supplies them ([`js/data/attack-mobility.js`](../../js/data/attack-mobility.js)); a field the attack writes
+itself wins over the tier's:
+
+| Tier | `control` / `airControl` | `topSpeed` / `airTopSpeed` | `momentum` / `airMomentum` | `friction` | For |
+| --- | --- | --- | --- | --- | --- |
+| `quick` | 0.8 / 0.9 | 1 / 1 | 1 / 1 | 0.6 | light, fast strikes: the run and the drift carry on through them |
+| `medium` | 0.55 / 0.7 | 0.6 / 0.9 | 0.9 / 1 | 0.8 | a clear wind-up or recovery, ordinary casts, everyday aerials with a motion of their own |
+| `heavy` | 0.2 / 0.4 | 0.25 / 0.6 | 0.6 / 0.9 | 1 | deliberate commitments: finishers, long flurries, trap casts, plunges |
+| `planted` | 0 / 0 | — | 1 / 1 | 1 | no steering: a move that roots its fighter, a roll's curl |
+
+A tier is chosen for what the move does, never for its name, slot, damage
+or clip length; each fighter's definition says why each move has its
+tier. An attack that names none is `medium`, so an ordinary attack never
+defaults to standing still. A plunge's or a lift's drift (a `slam`,
+`bounce` or `rise`) is the motion's own: its `airTopSpeed` is its
+`airControl`, exactly as authored. Steering works in every phase (startup,
+strike, recovery); a direction held also turns the attack (7.2.2 of the
+specification), so steering back turns it and carries it the new way.
+Combat Assist's attack is the exception: the run held since before the
+request neither turns nor steers it until another direction is held.
+
+`lockMovement: false` keeps normal locomotion throughout. An attack with
+a `motion` of its own (a homing dash, a plunge, a lift, a roll, a hover)
+owns the body instead
 ([combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)).
+
+The CPU obeys the same steering. Its predictions play an attack out
+unsteered, so on the ground it holds no direction through its own strike
+(`Executor.finish` in
+[`js/game/ai/cpu-intelligence/executor.js`](../../js/game/ai/cpu-intelligence/executor.js)):
+the choice of what to hold, never a different rule.
 
 ## 6. The Dash and the air dash
 
@@ -180,7 +230,7 @@ Mouvement buttons. Run taps never request it, on the ground or airborne.
 It needs the fighter free to act (or in an attack that hit and
 may be cut short: a Dash cancel), grounded, not shielding, not exhausted
 and real `mouvment` frames (refused and logged otherwise, never faked
-with the run). It costs 25 Energy (`DASH_ENERGY_COST`, the same for every
+with the run). It costs 20 Energy (`DASH_ENERGY_COST`, the same for every
 fighter, a Dash cancel included; see [Energy](energy.md)); running,
 jumps, air jumps, turning, air control and the fast fall cost none. It is movement only: no hitbox, damage,
 launch or invulnerability. Leaving the ground or meeting a solid ends it.
@@ -191,7 +241,7 @@ across it, facing the way it goes at once; its vertical speed is zeroed
 as it starts and gravity is held off throughout (no fall, no fast fall).
 `airDashUses` per airtime, given back on landing and by a hit; an air
 jump gives none back. The same rules as a Dash otherwise, and never while
-still flying from a launch or in free fall, and for the same 25 Energy.
+still flying from a launch or in free fall, and for the same 20 Energy.
 Meeting a solid or the ground ends it.
 
 **Flowing out of them.** Both commit to `dashCancelTime` of themselves;
@@ -219,7 +269,7 @@ all (it moves like a Dash but is none).
 In the air it goes straight at the target, down, up or across, with no
 fall, and uses up the airtime's air dash. It is not a Dash (`fighter.combatAssist`, never
 `fighter.dash`): it covers only the distance the attack needs, ends by
-starting that attack (stopped where it reached), and a jump, a Dash
+starting that attack at a run (see [momentum](#3-momentum)), and a jump, a Dash
 request (which then Dashes as above), the Shield, the Deflect or another
 move cancels it at any time, with no `dashCancelTime` to wait out. One on
 the ground never leaves it: an approach that would end past a ledge does
@@ -255,11 +305,25 @@ frames there is no Dash, without `midair_mouvment` frames no air dash
 every playable fighter has the same capabilities
 ([`tests/systems/universal-movement.test.mjs`](../../tests/systems/universal-movement.test.mjs)).
 
+## Shield walking
+
+Behind a raised Shield a held direction walks the fighter at the universal
+`shieldWalkSpeed` (130 units/s, about a third of the run), with the run's
+own acceleration and braking (`steer` toward that share of top speed), and
+turns it as ever: a run the Shield is raised in eases down to the walk,
+never at once. In blockstun it stands, the block's push running down under
+the normal deceleration. Jump jumps straight out of a raised Shield (never
+out of blockstun: the press waits in the jump buffer), carrying the walk's
+speed. No running and no Dash behind it. The rules are the Shield's
+([defense](defense.md)); the walk has no pose of its own, and the
+Shield's ring waves faster instead.
+
 ## Repeat cooldowns
 
-Dash and air dash are discrete actions, each with a separate 0.5-second reuse
-timer from acceptance (`CombatState.movementCooldowns`, `mouvment` and
-`midair_mouvment`). Their speed, duration, cancel time, Energy cost and airtime
+Dash and air dash are discrete actions, each with a separate reuse timer from
+acceptance, the universal `dashRepeat` (0.4 s, its own value, apart from the
+attacks' 0.5-second repeat delay; `CombatState.movementCooldowns`, `mouvment`
+and `midair_mouvment`). Their speed, duration, cancel time, Energy cost and airtime
 limits stay the same. Player and CPU check the same `Fighter.movementReady`.
 Requests made during these timers are discarded even through hitstop; busy
 requests for an otherwise ready Dash keep the existing short buffer. Landing
@@ -303,7 +367,20 @@ into attacks and jumps. The old values are kept in
   attack → Dash, the air jump, air dash → aerial, landing, the impact
   freeze and overspeed, for each fighter.
 - [`tests/systems/movement-rules.test.mjs`](../../tests/systems/movement-rules.test.mjs):
-  the rules against made-up values.
+  the rules against made-up values, the steering authority and the speed
+  it steers toward apart.
+- [`tests/systems/attack-mobility.test.mjs`](../../tests/systems/attack-mobility.test.mjs):
+  the mobility tiers and their resolution, every attack naming its tier,
+  and for every playable fighter: a quick strike keeps the run it is
+  thrown at, steering in every phase as its tier allows, heavy and planted
+  moves staying committed, aerials keeping their drift, refused presses
+  leaving the speed alone, run → strike → run / jump, and plunges' and
+  lifts' authored drift.
+- [`tests/benchmarks/feel-metrics.mjs`](../../tests/benchmarks/feel-metrics.mjs)
+  (by hand, not part of `node --test`): responsiveness proxies measured
+  with identical scripted inputs (run → attack retention, steering
+  displacement, back-spacing, aerial drift, Dash → attack, Combat Assist's
+  handoff, Dashes per 10 s), to compare two revisions number for number.
 - [`tests/systems/air-mouvment.test.mjs`](../../tests/systems/air-mouvment.test.mjs):
   the air dash for both fighters.
 - [`tests/systems/movement.test.mjs`](../../tests/systems/movement.test.mjs),

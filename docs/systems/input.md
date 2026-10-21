@@ -35,7 +35,7 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | Left stick down | none |
 | Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
-| Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
+| Shield (on the ground, held: a direction held with it walks behind it, Jump jumps out of it) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | the fighter's own layout (see below) | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Options / Menu | the timer / pause or More button |
 
@@ -400,7 +400,7 @@ defend:
 | Jump (and air jumps; held a little longer, higher) | Cross | A | The button every platformer jumps on, under the right thumb. |
 | Dash / air dash | R1 | RB | The right index finger: the left thumb aims it (the stick's way, else facing), the right thumb stays on Jump and the attacks, so a Dash flows into a jump or a strike with no hand moved. A bumper's short travel suits a quick, frequent press. |
 | Fast fall | Left stick down (in the air) | Left stick down | Push down to fall faster; it also steers a launch down. |
-| Shield (held, on the ground) / Deflect (pressed, in the air) | L1 | LB | One guard button on a finger of its own: guarding never takes the right thumb off the attacks (let go and strike at once), the left thumb keeps steering and turning while it is held, and a bumper makes the Deflect's timing crisp. |
+| Shield (held, on the ground) / Deflect (pressed, in the air) | L1 | LB | One guard button on a finger of its own: guarding never takes the right thumb off the attacks (let go and strike at once), the left thumb keeps steering, turning and walking behind it while it is held, the right thumb's Jump jumps straight out of it, and a bumper makes the Deflect's timing crisp. |
 | Pause | Options | Menu | The pause button of every game. |
 
 Before, the Dash was on L1 / LB and the guard on Circle / B: guarding held

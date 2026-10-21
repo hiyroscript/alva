@@ -23,13 +23,14 @@ import { BLOCK_ENERGY_COST, CombatState, resolveEnergy } from '../../js/game/com
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import {
-  SHIELD_SHAPE, SHIELD_STYLE, drawShield, shieldCenter, shieldOutline, shieldRadius,
+  SHIELD_SHAPE, SHIELD_STYLE, SHIELD_WALK_WAVE_RATE, drawShield, shieldCenter, shieldOutline, shieldRadius, shieldWaveTime,
 } from '../../js/game/rendering/shield-fx.js';
+import { BASE_FIGHTER_MOVEMENT } from '../../js/data/movement.js';
 import { EDGE_RED } from '../../js/core/organic-edge.js';
 import { energyBarState, ENERGY_STYLE } from '../../js/game/rendering/fighter-status.js';
 import { ACTIONS, ACTION_LABELS, CONFIG } from '../../js/config.js';
 import {
-  def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel,
+  def, DT, BASE, SIM_CTX, fakeSprites, fakeSpritesOf, makeFighter, frameName, stepUntil, steps, duel,
 } from '../helpers/fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -343,46 +344,113 @@ test('holding the Shield costs nothing: 3 s held at full stays at 100, and a low
   assert.equal(low.fighter.combat.shielding, true);
 });
 
-test('a grounded Shield holds the fighter in place: no walking, Dash or jump, though it may turn', () => {
+test('shield walking: a direction held behind a raised Shield walks the fighter slowly, turning it; no Dash; Jump jumps straight out of it', () => {
+  const mv = BASE_FIGHTER_MOVEMENT;
+  assert.ok(mv.shieldWalkSpeed > 0 && mv.shieldWalkSpeed < mv.maxSpeed / 2, 'slower than walking, well under the run');
   const { fighter, step } = makeFighter();
-  const plain = makeFighter();
   stepUntil(step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
-  stepUntil(plain.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
-  // Holding right with the Shield up slows exactly like letting go.
+  // Raised at a run, held on: the run eases down to the Shield's walk
+  // under the normal deceleration, never at once.
   step({ ...SHIELD, ...RIGHT });
-  plain.step();
-  for (let i = 0; i < 20; i++) {
-    assert.equal(fighter.body.vx, plain.fighter.body.vx, `step ${i}: vx`);
-    assert.equal(fighter.body.x, plain.fighter.body.x, `step ${i}: x`);
-    step({ ...HOLD, ...RIGHT });
-    plain.step();
-  }
+  assert.equal(fighter.combat.shielding, true);
+  assert.ok(Math.abs(fighter.body.vx - (fighter.maxSpeed - mv.deceleration * DT)) < 1e-9, 'eased, not stopped dead');
+  for (let i = 0; i < 20; i++) step({ ...HOLD, ...RIGHT });
+  assert.equal(fighter.body.vx, mv.shieldWalkSpeed, 'walking behind it');
+  assert.equal(fighter.shieldWalking, true);
+  assert.equal(fighter.state, 'shield', 'the held Shield pose: no walk of its own');
+  assert.equal(fighter.animator.anim.key, def.defense.groundAnimation);
+  let x = fighter.body.x;
+  for (let i = 0; i < 30; i++) step({ ...HOLD, ...RIGHT });
+  assert.ok(Math.abs(fighter.body.x - x - mv.shieldWalkSpeed * 30 * DT) < 1e-6, 'steadily, at its own speed');
+  // Let go of the direction: it stops as a walk does.
+  for (let i = 0; i < 10; i++) step(HOLD);
   assert.equal(fighter.body.vx, 0, 'stopped');
-  const x = fighter.body.x;
+  assert.equal(fighter.shieldWalking, false);
+  assert.equal(fighter.combat.shielding, true, 'the Shield still up');
+  // The other way: it turns at once and walks that way.
+  x = fighter.body.x;
   step({ ...HOLD, runLeft: true });
   assert.equal(fighter.facing, -1, 'turns at once, behind its Shield');
   for (let i = 0; i < 30; i++) step({ ...HOLD, runLeft: true });
-  assert.equal(fighter.body.x, x, 'no walking');
-  assert.equal(fighter.state, 'shield');
-  step({ ...HOLD, ...RIGHT });
-  assert.equal(fighter.facing, 1, 'and back');
-  assert.equal(fighter.body.x, x);
-  // No Dash: a double tap while shielding starts nothing and costs nothing.
-  step({ ...HOLD, runRight: true, runRightPressed: true });
-  step(HOLD);
+  assert.ok(fighter.body.x < x, 'walking left');
+  assert.equal(fighter.body.vx, -mv.shieldWalkSpeed);
+  // No Dash: a Dash asked for while shielding starts nothing and costs nothing.
   step({ ...HOLD, runRight: true, mouvementRightPressed: true });
   assert.equal(fighter.dash, null);
   assert.equal(fighter.combat.energy, 100);
-  // No jump.
-  step({ ...HOLD, ...JUMP });
-  for (let i = 0; i < 5; i++) step(HOLD);
-  assert.equal(fighter.grounded, true);
-  assert.equal(fighter.state, 'shield');
-  // Let go and everything works again.
-  step();
-  step(JUMP);
-  assert.equal(fighter.grounded, false);
+  // Walking costs nothing either.
+  assert.equal(fighter.combat.energy, 100);
+  // Jump: straight out of the Shield, the walk's speed going up with it.
+  for (let i = 0; i < 20; i++) step({ ...HOLD, ...RIGHT });
+  step({ ...HOLD, ...RIGHT, ...JUMP });
+  assert.equal(fighter.grounded, false, 'jumped out of it');
+  assert.equal(fighter.combat.shielding, false, 'the Shield dropped');
+  assert.equal(fighter.body.vx, mv.shieldWalkSpeed, 'its walk carried up');
+  assert.ok(fighter.body.vy < 0);
+  // Shield still held in the air: no Shield there, and no Deflect without a fresh press.
+  step({ ...HOLD, ...RIGHT });
+  assert.equal(fighter.combat.shielding, false);
+  assert.equal(fighter.combat.attack, null);
 });
+
+test('blockstun holds the Shield still: no walking and no jump until the block\'s stun is over, then both at once', () => {
+  const d = duel();
+  raiseShield(d);
+  const [event] = blockedAttack(d);
+  assert.equal(event.type, 'block');
+  assert.ok(d.target.combat.shieldStun > 0, 'blocked: in blockstun');
+  // Held away, with Jump pressed: the stun holds it, no walk, no jump.
+  let walked = false;
+  let n = 0;
+  d.tick({}, { ...HOLD, ...RIGHT, ...JUMP });
+  while ((d.target.combat.shieldStun > 0 || d.target.combat.hitstop > 0) && n++ < 120) {
+    assert.equal(d.target.grounded, true, 'no jump out of blockstun');
+    walked ||= d.target.shieldWalking;
+    d.tick({}, { ...HOLD, ...RIGHT });
+  }
+  assert.equal(walked, false, 'no walking in blockstun');
+  // Over: walking at once, and a fresh Jump jumps out of it.
+  d.tick({}, { ...HOLD, ...RIGHT });
+  assert.equal(d.target.shieldWalking, true, 'walking again once the stun is over');
+  d.tick({}, { ...HOLD, ...JUMP });
+  assert.equal(d.target.grounded, false, 'and jumping out of it');
+});
+
+test('the Shield\'s ring waves faster while its fighter walks, on its own clock, never a jump in its waves', () => {
+  assert.ok(SHIELD_WALK_WAVE_RATE >= 3, 'way faster');
+  const walker = makeFighter();
+  const stander = makeFighter();
+  walker.step(SHIELD);
+  stander.step(SHIELD);
+  // Each fighter's clock starts where the Arena's is.
+  assert.equal(shieldWaveTime(walker.fighter, 1), 1);
+  assert.equal(shieldWaveTime(stander.fighter, 1), 1);
+  walker.step({ ...HOLD, ...RIGHT });
+  stander.step(HOLD);
+  assert.equal(walker.fighter.shieldWalking, true);
+  assert.equal(stander.fighter.shieldWalking, false);
+  const w = shieldWaveTime(walker.fighter, 1.5);
+  const t = shieldWaveTime(stander.fighter, 1.5);
+  assert.ok(Math.abs(w - (1 + 0.5 * SHIELD_WALK_WAVE_RATE)) < 1e-9, `walking: ${w}`);
+  assert.ok(Math.abs(t - 1.5) < 1e-9, 'standing: the Arena\'s pace');
+  // Drawn twice in a frame (interior and rim): the same clock both times.
+  assert.equal(shieldWaveTime(walker.fighter, 1.5), w);
+  // Stopping slows it from where it is: no jump back.
+  walker.step(HOLD);
+  walker.step(HOLD);
+  assert.ok(Math.abs(shieldWaveTime(walker.fighter, 1.6) - (w + 0.1)) < 1e-9);
+});
+
+for (const c of [getCharacter('0001'), getCharacter('0002'), getCharacter('0003'), getCharacter('0004'), getCharacter('0005')]) {
+  test(`#${c.id}: shield walks at the one universal speed, in its own held Shield pose`, () => {
+    const h = makeFighter({ character: c, sprites: fakeSpritesOf(c) });
+    h.step(SHIELD);
+    for (let i = 0; i < 20; i++) h.step({ ...HOLD, ...RIGHT });
+    assert.equal(h.fighter.combat.shielding, true);
+    assert.equal(h.fighter.body.vx, BASE_FIGHTER_MOVEMENT.shieldWalkSpeed);
+    assert.equal(h.fighter.animator.anim.key, c.defense.groundAnimation);
+  });
+}
 
 // ---- No Shield in the air --------------------------------------------------------
 
