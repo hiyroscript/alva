@@ -504,3 +504,5 @@ Do not solve this by implementing companions, followers, AI teammates, summons, 
 The goal is for #0006 to genuinely feel like the player is controlling three synchronized characters as one unified fighting character.
 
 Prioritize getting this fundamental architecture correct before implementing or proposing any specific attack designs.
+
+Also a nice detail would be to make them have a little floating animation when they are idle.
