@@ -39,28 +39,6 @@ export const SHIELD_SHAPE = Object.freeze({
   waves: [[5, 0.8, 0.6], [8, -0.6, 0.4]], // [k, speed, weight]
 });
 
-// How much faster the waves drift while the fighter walks behind its
-// Shield (Fighter.shieldWalking): the ring churns as it moves, the only
-// sign of walking, since the held Shield pose stays (no clip of its own).
-export const SHIELD_WALK_WAVE_RATE = 4;
-
-// The drift time of `fighter`'s ring at the Arena's effects clock `time`
-// (art only, kept here, never on the fighter or read by the simulation):
-// the Arena's clock itself, plus a lead the ring gains while the fighter
-// walks behind its Shield (SHIELD_WALK_WAVE_RATE times the Arena's pace in
-// all) and keeps after, so a change of pace never makes the waves jump. A
-// fighter that never walks draws exactly at `time`. A clock that goes back
-// (a new Arena's) gains nothing until it moves on again.
-const waveLeads = new WeakMap();
-
-export function shieldWaveTime(fighter, time) {
-  let lead = waveLeads.get(fighter);
-  if (!lead) waveLeads.set(fighter, (lead = { at: time, ahead: 0 }));
-  if (fighter.shieldWalking) lead.ahead += Math.max(0, time - lead.at) * (SHIELD_WALK_WAVE_RATE - 1);
-  lead.at = time;
-  return time + lead.ahead;
-}
-
 // World-space radius of the Shield round a character.
 export function shieldRadius(def) {
   return def.visual.height * SHIELD_SHAPE.radius;
@@ -102,18 +80,17 @@ function trace(ctx, pts) {
 // One layer of `fighter`'s Shield, only while it is up: 'interior' (drawn
 // behind its sprite) or 'rim' (in front). `view` is the Arena's (world ->
 // device: x, y, scale; dpr for the CSS-pixel line widths), `time` the
-// Arena's effects clock, run through the fighter's own (shieldWaveTime).
-// True when drawn.
+// drift clock (the Arena's effects clock: both layers drawn at the same
+// time trace the very same waves). True when drawn.
 export function drawShield(ctx, fighter, view, layer, time = 0, reducedMotion = false) {
   if (!fighter.combat.shielding) return false;
-  const wave = shieldWaveTime(fighter, time);
   const s = view.scale;
   const px = (view.dpr ?? 1) / s; // world units per CSS pixel
   const [x, y] = shieldCenter(fighter);
   const radius = shieldRadius(fighter.def);
   ctx.save();
   ctx.setTransform(s, 0, 0, s, -view.x * s, -view.y * s);
-  trace(ctx, shieldOutline(x, y, radius, wave, reducedMotion));
+  trace(ctx, shieldOutline(x, y, radius, time, reducedMotion));
   if (layer === 'interior') {
     ctx.fillStyle = SHIELD_STYLE.interior;
     ctx.fill();
@@ -126,7 +103,7 @@ export function drawShield(ctx, fighter, view, layer, time = 0, reducedMotion = 
     // so it covers the outermost accentWidth of the black, flush with its
     // outer edge, never a red ring inside it round the fighter.
     const outset = ((SHIELD_STYLE.rimWidth - SHIELD_STYLE.accentWidth) / 2) * px;
-    trace(ctx, shieldOutline(x, y, radius + outset, wave, reducedMotion));
+    trace(ctx, shieldOutline(x, y, radius + outset, time, reducedMotion));
     ctx.lineWidth = SHIELD_STYLE.accentWidth * px;
     ctx.strokeStyle = SHIELD_STYLE.accent;
     ctx.stroke();

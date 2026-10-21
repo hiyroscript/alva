@@ -444,8 +444,8 @@ export class Arena {
     for (const c of this.clones) this.drawClone(c);
     // Player 1 last, so it is always drawn on top (behind it, the CPU). A
     // raised Shield wraps its fighter: its faint interior behind the sprite,
-    // its rim in front, so the fighter reads as inside it; its waves drift
-    // faster while the fighter walks behind it (see shield-fx.js).
+    // its rim in front, so the fighter reads as inside it; both trace the
+    // same waves, on this Arena's effects clock (see shield-fx.js).
     for (let i = fighters.length - 1; i >= 0; i--) {
       const f = fighters[i];
       this.drawTrail(f);

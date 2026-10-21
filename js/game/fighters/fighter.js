@@ -315,10 +315,6 @@ export class Fighter {
     this.shieldUpTime = 0;
     this.shieldDownTime = Infinity;
     this.shieldPerfectReady = false;
-    // Walking behind its Shield this step (see the Shield in update); the
-    // Shield's look reads it (its ring waves faster: see
-    // js/game/rendering/shield-fx.js).
-    this.shieldWalking = false;
     // A fresh combat state: 0 Launch Point, full Energy, Shield down and
     // every cooldown ready.
     this.combat = new CombatState(this.energyDef);
@@ -386,7 +382,6 @@ export class Fighter {
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
     this.steps++;
     this.fastFalling = false;
-    this.shieldWalking = false;
     this.airJumped = false;
     this.bounce = null;
     this.heals.length = 0;
@@ -394,6 +389,14 @@ export class Fighter {
     this.steerHeld.x = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
     this.steerHeld.y = (input.down ? 1 : 0) - (input.jump ? 1 : 0);
     this.updateAttackFacing();
+
+    // Whether the sideways speed the body has now is the fighter's own (its
+    // run, a Dash's burst, an attack's slide: what a Shield raised this step
+    // stops, see below): it was free on its last step, nothing has hit it
+    // since, and no pull has drawn it since (drawnBy, see
+    // js/game/combat/pull.js). A launch's or a stun's slide and a pull's
+    // drag are an outside force's.
+    const ownSpeed = combat.stun <= 0 && !combat.immobilized && !this.drawnBy;
 
     // Every cooldown recovers by this step first (the summon's and the
     // technique's too, in real time), so one started below ends the step at
@@ -674,6 +677,14 @@ export class Fighter {
     if (combat.shielding && !wasShielding) {
       this.shieldPerfectReady = this.shieldDownTime >= (this.defense?.perfectRearm ?? 0) - TIME_EPSILON;
       this.shieldUpTime = 0;
+      // A raised Shield plants the fighter: the sideways speed of its own
+      // it raised it with (ownSpeed: a run, a Dash's burst, an attack's
+      // slide) stops on this very step, never sliding on behind it. Speed
+      // an outside force gave it (a pull's drag, a stun's slide) is not its
+      // own to stop: it runs down behind the Shield as a block's push does
+      // (see the Shield's movement below). A moving platform's carry is no
+      // velocity at all (see carryBody).
+      if (ownSpeed) body.vx = 0;
     } else if (combat.shielding) {
       this.shieldUpTime += dt;
     }
@@ -749,15 +760,11 @@ export class Fighter {
         gravityShare = 0;
       }
     } else if (combat.shielding) {
-      // Shield walking: a direction held behind a raised Shield walks the
-      // fighter at movement.shieldWalkSpeed (the run's acceleration and
-      // braking, toward that share of top speed; a faster run it raised the
-      // Shield in eases down to it), turning it as ever (the Shield guards
-      // both sides). In blockstun it stands: the block's push runs down
-      // under the normal deceleration, whatever is held.
-      const walk = combat.shieldStun > 0 ? 0 : held;
-      this.shieldWalking = walk !== 0;
-      this.moveHorizontal(walk, 1, 1, dt, mv.shieldWalkSpeed / mv.maxSpeed);
+      // A raised Shield holds the fighter where it stands: no walking or
+      // running, whatever is held (it still turns: see updateFacing). Speed
+      // it is given behind it (a block's push: see CombatSystem.applyHit)
+      // runs down under the normal deceleration.
+      this.moveHorizontal(0, 1, 1, dt);
     } else if (atk?.motion && !atk.motion.done) {
       gravityShare = this.moveMotion(atk, this.attackSteer(atk, dir), dt);
     } else if (atk?.def.lockMovement) {
@@ -774,16 +781,17 @@ export class Fighter {
     else this.coyote = Math.max(0, this.coyote - dt);
 
     // A jump out of a raised Shield drops it and jumps (the Shield guards
-    // nothing in the air), unless a block holds it up (blockstun): then the
-    // press waits in the jump buffer for the stun to end. A jump may
-    // also cut short an attack that hit (see CombatState.cancellable), the
-    // human player's attack when Jump was pressed after it began (see
-    // playerMayCut), and a Dash or an air dash past its cancel time (see
-    // dashCancellable); it only cuts once it really jumps. It
-    // only sets the upward speed: whatever horizontal speed the fighter has
-    // (a Dash's whole burst included) carries straight into the air, under
-    // full gravity from this step. A tap is the normal jump; Jump held a
-    // little longer makes it the higher jump (see below).
+    // nothing in the air) from where the Shield planted it, unless a block
+    // holds it up (blockstun): then the press waits in the jump buffer for
+    // the stun to end. A jump may also cut short an attack that hit (see
+    // CombatState.cancellable), the human player's attack when Jump was
+    // pressed after it began (see playerMayCut), and a Dash or an air dash
+    // past its cancel time (see dashCancellable); it only cuts once it
+    // really jumps. It only sets the upward speed: whatever horizontal
+    // speed the fighter has (a Dash's whole burst included) carries
+    // straight into the air, under full gravity from this step. A tap is
+    // the normal jump; Jump held a little longer makes it the higher jump
+    // (see below).
     const free = (canAct || combat.cancellable || this.dashCancellable || this.playerMayCut(this.jumpPressedAt)) &&
       !(combat.shielding && combat.shieldStun > 0);
     let jumped = false;
@@ -791,7 +799,6 @@ export class Fighter {
       this.cutAttack();
       if (this.dash) this.endDash();
       combat.shielding = false;
-      this.shieldWalking = false;
       gravityShare = 1;
       this.highJump = { time: 0, fromY: body.y, lift: null };
       body.vy = -this.jumpVelocity;
@@ -2231,9 +2238,8 @@ export class Fighter {
   // The land and Shield-release poses never hold anyone: running (a
   // direction held, or sliding fast) goes straight past them, and anything
   // of higher priority (a jump, an attack, a Dash, the Shield) ends them.
-  // Walking behind the Shield has no pose of its own: the held Shield pose
-  // stays (the Shield's waving ring runs faster instead: see
-  // js/game/rendering/shield-fx.js).
+  // A raised Shield holds its fighter still (see the Shield in update), in
+  // its held Shield pose, whatever direction is held.
   updateState(dt) {
     const { body, combat } = this;
     const running = (this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140;

@@ -5,7 +5,8 @@
 // the impact freeze and overspeed, each checked for every playable fighter
 // on the real Fighter, physics and combat (see
 // tests/helpers/fighter-harness.mjs). Only real forces change it: a hit,
-// a wall, a move whose own mechanic redirects the body.
+// a wall, a move whose own mechanic redirects the body; and the one stop a
+// player chooses, the ground Shield going up (it plants the fighter).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { playableCharacters, getCharacter } from '../../js/data/characters.js';
@@ -283,10 +284,10 @@ for (const c of playableCharacters()) {
   });
 
   test(`${name}: above top speed a change of state never clamps the speed: it bleeds off at a rate`, () => {
-    // The Dash running out into a held run, a let-go slide, a Shield, a
-    // jump and back down: each step's change bounded by the harshest rate
-    // that applies, and the held run settles at top speed, never below.
-    for (const held of [RIGHT, {}, { shield: true }]) {
+    // The Dash running out into a held run, a let-go slide, a jump and back
+    // down: each step's change bounded by the harshest rate that applies,
+    // and the held run settles at top speed, never below.
+    for (const held of [RIGHT, {}]) {
       const { fighter, step } = dashing(0);
       const log = [];
       for (let i = 0; i < 40; i++) log.push(step(held).body.vx);
@@ -298,6 +299,23 @@ for (const c of playableCharacters()) {
       if (held === RIGHT) assert.equal(log.at(-1), mv.maxSpeed);
       void fighter;
     }
+  });
+
+  test(`${name}: the Shield is the one deliberate stop: held through a Dash, it plants the fighter the step it goes up`, () => {
+    // Held from the Dash's first step, with the run held too: the Dash runs
+    // its course untouched (no Shield cuts it), then the Shield goes up the
+    // step it ends and the burst stops there, never sliding on behind it.
+    const { fighter, step } = dashing(0);
+    const log = [];
+    let raised = -1;
+    for (let i = 0; i < 40; i++) {
+      const was = fighter.combat.shielding;
+      log.push(step({ shield: true, ...RIGHT }).body.vx);
+      if (fighter.combat.shielding && !was) raised = i;
+    }
+    assert.ok(raised > 0, 'up as the Dash ends');
+    for (let i = 0; i < raised; i++) assert.ok(log[i] > mv.maxSpeed, `step ${i}: the Dash's own speed, ${log[i]}`);
+    for (let i = raised; i < log.length; i++) assert.equal(log[i], 0, `step ${i}: stopped, the run held or not`);
   });
 }
 

@@ -759,7 +759,7 @@ test('How to Play contains exactly the eight approved sections in order in both 
     "Not every hit sends you in the same direction. Depending on the attack, you can be launched sideways, upward, or downward.",
     "If both players have the same score when the 5-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.",
     "Energy is used for dashing, Deflecting, and blocking hits with your Shield. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.",
-    "Hold the Shield button while on the ground to block incoming attacks from any direction. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.",
+    "Hold the Shield button while on the ground to block incoming attacks from any direction. While it’s raised you can’t move: release Shield to move again, or Jump to leave the Shield when allowed. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.",
     "While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. Deflecting costs Energy, even if it misses.",
   ];
   try {

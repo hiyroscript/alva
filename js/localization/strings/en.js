@@ -182,7 +182,7 @@ export const EN = {
   'howToPlay.energy.heading': 'Energy',
   'howToPlay.energy.description': 'Energy is used for dashing, Deflecting, and blocking hits with your Shield. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.',
   'howToPlay.shield.heading': 'Shield',
-  'howToPlay.shield.description': 'Hold the Shield button while on the ground to block incoming attacks from any direction. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.',
+  'howToPlay.shield.description': 'Hold the Shield button while on the ground to block incoming attacks from any direction. While it’s raised you can’t move: release Shield to move again, or Jump to leave the Shield when allowed. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.',
   'howToPlay.deflect.heading': 'Deflect',
   'howToPlay.deflect.description': 'While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. Deflecting costs Energy, even if it misses.',
 
@@ -521,7 +521,7 @@ export const EN = {
   'controller.action.fastFall': 'Fast fall',
   'controller.action.fastFall.description': 'Falls faster while held in the air, and steers a launch downward.',
   'controller.action.shield': 'Shield',
-  'controller.action.shield.description': 'Blocks incoming attacks while held, on the ground.',
+  'controller.action.shield.description': 'Blocks incoming attacks while held, on the ground, and holds you in place.',
   'controller.action.deflect': 'Deflect',
   'controller.action.deflect.description': 'In the air, a fresh press strikes and turns projectiles back at their thrower.',
   'controller.action.pause': 'Pause',
