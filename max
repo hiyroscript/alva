@@ -1830,4 +1830,4 @@ Now inspect the repository, establish the baseline, implement the highest-impact
 
 Do not stop after generating an analysis or implementation plan. Carry out the engineering work, and clearly identify any portions that cannot be completed or verified.
 
-Additionaly add shield walking (walking while in shield will make the character move slower than usual, walking in shiled with no use a special animation, instead the waving shield animation will be way faster) 
+Additionaly add shield walking (walking while in shield will make the character move slower than usual, walking in shiled with no use a special animation, instead the waving shield animation will be way faster
