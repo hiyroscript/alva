@@ -165,8 +165,8 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
     // The Deadlights: a float; the Red Balloon: its phantom's bite frightens
     // (the bite itself, its attack5, the same: a fear).
     '0005': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, attack3: 0.5, midair_attack3: 0.5, attack5: 3, extra_attack: 0.5, attack4: 3, deflect: 0 },
-    // Its moves still to come: only the Deflect so far.
-    '0006': { deflect: 0 },
+    // Ice Breath: a freeze.
+    '0006': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, extra_attack: 0.5, attack3: 0.5, attack4: 3, attack5: 0.5, deflect: 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

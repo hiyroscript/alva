@@ -57,6 +57,13 @@ export function fakeSprites(
   return fakeSpritesOf(DEFAULT_CHARACTER, keys, projectileKeys, effectKeys);
 }
 
+// Every clip key `character` has art for: an ensemble's, every key one of
+// its members has.
+export function clipKeysOf(character) {
+  if (!character.ensemble) return Object.keys(character.animations);
+  return [...new Set(character.ensemble.members.flatMap((m) => Object.keys(m.animations)))];
+}
+
 // The same for any character: every clip, projectile and effect it
 // declares has art unless the keys say otherwise. A fighter drawn as
 // several members (an `ensemble`) gets one such set per member, its clips

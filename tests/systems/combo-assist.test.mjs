@@ -28,7 +28,7 @@ import { getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { getMap } from '../../js/data/maps.js';
 import { PRACTICE_MAP } from '../../js/data/practice-map.js';
 import { mulberry32 } from '../../js/core/utils.js';
-import { fakeSpritesOf, DT } from '../helpers/fighter-harness.mjs';
+import { fakeSpritesOf, clipKeysOf, DT } from '../helpers/fighter-harness.mjs';
 import { playerRig, press, attackOf, placeFoeAt, FLAT } from '../helpers/player-rig.mjs';
 
 // Puts the rig's foe `gap` units out of `atk`'s reach (its box, motion and
@@ -319,7 +319,7 @@ test('the alternate keeps its own rules: its cooldown, its art, its starts for t
     assert.equal(r.player.combat.attack, null);
     assert.equal(r.player.bufferedAttack?.action, 'attack1', 'kept as its own press, as ever');
     // Its art: none, never forced.
-    const sprites = fakeSpritesOf(c, Object.keys(c.animations).filter((k) => k !== c.attacks[a2].animation));
+    const sprites = fakeSpritesOf(c, clipKeysOf(c).filter((k) => k !== c.attacks[a2].animation));
     const bare = far(c, { sprites });
     playOut(bare, 'attack1');
     assert.equal(bare.player.comboAction('attack1'), 'attack1', `#${c.id}: Attack 2 without art`);

@@ -19,7 +19,7 @@ import { DASH_ENERGY_COST, DEFLECT_ENERGY_COST } from '../../js/game/combat/comb
 import { getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { specialAction } from '../../js/data/loadout.js';
 import { COMBAT_BUTTONS } from '../../js/config.js';
-import { fakeSpritesOf, DT } from '../helpers/fighter-harness.mjs';
+import { fakeSpritesOf, clipKeysOf, DT } from '../helpers/fighter-harness.mjs';
 import { playerRig, press, attackOf, placeFoeAt } from '../helpers/player-rig.mjs';
 
 const C1 = getCharacter('0001');
@@ -141,7 +141,7 @@ test('a request that cannot start never cuts anything: its cooldown, no art, its
       assert.equal(r.player.combat.attack, record, `#${c.id} ${second} cooling: ${first} plays on`);
       assert.equal(r.player.combat.cooldowns.has(record.def.id), false, 'no cooldown started for it');
       // No art.
-      const sprites = fakeSpritesOf(c, Object.keys(c.animations).filter((k) => k !== c.attacks[secondId].animation));
+      const sprites = fakeSpritesOf(c, clipKeysOf(c).filter((k) => k !== c.attacks[secondId].animation));
       const bare = far(c, { sprites });
       bare.tick(press(first));
       const kept = bare.player.combat.attack;

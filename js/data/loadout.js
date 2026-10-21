@@ -54,12 +54,6 @@
 //
 // loadoutProblems checks a definition against every one of these rules;
 // js/data/characters.js refuses to load one that breaks any.
-//
-// One fighter is not held to them yet: one whose moves are still to come,
-// unplayable (`available: false`) and with no moves at all (no `actions`,
-// `attacks`, `summons`, `techniques` or `projectiles`). Its art and its body
-// can be in before anyone has designed what it does; the moment it has a
-// move, or is made playable, every rule above applies.
 
 import { COMBAT_BUTTONS, MOVES, NUMBERED_ATTACKS } from '../config.js';
 import { TECHNIQUE_CLIPS } from '../game/combat/technique.js';
@@ -145,7 +139,6 @@ export function describeLoadout(def) {
 export function loadoutProblems(def) {
   const problems = [];
   const say = (text) => problems.push(text);
-  if (movesToCome(def)) return problems;
   const actions = isObject(def?.actions) ? def.actions : {};
   const attacks = def?.attacks ?? {};
   // Where a clip must be: the fighter's `animations`, or for a fighter drawn
@@ -281,13 +274,6 @@ export function loadoutProblems(def) {
     }
   }
   return problems;
-}
-
-// Whether `def`'s moves are still to come (see the top of this module):
-// unplayable, and no move of any kind yet.
-function movesToCome(def) {
-  if (!def || def.available) return false;
-  return ['actions', 'attacks', 'summons', 'techniques', 'projectiles'].every((table) => def[table] === undefined);
 }
 
 // Throws, naming every problem, if `def` breaks the loadout rules (see

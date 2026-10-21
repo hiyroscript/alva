@@ -132,16 +132,13 @@ test('every fighter pays exactly 20 for a ground Dash, an air dash and a Dash ca
     air.step({ runRight: true, mouvementRightPressed: true });
     assert.ok(air.fighter.dash?.air, `${who}: an air dash`);
     assert.equal(air.fighter.combat.energy, 100 - 20, `${who}: the air dash, 20`);
-    // The Dash cancel, out of an attack that hit (a fighter whose moves are
-    // still to come has no attack to cancel yet).
-    if (c.actions) {
-      const d = duel({ attackerCharacter: c, gap: 40 });
-      untilCancellable(d);
-      const before = d.attacker.combat.energy;
-      d.tick({ runRight: true, mouvementRightPressed: true });
-      assert.ok(d.attacker.dash, `${who}: a Dash cancel`);
-      assert.equal(d.attacker.combat.energy, before - 20, `${who}: the Dash cancel, 20`);
-    }
+    // The Dash cancel, out of an attack that hit.
+    const d = duel({ attackerCharacter: c, gap: 40 });
+    untilCancellable(d);
+    const before = d.attacker.combat.energy;
+    d.tick({ runRight: true, mouvementRightPressed: true });
+    assert.ok(d.attacker.dash, `${who}: a Dash cancel`);
+    assert.equal(d.attacker.combat.energy, before - 20, `${who}: the Dash cancel, 20`);
     // Running, the air jumps, turning, the fast fall: free (the refill only).
     const free = makeFighter({ character: c });
     free.fighter.combat.setEnergy(50);
@@ -547,8 +544,7 @@ test('every discrete move takes the cooldown policy\'s delay: the baseline, else
 });
 
 test('every roster attack waits its repeat delay after ending, independent of other attacks', () => {
-  // Every fighter with attacks (one whose moves are still to come has none).
-  for (const c of CHARACTERS.filter((def) => def.actions)) {
+  for (const c of CHARACTERS) {
     const { fighter: f, step } = makeFighter({ character: c });
     step(P('attack1'));
     while (f.combat.attack) step();

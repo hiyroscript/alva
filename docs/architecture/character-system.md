@@ -91,7 +91,7 @@ named.
 | `launchReaction`, `launchBounce` | [launch](../systems/launch.md) | no (defaults) |
 | `defense` | [defense](../systems/defense.md) | no (none: the Shield button does nothing on the ground) |
 | `deflect` | [defense: the Deflect](../systems/defense.md#the-deflect) | no (none: the Shield button does nothing in the air) |
-| `actions` | Fighter, the AI, touch controls, input | yes (`attack1`, `attack2` at least), but for an unplayable fighter whose moves are still to come |
+| `actions` | Fighter, the AI, touch controls, input | yes (`attack1`, `attack2` at least) |
 | `attacks`, `projectiles`, `summons`, `techniques` | [combat](../systems/combat.md) | `attacks` for every mapped attack |
 | `mobileAbilities` | touch controls ([input](../systems/input.md#touch-controls)) | no (neutral glyphs and names) |
 | `abilityNames` | localization, touch labels | no (neutral names) |
@@ -111,7 +111,7 @@ performance data, never more fighters:
 | --- | --- |
 | definition, roster slot, `Fighter`, controller, input | an `id` (lowercase, in its file names) |
 | body (position, velocity, ground, facing), collider, pushbox | a `home` in the group (art pixels from the origin, facing right, mirrored with facing) |
-| hurtbox (round the group), Launch Point, Energy, Shield, cooldowns, stun, hitstop, launch | its own clips (`animations`, `<id>_<codename>_<member>_<frame>.png`) |
+| hurtbox (one, as big as a single fighter's), Launch Point, Energy, Shield, cooldowns, stun, hitstop, launch | its own clips (`animations`, `<id>_<codename>_<member>_<frame>.png`) |
 | the combat state: what it is doing | its own animator, playing the fighter's state in its own clip |
 
 Every member plays the fighter's state on the same fixed step (the clips
@@ -122,9 +122,10 @@ ordinary case, the Deflect exactly one, two or three only for a combination
 written as one move); the performer steps to the fighter's origin, the
 others step back behind it, and everyone glides home after. A move is one
 move however many perform it: one press, one cooldown, the strikes it
-authors and nothing more. The registry refuses a broken ensemble with every
-problem named (`assertEnsemble`), and a move of an ordinary fighter may name
-no members.
+authors and nothing more. A picture of one of its moves (a touch button,
+an ability tile) shows the clip of the move's first performer (`clipFor`).
+The registry refuses a broken ensemble with every problem named
+(`assertEnsemble`), and a move of an ordinary fighter may name no members.
 
 At runtime ([`js/game/rendering/ensemble.js`](../../js/game/rendering/ensemble.js),
 [rendering: ensembles](../systems/rendering.md#ensembles)) the fighter's
@@ -133,14 +134,6 @@ answering the Fighter as a `SpriteSet` and a `SpriteAnimator` do; the shared
 systems never ask which they have. The renderers draw `fighterParts(f)`:
 one part for an ordinary fighter, one per member for an ensemble. Nothing
 of it reaches movement, collision or combat.
-
-## A fighter whose moves are still to come
-
-A fighter's art and body may come before its moves (#0006). Unplayable
-(`available: false`) and without a single move (no `actions`, `attacks`,
-`summons`, `techniques` or `projectiles`), its loadout is not checked yet:
-the moment it has one move, or is made playable, every loadout rule
-applies. Nothing is invented to fill its buttons.
 
 ## The Discover profile, beside the definition
 

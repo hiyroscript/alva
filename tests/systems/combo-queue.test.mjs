@@ -318,7 +318,9 @@ test('mashing never beats the definitions: every attack plays out in full, none 
         assert.equal(r.player.combat.energy, 100, `${why}: attacks never touch Energy`);
       }
       const runs = [...played].map(([rec, t]) => ({ rec, ...t }));
-      const pair = [r.player.attackFor('attack1'), r.player.attackFor('attack2')];
+      // The pair on the ground and in the air (a roll may carry it off the
+      // ledge, mashing on in mid-air).
+      const pair = [true, false].flatMap((ground) => [r.player.attackFor('attack1', ground), r.player.attackFor('attack2', ground)]);
       assert.ok(runs.length >= 2, `${why}: ${runs.map((x) => x.rec.def.id)}`);
       runs.forEach((x, i) => {
         assert.ok(pair.includes(x.rec.def.id), `${why}: only the pair (${x.rec.def.id})`);

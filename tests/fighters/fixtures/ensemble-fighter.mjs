@@ -1,9 +1,10 @@
 // A test-only fighter drawn as several members (imported by the *.test.mjs
 // files; not a test file itself, and never in the game): #0006's three
 // members, their art, body, Shield and Deflect (borrowed: they are not what
-// these tests check), with moves written here only to exercise who performs
-// what (js/data/ensemble.js). Its clips reuse its members' own files, so
-// every move has art; the moves are no design of #0006's.
+// these tests check), with moves written here instead of its own, only to
+// exercise who performs what (js/data/ensemble.js). Its clips reuse its
+// members' own files, so every move has art; the moves are no design of
+// #0006's.
 //
 //   attack1         blue alone: the ordinary case, one member performs it
 //                   (in the air too: midair_attack1)
@@ -36,6 +37,14 @@ export const ENSEMBLE_FIGHTER = {
   available: false,
   rosterSlot: 40,
   controller: undefined,
+  // None of #0006's own moves: only those written here.
+  techniques: undefined,
+  projectiles: undefined,
+  projectileAnimations: undefined,
+  specialAbilities: undefined,
+  mobileAbilities: undefined,
+  abilityNames: undefined,
+  abilityDescriptions: undefined,
   ensemble: {
     ...BASE.ensemble,
     members: BASE.ensemble.members.map((m) => ({

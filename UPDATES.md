@@ -3052,3 +3052,93 @@ single performer, a pair, all three, green's Deflect, a hit and a launch,
 and (in a throwaway local copy with #0006 made playable with test moves)
 the roster slot and preview, the HUD card and Practice Ground; no page
 errors. Not yet played by hand.
+
+## #0006 playable: its moves
+
+Not a named update (it can become one if the owner names it). Asked for
+as: keep the loadout rule as it is (a fighter has at least two attacks; the
+exception for a fighter whose moves are still to come was a one-time one),
+finish #0006 and open a new pull request. `character_rule` was not
+touched; the characters are named nowhere.
+
+- **The exception is gone.** `loadoutProblems` holds every fighter to the
+  loadout rules again, playable or not: an ensemble with no moves, or one
+  numbered attack, is refused like any fighter (`ensemble` tests it).
+- **#0006's moves**, each from the three sisters' canon and performed by
+  the sister whose power it is (`members`): pink's **Power Punch** (a jab
+  that holds, a cross), **Heat Vision** (a technique: a beam from her eyes,
+  1500 units/s, the fastest shot in the roster) and **Ice Breath** (a
+  technique, its Special: a freezing gale, `paralyze` 1.4 s, every 3 s);
+  green's **Tornado Spin** (a `roll` that `pull`s whoever is near,
+  `carry`s them through four turns and sweeps them up) and **Flying
+  Punch** (its finisher: 5, Base Launch 3, once per airtime); blue's
+  **Flying Kick** and **Sonic Scream** (a technique: a wave that `carry`s,
+  `repel`s shots and shoves a Shield, `blockPush`); and all three's
+  **Triple Strike** (a `homing` dash locking on within 220 units, one hit
+  for 5 however many draw it, on the ground and once per airtime). 54 new
+  frames of the sisters cut from the sheet under each performer's
+  codenames, and 5 of the beam and the wave (`attack3_object`,
+  `attack5_object`); a technique's cast
+  and release share its codename's files (`0006_attack4_pink_1` ...).
+  The sheet's fireballs stay unused: not a power of theirs.
+- **Playable**: `available: true`, its controller layout by the comfort
+  rules (Square the Power Punch / Flying Kick, Triangle the Tornado Spin /
+  Flying Punch, Circle the Triple Strike, R2 Heat Vision, L2 Ice Breath,
+  the right stick forward the Sonic Scream), touch buttons, names and
+  descriptions in English and French, a Discover profile (3/5, a
+  versatile trio for every range), its `energy` (14 / s) and its
+  `launchReaction` (as #0003's and #0005's).
+- **A body of a single fighter's size**: collider 32 × 84, pushbox 36,
+  hurtbox `{ -18, -88, 36, 88 }` (it was 40 × 84, 52 and 60 wide round the
+  whole group: the easiest target in the roster, and held out of its own
+  Deflect's reach in a mirror match).
+- **Touch buttons and ability tiles of an ensemble** show the move's own
+  art from its first performer (`clipFor` in `js/data/ensemble.js`, read
+  by `previewFrame` in `js/data/ability-preview.js`); before, they found no
+  frame and fell back to a glyph.
+
+Found on the way, in #0006's own data: its Sonic Scream's wave touched the
+floor and was gone the step it appeared (a shot meeting a solid block,
+the main floor included, is gone); its Flying Kick and Flying Punch had
+step-ins, which move a fighter only on the ground; and with no
+`launchReaction` it never tumbled, so the CPU judged it never in danger.
+`adding-characters.md` now warns of the first two.
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 120 matches a level): #0006 wins 0.51 at
+Medium, 0.43 at Hard and 0.36 at Brutal, the low end of the roster at the
+higher levels (the others 0.45 to 0.63 over the same kind of runs);
+strongest against #0004, weakest against #0001 and #0005. As first
+written it won 0.85 at Hard (a Triple Strike locking on from 280 units
+after a twelfth of a second, for 5 in a 70 × 80 box); the steps from there
+are in [#0006's specification](docs/characters/0006.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0006.js`: the
+moves' phases are whole frames of their clips at `FPS_0006`; the Triple
+Strike's lock-on is its `motion` (`range` 220); Ice Breath's freeze its
+`burst.hit.paralyze`; the beam and the wave are its `projectiles`.
+
+**Code:** `js/data/characters/0006.js`, `js/data/loadout.js` (the
+exception removed), `js/data/ensemble.js` (`clipFor`),
+`js/data/ability-preview.js`, `js/data/fighter-profiles.js`, the English
+and French strings; the specification and guides (`ALVA_SPEC.md`,
+`README.md`, `docs/characters/0006.md`, the roster, adding a fighter, the
+character system, combat, defense, Energy, input, launch, movement,
+rendering, the AI, module responsibilities, testing).
+
+**Tests:** `fighter-0006` rewritten (registration and kit, performers,
+names, touch buttons, controller layout, the 131 files, every move's
+mechanic, the CPU playing its whole kit); `ensemble` (the exception's test
+replaced by its refusal); the roster-wide tables (`cooldown-policy`,
+`special-abilities`: seven Specials, `controller-profiles`: no layout of
+settings version 5 for a fighter added since, `empty-roster`, `discover`,
+each fighter's roster list); and the shared tests that read every playable
+fighter made to read an ensemble's clips (`combat-assist`, `combo-assist`,
+`move-cancel`, `universal-movement`), skip a homing dash where Combat
+Assist never serves one, read a pair of attacks on the ground and in the
+air (`combo-queue`) and count a fighter as back on the stage while its
+feet are on it (`cpu-intelligence`). Checked in headless Chromium: every
+move in Practice Ground (beam, gale and freeze, wave, tornado, the Triple
+Strike on the ground and in the air), the ability tiles and the phone
+layout's touch buttons showing each sister's art; no page errors. Not yet
+played by hand.
