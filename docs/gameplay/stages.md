@@ -88,7 +88,9 @@ The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.1.
 **Stages are data plus a theme.** Collision comes only from the map data
 ([`js/data/maps.js`](../../js/data/maps.js),
 [`js/data/practice-map.js`](../../js/data/practice-map.js)): the main
-stage, platforms (one-way: fighters jump up through them from below),
+stage, platforms (one-way: fighters jump up through them from below, and
+a fresh Down press drops a fighter through one unless its `dropThrough` is
+false, see [Platform drop](../systems/movement.md#platform-drop)),
 solids, spawn points and the Void's and camera's margins. Each stage's art
 is a procedural Canvas theme ([`js/stages/`](../../js/stages/)): flat
 parallax layers (sky, far, mid, near, atmosphere) generated once from a

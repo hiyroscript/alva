@@ -14,6 +14,9 @@
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
   --tc-dash: calc(var(--tc) * 0.62);
+  /* Down sits at the far left of the lower-left cluster, the size of a
+     Dash button: the cluster starts this much further in to make room. */
+  --tc-down-room: calc(var(--tc-dash) + var(--tc-gap));
   display: none;
   position: absolute;
   inset: 0;
@@ -30,7 +33,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .is-paused .touch-controls { opacity: 0.25; }
 .tc-cluster { position: absolute; bottom: var(--tc-bottom); }
 .tc-dpad {
-  left: calc(max(var(--safe-l), 12px) + 1.4vw);
+  left: calc(max(var(--safe-l), 12px) + 1.4vw + var(--tc-down-room));
   display: flex;
   gap: var(--tc-gap);
   pointer-events: auto;
@@ -168,9 +171,9 @@ html.is-touch .touch-controls[hidden] { display: none; }
    cluster is one round stick in the same translucent style as the buttons
    (a plain base and knob, no arrows in it), with a small Dash button just
    above each of its top corners (their centres sit 120deg and 60deg round
-   from the stick's, clear of its rim). */
+   from the stick's, clear of its rim), and Down to its left. */
 .tc-joystick {
-  left: calc(max(var(--safe-l), 12px) + 1.4vw);
+  left: calc(max(var(--safe-l), 12px) + 1.4vw + var(--tc-down-room));
   width: var(--tc-stick);
   height: calc(var(--tc) * 2.44);
 }
@@ -226,3 +229,19 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-dpad .tc-dash-left { left: calc((var(--tc) - var(--tc-dash)) / 2); }
 .tc-dpad .tc-dash-right { right: calc((var(--tc) - var(--tc-dash)) / 2); }
 .tc-dash .icon { display: block; }
+
+/* Down (both schemes): a small button, the size of a Dash button, at the
+   far left of the lower-left cluster, level with the middle of the stick
+   (Joystick) or of the Run arrows (Classic). Held, it is Down: the fast
+   fall, or on a one-way platform a drop through it. Classic's Run
+   container never captures its pointer. */
+.tc-down {
+  position: absolute;
+  left: calc(var(--tc-down-room) * -1);
+  width: var(--tc-dash);
+  height: var(--tc-dash);
+  font-size: calc(var(--tc-dash) * 0.46);
+}
+.tc-joystick .tc-down { bottom: calc((var(--tc-stick) - var(--tc-dash)) / 2); }
+.tc-dpad .tc-down { bottom: calc((var(--tc) - var(--tc-dash)) / 2); }
+.tc-down .icon { display: block; }

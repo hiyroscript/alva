@@ -1279,21 +1279,24 @@ code and stylesheet as in battle, never enabled, so nothing it does reaches
 gameplay. Every control of the layout can be moved and resized, the joystick
 itself included:
 
-- **Joystick:** Left mouvement (double left arrows), the joystick, Right
-  mouvement (double right arrows), and the actions (Extra Attack, Shield,
+- **Joystick:** Down (the downward chevron), Left mouvement (double left
+  arrows), the joystick, Right mouvement (double right arrows), and the
+  actions (Extra Attack, Shield,
   Attack 1 through Attack 5, Jump). Every editor control uses neutral
   localized names and universal icons, regardless of the selected fighter:
   one to five pips for the numbered attacks, the ring for Extra Attack, the
   shield for Defence and the upward arrow for Jump.
   All five numbered buttons remain available even if a fighter lacks them.
-- **Classic Buttons:** Run Left, Run Right, Mouvement Left, Mouvement Right, and the same actions.
+- **Classic Buttons:** Down, Run Left, Run Right, Mouvement Left, Mouvement Right, and the same actions.
 
 Each control has a stable control id, independent of its translated name
-(`TOUCH_CONTROL_IDS` in `js/core/touch-layout.js`:
+(`TOUCH_CONTROL_IDS` in `js/core/touch-layout.js`: `down`,
 `mouvementLeft`, `stick`, `mouvementRight`, `runLeft`, `runRight`,
 `extra_attack`, `shield`, `attack1` to `attack5`, `jump`); ids are never
-shown. A saved layout entry under an id the scheme no longer has is dropped
-when the layout is read, and every other entry is kept as saved.
+shown. A saved layout entry under an id the scheme no longer has (the
+retired `transform`) is dropped when the layout is read, and every other
+entry is kept as saved; a `down` entry saved while the old down arrow
+existed places the Down button where the player put it.
 
 - **Drag** a control to move it; the preview follows at once, and the
   control always stays whole inside the touch-control area. A press that
@@ -1539,10 +1542,11 @@ French, concise game terms).
   a lit facade and seven one-way platforms (racks, catwalks with billboards,
   a girder, the water-tower deck, a scaffold) that fighters jump up through
   from below, each a slab with depth, plus a stair bulkhead. No boundary
-  buildings. The player has no drop-through control and walks off an edge
-  to come down, and so does Quick Battle's combat AI; the training CPU can
-  drop through all of them except the water-tower deck. Neither CPU ever
-  walks off the roof's edges on its own.
+  buildings. The player drops through any of them but the water-tower deck
+  with a fresh Down press (7.2.2), or walks off an edge to come down;
+  Quick Battle's combat AI walks off an edge; the training CPU can drop
+  through all of them except the water-tower deck. Neither CPU ever walks
+  off the roof's edges on its own.
 - **Asperitas:** high above the clouds in daylight; a rich blue sky paling
   to a cyan and white horizon, the sun with soft rays, far cumulus, high
   cirrus, cloud banks and an endless cloud sea below (no ground anywhere),
@@ -1947,16 +1951,24 @@ each fighter's own values are in its character specification (7.2.9).
   `hitstunAirDrag` in the air (half its deceleration and air drag when it
   declares none), whatever is held. Missing hurt art holds its fallback
   frame.
-- `down` (S / ↓, D-pad or left stick down) is a
+- `down` (S / ↓, the left stick down, the touch Down button) is a
   direction only, never a stance, state or modifier: it has no animation,
-  locks no movement, refills nothing and changes no attack. It does two
-  things, both in the air: held while falling it is the fast fall, and held
-  as a hit lands it steers the launch downward (see the fast fall, 7.2.3,
-  and launch steering, 7.2.7). On the ground it does nothing at all: the fighter
-  idles, runs, attacks, jumps and shields exactly as with nothing held, and
-  every numbered button does the same thing whether or not Down is held. On
-  a one-way platform it never drops through (the player has no
-  drop-through control; see the stages above). Menus read Down from their
+  locks no movement, refills nothing and changes no attack. It does three
+  things: held while falling it is the fast fall, held as a hit lands it
+  steers the launch downward (see the fast fall, 7.2.3, and launch
+  steering, 7.2.7), and a **fresh press while standing on a one-way
+  platform drops the fighter through it** (any platform that allows it:
+  every one but Sol-Noir's water-tower deck; never the main floor or a
+  solid), the platform ignored for `dropThroughTime` (0.28 s), only while
+  free to act (never out of an attack, a stun, a paralysis, a technique, a
+  summon's startup or a Dash) and with no Shield up. Down held from before
+  never drops (a fast fall carried into a landing stands on the platform),
+  and a jump pressed on the same step jumps from where the fighter stood.
+  Otherwise, on the ground, it does nothing at all: the fighter idles, runs,
+  attacks, jumps and shields exactly as with nothing held, and every
+  numbered button does the same thing whether or not Down is held. Quick
+  Battle's combat AI never presses Down on the ground: it plans no drop and
+  walks off an edge instead. Menus read Down from their
   own bindings, the same keys and pad directions as ever (7.4). State
   priority is
   hitstun > technique > bound > attack > Dash > Shield > tumble > jump /
@@ -2059,8 +2071,8 @@ each fighter's own values are in its character specification (7.2.9).
     hit, like a ground jump, and an air dash past its cancel time. Quick
     Battle's CPU uses them to get back to the stage. A jump and both air
     jumps from a stage's highest footing stay well clear of the upper Void.
-  - *Fast fall.* Down (the `down` input: S / ↓, D-pad or stick down,
-    with no mobile Down button) held in the air while already descending
+  - *Fast fall.* Down (the `down` input: S / ↓, the left stick down, the
+    touch Down button) held in the air while already descending
     speeds the fall up toward `fastFallSpeed` at `fastFallAcceleration` on
     top of gravity: never while rising, never a jump in speed and never
     slower than the fall already is; it lands on platforms like any fall.
@@ -3564,8 +3576,9 @@ nothing in them names a fighter, an attack or an animation.
     explicit Mouvement request) all go through the fighter exactly as a
     player's do. It never writes to a fighter, never spawns or moves
     anything, never reads the player's raw input, never uses the wall clock
-    or unseeded randomness, and never uses the training CPU's platform drop:
-    it walks off platform edges instead. It never has Combat Assist
+    or unseeded randomness, and never drops through a platform (neither
+    the training CPU's drop nor a Down press on the ground): it walks off
+    platform edges instead. It never has Combat Assist
     (7.2.4a).
   - **Perception.** It sees its opponent as it was a reaction time ago
     (the level's window, resampled now and then; never zero), carried
@@ -4096,7 +4109,7 @@ Adding one is described in
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
+  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, as a hit lands, steering the launch downward, and pressed on a one-way platform, a drop through it), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
   extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground, a direction held with it walks behind it and Jump jumps out of it; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
@@ -4189,9 +4202,17 @@ Adding one is described in
     top-left and top-right sit two small Dash buttons named exactly **Left
     mouvement** and **Right mouvement** (centered double-arrow glyphs): one tap asks for one
     Dash that way (`queueTouchMouvement`, 7.2) and holds nothing; each
-    shows pressed while touched. No Down button or extra hit region exists.
+    shows pressed while touched. To the stick's left, level with its middle,
+    sits a small **Down** button (a downward chevron, the Dash buttons'
+    size; named "Down" / "Bas"): held, it holds `down` for as long as a
+    pointer stays on it (the fast fall in the air; pressed on a one-way
+    platform, the drop through it, 7.2.2). The lower-left cluster starts
+    that much further in (`--tc-down-room`) to make room for it. No other
+    hit region exists.
   - **Classic Buttons**: lower-left Run Left · Run Right with thumb sliding,
-    with two smaller Mouvement buttons directly above them. Shared elements,
+    with two smaller Mouvement buttons directly above them and the same
+    small Down button to the left of Run Left, level with the Run arrows'
+    middle; the Run container never captures Down's pointer. Shared elements,
     icons and one-shot handlers serve both schemes. Mouvement pointer events
     never enter the Run container's sliding/capture path; holding Run while
     tapping Mouvement or actions remains independent multi-touch input.

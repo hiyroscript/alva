@@ -94,7 +94,7 @@ plays every pairing at 30, 60 and 144 fps and compares every step).
 | `attackBuffer` | 0.15 | How long an attack press (and a Dash request) the fighter cannot act on yet is kept. |
 | `shieldWalkSpeed` | 130 | Shield walking: a direction held behind a raised Shield walks the fighter at this speed (about a third of the run), with the run's acceleration and braking. |
 | `hitstunFriction` / `hitstunAirDrag` | 1600 / 210 | How a launch or push runs down while stunned, whatever is held: the rates Launch Point is tuned against. |
-| `dropThroughTime` | 0.28 | How long a platform drop ignores the platform (the training CPU's drop only; no player control drops through). |
+| `dropThroughTime` | 0.28 | How long a platform drop (a fresh Down press on a one-way platform, or the training CPU's own drop) ignores that platform. |
 
 The values are tuned against the stages (main floors about 1400 units
 wide), the camera and combat ranges: a Dash covers about a seventh of a
@@ -304,6 +304,24 @@ frames there is no Dash, without `midair_mouvment` frames no air dash
 (refused and logged, never faked). Every **playable** fighter has both, so
 every playable fighter has the same capabilities
 ([`tests/systems/universal-movement.test.mjs`](../../tests/systems/universal-movement.test.mjs)).
+
+## Platform drop
+
+A fresh Down press (S / ↓, the left stick pushed down, the touch Down
+button) while standing on a one-way platform that allows it drops the
+fighter through it (`dropThrough` in
+[`js/game/physics.js`](../../js/game/physics.js)): the platform is ignored
+for `dropThroughTime` and the fighter falls on from where it stood, its
+speed kept. Every one-way platform allows it unless its map says
+`dropThrough: false` (Sol-Noir's water-tower deck); the main floor and the
+solids never do. It needs the fighter free to act (no attack, stun,
+paralysis, technique, summon's startup or Dash) and no Shield up. Down
+held from before never drops, so a fast fall carried into a landing stands
+on the platform; and a jump pressed on the same step jumps from where the
+fighter stood. A moving cloud drops a fighter the same way. The training
+CPU asks for the same drop with its own `dropPressed`; Quick Battle's
+combat AI never presses Down on the ground (it plans no drop and walks off
+an edge instead).
 
 ## Shield walking
 

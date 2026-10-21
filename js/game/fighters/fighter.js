@@ -675,10 +675,17 @@ export class Fighter {
     if (combat.shielding) this.shieldDownTime = 0;
     else this.shieldDownTime += dt;
 
-    // ---- Platform drop (training CPU only) -------------------------------
-    // No player key, button or touch control produces `dropPressed`; the
-    // training CPU uses it to follow the player down through one-way platforms.
-    if (input.dropPressed && canAct && body.grounded && !combat.shielding) {
+    // ---- Platform drop --------------------------------------------------
+    // A fresh Down press (S / ↓, the left stick down, the touch Down button)
+    // while standing on a one-way platform that lets fighters drop
+    // (`dropThrough`, see dropThrough in js/game/physics.js), free to act and
+    // with no Shield up, drops the fighter through it: never the main floor
+    // or a solid, never a platform that forbids it, never out of an attack,
+    // a stun, a paralysis, a technique or a Dash, and never a Down held since
+    // before (a fast fall carried into a landing stands on the platform). A
+    // jump pressed on the same step still jumps from where it stood. The
+    // training CPU asks for the same drop with `dropPressed`.
+    if ((input.downPressed || input.dropPressed) && canAct && body.grounded && !combat.shielding) {
       dropThrough(body, mv.dropThroughTime);
     }
 

@@ -98,7 +98,8 @@ export class InputManager {
     // Reused per-step snapshot to avoid allocations in the sim loop: every
     // held control and its press edge, the Dash requests and where the
     // controller's combat presses were made (see blankInput). Never
-    // `dropPressed`: only the training CPU drops through platforms.
+    // `dropPressed`, the training CPU's own drop: a player's drop is a fresh
+    // Down press (downPressed), whatever the device.
     const { dropPressed, ...frame } = blankInput();
     this.frame = frame;
 

@@ -1036,13 +1036,15 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
   assert.equal(touch.scheme, 'joystick');
   assert.equal(lowerLeft(), touch.joystick);
-  assert.equal(touch.buttons.get('down'), touch.stickDown);
+  assert.equal(touch.buttons.get('down'), touch.downButton, 'Down, by the stick');
+  assert.ok(touch.joystick.children.includes(touch.downButton));
 
   app.settings.set('mobileControls', 'classic');
   await screen.enter();
   assert.equal(touch.scheme, 'classic');
   assert.equal(lowerLeft(), touch.dpad);
-  assert.equal(touch.buttons.get('down'), touch.padButtons.get('down'));
+  assert.equal(touch.buttons.get('down'), touch.downButton, 'the same Down, by the Run arrows');
+  assert.ok(touch.dpad.children.includes(touch.downButton));
 
   app.settings.set('mobileControls', 'joystick');
   await screen.enter();
