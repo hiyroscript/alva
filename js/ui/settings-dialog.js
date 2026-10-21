@@ -12,7 +12,7 @@
 //             Customize controller controls, which opens the fighter roster
 //             and each fighter's own controller layout
 //             (js/ui/controller-editor.js). Keyboard controls never change.
-//   Combat    Combat Assist, On (the default) or Off, a single choice
+//   Combat    Combat Assist, On or Off (the default), a single choice
 //             (radio buttons, in the Language section's style) with the
 //             line that says what it does: the player's melee attacks (on
 //             the ground or in the air) close a short gap first, free

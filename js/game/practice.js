@@ -52,10 +52,11 @@ export function formatDamage(damage) {
 
 export class PracticeSession extends Arena {
   // `combatAssist` and `comboAssist` are the player's Combat Assist and
-  // Combo Assist settings (each on unless given false), for Player 1's
+  // Combo Assist settings (Combat Assist off unless given true, Combo
+  // Assist on unless given false, as the settings' defaults), for Player 1's
   // controller only: the practice CPU has no controller, so it never has
   // either.
-  constructor({ canvas, map, def, sprites, input, reducedMotion = false, combatAssist = true, comboAssist = true }) {
+  constructor({ canvas, map, def, sprites, input, reducedMotion = false, combatAssist = false, comboAssist = true }) {
     super({ canvas, map, input, reducedMotion });
     this.reducedMotion = reducedMotion;
     this.combatAssist = combatAssist === true;

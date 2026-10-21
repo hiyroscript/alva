@@ -598,7 +598,7 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}, trac
       dashLeft -= STEP;
       burst = true;
     } else if (riseLeft > 0) {
-      steer(b, MV, dir, rise.control ?? 0.5, 1, STEP, burst);
+      steer(b, MV, dir, rise.control ?? 0.5, 1, STEP, burst, rise.topSpeed ?? rise.control ?? 0.5);
       b.vy = -rise.speed;
       share = 0;
       riseLeft -= STEP;

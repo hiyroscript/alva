@@ -128,6 +128,12 @@ export class Executor {
     if (this.clock <= this.jumpHoldUntil) held.jump = true;
     const b = self.body;
     let d = this.wantDir;
+    // Its own strike on the ground plays out where it planned it: its
+    // predictions (prediction.js) play an attack out unsteered, so it holds
+    // no direction that would walk it off its mark. A player's attack obeys
+    // the same steering rules; this is the CPU's choice of what to hold.
+    const atk = self.combat.attack;
+    if (b.grounded && atk?.def.lockMovement && !atk.def.motion) d = 0;
     if (!b.grounded) held.shield = held.shield && this.pressed === 'shield';
     if (d && b.grounded && !this.allowEdge) {
       const decel = self.movement.deceleration;

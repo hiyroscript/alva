@@ -1162,7 +1162,8 @@ indicator. Each section keeps its existing settings, in this order:
 - **Combat** — **Combat Assist** (7.2.4a), under the line "Automatically
   closes a short gap before a melee attack. Never uses energy and never
   affects ranged attacks.", with exactly two choices in the Language section's
-  style: **On** (marked "Default") and **Off**, a `radiogroup` (labelled by
+  style: **On** and **Off** (marked "Default": a new player places their
+  own attacks, and turns it on as an aid), a `radiogroup` (labelled by
   the setting's name, described by its line) of two `radio` buttons; the
   one saved is ticked and outlined in green. Choosing one saves it at once
   and the dialog stays open; each Quick Battle or Practice Ground session
@@ -1237,15 +1238,21 @@ indicator. Each section keeps its existing settings, in this order:
 
   `language` is null until the player picks one (English is used meanwhile,
   but the first-launch chooser still asks: a default is never mistaken for a
-  choice). `combatAssist` and `comboAssist` are real booleans, each `true`
-  unless the player turned it off. Older objects are migrated: a version 1
+  choice). `combatAssist` and `comboAssist` are real booleans:
+  `combatAssist` `false` for a new player until they turn it on (it was on
+  by default before version 7), `comboAssist` `true` unless the player
+  turned it off. Older objects are migrated: a version 1
   object (`{ "version": 1, "mobileControls": … }`) keeps its Joystick /
   Classic choice, with no language chosen yet (so the chooser shows once)
   and both layouts empty; a version 2 object keeps its language, Mobile
   Controls and both custom layouts; a version 3 object keeps all of that
   and its Combat Assist; a version 4 object keeps all of that and every
   controller profile; a version 5 object keeps all of that and its Combo
-  Assist. Versions 1 and 2 get Combat Assist on, versions 1 to 3 no
+  Assist; a version 6 object keeps everything. A player whose settings were
+  saved before version 7 keeps Combat Assist exactly as they had it:
+  versions 1 and 2 (which never stored it) and any older object without a
+  valid value get it on, as they played (`LEGACY_COMBAT_ASSIST`), so only a
+  device with nothing saved starts with it off. Versions 1 to 3 get no
   controller profile, and versions 1 to 4 Combo Assist on. A controller
   profile saved under version 4 or 5 predates the named sticks and today's
   recommended layouts: it is upgraded for its fighter (7.4a), every binding
@@ -1974,8 +1981,9 @@ each fighter's own values are in its character specification (7.2.9).
   ground acceleration and deceleration, turn braking, overspeed handling,
   air acceleration, drag and turning, jump speed and higher jump, air jumps
   (count and strength), gravity, fall speed, fast fall, coyote time, jump
-  and combat input buffers, Dash speed, length and input window, and air
-  dash speed, length and uses: one frozen set of values
+  and combat input buffers, Dash speed, length, input window and repeat
+  delay, air dash speed, length and uses, and the Shield walk's speed: one
+  frozen set of values
   (`BASE_FIGHTER_MOVEMENT`, `js/data/movement.js`; docs/systems/movement.md
   lists them) that the Fighter reads for everyone. No fighter definition
   declares movement: a `movement` profile, `powers` or any of those fields
@@ -2013,8 +2021,10 @@ each fighter's own values are in its character specification (7.2.9).
     it, and a running jump carries its speed.
   - *Momentum.* A legal change of action never throws speed away: a jump
     and an air jump keep the sideways speed they find, an attack keeps its
-    `momentum` share of it (all of it unless its data says otherwise, a
-    Dash's burst included), a Dash never slows a faster fighter and its
+    `momentum` share of it (its mobility tier's, all of it for a quick
+    strike, a Dash's burst included: 7.2.4) and the player may steer it on
+    from there, Combat Assist's approach hands its fighter into its attack
+    at a run (7.2.4a), a Dash never slows a faster fighter and its
     speed carries on after it, landing keeps the speed it lands with, and
     the impact freeze holds a velocity without losing it. Only real forces
     change momentum: a hit, a launch, a carry, a pull, a rebound, a wall, a
@@ -2080,7 +2090,7 @@ each fighter's own values are in its character specification (7.2.9).
   paralysis, technique or Dash running) or in an attack that hit and may
   be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4), grounded, not
   shielding nor holding `shield` for a Shield that can go up, not exhausted
-  (it pays 25 Energy once as it starts, the same for every fighter and for
+  (it pays 20 Energy once as it starts, the same for every fighter and for
   a Dash cancel, or all that is left when that is less, emptying the bar:
   7.2.5) and its
   real `mouvment` clip (without it the Dash is refused and logged, never
@@ -2114,8 +2124,8 @@ each fighter's own values are in its character specification (7.2.9).
   an air dash left this airtime (`airDashUses`, 1; landing gives it back,
   and so does a hit, as for the air jumps; an air jump does not).
   Otherwise the Dash's rules: free to act or in an attack that hit and may
-  be cut short (a Dash cancel in the air, for the same 25), not
-  exhausted, paying 25 Energy; never while stunned, paralyzed or
+  be cut short (a Dash cancel in the air, for the same 20), not
+  exhausted, paying 20 Energy; never while stunned, paralyzed or
   already dashing; and, as an attack's own motion, never while still
   flying from a launch or in free fall. A request in the air that no air
   dash answers is kept for the buffer, and is the Dash if the fighter lands
@@ -2134,7 +2144,10 @@ each fighter's own values are in its character specification (7.2.9).
   through the same explicit requests: home when knocked off the stage too far
   out, and in the air to close in.
 - **Movement repeat cooldowns.** `mouvment` and `midair_mouvment` each use
-  their own 0.5-second acceptance timer in `CombatState.movementCooldowns`.
+  their own acceptance timer in `CombatState.movementCooldowns`, the
+  universal `dashRepeat` (0.4 s, its own value, apart from the attacks'
+  0.5 s repeat delay): a quick second Dash when it is wanted, never a chain
+  of instant ones.
   Player and CPU use the same readiness check. A cooling request is discarded,
   even during hitstop; it cannot become a delayed Dash. Combat Assist neither
   starts nor checks these timers. Landing and hits restore airtime resources,
@@ -2277,21 +2290,45 @@ each fighter's own values are in its character specification (7.2.9).
   attack (`pending: true`) is art only: one pass of its clip, no hit, and
   declaring combat fields on one is refused.
   - *Attack movement.* Normal locomotion is off while an attack plays, but
-    that is not the same as standing still: an attack keeps its share of
-    the horizontal speed it started with (`momentum` on the ground,
-    `airMomentum` in the air: all of it by default, never capped at top
-    speed, so a Dash's burst carries into a Dash attack), may be steered
-    with a share of the normal acceleration and top speed (`control`,
-    `airControl`), lets the rest of its speed run down under `friction` ×
-    the ground deceleration (above top speed the overspeed brake; the air
-    drag in the air), and may move by itself (`step: { at, speed }`:
-    forward speed raised to at least `speed` as its time crosses `at`, on
-    the ground, never lowered). Defaults (`momentum` 1, `control` 0,
-    `friction` 1, no step) keep the fighter's speed, unsteered; a planted
-    attack is one whose data says so (a low `momentum`, a high `friction`),
-    never the default. `lockMovement: false` keeps full locomotion. A
-    technique holds its fighter still instead and a clone never moves:
-    neither reads these.
+    that is not the same as standing still, or as losing control: an
+    attack keeps its share of the horizontal speed it started with
+    (`momentum` on the ground, `airMomentum` in the air: never capped at
+    top speed, so a Dash's burst carries into a Dash attack), lets the
+    player steer it with a share of the normal steering authority
+    (`control`, `airControl`: how quickly the held direction changes its
+    velocity, the turn's braking included) toward a share of top speed
+    (`topSpeed`, `airTopSpeed`), the two apart (a strike with 0.8 of the
+    authority may still hold the whole run), lets the speed it is not
+    steering run down under `friction` × the ground deceleration (above
+    top speed the overspeed brake; the air drag in the air), and may move
+    by itself (`step: { at, speed }`: forward speed raised to at least
+    `speed` as its time crosses `at`, on the ground, never lowered).
+    Steering works through the startup, the strike and the recovery; a
+    direction held also turns the attack, as ever, so steering back turns
+    it and carries it the new way.
+    - *Mobility tiers.* An attack names its tier (`mobility`, chosen by
+      what it does, never by its name, slot, damage or clip length) and the
+      tier supplies those numbers (`ATTACK_MOBILITY` in
+      `js/data/attack-mobility.js`, the same for every fighter); a field
+      the attack writes itself wins over its tier's:
+
+      | Tier | `control` / `airControl` | `topSpeed` / `airTopSpeed` | `momentum` / `airMomentum` | `friction` | For |
+      | --- | --- | --- | --- | --- | --- |
+      | `quick` | 0.8 / 0.9 | 1 / 1 | 1 / 1 | 0.6 | light, fast strikes: the run and the drift carry on through them |
+      | `medium` | 0.55 / 0.7 | 0.6 / 0.9 | 0.9 / 1 | 0.8 | strikes with a clear wind-up or recovery, ordinary casts, everyday aerials with a motion of their own |
+      | `heavy` | 0.2 / 0.4 | 0.25 / 0.6 | 0.6 / 0.9 | 1 | deliberate commitments: finishers, long flurries, trap casts, plunges |
+      | `planted` | 0 / 0 | — | 1 / 1 | 1 | no steering: a move that roots its fighter, a roll's curl |
+
+      An attack that names none is `medium`: no attack stands its fighter
+      still unless its own data says so. Every roster attack names its
+      tier, and each fighter's definition says why (its specification in
+      `docs/characters/` lists them). A plunge's or a lift's drift
+      (`slam`, `bounce`, `rise`) is the motion's own: its `airTopSpeed` is
+      its `airControl`, as authored.
+    `lockMovement: false` keeps full locomotion. A technique holds its
+    fighter still instead and a clone never moves: neither reads these.
+    The CPU obeys the same steering; on the ground it holds no direction
+    through its own strike, which it plans unsteered.
   - *Combat input buffer.* An ordinary attack press the fighter cannot act
     on yet (an attack or its recovery, a stun, a Dash before its cancel
     time, a repeat cooldown, `shield` held for its Shield) is kept for the
@@ -2322,7 +2359,7 @@ each fighter's own values are in its character specification (7.2.9).
     may be cut short once its time reaches its `hitCancel` (seconds in, or
     null for never; the step its freeze ends at the earliest), by another
     attack, a jump or, on the ground, a Dash (a **Dash cancel**, for the
-    same 25 Energy as any Dash): walking, the Shield, summons and techniques
+    same 20 Energy as any Dash): walking, the Shield, summons and techniques
     still wait for its end, and left alone it plays out in full. A Dash
     asked for during the hit's freeze comes out the step it ends. It cuts
     into itself only once its own repeat cooldown has
@@ -2346,7 +2383,7 @@ each fighter's own values are in its character specification (7.2.9).
     rules above) may cut its own attack short, its Deflect included, with a
     new request: another attack or the Extra Attack, a summon or a
     technique, a jump or an air jump, a Dash or an air dash (an explicit
-    Mouvement request, for the Dash cancel's 25 Energy), the Shield (a press
+    Mouvement request, for the Dash cancel's 20 Energy), the Shield (a press
     on the ground, the Shield going up on that step) or the Deflect (a press
     in the air, for its 15). Hit or not, in its startup, active phase or
     recovery: no hit is needed. The new move's own rules come first, every
@@ -2600,7 +2637,8 @@ each fighter's own values are in its character specification (7.2.9).
 
 #### 7.2.4a Combat Assist
 
-Combat Assist (Home › Settings › Combat, 6.10; on by default) makes close
+Combat Assist (Home › Settings › Combat, 6.10; off for a new player, an
+accessibility and convenience aid the player turns on) makes close
 fighting more forgiving for the human player: a melee press made just out
 of reach closes the gap first, then the very attack asked for comes out.
 It is a short movement phase before the attack, never a change to the
@@ -2702,20 +2740,27 @@ attack or a button.
   invulnerability, never through a wall, a ceiling or its target. It is
   measured afresh every step (the target may move; one aimed at a slide's
   end keeps aiming there, `combatAssist.ahead`), its limit of one Dash
-  (or air dash) applying to the whole approach. Once the attack reaches, it
-  stops where it is (in the air, hanging there, gravity back) and the
-  attack starts there by the ordinary rules (`tryAction`): its own phases,
-  hitbox and motion, exactly the attack thrown in reach from that spot,
-  facing the way the approach went. Once it can get no closer (its travel
-  or duration spent, the target off its level or behind it), it stops and
-  the attack starts where it is, facing the same way.
+  (or air dash) applying to the whole approach. Once the attack reaches,
+  the fighter goes into it running, never stopped dead: at top speed
+  toward its target (the horizontal share of its heading in the air,
+  hanging there, gravity back), the approach's own Dash speed spent (it
+  was the assist's, not the player's), and the attack starts there by the
+  ordinary rules (`tryAction`), keeping its share of that speed as any
+  attack thrown at a run does: its own phases, hitbox and motion, exactly
+  the attack thrown in reach from that spot by a fighter running at its
+  target, facing the way the approach went. Once it can get no closer
+  (its travel or duration spent, the target off its level or behind it),
+  the attack starts where it is the same way. A wall or a ledge in the
+  way still stops it dead (below). Pushboxes keep it out of its target as
+  ever.
 - **Run held.** Holding Run, toward the target, away from it or turned
   midway, never cancels or skips the approach (a direction held is never a
   request: 7.2.4), and never turns the attack it serves away from its
   target: an attack Combat Assist faced at its target keeps that facing
-  while the direction held as it started is still held; a new turn (the
-  direction let go and pressed again, or another one) turns it as any
-  attack turns (7.2.2).
+  while the direction held as it started is still held, and that stale
+  direction does not steer it either (it would walk it out of its own
+  strike); a new turn (the direction let go and pressed again, or another
+  one) turns and steers it as any attack (7.2.2, 7.2.4).
 - **The newest melee press wins.** While it runs, a fresh melee press
   replaces the attack it ends in and the approach is measured
   for that attack's own reach; one already in reach starts at once. There
@@ -2863,7 +2908,7 @@ nothing in them names a fighter, an attack or an animation.
   faster.
 - **Ranges.** The strings a player gets by pressing the same button twice
   land on a standing target, from every spacing where both moves reach it
-  on their own, with the default settings (Combat Assist on): Attack 1
+  on their own, with Combat Assist on (and so without it too): Attack 1
   then Attack 2 up to at least 60 Launch Point for every fighter; Attack 2
   then Attack 1 up to at least 30, except after an Attack 2 that ends in a
   full launcher (Base Launch 3, a fling meant to end the string: today
@@ -2924,21 +2969,33 @@ nothing in them names a fighter, an attack or an animation.
   Energy left is enough) and it has the held art. Leaving the ground
   drops it (a block's push off a ledge). It is decided before the
   combat intents: while `shield` is held with a Shield that can go up, no
-  attack, summon, technique, Dash or jump starts (let go of `shield`
-  first: an attack or a jump pressed meanwhile is buffered and comes out
-  the step the Shield is let go, if that is soon enough; a summon or
-  technique pressed meanwhile is not kept). On the ground it shows its
+  attack, summon, technique or Dash starts (let go of `shield` first: an
+  attack pressed meanwhile is buffered and comes out the step the Shield
+  is let go, if that is soon enough; a summon or technique pressed
+  meanwhile is not kept). **Jump out of Shield:** a jump press drops the
+  Shield and jumps on that very step, carrying the walk's speed, unless a
+  block holds it up (blockstun): then the press waits in the jump buffer
+  and jumps the first step the stun is over, if that is soon enough. On
+  the ground it shows its
   optional `groundStartAnimation` for one pass as it goes up, then
   `groundAnimation` (#0001's `shielding`) for as long as it is held;
   lowered on the ground, the optional `groundReleaseAnimation` shows for
   one pass (the `shieldRelease` state) while nothing of higher priority
   takes over (visual only: movement resumes at once). Neither #0001,
   #0002 nor #0004 has a raise or lower pose; #0003 has both (`prepshield`,
-  `releaseshield`, a frame each), and so has #0005 (two frames each). While it is up horizontal input moves
-  nothing (no walking, running or Dash, the current velocity slowing under
-  the normal deceleration), though the direction held turns the fighter.
-  Held through a jump, nothing is up in the air; it rises as the fighter
-  lands, with its raise pose. A missing held clip refuses the Shield
+  `releaseshield`, a frame each), and so has #0005 (two frames each).
+  **Shield walking:** while it is up a direction held walks the fighter
+  slowly behind it, at the universal `shieldWalkSpeed` (130 units/s, about
+  a third of the run) with the run's acceleration and braking (a run it
+  was raised in eases down to the walk, never at once), and turns it, as
+  ever (the Shield guards every side, so a turn costs nothing); no
+  running and no Dash. It has no pose of its own: the held Shield pose
+  stays, and the Shield's waving ring runs `SHIELD_WALK_WAVE_RATE` (4)
+  times faster while it walks (below). In blockstun it stands: the
+  block's push slows under the normal deceleration, whatever is held.
+  Walking costs no Energy. Walked off a ledge, the Shield drops as the
+  fighter leaves the ground. Held through a jump, nothing is up in the
+  air; it rises as the fighter lands, with its raise pose. A missing held clip refuses the Shield
   (logged once per clip); missing raise or lower poses are simply skipped.
 - **Blocking.** The Shield is a full circle: while it is up, every hit
   that reaches the fighter's own hurtboxes (the same `CombatSystem`
@@ -3055,7 +3112,10 @@ nothing in them names a fighter, an attack or an animation.
   whole-number sine waves round the circle (so it always closes and its
   mean radius never changes: it wavers like the Void's edge, never pulses)
   drifting slowly on the Arena's effects clock, traced at 96 points so the
-  curve stays smooth; with reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
+  curve stays smooth; while its fighter walks behind it the waves drift
+  `SHIELD_WALK_WAVE_RATE` (4) times as fast, each fighter's ring keeping
+  the lead it gains so slowing again never makes the waves jump
+  (`shieldWaveTime`); with reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
   the Void, name tags and status, and never used by collision. The debug
   overlay labels a shielding fighter `shield`; its hurtboxes are drawn as
   usual.
@@ -3066,11 +3126,11 @@ nothing in them names a fighter, an attack or an animation.
   | What | Energy |
   | --- | --- |
   | The bar, full (`MAX_ENERGY`) | 100 |
-  | A Dash, an air dash, a Dash cancel (`DASH_ENERGY_COST`) | 25, as it starts |
+  | A Dash, an air dash, a Dash cancel (`DASH_ENERGY_COST`) | 20, as it starts |
   | A Deflect (`DEFLECT_ENERGY_COST`) | 15, as it starts, hit or whiff |
   | A blocked hit, a perfect block's included (`BLOCK_ENERGY_COST`) | 15, per block |
   | Combat Assist's approach | 0, ever |
-  | Running, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 |
+  | Running, Shield walking, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 |
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
@@ -4037,7 +4097,7 @@ Adding one is described in
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
-  extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground; a fresh press in the air is the Deflect), U
+  extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground, a direction held with it walks behind it and Jump jumps out of it; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
   fighter acts only on the ones it has a button for, 7.2), Esc/P pause

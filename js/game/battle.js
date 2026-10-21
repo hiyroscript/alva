@@ -53,12 +53,13 @@ export class Battle extends Arena {
   // only the CPUs' controllers: both fighters are built from their
   // definitions alone. `seed` fixes the CPUs' randomness (tests); by default
   // every battle differs. `combatAssist` and `comboAssist` are the human
-  // player's Combat Assist and Combo Assist settings (each on unless given
-  // false): they go to the player's controller only, so a CPU (Quick
+  // player's Combat Assist and Combo Assist settings (Combat Assist off
+  // unless given true, Combo Assist on unless given false, as the settings'
+  // defaults): they go to the player's controller only, so a CPU (Quick
   // Battle's, or either of Watch Mode's) never has either.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
-    combatAssist = true, comboAssist = true,
+    combatAssist = false, comboAssist = true,
   }) {
     // One seed for the battle's randomness: each CPU's and each stage
     // hazard's its own stream of it.

@@ -14,6 +14,7 @@ import {
   def, DT, MOVEMENT, makeFighter, fakeSprites, stageMap, stepUntil, duel, STAGE,
 } from '../helpers/fighter-harness.mjs';
 import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
+import { ATTACK_MOBILITY } from '../../js/data/attack-mobility.js';
 
 const mv = MOVEMENT;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
@@ -345,28 +346,38 @@ test('an attack pressed during a Dash comes out once its cancel time is reached,
 
 // ---- Attacks and momentum ---------------------------------------------------------
 
-test('running into attack1 keeps its momentum share and slides on it under its own friction: no invisible wall', () => {
-  const attack1 = def.attacks.attack1;
+test('running into attack1, a quick strike, keeps the whole run while it is held and slides on under its friction when let go: no invisible wall', () => {
   const { fighter, step } = running();
+  const attack1 = fighter.attacks.attack1;
+  assert.equal(attack1.mobility, 'quick');
   step({ ...RIGHT, ...P('attack1') });
   assert.equal(fighter.combat.attack.def.id, 'attack1');
-  assert.ok(close(fighter.body.vx, fighter.maxSpeed * attack1.momentum - mv.deceleration * attack1.friction * DT), 'kept, then its friction');
+  assert.equal(fighter.body.vx, fighter.maxSpeed * attack1.momentum, 'the run kept, whole');
   const x = fighter.body.x;
+  for (step(RIGHT); fighter.state === 'attack'; step(RIGHT)) assert.equal(fighter.body.vx, fighter.maxSpeed, 'held: never braked');
+  assert.ok(fighter.body.x - x > 60, `it runs on through the punch (${(fighter.body.x - x).toFixed(1)})`);
+  // Let go: it slides on under its friction, slowing every step, never at once.
+  const slide = running();
+  slide.step({ ...RIGHT, ...P('attack1') });
   const log = [];
-  for (step(RIGHT); fighter.state === 'attack'; step(RIGHT)) log.push(fighter.body.vx);
-  assert.ok(fighter.body.x - x > 12, 'it carries on through the punch');
-  for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'never speeding up: no steering');
-  // Standing still, it never moves, whatever is held.
+  for (slide.step(); slide.fighter.state === 'attack'; slide.step()) log.push(slide.fighter.body.vx);
+  assert.ok(close(log[0], slide.fighter.maxSpeed - mv.deceleration * attack1.friction * DT), 'its friction');
+  for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'never speeding up with nothing held');
+  // Standing still with nothing held it never moves; with a direction held
+  // the player moves it, as quickly as its share of the steering allows.
   const still = makeFighter();
   const x0 = still.fighter.body.x;
-  for (still.step(P('attack1')); still.fighter.state === 'attack'; still.step(RIGHT)) {
-    assert.equal(still.fighter.body.x, x0);
-  }
+  for (still.step(P('attack1')); still.fighter.state === 'attack'; still.step()) assert.equal(still.fighter.body.x, x0);
+  const steered = makeFighter();
+  steered.step({ ...RIGHT, ...P('attack1') });
+  assert.ok(close(steered.fighter.body.vx, mv.acceleration * attack1.control * DT), 'its share of the acceleration');
+  for (steered.step(RIGHT); steered.fighter.state === 'attack'; steered.step(RIGHT));
+  assert.ok(steered.fighter.body.x - x0 > 60, 'steered on through the punch');
 });
 
 test('the High Kick steps in on its leap frame; an attack with control keeps a share of a run and may be steered, turning the way it is steered', () => {
-  const kick = def.attacks.extra_attack;
   const { fighter, step } = makeFighter();
+  const kick = fighter.attacks.extra_attack;
   step(P('extra_attack'));
   assert.equal(fighter.body.vx, 0, 'standing: no speed to keep');
   while (fighter.combat.attack.time < kick.step.at - 1e-9) step({});
@@ -382,8 +393,8 @@ test('the High Kick steps in on its leap frame; an attack with control keeps a s
 
   // Steering through an attack (`control`): Red, given a little.
   const steered = { ...def, attacks: { ...def.attacks, attack2: { ...def.attacks.attack2, control: 0.3 } } };
-  const red = def.attacks.attack2;
   const t = running({ character: steered });
+  const red = t.fighter.attacks.attack2;
   t.step({ ...RIGHT, ...P('attack2') });
   assert.equal(t.fighter.combat.attack.def.id, 'attack2');
   const kept = t.fighter.body.vx;
@@ -402,11 +413,12 @@ test('aerials keep their share of the drift and steer with their airControl; lan
   step({ ...RIGHT, ...P('attack1') });
   const atk = fighter.combat.attack;
   assert.equal(atk.def.id, 'midair_attack1');
-  // Its share of the drift (airMomentum), above its own steering cap
-  // (airControl of top speed): only the air drag eases it, holding on or
-  // not.
+  // Its share of the drift (airMomentum); held on, a quick aerial steers
+  // back up toward the whole top speed (airTopSpeed) with its share of the
+  // air steering (airControl).
   const drift = fighter.maxSpeed * atk.def.airMomentum;
-  assert.ok(close(fighter.body.vx, drift - mv.airDeceleration * DT), 'its share of the drift');
+  assert.equal(atk.def.airTopSpeed, 1);
+  assert.ok(close(fighter.body.vx, drift + mv.airAcceleration * atk.def.airControl * DT), 'its share of the drift, steered on');
   for (let i = 0; i < 4; i++) step(LEFT);
   assert.ok(fighter.body.vx < drift - 4 * mv.airDeceleration * DT, 'steered');
   // A plain aerial started just before touchdown plays its startup and
@@ -448,19 +460,30 @@ test('aerials keep their share of the drift and steer with their airControl; lan
   assert.ok(hover.fighter.body.y > y, 'and falls again once it is over');
 });
 
-test('attack movement is data with defaults: an attack that declares none is planted; lockMovement false keeps locomotion', () => {
+test('attack movement is data with defaults: an attack that declares none is medium, one that says so planted; lockMovement false keeps locomotion', () => {
   const plain = { animation: 'attack1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 1, hitbox: def.attacks.attack1.hitbox };
   const character = {
     ...def,
-    attacks: { ...def.attacks, plain, free: { ...plain, lockMovement: false } },
-    actions: { ...def.actions, attack1: 'plain', attack2: 'free' },
+    attacks: { ...def.attacks, plain, planted: { ...plain, mobility: 'planted' }, free: { ...plain, lockMovement: false } },
+    actions: { ...def.actions, attack1: 'plain', attack2: 'free', attack3: 'planted' },
   };
+  const medium = ATTACK_MOBILITY.medium;
   const a = running({ character });
   a.step({ ...RIGHT, ...P('attack1') });
   assert.equal(a.fighter.combat.attack.def.id, 'plain');
-  assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed - mv.deceleration * DT), 'all its speed, normal friction');
-  a.step(LEFT);
-  assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed - 2 * mv.deceleration * DT), 'no steering');
+  assert.equal(a.fighter.combat.attack.def.mobility, 'medium');
+  // Its tier's share of the run, held toward its tier's share of top speed.
+  const top = a.fighter.maxSpeed * medium.topSpeed;
+  assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed * medium.momentum - mv.deceleration * medium.friction * DT), 'its share, easing to its cap');
+  for (let i = 0; i < 10 && a.fighter.combat.attack; i++) a.step(RIGHT);
+  assert.ok(close(a.fighter.body.vx, top), 'held on: its share of top speed, steadily');
+
+  const p = running({ character });
+  p.step({ ...RIGHT, ...P('attack3') });
+  assert.equal(p.fighter.combat.attack.def.id, 'planted');
+  assert.ok(close(p.fighter.body.vx, p.fighter.maxSpeed - mv.deceleration * DT), 'planted: all its speed, normal friction');
+  p.step(RIGHT);
+  assert.ok(close(p.fighter.body.vx, p.fighter.maxSpeed - 2 * mv.deceleration * DT), 'no steering, held or not');
 
   const b = running({ character });
   b.step({ ...RIGHT, ...P('attack2') });

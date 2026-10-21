@@ -88,10 +88,20 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   airDashSpeed: 1250,
   airDashDuration: 1 / 6,
   airDashUses: 1,
+  // A Dash may start again this long after the last one started (the air
+  // dash likewise, on its own timer): never a chain of instant Dashes, but
+  // a quick second one when it is wanted.
+  dashRepeat: 0.4,
 
   // ---- Combat responsiveness --------------------------------------------------
   // How long an attack press the fighter cannot act on yet is kept.
   attackBuffer: 0.15,
+
+  // ---- The Shield ---------------------------------------------------------------
+  // Shield walking: a direction held behind a raised Shield walks the
+  // fighter at this speed (about a third of the run), with the run's own
+  // acceleration and braking; never in blockstun.
+  shieldWalkSpeed: 130,
 
   // ---- Stunned ------------------------------------------------------------------
   // How a launch or push runs down while stunned, whatever is held: the
@@ -149,9 +159,14 @@ export const MOVEMENT_GUIDE = Object.freeze([
   }),
   Object.freeze({ id: 'fastFall', name: 'Fast fall', description: 'Hold Down while falling to drop faster.' }),
   Object.freeze({
+    id: 'shieldWalk',
+    name: 'Shield walk',
+    description: 'Hold a direction behind the Shield to walk slowly while guarding. Jump straight out of it when not blocking.',
+  }),
+  Object.freeze({
     id: 'dash',
     name: 'Dash',
-    description: 'Press Q/E, the Dash button on a controller (the left shoulder button by default), or a movement button for a burst of speed. An attack or a jump can cut in after a moment.',
+    description: 'Press Q/E, the Dash button on a controller (the right shoulder button by default), or a movement button for a burst of speed. An attack or a jump can cut in after a moment.',
   }),
   Object.freeze({ id: 'airDash', name: 'Air dash', description: 'The Dash in mid-air, flat across, once per airtime.' }),
 ]);

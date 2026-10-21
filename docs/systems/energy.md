@@ -24,11 +24,18 @@ The same for every fighter, written once in `combat-state.js`:
 | What | Energy | Constant (resolved field) |
 | --- | --- | --- |
 | The bar, full: where every fighter starts, and what a respawn, a reset or a restart refills it to | 100 | `MAX_ENERGY` (`max`) |
-| A Dash, an air dash, or either cutting short an attack that hit (a Dash cancel) | 25, once, as it starts | `DASH_ENERGY_COST` (`dashCost`, `dashCancelCost`) |
+| A Dash, an air dash, or either cutting short an attack that hit (a Dash cancel) | 20, once, as it starts | `DASH_ENERGY_COST` (`dashCost`, `dashCancelCost`) |
 | A Deflect | 15, once, as it starts, whatever it meets | `DEFLECT_ENERGY_COST` (`deflectCost`) |
 | A hit the Shield blocks, a perfect block included | 15, per block | `BLOCK_ENERGY_COST` (`shieldHitCost`) |
 | Combat Assist's approach | 0, ever | — |
-| Running, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 | — |
+| Running, Shield walking, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 | — |
+
+The Dash was 25 until the combat-feel overhaul ([UPDATES.md](../../UPDATES.md#combat-feel-overhaul-and-shield-walking)):
+at 20 a Dash fits beside the blocks and Deflects a fight also pays for
+(from a full bar, about seven Dashes in a row before the bar runs dry, one
+every 1.7 s sustained at the default refill), while spamming it still
+empties the bar within a few seconds and exhausts the fighter until it is
+full again.
 
 ## Settings
 
@@ -78,7 +85,7 @@ does not know, is refused, naming the fighter and the field.
 (the rules, clamping, the refill, every cost, overspending, exhaustion,
 the bar),
 [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs)
-(every registered fighter: 100 everywhere it starts or refills, 25 for
+(every registered fighter: 100 everywhere it starts or refills, 20 for
 the Dash, the air dash and the Dash cancel, 15 for a block and a perfect
 block, 15 for a Deflect hit or whiffed, nothing back for landing one or
 turning a projectile back), the Dash cancel's cost in

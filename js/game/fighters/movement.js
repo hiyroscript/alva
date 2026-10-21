@@ -33,12 +33,16 @@ import { approach, sign } from '../../core/utils.js';
 const EPSILON = 1e-6;
 
 // One step of horizontal steering on whatever `body` stands on (or in the
-// air), with `control` (0-1) of the normal steering: that share of the
-// acceleration and of top speed. `friction` scales the ground deceleration
-// that slows it while it is not steering. `mv` is the movement values and
-// `dir` the direction held (-1, 0 or 1). `burst`: the speed above top speed
-// is the fighter's own (a Dash's or an air dash's; see Fighter.burst), so
-// it bleeds off in the air too.
+// air), with `control` (0-1) of the normal steering authority: that share
+// of the acceleration (and of the turn's braking). `speed` (0-1, all of it
+// by default) is the share of top speed the steering builds toward, apart
+// from the authority: a strike may steer with 0.8 of the authority and
+// still hold the whole run, or with a quarter of it toward a third of the
+// run. `friction` scales the ground deceleration that slows it while it is
+// not steering. `mv` is the movement values and `dir` the direction held
+// (-1, 0 or 1). `burst`: the speed above top speed is the fighter's own (a
+// Dash's or an air dash's; see Fighter.burst), so it bleeds off in the air
+// too.
 //
 // Ground: from rest to top speed at `acceleration`; letting go stops it at
 // `deceleration`; pressing against the way it moves brakes at
@@ -51,11 +55,14 @@ const EPSILON = 1e-6;
 // Air: the same shape with `airAcceleration`, `airTurnBoost` and the gentle
 // `airDeceleration` drag, so steering bends the drift instead of replacing
 // it; a burst above top speed bleeds off at `airOverspeedDeceleration`, and
-// any other speed (a launch's) only under the drag.
-export function steer(body, mv, dir, control, friction, dt, burst = false) {
+// any other speed (a launch's) only under the drag. Held to a `speed`
+// under 1, the speed over that share runs down at the rate letting go
+// would (the overspeed rates above top speed), so a heavy swing slows a run
+// it is thrown at, never at once.
+export function steer(body, mv, dir, control, friction, dt, burst = false, speed = 1) {
   const grounded = body.grounded;
   const v = body.vx;
-  const top = mv.maxSpeed * control;
+  const top = mv.maxSpeed * speed;
   const accel = (grounded ? mv.acceleration : mv.airAcceleration) * control;
   const boost = grounded ? mv.turnBoost : mv.airTurnBoost;
   const ahead = dir !== 0 && control > 0 && v !== 0 && sign(v) === dir;
@@ -81,9 +88,11 @@ export function steer(body, mv, dir, control, friction, dt, burst = false) {
 // One step of attack record `atk`'s own movement (see the attack fields in
 // js/game/combat/attacks.js) for a fighter facing `facing`: its step-in once
 // its time reaches it (on the ground only: never slower than the fighter
-// already goes that way), then steering with the attack's share of control
-// (none by default) over the speed it started with, the rest running down
-// under its friction. `burst` as for steer.
+// already goes that way), then steering with the attack's share of the
+// steering authority toward its share of top speed (its mobility tier's,
+// js/data/attack-mobility.js, unless it writes its own) over the speed it
+// started with, the rest running down under its friction. `burst` as for
+// steer.
 export function steerAttack(body, mv, facing, atk, dir, dt, burst = false) {
   const def = atk.def;
   const step = def.step;
@@ -92,7 +101,10 @@ export function steerAttack(body, mv, facing, atk, dir, dt, burst = false) {
     if (body.grounded && body.vx * facing < step.speed) body.vx = facing * step.speed;
   }
   const grounded = body.grounded;
-  steer(body, mv, dir, grounded ? def.control : def.airControl, grounded ? def.friction : 1, dt, burst);
+  steer(
+    body, mv, dir, grounded ? def.control : def.airControl, grounded ? def.friction : 1, dt, burst,
+    grounded ? def.topSpeed : def.airTopSpeed,
+  );
 }
 
 // The horizontal speed an attack definition `atk` starting now keeps of

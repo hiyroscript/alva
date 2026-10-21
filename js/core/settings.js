@@ -8,7 +8,7 @@
 //
 // Stored as
 //
-//   { version: 6,
+//   { version: 7,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
@@ -22,7 +22,8 @@
 // touch layout (see js/core/touch-layout.js); an empty one is Alva's
 // original layout. `combatAssist` is whether the human player's melee
 // presses close a short gap first (see Fighter.tryCombatAssist in
-// js/game/fighters/fighter.js): on unless the player turns it off.
+// js/game/fighters/fighter.js): off for a new player, who places their own
+// attacks, until they turn it on (an accessibility and convenience aid).
 // `comboAssist` is whether the human player's Attack 1 pressed again while
 // its own repeat cooldown runs (the attack over) is Attack 2, and the
 // reverse (see Fighter.comboAction): on unless the player turns it off.
@@ -42,9 +43,13 @@
 // custom layout; version 2 keeps its language, Mobile Controls and both
 // custom layouts; version 3 keeps all of that and its Combat Assist;
 // version 4 keeps all of that and its controller profiles; version 5 keeps
-// all of that and its Combo Assist. Versions 1 and 2 get Combat Assist on,
-// versions 1 to 3 no controller profile, and versions 1 to 4 Combo Assist
-// on. A controller profile saved under version 4 or 5 predates the named
+// all of that and its Combo Assist; version 6 keeps everything. Combat
+// Assist was on by default until version 7: a player whose settings were
+// saved before then keeps it exactly as they had it (versions 1 and 2,
+// which never stored it, and any older object without a valid value, keep
+// it on, as they played), so only a new player starts with it off.
+// Versions 1 to 3 get no controller profile, and versions 1 to 4 Combo
+// Assist on. A controller profile saved under version 4 or 5 predates the named
 // sticks and today's recommended layouts: it is upgraded for its fighter
 // (upgradeStoredProfiles, js/data/controller-profiles.js): every binding
 // plays as it did, the player's own choices are kept, and the bindings
@@ -70,16 +75,22 @@ export const DEFAULT_LANGUAGE = 'en';
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
 export const DEFAULT_MOBILE_CONTROLS = 'joystick';
 
-// Combat Assist (Home › Settings › Combat) is on for a player who has never
-// turned it off.
-export const DEFAULT_COMBAT_ASSIST = true;
+// Combat Assist (Home › Settings › Combat) is off for a new player, who
+// controls where every attack is thrown from, until they turn it on. A
+// player whose settings were saved before version 7 keeps what they had
+// (LEGACY_COMBAT_ASSIST where nothing valid was stored).
+export const DEFAULT_COMBAT_ASSIST = false;
+
+// The Combat Assist every settings object saved before version 7 played
+// with when it held no valid choice of its own: on, the default then.
+export const LEGACY_COMBAT_ASSIST = true;
 
 // Combo Assist (Home › Settings › Combat) is on for a player who has never
 // turned it off.
 export const DEFAULT_COMBO_ASSIST = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 7;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
@@ -125,33 +136,42 @@ function readCurrent(stored, profiles = sanitizeStoredProfiles) {
 // each belongs to.
 const upgradeProfiles = (raw) => upgradeStoredProfiles(raw, getCharacter);
 
+// The Combat Assist a settings object saved before version 7 keeps: its own
+// choice, or the default it played with then (LEGACY_COMBAT_ASSIST).
+const legacyAssist = (value) => (typeof value === 'boolean' ? value : LEGACY_COMBAT_ASSIST);
+
 // Older versions, each read into the current settings.
 const MIGRATIONS = Object.freeze({
   // Version 1 held Mobile Controls only: kept, and the language still to be
-  // chosen, so the chooser shows once after the update.
-  1: (stored) => readCurrent({ mobileControls: stored.mobileControls }),
+  // chosen, so the chooser shows once after the update; Combat Assist on,
+  // as it played.
+  1: (stored) => readCurrent({ mobileControls: stored.mobileControls, combatAssist: LEGACY_COMBAT_ASSIST }),
   // Version 2 had everything but Combat Assist: all of it kept, and Combat
-  // Assist on, whatever the object may hold under that name.
+  // Assist on (as it played), whatever the object may hold under that name.
   2: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
+    combatAssist: LEGACY_COMBAT_ASSIST,
   }),
   // Version 3 had everything but controller profiles and Combo Assist: all
   // of it kept, no fighter customized yet and Combo Assist on.
   3: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
-    combatAssist: stored.combatAssist,
+    combatAssist: legacyAssist(stored.combatAssist),
   }),
   // Version 4 had everything but Combo Assist: all of it kept (every
   // fighter's controller layout upgraded), and Combo Assist on, whatever
   // the object may hold under that name.
   4: (stored) => readCurrent({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
-    combatAssist: stored.combatAssist, controllerProfiles: stored.controllerProfiles,
+    combatAssist: legacyAssist(stored.combatAssist), controllerProfiles: stored.controllerProfiles,
   }, upgradeProfiles),
   // Version 5 had everything, its controller profiles in the shape they had
   // before the sticks were named: all of it kept, every fighter's layout
   // upgraded.
-  5: (stored) => readCurrent(stored, upgradeProfiles),
+  5: (stored) => readCurrent({ ...stored, combatAssist: legacyAssist(stored.combatAssist) }, upgradeProfiles),
+  // Version 6 had everything as it is now, saved while Combat Assist was on
+  // by default: all of it kept, its Combat Assist as it was.
+  6: (stored) => readCurrent({ ...stored, combatAssist: legacyAssist(stored.combatAssist) }),
 });
 
 // The settings a stored value holds: checked if it is the current version,

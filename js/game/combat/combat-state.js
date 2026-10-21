@@ -41,7 +41,7 @@ import { LAUNCH_RECOVERY_DELAY, LAUNCH_RECOVERY_INTERVAL, LAUNCH_RECOVERY_AMOUNT
 // (where every fighter starts, and what a respawn or a restart refills it
 // to) and what each thing that spends it costs.
 export const MAX_ENERGY = 100;
-export const DASH_ENERGY_COST = 25;    // a Dash or an air dash, a Dash cancel included
+export const DASH_ENERGY_COST = 20;    // a Dash or an air dash, a Dash cancel included
 export const BLOCK_ENERGY_COST = 15;   // each hit the Shield blocks, a perfect Shield's included
 export const DEFLECT_ENERGY_COST = 15; // each Deflect, as it starts
 

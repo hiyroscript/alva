@@ -755,6 +755,8 @@ test('Custom Play\'s Battle: two different fighters, Player 1 the player with th
   const booted = boot();
   const { app, screens } = booted;
   const screen = screens.battle;
+  // Combat Assist is off for a new player: this one has turned it on.
+  app.settings.set('combatAssist', true);
   const battle = await startCustom(booted, { difficulty: 'easy', fighter: TEST_SAMPLE, cpu: TEST_A });
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-a']);
   assert.notEqual(battle.p1.sprites, battle.p2.sprites, 'each its own art');

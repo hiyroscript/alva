@@ -114,16 +114,16 @@ test('every registered fighter holds exactly 100 Energy: at the start, after a r
 
 // ---- Energy: the Dash, the air dash and the Dash cancel --------------------------------
 
-test('every fighter pays exactly 25 for a ground Dash, an air dash and a Dash cancel, and nothing for running, jumps or a fast fall', () => {
-  assert.equal(DASH_ENERGY_COST, 25);
+test('every fighter pays exactly 20 for a ground Dash, an air dash and a Dash cancel, and nothing for running, jumps or a fast fall', () => {
+  assert.equal(DASH_ENERGY_COST, 20);
   for (const c of CHARACTERS) {
     const who = `#${c.id}`;
-    assert.deepEqual([resolveEnergy(c.energy).dashCost, resolveEnergy(c.energy).dashCancelCost], [25, 25], who);
+    assert.deepEqual([resolveEnergy(c.energy).dashCost, resolveEnergy(c.energy).dashCancelCost], [20, 20], who);
     // The Dash.
     const ground = makeFighter({ character: c });
     ground.step({ runRight: true, mouvementRightPressed: true });
     assert.ok(ground.fighter.dash && !ground.fighter.dash.air, `${who}: a Dash`);
-    assert.equal(ground.fighter.combat.energy, 100 - 25, `${who}: the Dash, 25`);
+    assert.equal(ground.fighter.combat.energy, 100 - 20, `${who}: the Dash, 20`);
     // The air dash.
     const air = makeFighter({ character: c });
     air.step(P('jump'));
@@ -131,14 +131,14 @@ test('every fighter pays exactly 25 for a ground Dash, an air dash and a Dash ca
     assert.equal(air.fighter.combat.energy, 100, `${who}: jumping is free`);
     air.step({ runRight: true, mouvementRightPressed: true });
     assert.ok(air.fighter.dash?.air, `${who}: an air dash`);
-    assert.equal(air.fighter.combat.energy, 100 - 25, `${who}: the air dash, 25`);
+    assert.equal(air.fighter.combat.energy, 100 - 20, `${who}: the air dash, 20`);
     // The Dash cancel, out of an attack that hit.
     const d = duel({ attackerCharacter: c, gap: 40 });
     untilCancellable(d);
     const before = d.attacker.combat.energy;
     d.tick({ runRight: true, mouvementRightPressed: true });
     assert.ok(d.attacker.dash, `${who}: a Dash cancel`);
-    assert.equal(d.attacker.combat.energy, before - 25, `${who}: the Dash cancel, 25`);
+    assert.equal(d.attacker.combat.energy, before - 20, `${who}: the Dash cancel, 20`);
     // Running, the air jumps, turning, the fast fall: free (the refill only).
     const free = makeFighter({ character: c });
     free.fighter.combat.setEnergy(50);
@@ -486,7 +486,7 @@ test('the same attack resolves identically under Easy, Medium, Hard and Brutal: 
   for (const r of runs) {
     assert.equal(r.built, runs[0].built, 'the fighter itself: every attack, its Energy, its movement');
     assert.deepEqual(r.hits, runs[0].hits, 'every hit and block, step for step');
-    assert.deepEqual([r.dashed, r.deflected], [75, 85], 'the Dash and the Deflect, 25 and 15');
+    assert.deepEqual([r.dashed, r.deflected], [80, 85], 'the Dash and the Deflect, 20 and 15');
   }
   const [kick, jab, blocked] = runs[0].hits;
   assert.deepEqual(kick.slice(1, 5), ['hit', 'extra_attack', 5, 0]);

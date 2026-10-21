@@ -515,9 +515,14 @@ test('Practice Ground gives Player 1 the saved Combat Assist on every entry, and
   const { app } = fakeApp();
   const screen = new PracticeGroundScreen(app);
   app.screens.current = screen;
-  assert.equal(app.settings.combatAssist, true, 'nothing stored: on');
+  assert.equal(app.settings.combatAssist, false, 'nothing stored: off');
   await screen.enter();
-  assert.equal(screen.session.player.controller.combatAssist, true);
+  assert.equal(screen.session.player.controller.combatAssist, false);
+  assert.equal(screen.session.player.combatAssistOn, false);
+  screen.exit();
+  app.settings.set('combatAssist', true);
+  await screen.enter();
+  assert.equal(screen.session.player.controller.combatAssist, true, 'read afresh on entry');
   assert.equal(screen.session.player.combatAssistOn, true);
   assert.equal(screen.session.cpu.combatAssistOn, false, 'the training dummy never');
   screen.exit();

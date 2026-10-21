@@ -13,6 +13,7 @@ import {
   steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
 } from '../../js/game/fighters/movement.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
+import { ATTACK_MOBILITY } from '../../js/data/attack-mobility.js';
 import { CONFIG } from '../../js/config.js';
 import { DT } from '../helpers/fighter-harness.mjs';
 
@@ -122,10 +123,33 @@ test('overspeed in the air: a burst of the fighter\'s own bleeds off, a launch\'
   near(slow.vx, 300 - VALUES.airDeceleration * DT, 1e-9);
 });
 
-test('`control` scales steering and the speed it steers toward', () => {
+test('`control` scales the steering authority and `speed` the top speed it steers toward, apart', () => {
+  // Half the authority: half the acceleration, but the whole top speed.
   const half = body();
+  steer(half, VALUES, 1, 0.5, 1, DT);
+  near(half.vx, VALUES.acceleration * 0.5 * DT, 1e-9, 'half the acceleration');
   for (let i = 0; i < 120; i++) steer(half, VALUES, 1, 0.5, 1, DT);
-  assert.equal(half.vx, 200, 'half control: half the top speed');
+  assert.equal(half.vx, VALUES.maxSpeed, 'half the authority: still the whole top speed');
+  // Full authority toward half the top speed: as quick to steer, capped at half.
+  const capped = body();
+  steer(capped, VALUES, 1, 1, 1, DT, false, 0.5);
+  near(capped.vx, VALUES.acceleration * DT, 1e-9, 'the whole acceleration');
+  for (let i = 0; i < 120; i++) steer(capped, VALUES, 1, 1, 1, DT, false, 0.5);
+  assert.equal(capped.vx, 200, 'half the top speed');
+  // A run held into a lower share runs down to it at the release rate, never at once.
+  const run = body({ vx: VALUES.maxSpeed });
+  steer(run, VALUES, 1, 1, 0.5, DT, false, 0.5);
+  near(run.vx, VALUES.maxSpeed - VALUES.deceleration * 0.5 * DT, 1e-9, 'eased toward the share');
+  for (let i = 0; i < 120; i++) steer(run, VALUES, 1, 1, 0.5, DT, false, 0.5);
+  assert.equal(run.vx, 200);
+  // Turning: the authority scales the turn's braking, whatever the speed share.
+  const turn = body({ vx: 300 });
+  steer(turn, VALUES, -1, 0.5, 1, DT);
+  near(turn.vx, 300 - VALUES.acceleration * 0.5 * VALUES.turnBoost * DT, 1e-9, 'braked at half the turn');
+  // None: no steering at all, only the friction.
+  const none = body({ vx: 300 });
+  steer(none, VALUES, 1, 0, 0.5, DT);
+  near(none.vx, 300 - VALUES.deceleration * 0.5 * DT, 1e-9, 'no authority: the held direction is nothing');
 });
 
 // ---- Attacks ------------------------------------------------------------------------
@@ -136,14 +160,17 @@ test('attack momentum: an attack keeps its share of the speed, never capped at t
   assert.equal(attackStartSpeed(atk, 1200, true), 600, 'a Dash\'s burst carries on: no cap');
   assert.equal(attackStartSpeed(atk, -1200, true), -600);
   assert.equal(attackStartSpeed(atk, 900, false), 225, 'in the air: airMomentum');
-  const whole = createAttackDefinition({ id: 'whole', animation: 'x', damage: 1 });
-  assert.equal(attackStartSpeed(whole, 1250, true), 1250, 'by default: all of it');
+  const whole = createAttackDefinition({ id: 'whole', animation: 'x', damage: 1, mobility: 'quick' });
+  assert.equal(attackStartSpeed(whole, 1250, true), 1250, 'a quick strike: all of it');
   assert.equal(attackStartSpeed(whole, -1250, false), -1250);
+  const plain = createAttackDefinition({ id: 'plain', animation: 'x', damage: 1 });
+  assert.equal(plain.mobility, 'medium', 'an attack naming no tier is medium');
+  assert.equal(attackStartSpeed(plain, 1000, true), 1000 * ATTACK_MOBILITY.medium.momentum, 'its tier\'s share');
   const free = createAttackDefinition({ id: 'free', animation: 'x', damage: 1, lockMovement: false });
   assert.equal(attackStartSpeed(free, 900, true), 900, 'normal locomotion kept: all of it');
   // Its step-in raises the forward speed once its time reaches `at`, never
   // lowers it, then its own control steers.
-  const stepping = createAttackDefinition({ id: 's', animation: 'x', damage: 1, step: { at: 0.05, speed: 250 }, control: 0 });
+  const stepping = createAttackDefinition({ id: 's', animation: 'x', damage: 1, step: { at: 0.05, speed: 250 }, mobility: 'planted' });
   const record = { def: stepping, time: 0, stepped: false };
   const b = body();
   steerAttack(b, VALUES, -1, record, 0, DT);

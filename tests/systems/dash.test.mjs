@@ -24,6 +24,8 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RIGHT = { runRight: true, runRightPressed: true };
 const LEFT = { runLeft: true, runLeftPressed: true };
 const DASH_STEPS = Math.round(MOVEMENT.dashDuration / DT);
+// A full Energy bar (MAX_ENERGY): what an exhausted fighter must refill to.
+const MOVEMENT_FULL = 100;
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a} vs ${b}`);
 
 // A tap: pressed on one step, released on the next.
@@ -366,14 +368,14 @@ test('a explicit request that cannot Dash is used up, never queued for later', (
 
 // ---- Cost, movement and ending -----------------------------------------------------------
 
-test('a Dash spends its cost (25) exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
+test('a Dash spends its cost (20) exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
   const full = fighter.combat.energy;
   assert.equal(full, 100);
   step({ ...RIGHT, mouvementRightPressed: true });
-  assert.equal(DASH_ENERGY_COST, 25);
-  assert.equal(fighter.combat.energy, 75, 'exactly 25, no refill on that step');
+  assert.equal(DASH_ENERGY_COST, 20);
+  assert.equal(fighter.combat.energy, 80, 'exactly 20, no refill on that step');
   assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'dash speed from the first step');
   const x0 = fighter.body.prevX;
   let n = 1;
@@ -716,17 +718,47 @@ test('end to end: a Right mouvement tap through the real InputManager and Player
   assert.equal(input.isHeld('runRight'), false);
 });
 
-test('Dash repeat lockout is exactly 30 steps from acceptance, separate from attacks, running and jumps', () => {
+test('Dash repeat lockout is exactly movement.dashRepeat (24 steps) from acceptance, separate from attacks, running and jumps', () => {
   const { fighter: f, step } = makeFighter();
+  assert.equal(MOVEMENT.dashRepeat, 0.4, 'its own universal value, not the attacks\' repeat delay');
+  const lockout = Math.round(MOVEMENT.dashRepeat / DT);
   step({ mouvementRightPressed: true });
-  assert.equal(f.combat.movementCooldowns.remaining('mouvment'), 0.5);
+  assert.equal(f.combat.movementCooldowns.remaining('mouvment'), MOVEMENT.dashRepeat);
   f.endDash();
   assert.equal(f.tryDash(-1), false);
   assert.equal(f.tryAction('attack1'), true, 'no global cooldown');
   f.combat.interruptAttack();
-  for (let i = 0; i < 29; i++) { step(); assert.equal(f.tryDash(-1), false); }
+  for (let i = 0; i < lockout - 1; i++) { step(); assert.equal(f.tryDash(-1), false); }
   step();
-  assert.equal(f.tryDash(-1), true, 'exactly half a second, no phase drift');
+  assert.equal(f.tryDash(-1), true, 'exactly its lockout, no phase drift');
+});
+
+test('spamming the Dash is affordable but never a loop: from a full bar it runs dry within a handful of Dashes, then exhaustion locks it out', () => {
+  const { fighter: f, step } = makeFighter({ x: 1000 });
+  const lockout = Math.round(MOVEMENT.dashRepeat / DT);
+  let dashes = 0;
+  let side = 1;
+  let last = -Infinity;
+  for (let i = 0; i < 600 && !f.combat.energyExhausted; i++) {
+    const before = f.dash;
+    step(side > 0 ? { mouvementRightPressed: true } : { mouvementLeftPressed: true });
+    f.body.x = 1000;
+    if (f.dash && f.dash !== before) {
+      assert.ok(i - last >= lockout, `never sooner than its repeat delay (${i - last} steps)`);
+      last = i;
+      dashes++;
+      side = -side;
+    }
+  }
+  assert.equal(f.combat.energyExhausted, true, 'it runs dry');
+  assert.ok(dashes >= 5 && dashes <= 8, `${dashes} Dashes from a full bar`);
+  // Exhausted: no Dash until the bar is full again, however it is asked for.
+  const regen = f.energyDef.regen;
+  const spent = f.dash;
+  for (let i = 0; i < Math.floor((MOVEMENT_FULL / regen - 0.1) / DT); i++) {
+    step({ mouvementRightPressed: true });
+    assert.ok(!f.dash || f.dash === spent, 'locked out: no new Dash');
+  }
 });
 
 test('Dash requests during cooldown are dropped even in hitstop; a fresh ready request works', () => {
