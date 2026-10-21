@@ -1,1 +1,1833 @@
+ALVA — COMPLETE COMBAT FEEL & MOVEMENT OVERHAUL
 
+YOUR ROLE
+
+You are a senior gameplay programmer, combat systems designer, game-feel specialist, and technical game designer working on Alva, a 2D browser-based platform fighting game.
+
+You have access to the GitHub repository:
+
+https://github.com/hiyroscript/alva
+
+Your task is to substantially improve the game’s moment-to-moment fighting experience.
+
+This is an implementation task, not a request to write a theoretical proposal or merely recommend improvements.
+
+Inspect the repository, understand the existing architecture, implement a coherent set of improvements, test them, correct regressions, and update the relevant documentation.
+
+Your guiding objective:
+
+Make Alva feel significantly more responsive, free, agile, fluid, expressive, and enjoyable to control, while preserving its character identities, combat depth, balance principles, and existing technical architecture.
+
+Do not treat faster movement as synonymous with better movement.
+
+The game should feel good because the player has precise, immediate, meaningful control over their fighter.
+
+⸻
+
+1. THE CORE PROBLEM
+
+Alva currently feels too sticky.
+
+Despite already having relatively fast movement, dashes, air dashes, triple jumps, momentum preservation, attack cancels, and several forms of aerial movement, combat can still feel restrictive.
+
+The player can experience:
+
+* Attacks that make their fighter feel artificially planted.
+* Directional inputs that lose influence during attack animations.
+* Momentum that disappears too quickly.
+* Abrupt transitions between attacks and movement.
+* Too much commitment to ordinary actions.
+* Aerial combat that doesn’t provide enough freedom.
+* Automatic movement that can override the player’s desired positioning.
+* Defensive actions that interrupt the overall movement flow.
+* Restrictions on rapidly changing tactics.
+* Too little freedom to reposition while pressuring an opponent.
+* Situations where the fighter appears to stop obeying movement input.
+
+In a platform fighter, control should feel continuous.
+
+The player should generally be able to think:
+
+“I want to move there, hit that opponent, change direction, jump away, land, and immediately reposition.”
+
+The fighter should respond naturally, with restrictions that are deliberate, readable, and justified by the current action.
+
+The player must feel like they are commanding the character, not waiting for the character to finish performing a scripted sequence.
+
+The desired gameplay identity
+
+Alva should feel:
+
+Responsive: Inputs produce immediate, predictable reactions whenever an action is legally available.
+
+Fluid: Movement, attacks, jumps, landings, and evasive actions flow naturally into one another.
+
+Agile: Fighters can rapidly reposition without feeling locked to the ground.
+
+Expressive: Skilled players have meaningful opportunities to create their own movement routes, combinations, and tactics.
+
+Momentum-driven: Velocity contributes to movement depth without becoming uncontrollable.
+
+Precise: Players can reliably stop, turn, space attacks, and control landings.
+
+Dynamic: Ground and aerial interactions feel active rather than stationary.
+
+Fair: Recovery, hitstun, cooldowns, and defensive restrictions continue to serve understandable combat purposes.
+
+Accessible: New players can perform ordinary movement and attacks without fighting against the controls.
+
+Skillful: Advanced players can master timing, momentum, positioning, air movement, and cancels.
+
+The ideal result balances the fluidity of modern platform fighters with the mechanical identity already established by Alva.
+
+Use games such as Super Smash Bros. Ultimate and Rivals of Aether as references for movement agency and responsiveness, but do not blindly copy their mechanics, exact statistics, or combat systems.
+
+Alva must retain its own identity.
+
+⸻
+
+2. FIRST, UNDERSTAND THE EXISTING PROJECT
+
+Before editing, inspect the latest repository contents rather than relying exclusively on this prompt’s descriptions.
+
+The repository is built with:
+
+* Vanilla JavaScript and ES modules.
+* HTML and CSS.
+* Canvas 2D.
+* A deterministic fixed-step simulation at 60 Hz.
+* Character definitions expressed primarily as data.
+* Shared movement and combat implementations.
+* A browser-based interface supporting desktop and mobile.
+* Keyboard, game controller, and touch controls.
+
+Do not introduce an unnecessary framework, build system, external game engine, physics library, or large dependency.
+
+Relevant files include:
+
+Movement
+
+js/data/movement.js
+
+Contains BASE_FIGHTER_MOVEMENT, the universal movement settings shared by the roster.
+
+js/game/fighters/movement.js
+
+Contains steering, braking, acceleration, attack movement, momentum, and jumping rules.
+
+js/game/fighters/fighter.js
+
+Contains the fighter’s update loop, movement state, dashing, jumping, attack transitions, input buffering, and combat movement integration.
+
+js/game/physics.js
+
+Handles integration, gravity, collision, and platforms.
+
+Combat
+
+js/game/combat/attacks.js
+
+Contains the attack schema and default movement characteristics.
+
+js/game/combat/combat-state.js
+
+Manages combat state, attack phases, hitstun, cooldowns, and Energy.
+
+js/game/combat/combat-assist.js
+
+Contains the automatic melee approach logic.
+
+js/data/cooldowns.js
+
+Contains the shared move cooldown policy.
+
+Input and settings
+
+Inspect:
+
+js/core/
+
+js/core/settings.js
+
+js/data/controller-profiles.js
+
+Relevant controllers and input translation modules.
+
+Characters
+
+js/data/characters/
+
+Every playable fighter must benefit from the combat improvements without losing the distinctive mechanical behaviour of its moveset.
+
+Documentation
+
+ALVA_SPEC.md
+
+docs/systems/movement.md
+
+docs/systems/combat.md
+
+docs/systems/input.md
+
+UPDATES.md
+
+The current product specification describes how Alva is supposed to work. Treat it as the source of truth for existing behaviour, but because this assignment intentionally changes gameplay design, update the specification where a deliberate design change is made.
+
+Do not leave the implementation and documentation contradicting each other.
+
+Tests
+
+Inspect the relevant test suite, especially:
+
+tests/systems/momentum.test.mjs
+
+tests/systems/movement-rules.test.mjs
+
+tests/systems/move-cancel.test.mjs
+
+tests/systems/air-mouvment.test.mjs
+
+tests/systems/combat-assist.test.mjs
+
+tests/systems/combo-assist.test.mjs
+
+tests/integration/roster-matrix.test.mjs
+
+Find other relevant tests through repository exploration.
+
+Run the existing test suite to establish a baseline before introducing changes.
+
+⸻
+
+3. INVESTIGATE THE ROOT CAUSES OF STICKINESS
+
+Do not randomly increase movement statistics or shorten every animation.
+
+Identify the exact mechanisms responsible for the feeling of lost control.
+
+Pay particular attention to the following known characteristics of the existing implementation. Confirm them against the latest code.
+
+3.1 Attack movement defaults
+
+In js/game/combat/attacks.js, existing attack defaults have historically included approximately:
+
+lockMovement: true,
+momentum: 1,
+airMomentum: 1,
+control: 0,
+airControl: 0,
+friction: 1
+
+This means an ordinary attack generally inherits its incoming momentum but does not permit normal directional steering unless the attack explicitly defines it.
+
+The retained velocity may then be reduced by friction during the attack.
+
+This is a major candidate for why attacks feel planted, particularly when the player is actively holding a movement direction.
+
+Examine every character’s explicit attack overrides before changing the defaults.
+
+3.2 Steering coupling
+
+Inspect steer() in js/game/fighters/movement.js.
+
+Its existing implementation uses movement control not only to scale acceleration, but also to scale the velocity toward which the fighter steers:
+
+const top = mv.maxSpeed * control;
+const accel = baseAcceleration * control;
+
+This creates a potentially undesirable coupling.
+
+For example, partial attack control may simultaneously give the player weaker acceleration and make the attack’s effective target speed much lower than ordinary running speed.
+
+The result can be a fighter that technically has directional control but still feels heavily slowed during an attack.
+
+Investigate this carefully.
+
+Do not assume that increasing control alone completely solves the problem.
+
+Consider decoupling steering authority from desired movement speed.
+
+3.3 Combat Assist and lost momentum
+
+Inspect Combat Assist, including:
+
+Fighter.tryCombatAssist()
+
+Fighter.stepCombatAssist()
+
+Fighter.finishCombatAssist()
+
+Combat Assist can automatically move the player’s fighter toward an opponent before executing a melee attack.
+
+The current implementation has historically reset velocity at the completion of the approach.
+
+This can produce abrupt stops and a feeling that the game is taking control of the character.
+
+It can also produce unwanted automatic repositioning.
+
+Both should be investigated.
+
+3.4 Dash restrictions
+
+Alva already has explicit ground dashes and air dashes.
+
+Historically, the shared values have included approximately:
+
+* Ground Dash speed: 1250 units/s.
+* Ground Dash duration: 1/6 second.
+* Air dash speed: 1250 units/s.
+* Air dash duration: 1/6 second.
+* Dash cancel time: 0.05 seconds.
+* One air dash per airtime.
+* Dash Energy cost: 25.
+* A 0.5-second movement reuse cooldown.
+
+These are not inherently bad numbers.
+
+However, the combined Energy cost, cooldown, steering restrictions, and interaction with other actions may make mobility feel unnecessarily expensive.
+
+Determine whether the restrictions are justified.
+
+3.5 Attack and movement transitions
+
+Alva already supports important cancellation mechanics, including player-requested attack cuts, hit-cancels, dash-cancels, and landing cancels.
+
+Study these systems before modifying them.
+
+In particular, Fighter.playerMayCut() already permits certain new player requests to interrupt an attack.
+
+Do not implement a second competing cancellation system when the existing one can be refined.
+
+Investigate whether the uncomfortable feeling comes from attack movement itself, action prerequisites, input buffers, repeat cooldowns, or transitions between state machines.
+
+3.6 Animation and perceived responsiveness
+
+An attack can be logically responsive while still looking unresponsive.
+
+Inspect how animation playback corresponds to gameplay state.
+
+Check whether apparent stickiness comes from:
+
+* Repeated animation restarts.
+* Visually long recovery poses.
+* Attack animations continuing after control has returned.
+* Delayed movement animation changes.
+* Landing poses that appear to hold a fighter in place.
+* Abrupt animation switching.
+* Movement state and visual state disagreeing.
+* Hitstop or attack feedback being disproportionate to the hit.
+
+Distinguish real input restrictions from animation presentation problems.
+
+⸻
+
+4. REBUILD THE FEEL OF GROUND MOVEMENT
+
+The goal is responsive, precisely controlled locomotion.
+
+4.1 Acceleration
+
+A fighter should begin moving almost immediately when the player holds a direction.
+
+Movement should feel deliberate and responsive.
+
+Preserve smooth acceleration rather than teleporting velocity instantly to maximum speed.
+
+Evaluate the current acceleration of approximately 6000 units/s² and the maximum run speed of approximately 420 units/s.
+
+Use these as the baseline.
+
+Do not immediately increase maximum run speed.
+
+First establish whether a better acceleration curve, improved steering during attacks, and more consistent velocity preservation solve the problem.
+
+If changes are justified, test modest increases in acceleration rather than huge increases in top speed.
+
+Potential test range:
+
+* Ground acceleration: current baseline up to approximately +15–25%.
+* Maximum run speed: initially unchanged.
+* Ground turning: improve precision without instant velocity reversal.
+
+The exact final values must be earned through testing.
+
+4.2 Ground braking
+
+Players should be able to stop intentionally.
+
+However, slowing down must not feel like the character has hit an invisible wall.
+
+Distinguish between:
+
+* Releasing movement input.
+* Pressing the opposite direction.
+* Holding the same direction while moving faster than top speed.
+* Attacking while moving.
+* Landing with existing momentum.
+
+Maintain different braking behaviour for these situations.
+
+A player who releases movement should experience controlled deceleration.
+
+A player who presses the opposite direction should be able to reverse direction decisively, with a short, predictable braking interval.
+
+Avoid long, slippery turnarounds, but also avoid instantaneous full-speed reversals.
+
+4.3 Preserve momentum intelligently
+
+Momentum preservation is part of Alva’s identity.
+
+Maintain velocity across legal transitions such as:
+
+Run → Jump
+
+Dash → Jump
+
+Dash → Attack
+
+Run → Attack
+
+Attack → Another Attack
+
+Attack → Jump
+
+Air Dash → Air Attack
+
+Air Attack → Landing
+
+Landing → Run
+
+Landing → Jump
+
+The precise amount of velocity preserved may depend on the action.
+
+The key rule is that velocity should not disappear for arbitrary reasons.
+
+A heavy planted attack may intentionally reduce momentum. A light strike should generally not behave like a planted heavy attack.
+
+4.4 Repositioning and direction changes
+
+Make it easy to perform the following sequences:
+
+Run forward, attack, then retreat.
+
+Run toward an opponent, stop just outside their range, and punish.
+
+Attack while moving backward.
+
+Approach, jump, attack, and change horizontal positioning.
+
+Dash toward an opponent and quickly reposition after the engagement.
+
+An ordinary attack should not automatically remove the player’s ability to control spacing.
+
+4.5 Movement should remain deterministic
+
+Continue to use the fixed-step physics simulation.
+
+Avoid frame-rate-dependent interpolation logic controlling authoritative gameplay.
+
+The same input sequence must produce the same simulation regardless of rendering frame rate.
+
+⸻
+
+5. MAKE ATTACKS FEEL MOBILE AND RESPONSIVE
+
+This is the highest-priority design change.
+
+Alva’s ordinary attacks should generally flow with the fighter’s movement.
+
+Not every attack must allow full movement.
+
+Instead, distinguish between quick, medium, heavy, and special-motion attacks.
+
+5.1 Introduce coherent attack mobility
+
+Create a simple, maintainable approach for configuring how an attack responds to movement input.
+
+Use existing fields where practical:
+
+lockMovement
+
+momentum
+
+airMomentum
+
+control
+
+airControl
+
+friction
+
+step
+
+Do not add dozens of redundant fields to each attack.
+
+However, if the existing schema cannot cleanly distinguish steering acceleration from movement-speed limits, extend it carefully.
+
+Prefer a small, documented, universal implementation over character-specific code.
+
+5.2 Initial tuning profiles
+
+Use the following as experimental tuning targets, not immutable balance rules.
+
+Attack category	Ground steering	Air steering	Momentum	Behaviour
+Quick melee attacks	0.65–0.85	0.75–1.0	0.9–1.0	Mobile and responsive
+Medium attacks	0.4–0.65	0.5–0.8	0.7–1.0	Moderate commitment
+Heavy attacks	0.1–0.4	0.2–0.5	Move-specific	Deliberate commitment
+Projectile attacks	Context-dependent	Context-dependent	Usually preserved	Casting should not arbitrarily stop movement
+Dedicated motion attacks	Authored individually	Authored individually	Mechanic-specific	Preserve unique move behaviour
+
+These categories are design guidance.
+
+Do not classify moves solely by name, numbered slot, damage value, or animation length.
+
+Inspect the actual function of each attack.
+
+The special mobility rules of homing attacks, rolls, dives, rising attacks, hovering attacks, and other authored motions must remain intentional.
+
+5.3 Decouple steering strength from speed cap
+
+Investigate adjusting steer() or introducing an attack-specific steering wrapper so that partial control does not automatically mean a drastically reduced target velocity.
+
+For example, a quick attack with 70% steering authority might still permit the player to maintain ordinary run speed.
+
+The 70% would affect how quickly the character changes velocity, not necessarily restrict maximum movement to 70% of normal.
+
+This distinction is critical.
+
+Implement the smallest maintainable solution.
+
+Add tests demonstrating the intended difference between steering strength and permitted velocity.
+
+5.4 Eliminate unintentional attack braking
+
+Audit the velocity behaviour of every attack.
+
+Identify attacks that lose speed because of default friction rather than deliberate move design.
+
+For quick moves:
+
+* Preserve meaningful running momentum.
+* Allow directional adjustment.
+* Avoid excessive automatic braking.
+* Avoid snapping to a reduced movement target.
+* Allow controlled backward spacing when appropriate.
+
+For heavy moves:
+
+* Preserve the intended commitment.
+* Use reduced movement when necessary.
+* Communicate the commitment visually.
+* Avoid arbitrary zeroing of velocity unless the move is deliberately stationary.
+
+5.5 Improve ordinary attack responsiveness
+
+Light attacks should feel quick and reliable.
+
+Inspect startup, active frames, recovery, cooldown, and input buffering.
+
+Avoid unnecessarily long periods in which a quick attack provides no meaningful interaction.
+
+Do not indiscriminately shorten every animation because combat timing is closely connected to the sprite frame timings.
+
+Instead:
+
+1. Identify light moves that feel disproportionately slow.
+2. Check whether movement restrictions create the sensation of slowness.
+3. Tune movement first.
+4. Adjust attack timings only when needed.
+5. Preserve hitbox synchronization and combo integrity.
+
+5.6 Maintain attack identity
+
+Fighters must not all attack identically.
+
+One fighter may specialize in speed and aerial follow-ups.
+
+Another may rely on grounded power.
+
+Another may use projectiles, summons, or distinctive movement techniques.
+
+Universal locomotion should remain universal, but a fighter’s authored moves may retain their unique movement behaviour.
+
+The speedster’s identity should come from the speedster’s moves, not an undocumented faster universal run.
+
+⸻
+
+6. IMPROVE ACTION CANCELLATIONS AND FLOW
+
+The player should experience minimal unnecessary delay when chaining legal actions.
+
+However, universal free cancellation would destroy attack commitment and combat balance.
+
+The goal is responsive transitions with meaningful restrictions.
+
+6.1 Preserve the current cancellation architecture
+
+Study:
+
+playerMayCut()
+
+canFollowUp()
+
+canAct()
+
+cutAttack()
+
+CombatState.cancellable
+
+startAttack()
+
+tryAction()
+
+tryDash()
+
+tryAirDash()
+
+Do not replace these systems without a compelling reason.
+
+The existing architecture already supports considerable freedom.
+
+Focus on situations where the rules technically allow an action but the fighter still feels unresponsive.
+
+6.2 Differentiate move commitment
+
+An attack should have a meaningful amount of commitment based on its role.
+
+For example:
+
+Quick strikes
+
+* Fast response.
+* Good movement control.
+* Smooth follow-ups.
+* Relatively low risk.
+* Limited ability to create oppressive infinite loops.
+
+Medium attacks
+
+* Clear startup and recovery.
+* Moderate steering.
+* Useful combo routes.
+* Some commitment on whiff.
+
+Heavy attacks
+
+* Meaningful startup.
+* Strong feedback.
+* Purposeful recovery.
+* Limited mobility where necessary.
+* Punishable mistakes.
+
+Special attacks
+
+* Preserve each mechanic’s unique rules.
+* Do not grant unrestricted cancels that bypass significant costs, cast commitments, or intended weaknesses.
+
+6.3 Avoid accidental animation locking
+
+A fighter should not remain locked merely because a sprite animation continues to play.
+
+Gameplay actions must be governed by deliberate combat state.
+
+When an attack has legally ended or been cancelled, control should return promptly.
+
+Visual transitions should reflect the gameplay state without producing fake delays.
+
+6.4 Improve buffered input behaviour
+
+Preserve input buffering for jump, attacks, and dash requests.
+
+Review whether the existing buffering windows are appropriate.
+
+Current values have historically included:
+
+* Attack input buffer: 0.15 seconds.
+* Jump input buffer: 0.12 seconds.
+* Coyote time: 0.1 seconds.
+
+Start from these values.
+
+Investigate whether inputs made during attack recovery, landings, or impact freeze execute at the earliest legal frame.
+
+Avoid:
+
+* Losing valid buffered actions.
+* Replaying an old action unexpectedly.
+* Triggering attacks well after the player intended them.
+* Overwriting a newer request with an older one.
+* Executing an action in the wrong grounded or airborne state.
+* Double-activating inputs held through transitions.
+
+Respect existing controller semantics and any deliberate one-press rules.
+
+6.5 Make whiff recovery fair
+
+Missing an attack should not automatically make the fighter helpless for an excessive period.
+
+But missing must still carry risk.
+
+Avoid universal instant whiff-cancels.
+
+Prioritize maintaining some directional control during appropriate recoveries, with stronger commitment for high-impact attacks.
+
+⸻
+
+7. MAKE AERIAL COMBAT A MAJOR STRENGTH
+
+A platform fighter should make the air feel like another meaningful combat space rather than a temporary interruption of ground combat.
+
+Alva already has multiple air jumps and air dashes.
+
+Improve their responsiveness and usefulness before introducing unnecessary additional mechanics.
+
+7.1 Improve aerial steering
+
+Air movement should feel responsive to directional intent.
+
+Players should be able to:
+
+* Adjust their landing position.
+* Drift toward an opponent.
+* Drift away after an attack.
+* Reverse direction in the air with controlled acceleration.
+* Correct a missed aerial approach.
+* Maintain appropriate momentum during aerial attacks.
+* Navigate platforms precisely.
+
+Do not make characters instantly reverse horizontal velocity at maximum speed.
+
+The objective is precise aerial control, not frictionless movement.
+
+7.2 Improve aerial attack drift
+
+Quick aerial attacks should not remove most of the player’s ability to position their fighter.
+
+Increase or refine aerial steering during appropriate attacks.
+
+Prevent air attack movement from becoming artificially slow simply because steering authority is reduced.
+
+Heavy aerial attacks and dedicated motion attacks may remain more committed.
+
+7.3 Preserve horizontal velocity across air actions
+
+Review:
+
+Jump → Air Attack
+
+Air Dash → Air Attack
+
+Air Attack → Air Jump
+
+Air Attack → Air Dash
+
+Air Attack → Landing
+
+The player should not encounter unexplained horizontal velocity resets.
+
+For example, an aerial attack performed during a fast horizontal approach should generally preserve the flow of that approach unless the attack intentionally alters momentum.
+
+7.4 Improve air dash behaviour
+
+Review the current horizontal air dash.
+
+The existing behaviour sets vertical velocity to zero and suspends falling during its duration.
+
+Investigate whether the initiation and exit feel abrupt.
+
+Consider smoother, more predictable transitions without sacrificing responsiveness.
+
+Potential experiments:
+
+* More consistent momentum preservation at the end of an air dash.
+* Earlier control handoff where balanced.
+* Improved interaction with aerial attacks.
+* More predictable jump and landing transitions.
+* Reduced unnecessary restrictions on aerial repositioning.
+
+Do not accidentally erase knockback or permit air dashes during states where the game intentionally disallows them.
+
+7.5 Investigate directional air dashing
+
+As a second-stage enhancement, evaluate whether Alva would benefit from directional air dashes.
+
+Potential directions:
+
+* Horizontal.
+* Diagonal upward.
+* Diagonal downward.
+* Possibly vertical, if compatible with the game’s stage and recovery balance.
+
+Only implement this if it can be integrated reliably with keyboard, controller, and touch input.
+
+Avoid new required art assets; existing dash animation may be reused where visually appropriate.
+
+Do not introduce a partial control feature that works on controllers but is inaccessible or confusing on mobile.
+
+If directional air dashing introduces excessive scope or risk, keep the existing horizontal air dash and polish it first.
+
+7.6 Improve fast fall responsiveness
+
+Fast fall should make aerial positioning more precise.
+
+Ensure the player can initiate it predictably while descending, including during appropriate aerial attacks.
+
+Preserve the distinction between jumping, naturally falling, and fast-falling.
+
+Do not let fast fall cancel deliberate hitstun, launch physics, or forced movement states.
+
+7.7 Preserve recovery balance
+
+Alva’s platforms and Void are essential to its combat design.
+
+Greater agility must not make falling off the stage nearly impossible.
+
+Test recovery from ledges with:
+
+* No remaining air jump.
+* One remaining air jump.
+* Both remaining air jumps.
+* Air dash available.
+* Air dash already spent.
+* Different horizontal launch speeds.
+* Different stage geometries.
+
+Ensure that knockback and ring-outs remain meaningful.
+
+⸻
+
+8. OVERHAUL COMBAT ASSIST’S FEEL
+
+Combat Assist is one of the systems most likely to create a sense of artificial control.
+
+It currently helps the human player close a short gap before a melee attack.
+
+This feature has value for accessibility, but it must not compromise precise manual combat.
+
+8.1 Make manual positioning the preferred experience
+
+The player should normally control where they attack from.
+
+Do not automatically redirect the fighter toward an opponent unless the player has explicitly chosen an assistance feature.
+
+Evaluate making Combat Assist disabled by default for new players, while preserving it as an optional accessibility or convenience feature.
+
+Existing users’ saved choices should be respected.
+
+Update settings, defaults, migrations, documentation, and tests as needed.
+
+Do not silently erase existing user preferences.
+
+8.2 Preserve momentum during assisted attacks
+
+Combat Assist should not unnecessarily reset horizontal velocity when the approach finishes.
+
+Investigate removing the forced zeroing in finishCombatAssist().
+
+Instead, hand velocity into the attack using the same intentional momentum rules used for ordinary attacks.
+
+Avoid excess overshoot, body clipping, and unexpected traversal through an opponent.
+
+A player who moves forward with momentum and initiates an assisted attack should not experience a sudden artificial stop.
+
+8.3 Respect directional intent
+
+An assisted approach should not feel like the character has completely disconnected from the movement controls.
+
+Investigate allowing deliberate input to interrupt or influence the approach where appropriate.
+
+If the player strongly reverses direction, jumps, dashes, or requests a different move, the response should be coherent and predictable.
+
+Preserve the documented rules for attack replacement and other approach interruptions unless changes are intentionally redesigned and tested.
+
+8.4 Compare assisted and unassisted combat
+
+Create test scenarios comparing:
+
+* Standing attack without assist.
+* Running attack without assist.
+* Running attack with assist.
+* Air attack without assist.
+* Air attack with assist.
+* Assist cancelled into jump.
+* Assist cancelled into dash.
+* Assist interrupted by an enemy hit.
+
+The assisted version should not feel like an entirely separate, less controllable game.
+
+⸻
+
+9. RETHINK THE DASH ECONOMY
+
+Dashing should be an important mobility tool rather than something the player hesitates to use because of excessive penalties.
+
+Do not simply remove all costs.
+
+Investigate how the existing Energy economy affects movement flow.
+
+9.1 Evaluate current restrictions
+
+Review the combined impact of:
+
+* Dash Energy cost.
+* Air dash Energy cost.
+* Movement repeat cooldown.
+* Dash startup commitment.
+* Dash cancel time.
+* Air dash resource limits.
+* Energy regeneration.
+* Defensive Energy costs.
+* Movement while exhausted.
+
+A dash can feel restricted even when its animation is fast.
+
+9.2 Test a more flexible mobility economy
+
+Evaluate a small number of controlled tuning variants.
+
+For example:
+
+Baseline: Current values.
+
+Mobility A: Slightly lower dash Energy cost.
+
+Mobility B: Shorter repeat delay with current cost.
+
+Mobility C: Moderate reductions to both, if justified.
+
+Possible experimental ranges:
+
+* Dash Energy cost: 15–25.
+* Dash reuse delay: 0.25–0.5 seconds.
+* Dash cancel time: current 0.05 seconds as a starting point.
+
+These are not mandatory final values.
+
+Measure how each combination changes chase pressure, disengagement, defensive counterplay, and exhaustion frequency.
+
+Ensure a change to universal Energy costs is applied consistently and deliberately across the roster.
+
+Preserve Shield and Deflect as meaningful defensive systems.
+
+9.3 Maintain meaningful dash commitment
+
+Do not allow unlimited instantaneous direction-switching dashes.
+
+Do not unintentionally create repeated dash loops with no counterplay.
+
+The player should be agile, but opponents must still be able to read and punish predictable movement.
+
+⸻
+
+10. IMPROVE LANDING AND PLATFORM FLOW
+
+Movement should not feel interrupted every time the character touches a surface.
+
+10.1 Smooth landings
+
+Review how fighters transition from:
+
+Fall → Land
+
+Air Attack → Land
+
+Air Dash → Land
+
+Fast Fall → Land
+
+Hitstun → Land
+
+When legal, players should be able to:
+
+* Continue running on landing.
+* Jump promptly after landing.
+* Attack promptly after landing.
+* Change horizontal direction.
+* Preserve appropriate horizontal momentum.
+
+Preserve existing recovery restrictions where they are intentional.
+
+10.2 Audit landing cancels
+
+Alva already supports landing cancels for certain aerial attack recoveries.
+
+Ensure these cancels remain reliable and frame-consistent.
+
+Do not make every aerial action automatically recovery-free on landing.
+
+A landing cancel should be an intentional mechanic with predictable behaviour.
+
+10.3 Add player-controlled platform drop-through
+
+Investigate adding a clear input for dropping through one-way platforms.
+
+Currently, platform drop-through is used by a training CPU path rather than exposed as a normal player action.
+
+A platform fighter benefits from deliberate vertical navigation.
+
+Possible control approaches:
+
+* Down plus Jump.
+* A down input gesture with a well-defined activation condition.
+* Another input that fits existing keyboard, controller, and touch layouts.
+
+Choose a scheme that avoids accidental drops during normal fast-fall inputs.
+
+Required safety checks:
+
+* Works only on appropriate one-way platforms.
+* Does not phase through solid geometry.
+* Does not trigger while immobilized.
+* Does not bypass Shield or attack commitments.
+* Does not break moving or disappearing platform interactions.
+* Does not interfere with jump buffering.
+* Behaves predictably at platform edges.
+
+If implemented, update the controls guide and the English/French UI.
+
+⸻
+
+11. MAKE DEFENSIVE MOVEMENT LESS AWKWARD
+
+Alva’s defense should remain important, but it should not unnecessarily make combat feel static.
+
+11.1 Ground Shield
+
+Currently, raising Shield prevents ordinary locomotion.
+
+Evaluate whether the player should be able to jump directly out of Shield after a clear, fair transition.
+
+A direct Shield → Jump transition may be more responsive than requiring Shield release followed by a separate jump.
+
+Do not permit this during blockstun unless the combat design explicitly allows it.
+
+Do not erase the vulnerability of a missed defensive read.
+
+11.2 Deflect
+
+Deflect is a meaningful airborne combat and defense action.
+
+Preserve its offensive and defensive identity.
+
+Check that valid transitions into and out of Deflect are responsive.
+
+Avoid creating free invulnerability, unlimited projectile reflection, or unavoidable defensive loops.
+
+11.3 Defensive agency versus defensive safety
+
+These are separate concepts.
+
+A fighter may have more control while recovering without becoming invulnerable.
+
+Prefer improving movement responsiveness over granting additional immunity or ignoring hitstun.
+
+⸻
+
+12. REVIEW ATTACK COOLDOWNS WITHOUT BREAKING COMBAT
+
+Alva has an intentional cooldown policy:
+
+* Ordinary repeated moves: historically 0.5 seconds.
+* Exceptional effects: historically 3 seconds.
+* High-impact 10-damage moves: historically 5 seconds.
+
+Preserve the existence of meaningful cooldown categories.
+
+However, investigate whether the ordinary repeat delay disproportionately slows basic combat.
+
+Do not mistake the repeat cooldown for the duration of every attack.
+
+These are different systems.
+
+Evaluate whether quick attacks would benefit from a more responsive repeat policy, for example an experimental ordinary repeat delay between 0.3 and 0.5 seconds.
+
+Consider whether the best solution is actually improved move diversity and follow-up flow rather than reduced cooldowns.
+
+If changing the policy:
+
+* Change it centrally.
+* Update every dependent system.
+* Preserve exceptional cooldown intent.
+* Test against repeated attack exploitation.
+* Check CPU behaviour.
+* Update the product specification and tests.
+* Do not weaken cooldown enforcement only for the human player.
+
+Avoid introducing infinite offensive loops.
+
+⸻
+
+13. IMPROVE INPUT RELIABILITY ACROSS DEVICES
+
+The best movement system will still feel bad if player input is inconsistent.
+
+Inspect keyboard, controller, and touch input handling.
+
+13.1 Keyboard
+
+Check:
+
+* Directional input sampling.
+* Simultaneous input handling.
+* Jump buffering.
+* Dash requests.
+* Rapid direction reversals.
+* Multiple combat buttons in adjacent frames.
+* Press and hold differences.
+* Input release responsiveness.
+
+Do not introduce keyboard-specific mechanics that function differently from equivalent controller actions without good reason.
+
+13.2 Game controllers
+
+Check:
+
+* Left-stick steering.
+* Dead zones.
+* Dash direction selection.
+* Direction changes during attacks.
+* Jump presses during recovery.
+* Input buffering.
+* Button mapping interactions.
+* Diagonal movement handling where relevant.
+
+Avoid dead zones that make steering feel delayed.
+
+Avoid overly sensitive dead zones that cause unintended movement.
+
+Respect customized controller profiles.
+
+13.3 Mobile touch controls
+
+Alva supports touchscreen layouts.
+
+Ensure all implemented mechanics remain accessible using the existing touch schemes, or update those schemes deliberately.
+
+Check:
+
+* Simultaneous movement and attack inputs.
+* Touch release behaviour.
+* Joystick direction changes.
+* Jump and fast fall.
+* Dash requests.
+* Input timing under variable rendering performance.
+* Responsive hit targets.
+* Multi-touch interactions.
+
+Do not require complex input combinations that are impractical on a phone.
+
+13.4 Device parity
+
+Equivalent gameplay inputs should produce equivalent gameplay results.
+
+Differences in the physical interface are fine.
+
+Differences in fighter physics or action privileges are not, unless explicitly part of an accessibility feature.
+
+⸻
+
+14. IMPROVE GAME FEEL WITHOUT OVERUSING VISUAL EFFECTS
+
+Responsiveness includes visual clarity.
+
+Once the mechanical changes are in place, inspect whether the animations and visual feedback make those changes apparent.
+
+14.1 Animation responsiveness
+
+Ensure animation state accurately follows gameplay state.
+
+A fighter that has regained control should visually communicate that control.
+
+Check:
+
+* Idle-to-run transitions.
+* Running attacks.
+* Jump takeoff.
+* Air movement.
+* Air attacks.
+* Dash transitions.
+* Landing recovery.
+* Attack cancellation.
+* Hit reactions.
+* Direction reversals.
+
+Do not require new sprite assets to implement the core improvements.
+
+Use existing animations appropriately.
+
+14.2 Hitstop
+
+Preserve the satisfying impact of attacks.
+
+Light attacks should generally produce shorter hitstop than dramatic heavy hits.
+
+Avoid excessive freeze that repeatedly interrupts the rhythm of basic exchanges.
+
+Do not eliminate hitstop altogether.
+
+Check that buffered inputs and velocity preservation work correctly through impact freeze.
+
+14.3 Movement feedback
+
+If possible with existing assets, polish the sense of acceleration, momentum, dashing, and landing.
+
+Avoid unnecessary camera shake, screen flashes, exaggerated zoom, or particle spam.
+
+Alva’s visual identity should remain coherent and polished.
+
+14.4 Distinguish mechanical responsiveness from animation timing
+
+Before changing an animation’s speed, prove whether the problem is visual timing or real input restriction.
+
+Do not break the alignment between animation frames and active combat frames.
+
+⸻
+
+15. PRESERVE IMPORTANT GAMEPLAY SYSTEMS
+
+The overhaul must not break the following:
+
+Launch Point and knockback
+
+Launch Point buildup, launch velocity, directional launch, hitstun, bounce mechanics, and ring-outs must remain meaningful.
+
+Never apply ordinary attack steering or movement improvements during forced knockback in a way that cancels the launch.
+
+Hitstun and blockstun
+
+A player should not be able to ignore hitstun simply because a movement button is held.
+
+Paralysis and other status effects
+
+Maintain the intended function of paralysis, float, pull, charm, fear, and other fighter-specific effects.
+
+Shield and Deflect
+
+Defensive systems must continue to behave consistently with universal combat rules.
+
+Character-specific movement attacks
+
+Preserve homing moves, rolls, plunges, rises, hovers, summons, projectiles, and techniques.
+
+Their intended movement can differ from ordinary locomotion.
+
+Energy
+
+Do not unintentionally make Energy meaningless.
+
+Stage hazards
+
+Do not break collision, hazards, moving platforms, disappearing platforms, the Void, or stage boundaries.
+
+CPU fairness
+
+The CPU must use the same underlying physics and legal action rules.
+
+Difficulty should continue to affect decision-making, not grant superior movement capabilities.
+
+Practice Ground
+
+Keep the training dummy, training controls, fighter switching, and hit testing functional.
+
+Determinism
+
+Preserve the 60 Hz deterministic simulation.
+
+Performance
+
+Keep the game lightweight and suitable for browser execution, including mobile devices.
+
+⸻
+
+16. TUNE EVERY EXISTING FIGHTER
+
+The current roster contains five playable fighters.
+
+Review every fighter’s attacks individually.
+
+Do not apply a single generic change to every attack without examining its mechanical purpose.
+
+Fighter #0001 — Sorcerer
+
+Preserve the distinction between:
+
+* Ordinary close-range strikes.
+* Aerial movement attacks.
+* Projectile abilities.
+* Defensive behaviour.
+* Powerful techniques.
+
+Its everyday attacks should not feel unnecessarily planted.
+
+Its powerful special abilities should retain their distinctive commitment and dramatic timing.
+
+Fighter #0002 — Speedster
+
+This fighter is an especially important test case.
+
+Its combat should feel highly dynamic because of the movement built into its moveset.
+
+Check:
+
+* Homing Attack.
+* Bounce Attack.
+* Spin Attack.
+* Blue Tornado.
+* Whirlwind.
+* Ordinary ground and aerial strikes.
+
+Ensure its movement attacks do not awkwardly collide with the new steering, dash, and cancel rules.
+
+Its enhanced mobility should come from its moves rather than undocumented advantages in universal locomotion.
+
+Fighter #0003 — Medic brawler
+
+Maintain a powerful close-range fighting identity.
+
+Ordinary attacks should be responsive without removing weight from heavy attacks.
+
+Check ground impacts, aerial plunges, and healing techniques.
+
+Preserve meaningful commitment on powerful strikes and deliberate casts.
+
+Fighter #0004 — Virtual singer
+
+Focus on flowing combat transitions where appropriate.
+
+Review dance attacks, aerial attacks, spinning strikes, stage dives, summons, and techniques.
+
+Avoid compromising the unique timing and behaviour of multi-hit strings.
+
+This fighter is an important test case for attacks that feel continuous rather than stop-start.
+
+Fighter #0005 — Dancing clown
+
+Review claw attacks, aerial strikes, tendrils, projectile interactions, and unusual special abilities.
+
+Improve ordinary combat mobility without removing the purposeful commitment of powerful or disruptive abilities.
+
+Universal requirement
+
+All five fighters must feel better to control.
+
+No fighter should accidentally become much stronger solely because a universal mechanic interacts exceptionally well with one untested move.
+
+⸻
+
+17. ESTABLISH A REAL GAME-FEEL TESTING MATRIX
+
+Do not rely exclusively on existing unit tests.
+
+Create or extend focused automated tests that capture the mechanical properties responsible for responsiveness.
+
+Where subjective playtesting is unavailable, measure explicit responsiveness proxies and state that limitation.
+
+17.1 Movement tests
+
+Verify:
+
+1. Movement begins promptly after directional input.
+2. Ground acceleration is consistent.
+3. Releasing movement causes predictable braking.
+4. Opposite input produces correct directional reversal.
+5. Above-top-speed momentum is not abruptly clamped.
+6. Running momentum carries into jumps.
+7. Dash momentum carries into attacks.
+8. Air dash momentum carries into aerial attacks.
+9. Appropriate attack steering functions during startup, active frames, and recovery.
+10. Quick attacks do not unintentionally brake a running fighter to a near stop.
+11. Heavy movement restrictions remain intentional.
+
+17.2 Attack transition tests
+
+Verify:
+
+1. Run → Quick Attack → Run.
+2. Run → Quick Attack → Jump.
+3. Dash → Attack.
+4. Attack → Dash when legal.
+5. Attack → Attack when legal.
+6. A blocked action does not illegally cancel the current move.
+7. Buffered attacks execute at the first legal frame.
+8. Invalid requests do not erase velocity or reset animations unexpectedly.
+9. Attack self-repeats still respect cooldown restrictions.
+10. Hitstop preserves velocities and permitted buffered inputs.
+
+17.3 Aerial tests
+
+Verify:
+
+1. Jump → Air Attack.
+2. Air Attack → Air Jump.
+3. Air Dash → Air Attack.
+4. Air Attack → Fast Fall.
+5. Aerial directional reversal.
+6. Aerial drift while attacking.
+7. Landing from an attack.
+8. Landing with dash momentum.
+9. Landing cancellation.
+10. Air resource restoration.
+11. Free-fall restrictions.
+12. Recovery after knockback.
+13. No infinite aerial resource loops.
+
+17.4 Combat Assist tests
+
+Verify:
+
+1. Combat Assist disabled.
+2. Combat Assist enabled.
+3. Saved settings preserved.
+4. No unexplained momentum reset at the end of an assisted approach.
+5. Assisted attacks do not pass through opponents.
+6. Assist cancellation into other actions.
+7. Targets moving during assisted approach.
+8. Opponents near ledges.
+9. Opponents on different platforms.
+10. Hitstun interrupting an approach.
+11. No Energy cost where assistance is intended to be free.
+12. No Combat Assist for CPU-controlled fighters unless the product design explicitly changes.
+
+17.5 Combat integrity tests
+
+Verify:
+
+* Shield blocking.
+* Hitstun.
+* Blockstun.
+* Knockback.
+* Launch Point.
+* Wall rebound.
+* Collision.
+* Stage ring-outs.
+* Status effects.
+* Special move cooldowns.
+* Projectile interactions.
+* CPU-controlled matches.
+* Multiple fighter pairings.
+* Practice Ground.
+
+17.6 Frame-rate determinism
+
+Use the existing integration testing approach to compare equivalent simulations rendered at different frame rates.
+
+At minimum, maintain determinism across the existing 30, 60, and 144 fps test scenarios.
+
+The gameplay simulation must not depend on rendering frequency.
+
+⸻
+
+18. MEASURE RESPONSIVENESS BEFORE AND AFTER
+
+Create a compact development-only methodology to evaluate the changes.
+
+Avoid introducing a large permanent diagnostics framework unless clearly necessary.
+
+Track useful metrics such as:
+
+Metric	Why it matters
+Input-to-action latency	Measures when valid commands take effect
+Time to reverse direction	Measures movement agility
+Run-to-attack velocity retention	Reveals unwanted attack braking
+Attack steering displacement	Shows how much positioning control attacks permit
+Dash-to-attack continuity	Reveals transition velocity loss
+Air attack steering authority	Measures aerial freedom
+Landing-to-action latency	Reveals landing friction
+Unintended velocity resets	Identifies abrupt state transitions
+Percentage of time in involuntary states	Helps characterize combat pacing
+Dash availability over time	Reveals whether the movement economy feels overly restrictive
+
+Use consistent, reproducible input sequences.
+
+When evaluating before and after:
+
+* Use the same fighter.
+* Use the same stage.
+* Use the same starting position.
+* Use the same input sequence.
+* Use the same simulation timing.
+
+These measurements cannot prove that a game is fun, but they can expose changes in responsiveness and control.
+
+Separate measured results from subjective design judgments.
+
+⸻
+
+19. IMPLEMENT THE WORK IN PHASES
+
+Do not rewrite the entire combat engine in one enormous patch.
+
+Implement the highest-value improvements first.
+
+PHASE 1 — Diagnose and establish baseline
+
+Inspect the current code and tests.
+
+Record:
+
+* Current movement values.
+* Attack steering defaults.
+* Existing per-character overrides.
+* Transition and cancellation rules.
+* Combat Assist velocity behaviour.
+* Dash and Energy restrictions.
+* Important regression risks.
+
+Identify the strongest sources of stickiness.
+
+PHASE 2 — Attack movement overhaul
+
+Implement improved attack steering.
+
+Decouple steering strength and target speed where needed.
+
+Preserve momentum more consistently.
+
+Tune quick attack mobility.
+
+Maintain authored heavy and special attacks.
+
+Add targeted tests.
+
+This phase is the top priority.
+
+PHASE 3 — Combat Assist correction
+
+Improve momentum handoff.
+
+Preserve meaningful player agency.
+
+Evaluate manual positioning as the default.
+
+Maintain optional accessibility functionality.
+
+Add regression coverage.
+
+PHASE 4 — Aerial control overhaul
+
+Improve aerial attack drift.
+
+Polish air dash transitions.
+
+Improve landing transitions.
+
+Refine fast-fall interactions.
+
+Add relevant tests.
+
+PHASE 5 — Combat pacing and dash economy
+
+Evaluate action restrictions using the improved movement as the new baseline.
+
+Only then tune:
+
+* Dash costs.
+* Dash reuse cooldowns.
+* Ordinary attack repeat delay.
+* Defensive movement transitions.
+* Input buffer windows.
+
+Avoid changing multiple balance variables simultaneously without separate tests.
+
+PHASE 6 — Additional platform fighter mobility
+
+If justified and safely implementable:
+
+* Player-controlled platform drop-through.
+* Expanded air dash directions.
+* Additional grounded or aerial transition improvements.
+
+These features must not delay or jeopardize the core improvements.
+
+PHASE 7 — Visual polish
+
+Improve animation-state transitions and perceived responsiveness using available assets.
+
+Avoid broad visual redesign.
+
+PHASE 8 — Final verification
+
+Run the full test suite.
+
+Correct unintended regressions.
+
+Update the documentation.
+
+Provide the exact changes and a summary of their measured effects.
+
+⸻
+
+20. IMPORTANT ENGINEERING RULES
+
+Follow these strictly.
+
+Rule 1: Do not rewrite working systems unnecessarily.
+
+Rule 2: Use the existing movement architecture wherever practical.
+
+Rule 3: Keep universal baseline locomotion shared by every fighter.
+
+Rule 4: Preserve character-specific movement mechanics.
+
+Rule 5: No new framework or build process.
+
+Rule 6: Preserve deterministic fixed-step gameplay.
+
+Rule 7: Do not replace physics with direct position teleportation.
+
+Rule 8: Do not add hidden invulnerability, unlimited resources, or illegal cancels.
+
+Rule 9: Do not silently change unrelated balance mechanics.
+
+Rule 10: Do not modify every attack with identical values without considering its role.
+
+Rule 11: Do not change animation timing without verifying gameplay synchronization.
+
+Rule 12: Do not break keyboard, controller, or touch support.
+
+Rule 13: Avoid unnecessary allocations or performance-heavy operations in the fighter update loop.
+
+Rule 14: Make tuning values centralized or clearly authored in existing data structures.
+
+Rule 15: Preserve existing player settings where possible.
+
+Rule 16: Add regression tests for every material new mechanic.
+
+Rule 17: Update the specification when gameplay rules intentionally change.
+
+Rule 18: Do not delete tests merely because they detect changed behaviour. Replace obsolete assertions with tests expressing the new intentional behaviour.
+
+Rule 19: Do not claim the game has been playtested if only automated tests were run.
+
+Rule 20: Implement a cohesive, working improvement rather than a collection of disconnected tweaks.
+
+⸻
+
+21. THE TARGET PLAY EXPERIENCE
+
+The finished system should support the following situations naturally.
+
+Scenario A — Fluid ground pressure
+
+A player runs toward an opponent.
+
+They perform a quick attack without coming to an abrupt stop.
+
+While the attack is happening, they continue influencing their horizontal position.
+
+The attack ends or is legally cancelled.
+
+The player can promptly move, follow up, jump, or retreat.
+
+The exchange feels continuous.
+
+Scenario B — Responsive aerial combat
+
+A player jumps toward an opponent.
+
+They perform an aerial attack while drifting forward.
+
+The opponent moves away.
+
+The player adjusts their position as far as the move’s steering rules reasonably permit.
+
+They land and transition smoothly into the next legal action.
+
+The player feels in control throughout the sequence.
+
+Scenario C — Deliberate heavy attack
+
+The player commits to a powerful attack.
+
+The fighter has reduced mobility because the move is intentionally heavy.
+
+The attack looks and feels impactful.
+
+The opponent can punish the commitment if it misses.
+
+This does not feel like input lag: it feels like a meaningful tactical choice.
+
+Scenario D — Dash into combat
+
+The player initiates a dash.
+
+They attack at the earliest legal cancel window.
+
+Momentum transitions smoothly into the attack.
+
+The fighter does not abruptly lose its speed without a deliberate attack-specific reason.
+
+Scenario E — Defensive repositioning
+
+The player defends against an attack.
+
+Once the relevant blockstun or recovery has ended, movement becomes available promptly.
+
+The player does not have to fight awkward input timing to resume control.
+
+Scenario F — Precise platform navigation
+
+The player jumps between platforms.
+
+They adjust their landing position accurately.
+
+They can use ordinary aerial attacks and movement without feeling stuck.
+
+Where supported, they can intentionally drop through eligible one-way platforms.
+
+They never accidentally phase through solid geometry.
+
+Scenario G — Combat Assist optional
+
+A player who wants manual spacing can disable Combat Assist and maintain full control of their attacks’ positioning.
+
+A player who enables Combat Assist receives helpful approach assistance without sudden, unexplained velocity loss.
+
+Both experiences feel coherent.
+
+⸻
+
+22. DEFINITION OF DONE
+
+The overhaul is complete only when all core requirements are satisfied.
+
+Responsiveness
+
+* Directional control works consistently during appropriate attacks.
+* Quick strikes no longer default to unnecessarily planted behaviour.
+* Ground and aerial positioning feel more deliberate.
+* Valid movement transitions do not suffer unexplained velocity resets.
+* Input buffering behaves predictably.
+
+Movement
+
+* Running, stopping, turning, jumping, dashing, and landing are coherent.
+* Momentum preservation is consistent.
+* Aerial steering is improved.
+* Air attacks support meaningful directional influence when appropriate.
+* Stage recovery remains balanced.
+
+Combat
+
+* Light attacks feel agile.
+* Heavy attacks still have meaningful commitment.
+* Cancellations remain fair.
+* Hitstun and blockstun work.
+* Combos and cooldowns do not create obvious infinite exploits.
+* Character-specific mechanics still function correctly.
+
+Architecture
+
+* Shared movement remains universal.
+* Move-specific behaviour remains data-driven.
+* No unnecessary dependencies are introduced.
+* Simulation determinism is preserved.
+* Desktop and mobile performance remains suitable.
+
+Reliability
+
+* Existing tests pass, except obsolete assertions deliberately replaced with correct new ones.
+* New tests cover changed gameplay rules.
+* All five fighters are verified.
+* CPU and Practice Ground still function.
+* Keyboard, controller, and mobile support are preserved.
+
+Documentation
+
+* ALVA_SPEC.md reflects the new rules.
+* Movement and combat guides are updated.
+* Controls documentation is updated where relevant.
+* UPDATES.md summarizes the gameplay changes.
+
+⸻
+
+23. FINAL DELIVERABLES
+
+Implement the improvements in the repository.
+
+Use a dedicated branch if the development workflow supports it, and do not overwrite unrelated work.
+
+After implementation, provide:
+
+A. Summary of changes
+
+Explain what was changed and why.
+
+B. Root causes identified
+
+State which parts of the old system were creating stickiness.
+
+Separate confirmed code-level causes from hypotheses about subjective feel.
+
+C. Movement tuning
+
+Provide a before-and-after comparison of relevant numerical values, including attack steering, friction, dash restrictions, and any changed cooldowns.
+
+D. Combat changes
+
+Describe the new attack mobility behaviour, cancellation transitions, aerial control, and Combat Assist handling.
+
+E. Fighter compatibility
+
+Explain how the five existing fighters were checked and which move-specific exceptions were preserved.
+
+F. Testing results
+
+List:
+
+* Tests executed.
+* Tests passed.
+* Any failures.
+* Regressions fixed.
+* Scenarios that still require manual playtesting.
+
+G. Remaining risks
+
+Identify potential balance concerns and mechanics requiring additional real-player feedback.
+
+H. Follow-up recommendations
+
+Only after the implementation is complete, suggest any remaining changes that might further improve combat feel.
+
+Do not present unimplemented ideas as completed work.
+
+⸻
+
+24. FINAL DESIGN PRINCIPLE
+
+The single most important principle behind this entire task is:
+
+The player should feel continuous ownership of their fighter.
+
+Attacking should not arbitrarily remove movement.
+
+Jumping should not feel disconnected from combat.
+
+Landing should not unnecessarily stop the flow.
+
+Dashing should feel like a useful part of the movement system rather than a disruptive scripted action.
+
+Aerial combat should provide real positioning freedom.
+
+Heavy attacks can remain committed because commitment creates meaningful tactical decisions.
+
+Forced states such as hitstun and paralysis can restrict the player because their restrictions are part of combat.
+
+But ordinary fighting should never feel restrictive simply because the implementation defaults to disabling control.
+
+The goal is not maximum speed.
+
+The goal is a fighter that responds to the player’s intentions, permits creative movement, preserves the consequences of their decisions, and feels enjoyable even before advanced mechanics are mastered.
+
+A successful overhaul should make Alva noticeably more enjoyable to play within the first 30 seconds of an ordinary fight.
+
+Its controls should feel intuitive immediately, while its full movement and combat systems still offer substantial depth to master.
+
+Prioritize control freedom, animation-to-gameplay consistency, smooth momentum, and reliable transitions over raw speed increases.
+
+Now inspect the repository, establish the baseline, implement the highest-impact improvements, test the result, and deliver a working, documented combat-feel overhaul.
+
+Do not stop after generating an analysis or implementation plan. Carry out the engineering work, and clearly identify any portions that cannot be completed or verified.
+
+Additionaly add shield walking (walking while in shield will make the character move slower than usual, walking in shiled with no use a special animation, instead the waving shield animation will be way faster) 
