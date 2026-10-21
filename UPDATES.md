@@ -2668,3 +2668,202 @@ All five fighters already keep every rule: no layout changed.
 **Tests:** `controller-profiles` (every rule refused, for the roster's
 fighters and a fighter to come; every playable fighter keeps them all; the
 registry runs them).
+
+## Combat feel overhaul and shield walking
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: make fighting feel responsive, fluid and continuous (attacks that
+no longer plant the fighter, momentum kept through every legal change of
+action, Combat Assist that never takes control, a mobility economy that
+does not discourage the Dash), without changing any fighter's identity,
+timing, hitboxes, damage or cooldown classes; and, added by the owner,
+**shield walking**: walking behind a raised Shield, slower than usual, with
+no animation of its own, the waving Shield animation running much faster
+instead.
+
+**Root causes found** (confirmed in the code, measured with the new
+`tests/benchmarks/feel-metrics.mjs` on the same inputs before and after):
+
+- **Attacks planted by default.** The attack defaults were `control: 0`
+  and `friction: 1`, and no roster ground attack set `control`: a held
+  direction did nothing during an attack, so every ordinary ground attack
+  braked a full run to a dead stop (lowest speed 0 for every one, with the
+  direction held), and a standing attack could not be moved at all (2 units,
+  the step after it ended).
+- **Steering coupled to speed.** `steer` used one `control` share for both
+  the acceleration and the top speed it steered toward, so a 0.5 aerial
+  could never drift faster than half the run.
+- **Combat Assist stopped the fighter dead** at the end of its approach
+  (`finishCombatAssist` zeroed the velocity: 0 units/s handed into the
+  attack after a 1250 units/s approach), and it was on by default.
+- **The Dash economy**: 25 Energy a Dash (five in a row empty the bar,
+  then about 8 s exhausted) and the attacks' 0.5 s repeat delay borrowed
+  for the Dash's reuse.
+
+Not causes, checked and left alone: the land and Shield-release poses
+(already pose-only, never holding anyone), the input buffers (attack 0.15
+s, jump 0.12 s, coyote 0.1 s, all kept through the impact freeze and
+already firing on the first legal step), hitstop (short for light hits,
+velocity frozen, never lost) and the ordinary 0.5 s attack repeat delay
+(different-move follow-ups and Combo Assist already flow, and the repeat
+delay is what keeps a single strike from looping).
+
+**What it changed.**
+
+- **Attack mobility tiers** (`js/data/attack-mobility.js`, new): every
+  attack names a tier, `quick`, `medium`, `heavy` or `planted`, chosen
+  for what it does (never its name, slot, damage or length), and the tier
+  supplies its movement: `momentum` / `airMomentum`, `control` /
+  `airControl` (steering authority) and, new, `topSpeed` / `airTopSpeed`
+  (the share of top speed that steering builds toward), and `friction`.
+  A field the attack writes wins over its tier's. An attack that names no
+  tier is `medium`, so nothing defaults to standing still.
+
+  | Tier | control / air | topSpeed / air | momentum / air | friction |
+  | --- | --- | --- | --- | --- |
+  | quick | 0.8 / 0.9 | 1 / 1 | 1 / 1 | 0.6 |
+  | medium | 0.55 / 0.7 | 0.6 / 0.9 | 0.9 / 1 | 0.8 |
+  | heavy | 0.2 / 0.4 | 0.25 / 0.6 | 0.6 / 0.9 | 1 |
+  | planted | 0 / 0 | — | 1 / 1 | 1 (the old defaults) |
+
+- **Steering decoupled** (`steer` takes a speed share apart from its
+  authority; `steerAttack` passes the attack's). Quick strikes keep the
+  whole run with a direction held; heavy ones slow to a walk.
+- **Every attack classified**, the reason in each definition's comment
+  and a table in each fighter's specification: quick: every Jab-like
+  strike (#0001 Jab and Floating Straight, #0002 One-Two, #0003 Chakra
+  Punch, #0004 Dance Combo and Air Dance, #0005 Claw Swipe and Claw Rake);
+  medium: the launchers and everyday kicks, ordinary casts, pull and
+  hover aerials, homing recoveries and every Deflect; heavy: finishers,
+  long flurries, trap casts and plunges (#0001 Red, Maximum Blue, Red
+  Kick; #0002 Rapid Kicks, Bounce Attack, Blue Tornado, Whirlwind; #0003
+  Heavenly Foot of Pain, Chakra Haymaker; #0004 Stage Dive; #0005 Long
+  Bite); planted: #0002's Spin Attack curl, #0005's Dark Tendrils and its
+  phantom's bite. Preserved on purpose: every plunge's and lift's drift
+  (`airTopSpeed` = its `airControl`, exactly as before), the hovers' hang
+  (`airMomentum`), #0001's High Kick and #0003's Haymaker lunges
+  (`friction` 0.6 / 0.7), #0002's Rapid Kicks and #0005's Long Bite
+  momentum, the Tendrils' root (`momentum: 0`). No timing, hitbox, damage,
+  launch, cooldown or motion changed.
+- **Combat Assist**: off for a new player (an aid they turn on; settings
+  version 7). A player whose settings were saved before keeps exactly
+  what they had (versions 1 and 2, and any older object without a valid
+  value, keep it on, as they played: `LEGACY_COMBAT_ASSIST`). The finished
+  approach now hands its fighter into the attack at a run (top speed
+  toward the target, the horizontal share of its heading in the air; the
+  approach's own Dash speed is spent), and the attack keeps its share as
+  any attack thrown at a run does. The stale run held through the request
+  neither turns nor steers the assisted attack (`Fighter.attackSteer`), so
+  it never walks out of its own strike.
+- **Shield walking**: a direction held behind a raised Shield walks the
+  fighter at `shieldWalkSpeed` (130 units/s, new universal movement value,
+  about a third of the run) with the run's acceleration and braking; no
+  walk in blockstun; no run or Dash behind it; free of Energy. No new art:
+  the held Shield pose stays, and the Shield's wavy ring drifts
+  `SHIELD_WALK_WAVE_RATE` (4) times faster while the fighter walks, each
+  fighter's ring keeping the lead it gains so its waves never jump
+  (`shieldWaveTime`, render-only, in `js/game/rendering/shield-fx.js`; the
+  Fighter only reports `shieldWalking`). Every held Shield clip is one
+  frame, so the "waving shield animation" is that ring.
+- **Jump out of Shield**: a jump press drops a raised Shield and jumps on
+  that step, carrying the walk's speed; never in blockstun (the press
+  waits in the jump buffer for the stun to end).
+- **The Dash economy**: `DASH_ENERGY_COST` 25 → 20 (a Dash, an air dash, a
+  Dash cancel), and the Dash's and air dash's reuse timers use their own
+  universal `dashRepeat` (0.4 s, was the attacks' 0.5 s). Measured
+  variants (regen 12/s): 25 / 0.5 s five Dashes before exhaustion, one per
+  2.1 s sustained; 20 / 0.5 s seven, one per 1.7 s; 25 / 0.35 s five in
+  1.4 s; 20 / 0.4 s (chosen) seven in 2.4 s, one per 1.7 s. Spamming still
+  exhausts within a few seconds; the Dash's speed, length and 0.05 s cancel
+  commitment are unchanged, so it stays readable and punishable.
+- **The CPU** obeys the same steering. On the ground it holds no direction
+  through its own strike, since its predictions play attacks out unsteered
+  (`Executor.finish`); its capability model and recovery prediction read
+  the new fields (`topSpeed`, `airTopSpeed`, `mobility`).
+- **Copy**: Discover's movement guide gains Shield walk (English and
+  French); its Dash line now names the right shoulder button (R1 / RB has
+  been the default since the controller redesign).
+
+**Measured** (`node tests/benchmarks/feel-metrics.mjs`, same inputs; units
+and units/s):
+
+| Proxy | Before | After |
+| --- | --- | --- |
+| Lowest speed of a quick strike thrown at a run, direction held | 0 | 420 (the whole run) |
+| Distance a running Jab carries, held (#0001) | 29 | 133 |
+| A standing Jab steered with a direction held (#0001) | 2 | 118 |
+| Back-spacing during a running Jab (#0001) | +26 (forward) | -85 (back) |
+| Medium strikes held on (#0004 Leek Swing) | 0 → stop, 8 travelled | 252 kept, 108 travelled |
+| Heavy strikes from a standstill (#0005 Long Bite, 0.87 s) | 2 | 91 (a slow walk) |
+| An aerial's drift held on (#0001 Floating Straight) | 313 | 420 |
+| Dash → Attack 1, six steps on | 620 | 970 |
+| Combat Assist's speed into its attack | 0 | 372 |
+| Dashes in 10 s, spamming | 7 | 9 |
+| Ground / air reversal at full speed | 6 / 10 steps | unchanged |
+| #0005 Dark Tendrils (planted) | 2 | 2 (unchanged) |
+
+These are responsiveness proxies from automated runs only: **nothing here
+has been playtested**. CPU behaviour against the competent reference
+shifted with it: at the ledge the CPU's launch share among its
+commitments fell from about 0.65 to 0.58 (seeds 3-10, every level), KOs
+34-37 of 40 against 36-38. That shift comes from the scripted opponent's
+own strikes now steering it out of the corner; with them unsteered the
+CPU is back at 0.62-0.74. The test now asks for a majority.
+
+**Not done, and why.**
+
+- **Player platform drop-through**: Down is the natural input, but touch
+  has no Down by the owner's design (the joystick reads sideways only and
+  the mobile Down button was removed), so it would be a keyboard- and
+  controller-only privilege. Left for the owner to decide (a touch Down,
+  or another one-input gesture).
+- **Directional air dashes**: a direction held with the Dash button breaks
+  the controller comfort rules and has no clean touch form; the flat air
+  dash is kept.
+- **Reversing out of Combat Assist's approach**: the approach lasts at most
+  a sixth of a second, and a jump, a Dash, the Shield or another move
+  already cancel it.
+
+**Where to tune it.** The tiers in `js/data/attack-mobility.js`; each
+attack's tier and overrides in its fighter's definition; `shieldWalkSpeed`
+and `dashRepeat` in `js/data/movement.js`; `DASH_ENERGY_COST` in
+`js/game/combat/combat-state.js`; `SHIELD_WALK_WAVE_RATE` in
+`js/game/rendering/shield-fx.js`; `DEFAULT_COMBAT_ASSIST` and
+`LEGACY_COMBAT_ASSIST` in `js/core/settings.js`.
+
+**Code:** `js/data/attack-mobility.js` (new), `js/game/combat/attacks.js`,
+`js/game/fighters/movement.js`, `js/game/fighters/fighter.js` (the Shield
+walk, the jump out of it, `attackSteer`, `finishCombatAssist`,
+`dashRepeat`), `js/data/movement.js`, `js/game/combat/combat-state.js`,
+`js/core/settings.js`, `js/game/battle.js`, `js/game/practice.js`,
+`js/game/fighters/fighter-controller.js`, `js/ui/settings-dialog.js`,
+`js/game/rendering/shield-fx.js`, `js/game/arena.js`, the CPU
+(`executor.js`, `capabilities.js`, `prediction.js`, `values.js`),
+`js/data/cooldowns.js` (`mobility` classified as routine), each
+`js/data/characters/<id>.js`, `js/data/fighter-profiles.js` (the review
+hashes: every definition changed, and each rating and play-style
+description was rechecked against it and still holds),
+`js/localization/strings/fr.js`,
+`tests/benchmarks/feel-metrics.mjs` (new), and the specification and
+guides.
+
+**Tests:** `attack-mobility` (new: the tiers, resolution, every attack
+naming its tier, and for every playable fighter quick strikes keeping the
+run, steering in every phase, heavy and planted moves committed, aerials
+keeping their drift, refused presses leaving the speed alone, run →
+strike → run / jump, plunges' authored drift), `defense` (Shield walking
+for every fighter, the jump out of it, blockstun, the ring's faster waves),
+`settings` (version 7, the version 6 migration keeping each choice, Combat
+Assist off for a new player), `dash` (the 0.4 s repeat, the cost, spamming
+running dry), `movement-rules` (authority apart from speed), and the old
+assertions rewritten for the new rules in `movement`, `moves-0001`,
+`combat-assist` (the handoff, the assisted attack equal to one thrown at a
+run, the defaults), `combo-assist`, `energy`, `combat-rules`,
+`air-mouvment`, `cpu-behaviour`, `practice-ground`, `quick-battle`,
+`battle-screen`, `discover` and `i18n`. Determinism at 30, 60 and 144 fps
+(`roster-matrix`) passes unchanged. Checked in headless Chromium too: in
+Practice Ground with a fresh profile (Combat Assist off), L + D walks #0001
+behind its Shield at 130 units/s in its held pose with the ring drawn,
+Space jumps straight out of it, and a running Jab with D held keeps 420
+units/s throughout; no page errors. Not yet played by hand, on a
+controller or on a phone.

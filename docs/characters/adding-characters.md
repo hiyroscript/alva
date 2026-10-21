@@ -194,8 +194,16 @@ its `baseLaunch` (0 to
 3: by `codename_rule`'s launch levels, 1 for light, 2 for medium, 3 for
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Add how
-it moves (`momentum`, `control`, `friction`, `step`), whether a hit
-opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
+it moves: its mobility tier (`mobility`: `'quick'` for a light, fast
+strike, `'medium'` for one with a clear wind-up or recovery or an
+ordinary cast, `'heavy'` for a deliberate commitment, `'planted'` for a
+move that roots its fighter; chosen for what the move does, never its
+name, slot, damage or length, with a comment saying why), plus only the
+movement fields its own mechanic needs over the tier's (`momentum`,
+`control`, `topSpeed`, `friction` and their air versions, `step`; a
+plunge or lift writes its `airTopSpeed` equal to its `airControl`:
+[attack movement](../systems/movement.md#5-attack-movement)); and
+whether a hit opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
 policy derives it from what the move does (5 s for 10 damage, 3 s for a
 heal, a paralysis or a charm, else the 0.5 s repeat delay; independent of the
 move's phases), and a value it does not give is refused as the registry
