@@ -1,1239 +1,506 @@
-ALVA — Portrait Mode & Slide Controls Update
+ALVA — Implement Character #0006: A True 3-in-1 Synchronized Fighter
 
-Mission
+Task
 
-Implement full portrait-orientation support for Alva, introducing a new gameplay input system named Slide Controls.
+Inspect the entire Alva repository and implement a new character, #0006, using the sprite sheet attached to this conversation.
 
-Alva must become a truly dual-orientation mobile game, not simply a landscape game compressed into a vertical screen.
+Character #0006 is fundamentally different from the existing roster. It is THREE characters functioning together as ONE playable fighter.
 
-The guiding principle:
+This is not a character that summons two companions. It is not a character that switches between three forms. It is not three independently controlled fighters.
 
-Alva should feel as natural to play with one or two fingers in portrait as it does with a controller in landscape. Players should perform actions according to what they visually expect their fighter to do, without needing to memorize arbitrary inputs.
+The player controls all three simultaneously, using exactly one controller, one movement system, one shared combat state, one Launch Point, and one shared defensive hitbox.
 
-This is a major gameplay input and interface update. Implement it as a complete, production-ready feature using Alva’s existing architecture.
+All three must be visibly present in the arena together throughout gameplay.
 
-Do not rebuild combat mechanics, alter character balance, or compromise the existing landscape experience.
-
-⸻
-
-1. Understand the existing repository first
-
-Before modifying code, inspect the relevant systems and their contracts.
-
-Important repository files:
-
-Product rules and architecture
-
-* ALVA_SPEC.md
-* CLAUDE.md
-* codename_rule
-* docs/systems/input.md
-* docs/systems/movement.md
-* docs/systems/combat.md
-* docs/systems/defense.md
-* docs/characters/adding-characters.md
-* All five existing character specifications
-
-Input, gameplay, and controls
-
-* js/core/device.js
-* js/core/input-manager.js
-* js/core/controller-resolver.js
-* js/data/controller-profiles.js
-* js/ui/touch-controls.js
-* js/game/fighters/fighter-controller.js
-* js/game/fighters/fighter.js
-* js/game/combat/combat-assist.js
-* js/game/combat/deflect.js
-* js/game/combat/defense.js
-
-Display and interface
-
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
-* js/game/arena.js
-* js/game/rendering/camera.js
-* js/ui/hud.js
-* js/ui/ability-hud.js
-* js/ui/settings-dialog.js
-* css/responsive.css
-* css/battle.css
-* css/touch-controls.css
-* css/overlays.css
-* manifest.webmanifest
-
-Understand how these modules work before introducing Slide Controls.
-
-Non-negotiable architectural rules
-
-1. All input devices must continue sending Alva’s existing action codenames.
-2. The Fighter remains the authority for whether a move is legal and what it does.
-3. Every fighter must retain its original attacks, movement, cooldowns, Energy requirements, combat behavior, and restrictions.
-4. Slide Controls must work for all five current fighters and support future fighters without character-ID conditionals in shared logic.
-5. Preserve the existing controller comfort rules. Do not weaken their validation to accommodate gestures.
-6. Do not edit, move, rename, or reformat character_rule.
-7. Respect the spelling and naming contracts in codename_rule, including mouvment.
-8. Preserve CPU behavior, Watch Mode, Practice Ground, Combat Assist, Combo Assist, and all existing controller and keyboard input paths.
-
-Implement Slide Controls as a distinct input interpretation layer above the existing gameplay systems.
+This request focuses on defining and implementing the synchronized three-in-one character system. Do not invent, enumerate, or describe individual attacks. Their specific designs can be established separately.
 
 ⸻
 
-2. Two mobile experiences
+1. The fundamental concept: THREE bodies, ONE fighter
 
-Alva will support two complete mobile experiences determined automatically by device orientation.
+Think of #0006 as a single fighter whose visual body consists of three individual characters.
 
-Landscape — Original Alva
+The three individuals must each have their own appearance, animation frames, relative position, and capacity to participate in attacks.
 
-Landscape must remain essentially unchanged.
+However, gameplay must recognize them collectively as exactly one fighter.
 
-Retain:
+The correct conceptual structure is:
 
-* Joystick controls
-* Classic Buttons controls
-* Existing touch control customization
-* Existing controller and keyboard support
-* Existing battle interface
-* Existing fighter ability artwork and button indicators
+* ONE selectable character: #0006.
+* ONE player or CPU controller.
+* ONE logical Fighter instance.
+* ONE shared position and movement state.
+* ONE shared Launch Point.
+* ONE defensive hurtbox and collision body.
+* ONE shared Energy system.
+* ONE shared combat state, including stun, cooldowns, attack commitment, and hitstop.
+* THREE independently rendered sprites that belong to that same fighter.
+* THREE coordinated animation tracks controlled by the same gameplay state.
 
-Do not remove existing customization, reset saved layouts, or change gameplay rules.
+Do not create three separate Fighter instances.
 
-Portrait — Slide Controls
+Do not give each individual their own health, Launch Point, physics body, collision box, or autonomous decision-making.
 
-Portrait automatically activates the new Slide Controls system.
+The player must never need to manually select which individual they are controlling.
+
+All three are always controlled as one unit.
+
+2. Permanent presence
+
+All three individuals must remain present together for the entire duration that #0006 is in play.
+
+This is non-negotiable.
+
+When #0006 spawns, all three appear.
+
+When #0006 stands idle, all three remain visible.
+
+When #0006 moves, all three move.
+
+When #0006 attacks, all three remain present, even when only one performs the attack.
+
+When #0006 gets hurt, all three react.
+
+When #0006 is launched, all three are launched together.
+
+When #0006 respawns, all three return together.
+
+An individual must never disappear simply because another individual is performing an action.
+
+No character switching, temporary despawning, replacing one sprite with another, or summon behavior.
+
+The three should have recognizable spacing, preserving the impression that they are three distinct individuals standing together.
+
+They can change their relative positions and animation poses when necessary, but must remain part of one cohesive formation.
+
+3. Synchronized movement
+
+Every universal movement action applies to all three at the same time.
+
+This includes:
+
+* Idle and turning.
+* Running and stopping.
+* Jumping, including subsequent air jumps.
+* Falling and fast-falling.
+* Landing.
+* Ground Dash.
+* Air Dash.
+* Hurt and aerial hurt.
+* Hitstun and knockback.
+* Ground shielding.
+* Shield preparation and release.
+* Recovery from launches.
+* Respawning and elimination.
+
+When the player presses Jump, all three jump simultaneously.
+
+When the player runs right, all three run right.
+
+When the player changes direction, all three turn with the formation.
+
+When the player Dashes, all three Dash in synchronization.
+
+When the fighter falls off a platform, all three fall together.
+
+They must not jump independently, follow each other with delayed physics, or require different movement inputs.
+
+Their animations can be different because they have different sprite artwork, but their underlying movement states and state transitions must be synchronized.
+
+For example, during a jump, all three can display their own jump animations while sharing the exact same jump velocity, gravity, and landing event.
+
+Do not implement the three individuals as a leader and two followers that must catch up.
+
+Instead, implement one shared physics body with three visual representations positioned relative to it.
+
+The three sprites can have configurable local offsets and formation animations, but those offsets must not create separate gameplay movement.
+
+Respect Alva’s existing universal movement rules. Character #0006 must not override the baseline running, jumping, Dash, or air-dash physics.
+
+4. Formation and positioning
+
+The three individuals must appear as a coordinated group.
+
+Their positions should be derived from the single fighter’s world position, using relative formation offsets.
+
+The formation must support:
+
+* A natural default idle arrangement.
+* Maintaining recognizable separation while running.
+* Synchronized airborne positioning.
+* Formation adjustments for attacks.
+* Members stepping backward while another attacks.
+* Smooth returns to the normal formation.
+* Correct horizontal mirroring when changing facing direction.
+
+They must not overlap permanently into what looks like a single sprite.
+
+They must not spread apart into completely independent entities.
+
+Use a stable formation anchor so the trio’s movement remains understandable to the player.
+
+Relative positioning is visual coordination, not separate physics.
+
+Avoid abrupt teleportation between formation arrangements. Position changes should be visually smooth and deterministic.
+
+5. Attack coordination — critically important
+
+Although they collectively function as one fighter, all three individuals are capable of performing attacks.
+
+However, this does NOT mean they all automatically attack whenever the player presses an attack button.
+
+Standard single-member attacks
+
+For an attack assigned to one individual:
+
+1. The designated individual performs the attack animation.
+2. The other two do not perform that attack.
+3. The other two move backward relative to the direction the formation is facing, creating space for the attacking individual.
+4. Both non-attacking individuals remain visible and synchronized with the group.
+5. After the attack, the three smoothly return to their normal arrangement.
+
+The non-attacking members are not idle summons, and they are not acting independently. Their backward movement is a coordinated part of the group’s animation.
+
+Two-member combination attacks
+
+The system must also support an attack that intentionally involves TWO members.
+
+In this case:
+
+* Both designated members participate in the attack.
+* The third member moves backward and remains present.
+* The two participants coordinate their action as one logical attack.
+* The entire trio remains controlled by the same player and shared combat state.
+
+Three-member combination attacks
+
+The system must also support an attack involving ALL THREE members.
+
+In this case:
+
+* All three participate in the same coordinated action.
+* Each individual can have its own animation sequence.
+* All three sequences belong to one logical move.
+* The move follows Alva’s normal combat rules.
+
+Essential distinction
+
+One, two, or three members may participate in a move, but every move still belongs to one fighter.
+
+Do not implement attacks as three independently triggered combat actions.
+
+The system should support specifying which members participate in any given attack using reusable, declarative character data.
+
+Single-member attacks are the normal behavior. Two-member and three-member participation must occur only when explicitly defined.
+
+No automatic simultaneous attacking by all three.
+
+No independent attack cooldowns for individual members.
+
+No autonomous attacks by non-participating members.
+
+No extra damage simply because multiple sprites are visible.
+
+A combination attack is one coordinated move, with whatever strike events are explicitly authored for that move.
+
+Do not design the individual moves in this task. Implement the participation and coordination system so that later attack definitions can use it.
+
+6. One Launch Point, one hurtbox, one physics body
+
+This is the most important gameplay requirement after synchronization.
+
+All three share exactly ONE Launch Point.
+
+If an opponent lands a hit on #0006, the damage is applied to the shared fighter, not to a specific individual.
+
+All three react to that hit together.
 
 There must be:
 
-* No virtual joystick
-* No attack buttons
-* No jump button
-* No movement buttons
-* No Shield button
-* No Dash button
-* No invisible conventional button overlay masquerading as gestures
+* No separate Launch Point for each individual.
+* No individual damage accumulation.
+* No individual deaths or knockouts.
+* No separate hitstun timers.
+* No independent knockback velocities.
+* No ability for the opponent to eliminate only one member.
 
-The game screen itself becomes the control surface.
+Use ONE shared defensive hurtbox for the entire trio, positioned around the group’s logical body.
 
-The player interacts directly with the battlefield using taps, holds, and swipes.
+The opponent is fighting character #0006, not three targets.
 
-Normal interface controls such as Pause, Back, Settings, and menu choices remain available when appropriate. The buttonless requirement concerns gameplay actions, not the ability to navigate the game.
+The formation’s extra visible bodies must not create additional independent vulnerable collision regions.
 
-Orientation transitions
+Hitting the shared hurtbox triggers one normal hit event, with one application of damage, Launch Point, hitstun, and launch physics.
 
-When a player rotates the device:
+Do not triple damage because three characters are shown.
 
-Landscape to portrait
+Do not let one area attack hit all three separately.
 
-* Disable conventional mobile gameplay controls.
-* Clear their held input state.
-* Activate Slide Controls.
-* Recalculate the battlefield and interface layout.
-* Preserve the ongoing battle.
+Do not create three pushboxes or three platform-collision bodies.
 
-Portrait to landscape
+The shared hitbox requirement concerns the trio’s defensive collision and vulnerability. Individual moves may still have their normal offensive hitboxes, following Alva’s existing attack definitions.
 
-* Release all active gestures and associated gameplay inputs.
-* Disable Slide Controls.
-* Restore the selected landscape control layout.
-* Recalculate the camera and interface.
-* Preserve the ongoing battle.
+When a member performs a move, its offensive effects must line up with its visible animation and position, without creating an additional vulnerable Fighter entity.
 
-Never interpret orientation-change touch events as gameplay commands.
+Keep the game’s combat rules consistent.
 
-Do not restart a fight, reset the match timer, replenish resources, or change the player’s selected fighter.
+7. Shared hurt and launch synchronization
 
-Existing orientation changes automatically pause the game in some situations. Remove that portrait restriction carefully. Orientation changes must not create an unintended pause; an already paused game should remain paused.
+When the shared fighter takes a hit:
 
-Portrait support applies only to mobile/touch-capable devices. Do not classify a desktop as mobile merely because its browser window is narrow.
+All three must respond to that same hit.
 
-⸻
+They should enter the appropriate hurt animation on the same simulation step.
 
-3. Slide Controls — Fundamental gameplay rules
+If the hit launches the fighter, all three travel together under one velocity and one launch calculation.
 
-A. Tap to Jump
+They may use different hurt poses, but they must never become separated into three independently launched bodies.
 
-A quick tap on the playable screen requests Jump.
+The same applies to:
 
-Expected behavior:
+* Ground hitstun.
+* Aerial hitstun.
+* Tumbling.
+* Hitstop.
+* Launch rebounds.
+* Being pushed or pulled.
+* Recovery.
+* Falling into the Void.
+* Elimination.
+* Respawning.
 
-* Grounded: normal jump.
-* Airborne: another available air jump.
-* Repeated taps: use Alva’s existing triple-jump system.
-* No available air jumps: follow existing restrictions.
-* Stunned, attacking, or otherwise restricted: preserve the existing jump buffer and legality rules.
+Any gameplay event that normally affects an entire fighter must affect the complete trio.
 
-A tap must issue exactly one Jump press.
+8. Shield synchronization
 
-Never interpret browser-generated trailing click events as another jump.
+Ground shielding is a synchronized defensive action.
 
-Variable-height jumping
+When the player activates the Shield, all three must visibly react to the shielding state.
 
-Alva already supports higher jumps through holding Jump.
+All three should adopt appropriate defensive or guarding animations.
 
-Preserve access to this mechanic if possible without compromising the basic tap behavior.
+They share one Shield state, one protection calculation, one Energy bar, and one hit/block resolution.
 
-Recommended solution: an intentional stationary hold in the neutral center region, initiated while grounded, can produce and sustain Jump after the gesture is classified. A short tap produces the normal jump.
+Do not give them three independent Shields.
 
-This must not accidentally convert movement holds into jumps.
+Do not make the opponent break through the Shield by attacking a different visual member.
 
-B. Hold left side — Run Left
+When Shield is released, all three return to their normal shared state.
 
-Press and hold the left half of the gameplay area to run left.
+Use Alva’s existing Shield mechanics, including its existing Energy rules, perfect-block behavior, and restrictions.
 
-* Movement continues while held.
-* Releasing stops the held input.
-* Follow existing acceleration, momentum, and braking.
-* The action works independently of the fighter’s facing.
-* Holding Run never automatically requests Dash.
-* The player can perform an attack with another finger while running.
+9. Deflect is different
 
-C. Hold right side — Run Right
+Deflect must be performed by only ONE designated individual at a time.
 
-Use the same rules for the right side.
+This is an intentional exception to the shared-action animation behavior.
 
-Running must remain responsive and natural.
+When the player uses the aerial Deflect input:
 
-Holding two opposing movement directions must never produce unstable or alternating movement.
+* One designated member performs the Deflect.
+* The other two remain visible.
+* The other two can assume appropriate coordinated non-attacking poses or shift backward.
+* The Deflect uses ONE logical combat action.
+* Only the designated participant visually executes the Deflect.
+* Its hitbox and projectile interaction use Alva’s existing Deflect rules.
 
-Use deterministic ownership and cancellation rules.
+Do not automatically make all three Deflect simultaneously.
 
-D. Hold while airborne — Fast Fall
+Do not create three overlapping Deflect hitboxes.
 
-Holding a finger initiated during airtime requests the existing down action after recognition as an intentional hold.
+Do not spend Energy three times.
 
-Important considerations:
+The Deflect still belongs to the complete #0006 fighter, even though only one member visibly performs it.
 
-* The player can still steer horizontally in the air.
-* An airborne hold on the left or right may combine horizontal steering with Fast Fall.
-* A hold initiated on the ground and carried into a jump must not unexpectedly trigger Fast Fall.
-* A new stationary hold initiated while airborne should provide Fast Fall without requiring an attack.
-* Existing launch steering behavior must be preserved.
-* Fast Fall must not activate during moves or states where the Fighter disallows it.
+10. Sprite sheet and animation implementation
 
-Do not create a new falling physics model.
+Use the image attached to this conversation as the source of character #0006’s sprite artwork.
 
-Use the existing universal movement system.
+The sheet contains three distinct visual characters organized into their respective sections:
 
-E. Tap conflicts
+* The upper pink/red-themed character.
+* The middle blue-themed character.
+* The lower green-themed character.
 
-A quick tap should be classified as Jump unless it targets an eligible incoming threat for contextual Deflect, or interacts with an actual interface element.
+Treat these as the three permanent members of the fighter.
 
-Input priority:
+Extract their existing sprites precisely, preserving their original pixel-art style, colors, silhouettes, and details.
 
-1. Active interface/dialog interactions
-2. Valid contextual danger tap
-3. Swipe gesture
-4. Intentional sustained hold
-5. Ordinary tap resulting in Jump
+The uploaded image has a solid gray background. Remove the background carefully when extracting sprites so the final frames have proper transparency.
 
-These are classification priorities, not permission to delay a recognized action unnecessarily.
+Do not include labels, sheet headings, credits text, or unrelated illustrated creatures in ordinary character frames.
 
-The classifier must be designed to prevent accidental jumping when someone intends to run, and accidental running when someone intends to swipe.
+Do not redraw, recolor, smooth, or generate replacement artwork. Preserve the source sprite art.
 
-⸻
+All three need their own animation handling.
 
-4. Swipe gestures — Attacks and special moves
+The renderer must support three simultaneously active sprite animations belonging to one Fighter instance.
 
-This is the most important design requirement.
+This is particularly important for attacks because one member may be executing an animation while the other two execute coordinated retreat or standby animations.
 
-Every available combat move must have an intuitive gesture inspired by its visible animation, travel direction, and gameplay purpose.
+For ordinary movement, the three animation tracks should change state together while playing their corresponding individual artwork.
 
-Do not simply map Attack 1 to swipe right, Attack 2 to swipe left, and so forth.
+Ensure consistent scaling, anchoring, facing, and pixel-perfect rendering.
 
-That would violate Alva’s controller comfort philosophy.
+If the sheet lacks a necessary animation, identify that limitation rather than fabricating artwork or silently substituting unrelated sprites.
 
-The controller comfort rules are the reference
+Follow Alva’s existing asset naming contract, using assets/characters/0006/ and the required codenames, including mouvment and midair_mouvment.
 
-The existing controller system prioritizes:
+You may introduce a reusable per-member sprite structure where necessary, without breaking existing asset discovery or validation.
 
-* One natural action per move.
-* Common attacks being easy to perform.
-* Visible direction over internal attack numbering.
-* Upward movement corresponding to upward input.
-* Downward movement corresponding to downward input.
-* Projectiles corresponding to outward movement.
-* Dangerous plunges requiring deliberate action.
-* Related ground and air moves sharing a familiar control language.
+11. Integration with Alva’s architecture
 
-Slide Controls must embody these same principles.
+Before implementing, inspect:
 
-Swipe directions
-
-Support recognition of:
-
-* Left
-* Right
-* Up
-* Down
-* Up-left
-* Up-right
-* Down-left
-* Down-right
-
-The gesture vocabulary may also support curved single-finger swipes for clearly circular or surrounding attacks where a straight direction is not meaningful.
-
-All gestures must remain physically comfortable on a typical phone.
-
-Avoid complicated drawings, multi-stroke symbols, arbitrary combinations, or memorization-heavy patterns.
-
-Facing-relative interpretation
-
-Use the fighter’s facing direction.
-
-For example:
-
-* A forward swipe means the direction the fighter currently faces.
-* If facing right, forward means right.
-* If facing left, forward means left.
-* An up-forward swipe mirrors with facing.
-* An up-back swipe mirrors as well.
-
-Swipes that explicitly move something downward should remain downward regardless of facing.
-
-Use visible motion, not an attack’s launch direction, to choose a gesture.
-
-Resolve facing deterministically when the gesture commits. Avoid mapping a single swipe to different attacks because the fighter turned halfway through its motion.
-
-Fighter-specific gesture profiles
-
-Create a built-in gesture definition for every fighter.
-
-Each definition must identify:
-
-* Ground or air
-* Existing action codename
-* Actual ability
-* Gesture shape and direction
-* Facing-relative behavior
-* Why the gesture matches the move’s visuals
-* Whether the move is dangerous or commits the fighter
-* Required move availability
-* Possible collisions with other gestures
-
-Gesture definitions must be part of the character data system or an appropriate shared registry.
-
-Do not hardcode behavior based on fighter IDs in the gesture recognition engine.
-
-Example design principles
-
-Straight punches and basic attacks: An easy, short forward swipe.
-
-Rising uppercuts, rising kicks, or upward movement: An upward or up-forward swipe.
-
-Downward kicks and slams: Downward or down-forward swipes.
-
-Ranged attacks: A deliberate swipe following the projectile’s visible direction.
-
-Pulling attacks: Consider a swipe toward the fighter when that accurately represents the pulling effect.
-
-Area attacks: Consider a comfortable, short curved gesture if the move visually expands or circulates around the fighter.
-
-Summons: The swipe should reflect where the summoned object appears or moves.
-
-Healing and self-targeted abilities: Use an intuitive gesture directed toward the player’s fighter rather than an arbitrary direction.
-
-Dangerous plunging attacks: Require a deliberate downward gesture, resistant to accidental activation during ordinary movement.
-
-These are design principles, not permission to assign multiple moves to the same input.
-
-Gesture ambiguity is unacceptable
-
-The five current fighters can have several attacks with similar visual directions.
-
-Therefore a simple four-direction classifier is insufficient.
-
-Construct and review a complete move-to-gesture matrix for all current fighters.
-
-Where multiple moves naturally share a direction, evaluate a secondary visible distinction such as:
-
-* Short versus extended motion
-* Straight versus curved motion
-* Directional diagonal versus horizontal travel
-* A deliberate sweeping gesture for a significant Special
-
-Only use distinctions that remain intuitive and consistently recognizable.
-
-Do not distinguish unrelated moves through invisible timing tricks.
-
-Avoid requiring users to count milliseconds or memorize arbitrary swipe lengths.
-
-If a proposed mapping is ambiguous, redesign it before implementation.
-
-Every eligible attack must remain accessible. Do not omit an ability because it is difficult to map.
-
-Important fighter examples
-
-Review the actual animation and mechanics of the current roster:
-
-Fighter #0001
-Jab, High Kick, Red, Maximum Blue, Unlimited Void, Hollow Purple, Floating Straight, Blue, and Red Kick.
-
-Distinguish pulling Blue from pushing Red, the quick basic attacks from large casts, and the forward-moving Hollow Purple from ordinary ranged attacks.
-
-Fighter #0002
-One-Two, Rapid Kicks, Spin Attack, Whirlwind, Homing Attack, Blue Tornado, and Bounce Attack.
-
-Upward Blue Tornado and downward Bounce Attack should be especially natural and deliberate.
-
-Fighter #0003
-Chakra Punch, Heel Drop, Chakra Haymaker, Cherry Blossom Impact, Mystical Palm Technique, Leaping Kick, and Heavenly Foot of Pain.
-
-Do not confuse an attack that launches the opponent upward with a move where the fighter physically rises.
-
-Fighter #0004
-Dance Combo, Leek Swing, Crescent Kick, Melody, World is Mine, Ievan Polkka, Air Dance, Leekspin, and Stage Dive.
-
-Summoning a double, projecting a note, and casting a surrounding charm must remain distinguishable.
-
-Fighter #0005
-Claw Swipe, Long Bite, Phantom Hands, Dark Tendrils, Deadlights, Red Balloon, Claw Rake, Snapping Jaws, and Floating Hands.
-
-The tendril pull, the rising balloons, the extending bite, and the surrounding spectacle of Deadlights should inform the gestures.
-
-All assignments must be checked against the current move data and animations, not merely their names.
-
-Context-sensitive actions
-
-Ground and air can use the same swipe for related moves.
-
-A ground-only ability must never activate in the air.
-
-Aerial moves must respect airtime limitations, free fall, cooldowns, and Energy.
-
-The existing move buffering and Combo Assist rules must remain functional.
-
-A gesture should emit a single recognized action press, not continually repeat the move while the finger remains down.
-
-⸻
-
-5. Contextual Deflect — Tap an incoming danger
-
-Implement a new Slide Controls feature: Contextual Deflect Assist.
-
-The objective is to let beginners respond naturally to visible incoming threats.
-
-Instead of pressing an abstract defense key, the player directly taps the danger on screen.
-
-Intended behavior
-
-When an eligible enemy attack or projectile approaches the player’s fighter:
-
-1. The player taps the visible incoming danger.
-2. The game identifies the specific hostile threat.
-3. The system determines whether a legal interception is possible.
-4. If the fighter is already in Deflect range, it performs Deflect when permitted.
-5. If the fighter is slightly outside range, it approaches using a Dash-like movement similar to Combat Assist.
-6. Once inside the actual Deflect range and at an appropriate moment, the Fighter performs its existing Deflect.
-7. The existing hitbox and projectile reflection systems determine the outcome.
-
-It must feel like the player has deliberately selected a threat to intercept, not like the game automatically deflects every nearby attack.
-
-Eligible targets
-
-Prioritize:
-
-* Hostile projectiles
-* Visible approaching melee threats
-* Other enemy-owned attacks with a reliable, visible and targetable collision representation
-
-Do not treat decorative particles as attacks.
-
-Do not automatically target neutral stage hazards. Stage hazards may have different defense and ownership rules.
-
-Do not allow off-screen enemies or invisible hitboxes to become magical touch targets.
-
-Threat recognition
-
-Use gameplay data and combat geometry, not visual color matching or pixels sampled from the canvas.
-
-For each eligible threat, determine:
-
-* Its owner
-* Its world position and visible screen projection
-* Its collision geometry
-* Its movement direction and speed
-* Its attack state
-* Whether it can currently be Deflected
-* Its expected interception position
-* Whether it will remain alive and hostile long enough
-
-Use reasonable touch-target expansion for small, fast projectiles while avoiding ambiguous overlap.
-
-Range and interception
-
-Build on the principles of combat-assist.js.
-
-The approach should:
-
-* Have a strict maximum range based on existing movement capability.
-* Respect arena collisions.
-* Never pass through solid terrain.
-* Not teleport.
-* Not grant invulnerability.
-* Not change the Deflect hitbox.
-* Not ignore startup, recovery, cooldown, or Energy.
-* Cancel safely if the threat disappears or becomes unreachable.
-
-Prefer reusing the existing Combat Assist-style approach mechanism or extracting safe shared movement-planning helpers.
-
-Do not duplicate an entire second movement physics engine.
-
-Ground versus air
-
-Alva currently permits Deflect in the air, not on the ground.
-
-Preserve this constraint.
-
-For an airborne player, a contextual danger tap may perform a legal air approach followed by the existing Deflect press.
-
-For a grounded player, explore an assisted jump/interception sequence only if it can be completed using the ordinary Jump, Dash, and airborne Deflect rules.
-
-If this cannot be done reliably, do not silently grant a ground Deflect. Retain the tap’s ordinary Jump behavior or an intentional, visibly understandable fallback.
-
-Document any grounded interception limitation.
-
-Energy policy
-
-A normal Deflect uses Alva’s existing Energy requirement.
-
-Use the existing combat code as the authority.
-
-For the approach, evaluate using a Combat Assist-style movement, which is visually Dash-like but not necessarily an actual Energy-consuming Dash.
-
-Choose and document one consistent approach policy.
-
-Do not accidentally charge for a real Dash and then also charge for an assist approach.
-
-No free Deflects, duplicate costs, or infinite Energy loops.
-
-Cancellation
-
-Cancel a pending contextual Deflect when:
-
-* Its target disappears or is destroyed.
-* The target leaves the reachable region.
-* The player is hit, stunned, or eliminated.
-* The player initiates a conflicting deliberate action.
-* The match pauses or ends.
-* Orientation changes.
-* A restart, rematch, or fighter swap occurs.
-* The interception is no longer legal.
-
-A failed or refused Deflect must not remain buffered and trigger unexpectedly later.
-
-Feedback
-
-Provide minimal, readable visual feedback:
-
-* A brief highlight on the selected danger.
-* A restrained indication that the fighter is moving to intercept.
-* Normal Deflect effects when the existing move actually activates.
-
-Avoid giant targeting circles or excessive effects over the battlefield.
-
-The player should always be able to understand what was targeted.
-
-⸻
-
-6. Recommendations for Shield and Dash
-
-These two mechanics are not yet assigned required Slide Control gestures.
-
-Prioritize solving the core tap, hold, swipe, and contextual Deflect experience before finalizing them.
-
-Shield — Recommended approach
-
-Consider holding two fingers stationary on the screen to raise Shield while grounded.
-
-Potential behavior:
-
-* Two fingers held: Shield active.
-* Releasing the gesture: Shield lowers.
-* No toggle state.
-* Preserve ordinary Shield walking, blocks, Energy costs, and blockstun.
-* A deliberate Jump interaction should still be able to exit Shield, as the current gameplay permits.
-
-Because this is a sustained defense rather than an attack, a hold is conceptually appropriate.
-
-The gesture must not interfere with using one finger to run and another to attack.
-
-Dash — Recommended approach
-
-Consider a quick two-finger horizontal swipe in the intended Dash direction.
-
-* Swipe left: Dash left.
-* Swipe right: Dash right.
-* Works on the ground or in the air.
-* Emits the existing one-step Dash request.
-* Uses existing Energy costs, cooldowns, movement, and airtime restrictions.
-* Does not repeat automatically.
-* Does not occur from ordinary running.
-
-A two-finger swipe may provide a clear distinction from single-finger attacks, but it must be tested for comfort and accidental activation.
-
-Recommendation status
-
-These are design proposals, not fixed requirements.
-
-If either gesture causes unavoidable conflicts, refine it and document the decision.
-
-Do not implement a confusing workaround merely to check off an action.
-
-However, do not delete Shield or Dash functionality from the game. Landscape, keyboard, and controller behavior must remain intact.
-
-⸻
-
-7. Build a robust gesture recognition system
-
-Create an independently testable Slide Controls module.
-
-Suggested architecture:
-
-* A portrait gesture recognizer.
-* A gesture-to-action resolver.
-* A per-fighter gesture profile registry.
-* A contextual Deflect targeting and interception component.
-
-Adapt filenames and boundaries to existing architectural conventions.
-
-Pointer tracking
-
-Support real mobile multitouch using Pointer Events.
-
-Track each finger by its pointerId.
-
-Each finger must have clear ownership and lifecycle information:
-
-* Starting position
-* Current position
-* Start time
-* Movement distance
-* Current classification
-* Owned gameplay action
-* Pointer capture status
-* Release or cancellation state
-
-Use an explicit gesture state machine.
-
-Example states:
-
-* Pending
-* Running
-* Jump hold
-* Fast falling
-* Swiping
-* Targeting danger
-* Completed
-* Cancelled
-
-Prevent a gesture from executing multiple unrelated actions.
-
-Gesture recognition
-
-Provide centralized, testable thresholds for:
-
-* Tap distance
-* Tap duration
-* Hold classification
-* Swipe minimum distance
-* Direction sectors
-* Directional hysteresis
-* Curved gesture recognition, where needed
-* Accidental-movement tolerance
-
-All distances should be responsive to physical screen characteristics rather than relying blindly on raw device pixels.
-
-Start with reasonable defaults, then verify and tune them using real-device testing.
-
-The user-facing Slide Controls remain non-customizable.
-
-Responsiveness
-
-Recognize deliberate input as soon as sufficient evidence exists.
-
-Avoid waiting for an unnecessarily long timeout on every swipe.
-
-Quick attacks must feel quick.
-
-Running must begin promptly after a hold is recognized.
-
-Do not delay or interfere with Alva’s existing simulation step or attack buffer.
-
-Multitouch examples
-
-All of these should be evaluated:
-
-* Hold left + swipe attack with another finger.
-* Hold right + tap to jump with another finger.
-* Move during an aerial attack.
-* Initiate a Fast Fall while steering.
-* Tap a danger while a movement finger remains held.
-* Release one finger while another continues its action.
-
-Gestures must remain independent unless the recognized action intentionally uses multiple fingers.
-
-Pointer cleanup
-
-Fully release all active controls on:
-
-* Pointer cancellation
-* Lost pointer capture
-* Window blur
-* Page hidden
-* Screen change
-* Pause
-* Result screen
-* Orientation change
-* Fighter change
-* Session destruction
-
-Never leave Run, Down, Jump, or Shield stuck after a gesture ends.
-
-Prevent browser scrolling, text selection, unwanted long-press menus, and browser gesture interference only within the actual gameplay surface.
-
-Do not disable normal menu scrolling or accessibility interactions.
-
-⸻
-
-8. Portrait gameplay interface
-
-Portrait mode needs its own carefully designed responsive presentation.
-
-Do not solve portrait support by squeezing the entire landscape interface into a narrow rectangle.
-
-Main visual hierarchy
-
-Use this priority:
-
-1. Readable combat status.
-2. A clearly visible fighting area.
-3. Fighters and incoming dangers that can be recognized.
-4. Minimal unobtrusive gesture guidance.
-5. Accessible pause/menu entry.
-
-The battlefield must remain the main visual focus.
-
-Conceptual composition
-
-Design a layout suitable for a tall mobile screen:
-
-Top: Match information and compact fighter status.
-
-Center: Main battlefield and combat view.
-
-Lower area: Continued visible battlefield and comfortable gesture interaction area, rather than a cluster of fixed gameplay buttons.
-
-Do not create a large permanent empty area beneath the game.
-
-The control surface should feel integrated with the battle itself.
-
-Battle HUD
-
-Adapt:
-
-* Player and CPU portraits
-* Fighter names
-* Launch Points
-* Scores
-* Match timer
-* Pause control
-* Energy indicators
-* Ability cooldown information
-* Special marks and status indicators
-
-Portrait HUD elements must not overlap each other or cover important combat activity.
-
-Use compact arrangements appropriate for phones.
-
-Do not shrink essential text until it becomes unreadable.
-
-Gesture information and ability status
-
-Landscape touch buttons currently display move artwork and cooldowns.
-
-With those buttons removed in portrait, players still need enough information to understand:
-
-* Which moves are available
-* Which moves are cooling down
-* Which moves are restricted
-* What swipes perform their fighter’s abilities
-
-Create a restrained, portrait-appropriate gesture reference.
-
-Recommended behavior:
-
-* Brief onboarding when Slide Controls are first encountered.
-* A small contextual hint for a newly selected fighter.
-* A full move/gesture guide accessible from Pause or Discover.
-* Optional momentary visual acknowledgment of a recognized gesture.
-
-Preserve visibility of important cooldowns without recreating a large attack-button interface.
-
-Reuse existing ability art and status logic where sensible.
-
-Portrait camera
-
-This is particularly important because Alva is a platform fighter with open ledges, airborne movement, projectiles, and a Void.
-
-The camera must:
-
-* Keep the player’s fighter readable.
-* Keep the opponent visible when reasonably possible.
-* Make stage edges understandable.
-* Preserve awareness of dangerous Void boundaries.
-* Show enough vertical space for jumping and aerial attacks.
-* Account for wide projectiles and off-center action.
-* Avoid excessive zoom changes.
-* Avoid stretching sprites or gameplay geometry.
-* Respect the existing camera bounds and world-coordinate system.
-
-Inspect the existing world scale and camera framing calculations.
-
-Portrait cannot rely uncritically on the landscape framing assumptions.
-
-If the full stage cannot be shown at a useful scale, prioritize intelligent camera composition and danger awareness without changing combat physics or stage dimensions.
-
-Use the existing off-screen fighter indications where appropriate.
-
-Portrait-specific responsive behavior
-
-Support narrow devices, taller phones, tablets, and devices with notches or home indicator areas.
-
-Account for:
-
-* CSS safe-area insets
-* Visual viewport changes
-* Browser address bars
-* Standalone PWA mode
-* Different pixel densities
-* Rotation
-* Accessibility font sizes
-* Small landscape heights
-* Unusual aspect ratios
-
-Use responsive constraints instead of fixed offsets copied from one device.
-
-⸻
-
-9. Adapt every Alva screen
-
-Portrait support must be complete across the product, not limited to the battle canvas.
-
-Review and adapt:
-
-1. Splash screen
-2. Home
-3. Mode selection
-4. Difficulty selection
-5. Fighter selection
-6. CPU fighter selection
-7. Stage selection
-8. Quick Battle
-9. Practice Ground
-10. Watch Mode
-11. Discover
-12. Settings
-13. Credits
-14. Pause menus
-15. Result and rematch screens
-16. Fighter change dialogs
-17. Touch customization editor
-18. Controller settings and editors
-19. Installation dialogs
-20. Language dialogs and all other overlays
-
-For grids and rosters, reduce the column count or introduce proper scrolling when necessary.
-
-Keep fighter art at sensible dimensions.
-
-Text must wrap correctly.
-
-Dialogs must fit within the visual viewport, with scrollable bodies and accessible closing controls.
-
-No horizontal overflow, clipped buttons, overlapping cards, or unreachable controls.
-
-Watch Mode
-
-Watch Mode is spectator-only.
-
-It must work in portrait with a properly framed battle and responsive HUD.
-
-Do not display Slide Controls or allow gameplay gestures to control either CPU fighter.
-
-The existing pause and spectator management actions must still work.
-
-Practice Ground
-
-Practice Ground must support:
-
-* Slide Controls
-* Fighter swapping
-* CPU/dummy configuration
-* Training HUD
-* Damage readouts
-* Pause/menu overlays
-
-Changing the selected fighter must immediately switch to that fighter’s gesture profile without leaving the previous fighter’s gestures active.
-
-⸻
-
-10. Settings and onboarding
-
-Slide Controls will not be customizable in this release.
-
-Do not add a gesture editor or user gesture remapping feature.
-
-Settings behavior
-
-Preserve the landscape Mobile Controls setting.
-
-The player may continue choosing:
-
-* Joystick
-* Classic Buttons
-
-These choices apply to landscape.
-
-For portrait, Slide Controls activate automatically.
-
-Add a clear explanation of the two orientations in Settings.
-
-When portrait is active:
-
-* Identify Slide Controls as the active gameplay input method.
-* Explain that it uses gestures.
-* Do not offer gesture customization.
-* Keep the landscape layout editor accessible only where sensible and clearly labeled as applying to landscape.
-
-Do not replace saved landscape custom layouts.
-
-Onboarding
-
-Provide a short introduction explaining:
-
-* Tap to jump.
-* Hold left to run left.
-* Hold right to run right.
-* Hold in the air to Fast Fall.
-* Swipe according to the move’s visible direction.
-* Tap an eligible incoming danger for contextual Deflect.
-* Explain Shield and Dash if their proposed gestures are implemented.
-
-Use Alva’s existing visual identity and localization system.
-
-Prefer a small illustrated guide over lengthy paragraphs.
-
-The player should be able to reopen the guide later.
-
-Avoid interrupting every battle with repeated explanations.
-
-All new interface strings must be available in English and French.
-
-⸻
-
-11. Web app and orientation restrictions
-
-The repository currently blocks portrait gameplay.
-
-Remove or revise the relevant logic, including:
-
-* Device.blockedPortrait
-* The portrait-blocking CSS class and rotation overlay
-* Battle’s orientation-triggered pause behavior
-* Practice Ground’s orientation-triggered menu behavior
-* Resume restrictions that require landscape
-* Any other portrait-only guards
-
-Do not simply hide the rotation overlay while leaving the underlying simulation blocked.
-
-Check manifest.webmanifest, which currently specifies landscape orientation.
-
-Update it so the installed Alva web app supports both portrait and landscape.
-
-Verify mobile Safari and Chrome behavior, including standalone web app launches.
-
-Orientation must no longer be treated as an error state.
-
-⸻
-
-12. Preserve combat integrity
-
-Slide Controls change how actions are requested, not the underlying mechanics.
-
-Verify parity for:
-
-* Running acceleration and momentum
-* Normal and high jumps
-* Triple jumps
-* Fast Fall
-* Dash and air dash
-* Shield and perfect Shield
-* Deflect
-* Energy costs and exhaustion
-* Attack startup, active frames, and recovery
-* Attack and Dash cancellation
-* Attack buffering
-* Hitstun and blockstun
-* Combo Assist
-* Combat Assist
-* Ground-only restrictions
-* Airtime restrictions
-* Free fall
-* Projectiles and summons
-* Specials and their cooldowns
-* Launch and directional knockback
-* Stage and Void collisions
-
-Never introduce artificial advantages for portrait players.
-
-A portrait player must not gain invulnerability, extra range, unlimited Deflect opportunities, or stronger attacks.
-
-The contextual Deflect assistant may make selecting a defense easier, but its actual defensive outcome must remain governed by Alva’s existing rules.
-
-⸻
-
-13. Test requirements
-
-Add automated tests rather than relying only on manual testing.
-
-A. Gesture classification
-
-Test:
-
-* Short taps
-* Long holds
-* Swipes in all supported directions
-* Facing-relative gestures
-* Diagonal boundary cases
-* Curved gestures if implemented
-* Multitouch ownership
-* Tap versus hold ambiguity
-* Swipe versus run ambiguity
-* Repeated presses
-* Touch cancellations
-* Rapid alternating directions
-* Swipes crossing screen halves
-
-B. Fighter mappings
-
-Test every move of every current fighter in its proper ground/air context.
-
-Verify:
-
-* Every eligible move is reachable.
-* No conflicting gestures exist in the same context.
-* Facing reversal works.
-* Aerial moves are selected correctly.
-* Specials are deliberate.
-* Dangerous plunges cannot be triggered by ordinary taps.
-* New fighters can supply profiles through data without modifying shared recognition code.
-
-C. Contextual Deflect
-
-Test:
-
-* Projectile already in range
-* Projectile slightly outside range
-* Moving projectile
-* Multiple incoming projectiles
-* Enemy melee attack
-* Unreachable threat
-* Threat outside the interception window
-* Threat destroyed during approach
-* Player stunned
-* Insufficient Energy
-* Deflect on cooldown
-* Player grounded
-* Player airborne
-* No air dash resource
-* Wall or platform obstruction
-* Threat passing behind the fighter
-* Target lost due to a Void elimination
-* Cancellation on pause and rotation
-
-The tests must establish that no invalid Deflect, teleport, or unintended invulnerability occurs.
-
-D. Integration
-
-Verify:
-
-* Landscape Joystick still works.
-* Landscape Classic Buttons still works.
-* Customized touch positions remain saved.
-* Saved controller layouts remain intact.
-* Keyboard input still works.
-* Gamepads still work.
-* Mobile portrait activates gestures.
-* Watch Mode never enables gameplay gestures.
-* Practice Ground fighter swapping changes the gesture profile.
-* Pause and overlays disable gameplay input.
-* Rotation does not create stuck actions.
-* Combat Assist and Combo Assist continue functioning.
-
-E. Interface and device testing
-
-Test representative portrait viewports such as:
-
-* 320 × 568
-* 360 × 800
-* 390 × 844
-* 430 × 932
-
-Also check tablets, landscape phones, and desktop.
-
-Run actual browser checks where available.
-
-In particular, validate:
-
-* iPhone Safari
-* Android Chrome
-* Installed PWA behavior
-* Portrait/landscape changes during battle
-* Gestures near screen edges
-* Safe areas
-* Menus and long dialog content
-* Performance during effects-heavy fights
-
-Test command
-
-Run the complete existing test suite:
-
-node --test
-
-Add focused tests alongside the relevant tests/interface/, tests/systems/, and tests/integration/ suites.
-
-Do not declare the feature complete with failing tests.
-
-⸻
-
-14. Documentation
-
-Update:
-
+* CLAUDE.md
 * ALVA_SPEC.md
-* README.md
-* docs/systems/input.md
-* Relevant architecture and interface documentation
-* Relevant testing documentation
-* English and French localization files
+* character_rule
+* codename_rule
+* docs/characters/adding-characters.md
+* docs/architecture/character-system.md
+* js/data/characters.js
+* js/data/characters/
+* js/game/fighters/fighter.js
+* js/game/rendering/sprite-animator.js
+* js/game/rendering/sprite-normalizer.js
+* js/game/arena.js
+* js/game/combat/
+* js/game/physics.js
 
-Document Slide Controls as an official input scheme.
+Pay particular attention to how a Fighter instance owns its body, combat state, sprite animator, hit detection, and launch response.
 
-Include:
+Character #0006 must use id: '0006', displayName: '#0006', and roster slot index 5 (the sixth roster slot).
 
-* The gesture vocabulary
-* Ground and air behavior
-* Every fighter’s gesture assignments
-* The interaction with facing
-* Danger tapping and Deflect interception
-* Shield/Dash design decisions
-* Orientation behavior
-* Known limitations
+Preserve the existing character architecture.
 
-Preserve the authority hierarchy established by the existing repository documentation.
+Do not rewrite Alva’s core gameplay to accommodate three separate fighters.
 
-Do not edit character_rule.
+Instead, introduce the smallest clean, reusable extension needed for a fighter to have multiple coordinated visual members.
 
-⸻
+Prefer a general-purpose, optional multi-member presentation and action-participation capability, configured through character data.
 
-15. Implementation quality
+Do not special-case the string '0006' in shared engine modules.
 
-Follow existing JavaScript, CSS, module, and test conventions.
+Existing characters #0001–#0005 must continue behaving exactly as before.
 
-Prefer small, cohesive modules.
+Do not change universal movement physics, Energy costs, combat damage tiers, Launch Point rules, or input conventions.
 
-Avoid:
+Respect the repository’s protected files and its rules about character naming, credits, sprite usage, and controller comfort.
 
-* Character-specific conditionals in the shared recognizer
-* Duplicating Fighter mechanics
-* Duplicating Combat Assist physics
-* Hardcoded viewport dimensions
-* Global pointer handlers that leak between screens
-* Timers that remain alive after screen changes
-* Guessing attack availability from animations
-* Special-casing individual phones
-* Altering controller rules to fit Slide Controls
+12. UI, CPU and other game modes
 
-Use real fighter state and existing move-status helpers as the source of truth.
+Character #0006 must be treated as ONE selectable character throughout the game.
 
-Keep gesture recognition and input presentation logically separate from combat resolution.
+It should occupy one roster slot and appear once in character selection.
 
-Keep the system maintainable as the roster expands.
+Its portrait or preview should visually represent the trio, rather than accidentally portraying it as one independent fighter.
 
-⸻
+It must have one player indicator, one Launch Point display, one Energy bar, and one set of cooldown indicators.
 
-16. Definition of done
+The camera must track the shared fighter anchor.
 
-This update is complete only when:
+The CPU should control the trio through the same single-fighter interface as the human player.
 
-* [ ]	Portrait mobile play is fully enabled.
-* [ ]	Landscape play is preserved.
-* [ ]	Portrait gameplay uses no conventional gameplay buttons.
-* [ ]	Tapping performs Jump.
-* [ ]	Holding the left/right side performs movement.
-* [ ]	Intentional airborne holding performs Fast Fall.
-* [ ]	Every existing fighter’s eligible moves can be triggered using comfortable, visually meaningful swipes.
-* [ ]	Swipes are consistent with the controller comfort philosophy.
-* [ ]	No move has an ambiguous gesture mapping within its gameplay context.
-* [ ]	Tapping an eligible incoming danger performs a legal contextual Deflect interception when reachable.
-* [ ]	Deflect retains its actual combat restrictions.
-* [ ]	Shield and Dash have reviewed, documented design decisions.
-* [ ]	Multitouch works reliably.
-* [ ]	The portrait camera keeps combat understandable.
-* [ ]	Every major game screen fits portrait.
-* [ ]	The interface remains consistent with Alva’s visual design.
-* [ ]	Mobile orientation changes do not reset matches or leave stuck inputs.
-* [ ]	Settings and onboarding accurately describe Slide Controls.
-* [ ]	The PWA supports both orientations.
-* [ ]	English and French localization is complete.
-* [ ]	Existing combat, landscape, controller, keyboard, and touch tests pass.
-* [ ]	New gesture, Deflect, and responsive interface tests pass.
+The CPU must not issue independent movement or attack commands to the three members.
 
-⸻
+Quick Battle, Watch Mode, Practice Ground, touch controls, the controller editor, and other applicable systems should recognize it as one fighter.
 
-17. Expected implementation process
+The formation must render correctly for either player slot and when facing either direction.
 
-Complete the work in this order:
+13. State architecture
 
-Phase 1 — Repository audit
+Maintain a clear distinction between gameplay state and visual-member state.
 
-Identify existing input contracts, controller comfort rules, orientation restrictions, and responsive limitations.
+Shared gameplay state: position, velocity, ground contact, movement, facing, Launch Point, Energy, stun, Shield, cooldowns, input, attack state, launch, and elimination.
 
-Phase 2 — Gesture design
+Per-member visual state: animation clip, animation frame, local formation offset, visual facing, participation in the currently executing move, and coordinated transitions.
 
-Produce a complete gesture map for the roster and resolve every ambiguous move before implementing recognition.
+Per-member state must never secretly introduce separate combat rules.
 
-Phase 3 — Core Slide Controls
+There should be one authoritative simulation state, with three visual actors responding to it.
 
-Implement tap, hold, directional swipe, multitouch, facing-relative input, and ground/air context.
+All transitions must remain deterministic under Alva’s fixed-step simulation.
 
-Phase 4 — Contextual Deflect
+Formation movement and animation should not drift out of sync across frame rates.
 
-Implement threat targeting, reachable interception planning, legal approach, and existing Deflect execution.
+14. Tests and acceptance requirements
 
-Phase 5 — Full portrait interface
+Add character-specific tests in tests/fighters/0006/ and any necessary tests for a reusable multi-member capability.
 
-Adapt the camera, HUD, menus, rosters, overlays, Settings, and onboarding.
+Verify that:
 
-Phase 6 — Integration and validation
+1. Exactly one Fighter instance represents #0006.
+2. Exactly three member sprites are visible while the fighter is in play.
+3. All three move, jump, fall, Dash, and air dash together.
+4. All three react together to being hit and launched.
+5. The trio has exactly one Launch Point and one defensive hurtbox.
+6. A single incoming attack cannot deal damage three times because there are three visible members.
+7. A standard single-member attack animates one participant while the other two move backward.
+8. Explicit two-member and three-member participation works within one logical attack.
+9. The aerial Deflect is visually performed by one member only.
+10. Ground shielding synchronizes all three while preserving one shared Shield.
+11. Formation changes remain stable when facing left or right.
+12. Falling into the Void, being eliminated, and respawning affect the trio as one fighter.
+13. The roster, CPU, HUD, and camera treat #0006 as one character.
+14. Existing fighters are not affected.
+15. The result remains deterministic at different render frame rates.
 
-Preserve landscape, update the PWA configuration, run tests, repair issues, and document everything.
+Run the full test suite with node --test.
 
-Final deliverables
+Also verify the final appearance in a browser, since unit tests cannot fully validate pixel-art extraction, sprite anchoring, formation spacing, or animation coordination.
 
-Provide:
+15. Completing the integration
 
-1. Working implementation in the repository.
-2. Complete fighter-by-fighter Slide Controls mapping.
-3. Summary of architecture and modified files.
-4. Explanation of contextual Deflect behavior and its limitations.
-5. Final Shield and Dash recommendations or implementation decisions.
-6. Automated test results.
-7. Responsive interface and real-device test findings.
-8. Any remaining issues clearly identified.
+Follow the repository’s normal fighter-registration process.
 
-Do not stop at a proposal, a visual prototype, or a basic gesture demo.
+Create the character module, assets, documentation, and tests necessary for the new fighter architecture.
 
-The goal is a playable, polished portrait version of Alva that makes combat approachable to beginners while remaining faithful to the original game’s mechanics and control philosophy.
+Update the fighter registry and relevant roster documentation.
 
-The experience should be intuitive enough that a new player can discover the controls through ordinary interaction with the screen, and precise enough that an experienced player can still execute deliberate movement, attacks, combos, and defensive maneuvers.
+Respect the existing Discover profile, localization, controller-layout, and credit requirements.
+
+Do not modify the protected character_rule file.
+
+Do not invent individual attack concepts or assign arbitrary attacks merely to satisfy the registry. Where actual attack content is not yet specified, use the repository’s supported pending/unavailable approach and identify what remains incomplete.
+
+Do not mark the fighter as fully playable until it satisfies Alva’s existing playable-character requirements.
+
+The synchronized three-member system itself must be implemented and tested, not merely described in comments.
+
+Final clarification — what 3-in-1 actually means
+
+The most important thing to understand is the difference between three characters controlled together and three separate characters following one controller.
+
+I want the first.
+
+There must be three distinct individuals visually present and capable of participating in combat, but the underlying game must fundamentally understand them as one character.
+
+One input moves all three.
+
+One Jump makes all three jump.
+
+One Dash makes all three Dash.
+
+One hit hurts all three.
+
+One launch sends all three flying.
+
+One Shield protects the shared fighter.
+
+One Deflect makes one designated member perform the Deflect.
+
+One regular attack involves one member while the others step back.
+
+One specifically defined combination attack may involve two or three members.
+
+One Launch Point tracks the entire trio.
+
+One defensive hitbox represents the entire trio.
+
+THREE visible characters. ONE playable fighter. ONE unified gameplay entity.
+
+Do not solve this by implementing companions, followers, AI teammates, summons, character switching, or three overlapping Fighter instances.
+
+The goal is for #0006 to genuinely feel like the player is controlling three synchronized characters as one unified fighting character.
+
+Prioritize getting this fundamental architecture correct before implementing or proposing any specific attack designs.
