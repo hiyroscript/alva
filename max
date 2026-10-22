@@ -1,538 +1,669 @@
-ALVA — Completely Remove Shield Walking and Make Ground Shield Stationary
+ALVA — Completely Remove Combo Assist and Combat Assist
 
 Objective
 
-Implement a complete removal of the Shield Walking mechanic in the Alva fighting game.
-
-Desired behavior: Match the stationary guarding behavior requested from Warriors of the Universe. When a fighter raises their Shield, they must be unable to walk or voluntarily move horizontally until they lower it.
-
-This must be a permanent, universal gameplay change for every playable fighter, every control method, and the CPU.
-
-Do not merely reduce the Shield’s movement speed or hide its animation. Remove the underlying feature, its configuration, its dedicated state, its visual enhancements, and its active documentation.
-
-Preserve all unrelated Shield, combat, movement, and physics systems.
-
-1. Understand the Existing Architecture
+Perform a complete, permanent removal of Combo Assist and Combat Assist from Alva.
 
 Repository: hiyroscript/alva
+Branch: main
 
-Before modifying anything, inspect the actual implementations and their interactions.
+This is a full feature-removal and code-cleanup task, not a request to disable, hide, or default either feature to Off.
 
-Important files:
+Both systems must cease to exist as gameplay mechanics, settings, state, UI features, and active code dependencies.
 
-* js/game/fighters/fighter.js — Main Fighter update loop, Shield state transitions, movement priorities, jumping, facing and animation.
-* js/game/fighters/movement.js — Universal steering, braking, acceleration and momentum.
-* js/data/movement.js — Universal movement configuration and Discover movement guide.
-* js/game/combat/defense.js — Ground Shield definition.
-* js/game/combat/combat-state.js — Shield state, blockstun and Energy.
-* js/game/combat/combat.js — Hit handling and blockPush.
-* js/game/physics.js — Physics integration, collisions, pushboxes and moving platforms.
-* js/game/rendering/shield-fx.js — Shield visual effects.
-* js/game/ai/cpu-intelligence/ — CPU defending, movement planning and input execution.
-* tests/systems/defense.test.mjs — Current Shield Walking and defense tests.
+Do not introduce replacement assist systems. Do not redesign the combat engine or change the established manual combat mechanics.
 
-Read CLAUDE.md, ALVA_SPEC.md, and the relevant system documentation before editing.
+The finished game must provide fully manual attacks, with the player deciding which attacks to perform and positioning their fighter themselves.
 
-Follow the existing modular architecture, fixed-step simulation, and universal character-system rules.
+1. Understand Alva before editing
 
-Do not change character_rule.
+Alva is a browser-based fighting game with a shared fighter simulation, character-specific movesets, Quick Battle, Practice Ground, Watch Mode, and keyboard, touch, and game-controller input.
 
-2. New Ground Shield Behavior
+Read the repository’s architecture and implementation before making changes.
 
-A. Completely stationary voluntary movement
+Pay particular attention to:
 
-While combat.shielding === true:
+* CLAUDE.md
+* ALVA_SPEC.md
+* docs/systems/combat.md
+* docs/systems/input.md
+* docs/systems/movement.md
+* docs/architecture/character-system.md
+* js/game/fighters/fighter.js
+* js/game/fighters/fighter-controller.js
+* js/game/combat/combo-assist.js
+* js/game/combat/combat-assist.js
+* js/core/settings.js
 
-* Holding Left must not walk the fighter left.
-* Holding Right must not walk the fighter right.
-* Holding a joystick in any horizontal direction must not cause walking.
-* Holding a direction before raising the Shield must not bypass this restriction.
-* Pressing movement inputs repeatedly must not produce creeping or positional drift.
-* Direction changes must not introduce acceleration or walking.
-* A fighter must remain stationary on static ground unless another legitimate game mechanic physically moves them.
+Follow the project’s existing architecture, naming conventions, fixed-step simulation, and character-system rules.
 
-This must apply equally to keyboard, touch controls, game controllers, and CPU-controlled fighters.
+Never modify character_rule. Preserve the project’s intentional mouvment spelling and established control codenames.
 
-There must be no special combination of inputs that allows normal locomotion while the Shield is up.
+Do not special-case character IDs or duplicate combat behavior across fighters.
 
-B. Immediately stop when raising the Shield
+2. Completely remove Combo Assist
 
-Currently, a fighter can raise the Shield during a run and gradually decelerate to the Shield Walking speed.
+Current behavior
 
-Remove this behavior.
+Combo Assist currently provides two automated behaviors:
 
-New behavior:
+Automatic attack alternation
 
-1. The fighter runs normally.
-2. The fighter successfully raises their ground Shield.
-3. Their existing voluntary horizontal running momentum stops immediately on that simulation step.
-4. The Shield remains raised.
-5. Continued directional input does not move the fighter.
+When Attack 1 has finished but is still on cooldown, pressing Attack 1 again can request Attack 2 instead. Attack 2 can similarly redirect to Attack 1.
 
-Do not allow the fighter to slide forward from their previous run just because the Shield has activated.
+Automatic queued follow-ups
 
-Apply the stop only when the Shield actually becomes active. A Shield input rejected due to stun, exhaustion, missing art, an active Dash, or another restriction must not incorrectly cancel the fighter’s momentum.
+Pressing the button for an attack already playing can queue its paired attack. Once the original attack finishes, the game attempts to execute the queued attack, potentially holding it briefly while its cooldown expires.
 
-C. Preserve externally forced movement
+Both behaviors must be deleted completely.
 
-Stationary guarding means no player-controlled walking, not immunity to physics.
+Required changes
 
-Do not break:
+Delete:
 
-* blockPush from attacks that shove a raised Shield.
-* Physical pushbox separation between fighters.
-* Moving platforms carrying a guarding fighter.
-* Stage collision and hazards.
-* Hitstop and blockstun.
-* Normal gravity, falling, and ledge behavior.
-* Existing momentum rules outside the Shield state.
+js/game/combat/combo-assist.js
 
-In particular, CombatSystem.applyHit currently applies blockPush directly to the defender’s horizontal velocity.
+Remove its imports, exports, references, and all feature-specific integration code.
 
-Do not erase this legitimate forced movement by indiscriminately setting body.vx = 0 on every Shield frame.
+In js/game/fighters/fighter.js, remove the Combo Assist system, including:
 
-Instead, distinguish between horizontal momentum cleared when voluntarily raising a Shield and horizontal velocity subsequently introduced by an external gameplay effect.
+* comboAssistOn
+* comboAction
+* noteFollowUp
+* queueFollowUp
+* holdFollowUp
+* queuedFollowUp
+* comboQueue
+* The automatic follow-up dispatch from Fighter.update
+* Automatic Attack 1 / Attack 2 substitutions
+* Assist-specific cooldown waiting and extended buffering
+* Assist-specific flags, properties, documentation, and comments
 
-The existing grounded braking behavior may continue reducing forced blockPush momentum.
+Inspect pressRequest, repeatsMove, bufferAttack, and attack-start logic carefully.
 
-A blocking character must remain stationary against ordinary directional input but still react correctly when physically shoved.
+Simplify these functions to operate on the player’s actual requested move.
 
-3. Modify the Fighter Update Loop
+A press of Attack 1 must always request Attack 1. A press of Attack 2 must always request Attack 2.
 
-File: js/game/fighters/fighter.js
+This applies on the ground and in the air, for every playable fighter.
 
-Locate the Shield state-transition logic in Fighter.update, especially:
+Preserve manual attack behavior
 
-* wasShielding
-* combat.shielding
-* The combat.shielding horizontal movement branch
-* shieldWalking
-* The movement and jumping priority logic
+The following must remain true:
 
-Currently, the shielding branch uses:
+1. Attack 1 and Attack 2 remain separate usable inputs.
+2. Repeating the same attack button while that attack is already playing must not restart, cut, or duplicate it.
+3. Repeating an attack during its cooldown must not automatically substitute another attack.
+4. Repeating an attack must never schedule another move to execute automatically.
+5. A different attack requested by the player must still follow Alva’s existing cancellation and cooldown rules.
+6. Ordinary attack buffering must remain operational, but must only replay the actual move explicitly requested by the player.
+7. Holding a button must not generate repeated attack presses.
+8. Ground and aerial move bindings must remain correct.
 
-this.moveHorizontal(walk, 1, 1, dt, mv.shieldWalkSpeed / mv.maxSpeed);
+Remove any special button-to-attack identity tracking introduced solely because Combo Assist could change the requested move.
 
-Remove that Shield Walking implementation.
+Retain attack identity and timing information genuinely required by the normal combat engine.
 
-Recommended design:
-
-On Shield activation:
-
-When combat.shielding changes from false to true, eliminate existing voluntary horizontal running momentum so the fighter stops immediately.
-
-While Shield is active:
-
-Ignore held horizontal input for locomotion. Use neutral horizontal steering or an equivalent existing grounded braking mechanism to maintain stationary guarding while permitting forced knockback to decay naturally.
-
-For example, the Shield movement branch may use neutral steering without any Shield-specific speed:
-
-this.moveHorizontal(0, 1, 1, dt);
-
-However, ensure this works together with the activation-time stop and preserves blockPush.
-
-Use the simplest correct implementation consistent with Alva’s existing physics architecture.
-
-Do not introduce a second movement system, a separate Shield physics controller, or per-character special cases.
-
-Remove the dedicated Shield Walking state
-
-Find and remove the obsolete this.shieldWalking state and its assignments from the Fighter’s initialization, reset, per-frame update, and jump logic.
-
-Update all related comments so they describe stationary guarding rather than walking.
-
-Do not replace shieldWalking with another redundant state that serves the same purpose.
-
-4. Fully Remove Shield Walking Configuration
-
-File: js/data/movement.js
-
-Delete the obsolete universal movement property:
-
-shieldWalkSpeed: 130
-
-Remove its dedicated comments and description.
-
-Because MOVEMENT_FIELDS is derived from BASE_FIGHTER_MOVEMENT, verify that removing the property also removes it from the universal movement-field registry.
-
-Do not replace it with:
-
-* shieldWalkSpeed: 0
-* A new guardMoveSpeed
-* A hidden multiplier
-* A fighter-specific Shield speed
-* An optional Shield Walking setting
-
-Shield Walking must no longer exist as a configurable movement mechanic.
-
-Keep all normal movement parameters unchanged.
-
-Remove the Discover entry
-
-In MOVEMENT_GUIDE, remove the entire entry with:
-
-id: 'shieldWalk'
-
-Do not leave an obsolete Shield Walking card describing a removed feature.
-
-The normal Run, Jump, Dash, and Air Dash guide entries must remain.
-
-5. Remove Shield Walking Visual Logic
-
-File: js/game/rendering/shield-fx.js
-
-Alva currently speeds up the Shield’s wavy black-and-red ring when a fighter walks while shielding.
-
-This is implemented with:
-
-* SHIELD_WALK_WAVE_RATE
-* shieldWaveTime
-* waveLeads
-* References to fighter.shieldWalking
-
-Remove the Shield Walking-specific visual acceleration system.
-
-The Shield should keep its existing appearance:
-
-* Black translucent interior
-* Black wavy perimeter
-* Thin red outer accent
-* Existing dimensions and positioning
-* Normal continuous wave animation
-* Existing reduced-motion support
-
-Without Shield Walking, the ring should animate at its normal rate using the Arena’s existing effects time.
-
-Keep the Shield’s interior and rim synchronized, including when they are drawn separately.
-
-Remove unnecessary WeakMap bookkeeping if its only purpose was storing extra wave movement time.
-
-Do not remove or redesign the Shield itself.
-
-Update relevant comments in js/game/arena.js and the Shield renderer.
-
-6. Preserve Shield Combat Mechanics
-
-The purpose of this task is to remove walking while defending, not to rebalance the Shield.
-
-Preserve:
-
-* Holding Shield to guard on the ground.
-* Blocking attacks from every direction.
-* Existing full-circle blocking behavior.
-* Perfect Shield timing and rearm behavior.
-* Blockstun and hitstop.
-* Existing Shield Energy costs.
-* Exhaustion restrictions.
-* Blocking melee attacks, projectiles, techniques, summons and other supported hit sources.
-* Existing guard animation, raising animation and release animation.
-* Existing attack-buffering and action-priority rules.
-* Normal hit detection and hurtboxes.
-* Existing Shield release timing.
-* Existing Shield stall effects and blockPush.
-* The shared Shield button’s aerial Deflect behavior.
-
-Do not change fighter attack data or introduce special behavior for particular character IDs.
-
-All characters must use the same stationary Shield rule.
-
-7. Preserve Jumping Out of Shield
-
-Alva currently allows a player to jump directly out of an active ground Shield when not prevented by blockstun.
-
-Keep that mechanic.
-
-Expected sequence:
-
-1. Player raises Shield.
-2. Fighter becomes stationary.
-3. Player holds Left or Right while shielding.
-4. The fighter does not walk.
-5. Player presses Jump.
-6. The Shield immediately drops and the fighter jumps, subject to the existing rules.
-7. Normal airborne movement and steering become available.
-
-Because ordinary Shield Walking has been removed, jumping from a stationary guard should no longer inherit Shield Walking momentum.
-
-Do not introduce an artificial sideways jump impulse.
-
-Normal air steering after the jump should remain fully functional.
-
-If the fighter is experiencing legitimate external momentum from blockPush, preserve existing physics rules unless doing so would violate an established combat invariant.
-
-Jump presses during blockstun must still obey the current jump buffer.
-
-8. Preserve Facing and Direction Changes
-
-Alva’s Shield already protects from both sides, and the Fighter can update its facing while guarding.
-
-Preserve facing changes if they are part of the existing input rules.
-
-A player may change which direction their fighter faces without physically translating their position.
-
-Changing facing must never restart movement, alter the Shield’s collision logic, or unintentionally drop guard.
-
-Do not confuse turning with walking.
-
-9. Update CPU Behavior
+Remove queue-specific combat state
 
 Inspect:
 
-* js/game/ai/cpu-intelligence/defense.js
-* js/game/ai/cpu-intelligence/plans.js
-* js/game/ai/cpu-intelligence/executor.js
-* Related CPU movement and liveness logic
+js/game/combat/combat-state.js
 
-CPU-controlled fighters must obey exactly the same stationary Shield mechanics as human players.
+The CombatState.finished property currently communicates fully completed attacks to Combo Assist’s follow-up queue.
 
-A CPU holding Shield must not travel horizontally through ordinary run inputs.
+If no independent gameplay system requires this property, remove it and its assignments.
 
-Ensure defensive planning still works:
+Similarly, remove Combo Assist’s additional bufferedAttack.hold, queued move metadata, and related timer-extension logic when no longer required.
 
-* Raise Shield when appropriate.
-* Hold position during defense.
-* Release Shield when movement is required.
-* Resume normal movement after releasing it.
-* Jump or use another permitted action when appropriate.
-* Correctly process incoming blockPush.
-* Avoid getting trapped in a plan that assumes shielding permits walking.
+Do not remove the standard combat buffer, repeat cooldowns, attack recovery, attack-phase tracking, or ordinary attack completion.
 
-Do not unnecessarily rewrite CPU Intelligence.
+3. Completely remove Combat Assist
 
-Only adjust its logic where an actual dependency on Shield Walking exists.
+Current behavior
 
-10. Update Documentation and Localization
+Combat Assist automatically evaluates melee reach and, when eligible, moves the player toward the opponent before executing the requested attack.
 
-Remove Shield Walking as an active game feature from all relevant documentation.
+This includes:
 
-Inspect and update:
+* Ground approaches using Dash-like movement.
+* Aerial approaches using air-dash-like movement.
+* Target tracking and gap measurement.
+* Predicted target positioning.
+* Automatic approach direction and facing.
+* Starting the selected attack when the approach finishes.
+* Cancelling or replacing the approach when other inputs or interruptions occur.
+* Special animation and movement-state handling.
 
-* ALVA_SPEC.md
-* docs/systems/defense.md
-* docs/systems/movement.md
-* docs/systems/energy.md
-* js/data/movement.js
+All Combat Assist-specific behavior must be removed.
+
+Required changes
+
+Delete:
+
+js/game/combat/combat-assist.js
+
+Remove the module’s imports and all unused dependencies.
+
+In js/game/fighters/fighter.js, remove:
+
+* combatAssistOn
+* combatAssistFor
+* assistPlan
+* tryCombatAssist
+* assistIntents
+* stepCombatAssist
+* finishCombatAssist
+* cancelCombatAssist
+* this.combatAssist
+* Combat Assist-specific targeting, movement, velocity, and animation branches
+* Assist-specific state-machine transitions
+* Assist-specific restrictions or conditions in movement and attack checks
+* Assist-specific attack initiation and facing overrides
+
+Clean up tryAction and startAttack so accepted attacks begin directly from the fighter’s current position.
+
+Remove the assist planning path and any now-unused assist options or toward/turnHold behavior that exists exclusively to support Combat Assist.
+
+Check whether any facing-control behavior serves ordinary attacks independently before removing it.
+
+Required combat behavior
+
+When the player presses a melee attack:
+
+1. Validate the attack using the existing combat rules.
+2. If permitted, begin the attack immediately at the fighter’s current position.
+3. Do not calculate an automatic path toward the opponent.
+4. Do not advance, teleport, glide, or perform an assist approach before attacking.
+5. Do not automatically face the opponent as a consequence of an assist targeting calculation.
+6. Do not override ordinary movement or facing rules.
+7. Do not automatically initiate another attack later.
+
+If an attack is out of range, it must be allowed to miss naturally.
+
+Preserve intentional attack movement
+
+Alva already contains legitimate movement mechanics that are not Combat Assist.
+
+Do not remove or alter them simply because they involve movement toward an opponent.
+
+Preserve:
+
+* Manual Dash and air dash.
+* Dash Energy costs and cooldowns.
+* Running, jumping, falling, and air movement.
+* Momentum and attack mobility.
+* Attack-authored motion, lunges, rushes, and lunging hitboxes.
+* Homing attacks and explicitly authored lock-on behavior.
+* Projectile movement and targeting.
+* Pulls, knockback, launches, bounces, and hitstun.
+* CPU movement and positioning decisions.
+* Character-specific movement abilities.
+
+The critical distinction is that an attack’s own authored movement remains, while an extra automatically triggered approach before that attack does not.
+
+The mouvment and midair_mouvment animations must remain available for their legitimate movement abilities.
+
+4. Clean up the combat engine and lifecycle
+
+Audit the entire Fighter lifecycle, including:
+
+* Construction and reset
+* Fixed-step updates
+* Input resolution
+* Hit and interruption handling
+* Attack buffering
+* Jump and Dash cancellation
+* Ground and wall contact
+* Void and respawn handling
+* Animation selection
+* State transitions
+
+Remove conditions and cleanup operations that only exist for the two assists.
+
+Review:
+
+js/game/arena.js
+
+Remove Combat Assist-specific cleanup from detachFromPlay and destroy, while preserving summons, projectiles, clones, techniques, target detachment, and other lifecycle responsibilities.
+
+Review:
+
+js/game/practice.js
+
+Remove Combat Assist-specific cleanup when changing fighters or removing a CPU.
+
+Review:
+
+js/game/rendering/hit-fx.js
+
+Remove Combat Assist from speed-trail detection while retaining trails for Dash, air dash, and legitimate launch movement.
+
+In fighter.js, ensure that removing the assist state does not accidentally introduce movement, gravity, input-priority, or animation regressions.
+
+The simulation must remain deterministic.
+
+5. Remove both assists from the player controller
+
+Edit:
+
+js/game/fighters/fighter-controller.js
+
+Remove the combatAssist and comboAssist constructor options and instance properties.
+
+Remove their explanatory comments.
+
+PlayerController should only be responsible for legitimate player input behavior and its established controller contract.
+
+The CPU controller must remain unchanged unless cleanup of a genuinely unused reference is necessary.
+
+Do not alter controller mappings or the meaning of Attack 1, Attack 2, or other combat codenames.
+
+6. Remove assist configuration from all gameplay modes
+
+Inspect:
+
+* js/game/battle.js
+* js/game/practice.js
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+
+Remove both assist arguments and all settings lookups that pass them into gameplay.
+
+Remove any session-level saved copies of these properties.
+
+Ensure that the following still construct their fighters and controllers correctly:
+
+* Quick Battle / Regular Play
+* Quick Battle / Custom Play
+* Practice Ground
+* Practice Ground’s Change Fighter flow
+* Watch Mode
+* Restarts, rematches, and respawns
+
+No mode should have its own version of either assist, and no assist flag should be needed to construct a fighter or controller.
+
+7. Completely remove assist settings
+
+Edit:
+
+js/core/settings.js
+
+Remove:
+
+* DEFAULT_COMBAT_ASSIST
+* LEGACY_COMBAT_ASSIST
+* DEFAULT_COMBO_ASSIST
+* Both assist fields from DEFAULT_SETTINGS
+* Both assist getters and setters
+* Assist validation and toggle handling
+* Assist-specific migration rules
+* Any now-unused utilities or comments
+
+Important: migrate existing saved settings safely
+
+The current settings schema is version 7, stored under alva.settings.
+
+The new settings format must no longer contain either assist field.
+
+Increment the schema version to 8 and implement the necessary migration.
+
+Existing version 7 settings must retain valid unrelated preferences, including:
+
+* Selected language
+* Mobile control scheme
+* Customized touch layouts
+* Per-fighter controller profiles
+
+Remove the two deprecated assist fields during migration regardless of their old values.
+
+Existing versions 1–6 must continue to migrate correctly, preserving the historical controller-profile upgrades where applicable.
+
+Do not reset a player’s settings simply because either assist property was previously stored.
+
+On the next save, the resulting settings object must contain neither assist property.
+
+Unsupported, corrupt, or unavailable storage must continue to fall back safely.
+
+If the generic toggle infrastructure has no remaining consumers, remove it rather than keeping unused machinery.
+
+Keep the existing settings storage key unless there is a compelling compatibility reason to change it.
+
+8. Remove the entire Combat settings section
+
+Edit:
+
+js/ui/settings-dialog.js
+
+Currently Settings contains:
+
+* Language
+* Controls
+* Combat
+
+The Combat tab exists to configure Combat Assist and Combo Assist.
+
+Remove the entire Combat tab and its panel.
+
+Do not leave an empty tab, empty heading, blank group, disabled toggle, or placeholder message.
+
+Remove:
+
+* The Combat entry in SETTINGS_SECTIONS
+* buildCombat
+* assistOptions
+* comboOptions
+* assistFor
+* comboFor
+* chooseCombatAssist
+* chooseComboAssist
+* Assist-related DOM elements
+* Assist-related aria-* relationships
+* Assist-related selection logic in markCurrent
+* Unused imports, constants, and comments
+
+The remaining Settings dialog must contain only Language and Controls.
+
+Verify keyboard, mouse, touch, and gamepad navigation, including tab switching, focus restoration, and closing the dialog.
+
+Review css/settings.css and remove orphaned assist-only styling, such as .settings-energy.
+
+Preserve generic settings layout and controls styling still used elsewhere.
+
+9. Remove assist indicators from HUD and touch controls
+
+Combo Assist exposes a queued-follow-up indicator through the shared move-status system.
+
+This indicator must disappear completely.
+
+Inspect:
+
+* js/game/combat/move-status.js
+* js/ui/ability-hud.js
+* js/ui/touch-controls.js
+* css/ability-hud.css
+* css/touch-controls.css
+
+Remove:
+
+* moveQueued
+* The queued property from abilityStatus
+* Queued-follow-up lookup logic
+* Queued status caches and comparisons
+* is-queued class toggling
+* Assist-only CSS highlighting
+* Queued-follow-up accessible descriptions and labels
+
+Do not replace the indicator with a different assist or input-prediction feature.
+
+Preserve ordinary HUD behavior
+
+The following must continue working exactly as before:
+
+* Move artwork
+* Ground and aerial moves
+* Keyboard/controller binding display
+* Standard attack cooldown indicators
+* Special ability cooldowns and countdowns
+* Airtime restrictions and unavailable states
+* Input-context changes
+* Controller-profile updates
+* Fighter swaps
+* Touch button feedback
+* Accessibility labels for actual move states
+
+Do not remove standard attack cooldown indicators merely because Combo Assist used those cooldowns.
+
+10. Remove obsolete localization strings
+
+Edit:
+
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
-* Any relevant controls, Discover, or gameplay explanations.
 
-In particular, remove the outdated French localization keys:
+Remove localization keys exclusively associated with the deleted systems.
 
-* movement.shieldWalk.name
-* movement.shieldWalk.description
+This includes the settings.combatAssist*, settings.comboAssist*, and settings.combat keys, plus abilityHud.queued.
 
-Remove references to Shield Walking speed, walking under the Shield, carrying Shield Walking momentum into a jump, and accelerated shield-wave animation.
+Remove no-longer-needed sentence fragments and assist descriptions.
 
-Where relevant, replace the old explanation with:
+Do not remove shared language keys such as Energy, On, Off, or other terms that still serve the game.
 
-English: “Holding Shield on the ground blocks incoming attacks and prevents movement. Release Shield to move again, or Jump to leave the Shield when allowed.”
+Ensure English and French contain matching keys and that no removed translation is referenced.
 
-French: “Maintenir le Bouclier au sol bloque les attaques et empêche les déplacements. Relâchez le Bouclier pour vous déplacer à nouveau, ou sautez pour quitter la garde lorsque cela est permis.”
+11. Update tests comprehensively
 
-Adapt the wording to existing terminology and UI space.
+Removing tests that directly validate the old assist behavior is necessary, but this alone is insufficient.
 
-Keep historical records in UPDATES.md accurate. If they describe the previously introduced Shield Walking feature, mark it as superseded or add a new note describing its removal rather than falsifying historical implementation details.
+Rewrite affected tests to verify the new manual-only gameplay.
 
-Update all affected current specifications so they describe the new behavior consistently.
+Review or remove the assist-specific suites:
 
-11. Replace Old Tests and Add Regression Coverage
+* tests/systems/combat-assist.test.mjs
+* tests/systems/combo-assist.test.mjs
+* tests/systems/combo-queue.test.mjs
 
-File: tests/systems/defense.test.mjs
+Then update all dependent tests and fixtures, especially:
 
-Existing tests explicitly expect Shield Walking, including the 130-unit-per-second movement, gradual deceleration from running, carried jump momentum, and accelerated Shield waves.
+* tests/helpers/player-rig.mjs
+* tests/systems/basic-strings.test.mjs
+* tests/systems/request-devices.test.mjs
+* tests/systems/move-cancel.test.mjs
+* tests/interface/settings.test.mjs
+* tests/interface/ability-hud.test.mjs
+* tests/interface/controls-ui.test.mjs
+* tests/interface/battle-screen.test.mjs
+* tests/interface/i18n.test.mjs
+* tests/integration/quick-battle.test.mjs
+* tests/integration/practice-ground.test.mjs
+* tests/benchmarks/feel-metrics.mjs
 
-These expectations must be removed or replaced.
+Also inspect any other tests referencing the deleted APIs or relying on assists being enabled by default.
 
-Do not simply delete the tests and leave behavior untested.
+Required regression scenarios
 
-Implement focused automated tests covering:
+Manual attacks
 
-Test A — Shield while standing
+* Attack 1 always requests Attack 1.
+* Attack 2 always requests Attack 2.
+* Attack 1 cannot automatically become Attack 2 during cooldown.
+* Attack 2 cannot automatically become Attack 1 during cooldown.
+* Repeated input during an active attack does not create a follow-up queue.
+* Held input does not generate extra attacks.
+* An explicitly pressed different attack can still cancel when the established combat rules allow it.
+* An attack rejected due to cooldown or other restrictions must not improperly cancel the current attack.
 
-Raise Shield while stationary.
+Manual positioning
 
-Hold Left and Right separately for many simulation frames.
+* Out-of-range melee attacks do not automatically approach the opponent.
+* Attacks execute at the player’s current position.
+* An out-of-range attack can naturally miss.
+* Manual Dash and air dash remain operational.
+* Dash Energy consumption remains correct.
+* Character-authored moving attacks retain their original movement.
+* Aerial attacks do not automatically move toward an opponent.
+* Normal facing and directional input behavior are preserved.
 
-Verify that horizontal velocity and position do not change from voluntary movement.
+Combos
 
-Test B — Shield while running
+* Attack 1 into Attack 2 remains possible through two explicit inputs.
+* Attack 2 into Attack 1 remains possible through two explicit inputs.
+* Valid authored combo routes, hit-cancels, and their timing rules remain functional.
+* Rework basic-string tests so they use explicit Attack 1 / Attack 2 presses rather than the deleted automatic follow-up.
+* Preserve meaningful combo coverage and character behavior; do not weaken assertions merely to make the suite pass.
 
-Reach normal maximum running speed.
+Input devices
 
-Raise Shield while still holding the running direction.
+Run equivalent manual-input tests for:
 
-Verify the fighter immediately stops on the successful Shield activation step.
+* Keyboard
+* Touch controls
+* Game controller
 
-Verify it remains stationary for subsequent frames.
+Verify that each device generates the same intended attacks without automatic substitution.
 
-Test C — Both directions
+Settings and UI
 
-Try Left, Right, opposite directional inputs and repeated directional changes while shielding.
+* No Combat settings tab.
+* No assist options or stale accessibility elements.
+* No queued-follow-up highlight.
+* No assist strings in the active localization tables.
+* Existing version 7 settings migrate without losing unrelated preferences.
+* Older supported settings versions still migrate.
+* The Settings dialog remains fully navigable.
 
-Verify that none cause horizontal translation.
+Game modes
 
-Verify permitted facing changes still work.
+Validate player and CPU construction in Quick Battle, Practice Ground, and Watch Mode.
 
-Test D — Shield release
+Check fighter swaps, respawns, rounds, restarts, and rematches.
 
-Hold Shield and a direction.
+All ordinary systems must continue operating without referencing either assist.
 
-Confirm the fighter is stationary.
-
-Release Shield while continuing to hold that direction.
-
-Verify movement resumes normally under existing acceleration rules.
-
-Test E — Jump out of Shield
-
-Raise Shield while holding Right.
-
-Verify no walking.
-
-Press Jump.
-
-Verify the Shield drops and jumping works.
-
-Verify no artificial Shield Walking momentum is inherited.
-
-Verify ordinary airborne control remains available.
-
-Test F — Blockstun
-
-While Shield is raised, block an attack that causes blockstun.
-
-Verify movement inputs do not produce walking during or after blockstun while the Shield remains raised.
-
-Verify jumping remains restricted and buffered according to existing rules.
-
-Test G — BlockPush
-
-Use an attack with nonzero blockPush.
-
-Verify a raised Shield still blocks the attack.
-
-Verify the defender experiences the expected external displacement and its existing deceleration.
-
-Verify held directional input does not add Shield Walking velocity.
-
-Test H — Moving platforms
-
-Place a shielding fighter on a moving platform.
-
-Verify it is carried by the platform.
-
-Verify it cannot walk relative to the platform while guarding.
-
-Ensure the platform system is not broken.
-
-Test I — All fighters
-
-Verify stationary Shield behavior across every registered playable fighter with a valid ground Shield.
-
-Include fighter #0006 and its ensemble rendering/physics behavior.
-
-Do not hardcode different Shield speeds or behavior by fighter.
-
-Test J — CPU controls
-
-Verify CPU Shield actions do not cause walking.
-
-Verify CPUs can release Shield, move, attack, and defend without deadlock.
-
-Test K — Shield visuals
-
-Verify the normal Shield outline and animation still render.
-
-Verify the removed Shield Walking wave-speed feature is no longer present.
-
-Check interior/rim synchronization and reduced-motion behavior.
-
-Test L — Different input devices
-
-Verify that keyboard, touch and gamepad inputs all produce the same stationary guarding behavior through the shared Fighter system.
-
-Existing universal movement and control bindings must remain functional.
-
-Test M — Frame-rate determinism
-
-Verify that shielding behavior is consistent across Alva’s fixed-step simulation regardless of rendering frame rate.
-
-12. Audit for Remaining Shield Walking References
-
-Search the entire repository for:
-
-* shieldWalk
-* shieldWalking
-* shieldWalkSpeed
-* SHIELD_WALK_WAVE_RATE
-* shieldWaveTime
-* "Shield walking"
-* "shield walk"
-* "Marche sous Bouclier"
-* Any equivalent obsolete wording
-
-Inspect every match.
-
-Remove active implementation, configuration, visual enhancement, localization, and test dependencies associated exclusively with Shield Walking.
-
-Historical changelog mentions may remain if they are clearly historical or superseded.
-
-Do not leave unused exports, dead branches, meaningless constants, outdated tests, or obsolete UI guidance.
-
-13. Verification
-
-Run the focused defense tests first:
-
-node --test tests/systems/defense.test.mjs
-
-Then run related movement, controls, physics, combat and AI tests.
-
-Finally run the complete test suite:
+12. Update the specification and documentation
+
+Remove obsolete product requirements that claim either assist is available.
+
+Review:
+
+* ALVA_SPEC.md
+* README.md
+* docs/systems/combat.md
+* docs/systems/input.md
+* docs/systems/movement.md
+* docs/systems/energy.md
+* docs/gameplay/battle.md
+* docs/gameplay/practice.md
+* docs/architecture/module-responsibilities.md
+* docs/development/testing.md
+* docs/characters/adding-characters.md
+* Any other relevant active documentation
+
+Update the descriptions of manual inputs, attack combos, and combat movement to match the actual implementation.
+
+Remove obsolete references to the deleted modules, tests, settings, and HUD states.
+
+Do not delete legitimate descriptions of the underlying combo system or authored attack behavior.
+
+Treat UPDATES.md as historical release documentation: preserve historical accuracy, but clearly record the removal if needed rather than rewriting past events as though those systems never existed.
+
+13. Perform a repository-wide dependency audit
+
+After making the changes, search the entire repository for remaining references to either system.
+
+Include searches for:
+
+* comboAssist
+* combatAssist
+* combo-assist
+* combat-assist
+* Combo Assist
+* Combat Assist
+* comboQueue
+* queuedFollowUp
+* noteFollowUp
+* queueFollowUp
+* holdFollowUp
+* comboAction
+* followUpAction
+* combatAssistFor
+* tryCombatAssist
+* assistPlan
+* assistIntents
+* stepCombatAssist
+* finishCombatAssist
+* cancelCombatAssist
+* moveQueued
+* is-queued
+* Assist-only settings IDs and localization keys
+
+Look for case variations and dynamically constructed strings where relevant.
+
+Check all imports, exports, constructor arguments, runtime properties, tests, CSS, translations, and documentation.
+
+A complete removal means there must be:
+
+* No functioning assist mechanic.
+* No hidden assist configuration.
+* No dormant assist feature flag.
+* No unused assist runtime state.
+* No dead helper function.
+* No stale import.
+* No obsolete UI indicator.
+* No unfinished settings migration.
+* No build or test dependency on either deleted module.
+
+Historical references in explicitly historical documentation may remain if properly contextualized.
+
+Do not indiscriminately delete unrelated uses of words such as combo, assist, queue, or finished. Verify their purpose before changing them.
+
+14. Run validation and fix regressions
+
+Run the complete test suite using the project’s documented command:
 
 node --test
 
-Fix any regressions caused by the removal.
+Also execute relevant focused tests while developing.
 
-Do not weaken unrelated tests or change expected combat behavior merely to make the suite pass.
+Do not stop at the first failing test.
 
-If browser testing is available, manually test a real Battle in Alva using keyboard, touch and gamepad where supported.
+Fix all test failures caused by this removal, including indirect failures from settings-schema changes and removed exports.
 
-Verify that holding the Shield produces the intended stationary guarding feel.
+Check for JavaScript import errors, syntax errors, missing localization keys, dead selectors, and invalid state references.
 
-14. Acceptance Criteria
+Where browser testing is available, smoke-test the actual gameplay and Settings dialog in Quick Battle and Practice Ground on keyboard, touch, and controller input.
 
-The implementation is complete only when all of these are true:
+Ensure Watch Mode and CPU Intelligence remain operational.
 
-* Every valid ground Shield is stationary against voluntary horizontal movement.
-* Raising Shield while running stops voluntary horizontal momentum immediately.
-* Directional input cannot walk or creep while shielding.
-* Movement resumes normally after Shield is lowered.
-* Jumping out of Shield still works.
-* Aerial Deflect remains unchanged.
-* BlockPush and moving platforms still work.
-* Perfect Shield, Energy costs, blockstun, defensive hit detection, and Shield animations remain functional.
-* Shield Walking’s movement parameter, Fighter state, visual acceleration system, Discover entry and active localization have been removed.
-* CPUs use the same stationary rules.
-* The product specification and system documentation accurately describe stationary guarding.
-* Tests cover the new behavior and the complete suite passes.
+Do not declare success unless the implementation has been checked.
 
-Important: Do not solve this by setting shieldWalkSpeed to zero. The goal is to remove Shield Walking as a mechanic entirely.
+If any validation cannot be performed, explain the limitation explicitly rather than claiming that it passed.
 
-Keep the implementation minimal, clean, universal, and consistent with the existing architecture.
+15. Scope and engineering standards
 
-15. Final Delivery
+Make the smallest clean architectural changes that achieve complete feature removal.
 
-After implementing the change, report:
+Do not introduce unrelated refactoring.
 
-1. The files changed and why.
-2. How the stationary Shield behavior is implemented.
-3. How voluntary movement is distinguished from external blockPush.
-4. Which obsolete Shield Walking components were removed.
-5. Which existing combat and movement mechanics were preserved.
-6. Which tests were added or updated.
-7. The test commands run and their actual results.
-8. Any remaining issues or limitations.
+Do not modify character damage values, attack animation timing, range, Launch Point, Energy costs, cooldown policy, or movement constants merely to compensate for the missing assists.
 
-Do not report tests as passed unless they were executed successfully.
+Do not alter sprites or delete Dash animation assets.
 
-Final gameplay goal: In Alva, raising the ground Shield means planting your feet and defending. You cannot walk until you drop the Shield, just as requested from Warriors of the Universe.
+Preserve the existing player-request cancellation and combat buffering design.
+
+Keep fixed-step determinism and CPU/controller separation intact.
+
+Prefer deleting unused code and simplifying existing functions over adding compatibility shims or permanent Off flags.
+
+Do not leave commented-out assist code behind.
+
+16. Final deliverables
+
+Implement the complete removal and report:
+
+1. Summary of changes: Explain exactly how both assists were eliminated.
+2. Deleted files and APIs: Identify removed modules and major methods.
+3. Combat behavior: Explain how manual input, attack cancellation, and positioning work after removal.
+4. Settings migration: Confirm how existing users’ saved preferences are preserved while assist properties disappear.
+5. UI and documentation: Summarize removed settings, indicators, translations, and updated documentation.
+6. Validation: Report the tests and checks actually run, with their results.
+7. Remaining issues: Identify any genuine unfinished work.
+
+Non-negotiable acceptance criteria
+
+The task is complete only when:
+
+* Combo Assist is entirely removed.
+* Combat Assist is entirely removed.
+* Neither feature is accessible or stored.
+* Attack 1 and Attack 2 always retain their own input identities.
+* No automatic attack follow-up or pre-attack opponent approach exists.
+* Existing manual combos and combat cancellation still work.
+* Character-authored attacks and legitimate movement mechanics are preserved.
+* Keyboard, touch, and controller input remain functional.
+* Quick Battle, Practice Ground, Watch Mode, and CPU behavior remain functional.
+* The saved-settings migration is safe.
+* Active documentation accurately describes the game.
+* The full test suite passes, or any remaining failures are explicitly documented.
+
+Implement the removal fully. Do not simply switch both features Off, hide their settings, or leave their code dormant. The final result must be a clean, manual-only combat system with the rest of Alva’s gameplay preserved.
