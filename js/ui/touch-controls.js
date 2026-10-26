@@ -55,10 +55,9 @@
 // fighter, and each combat button shows what the ability HUD shows on a
 // keyboard or a controller, read the same way (abilityStatus,
 // js/game/combat/move-status.js): a cooldown's sweep over its art, with its
-// seconds for a 3 s or 5 s one, the 0.5 s repeat delay as a faint sweep, a
-// move spent for this airtime muted, and Combo Assist's queued follow-up
-// lit. Paint only: it never changes what a button does, and it writes only
-// what changed.
+// seconds for a 3 s or 5 s one, the 0.5 s repeat delay as a faint sweep
+// and a move spent for this airtime muted. Paint only: it never changes
+// what a button does, and it writes only what changed.
 
 import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
@@ -625,15 +624,14 @@ export class TouchControls {
   // Button `b`'s state from `status` (abilityStatus, or null for none):
   // is-cooling (a 3 s or 5 s cooldown: the sweep, --tc-progress, and its
   // seconds, data-seconds), is-repeat (the 0.5 s repeat delay: a faint
-  // sweep), is-spent (spent for this airtime, free fall or missing art) and
-  // is-queued (Combo Assist's queued follow-up), apart from it. Only what
-  // changed is written.
+  // sweep) or is-spent (spent for this airtime, free fall or missing art).
+  // Only what changed is written.
   paintStatus(b, status) {
     const cd = status?.cooldown;
     const state = !status ? 'ready' : status.restriction ? 'spent' : cd.cooling ? (cd.special ? 'cooling' : 'repeat') : 'ready';
     // A button starts neutral (the stylesheet's own look), so one with
     // nothing to show is never written to.
-    const shown = b._status ??= { state: 'ready', progress: 1, text: '', queued: false };
+    const shown = b._status ??= { state: 'ready', progress: 1, text: '' };
     if (state !== shown.state) {
       shown.state = state;
       b.classList.toggle('is-cooling', state === 'cooling');
@@ -650,11 +648,6 @@ export class TouchControls {
       shown.text = text;
       if (text) b.setAttribute('data-seconds', text);
       else b.removeAttribute('data-seconds');
-    }
-    const queued = !!status?.queued;
-    if (queued !== shown.queued) {
-      shown.queued = queued;
-      b.classList.toggle('is-queued', queued);
     }
   }
 

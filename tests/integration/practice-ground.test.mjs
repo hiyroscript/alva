@@ -511,41 +511,41 @@ test('Practice Ground starts with Player 1 and the default CPU: two fighters, pa
   }
 });
 
-test('Practice Ground gives Player 1 the saved Combat Assist on every entry, and Change Fighter keeps it; the CPU never has it', async () => {
+test('Practice Ground gives Player 1 the saved Automatic turn-around on every entry, and Change Fighter keeps it; the CPU never has it', async () => {
   const { app } = fakeApp();
   const screen = new PracticeGroundScreen(app);
   app.screens.current = screen;
-  assert.equal(app.settings.combatAssist, false, 'nothing stored: off');
+  assert.equal(app.settings.automaticTurnAround, true, 'nothing stored: on');
   await screen.enter();
-  assert.equal(screen.session.player.controller.combatAssist, false);
-  assert.equal(screen.session.player.combatAssistOn, false);
+  assert.equal(screen.session.player.controller.automaticTurnAround, true);
+  assert.equal(screen.session.player.automaticTurnAround, true);
+  assert.equal(screen.session.cpu.automaticTurnAround, false, 'the training dummy never');
+  for (const gone of ['combatAssist', 'comboAssist']) {
+    assert.equal(screen.session.player.controller[gone], undefined, gone);
+    assert.equal(screen.session[gone], undefined, gone);
+  }
   screen.exit();
-  app.settings.set('combatAssist', true);
+  app.settings.set('automaticTurnAround', false);
   await screen.enter();
-  assert.equal(screen.session.player.controller.combatAssist, true, 'read afresh on entry');
-  assert.equal(screen.session.player.combatAssistOn, true);
-  assert.equal(screen.session.cpu.combatAssistOn, false, 'the training dummy never');
-  screen.exit();
-  app.settings.set('combatAssist', false);
-  await screen.enter();
-  assert.equal(screen.session.player.combatAssistOn, false, 'read afresh on entry');
+  assert.equal(screen.session.player.controller.automaticTurnAround, false, 'read afresh on entry');
+  assert.equal(screen.session.player.automaticTurnAround, false);
   // Change Fighter and Change CPU: the player keeps the setting, the CPU never has it.
   screen.openMenu();
   screen.openRoster();
   slotFor(screen, '9999').click(0);
   await flush();
   assert.equal(screen.session.player.def.id, '9999');
-  assert.equal(screen.session.player.combatAssistOn, false);
+  assert.equal(screen.session.player.automaticTurnAround, false);
   screen.exit();
-  app.settings.set('combatAssist', true);
+  app.settings.set('automaticTurnAround', true);
   await screen.enter();
   screen.openMenu();
   screen.openRoster();
   slotFor(screen, '9999').click(0);
   await flush();
-  assert.equal(screen.session.player.combatAssistOn, true);
+  assert.equal(screen.session.player.automaticTurnAround, true, 'the swapped-in fighter has it too');
   const cpu = await enableCpu(screen);
-  assert.equal(cpu.combatAssistOn, false);
+  assert.equal(cpu.automaticTurnAround, false);
   assert.equal(cpu.controller, null);
   screen.exit();
 });

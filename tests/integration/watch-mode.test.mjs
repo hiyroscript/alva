@@ -331,12 +331,12 @@ async function startQuickBattle({ app, screens }, { difficulty = 'easy', fighter
 // A Watch Mode Battle on a fake canvas, seeded with 1; `mode` and `seed`
 // given as undefined reach Battle as undefined.
 function makeBattle(opts = {}) {
-  const { difficulty, p1Def = DEF_0001, p2Def = DEF_0001, input = fakeInput() } = opts;
+  const { difficulty, p1Def = DEF_0001, p2Def = DEF_0001, input = fakeInput(), automaticTurnAround } = opts;
   const mode = 'mode' in opts ? opts.mode : 'watch';
   const seed = 'seed' in opts ? opts.seed : 1;
   return new Battle({
     canvas: new Element('canvas'), map: getMap('desert'), mode,
-    p1Def, p2Def, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input, difficulty, seed,
+    p1Def, p2Def, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input, difficulty, seed, automaticTurnAround,
   });
 }
 
@@ -767,6 +767,17 @@ test('difficulty changes only how the CPUs think: both fighters are the same on 
       assert.deepEqual(stats(battle[side]), stats(base[side]), `${id} ${side}`);
     }
   }
+});
+
+test('the player\'s Automatic turn-around never reaches a Watch Mode CPU: on or off, the same CPUs, the same fight, step for step', () => {
+  const steps = Math.ceil(12 / DT);
+  const on = makeBattle({ seed: 11, difficulty: 'hard', automaticTurnAround: true });
+  const off = makeBattle({ seed: 11, difficulty: 'hard', automaticTurnAround: false });
+  for (const battle of [on, off]) {
+    assert.deepEqual([battle.p1.automaticTurnAround, battle.p2.automaticTurnAround], [false, false]);
+    assert.ok(battle.p1.controller instanceof CombatAIController && battle.p2.controller instanceof CombatAIController);
+  }
+  assert.deepEqual(trace(on, steps), trace(off, steps));
 });
 
 test('a seeded Watch battle is reproducible, and another seed plays differently', () => {

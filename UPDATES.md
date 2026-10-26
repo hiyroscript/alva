@@ -3240,3 +3240,120 @@ phone-sized page (the stick and the Shield button): the run stopped on
 the raise, not a unit moved in two seconds, the fighter turned, it ran
 again once the Shield was down, the ring drawn; no page errors. Not yet
 played by hand.
+
+## Combat Assist and Combo Assist removed, Automatic turn-around
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: remove Combat Assist and Combo Assist from the game entirely, and
+add one Combat setting in their place, **Automatic turn-around**, on by
+default for every player (those upgrading included), which makes the
+human player's fighter face the closest valid enemy and does nothing
+else. It undoes Combat Assist (from the early combat work, last changed in
+[Fighting feel: strings, follow-ups and
+touch](#fighting-feel-strings-follow-ups-and-touch)) and Combo Assist
+([Combo Assist, move cancellation and controller
+art](#combo-assist-move-cancellation-and-controller-art), [Queued Combo
+Assist](#queued-combo-assist)). Those entries stay as the history of what
+was. `character_rule` was not touched.
+
+**What it removed.**
+
+- **Combat Assist**: `js/game/combat/combat-assist.js` and everything of it
+  in the Fighter (`combatAssist`, `combatAssistOn`, `combatAssistFor`,
+  `assistPlan`, `tryCombatAssist`, `assistIntents`, `stepCombatAssist`,
+  `finishCombatAssist`, `cancelCombatAssist`, the `assist` visual state,
+  its movement branch, its fast-fall and Energy exceptions, its wall and
+  ground checks), `tryAction`'s `assist` / `toward` options, the attack
+  record's `turnHold` and `attackSteer`, the arena's, Practice Ground's
+  and the hit effects' references (the speed trail is a Dash's again
+  only).
+- **Combo Assist**: `js/game/combat/combo-assist.js`, the Fighter's
+  `comboAssistOn`, `comboAction`, `comboQueue`, `noteFollowUp`,
+  `queueFollowUp`, `holdFollowUp`, `queuedFollowUp`, the buffer's `hold`
+  and `button`, and `CombatState.finished` (only the queue read it).
+- **The queued look**: `moveQueued` and `abilityStatus`'s `queued`, the
+  ability HUD's and the touch buttons' `is-queued` (their styles too) and
+  the "queued next" wording.
+- **Settings**: both options, their strings (English and French, the
+  Energy word in Combat Assist's line included) and their defaults
+  (`DEFAULT_COMBAT_ASSIST`, `LEGACY_COMBAT_ASSIST`, `DEFAULT_COMBO_ASSIST`).
+
+**What stays.** The player's move cancellation (`playerMayCut`), the press
+for the attack already playing being no request (`repeatsMove`: never a
+cut, a restart or a kept press), the 0.15 s buffer, hit-cancels, Dash
+cancels, every cooldown, `isMeleeAttack` / `isRangedAttack` /
+`attackReach` (the CPU reads them), and every move's own movement.
+
+**What it added.**
+
+- **Automatic turn-around** (Settings › Combat, the section's only setting:
+  "Automatically makes your fighter face the closest enemy.", On
+  (Default) / Off; French "Retournement automatique", "Oriente
+  automatiquement votre combattant vers l’ennemi le plus proche.",
+  Activé / Désactivé). The player's controller carries it
+  (`PlayerController`'s `automaticTurnAround`, on unless given false);
+  `Battle` and `PracticeSession` take it as a session starts. The
+  Fighter's `automaticTurnAround` is true only for a `player`-kind
+  controller with it on, so no CPU, dummy or other controller ever has it.
+- **Targeting** (`js/game/fighters/turn-around.js`): `isValidEnemy`,
+  `closestEnemy` (squared world distance, ties to the first listed) and
+  `facingToward` (1, -1, or null at the same x), over `Fighter.enemies`
+  (the opponent today; a reused list).
+- **The facing** (`js/game/fighters/fighter.js`): `turnAroundFacing`, read
+  through `attackTargetFacing` by the existing attack orientation
+  (`faceAttackTarget`, `updateAttackFacing`, which the CPU's
+  `attackFacing` already used) and by `updateFacing` for every other
+  state; `facingLocked` (a stun, a paralysis, a technique, a summon's
+  startup, a Dash, a motion attack) holds it; `settleFacing` replaces the
+  arena's post-movement `updateAttackFacing` pass, so the player's facing
+  is settled after both fighters move too. Off, the manual rules are
+  exactly what they were.
+- **Settings** version 8 (`automaticTurnAround`); versions 1 to 7 migrate,
+  every other choice kept (language, Mobile Controls, touch layouts,
+  controller profiles and their upgrade), both old assist values dropped
+  and Automatic turn-around on.
+
+**Strings by hand.** The basic two-hit strings' promised ranges were only
+ever met with Combat Assist's approach closing the gap the first hit
+opened (the old test asserted them with it on). No move was retuned: the
+test now pins what holds by hand, Attack 1 into Attack 2 hit-confirmed up
+to 40 Launch Point for every fighter and Attack 2 into Attack 1 on a fresh
+target, and the specification says so (7.2.4b).
+
+**Where to tune it.** Nowhere: there is no turn-around value. Which
+enemies count is `isValidEnemy`; which moves keep their facing is
+`facingLocked`.
+
+**Code:** `js/game/fighters/fighter.js`, new `js/game/fighters/turn-around.js`,
+`js/game/fighters/fighter-controller.js`, `js/game/arena.js`,
+`js/game/battle.js`, `js/game/practice.js`, `js/game/combat/combat-state.js`,
+`js/game/combat/move-status.js`, `js/game/combat/attacks.js` (a comment),
+`js/game/rendering/hit-fx.js`, `js/core/settings.js`,
+`js/ui/settings-dialog.js`, `js/ui/ability-hud.js`, `js/ui/touch-controls.js`,
+`js/screens/battle-screen.js`, `js/screens/practice-screen.js`, both string
+tables, `css/settings.css`, `css/ability-hud.css`, `css/touch-controls.css`;
+removed `js/game/combat/combat-assist.js` and `js/game/combat/combo-assist.js`.
+The specification (6.10, 7.2.2, 7.2.3, 7.2.4, 7.2.4a, 7.2.4b, 7.2.5, 7.2.8,
+7.3, 7.4) and the documents (README, combat, movement, input, energy, AI,
+the battle and practice guides, the module map, testing, the fighter
+pages).
+
+**Tests:** new `tests/systems/turn-around.test.mjs` (on by default, either
+side, a crossing, standing, running away and in the air with the movement
+unchanged, Off, no enemy, one out of play, overlapping x, several enemies
+and ties, attacks, techniques and summons aimed, Dashes, air dashes and
+every motion attack keeping their course, stuns, released projectiles,
+never a CPU, a Quick Battle CPU's aim its own, Practice Ground's swaps and
+removal, respawn and restart, 30 / 60 / 144 fps) and
+`tests/systems/direct-input.test.mjs` (each button its own move, a repeat
+nothing, mashing, a press out of reach whiffing with the same course as
+with no target, melee and ranged, nothing of either assist left: the
+generic parts of the removed suites); removed `combat-assist`,
+`combo-assist` and `combo-queue`; `basic-strings` rewritten for strings
+made by hand; `settings` (schema 8, the 1 to 7 migrations, the Combat
+section, navigation), `i18n`, `ability-hud`, `controls-ui`,
+`request-devices`, `battle-screen`, `quick-battle`, `practice-ground`,
+`watch-mode` (the player's setting never reaching a Watch CPU),
+`facing`, `move-cancel`, `controller-input`, `ui-consistency` and the
+`player-rig` helper (the arena's facing pass) updated; the feel-metrics
+benchmark lost its assist handoff.

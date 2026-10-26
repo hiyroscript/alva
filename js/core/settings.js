@@ -3,30 +3,26 @@
 // One small versioned object under one localStorage key, read once at start
 // and written whole on every change, so nothing else in the game touches
 // storage. Presentation, input configuration and the human player's own
-// Combat Assist and Combo Assist only: no setting changes a fighter, a
-// stage, a CPU or the rules of a fight.
+// Automatic turn-around only: no setting changes a fighter, a stage, a CPU
+// or the rules of a fight.
 //
 // Stored as
 //
-//   { version: 7,
+//   { version: 8,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
-//     combatAssist: true | false,
-//     comboAssist: true | false,
+//     automaticTurnAround: true | false,
 //     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... } }
 //
 // `language` stays null until the player picks one: the game then speaks
 // English, but the first-launch chooser still asks (languageChosen), so a
 // default is never mistaken for a choice. Each scheme keeps its own custom
 // touch layout (see js/core/touch-layout.js); an empty one is Alva's
-// original layout. `combatAssist` is whether the human player's melee
-// presses close a short gap first (see Fighter.tryCombatAssist in
-// js/game/fighters/fighter.js): off for a new player, who places their own
-// attacks, until they turn it on (an accessibility and convenience aid).
-// `comboAssist` is whether the human player's Attack 1 pressed again while
-// its own repeat cooldown runs (the attack over) is Attack 2, and the
-// reverse (see Fighter.comboAction): on unless the player turns it off.
+// original layout. `automaticTurnAround` is whether the human player's
+// fighter faces the closest enemy by itself (see Fighter.turnAroundFacing
+// in js/game/fighters/fighter.js): on unless the player turns it off, and
+// then its facing follows its own movement, as it always used to.
 //
 // `controllerProfiles` holds the player's own controller layout for each
 // fighter they customized (Settings › Controls › Controller controls), keyed
@@ -40,25 +36,22 @@
 //
 // Older objects are migrated: version 1 ({ version: 1, mobileControls })
 // keeps its Mobile Controls choice, with no language chosen yet and no
-// custom layout; version 2 keeps its language, Mobile Controls and both
-// custom layouts; version 3 keeps all of that and its Combat Assist;
-// version 4 keeps all of that and its controller profiles; version 5 keeps
-// all of that and its Combo Assist; version 6 keeps everything. Combat
-// Assist was on by default until version 7: a player whose settings were
-// saved before then keeps it exactly as they had it (versions 1 and 2,
-// which never stored it, and any older object without a valid value, keep
-// it on, as they played), so only a new player starts with it off.
-// Versions 1 to 3 get no controller profile, and versions 1 to 4 Combo
-// Assist on. A controller profile saved under version 4 or 5 predates the named
-// sticks and today's recommended layouts: it is upgraded for its fighter
-// (upgradeStoredProfiles, js/data/controller-profiles.js): every binding
-// plays as it did, the player's own choices are kept, and the bindings
-// that were only the old recommended ones give way to today's wherever
-// that conflicts with nothing, so a fighter the player never really
-// changed plays with today's layout. Missing, blocked or unreadable storage, a stored object of any
-// other version, and every value that is not one of its setting's choices
-// fall back to the defaults, value by value, so the game always starts with
-// a valid set.
+// custom layout; versions 2 and 3 keep their language, Mobile Controls and
+// both custom layouts; version 4 keeps all of that and its controller
+// profiles; versions 5 to 7 keep everything. Versions 1 to 3 get no
+// controller profile. A controller profile saved under version 4 or 5
+// predates the named sticks and today's recommended layouts: it is upgraded
+// for its fighter (upgradeStoredProfiles, js/data/controller-profiles.js):
+// every binding plays as it did, the player's own choices are kept, and the
+// bindings that were only the old recommended ones give way to today's
+// wherever that conflicts with nothing, so a fighter the player never
+// really changed plays with today's layout. No older version had Automatic
+// turn-around: every one starts with it on, and the Combat Assist and Combo
+// Assist choices versions 3 to 7 stored (both since removed from the game)
+// are dropped, never read into anything. Missing, blocked or unreadable
+// storage, a stored object of any other version, and every value that is
+// not one of its setting's choices fall back to the defaults, value by
+// value, so the game always starts with a valid set.
 
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
 import { sanitizeStoredProfile, sanitizeStoredProfiles, upgradeStoredProfiles } from '../data/controller-profiles.js';
@@ -75,36 +68,25 @@ export const DEFAULT_LANGUAGE = 'en';
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
 export const DEFAULT_MOBILE_CONTROLS = 'joystick';
 
-// Combat Assist (Home › Settings › Combat) is off for a new player, who
-// controls where every attack is thrown from, until they turn it on. A
-// player whose settings were saved before version 7 keeps what they had
-// (LEGACY_COMBAT_ASSIST where nothing valid was stored).
-export const DEFAULT_COMBAT_ASSIST = false;
-
-// The Combat Assist every settings object saved before version 7 played
-// with when it held no valid choice of its own: on, the default then.
-export const LEGACY_COMBAT_ASSIST = true;
-
-// Combo Assist (Home › Settings › Combat) is on for a player who has never
-// turned it off.
-export const DEFAULT_COMBO_ASSIST = true;
+// Automatic turn-around (Home › Settings › Combat) is on for every player
+// who has not turned it off, a player whose settings predate it included.
+export const DEFAULT_AUTOMATIC_TURN_AROUND = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 7;
+export const SETTINGS_VERSION = 8;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
   mobileControls: DEFAULT_MOBILE_CONTROLS,
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
-  combatAssist: DEFAULT_COMBAT_ASSIST,
-  comboAssist: DEFAULT_COMBO_ASSIST,
+  automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND,
   controllerProfiles: Object.freeze({}),
 });
 
 // The settings that are one choice from a list, and their allowed values.
 const CHOICES = Object.freeze({ language: LANGUAGES, mobileControls: MOBILE_CONTROLS });
 // The settings that are on or off: a real boolean, nothing else.
-const TOGGLES = Object.freeze(['combatAssist', 'comboAssist']);
+const TOGGLES = Object.freeze(['automaticTurnAround']);
 
 // Whether `value` is one `name` may take: one of a choice's values, or a
 // boolean for a toggle.
@@ -126,8 +108,7 @@ function readCurrent(stored, profiles = sanitizeStoredProfiles) {
     language: resolveSetting('language', stored.language),
     mobileControls: resolveSetting('mobileControls', stored.mobileControls),
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
-    combatAssist: resolveSetting('combatAssist', stored.combatAssist),
-    comboAssist: resolveSetting('comboAssist', stored.comboAssist),
+    automaticTurnAround: resolveSetting('automaticTurnAround', stored.automaticTurnAround),
     controllerProfiles: profiles(stored.controllerProfiles),
   };
 }
@@ -136,42 +117,37 @@ function readCurrent(stored, profiles = sanitizeStoredProfiles) {
 // each belongs to.
 const upgradeProfiles = (raw) => upgradeStoredProfiles(raw, getCharacter);
 
-// The Combat Assist a settings object saved before version 7 keeps: its own
-// choice, or the default it played with then (LEGACY_COMBAT_ASSIST).
-const legacyAssist = (value) => (typeof value === 'boolean' ? value : LEGACY_COMBAT_ASSIST);
+// An older version's `kept` values read into the current settings, each
+// checked (`profiles` reads its controller profiles), with Automatic
+// turn-around on: no older version had it, whatever the object may hold
+// under that name. Nothing else it held (Combat Assist, Combo Assist) is
+// read.
+const migrate = (kept, profiles) => readCurrent({ ...kept, automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND }, profiles);
 
 // Older versions, each read into the current settings.
 const MIGRATIONS = Object.freeze({
   // Version 1 held Mobile Controls only: kept, and the language still to be
-  // chosen, so the chooser shows once after the update; Combat Assist on,
-  // as it played.
-  1: (stored) => readCurrent({ mobileControls: stored.mobileControls, combatAssist: LEGACY_COMBAT_ASSIST }),
-  // Version 2 had everything but Combat Assist: all of it kept, and Combat
-  // Assist on (as it played), whatever the object may hold under that name.
-  2: (stored) => readCurrent({
+  // chosen, so the chooser shows once after the update.
+  1: (stored) => migrate({ mobileControls: stored.mobileControls }),
+  // Version 2 had the language, Mobile Controls and both custom layouts,
+  // and version 3 Combat Assist besides: those three kept, no fighter
+  // customized yet.
+  2: (stored) => migrate({ language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts }),
+  3: (stored) => migrate({ language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts }),
+  // Version 4 also had controller profiles: kept too, every fighter's
+  // layout upgraded.
+  4: (stored) => migrate({
     language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
-    combatAssist: LEGACY_COMBAT_ASSIST,
-  }),
-  // Version 3 had everything but controller profiles and Combo Assist: all
-  // of it kept, no fighter customized yet and Combo Assist on.
-  3: (stored) => readCurrent({
-    language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
-    combatAssist: legacyAssist(stored.combatAssist),
-  }),
-  // Version 4 had everything but Combo Assist: all of it kept (every
-  // fighter's controller layout upgraded), and Combo Assist on, whatever
-  // the object may hold under that name.
-  4: (stored) => readCurrent({
-    language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
-    combatAssist: legacyAssist(stored.combatAssist), controllerProfiles: stored.controllerProfiles,
+    controllerProfiles: stored.controllerProfiles,
   }, upgradeProfiles),
-  // Version 5 had everything, its controller profiles in the shape they had
-  // before the sticks were named: all of it kept, every fighter's layout
-  // upgraded.
-  5: (stored) => readCurrent({ ...stored, combatAssist: legacyAssist(stored.combatAssist) }, upgradeProfiles),
-  // Version 6 had everything as it is now, saved while Combat Assist was on
-  // by default: all of it kept, its Combat Assist as it was.
-  6: (stored) => readCurrent({ ...stored, combatAssist: legacyAssist(stored.combatAssist) }),
+  // Version 5 had everything that is kept, its controller profiles in the
+  // shape they had before the sticks were named: all of it kept, every
+  // fighter's layout upgraded.
+  5: (stored) => migrate(stored, upgradeProfiles),
+  // Versions 6 and 7 had everything that is kept as it is now: all of it
+  // kept.
+  6: (stored) => migrate(stored),
+  7: (stored) => migrate(stored),
 });
 
 // The settings a stored value holds: checked if it is the current version,
@@ -235,8 +211,8 @@ export class Settings {
   }
 
   // Sets choice `name` (language or mobileControls) or toggle
-  // (combatAssist, comboAssist) to `value` and saves; an unknown setting or value is
-  // refused (false). Listeners hear about real changes only.
+  // (automaticTurnAround) to `value` and saves; an unknown setting or value
+  // is refused (false). Listeners hear about real changes only.
   set(name, value) {
     if (!allowed(name, value)) return false;
     if (this.values[name] === value) return true;
@@ -276,24 +252,14 @@ export class Settings {
     this.set('mobileControls', value);
   }
 
-  // Whether the human player's Combat Assist is on (see the top of this
-  // file). Only a boolean is taken.
-  get combatAssist() {
-    return this.values.combatAssist;
+  // Whether the human player's Automatic turn-around is on (see the top of
+  // this file). Only a boolean is taken.
+  get automaticTurnAround() {
+    return this.values.automaticTurnAround;
   }
 
-  set combatAssist(value) {
-    this.set('combatAssist', value);
-  }
-
-  // Whether the human player's Combo Assist is on (see the top of this
-  // file). Only a boolean is taken.
-  get comboAssist() {
-    return this.values.comboAssist;
-  }
-
-  set comboAssist(value) {
-    this.set('comboAssist', value);
+  set automaticTurnAround(value) {
+    this.set('automaticTurnAround', value);
   }
 
   // A copy of `scheme`'s custom touch layout ({} for the original one).

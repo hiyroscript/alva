@@ -41,7 +41,7 @@ async function padFighter(character, { x = 900, facing = 1, profileFor, pads } =
   const rig = await controllerRig({ ...(profileFor ? { profileFor } : {}), ...(pads ? { pads } : {}) });
   const fighter = new Fighter({
     def: character, sprites: fakeSpritesOf(character), stage: STAGE, slot: 0, label: 'P1',
-    controller: new PlayerController(rig.input, { combatAssist: false }), spawn: { x, facing },
+    controller: new PlayerController(rig.input), spawn: { x, facing },
   });
   const frame = () => {
     rig.poll();

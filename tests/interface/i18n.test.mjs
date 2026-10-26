@@ -178,9 +178,7 @@ test('English and French have exactly the same keys, every one a real string', (
   assert.deepEqual(fr.filter((k) => !en.includes(k)), [], 'no French key without English');
   for (const language of LANGUAGES) {
     for (const [key, value] of Object.entries(STRINGS[language])) {
-      // Inline sentence fragments preserve spacing around the emphasized energy word.
-      const fragment = ['settings.combatAssistDescBeforeEnergy', 'settings.combatAssistDescAfterEnergy'].includes(key);
-      assert.ok(typeof value === 'function' || (typeof value === 'string' && value.trim() && (fragment || value.trim() === value)), `${language} ${key}`);
+      assert.ok(typeof value === 'function' || (typeof value === 'string' && value.trim() && value.trim() === value), `${language} ${key}`);
       assert.match(key, /^[a-z][\w]*(\.[\w]+)+$/, `${key}: a dotted key, not a sentence`);
     }
   }
@@ -191,6 +189,11 @@ test('neither localization table retains removed Lore keys', () => {
   for (const language of LANGUAGES) {
     assert.deepEqual(Object.keys(STRINGS[language]).filter((key) => key === 'discover.lore' || key.startsWith('lore.')), [], language);
   }
+});
+
+test('neither localization table retains the removed Combat Assist or Combo Assist, nor their queued follow-up', () => {
+  const removed = (key) => /combatAssist|comboAssist/.test(key) || key === 'settings.energy' || key === 'abilityHud.queued';
+  for (const language of LANGUAGES) assert.deepEqual(Object.keys(STRINGS[language]).filter(removed), [], language);
 });
 
 test('French is really French: only proper names, codes and shared words read the same in both', () => {
@@ -551,7 +554,13 @@ test('Settings labels use sentence case and dynamic editor copy preserves locali
     'settings.combat': ['Combat', 'Combat'],
     'settings.mobileControls': ['Mobile controls', 'Commandes tactiles'],
     'settings.scheme.classic': ['Classic buttons', 'Boutons classiques'],
-    'settings.combatAssist': ['Combat assist', 'Assistance au combat'],
+    'settings.automaticTurnAround': ['Automatic turn-around', 'Retournement automatique'],
+    'settings.automaticTurnAroundDesc': [
+      'Automatically makes your fighter face the closest enemy.',
+      'Oriente automatiquement votre combattant vers l’ennemi le plus proche.',
+    ],
+    'settings.automaticTurnAroundOn': ['On', 'Activé'],
+    'settings.automaticTurnAroundOff': ['Off', 'Désactivé'],
     'settings.customized': ['Custom layout', 'Disposition personnalisée'],
     'common.default': ['Default', 'Par défaut'],
     'touch.mouvementLeft': ['Left movement', 'Mouvement à gauche'],

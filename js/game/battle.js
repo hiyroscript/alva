@@ -52,14 +52,13 @@ export class Battle extends Arena {
   // (js/data/difficulty.js); anything missing or unknown is Medium. It shapes
   // only the CPUs' controllers: both fighters are built from their
   // definitions alone. `seed` fixes the CPUs' randomness (tests); by default
-  // every battle differs. `combatAssist` and `comboAssist` are the human
-  // player's Combat Assist and Combo Assist settings (Combat Assist off
-  // unless given true, Combo Assist on unless given false, as the settings'
-  // defaults): they go to the player's controller only, so a CPU (Quick
-  // Battle's, or either of Watch Mode's) never has either.
+  // every battle differs. `automaticTurnAround` is the human player's
+  // Automatic turn-around setting (on unless given false, as the settings'
+  // default): it goes to the player's controller only, so a CPU (Quick
+  // Battle's, or either of Watch Mode's) never has it.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
-    combatAssist = false, comboAssist = true,
+    automaticTurnAround = true,
   }) {
     // One seed for the battle's randomness: each CPU's and each stage
     // hazard's its own stream of it.
@@ -74,7 +73,7 @@ export class Battle extends Arena {
     const sides = BATTLE_MODES[this.mode];
     const controllerFor = (side) => (side.cpu
       ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
-      : new PlayerController(input, { combatAssist, comboAssist }));
+      : new PlayerController(input, { automaticTurnAround }));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
       def: p1Def, sprites: p1Sprites, spawn: s1, stage: this.stage,

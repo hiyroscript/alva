@@ -3,9 +3,9 @@
 // (CombatAIController, js/game/ai/combat-ai.js), which plugs in here without
 // touching Fighter. TrainingAIController below is the older non-attacking
 // training opponent, kept as a standalone controller. Only the player's
-// controller carries the player's Combat Assist and Combo Assist
-// preferences, and only its presses are a player's deliberate requests
-// (see Fighter.playerControlled); no CPU's ever is.
+// controller carries the player's Automatic turn-around preference, and
+// only its presses are a player's deliberate requests (see
+// Fighter.playerControlled); no CPU's ever is.
 
 import { range } from '../../core/utils.js';
 import { ACTIONS } from '../../config.js';
@@ -48,20 +48,18 @@ export function jumpTapHold(self) {
 
 // The human player's controller: the one kind ('player') whose presses are
 // deliberate requests that may cut its own attack short (see
-// Fighter.playerMayCut), and the one that may have Combat Assist (see
-// Fighter.tryCombatAssist) and Combo Assist (see Fighter.comboAction), each
-// only while its own setting (`combatAssist`, `comboAssist`: Home ›
-// Settings › Combat, read as the mode starts) is on. As in the settings,
-// Combat Assist is off and Combo Assist on unless said otherwise.
+// Fighter.playerMayCut), and the one that may have Automatic turn-around
+// (see Fighter.turnAroundFacing), while its setting (`automaticTurnAround`:
+// Home › Settings › Combat, read as the mode starts) is on. As in the
+// settings, it is on unless said otherwise.
 // Each sample is taken for the fighter as it is at that step (on the ground
 // or not, its facing, which fighter it is), so a game controller resolves
 // through that fighter's own controller profile (js/core/input-manager.js).
 export class PlayerController {
-  constructor(input, { combatAssist = false, comboAssist = true } = {}) {
+  constructor(input, { automaticTurnAround = true } = {}) {
     this.input = input;
     this.kind = 'player';
-    this.combatAssist = combatAssist === true;
-    this.comboAssist = comboAssist === true;
+    this.automaticTurnAround = automaticTurnAround === true;
   }
 
   getInput(self) {

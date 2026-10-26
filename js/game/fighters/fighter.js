@@ -4,10 +4,9 @@
 //
 // Purpose: the one runtime fighter every mode uses, for every character.
 // It owns the fighter's state (its body, Dash and air dash, jumps, Shield,
-// attack in progress (its Deflect included), Combat Assist's approach,
-// Combo Assist's queued follow-up, summon startup, technique, launch
-// sequence) and the order in which each fixed step updates it
-// (Fighter.update).
+// attack in progress (its Deflect included), summon startup, technique,
+// launch sequence, facing) and the order in which each fixed step updates
+// it (Fighter.update).
 // Inputs: a character definition (js/data/characters/<id>.js), its loaded
 // SpriteSet (clip lengths time the land pose, pending attacks and summon
 // startups; the Dash and the air dash need their art), the universal
@@ -18,17 +17,16 @@
 // Important constraints: the rules are shared; movement's numbers are
 // universal (no fighter has its own run, jump or Dash) and every other
 // number is the character's. Movement math lives in
-// js/game/fighters/movement.js, attack
-// / defense / Energy schemas and Combat Assist's measurements in
-// js/game/combat/, and nothing here names a fighter or a button's role: a
-// summon or technique is whatever the character's `actions` say it is, and
-// whether Combat Assist serves an attack is its own data too (melee, and no
-// homing: assistsAttack). Combat Assist and Combo Assist are the human
-// player's only, and so is cutting its own attack short with a new
-// request (playerMayCut): its controller says so (kind 'player', with
-// combatAssist / comboAssist on), never a slot, a label or a fighter. The
-// simulation is fixed-step and deterministic; rendering reads it
-// (interpolate, spriteFlip) and never feeds back.
+// js/game/fighters/movement.js, attack / defense / Energy schemas in
+// js/game/combat/, Automatic turn-around's targeting in
+// js/game/fighters/turn-around.js, and nothing here names a fighter or a
+// button's role: a summon or technique is whatever the character's
+// `actions` say it is. Cutting its own attack short with a new request
+// (playerMayCut) and Automatic turn-around are the human player's only:
+// its controller says so (kind 'player', with automaticTurnAround on for
+// the latter), never a slot, a label or a fighter. The simulation is
+// fixed-step and deterministic; rendering reads it (interpolate,
+// spriteFlip) and never feeds back.
 
 import { createAnimator } from '../rendering/ensemble.js';
 import { createBody, stepBody, dropThrough, separate, carryBody } from '../physics.js';
@@ -42,15 +40,11 @@ import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
-import {
-  assistsAttack, assistSpeed, assistRange, approachMove, approachClear, assistTarget, inReach, REACHED,
-} from '../combat/combat-assist.js';
-import { comboAction, followUpAction } from '../combat/combo-assist.js';
-import { REPEAT_COOLDOWN } from '../../data/cooldowns.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
 import { COMBAT_BUTTONS } from '../../config.js';
 import { blankInput } from './fighter-controller.js';
+import { closestEnemy, facingToward } from './turn-around.js';
 import { approach, clamp } from '../../core/utils.js';
 import {
   steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
@@ -179,6 +173,9 @@ export class Fighter {
     // `launchBounce`).
     this.launchBounce = resolveLaunchBounce(def.launchBounce, `Character "${def.id}"`);
     this.opponent = null;
+    // The list `enemies` hands out, refilled on every read (no allocation
+    // in the fixed step).
+    this.enemyList = [];
     this.spawn = spawn;
     this.reset(stage);
   }
@@ -187,8 +184,7 @@ export class Fighter {
     // A technique in progress ends first: nothing of it survives a rematch.
     if (this.technique) this.endTechnique('reset');
     const { def, spawn } = this;
-    // The stage it stands on: what a Combat Assist press checks its path
-    // against (see tryCombatAssist).
+    // The stage it stands on (it was reset or respawned on).
     this.stage = stage;
     const half = def.collider.width / 2;
     const from = spawn.y ?? stage.groundY;
@@ -267,22 +263,14 @@ export class Fighter {
     // began cuts that attack short (see playerMayCut).
     this.shieldPressedAt = -1;
     // The latest combat button press (extra_attack, attack1 to attack5) the
-    // fighter could not act on yet ({ action, age, at, place, button }: the
-    // move it asked for, Combo Assist applied as it was pressed), tried
-    // again every step for movement.attackBuffer seconds (see bufferAttack),
-    // or null. A queued follow-up waiting out its own cooldown is kept here
-    // too, that much longer (`hold` seconds, its `move` named: see
-    // holdFollowUp).
+    // fighter could not act on yet ({ action, age, at, place }), tried again
+    // every step for movement.attackBuffer seconds (see bufferAttack), or
+    // null.
     this.bufferedAttack = null;
     // Likewise the latest Dash (or air dash) asked for that could not start
     // yet ({ direction, age, at }), tried again every step for the same
     // movement.attackBuffer (see the Dash in update), or null.
     this.bufferedDash = null;
-    // Combo Assist's queued follow-up: the attack that follows the human
-    // player's attack in progress once it plays out, asked for by repeating
-    // it ({ source, action, move, button, place, at }; see queueFollowUp),
-    // or null.
-    this.comboQueue = null;
     // How many times each attack with `airUses` has started since the
     // fighter was last on the ground or hit: attack id -> count.
     this.airAttacks = new Map();
@@ -297,16 +285,6 @@ export class Fighter {
     // The Dash or air dash in progress ({ direction, time, duration, speed,
     // air, animation }; see tryDash and tryAirDash), or null.
     this.dash = null;
-    // Combat Assist's approach in progress (see tryCombatAssist), or null:
-    // { action, attack, target, direction, air, animation, move, ahead,
-    // travelled, time }, the melee press it serves (the newest), its attack,
-    // the opponent it closes on, the way it faces, whether it is the air's
-    // (straight at its target, any way) or the ground's (straight across),
-    // its clip, the move it still has to make ({ dx, dy, length }, see
-    // approachMove), whether it aims where the target's slide ends
-    // (assistTarget) rather than where it is, how far it has gone and for
-    // how long. It costs no Energy at all.
-    this.combatAssist = null;
     // The last step this fighter paid Energy on (a Dash, an air dash or a
     // Deflect, see payEnergy): no refill on that step.
     this.energyPaidAt = -1;
@@ -404,21 +382,15 @@ export class Fighter {
     combat.update(dt);
     // Hitstun always wins over a technique and a summon's startup
     // (CombatSystem.applyHit normally ends them on the hit itself), and over
-    // a Dash, an air dash or Combat Assist's approach (takeHit ends that on
-    // the hit itself), as does a paralysis.
+    // a Dash or an air dash, as does a paralysis.
     if (this.technique && combat.stun > 0) this.endTechnique('hit');
     if (this.pendingSummon && (combat.stun > 0 || combat.immobilized)) this.cancelSummon();
     if (this.dash && (combat.stun > 0 || combat.immobilized)) this.endDash();
-    if (this.combatAssist && (combat.stun > 0 || combat.immobilized)) this.cancelCombatAssist();
     // A hit (or a paralysis) takes the fighter out of its own attack: nothing of
     // it is left to strike, release a projectile or recover from. Checked
     // here, on the fighter's next step, so two attacks that connect on the
     // same step still trade.
     if (combat.attack && (combat.stun > 0 || combat.immobilized)) combat.interruptAttack();
-    // Combo Assist's queued follow-up waits on its own attack alone, and this
-    // step's presses have their say on it before anything acts on them (an
-    // impact freeze included): see noteFollowUp.
-    this.noteFollowUp(input);
     // ---- Projectile release ----------------------------------------------
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
@@ -451,7 +423,7 @@ export class Fighter {
       body.prevY = body.y - body.carryY;
       for (const pressed of COMBAT_ACTIONS) {
         const action = input[`${pressed}Pressed`] ? this.pressRequest(pressed) : null;
-        if (action) this.bufferAttack(action, pressPlace(input), pressed);
+        if (action) this.bufferAttack(action, pressPlace(input));
       }
       const frozenDash = this.dashAsked(input);
       if (frozenDash) this.bufferDash(frozenDash);
@@ -489,9 +461,8 @@ export class Fighter {
     // The held direction: what steering, a turning attack and a cut-short
     // attack all read.
     const held = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
-    // The Dash this step asks for (see dashAsked), read before the intents:
-    // asking for one also cancels Combat Assist's approach (see
-    // assistIntents). It starts, or waits, in the Dash section below.
+    // The Dash this step asks for (see dashAsked). It starts, or waits, in
+    // the Dash section below.
     const dashDirection = this.dashAsked(input);
 
     // ---- Combat intents --------------------------------------------------
@@ -520,24 +491,15 @@ export class Fighter {
     // press itself or not at all: never from the button held, never kept
     // for later.
     //
-    // A melee press may start Combat Assist's approach instead of its
-    // attack (see tryCombatAssist). While that runs, this step's presses
-    // are its own (see assistIntents): a jump, a Dash, the Shield or a
-    // Deflect cancels it and takes over, a melee press replaces the attack
-    // it will end in, and any other move cancels it and starts as ever.
-    //
     // The human player's presses are resolved into requests first, one
     // action-resolution path for every device (see "The player's requests",
-    // after bufferAttack): the raw press, the move it asks for (Combo Assist:
-    // comboAction), whether it is only the press for the move already
-    // playing (repeatsMove: no request for now, the move plays on; with
-    // Combo Assist it queues the other attack to follow it, see
-    // noteFollowUp), whether that move may start now (tryAction's own
+    // after bufferAttack): each button asks for its own move, whether it is
+    // only the press for the move already playing (repeatsMove: no request,
+    // the move plays on), whether that move may start now (tryAction's own
     // checks), whether starting it cuts the player's attack short
     // (playerMayCut: only a request made after that attack began, and only
     // once the new move is known to start), and otherwise the buffer. Run
-    // is never a request. A queued follow-up is the step's last request,
-    // tried only on the step its attack plays out in full.
+    // is never a request.
     const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0 && !this.freeFall);
     const jumpFirst = (at) =>
       this.jumpBuffer > 0 && canJump && this.jumpPressedAt < at &&
@@ -547,53 +509,31 @@ export class Fighter {
     // one for the air the ground's, now or from the buffer.
     const place = pressPlace(input);
     const here = body.grounded ? 'ground' : 'air';
-    if (this.combatAssist) {
-      this.assistIntents(input, held, shieldHeld, dashDirection);
-    } else {
-      let started = !body.grounded && !!input.shieldPressed && this.tryDeflect(held);
-      if (started) this.bufferedAttack = null;
-      for (const pressed of COMBAT_ACTIONS) {
-        if (!input[`${pressed}Pressed`] || (place && place !== here)) continue;
-        const action = this.pressRequest(pressed);
-        if (!action) continue;
-        if (shieldHeld || jumpFirst(this.steps)) {
-          this.bufferAttack(action, place, pressed);
-          continue;
-        }
-        if (this.tryAction(action, held, { button: pressed })) {
-          this.bufferedAttack = null;
-          started = true;
-        } else if (!started) {
-          // Not a press that lost to another made on this same step.
-          this.bufferAttack(action, place, pressed);
-        }
+    let started = !body.grounded && !!input.shieldPressed && this.tryDeflect(held);
+    if (started) this.bufferedAttack = null;
+    for (const pressed of COMBAT_ACTIONS) {
+      if (!input[`${pressed}Pressed`] || (place && place !== here)) continue;
+      const action = this.pressRequest(pressed);
+      if (!action) continue;
+      if (shieldHeld || jumpFirst(this.steps)) {
+        this.bufferAttack(action, place);
+        continue;
       }
-      const waiting = this.bufferedAttack;
-      if ((waiting?.place && waiting.place !== here) || (waiting && this.repeatsMove(waiting.action, waiting.button))) {
+      if (this.tryAction(action, held)) {
         this.bufferedAttack = null;
-      } else if (!started && waiting && waiting.at < this.steps && !shieldHeld && !jumpFirst(waiting.at)) {
-        const { action } = waiting;
-        if (this.tryAction(action, held, { at: waiting.at, button: waiting.button })) this.bufferedAttack = null;
-        else if (!this.attackMayStart(action, waiting.place)) this.bufferedAttack = null;
+        started = true;
+      } else if (!started) {
+        // Not a press that lost to another made on this same step.
+        this.bufferAttack(action, place);
       }
-      // Combo Assist's queued follow-up, last: the attack it waits on played
-      // out in full on this step (CombatState.finished), so it is tried now,
-      // once, as an ordinary request made when it was pressed (tryAction:
-      // its cooldown, art, airtime, the fighter free, Combat Assist), in the
-      // place that attack started in (see noteFollowUp), unless the Shield is
-      // held or a jump pressed before it goes first (as for a buffered
-      // press). One whose own cooldown alone still holds it, for no longer
-      // than the repeat delay, waits it out in the combat buffer
-      // (holdFollowUp); anything else that stops it drops it: never retried
-      // for long, never swapped for another move.
-      const queued = this.comboQueue;
-      if (queued && queued.source === combat.finished) {
-        this.comboQueue = null;
-        if (!started && queued.place === here && !shieldHeld && !jumpFirst(queued.at) &&
-          !this.tryAction(queued.action, held, { at: queued.at, button: queued.button })) {
-          this.holdFollowUp(queued);
-        }
-      }
+    }
+    const waiting = this.bufferedAttack;
+    if ((waiting?.place && waiting.place !== here) || (waiting && this.repeatsMove(waiting.action))) {
+      this.bufferedAttack = null;
+    } else if (!started && waiting && waiting.at < this.steps && !shieldHeld && !jumpFirst(waiting.at)) {
+      const { action } = waiting;
+      if (this.tryAction(action, held, { at: waiting.at })) this.bufferedAttack = null;
+      else if (!this.attackMayStart(action, waiting.place)) this.bufferedAttack = null;
     }
 
     // ---- Dash: an explicit mouvement request --------------------------
@@ -710,14 +650,11 @@ export class Fighter {
     // while an attack's own motion owns the body, and then the share of
     // gravity it falls under this step). A summon's startup holds the
     // fighter still where it stands, as a technique does. An air dash owns
-    // the body too: straight across at its speed, no fall. So does Combat
-    // Assist's approach: across on the ground, the Dash's way; in the air,
-    // at the air dash's speed, any way at its target.
+    // the body too: straight across at its speed, no fall.
     const atk = combat.attack;
-    const assist = this.combatAssist;
     let gravityShare = 1;
     let dir = held;
-    if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash || this.pendingSummon || assist) dir = 0;
+    if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash || this.pendingSummon) dir = 0;
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
 
@@ -746,19 +683,6 @@ export class Fighter {
         body.vy = 0;
         gravityShare = 0;
       }
-    } else if (assist) {
-      // Straight at its target at the Dash's (or the air dash's) speed,
-      // never past the point its attack reaches from (see assistIntents):
-      // the last step covers only what is left. On the ground across; in
-      // the air whichever way the target is, with no fall. Physics and
-      // pushboxes stop it like any body.
-      const { dx, dy, length } = assist.move;
-      const speed = length > 0 ? Math.min(assistSpeed(this, assist.air), length / dt) / length : 0;
-      body.vx = assist.direction * dx * speed;
-      if (assist.air) {
-        body.vy = dy * speed;
-        gravityShare = 0;
-      }
     } else if (combat.shielding) {
       // A raised Shield holds the fighter where it stands: no walking or
       // running, whatever is held (it still turns: see updateFacing). Speed
@@ -766,9 +690,9 @@ export class Fighter {
       // runs down under the normal deceleration.
       this.moveHorizontal(0, 1, 1, dt);
     } else if (atk?.motion && !atk.motion.done) {
-      gravityShare = this.moveMotion(atk, this.attackSteer(atk, dir), dt);
+      gravityShare = this.moveMotion(atk, dir, dt);
     } else if (atk?.def.lockMovement) {
-      this.moveAttack(atk, this.attackSteer(atk, dir), dt);
+      this.moveAttack(atk, dir, dt);
     } else {
       this.moveHorizontal(dir, 1, 1, dt);
     }
@@ -850,11 +774,10 @@ export class Fighter {
     // toward movement.fastFallSpeed at
     // fastFallAcceleration: never while rising, never a jump in speed, and
     // never slower than the fall already is. Aerial attacks (a Deflect
-    // included) may fast-fall; a stun, a paralysis, an air dash or Combat
-    // Assist's approach in the air may not.
+    // included) may fast-fall; a stun, a paralysis or an air dash may not.
     if (
       !body.grounded && input.down && body.vy > 0 && mv.fastFallSpeed > 0 &&
-      combat.stun <= 0 && !combat.immobilized && !this.technique && !this.inMotion && !this.dash && !this.combatAssist
+      combat.stun <= 0 && !combat.immobilized && !this.technique && !this.inMotion && !this.dash
     ) {
       this.fastFalling = true;
       body.vy = fastFallVelocity(body.vy, mv, dt);
@@ -944,24 +867,11 @@ export class Fighter {
     // there.
     if (this.dash && (this.dash.air === body.grounded || body.wall === this.dash.direction)) this.endDash();
 
-    // ---- Combat Assist: ground and walls -------------------------------------
-    // Its approach counts the time and distance it has covered (see
-    // assistIntents). As a Dash, one on the ground ends on leaving it; as
-    // an air dash, one in the air ends on meeting the ground; neither
-    // passes through a solid (a wall, or a ceiling in the air). Ended so,
-    // its attack never comes.
-    const closing = this.combatAssist;
-    if (closing) {
-      closing.time += dt;
-      closing.travelled += Math.hypot(body.x - body.prevX, body.y - body.prevY);
-      if (closing.air === body.grounded || body.wall === closing.direction || body.bonked) this.cancelCombatAssist();
-    }
-
     // ---- Energy refill -----------------------------------------------------
     // Every step no Energy was paid on (see payEnergy), a held Shield, a
-    // block, a Deflect's strike or Combat Assist's approach included, at the
-    // one passive rate: nothing held or done ever makes it faster, and no
-    // defense, however well timed, gives any back.
+    // block or a Deflect's strike included, at the one passive rate:
+    // nothing held or done ever makes it faster, and no defense, however
+    // well timed, gives any back.
     if (this.energyPaidAt !== this.steps) combat.updateEnergy(dt);
 
     // A burst is over once the speed is back to top speed or less.
@@ -971,7 +881,7 @@ export class Fighter {
     // in a freeze) and is gone once it is older than the buffer.
     if (this.bufferedAttack) {
       this.bufferedAttack.age += dt;
-      if (this.bufferedAttack.age > mv.attackBuffer + (this.bufferedAttack.hold ?? 0) + TIME_EPSILON) this.bufferedAttack = null;
+      if (this.bufferedAttack.age > mv.attackBuffer + TIME_EPSILON) this.bufferedAttack = null;
     }
     if (this.bufferedDash) {
       this.bufferedDash.age += dt;
@@ -998,15 +908,6 @@ export class Fighter {
     steerAttack(this.body, this.movement, this.facing, atk, dir, dt, this.burst);
   }
 
-  // The direction attack record `atk` is steered with this step: the one
-  // held, unless it is the run held since before Combat Assist faced the
-  // attack at its target (`turnHold`, see startAttack): a direction that may
-  // not turn the attack away from its target may not walk it away either.
-  // Once another is held (or none), it steers as ever.
-  attackSteer(atk, dir) {
-    return atk.turnHold != null && dir === atk.turnHold ? 0 : dir;
-  }
-
   // The horizontal speed an attack starting now keeps of `vx` (see
   // attackStartSpeed in js/game/fighters/movement.js).
   attackStartSpeed(atk, vx, grounded) {
@@ -1018,23 +919,21 @@ export class Fighter {
   // movement.attackBuffer seconds. Any other press leaves the buffer as it
   // is. `place` ('ground' / 'air'), from a game controller, keeps the press
   // for that place only: it never comes out as the other place's move (see
-  // pressPlace). `button` is the combat button pressed (Combo Assist may
-  // have made `action` another: see repeatsMove).
-  bufferAttack(action, place = null, button = action) {
+  // pressPlace).
+  bufferAttack(action, place = null) {
     if (!(this.movement.attackBuffer > 0) || !this.attackMayStart(action, place)) return;
-    this.bufferedAttack = { action, age: 0, at: this.steps, place, button };
+    this.bufferedAttack = { action, age: 0, at: this.steps, place };
   }
 
   // ---- The player's requests ----------------------------------------------
   //
-  // Four parts, kept apart, cooperate on one press (see the combat intents
+  // Three parts, kept apart, cooperate on one press (see the combat intents
   // in update):
-  //   Combo Assist   which move the press asks for (comboAction), and the
-  //                  follow-up a repeat queues (noteFollowUp).
+  //   The request    each combat button asks for its own move, never
+  //                  another's (pressRequest), unless it is only the
+  //                  press for the move already playing (repeatsMove).
   //   Cancellation   whether that move, once it may start, replaces the
   //                  player's attack in progress (playerMayCut).
-  //   Combat Assist  whether a melee attack that may start closes the gap
-  //                  first (tryCombatAssist).
   //   The buffer     keeps a request that may not start yet (bufferAttack,
   //                  bufferDash, the jump buffer).
   // Requests are discrete presses only: a jump, a Dash or air dash
@@ -1050,144 +949,25 @@ export class Fighter {
     return this.controller?.kind === 'player';
   }
 
-  // Whether this fighter has Combo Assist: the human player's controller
-  // with the player's setting on (see PlayerController), never a CPU.
-  get comboAssistOn() {
-    return this.playerControlled && this.controller.comboAssist === true;
-  }
-
-  // The move a fresh press of `pressed` asks for: with Combo Assist, Attack 1
-  // pressed again while its own (finished) attack cools down is Attack 2, and
-  // the reverse (comboAction in js/game/combat/combo-assist.js); otherwise
-  // the press's own.
-  comboAction(pressed) {
-    return this.comboAssistOn ? comboAction(this, pressed, this.body.grounded) : pressed;
-  }
-
-  // A fresh press of `pressed` as the request it makes: the action it asks
-  // for (comboAction), or null when it is the player's press for the move
-  // already playing (repeatsMove), which is no request at all.
+  // A fresh press of `pressed` as the request it makes: its own action, or
+  // null when it is the player's press for the move already playing
+  // (repeatsMove), which is no request at all.
   pressRequest(pressed) {
-    const action = this.comboAction(pressed);
-    return this.repeatsMove(action, pressed) ? null : action;
+    return this.repeatsMove(pressed) ? null : pressed;
   }
 
-  // Whether a press of combat button `button`, asking for `action`, is the
-  // human player's press for the very attack it is performing: `action`'s
-  // attack (where it is now: its ground or mid-air move) is that attack, or
-  // `button` is the button that asked for it (Attack 1 pressed again during
-  // the Attack 2 its last press made, with Combo Assist). Such a press never
-  // cuts, restarts or buffers that attack: it plays on, whatever its phase.
-  // With Combo Assist it queues the other attack to follow it (see
-  // noteFollowUp); without, the press is gone. Never a CPU's (its presses go
-  // through the ordinary rules, unchanged).
-  repeatsMove(action, button = action) {
+  // Whether a press of combat button `action` is the human player's press
+  // for the very attack it is performing: `action`'s attack (where it is
+  // now: its ground or mid-air move) is that attack, or `action` is the
+  // button that asked for it (Attack 1 pressed again in the air during the
+  // ground Attack 1 it carried off a ledge). Such a press never cuts,
+  // restarts or buffers that attack: it plays on, whatever its phase, and
+  // the press is gone. Never a CPU's (its presses go through the ordinary
+  // rules, unchanged).
+  repeatsMove(action) {
     const a = this.combat.attack;
     if (!a || !this.playerControlled) return false;
-    return this.attackFor(action) === a.def.id || (a.button != null && a.button === button);
-  }
-
-  // ---- Combo Assist's queued follow-up ------------------------------------
-  //
-  // The human player's repeat (repeatsMove) never touches the attack in
-  // progress: no cut, restart, replay or second strike, its time, phases,
-  // motion, hits, release and cooldown its own. With Combo Assist it asks
-  // for that attack's partner to follow it (followUpAction in
-  // js/game/combat/combo-assist.js), kept in `comboQueue`: the attack
-  // record it waits on (`source`), the action and attack to start, the
-  // button pressed (the new attack's `button`, see repeatsMove), the place
-  // its source started in and the step it was pressed on. One at most:
-  // further repeats during the same attack change nothing, and a held
-  // button is a single press. It keeps no timer: it lasts exactly as long
-  // as its source plays and is tried once, on the step that attack plays
-  // out in full (CombatState.finished), as that step's last request (see
-  // update). Anything else ends it unused: its source cut, interrupted,
-  // landing-cancelled or ended by its motion, a newer request, a hit, input
-  // locked, a reset or a respawn.
-
-  // This step's presses, for the queued follow-up. A stale one goes first:
-  // its source neither playing nor played out this step, the fighter out of
-  // the place that attack started in (a ground attack carried off a ledge,
-  // a slam landed), input locked or Combo Assist off. Then any other
-  // request (a combat button the fighter has, other than a repeat; a jump;
-  // a Dash; a Shield press, the Deflect in the air) replaces it, or the one
-  // the buffer holds while it waits out its cooldown (holdFollowUp), and a
-  // repeat made with none queues one (queueFollowUp). A press made for the
-  // other place (pressPlace) is nothing here, as everywhere.
-  noteFollowUp(input) {
-    if (!this.comboAssistOn) {
-      this.comboQueue = null;
-      return;
-    }
-    const place = pressPlace(input);
-    const here = this.body.grounded ? 'ground' : 'air';
-    const q = this.comboQueue;
-    const live = q && (q.source === this.combat.attack || q.source === this.combat.finished);
-    if (q && (!live || q.place !== here || this.inputLocked)) this.comboQueue = null;
-    let other = !!(input.jumpPressed || input.shieldPressed || this.dashAsked(input));
-    let repeated = null;
-    for (const pressed of COMBAT_ACTIONS) {
-      if (!input[`${pressed}Pressed`] || (place && place !== here)) continue;
-      if (!this.pressRequest(pressed)) repeated ??= pressed;
-      else if (this.def.actions?.[pressed] != null) other = true;
-    }
-    if (other || this.inputLocked) {
-      this.comboQueue = null;
-      // So is one waiting out its cooldown in the buffer (holdFollowUp).
-      if (this.bufferedAttack?.hold != null) this.bufferedAttack = null;
-    } else if (repeated) {
-      this.queueFollowUp(repeated);
-    }
-  }
-
-  // Queues the follow-up to the attack in progress for a repeat of button
-  // `pressed`, unless one is queued for it already: its partner
-  // (followUpAction) for the place it started in, with the fighter still
-  // there, and an attack that could start there at all (attackStartsWhere,
-  // the combat buffer's own test: art, ground-only, the airtime; its
-  // cooldown and every other rule are checked as it is tried). The newest
-  // press wins, as in the buffer: an older buffered press is dropped.
-  queueFollowUp(pressed) {
-    const source = this.combat.attack;
-    if (!source || this.comboQueue?.source === source) return;
-    const grounded = !source.airborne;
-    const action = followUpAction(this, source);
-    if (!action || grounded !== this.body.grounded || !this.attackStartsWhere(action, grounded)) return;
-    this.comboQueue = {
-      source, action, move: this.attackFor(action, grounded), button: pressed, place: grounded ? 'ground' : 'air', at: this.steps,
-    };
-    this.bufferedAttack = null;
-  }
-
-  // A queued follow-up `q` that could not start as its attack played out:
-  // when the only thing in its way is its own cooldown, with no more than
-  // the repeat delay (REPEAT_COOLDOWN) of it left, it is kept by the combat
-  // buffer until that cooldown is over and the buffer's own attackBuffer
-  // after (`hold`), so it starts the first step it may, as a press made
-  // then would. The same press of the same button therefore follows up the
-  // same way whatever the fighter's attack lengths. Still cooling longer (a
-  // 3 s or 5 s cooldown), or stopped by anything else (the fighter busy,
-  // its art, the airtime), it is dropped. In the buffer it keeps every rule
-  // of a buffered press: a newer press replaces it, a hit drops it, and a
-  // held Shield, an earlier jump or a change of place stops it.
-  holdFollowUp(q) {
-    const grounded = q.place === 'ground';
-    const left = this.combat.cooldowns.get(q.move) ?? 0;
-    if (!(left > 0) || left > REPEAT_COOLDOWN + TIME_EPSILON || !this.canAct() || !this.attackStartsWhere(q.action, grounded)) return;
-    this.bufferedAttack = {
-      action: q.action, age: 0, at: q.at, place: q.place, button: q.button, move: q.move, hold: left,
-    };
-  }
-
-  // The follow-up queued now, for readers (the ability HUD): comboQueue
-  // while its attack still plays, or one the buffer holds while it waits out
-  // its cooldown (holdFollowUp); null otherwise, or out of play.
-  get queuedFollowUp() {
-    if (this.lostToVoid) return null;
-    const q = this.comboQueue;
-    if (q && q.source === this.combat.attack) return q;
-    const b = this.bufferedAttack;
-    return b?.hold != null ? b : null;
+    return this.attackFor(action) === a.def.id || (a.button != null && a.button === action);
   }
 
   // Whether the human player's request made on step `at` may cut its
@@ -1196,7 +976,7 @@ export class Fighter {
   // with it, on the step it started, lost to it), and never while a forced
   // state holds the fighter (an impact freeze, hitstun, blockstun, a
   // paralysis) or something else owns it (a technique, a summon's startup,
-  // a Dash, Combat Assist's approach: each keeps its own rules). Hit or not,
+  // a Dash: each keeps its own rules). Hit or not,
   // in any phase. The new move's own checks come first: a request that
   // cannot start (its cooldown, no art, its place, no Energy, the airtime)
   // never cuts anything, and one that does cuts the attack exactly once
@@ -1206,13 +986,13 @@ export class Fighter {
     const { combat } = this;
     const a = combat.attack;
     return !!a && this.playerControlled && at > a.startedAt && combat.hitstop <= 0 && combat.stun <= 0 &&
-      combat.shieldStun <= 0 && !combat.immobilized && !this.technique && !this.pendingSummon && !this.dash && !this.combatAssist;
+      combat.shieldStun <= 0 && !combat.immobilized && !this.technique && !this.pendingSummon && !this.dash;
   }
 
   // A hit (never a block) just landed on this fighter (see
-  // CombatSystem.applyHit): Combat Assist's approach is cancelled; it gets
-  // both its air jumps back, so a launch never strands it without them, and
-  // its air dashes and once-per-airtime attacks (`airUses`) too; a higher
+  // CombatSystem.applyHit): it gets both its air jumps back, so a launch
+  // never strands it without them, and its air dashes and once-per-airtime
+  // attacks (`airUses`) too; a higher
   // jump (deciding or rising) is over, and so is any burst of its own
   // (whatever speed it has now is the hit's).
   //
@@ -1225,19 +1005,12 @@ export class Fighter {
   // so a wall can never keep a combo going. A hit that launches nothing
   // leaves the sequence it is flying in as it is.
   takeHit(event) {
-    // Combat Assist's approach is over on the hit itself, its attack never
-    // coming, and the hurt pose shows on this very step.
-    if (this.combatAssist) {
-      this.cancelCombatAssist();
-      this.updateState(0);
-    }
-    // The human player's requests made before the hit are stale (a queued
-    // follow-up included): none of them comes out after the stun (presses
-    // made from now on are kept as ever).
+    // The human player's requests made before the hit are stale: none of
+    // them comes out after the stun (presses made from now on are kept as
+    // ever).
     if (this.playerControlled) {
       this.bufferedAttack = null;
       this.bufferedDash = null;
-      this.comboQueue = null;
       this.jumpBuffer = 0;
     }
     this.airJumps = this.movement.airJumps;
@@ -1260,11 +1033,11 @@ export class Fighter {
   }
 
   // Cuts the attack in progress short, if any: another attack, a jump, a
-  // Dash, the Shield, a summon, a technique or Combat Assist's approach is
-  // starting now, its caller having checked it may (the attack is
-  // cancellable, CombatState.cancellable, or the human player's request may
-  // cut it, playerMayCut). Its cooldown starts (once: the attack is gone);
-  // nothing it has not struck or released yet ever is.
+  // Dash, the Shield, a summon or a technique is starting now, its caller
+  // having checked it may (the attack is cancellable, CombatState.cancellable,
+  // or the human player's request may cut it, playerMayCut). Its cooldown
+  // starts (once: the attack is gone); nothing it has not struck or released
+  // yet ever is.
   cutAttack() {
     if (this.combat.attack) this.combat.endAttack();
   }
@@ -1288,12 +1061,11 @@ export class Fighter {
   }
 
   // Free to start something new: the combat state allows it (no attack,
-  // stun, blockstun or paralysis), no technique, summon's startup or Combat
-  // Assist's approach owns the fighter and it is not dashing (on the ground
-  // or in the air). Its Launch Point, however high, and the Energy it has
-  // left never matter.
+  // stun, blockstun or paralysis), no technique or summon's startup owns the
+  // fighter and it is not dashing (on the ground or in the air). Its Launch
+  // Point, however high, and the Energy it has left never matter.
   canAct() {
-    return this.combat.canAct() && !this.technique && !this.dash && !this.pendingSummon && !this.combatAssist;
+    return this.combat.canAct() && !this.technique && !this.dash && !this.pendingSummon;
   }
 
   // A hit landing now would meet a perfect Shield: one raised no more than
@@ -1450,7 +1222,7 @@ export class Fighter {
   // dash, a Deflect), if it is not exhausted (CombatState.spendEnergy: all
   // that is left when that is less). True when paid; the step it was paid
   // on gets no refill (see the end of update). Nothing else the fighter
-  // does pays Energy: Combat Assist's approach never does.
+  // does pays Energy.
   payEnergy(cost) {
     if (!this.combat.spendEnergy(cost)) return false;
     this.energyPaidAt = this.steps;
@@ -1464,231 +1236,6 @@ export class Fighter {
   // overspeed does (see steer in js/game/fighters/movement.js).
   endDash() {
     this.dash = null;
-  }
-
-  // ---- Combat Assist (measurements: js/game/combat/combat-assist.js) --------
-
-  // Whether this fighter has Combat Assist: only a human player's, by its
-  // controller (kind 'player', with the player's setting on: see
-  // PlayerController). A CPU's controller, the training dummy's lack of one
-  // and any other kind never have it, whatever the fighter, slot or label.
-  get combatAssistOn() {
-    const c = this.controller;
-    return c?.kind === 'player' && c.combatAssist === true;
-  }
-
-  // What Combat Assist does for a press of attack `atk` that may start now
-  // (tryAction has checked it, on the ground or in the air as the fighter
-  // is, whatever route lets it start: free to act, a hit-cancel, a Dash past
-  // its cancel time or the player's own cancellation), or null when it does
-  // not serve it and the attack starts as ever. It serves it when the
-  // fighter has it (combatAssistOn), `atk` is melee and homes in on nothing
-  // by itself (assistsAttack: never a projectile attack, a pending one, a
-  // homing dash, a summon, a technique or the Deflect, which is never a
-  // combat button's), the Shield is down and its opponent is in play. Then:
-  //   - the attack already reaches its target facing it (inReach: its own
-  //     reach, its motion's or pull's included): { direction }, no approach,
-  //     the attack faces its target (whatever is held or faced: see
-  //     startAttack's `toward`);
-  //   - else the attack is out of reach but its box within one Dash's
-  //     travel (approachMove: ahead of it, never through it; on the ground,
-  //     on its level), with nothing in the way (approachClear: on the
-  //     ground, footing too; in the air, nothing to land on), the art there
-  //     (mouvment, or midair_mouvment with the airtime's air dash left, no
-  //     free fall and no launch): { direction, air, animation, move }, the
-  //     approach to start (see tryCombatAssist);
-  //   - anything else (too far, another level, a wall, no art, no air dash
-  //     left): null, the attack where the fighter is, as ever.
-  // Measured from simulation state only, the same way every step.
-  combatAssistFor(atk) {
-    if (!this.combatAssistOn || !assistsAttack(atk) || this.combat.shielding || this.combatAssist) return null;
-    const foe = this.opponent;
-    if (!foe || foe.lostToVoid) return null;
-    const direction = Math.sign(foe.body.x - this.body.x) || this.facing;
-    // A target sliding away from a hit is measured where its slide ends
-    // (assistTarget), when that is in reach or one approach can get there;
-    // otherwise where it is, exactly as ever (a slide past a Dash, or into
-    // a wall the measurement does not know).
-    const mark = assistTarget(this, foe);
-    return (mark !== foe && this.assistPlan(atk, mark, direction, true)) || this.assistPlan(atk, foe, direction, false);
-  }
-
-  // combatAssistFor's measurement against `target` (the opponent, or where
-  // its slide ends: `ahead`), facing `direction`: { direction } to attack at
-  // once, the approach to start ({ direction, air, animation, move, ahead }),
-  // or null.
-  assistPlan(atk, target, direction, ahead) {
-    if (inReach(this, atk, target, direction)) return { direction, move: null };
-    const air = !this.body.grounded;
-    const animation = air ? 'midair_mouvment' : 'mouvment';
-    if (air && (this.airDashes <= 0 || this.freeFall || this.launch)) return null;
-    const range = assistRange(this, air);
-    if (!range || !this.sprites.has(animation)) return null;
-    const move = approachMove(this, atk, target, direction, range, air, true);
-    if (move === REACHED) return { direction, move: null };
-    if (!move || !approachClear(this, this.stage, direction, move, air)) return null;
-    return { direction, air, animation, move, ahead };
-  }
-
-  // Starts Combat Assist's approach `plan` (from combatAssistFor) for
-  // `action`'s attack `atk` instead of the attack itself; true when it
-  // started. Only now, the approach accepted, does whatever it cuts short
-  // end: a hit-cancelled attack or the player's own cancelled one (its
-  // cooldown starting, see cutAttack), or a Dash past its cancel time.
-  //
-  // On the ground it is the Dash's: straight across at dashSpeed, its
-  // mouvment clip. In the air it is the air dash's: straight at the target,
-  // down, up or across, at airDashSpeed (gravity held off throughout), its
-  // midair_mouvment clip, and it uses up an air dash of the airtime
-  // (airDashUses). It moves the way a Dash or an air dash does but is
-  // neither: it costs no Energy at all, so it starts as well with a full
-  // bar, a part of one or an exhausted one, and never holds back the
-  // refill. It faces the opponent, carries a burst (see `burst`) and plays
-  // its clip from the first frame. `button` is the combat button pressed
-  // for it (see repeatsMove).
-  tryCombatAssist(action, atk, plan = this.combatAssistFor(atk), button = action) {
-    if (!plan?.move) return false;
-    const { direction, air, animation, move, ahead } = plan;
-    this.cutAttack();
-    if (this.dash) this.endDash();
-    this.combatAssist = {
-      action, button, attack: atk, target: this.opponent, direction, air, animation, move, ahead, travelled: 0, time: 0,
-    };
-    if (air) {
-      this.airDashes--;
-      this.highJump = null;
-      this.body.vy = 0;
-    }
-    this.facing = direction;
-    this.burst = true;
-    this.animator.play(animation, { restart: true });
-    return true;
-  }
-
-  // This step's presses while the approach runs, before anything else reads
-  // them, then the approach's own step (stepCombatAssist). The first that
-  // applies takes the step:
-  //   - a jump (an air jump in the air), a Dash (an explicit mouvement request) or the Shield (pressed, or held where it may go
-  //     up) cancels it, and goes through its own rules on this same step; a
-  //     combat button pressed with it is dropped. In the air the `shield`
-  //     press is its Deflect, as ever.
-  //   - else the first combat button pressed, as the move it asks for
-  //     (Combo Assist: comboAction): a melee attack an approach
-  //     may serve (assistsAttack), for where it runs (the ground's, or the
-  //     air's), replaces the attack it ends in (the one it already serves
-  //     changes nothing), unless it
-  //     cannot start (its cooldown, no art, its starts for the airtime used
-  //     up), which cancels the approach with nothing in its place, never
-  //     the older attack; any other move (a projectile attack, a pending
-  //     one, a homing dash, a summon, a technique) cancels it and is tried
-  //     at once as a press of its own; a reserved button does nothing, as
-  //     ever.
-  // The attack the approach serves is never put in the combat buffer, so a
-  // replaced or cancelled one never comes out later. Held directions (Run)
-  // are not presses: they never cancel, steer or turn the approach.
-  assistIntents(input, held, shieldHeld, dashDirection) {
-    if (input.jumpPressed || dashDirection || input.shieldPressed || shieldHeld) {
-      this.cancelCombatAssist();
-      if (!this.body.grounded && input.shieldPressed && this.tryDeflect(held)) this.bufferedAttack = null;
-      return;
-    }
-    const place = pressPlace(input);
-    const here = this.body.grounded ? 'ground' : 'air';
-    for (const pressed of COMBAT_ACTIONS) {
-      if (!input[`${pressed}Pressed`] || (place && place !== here)) continue;
-      const action = this.comboAction(pressed);
-      const special = specialAction(this.def, action);
-      const id = special ? null : this.attackFor(action, !this.combatAssist.air);
-      const atk = id ? this.attacks[id] : null;
-      if (!special && !atk) continue;
-      if (assistsAttack(atk)) {
-        const blocked = this.combatAssist.air && this.airStartBlocked(atk);
-        if (blocked || this.combat.cooldowns.has(id) || !atk.animation || !this.sprites.has(atk.animation)) {
-          this.cancelCombatAssist();
-          return;
-        }
-        this.combatAssist.action = action;
-        this.combatAssist.attack = atk;
-        this.combatAssist.button = pressed;
-        break;
-      }
-      this.cancelCombatAssist();
-      if (this.tryAction(action, held, { button: pressed })) this.bufferedAttack = null;
-      else this.bufferAttack(action, place, pressed);
-      return;
-    }
-    this.stepCombatAssist(held);
-  }
-
-  // One step of the approach, once this step's presses have had their say.
-  // It ends with nothing more if anything has made it impossible (the
-  // fighter hit, held or busy, off its ground or, in the air, landed, its
-  // input locked, its target gone, lost to the Void or replaced). Its
-  // attack starts (see finishCombatAssist) once the attack reaches the
-  // target, or where the fighter is once the approach can get no closer (a
-  // Dash's or air dash's travel or time spent, the target off its level or
-  // behind it: it may whiff, as a press out of reach does). Otherwise it
-  // plans this step's move, what is still to go, with nothing in the way:
-  // a wall, a ceiling, a ledge on the ground or a landing in the air stops
-  // the fighter there and ends it.
-  stepCombatAssist(held) {
-    const a = this.combatAssist;
-    const foe = this.opponent;
-    const busy = !this.combat.canAct() || this.combat.shielding || this.technique || this.pendingSummon || this.dash;
-    if (!foe || foe !== a.target || foe.lostToVoid || this.inputLocked || a.air === this.body.grounded || busy) {
-      this.cancelCombatAssist();
-      return;
-    }
-    const left = assistRange(this, a.air) - a.travelled;
-    const duration = a.air ? this.airDashDuration : this.dashDuration;
-    const aim = a.ahead ? assistTarget(this, foe) : foe;
-    const move = a.time < duration - TIME_EPSILON ? approachMove(this, a.attack, aim, a.direction, left, a.air) : null;
-    if (!move || move === REACHED) {
-      this.finishCombatAssist(held);
-      return;
-    }
-    if (!approachClear(this, this.stage, a.direction, move, a.air)) {
-      this.cancelCombatAssist();
-      this.body.vx = 0;
-      if (a.air) this.body.vy = 0;
-      return;
-    }
-    a.move = move;
-  }
-
-  // The approach is over, its target reached or as close as it gets: the
-  // fighter goes into the attack it served running, never stopped dead: at
-  // top speed toward its target (the horizontal share of the way it was
-  // heading, in the air, where it hangs, gravity back from this step), the
-  // approach's own Dash speed spent (it was the assist's, not the
-  // player's). The attack then starts by the ordinary rules (tryAction,
-  // never another approach) and keeps its share of that speed exactly as
-  // an attack thrown at a run does (see attackStartSpeed): its own timing,
-  // hitbox and motion, facing the way the approach went (toward its
-  // target), never turned back by the direction held as it starts (a run
-  // held through the whole request, toward the target or away: see
-  // startAttack's `toward`). One that cannot start now is not started, nor
-  // kept for later; the fighter runs on from there as ever.
-  finishCombatAssist(held) {
-    const { action, air, direction, button, move } = this.combatAssist;
-    this.combatAssist = null;
-    const heading = move?.length > 0 ? move.dx / move.length : 1;
-    this.body.vx = direction * this.maxSpeed * heading;
-    if (air) this.body.vy = 0;
-    if (this.tryAction(action, held, { assist: false, toward: direction, button })) this.bufferedAttack = null;
-  }
-
-  // Ends the approach in progress, if any, and its attack with it: never
-  // started, never kept in the combat buffer. A jump, a Dash, the Shield,
-  // a Deflect or another move; a hit or a paralysis; the ground lost (or,
-  // in the air, met) or a wall; its target gone; a reset, a respawn or the
-  // arena going. It
-  // paid no Energy, so there is none to give back; the fighter keeps
-  // whatever speed it has, as after a Dash.
-  cancelCombatAssist() {
-    if (!this.combatAssist) return;
-    this.combatAssist = null;
-    this.bufferedAttack = null;
   }
 
   // Starts the fighter's Deflect (its `deflect` entry, see
@@ -1839,21 +1386,19 @@ export class Fighter {
   // technique (see trySpecial), or else its attack. `dir` is the direction
   // held on this step: an attack faces it as it starts (so a turn made on
   // the press step is never stale), and otherwise keeps the fighter's
-  // facing. Combat AI uses the current target instead (faceAttackTarget).
-  // Starting it cuts short an attack
+  // facing; a fighter whose attacks are aimed for it (a CPU's target, the
+  // human player's Automatic turn-around: see faceAttackTarget) faces that
+  // way instead. Starting it cuts short an attack
   // that may be (its hit confirmed; see CombatState.cancellable), or the
   // human player's own attack when this request was made on step `at`,
   // after that attack began (playerMayCut), only once every check below has
   // passed: a request that cannot start never cuts anything. Never into
   // itself: the player's press for the attack already playing is none (see
   // repeatsMove), and anyone else's only once its own cooldown would be
-  // over. A melee attack Combat Assist serves (see combatAssistFor;
-  // `assist` false never asks) faces its target, and one just out of reach
-  // starts the approach first (tryCombatAssist): true either way. `toward`
-  // (1 / -1) makes the attack face that way instead of `dir` (see
-  // startAttack); `button` is the combat button pressed for it, when Combo
-  // Assist made `action` another (see repeatsMove).
-  tryAction(action, dir = 0, { assist = true, at = this.steps, toward = null, button = action } = {}) {
+  // over. The attack starts where the fighter is, exactly as authored: one
+  // pressed out of reach whiffs, nothing ever moves the fighter toward its
+  // target first.
+  tryAction(action, dir = 0, { at = this.steps } = {}) {
     const combat = this.combat;
     combat.lastIntent = action;
     const special = specialAction(this.def, action);
@@ -1867,9 +1412,7 @@ export class Fighter {
     if (combat.attack?.def.id === attackId &&
       (this.playerControlled || combat.cancellableFor < atk.cooldown - TIME_EPSILON)) return false;
     if (!this.attackStartable(atk, this.body.grounded, { warn: true })) return false;
-    const plan = assist ? this.combatAssistFor(atk) : null;
-    if (plan?.move && this.tryCombatAssist(action, atk, plan, button)) return true;
-    this.startAttack(atk, dir, { toward: plan?.direction ?? toward, button });
+    this.startAttack(atk, dir, { button: action });
     return true;
   }
 
@@ -1879,8 +1422,7 @@ export class Fighter {
   // fall, its `airUses`, no motion while flying from a launch: see
   // airStartBlocked), and its art there: real frames for the attack (never
   // a faked pose) and, for a throw, for its projectile (never an invisible
-  // one). `warn` reports missing art. Read by tryAction and by Combo
-  // Assist (js/game/combat/combo-assist.js).
+  // one). `warn` reports missing art. Read by tryAction.
   attackStartable(atk, grounded = this.body.grounded, { warn = false } = {}) {
     if (!atk || this.combat.cooldowns.has(atk.id)) return false;
     if (!grounded && (atk.groundOnly || this.airStartBlocked(atk))) return false;
@@ -1906,23 +1448,20 @@ export class Fighter {
   // spend the airtime, and sets its motion going. `airborne` remembers
   // where it started, for the landing cancel (see update), `startedAt`
   // the step it started on (see playerMayCut) and `button` the combat
-  // button pressed for it, if any (see repeatsMove). `toward` (1 / -1,
-  // Combat Assist's target) faces it that way instead, whatever is held,
-  // and the direction held as it starts (`turnHold`) never turns it until
-  // that direction changes (see updateFacing): a run held through the
-  // request never turns an assisted attack away from its target.
-  startAttack(atk, dir = 0, { toward = null, button = null } = {}) {
+  // button pressed for it, if any (see repeatsMove). A fighter whose
+  // attacks are aimed for it faces that way instead of `dir` (see
+  // faceAttackTarget).
+  startAttack(atk, dir = 0, { button = null } = {}) {
     const combat = this.combat;
     this.cutAttack();
     if (this.dash) this.endDash();
-    if (toward) this.facing = toward;
-    else this.faceAttackTarget(dir);
+    this.faceAttackTarget(dir);
     const runningSpeed = this.body.vx;
     this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
     combat.attack = {
       def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false,
       struck: null, blocked: false, motion: null, airborne: !this.body.grounded,
-      startedAt: this.steps, button, turnHold: toward ? this.steerHeld.x : null,
+      startedAt: this.steps, button,
     };
     if (atk.airUses > 0 && !this.body.grounded) this.airAttacks.set(atk.id, (this.airAttacks.get(atk.id) ?? 0) + 1);
     if (atk.freeFall && !this.body.grounded) this.freeFall = true;
@@ -2172,6 +1711,8 @@ export class Fighter {
     return (grounded ? mapping.ground : mapping.air) || null;
   }
 
+  // ---- Facing ----------------------------------------------------------------
+
   // Manual facing follows the fighter's own input: the way it is running
   // (once past a small speed on the ground, so a turn does not flicker) or
   // steering in the air (`dir`). In an action of its own (an attack or the
@@ -2182,38 +1723,93 @@ export class Fighter {
   // a technique started with a direction held (tryAction); a spawn or
   // respawn takes the spawn's. Otherwise it keeps its last facing: it never
   // turns toward its opponent by itself, standing still included, so an
-  // opponent crossing behind it stays behind it. Locked while a stun, paralysis,
-  // technique, summon's startup, Dash or Combat Assist's approach (facing
-  // its target from its first step) plays: none of those is the fighter's
-  // to steer; nor is an attack with a motion of its own (a roll, a homing
-  // dash, a plunge, a lift). Combat AI opts into attack targeting first;
-  // updateAttackFacing separates visual turns from locked motion.
+  // opponent crossing behind it stays behind it.
+  //
+  // Automatic turn-around (the human player's, with the setting on: see
+  // turnAroundFacing) replaces those rules whenever there is an enemy to
+  // face: standing, running either way (running away, the fighter keeps
+  // facing its enemy), in the air, Shield up and in an ordinary attack
+  // (through updateAttackFacing, the way a CPU's attack is aimed). With no
+  // enemy in play the manual rules apply as ever.
+  //
+  // Either way it is locked while anything facingLocked names plays: none
+  // of those is the fighter's to turn, and each keeps the way it committed
+  // to; the facing is free again the step it ends. Combat AI opts into
+  // attack targeting first; updateAttackFacing separates visual turns from
+  // locked motion.
   updateFacing(dir, held) {
     const { body, combat } = this;
-    if (this.updateAttackFacing()) return;
-    if (combat.stun > 0 || combat.immobilized || this.technique || this.pendingSummon || this.dash || this.combatAssist) return;
-    // An attack with a motion of its own never turns (a homing dash faces
-    // the way it flies: see moveMotion).
-    if (combat.attack?.def.motion) return;
+    if (this.updateAttackFacing() || this.facingLocked) return;
+    const auto = this.turnAroundFacing();
+    if (auto != null) {
+      this.facing = auto;
+      return;
+    }
     if (combat.attack || combat.shielding) {
-      // An attack Combat Assist faced at its target keeps that way while the
-      // direction held as it started still is (see startAttack's `toward`);
-      // any other direction held turns it, as ever, from then on.
-      const a = combat.attack;
-      if (a && a.turnHold != null) {
-        if (held === a.turnHold) return;
-        a.turnHold = null;
-      }
       if (held) this.facing = held;
       return;
     }
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
   }
 
-  // Only the attacking combat controller supplies this orientation. Human
-  // and training controllers retain their manual facing rules.
+  // Whether the fighter's facing is held where it is, whatever is held or
+  // wherever its enemy goes: a stun, a paralysis, a technique, a summon's
+  // startup, a Dash or an air dash (each faces the way it went), or an
+  // attack with a motion of its own (a roll, a homing dash, a plunge, a
+  // lift: a homing dash faces the way it flies, see moveMotion), whose
+  // course a turn would rewrite.
+  get facingLocked() {
+    const { combat } = this;
+    return combat.stun > 0 || !!combat.immobilized || !!this.technique || !!this.pendingSummon || !!this.dash ||
+      !!combat.attack?.def.motion;
+  }
+
+  // The fighters this one fights, for Automatic turn-around to pick the
+  // closest of (closestEnemy, js/game/fighters/turn-around.js): its
+  // opponent, the only one any mode has today. Read it at once: the same
+  // list is refilled on the next read.
+  get enemies() {
+    const list = this.enemyList;
+    list.length = 0;
+    if (this.opponent) list.push(this.opponent);
+    return list;
+  }
+
+  // Whether this fighter has Automatic turn-around: the human player's
+  // controller (kind 'player') with the player's setting on (see
+  // PlayerController). A CPU's controller, the practice dummy's lack of
+  // one and any other kind never have it, whatever the fighter, slot or
+  // label.
+  get automaticTurnAround() {
+    return this.playerControlled && this.controller.automaticTurnAround === true;
+  }
+
+  // The way Automatic turn-around faces this fighter now (1 right, -1
+  // left): toward the closest enemy in play (closestEnemy), or the way it
+  // faces already while that enemy stands at its very x. Null when it does
+  // not turn it: the setting off (or not the player's), input locked, or
+  // no enemy in play (none, or one lost to the Void and waiting to
+  // respawn), and the facing is then manual. A direction only: it never
+  // moves, steers, attacks or spends anything.
+  turnAroundFacing() {
+    if (!this.automaticTurnAround || this.inputLocked || this.lostToVoid) return null;
+    const enemy = closestEnemy(this, this.enemies);
+    if (!enemy) return null;
+    return facingToward(this, enemy) ?? this.attackVisualFacing ?? this.facing;
+  }
+
+  // The way this fighter's attacks, techniques and summon startups are aimed
+  // now: by its combat controller (a CPU's live target, attackFacing in
+  // js/game/ai/cpu-intelligence/brain.js) or by Automatic turn-around
+  // (turnAroundFacing). Null when nothing aims them and they turn by hand.
+  attackTargetFacing() {
+    return this.controller?.attackFacing?.(this) ?? this.turnAroundFacing();
+  }
+
+  // A move starting now faces the way it is aimed (attackTargetFacing),
+  // else the direction held (`dir`), else the way the fighter faces.
   faceAttackTarget(dir = 0) {
-    const target = this.controller?.attackFacing?.(this);
+    const target = this.attackTargetFacing();
     if (target != null) this.attackVisualFacing = target;
     if (target || dir) this.facing = target || dir;
   }
@@ -2221,17 +1817,30 @@ export class Fighter {
   // Ordinary attacks turn their hitboxes and unreleased projectiles with
   // the sprite. Motion attacks and techniques keep their physical facing;
   // only their artwork turns, leaving their committed motion/hits intact.
+  // A projectile already released keeps the direction it was given.
   updateAttackFacing() {
     const { combat } = this;
     if ((!combat.attack && !this.technique && !this.pendingSummon) || combat.stun > 0 || combat.immobilized) {
       this.attackVisualFacing = null;
       return false;
     }
-    const target = this.controller?.attackFacing?.(this);
+    const target = this.attackTargetFacing();
     if (target == null) return false;
     this.attackVisualFacing = target;
     if (!combat.attack?.def.motion && !this.technique) this.facing = target;
     return true;
+  }
+
+  // The facing as the step ends, once every fighter has moved (see
+  // Arena.update), before any hit is resolved: an aimed attack
+  // (updateAttackFacing) and Automatic turn-around, where nothing locks the
+  // facing, follow a side switch made by a fighter updated after this one,
+  // so the hitbox, the sprite and the next step's controls never lag a step
+  // behind. Manual facing never changes here.
+  settleFacing() {
+    if (this.updateAttackFacing() || this.facingLocked) return;
+    const auto = this.turnAroundFacing();
+    if (auto != null) this.facing = auto;
   }
 
   // Visual state only: nothing here feeds back into movement or collision.
@@ -2250,7 +1859,6 @@ export class Fighter {
     else if (this.pendingSummon) next = 'summon';
     else if (combat.attack) next = 'attack';
     else if (this.dash) next = 'dash';
-    else if (this.combatAssist) next = 'assist';
     else if (combat.shielding) next = 'shield';
     else if (this.tumbling && !body.grounded) next = 'tumble';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
@@ -2278,15 +1886,11 @@ export class Fighter {
       const anim = this.animator.anim;
       const ratio = Math.abs(body.vx) / this.maxSpeed;
       this.animator.setSpeed(clamp(ratio, anim?.minSpeedScale ?? 1, anim?.maxSpeedScale ?? RUN_MAX_SPEED_SCALE));
-    } else if (next === 'dash' || next === 'assist') {
+    } else if (next === 'dash') {
       // One pass of the Dash's (or air dash's) clip across the whole Dash,
-      // whatever its frame count and rate; Combat Assist's approach plays
-      // the Dash's clip (the air dash's in the air) at that one's rate, for
-      // as long as it lasts.
-      const assist = this.combatAssist;
-      const clip = next === 'dash' ? this.dash.animation : assist.animation;
-      const duration = next === 'dash' ? this.dash.duration : assist.air ? this.airDashDuration : this.dashDuration;
-      const pass = this.sprites.duration(clip);
+      // whatever its frame count and rate.
+      const pass = this.sprites.duration(this.dash.animation);
+      const duration = this.dash.duration;
       this.animator.setSpeed(pass > 0 && duration > 0 ? pass / duration : 1);
     } else {
       this.animator.setSpeed(1);
@@ -2311,8 +1915,7 @@ export class Fighter {
   // Hitstun, and being held by a paralysis (the `bound` state), show `hurt` on the ground and
   // `midair_hurt` in the air. A technique plays the clip of its current
   // phase, a summon's startup its summon's own startupAnimation, a Dash
-  // plays `mouvment` and an air dash `midair_mouvment`, and Combat Assist's
-  // approach whichever of the two it is. A Deflect is an
+  // plays `mouvment` and an air dash `midair_mouvment`. A Deflect is an
   // attack: its own clip. The Shield (on the ground only) shows its held
   // pose, opening with `groundStartAnimation` for one frame as it goes up;
   // the shieldRelease state is `groundReleaseAnimation`.
@@ -2334,7 +1937,6 @@ export class Fighter {
     if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midair_hurt';
     if (state === 'tumble') return 'midair_hurt';
     if (state === 'dash') return this.dash.animation;
-    if (state === 'assist') return this.combatAssist.animation;
     return state;
   }
 
@@ -2368,8 +1970,8 @@ export class Fighter {
   }
 
   // The way its art faces: its facing, or while it attacks, casts or
-  // summons the way its combat controller turned the art (see
-  // updateAttackFacing). Rendering only, as spriteFlip.
+  // summons the way it is aimed (see updateAttackFacing). Rendering only,
+  // as spriteFlip.
   get visualFacing() {
     const attacking = this.combat.attack || this.technique || this.pendingSummon;
     return attacking ? this.attackVisualFacing ?? this.facing : this.facing;

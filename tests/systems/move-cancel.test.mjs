@@ -25,9 +25,9 @@ import { playerRig, press, attackOf, placeFoeAt } from '../helpers/player-rig.mj
 const C1 = getCharacter('0001');
 const EPS = 1e-6;
 
-// The player far from its opponent (nothing to approach or hit), Combo
-// Assist and Combat Assist off unless asked for: the requests alone.
-const far = (character, opts = {}) => playerRig({ character, gap: 900, combatAssist: false, comboAssist: false, ...opts });
+// The player far from its opponent (nothing to hit), with manual facing
+// (Automatic turn-around off) unless asked for: the requests alone.
+const far = (character, opts = {}) => playerRig({ character, gap: 900, automaticTurnAround: false, ...opts });
 
 // The ground attack buttons `character` has (attacks, not specials).
 const groundAttacks = (f) => COMBAT_BUTTONS.filter((a) => !specialAction(f.def, a) && f.attackFor(a, true));
@@ -83,7 +83,7 @@ test('the cut attack never strikes or releases after it: a melee cut before its 
     const f = far(c).player;
     for (const [first, second] of pairs(f)) {
       const atk = f.attacks[f.attackFor(first)];
-      const r = playerRig({ character: c, gap: 40, combatAssist: false, comboAssist: false });
+      const r = playerRig({ character: c, gap: 40, automaticTurnAround: false });
       r.tick(press(first));
       r.tick(press(second));
       for (let i = 0; i < 90; i++) r.tick();
@@ -325,7 +325,7 @@ test('never in a freeze, a stun or a paralysis: a press during the hit\'s freeze
     const f = far(c).player;
     // A melee first attack (its own hit freezes it), then another.
     const [first, second] = pairs(f).find(([a]) => f.attacks[f.attackFor(a)].hitbox && !f.attacks[f.attackFor(a)].projectile);
-    const r = playerRig({ character: c, gap: 40, combatAssist: false, comboAssist: false });
+    const r = playerRig({ character: c, gap: 40, automaticTurnAround: false });
     r.tick(press(first));
     r.until(() => r.player.combat.hitstop > 0);
     const record = r.player.combat.attack;
@@ -364,7 +364,7 @@ test('a Dash keeps its first moment: an attack asked for before its cancel time 
 
 test('a hit makes the player\'s earlier requests stale: none comes out after the stun', () => {
   for (const c of playableCharacters()) {
-    const r = playerRig({ character: c, gap: 40, combatAssist: false, comboAssist: false });
+    const r = playerRig({ character: c, gap: 40, automaticTurnAround: false });
     r.player.combat.cooldowns.set(r.player.attackFor('attack2'), 0.05);
     r.tick(press('attack2'));
     assert.equal(r.player.bufferedAttack?.action, 'attack2', 'kept for its cooldown');

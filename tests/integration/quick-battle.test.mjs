@@ -751,12 +751,12 @@ test('Select CPU is the shared roster on its own screen: its own preview id, the
   assert.deepEqual(ids.filter((id, i) => ids.indexOf(id) !== i), []);
 });
 
-test('Custom Play\'s Battle: two different fighters, Player 1 the player with the touch controls and Combat Assist, the CPU at the chosen level', async () => {
+test('Custom Play\'s Battle: two different fighters, Player 1 the player with the touch controls and Automatic turn-around, the CPU at the chosen level', async () => {
   const booted = boot();
   const { app, screens } = booted;
   const screen = screens.battle;
-  // Combat Assist is off for a new player: this one has turned it on.
-  app.settings.set('combatAssist', true);
+  // Automatic turn-around is on for a new player, as saved.
+  assert.equal(app.settings.automaticTurnAround, true);
   const battle = await startCustom(booted, { difficulty: 'easy', fighter: TEST_SAMPLE, cpu: TEST_A });
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-a']);
   assert.notEqual(battle.p1.sprites, battle.p2.sprites, 'each its own art');
@@ -772,7 +772,7 @@ test('Custom Play\'s Battle: two different fighters, Player 1 the player with th
   assert.equal(screen.touch.buttons.get('attack2').getAttribute('aria-label'), 'Attack 2');
   assert.equal(screen.touchRoot.hidden, false);
   assert.equal(app.input.gameplayActive, true);
-  assert.deepEqual([battle.p1.combatAssistOn, battle.p2.combatAssistOn], [true, false], 'Combat Assist is Player 1\'s alone');
+  assert.deepEqual([battle.p1.automaticTurnAround, battle.p2.automaticTurnAround], [true, false], 'Automatic turn-around is Player 1\'s alone');
   screen.exit();
 
   // The same fighter on both sides: one load, one shared sprite set.

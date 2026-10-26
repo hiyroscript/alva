@@ -30,13 +30,12 @@ reads, what a fighter may leave out, and its tests.
   for every fighter), momentum, the triple jump, the Dash and the air
   dash.
 - [Combat](systems/combat.md): loadouts, attacks, hit resolution,
-  projectiles, summons, techniques, cooldowns, the player's requests (move
-  cancellation, Combo Assist), Combat Assist.
+  projectiles, summons, techniques, cooldowns, the player's requests (each
+  button its own move, move cancellation), Automatic turn-around.
 - [Launch](systems/launch.md): Launch Point, Base and Directional Launch,
   launch reaction, rebounds.
 - [Defense](systems/defense.md): the Shield button and the Shield.
-- [Energy](systems/energy.md): the Dash, Combat Assist and Shield
-  resource.
+- [Energy](systems/energy.md): the Dash, Deflect and Shield resource.
 - [CPU Intelligence](systems/ai.md): the CPU, its layers, its match objectives and deliberate waits, difficulty, the benchmark and the playtesting checklist.
 - [Input](systems/input.md): controls on every device, touch layouts and
   their editor, game controllers (PlayStation and Xbox: connections, the

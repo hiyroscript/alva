@@ -1,5 +1,7 @@
 // Run with node --test tests/systems/facing.test.mjs (no dependencies).
-// Facing is manual: a fighter never turns toward its opponent by itself.
+// Manual facing (every fighter but the human player's with Automatic
+// turn-around on, see turn-around.test.mjs): a fighter never turns toward
+// its opponent by itself.
 // Only its own input turns it: its movement, a Dash, a direction held as an
 // attack or a technique starts, and a direction held during an attack or
 // the Shield (at once, either way); standing still it keeps its last
@@ -208,11 +210,11 @@ test('the training AI turns only by its own movement: stopped, it keeps its last
   assert.equal(dummy.fighter.facing, -1);
 });
 
-test('a respawn takes the spawn\'s facing, and the opponent\'s side does not flip it', () => {
+test('a respawn takes the spawn\'s facing, and the opponent\'s side does not flip it (Automatic turn-around off)', () => {
   const sprites = fakeSprites();
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites,
-    input: { flush() {}, sample: () => ({}) },
+    input: { flush() {}, sample: () => ({}) }, automaticTurnAround: false,
   });
   battle.p2.controller = null;
   battle.setPhase('fight');

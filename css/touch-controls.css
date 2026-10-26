@@ -113,8 +113,8 @@ html.is-touch .touch-controls[hidden] { display: none; }
    recovering clockwise from the top (--tc-progress, 0 as it starts, 1
    ready), with its seconds (data-seconds) for a 3 s or 5 s one; the 0.5 s
    repeat delay only a faint sweep; a move spent for this airtime muted like
-   an unavailable one; Combo Assist's queued follow-up a steady lit ring.
-   Nothing moves by itself, so reduced motion has nothing to stop. */
+   an unavailable one. Nothing moves by itself, so reduced motion has
+   nothing to stop. */
 .tc-btn::after {
   content: '';
   position: absolute;
@@ -142,10 +142,6 @@ html.is-touch .touch-controls[hidden] { display: none; }
   pointer-events: none;
 }
 .tc-btn.is-spent { opacity: 0.4; border-style: dashed; }
-.tc-btn.is-queued {
-  border-color: var(--white);
-  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(255, 255, 255, 0.55);
-}
 .tc-jump { right: 0; bottom: 0; }
 .tc-shield { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
 /* Numbered attack buttons, by the slot TouchControls.setCharacter gives the

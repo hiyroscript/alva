@@ -114,9 +114,12 @@ blocks every attack.
   cursor for the menus, comfortable recommended controls designed for each
   fighter, and a layout of your own for every fighter (Settings ›
   Controls › Controller controls).
-- **Combat Assist** for the human player (on by default, in Settings): a
-  melee attack pressed just out of reach closes the short gap first, and
-  never costs Energy. Never for ranged attacks, never for a CPU.
+- **Automatic turn-around** for the human player (on by default, in
+  Settings › Combat): the fighter faces the closest enemy by itself,
+  standing, running either way or in the air. It only turns: movement,
+  attacks and combos stay entirely the player's, and a Dash or any move
+  committed to a direction keeps its own way. Off, the fighter faces the
+  way it moves, as ever. Never for a CPU.
 - **Add it to your home screen**: Home's Download button explains how to
   install Alva as a lightweight web app (no large download), using the
   browser's own installation where it offers one and step-by-step

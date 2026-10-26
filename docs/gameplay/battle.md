@@ -25,7 +25,8 @@ Each side is checked on its own: a fighter that is not playable is never
 started and nothing stands in for it. Restart Battle and Rematch keep the
 match's fighters and stage, Regular Play's draw included; a new setup draws
 again. Player 1 alone has the touch controls (its fighter's art and names)
-and the Combat Assist setting; the difficulty only changes how the CPU
+and the Automatic turn-around setting (on by default: its fighter faces the
+CPU by itself, and only turns); the difficulty only changes how the CPU
 thinks.
 
 **Ability HUD.** Playing with a keyboard or a controller, Player 1's
@@ -33,12 +34,11 @@ moves sit in the bottom-right corner: each move's own art over the key or
 pad input that performs it, the moves of where the fighter is now on top
 and the other place's smaller beneath, turning like a small wheel as it
 jumps and lands, each with its cooldown (seconds for the 3 s and 5 s ones,
-a faint sweep for the 0.5 s repeat delay), and the move Combo Assist has
-queued to follow the attack playing lit along its edge
+a faint sweep for the 0.5 s repeat delay)
 ([input](../systems/input.md#the-ability-hud)).
 It hides under the pause menu and at the result, never shows in Watch
 Mode, and a touch screen keeps its touch controls instead, whose buttons
-show the same cooldowns and queued follow-up. While it shows,
+show the same cooldowns. While it shows,
 Player 1's cooldown rings under its feet step aside; the CPU keeps its own.
 
 **Scoring.** 5 minutes (`CONFIG.battle.matchSeconds`, 300 s; the

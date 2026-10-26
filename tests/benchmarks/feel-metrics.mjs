@@ -25,8 +25,6 @@
 //                  right held (how much of the drift it keeps)
 //   dash → attack  Attack 1 at the Dash's first cancel step: the speed it
 //                  starts with and six steps on
-//   assist         Combat Assist's approach (a player's #0001 Jab, out of
-//                  reach): the speed handed into the attack as it ends
 //   dashes / 10 s  Dashes started by pressing the Dash every step it is
 //                  allowed, alternating sides, from a full bar
 //
@@ -152,28 +150,12 @@ function dashesIn10s(makeFighter) {
   return count;
 }
 
-function assistHandoff() {
-  const c = getCharacter('0001');
-  const { duel } = harnessFor(c);
-  const d = duel({ gap: 150, pushboxes: true });
-  Object.assign(d.attacker.controller, { kind: 'player', combatAssist: true, comboAssist: false });
-  d.tick(P('attack1'));
-  if (!d.attacker.combatAssist) return { approached: false };
-  let speed = null;
-  for (let i = 0; i < 30 && d.attacker.combatAssist; i++) {
-    d.tick();
-    if (!d.attacker.combatAssist) speed = d.attacker.body.vx;
-  }
-  return { approached: true, handedOn: round(speed ?? 0), attacking: !!d.attacker.combat.attack };
-}
-
 const results = { universal: {}, fighters: {} };
 {
   const { makeFighter } = harnessFor(getCharacter('0001'));
   results.universal.reverseGroundSteps = reverseSteps(makeFighter, false);
   results.universal.reverseAirSteps = reverseSteps(makeFighter, true);
   results.universal.dashesIn10s = dashesIn10s(makeFighter);
-  results.universal.assist = assistHandoff();
 }
 for (const c of playableCharacters()) {
   const { makeFighter } = harnessFor(c);
@@ -197,7 +179,6 @@ for (const c of playableCharacters()) {
 const u = results.universal;
 console.log(`reverse: ground ${u.reverseGroundSteps} steps, air ${u.reverseAirSteps} steps`);
 console.log(`dashes / 10 s: ${u.dashesIn10s}`);
-console.log(`assist: ${u.assist.approached ? `hands on ${u.assist.handedOn} units/s${u.assist.attacking ? ', attack started' : ''}` : 'no approach'}`);
 for (const [id, f] of Object.entries(results.fighters)) {
   console.log(`\n#${id}  dash → Attack 1: ${f.dashAttack.start} → ${f.dashAttack.later} units/s`);
   console.log('  ground attack        run held: first/min/end travel | released: end travel | stand steer | back-space');

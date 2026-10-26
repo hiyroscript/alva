@@ -1538,8 +1538,8 @@ test('a pointer\'s own trailing click is never a second press, whatever its deta
 
 // ---- Live move state ---------------------------------------------------------------
 
-test('the combat buttons show the fighter\'s live state as the ability HUD does: cooldowns, the repeat delay, a spent move, the queued follow-up', () => {
-  const r = playerRig({ character: DEF_0001, gap: 900, combatAssist: false });
+test('the combat buttons show the fighter\'s live state as the ability HUD does: cooldowns, the repeat delay, a spent move', () => {
+  const r = playerRig({ character: DEF_0001, gap: 900 });
   const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
   const btn = (action) => tc.buttons.get(action);
   const looks = (action) => ['is-cooling', 'is-repeat', 'is-spent', 'is-queued'].filter((c) => btn(action).classList.contains(c));
@@ -1556,18 +1556,17 @@ test('the combat buttons show the fighter\'s live state as the ability HUD does:
   tc.showStatus(r.player);
   const left = r.player.combat.abilityCooldowns.remaining('attack5');
   assert.ok(Number(btn('attack5').getAttribute('data-seconds')) > 0 && Math.abs(Number(btn('attack5').style['--tc-progress']) - (1 - left / 5)) <= 0.005, 'it runs down with the timer');
-  // The Jab, then pressed again: Red queued while the Jab plays, then the
-  // Jab's 0.5 s repeat delay as a faint sweep, no number.
+  // The Jab, then pressed again while it plays: nothing is queued or lit;
+  // once it is over, its 0.5 s repeat delay as a faint sweep, no number.
   r.tick(pressed('attack1'));
   r.tick(pressed('attack1'));
   tc.showStatus(r.player);
-  assert.deepEqual(looks('attack2'), ['is-queued'], 'Red, queued');
-  assert.equal(btn('attack1').classList.contains('is-queued'), false, 'only the move that follows');
-  r.until(() => r.player.combat.attack?.def.id === 'attack2');
+  for (const action of ABILITY_ACTIONS) assert.equal(btn(action).classList.contains('is-queued'), false, `${action}: nothing queued`);
+  r.until(() => !r.player.combat.attack);
   tc.showStatus(r.player);
   assert.deepEqual(looks('attack1'), ['is-repeat']);
   assert.equal(btn('attack1').getAttribute('data-seconds'), null, 'no number for the repeat delay');
-  assert.equal(btn('attack2').classList.contains('is-queued'), false, 'gone once it starts');
+  assert.deepEqual(looks('attack2'), [], 'Red never followed');
   // In the air: a move spent for this airtime is muted; the ground-only
   // buttons keep their own unavailable look.
   r.player.airAttacks.set('midair_attack2', 1);
@@ -1583,7 +1582,7 @@ test('the combat buttons show the fighter\'s live state as the ability HUD does:
 });
 
 test('the live state writes only what changed, and nothing at all for a button with nothing to show', () => {
-  const r = playerRig({ character: DEF_0001, gap: 900, combatAssist: false });
+  const r = playerRig({ character: DEF_0001, gap: 900 });
   const { tc } = touchControls(DEF_0001, { scheme: 'classic' });
   let writes = 0;
   for (const b of tc.buttons.values()) {
@@ -1603,9 +1602,10 @@ test('the live state writes only what changed, and nothing at all for a button w
   const after = writes;
   tc.showStatus(r.player);
   assert.equal(writes, after, 'the same state again: nothing written');
-  // The stylesheet: a sweep and seconds over the art, a muted spent move, a
-  // lit queued one; nothing that moves by itself.
-  for (const rule of ['.tc-btn::after', '.tc-btn.is-cooling::after', '.tc-btn.is-repeat::after', '.tc-btn[data-seconds]::before', '.tc-btn.is-spent', '.tc-btn.is-queued']) {
+  // The stylesheet: a sweep and seconds over the art and a muted spent
+  // move, nothing that moves by itself; no queued look left.
+  assert.doesNotMatch(CSS, /is-queued/);
+  for (const rule of ['.tc-btn::after', '.tc-btn.is-cooling::after', '.tc-btn.is-repeat::after', '.tc-btn[data-seconds]::before', '.tc-btn.is-spent']) {
     const body = CSS.match(new RegExp(`${rule.replace(/[.[\]()*:]/g, '\\$&')} \\{[^}]*\\}`))?.[0];
     assert.ok(body, rule);
     assert.doesNotMatch(body, /animation|transition/, rule);

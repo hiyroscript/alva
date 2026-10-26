@@ -4,9 +4,10 @@ The one resource a fighter spends, on the same terms for every fighter,
 and only on three things: a Dash or an air dash (as it starts, a Dash
 cancel included), the Deflect (as it starts) and the Shield (for each hit
 it blocks, a perfect block included). There is no separate Shield meter:
-this is it. Movement, jumps, attacks, Combat Assist (the human player's
-approach, see [combat](combat.md#combat-assist)), summons and techniques
-never touch it, and no defense, however it turns out, gives any back. The
+this is it. Movement, jumps, attacks, turning (Automatic turn-around
+included, see [combat](combat.md#facing-and-automatic-turn-around)),
+summons and techniques never touch it, and no defense, however it turns
+out, gives any back. The
 product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.5.
 
 | Module | Owns |
@@ -27,8 +28,7 @@ The same for every fighter, written once in `combat-state.js`:
 | A Dash, an air dash, or either cutting short an attack that hit (a Dash cancel) | 20, once, as it starts | `DASH_ENERGY_COST` (`dashCost`, `dashCancelCost`) |
 | A Deflect | 15, once, as it starts, whatever it meets | `DEFLECT_ENERGY_COST` (`deflectCost`) |
 | A hit the Shield blocks, a perfect block included | 15, per block | `BLOCK_ENERGY_COST` (`shieldHitCost`) |
-| Combat Assist's approach | 0, ever | — |
-| Running, holding the Shield up, jumps, air jumps, the fast fall, turning, air control, attacks, projectiles, summons, techniques | 0 | — |
+| Running, holding the Shield up, jumps, air jumps, the fast fall, turning (by hand or Automatic turn-around), air control, attacks, projectiles, summons, techniques | 0 | — |
 
 The Dash was 25 until the combat-feel overhaul ([UPDATES.md](../../UPDATES.md#combat-feel-overhaul-and-shield-walking)):
 at 20 a Dash fits beside the blocks and Deflects a fight also pays for
@@ -61,18 +61,17 @@ does not know, is refused, naming the fighter and the field.
 - Reaching 0, however it happens, **exhausts** the fighter: no Dash, air
   dash, Deflect or Shield until Energy is back at exactly 100 (a partial
   refill does not unlock them). The bar turns gray through the refill. An
-  exhausted player's melee press still starts its attack (Combat Assist's
-  approach included: it costs nothing).
+  exhausted player's attack press still starts its attack: attacks cost
+  nothing.
 - No refill on a step a Dash, an air dash or a Deflect was paid for
   (`Fighter.energyPaidAt`); every other step refills at the one rate, a
-  held Shield, a block and Combat Assist's approach included.
+  held Shield and a block included.
 - Holding the Shield costs nothing; a miss costs nothing; a perfect
   Shield costs the same 15 as any block (its advantage is no blockstun,
   never Energy). A Deflect is no Shield: it pays its own 15 as it starts,
   and a whiff has paid it all the same.
 - Nothing gives Energy back: no block, perfect block, Deflect that lands,
-  projectile turned back or cancelled approach refunds anything or adds a
-  refill of its own. Only the passive refill, and a full refill on a
+  projectile turned back refunds anything or adds a refill of its own. Only the passive refill, and a full refill on a
   respawn, a reset or a restart, raise it.
 - Difficulty never changes any of it: the CPU pays what a player pays.
 - The bar shows over the fighter's name tag only while below full
@@ -92,5 +91,6 @@ turning a projectile back), the Dash cancel's cost in
 [`tests/systems/combo.test.mjs`](../../tests/systems/combo.test.mjs), the
 Deflect's in
 [`tests/systems/deflect.test.mjs`](../../tests/systems/deflect.test.mjs),
-and Combat Assist's (none) in
-[`tests/systems/combat-assist.test.mjs`](../../tests/systems/combat-assist.test.mjs).
+and attacks and Automatic turn-around never touching it in
+[`tests/systems/direct-input.test.mjs`](../../tests/systems/direct-input.test.mjs)
+and [`tests/systems/turn-around.test.mjs`](../../tests/systems/turn-around.test.mjs).

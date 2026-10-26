@@ -471,10 +471,10 @@ export function attackReach(def) {
 }
 
 // What kind of strike attack definition `def` is, for every reader that
-// sorts attacks (the Fighter's Combat Assist, the combat AI's moveset in
-// js/game/ai/moveset.js), so the two can never disagree: a projectile
-// attack is ranged; an attack with a hitbox of its own and no projectile is
-// melee. A pending attack has neither, so it is neither.
+// sorts attacks (today the combat AI's moveset in js/game/ai/moveset.js),
+// so no two can ever disagree: a projectile attack is ranged; an attack
+// with a hitbox of its own and no projectile is melee. A pending attack has
+// neither, so it is neither.
 export function isRangedAttack(def) {
   return !!def?.projectile;
 }
