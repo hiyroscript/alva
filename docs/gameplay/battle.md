@@ -34,7 +34,8 @@ moves sit in the bottom-right corner: each move's own art over the key or
 pad input that performs it, the moves of where the fighter is now on top
 and the other place's smaller beneath, turning like a small wheel as it
 jumps and lands, each with its cooldown (seconds for the 3 s and 5 s ones,
-a faint sweep for the 0.5 s repeat delay)
+from the moment the move is released; an ordinary move has none) and a
+muted look for a move it cannot pay for while exhausted
 ([input](../systems/input.md#the-ability-hud)).
 It hides under the pause menu and at the result, never shows in Watch
 Mode, and a touch screen keeps its touch controls instead, whose buttons

@@ -16,7 +16,7 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/core/controller-resolver.js`](../../js/core/controller-resolver.js) | `ControllerResolver`: Player 1's presses resolved, for the fighter and where it is, into control codenames (combinations, directions on their own stick, each stick's pushes as presses of their own, activations, one owner per press). |
 | [`js/ui/controller-cursor.js`](../../js/ui/controller-cursor.js) | The circular controller cursor, part of `MenuNavigator`. |
 | [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button and stick names, binding phrases, chips (`stickGlyph`) and the controller diagram, either stick lit on its own. |
-| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Automatic turn-around setting, see [combat](combat.md#facing-and-automatic-turn-around), and its presses alone may cut its own attack short, see [combat](combat.md#the-players-requests)), `blankInput`, `HELD_CONTROLS`. |
+| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Automatic turn-around setting, see [combat](combat.md#facing-and-automatic-turn-around); its presses go through the same request and cancellation rules as a CPU's, see [combat](combat.md#requests-and-cancellation)), `blankInput`, `HELD_CONTROLS`. |
 | [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
 | [`js/ui/ability-hud.js`](../../js/ui/ability-hud.js), [`css/ability-hud.css`](../../css/ability-hud.css) | The ability HUD: Player 1's moves, their art and their keyboard or controller inputs in the bottom-right corner, on a ground / air wheel, with their cooldowns ([below](#the-ability-hud)). |
 | [`js/ui/mobile-abilities.js`](../../js/ui/mobile-abilities.js) | Which buttons a fighter has (`abilityPresence`, from its `actions`), and each button's name and frame (`previewFrame`, from its `mobileAbilities`). |
@@ -124,12 +124,14 @@ button's move for the current place is read through `abilityStatus`
 exactly as the ability HUD reads it ([below](#the-ability-hud)) and
 painted on the button itself, with no element of its own:
 
-- `is-cooling`: a 3 s or 5 s cooldown, a dark sweep over the art
+- `is-cooling`: a 3 s or 5 s cooldown, from the moment its move is
+  released (never while it still casts), a dark sweep over the art
   recovering clockwise from the top (`--tc-progress`, the button's
-  `::after`) and its seconds (`data-seconds`, drawn by its `::before`);
-- `is-repeat`: the 0.5 s repeat delay, the same sweep, fainter, no number;
-- `is-spent`: spent for this airtime, free fall or missing art (dashed,
-  dimmed), apart from `is-unavailable` (a ground-only move in the air).
+  `::after`) and its seconds (`data-seconds`, drawn by its `::before`). An
+  ordinary move has no cooldown, so never shows one;
+- `is-spent`: spent for this airtime, free fall, a move that costs Energy
+  while the fighter is exhausted, or missing art (dashed, dimmed), apart
+  from `is-unavailable` (a ground-only move in the air).
 
 Only what changed is written (each button caches what it shows), and a
 button with nothing to show is never written to; nothing animates. Another
@@ -164,15 +166,16 @@ settings migration. `down` is a control again (Down, first in each scheme's
 list): an entry saved while the old down arrow existed puts it back where
 the player had it.
 
-**Automatic turn-around** (Settings → Combat) and the player's move
-cancellation are not part of the input system: no binding, device or
+**Automatic turn-around** (Settings → Combat) and move cancellation
+are not part of the input system: no binding, device or
 `InputManager` code knows them, and no new control exists for them.
 Keyboard, controller and touch presses reach the fighter in the same
 snapshot as ever, one `…Pressed` edge per press (a key held, a touch
 control held or a controller button held is one press, never a stream:
-holding never strings attacks), and the Fighter decides whether each press
-cuts the player's attack, every combat button asking for its own move only
-([combat](combat.md#the-players-requests)); the player's controller carries
+holding never strings attacks), and the Fighter decides what each press
+starts, every combat button asking for its own move only, and never cuts
+an attack that can harm short outside its hit-confirmed window
+([combat](combat.md#requests-and-cancellation)); the player's controller carries
 the setting. So a repeat works identically on every device: a press
 released and made again during the attack is nothing, a held control is
 one press, and a controller's ground / air resolution (`pressedOnGround` /
@@ -232,9 +235,11 @@ interface, and nothing about them changes.
   change mid-turn, at once with reduced motion).
 - **Cooldowns and restrictions** are read each frame through
   `abilityStatus` from the combat state ([combat](combat.md#cooldowns)):
-  `cooling` (a 3 s or 5 s cooldown: sweep and seconds), `repeat` (the 0.5 s
-  repeat delay: a faint sweep), `restricted` (spent for this airtime, free
-  fall or missing art: muted, no countdown) or `ready`. Only changed values
+  `cooling` (a 3 s or 5 s cooldown, from its release: sweep and seconds),
+  `restricted` (spent for this airtime, free fall, no Energy while
+  exhausted for a move that costs it, or missing art: muted, no countdown;
+  `data-restriction` says which) or `ready`. There is no repeat-delay
+  state: an ordinary move has no cooldown at all. Only changed values
   reach the DOM.
   The touch controls show the same states on their own buttons
   ([below](#touch-controls-live-move-state)).
@@ -622,7 +627,8 @@ them as a stack (`MenuNavigator.syncLayers`):
   never in the air, nothing but the fighter's own buttons), the wheel and rapid changes of
   place, the art and its fallback, keyboard keys, PlayStation and Xbox
   glyphs, a saved layout, device switching, cooldowns through changes of
-  place and on recovery, the repeat delay, airtime restrictions, a repeated
+  place and on recovery, from the release only, no repeat delay, the Energy
+  restriction, airtime restrictions, a repeated
   press lighting nothing (no queued look or wording), a fighter swap, which
   screens show it, its stylesheet and the arena's rings.
 - [`tests/systems/controller-devices.test.mjs`](../../tests/systems/controller-devices.test.mjs):
@@ -661,14 +667,15 @@ them as a stack (`MenuNavigator.syncLayers`):
   the keyboard, touch and a controller making the same requests: a held
   button is one press, a repeat during the attack nothing and a press
   during its cooldown never another move (on the ground and in the air),
-  and move cancellation from each, Run never a request.
+  a different attack pressed during the Jab never cutting it on any
+  device, Run never a request.
 
 - [`tests/interface/controls-ui.test.mjs`](../../tests/interface/controls-ui.test.mjs):
   both layouts, the art on every button for both fighters, fallbacks, names
   in both languages, multi-touch, one press per touch (a pointer's own
   trailing click never a second one; assistive activation kept), and the
-  live move state (cooldowns, the repeat delay, a spent move, nothing
-  queued; nothing written when nothing changed).
+  live move state (cooldowns from their release, no repeat delay, a spent
+  or unpaid move, nothing queued; nothing written when nothing changed).
 - [`tests/interface/touch-layout.test.mjs`](../../tests/interface/touch-layout.test.mjs):
   custom layouts and the editor.
 - [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs):

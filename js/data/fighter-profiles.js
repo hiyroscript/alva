@@ -75,7 +75,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0001': Object.freeze({
     difficulty: 5,
     descriptionKey: 'discover.fighter.0001.playStyle',
-    reviewedSourceHash: '212674d9e570f4eab78e38e33aab22333f03c9d7f864f98bd772386990b2ab62',
+    reviewedSourceHash: '8a0a3cd5220c8805cd783c3c19f1704a809b6bb607d992336928b5fdc1edbf98',
   }),
   // A momentum rushdown and aerial chaser: a readable core game plan, with
   // mastery in momentum, air uses and free fall, approach angles, trap
@@ -83,7 +83,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0002': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0002.playStyle',
-    reviewedSourceHash: 'f6f0133638319403405396e4a3b833d2ff10276d882b9a70f0d6218549f0f55a',
+    reviewedSourceHash: '6b9809c93a215f3be75bbf78a8034ba85ea589b2cc9f7109d42310cc45fcdfba',
   }),
   // A ground-shattering bruiser and self-healer: a readable core of heavy,
   // telegraphed blows, with mastery in reading who is standing on the
@@ -92,7 +92,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0003': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0003.playStyle',
-    reviewedSourceHash: '7197b286a60ec2e4ffe7c4e679a66601f2328891ebc905357583127aae9a01ed',
+    reviewedSourceHash: '4c447ed653fe326f3898ba278ee5c7b633d701a831cf8c17a3d37f72ecbf292d',
   }),
   // A space controller and setup fighter: notes that turn projectiles back,
   // a stationary double to place, a long, breakable song whose charm window
@@ -103,7 +103,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0004': Object.freeze({
     difficulty: 4,
     descriptionKey: 'discover.fighter.0004.playStyle',
-    reviewedSourceHash: '2c286cdc5b708fe45b23ad54464c24e107b19290a9fad829f70eee9a357d98e3',
+    reviewedSourceHash: '31b9dff69aa08ac5377a159787d0d1f24841d751e85719ea55c3923691c33d37',
   }),
   // A predator of reach, setups and attrition: the longest pokes in the
   // roster that are slow to pull back, a pull that reels opponents in from
@@ -116,7 +116,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0005': Object.freeze({
     difficulty: 4,
     descriptionKey: 'discover.fighter.0005.playStyle',
-    reviewedSourceHash: '9e141c2f313c7abbe3990d96705bd46db9fc9633b0b34477e267e3436942a826',
+    reviewedSourceHash: '23bbba2459d946224608aca674cc6fb6e41921114cc3e7e187d629015acd1f9d',
   }),
   // A versatile all-rounder in three bodies: quick strikes and a lock-on
   // rush up close, a long beam and a wave of sound that turns shots back
@@ -127,7 +127,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0006': Object.freeze({
     difficulty: 3,
     descriptionKey: 'discover.fighter.0006.playStyle',
-    reviewedSourceHash: 'b341e295c7b6552fa98e7303f5076ec09f71fe1fa19765217591469c3697ea82',
+    reviewedSourceHash: '0c440a5fec54b4e8c2e507c2cc6f73786eb3c16034937e78cc8232454f35dd15',
   }),
 });
 

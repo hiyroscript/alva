@@ -320,7 +320,7 @@ test('runs, jumps, melee attacks and techniques with a special cooldown are free
   for (let i = 0; i < steps(1); i++) t();
   t({ attack1: true, attack1Pressed: true });
   for (let i = 0; i < 30; i++) t();
-  // Red (attack2) and Blue (attack3): ordinary throws, 15 each as they start.
+  // Red (attack2) and Maximum Blue (attack3): ordinary throws, 15 each as they start.
   t({ attack2: true, attack2Pressed: true }, 15);
   for (let i = 0; i < 60; i++) t();
   t({ attack3: true, attack3Pressed: true }, 15);

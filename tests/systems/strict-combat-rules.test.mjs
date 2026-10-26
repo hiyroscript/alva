@@ -278,7 +278,7 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
 });
 
 test('an ordinary throw pays 15 once as it starts, never again over its flight, its strikes or its turning back', () => {
-  // Blue (#0001's attack3): a piercing orb that strikes several times.
+  // Maximum Blue (#0001's attack3): a piercing orb that strikes several times.
   const r = playerRig({ character: C1, gap: 220, automaticTurnAround: false });
   r.tick(press('attack3'));
   assert.equal(r.player.combat.energy, 100 - 15, 'its 15, and no refill on that step');
