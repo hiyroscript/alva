@@ -204,7 +204,8 @@ test('holding Down never speeds up a cooldown: Attack 4 and Attack 5 recover in 
     const recover = (held) => {
       const d = duel({ gap: 600, attackerCharacter: COOLING_CASTER });
       d.tick(P(button));
-      d.until(() => d.attacker.combat.abilityCooldowns.active(button), 1);
+      // It starts as the technique releases, its cast over.
+      d.until(() => d.attacker.combat.abilityCooldowns.active(button), 120);
       const cd = d.attacker.combat.abilityCooldowns;
       const out = [];
       for (let i = 0; i < steps(1); i++) {

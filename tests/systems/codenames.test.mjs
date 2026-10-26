@@ -245,11 +245,13 @@ test('attack4 is Unlimited Void\'s technique and attack5 Hollow Purple\'s, each 
   });
 });
 
-test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves with shared artwork', () => {
-  // The real roster technique starts its timer on the same press.
+test('attack4 and attack5 start their cooldowns as they release, keyed by those moves with shared artwork', () => {
+  // The real roster technique starts its timer as it releases, never on the press.
   const free = makeFighter();
   free.step({ attack4: true, attack4Pressed: true });
   assert.equal(free.fighter.technique?.def.id, 'attack4');
+  assert.equal(free.fighter.combat.abilityCooldowns.size, 0, 'nothing while it casts');
+  while (!free.fighter.technique.released) free.step({});
   assert.equal(free.fighter.combat.abilityCooldowns.size, 1);
   assert.deepEqual(cooldownIndicators(free.fighter).map(c => c.id), ['attack4']);
   // A fighter whose techniques have one: keyed by the move, shown by it.
@@ -262,6 +264,7 @@ test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves 
   while (caster.fighter.technique) caster.step({});
   caster.step({ attack5: true, attack5Pressed: true });
   assert.equal(caster.fighter.technique?.def.id, 'attack5');
+  while (!caster.fighter.technique.released) caster.step({});
   assert.deepEqual([...caster.fighter.combat.abilityCooldowns.entries.keys()], ['attack4', 'attack5']);
   assert.deepEqual(cooldownIndicators(caster.fighter).map((c) => c.id), ['attack4', 'attack5']);
 });

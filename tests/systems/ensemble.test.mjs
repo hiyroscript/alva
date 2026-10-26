@@ -255,11 +255,12 @@ test('a combination: two members perform one move together while the third steps
   assert.equal(place(f, 'blue').x, -9.5 - retreat, 'blue behind them');
   assert.deepEqual([place(f, 'pink').x, place(f, 'green').x], [9.5, -9.5], 'the pair centred on the origin');
   d.until(() => !f.combat.attack);
-  // One move: one hit, its own damage once, one cooldown.
+  // One move: one hit, its own damage once, and no cooldown (an ordinary
+  // move has none).
   const hits = d.events.filter((e) => e.attacker === f && e.type === 'hit');
   assert.equal(hits.length, 1);
   assert.equal(d.target.combat.launchPoint, 3);
-  assert.deepEqual([...f.combat.cooldowns.keys()], ['attack2']);
+  assert.deepEqual([...f.combat.cooldowns.keys()], []);
   for (let i = 0; i < 60; i++) d.tick({});
   // All three.
   d.tick(P('attack3'));

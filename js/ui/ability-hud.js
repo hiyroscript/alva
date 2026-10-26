@@ -34,10 +34,11 @@
 //     lastDevice: a pad that is only connected never counts);
 //   - the cooldowns and other restrictions: the fighter's combat state,
 //     read through abilityStatus (js/game/combat/move-status.js). The HUD
-//     keeps no timer: a long cooldown (one of the policy's special lengths,
-//     js/data/cooldowns.js) shows its sweep and its seconds
-//     (formatCooldown), the 0.5 s repeat delay only a faint sweep, and a
-//     move spent for this airtime (or missing its art) a muted look with no
+//     keeps no timer: a cooldown (only the policy's special lengths, 3 s or
+//     5 s, exist: js/data/cooldowns.js; an ordinary move has none) shows its
+//     sweep and its seconds (formatCooldown) from the moment its move is
+//     released, and a move spent for this airtime, unpaid for while the
+//     fighter is exhausted (or missing its art) a muted look with no
 //     countdown.
 //
 // It is information, not a control: nothing in it takes focus or the
@@ -336,13 +337,12 @@ export class AbilityHUD {
     }
   }
 
-  // One tile's state: 'ready', 'cooling' (a special cooldown: sweep and
-  // seconds), 'repeat' (the 0.5 s repeat delay: a faint sweep) or
-  // 'restricted' (spent for this airtime, or missing its art: muted, no
-  // countdown).
+  // One tile's state: 'ready', 'cooling' (a 3 s or 5 s cooldown: sweep and
+  // seconds) or 'restricted' (spent for this airtime, no Energy while
+  // exhausted, or missing its art: muted, no countdown).
   paint(tile, status) {
     const cd = status.cooldown;
-    const state = status.restriction ? 'restricted' : cd.cooling ? (cd.special ? 'cooling' : 'repeat') : 'ready';
+    const state = status.restriction ? 'restricted' : cd.cooling ? 'cooling' : 'ready';
     const shown = tile.shown;
     if (state !== shown.state) {
       // A long cooldown just over: a brief, quiet highlight.

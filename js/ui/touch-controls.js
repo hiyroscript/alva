@@ -54,10 +54,11 @@
 // Live move state (showStatus): once a frame the screens hand it Player 1's
 // fighter, and each combat button shows what the ability HUD shows on a
 // keyboard or a controller, read the same way (abilityStatus,
-// js/game/combat/move-status.js): a cooldown's sweep over its art, with its
-// seconds for a 3 s or 5 s one, the 0.5 s repeat delay as a faint sweep
-// and a move spent for this airtime muted. Paint only: it never changes
-// what a button does, and it writes only what changed.
+// js/game/combat/move-status.js): a 3 s or 5 s cooldown's sweep over its
+// art, with its seconds, from the moment its move is released (an ordinary
+// move has no cooldown), and a move spent for this airtime or unpaid for
+// while exhausted muted. Paint only: it never changes what a button does,
+// and it writes only what changed.
 
 import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
@@ -623,19 +624,18 @@ export class TouchControls {
 
   // Button `b`'s state from `status` (abilityStatus, or null for none):
   // is-cooling (a 3 s or 5 s cooldown: the sweep, --tc-progress, and its
-  // seconds, data-seconds), is-repeat (the 0.5 s repeat delay: a faint
-  // sweep) or is-spent (spent for this airtime, free fall or missing art).
-  // Only what changed is written.
+  // seconds, data-seconds) or is-spent (spent for this airtime, free fall,
+  // no Energy while exhausted, or missing art). Only what changed is
+  // written.
   paintStatus(b, status) {
     const cd = status?.cooldown;
-    const state = !status ? 'ready' : status.restriction ? 'spent' : cd.cooling ? (cd.special ? 'cooling' : 'repeat') : 'ready';
+    const state = !status ? 'ready' : status.restriction ? 'spent' : cd.cooling ? 'cooling' : 'ready';
     // A button starts neutral (the stylesheet's own look), so one with
     // nothing to show is never written to.
     const shown = b._status ??= { state: 'ready', progress: 1, text: '' };
     if (state !== shown.state) {
       shown.state = state;
       b.classList.toggle('is-cooling', state === 'cooling');
-      b.classList.toggle('is-repeat', state === 'repeat');
       b.classList.toggle('is-spent', state === 'spent');
     }
     const progress = cd?.cooling ? Math.round(cd.progress * 200) / 200 : 1;

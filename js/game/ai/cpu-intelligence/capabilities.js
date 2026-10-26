@@ -21,7 +21,13 @@
 // defense, Deflect, Energy rules and SpriteSet).
 // Outputs: analyzeCapabilities (cached per fighter, rebuilt if its
 // definition or art changes), moveReady (live availability: cooldowns,
-// airtime limits, Energy, free to act) and MOVE_ROLES.
+// airtime limits, Energy, free to act) and MOVE_ROLES. Every move's
+// `energyCost` is the one the Fighter pays as it starts it (the Energy
+// policy's, js/data/energy.js: 15 for the Deflect and for an ordinary move
+// that creates a construct, a projectile, a burst or a clone; 0 for a
+// melee strike and for a move with a special cooldown), and its
+// `abilityCooldown` / `cooldown` the 3 s or 5 s that starts only as it is
+// released (an ordinary move has none).
 // Important constraints: read-only. Immutable data is cached; anything that
 // changes from step to step (cooldowns, Energy, air uses, free fall) is read
 // live by moveReady every time a move is considered. Nothing here names a
@@ -200,7 +206,7 @@ function techniqueMove(f, special, sprites) {
     blockstun: burstHit?.blockstun ?? 0, hitstop: burstHit?.hitstop ?? 0, reach: t.burst ? { ...t.burst.hitbox } : null,
     hitbox: t.burst?.hitbox ?? null, motion: null, motionSpec: null, pull: projectile?.pull ?? null,
     cooldown: 0, abilityCooldown: t.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
-    energyCost: 0, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
+    energyCost: t.energyCost, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
     topSpeed: 0, airTopSpeed: 0, friction: 1, step: null,
     passThrough: false, deflectProjectiles: false, carry: null,
   };
@@ -221,7 +227,7 @@ function summonMove(f, special, entry) {
     burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, impact: null, heal: 0, ...sum,
     blockstun: atk.blockstun, hitstop: atk.hitstop, reach: null, hitbox: atk.hitbox, motion: null, motionSpec: null,
     pull: null, cooldown: 0, abilityCooldown: s.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
-    energyCost: 0, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
+    energyCost: s.energyCost, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
     topSpeed: 0, airTopSpeed: 0, friction: 1, step: null,
     passThrough: false, deflectProjectiles: false, carry: null,
   };
@@ -233,8 +239,8 @@ export function analyzeCapabilities(f) {
   if (cached && cached.def === f.def && cached.sprites === f.sprites) return cached;
   const ms = readMoveset(f);
   const moves = [];
-  for (const m of ms.melee) moves.push(attackMove('melee', m.action, m.air, m.id, m.atk, null));
-  for (const r of ms.ranged) moves.push(attackMove('ranged', r.action, r.air, r.id, r.atk, r.proj));
+  for (const m of ms.melee) moves.push(attackMove('melee', m.action, m.air, m.id, m.atk, null, m.atk.energyCost));
+  for (const r of ms.ranged) moves.push(attackMove('ranged', r.action, r.air, r.id, r.atk, r.proj, r.atk.energyCost));
   for (const c of ms.specials) {
     moves.push(c.type === 'technique' ? techniqueMove(f, c, f.sprites) : summonMove(f, c, c));
   }
@@ -283,25 +289,32 @@ export function analyzeCapabilities(f) {
 }
 
 // Whether move `m` could start for fighter `self` right now, read live:
-// ground or air as it is, free to act (or to follow up out of an attack
-// that hit or a Dash past its cancel time), its cooldown over, its starts
-// for this airtime not used up, not in free fall, and, for the Deflect,
-// not exhausted. A summon or technique needs the ground, a free fighter and
-// its own cooldown over; a summon its opponent in play (it appears behind
-// it), and so does any technique that strikes (the CPU attacks nobody), but
-// not a heal of its own. The checks mirror the ones the Fighter makes when
-// the button is pressed, so the CPU never presses what cannot start.
+// ground or air as it is, free to act (or to follow up: out of an attack
+// that hit, a Dash past its cancel time, or a move that yields, its own
+// Deflect or a heal: Fighter.canFollowUp), its cooldown over (one that
+// never released started none), its starts for this airtime not used up,
+// not in free fall, never into itself (nor its button pressed again while
+// that button's attack plays), and, for a move that costs Energy
+// (the Deflect, a construct move), not exhausted. A summon or technique
+// needs the ground, a free fighter (or one in a move that yields) and its
+// own cooldown over; a summon its opponent in play (it appears behind it),
+// and so does any technique that strikes (the CPU attacks nobody), but not
+// a heal of its own. The checks mirror the ones the Fighter makes when the
+// button is pressed, so the CPU never presses what cannot start.
 export function moveReady(self, m) {
   const grounded = self.body.grounded;
   const combat = self.combat;
+  if (m.energyCost > 0 && combat.energyExhausted) return false;
   if (m.kind === 'technique' || m.kind === 'summon') {
     const gone = !!self.opponent?.lostToVoid;
     const pureHeal = m.kind === 'technique' && m.heal > 0 && !m.projectile && !m.burst;
-    return grounded && self.canAct() && !combat.abilityCooldowns.active(m.id) && (!gone || pureHeal);
+    if (self.technique?.def.id === m.id || self.pendingSummon?.id === m.id) return false;
+    return grounded && (self.canAct() || self.moveYields()) && !combat.abilityCooldowns.active(m.id) && (!gone || pureHeal);
   }
   if (m.air === grounded) return false;
   if (!self.canFollowUp() || combat.cooldowns.has(m.id) || self.airStartBlocked(m.def)) return false;
-  if (combat.attack && combat.attack.def.id === m.id) return false;
-  if (m.kind === 'deflect') return !combat.energyExhausted;
+  // Never into itself, nor its own button's press while that button's
+  // attack plays (Fighter.repeatsMove: no request at all).
+  if (combat.attack && (combat.attack.def.id === m.id || self.repeatsMove(m.action))) return false;
   return true;
 }

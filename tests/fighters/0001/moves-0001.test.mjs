@@ -14,7 +14,6 @@ import assert from 'node:assert/strict';
 import { DT, MOVEMENT, duel, fakeSpritesOf, makeFighter, steps } from '../../helpers/fighter-harness.mjs';
 import { getCharacter } from '../../../js/data/characters.js';
 import { LAUNCH_UNIT_SPEED as U } from '../../../js/data/launch.js';
-import { REPEAT_COOLDOWN } from '../../../js/data/cooldowns.js';
 
 const DEF = getCharacter('0001');
 const DEF_0002 = getCharacter('0002');
@@ -111,18 +110,17 @@ test('the Floating Straight stands on the air while it strikes: no fall, twice p
   airborne(step);
   step(P('attack1'));
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1');
-  fighter.body.y = -3000; // enough airtime to test two uses with their repeat delay
+  fighter.body.y = -3000; // enough airtime to test two uses back to back
   const y = fighter.body.y;
   while (fighter.combat.attack) {
     step({});
     if (fighter.combat.attack) assert.equal(fighter.body.vy, 0, 'standing on the air');
   }
   assert.ok(Math.abs(fighter.body.y - y) < 1, 'where it began');
-  for (let i = 0; i < steps(REPEAT_COOLDOWN); i++) step({});
   step(P('attack1'));
-  assert.equal(fighter.combat.attack?.def.id, 'midair_attack1', 'a second one');
+  assert.equal(fighter.combat.attack?.def.id, 'midair_attack1', 'a second one, at once: no repeat delay');
   while (fighter.combat.attack) step({});
-  for (let i = 0; i < steps(REPEAT_COOLDOWN); i++) step({});
+  step({});
   assert.equal(fighter.body.grounded, false);
   step(P('attack1'));
   assert.equal(fighter.combat.attack, null, 'not a third before it lands');
@@ -327,7 +325,7 @@ test('Unlimited Void: half a second of cast, then a hit round #0001 for 3, paral
   // while longer.
   tickUntil(d, () => !d.attacker.technique, {}, {}, 60);
   assert.ok(d.target.combat.paralysis > 1.2, `still held (${d.target.combat.paralysis.toFixed(2)} s)`);
-  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), true, '3-second cooldown still running');
+  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), true, '3-second cooldown still running, from its release');
   assert.equal(d.attacker.combat.abilityCooldowns.size, 1);
   d.tick(P('attack4'));
   assert.equal(d.attacker.technique, null, 'a free fighter still waits for the cooldown');
@@ -465,9 +463,9 @@ test('Hollow Purple erases the projectiles it meets; a hit during the chant brea
   assert.equal(t.released, false);
   for (let i = 0; i < steps(1.5); i++) b.tick();
   assert.ok(b.projectiles.every((p) => p.def.id !== 'attack5_object'), 'no sphere');
-  assert.equal(b.attacker.combat.abilityCooldowns.active('attack5'), true, 'interruption does not refund the 5-second cooldown');
+  assert.equal(b.attacker.combat.abilityCooldowns.active('attack5'), false, 'never fired: its 5-second cooldown never started');
   b.tick(P('attack5'));
-  assert.equal(b.attacker.technique, null, 'the interrupted chant still waits for its cooldown');
+  assert.ok(b.attacker.technique, 'the interrupted chant may be tried again at once');
 });
 
 // ---- Infinity -------------------------------------------------------------------------------

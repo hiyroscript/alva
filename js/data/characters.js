@@ -141,7 +141,8 @@ export function characterFramePaths(def) {
 // the Fighter builds it, so a hit dealing anything but 1, 3, 5 or 10, a
 // move declaring a cooldown the cooldown policy does not give it
 // (js/data/cooldowns.js: 5 s for 10 damage, 3 s for a heal or a paralysis,
-// else the 0.5 s repeat delay; none for a Deflect), a Deflect off its
+// else none, a Deflect's included) or an Energy cost the Energy policy does
+// not give it (js/data/energy.js), a Deflect off its
 // fixed strike or an `energy` entry that sets its own maximum or costs is
 // refused as the registry loads, not when a match first builds the
 // fighter. So is any way past an active Shield (`unblockable` and the rest

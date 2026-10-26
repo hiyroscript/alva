@@ -15,28 +15,35 @@
 //      that turns its target's hits into heals, a float that lifts its
 //      target helpless into the air, a fear that makes its own hits on its
 //      target heal it).
-//   3. Otherwise it has no cooldown of its own: only the universal repeat
-//      delay, REPEAT_COOLDOWN (0.5 s).
+//   3. Otherwise it is an ordinary move: no cooldown at all (0). There is
+//      no universal repeat delay: what keeps an ordinary move from being
+//      used again at once is its own animation (it never restarts or cuts
+//      into itself while it plays, see Fighter.tryAction) and, for one that
+//      creates a gameplay construct (a projectile, a clone, a burst), its
+//      Energy (js/data/energy.js).
 //
 // The first rule that applies decides; the special cooldowns never add up
 // (a 10-damage paralysis is 5 s, never 8). Nothing else counts: launching,
 // pushing, pulling, homing, carrying, a projectile, a quake, a bounce, a
 // slam, ordinary hitstun or blockstun, a long animation (ROUTINE_EFFECTS).
+// The Deflect deals 3 and has no special effect: it is ordinary, 0.
+// Locomotion, jumps and the Shield have no move cooldown either; the Dash
+// and the air dash keep their own movement timers
+// (CombatState.movementCooldowns, movement.dashRepeat), outside this policy.
 //
-// Exempt moves (the Deflect) skip the universal repeat delay: with no
-// special class their cooldown is 0, none at all. Locomotion, jumps and the
-// Shield have no move cooldown either; the Dash and the air dash keep their
-// own movement timers (CombatState.movementCooldowns), outside this policy.
+// So exactly two lengths exist, EXCEPTIONAL_COOLDOWN and
+// TEN_DAMAGE_COOLDOWN, and 0 for every ordinary move. A definition may
+// leave `cooldown` out (and should: it is derived); one that declares it
+// must agree with the policy, or it is refused as it is built
+// (resolveCooldown): no fighter can author an 8-second cooldown, a
+// 12-second heal or a 0.5 s jab.
 //
-// So exactly three lengths exist: REPEAT_COOLDOWN, EXCEPTIONAL_COOLDOWN and
-// TEN_DAMAGE_COOLDOWN (and 0 for an exempt move). A definition may leave
-// `cooldown` out (and should: it is derived); one that declares it must
-// agree with the policy, or it is refused as it is built (resolveCooldown):
-// no fighter can author an 8-second cooldown, a 12-second heal or a 0.05 s
-// Deflect. A value up to REPEAT_COOLDOWN on a move with no special class is
-// the baseline itself, so it is accepted (and is the baseline).
+// A special cooldown starts only once its move is released (see
+// RELEASE_EVENTS): never on the press, the startup or the cast. A move
+// interrupted before it releases starts none; one released keeps its
+// cooldown whatever happens after (a hit in its recovery, a miss, a block,
+// a projectile turned back, a clone gone). One activation starts it once.
 
-export const REPEAT_COOLDOWN = 0.5;
 export const EXCEPTIONAL_COOLDOWN = 3;
 export const TEN_DAMAGE_COOLDOWN = 5;
 
@@ -47,9 +54,9 @@ export const TEN_DAMAGE = 10;
 export const SPECIAL_COOLDOWNS = Object.freeze([EXCEPTIONAL_COOLDOWN, TEN_DAMAGE_COOLDOWN]);
 
 // A move's class, by the rule that applies to it (see above), and the
-// cooldown each gives (null: the baseline, or none for an exempt move).
+// cooldown each gives (0: none at all).
 export const COOLDOWN_CLASSES = Object.freeze({
-  ordinary: null,
+  ordinary: 0,
   exceptional: EXCEPTIONAL_COOLDOWN,
   tenDamage: TEN_DAMAGE_COOLDOWN,
 });
@@ -139,13 +146,34 @@ export function cooldownClass(kind, spec, context) {
   return impactClass(moveImpact(kind, spec, context));
 }
 
-// The cooldown the policy gives a move of class `cls`: its special one, else
-// the universal repeat delay (none at all for an exempt move).
-export function policyCooldown(cls = 'ordinary', { exempt = false } = {}) {
-  const special = COOLDOWN_CLASSES[cls];
-  if (special === undefined) throw new Error(`[Alva] Unknown cooldown class "${cls}"`);
-  return special ?? (exempt ? 0 : REPEAT_COOLDOWN);
+// The cooldown the policy gives a move of class `cls`: its special one, or
+// 0 for an ordinary move.
+export function policyCooldown(cls = 'ordinary') {
+  const seconds = COOLDOWN_CLASSES[cls];
+  if (seconds === undefined) throw new Error(`[Alva] Unknown cooldown class "${cls}"`);
+  return seconds;
 }
+
+// When each kind of move is released, the one event its special cooldown
+// starts on (see the top), by what the move is. Release is not a hit: a
+// projectile that later misses, a strike that whiffs or is blocked was
+// released all the same.
+//
+//   strike       a single-strike melee attack: its strike goes live (its
+//                startup over).
+//   strikes      a multi-hit attack: its last strike goes live, the whole
+//                authored string emitted (an early strike is not enough).
+//   projectile   an attack that throws one: the projectile is spawned (the
+//                attack's time crosses its spawnAt, the thrower not stunned).
+//   impact       a slam with an impact: the impact strikes, as it lands
+//                (one whose plunge runs out in the air never releases).
+//   technique    its cast is over and it lets go of what it casts (its
+//                projectile, its burst, its heal: Technique.release).
+//   summon       its clone actually appears (spawnClones,
+//                js/game/combat/summon.js).
+//
+// An attack that both strikes and throws is released once both have.
+export const RELEASE_EVENTS = Object.freeze(['strike', 'strikes', 'projectile', 'impact', 'technique', 'summon']);
 
 const REASONS = Object.freeze({
   tenDamage: 'it deals 10 damage',
@@ -155,17 +183,16 @@ const REASONS = Object.freeze({
 
 // The cooldown `owner` (a move, named in errors) really has: the policy's
 // for its class `cls` (see policyCooldown). A declared `value` must be
-// finite, non-negative seconds, and must agree with the policy (anything up
-// to REPEAT_COOLDOWN is the baseline itself, on a move that is not exempt);
-// any other is refused, never quietly kept or rounded.
-export function resolveCooldown(value, owner = 'Move', { exempt = false, cls = 'ordinary' } = {}) {
-  const policy = policyCooldown(cls, { exempt });
+// finite, non-negative seconds, and must agree with the policy exactly (0
+// for an ordinary move); any other is refused, never quietly kept or
+// rounded.
+export function resolveCooldown(value, owner = 'Move', { cls = 'ordinary' } = {}) {
+  const policy = policyCooldown(cls);
   if (value === undefined) return policy;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     throw new Error(`[Alva] ${owner} declares cooldown ${value}: expected finite, non-negative seconds`);
   }
-  const declared = exempt ? value : Math.max(REPEAT_COOLDOWN, value);
-  if (Math.abs(declared - policy) > 1e-9) {
+  if (Math.abs(value - policy) > 1e-9) {
     throw new Error(`[Alva] ${owner} declares cooldown ${value}: the cooldown policy gives it ${policy} s, as ${REASONS[cls]} (js/data/cooldowns.js)`);
   }
   return policy;

@@ -294,10 +294,11 @@ export const CHARACTER_0002 = {
     steerAngle: 15,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): the same
-  // bar and the same costs as every fighter's (100; a Dash, an air dash or a
-  // Dash cancel 25, a Deflect 15, each blocked hit 15). Its own is only how
-  // fast it refills: 12 a second.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js and
+  // js/data/energy.js): the same bar and the same price as every
+  // fighter's (100; 15 for a Dash, an air dash or a Dash cancel, a Deflect,
+  // each blocked hit, and each ordinary move that creates a construct). Its
+  // own is only how fast it refills: 12 a second.
   energy: {
     regen: 12,
   },
@@ -434,8 +435,8 @@ export const CHARACTER_0002 = {
   // origin, mirrored with facing). Its speed is in its moves' own motion
   // (the homing dash, the plunge, the roll, the lift), never in how it runs.
   // Cooldowns are the shared policy's (js/data/cooldowns.js), never authored
-  // here: the Whirlwind, whose tornado's finisher deals 10, waits 5 seconds;
-  // every other move only the universal 0.5-second repeat delay. Neither
+  // here: the Whirlwind, whose tornado's finisher deals 10, waits 5 seconds
+  // from the moment its tornado leaves; every other move none at all. Neither
   // changes startup, strikes or recovery. Each moves by the mobility tier
   // its role gives it (js/data/attack-mobility.js); its speed is in its
   // moves' own motions (the homing dash, the roll, the plunge, the lift),
@@ -501,8 +502,8 @@ export const CHARACTER_0002 = {
     // Attack): 6 in all, and #0002's surest way to send someone off the
     // stage. Once the finisher has landed, a jump or a Dash may chase it.
     // The hitbox is the thick of the flurry just in front, where the feet
-    // land, not the trails' tips. Pressed again and again, flurries string
-    // with a repeat delay between flurries; different-move follow-ups can
+    // land, not the trails' tips. Pressed again and again, each flurry
+    // plays out before the next; different-move follow-ups can
     // still chase the fling. A Shield stops the flurry at the kick it blocks. It keeps most
     // of a run as it starts, but it is heavy: slowed to a walk and steered
     // only a little, so the flurry stays on its target.

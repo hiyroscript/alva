@@ -400,7 +400,7 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   for (let i = 0; i < 3; i++) assert.ok(def.hits[i].hitstun > def.hits[i + 1].at - def.hits[i].at + def.hits[i].hitstop);
   assert.equal(def.startup, 4 / 20);
   assert.ok(def.hitCancel >= def.hits[3].at + def.hits[3].active - 1e-9, 'committed to the whole flurry: a chase only once the finisher is out');
-  assert.equal(def.cooldown, 0.5, 'universal repeat cooldown');
+  assert.equal(def.cooldown, 0, 'an ordinary move: no cooldown at all');
   // Pressed over and over, flurries string only until their fling, growing
   // with the Launch Point, carries the target out of reach: never a loop.
   const spam = versus({ gap: 44 });
@@ -505,11 +505,8 @@ test('the Bounce Attack plunges at a fixed speed and bounces back up off the gro
   assert.equal(fighter.grounded, false, 'no landing');
   assert.equal(fighter.combat.attack, null, 'the attack is over');
   assert.notEqual(fighter.state, 'land');
-  // A press near the beginning of the cooldown expires. A fresh press
-  // after the timer can use the second airborne attack.
-  step(P('attack2'));
-  stepUntil(step, (f) => !f.combat.cooldowns.has('midair_attack2'), {}, 40);
-  assert.equal(fighter.combat.attack, null);
+  // No repeat delay: a fresh press is the second airborne one at once.
+  assert.equal(fighter.combat.cooldowns.has('midair_attack2'), false);
   step(P('attack2'));
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack2');
   stepUntil(step, (f) => !f.combat.attack, {});

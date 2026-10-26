@@ -43,8 +43,9 @@
 // air the Shield button is its Deflect, green alone whirling to bat
 // projectiles back. Its cooldowns are the shared policy's
 // (js/data/cooldowns.js), derived from what each move does, never authored
-// here: Ice Breath waits 3 s (a freeze), every other move only the
-// universal 0.5 s repeat delay, and the Deflect none.
+// here: Ice Breath waits 3 s (a freeze) from its release; every other
+// move none at all (Heat Vision and the Sonic Scream, ordinary projectile
+// casts, cost 15 Energy each instead), and the Deflect none.
 //
 // Every power is the sisters' own in their canon: flight, super strength
 // and speed, heat vision, an icy breath, a sonic scream, spinning into a
@@ -355,9 +356,9 @@ export const CHARACTER_0006 = {
     steerAngle: 20,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): the same
-  // bar and the same costs as every fighter's. Its own is only how fast it
-  // refills: 14 a second.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js and
+  // js/data/energy.js): the same bar and the same price, 15, as every
+  // fighter's. Its own is only how fast it refills: 14 a second.
   energy: {
     regen: 14,
   },
@@ -536,12 +537,12 @@ export const CHARACTER_0006 = {
   // js/game/combat/technique.js). A cast: the sister performing it stands
   // committed to it at the front, then lets go all at once. A hit on #0006
   // before it lets go breaks it (nothing released), and it needs the ground
-  // throughout. Its cooldown begins on acceptance and runs on even if
-  // interrupted.
+  // throughout. Its cooldown, if it has one, begins as it releases (a cast
+  // broken before then starts none).
   techniques: {
     // Heat Vision: 0.3 s with pink's eyes heating up, then her glare as the
     // beam leaves them (from her eyes, 24 in front of her, 46 up), 0.2 s
-    // more. The policy's 0.5 s.
+    // more. No cooldown: an ordinary projectile, 15 Energy.
     attack3: {
       members: ['pink'],
       castAnimation: 'attack3_cast',
@@ -567,8 +568,8 @@ export const CHARACTER_0006 = {
     // The Sonic Scream: a third of a second as blue screws up her face and
     // opens her mouth, then her scream bursts out and its wave leaves her
     // (from her mouth, 44 in front of her; its middle 56 up, so the wave
-    // clears the floor), 0.4 s more. The policy's
-    // 0.5 s.
+    // clears the floor), 0.4 s more. No cooldown: an ordinary projectile,
+    // 15 Energy.
     attack5: {
       members: ['blue'],
       castAnimation: 'attack5_cast',
@@ -581,10 +582,9 @@ export const CHARACTER_0006 = {
   // js/game/combat/attacks.js), each naming the sister(s) performing it.
   // Phases are whole frames of each clip, and every hitbox is measured from
   // her art at the front of the group, where she stands for it (the
-  // fighter's origin; facing right, mirrored with facing). Each has only
-  // the universal 0.5-second repeat delay (the cooldown policy's: none
-  // deals 10, paralyzes, floats or frightens), independent of its phases
-  // and of other moves' cooldowns. Each moves by the mobility tier its role
+  // fighter's origin; facing right, mirrored with facing). None has a
+  // cooldown (the cooldown policy's: none deals 10, paralyzes, floats or
+  // frightens). Each moves by the mobility tier its role
   // gives it (js/data/attack-mobility.js): the punch and the kick quick,
   // the Flying Punch heavy, the tornado planted (it rolls on by itself),
   // the strike medium (its dash is its own).

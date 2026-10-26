@@ -305,8 +305,13 @@ test('harder levels answer an incoming Red more often', () => {
 test('it closes in on a distant opponent', () => {
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, seed: 7, cpuX: 300, foeX: 1500 });
-    r.run(seconds(6));
-    const dist = Math.abs(r.foe.body.x - r.cpu.body.x);
+    // Its closest approach: once it has closed in it may well send the
+    // opponent flying away again.
+    let dist = Infinity;
+    for (let i = 0; i < seconds(6); i++) {
+      r.step();
+      dist = Math.min(dist, Math.abs(r.foe.body.x - r.cpu.body.x));
+    }
     assert.ok(dist < 400, `${difficulty} got closer (${dist.toFixed(0)} from 1200)`);
   }
 });
@@ -438,19 +443,20 @@ test('left to itself, a high level uses Unlimited Void and Hollow Purple on an o
   for (const [seed, foeX, lp] of [0, 1, 2, 3, 4, 5].flatMap((n) => [[n, 900, 0], [n, 1300, 60]])) {
     const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX, script: () => ({}) });
     let tech = null;
-    let cooling = [];
     for (let i = 0; i < seconds(14); i++) {
       r.foe.combat.launchPoint = lp;
       r.step();
       const out = r.log.at(-1);
-      const now = [...r.cpu.combat.abilityCooldowns.entries.keys()];
-      for (const id of now.filter((c) => !cooling.includes(c))) {
+      const cast = r.cpu.technique;
+      if (cast && cast !== tech) {
+        const id = cast.action;
         assert.ok(out[`${id}Pressed`], `seed ${seed}: ${id} started on its own button`);
         assert.ok(!out.attack1Pressed && !out.attack2Pressed && !out.attack3Pressed, `seed ${seed}: never from another attack`);
+        // Its cooldown starts as it releases, never on the press.
+        assert.equal(r.cpu.combat.abilityCooldowns.active(cast.def.id), false, `seed ${seed}: ${id} not cooling on its press`);
+        used[id]++;
       }
-      cooling = now;
-      if (r.cpu.technique && r.cpu.technique !== tech) used[r.cpu.technique.action]++;
-      tech = r.cpu.technique;
+      tech = cast;
     }
   }
   assert.ok(used.attack4 > 0, `it casts Unlimited Void (${used.attack4})`);

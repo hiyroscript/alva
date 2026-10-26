@@ -713,6 +713,8 @@ test('custom bindings: a single button, a combination, a direction on a stick, h
   // #0002 keeps its own layout: independent.
   const q = await padFighter(TWO, { profileFor });
   assert.equal(q.press(['east']).attack, 'attack3', '#0002: Circle is still its Spin Attack');
+  // A Shield press never cuts that attack short: once it has played out.
+  q.settle(60);
   assert.equal(q.press(['l1'], { hold: 10 }).shield, true, '#0002: L1 still its Shield');
 });
 

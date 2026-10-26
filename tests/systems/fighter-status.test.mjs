@@ -47,7 +47,7 @@ function recorder() {
 
 const texts = (calls, fn = 'fillText') => calls.filter((c) => c.fn === fn).map((c) => c.args[0]);
 
-test('only cooldowns above the baseline have rings, and each uses the shared touch preview', () => {
+test('only the special cooldowns have rings, from the moment their move is released, and each uses the shared touch preview', () => {
   for (const [id, action, seconds, animation, frame] of [
     ['0001', 'attack4', 3, 'attack4_cast', 5],
     ['0001', 'attack5', 5, 'attack5_object', 0],
@@ -56,7 +56,11 @@ test('only cooldowns above the baseline have rings, and each uses the shared tou
     const { fighter: f, step } = makeFighter({ character: getCharacter(id) });
     assert.deepEqual(cooldownIndicators(f), []);
     step({ [action]: true, [`${action}Pressed`]: true });
-    if (action === 'extra_attack') while (f.combat.attack) step();
+    // Nothing until the move is released (its cast, or its throw).
+    while (!cooldownIndicators(f).length) {
+      assert.ok(f.technique || f.combat.attack, `${id} ${action}: still performing it`);
+      step();
+    }
     const [c] = cooldownIndicators(f);
     assert.equal(c.id, action);
     assert.equal(c.text, seconds.toFixed(1));
@@ -69,9 +73,10 @@ test('only cooldowns above the baseline have rings, and each uses the shared tou
     f.combat.update(seconds / 2);
     assert.deepEqual(cooldownIndicators(f), []);
   }
+  // An ordinary move has no cooldown to ring, and the Dash's own movement
+  // timer is no move cooldown.
   const { fighter: f } = makeFighter();
   f.combat.cooldowns.set('attack1', 0.5);
-  f.combat.abilityCooldowns.start('attack4', 0.5);
   f.combat.movementCooldowns.start('mouvment', 0.5);
   assert.deepEqual(cooldownIndicators(f), []);
   const { ctx, calls } = recorder();

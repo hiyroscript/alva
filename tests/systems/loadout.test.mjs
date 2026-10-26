@@ -92,7 +92,8 @@ for (const c of LOADOUT_CASES) {
         assert.equal(f.combat.abilityCooldowns.size, 0);
       } else if (type === 'summon') {
         assert.equal(f.combat.attack, null, `${button}: no attack of the fighter's own`);
-        assert.ok(f.combat.abilityCooldowns.active(button), `${button}, the summon, with its cooldown`);
+        assert.equal(f.combat.abilityCooldowns.active(button), false, `${button}, the summon: no cooldown before its clone`);
+        assert.equal(f.combat.energy, 100 - f.summonDefs[button].energyCost, `${button}: its Energy, as it is accepted`);
         // Its owner's summoning startup first (#0001's, borrowed), then the
         // clone, from the same press.
         assert.equal(f.state, 'summon', `${button}: the startup, from the press`);
@@ -100,9 +101,10 @@ for (const c of LOADOUT_CASES) {
         for (let i = 0; i < startupSteps(c.def, button); i++) ground.tick();
         assert.equal(ground.clones.length, 1, 'its clone');
         assert.equal(ground.clones[0].attackDef.id, 'attack1');
+        assert.equal(f.combat.abilityCooldowns.active(button), f.summonDefs[button].cooldown > 0, `${button}: its cooldown, if any, from the clone`);
       } else if (type === 'technique') {
         assert.equal(f.technique?.def.id, button, `${button}, the technique`);
-        assert.ok(f.combat.abilityCooldowns.active(button));
+        assert.equal(f.combat.abilityCooldowns.active(button), false, `${button}: no cooldown before its release`);
       } else {
         // A button it does not have (attack5 of a smaller fighter, its
         // reserved or missing extras).
@@ -271,7 +273,12 @@ test('a Case F CPU presses attack3, attack4 and attack5 directly: each summon or
     // Each summon or technique starts on a step where its own button is
     // pressed, and no other numbered button with it.
     mine.forEach((s, i) => {
-      for (const id of s.cooling.filter((c) => !(mine[i - 1]?.cooling ?? []).includes(c))) {
+      const before = mine[i - 1];
+      const started = [
+        s.technique && s.technique !== before?.technique ? s.technique : null,
+        s.summoned && s.summoned !== before?.summoned ? s.summoned : null,
+      ].filter(Boolean);
+      for (const id of started) {
         specials++;
         assert.ok(s[`${id}Pressed`], `seed ${seed}: ${id} from its own button`);
         for (const other of ['attack1', 'attack2']) assert.ok(!s[`${other}Pressed`], `seed ${seed}: ${id} never from ${other}`);

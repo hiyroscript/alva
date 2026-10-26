@@ -227,9 +227,10 @@ pushed left or right, the way it is pushed), or either touch layout's
 Mouvement buttons. Run taps never request it, on the ground or airborne.
 `Fighter.tryMouvment` selects `tryDash` on the ground or `tryAirDash` in the air.
 It needs the fighter free to act (or in an attack that hit and
-may be cut short: a Dash cancel), grounded, not shielding, not exhausted
+may be cut short: a Dash cancel; or in a move that yields to any request,
+such as a heal), grounded, not shielding, not exhausted
 and real `mouvment` frames (refused and logged otherwise, never faked
-with the run). It costs 20 Energy (`DASH_ENERGY_COST`, the same for every
+with the run). It costs 15 Energy (`DASH_ENERGY_COST`, the same for every
 fighter, a Dash cancel included; see [Energy](energy.md)); running,
 jumps, air jumps, turning, air control and the fast fall cost none. It is movement only: no hitbox, damage,
 launch or invulnerability. Leaving the ground or meeting a solid ends it.
@@ -240,7 +241,7 @@ across it, facing the way it goes at once; its vertical speed is zeroed
 as it starts and gravity is held off throughout (no fall, no fast fall).
 `airDashUses` per airtime, given back on landing and by a hit; an air
 jump gives none back. The same rules as a Dash otherwise, and never while
-still flying from a launch or in free fall, and for the same 20 Energy.
+still flying from a launch or in free fall, and for the same 15 Energy.
 Meeting a solid or the ground ends it.
 
 **Flowing out of them.** Both commit to `dashCancelTime` of themselves;
@@ -344,8 +345,8 @@ Shield's ([defense](defense.md)).
 ## Repeat cooldowns
 
 Dash and air dash are discrete actions, each with a separate reuse timer from
-acceptance, the universal `dashRepeat` (0.4 s, its own value, apart from the
-attacks' 0.5-second repeat delay; `CombatState.movementCooldowns`, `mouvment`
+acceptance, the universal `dashRepeat` (0.4 s, its own movement timer: the
+attacks' old 0.5-second repeat delay is gone, and this is no replacement for it; `CombatState.movementCooldowns`, `mouvment`
 and `midair_mouvment`). Their speed, duration, cancel time, Energy cost and airtime
 limits stay the same. Player and CPU check the same `Fighter.movementReady`.
 Requests made during these timers are discarded even through hitstop; busy

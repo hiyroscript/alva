@@ -8,7 +8,7 @@
 // Launch and damage validation from js/data/launch.js, the hit effects
 // (paralyze, blockPush) from js/game/combat/hit-effects.js and the attack
 // classification from js/game/combat/offense.js.
-// Outputs: createAttackDefinition, attackPhase, strikeLive, attackReach,
+// Outputs: createAttackDefinition, attackPhase, attackReleaseAt, strikeLive, attackReach,
 // isMeleeAttack / isRangedAttack (what kind of strike an attack is),
 // MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares with).
 // Important constraints: definitions are frozen and validated once; a
@@ -58,13 +58,24 @@
 // the cooldown policy's (js/data/cooldowns.js), derived from what the
 // attack does: 5 s for one that deals 10 damage (its strikes, its slam's
 // impact, the projectile it throws: pass the fighter's `projectiles` so a
-// throw is judged by its projectile), 3 s for one that paralyzes, else the
-// universal 0.5 s repeat delay. An entry may leave it out; one it declares
-// must agree. The Deflect alone is exempt from the 0.5 s baseline (none at
-// all). Every definition records its class (`cooldownClass`). Ordinary
-// timers begin when an attack ends, is cut short or is interrupted.
-// Self-cancels must have been open for that move's delay. Summons and
-// techniques start their own timers on acceptance.
+// throw is judged by its projectile), 3 s for one that paralyzes, else
+// none at all (an ordinary attack, the Deflect included). An entry may
+// leave it out; one it declares must agree. Every definition records its
+// class (`cooldownClass`). A special cooldown starts once, as the attack
+// is released (`releaseAt`, see attackReleaseAt; a slam with an impact as
+// that impact lands): never as it starts, and never for one interrupted
+// before then. Nothing starts as it ends, is cut short or is interrupted.
+//
+// `energyCost` is what one use of it costs as it starts (the Energy
+// policy's, js/data/energy.js): 15 for an ordinary attack that throws a
+// projectile (a construct), 0 for every other (a melee strike, a throw
+// with a special cooldown). Derived; one an entry declares must agree.
+//
+// `freeCancel` says whether the attack gives way to any valid request
+// while it plays (see yieldsToRequests in js/game/combat/offense.js): an
+// attack that can harm never does (only an authored, hit-confirmed
+// `hitCancel` cuts it short), one that cannot (a pending attack) does, and
+// so does the Deflect, a defense, by explicit rule.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -268,18 +279,19 @@
 // them). Its length is one pass of its clip (the fighter's art decides it:
 // see createAttackDefinition's `clipDuration`), all of it recovery, so the
 // fighter is committed and harmless for exactly as long as the art plays.
-// The baseline repeat cooldown, no hit-cancel; it moves by its mobility
+// No cooldown, no Energy, no hit-cancel; it gives way to any valid request (it harms nobody); it moves by its mobility
 // tier like any attack (the default one unless it names its own). Nothing
 // about it names a fighter: any fighter whose art arrives before its
 // attributes can use it.
 //
 //   attack1: { animation: 'attack1', pending: true },
 
-import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { resolveMoveEnergy } from '../../data/energy.js';
 import { resolveMobility } from '../../data/attack-mobility.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { createHit, resolveHitEffects } from './hit-effects.js';
-import { assertNoShieldBypass, attackOffense, resolveOffense } from './offense.js';
+import { assertNoShieldBypass, attackOffense, resolveOffense, yieldsToRequests } from './offense.js';
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -291,7 +303,7 @@ const ATTACK_DEFAULTS = {
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
-  cooldown: REPEAT_COOLDOWN,
+  cooldown: 0,
   groundOnly: false,
   // The attack governs the fighter's movement while it plays: its mobility
   // tier's momentum, airMomentum, control, airControl, topSpeed,
@@ -514,12 +526,29 @@ export function attackPhase(def, time) {
   return 'recovery';
 }
 
+// Seconds into attack `def` at which it is released (see RELEASE_EVENTS in
+// js/data/cooldowns.js), or null when no time releases it: a single strike
+// as it goes live (its startup over), a multi-hit string as its last
+// strike goes live, a throw as its projectile spawns (an attack that does
+// both, once both have). A slam with an impact is released by the impact
+// itself, as it lands (see Fighter.landSlam), and a pending attack never
+// is: both null.
+export function attackReleaseAt(def) {
+  if (!def || def.pending) return null;
+  if (def.motion?.type === 'slam' && def.motion.impact) return null;
+  let at = null;
+  if (def.hits?.length) at = def.hits[def.hits.length - 1].at;
+  else if (def.hitbox) at = def.startup;
+  if (def.projectile) at = Math.max(at ?? 0, def.projectile.spawnAt ?? 0);
+  return at;
+}
+
 // What a pending attack may not declare: everything that would make it hit
 // or time a strike.
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze',
+  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'energyCost',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -529,7 +558,7 @@ const PENDING_REFUSED = Object.freeze([
 // its clip, and strikes nothing. `projectiles` is the fighter's own
 // `projectiles` entry: the one this attack throws counts toward its
 // cooldown class (see `cooldown` above).
-export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt = false, projectiles = null } = {}) {
+export function createAttackDefinition(spec, { clipDuration = 0, projectiles = null } = {}) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
   const owner = `Attack "${spec.id}"`;
   assertNoShieldBypass(spec, owner);
@@ -544,7 +573,10 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
     };
     def.total = def.recovery;
     def.cooldownClass = 'ordinary';
+    def.releaseAt = null;
+    def.energyCost = 0;
     def.offense = resolveOffense(spec, attackOffense(def), owner);
+    def.freeCancel = yieldsToRequests(def.offense);
     return Object.freeze(def);
   }
   const def = spec.hits
@@ -557,12 +589,15 @@ export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt 
     throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
   }
   def.cooldownClass = cooldownClass('attack', spec, { projectiles });
-  def.cooldown = resolveCooldown(spec.cooldown, owner, { exempt: cooldownExempt, cls: def.cooldownClass });
+  def.cooldown = resolveCooldown(spec.cooldown, owner, { cls: def.cooldownClass });
+  def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'attack', def, def.cooldownClass);
   def.motion = resolveMotion(spec.motion, owner, spec.id);
   def.pull = resolvePull(spec.pull, owner);
   def.deflectProjectiles = !!def.deflectProjectiles;
   if (def.deflectProjectiles && !def.hitbox) throw new Error(`[Alva] ${owner} deflects projectiles but has no hitbox to do it with`);
   def.total = def.startup + def.active + def.recovery;
+  def.releaseAt = attackReleaseAt(def);
   def.offense = resolveOffense(spec, attackOffense(def), owner);
+  def.freeCancel = yieldsToRequests(def.offense);
   return Object.freeze(def);
 }

@@ -94,7 +94,7 @@ test('a charm is exceptional, like a heal or a paralysis: 3 s, and a ten-damage 
   assert.equal(createTechniqueDefinition({ id: 't', burst: { hitbox: BOX, hit: { damage: 10, charm: 2.5 } } }).cooldown, 5);
   const projectiles = { x_object: { damage: 3, charm: 1 } };
   assert.equal(cooldownClass('attack', { hitbox: null, projectile: { id: 'x_object' } }, { projectiles }), 'exceptional', 'a thrown one too');
-  assert.equal(createAttackDefinition({ id: 'b', hitbox: BOX, damage: 3, charm: 0 }).cooldown, 0.5, 'no charm, no cooldown');
+  assert.equal(createAttackDefinition({ id: 'b', hitbox: BOX, damage: 3, charm: 0 }).cooldown, 0, 'no charm, no cooldown');
 });
 
 test('a hit that charms is an attack, whatever else it does', () => {

@@ -209,9 +209,11 @@ attack's own `hitbox` (and no `projectile`) is what makes it melee.
 
 Optionally `energy: { regen }`, its refill rate per second (12 when left
 out). That is all a fighter sets of its Energy: the bar (100) and every
-cost (a Dash, an air dash or a Dash cancel 25, a Deflect 15, a block 15)
-are the same for everyone, and a definition that
-writes another is refused ([Energy](../systems/energy.md)).
+cost (15 for everything: a Dash, an air dash or a Dash cancel, a Deflect,
+a block, and each ordinary move that creates a construct: a projectile, a
+burst, a clone) are the same for everyone, derived from the move's data,
+and a definition that writes another (a move's `energyCost` included) is
+refused ([Energy](../systems/energy.md)).
 Optionally too `launchReaction` (extra stun, tumble,
 steering; [launch](../systems/launch.md#launch-reaction-per-fighter)) and
 `launchBounce` (overrides of the shared rebound settings).
@@ -262,9 +264,12 @@ plunge or lift writes its `airTopSpeed` equal to its `airControl`:
 [attack movement](../systems/movement.md#5-attack-movement)); and
 whether a hit opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
 policy derives it from what the move does (5 s for 10 damage, 3 s for a
-heal, a paralysis or a charm, else the 0.5 s repeat delay; independent of the
-move's phases), and a value it does not give is refused as the registry
-loads ([combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
+heal, a paralysis or a charm, else none at all; a 3 s or 5 s one starts
+as the move is released, never on the press), and a value it does not give
+is refused as the registry loads ([combat](../systems/combat.md#cooldowns)).
+Do not lean on a cooldown to stop a quick move being repeated: an
+ordinary move may start again the moment it ends, so its own length is
+its limit (and, if it throws, its 15 Energy). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`, `slam`: a plunge that lands with an `impact`),
 `pull`, `airUses`, `freeFall`, `passThrough`, `hurtboxes`, and on any hit
@@ -293,14 +298,16 @@ leaves her mouth with its middle 56 up).
 **A summon** (a clone of the fighter performing one of its own attacks)
 is a `summons.attackN` entry with its `attack`, its `cloud` (an
 `effectAnimations` entry named `attackN_object`; its cooldown is the
-policy's, from the attack its clone performs), and
+policy's, from the attack its clone performs, starting as the clone
+appears; an ordinary one costs 15 Energy), and
 optionally `startupAnimation` (`attackN_summon`) and `noGround`
 ([summons](../systems/combat.md#summons); #0005's Red Balloon).
 
 **A technique** is a `techniques.attackN` entry. The runtime supports one
 form, the cast: two fighter clips (`castAnimation`, `releaseAnimation`,
 named `attackN_cast` and `attackN_release` by convention; its cooldown is
-the policy's, from what it releases), and what it lets go of
+the policy's, from what it releases, starting as it releases; an ordinary
+one that releases a projectile or a burst costs 15 Energy), and what it lets go of
 as the cast ends: a `projectile` (an entry of `projectiles`,
 `attackN_object`), a `burst` round the fighter (a `hitbox` and its `hit`,
 and optionally its art as it goes out, `effect: { animation, offset }`, an
@@ -352,8 +359,9 @@ directly, and never with its own idea of when a Shield counts.
   for the Shield button in the air ([the
   Deflect](../systems/defense.md#the-deflect)): an attack whose strike is
   always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out) and that
-  costs every fighter 15 Energy as it starts; it has no cooldown (the
-  policy exempts every Deflect from the 0.5 s baseline). It is both an attack and a
+  costs every fighter 15 Energy as it starts; it has no cooldown (it is
+  ordinary), and it is cancellable into any valid aerial move, air jump or
+  air dash by explicit rule. It is both an attack and a
   defense (it must turn projectiles back), and never a Shield. Its box
   is also what catches projectiles, so cover the front of the body the
   move sweeps. Leave it out for none (the button then does nothing in the

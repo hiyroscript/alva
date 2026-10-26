@@ -19,7 +19,6 @@
 // CPU) can do. Changing place (ground or air) never touches a timer.
 
 import { COMBAT_BUTTONS, NUMBERED_ATTACKS } from '../../config.js';
-import { REPEAT_COOLDOWN } from '../../data/cooldowns.js';
 import { moveFor } from '../../data/controller-profiles.js';
 import { specialAction } from '../../data/loadout.js';
 import { isSpecialAbility } from '../../data/special-abilities.js';
@@ -60,8 +59,11 @@ export function abilityGroups(def) {
 // One move's cooldown, read live: { id, duration, remaining, progress,
 // cooling, special }. `duration` is the full length of the cooldown now
 // running (its move's own when it is ready), `progress` how far it has
-// recovered (0 as it starts, 1 ready) and `special` whether its length is
-// one of the policy's special ones (longer than the repeat delay).
+// recovered (0 as it starts, 1 ready) and `special` whether the move has
+// one of the policy's special cooldowns at all (3 s or 5 s: an ordinary
+// move has none, so never cools down). A cooldown shows only once its move
+// has been released (js/data/cooldowns.js): a move still in its startup
+// or cast shows none.
 // `special` (the move kind) says which store holds it: a summon's and a
 // technique's own timers, else the ordinary ones.
 export function moveCooldown(fighter, id, kind = null) {
@@ -87,27 +89,31 @@ export function moveCooldown(fighter, id, kind = null) {
     remaining,
     progress: cooling && duration > 0 ? Math.min(1, Math.max(0, 1 - remaining / duration)) : 1,
     cooling,
-    special: length > REPEAT_COOLDOWN + 1e-9,
+    special: length > 1e-9,
   };
 }
 
 // Why move `entry` (from abilityGroups) of `fighter` cannot start in its
 // place for a reason other than its cooldown, or null. Shown apart from a
-// cooldown, never as one: 'airUses' (its starts for this airtime are used
-// up), 'freeFall' (an earlier move spent the airtime) and 'art' (its frames
-// are missing: refused, never faked). Only the place the fighter is in now
-// can be spent this way; the other place's moves are a preview of what
-// comes after landing or leaving the ground.
+// cooldown, never as one: 'art' (its frames are missing: refused, never
+// faked), 'energy' (it costs Energy, its `energyCost`, and the fighter is
+// exhausted until its bar is full again, in either place), 'airUses' (its
+// starts for this airtime are used up) and 'freeFall' (an earlier move
+// spent the airtime). Only the place the fighter is in now can be spent
+// for the airtime; the other place's moves are a preview of what comes
+// after landing or leaving the ground.
 export function moveRestriction(fighter, entry, place) {
   if (entry.special) {
     const defs = entry.special === 'technique' ? fighter.techniqueDefs : fighter.summonDefs;
     const def = defs?.[entry.move];
     if (!def) return 'art';
     const problem = entry.special === 'technique' ? techniqueProblem(fighter, def) : summonProblem(fighter, def);
-    return problem ? 'art' : null;
+    if (problem) return 'art';
+    return def.energyCost > 0 && fighter.combat?.energyExhausted ? 'energy' : null;
   }
   const atk = fighter.attacks?.[entry.move];
   if (!atk?.animation || !fighter.sprites?.has?.(atk.animation)) return 'art';
+  if (atk.energyCost > 0 && fighter.combat?.energyExhausted) return 'energy';
   const here = fighter.body?.grounded ? 'ground' : 'air';
   if (place !== 'air' || here !== 'air') return null;
   if (fighter.freeFall) return 'freeFall';

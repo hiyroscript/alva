@@ -3378,3 +3378,130 @@ direction, as by hand. Movement is unchanged either way.
 same facing and movement as with it off), sliding keeps it, stopping turns
 it; the air with and without a direction held; an attack with a direction
 held; the Dash and the air dash faced again once the fighter has stopped.
+
+## Strict combat rules
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max` as strict, permanent, universal gameplay rules that supersede the
+older rules below wherever they disagree: the [Combo Assist, move
+cancellation and controller art](#combo-assist-move-cancellation-and-controller-art)
+entry's player move cancellation, the 0.5-second repeat delay of the
+[combat feel overhaul](#combat-feel-overhaul-and-shield-walking) and every
+earlier entry that mentions it, special cooldowns starting "on
+acceptance", the Dash's 20 Energy, and every statement that attacks,
+projectiles, summons or techniques never spend Energy. Those entries stay
+as the record of what each change was at the time.
+
+**What it changed.**
+
+- **No broad attack cancellation.** The behaviour PR #114 (`85fd4af`)
+  added, a human player's new valid request cutting its own attack short
+  in any phase, hit or not, is removed (`Fighter.playerMayCut`,
+  `shieldPressedAt` and the attack record's `startedAt` are gone; the rest
+  of that commit, removed since or not, is untouched). An attack that can
+  harm is cut short only by an established, legitimate window: its
+  authored, hit-confirmed `hitCancel` (into another attack, a jump, a Dash
+  or the Deflect), a Dash past its `dashCancelTime`, the landing cancel, a
+  slam's or a plunge's own contact. A request made during it waits in the
+  buffer and comes out as it ends. `Fighter.cutAttack` now ends only a
+  move that may be cut, whoever calls it. Nothing ever cuts into itself
+  (the CPU's old "once its repeat delay has run since it became
+  cancellable" self-cancel and `CombatState.cancellableFor` are gone), and
+  `repeatsMove` (the press for the move already playing is no request)
+  applies to every fighter.
+- **Non-attacking moves and the Deflect are cancellable.** A move whose
+  classification is no attack (a heal of its own, a pending attack) and,
+  by explicit rule, the Deflect (attack and defense: `yieldsToRequests` in
+  `js/game/combat/offense.js`, recorded as each definition's `freeCancel`)
+  give way to any valid request (`Fighter.moveYields`, folded into
+  `canFollowUp`): another attack, a special on the ground, a jump or air
+  jump, a Dash or air dash, a fresh Shield press, from the step after the
+  move began, never in a forced state, never into itself, and only once
+  the replacement is known to start. A cancelled Deflect strikes and turns
+  back nothing more (what it turned back stays turned) and keeps its 15
+  Energy; a heal cancelled before it lets go heals nothing and starts no
+  cooldown. Harmful techniques and summon startups keep their commitment.
+- **No 0.5-second repeat delay.** `REPEAT_COOLDOWN` is gone: an ordinary
+  move has no cooldown at all (`COOLDOWN_CLASSES.ordinary` is 0, a
+  declared `cooldown` must equal the policy exactly). Only 3 s
+  (exceptional) and 5 s (ten-damage) remain, classified exactly as before.
+  No hidden timer replaces it; the Dash's own `dashRepeat` (0.4 s) is a
+  movement timer and stays.
+- **Cooldowns start on release.** A 3 s or 5 s cooldown starts once, as
+  its move is released (`RELEASE_EVENTS` in `js/data/cooldowns.js`): a
+  strike as it goes live, a string as its last strike goes live, a throw
+  as its projectile spawns (`attackReleaseAt`, `CombatState.releaseAttack`),
+  a slam as its impact lands (`Fighter.landSlam`), a technique as its cast
+  lets go (`Technique.takeCooldown`), a summon as its clone appears
+  (`spawnClones`). Interrupted before then, none starts; released, it runs
+  on whatever follows.
+- **One Energy price, 15.** `js/data/energy.js` holds every price:
+  `ENERGY_COST` (15) for the Dash, air dash and Dash cancel (was 20), the
+  Deflect, each block, and each ordinary move that creates a construct (a
+  projectile, a burst, a clone: `createsConstruct`,
+  `constructEnergyCost`), paid once as it starts, never refunded. Moves
+  with a 3 s or 5 s cooldown pay nothing for their construct. Newly
+  costing 15: #0001 Red and Maximum Blue, #0003 Cherry Blossom Impact,
+  #0004 the Melody, #0006 Heat Vision and the Sonic Scream. `resolveEnergy`
+  knows `constructCost`; each definition's `energyCost` is derived and
+  validated (`resolveMoveEnergy`).
+- **CPU parity.** `moveReady`, `readySoon`, `readyInAir` and the
+  defense / plan follow-up checks mirror the Fighter: each move's real
+  `energyCost`, refusal while exhausted, `repeatsMove`, `moveYields` (so a
+  CPU may cancel its own Deflect or heal), cooldowns read live (so an
+  interrupted startup is ready at once). Difficulty changes none of it.
+- **A loop the repeat delay hid.** Pressed on the very step it rebounds,
+  #0002's Bounce Attack started its hang on the floor, which counted as a
+  landing and gave its air uses back: an endless bounce. Touching the floor
+  in the hang of an attack started in the air is no landing now
+  (`Fighter.update`), so it bounces twice per airtime, as authored.
+- **Interface.** The ability HUD and touch buttons lose the repeat-delay
+  look (`data-state="repeat"`, `is-repeat`); a cooldown shows only from
+  its release; a move that costs Energy is muted while exhausted
+  (`moveRestriction` `energy`, "No Energy until the bar refills" / "Plus
+  d’Énergie jusqu’à ce que la barre se remplisse"). How to Play's Energy
+  and Deflect copy says the new rules.
+
+**Consequences.** Mashing an ordinary attack plays whole attacks back to
+back (no restart, no delay between them). #0001's repeated Jabs remain no
+true combo (a Jab never cuts into itself). Basic strings now go through
+the hit-confirmed window: Attack 1 into Attack 2 still lands on a fresh
+target for every fighter, but against a heavily battered target (40
+Launch Point) #0002's and #0004's first hit launches it out of reach
+before the second (it reached 40 only through PR #114's broad cut). The
+CPU uses projectiles a little less now that they cost Energy, and its
+slow, dominated moves (#0006's ground flurry) come up rarely now that its
+quick strikes never wait. No move's damage, timing, range, trajectory or
+cooldown class was changed.
+
+**Code:** `js/data/cooldowns.js`, new `js/data/energy.js`,
+`js/game/combat/offense.js` (`yieldsToRequests`), `attacks.js`
+(`attackReleaseAt`, `releaseAt`, `energyCost`, `freeCancel`),
+`technique.js`, `summon.js`, `deflect.js`, `combat-state.js`,
+`move-status.js`, `js/game/fighters/fighter.js`,
+`js/game/ai/cpu-intelligence/` (`capabilities.js`, `evaluator.js`,
+`defense.js`, `plans.js`), `js/game/rendering/fighter-status.js`,
+`js/ui/ability-hud.js`, `js/ui/touch-controls.js`, their stylesheets, the
+English and French strings, each fighter's definition comments; the
+specification (7.2.2 to 7.2.6, 7.3), the combat, energy, defense, input,
+movement and AI guides, module responsibilities, adding characters, every
+fighter's specification and the docs index.
+
+**Tests:** new `tests/systems/strict-combat-rules.test.mjs` (release
+points from each attack's structure; release timing for a strike, a
+string, a throw, a slam's impact, a technique and a summon, before and
+after release, exactly once; the construct Energy policy, the roster's
+table, one payment per activation, Energy refusals, no refunds; the CPU's
+costs and cooldown reading); `move-cancel` rewritten (no request cuts an
+attack in any phase, player or CPU; the buffer; no restart; hit-confirmed
+windows still cut; the Deflect cancelled into an aerial, an air jump and an
+air dash, its reflection stopping, its Energy kept, invalid requests
+ending nothing; a heal cancelled before and after release; harmful
+specials committed; identical results for player, CPU and bare
+controllers); `cooldown-policy`, `combat-rules`, `energy`, `dash`, `combo`,
+`technique`, `basic-strings`, `direct-input`, `request-devices`,
+`attack-mobility`, `movement`, `loadout`, `charm`, `down`, `codenames`,
+`ensemble`, `fighter-status`, `sample-fighter`, `slam`, `combat-ai`,
+`cpu-intelligence` (rare moves get extra seeds rather than a lower bar),
+`controller-input`, `ability-hud`, `controls-ui`, `discover`,
+`practice-ground` and the fighter suites updated to the new rules.

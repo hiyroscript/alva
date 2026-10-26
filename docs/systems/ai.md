@@ -52,6 +52,37 @@ player's raw input or the DOM, never uses the wall clock, and never has
 the player's Automatic turn-around (its attacks are aimed by its own
 `attackFacing`). Every random draw comes from its injected seeded RNG.
 
+### The same combat rules as a player
+
+The CPU is bound by exactly the rules a human player is, read from the
+Fighter's own checks, whatever its difficulty (difficulty changes
+decision quality, never a rule):
+
+- **Cancellation.** It never cuts short its own attack that can harm
+  outside the attack's authored, hit-confirmed window (`hitCancel`): its
+  follow-ups go through that window, a Dash cancel, a jump, or the buffer
+  as the attack ends. It may cancel its own Deflect or a heal of its own
+  into any move that may start (`Fighter.moveYields`, folded into
+  `canFollowUp`), but never on the step the move began, never into the
+  same move, and never with a move that cannot start: `moveReady`,
+  `readySoon` and `readyInAir` mirror `Fighter.tryAction` (never into
+  itself, nor its button pressed again while that button's attack plays:
+  `repeatsMove`), `trySpecial` and `tryDeflect`.
+- **Cooldowns.** Only 3 s and 5 s ones exist; an ordinary move has none,
+  so it is ready again the moment it ends. A special cooldown starts only
+  as its move is released, so a move whose startup was interrupted is
+  ready at once; one released is never planned before its cooldown is
+  over. `moveReady` reads `CombatState.cooldowns` and `abilityCooldowns`
+  live, so it can never disagree with the Fighter. A cooldown is no
+  animation lock: a move without one can still be unavailable because the
+  fighter is busy.
+- **Energy.** Each move's `energyCost` is the Fighter's own (15 for the
+  Deflect and for an ordinary move that creates a construct: a throw, a
+  burst, a clone; 0 for a melee strike and a 3 s / 5 s move), the Dash's
+  15 its own too. A move that costs Energy is never ready while the CPU is
+  exhausted, and the evaluator weighs what is left after it (below), so
+  projectiles stay in its game, used where they are worth their price.
+
 ## From the match to the buttons
 
 Four layers, each informing the one below and never reaching past it:
@@ -300,7 +331,8 @@ path, and scored as expected utility:
   it stands (its `finish` estimate over 0.35: by a ledge, say) back to
   safety, gives that finish up, unless the move's own blow is likely to
   end its life.
-- **Costs:** Energy (emptying the bar is worth it only for a life), long
+- **Costs:** Energy (a Dash's, a Deflect's, a construct move's 15; what is
+  left after it; emptying the bar is worth it only for a life), long
   cooldowns, tempo (the same hit is worth less the longer it takes).
 - **Preferences:** the strategy mode's roles (and the roles the opponent's
   habits call for: anti-air against a jumper, Shield pressure against a

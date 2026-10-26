@@ -125,9 +125,8 @@ export class Evaluator {
     if (m.kind === 'technique' || m.kind === 'summon') return moveReady(self, m);
     if (m.air === grounded) return false;
     if ((self.combat.cooldowns.get(m.id) ?? 0) > wait + 0.01) return false;
-    if (self.airStartBlocked(m.def) || self.combat.attack?.def.id === m.id) return false;
-    if (m.kind === 'deflect') return !self.combat.energyExhausted;
-    return true;
+    if (self.airStartBlocked(m.def) || self.combat.attack?.def.id === m.id || self.repeatsMove(m.action)) return false;
+    return !(m.energyCost > 0 && self.combat.energyExhausted);
   }
 
   // Move `m` started `k0` steps from now, from where the CPU is.
@@ -372,7 +371,7 @@ export class Evaluator {
   // aside (it may run out by then), not in free fall, its starts for the
   // airtime not used up (all of them back once it has landed).
   readyInAir(self, m, fromGround) {
-    if (m.kind === 'deflect' && self.combat.energyExhausted) return false;
+    if (m.energyCost > 0 && self.combat.energyExhausted) return false;
     if (fromGround) return true;
     if (self.freeFall) return false;
     return !(m.airUses > 0 && (self.airAttacks.get(m.id) ?? 0) >= m.airUses);
@@ -508,7 +507,9 @@ export class Evaluator {
         interrupt = Math.max(interrupt, clamp(1 - Math.exp(-model.pressure * open), 0, 0.85));
       }
     }
-    // Resources: Energy (the Deflect's, a Dash's), a long cooldown.
+    // Resources: Energy (the Deflect's, a Dash's, a construct move's: one
+    // that throws, casts or summons with no special cooldown pays 15), a
+    // long cooldown.
     let cost = 0;
     const energy = (c.energy ?? 0) + (m.energyCost ?? 0);
     if (energy > 0) {

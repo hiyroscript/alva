@@ -54,9 +54,11 @@ value.
   an attack, Dash, technique, summon startup, stun or paralysis short; it
   comes up the step that ends if `shield` is still held, a landing
   included (held through a jump it rises as the fighter lands, with its
-  raise pose). The one exception is the human player's own attack: a
-  Shield press made after that attack began cuts it and goes up on that
-  step ([combat](combat.md#the-players-requests)).
+  raise pose). The only move it ends is one that yields to any request (a
+  heal of its own, a pending attack): a fresh Shield press made after that
+  move began ends it and goes up on that step; an attack that can harm is
+  never cut short by it, for the human player as for a CPU
+  ([combat](combat.md#requests-and-cancellation)).
 - It takes the step: while it is held no attack, summon, technique or
   Dash starts (an attack pressed meanwhile is buffered for the release; a
   summon or technique is not kept). **Jump jumps out of it**: a jump press
@@ -106,8 +108,10 @@ or lower poses are skipped. There is no Dodge and no chip-damage Block.
 In the air the same button is the fighter's **Deflect**, its `deflect`
 entry: an attack in every way (it goes through `createAttackDefinition`,
 plays its own `deflect` clip, has a startup, an active phase, a recovery,
-a melee hitbox, its stuns and hitstop, its own cooldown, exempt from the 0.5 s baseline, its
-momentum and steering), resolved by the same `CombatSystem` as any attack.
+a melee hitbox, its stuns and hitstop, its cooldown (none: an ordinary
+move), its momentum and steering), resolved by the same `CombatSystem` as
+any attack. Attack though it is, it is **cancellable** by explicit rule
+(below).
 It costs 15 Energy (`DEFLECT_ENERGY_COST`), paid once as it starts. Its strike
 is always **3** Launch Points at **Base Launch 2**, the shared rule
 (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`): a fighter leaves both out, and
@@ -118,7 +122,8 @@ any other value is refused. Its direction is the fighter's own.
 | `animation` | Its clip (`deflect`). Required; missing art refuses it (logged once), never faked. |
 | `startup` / `active` / `recovery` | Its phases, whole frames of its clip. |
 | `hitbox` | Its live box, facing right from the fighter's origin: what its strike meets, and what it catches projectiles with. Required. |
-| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `cooldown` (finite and non-negative, no baseline floor), `airMomentum`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
+| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `airMomentum`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
+| `cooldown` | Never authored but as 0: the policy gives every Deflect none. |
 | `deflectProjectiles` | `true`: while it is live its box turns projectiles back (below). |
 | `damage` / `baseLaunch` | Never authored: always 3 and 2. |
 
@@ -128,10 +133,13 @@ or `groundOnly`.
 - **The press.** A fresh `shield` press (`shieldPressed`) in the air,
   never the button held: holding it starts nothing more, and a press it
   cannot use is never kept for later (it is not buffered). It needs the
-  fighter in the air and free to act, or in an attack that hit and may be
-  cut short (the shared hit-cancel, [combat](combat.md)): never stunned,
-  paralyzed, in a Dash or an air dash, mid-attack otherwise, already
-  Deflecting, cooling down, exhausted, in free fall or out of `airUses`.
+  fighter in the air and free to act, in an attack that hit and may be
+  cut short (the shared hit-cancel, [combat](combat.md)) or in a move
+  that yields: never stunned, paralyzed, in a Dash or an air dash before
+  its cancel time, mid-attack otherwise (a damaging attack is never cut
+  short by a Deflect outside its hit-confirmed window), already
+  Deflecting (a press during its own Deflect restarts nothing), exhausted,
+  in free fall or out of `airUses`.
   Tried before the attack buttons: an attack pressed on the same step
   loses to it.
 - **Its Energy.** 15 (`DEFLECT_ENERGY_COST`), paid as it starts
@@ -141,10 +149,21 @@ or `groundOnly`.
   does not start; with less than 15 left it takes the rest.
 - **An attack and a defense.** Its `offense` is `{ attack: true, defense:
   true }`: its strike is an attack in every way (startup, active frames,
-  recovery, hit detection, damage, launch, hitstop, hit-cancels, being
-  cut short, the CPU's offense), blocked by a raised ground Shield like
-  any other; turning projectiles back is a real defense. Every Deflect
-  turns projectiles back (`deflectProjectiles: false` is refused).
+  recovery, hit detection, damage, launch, hitstop, hit-cancels, the
+  CPU's offense), blocked by a raised ground Shield like any other;
+  turning projectiles back is a real defense. Every Deflect turns
+  projectiles back (`deflectProjectiles: false` is refused).
+- **Cancellable.** Being a defense, it yields to any valid request
+  (`freeCancel`, see `yieldsToRequests` in `js/game/combat/offense.js` and
+  `Fighter.moveYields`), for the human player and a CPU alike: from the
+  step after it starts, in its startup, active phase or recovery, another
+  aerial, an air jump or an air dash ends it the moment that move really
+  starts (its own checks first: one that cannot start, out of air jumps,
+  exhausted, out of `airUses`, ends nothing). From then its box strikes
+  nothing and turns nothing back; a projectile it already turned back
+  stays turned. Its 15 is never given back, and the replacement pays its
+  own (an air dash: another 15). Cancelling out of a Deflect is not
+  cancelling into one: a Deflect still cuts short only what may be cut.
 - **Not a Shield.** `combat.shielding` stays false throughout: no block,
   no perfect Shield, no block's Energy (only its own 15), no blockstun, no
   stall, no Shield look and no slow fall. A blow it does not turn back

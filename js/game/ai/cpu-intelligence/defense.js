@@ -308,8 +308,11 @@ export class Defense {
     const sev = threat.severity + threat.ko * 40;
     // Doing nothing: the hit lands.
     options.push({ score: -sev, plan: null, why: 'takes it' });
-    const free = me.canAct || (self.canFollowUp() && !me.attack);
-    const canJump = (me.canAct || self.combat.cancellable || self.dashCancellable) && !me.shielding;
+    // The same follow-up rules as the Fighter's (Fighter.canFollowUp): an
+    // attack that can harm holds the CPU as it holds a player, and a move
+    // that yields (its own Deflect, a heal) gives way to the defense.
+    const free = me.canAct || (self.canFollowUp() && (!me.attack || self.moveYields()));
+    const canJump = (me.canAct || self.combat.cancellable || self.dashCancellable || self.moveYields()) && !me.shielding;
     // The Shield.
     const shield = s.caps.shield;
     // Every threat is an attack, and every attack is blockable: a technique's
@@ -523,7 +526,7 @@ export class Defense {
     if (!threat.def) return null;
     const me = s.me;
     const jumpFirst = me.grounded;
-    if (jumpFirst && !(me.canAct || s.self.combat.cancellable)) return null;
+    if (jumpFirst && !(me.canAct || s.self.combat.cancellable || s.self.moveYields())) return null;
     if (!jumpFirst && !s.self.canFollowUp()) return null;
     if (!jumpFirst && (s.self.freeFall || s.self.airStartBlocked(d.def))) return null;
     const arc = jumpFirst ? arcTrack(this.arc, s.stage, s.gravity, me, { jump: 'ground', dir: 0, steps: 70 }) :

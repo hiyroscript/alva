@@ -345,11 +345,15 @@ test('the device last used decides: a pad\'s presses show its inputs, a key brin
 
 // ---- Cooldowns ---------------------------------------------------------------------
 
-test('a special cooldown shows its sweep and seconds from the combat state, and runs on through the wheel\'s swaps', () => {
+test('a special cooldown shows its sweep and seconds from its release, never while it casts, and runs on through the wheel\'s swaps', () => {
   const { hud, fighter, step } = hudFor(DEF_0001);
   step({ attack5: true, attack5Pressed: true });
   hud.update(fighter);
   const tile = tileOf(hud, 'ground', 'attack5');
+  assert.equal(tile.el.dataset.state, 'ready', 'casting, not released: no false countdown');
+  assert.equal(tile.seconds.textContent, '');
+  while (!fighter.technique.released) step({});
+  hud.update(fighter);
   assert.equal(tile.el.dataset.state, 'cooling');
   assert.equal(tile.seconds.textContent, '5.0');
   for (let i = 0; i < 30; i++) step({});
@@ -370,9 +374,10 @@ test('a special cooldown shows its sweep and seconds from the combat state, and 
   assert.deepEqual([status.remaining, status.duration, status.cooling, status.special], [left, 5, true, true]);
 });
 
-test('a cooldown over clears the overlay and the seconds, with a brief highlight; the 0.5 s repeat delay is only a faint sweep', () => {
+test('a cooldown over clears the overlay and the seconds, with a brief highlight; an ordinary move never shows one, and one that costs Energy is muted while exhausted', () => {
   const { hud, fighter, step } = hudFor(DEF_0001);
   step({ attack4: true, attack4Pressed: true });
+  while (!fighter.technique.released) step({});
   hud.update(fighter);
   const tile = tileOf(hud, 'ground', 'attack4');
   assert.equal(tile.seconds.textContent, '3.0');
@@ -384,17 +389,27 @@ test('a cooldown over clears the overlay and the seconds, with a brief highlight
   assert.ok(tile.el.classList.contains('is-recovered'), 'a quiet highlight');
   tile.el.dispatch('animationend');
   assert.equal(tile.el.classList.contains('is-recovered'), false);
-  // The Jab: only the repeat delay.
+  // The Jab: no cooldown at all, no fabricated sweep.
   step({ attack1: true, attack1Pressed: true });
   while (fighter.combat.attack) step({});
   hud.update(fighter);
   const jab = tileOf(hud, 'ground', 'attack1');
-  assert.equal(jab.el.dataset.state, 'repeat', 'momentarily cooling');
+  assert.equal(jab.el.dataset.state, 'ready', 'ready the moment it ends');
   assert.equal(jab.seconds.textContent, '', 'no number on every punch');
-  for (let i = 0; i < Math.round(0.5 / DT); i++) step({});
+  assert.equal(jab.el.classList.contains('is-recovered'), false, 'no highlight');
+  assert.doesNotMatch(stylesheet(), /data-state="repeat"/, 'no repeat-delay look left');
+  // Exhausted: Red (an ordinary throw, 15 Energy) is muted, the Jab is not.
+  fighter.combat.setEnergy(0);
   hud.update(fighter);
-  assert.equal(jab.el.dataset.state, 'ready');
-  assert.equal(jab.el.classList.contains('is-recovered'), false, 'no highlight for the repeat delay');
+  const red = tileOf(hud, 'ground', 'attack2');
+  assert.equal(red.el.dataset.state, 'restricted');
+  assert.equal(red.el.dataset.restriction, 'energy');
+  assert.equal(red.seconds.textContent, '', 'never a countdown');
+  assert.match(red.el.getAttribute('aria-label'), /No Energy until the bar refills/);
+  assert.equal(jab.el.dataset.state, 'ready', 'a melee strike needs no Energy');
+  fighter.combat.refillEnergy();
+  hud.update(fighter);
+  assert.equal(red.el.dataset.state, 'ready');
 });
 
 test('a move spent for this airtime, or in free fall, looks unavailable, never like a cooldown', () => {
@@ -444,7 +459,7 @@ test('a repeated attack press lights nothing: no queued follow-up, no queued loo
       assert.equal(Object.hasOwn(abilityStatus(r.player, tile.entry, place), 'queued'), false, 'no queued status at all');
     }
   }
-  assert.equal(red.el.dataset.state, 'repeat', 'its cooldown still shows');
+  assert.equal(red.el.dataset.state, 'cooling', 'its cooldown still shows');
   assert.equal(r.player.queuedFollowUp, undefined, 'the fighter keeps no follow-up');
   r.until(() => !r.player.combat.attack);
   hud.update(r.player);

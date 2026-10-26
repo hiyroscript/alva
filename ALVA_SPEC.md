@@ -1986,8 +1986,8 @@ each fighter's own values are in its character specification (7.2.9).
   states resume when it ends. The pose is
   visual only (no collider changes), but being hit is not: a hit (never a
   block) or a paralysis takes the fighter out of its own attack on its next step, so nothing of
-  that attack is left to strike, release a projectile or recover from. Ordinary attacks start their repeat cooldown; Deflect retains
-  its existing interruption behavior. Checked on the fighter's next step, two attacks that
+  that attack is left to strike, release a projectile or recover from, and
+  no cooldown starts for it unless it had already been released (7.2.4). Checked on the fighter's next step, two attacks that
   connect on the same step still trade. A stunned fighter's push or
   launch runs down at its own `movement.hitstunFriction` on the ground and
   `hitstunAirDrag` in the air (half its deceleration and air drag when it
@@ -2108,10 +2108,11 @@ each fighter's own values are in its character specification (7.2.9).
     speed carries straight through it, and steering the other way bends it
     round as air control allows, never in one step. Landing gives both
     back, and so does a hit (and a homing dash's spring off what it hit).
-    Not while stunned, paralysed, in an attack (a Deflect included) or a
-    technique, nor in free fall; a jump pressed in the air with none left
-    waits (the jump buffer) for the ground. It may cut short an attack that
-    hit, like a ground jump, and an air dash past its cancel time. Quick
+    Not while stunned, paralysed, in an attack or a technique, nor in free
+    fall; a jump pressed in the air with none left waits (the jump buffer)
+    for the ground. It may cut short an attack that hit, like a ground
+    jump, a Deflect (cancellable, 7.2.4) and an air dash past its cancel
+    time. Quick
     Battle's CPU uses them to get back to the stage. A jump and both air
     jumps from a stage's highest footing stay well clear of the upper Void.
   - *Fast fall.* Down (the `down` input: S / ↓, the left stick down, the
@@ -2142,10 +2143,11 @@ each fighter's own values are in its character specification (7.2.9).
   Opposing simultaneous requests ask for nothing. `Fighter.tryMouvment`
   selects `tryDash` on the ground and `tryAirDash` in the air. Every existing
   cost, restriction, animation, cancellation and buffer applies. A Dash needs the fighter free to act (no attack, stun,
-  paralysis, technique or Dash running) or in an attack that hit and may
-  be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4), grounded, not
+  paralysis, technique or Dash running), in an attack that hit and may
+  be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4) or in a move
+  that yields to any request (a heal of its own, 7.2.4), grounded, not
   shielding nor holding `shield` for a Shield that can go up, not exhausted
-  (it pays 20 Energy once as it starts, the same for every fighter and for
+  (it pays 15 Energy once as it starts, the same for every fighter and for
   a Dash cancel, or all that is left when that is less, emptying the bar:
   7.2.5) and its
   real `mouvment` clip (without it the Dash is refused and logged, never
@@ -2178,9 +2180,10 @@ each fighter's own values are in its character specification (7.2.9).
   is refused and logged, never faked with the Dash's clip or the run) and
   an air dash left this airtime (`airDashUses`, 1; landing gives it back,
   and so does a hit, as for the air jumps; an air jump does not).
-  Otherwise the Dash's rules: free to act or in an attack that hit and may
-  be cut short (a Dash cancel in the air, for the same 20), not
-  exhausted, paying 20 Energy; never while stunned, paralyzed or
+  Otherwise the Dash's rules: free to act, in an attack that hit and may
+  be cut short (a Dash cancel in the air, for the same 15) or in a Deflect
+  (cancellable, 7.2.4), not exhausted, paying 15 Energy; never while
+  stunned, paralyzed or
   already dashing; and, as an attack's own motion, never while still
   flying from a launch or in free fall. A request in the air that no air
   dash answers is kept for the buffer, and is the Dash if the fighter lands
@@ -2200,9 +2203,9 @@ each fighter's own values are in its character specification (7.2.9).
   out, and in the air to close in.
 - **Movement repeat cooldowns.** `mouvment` and `midair_mouvment` each use
   their own acceptance timer in `CombatState.movementCooldowns`, the
-  universal `dashRepeat` (0.4 s, its own value, apart from the attacks'
-  0.5 s repeat delay): a quick second Dash when it is wanted, never a chain
-  of instant ones.
+  universal `dashRepeat` (0.4 s, its own movement timer; the attacks' old
+  0.5 s repeat delay is gone, and this is no replacement for it): a quick
+  second Dash when it is wanted, never a chain of instant ones.
   Player and CPU use the same readiness check. A cooling request is discarded,
   even during hitstop; it cannot become a delayed Dash. Landing and hits restore airtime resources,
   not timers. All attack, ability and movement timers clear on reset/respawn
@@ -2287,8 +2290,9 @@ each fighter's own values are in its character specification (7.2.9).
     an authored hit.
   - *Cooldown policy.* Every discrete move's reuse delay is derived from what
     it does, the same rules for every fighter (`js/data/cooldowns.js`), never
-    chosen by its fighter. Exactly two special cooldowns exist besides the
-    universal **0.5-second repeat delay** (`REPEAT_COOLDOWN`):
+    chosen by its fighter. Exactly two cooldowns exist, and an ordinary move
+    has **none at all**: the universal 0.5-second repeat delay is removed,
+    and nothing (no hidden timer, no global lockout) replaces it:
     1. **5 s** (`TEN_DAMAGE_COOLDOWN`) for a move that deals **10**: any one
        hit of it dealing 10 (a strike, a multi-hit's finisher, the
        projectile it throws or releases or that projectile's finisher, a
@@ -2296,9 +2300,9 @@ each fighter's own values are in its character specification (7.2.9).
        everything one use can deal one target adding up to 10 or more;
     2. otherwise **3 s** (`EXCEPTIONAL_COOLDOWN`) for a move with an
        exceptional effect (`EXCEPTIONAL_EFFECTS`): a heal of Launch Point, a
-       paralysis that holds its target unable to act, or a charm that turns
-       its target's hits into heals;
-    3. otherwise nothing beyond the 0.5 s repeat delay.
+       paralysis that holds its target unable to act, a charm that turns
+       its target's hits into heals, a float or a fear;
+    3. otherwise **0**: an ordinary move, the Deflect included.
     The first rule that applies decides; the two never add up (a 10-damage
     paralysis is 5 s, never 8). Nothing else earns a cooldown, however strong
     it looks (`ROUTINE_EFFECTS`): launching, pushing, pulling (Blue and
@@ -2307,21 +2311,38 @@ each fighter's own values are in its character specification (7.2.9).
     is classified one way or the other on purpose. The cooldown is the move's
     (the button's), never one per projectile or hitbox it creates. A
     definition leaves `cooldown` out; one that declares it must agree with
-    the policy (a value up to 0.5 s on a move with no special class is the
-    baseline itself), or the registry refuses it as it loads, naming the move
+    the policy exactly (0 for an ordinary move: the old 0.5 s is refused),
+    or the registry refuses it as it loads, naming the move
     (`resolveCooldown`): no fighter can author an 8-second move, a 12-second
     heal or a 0.05 s Deflect. Every built definition records its class
     (`cooldownClass`). Running, ground/air jumps and the Shield have no move
-    cooldown; the Deflect is exempt from the 0.5 s baseline (none at all,
-    for every fighter: Energy is its limit) though a special class would
-    still apply to it. The Dash and the air dash keep their own 0.5 s
-    movement timers (`CombatState.movementCooldowns`), outside the policy.
+    cooldown. The Dash and the air dash keep their own movement timers
+    (`dashRepeat`, `CombatState.movementCooldowns`), outside the policy.
     Fast fall stays directional movement. These are reuse timers, never added
-    to startup, active, recovery or animation timing and never global lockouts.
-    Ordinary attacks use `CombatState.cooldowns` from their end, hit-cancel or
-    interruption; same-move hit-cancels require the full repeat delay since
-    becoming cancellable. Summons and techniques use acceptance timers (7.2.6),
-    so cancelling or breaking one never escapes its cooldown. The roster:
+    to startup, active, recovery or animation timing and never global
+    lockouts; and no cooldown is no animation commitment: an ordinary attack
+    still plays its whole length and never restarts or cuts into itself, it
+    may simply start again the moment it has ended.
+  - *Cooldowns start on release.* A 3 s or 5 s cooldown starts only when
+    its move is **released**, the event that emits what it authors
+    (`RELEASE_EVENTS`), exactly once per activation: a single strike as it
+    goes live (its startup over), a multi-hit string as its last strike
+    goes live (an early strike is not enough), a throw as its projectile
+    spawns, a slam with an impact as the impact lands, a technique as its
+    cast lets go (projectile, burst or heal), a summon as its clone
+    actually appears. The press, the startup, the cast or the summoning pose
+    start nothing. A move interrupted before its release (a hit, a
+    paralysis, lost ground, a target gone, a cancel it yields to) starts
+    none and may be used again at once; one released keeps its cooldown
+    whatever follows (a hit in its recovery, a miss, a block, its
+    projectile turned back, its clone gone, the opponent escaping). Release
+    is not a hit: a projectile that later misses was released all the
+    same; nothing waits for a projectile to finish its flight. Nothing
+    starts or restarts it again for the same activation (a later step, a
+    second strike, several components, the move ending or being cut short:
+    `CombatState.releaseAttack`, `Technique.takeCooldown`, `spawnClones`).
+    Attacks use `CombatState.cooldowns`, summons and techniques
+    `abilityCooldowns`. The roster:
     #0001 Unlimited Void 3 s (paralysis) and Hollow Purple 5 s (its 10-damage
     sphere); #0002 Whirlwind 5 s (its tornado's 10-damage finisher); #0003
     Mystical Palm Technique 3 s (its heal); #0004 Ievan Polkka 5 s (its
@@ -2330,9 +2351,10 @@ each fighter's own values are in its character specification (7.2.9).
     phantom's fear), #0006 Ice Breath 3 s (its freeze); every other move of
     the six, Red, Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly
     Foot of Pain, the Stage Dive, Dark Tendrils, the Tornado Spin, Heat
-    Vision and the Sonic Scream included, only the 0.5 s repeat delay. The player, the CPU and the
-    ability HUD all read the same built definitions and combat state
-    (`js/game/combat/move-status.js` for presentation).
+    Vision and the Sonic Scream included, none at all (the ordinary ones
+    that create a construct cost 15 Energy instead, 7.2.5). The player, the
+    CPU and the ability HUD all read the same built definitions and combat
+    state (`js/game/combat/move-status.js` for presentation).
     An airborne version that lands
   plays its startup and strike on (never restarted, never switched to the
   ground version or Land), and its recovery is over on touchdown: the
@@ -2386,7 +2408,7 @@ each fighter's own values are in its character specification (7.2.9).
     through its own strike, which it plans unsteered.
   - *Combat input buffer.* An ordinary attack press the fighter cannot act
     on yet (an attack or its recovery, a stun, a Dash before its cancel
-    time, a repeat cooldown, `shield` held for its Shield) is kept for the
+    time, a 3 s or 5 s cooldown, `shield` held for its Shield) is kept for the
     universal `attackBuffer` (0.15 s, the same for every fighter) and comes
     out on the first step it can, if it still maps to an attack that can
     start there (on the ground or in the air as the fighter is then). The
@@ -2401,73 +2423,93 @@ each fighter's own values are in its character specification (7.2.9).
     buffered jump: a jump pressed before the attack goes first and the
     attack comes out next step, in the air; pressed on the same step, the
     ground attack goes first. A Dash request is buffered the same way
-    (7.2.3). The human player's press is kept as its own button's move
-    (7.2.4b), its press for the attack already playing is never kept here
-    (below), and a hit on the player drops whatever it had kept, attack,
+    (7.2.3). Every press is kept as its own button's move (7.2.4b), the
+    press for the attack already playing is never kept here (below), and a
+    hit on the human player drops whatever it had kept, attack,
     Dash and jump alike: nothing asked for before the hit comes out after
     the stun. The buffer stays 0.15 s.
   - *Hit-cancels.* An attack that hits (a Shield's block does not count)
     may be cut short once its time reaches its `hitCancel` (seconds in, or
     null for never; the step its freeze ends at the earliest), by another
-    attack, a jump or, on the ground, a Dash (a **Dash cancel**, for the
-    same 20 Energy as any Dash): walking, the Shield, summons and techniques
-    still wait for its end, and left alone it plays out in full. A Dash
-    asked for during the hit's freeze comes out the step it ends. It cuts
-    into itself only once its own repeat cooldown has
-    run since it became cancellable, and never on the step it hit (its
-    freeze holds both fighters). The cut attack's cooldown, if any, starts
-    as it is cut. A whiff or
-    a block keeps the whole recovery (and never Dash-cancels), so
-    commitment is unchanged where it matters: a hit opens the chase sooner
-    than a whiff ever could. A cancel keeps momentum: a jump out of an
-    attack keeps its speed, a Dash out of one goes the Dash's way at its
-    speed. Which attacks open a
-    follow-up, and the combo routes they make, are each fighter's own
-    (7.2.9). No route loops: every hit adds to the Launch Point that sends
-    the next one further, a Dash chase spends the Energy the Shield needs,
-    and a wall's rebounds are capped until the target recovers (7.2.7).
-    These are the rules for every fighter; the human player also has its
-    own move cancellation (next).
-  - *The player's move cancellation.* The human player's fighter (its
-    controller is a `PlayerController`, kind `player`; never a CPU, the
-    practice dummy or any other controller, whose attacks keep exactly the
-    rules above) may cut its own attack short, its Deflect included, with a
-    new request: another attack or the Extra Attack, a summon or a
-    technique, a jump or an air jump, a Dash or an air dash (an explicit
-    Mouvement request, for the Dash cancel's 20 Energy), the Shield (a press
-    on the ground, the Shield going up on that step) or the Deflect (a press
-    in the air, for its 15). Hit or not, in its startup, active phase or
-    recovery: no hit is needed. The new move's own rules come first, every
-    one of them (its cooldown, its art, its place, ground-only or not, its
-    starts for the airtime, free fall, a launch, Energy, an exhausted
-    fighter, a technique's ground and cooldown); only once it is known to
-    start is the attack cut, through the ordinary end of an attack: its
-    repeat cooldown starts, once; whatever it has not struck or released
-    never is (a strike still to come, a projectile not yet thrown); what it
-    already sent out stays (a projectile in flight); its fighter keeps its
-    speed and facing as any cut does. A request that cannot start cuts
-    nothing. Only a request made after the attack began cuts it: a press
-    made on the step it started (a jump or a Dash pressed with the attack)
-    lost to it and never cuts it later, a Shield held since before the
-    attack never cuts it, and requests from the buffer keep the step they
-    were made on. Never while a forced state holds the fighter (an impact
-    freeze, hitstun, blockstun, a paralysis: a press made during the freeze
-    is kept by the buffer and cuts the attack the step the freeze ends),
-    and never anything that keeps a commitment of its own: a technique, a
-    summon's startup, a Dash or air dash before its cancel time. The
-    player's press for the attack already playing (its own button, or the
-    button whose press started it) is no request at all: never a cut, a
-    restart, a kept press or anything queued to follow it, whatever its
-    phase, whatever its hit-cancel (7.2.4b). A press of another button is
-    a new request and cuts as above at once. **Run is never
-    a request**: holding, turning or pressing a direction (keyboard, touch
-    or stick) only steers, and turns as ever with Automatic turn-around off
-    (an attack still turns to the direction held; with it on, the attack
-    faces its enemy, 7.2.4a); a Dash is only ever the explicit Mouvement
-    request (7.2.3). One step accepts at most one move: the first by the
-    usual order (a Deflect, then the combat buttons in order, then a
-    buffered press, then the Dash, the Shield, the jump), and nothing later
-    on that step cuts it.
+    attack (the Deflect included), a jump or, on the ground, a Dash (a
+    **Dash cancel**, for the same 15 Energy as any Dash): walking, the
+    Shield, summons and techniques still wait for its end, and left alone it
+    plays out in full. A Dash asked for during the hit's freeze comes out
+    the step it ends. It never cuts into itself (the same attack never
+    restarts while it plays), and never on the step it hit (its freeze
+    holds both fighters). A whiff or a block keeps the whole recovery (and
+    never Dash-cancels), so commitment is unchanged where it matters: a hit
+    opens the chase sooner than a whiff ever could. A cancel keeps
+    momentum: a jump out of an attack keeps its speed, a Dash out of one
+    goes the Dash's way at its speed. Which attacks open a follow-up, and
+    the combo routes they make, are each fighter's own (7.2.9). No route
+    loops: every hit adds to the Launch Point that sends the next one
+    further, a Dash chase spends the Energy the Shield needs, and a wall's
+    rebounds are capped until the target recovers (7.2.7).
+  - *Move cancellation: the strict rules.* The same for every fighter, the
+    human player's (a `PlayerController`) and a CPU's alike, at every
+    difficulty; nothing about it is exclusive to `controller.kind ===
+    'player'`. They supersede the broad player cancellation of PR #114 (a
+    new request cutting the player's attack, hit or not), which is removed.
+    1. **An attack that can harm is never cut short merely because
+       something else was asked for.** Another numbered attack, the Extra
+       Attack, a summon or technique, a jump, a Dash or air dash, a Shield
+       press or a Deflect asked for in its startup, active phase or
+       recovery does not end it: it plays on, and the request waits in the
+       combat input buffer to come out as it ends naturally, or is gone.
+       Only a legitimate, established window cuts it: its authored,
+       hit-confirmed `hitCancel` (above), a landing (the landing cancel),
+       a slam's or a plunge's own contact. A summon or technique never cuts
+       an attack short, not even one that hit. The press for the attack
+       already playing (its own button, or the button whose press started
+       it) is no request at all: never a cut, a restart, a kept press or a
+       stack of copies; once the attack has ended it may be used again at
+       once (there is no repeat delay). Repeated presses of an ordinary
+       attack therefore play whole attacks, one after another.
+    2. **A move that harms nobody gives way to any valid request.** A
+       move whose classification is no attack (a technique that only heals
+       its own fighter, a pending attack: `yieldsToRequests` on its
+       `offense`, never its name or animation) is cancellable: a valid
+       replacement (another attack, a summon or technique on the ground, a
+       jump or air jump, a Dash or air dash, a fresh Shield press, a
+       Deflect) ends it at once, in any phase, with no hit needed. Before
+       a heal is released nothing is healed and no cooldown starts; after,
+       the heal and its cooldown are kept. A summon or technique that harms
+       keeps its commitment: no request ends it. The Dash and air dash keep
+       their own `dashCancelTime`.
+    3. **The Deflect is cancellable, by explicit rule.** Attack and
+       defense though it is (it deals 3), from the step after it starts,
+       in its startup, active phase or recovery, any valid request (another
+       aerial, an air jump, an air dash) ends it the moment the replacement
+       really starts. From then its box strikes nothing and turns nothing
+       back; a projectile it already turned back stays turned. Its 15
+       Energy is never given back and the replacement pays its own (an air
+       dash another 15: never one payment for both). Holding or pressing
+       its button again never restarts it. Cancelling out of a Deflect is
+       not cancelling into one: a Deflect cuts short only an attack that
+       may be cut (its hit-confirmed window) or a move that yields.
+    Every cancellation checks the replacement first (its art, its place,
+    its starts for the airtime, free fall, a launch, its cooldown, its
+    Energy, an exhausted fighter): a request that cannot start ends
+    nothing. Only a request made after the move began ends it (one made on
+    its own step lost to it; a buffered request keeps the step it was made
+    on), and never while a forced state holds the fighter (an impact
+    freeze, hitstun, blockstun, a paralysis); a hit, a death, the Void and
+    every other forced interruption still end moves as before. The old
+    move ends cleanly (`Fighter.cutAttack`, which ends only a move that may
+    be cut): nothing it had not struck or released ever is, no hitbox,
+    lock, pending effect or stale input lingers, and the new move starts
+    exactly once. **Run is never a request**: holding, turning or pressing
+    a direction (keyboard, touch or stick) only steers, and turns as ever
+    with Automatic turn-around off (an attack still turns to the direction
+    held; with it on, the attack faces its enemy, 7.2.4a); a Dash is only
+    ever the explicit Mouvement request (7.2.3). One step accepts at most
+    one move: the first by the usual order (a Deflect, then the combat
+    buttons in order, then a buffered press, then the Dash, the Shield, the
+    jump), and nothing later on that step ends it. The CPU plans with the
+    same checks (`moveReady`, `canFollowUp`, `moveYields`, `repeatsMove`):
+    it keeps legitimate combos and may cancel its own Deflect or heal when
+    a better move is open, but never presses what cannot start.
   - *Hitstop.* Per hit, its own `hitstop`: crisp for light strikes (two
     steps), longer for heavy ones and finishers; a hard rebound off the
     stage freezes its fighter alone for `LAUNCH_BOUNCE.hitstop`. It freezes
@@ -2782,23 +2824,30 @@ in saved settings (6.10) or on the HUD.
 - **A repeat is nothing.** The press for the attack already playing
   (pressed again or held) never cuts, restarts or replays it, nothing is
   queued to follow it, and nothing comes out after it (7.2.4, *The
-  player's move cancellation*). Mashing therefore plays whole attacks,
-  each to its end and each again only once its own cooldown is over.
+  strict rules*). Mashing therefore plays whole attacks, each to its end
+  and each again at once (an ordinary attack has no cooldown) or once its
+  3 s or 5 s cooldown is over.
 - **Combos are deliberate.** A different button pressed during an attack
-  is a new request, which cuts at once by the player's cancellation rules
-  (7.2.4); hit-cancels, Dash cancels, jumps out of an attack, ground-to-air
+  is a new request, which never cuts an attack that can harm short: it
+  waits in the buffer to come out as the attack ends, or comes out in the
+  attack's hit-confirmed window (7.2.4); hit-cancels, Dash cancels, jumps
+  out of an attack that hit, ground-to-air
   and air-to-ground transitions, momentum, multi-hit attacks, hitstun and
   launches keep their rules.
 - **Ranges.** A player's basic strings by hand, on a standing target, from
   every spacing where both moves reach it on their own: Attack 1 then
-  Attack 2, the second pressed once the first's hit has landed, lands up
-  to at least 40 Launch Point for every fighter; Attack 2 then Attack 1
-  lands on a fresh target (0 Launch Point), pressed once the first has
-  landed or as it plays out. The spacing is the player's own. Read from
-  each fighter's data (`tests/systems/basic-strings.test.mjs`). (With the
-  former Combat Assist's approach closing the gap the first hit opened,
-  these ranges used to be 60 and 30; no move was retuned when it was
-  removed.)
+  Attack 2, the second pressed in the first's hit-confirmed window, lands
+  on a fresh target (0 Launch Point) for every fighter; Attack 2 then
+  Attack 1 lands on a fresh target from most of those spacings, pressed in
+  the first's window or as it plays out; a second press made the instant
+  the first hit lands waits for that window. The spacing is the player's
+  own. Read from each fighter's data
+  (`tests/systems/basic-strings.test.mjs`). (With the former Combat
+  Assist's approach these ranges were 60 and 30 Launch Point, and with the
+  broad player cancellation of PR #114 Attack 1 into Attack 2 reached 40;
+  under the strict rules the second strike starts no earlier than the
+  first's window, so against a heavily battered target #0002's and #0004's
+  launch it out of reach first. No move was retuned for either change.)
 - **Shown.** The ability HUD (7.3) and the touch buttons show cooldowns
   and restrictions only: there is no queued look.
 
@@ -2911,16 +2960,18 @@ in saved settings (6.10) or on the HUD.
 - **Deflect.** In the air, a fresh `shield` press (`shieldPressed`,
   never the button held) is the fighter's Deflect: an attack in every
   way, through `createAttackDefinition` (its own `deflect` clip, startup,
-  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (the policy's: exempt from the 0.5 s baseline, so none, 7.2.4), momentum and steering), resolved by the same `CombatSystem` as any
+  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (the policy's: an ordinary move, so none, 7.2.4), momentum and steering), resolved by the same `CombatSystem` as any
   attack, trading, interrupted and punished as one. Its strike is the
   same for every fighter: **3** Launch Points at **Base Launch 2**
   (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`; a fighter authors neither, and
   any other value is refused); its direction, timing, box and stuns are
   the fighter's own. It is one strike in the air (no `hits`,
   projectile, `pending` or `groundOnly`). It starts only in the air, free
-  to act or in an attack that hit and may be cut short (7.2.4's
-  hit-cancel), never stunned, paralyzed, in a Dash or air dash, in another
-  attack, already Deflecting, during its cooldown, in free fall or out of
+  to act, in an attack that hit and may be cut short (7.2.4's
+  hit-cancel) or in a move that yields (7.2.4), never stunned, paralyzed,
+  in a Dash or air dash before its cancel time, in another attack (a
+  damaging one is never cut short by a Deflect outside its hit-confirmed
+  window), already Deflecting (a press during it restarts nothing), in free fall or out of
   `airUses`, never while exhausted, and only with its art (missing art is
   refused and logged once). It costs **15** Energy (`DEFLECT_ENERGY_COST`,
   `energy.deflectCost`, the same for every fighter), paid once as it
@@ -2949,10 +3000,19 @@ in saved settings (6.10) or on the HUD.
   the `ability` that made it), and still blockable: its new target's
   raised Shield blocks and stops it. Startup and recovery turn nothing
   back.
+  **Cancellable, by explicit rule** (7.2.4, *Move cancellation*): attack
+  though it is, the Deflect gives way to any valid request, from the step
+  after it starts, in its startup, active phase or recovery: another
+  aerial, an air jump or an air dash ends it the moment that move really
+  starts (its own checks first: out of air jumps, exhausted, out of
+  `airUses`, a request ends nothing). From then its box strikes nothing
+  and turns nothing back (a projectile it already turned back stays
+  turned); its 15 is not given back, and the replacement pays its own. The
+  same for the human player and a CPU.
 - **The Deflect is an attack and a defense.** Its strike is an attack in
   every way (startup, active frames, recovery, hit detection, its fixed 3
-  at Base Launch 2, launch, hitstop, hit-cancels, being cut short, the
-  CPU's offense), blocked by a raised ground Shield like any other; its
+  at Base Launch 2, launch, hitstop, hit-cancels, the CPU's offense; and,
+  as a defense, cancellable), blocked by a raised ground Shield like any other; its
   turning projectiles back is a real defense. Every Deflect turns
   projectiles back (`deflectProjectiles: false` is refused). Being a
   defense never makes it a Shield (above): a blow it does not turn back
@@ -2994,21 +3054,43 @@ in saved settings (6.10) or on the HUD.
   overlay labels a shielding fighter `shield`; its hurtboxes are drawn as
   usual.
 - **Energy** (`CombatState.energy`, `maxEnergy`, `energyExhausted`) is
-  the one resource a fighter spends, on the same terms for every fighter
-  (`js/game/combat/combat-state.js`, `resolveEnergy`):
+  the one resource a fighter spends, on the same terms for every fighter,
+  human or CPU, and every action that spends it costs **the same nominal
+  15** (`ENERGY_COST`, `js/data/energy.js`; `resolveEnergy` in
+  `js/game/combat/combat-state.js`). No fighter and no move has a price of
+  its own:
 
   | What | Energy |
   | --- | --- |
   | The bar, full (`MAX_ENERGY`) | 100 |
-  | A Dash, an air dash, a Dash cancel (`DASH_ENERGY_COST`) | 20, as it starts |
+  | A Dash, an air dash, a Dash cancel (`DASH_ENERGY_COST`) | 15, as it starts |
   | A Deflect (`DEFLECT_ENERGY_COST`) | 15, as it starts, hit or whiff |
   | A blocked hit, a perfect block's included (`BLOCK_ENERGY_COST`) | 15, per block |
-  | Running, holding the Shield up, jumps, air jumps, the fast fall, turning (Automatic turn-around included), air control, attacks, projectiles, summons, techniques | 0 |
+  | An ordinary move that creates a construct (`CONSTRUCT_ENERGY_COST`, each definition's `energyCost`) | 15, once per activation, as it starts |
+  | Running, holding the Shield up, jumps, air jumps, the fast fall, turning (Automatic turn-around included), air control, melee strikes, a heal of its own, any move with a 3 s or 5 s cooldown | 0 |
+
+  A **construct** is read from structured data (`createsConstruct`, never
+  a name, button or fighter): an attack that throws a projectile, a
+  technique that releases a projectile or a burst, a summon's clone (and
+  any future move with an equivalent mechanic: a thrown object, a trap, a
+  persistent damaging area, a field). A purely visual effect, a melee
+  strike, a slam's impact and a pull are none. Such a move costs 15 when
+  its cooldown class is ordinary (it has no cooldown since the 0.5 s
+  repeat delay is gone); one with a 3 s or 5 s cooldown pays nothing for
+  its construct, its cooldown being its limit. The roster's ordinary
+  construct moves: #0001 Red and Maximum Blue, #0003 Cherry Blossom
+  Impact, #0004 the Melody, #0006 Heat Vision and the Sonic Scream. One
+  activation pays once: never per projectile update, per hit (a piercing
+  orb's several strikes), per frame a construct lives, per clone strike,
+  per projectile turned back or per phase; a refused press pays nothing
+  (the payment comes after every other check); a move interrupted after
+  it started gets nothing back.
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14). The maximum and every
-  cost are universal: a definition may leave each out, and declaring one
+  14, #0006 14). The maximum and every
+  cost are universal (a move's own `energyCost` too: one it declares must
+  agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
   the registry loads, so no fighter holds more or less Energy, or pays
   more or less for anything, than another. There is no Shield meter: this
@@ -3018,15 +3100,18 @@ in saved settings (6.10) or on the HUD.
   full, and every change goes through `setEnergy`, clamped to [0, 100]. It
   refills by itself at `regen` on every step nothing was paid on (idle,
   moving, airborne, attacking, shielding, stunned or frozen; `updateEnergy`), at that one rate whatever is held; a
-  step a Dash, an air dash or a Deflect was paid on has no refill. Nothing
-  else ever adds to it: no block, perfect block, Deflect or projectile
-  turned back gives any back or earns a refill of its own. Reaching 0 (a
-  Dash, a Deflect or a block alike, an overspend included) exhausts the
-  fighter: Dash, air dash, Deflect and Shield stay unavailable however much
-  has refilled (1, 25, 50, 75, 99) until Energy is back at exactly 100,
-  which clears it (an exhausted player's attack press simply starts its
-  attack). Energy never gates movement, jumps, attacks, turning,
-  projectiles, summons or techniques, and none of them spend it. A respawn, a reset, a restart and Practice
+  step Energy was paid on has no refill. Nothing else ever adds to it: no
+  block, perfect block, Deflect, projectile turned back or cancelled move
+  gives any back or earns a refill of its own. Reaching 0 (a Dash, a
+  Deflect, a block or a construct move alike, an overspend included)
+  exhausts the fighter: Dash, air dash, Deflect, Shield and every construct
+  move stay unavailable however much has refilled (1, 25, 50, 75, 99)
+  until Energy is back at exactly 100, which clears it (an exhausted
+  fighter's melee attack press simply starts its attack); a press refused
+  for Energy is never kept in the buffer, and the ability HUD and touch
+  buttons show such a move unavailable. Energy never gates movement,
+  jumps, melee attacks, turning, heals or 3 s / 5 s moves, and none of them
+  spend it. A respawn, a reset, a restart and Practice
   Ground's change of fighter all start it at exactly 100.
 
 #### 7.2.6 Summons and techniques
@@ -3045,29 +3130,35 @@ in saved settings (6.10) or on the HUD.
   on the type (`trySummon` / `tryTechnique`). The rule is shared: the
   button's own new press, on the ground, with the fighter free to act (no
   attack, stun, paralysis, technique, Dash or held Shield; one never cuts
-  an attack short, but for the human player's own attack, which a summon
-  or technique asked for after it began cuts once it is accepted, 7.2.4)
-  and its cooldown (if it has one) over. Anything else, an airborne press, a
+  an attack that can harm short, not even one that hit, for any fighter;
+  it may end a move that yields to any request, a heal of its own or a
+  pending attack, once it is accepted, 7.2.4), not into itself, its
+  cooldown (if it has one) over and its Energy (if it costs any) payable.
+  Anything else, an airborne press, a
   busy fighter, a cooldown still running, no opponent for a summon, missing
   art or invalid data, makes the press do nothing at all: never an
   ordinary attack in its place, never kept for later (the combat
   input buffer below keeps ordinary attacks only), never an invisible move.
   Holding the button does not repeat it, and neither Down nor any other
-  input changes what it does. Neither spends Energy. Each cooldown is the
-  cooldown policy's (7.2.4): #0001 Unlimited Void 3 s (its paralysis),
+  input changes what it does. An ordinary one (no cooldown) that creates a
+  construct, a projectile, a burst or a clone, pays 15 Energy once as it is
+  accepted (7.2.5); one with a 3 s or 5 s cooldown pays none. Each
+  cooldown is the cooldown policy's (7.2.4): #0001 Unlimited Void 3 s (its paralysis),
   Hollow Purple 5 s (its 10-damage sphere), #0003 the Mystical Palm
-  Technique 3 s (its heal) and Cherry Blossom Impact only the 0.5 s repeat
-  delay, #0004 Ievan Polkka 5 s (its double's strikes add up to 10) and
+  Technique 3 s (its heal) and Cherry Blossom Impact none (15 Energy),
+  #0004 Ievan Polkka 5 s (its double's strikes add up to 10) and
   World is Mine 3 s (its charm), #0005 the Deadlights 3 s (its float) and
   the Red Balloon 3 s (its phantom's fear), #0006 Ice Breath 3 s (its
-  freeze) and Heat Vision and the Sonic Scream only the 0.5 s repeat delay,
+  freeze) and Heat Vision and the Sonic Scream none (15 Energy each),
   with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
-  `{ remaining, duration }` per id, apart from ordinary attacks' short
-  repeat cooldowns in `CombatState.cooldowns`), started the moment the
-  move is accepted (a summon's startup included) and recovering at 1 s per second, whatever the fighter does
-  (impact freezes included), never below 0. Neither spends Energy. The summon system never depends on technique
+  `{ remaining, duration }` per id, apart from attacks' cooldowns in
+  `CombatState.cooldowns`), started only as the move is released (a
+  technique's cast letting go, a summon's clone appearing; never on the
+  press, the cast or the summoning pose, so one broken before then starts
+  none) and recovering at 1 s per second, whatever the fighter does
+  (impact freezes included), never below 0. The summon system never depends on technique
   code, nor the technique runtime on the summon system.
 - **Summons** (`summons` on the character; runtime in
   `js/game/combat/summon.js`). The one kind of summon so far is a clone of
@@ -3088,7 +3179,8 @@ in saved settings (6.10) or on the HUD.
     (its hurt pose on the hit's own step), lost ground, the Void taking it
     or its target, a reset or respawn, a Practice Ground fighter or CPU
     change or the arena going cut it short: no clone, never another target,
-    the cooldown (started on acceptance) running on. Without one the
+    and no cooldown (it starts only as a clone appears); its Energy, if it
+    paid any, is not given back. Without one the
     summon is sent out on the press and the owner is free at once.
   - *Placement.* The clone appears on the target's back side
     (`x = target.x − target.facing × behindDistance`, never clamped: there
@@ -3725,8 +3817,9 @@ Adding one is described in
   (`#b026ff`), `energy / maxEnergy` wide, shrinking from the right; gray
   instead from the moment it empties and through the whole refill,
   proportional to what has come back, and gone, never purple, once full. Under the feet a row of
-  cooldown rings only for active durations above the 0.5-second baseline
-  (the policy's 3 s and 5 s): ordinary attacks as well as summons and
+  cooldown rings only for running cooldowns (the policy's 3 s and 5 s, the
+  only ones there are), from the moment the move is released, never while
+  it still casts: attacks as well as summons and
   techniques (#0001 Unlimited Void 3 s, Hollow Purple 5 s, #0002 Whirlwind
   5 s, #0003 Mystical Palm Technique 3 s, #0004 Ievan Polkka 5 s and World
   is Mine 3 s, #0005 Deadlights 3 s and Red Balloon 3 s, #0006 Ice Breath
@@ -3848,13 +3941,15 @@ Adding one is described in
     `abilityStatus` (never a timer of its own, so the HUD, the player's
     presses and the CPU always agree): a special cooldown (3 s or 5 s)
     darkens the art under a clockwise sweep from the top with its seconds
-    over it (`formatCooldown`: 5.0, 4.9 … ready); the 0.5 s repeat delay
-    shows only a faint sweep, no number; on recovery the overlay and number
-    go and the tile's edge lights for about 160 ms. A cooldown keeps
+    over it (`formatCooldown`: 5.0, 4.9 … ready), from the moment its move
+    is released (a move still casting shows none); an ordinary move has no
+    cooldown and shows none, never a fabricated sweep; on recovery the
+    overlay and number go and the tile's edge lights for about 160 ms. A cooldown keeps
     counting in whichever row its move is, and a change of place never
     touches it. A move unavailable for another reason (its starts for this
-    airtime used up, free fall, missing art) is muted (grey art, dashed
-    edge) with no countdown. The input stays readable throughout.
+    airtime used up, free fall, a move that costs Energy while the fighter
+    is exhausted, missing art) is muted (grey art, dashed edge) with no
+    countdown, its reason in its accessible name. The input stays readable throughout.
   - *Lifecycle.* Bound to Player 1 as play starts (Practice Ground's
     Change Fighter replaces the whole moveset at once), cleared on leaving
     the screen; it writes to the DOM only when a shown value changes.
@@ -4162,9 +4257,10 @@ Adding one is described in
   state on its combat buttons, read the way the ability HUD reads it
   (`abilityStatus`, 7.3): a cooldown darkens the art under a clockwise
   sweep from the top (`--tc-progress`), with its seconds over it for a
-  3 s or 5 s one (`data-seconds`, `formatCooldown`) and only a faint sweep
-  for the 0.5 s repeat delay; a move spent for this airtime (or in free
-  fall, or missing its art) is muted (dashed, dimmed: `is-spent`). Nothing
+  3 s or 5 s one (`data-seconds`, `formatCooldown`), from its release (an
+  ordinary move has none to show); a move spent for this airtime (or in
+  free fall, unpaid for while exhausted, or missing its art) is muted
+  (dashed, dimmed: `is-spent`). Nothing
   of it moves by itself, so reduced
   motion has nothing to stop; only what changed is written, and a button
   with nothing to show is never written to. It never changes what a

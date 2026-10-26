@@ -77,26 +77,41 @@
 // A target whose Shield is up blocks it: no Launch Point, no paralysis, no
 // launch, whatever the burst's size or the side it comes from.
 //
-// A technique's cooldown starts on acceptance, even if interrupted. It is
-// the cooldown policy's (js/data/cooldowns.js), derived from what the cast
-// releases: 5 s when its burst or its projectile (judged from the fighter's
-// `projectiles`) deals 10 damage, else 3 s when it heals, paralyzes,
-// charms, floats or frightens, else the universal 0.5 s repeat delay. An entry may leave it out; one it
-// declares must agree. It recovers every fixed step, including hitstop.
-// Phase timing is separate.
+// A technique's cooldown is the cooldown policy's (js/data/cooldowns.js),
+// derived from what the cast releases: 5 s when its burst or its
+// projectile (judged from the fighter's `projectiles`) deals 10 damage,
+// else 3 s when it heals, paralyzes, charms, floats or frightens, else none
+// at all. An entry may leave it out; one it declares must agree. It starts
+// as the technique is released (its cast over: see release and
+// takeCooldown), exactly once: a cast broken before that starts none, and
+// one released keeps it whatever happens after. It recovers every fixed
+// step, including hitstop. Phase timing is separate.
+//
+// Its Energy (`energyCost`, the Energy policy's, js/data/energy.js) is 15
+// for an ordinary technique that releases a projectile or a burst (a
+// construct), paid once as it starts; 0 for one with a special cooldown or
+// one that only heals.
+//
+// A technique that is no attack (one that only heals its own fighter) gives
+// way to any valid request while it plays (`freeCancel`, see
+// yieldsToRequests in js/game/combat/offense.js): another move, a jump or a
+// Dash ends it at once, before its release (nothing healed, no cooldown) or
+// in its release pose (the heal and the cooldown kept). A technique that
+// harms never does: it owns its fighter until it is over.
 // A horizontal launch travels along the technique's facing.
 
-import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { resolveMoveEnergy } from '../../data/energy.js';
 import { createHit } from './hit-effects.js';
-import { assertNoShieldBypass, resolveOffense, techniqueOffense } from './offense.js';
+import { assertNoShieldBypass, resolveOffense, techniqueOffense, yieldsToRequests } from './offense.js';
 
 const TECHNIQUE_DEFAULTS = {
   castAnimation: null,
   releaseAnimation: null,
-  // Seconds before the technique can be used again, from its start (see
-  // Fighter.tryTechnique): spent whether it lands or not. The cooldown
-  // policy's, never the entry's own (see above).
-  cooldown: REPEAT_COOLDOWN,
+  // Seconds before the technique can be used again, from its release (see
+  // takeCooldown): spent whether it lands or not. The cooldown policy's,
+  // never the entry's own (see above).
+  cooldown: 0,
   // { id, offset }: the projectile it releases (see above), or null.
   projectile: null,
   // { hitbox, hit }: the burst round the fighter it releases, or null.
@@ -131,7 +146,9 @@ export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
     });
   }
   if (!(Number.isInteger(def.heal) && def.heal >= 0)) throw new Error(`[Alva] ${owner}'s heal must be a whole number of Launch Points from 0`);
+  def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'technique', def, cls);
   def.offense = resolveOffense(spec, techniqueOffense(def), owner);
+  def.freeCancel = yieldsToRequests(def.offense);
   return Object.freeze(def);
 }
 
@@ -185,6 +202,7 @@ export class Technique {
     this.burstDue = false; // the burst, waiting for the CombatSystem
     this.effectDue = false; // the burst's art, waiting for its fighter (see takeEffect)
     this.healDue = 0; // the heal, waiting for its fighter (see takeHeal)
+    this.cooldownDue = false; // its cooldown, waiting for its fighter (see takeCooldown)
     this.endReason = null;
     this.castDuration = owner.sprites.duration(def.castAnimation);
     this.releaseDuration = owner.sprites.duration(def.releaseAnimation);
@@ -209,7 +227,8 @@ export class Technique {
 
   // Lets go of what the technique casts, exactly once: its projectile joins
   // the fighter's releases (the Battle spawns it this step, like a thrown
-  // one) and its burst is due for the CombatSystem this step.
+  // one), its burst is due for the CombatSystem this step, and its
+  // cooldown is due to start (the release is its one commitment).
   release() {
     if (this.released) return;
     this.released = true;
@@ -218,6 +237,15 @@ export class Technique {
     if (this.def.burst) this.burstDue = true;
     if (this.def.burst?.effect) this.effectDue = true;
     if (this.def.heal > 0) this.healDue = this.def.heal;
+    this.cooldownDue = true;
+  }
+
+  // Whether its cooldown is due this step, taken (its fighter starts it,
+  // see Fighter.update): true exactly once, on the step it releases.
+  takeCooldown() {
+    const due = this.cooldownDue;
+    this.cooldownDue = false;
+    return due;
   }
 
   // The art its burst plays as it lets go, taken on the step it does (its
@@ -291,6 +319,7 @@ export class Technique {
     this.burstDue = false;
     this.effectDue = false;
     this.healDue = 0;
+    this.cooldownDue = false;
     this.owner = null;
   }
 }

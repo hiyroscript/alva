@@ -368,14 +368,14 @@ test('a explicit request that cannot Dash is used up, never queued for later', (
 
 // ---- Cost, movement and ending -----------------------------------------------------------
 
-test('a Dash spends its cost (20) exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
+test('a Dash spends its cost (15) exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
   const full = fighter.combat.energy;
   assert.equal(full, 100);
   step({ ...RIGHT, mouvementRightPressed: true });
-  assert.equal(DASH_ENERGY_COST, 20);
-  assert.equal(fighter.combat.energy, 80, 'exactly 20, no refill on that step');
+  assert.equal(DASH_ENERGY_COST, 15);
+  assert.equal(fighter.combat.energy, 85, 'exactly 15, no refill on that step');
   assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'dash speed from the first step');
   const x0 = fighter.body.prevX;
   let n = 1;
@@ -443,7 +443,7 @@ test('Shield wins over a Dash on the same step; so does an attack; Down held nev
   assert.equal(attack.fighter.state, 'attack');
   assert.equal(attack.fighter.combat.attack.def.id, 'attack2');
   assert.equal(attack.fighter.dash, null);
-  assert.equal(attack.fighter.combat.energy, 100);
+  assert.equal(attack.fighter.combat.energy, 100 - attack.fighter.attacks.attack2.energyCost, 'only the throw\'s own 15: no Dash paid');
   // Down pressed and held through the explicit request: only a direction, so
   // the Dash comes out all the same, and costs what it always does.
   const down = makeFighter();
@@ -751,7 +751,9 @@ test('spamming the Dash is affordable but never a loop: from a full bar it runs 
     }
   }
   assert.equal(f.combat.energyExhausted, true, 'it runs dry');
-  assert.ok(dashes >= 5 && dashes <= 8, `${dashes} Dashes from a full bar`);
+  // A full bar pays for MAX / 15 of them, a few more with the refill.
+  const paid = Math.ceil(f.combat.maxEnergy / DASH_ENERGY_COST);
+  assert.ok(dashes >= paid && dashes <= paid + 4, `${dashes} Dashes from a full bar`);
   // Exhausted: no Dash until the bar is full again, however it is asked for.
   const regen = f.energyDef.regen;
   const spent = f.dash;

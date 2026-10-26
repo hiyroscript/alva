@@ -38,9 +38,9 @@
 // through the air. Its cooldowns are the shared policy's
 // (js/data/cooldowns.js), derived from what each move does, never authored
 // here: Ievan Polkka waits 5 s (its double's strikes add up to 10), World
-// is Mine 3 s (a charm), every other move only the universal 0.5 s repeat
-// delay, and the Deflect none. These timers never alter their animation
-// phases. The sheet's intro, victory and defeat poses and its full-screen
+// is Mine 3 s (a charm), each from its release; every other move none at
+// all (the Melody, a sung note it sends flying, costs 15 Energy instead),
+// and the Deflect none. These timers never alter their animation phases. The sheet's intro, victory and defeat poses and its full-screen
 // cut-in pictures are no move.
 
 import { frames, pad, flick, legacyPad } from './helpers.js';
@@ -306,10 +306,11 @@ export const CHARACTER_0004 = {
     steerAngle: 18,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): the same
-  // bar and the same costs as every fighter's (100; a Dash, an air dash or a
-  // Dash cancel 25, a Deflect 15, each blocked hit 15). Its own is only how
-  // fast it refills: 14 a second, a performer's breath control.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js and
+  // js/data/energy.js): the same bar and the same price as every
+  // fighter's (100; 15 for a Dash, an air dash or a Dash cancel, a Deflect,
+  // each blocked hit, and each ordinary move that creates a construct). Its
+  // own is only how fast it refills: 14 a second, a performer's breath control.
   energy: {
     regen: 14,
   },
@@ -462,7 +463,8 @@ export const CHARACTER_0004 = {
   // js/game/combat/technique.js). Each is a cast: #0004 stands committed to
   // it, then lets go all at once. A hit on #0004 before it lets go breaks
   // it (nothing released), and it needs the ground throughout. Cooldowns
-  // begin on acceptance and run on even if interrupted.
+  // begin as each releases (a cast broken before then starts none) and run
+  // on whatever follows.
   techniques: {
     // Ievan Polkka: 0.4 s to call (four frames at 10 fps), then the double
     // appears 62 units in front of #0004, standing on the ground (its
@@ -497,9 +499,9 @@ export const CHARACTER_0004 = {
   // Attack definitions (schema: createAttackDefinition in
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
-  // mirrored with facing). Each has only the universal 0.5-second repeat
-  // delay (the cooldown policy's: none deals 10, paralyzes or charms),
-  // independent of its phases and of other moves' cooldowns. Each moves by
+  // mirrored with facing). None has a cooldown (the cooldown policy's: none
+  // deals 10, paralyzes or charms); the Melody, an ordinary projectile,
+  // costs 15 Energy. Each moves by
   // the mobility tier its role gives it (js/data/attack-mobility.js): its
   // dance strings quick, so they flow with the run and the drift, its swings
   // and the Melody medium, the Stage Dive heavy.

@@ -213,7 +213,7 @@ const STEPS = {
         return 'run';
       }
       if (c.jump !== 'air' && !me.grounded) return 'fail';
-      const free = me.canAct || self.combat.cancellable || self.dashCancellable;
+      const free = me.canAct || self.combat.cancellable || self.dashCancellable || self.moveYields();
       if (!free) return brain.clock - plan.start > 0.3 ? 'fail' : 'run';
       if (ex.jump(self, c.jump === 'high')) {
         plan.jumped = true;
