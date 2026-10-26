@@ -81,6 +81,11 @@ export function pressPlace(input) {
 // otherwise with its own maxSpeedScale). Art only.
 const RUN_MAX_SPEED_SCALE = 1.6;
 
+// Sideways speed (units/s) above which a fighter on the ground counts as
+// running for its facing: a run turns it past this, and Automatic
+// turn-around waits until a run or a Dash has slid down to it.
+const TURN_SPEED = 20;
+
 // World units behind the fighter's middle an opponent may be and still be
 // locked on to by a homing dash (see Fighter.lockOn): one straight above
 // or below counts as ahead, one behind it does not.
@@ -1726,11 +1731,13 @@ export class Fighter {
   // opponent crossing behind it stays behind it.
   //
   // Automatic turn-around (the human player's, with the setting on: see
-  // turnAroundFacing) replaces those rules whenever there is an enemy to
-  // face: standing, running either way (running away, the fighter keeps
-  // facing its enemy), in the air, Shield up and in an ordinary attack
-  // (through updateAttackFacing, the way a CPU's attack is aimed). With no
-  // enemy in play the manual rules apply as ever.
+  // turnAroundFacing) replaces those rules only while the fighter is not
+  // moving left or right: no direction held, and on the ground not still
+  // sliding from a run or a Dash (movingSideways). Then it faces its
+  // enemy: standing, in the air, Shield up and in an ordinary attack
+  // (through updateAttackFacing, the way a CPU's attack is aimed). Moving,
+  // the manual rules apply, so it faces the way it goes and never walks
+  // backwards; with no enemy in play they apply as ever.
   //
   // Either way it is locked while anything facingLocked names plays: none
   // of those is the fighter's to turn, and each keeps the way it committed
@@ -1740,7 +1747,7 @@ export class Fighter {
   updateFacing(dir, held) {
     const { body, combat } = this;
     if (this.updateAttackFacing() || this.facingLocked) return;
-    const auto = this.turnAroundFacing();
+    const auto = this.movingSideways ? null : this.turnAroundFacing();
     if (auto != null) {
       this.facing = auto;
       return;
@@ -1749,7 +1756,16 @@ export class Fighter {
       if (held) this.facing = held;
       return;
     }
-    if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
+    if (dir !== 0 && (Math.abs(body.vx) > TURN_SPEED || !body.grounded)) this.facing = dir;
+  }
+
+  // Whether the fighter is moving left or right, for Automatic turn-around:
+  // a direction held this step (`steerHeld`), or on the ground a run or a
+  // Dash still sliding faster than TURN_SPEED. Drifting in the air with
+  // nothing held is not.
+  get movingSideways() {
+    const { body } = this;
+    return this.steerHeld.x !== 0 || (body.grounded && Math.abs(body.vx) > TURN_SPEED);
   }
 
   // Whether the fighter's facing is held where it is, whatever is held or
@@ -1787,12 +1803,14 @@ export class Fighter {
   // The way Automatic turn-around faces this fighter now (1 right, -1
   // left): toward the closest enemy in play (closestEnemy), or the way it
   // faces already while that enemy stands at its very x. Null when it does
-  // not turn it: the setting off (or not the player's), input locked, or
-  // no enemy in play (none, or one lost to the Void and waiting to
-  // respawn), and the facing is then manual. A direction only: it never
-  // moves, steers, attacks or spends anything.
+  // not turn it: the setting off (or not the player's), input locked, a
+  // direction held (the player is moving it: an attack started or turned
+  // with one faces that way, as by hand), or no enemy in play (none, or
+  // one lost to the Void and waiting to respawn), and the facing is then
+  // manual. A direction only: it never moves, steers, attacks or spends
+  // anything.
   turnAroundFacing() {
-    if (!this.automaticTurnAround || this.inputLocked || this.lostToVoid) return null;
+    if (!this.automaticTurnAround || this.inputLocked || this.lostToVoid || this.steerHeld.x !== 0) return null;
     const enemy = closestEnemy(this, this.enemies);
     if (!enemy) return null;
     return facingToward(this, enemy) ?? this.attackVisualFacing ?? this.facing;
@@ -1838,7 +1856,7 @@ export class Fighter {
   // so the hitbox, the sprite and the next step's controls never lag a step
   // behind. Manual facing never changes here.
   settleFacing() {
-    if (this.updateAttackFacing() || this.facingLocked) return;
+    if (this.updateAttackFacing() || this.facingLocked || this.movingSideways) return;
     const auto = this.turnAroundFacing();
     if (auto != null) this.facing = auto;
   }

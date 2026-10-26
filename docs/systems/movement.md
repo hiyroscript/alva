@@ -261,10 +261,13 @@ Energy, the Shield held, no art) is used up.
 (Home › Settings › Combat, the default; [combat](combat.md#facing-and-automatic-turn-around)),
 faces the closest enemy by itself. It changes the facing only: every
 number in this guide, every velocity and every input reads exactly as with
-it off. Running away, the fighter runs backwards, still facing its enemy;
-a jump, an air jump, air steering and the fast fall carry on as ever while
-the facing follows the enemy across; a Dash or an air dash faces and goes
-its own way to its end, and the enemy is faced again the step it ends.
+it off. It only turns the fighter while it is not moving left or right:
+running or steering (a direction held), or on the ground still sliding
+faster than a run turns it (20 units/s) after a run or a Dash, the
+fighter faces the way it goes and never runs backwards; stopped, or in
+the air with nothing held, it faces its enemy. A Dash or an air dash
+faces and goes its own way to its end, and the enemy is faced once the
+fighter has stopped.
 Nothing ever moves the fighter toward an enemy: an attack pressed out of
 reach whiffs where it is thrown.
 

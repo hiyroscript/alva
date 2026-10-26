@@ -1965,9 +1965,9 @@ each fighter's own values are in its character specification (7.2.9).
   and otherwise it keeps its last facing: it never auto-faces. With
   **Automatic turn-around** on (the human player's default, 7.2.4a) the
   player's fighter faces the closest valid enemy instead whenever there is
-  one, standing, running either way, in the air, Shield up and in an
-  ordinary attack, by the same rules the combat CPU's attacks are aimed
-  by. The combat CPU aims at its live opponent on
+  one and it is not moving left or right (standing, in the air, Shield up
+  and in an ordinary attack, by the same rules the combat CPU's attacks
+  are aimed by); moving, the manual rules above apply. The combat CPU aims at its live opponent on
   attack initiation and each simulation step, including side switches during
   startup, active frames and recovery. It supplies an orientation separately
   from movement input. Either way a stun, a paralysis, a Dash, an air dash,
@@ -2718,14 +2718,23 @@ every fighter, now and later, has it alike.
   out of play, input locked): the fighter's facing is its own, by the
   manual rules (7.2.2), so a fighter alone keeps its facing standing still
   and turns by Run; it is faced again the step an enemy is back.
-- **Always.** Standing still, running (either way: running away, the
-  fighter runs backwards facing its enemy, exactly as fast and as far as
-  with the setting off), jumping, air jumping and steering in the air, the
-  Shield up (blockstun included), and through an ordinary attack: the
-  attack starts facing its enemy, and an enemy that switches sides during
-  it turns it (its hitbox, a step-in still to come and a projectile not yet
+- **Only while not moving left or right.** It turns the fighter only
+  while no left or right direction is held and, on the ground, it is not
+  still sliding from a run or a Dash (faster than the 20 units/s a run
+  turns the fighter past). Moving, the manual rules apply (7.2.2): the
+  fighter faces the way it runs or steers and never walks backwards; let
+  go, it slides on facing its way and turns to its enemy once it has
+  stopped. In the air with nothing held (a jump straight up, a drift, an
+  air jump) it faces its enemy. Movement is exactly the same as with the
+  setting off, and the fighter is faced the step it stops.
+- **Then always.** Standing still, in the air, the Shield up (blockstun
+  included), and through an ordinary attack pressed with no direction
+  held: the attack starts facing its enemy, and an enemy that switches
+  sides during it turns it (its hitbox, a step-in still to come and a projectile not yet
   released go the new way, its art with them), exactly as a CPU's attack
   is aimed (7.2.2). A technique and a summon's startup start facing it.
+  An attack pressed, or held, with a direction faces that direction, as by
+  hand; let go during it, it turns to its enemy.
 - **Committed moves keep theirs.** A stun, a paralysis, a technique, a
   summon's startup, a Dash or an air dash, and an attack with a motion of
   its own (a homing dash, a roll, a plunge, a lift, a hover) hold the
