@@ -1,1033 +1,1212 @@
-ALVA — Remove Combat Assist and Combo Assist, Introduce Automatic Turn-Around
+ALVA — STRICT COMBAT RULES OVERHAUL
 
-Objective
+Attack Cancellation Reversion, Non-Attack Cancellation, Release-Based Cooldowns, Universal Energy Costs, and CPU Parity
 
-Perform a complete, production-quality refactor of the Alva fighting game.
+OBJECTIVE
+
+Work directly in my GitHub repository:
 
 Repository: hiyroscript/alva
 Branch: main
+Repository URL: https://github.com/hiyroscript/alva
 
-The required changes are:
+I want you to thoroughly investigate and implement a significant overhaul of the game’s combat rules.
 
-1. Completely remove Combat Assist from the game.
-2. Completely remove Combo Assist from the game.
-3. Add a new setting named Automatic turn-around under Settings → Combat.
-4. Make Automatic turn-around ON by default for all players, including existing players upgrading from older settings versions.
-5. When enabled, automatically orient the human player’s fighter toward the closest valid enemy.
-6. When disabled, restore Alva’s existing manual-facing behavior exactly.
-7. Preserve every other existing gameplay mechanic.
+These are new, strict, universal gameplay rules. They supersede older specifications, previous requests, documentation, tests, and historical design decisions wherever those contradict the requirements below.
 
-This must be a real engine-level implementation, not simply a settings-menu redesign.
+Do not merely change a few constants or introduce superficial workarounds. Understand Alva’s combat architecture, implement these mechanics at their actual sources of truth, and ensure they behave consistently for every character and every CPU.
 
-Do not introduce temporary compatibility systems, disabled versions of the previous assists, unused configuration options, or hidden residual behavior.
+Do not redesign unrelated gameplay systems.
 
 ⸻
 
-1. Understand the current architecture
+1. FIRST: INVESTIGATE THE EXISTING GAME
 
-Before editing, thoroughly inspect the existing implementation.
+Before editing anything, examine the repository and understand:
 
-Alva is a browser-based 2D platform fighting game built with vanilla JavaScript, ES modules, Canvas 2D, HTML, and CSS.
+* The complete combat input and move execution lifecycle.
+* Every playable fighter and their full ground/air movesets.
+* What the game considers an attack versus a non-attacking move.
+* How attack animations progress through startup, active frames, recovery, and release.
+* Existing hit-confirmed cancellation windows.
+* Dash and air-Dash cancel windows.
+* The earlier player-requested attack cancellation feature.
+* How special techniques, summons, clones, projectiles, bursts, traps, and other objects are created.
+* How cooldowns are assigned, started, and displayed.
+* How Energy is consumed and replenished.
+* How CPU fighters decide when to attack, defend, cancel, and use special abilities.
+* How combat behavior differs between players and CPUs.
+* The tests and documentation that enforce the current rules.
 
-Its gameplay uses a fixed-timestep simulation shared by Quick Battle, Watch Mode, and Practice Ground.
+Pay particular attention to:
 
-The following files are particularly important:
+js/game/fighters/fighter.js
 
-Settings and interface
+js/game/combat/combat-state.js
 
-* js/core/settings.js
-* js/ui/settings-dialog.js
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* css/settings.css
+js/game/combat/attacks.js
 
-Gameplay and fighter control
+js/game/combat/deflect.js
 
-* js/game/fighters/fighter.js
-* js/game/fighters/fighter-controller.js
-* js/game/fighters/movement.js
-* js/game/arena.js
-* js/game/battle.js
-* js/game/practice.js
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
+js/game/combat/technique.js
 
-Existing assist implementations
+js/game/combat/summon.js
 
-* js/game/combat/combat-assist.js
-* js/game/combat/combo-assist.js
-* js/game/combat/move-status.js
+js/game/combat/projectile.js
 
-Other relevant systems
+js/game/combat/offense.js
 
-* js/game/combat/attacks.js
-* js/game/combat/combat-state.js
-* js/game/ai/cpu-intelligence/brain.js
-* js/ui/ability-hud.js
-* js/ui/touch-controls.js
-* js/game/rendering/hit-fx.js
+js/game/combat/move-status.js
 
-Understand dependencies before removing code.
+js/data/cooldowns.js
 
-Alva’s fighter/controller architecture, animation system, combat rules, character data, physics, and input buffering must remain coherent.
+js/data/characters.js
 
-Do not replace the existing combat system with a simplified implementation.
+js/data/characters/0001.js through 0006.js
 
-⸻
+js/game/ai/moveset.js
 
-2. Completely remove Combat Assist
+js/game/ai/cpu-intelligence/
 
-Combat Assist currently allows a human-controlled fighter to automatically approach an opponent before executing a melee attack.
+js/ui/ability-hud.js
 
-That entire functionality must be removed.
+js/ui/mobile-abilities.js
 
-Remove the gameplay implementation
+Relevant tests, documentation, and the product specification must also be reviewed.
 
-Delete:
+Use the real implementation rather than assuming that every move follows the same animation or release behavior.
 
-js/game/combat/combat-assist.js
-
-Remove all Combat Assist-specific imports, properties, methods, calculations, and execution paths from Fighter.
-
-This includes, where present:
-
-* combatAssist
-* combatAssistOn
-* combatAssistFor
-* assistPlan
-* tryCombatAssist
-* assistIntents
-* stepCombatAssist
-* finishCombatAssist
-* cancelCombatAssist
-
-Remove associated runtime state, targeting calculations, automatic approach movement, energy exceptions, approach animations, interruption logic, and special attack handoff behavior.
-
-Remove unused assist-related imports and constants.
-
-Restore ordinary attack behavior
-
-When a player presses an attack:
-
-1. Resolve the action associated with that input.
-2. Check the existing attack eligibility rules.
-3. If valid, begin that attack normally.
-4. Execute its original movement, hitboxes, animation, damage, and cooldown behavior.
-
-Never move the fighter automatically toward the opponent merely because the attack is out of range.
-
-An attack that misses because the target is too far away must be allowed to miss normally.
-
-Preserve attacks that intentionally move the fighter, including homing attacks, rolls, lunges, plunges, dashes, and other character-specific mechanics.
-
-These are genuine move properties and must not be mistaken for Combat Assist.
-
-Do not remove shared attack classifications or attack-reach calculations used by the CPU or other systems simply because Combat Assist previously used them.
-
-Clean up related systems
-
-Remove Combat Assist-specific logic from:
-
-* Fighter.update()
-* Fighter.tryAction()
-* Attack start and cancellation paths
-* Movement and collision handling
-* Respawn and reset handling
-* Arena.detachFromPlay()
-* Practice fighter replacement and removal
-* Hit effects and movement trails
-* Any relevant tests and helpers
-
-In particular, remove the special movement-trail condition associated with fighter.combatAssist without affecting ordinary Dash trails.
-
-Remove attack properties such as assist-specific toward and turnHold where they no longer serve any independent gameplay purpose.
-
-Do not remove legitimate movement, attack-cancellation, or projectile mechanics.
-
-⸻
-
-3. Completely remove Combo Assist
-
-Combo Assist currently changes Attack 1 and Attack 2 behavior through automatic move alternation and queued follow-ups.
-
-This system must also be completely removed.
-
-Delete:
-
-js/game/combat/combo-assist.js
-
-Remove the relevant Combo Assist-specific functionality, including:
-
-* comboAssist
-* comboAssistOn
-* comboAction
-* noteFollowUp
-* queueFollowUp
-* holdFollowUp
-* comboQueue
-* queuedFollowUp
-* The automatic Attack 1 ↔ Attack 2 mapping
-* Assist-specific follow-up scheduling
-* Assist-specific buffered attack extensions
-* The corresponding HUD queued-move indicators
-
-Restore direct input behavior
-
-Each attack button must always request its own mapped attack.
-
-For example:
-
-* Attack 1 requests Attack 1.
-* Attack 2 requests Attack 2.
-* Attack 3 requests Attack 3.
-* Extra Attack requests its assigned action.
-
-If Attack 1 is on cooldown, pressing Attack 1 must not automatically execute Attack 2.
-
-If Attack 2 is on cooldown, pressing Attack 2 must not automatically execute Attack 1.
-
-Repeatedly pressing an attack must not create an automatic follow-up queue.
-
-Remove the assist-generated follow-up behavior entirely.
-
-Preserve legitimate combos
-
-Removing Combo Assist does not mean removing the game’s ordinary combo mechanics.
-
-Players must still be able to perform combos manually using deliberate inputs.
-
-Preserve:
-
-* Existing attack cooldowns
-* Normal attack buffering
-* Hit-confirmed cancels
-* Player-requested attack cancellation
-* Ground-to-air and air-to-ground transitions
-* Momentum preservation
-* Attack recovery rules
-* Character-specific move sequences
-* Hitstun and launch mechanics
-* Multi-hit attacks
-* Move-specific chaining mechanics
-
-In particular, preserve playerMayCut and other legitimate player-request cancellation rules.
-
-If the current system prevents repeated presses from restarting an attack already in progress, preserve that behavior independently of Combo Assist.
-
-Do not turn removal of Combo Assist into a general redesign of combat timing or responsiveness.
-
-Remove queued indicators
-
-Remove Combo Assist-specific queued indicators from:
-
-* js/game/combat/move-status.js
-* js/ui/ability-hud.js
-* js/ui/touch-controls.js
-* css/ability-hud.css
-* css/touch-controls.css
-
-Remove unused moveQueued logic and assist-specific queued state.
-
-Remove orphaned is-queued styling and localization strings if they have no remaining legitimate use.
-
-Preserve cooldown progress indicators, repeat-delay visuals, unavailable-move indicators, and every other existing HUD feature.
-
-⸻
-
-4. Add Automatic turn-around
-
-Introduce a new human-player gameplay setting:
-
-Automatic turn-around
-
-This is an orientation feature, not a movement or attack-assistance feature.
-
-Required functionality
-
-When enabled, the player’s fighter automatically faces the closest valid enemy.
-
-Examples:
-
-Enemy on the right
-
-The player’s fighter faces right.
-
-Enemy on the left
-
-The player’s fighter faces left.
-
-Enemy moves behind the player
-
-The fighter automatically turns to face the enemy, subject to the existing rules for direction-locked actions.
-
-Player stands still
-
-The fighter continues facing the enemy without requiring movement input.
-
-Player moves away from the enemy
-
-The player can still move away normally while the fighter visually faces the enemy when eligible.
-
-Enemy crosses from one side to another
-
-The fighter updates its facing without requiring the player to press the opposite direction.
-
-Player jumps
-
-Automatic facing continues to work in the air.
-
-Enemy is removed or unavailable
-
-The fighter retains its current facing rather than rapidly switching directions or producing errors.
-
-Important restriction
-
-Automatic turn-around must only change fighter orientation.
-
-It must never:
-
-* Move the fighter toward an enemy.
-* Change horizontal or vertical velocity.
-* Automatically Dash or jump.
-* Automatically attack.
-* Automatically start a combo.
-* Alter Energy.
-* Modify attack damage.
-* Change movement speed.
-* Teleport or reposition the fighter.
-* Grant additional attack range.
-* Override normal hitstun or recovery rules.
-
-The player retains complete control over movement and attacks.
-
-⸻
-
-5. Closest-enemy detection
-
-Implement a robust and deterministic targeting method.
-
-For the game’s current one-versus-one encounters, the existing fighter.opponent reference identifies the relevant enemy.
-
-However, structure the implementation so that selecting the nearest valid enemy remains straightforward if multiple enemy fighters are supported later.
-
-Target validity
-
-A target must:
-
-* Exist.
-* Be a valid enemy fighter.
-* Not be the player themselves.
-* Be alive and participating in the current simulation.
-* Not be temporarily removed because of a Void elimination or respawn wait.
-* Have valid finite position data.
-
-Do not target:
-
-* Projectiles
-* Summoned visual effects
-* Stage hazards
-* The fighter itself
-* Invalid or missing entities
-* Enemies currently outside active play
-
-Use Alva’s existing fighter identity and in-play model rather than inventing an incompatible team system.
-
-Distance calculation
-
-If multiple enemies exist, select the closest eligible fighter using a consistent world-space distance measure based on fighter positions.
-
-A squared-distance comparison is sufficient and avoids unnecessary square-root calculations.
-
-For example:
-
-distanceSquared = dx * dx + dy * dy
-
-Use the current fighter positions, not screen coordinates or camera positions.
-
-Facing calculation
-
-After selecting the closest enemy:
-
-* Enemy X greater than player X → facing 1
-* Enemy X less than player X → facing -1
-* Same horizontal X position → retain the last valid facing
-
-Handle equal distances deterministically to avoid target switching and visual jitter.
-
-Never assign a zero, NaN, or invalid value to fighter facing.
-
-Do not continually allocate temporary objects unnecessarily inside the fixed simulation loop.
-
-⸻
-
-6. Integrate facing correctly with Alva’s engine
-
-This is especially important.
-
-Alva currently has a manual-facing system in Fighter.updateFacing() and separate CPU attack-targeting behavior.
-
-Relevant existing functions include:
-
-* Fighter.updateFacing()
-* Fighter.faceAttackTarget()
-* Fighter.updateAttackFacing()
-* Fighter.startAttack()
-* Fighter.visualFacing
-* Fighter.spriteFlip
-
-The CPU also exposes attackFacing(self) through its combat intelligence.
-
-Study these carefully.
-
-Automatic facing priority
-
-When the new setting is ON:
-
-1. Determine the nearest valid opponent.
-2. Determine the appropriate facing direction.
-3. Apply it through the existing orientation system at the correct simulation points.
-4. Ensure the fighter and sprite remain visually consistent.
-5. Preserve legitimate direction locks and committed move behavior.
-
-The system should work while the fighter is idle, moving, jumping, shielding when orientation changes are allowed, and performing ordinary attacks.
-
-Attacks
-
-An ordinary attack should be correctly oriented toward the valid target when it begins.
-
-If an enemy switches sides during an ordinary attack, use Alva’s existing facing rules so its sprite, hitbox, and unreleased projectile remain correctly synchronized.
-
-Do not introduce independent sprite-facing logic that disagrees with the combat engine.
-
-Direction-locked moves
-
-Certain moves commit to a physical direction or trajectory.
-
-Examples include:
-
-* Dashes
-* Air dashes
-* Motion attacks
-* Homing attacks
-* Rolls
-* Plunges
-* Techniques with committed release directions
-
-Automatic turn-around must not reverse committed velocity, rewrite a locked attack trajectory, or redirect an already-released projectile.
-
-Where the existing engine distinguishes visual orientation from physical facing, use that distinction appropriately.
-
-If a move cannot safely change physical facing while committed, preserve its physical direction and resume automatic physical facing as soon as that restriction ends.
-
-Visual tracking may continue during a committed move only where consistent with the current rendering architecture.
-
-Simulation order
-
-Facing must be resolved early enough for new attacks to use the correct direction.
-
-Also account for Alva’s final facing update after both fighters have moved, before collision and hit resolution.
-
-Do not create a one-frame delay where a fighter visibly faces one direction but attacks in another.
-
-Maintain deterministic behavior under different rendering frame rates.
-
-Controller inputs
-
-Alva’s input resolver reads the fighter’s facing when resolving directional controller bindings.
-
-Ensure Automatic turn-around does not break:
-
-* Forward/back controller bindings
-* Right-stick attacks
-* Keyboard inputs
-* Touch movement buttons
-* Joystick movement
-* Dash direction
-* Character-specific controller profiles
-
-Keep movement intent independent of automatic facing.
-
-Use the existing player-controller and fighter interfaces wherever possible instead of introducing another independent simulation system.
-
-⸻
-
-7. Automatic turn-around OFF
-
-When the setting is disabled, the fighter must use the existing manual-facing rules.
-
-This means:
-
-* Running left can turn the fighter left.
-* Running right can turn the fighter right.
-* Directional attack inputs retain their original behavior.
-* A Dash turns the fighter according to its existing rules.
-* A stationary fighter keeps its previous facing.
-* An enemy crossing behind does not automatically turn the fighter.
-* Existing direction locks still apply.
-
-This behavior must match the game’s original manual-facing implementation.
-
-Do not leave behind partial automatic targeting when the setting is OFF.
-
-The ON and OFF states must be genuinely different gameplay options.
-
-⸻
-
-8. Apply only to the human player
-
-Automatic turn-around is a player preference.
-
-It must apply to the human fighter in:
-
-* Quick Battle — Regular Play
-* Quick Battle — Custom Play
-* Practice Ground
-
-It must continue to work after:
-
-* Fighter replacement in Practice Ground
-* CPU replacement
-* Removing the Practice CPU
-* Restarting a match
-* Respawning after falling into the Void
-* Changing stages or characters
-* Starting a new battle
-
-CPU behavior
-
-Do not apply this preference to CPU fighters.
-
-Preserve:
-
-* Quick Battle CPU intelligence
-* Watch Mode CPU-versus-CPU behavior
-* The CPU’s existing attack-facing system
-* Practice Ground dummy behavior
-* CPU movement and decision-making
-
-The distinction must be based on the controller’s actual kind, not fighter identifiers, roster slots, or display labels.
-
-A CPU must never inherit player-only automatic turn-around behavior simply because it uses the same Fighter class.
-
-⸻
-
-9. Replace the Combat settings interface
-
-Go to:
-
-Home → Settings → Combat
-
-Completely remove both existing settings:
-
-* Combat Assist
-* Combo Assist
-
-Do not hide them with CSS. Remove their actual UI construction, event handlers, stored settings, and related code.
-
-Replace them with one clean setting.
-
-Exact English content
-
-Automatic turn-around
-
-Description:
-
-“Automatically makes your fighter face the closest enemy.”
-
-Options:
-
-On — Default
-Off
-
-The setting must be ON by default.
-
-French localization
-
-Add equivalent French translations.
-
-Suggested text:
-
-Retournement automatique
-
-Description:
-
-“Oriente automatiquement votre combattant vers l’ennemi le plus proche.”
-
-Options:
-
-Activé — Par défaut
-Désactivé
-
-Keep the project’s existing localization conventions and typography.
-
-UI design
-
-Reuse the visual design currently used by the Settings radio choices.
-
-Preserve:
-
-* Glass-panel design
-* Section layout
-* Radio-button accessibility
-* Selected-option checkmark
-* Default-option label
-* Keyboard navigation
-* Controller navigation
-* Touch interaction
-* Responsive layout
-* English/French switching
-* Immediate settings persistence
-
-The Combat section should contain the new setting cleanly, without empty spaces, leftover headings, or obsolete descriptions.
-
-Do not add a separate settings category.
-
-⸻
-
-10. Settings schema and migration
-
-Update:
-
-js/core/settings.js
-
-Introduce a properly named setting, for example:
-
-automaticTurnAround
-
-Default:
-
-true
-
-Use the same boolean validation and persistence patterns as the other settings.
-
-A suitable constant is:
-
-DEFAULT_AUTOMATIC_TURN_AROUND = true
-
-Completely remove old properties
-
-Remove both:
-
-combatAssist
-comboAssist
-
-From:
-
-* Default settings
-* Stored schema
-* Boolean toggle registry
-* Public settings getters/setters
-* Runtime configuration
-* Serialization
-* Settings UI
-* Session constructors
-* Player controllers
-
-Remove legacy assist-specific defaults and migration helpers that become unused.
-
-Version migration
-
-The inspected schema currently uses version 7.
-
-Bump the settings version to 8.
-
-Support migration from existing supported versions 1 through 7.
-
-When loading old settings:
-
-1. Preserve the player’s language.
-2. Preserve Mobile Controls selection.
-3. Preserve custom touch layouts.
-4. Preserve custom controller profiles.
-5. Preserve existing profile-upgrade rules.
-6. Remove both obsolete assist fields.
-7. Introduce automaticTurnAround: true.
-8. Do not reset unrelated preferences.
-
-All existing players must initially receive Automatic turn-around ON, regardless of their previous Combat Assist or Combo Assist preferences.
-
-Afterward, their own ON/OFF selection must persist normally.
-
-Malformed or missing values should fall back to the default ON.
-
-Future saves must use only the updated schema, without old assist properties.
-
-Preserve the existing first-launch language selection behavior and localStorage error handling.
-
-⸻
-
-11. Update the mode initialization pipeline
-
-Review and update:
-
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
-* js/game/battle.js
-* js/game/practice.js
-* js/game/fighters/fighter-controller.js
-
-Remove old constructor arguments:
-
-combatAssist
-comboAssist
-
-Pass the new setting into the player controller when each playable session is created.
-
-Use the player’s saved preference.
-
-The player controller must default to Automatic turn-around ON when instantiated without an explicit preference.
-
-However, arbitrary custom or CPU controllers without the setting must not implicitly gain player-only auto-facing behavior.
-
-Follow Alva’s existing policy of reading gameplay preferences when the session starts.
-
-Do not introduce unrelated live settings updates into an active simulation.
-
-⸻
-
-12. Remove obsolete code and presentation state
-
-Perform a comprehensive dependency cleanup.
-
-Inspect all runtime references to the old assists.
-
-Examples include:
-
-* Combat Assist approach cancellation during respawn
-* Practice target removal
-* Old movement state checks
-* Combo queue fields
-* Assist-related timing data
-* Queued follow-up status
-* Hit effect trail checks
-* HUD queued highlighting
-* Touch button queued styling
-* Old settings option identifiers
-* Assist-specific localization
-* Unused module imports
-
-Remove obsolete declarations rather than leaving disabled code behind.
-
-Do not delete a shared function merely because its name appears in an old assist file.
-
-Verify that remaining references still serve legitimate gameplay behavior.
-
-Keep historical release history intact; do not rewrite prior commits or historical changelog entries merely because they describe a previous version of the game.
-
-⸻
-
-13. Update tests thoroughly
-
-The repository uses Node’s native test runner.
-
-Run:
-
-node --test
-
-First inspect existing tests, then update them to match the new design.
-
-Remove obsolete assist tests
-
-The following files primarily test systems being removed:
-
-* tests/systems/combat-assist.test.mjs
-* tests/systems/combo-assist.test.mjs
-* tests/systems/combo-queue.test.mjs
-
-Delete obsolete assist-only test cases.
-
-Before deleting an entire test file, identify whether it contains any generic combat behavior worth preserving elsewhere.
-
-Add Automatic turn-around tests
-
-Create dedicated regression coverage, preferably within a suitably named system test file.
-
-Required cases:
-
-A. Enabled by default
-
-A new player controller automatically faces a valid opponent.
-
-B. Enemy on the right
-
-Player faces right.
-
-C. Enemy on the left
-
-Player faces left.
-
-D. Enemy crosses behind
-
-Player turns automatically when eligible.
-
-E. Player is stationary
-
-Facing still updates.
-
-F. Player moves away
-
-Movement remains player-controlled, while facing follows the enemy when eligible.
-
-G. Mid-air behavior
-
-Facing updates during normal jumps and aerial movement.
-
-H. Setting OFF
-
-Original manual-facing behavior is preserved.
-
-I. No enemy
-
-Current facing is preserved.
-
-J. Enemy temporarily out of play
-
-No invalid turns or errors.
-
-K. Overlapping X coordinates
-
-Facing never becomes zero or invalid.
-
-L. Multiple enemies
-
-The nearest eligible opponent is selected, with deterministic tie handling.
-
-M. Ordinary attacks
-
-Attacks begin facing the correct opponent and maintain hitbox/sprite synchronization.
-
-N. Committed motion
-
-Existing trajectory, collision, velocity, and direction locks remain unchanged.
-
-O. Projectiles
-
-A released projectile never changes direction because its owner turns afterward.
-
-P. CPU exclusion
-
-Quick Battle and Watch Mode CPUs do not inherit this preference.
-
-Q. Practice Ground
-
-The setting works with the dummy, after swapping fighters or CPUs, and when the dummy is removed.
-
-R. Respawn and restart
-
-The selected setting survives and becomes effective when targets are valid.
-
-S. Determinism
-
-Behavior is consistent across supported fixed-step simulations and rendering frame rates.
-
-Settings tests
-
-Update:
-
-tests/interface/settings.test.mjs
-
-Verify:
-
-* New default ON
-* Valid boolean handling
-* OFF persistence
-* ON persistence
-* Invalid values rejected
-* Correct migrations from versions 1–7
-* Removal of obsolete fields
-* Preserved language and controller customizations
-* Version 8 serialization
-* Future/invalid schema fallback
-* Combat menu layout
-* English and French labels
-* Accessibility and focus behavior
-
-Integration tests
-
-Review and update:
-
-* tests/interface/battle-screen.test.mjs
-* tests/integration/quick-battle.test.mjs
-* tests/integration/practice-ground.test.mjs
-* tests/integration/watch-mode.test.mjs
-
-Ensure the correct setting reaches the correct fighter.
-
-Other affected tests
+Historical context: the specific change to reverse
 
 Review:
 
-* tests/systems/facing.test.mjs
-* tests/systems/basic-strings.test.mjs
-* tests/systems/move-cancel.test.mjs
-* tests/systems/combo.test.mjs
-* tests/interface/ability-hud.test.mjs
-* tests/interface/controls-ui.test.mjs
-* tests/interface/i18n.test.mjs
-* tests/helpers/player-rig.mjs
-* tests/benchmarks/feel-metrics.mjs
+Pull Request #114 — Combo Assist, player move cancellation, Combat Assist fixes and controller art
 
-Update assist-specific test fixtures and benchmarks.
+https://github.com/hiyroscript/alva/pull/114
 
-Preserve tests that exercise ordinary attacks, manual combos, buffering, hit-cancels, cooldowns, and combat rules.
+Commit: 85fd4afb9812fc33a26f748467d75f4b494a0737
 
-Do not delete legitimate tests merely to make the test suite pass.
+This change introduced the behavior where a human player’s new valid move request can interrupt an attack already playing, even if that attack has not connected.
+
+That is the specific behavior I want reversed.
+
+Important: Do not revert the entire commit or restore unrelated removed features. Reverse the relevant attack-cancellation behavior while preserving other intentional changes, including the current Automatic turn-around system, manual combos, controller functionality, and unrelated improvements.
 
 ⸻
 
-14. Update documentation
+2. STRICT RULE A — REMOVE BROAD ATTACK CANCELLATION
 
-Update the current product documentation to reflect the new game behavior.
+What I want removed
 
-Relevant files include:
+An ordinary damaging attack must no longer be freely interrupted just because another move is requested.
 
-* README.md
-* ALVA_SPEC.md
-* docs/systems/combat.md
-* docs/systems/movement.md
-* docs/systems/input.md
-* docs/systems/energy.md
-* docs/architecture/module-responsibilities.md
-* docs/development/testing.md
+For example:
 
-Also inspect other current guides for references to the removed functionality.
+1. A fighter begins Attack 1.
+2. Its startup animation begins.
+3. The player presses Attack 2.
+4. Attack 1 must NOT immediately disappear and be replaced by Attack 2.
 
-Remove active documentation presenting Combat Assist or Combo Assist as existing features.
+The same applies when the player presses:
 
-Document Automatic turn-around, including:
+* Another numbered attack.
+* Extra Attack.
+* A special technique.
+* A summon.
+* Jump.
+* Dash or air Dash.
+* Shield or Deflect.
 
-* What it does
-* That it is ON by default
-* How to disable it
-* Its player-only scope
-* Its interaction with manual movement
-* Its behavior during attacks
-* Why committed directional moves are protected
-* Its persistence across sessions
+A new request must not automatically grant the right to cut short an ongoing damaging attack.
 
-Update specification references where necessary without unnecessarily renumbering or rewriting unrelated sections.
+This applies during startup, active frames, and recovery.
 
-Preserve historical changelog information.
+The player must not gain an unconditional attack escape simply because another button was pressed.
 
-⸻
+What must remain
 
-15. Preserve Alva’s existing design contracts
+I am NOT asking you to remove deliberate cancel windows.
 
-The game has important architectural rules.
+Keep legitimate pre-existing mechanics such as:
 
-Respect them.
+* Hit-confirmed attack cancels.
+* Authored hitCancel timing.
+* Legitimate attack-to-attack follow-ups.
+* Valid attack-to-Jump follow-ups.
+* Valid attack-to-Dash follow-ups.
+* Existing Dash cancel windows.
+* Movement transitions governed by their own established timing.
+* Normal input buffering.
+* Natural attack completion.
+* Existing landing interactions and character-specific mechanics.
 
-Character-independent logic
+These are separate from the broad player-requested cancellation system.
 
-Do not hardcode fighter IDs into shared behavior.
+The intention is:
 
-All current fighters and future fighters must work with the new feature automatically.
+An attack cannot be cancelled arbitrarily, but it can still be cancelled when an established, legitimate cancellation rule explicitly permits it.
 
-Universal movement
+Do not introduce a new global rule that disables legitimate combos.
 
-Do not modify the shared movement balance.
+Existing implementation to examine
 
-Movement values, jump heights, Dash speeds, air-dash behavior, friction, momentum, and gravity must remain unchanged.
+Investigate the current use of:
 
-Existing controls
+* Fighter.playerMayCut()
+* Fighter.cutAttack()
+* Fighter.canFollowUp()
+* Fighter.tryAction()
+* Fighter.tryDeflect()
+* Fighter.trySpecial()
+* Fighter.tryDash()
+* Fighter.tryAirDash()
+* Fighter.startAttack()
+* CombatState.cancellable
+* CombatState.cancellableFor
+* CombatState.endAttack()
 
-Do not introduce new gameplay key bindings.
+Remove the broad attack-cancellation permission introduced by PR #114 wherever it is involved in starting another move.
 
-Do not change recommended controller layouts.
+Do not simply delete cutAttack() because other legitimate systems depend on ending attacks.
 
-Preserve the project’s intentional internal codename conventions, including mouvment.
+Instead, ensure calls to it occur only when the current move is actually eligible to be interrupted.
 
-Character abilities
+Input behavior
 
-Do not modify character move definitions or sprite assets unless absolutely necessary to correct an actual integration problem.
+A new attack request made during an uncancellable attack must not restart, replace, or prematurely finish that attack.
 
-Preserve:
+Normal buffering should continue to function. A buffered follow-up may begin after the first attack naturally finishes, or when a legitimate cancellation window opens.
 
-* Special abilities
-* Shield and Deflect
-* Launch Point
-* Energy
-* Hitstun
-* Hitstop
-* Projectile behavior
-* Techniques
-* Summons
-* Homing attacks
-* Air attacks
-* Attack cooldowns
-* Character-specific mechanics
+Repeatedly pressing the button for the attack already playing must not restart it or stack unlimited copies of it.
 
-Gameplay modes
+Do not introduce automatic attack chaining.
 
-Quick Battle, Watch Mode, and Practice Ground must continue working as before, except for the expressly requested changes to human-player facing and the removal of the two assists.
-
-Protected files
-
-Follow the repository’s contributor and development conventions.
-
-Do not alter character_rule.
+The current removal of Combo Assist must remain respected.
 
 ⸻
 
-16. Acceptance criteria
+3. STRICT RULE B — NON-ATTACKING MOVES MUST BE CANCELLABLE
 
-The implementation is complete only when all the following are true:
+While damaging attacks are protected from arbitrary cancellation, moves that are not attacks must be cancellable.
 
-* [ ]	Combat Assist no longer exists as a gameplay system.
-* [ ]	Combo Assist no longer exists as a gameplay system.
-* [ ]	Neither assist appears in Settings.
-* [ ]	Neither assist can be enabled through saved settings.
-* [ ]	Neither assist affects attack execution.
-* [ ]	Obsolete assist runtime state and UI indicators are removed.
-* [ ]	Automatic turn-around appears under Settings → Combat.
-* [ ]	Automatic turn-around is ON by default.
-* [ ]	ON automatically faces the closest valid enemy.
-* [ ]	OFF restores original manual-facing behavior.
-* [ ]	Player movement remains completely manual.
-* [ ]	The new option does not create attacks, movement, or combos.
-* [ ]	Direction-locked moves retain their intended mechanics.
-* [ ]	Quick Battle player behavior works correctly.
-* [ ]	Practice Ground player behavior works correctly.
-* [ ]	Watch Mode CPU behavior remains unchanged.
-* [ ]	All six existing fighters work correctly.
-* [ ]	English and French translations are complete.
-* [ ]	Old settings migrate without losing unrelated preferences.
-* [ ]	Obsolete active documentation references are cleaned up.
-* [ ]	All relevant regression tests pass.
-* [ ]	node --test completes successfully.
-* [ ]	No unnecessary refactors or gameplay balance changes have been introduced.
+This rule is extremely important.
+
+A move that does not attack or harm an opponent should not unnecessarily trap the fighter in an animation when the fighter makes a valid request to perform something else.
+
+Examples include applicable:
+
+* Defensive actions.
+* Non-damaging techniques.
+* Healing or support actions.
+* Non-offensive movement abilities.
+* Mobility actions.
+* Utility actions.
+* Other moves that do not directly or indirectly attack an opponent.
+
+When a valid new action is requested, allow the ongoing non-attacking action to be cancelled according to its legitimate movement or state restrictions.
+
+Cancellation must be responsive and must not require a hit-confirmed attack window for a move that does not attack.
+
+Use Alva’s real attack classification
+
+The repository already has a shared classification system in:
+
+js/game/combat/offense.js
+
+It distinguishes the way a move is executed from whether that move can harm an opponent.
+
+Use this existing classification as the foundation.
+
+A damaging projectile, offensive summon, clone that strikes an opponent, damaging burst, or similar attack remains an attack even if the fighter does not personally perform a melee hit.
+
+A non-damaging healing technique is not automatically an attack just because the game executes it through the technique system.
+
+Do not classify everything with an animation named attack as an offensive attack.
+
+Likewise, do not incorrectly classify offensive projectiles as harmless simply because their damage occurs later.
+
+Use the underlying gameplay effect rather than animation names.
+
+Critical exception: DEFLECT
+
+DEFLECT MUST BE CANCELLABLE. THIS IS AN EXPLICIT OVERRIDE.
+
+Alva currently treats Deflect as an attack/defense hybrid. It also deals 3 damage.
+
+Despite that internal classification, Deflect must be allowed to be cancelled.
+
+A fighter performing Deflect must be able to stop its animation and transition into a different valid action without needing the Deflect to land a hit.
+
+This applies to the Deflect’s startup, active, and recovery phases when another action is legitimately available.
+
+For example:
+
+* Deflect → another aerial attack.
+* Deflect → air Jump.
+* Deflect → air Dash.
+* Deflect → another valid aerial action.
+
+The old Deflect should stop cleanly when the replacement action actually begins.
+
+Its old hitbox must not continue dealing damage after cancellation. Its projectile-reflection window must not remain active after the Deflect ends.
+
+However, anything already successfully reflected must continue behaving correctly.
+
+Do not refund Energy already spent on a committed Deflect.
+
+Do not allow holding the Deflect button or repeatedly pressing the same active Deflect to restart it infinitely.
+
+Also distinguish cancelling out of Deflect from using Deflect to cancel an unrelated damaging attack. The first must be supported; the second must still respect the attack’s legitimate cancellation restrictions.
+
+Deflect must follow these same rules for every fighter, human or CPU.
+
+Valid cancellation rules
+
+For non-attacking moves and Deflect:
+
+1. Check whether the requested replacement action is valid.
+2. Respect genuine constraints such as stun, paralysis, exhausted Energy, missing animations, ground/air requirements, and other required restrictions.
+3. Respect deliberate movement-specific cancel windows where applicable, such as the Dash’s existing dashCancelTime.
+4. Do not cancel the ongoing action if the replacement cannot start.
+5. Once the replacement is accepted, terminate the old action cleanly.
+6. Start the new action exactly once.
+7. Do not leave lingering hitboxes, animation locks, pending effects, or stale input state.
+
+Forced interruption by an opponent’s hit, death, Void transitions, or other established systems must continue working.
 
 ⸻
 
-17. Final verification and delivery
+4. STRICT RULE C — 3-SECOND AND 5-SECOND COOLDOWNS START ONLY AFTER FULL RELEASE
 
-After implementation:
+This is a fundamental cooldown timing change.
 
-1. Inspect the complete diff.
-2. Search the repository for residual references to the removed assist systems.
-3. Classify any remaining historical references and confirm none are active dependencies.
-4. Run the complete test suite.
-5. Test both Automatic turn-around states.
-6. Verify English and French settings screens.
-7. Check Quick Battle, Practice Ground, and Watch Mode.
-8. Verify legacy settings migrations.
-9. Verify no changes to combat balance or movement fundamentals.
-10. Remove unused imports, declarations, test helpers, and CSS.
+Currently, Alva can start a special move’s cooldown immediately after its activation begins.
 
-Provide a final report showing:
+That is no longer acceptable.
 
-* Files changed
-* Files deleted
-* New functionality implemented
-* Settings migration behavior
-* Regression tests added or modified
-* Test command results
-* Any remaining limitations
+A 3-second or 5-second cooldown must start only when the move has actually been released.
 
-Do not consider the task finished merely because the settings interface looks correct.
+Beginning the initial animation is NOT enough.
 
-Both old assists must be eliminated from active gameplay, and Automatic turn-around must be integrated correctly into the real fighter simulation.
+Pressing the move’s button is NOT enough.
 
-Final goal: Alva should have a cleaner combat configuration containing Automatic turn-around, enabled by default, while preserving the game’s full manual combat depth, movement freedom, CPU intelligence, and existing fighter mechanics.
+Entering a cast or startup phase is NOT enough.
 
-Implement the changes directly, comprehensively, and without unrelated modifications.
+Define a real release event
+
+Use the existing attack and ability lifecycle to identify when the move’s meaningful effect has actually been emitted.
+
+Examples:
+
+Move type	Cooldown begins when
+Projectile attack	The projectile is actually released/spawned
+Projectile technique	The cast completes and the projectile is released
+Summon or clone	The summon/clone is actually created
+Trap or persistent object	The gameplay object is actually deployed
+Healing technique	The healing effect is actually executed
+Burst technique	The burst effect is actually activated
+Single-strike melee attack	The strike has reached its actual active/release event
+Multi-hit attack	The complete authored sequence has released its required strikes, including its final strike
+Impact-dependent attack	Its required damaging impact actually occurs
+
+These release rules must be derived from each move’s actual structure and timing.
+
+A move can count as released even if its projectile later misses, its opponent blocks, or its attack fails to connect.
+
+Release is not the same as a successful hit.
+
+For example, Hollow Purple’s cooldown should begin when Hollow Purple is actually fired, not when its casting animation begins and not when it eventually hits an enemy.
+
+Similarly, a clone’s cooldown begins when the clone successfully appears, not when the fighter first assumes the summoning pose.
+
+For multi-hit attacks, do not interpret the first startup animation or first partial strike as complete release when additional required strikes have not yet been emitted.
+
+Do not wait for a projectile to finish its lifetime or travel across the arena. Once the move’s authored payload has been fully emitted, the release condition has been met.
+
+Interruption before release
+
+If the move is interrupted before its full release event:
+
+DO NOT START ITS 3-SECOND OR 5-SECOND COOLDOWN.
+
+Examples:
+
+* A technique is interrupted halfway through casting.
+* A summoner is hit before the clone appears.
+* A projectile attack is interrupted before its projectile spawns.
+* A non-attacking healing technique is cancelled before its healing event.
+* A multi-hit move ends before its complete required sequence has been released.
+
+In these cases, the cooldown must not activate merely because the move was attempted.
+
+If a cooldown timer was previously scheduled at activation, remove that premature timer behavior.
+
+Interruption after release
+
+If the move has already been fully released, its cooldown must remain active even if:
+
+* The fighter is hit during recovery.
+* The animation is interrupted.
+* The projectile misses.
+* The attack is blocked.
+* The projectile is reflected.
+* The summon or clone later disappears.
+* The attacker’s position changes.
+* The opponent escapes or is defeated.
+
+The cooldown belongs to the successfully released move, not to its eventual hit result.
+
+Implementation architecture
+
+Introduce or reuse one reliable, idempotent cooldown commitment mechanism.
+
+Conceptually:
+
+* A move starts.
+* It enters startup or casting.
+* It reaches the authoritative release event.
+* The system records that this activation was released.
+* Its 3s/5s cooldown starts exactly once.
+* Recovery continues independently.
+
+Do not start or reset the cooldown a second time when the animation finishes or another lifecycle callback fires.
+
+Do not let multiple projectiles, multiple hits, or multiple update steps trigger duplicate cooldown starts for the same move activation.
+
+All cooldown stores and the UI must remain synchronized.
+
+Inspect and update:
+
+CombatState.endAttack()
+
+CombatState.interruptAttack()
+
+CombatState.update()
+
+Fighter.trySummon()
+
+Fighter.finishSummon()
+
+Fighter.tryTechnique()
+
+Technique.release()
+
+Fighter.update()
+
+The existing attack projectile release mechanism also needs review.
+
+The exact implementation can differ by move type, but the release-based contract must be universal.
+
+⸻
+
+5. STRICT RULE D — REMOVE THE 0.5-SECOND COOLDOWN COMPLETELY
+
+Alva currently has a universal attack repeat cooldown:
+
+REPEAT_COOLDOWN = 0.5
+
+Located in:
+
+js/data/cooldowns.js
+
+This universal 0.5-second cooldown must be removed as an active gameplay restriction.
+
+The cooldown policy should become:
+
+Move classification	Cooldown
+Ordinary move	0 seconds
+Exceptional move	3 seconds
+Ten-damage move	5 seconds
+Deflect	0 seconds
+
+Keep the existing rules for determining which moves belong to the exceptional and ten-damage cooldown classes.
+
+Do not change damage tiers or reclassify existing extraordinary effects simply to change their cooldowns.
+
+Ordinary attacks must no longer receive an artificial 0.5-second timer merely because the move ended.
+
+However:
+
+Removing the 0.5-second cooldown must not allow an attack animation to restart or cancel itself while it is still playing.
+
+An attack must still respect:
+
+* Its full animation and recovery timing.
+* Existing legitimate cancel windows.
+* Hitstun.
+* Required move commitments.
+* Existing air-use restrictions.
+* Input state and button press requirements.
+
+No cooldown is not the same thing as no animation commitment.
+
+Also review the code that currently relies on the 0.5-second value to determine whether an attack may cancel into itself. Remove obsolete dependencies without accidentally creating infinite same-frame attack loops.
+
+Existing separate movement mechanics, such as Dash duration and its independently authored movement repeat timer, should not be silently removed under the guise of removing the universal 0.5-second attack cooldown.
+
+Do not replace 0.5 seconds with a hidden equivalent timer elsewhere.
+
+Clean up old assumptions
+
+Update:
+
+* policyCooldown()
+* resolveCooldown()
+* COOLDOWN_CLASSES
+* Move constructors and defaults.
+* Combat cooldown checks.
+* CPU readiness calculations.
+* Cooldown display and HUD behavior.
+* Touch controls.
+* Ability restriction indicators.
+* Tests that currently expect 0.5 seconds.
+
+Ordinary moves should genuinely have no cooldown timer.
+
+A 0.5-second cooldown indicator must not continue displaying after the mechanic has been removed.
+
+⸻
+
+6. STRICT RULE E — UNIVERSAL ENERGY COST IS 15
+
+Every move or action that consumes Energy must now cost exactly the same nominal amount: 15 Energy.
+
+No fighter may have a unique Energy cost.
+
+No move may have a special Energy price such as 20, 25, 30, or 40.
+
+The current Dash cost of 20 must become 15.
+
+Universal costs
+
+Action	Energy cost
+Ground Dash	15
+Air Dash	15
+Dash cancel	15
+Deflect	15
+Shield-blocked hit	15
+Perfect Shield-blocked hit	15
+Eligible ordinary projectile move	15
+Eligible ordinary trap deployment	15
+Eligible ordinary summon	15
+Eligible ordinary clone	15
+Eligible ordinary gameplay object	15
+Eligible ordinary field/burst or similar spawned gameplay effect	15
+
+Holding Shield should remain free; blocking a hit consumes Energy.
+
+Normal running, jumping, turning, and ordinary melee attacks that do not create cost-bearing gameplay entities should remain free unless another existing mechanic explicitly requires Energy.
+
+Do not make every attack consume Energy.
+
+The new Energy requirement for generated gameplay entities is governed by the next rule.
+
+New Energy costs for projectiles, traps, summons, clones, and objects
+
+All player-generated or CPU-generated offensive and utility gameplay constructs whose parent move does NOT have a 3-second or 5-second cooldown must consume 15 Energy.
+
+This includes all applicable:
+
+* Projectiles.
+* Thrown objects.
+* Summoned clones.
+* Summoned entities.
+* Deployed traps.
+* Persistent damaging areas.
+* Autonomous objects.
+* Spawned gameplay constructs.
+* Gameplay-affecting bursts or fields.
+* Future additions using equivalent mechanics.
+
+The exact name of the move does not matter.
+
+The rule must be determined from what the move actually creates and from its cooldown classification.
+
+Use structured move data, not a hardcoded list of current character names.
+
+A construct-producing move with a 3s or 5s cooldown should not receive this additional 15-Energy requirement.
+
+Its cooldown is already the restriction assigned by this rule set.
+
+For example:
+
+* An ordinary projectile that previously had the 0.5s repeat cooldown now has no cooldown, but costs 15 Energy.
+* A normal clone deployment without a 3s/5s cooldown costs 15 Energy.
+* A projectile technique with an exceptional 3s cooldown keeps its 3s cooldown and does not gain the new construct Energy charge.
+* A 5s ultimate projectile keeps its 5s cooldown without an additional construct charge.
+
+One activation, one charge
+
+A single move activation should consume its Energy cost only once.
+
+Do not charge 15 for every individual hit from the same projectile.
+
+Do not charge 15 repeatedly for:
+
+* Each projectile update.
+* Each frame a trap remains alive.
+* Each hit from a clone.
+* Each clone animation.
+* A projectile piercing multiple opponents.
+* A projectile being reflected.
+* A persistent area’s repeated collision checks.
+* Multiple phases of one already-paid attack.
+
+If one move creates several components as part of one authored activation, treat them as one parent activation for the Energy cost unless the data defines separate independently activated moves.
+
+Validate the move’s actual eligibility before charging Energy. Rejected inputs must not consume it.
+
+Keep Energy accounting deterministic, including interrupted startup animations and reused moves.
+
+Do not invent Energy refunds for already committed actions unless needed to correct a duplicate or invalid charge.
+
+Preserve the existing Energy model unless explicitly changed
+
+Retain the existing:
+
+* 100 maximum Energy.
+* Per-fighter passive regeneration rates.
+* Exhaustion state.
+* Exhaustion recovery requirements.
+* Shield mechanics.
+* Zero-energy restrictions.
+* Reset and respawn behavior.
+
+Alva currently allows some Energy actions to drain the remaining bar even when it contains less than the nominal cost, causing exhaustion until fully replenished.
+
+Preserve that underlying partial-spend behavior unless it would cause a violation of the new 15-Energy activation rules. Do not silently introduce a completely different Energy regeneration or exhaustion system.
+
+Importantly, all newly Energy-costing constructs must participate in the same exhaustion and resource eligibility checks as existing Energy actions.
+
+No fighter should be able to use ordinary projectiles for free simply because the code previously regarded all attacks as Energy-free.
+
+Shared source of truth
+
+Prefer one shared Energy cost constant or centrally derived policy.
+
+Avoid scattered literal 15 values in every character implementation.
+
+Update resolveEnergy() and its schema validation so fighter-specific cost overrides cannot violate the universal rules.
+
+⸻
+
+7. STRICT RULE F — CPU FIGHTERS MUST USE THE SAME SYSTEM
+
+All changes must apply equally to human players and CPU-controlled fighters.
+
+This is mandatory.
+
+The CPU cannot use a separate old implementation of cooldowns, Energy, or cancellation.
+
+Cancellation parity
+
+The CPU must obey the same attack-cancellation restrictions as the player.
+
+It must NOT freely interrupt damaging attacks outside legitimate cancel windows.
+
+It must retain legitimate hit-confirmed combos and authored follow-ups.
+
+However, CPU fighters must also be allowed to cancel non-attacking moves and Deflect under the same conditions as human fighters.
+
+Do not keep the new cancellation rules exclusive to controller.kind === 'player'.
+
+Implement the relevant permissions at a shared fighter/gameplay level.
+
+The CPU should be able to intentionally cancel a utility move or Deflect when a better valid action becomes available.
+
+It should not spam cancellation every frame or repeatedly select impossible replacement moves.
+
+Cooldown awareness
+
+The CPU must understand:
+
+* Ordinary moves have no 0.5s cooldown.
+* Exceptional moves have 3s cooldowns.
+* Ten-damage moves have 5s cooldowns.
+* A 3s/5s cooldown begins only after the move releases.
+* An interrupted move that never released does not start its cooldown.
+* A released move remains unavailable until its cooldown expires.
+* A cooldown is not the same as an animation lock.
+* Moves without cooldowns can still be unavailable because the fighter is busy or a different eligibility rule blocks them.
+
+It must never plan a special move as ready while it is actually cooling down.
+
+It must also avoid treating a move as permanently unavailable simply because an earlier startup animation was interrupted.
+
+Energy awareness
+
+The CPU must understand that normal projectiles and construct-producing moves now spend Energy.
+
+Update CPU capabilities, move readiness, planning, and evaluation so that it correctly accounts for the 15-Energy cost.
+
+The CPU must not:
+
+* Fire projectiles without paying.
+* Summon clones for free when their move requires Energy.
+* Assume all attacks are Energy-free.
+* Use an exhausted fighter’s resources illegally.
+* Continue selecting unavailable cost-bearing moves.
+* Pay an incorrect Dash cost.
+* Use outdated cooldown or availability information.
+
+Its decision-making should consider the actual Energy left after a move.
+
+A fighter should still make intelligent tradeoffs among attacks, summons, defense, and mobility.
+
+The CPU must not become completely passive or stop using projectiles because of the new costs.
+
+CPU architecture to investigate
+
+Review at minimum:
+
+js/game/ai/moveset.js
+
+js/game/ai/cpu-intelligence/capabilities.js
+
+js/game/ai/cpu-intelligence/evaluator.js
+
+js/game/ai/cpu-intelligence/brain.js
+
+js/game/ai/cpu-intelligence/executor.js
+
+And any planning, decision, perception, or state modules affected by these changes.
+
+Update moveReady() and capability energy costs to match the actual gameplay execution path.
+
+The AI should reason with the same rules the Fighter enforces.
+
+These changes must work in normal matches, CPU-versus-CPU matches, Watch Mode, and any applicable practice or test modes.
+
+They must be independent of difficulty level.
+
+Difficulty can change decision quality, but never the universal gameplay rules.
+
+⸻
+
+8. IMPORTANT INTERACTION RULES AND EDGE CASES
+
+The new systems must coexist correctly.
+
+Case A: Attack → different attack
+
+If Attack 1 is an ongoing damaging attack and Attack 2 is requested before the first attack is cancellable:
+
+Attack 1 continues.
+
+Attack 2 may be buffered according to existing rules, but it must not forcibly replace Attack 1.
+
+Case B: Attack → Dash
+
+If the attack has not entered a legitimate cancellation window, Dash cannot cut it short merely because the player requested it.
+
+If the attack has entered its valid hit-confirmed Dash cancellation window, the Dash can start according to the existing timing restrictions and costs 15 Energy.
+
+Case C: Deflect → aerial attack
+
+An airborne fighter starts Deflect and then requests a different valid aerial attack.
+
+Deflect must be cancellable.
+
+The old Deflect hitbox and reflection effect must stop when cancelled.
+
+The new attack begins only after its eligibility checks succeed.
+
+Case D: Deflect → air Dash
+
+Deflect is interrupted by a valid air Dash.
+
+Deflect has already consumed its 15 Energy.
+
+The air Dash consumes its own 15 Energy.
+
+Do not combine both actions into a single charge.
+
+Case E: Ordinary projectile
+
+A move with no special cooldown creates a projectile.
+
+The move consumes 15 Energy exactly once, has no universal 0.5s cooldown, and remains governed by its animation and normal action restrictions.
+
+Case F: Exceptional projectile interrupted during casting
+
+A 3s projectile technique begins casting but is interrupted before release.
+
+No projectile appears.
+
+No 3s cooldown starts.
+
+Any Energy behavior must follow the move’s actual established cost rules.
+
+Case G: Exceptional projectile successfully released
+
+The projectile actually appears.
+
+The 3s cooldown starts immediately at that release event.
+
+The projectile may hit, miss, or be reflected without changing the timer.
+
+Case H: Summon interrupted before spawning
+
+The fighter starts a summon whose release requires a startup animation.
+
+The fighter is hit before the summon materializes.
+
+The summon does not appear.
+
+If it is a 3s/5s summon, that cooldown must not start.
+
+If it is a cost-bearing ordinary summon, its Energy handling must match the defined one-time activation charge without duplicate deductions.
+
+Case I: Summon successfully released
+
+The clone materializes.
+
+Its 3s/5s cooldown, if applicable, begins then.
+
+Subsequent clone attacks do not restart the cooldown.
+
+For an ordinary cost-bearing clone, the 15-Energy cost must not repeat when the clone attacks.
+
+Case J: Healing technique
+
+A non-attacking healing technique begins casting.
+
+The fighter is allowed to cancel it with a valid replacement action.
+
+If cancelled before healing is released, no 3s cooldown begins.
+
+If healing has already been executed, the 3s cooldown starts even if the fighter later leaves the recovery animation.
+
+Case K: Zero cooldown, same attack
+
+A fighter presses an ordinary melee attack repeatedly while that same attack animation is running.
+
+The move must not continuously restart itself.
+
+Once the attack finishes naturally, it can be used again, assuming every other rule allows it.
+
+Case L: CPU Deflect cancellation
+
+A CPU starts Deflect and recognizes an opportunity to use a different valid move.
+
+It can cancel Deflect just as the player can.
+
+It must pay the same Energy and satisfy the same eligibility requirements.
+
+Case M: Interrupted multi-hit special
+
+A multi-hit move that qualifies for the 5s cooldown is interrupted before its complete required sequence is released.
+
+Do not start its 5s cooldown merely because the first animation or an early strike began.
+
+If its complete authored attack sequence is released, the cooldown begins and cannot be bypassed by later interruption.
+
+Case N: Multiple effects from one action
+
+A technique releases a projectile and a burst, or an attack creates multiple connected gameplay effects.
+
+Do not charge Energy separately for each component if they belong to one activation.
+
+Do not start a cooldown separately for each hit or component.
+
+The move’s complete authored release event should trigger its cooldown exactly once.
+
+Case O: Reset, death, and match transitions
+
+Do not leave pending cooldown events, ghost clones, stale release flags, or repeated Energy charges after:
+
+* Death.
+* Respawn.
+* Match restart.
+* Practice reset.
+* Void transitions.
+* Fighter destruction.
+* CPU plan cancellation.
+* Battle teardown.
+
+Preserve existing behavior regarding active projectile persistence and cooldown clearing where those rules are not superseded.
+
+⸻
+
+9. AUDIT ALL SIX CURRENT FIGHTERS
+
+Do not implement this only for fighter 0001.
+
+Audit every move for every existing playable character.
+
+Pay special attention to the documented 3s/5s moves:
+
+Fighter	Existing special-cooldown examples
+0001	Unlimited Void (3s), Hollow Purple (5s)
+0002	Whirlwind (5s)
+0003	Mystical Palm Technique (3s)
+0004	Ievan Polkka (5s), World is Mine (3s)
+0005	Deadlights (3s), Red Balloon (3s)
+0006	Ice Breath (3s)
+
+Verify the current source definitions before altering them.
+
+For ordinary construct-producing moves, investigate examples such as Red, Blue, Maximum Blue, Heat Vision, Sonic Scream, and other existing projectile or deployed-effect abilities.
+
+Ensure they receive the new 15-Energy cost when they do not qualify for a 3s/5s cooldown.
+
+Do not accidentally apply the construct cost to a purely visual effect.
+
+Do not change a move’s damage, animation, range, projectile trajectory, or cooldown class simply because the new Energy rule needs to be applied.
+
+Create a complete internal roster audit identifying, for each action:
+
+* Fighter.
+* Action ID.
+* Execution type.
+* Attack/non-attack classification.
+* Whether it can be cancelled.
+* Existing legitimate cancellation windows.
+* Cooldown class.
+* Cooldown duration.
+* Authoritative release event.
+* Energy cost.
+* Whether it spawns a gameplay entity.
+* CPU availability.
+
+Use this audit to verify that no moves were overlooked.
+
+Newly added characters should inherit the same strict rules automatically.
+
+⸻
+
+10. USER INTERFACE AND GAME FEEDBACK
+
+Update all affected displays.
+
+The gameplay HUD must correctly reflect:
+
+* No 0.5s repeat cooldown.
+* 3s cooldowns.
+* 5s cooldowns.
+* Cooldowns beginning at actual release.
+* Current remaining cooldown.
+* Correct Energy consumption.
+* Energy-based move unavailability.
+* Exhaustion.
+* Correct readiness after interrupted startup animations.
+
+A move that is still casting but has not released must not show a false cooldown countdown.
+
+A move with zero cooldown must not display a fabricated 0.5s cooldown sweep.
+
+The ability HUD and touch controls must not disagree with keyboard or controller gameplay.
+
+Check:
+
+js/game/combat/move-status.js
+
+js/ui/ability-hud.js
+
+js/ui/mobile-abilities.js
+
+js/game/rendering/fighter-status.js
+
+Any relevant CSS, localization, settings copy, Discover explanations, and help screens.
+
+Do not remove unrelated ability icons or change the current interface design unnecessarily.
+
+⸻
+
+11. UPDATE THE TEST SUITE
+
+The new strict rules require substantial test coverage.
+
+Review and update existing tests rather than simply deleting tests that conflict with the new design.
+
+Prioritize:
+
+tests/systems/move-cancel.test.mjs
+
+tests/systems/cooldown-policy.test.mjs
+
+tests/systems/combat-rules.test.mjs
+
+tests/systems/energy.test.mjs
+
+tests/systems/deflect.test.mjs
+
+tests/systems/combo.test.mjs
+
+tests/systems/dash.test.mjs
+
+tests/systems/technique.test.mjs
+
+tests/systems/cpu-behaviour.test.mjs
+
+tests/systems/cpu-intelligence.test.mjs
+
+tests/interface/ability-hud.test.mjs
+
+Also examine each fighter-specific test suite and the integration tests.
+
+Required test categories
+
+Attack cancellation tests
+
+Verify that an attack cannot be arbitrarily cancelled during startup, active frames, or recovery.
+
+Test all major replacement requests.
+
+Confirm that legitimate hit-confirmed cancellation windows still work.
+
+Confirm that both player and CPU obey the same restrictions.
+
+Non-attack cancellation tests
+
+Verify cancellation for non-offensive utility and defensive actions.
+
+Specifically test Deflect cancellation into several different valid moves.
+
+Ensure invalid replacement requests never terminate the current move.
+
+Ensure no stale hitboxes or effects remain.
+
+Cooldown tests
+
+Verify ordinary cooldown = 0.
+
+Verify exceptional cooldown = 3.
+
+Verify ten-damage cooldown = 5.
+
+Verify no 0.5-second cooldown remains.
+
+Test release timing for:
+
+* Melee attacks.
+* Multi-hit attacks.
+* Projectiles.
+* Techniques.
+* Summons.
+* Healing.
+* Bursts.
+* Delayed-impact moves.
+
+Test interruption both before and after release.
+
+Test exactly-once cooldown activation.
+
+Energy tests
+
+Verify that all nominal Energy costs are 15.
+
+Verify Dash and Dash cancels cost 15.
+
+Verify Deflect and Shield blocks cost 15.
+
+Verify ordinary construct-producing moves cost 15.
+
+Verify 3s/5s construct-producing moves do not receive the additional construct charge.
+
+Verify one activation does not produce repeated Energy deductions.
+
+Verify exhaustion, regeneration, and reset behavior.
+
+CPU tests
+
+Verify that every CPU follows the same gameplay permissions and restrictions.
+
+Verify CPU ability evaluation recognizes new Energy costs.
+
+Verify CPU readiness recognizes the removal of the 0.5s cooldown.
+
+Verify CPU special-cooldown timing follows release events.
+
+Verify CPU Deflect cancellation.
+
+Verify CPU attack commitment and legitimate combos remain functional.
+
+Run appropriate CPU-versus-CPU scenarios.
+
+Regression tests
+
+Confirm that no regression occurs in:
+
+* Movement.
+* Air control.
+* Jumping.
+* Dashing.
+* Normal combo timing.
+* Projectile collisions.
+* Deflect reflection.
+* Shield protection.
+* Launch and hitstun.
+* AI behavior.
+* Character-specific techniques.
+* Touch controls.
+* Keyboard and gamepad controls.
+* Practice Ground.
+* Watch Mode.
+* Match reset and respawn.
+
+Run the full available test suite.
+
+Fix failures caused by obsolete expectations while preserving valid unrelated behavior.
+
+Do not weaken tests merely to make the suite green.
+
+⸻
+
+12. IMPLEMENTATION QUALITY REQUIREMENTS
+
+Follow the repository’s architectural conventions.
+
+Prefer shared, authoritative rules rather than individual character-specific hacks.
+
+Use Alva’s existing structured definitions wherever possible.
+
+Maintain the separation between:
+
+* Move execution type.
+* Offensive classification.
+* Cancellation eligibility.
+* Cooldown class.
+* Cooldown commitment.
+* Energy requirements.
+* CPU planning.
+
+Ensure consistent deterministic behavior under the game’s fixed-step simulation.
+
+Avoid state races or double processing when:
+
+* A projectile is released on the same simulation step an attack finishes.
+* A move is interrupted at the release boundary.
+* Several projectiles are spawned in one activation.
+* A fighter is hit during a release frame.
+* A CPU changes plans during an animation.
+* A move transitions between casting, release, and recovery.
+
+Do not use animation appearance alone as the authoritative gameplay event when the actual effect has its own logical release callback.
+
+Do not introduce artificial global lockouts that replace the removed 0.5s cooldown.
+
+Do not make all animations instant or freely cancellable.
+
+Do not break cooldown class validation or silently permit invalid character definitions.
+
+Preserve current character identity, audiovisual presentation, controls, and combat feel except where the new rules explicitly require changes.
+
+⸻
+
+13. DOCUMENTATION — MAKE THESE THE NEW PERMANENT RULES
+
+Update the relevant documentation, particularly:
+
+ALVA_SPEC.md
+
+docs/systems/combat.md
+
+docs/systems/energy.md
+
+docs/systems/defense.md
+
+docs/systems/input.md
+
+docs/systems/ai.md
+
+docs/architecture/module-responsibilities.md
+
+docs/characters/adding-characters.md
+
+UPDATES.md
+
+And any relevant README, character specification, or development documentation.
+
+Remove or revise old statements claiming:
+
+* A player can freely cancel an attack with a new valid request.
+* Every ordinary move has a 0.5-second repeat cooldown.
+* Special ability cooldowns begin as soon as a move is accepted.
+* Summons and techniques never cost Energy.
+* Dash costs 20 Energy.
+* Projectiles always cost no Energy.
+* CPU cancellation follows an obsolete separate rule.
+* Deflect cannot be cancelled because it is classified as an attack.
+
+Explain the new exceptions and behavior clearly.
+
+Document the distinction between an attack, a non-attacking move, and Deflect’s special cancellation permission.
+
+Make the shared cooldown and Energy policies authoritative for all current and future characters.
+
+Historical notes in UPDATES.md should remain understandable, but the new update must explicitly supersede the obsolete rules.
+
+⸻
+
+14. FINAL ACCEPTANCE CRITERIA
+
+The work is not complete until ALL of the following statements are true:
+
+* [ ]	Broad player-requested attack cancellation from PR #114 is removed.
+* [ ]	Legitimate hit-confirmed and authored cancel windows still work.
+* [ ]	Ordinary attacks cannot be arbitrarily interrupted.
+* [ ]	Non-attacking moves can be cancelled by valid replacement actions.
+* [ ]	Deflect is explicitly cancellable.
+* [ ]	Deflect retains its correct damage, reflection, and Energy behavior.
+* [ ]	The universal 0.5s cooldown no longer exists as an active restriction.
+* [ ]	Ordinary moves have zero cooldown.
+* [ ]	Exceptional moves retain exactly 3s cooldowns.
+* [ ]	Ten-damage moves retain exactly 5s cooldowns.
+* [ ]	A 3s/5s cooldown does not start when startup begins.
+* [ ]	A 3s/5s cooldown starts exactly once when the move is fully released.
+* [ ]	Interruption before full release does not trigger that cooldown.
+* [ ]	Interruption after release does not remove an earned cooldown.
+* [ ]	All Energy-consuming actions use the universal nominal cost of 15.
+* [ ]	Dash, air Dash, and Dash cancels cost 15.
+* [ ]	Eligible ordinary projectiles, summons, traps, clones, and gameplay objects cost 15.
+* [ ]	Moves with 3s/5s cooldowns do not gain the additional construct Energy cost.
+* [ ]	Energy is not deducted repeatedly from a single activation.
+* [ ]	All six fighters follow the new rules.
+* [ ]	CPUs obey the same rules as human players.
+* [ ]	CPU planning recognizes the new cancellation, Energy, and cooldown requirements.
+* [ ]	UI cooldown and Energy indicators match the actual gameplay state.
+* [ ]	Existing unrelated mechanics remain intact.
+* [ ]	Relevant tests pass.
+* [ ]	Documentation reflects the new universal rules.
+
+⸻
+
+15. EXPECTED DELIVERY
+
+Implement the changes in the actual project. Do not stop after explaining what needs to change.
+
+Before implementation, complete the relevant investigation so the changes do not overlook special abilities or unusual move lifecycles.
+
+After implementation, provide:
+
+1. Technical summary: What was changed and why.
+2. Cancellation summary: Exactly how attacks, non-attacking moves, and Deflect now behave.
+3. Cooldown summary: How release-based timing is enforced across each move type.
+4. Energy summary: The universal 15-Energy policy and which moves gained the new cost.
+5. CPU summary: How CPU readiness, evaluation, planning, and execution were updated.
+6. Roster audit: A move-by-move table covering all six fighters, their cooldowns, Energy costs, release events, and cancellation classification.
+7. Tests: What was run, what passed, and any remaining limitations.
+8. Changed files: The significant files modified and their responsibilities.
+
+If the implementation is performed through a GitHub coding workflow, make the changes on an appropriate working branch and provide a pull request for review. Do not merge without authorization.
+
+FINAL PRIORITY INSTRUCTION
+
+These are not optional balancing suggestions. They are strict gameplay rules.
+
+The most important distinction is this:
+
+I want to reverse the previous request that allowed attacks to be freely cancelled. I do NOT want to remove the game’s legitimate cancellation windows.
+
+At the same time:
+
+Non-attacking moves must be cancellable, and Deflect must explicitly be cancellable despite being internally classified as an attack.
+
+Only the 3-second and 5-second special cooldown classes remain. They start after full release, never merely when startup begins.
+
+Every Energy-consuming action has a universal nominal cost of 15. Ordinary projectiles, traps, summons, clones, and other qualifying gameplay objects must now consume that Energy instead of relying on the removed 0.5-second repeat cooldown.
+
+All of these mechanics must be shared by humans and CPUs.
+
+Implement these rules systematically, comprehensively, and permanently, without compromising existing legitimate combos or unrelated gameplay mechanics.
