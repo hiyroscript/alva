@@ -34,8 +34,8 @@
 // what each move does, never authored here: the Mystical Palm Technique's
 // heal waits 3 s; every other move (Cherry Blossom Impact and the Heavenly
 // Foot of Pain included: a quake, a slam and a launch earn nothing, and
-// neither deals 10) only the universal 0.5 s repeat delay, and the Deflect
-// none. These timers never alter their animation phases. The sheet's
+// neither deals 10) none at all, and the Deflect none; Cherry Blossom
+// Impact, an ordinary burst, costs 15 Energy instead. These timers never alter their animation phases. The sheet's
 // sealed-strength poses are no move.
 
 import { frames, pad, flick, legacyPad } from './helpers.js';
@@ -223,10 +223,11 @@ export const CHARACTER_0003 = {
     steerAngle: 20,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): the same
-  // bar and the same costs as every fighter's (100; a Dash, an air dash or a
-  // Dash cancel 25, a Deflect 15, each blocked hit 15). Its own is only how
-  // fast it refills: 15 a second, the quickest of the roster (its precise
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js and
+  // js/data/energy.js): the same bar and the same price as every
+  // fighter's (100; 15 for a Dash, an air dash or a Dash cancel, a Deflect,
+  // each blocked hit, and each ordinary move that creates a construct). Its
+  // own is only how fast it refills: 15 a second, the quickest of the roster (its precise
   // chakra control wastes none).
   energy: {
     regen: 15,
@@ -372,9 +373,11 @@ export const CHARACTER_0003 = {
   // js/game/combat/technique.js). Each is a cast: #0003 stands committed to
   // it, then lets go all at once. A hit on #0003 before it lets go breaks
   // it (nothing released), and it needs the ground throughout. Cooldowns
-  // begin on acceptance and run on even if interrupted; the policy gives
-  // Cherry Blossom Impact only the 0.5 s repeat delay and the Mystical Palm
-  // Technique 3 s (its heal).
+  // begin as each releases (a cast broken before then starts none) and run
+  // on whatever follows; the policy gives
+  // Cherry Blossom Impact none (15 Energy instead, its burst a construct)
+  // and the Mystical Palm Technique 3 s (its heal). The heal harms nobody,
+  // so any valid request cuts it short (see yieldsToRequests).
   techniques: {
     // Cherry Blossom Impact: a fifth of a second to raise the fist, gather
     // the chakra in it and bring it down (every frame of it, at ordinary-
@@ -412,9 +415,8 @@ export const CHARACTER_0003 = {
   // Attack definitions (schema: createAttackDefinition in
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
-  // mirrored with facing). Each has only the universal 0.5-second repeat
-  // delay (the cooldown policy's: none deals 10 or paralyzes), independent
-  // of its phases and of other moves' cooldowns. Each moves by the mobility
+  // mirrored with facing). None has a cooldown (the cooldown policy's: none
+  // deals 10 or paralyzes). Each moves by the mobility
   // tier its role gives it (js/data/attack-mobility.js): the punch quick,
   // the everyday kicks medium, the finishers and the plunge heavy.
   attacks: {

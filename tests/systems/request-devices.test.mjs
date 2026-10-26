@@ -112,7 +112,7 @@ test('every device: Attack 1 pressed, let go and pressed again during the Jab is
   }
 });
 
-test('every device: a different attack pressed during the Jab cuts it into that attack; Run held and turned on that device never does', async () => {
+test('every device: a different attack pressed during the Jab never cuts it: it plays out and that attack follows; Run held and turned on that device never cuts either', async () => {
   for (const device of DEVICES) {
     const p = await devicePlayer(device);
     p.hold('runRight', true);
@@ -125,9 +125,14 @@ test('every device: a different attack pressed during the Jab cuts it into that 
     p.step();
     p.step();
     assert.equal(p.fighter.combat.attack, jab, `${device}: Run turned, the Jab plays on`);
+    // Pressed in its last steps (within the buffer): never a cut.
+    while (jab.time + 3 * DT < jab.def.total - 1e-6) p.step();
     p.tap('attack3');
-    assert.equal(p.fighter.combat.attack?.def.id, 'attack3', `${device}: cut into Maximum Blue`);
-    assert.ok(p.fighter.combat.cooldowns.has('attack1'), `${device}: the Jab's cooldown`);
+    assert.equal(p.fighter.combat.attack, jab, `${device}: the Jab plays on, never cut`);
+    while (p.fighter.combat.attack === jab) p.step();
+    assert.ok(jab.time >= jab.def.total - 1e-6, `${device}: the Jab played out`);
+    assert.equal(p.fighter.combat.attack?.def.id, 'attack3', `${device}: Maximum Blue follows it`);
+    assert.equal(p.fighter.combat.cooldowns.has('attack1'), false, `${device}: no cooldown for the Jab`);
     // Run held on through Maximum Blue: never a cut.
     const blue = p.fighter.combat.attack;
     while (p.fighter.combat.attack === blue) p.step();

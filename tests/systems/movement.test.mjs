@@ -783,7 +783,7 @@ test('an air jump never sets the sideways speed: the drift carries on, and a hel
   assert.ok(close(on.fighter.body.vx, vx - mv.airDeceleration * DT), 'no direction: the drift, under the drag');
 });
 
-test('a hit gives the air jumps back; a stun or an attack in progress (a Deflect too) holds them for later', () => {
+test('a hit gives the air jumps back; a stun or an attack in progress holds them for later, but a Deflect gives way to one', () => {
   const d = duel({ gap: 44 });
   d.target.body.y = 700;
   d.target.body.grounded = false;
@@ -806,7 +806,17 @@ test('a hit gives the air jumps back; a stun or an attack in progress (a Deflect
   deflect.step({ shield: true, shieldPressed: true });
   assert.equal(deflect.fighter.combat.attack?.def.id, 'deflect');
   deflect.step({ shield: true, ...JUMP });
-  assert.equal(deflect.fighter.airJumps, mv.airJumps, 'the Deflect plays on: the jump waits');
+  assert.equal(deflect.fighter.airJumps, mv.airJumps - 1, 'the Deflect is cancellable: the air jump goes');
+  assert.equal(deflect.fighter.combat.attack, null, 'the Deflect is over');
+  // An aerial that has not hit holds it: the jump waits.
+  const aerial = makeFighter();
+  aerial.step(JUMP);
+  stepUntil(aerial.step, (f) => f.body.vy > 0, { jump: true });
+  aerial.step({ attack1: true, attack1Pressed: true });
+  const record = aerial.fighter.combat.attack;
+  aerial.step(JUMP);
+  assert.equal(aerial.fighter.combat.attack, record, 'the aerial plays on');
+  assert.equal(aerial.fighter.airJumps, mv.airJumps, 'the jump waits');
 });
 
 test('the CPUs let go of Jump inside the higher-jump window: their jumps are normal ones', async () => {

@@ -107,6 +107,8 @@ const FIGHT_SECONDS = 50;
 // Two seeds each: a level's rarest moves (Easy's above all) are used a
 // handful of times a fight, so one fight's luck is never what decides.
 const FIGHT_SEEDS = [3, 4];
+// More seeds, only where a rare move has not come up in the shared fights.
+const EXTRA_SEEDS = [5, 6];
 const fights = new Map();
 function fightsAt(difficulty) {
   if (!fights.has(difficulty)) {
@@ -467,19 +469,25 @@ test('every move of every fighter is used in real fights, at every level', () =>
   for (const difficulty of DIFFICULTY_IDS) {
     const usage = new Map();
     const kits = new Map();
-    for (const { a, b } of fightsAt(difficulty)) {
-      for (const f of [a, b]) {
-        kits.set(f.def.id, analyzeCapabilities(f).moves.map((m) => m.key));
-        const u = usage.get(f.def.id) ?? new Map();
-        for (const [k, v] of f.controller.telemetry.moveUsage) u.set(k, (u.get(k) ?? 0) + v);
-        usage.set(f.def.id, u);
+    const tally = (fights) => {
+      for (const { a, b } of fights) {
+        for (const f of [a, b]) {
+          kits.set(f.def.id, analyzeCapabilities(f).moves.map((m) => m.key));
+          const u = usage.get(f.def.id) ?? new Map();
+          for (const [k, v] of f.controller.telemetry.moveUsage) u.set(k, (u.get(k) ?? 0) + v);
+          usage.set(f.def.id, u);
+        }
       }
+    };
+    const missing = () => [...kits].flatMap(([id, keys]) => keys.filter((k) => !(usage.get(id).get(k) > 0)).map((k) => `#${id} ${k}`));
+    tally(fightsAt(difficulty));
+    // A rare move (a low level's aerial Extra Attack) may need more than the
+    // shared fights to come up: a few more seeds, never fewer moves.
+    for (const seed of EXTRA_SEEDS) {
+      if (!missing().length) break;
+      tally([[0, 1], [1, 0]].map(([x, y]) => cpuFight(FIGHTERS[x], FIGHTERS[y % FIGHTERS.length], { seconds: FIGHT_SECONDS, seed, difficulty })));
     }
-    for (const [id, keys] of kits) {
-      const u = usage.get(id);
-      const missing = keys.filter((k) => !(u.get(k) > 0));
-      assert.deepEqual(missing, [], `${difficulty} #${id} never used: ${missing.join(', ')}`);
-    }
+    assert.deepEqual(missing(), [], `${difficulty} never used: ${missing().join(', ')}`);
   }
 });
 

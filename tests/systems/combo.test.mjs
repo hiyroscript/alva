@@ -11,7 +11,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { def, DT, MOVEMENT, makeFighter, duel, startupSteps } from '../helpers/fighter-harness.mjs';
 import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
-import { REPEAT_COOLDOWN } from '../../js/data/cooldowns.js';
 
 const mv = MOVEMENT;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
@@ -21,11 +20,6 @@ const KICK = P('extra_attack');
 const THROW = KICK;
 const JUMP = P('jump');
 const BUFFER_STEPS = Math.floor(mv.attackBuffer / DT + 1e-6);
-// Explicit baseline fixture for shared hit-cancel and buffer tests.
-const COOLING = {
-  ...def,
-  attacks: Object.fromEntries(Object.entries(def.attacks).map(([id, a]) => [id, { ...a, cooldown: REPEAT_COOLDOWN }])),
-};
 
 // A duel whose target's every update is logged: `free[i]` is whether the
 // target could act on step i (after its own update, before that step's
@@ -84,10 +78,12 @@ test('a press older than the buffer never comes out: no ancient inputs', () => {
   assert.equal(fighter.bufferedAttack, null);
 });
 
-test('ordinary attack buffering expires during long cooldowns, but a press within the final buffer still fires', () => {
+test('attack buffering expires during a long cooldown, but a press within the final buffer still fires', () => {
   const { fighter: f, step } = makeFighter();
   step(ATTACK1);
   while (f.combat.attack) step();
+  // An ordinary move has no cooldown: one held as a 3 s or 5 s move's is.
+  f.combat.cooldowns.set('attack1', 1);
   step(ATTACK1);
   for (let i = 0; i < 35; i++) step();
   assert.equal(f.combat.attack, null, 'early press expired');
@@ -208,13 +204,13 @@ test('buffered presses keep their order: jump then attack1 is a jump and an air 
 
 // ---- Hit-cancels ------------------------------------------------------------------
 
-test('an attack1 that hits may be cut short by another attack the step its freeze ends; its cooldown starts then', () => {
-  const d = combo({ gap: 40, character: COOLING });
+test('an attack1 that hits may be cut short by another attack the step its freeze ends (its hitCancel reached); no cooldown starts', () => {
+  const d = combo({ gap: 40, character: def });
   d.run((i) => (i === 0 ? ATTACK1 : i === 2 ? KICK : {}), 10);
   assert.equal(d.hits.length, 1);
   while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
   assert.equal(d.attacker.combat.attack?.def.id, 'extra_attack', 'cut short into the High Kick');
-  assert.ok(d.attacker.combat.cooldowns.has('attack1'), 'attack1\'s cooldown from the cut');
+  assert.equal(d.attacker.combat.cooldowns.has('attack1'), false, 'an ordinary move: no cooldown from the cut');
 });
 
 test('a whiffed or blocked attack keeps its whole recovery: no cut short', () => {
@@ -234,7 +230,7 @@ test('a whiffed or blocked attack keeps its whole recovery: no cut short', () =>
 
 test('a jump or a Dash cuts a connected High Kick short; walking, the Shield and Down never do', () => {
   const hitBa2 = () => {
-    const d = combo({ gap: 40, character: COOLING });
+    const d = combo({ gap: 40, character: def });
     d.run((i) => (i === 0 ? KICK : {}), 20);
     assert.equal(d.hits.length, 1);
     while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
@@ -256,7 +252,7 @@ test('a jump or a Dash cuts a connected High Kick short; walking, the Shield and
   dash.tick({ mouvementRightPressed: true });
   assert.ok(dash.attacker.dash, 'an explicit request Dashes out of it');
   assert.equal(dash.attacker.combat.attack, null);
-  assert.ok(dash.attacker.combat.cooldowns.has('extra_attack'), 'the kick\'s cooldown from the cut');
+  assert.equal(dash.attacker.combat.cooldowns.size, 0, 'no cooldown from the cut');
 });
 
 // ---- Dash cancel ----------------------------------------------------------------------
@@ -264,11 +260,11 @@ test('a jump or a Dash cuts a connected High Kick short; walking, the Shield and
 const MOUVEMENT_RIGHT = { runRight: true, mouvementRightPressed: true };
 const MOUVEMENT_LEFT = { runLeft: true, mouvementLeftPressed: true };
 
-test('a Dash cancel: out of an attack1 that hit, either way, for the same 25 as any Dash', () => {
+test('a Dash cancel: out of an attack1 that hit, either way, for the same 15 as any Dash', () => {
   const fighterEnergy = makeFighter().fighter.energyDef;
   assert.deepEqual([fighterEnergy.dashCancelCost, fighterEnergy.dashCost], [DASH_ENERGY_COST, DASH_ENERGY_COST]);
   for (const [press, direction] of [[MOUVEMENT_RIGHT, 1], [MOUVEMENT_LEFT, -1]]) {
-    const d = combo({ gap: 40, character: COOLING });
+    const d = combo({ gap: 40, character: def });
     untilHit(d);
     assert.ok(d.attacker.combat.hitstop > 0, 'the hit\'s freeze');
     d.run(() => press, 1);
@@ -278,7 +274,7 @@ test('a Dash cancel: out of an attack1 that hit, either way, for the same 25 as 
     assert.equal(d.attacker.dash?.direction, direction, '...but asked for in it, out the step it ends');
     assert.equal(d.attacker.facing, direction, 'facing the Dash');
     assert.equal(d.attacker.combat.attack, null);
-    assert.ok(d.attacker.combat.cooldowns.has('attack1'));
+    assert.equal(d.attacker.combat.cooldowns.has('attack1'), false);
     assert.equal(d.attacker.combat.energy, 100 - DASH_ENERGY_COST);
   }
   // A plain Dash costs exactly the same.
@@ -314,8 +310,8 @@ test('no Dash cancel out of a whiff, a block or while exhausted: nothing is spen
   tryCancel(tired, 'exhausted');
 });
 
-test('in the air the same cancel is the air dash: a midair_attack1 that hit is cut short for the same 25, once per airtime', () => {
-  const air = combo({ gap: 40, character: COOLING });
+test('in the air the same cancel is the air dash: a midair_attack1 that hit is cut short for the same 15, once per airtime', () => {
+  const air = combo({ gap: 40, character: def });
   for (const f of [air.attacker, air.target]) Object.assign(f.body, { y: 700, vy: 0, grounded: false, ground: null });
   air.run((i) => (i === 0 ? ATTACK1 : {}), 1);
   while (!air.hits.length) air.run(() => ({}), 1);
@@ -324,34 +320,35 @@ test('in the air the same cancel is the air dash: a midair_attack1 that hit is c
   air.run(() => MOUVEMENT_RIGHT, 1);
   assert.equal(air.attacker.dash?.air, true, 'the air dash, never the ground Dash');
   assert.equal(air.attacker.combat.attack, null, 'the attack is cut short');
-  assert.ok(air.attacker.combat.cooldowns.has('midair_attack1'), 'its cooldown from the cut');
+  assert.equal(air.attacker.combat.cooldowns.has('midair_attack1'), false, 'no cooldown from the cut');
   assert.equal(air.attacker.combat.energy, 100 - DASH_ENERGY_COST);
   assert.equal(air.attacker.airDashes, 0, 'its one air dash this airtime');
 });
 
-test('a hit-cancel cannot restart its own move or bypass its cooldown through a Dash', () => {
+test('a hit-cancel cannot restart its own move; out of a Dash cancel it comes again only past the Dash\'s cancel time', () => {
   const d = combo({ gap: 40 });
   untilHit(d);
   while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
   const first = d.attacker.combat.attack;
-  assert.equal(d.attacker.tryAction('attack1'), false);
+  assert.equal(d.attacker.tryAction('attack1'), false, 'never into itself');
   assert.equal(d.attacker.combat.attack, first);
   assert.equal(d.attacker.tryDash(1), true);
-  assert.equal(d.attacker.combat.cooldowns.get('attack1'), 0.5);
-  d.run(() => ATTACK1, 5);
-  assert.equal(d.attacker.combat.attack, null);
-  d.run(() => ({}), 40);
-  assert.equal(d.attacker.combat.attack, null, 'buffer expired, no delayed Jab');
+  assert.equal(d.attacker.combat.cooldowns.size, 0, 'no hidden lockout');
+  const dash = d.attacker.dash;
+  let n = 0;
+  for (; !d.attacker.combat.attack && n < 20; n++) d.run(() => ATTACK1, 1);
+  assert.equal(d.attacker.combat.attack?.def.id, 'attack1', 'out of the Dash');
+  assert.ok(dash.time >= mv.dashCancelTime - 1e-6, 'never before the Dash\'s cancel time');
 });
 
-test('left alone a connected attack keeps its full clip and freeze before the repeat timer', () => {
+test('left alone a connected attack keeps its full clip and freeze, and no repeat timer follows it', () => {
   const d = combo({ gap: 40 });
   d.run(() => ATTACK1, 1);
   const atk = d.attacker.combat.attack;
   let n = 0;
   while (d.attacker.combat.attack === atk) { d.run(() => ({}), 1); n++; }
   assert.equal(n, Math.round(atk.def.total / DT) + Math.round(atk.def.hitstop / DT));
-  assert.equal(d.attacker.combat.cooldowns.get('attack1'), REPEAT_COOLDOWN);
+  assert.equal(d.attacker.combat.cooldowns.has('attack1'), false);
 });
 
 // ---- Interruption --------------------------------------------------------------------

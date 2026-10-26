@@ -6,44 +6,52 @@
 // Inputs: the fighter's resolved Energy settings (resolveEnergy, from its
 // definition's `energy` entry).
 // Outputs: CombatState, CooldownTimers, resolveEnergy and the Energy rules
-// (MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST).
-// Important constraints: the Fighter (js/game/fighters/fighter.js) and
-// CombatSystem.applyHit (js/game/combat/combat.js) are the only writers;
+// (re-exported from js/data/energy.js: MAX_ENERGY, ENERGY_COST,
+// DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST,
+// CONSTRUCT_ENERGY_COST).
+// Important constraints: the Fighter (js/game/fighters/fighter.js),
+// CombatSystem.applyHit (js/game/combat/combat.js) and spawnClones (a
+// summon's cooldown, as its clone appears) are the only writers;
 // readers (the HUD, the status drawn over a fighter, the combat AI) only
 // read. Every clock compares its boundaries with PHASE_EPSILON
 // (js/game/combat/attacks.js), so a phase a whole number of fixed steps
 // long lasts exactly that many steps.
 //
-// A summon or a technique on a numbered button (see js/data/loadout.js) is
-// not paid for: each has its own cooldown (CombatState.abilityCooldowns, see
-// CooldownTimers), keyed by the attack it is (attack4, attack5), started
-// on acceptance, apart from ordinary attack repeat timers (CombatState.cooldowns)
-// and Dash/air-dash timers (movementCooldowns). All recover every fixed step,
-// including impact freeze; a fresh life replaces all three stores.
+// Cooldowns: only the cooldown policy's special ones exist (3 s and 5 s,
+// js/data/cooldowns.js); an ordinary move has none. Each starts once, as
+// its move is released, never as it starts: an ordinary attack's in
+// CombatState.cooldowns (see releaseAttack: its strike, its last strike,
+// its projectile or its impact out), a technique's in abilityCooldowns
+// as its cast lets go (Fighter.update, Technique.takeCooldown), a summon's
+// there too as its clone appears (spawnClones, js/game/combat/summon.js),
+// each keyed by the attack it is (attack4, attack5). A move interrupted
+// before it releases starts none. The Dash and air dash keep their own
+// timers (movementCooldowns). All recover every fixed step, including
+// impact freeze; a fresh life replaces all three stores.
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
-// fighter spends (there is no Shield meter apart from it), on three things
-// only, at the same price for every fighter: a Dash or an air dash pays
-// DASH_ENERGY_COST as it starts (the same when it cuts short an attack that
-// hit), the Deflect pays DEFLECT_ENERGY_COST as it starts, and every hit the
-// Shield blocks costs BLOCK_ENERGY_COST, a perfect Shield's included. Each
-// works with less left than it costs, but then takes all of it. It refills
-// by itself at one passive rate, and every fighter's bar holds MAX_ENERGY.
-// Emptied, it exhausts the fighter: no Dash, air dash, Deflect or Shield
-// until it is full again. Nothing else (movement, jumps, attacks, summons,
-// techniques, a successful block or Deflect) ever touches it: no defense
-// gives any back.
+// fighter spends (there is no Shield meter apart from it), at one nominal
+// price for every fighter and everything, ENERGY_COST (15, the Energy
+// policy's: js/data/energy.js): a Dash or an air dash as it starts (a Dash
+// cancel included), the Deflect as it starts, every hit the Shield blocks
+// (a perfect Shield's included), and every move that creates a construct
+// (a projectile, a clone, a burst) with no special cooldown, as it starts
+// (its definition's `energyCost`). Each works with less left than it
+// costs, but then takes all of it. It refills by itself at one passive
+// rate, and every fighter's bar holds MAX_ENERGY. Emptied, it exhausts the
+// fighter: no Dash, air dash, Deflect, Shield or construct move until it
+// is full again. Nothing else (movement, jumps, melee attacks, a heal, a
+// successful block or Deflect) ever touches it: no defense gives any back.
 
 import { PHASE_EPSILON, attackPhase } from './attacks.js';
 import { LAUNCH_RECOVERY_DELAY, LAUNCH_RECOVERY_INTERVAL, LAUNCH_RECOVERY_AMOUNT } from '../../data/launch.js';
 
-// The Energy rules, the same for every fighter: what a full bar holds
-// (where every fighter starts, and what a respawn or a restart refills it
-// to) and what each thing that spends it costs.
-export const MAX_ENERGY = 100;
-export const DASH_ENERGY_COST = 20;    // a Dash or an air dash, a Dash cancel included
-export const BLOCK_ENERGY_COST = 15;   // each hit the Shield blocks, a perfect Shield's included
-export const DEFLECT_ENERGY_COST = 15; // each Deflect, as it starts
+import {
+  MAX_ENERGY, ENERGY_COST, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST, CONSTRUCT_ENERGY_COST,
+} from '../../data/energy.js';
+
+// The Energy rules, the same for every fighter (js/data/energy.js).
+export { MAX_ENERGY, ENERGY_COST, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST, CONSTRUCT_ENERGY_COST };
 
 // The universal fields of a resolved Energy entry, by name. A fighter's
 // `energy` entry may leave any of them out (and should), and declaring one
@@ -55,6 +63,7 @@ const ENERGY_RULES = Object.freeze({
   dashCancelCost: DASH_ENERGY_COST,
   shieldHitCost: BLOCK_ENERGY_COST,
   deflectCost: DEFLECT_ENERGY_COST,
+  constructCost: CONSTRUCT_ENERGY_COST,
 });
 
 // The one field a fighter's `energy` entry may set, its refill rate:
@@ -161,7 +170,8 @@ export class CombatState {
     this.shieldStun = 0;    // blockstun remaining, held in the Shield
     this.hitstop = 0;       // freeze frames on impact
     // { def, time, hasHit, confirmed, confirmedAt, projectileSpawned,
-    // stepped, struck, blocked, motion }: hasHit once its hitbox (any of its
+    // released, stepped, struck, blocked, motion }: released once it has
+    // emitted what it authors (see releaseAttack), hasHit once its hitbox (any of its
     // strikes) has struck anyone, confirmed (at its time confirmedAt) only
     // for a hit a Shield did not block, stepped once its `step` has moved
     // the fighter. A multi-hit attack also keeps the strikes it has dealt
@@ -169,13 +179,15 @@ export class CombatState {
     // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
-    // Ordinary attack cooldowns (the cooldown policy's, js/data/cooldowns.js:
-    // the 0.5 s repeat delay, or 3 s / 5 s): attack id -> seconds left. The
-    // Deflect has none.
+    // Attack cooldowns (the cooldown policy's special ones,
+    // js/data/cooldowns.js: 3 s or 5 s, started as the attack is released):
+    // attack id -> seconds left. An ordinary attack and the Deflect have
+    // none.
     this.cooldowns = new Map();
     // The summons' and techniques' own cooldowns (e.g. #0001's attack4 and
-    // attack5), by the attack each one is: the Fighter starts them, and
-    // they recover in real time (see update).
+    // attack5), by the attack each one is: started as each is released (a
+    // technique's cast letting go, a summon's clone appearing), and they
+    // recover in real time (see update).
     this.abilityCooldowns = new CooldownTimers();
     this.movementCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)
@@ -204,6 +216,9 @@ export class CombatState {
   // hitCancel time: another attack, a jump or a Dash may cut the rest of it
   // short (see Fighter.tryAction, Fighter.tryDash and the jump in
   // Fighter.update). Never during the hit's freeze, a stun or a paralysis.
+  // This authored, hit-confirmed window is the only way an attack that can
+  // harm is ever cut short by a request (one that yields, see
+  // Fighter.moveYields, is the other case).
   get cancellable() {
     const a = this.attack;
     const at = a?.def.hitCancel;
@@ -211,28 +226,28 @@ export class CombatState {
       a.time >= at - PHASE_EPSILON;
   }
 
-  // Seconds the attack in progress has been cancellable (see cancellable),
-  // or -1 while it is not: it may cut itself short into itself only once
-  // its own repeat delay has run for that long.
-  get cancellableFor() {
-    if (!this.cancellable) return -1;
+  // The attack in progress is released (see RELEASE_EVENTS in
+  // js/data/cooldowns.js): its special cooldown, if it has one, starts now.
+  // Exactly once per attack: a later step, a second strike, the attack
+  // ending or being cut short never starts or restarts it.
+  releaseAttack() {
     const a = this.attack;
-    return a.time - Math.max(a.def.hitCancel, a.confirmedAt);
+    if (!a || a.released) return;
+    a.released = true;
+    if (a.def.cooldown > 0) this.cooldowns.set(a.def.id, a.def.cooldown);
   }
 
-  // Ends the attack in progress now: finished, or cut short once it is
-  // cancellable. Its cooldown starts either way.
+  // Ends the attack in progress now: finished, landed, or cut short (it
+  // was cancellable, or it yields). Its cooldown, if it has one, started
+  // as it was released, or never: nothing starts here.
   endAttack() {
-    const a = this.attack;
-    if (!a) return;
-    if (a.def.cooldown > 0) this.cooldowns.set(a.def.id, a.def.cooldown);
     this.attack = null;
   }
 
-  // A hit or paralysis discards the strike/release, retaining the ordinary
-  // repeat delay. Deflect keeps its existing no-timer interruption semantics.
+  // A hit or a paralysis takes the attack away: what it had not struck or
+  // released yet never is (no cooldown starts for it), and a cooldown its
+  // release already started runs on.
   interruptAttack() {
-    if (this.attack?.def.id !== 'deflect') this.endAttack();
     this.attack = null;
     this.release = null;
   }
@@ -468,16 +483,24 @@ export class CombatState {
     // A float runs down with the paralysis that holds it, and ends with it.
     if (this.floating > 0) this.floating = this.floating - dt <= PHASE_EPSILON || !this.paralysis ? 0 : this.floating - dt;
     if (this.attack) {
-      this.attack.time += dt;
+      const a = this.attack;
+      a.time += dt;
+      // Nothing comes out of an attack while its fighter is stunned or held
+      // (Fighter.update takes the attack away on this same step).
+      const free = this.stun <= 0 && !this.immobilized;
       // One-shot release: the step the attack's time crosses `spawnAt`. A
       // throw interrupted by a hit before that point throws nothing.
-      const proj = this.attack.def.projectile;
-      if (proj && !this.attack.projectileSpawned && this.attack.time >= proj.spawnAt - PHASE_EPSILON) {
-        this.attack.projectileSpawned = true;
+      const proj = a.def.projectile;
+      if (proj && !a.projectileSpawned && a.time >= proj.spawnAt - PHASE_EPSILON) {
+        a.projectileSpawned = true;
         // Whatever releases it, the attack that threw it is its ability.
-        if (this.stun <= 0) this.release = { ...proj, ability: this.attack.def.id };
+        if (this.stun <= 0) this.release = { ...proj, ability: a.def.id };
       }
-      if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) this.endAttack();
+      // Released once its time reaches its release point (a slam with an
+      // impact is released by the impact itself: Fighter.landSlam).
+      const at = a.def.releaseAt;
+      if (at != null && !a.released && free && a.time >= at - PHASE_EPSILON) this.releaseAttack();
+      if (a.time >= a.def.total - PHASE_EPSILON) this.endAttack();
     }
   }
 }

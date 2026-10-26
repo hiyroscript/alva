@@ -16,7 +16,7 @@
 // Fighter's resolved tables of them.
 // Outputs: classifyHit, isHarmfulHit, attackOffense, projectileOffense,
 // techniqueOffense, summonOffense, actionOffense, resolveOffense,
-// assertNoShieldBypass, SHIELD_BYPASS_FIELDS, ATTACK_SOURCES and the two
+// yieldsToRequests, assertNoShieldBypass, SHIELD_BYPASS_FIELDS, ATTACK_SOURCES and the two
 // fixed profiles NOT_AN_ATTACK and PURE_DEFENSE.
 // Important constraints: classification is inferred from a definition's
 // damaging components (a hit that deals damage, paralyzes or launches; a
@@ -141,6 +141,27 @@ export function summonOffense(def, attacks = null) {
   if (!attacks) return profile(true, false, ['clone']);
   const ids = [def?.attack, def?.noGround?.attack].filter(Boolean);
   return ids.some((id) => attackOffense(attacks[id]).attack) ? profile(true, false, ['clone']) : NOT_AN_ATTACK;
+}
+
+// Whether a move classified `offense` gives way to any valid request while
+// it plays (a definition's `freeCancel`, read by Fighter.moveYields): the
+// cancellation rule, shared by every fighter, human or CPU.
+//
+//   - A move that is no attack (it harms nobody: a heal of its own
+//     fighter's, a pending attack) yields: a valid replacement (an attack, a
+//     special, a jump, a Dash, the Shield, the Deflect) ends it at once,
+//     in any phase, without any hit.
+//   - A move that is a defense yields too, attack or not: the Deflect, an
+//     attack and a defense, is cancellable by explicit rule.
+//   - Every other attack (it can harm: a strike, a projectile, a burst, a
+//     clone) never yields: it plays out, and only an authored, hit-confirmed
+//     window cuts it short (`hitCancel`, see CombatState.cancellable).
+//
+// A request only ends a yielding move once the replacement is known to
+// start (Fighter.cutAttack), never before, and never a forced state (an
+// impact freeze, a stun, a paralysis).
+export function yieldsToRequests(offense) {
+  return !offense?.attack || !!offense.defense;
 }
 
 // Checks `spec`'s own `offensive` (if it states one) against `inferred`

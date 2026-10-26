@@ -3,8 +3,10 @@
 // and nothing else. Covered here: Attack 1 on its cooldown never becomes
 // Attack 2 (nor the reverse, nor any button another's); the press for the
 // attack already playing, mashed or held, never cuts, restarts or replays
-// it and queues nothing to follow it; mashing never beats an attack's own
-// length or cooldown; a melee press out of reach starts where the fighter
+// it and queues nothing to follow it (once it has ended, a fresh press may
+// start it again: there is no repeat delay); mashing never beats an
+// attack's own length or its 3 s / 5 s cooldown, and pays only what a throw
+// costs each time it really starts; a melee press out of reach starts where the fighter
 // stands and may whiff, with nothing moving it toward its target first (no
 // Dash's clip, no Energy, the same course as with no target at all); and
 // melee and ranged are one shared reading of an attack's data. Combat
@@ -67,7 +69,7 @@ test('every button asks for its own move: Attack 1 cooling down is never Attack 
   }
 });
 
-test('the press for the attack already playing, mashed or held, never cuts, restarts or replays it, and nothing follows it', () => {
+test('the press for the attack already playing, mashed or held, never cuts, restarts or replays it, and nothing else follows it', () => {
   for (const c of playableCharacters()) {
     for (const action of groundAttacks(playerRig({ character: c, gap: 900 }).player)) {
       for (const held of [false, true]) {
@@ -93,7 +95,8 @@ test('the press for the attack already playing, mashed or held, never cuts, rest
         const thrown = new Set();
         let lastTime = 0;
         while (r.player.combat.attack === rec) {
-          assert.equal(combat.cooldowns.has(rec.def.id), false, `${why}: no cooldown while it plays`);
+          // A cooldown, if it has one, only from its release (an ordinary move none at all).
+          assert.equal(combat.cooldowns.has(rec.def.id), !!rec.released && rec.def.cooldown > 0, `${why}: no cooldown before its release`);
           r.tick(held ? { [action]: true } : press(action));
           for (const p of r.projectiles) if (p.ability === rec.def.id) thrown.add(p);
           if (r.player.combat.attack !== rec) break;
@@ -107,18 +110,21 @@ test('the press for the attack already playing, mashed or held, never cuts, rest
         const strikes = r.events.filter((e) => e.attacker === r.player && e.move === rec.def.id && e.type !== 'charmed');
         assert.ok(strikes.length <= (rec.def.hits?.length ?? 1), `${why}: ${strikes.length} strike(s), never repeated`);
         assert.ok(thrown.size <= 1, `${why}: one projectile at most`);
-        // Nothing follows it: no other attack starts (a press made on the
-        // very step it ended is a fresh one for its own move, which waits
-        // out that move's cooldown in the buffer and expires).
-        assert.equal(r.player.combat.attack, null, `${why}: nothing follows`);
+        // Nothing else follows it: a press made on the very step it ended is
+        // a fresh one for its own move, which may start it again at once (no
+        // repeat delay) unless a 3 s / 5 s cooldown holds it; never another.
+        const own = [true, false].map((ground) => r.player.attackFor(action, ground));
+        const next = r.player.combat.attack;
+        assert.ok(!next || (own.includes(next.def.id) && next.time <= DT + EPS), `${why}: only its own move again, from that fresh press`);
+        if (rec.def.cooldown > 0) assert.equal(next, null, `${why}: its cooldown holds it`);
         const later = [...watchAttacks(r, 20)];
-        assert.deepEqual(later.filter((s) => s !== `buffered:${action}`), [], `${why}: nothing comes later (${later})`);
+        assert.deepEqual(later.filter((s) => s !== `buffered:${action}` && !own.includes(s)), [], `${why}: nothing else comes later (${later})`);
       }
     }
   }
 });
 
-test('mashing one button never beats the definitions: only its own attack, each played out, again only once its cooldown is over, Energy untouched', () => {
+test('mashing one button never beats the definitions: only its own attack, each played out, again only once its cooldown is over, Energy only for a throw', () => {
   for (const c of playableCharacters()) {
     for (const action of ['attack1', 'attack2']) {
       const why = `#${c.id} ${action}`;
@@ -127,11 +133,14 @@ test('mashing one button never beats the definitions: only its own attack, each 
       const played = new Map();
       for (let i = 0; i < 240; i++) {
         const before = r.player.combat.attack;
+        const energy = r.player.combat.energy;
         r.tick(press(action));
         const now = r.player.combat.attack;
         if (before && before !== now) played.get(before).end = r.player.steps;
         if (now && now !== before) played.set(now, { start: r.player.steps });
-        assert.equal(r.player.combat.energy, 100, `${why}: attacks never touch Energy`);
+        // Energy only for what a throw costs, each time one really starts.
+        const paid = now && now !== before ? now.def.energyCost : 0;
+        assert.ok(r.player.combat.energy >= energy - paid - EPS, `${why}: only a started throw's own cost`);
       }
       const runs = [...played].map(([rec, t]) => ({ rec, ...t })).filter((x) => x.end != null);
       assert.ok(runs.length >= 2, `${why}: ${runs.map((x) => x.rec.def.id)}`);

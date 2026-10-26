@@ -150,11 +150,13 @@ test('five numbered attacks, each a button of its own: two ordinary with mid-air
     attack1: ['pink'], midair_attack1: ['blue'], attack2: ['green'], midair_attack2: ['green'], extra_attack: ['pink', 'green', 'blue'],
     attack3: ['pink'], attack4: ['pink'], attack5: ['blue'],
   });
-  // Its cooldowns are the policy's: Ice Breath's freeze 3 s, the rest the
-  // universal repeat delay, the Deflect none.
+  // Its cooldowns are the policy's: Ice Breath's freeze 3 s, none for the
+  // rest, the Deflect included; its two ordinary projectile techniques
+  // cost 15 Energy instead.
   const { fighter: f } = solo();
-  for (const id of Object.keys(DEF.attacks)) assert.equal(f.attacks[id].cooldown, 0.5, id);
-  assert.deepEqual(Object.values(f.techniqueDefs).map((t) => t.cooldown), [0.5, 3, 0.5]);
+  for (const id of Object.keys(DEF.attacks)) assert.equal(f.attacks[id].cooldown, 0, id);
+  assert.deepEqual(Object.values(f.techniqueDefs).map((t) => t.cooldown), [0, 3, 0]);
+  assert.deepEqual(Object.values(f.techniqueDefs).map((t) => t.energyCost), [15, 0, 15]);
   assert.equal(f.deflect.cooldown, 0);
 });
 
@@ -706,12 +708,17 @@ test('the camera, the CPU and a whole Battle treat it as one fighter; the CPU pl
   // The CPU plays it through the one fighter's controls, against the
   // roster: every move of its kit, its Deflect included, over a few fights.
   const used = new Map();
-  for (const [foe, seed] of [[DEF_0001, 5], [getCharacter('0003'), 6], [getCharacter('0005'), 7]]) {
+  const kit = analyzeCapabilities(solo().fighter).moves.map((m) => m.key);
+  // Its slow ground flurry is a rare pick now that its quick strikes never
+  // wait (no repeat delay): the rest of the roster, if it has not come up.
+  const extra = [[getCharacter('0002'), 6], [getCharacter('0004'), 5]];
+  for (const entry of [[DEF_0001, 5], [getCharacter('0003'), 6], [getCharacter('0005'), 7], ...extra]) {
+    if (extra.includes(entry) && kit.every((k) => used.get(k) > 0)) break;
+    const [foe, seed] = entry;
     const fight = cpuFight(DEF, foe, { seconds: 30, seed });
     for (const [k, v] of fight.a.controller.telemetry.moveUsage) used.set(k, (used.get(k) ?? 0) + v);
     assert.equal(fighterParts(fight.a).length, 3);
   }
-  const kit = analyzeCapabilities(solo().fighter).moves.map((m) => m.key);
   assert.deepEqual(kit.filter((k) => !(used.get(k) > 0)), [], `every move used: ${JSON.stringify(Object.fromEntries(used))}`);
 });
 

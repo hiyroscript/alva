@@ -30,8 +30,8 @@
 // (see Fighter.trySummon and finishSummon). For its length the owner is
 // committed to it: it stands still, keeps its facing and can do nothing
 // else, and a hit, lost ground or a target gone from play cancels it with
-// no clone at all. The cooldown already runs from the press. Without one
-// the request is queued on the press itself and the owner is free at once.
+// no clone at all, and so no cooldown. Without one the request is queued on
+// the press itself and the owner is free at once.
 // The startup is the owner's; the `cloud` is the clone's, played where the
 // clone appears.
 //
@@ -69,8 +69,17 @@
 // from the attack its clone performs (the more severe of its attack and its
 // no-ground one, judged from the fighter's `attacks` and `projectiles`): 5 s
 // for one that deals 10 damage, 3 s for one with an exceptional effect (a
-// paralysis, a charm, a float, a fear), else the universal 0.5 s repeat
-// delay. An entry may leave it out; one it declares must agree.
+// paralysis, a charm, a float, a fear), else none at all. An entry may
+// leave it out; one it declares must agree. It starts as the summon is
+// released, the moment its clone actually appears (see spawnClones):
+// never on the press or the startup, so a summon whose startup is broken
+// starts none, and once the clone is out it runs on whatever the clone
+// then does (its strikes never start it again) or wherever it goes.
+//
+// Its Energy (`energyCost`, the Energy policy's, js/data/energy.js) is 15
+// for an ordinary summon (its clone is a construct), paid once as it is
+// accepted, never again for the clone's attack; 0 for one with a special
+// cooldown.
 //
 // A summon is an attack (its definition's `offense`, see
 // js/game/combat/offense.js): the summoning ability, the clone it sends,
@@ -78,16 +87,17 @@
 // owner's. Its clone is no fighter, but its strike is resolved like any
 // other: a target whose Shield is up blocks it.
 
-import { REPEAT_COOLDOWN, cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
+import { resolveMoveEnergy } from '../../data/energy.js';
 import { SpriteAnimator } from '../rendering/sprite-animator.js';
 import { attackPhase } from './attacks.js';
-import { assertNoShieldBypass, resolveOffense, summonOffense } from './offense.js';
+import { assertNoShieldBypass, resolveOffense, summonOffense, yieldsToRequests } from './offense.js';
 
 const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
   cloud: null,        // owner effect animation it appears / vanishes through
   startupAnimation: null, // owner fighter clip played once before the request (none: at once)
-  cooldown: REPEAT_COOLDOWN, // seconds before the owner can summon it again: the policy's
+  cooldown: 0,        // seconds before the owner can summon it again, from its release: the policy's
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
   noGround: null,     // { attack, offset } where there is no ground behind
@@ -112,7 +122,9 @@ export function createSummonDefinition(spec, { attacks = null, projectiles = nul
   const cls = cooldownClass('summon', spec, { attacks, projectiles });
   const def = { ...SUMMON_DEFAULTS, ...spec, cooldownClass: cls, cooldown: resolveCooldown(spec.cooldown, owner, { cls }) };
   if (def.noGround) def.noGround = Object.freeze({ ...NO_GROUND_DEFAULTS, ...def.noGround });
+  def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'summon', def, cls);
   def.offense = resolveOffense(spec, summonOffense(def), owner);
+  def.freeCancel = yieldsToRequests(def.offense);
   return Object.freeze(def);
 }
 
@@ -289,12 +301,16 @@ export class Clone {
 }
 
 // Turns every summon the fighters requested this step into a live Clone in
-// `list`. Each request is consumed exactly once.
+// `list`. Each request is consumed exactly once. A clone that appears is
+// its summon's release: the summon's cooldown starts now, once for this
+// one request (a request that makes no clone starts none).
 export function spawnClones(fighters, list, stage) {
   for (const f of fighters) {
     for (const request of f.summons) {
       const c = Clone.summon(f, request, stage);
-      if (c) list.push(c);
+      if (!c) continue;
+      list.push(c);
+      f.combat.abilityCooldowns.start(request.id, c.def.cooldown);
     }
     f.summons.length = 0;
   }

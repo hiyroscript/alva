@@ -307,7 +307,7 @@ test('the Long Bite: all along its neck, from right up close out to the jaws (16
   }
   const atk = createAttackDefinition({ id: 'attack2', ...DEF.attacks.attack2 });
   assert.ok(near(atk.startup, 4 / 15) && near(atk.total, 13 / 15), 'a good quarter of a second to see coming, 0.87 s in all');
-  assert.equal(atk.cooldown, 0.5, 'its bites add up to 8: no long cooldown');
+  assert.equal(atk.cooldown, 0, 'its bites add up to 8: no cooldown at all');
 });
 
 test('Snapping Jaws: a shorter bite in the air, all along its neck from right up close (16 to 118 units), that chews, then flings (1, 1, 3 at Base Launch 2)', () => {
@@ -429,9 +429,10 @@ test('Dark Tendrils never shove #0005 back: whoever they reel in from the far en
   }
 });
 
-test('the player\'s Deadlights out of Dark Tendrils\' seizing let go while the prey is still held, facing #0005', () => {
-  // A player's own press cuts the tendrils short once they have reeled in
-  // (a CPU's technique waits for the move to end).
+test('the Deadlights cast as Dark Tendrils\' seizing ends let go while the prey is still held; pressed earlier they never cut the tendrils', () => {
+  // A technique never cuts an attack short, not even one that hit (for a
+  // player as for a CPU): pressed during the tendrils it does nothing; cast
+  // the step they end, the lights still catch the prey they hold.
   const r = playerRig({ character: DEF, foeCharacter: DEF_0001, gap: 220 });
   const at = (move) => r.events.findIndex((e) => e.attacker === r.player && (e.move === move || e.ability === move));
   let step = 0;
@@ -445,13 +446,18 @@ test('the player\'s Deadlights out of Dark Tendrils\' seizing let go while the p
     if (!stepOf.has(move) && at(move) >= 0) stepOf.set(move, step);
   };
   tick(press('extra_attack'));
+  const tendrils = r.player.combat.attack;
   for (let i = 0; i < 60 && !r.player.combat.cancellable; i++) {
     tick();
     mark('extra_attack');
   }
   assert.ok(stepOf.has('extra_attack') && r.player.combat.cancellable, 'seized, and the reel-in done');
   tick(press('attack4'));
-  assert.ok(r.player.technique, 'the cast cut the tendrils short');
+  assert.equal(r.player.technique, null, 'the cast never cuts the tendrils short');
+  assert.equal(r.player.combat.attack, tendrils, 'they play on');
+  while (r.player.combat.attack === tendrils) tick();
+  tick(press('attack4'));
+  assert.ok(r.player.technique, 'cast as the tendrils end');
   let heldAsTheyGo = null;
   while (r.player.technique) {
     const stun = r.foe.combat.stun;
@@ -463,7 +469,7 @@ test('the player\'s Deadlights out of Dark Tendrils\' seizing let go while the p
   assert.equal(lights?.type, 'hit', 'caught in the lights');
   assert.equal(r.foe.combat.afloat, true);
   const after = (stepOf.get('attack4') - stepOf.get('extra_attack')) * DT;
-  assert.ok(heldAsTheyGo > 0.1, `the lights let go ${after.toFixed(3)} s after the seizing, ${heldAsTheyGo.toFixed(3)} s of its hold to spare`);
+  assert.ok(heldAsTheyGo > 0, `the lights let go ${after.toFixed(3)} s after the seizing, while the prey is still held`);
 });
 
 test('the Red Balloon: a third of a second gathering, then balloons rise behind the opponent and a phantom bites its back: 3, its prey afraid for 2.5 s', () => {

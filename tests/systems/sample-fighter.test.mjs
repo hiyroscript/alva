@@ -66,8 +66,9 @@ test('its Attack 3 button summons its attack3 clone, shown as A3; attack1 and at
   const d = duel({ attackerCharacter: SAMPLE_FIGHTER, attackerSprites: SPRITES, gap: 120 });
   d.tick(P('attack3'));
   assert.equal(d.attacker.combat.attack, null, 'the summon, not an attack of its own');
-  assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'));
-  assert.equal(d.attacker.combat.abilityCooldowns.duration('attack3'), 0.5, 'its clone deals 5, no special class: the repeat delay');
+  assert.equal(d.attacker.summonDefs.attack3.cooldown, 0, 'its clone deals 5, no special class: no cooldown at all');
+  assert.equal(d.attacker.combat.abilityCooldowns.active('attack3'), false);
+  assert.equal(d.attacker.combat.energy, 100 - 15, 'an ordinary summon: its clone costs 15 Energy, as it is accepted');
   assert.deepEqual(cooldownIndicators(d.attacker).map((c) => c.id), [], 'no long cooldown to ring');
   d.until(() => d.clones.length === 1);
   assert.equal(d.clones[0].attackDef.id, 'attack2', 'the clone performs its own attack2');

@@ -1538,15 +1538,19 @@ test('a pointer\'s own trailing click is never a second press, whatever its deta
 
 // ---- Live move state ---------------------------------------------------------------
 
-test('the combat buttons show the fighter\'s live state as the ability HUD does: cooldowns, the repeat delay, a spent move', () => {
+test('the combat buttons show the fighter\'s live state as the ability HUD does: cooldowns from their release, no repeat delay, a spent or unpaid move', () => {
   const r = playerRig({ character: DEF_0001, gap: 900 });
   const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
   const btn = (action) => tc.buttons.get(action);
   const looks = (action) => ['is-cooling', 'is-repeat', 'is-spent', 'is-queued'].filter((c) => btn(action).classList.contains(c));
   tc.showStatus(r.player);
   for (const action of ABILITY_ACTIONS) assert.deepEqual(looks(action), [], `${action}: ready`);
-  // Hollow Purple's 5 s: the sweep from its start and its seconds.
+  // Hollow Purple's 5 s: nothing while it chants, then the sweep from its
+  // release and its seconds.
   r.tick(pressed('attack5'));
+  tc.showStatus(r.player);
+  assert.deepEqual(looks('attack5'), [], 'chanting: no false countdown');
+  r.until(() => r.player.technique?.released);
   tc.showStatus(r.player);
   assert.deepEqual(looks('attack5'), ['is-cooling']);
   assert.equal(btn('attack5').getAttribute('data-seconds'), '5.0');
@@ -1557,16 +1561,23 @@ test('the combat buttons show the fighter\'s live state as the ability HUD does:
   const left = r.player.combat.abilityCooldowns.remaining('attack5');
   assert.ok(Number(btn('attack5').getAttribute('data-seconds')) > 0 && Math.abs(Number(btn('attack5').style['--tc-progress']) - (1 - left / 5)) <= 0.005, 'it runs down with the timer');
   // The Jab, then pressed again while it plays: nothing is queued or lit;
-  // once it is over, its 0.5 s repeat delay as a faint sweep, no number.
+  // once it is over, no cooldown at all: ready.
   r.tick(pressed('attack1'));
   r.tick(pressed('attack1'));
   tc.showStatus(r.player);
   for (const action of ABILITY_ACTIONS) assert.equal(btn(action).classList.contains('is-queued'), false, `${action}: nothing queued`);
   r.until(() => !r.player.combat.attack);
   tc.showStatus(r.player);
-  assert.deepEqual(looks('attack1'), ['is-repeat']);
-  assert.equal(btn('attack1').getAttribute('data-seconds'), null, 'no number for the repeat delay');
+  assert.deepEqual(looks('attack1'), [], 'no repeat delay');
+  assert.equal(btn('attack1').getAttribute('data-seconds'), null, 'no number');
   assert.deepEqual(looks('attack2'), [], 'Red never followed');
+  // Exhausted: Red, an ordinary throw (15 Energy), is muted; the Jab is not.
+  r.player.combat.setEnergy(0);
+  tc.showStatus(r.player);
+  assert.deepEqual(looks('attack2'), ['is-spent']);
+  assert.deepEqual(looks('attack1'), []);
+  r.player.combat.refillEnergy();
+  tc.showStatus(r.player);
   // In the air: a move spent for this airtime is muted; the ground-only
   // buttons keep their own unavailable look.
   r.player.airAttacks.set('midair_attack2', 1);
@@ -1598,6 +1609,7 @@ test('the live state writes only what changed, and nothing at all for a button w
   }
   assert.equal(writes, 0, 'idle: nothing written');
   r.tick(pressed('attack5'));
+  r.until(() => r.player.technique?.released);
   tc.showStatus(r.player);
   const after = writes;
   tc.showStatus(r.player);
@@ -1605,7 +1617,8 @@ test('the live state writes only what changed, and nothing at all for a button w
   // The stylesheet: a sweep and seconds over the art and a muted spent
   // move, nothing that moves by itself; no queued look left.
   assert.doesNotMatch(CSS, /is-queued/);
-  for (const rule of ['.tc-btn::after', '.tc-btn.is-cooling::after', '.tc-btn.is-repeat::after', '.tc-btn[data-seconds]::before', '.tc-btn.is-spent']) {
+  assert.doesNotMatch(CSS, /is-repeat/, 'no repeat-delay look left');
+  for (const rule of ['.tc-btn::after', '.tc-btn.is-cooling::after', '.tc-btn[data-seconds]::before', '.tc-btn.is-spent']) {
     const body = CSS.match(new RegExp(`${rule.replace(/[.[\]()*:]/g, '\\$&')} \\{[^}]*\\}`))?.[0];
     assert.ok(body, rule);
     assert.doesNotMatch(body, /animation|transition/, rule);

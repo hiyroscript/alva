@@ -111,9 +111,9 @@ html.is-touch .touch-controls[hidden] { display: none; }
 /* Live move state (TouchControls.showStatus), read from the fighter each
    frame as the ability HUD's is: a cooldown's sweep over the art,
    recovering clockwise from the top (--tc-progress, 0 as it starts, 1
-   ready), with its seconds (data-seconds) for a 3 s or 5 s one; the 0.5 s
-   repeat delay only a faint sweep; a move spent for this airtime muted like
-   an unavailable one. Nothing moves by itself, so reduced motion has
+   ready), with its seconds (data-seconds), for a 3 s or 5 s one (an
+   ordinary move has no cooldown); a move spent for this airtime or unpaid
+   for while exhausted muted like an unavailable one. Nothing moves by itself, so reduced motion has
    nothing to stop. */
 .tc-btn::after {
   content: '';
@@ -125,7 +125,6 @@ html.is-touch .touch-controls[hidden] { display: none; }
   background: conic-gradient(rgba(5, 6, 8, 0) 0 calc(var(--tc-progress, 1) * 360deg), rgba(5, 6, 8, 0.64) 0);
 }
 .tc-btn.is-cooling::after { opacity: 1; }
-.tc-btn.is-repeat::after { opacity: 0.5; }
 .tc-btn[data-seconds]::before {
   content: attr(data-seconds);
   position: absolute;

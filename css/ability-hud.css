@@ -209,9 +209,8 @@ html.is-touch .ability-hud { display: none; }
 /* A special cooldown (3 s or 5 s): the full overlay, dimmed art, seconds. */
 .ah-tile[data-state="cooling"] .ah-cd { opacity: 1; }
 .ah-tile[data-state="cooling"] .ah-sprite { filter: brightness(0.55) saturate(0.7); }
-/* The 0.5 s repeat delay: only a faint sweep, no number. */
-.ah-tile[data-state="repeat"] .ah-cd { opacity: 0.45; }
-/* Spent for this airtime, or missing its art: muted, no countdown. */
+/* Spent for this airtime, no Energy while exhausted, or missing its art:
+   muted, no countdown. */
 .ah-tile[data-state="restricted"] { border-style: dashed; border-color: rgba(255, 255, 255, 0.2); }
 .ah-tile[data-state="restricted"] .ah-sprite,
 .ah-tile[data-state="restricted"] .ah-art .icon { filter: grayscale(1) brightness(0.55); opacity: 0.75; }

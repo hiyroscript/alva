@@ -195,13 +195,19 @@ for (const c of playableCharacters()) {
       h.step(RIGHT);
       assert.equal(h.fighter.body.vx, MV.maxSpeed, `${id}: running on at once`);
       assert.equal(h.fighter.state, 'run');
-      // Cut by a jump the player asks for after it began: the run goes up with it.
+      // A jump asked for in its last steps never cuts it (it has not hit):
+      // the jump waits in its buffer and goes up on the first free step,
+      // the run with it.
       const j = running(makeFighter);
       j.fighter.controller.kind = 'player';
       j.step({ ...RIGHT, ...P(action) });
-      j.step(RIGHT);
+      const record = j.fighter.combat.attack;
+      while (record.time + 3 * DT < record.def.total - 1e-6) j.step(RIGHT);
       j.step({ ...RIGHT, ...P('jump') });
-      assert.equal(j.fighter.grounded, false, `${id}: jumped out of it`);
+      assert.equal(j.fighter.combat.attack, record, `${id}: never cut by the jump`);
+      while (j.fighter.combat.attack === record) j.step(RIGHT);
+      if (j.fighter.grounded) j.step(RIGHT);
+      assert.equal(j.fighter.grounded, false, `${id}: jumped as it ended`);
       assert.equal(j.fighter.body.vx, MV.maxSpeed, `${id}: the whole run in the air`);
     }
   });

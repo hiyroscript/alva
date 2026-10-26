@@ -1,17 +1,20 @@
 // The cooldown policy (js/data/cooldowns.js): exactly two special
 // cooldowns, 5 s for a move that deals 10 damage and 3 s for one with an
 // exceptional effect (a heal, a paralysis), derived from structured combat
-// data for every kind of move; everything else only the universal 0.5 s
-// repeat delay (none for a Deflect). No authored value bypasses it, the
-// roster follows it, and the CPU obeys exactly what the player does.
+// data for every kind of move; everything else none at all (there is no
+// universal repeat delay any more, the Deflect included). No authored value
+// bypasses it, the roster follows it, and the CPU obeys exactly what the
+// player does. A special cooldown starts only as its move is released (see
+// tests/systems/release-cooldowns.test.mjs for every kind of release).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DT, duel, makeFighter } from '../helpers/fighter-harness.mjs';
 import {
-  COOLDOWN_CLASSES, EXCEPTIONAL_COOLDOWN, EXCEPTIONAL_EFFECTS, REPEAT_COOLDOWN, ROUTINE_EFFECTS, SPECIAL_COOLDOWNS, TEN_DAMAGE_COOLDOWN,
+  COOLDOWN_CLASSES, EXCEPTIONAL_COOLDOWN, EXCEPTIONAL_EFFECTS, ROUTINE_EFFECTS, SPECIAL_COOLDOWNS, TEN_DAMAGE_COOLDOWN,
   cooldownClass, moveImpact, policyCooldown, resolveCooldown,
 } from '../../js/data/cooldowns.js';
+import * as COOLDOWNS from '../../js/data/cooldowns.js';
 import { CHARACTERS, assertCombatRules, getCharacter } from '../../js/data/characters.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { createTechniqueDefinition } from '../../js/game/combat/technique.js';
@@ -32,20 +35,19 @@ const P = (action) => ({ [action]: true, [`${action}Pressed`]: true });
 const attack = (spec, projectiles) => createAttackDefinition({ id: 'a', hitbox: BOX, ...spec }, { projectiles });
 const PROJECTILE = (spec) => ({ animation: 'o', speed: 400, lifetime: 1, hitbox: { x: -10, y: -10, w: 20, h: 20 }, ...spec });
 
-test('the policy has exactly two special lengths, 3 s and 5 s, beside the 0.5 s repeat delay', () => {
-  assert.equal(REPEAT_COOLDOWN, 0.5);
+test('the policy has exactly two lengths, 3 s and 5 s: an ordinary move has none, and no 0.5 s repeat delay exists', () => {
+  assert.equal('REPEAT_COOLDOWN' in COOLDOWNS, false, 'the universal repeat delay is gone');
   assert.deepEqual([...SPECIAL_COOLDOWNS], [3, 5]);
-  assert.deepEqual({ ...COOLDOWN_CLASSES }, { ordinary: null, exceptional: EXCEPTIONAL_COOLDOWN, tenDamage: TEN_DAMAGE_COOLDOWN });
-  assert.equal(policyCooldown('ordinary'), 0.5);
-  assert.equal(policyCooldown('ordinary', { exempt: true }), 0);
+  assert.deepEqual({ ...COOLDOWN_CLASSES }, { ordinary: 0, exceptional: EXCEPTIONAL_COOLDOWN, tenDamage: TEN_DAMAGE_COOLDOWN });
+  assert.equal(policyCooldown('ordinary'), 0);
   assert.equal(policyCooldown('exceptional'), 3);
   assert.equal(policyCooldown('tenDamage'), 5);
   assert.throws(() => policyCooldown('legendary'), /Unknown cooldown class/);
 });
 
-test('1-2: a 3-damage or a 5-damage attack with nothing exceptional has only the repeat delay', () => {
-  assert.equal(attack({ damage: 3 }).cooldown, 0.5);
-  assert.equal(attack({ damage: 5, baseLaunch: 3, directionalLaunch: 'vertical' }).cooldown, 0.5);
+test('1-2: a 3-damage or a 5-damage attack with nothing exceptional has no cooldown at all', () => {
+  assert.equal(attack({ damage: 3 }).cooldown, 0);
+  assert.equal(attack({ damage: 5, baseLaunch: 3, directionalLaunch: 'vertical' }).cooldown, 0);
   assert.equal(attack({ damage: 1 }).cooldownClass, 'ordinary');
 });
 
@@ -58,7 +60,7 @@ test('3: an attack that deals 10 waits 5 s, a strike of a multi-hit one, or a to
   assert.equal(total.damage, 10);
   assert.equal(total.cooldown, 5, 'its strikes add up to 10');
   const short = attack({ hits: [{ at: 0, active: 0.05, damage: 3 }, { at: 0.1, active: 0.05, damage: 5 }] });
-  assert.equal(short.cooldown, 0.5, '8 in all is no ten-damage move');
+  assert.equal(short.cooldown, 0, '8 in all is no ten-damage move');
   const slam = attack({ damage: 3, motion: { type: 'slam', fallSpeed: 900, impact: { hitbox: BOX, hit: { damage: 10 } } } });
   assert.equal(slam.cooldown, 5, 'a slam whose impact deals 10');
 });
@@ -72,10 +74,10 @@ test('4-5: a move whose projectile, or its projectile\'s finisher, deals 10 wait
   const throws = (id) => ({ hitbox: null, projectile: { id, spawnAt: 0.1, offset: { x: 0, y: 0 } } });
   assert.equal(attack(throws('big'), projectiles).cooldown, 5);
   assert.equal(attack(throws('grind'), projectiles).cooldown, 5, 'its finisher deals 10');
-  assert.equal(attack(throws('small'), projectiles).cooldown, 0.5);
+  assert.equal(attack(throws('small'), projectiles).cooldown, 0);
   const cast = (id) => createTechniqueDefinition({ id: 't', projectile: { id } }, { projectiles });
   assert.equal(cast('big').cooldown, 5, 'a technique\'s projectile counts too');
-  assert.equal(cast('small').cooldown, 0.5);
+  assert.equal(cast('small').cooldown, 0);
   // The cooldown is the move's, not one per projectile or hitbox.
   assert.deepEqual(moveImpact('attack', throws('grind'), { projectiles }).hits.map((h) => h.damage), [1, 1, 10]);
   // The roster's: Hollow Purple's sphere and the Whirlwind's tornado finisher.
@@ -96,7 +98,7 @@ test('6-7: a healing technique and a paralysis (or any hard hold) wait 3 s', () 
   // A summon is judged by its clone's attack.
   const attacks = { attack1: { hitbox: BOX, damage: 3, paralyze: 1 }, attack2: { hitbox: BOX, damage: 3 } };
   assert.equal(createSummonDefinition({ id: 's', attack: 'attack1', cloud: 'c' }, { attacks }).cooldown, 3);
-  assert.equal(createSummonDefinition({ id: 's', attack: 'attack2', cloud: 'c' }, { attacks }).cooldown, 0.5);
+  assert.equal(createSummonDefinition({ id: 's', attack: 'attack2', cloud: 'c' }, { attacks }).cooldown, 0);
   assert.equal(createSummonDefinition({ id: 's', attack: 'attack2', cloud: 'c', noGround: { attack: 'attack1' } }, { attacks }).cooldown, 3,
     'the more severe of its two attacks');
   // The roster's: Unlimited Void and the Mystical Palm Technique.
@@ -105,25 +107,25 @@ test('6-7: a healing technique and a paralysis (or any hard hold) wait 3 s', () 
 });
 
 test('8-10: a pull, ordinary hitstun, a slam, a bounce, a launch or a quake earns nothing', () => {
-  assert.equal(attack({ damage: 3, pull: { radius: 200, speed: 1300 } }).cooldown, 0.5, 'a pull');
-  assert.equal(attack({ damage: 3, hitstun: 1.2, blockstun: 0.6, hitstop: 0.2 }).cooldown, 0.5, 'a long hitstun');
-  assert.equal(attack({ damage: 5, baseLaunch: 3, directionalLaunch: 'vertical', quake: true, blockPush: 600 }).cooldown, 0.5, 'a launch, a quake, a shove');
-  assert.equal(attack({ damage: 3, motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 } }).cooldown, 0.5, 'a bounce');
-  assert.equal(attack({ damage: 3, motion: { type: 'slam', fallSpeed: 1500, impact: { hitbox: BOX, hit: { damage: 5, quake: true } } } }).cooldown, 0.5, 'a slam');
-  assert.equal(attack({ damage: 3, motion: { type: 'homing', range: 200, speed: 1000 } }).cooldown, 0.5, 'homing');
-  assert.equal(attack({ damage: 3, carry: { lift: 300 } }).cooldown, 0.5, 'a carry');
+  assert.equal(attack({ damage: 3, pull: { radius: 200, speed: 1300 } }).cooldown, 0, 'a pull');
+  assert.equal(attack({ damage: 3, hitstun: 1.2, blockstun: 0.6, hitstop: 0.2 }).cooldown, 0, 'a long hitstun');
+  assert.equal(attack({ damage: 5, baseLaunch: 3, directionalLaunch: 'vertical', quake: true, blockPush: 600 }).cooldown, 0, 'a launch, a quake, a shove');
+  assert.equal(attack({ damage: 3, motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 } }).cooldown, 0, 'a bounce');
+  assert.equal(attack({ damage: 3, motion: { type: 'slam', fallSpeed: 1500, impact: { hitbox: BOX, hit: { damage: 5, quake: true } } } }).cooldown, 0, 'a slam');
+  assert.equal(attack({ damage: 3, motion: { type: 'homing', range: 200, speed: 1000 } }).cooldown, 0, 'homing');
+  assert.equal(attack({ damage: 3, carry: { lift: 300 } }).cooldown, 0, 'a carry');
   const projectiles = { orb: PROJECTILE({ damage: 1, pull: { radius: 140, speed: 360 }, pierce: { hits: 3, interval: 0.25 }, finisher: { damage: 3 } }) };
-  assert.equal(attack({ hitbox: null, projectile: { id: 'orb', spawnAt: 0 } }, projectiles).cooldown, 0.5, 'a pulling, grinding orb');
+  assert.equal(attack({ hitbox: null, projectile: { id: 'orb', spawnAt: 0 } }, projectiles).cooldown, 0, 'a pulling, grinding orb');
   // The roster's: Blue and Maximum Blue pull, Cherry Blossom Impact quakes,
   // the Heavenly Foot of Pain slams, the Bounce Attack bounces.
   const one = makeFighter({ character: DEF_0001 }).fighter;
   const two = makeFighter({ character: DEF_0002 }).fighter;
   const three = makeFighter({ character: DEF_0003 }).fighter;
-  assert.equal(one.attacks.attack3.cooldown, 0.5);
-  assert.equal(one.attacks.midair_attack3.cooldown, 0.5);
-  assert.equal(three.techniqueDefs.attack3.cooldown, 0.5);
-  assert.equal(three.attacks.midair_attack2.cooldown, 0.5);
-  assert.equal(two.attacks.midair_attack2.cooldown, 0.5);
+  assert.equal(one.attacks.attack3.cooldown, 0);
+  assert.equal(one.attacks.midair_attack3.cooldown, 0);
+  assert.equal(three.techniqueDefs.attack3.cooldown, 0);
+  assert.equal(three.attacks.midair_attack2.cooldown, 0);
+  assert.equal(two.attacks.midair_attack2.cooldown, 0);
 });
 
 test('11: a move that qualifies for both waits 5 s, never 8: the special cooldowns never add up', () => {
@@ -134,15 +136,17 @@ test('11: a move that qualifies for both waits 5 s, never 8: the special cooldow
 
 test('12: an authored cooldown the policy does not give is refused, as the move is built and as a fighter registers', () => {
   for (const cooldown of [2, 4, 6, 8, 10, 12]) {
-    assert.throws(() => attack({ damage: 3, cooldown }), /the cooldown policy gives it 0.5 s/, `${cooldown}`);
+    assert.throws(() => attack({ damage: 3, cooldown }), /the cooldown policy gives it 0 s/, `${cooldown}`);
     assert.throws(() => attack({ damage: 10, cooldown }), /the cooldown policy gives it 5 s/, `${cooldown}`);
     assert.throws(() => createTechniqueDefinition({ id: 't', heal: 10, cooldown }), /the cooldown policy gives it 3 s/, `${cooldown}`);
   }
   assert.throws(() => attack({ damage: 10, cooldown: 0.5 }), /gives it 5 s/, 'a ten-damage move cannot keep the baseline either');
-  assert.throws(() => attack({ damage: 3, cooldown: 3 }), /gives it 0.5 s/, 'nor an ordinary one borrow a special length');
+  assert.throws(() => attack({ damage: 3, cooldown: 3 }), /gives it 0 s/, 'nor an ordinary one borrow a special length');
   // What the policy gives, it accepts.
   assert.equal(attack({ damage: 10, cooldown: 5 }).cooldown, 5);
-  assert.equal(attack({ damage: 3, cooldown: 0.5 }).cooldown, 0.5);
+  assert.equal(attack({ damage: 3, cooldown: 0 }).cooldown, 0);
+  assert.throws(() => attack({ damage: 3, cooldown: 0.5 }), /declares cooldown 0.5: the cooldown policy gives it 0 s/, 'the old repeat delay is refused');
+  assert.throws(() => attack({ damage: 3, cooldown: 0.05 }), /gives it 0 s/, 'and so is any hidden short timer');
   assert.equal(resolveCooldown(undefined, 'x', { cls: 'exceptional' }), 3);
   // A fighter that authors an 8-second move never registers.
   const greedy = { ...DEF_0001, attacks: { ...DEF_0001.attacks, attack1: { ...DEF_0001.attacks.attack1, cooldown: 8 } } };
@@ -157,16 +161,16 @@ test('12: an authored cooldown the policy does not give is refused, as the move 
 
 test('the roster: every move\'s cooldown, reclassified from its mechanics', () => {
   const table = {
-    '0001': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, attack3: 0.5, midair_attack3: 0.5, extra_attack: 0.5, attack4: 3, attack5: 5, deflect: 0 },
-    '0002': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, attack3: 0.5, midair_attack3: 0.5, extra_attack: 5, deflect: 0 },
-    '0003': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, extra_attack: 0.5, attack3: 0.5, attack4: 3, deflect: 0 },
+    '0001': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0, attack4: 3, attack5: 5, deflect: 0 },
+    '0002': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 5, deflect: 0 },
+    '0003': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, attack3: 0, attack4: 3, deflect: 0 },
     // Ievan Polkka's double: six strikes adding up to 10; World is Mine: a charm.
-    '0004': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, attack3: 0.5, midair_attack3: 0.5, extra_attack: 0.5, attack4: 5, attack5: 3, deflect: 0 },
+    '0004': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0, attack4: 5, attack5: 3, deflect: 0 },
     // The Deadlights: a float; the Red Balloon: its phantom's bite frightens
     // (the bite itself, its attack5, the same: a fear).
-    '0005': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, attack3: 0.5, midair_attack3: 0.5, attack5: 3, extra_attack: 0.5, attack4: 3, deflect: 0 },
+    '0005': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack5: 3, extra_attack: 0, attack4: 3, deflect: 0 },
     // Ice Breath: a freeze.
-    '0006': { attack1: 0.5, midair_attack1: 0.5, attack2: 0.5, midair_attack2: 0.5, extra_attack: 0.5, attack3: 0.5, attack4: 3, attack5: 0.5, deflect: 0 },
+    '0006': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, attack3: 0, attack4: 3, attack5: 0, deflect: 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
@@ -194,18 +198,28 @@ test('every effect a hit or a move can carry is classified, exceptional or routi
   assert.equal(cooldownClass('attack', { hitbox: BOX, damage: 3, animation: 'hollow_purple' }), 'ordinary');
 });
 
-test('13: a technique broken during its cast keeps the cooldown it began on acceptance; nothing re-casts through it', () => {
+test('13: a technique broken during its cast starts no cooldown and may be cast again; one released keeps its cooldown through a hit', () => {
   for (const [button, seconds] of [['attack4', 3], ['attack5', 5]]) {
     const d = duel({ attackerCharacter: DEF_0001, gap: 300 });
     d.tick({});
     d.tick(P(button));
     assert.ok(d.attacker.technique, `${button}: casting`);
+    const cd = d.attacker.combat.abilityCooldowns;
+    assert.equal(cd.active(button), false, `${button}: no cooldown while it casts`);
     new CombatSystem().applyHit(d.target, d.attacker, createAttackDefinition({ id: 'testHit', damage: 1, hitstun: 0.2, hitstop: 0 }));
     assert.equal(d.attacker.technique, null, `${button}: broken`);
-    const cd = d.attacker.combat.abilityCooldowns;
-    assert.ok(Math.abs(cd.remaining(button) - seconds) < 1e-9, `${button}: its ${seconds} s runs on`);
+    assert.equal(cd.active(button), false, `${button}: broken before its release, no ${seconds} s`);
+    d.until(() => d.attacker.canAct());
+    d.tick(P(button));
+    assert.ok(d.attacker.technique, `${button}: cast again at once, nothing holds it`);
+    d.until(() => cd.active(button));
+    assert.ok(Math.abs(cd.remaining(button) - seconds) < 1e-9, `${button}: its ${seconds} s from the release`);
+    assert.ok(d.attacker.technique?.released, `${button}: started on the release step`);
+    new CombatSystem().applyHit(d.target, d.attacker, createAttackDefinition({ id: 'testHit', damage: 1, hitstun: 0.2, hitstop: 0 }));
+    assert.equal(d.attacker.technique, null, `${button}: hit in its release pose`);
+    assert.ok(cd.active(button), `${button}: the released cooldown runs on`);
     let refused = true;
-    for (let i = 0; i < Math.round((seconds - 0.2) / DT); i++) {
+    for (let i = 0; i < Math.round((seconds - 0.4) / DT); i++) {
       d.tick(i % 7 === 0 ? P(button) : {});
       if (d.attacker.technique) refused = false;
     }
@@ -236,7 +250,13 @@ test('14: the CPU and the player read the same cooldowns and the CPU never press
     for (const m of analyzeCapabilities(cpu).moves.filter((x) => x.kind === 'technique')) {
       assert.equal(moveReady(cpu, m), true, `#${c.id} ${m.id}: ready`);
       cpu.combat.abilityCooldowns.start(m.id, m.def.cooldown);
-      assert.equal(moveReady(cpu, m), false, `#${c.id} ${m.id}: cooling, never pressed`);
+      // An ordinary technique has no cooldown to wait for: still ready.
+      assert.equal(moveReady(cpu, m), !(m.def.cooldown > 0), `#${c.id} ${m.id}: cooling, never pressed`);
+      cpu.combat.abilityCooldowns.clear();
+      // One that costs Energy is never pressed while the CPU is exhausted.
+      cpu.combat.setEnergy(0);
+      assert.equal(moveReady(cpu, m), !(m.energyCost > 0), `#${c.id} ${m.id}: exhausted`);
+      cpu.combat.refillEnergy();
     }
   }
 });

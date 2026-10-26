@@ -28,17 +28,27 @@
 // (`deflectProjectiles`), so it is always both.
 //
 // It costs Energy, the same for every fighter: DEFLECT_ENERGY_COST (15, see
-// js/game/combat/combat-state.js), paid once as it starts (Fighter.tryDeflect),
+// js/data/energy.js), paid once as it starts (Fighter.tryDeflect),
 // whether it then strikes, turns a projectile back or meets nothing, and
 // never while the fighter is exhausted. Nothing it does gives any back.
 //
 // Its strike is the same for every fighter: DEFLECT_DAMAGE (3) Launch
 // Points at Base Launch DEFLECT_BASE_LAUNCH (2). A fighter authors the rest
 // (its clip, timing, box, stuns, freeze, direction and movement). Its
-// cooldown is the cooldown policy's (js/data/cooldowns.js), exempt from the
-// universal 0.5 s repeat delay: none at all, since its 3 damage is no
-// special class (Energy is what limits it). An entry may leave `cooldown`
-// out or declare 0; any other is refused. It may leave damage and
+// cooldown is the cooldown policy's (js/data/cooldowns.js): none at all,
+// since its 3 damage is no special class (Energy is what limits it). An
+// entry may leave `cooldown` out or declare 0; any other is refused.
+//
+// Attack though it is, a Deflect is cancellable (its `freeCancel`, by
+// explicit rule: it is a defense, see yieldsToRequests in
+// js/game/combat/offense.js): from the step after it starts, in its
+// startup, active phase or recovery, any valid request (another aerial, an
+// air jump, an air dash) ends it the moment the replacement starts. Its box
+// strikes nothing and turns nothing back after that; a projectile it has
+// already turned back stays turned. Its Energy is never given back, and it
+// never cancels into itself. Cancelling out of a Deflect is not cancelling
+// into one: a Deflect may only cut short an attack that may be cut short
+// (its hit-confirmed `hitCancel`) or itself yields. It may leave damage and
 // baseLaunch out; any other value for either is refused, so no fighter's
 // Deflect can drift from the rule:
 //
@@ -86,5 +96,5 @@ export function createDeflectDefinition(spec) {
   if (spec.deflectProjectiles === false) throw new Error(`[Alva] ${owner} declares deflectProjectiles: false: a Deflect turns projectiles back`);
   return createAttackDefinition({
     ...spec, id: 'deflect', damage: DEFLECT_DAMAGE, baseLaunch: DEFLECT_BASE_LAUNCH, groundOnly: false, deflectProjectiles: true,
-  }, { cooldownExempt: true });
+  });
 }

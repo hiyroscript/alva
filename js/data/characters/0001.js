@@ -29,9 +29,10 @@
 // of its own (its midair_mouvment), apart from its Dash. Its orbs spin as
 // they fly. Its cooldowns are the shared policy's (js/data/cooldowns.js),
 // derived from what each move does, never authored here: Unlimited Void's
-// paralysis waits 3 s, Hollow Purple's 10-damage sphere 5 s, every other
-// move only the universal 0.5 s repeat delay (Red's push and Blue's pull
-// earn nothing), and the Deflect none. They never alter animation phases.
+// paralysis waits 3 s, Hollow Purple's 10-damage sphere 5 s, each from
+// the moment it is released; every other move none at all (Red's push and
+// Blue's pull earn nothing; as ordinary throws they cost 15 Energy each
+// instead), and the Deflect none. They never alter animation phases.
 
 import { frames, pad, flick, legacyPad } from './helpers.js';
 
@@ -292,10 +293,11 @@ export const CHARACTER_0001 = {
     steerAngle: 18,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): the same
-  // bar and the same costs as every fighter's (100; a Dash, an air dash or a
-  // Dash cancel 25, a Deflect 15, each blocked hit 15). Its own is only how
-  // fast it refills: 14 a second.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js and
+  // js/data/energy.js): the same bar and the same price as every
+  // fighter's (100; 15 for a Dash, an air dash or a Dash cancel, a Deflect,
+  // each blocked hit, and each ordinary move that creates a construct). Its
+  // own is only how fast it refills: 14 a second.
   energy: {
     regen: 14,
   },
@@ -467,7 +469,8 @@ export const CHARACTER_0001 = {
   // js/game/combat/technique.js). Each is a cast: #0001 stands committed to
   // it, then lets go all at once. A hit on #0001 before it lets go breaks
   // it (nothing released), and it needs the ground throughout. Cooldowns
-  // begin on acceptance and run on even if interrupted; the policy gives
+  // begin as each releases (a cast broken before then starts none) and run
+  // on whatever follows; the policy gives
   // Unlimited Void 3 s (its paralysis) and Hollow Purple 5 s (its 10).
   techniques: {
     // Unlimited Void: half a second to cast, then the domain closes round
@@ -502,15 +505,15 @@ export const CHARACTER_0001 = {
   // it (js/data/attack-mobility.js): its quick strikes carry the run and
   // the drift on through them, its launcher and its pull steer as medium
   // ones, and its casts (Red, Maximum Blue) are heavy, slowing it as it
-  // casts. Each has only the universal 0.5-second repeat delay (the
-  // cooldown policy's: none of them deals 10 or paralyzes), independent of
-  // its phases and of other moves' cooldowns.
+  // casts. None has a cooldown (the cooldown policy's: none of them deals
+  // 10 or paralyzes); Red and Maximum Blue, ordinary throws, cost 15 Energy
+  // each as they start.
   attacks: {
     // The Jab: frames 1-2 the wind-up, 3-4 the punch (its box out to 40
     // units, at the shoulders, just short of the fist's tip), 5-6 back,
     // 0.3 s in all. Light and quick (3), with a crisp two-step freeze, it
     // pushes (Base Launch 1 sideways) and opens a follow-up once it has
-    // hit; its repeat timer prevents immediate same-move strings. A quick
+    // hit (never into itself: a Jab plays out before the next). A quick
     // strike: it keeps all the speed it is thrown at (a Dash's included)
     // and the run on through it while a direction is held.
     attack1: {

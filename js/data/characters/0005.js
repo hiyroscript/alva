@@ -39,8 +39,8 @@
 // sprint's long, flat leap. Its cooldowns are the shared policy's
 // (js/data/cooldowns.js), derived from what each move does, never authored
 // here: the Deadlights wait 3 s (a float), the Red Balloon 3 s (its bite's
-// fear), every other move only the universal 0.5 s repeat delay, and the
-// Deflect none. These timers never alter their animation phases. The
+// fear), each from its release (the Red Balloon's as its phantom
+// appears); every other move none at all, and the Deflect none. These timers never alter their animation phases. The
 // sheet's intro, walk, victory dance and defeat, its transformations (the
 // spider, the giant face), its detached head and the rising bite are no
 // move.
@@ -278,10 +278,11 @@ export const CHARACTER_0005 = {
     steerAngle: 20,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): the same
-  // bar and the same costs as every fighter's (100; a Dash, an air dash or a
-  // Dash cancel 25, a Deflect 15, each blocked hit 15). Its own is only how
-  // fast it refills: 14 a second.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js and
+  // js/data/energy.js): the same bar and the same price as every
+  // fighter's (100; 15 for a Dash, an air dash or a Dash cancel, a Deflect,
+  // each blocked hit, and each ordinary move that creates a construct). Its
+  // own is only how fast it refills: 14 a second.
   energy: {
     regen: 14,
   },
@@ -436,7 +437,7 @@ export const CHARACTER_0005 = {
   // js/game/combat/technique.js). A cast: #0005 stands committed to it,
   // then lets go all at once. A hit on #0005 before it lets go breaks it
   // (nothing released), and it needs the ground throughout. Its cooldown
-  // begins on acceptance and runs on even if interrupted.
+  // begins as it releases (a cast broken before then starts none).
   techniques: {
     // The Deadlights: 0.4 s with the fists raised and the face splitting
     // open (its longest commitment, and nothing protects it; out of Dark
@@ -481,10 +482,8 @@ export const CHARACTER_0005 = {
   // Attack definitions (schema: createAttackDefinition in
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
-  // mirrored with facing). Each has only the universal 0.5-second repeat
-  // delay (the cooldown policy's: none deals 10, paralyzes, floats or
-  // frightens) but the phantom's bite, independent of its phases and of
-  // other moves' cooldowns. Each moves by the mobility tier its role gives
+  // mirrored with facing). None has a cooldown (the cooldown policy's: none
+  // deals 10, paralyzes, floats or frightens) but the phantom's bite. Each moves by the mobility tier its role gives
   // it (js/data/attack-mobility.js): the claws quick, the bites and hands
   // medium, the Long Bite heavy, the tendrils planted.
   attacks: {

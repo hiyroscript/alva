@@ -46,9 +46,9 @@ export function jumpTapHold(self) {
   return Math.max(0, self.movement.highJumpWindow - 1.5 / 60);
 }
 
-// The human player's controller: the one kind ('player') whose presses are
-// deliberate requests that may cut its own attack short (see
-// Fighter.playerMayCut), and the one that may have Automatic turn-around
+// The human player's controller (kind 'player'): its presses go through
+// the same request and cancellation rules as a CPU's (see
+// Fighter.canFollowUp), and it is the one that may have Automatic turn-around
 // (see Fighter.turnAroundFacing), while its setting (`automaticTurnAround`:
 // Home › Settings › Combat, read as the mode starts) is on. As in the
 // settings, it is on unless said otherwise.

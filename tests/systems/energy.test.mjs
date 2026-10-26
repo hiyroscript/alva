@@ -1,9 +1,11 @@
 // Run with node --test tests/systems/energy.test.mjs (no dependencies).
-// Energy: the one resource, the same bar (100) and the same prices for
-// every fighter, spent only by the Dash and the air dash (20 as either
-// starts, a Dash cancel included), the Deflect (15 as it starts) and the
-// Shield (15 for each hit it blocks, a perfect block's included); never by
-// anything else. Its rules, clamping, its one passive
+// Energy: the one resource, the same bar (100) and one price, 15, for
+// every fighter and everything that spends it: the Dash and the air dash
+// (as either starts, a Dash cancel included), the Deflect (as it starts),
+// the Shield (each hit it blocks, a perfect block's included) and an
+// ordinary move that creates a construct (a projectile, a burst, a clone:
+// as it starts, once); never anything else (see also
+// tests/systems/strict-combat-rules.test.mjs). Its rules, clamping, its one passive
 // refill rate, what each action costs, spending more than is left (it
 // still happens, and empties the bar), the exhaustion lockout that only a
 // full refill clears, and the one bright purple bar. Uses the real Fighter,
@@ -13,7 +15,8 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  BLOCK_ENERGY_COST, CombatState, DASH_ENERGY_COST, DEFLECT_ENERGY_COST, MAX_ENERGY, resolveEnergy,
+  BLOCK_ENERGY_COST, CONSTRUCT_ENERGY_COST, CombatState, DASH_ENERGY_COST, DEFLECT_ENERGY_COST, ENERGY_COST, MAX_ENERGY,
+  resolveEnergy,
 } from '../../js/game/combat/combat-state.js';
 import * as status from '../../js/game/rendering/fighter-status.js';
 import { energyBarState, ENERGY_STYLE } from '../../js/game/rendering/fighter-status.js';
@@ -33,11 +36,12 @@ const dash = (step, dir = 'runRight') => {
   return step({ [dir === 'runRight' ? 'mouvementRightPressed' : 'mouvementLeftPressed']: true, [dir]: true });
 };
 
-test('the Energy rules are universal: 100 full, 20 per Dash, air dash or Dash cancel, 15 per Deflect, 15 per blocked hit; a fighter sets only its refill', () => {
-  assert.deepEqual([MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST], [100, 20, 15, 15]);
+test('the Energy rules are universal: 100 full, 15 for everything (a Dash, air dash or Dash cancel, a Deflect, a blocked hit, a construct move); a fighter sets only its refill', () => {
+  assert.equal(ENERGY_COST, 15);
+  assert.deepEqual([MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST, CONSTRUCT_ENERGY_COST], [100, 15, 15, 15, 15]);
   assert.deepEqual(def.energy, { regen: 14 }, '#0001 declares its refill rate, and nothing else');
   assert.equal(def.stamina, undefined, 'the old name is gone');
-  const RULES = { max: 100, dashCost: 20, dashCancelCost: 20, shieldHitCost: 15, deflectCost: 15 };
+  const RULES = { max: 100, dashCost: 15, dashCancelCost: 15, shieldHitCost: 15, deflectCost: 15, constructCost: 15 };
   assert.deepEqual({ ...resolveEnergy(undefined) }, { ...RULES, regen: 12 }, 'the default refill');
   assert.deepEqual({ ...resolveEnergy({ regen: 14 }) }, { ...RULES, regen: 14 });
   // Every universal field may be left out, or declared as the rule says;
@@ -45,7 +49,8 @@ test('the Energy rules are universal: 100 full, 20 per Dash, air dash or Dash ca
   assert.deepEqual({ ...resolveEnergy({ ...RULES, regen: 9 }) }, { ...RULES, regen: 9 });
   for (const [field, value] of [
     ['max', 80], ['max', 120], ['dashCost', 12], ['dashCost', 25], ['dashCancelCost', 35], ['dashCancelCost', 40],
-    ['shieldHitCost', 20], ['shieldHitCost', 25], ['shieldHitCost', 0], ['deflectCost', 0],
+    ['shieldHitCost', 20], ['shieldHitCost', 25], ['shieldHitCost', 0], ['deflectCost', 0], ['deflectCost', 25],
+    ['dashCost', 20], ['dashCancelCost', 20], ['constructCost', 0], ['constructCost', 20], ['constructCost', 30],
   ]) {
     assert.throws(() => resolveEnergy({ [field]: value }, 'Character "x"'), new RegExp(`Character "x" declares Energy ${field} ${value}: it is ${RULES[field]} for every fighter`));
   }
@@ -144,14 +149,14 @@ test('it refills at one passive rate only, whatever is held: standing, holding D
   assert.ok(cast.technique, 'still casting');
   near(cast.combat.energy, 20 + E.regen / 2, 'half a second of the cast: the same rate');
   // There is one rate to set, and nothing else.
-  assert.deepEqual(Object.keys(resolveEnergy()).sort(), ['dashCancelCost', 'dashCost', 'deflectCost', 'max', 'regen', 'shieldHitCost']);
+  assert.deepEqual(Object.keys(resolveEnergy()).sort(), ['constructCost', 'dashCancelCost', 'dashCost', 'deflectCost', 'max', 'regen', 'shieldHitCost']);
   const c = new CombatState();
   c.setEnergy(0);
   c.updateEnergy(0.5, true);
   near(c.energy, 6, 'updateEnergy(dt) takes nothing else into account (the default 12 / s)');
 });
 
-test('a Dash spends exactly its cost (20) as it starts, and only then; spending the last of it exhausts', () => {
+test('a Dash spends exactly its cost (15) as it starts, and only then; spending the last of it exhausts', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   dash(step);
@@ -294,15 +299,17 @@ test('exhausted, a fighter still moves, jumps, attacks, and uses its techniques,
   assert.equal(c.energyExhausted, true);
 });
 
-test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, orbs and techniques are free', () => {
+test('runs, jumps, melee attacks and techniques with a special cooldown are free; each ordinary throw costs 15, once', () => {
   const d = duel();
   const { attacker, tick } = d;
   const spent = () => {
-    // Refill is the only change: Energy never drops.
+    // Refill is the only change: Energy never drops, unless `cost` is due
+    // on this step (then exactly that, and no refill).
     let last = attacker.combat.energy;
-    return (held = {}) => {
+    return (held = {}, cost = 0) => {
       tick(held);
-      assert.ok(attacker.combat.energy >= last - 1e-9, `nothing spent (${attacker.state})`);
+      if (cost) assert.ok(Math.abs(attacker.combat.energy - (last - cost)) < 1e-9, `exactly ${cost} (${attacker.state})`);
+      else assert.ok(attacker.combat.energy >= last - 1e-9, `nothing spent (${attacker.state})`);
       last = attacker.combat.energy;
     };
   };
@@ -313,18 +320,19 @@ test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, or
   for (let i = 0; i < steps(1); i++) t();
   t({ attack1: true, attack1Pressed: true });
   for (let i = 0; i < 30; i++) t();
-  t({ attack2: true, attack2Pressed: true });
+  // Red (attack2) and Blue (attack3): ordinary throws, 15 each as they start.
+  t({ attack2: true, attack2Pressed: true }, 15);
   for (let i = 0; i < 60; i++) t();
-  t({ attack3: true, attack3Pressed: true });
+  t({ attack3: true, attack3Pressed: true }, 15);
   for (let i = 0; i < 60; i++) t();
   t({ extra_attack: true, extra_attackPressed: true });
   for (let i = 0; i < 30; i++) t();
   for (let i = 0; i < 10; i++) t(DOWN);
   t({ attack4: true, attack4Pressed: true });
-  assert.ok(attacker.technique, 'A4 cast Unlimited Void');
+  assert.ok(attacker.technique, 'A4 cast Unlimited Void: 3 s, no Energy');
   while (attacker.technique) t();
   t({ attack5: true, attack5Pressed: true });
-  assert.ok(attacker.technique, 'A5 cast Hollow Purple');
+  assert.ok(attacker.technique, 'A5 cast Hollow Purple: 5 s, no Energy');
   while (attacker.technique) t();
 });
 

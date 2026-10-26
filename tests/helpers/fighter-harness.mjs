@@ -239,7 +239,8 @@ export function duel({
 // Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in
 // Battle.update's order. Returns every step's inputs and states, keyed by
 // fighter; `cooling` lists the summons and techniques cooling down after
-// the step. `spritesA` / `spritesB` swap in other art (by default each
+// the step (a cooldown starts as its move is released), `technique` and
+// `summoned` the special it is performing. `spritesA` / `spritesB` swap in other art (by default each
 // fighter's every clip).
 export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'brutal', spritesA, spritesB } = {}) {
   const stage = new StageCollision(stageMap());
@@ -265,6 +266,8 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
         ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
         state: f.state, grounded: f.grounded, frame: frameName(f), cooling: [...f.combat.abilityCooldowns.entries.keys()],
         technique: f.technique?.def.id ?? null, free, exhausted: f.combat.energyExhausted,
+        // The summon it is performing (its startup) or sent out this step.
+        summoned: f.pendingSummon?.id ?? f.summons[0]?.id ?? null,
         // What the CPU says it is deliberately waiting for, if anything.
         waiting: f.controller.waiting ?? null, vx: f.body.vx,
       });

@@ -1125,9 +1125,9 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   session.projectiles.push({ alive: true });
   session.clones.push({ alive: true });
   old.combat.launchPoint = 30;
-  // #0001's techniques leave no cooldown; one is left behind by hand, as a
-  // fighter's whose technique cools down would.
-  assert.equal(old.combat.abilityCooldowns.active('attack4'), true);
+  // Still casting, it has no cooldown yet (one starts as it releases); one
+  // is left behind by hand, as a released technique's would be.
+  assert.equal(old.combat.abilityCooldowns.active('attack4'), false);
   old.combat.abilityCooldowns.start('attack4', 14);
 
   screen.openMenu();
@@ -2097,7 +2097,7 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
 
 // ---- Summon and technique cooldowns and the Void ---------------------------
 
-test('the CPU taken out or changed during a summoning startup: no clone, never at the new CPU, and the Attack 3 cooldown runs on', () => {
+test('the CPU taken out or changed during a summoning startup: no clone, never at the new CPU, and no cooldown for a summon never released', () => {
   // A fighter whose Attack 3 summons after a startup of its own (the
   // loadout matrix's Case D, see tests/fighters/fixtures/loadout-fighters.mjs).
   const summoner = LOADOUT_CASES.find((c) => c.name === 'D').def;
@@ -2113,7 +2113,7 @@ test('the CPU taken out or changed during a summoning startup: no clone, never a
     else session.setCPU(DEF_9999, fakeSprites());
     assert.equal(player.pendingSummon, null, `${change}: the startup is cut short`);
     assert.equal(player.state, 'idle', `${change}: free at once`);
-    assert.ok(player.combat.abilityCooldowns.active('attack3'), `${change}: the accepted use keeps its cooldown`);
+    assert.equal(player.combat.abilityCooldowns.active('attack3'), false, `${change}: no clone, so no cooldown`);
     run({}, startupSteps(summoner, 'attack3') + 60);
     assert.deepEqual(session.clones, [], `${change}: no clone, at the old CPU or the new one`);
     assert.deepEqual(player.summons, []);
@@ -2130,7 +2130,8 @@ test('a Practice Void respawn is a fresh training state: 0 Launch Point, full En
   run({}, 2);
   run({ attack5: true, attack5Pressed: true });
   const cd = player.combat.abilityCooldowns;
-  // Both accepted techniques are still cooling; lengthen them to span the respawn.
+  until(() => player.technique?.released, 400);
+  // Both released techniques are cooling; lengthen them to span the respawn.
   assert.equal(cd.size, 2);
   cd.start('attack4', 14);
   cd.start('attack5', 12);

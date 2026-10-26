@@ -1,6 +1,6 @@
 // World-space Energy and long cooldown status, the Special ability mark, the
-// charm mark and the fear mark. Ready moves and baseline repeat delays draw
-// nothing. Each
+// charm mark and the fear mark. Ready moves draw nothing (an ordinary move
+// has no cooldown at all; a 3 s or 5 s one shows from its release). Each
 // long timer has its shared ability artwork in the center, original colors
 // intact, with remaining seconds underneath. The Special ability mark is an
 // orange exclamation mark over a fighter while it performs one of its
@@ -14,7 +14,6 @@
 import { COMBAT_BUTTONS } from '../../config.js';
 import { specialAction } from '../../data/loadout.js';
 import { abilityMove, previewFrame } from '../../data/ability-preview.js';
-import { REPEAT_COOLDOWN } from '../../data/cooldowns.js';
 import { drawCenteredFrame } from './sprite-normalizer.js';
 
 // Energy bar: one thin, bright purple fill on a dark track with a black
@@ -61,7 +60,8 @@ export function energyBarState(fighter) {
   };
 }
 
-// Long cooldowns in control order, including ordinary attacks. Ground and
+// Running cooldowns (only 3 s and 5 s ones exist) in control order,
+// attacks included. Ground and
 // air variants keep their own timers and preview context. No entry at ready.
 export function cooldownIndicators(fighter) {
   const list = [];
@@ -73,7 +73,7 @@ export function cooldownIndicators(fighter) {
       const timers = fighter.combat.abilityCooldowns;
       const remaining = special ? timers.remaining(id) : fighter.combat.cooldowns.get(id) ?? 0;
       const duration = special ? timers.duration(id) : fighter.attacks[id]?.cooldown;
-      if (!(remaining > 0 && duration > REPEAT_COOLDOWN)) continue;
+      if (!(remaining > 0 && duration > 0)) continue;
       list.push({ id, preview: previewFrame(fighter.def, action, id !== abilityMove(fighter.def, action)),
         progress: Math.min(1, Math.max(0, 1 - remaining / duration)), text: formatCooldown(remaining) });
     }

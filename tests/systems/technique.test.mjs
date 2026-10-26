@@ -5,7 +5,7 @@
 // round itself (with art of its own as it goes out), or both. Its timing is
 // its clips', its facing is snapshotted as it starts, it needs the ground
 // throughout, a hit breaks
-// it, and its cooldown runs from its start. Checked on a test-only caster
+// it, and its cooldown (a 3 s or 5 s one) runs from its release, never its start. Checked on a test-only caster
 // (#0001's body and clips, re-timed, with a technique of its own) through
 // the real Fighter, projectiles and CombatSystem (see
 // tests/helpers/fighter-harness.mjs).
@@ -155,9 +155,7 @@ test('a hit during the cast breaks it and nothing is released; one after the rel
   assert.equal(early.attacker.technique, null);
   assert.equal(t.endReason, 'hit');
   assert.equal(t.released, false);
-  assert.ok(early.attacker.combat.abilityCooldowns.active('attack4'), 'its cooldown runs on all the same');
-  early.tick(P('attack4'));
-  assert.equal(early.attacker.technique, null, 'broken: no fresh cast escapes its cooldown');
+  assert.equal(early.attacker.combat.abilityCooldowns.active('attack4'), false, 'never released: no cooldown');
   for (let i = 0; i < steps(CAST + RELEASE); i++) early.tick();
   assert.deepEqual(early.projectiles, [], 'nothing came of it');
   // In its release pose: the orb is out and flies on.
@@ -204,14 +202,19 @@ const PARALYZER = {
 };
 const PARALYZER_SPRITES = fakeSpritesOf(PARALYZER);
 
-test('its cooldown runs from its start; a press while it runs, in the air or mid-attack does nothing at all', () => {
+test('its cooldown runs from its release, never its press; a press while it runs, in the air or mid-attack does nothing at all', () => {
   const { fighter, step } = makeFighter({ character: PARALYZER, sprites: PARALYZER_SPRITES });
   assert.equal(fighter.techniqueDefs.attack4.cooldown, 3, 'a paralysis: the policy\'s 3 s');
-  assert.equal(caster().fighter.techniqueDefs.attack4.cooldown, 0.5, 'the plain caster: only the repeat delay');
+  assert.equal(caster().fighter.techniqueDefs.attack4.cooldown, 0, 'the plain caster: no cooldown at all');
   step({});
   step(P('attack4'));
   const cd = fighter.combat.abilityCooldowns;
-  assert.equal(cd.remaining('attack4'), 3, 'started on the press step');
+  assert.equal(cd.active('attack4'), false, 'nothing on the press step');
+  while (!fighter.technique.released) {
+    assert.equal(cd.active('attack4'), false, 'nothing while it casts');
+    step({});
+  }
+  assert.equal(cd.remaining('attack4'), 3, 'started on the release step');
   step({});
   assert.ok(Math.abs(cd.remaining('attack4') - (3 - DT)) < 1e-9, 'running from there');
   while (fighter.technique) step({});
@@ -220,6 +223,7 @@ test('its cooldown runs from its start; a press while it runs, in the air or mid
   assert.equal(fighter.combat.attack, null, 'and no other move instead');
   for (let i = 0; i < steps(3); i++) step({});
   assert.equal(cd.active('attack4'), false);
+  assert.equal(fighter.combat.energy, 100, 'a 3 s technique pays no Energy');
   // In the air: nothing.
   step(P('jump'));
   for (let i = 0; i < 6; i++) step({});
@@ -294,7 +298,7 @@ test('a hit before it lets go breaks it and heals nothing', () => {
   assert.equal(d.attacker.technique, null);
   for (let i = 0; i < steps(CAST + RELEASE); i++) d.tick();
   assert.equal(d.attacker.combat.launchPoint, 31, 'only the hit counted');
-  assert.ok(d.attacker.combat.abilityCooldowns.active('attack4'), 'its cooldown runs on all the same');
+  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), false, 'never released: no cooldown');
 });
 
 // ---- The burst's art --------------------------------------------------------------------
