@@ -46,8 +46,8 @@ ground) or an air dash (in the air) is tried, or buffered; a technique
 advances; the Shield goes up or down (on the ground only); then
 horizontal movement is chosen, in priority: standing still (a summon's
 startup, a technique's cast, a paralysis), the hitstun drift, the Dash's
-or the air dash's speed (an air dash also holds the fall off), Combat
-Assist's approach, the Shield's stand (no steering at all), an attack's
+or the air dash's speed (an air dash also holds the fall off), the
+Shield's stand (no steering at all), an attack's
 own motion, an attack's steering, or normal steering.
 Then the jump (buffered, with coyote time), the air jump, the higher
 jump's lift and the fast fall; then the body is integrated and collided;
@@ -117,11 +117,6 @@ away:
   into the attack. The player then steers it on from there, as its tier
   allows. A planted attack is a choice its data makes (the `planted`
   tier, a `momentum` of 0), never the default.
-- **Combat Assist.** Its approach hands its fighter into the attack at a
-  run (top speed toward the target, the horizontal share of its heading in
-  the air), never stopped dead: the approach's own Dash speed is the
-  assist's and is spent; the attack keeps its share of the run as any
-  attack does.
 - **Dashes.** A Dash or air dash goes at its speed or at the fighter's own
   speed that way if that is faster: it never slows anyone down. When it
   ends (run out, cut short, or stopped by a wall or the ground) the
@@ -204,9 +199,9 @@ defaults to standing still. A plunge's or a lift's drift (a `slam`,
 `bounce` or `rise`) is the motion's own: its `airTopSpeed` is its
 `airControl`, exactly as authored. Steering works in every phase (startup,
 strike, recovery); a direction held also turns the attack (7.2.2 of the
-specification), so steering back turns it and carries it the new way.
-Combat Assist's attack is the exception: the run held since before the
-request neither turns nor steers it until another direction is held.
+specification), so steering back turns it and carries it the new way
+(with Automatic turn-around on, the attack faces its enemy instead and the
+direction held only steers it: see below).
 
 `lockMovement: false` keeps normal locomotion throughout. An attack with
 a `motion` of its own (a homing dash, a plunge, a lift, a roll, a hover)
@@ -262,23 +257,16 @@ one in the air that no air dash answers, which is the Dash if the fighter
 lands in time. One refused on the ground for any other reason (no
 Energy, the Shield held, no art) is used up.
 
-**Combat Assist's approach.** The human player's melee press made just out
-of reach may close the gap first ([combat](combat.md#combat-assist)), on
-the Dash's own numbers on the ground and the air dash's in the air: at
-most one Dash's (or air dash's) travel (`assistRange` in
-[`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js)),
-at up to `dashSpeed` (or `airDashSpeed`), its `mouvment` (or
-`midair_mouvment`) clip played at that movement's rate, for no Energy at
-all (it moves like a Dash but is none).
-In the air it goes straight at the target, down, up or across, with no
-fall, and uses up the airtime's air dash. It is not a Dash (`fighter.combatAssist`, never
-`fighter.dash`): it covers only the distance the attack needs, ends by
-starting that attack at a run (see [momentum](#3-momentum)), and a jump, a Dash
-request (which then Dashes as above), the Shield, the Deflect or another
-move cancels it at any time, with no `dashCancelTime` to wait out. One on
-the ground never leaves it: an approach that would end past a ledge does
-not start, and one whose target moves out over a gap stops at the edge
-rather than flying off. One in the air ends if it meets the ground.
+**Automatic turn-around.** The human player's fighter, with the setting on
+(Home › Settings › Combat, the default; [combat](combat.md#facing-and-automatic-turn-around)),
+faces the closest enemy by itself. It changes the facing only: every
+number in this guide, every velocity and every input reads exactly as with
+it off. Running away, the fighter runs backwards, still facing its enemy;
+a jump, an air jump, air steering and the fast fall carry on as ever while
+the facing follows the enemy across; a Dash or an air dash faces and goes
+its own way to its end, and the enemy is faced again the step it ends.
+Nothing ever moves the fighter toward an enemy: an attack pressed out of
+reach whiffs where it is thrown.
 
 ## 7. Landing
 
@@ -363,9 +351,7 @@ or being hit refunds airtime resources but never the repeat timer. Reset and
 respawn clear both timers; live overtime preserves them.
 
 Running, ground/air jumps, Shield and Deflect are exempt from the new baseline.
-Fast fall remains directional movement. Combat Assist only looks like a Dash:
-it neither consumes nor checks its cooldown, and still checks the requested
-attack's timer at completion.
+Fast fall remains directional movement.
 
 ## History
 
@@ -411,14 +397,15 @@ into attacks and jumps. The old values are kept in
 - [`tests/benchmarks/feel-metrics.mjs`](../../tests/benchmarks/feel-metrics.mjs)
   (by hand, not part of `node --test`): responsiveness proxies measured
   with identical scripted inputs (run → attack retention, steering
-  displacement, back-spacing, aerial drift, Dash → attack, Combat Assist's
-  handoff, Dashes per 10 s), to compare two revisions number for number.
+  displacement, back-spacing, aerial drift, Dash → attack, Dashes per
+  10 s), to compare two revisions number for number.
 - [`tests/systems/air-mouvment.test.mjs`](../../tests/systems/air-mouvment.test.mjs):
   the air dash for both fighters.
 - [`tests/systems/movement.test.mjs`](../../tests/systems/movement.test.mjs),
   [`dash.test.mjs`](../../tests/systems/dash.test.mjs),
   [`down.test.mjs`](../../tests/systems/down.test.mjs),
   [`facing.test.mjs`](../../tests/systems/facing.test.mjs),
+  [`turn-around.test.mjs`](../../tests/systems/turn-around.test.mjs),
   [`combo.test.mjs`](../../tests/systems/combo.test.mjs): the same rules,
   frame-exact, run on #0001, including the `hover` motion of its Floating
   Straight.

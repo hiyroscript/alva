@@ -425,43 +425,32 @@ test('a move spent for this airtime, or in free fall, looks unavailable, never l
   assert.match(stylesheet(), /\.ah-tile\[data-state="restricted"\] \{ border-style: dashed;/);
 });
 
-test('Combo Assist\'s queued follow-up lights its own tile while it waits, in its place only, its cooldown still shown; read, never rebuilt', () => {
-  const r = playerRig({ character: DEF_0001, gap: 900, combatAssist: false });
+test('a repeated attack press lights nothing: no queued follow-up, no queued look or wording; each tile shows only its own state', () => {
+  const r = playerRig({ character: DEF_0001, gap: 900 });
   const hud = new AbilityHUD(new Element('div'), { input: fakeInput(), settings: new Settings(null) });
   hud.bind(r.player);
   hud.setVisible(true);
-  const lit = () => ['ground', 'air'].flatMap((p) => tiles(hud, p).filter((t) => t.el.classList.contains('is-queued')).map((t) => `${p}:${t.entry.move}`));
-  r.tick(press('attack1'));
-  hud.update(r.player);
-  assert.deepEqual(lit(), [], 'nothing queued yet');
   const red = tileOf(hud, 'ground', 'attack2');
   const nodes = tiles(hud, 'ground').map((t) => t.el);
+  r.tick(press('attack1'));
   r.player.combat.cooldowns.set('attack2', 0.1);
+  // Attack 1 pressed again while it plays: nothing waits to follow it.
   r.tick(press('attack1'));
   hud.update(r.player);
-  assert.deepEqual(lit(), ['ground:attack2'], 'Red, on the ground row, and nothing else');
-  assert.equal(red.el.dataset.state, 'repeat', 'its cooldown still shows: queued is never ready');
-  assert.match(red.el.getAttribute('aria-label'), /^Red: .*, queued next$/);
-  // Nothing changed, nothing written.
-  let writes = 0;
-  const setAttribute = red.el.setAttribute.bind(red.el);
-  red.el.setAttribute = (...args) => { writes++; setAttribute(...args); };
+  for (const place of ['ground', 'air']) {
+    for (const tile of tiles(hud, place)) {
+      assert.equal(tile.el.classList.contains('is-queued'), false, `${place}:${tile.entry.move}`);
+      assert.doesNotMatch(tile.el.getAttribute('aria-label'), /queued/, `${place}:${tile.entry.move}`);
+      assert.equal(Object.hasOwn(abilityStatus(r.player, tile.entry, place), 'queued'), false, 'no queued status at all');
+    }
+  }
+  assert.equal(red.el.dataset.state, 'repeat', 'its cooldown still shows');
+  assert.equal(r.player.queuedFollowUp, undefined, 'the fighter keeps no follow-up');
+  r.until(() => !r.player.combat.attack);
   hud.update(r.player);
-  assert.equal(writes, 0, 'no per-frame rewrite');
-  setLanguage('fr');
-  hud.update(r.player);
-  assert.match(red.el.getAttribute('aria-label'), /enchaînement prévu$/);
-  setLanguage('en');
-  // Gone once Red starts.
-  while (r.player.combat.attack?.def.id === 'attack1') r.tick();
-  hud.update(r.player);
-  assert.equal(r.player.combat.attack?.def.id, 'attack2');
-  assert.deepEqual(lit(), [], 'gone once it starts');
+  assert.equal(r.player.combat.attack, null, 'nothing followed the Jab');
   assert.deepEqual(tiles(hud, 'ground').map((t) => t.el), nodes, 'the same tiles throughout');
-  // A steady edge: no animation of its own, so reduced motion has nothing to stop.
-  const rule = stylesheet().match(/\.ah-tile\.is-queued \{[^}]*\}/)?.[0];
-  assert.ok(rule, 'styled');
-  assert.doesNotMatch(rule, /animation|transition/);
+  assert.doesNotMatch(stylesheet(), /is-queued/, 'no queued styling left');
   hud.destroy();
 });
 

@@ -3,8 +3,8 @@
 // (imported by the *.test.mjs files; not a test file itself). The player's
 // fighter is driven by a real PlayerController, so it is the human
 // player's in every way the Fighter reads (Fighter.playerControlled,
-// combatAssistOn, comboAssistOn); `controller` swaps in any other one (a
-// CPU's, or a bare one with no kind) to compare.
+// automaticTurnAround); `controller` swaps in any other one (a CPU's, or a
+// bare one with no kind) to compare.
 import { CONFIG } from '../../js/config.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { PlayerController, blankInput } from '../../js/game/fighters/fighter-controller.js';
@@ -20,20 +20,20 @@ export const FLAT = new StageCollision(stageMap());
 // This step's input with `actions` pressed (held, and their press edge).
 export const press = (...actions) => Object.fromEntries(actions.flatMap((a) => [[a, true], [`${a}Pressed`, true]]));
 
-// The player (Combat Assist `combatAssist`, Combo Assist `comboAssist`) at
-// `x` facing right, its opponent `gap` units to its right facing it (no
+// The player (Automatic turn-around `automaticTurnAround`, on as in the
+// game unless given false) at `x` facing right, its opponent `gap` units to its right facing it (no
 // controller by default: a training dummy). `tick(input)` feeds the player
 // one input snapshot (anything left out is not held) and the opponent
 // `foeInput` when it has a controller of the rig's own (`foeHeld`).
 export function playerRig({
-  character, foeCharacter = character, gap = 200, x = 800, stage = FLAT, combatAssist = true, comboAssist = true,
+  character, foeCharacter = character, gap = 200, x = 800, stage = FLAT, automaticTurnAround = true,
   controller, foeController = null, sprites, foeFacing = -1,
 } = {}) {
   const held = {};
   const input = { sample: () => ({ ...blankInput(), ...held }) };
   const player = new Fighter({
     def: character, sprites: sprites ?? fakeSpritesOf(character), stage, slot: 'p1', label: 'P1',
-    spawn: { x, facing: 1 }, controller: controller ?? new PlayerController(input, { combatAssist, comboAssist }),
+    spawn: { x, facing: 1 }, controller: controller ?? new PlayerController(input, { automaticTurnAround }),
   });
   const foe = new Fighter({
     def: foeCharacter, sprites: fakeSpritesOf(foeCharacter), stage, slot: 'p2', label: 'CPU',
@@ -54,7 +54,7 @@ export function playerRig({
     for (const f of live) f.update(DT, ctx);
     separateFighters(player, foe, stage);
     for (const f of live) resolveSolidOverlap(f.body, stage);
-    for (const f of live) f.updateAttackFacing();
+    for (const f of live) f.settleFacing();
     spawnProjectiles(live, projectiles);
     for (const p of projectiles) p.update(DT, stage);
     clashProjectiles(projectiles);

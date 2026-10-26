@@ -49,7 +49,8 @@ fighter and the combat system decide what those inputs do, so the CPU
 cannot attack while stunned, skip recovery, bypass a cooldown, Dash while
 exhausted or spawn anything. It never writes to a fighter, never reads the
 player's raw input or the DOM, never uses the wall clock, and never has
-Combat Assist. Every random draw comes from its injected seeded RNG.
+the player's Automatic turn-around (its attacks are aimed by its own
+`attackFacing`). Every random draw comes from its injected seeded RNG.
 
 ## From the match to the buttons
 

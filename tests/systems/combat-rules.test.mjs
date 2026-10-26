@@ -2,8 +2,8 @@
 // The shared combat rules, for every registered fighter and every kind of
 // hit at once (each one's own system has its own tests too): Energy (100
 // for everyone; 25 for any Dash, air dash or Dash cancel; 15 for any
-// Deflect; 15 for any block, a perfect one's included; nothing for Combat
-// Assist; nothing back for any defense), damage (1, 3, 5 or 10, every hit
+// Deflect; 15 for any block, a perfect one's included; nothing back for
+// any defense), damage (1, 3, 5 or 10, every hit
 // that can land), difficulty (the CPU's judgement only, never a number of
 // the fight), cooldowns (the shared baseline and longer per-move overrides) and movement (one baseline). Runs the real Fighter, CombatSystem,
 // combat AI, Battle and Practice Ground (see tests/helpers/fighter-harness.mjs).

@@ -201,17 +201,16 @@ its attacks' `momentum`).
 What it does bring is art: a `mouvment` clip for the Dash and a
 `midair_mouvment` clip for the air dash (each is played once across the
 universal Dash, whatever its frame count). Every playable fighter needs
-both, so every playable fighter has the same capabilities. The same two
-clips are what the human player's Combat Assist plays as it closes in
-before a melee attack, on the ground and in the air
-([combat](../systems/combat.md#combat-assist)): that needs nothing else
-from a fighter, as an attack's own `hitbox` (and no `projectile`) is what
-makes it melee.
+both, so every playable fighter has the same capabilities. Facing needs
+nothing of a fighter either: the human player's Automatic turn-around
+([combat](../systems/combat.md#facing-and-automatic-turn-around)) works
+for every fighter, now and later, from its body's position alone, and an
+attack's own `hitbox` (and no `projectile`) is what makes it melee.
 
 Optionally `energy: { regen }`, its refill rate per second (12 when left
 out). That is all a fighter sets of its Energy: the bar (100) and every
-cost (a Dash, an air dash or a Dash cancel 25, a Deflect 15, a block 15;
-Combat Assist nothing) are the same for everyone, and a definition that
+cost (a Dash, an air dash or a Dash cancel 25, a Deflect 15, a block 15)
+are the same for everyone, and a definition that
 writes another is refused ([Energy](../systems/energy.md)).
 Optionally too `launchReaction` (extra stun, tumble,
 steering; [launch](../systems/launch.md#launch-reaction-per-fighter)) and

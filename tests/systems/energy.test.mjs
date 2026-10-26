@@ -3,7 +3,7 @@
 // every fighter, spent only by the Dash and the air dash (20 as either
 // starts, a Dash cancel included), the Deflect (15 as it starts) and the
 // Shield (15 for each hit it blocks, a perfect block's included); never by
-// Combat Assist. Its rules, clamping, its one passive
+// anything else. Its rules, clamping, its one passive
 // refill rate, what each action costs, spending more than is left (it
 // still happens, and empties the bar), the exhaustion lockout that only a
 // full refill clears, and the one bright purple bar. Uses the real Fighter,

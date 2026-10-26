@@ -16,8 +16,8 @@
 //
 // Every string is a translation key (js/localization/i18n.js); the touch controls
 // use the player's saved scheme and custom layout, read on every entry, as
-// is the player's Combat Assist (Home › Settings › Combat), for Player 1's
-// fighter only: the practice CPU never has it.
+// is the player's Automatic turn-around (Home › Settings › Combat), for
+// Player 1's fighter only: the practice CPU never has it.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -244,8 +244,7 @@ export class PracticeGroundScreen extends Screen {
       sprites,
       input: app.input,
       reducedMotion: app.device.reducedMotion,
-      combatAssist: app.settings.combatAssist,
-      comboAssist: app.settings.comboAssist,
+      automaticTurnAround: app.settings.automaticTurnAround,
     });
     // The CPU is on from the start: the same fighter and the same sprite
     // set (one load for both), at the CPU spawn facing Player 1, paired

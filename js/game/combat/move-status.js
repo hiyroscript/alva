@@ -8,9 +8,7 @@
 // (js/game/combat/combat-state.js).
 // Outputs: abilityGroups (which moves each place shows, in control order),
 // moveCooldown (one move's cooldown as the combat state holds it),
-// moveQueued (whether it is Combo Assist's queued follow-up),
-// abilityStatus (a move's cooldown, any other restriction on it and whether
-// it is queued),
+// abilityStatus (a move's cooldown and any other restriction on it),
 // activeMove (the move being performed now) and activeSpecialAbility (that
 // move, when the fighter classifies it as Special).
 // Important constraints: nothing here writes or keeps time. Every value is
@@ -117,26 +115,15 @@ export function moveRestriction(fighter, entry, place) {
   return null;
 }
 
-// Whether move `entry` (from abilityGroups) in `place` is the follow-up
-// Combo Assist has queued for `fighter` (Fighter.queuedFollowUp): asked
-// for, waiting for the attack in progress to play out. Never a sign that it
-// will start: its cooldown and restrictions are read apart, and it is tried
-// by the ordinary rules when its turn comes.
-export function moveQueued(fighter, entry, place) {
-  const q = fighter.queuedFollowUp;
-  return !!q && q.place === place && q.move === entry.move;
-}
-
 // Everything a reader shows for `entry` in `place`: { action, move,
-// special, cooldown (moveCooldown), restriction (moveRestriction), queued
-// (moveQueued), ready }. `ready` is neither cooling nor restricted (whether
+// special, cooldown (moveCooldown), restriction (moveRestriction), ready }.
+// `ready` is neither cooling nor restricted (whether
 // the fighter is free to act at this instant is its own business: a hit or
 // an attack in progress holds every move alike).
 export function abilityStatus(fighter, entry, place) {
   const cooldown = moveCooldown(fighter, entry.move, entry.special);
   const restriction = moveRestriction(fighter, entry, place);
-  const queued = moveQueued(fighter, entry, place);
-  return { ...entry, cooldown, restriction, queued, ready: !cooldown.cooling && !restriction };
+  return { ...entry, cooldown, restriction, ready: !cooldown.cooling && !restriction };
 }
 
 // The move `fighter` is performing at this instant, by its codename, or

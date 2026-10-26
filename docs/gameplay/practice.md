@@ -37,11 +37,10 @@ unavailable, with Back to Home.
 - **Ability HUD.** With a keyboard or a controller, the practice
   fighter's moves show in the bottom-right corner, as in Quick Battle
   ([input](../systems/input.md#the-ability-hud)): art over input, ground
-  and air rows on a wheel, cooldowns read from the fighter, Combo
-  Assist's queued follow-up lit. The Practice
+  and air rows on a wheel, cooldowns read from the fighter. The Practice
   menu and its rosters fade it out; Change Fighter replaces its whole
   moveset at once. On a touch screen the touch buttons show the same
-  cooldowns and queued follow-up instead.
+  cooldowns instead.
 - **Change Fighter** opens the full roster as a large glass dialog over the
   paused stage. It is the same roster component as Select Fighter
   (`js/ui/fighter-roster.js`). Confirming swaps the fighter in place at the
@@ -51,9 +50,12 @@ unavailable, with Back to Home.
 - **Practice CPU.** Change CPU opens a second copy of the roster dialog
   (Change CPU, or Select CPU once it is disabled). Confirming loads that
   fighter and puts it 320 units to your right, facing you, labelled CPU, and
-  resumes; the camera frames you both.
-  It is a training dummy with no controller: it never moves, jumps, attacks
-  or defends, but it takes real hits, hitstun, launches, pulls and
+  resumes; the camera frames you both. With Automatic turn-around on (the
+  default) your fighter faces it wherever it is, through every Change
+  Fighter and Change CPU; with no CPU your facing is your own until one is
+  back.
+  It is a training dummy with no controller: it never moves, jumps, attacks,
+  defends or turns, but it takes real hits, hitstun, launches, pulls and
   paralysis, so every move lands on it: attacks, projectiles, clones and
   techniques. Its
   Launch Point builds up with hits (and launching hits send it further)

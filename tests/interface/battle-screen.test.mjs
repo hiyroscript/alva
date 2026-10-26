@@ -1238,9 +1238,9 @@ test('Battle updates touch context after the player simulation, never from the o
   assert.equal(screen.touch.buttons.get('attack1')._sprite, image);
 });
 
-// ---- Combat Assist ------------------------------------------------------------------
+// ---- Automatic turn-around --------------------------------------------------------
 
-test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; its CPU and Watch Mode\'s never have it', () => withTestFighters([TEST_A], async () => {
+test('Quick Battle gives Player 1 the saved Automatic turn-around, read on every entry; its CPU and Watch Mode\'s never have it', () => withTestFighters([TEST_A], async () => {
   globalThis.Path2D ??= class {
     constructor() {
       return new Proxy(this, { get: (t, k) => (k in t ? t[k] : () => {}) });
@@ -1265,25 +1265,28 @@ test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; 
     assert.ok(screen.battle, 'a Battle was built');
     return screen.battle;
   };
-  assert.equal(app.settings.combatAssist, false, 'nothing stored: off');
+  assert.equal(app.settings.automaticTurnAround, true, 'nothing stored: on');
   let battle = await enter();
   assert.equal(battle.p1.controller.kind, 'player');
-  assert.equal(battle.p1.combatAssistOn, false);
-  app.settings.set('combatAssist', true);
-  battle = await enter();
-  assert.equal(battle.p1.combatAssistOn, true, 'read afresh on entry');
+  assert.equal(battle.p1.controller.automaticTurnAround, true);
+  assert.equal(battle.p1.automaticTurnAround, true);
   assert.ok(battle.p2.controller instanceof CombatAIController);
-  assert.equal(battle.p2.combatAssistOn, false, 'never the CPU');
-  app.settings.set('combatAssist', false);
+  assert.equal(battle.p2.automaticTurnAround, false, 'never the CPU');
+  assert.equal(battle.p2.controller.automaticTurnAround, undefined, 'the CPU\'s controller never carries it');
+  for (const gone of ['combatAssist', 'comboAssist']) assert.equal(battle.p1.controller[gone], undefined, gone);
+  app.settings.set('automaticTurnAround', false);
   battle = await enter();
-  assert.equal(battle.p1.combatAssistOn, false, 'read afresh on entry');
-  app.settings.set('combatAssist', true);
+  assert.equal(battle.p1.automaticTurnAround, false, 'read afresh on entry');
+  app.settings.set('automaticTurnAround', true);
   battle = await enter();
-  assert.equal(battle.p1.combatAssistOn, true);
+  assert.equal(battle.p1.automaticTurnAround, true, 'read afresh on entry');
+  // A restart and a rematch keep the session's controllers.
+  battle.restart();
+  assert.equal(battle.p1.automaticTurnAround, true, 'after a restart');
   // Watch Mode: no player, so nobody has it, whatever is saved.
   battle = await enter({ mode: 'watch' });
-  assert.equal(battle.p1.combatAssistOn, false, 'CPU 1');
-  assert.equal(battle.p2.combatAssistOn, false, 'CPU 2');
+  assert.equal(battle.p1.automaticTurnAround, false, 'CPU 1');
+  assert.equal(battle.p2.automaticTurnAround, false, 'CPU 2');
   assert.ok(battle.p1.controller instanceof CombatAIController && battle.p2.controller instanceof CombatAIController);
   screen.exit?.();
 }));

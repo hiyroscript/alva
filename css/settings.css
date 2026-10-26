@@ -110,13 +110,11 @@
   color: var(--text-strong);
 }
 .settings-group-note { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
-/* Match ENERGY_STYLE.fill in js/game/rendering/fighter-status.js. */
-.settings-energy { font-weight: 700; color: #b026ff; }
 .settings-subgroup { display: grid; gap: 8px; }
 .settings-subtitle { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
 
-/* Language, and Combat Assist's On / Off: two self-named choices, the
-   chosen one ticked and outlined. */
+/* Language, and Automatic turn-around's On / Off: two self-named choices,
+   the chosen one ticked and outlined. */
 .settings-languages, .settings-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); }
 .settings-language, .settings-choice {
   display: flex;

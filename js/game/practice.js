@@ -9,8 +9,9 @@
 //
 // The practice CPU is a training dummy: it has no controller, so it never
 // moves, jumps, attacks or shields of its own accord (Fighter falls
-// back to neutral input), and keeps its spawn's facing: like every fighter
-// it never turns toward its opponent by itself. It is otherwise a normal
+// back to neutral input), and keeps its spawn's facing: it never turns
+// toward its opponent by itself (Automatic turn-around is the player's
+// alone). It is otherwise a normal
 // fighter: it takes real hits, hitstun, launches and paralysis, collides, and
 // the camera frames it as the secondary fighter. Its Launch Point builds up
 // with hits and recovers between them like anyone's, shown on
@@ -51,16 +52,14 @@ export function formatDamage(damage) {
 }
 
 export class PracticeSession extends Arena {
-  // `combatAssist` and `comboAssist` are the player's Combat Assist and
-  // Combo Assist settings (Combat Assist off unless given true, Combo
-  // Assist on unless given false, as the settings' defaults), for Player 1's
-  // controller only: the practice CPU has no controller, so it never has
-  // either.
-  constructor({ canvas, map, def, sprites, input, reducedMotion = false, combatAssist = false, comboAssist = true }) {
+  // `automaticTurnAround` is the player's Automatic turn-around setting (on
+  // unless given false, as the settings' default), for Player 1's
+  // controller only, every fighter the player swaps in included: the
+  // practice CPU has no controller, so it never has it.
+  constructor({ canvas, map, def, sprites, input, reducedMotion = false, automaticTurnAround = true }) {
     super({ canvas, map, input, reducedMotion });
     this.reducedMotion = reducedMotion;
-    this.combatAssist = combatAssist === true;
-    this.comboAssist = comboAssist === true;
+    this.automaticTurnAround = automaticTurnAround === true;
     this.player = null;
     this.cpu = null;
     // Live damage numbers over the CPU, oldest first:
@@ -71,22 +70,21 @@ export class PracticeSession extends Arena {
 
   // Puts `def` on the training floor as the practice fighter, replacing the
   // current one: a fresh Fighter at the stage's spawn with 0 Launch Point and
-  // no cooldowns, driven by Player 1 at once (with the session's Combat
-  // Assist and Combo Assist settings). Nothing of the previous fighter stays: its technique
-  // ends, its summon's startup and Combat Assist's approach are cut short
-  // and its projectiles and clones go. A CPU stays as it is.
+  // no cooldowns, driven by Player 1 at once (with the session's Automatic
+  // turn-around setting). Nothing of the previous fighter stays: its
+  // technique ends, its summon's startup is cut short and its projectiles
+  // and clones go. A CPU stays as it is.
   setFighter(def, sprites) {
     const old = this.player;
     if (old) {
       old.endTechnique('destroy');
       old.cancelSummon();
-      old.cancelCombatAssist();
       old.opponent = null;
     }
     this.player = new Fighter({
       def, sprites, spawn: this.map.spawnPoints[0], stage: this.stage,
       slot: 'p1', label: 'P1',
-      controller: new PlayerController(this.input, { combatAssist: this.combatAssist, comboAssist: this.comboAssist }),
+      controller: new PlayerController(this.input, { automaticTurnAround: this.automaticTurnAround }),
     });
     this.pairFighters();
     this.projectiles.length = 0;
@@ -115,15 +113,14 @@ export class PracticeSession extends Arena {
 
   // Takes the CPU out of the session, if there is one, with every reference
   // to it: a summon's startup cast at it is cut short (its cooldown runs
-  // on), Combat Assist's approach toward it ends (its attack never comes),
-  // clones summoned at it go, and so do its numbers. Practice is then
-  // solo again.
+  // on), clones summoned at it go, and so do its numbers. Practice is then
+  // solo again (the player's Automatic turn-around has no one to face, so
+  // its facing is manual until a CPU is back).
   removeCPU() {
     const cpu = this.cpu;
     if (!cpu) return;
     const player = this.player;
     if (player.pendingSummon?.target === cpu) player.cancelSummon();
-    if (player.combatAssist?.target === cpu) player.cancelCombatAssist();
     player.summons = player.summons.filter((s) => s.target !== cpu);
     cpu.endTechnique('destroy');
     cpu.cancelSummon();

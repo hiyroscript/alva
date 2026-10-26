@@ -16,13 +16,13 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/core/controller-resolver.js`](../../js/core/controller-resolver.js) | `ControllerResolver`: Player 1's presses resolved, for the fighter and where it is, into control codenames (combinations, directions on their own stick, each stick's pushes as presses of their own, activations, one owner per press). |
 | [`js/ui/controller-cursor.js`](../../js/ui/controller-cursor.js) | The circular controller cursor, part of `MenuNavigator`. |
 | [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button and stick names, binding phrases, chips (`stickGlyph`) and the controller diagram, either stick lit on its own. |
-| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Combat Assist and Combo Assist settings, and its presses alone may cut its own attack short, see [combat](combat.md#the-players-requests)), `blankInput`, `HELD_CONTROLS`. |
+| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Automatic turn-around setting, see [combat](combat.md#facing-and-automatic-turn-around), and its presses alone may cut its own attack short, see [combat](combat.md#the-players-requests)), `blankInput`, `HELD_CONTROLS`. |
 | [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
 | [`js/ui/ability-hud.js`](../../js/ui/ability-hud.js), [`css/ability-hud.css`](../../css/ability-hud.css) | The ability HUD: Player 1's moves, their art and their keyboard or controller inputs in the bottom-right corner, on a ground / air wheel, with their cooldowns ([below](#the-ability-hud)). |
 | [`js/ui/mobile-abilities.js`](../../js/ui/mobile-abilities.js) | Which buttons a fighter has (`abilityPresence`, from its `actions`), and each button's name and frame (`previewFrame`, from its `mobileAbilities`). |
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
-| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Combat Assist and Combo Assist on or off, and each fighter's saved controller layout (the only module touching storage). |
+| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Automatic turn-around on or off, and each fighter's saved controller layout (the only module touching storage). |
 | [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges. It also owns the dialog stack (see [Dialog layers](#dialog-layers)). |
 | [`js/core/input-modality.js`](../../js/core/input-modality.js) | The input modality (mouse, touch, keyboard or gamepad) on `<html>`, which keeps hover, focus and selection apart (see [Interaction states](#interaction-states)). |
 
@@ -129,9 +129,7 @@ painted on the button itself, with no element of its own:
   `::after`) and its seconds (`data-seconds`, drawn by its `::before`);
 - `is-repeat`: the 0.5 s repeat delay, the same sweep, fainter, no number;
 - `is-spent`: spent for this airtime, free fall or missing art (dashed,
-  dimmed), apart from `is-unavailable` (a ground-only move in the air);
-- `is-queued`: Combo Assist's queued follow-up, a steady white ring, with
-  any cooldown still showing.
+  dimmed), apart from `is-unavailable` (a ground-only move in the air).
 
 Only what changed is written (each button caches what it shows), and a
 button with nothing to show is never written to; nothing animates. Another
@@ -166,22 +164,27 @@ settings migration. `down` is a control again (Down, first in each scheme's
 list): an entry saved while the old down arrow existed puts it back where
 the player had it.
 
-**Combat Assist** and **Combo Assist** (Settings → Combat), and the
-player's move cancellation, are not part of the input system: no binding,
-device or `InputManager` code knows them. Keyboard, controller and touch
-presses reach the fighter in the same snapshot as ever, one `…Pressed` edge
-per press (a key held, a touch control held or a controller button held is
-one press, never a stream: holding never strings attacks), and the Fighter
-decides what each press asks for, whether it cuts the player's attack and
-whether a melee press closes in, while the player's controller carries the
-settings ([combat](combat.md#the-players-requests)). So Combo Assist's
-queued follow-up works identically on every device: a press released and
-made again is two edges (a repeat queues the follow-up), a held control is
-one, and a controller's ground / air resolution (`pressedOnGround` /
-`pressedInAir`) decides the place a repeat counts in, as for any press. `runLeft` /
-`runRight` (the keys, the touch Run buttons and joystick, the stick) only
-hold a direction: their press edges request nothing, so Run never cancels
-an attack or Combat Assist's approach.
+**Automatic turn-around** (Settings → Combat) and the player's move
+cancellation are not part of the input system: no binding, device or
+`InputManager` code knows them, and no new control exists for them.
+Keyboard, controller and touch presses reach the fighter in the same
+snapshot as ever, one `…Pressed` edge per press (a key held, a touch
+control held or a controller button held is one press, never a stream:
+holding never strings attacks), and the Fighter decides whether each press
+cuts the player's attack, every combat button asking for its own move only
+([combat](combat.md#the-players-requests)); the player's controller carries
+the setting. So a repeat works identically on every device: a press
+released and made again during the attack is nothing, a held control is
+one press, and a controller's ground / air resolution (`pressedOnGround` /
+`pressedInAir`) decides the place a press counts in, as for any press.
+`runLeft` / `runRight` (the keys, the touch Run buttons and joystick, the
+stick) only hold a direction: their press edges request nothing, so Run
+never cancels an attack. With Automatic turn-around on, Run moves the
+fighter either way while it keeps facing its enemy; directional controller
+bindings (forward and back on a stick, the Dash with no stick pushed) read
+the facing the fighter has at that step, which is the enemy's side, so
+"forward" is toward the enemy (the facing is settled after every fighter
+has moved, before the next step's controls are resolved).
 
 ## The ability HUD
 
@@ -233,14 +236,7 @@ interface, and nothing about them changes.
   repeat delay: a faint sweep), `restricted` (spent for this airtime, free
   fall or missing art: muted, no countdown) or `ready`. Only changed values
   reach the DOM.
-- **Combo Assist's queued follow-up** (`abilityStatus(...).queued`, from
-  `Fighter.queuedFollowUp`): the tile of the move that follows the attack
-  in progress, in the row of its place, gets `is-queued` (a steady
-  brighter edge and inner ring, no motion) and "queued next" in its
-  accessible name, for as long as it waits (its own repeat delay included,
-  [combat](combat.md#combo-assists-queued-follow-up)). It is apart from the
-  state above, so a cooling move that is queued still shows its sweep. The
-  touch controls show the same states on their own buttons
+  The touch controls show the same states on their own buttons
   ([below](#touch-controls-live-move-state)).
 - **Screens.** `BattleScreen.syncAbilityHud` and
   `PracticeGroundScreen.syncAbilityHud` show it for Player 1 after each
@@ -626,10 +622,9 @@ them as a stack (`MenuNavigator.syncLayers`):
   never in the air, nothing but the fighter's own buttons), the wheel and rapid changes of
   place, the art and its fallback, keyboard keys, PlayStation and Xbox
   glyphs, a saved layout, device switching, cooldowns through changes of
-  place and on recovery, the repeat delay, airtime restrictions, Combo
-  Assist's queued follow-up (its tile only, its cooldown still shown, both
-  languages, nothing rewritten), a fighter swap, which screens show it, its
-  stylesheet and the arena's rings.
+  place and on recovery, the repeat delay, airtime restrictions, a repeated
+  press lighting nothing (no queued look or wording), a fighter swap, which
+  screens show it, its stylesheet and the arena's rings.
 - [`tests/systems/controller-devices.test.mjs`](../../tests/systems/controller-devices.test.mjs):
   identification across browsers, button names, zero / one / four / five
   controllers, unsupported devices, disconnection, reconnection, Player 1,
@@ -664,16 +659,16 @@ them as a stack (`MenuNavigator.syncLayers`):
   either stick on its own, in both languages.
 - [`tests/systems/request-devices.test.mjs`](../../tests/systems/request-devices.test.mjs):
   the keyboard, touch and a controller making the same requests: a held
-  button is one press, Combo Assist (its queued follow-up included, on the
-  ground and in the air) and move cancellation from each, Run never a
-  request.
+  button is one press, a repeat during the attack nothing and a press
+  during its cooldown never another move (on the ground and in the air),
+  and move cancellation from each, Run never a request.
 
 - [`tests/interface/controls-ui.test.mjs`](../../tests/interface/controls-ui.test.mjs):
   both layouts, the art on every button for both fighters, fallbacks, names
   in both languages, multi-touch, one press per touch (a pointer's own
   trailing click never a second one; assistive activation kept), and the
-  live move state (cooldowns, the repeat delay, a spent move, the queued
-  follow-up; nothing written when nothing changed).
+  live move state (cooldowns, the repeat delay, a spent move, nothing
+  queued; nothing written when nothing changed).
 - [`tests/interface/touch-layout.test.mjs`](../../tests/interface/touch-layout.test.mjs):
   custom layouts and the editor.
 - [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs):
