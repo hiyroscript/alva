@@ -738,8 +738,16 @@ or changes a hitbox, a range or a stun. The rules are
 - **Which way.** `turnAroundFacing()`: 1 or -1 toward it
   (`facingToward`); at the very same x, the way the fighter already faces
   (its art's way while it attacks), never 0 or NaN. Null when it does not
-  turn the fighter: the setting off, input locked, the fighter out of
+  turn the fighter: the setting off, input locked, a direction held (the
+  player is moving it, or aiming an attack that way), the fighter out of
   play, or no valid enemy; the manual rules then apply.
+- **Not while moving.** `movingSideways`: a direction held this step
+  (`steerHeld.x`), or on the ground a run or a Dash still sliding faster
+  than `TURN_SPEED` (20 units/s, the speed past which a run turns the
+  fighter by hand). While it holds, `updateFacing` and `settleFacing` leave
+  the facing to the manual rules, so the fighter faces the way it moves and
+  never walks backwards; drifting in the air with nothing held is not
+  moving.
 - **When.** Three points of every fixed step, through the one facing
   system: `updateAttackFacing` as the step starts and `faceAttackTarget`
   as an attack, a technique or a summon's startup begins (both read
@@ -817,7 +825,9 @@ or changes a hitbox, a range or a stun. The rules are
   never a string.
 - [`tests/systems/turn-around.test.mjs`](../../tests/systems/turn-around.test.mjs):
   Automatic turn-around on by default, either side, a crossing behind,
-  standing, running away and in the air (the same movement as off), Off as
+  standing and in the air, moving left or right (the manual facing, never
+  backwards, the same movement as off) and stopping, attacks pressed with
+  a direction held, Off as
   the manual rules, no enemy, one out of play, overlapping x, several
   enemies and ties, ordinary attacks, techniques and summons aimed,
   a Dash, an air dash and every motion attack keeping their course, stuns,

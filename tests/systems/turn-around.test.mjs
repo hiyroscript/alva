@@ -2,8 +2,10 @@
 // Automatic turn-around (Home › Settings › Combat, on by default): the human
 // player's fighter faces the closest valid enemy by itself, and only turns.
 // Covered here: on by default for a new player controller; the enemy on
-// either side, crossing behind, the player standing, running away and in
-// the air; Off as the manual rules exactly; no enemy, one out of play,
+// either side, crossing behind, the player standing and in the air; only
+// while not moving left or right (running, steering or sliding it faces
+// its way, never walking backwards, and turns once stopped); attacks
+// pressed with a direction held facing it; Off as the manual rules exactly; no enemy, one out of play,
 // overlapping x and several enemies (the closest, ties settled the same
 // way every time); ordinary attacks aimed at the enemy with hitbox and
 // sprite together; committed moves (a Dash, an air dash, every motion
@@ -84,14 +86,14 @@ test('the enemy on the right faces it right, on the left faces it left, and a cr
   }
 });
 
-test('running away: the player moves exactly as with it off, while it faces the enemy; Run never turns it away', () => {
+test('moving left or right it faces the way it moves, exactly as with it off (never walking backwards); stopped, it turns to the enemy', () => {
   for (const c of playableCharacters()) {
     const traces = [true, false].map((automaticTurnAround) => {
       const r = playerRig({ character: c, gap: 300, automaticTurnAround });
       const out = [];
       for (let i = 0; i < 90; i++) {
         r.tick(i < 60 ? { runLeft: true, runLeftPressed: i === 0 } : {});
-        out.push({ motion: motionOf(r.player), facing: r.player.facing, energy: r.player.combat.energy });
+        out.push({ motion: motionOf(r.player), facing: r.player.facing, moving: r.player.movingSideways, energy: r.player.combat.energy });
       }
       return { out, r };
     });
@@ -99,22 +101,33 @@ test('running away: the player moves exactly as with it off, while it faces the 
     assert.deepEqual(on.out.map((s) => s.motion), off.out.map((s) => s.motion), `#${c.id}: the same run, step for step`);
     assert.deepEqual(on.out.map((s) => s.energy), off.out.map((s) => s.energy), `#${c.id}: Energy untouched`);
     assert.ok(on.r.player.body.x < 800 - 100, `#${c.id}: it really ran away`);
-    assert.ok(on.out.every((s) => s.facing === 1), `#${c.id}: on, it faced the enemy throughout`);
-    assert.equal(off.out[30].facing, -1, `#${c.id}: off, the run turned it, as ever`);
+    on.out.forEach((s, i) => {
+      if (s.moving) assert.equal(s.facing, off.out[i].facing, `#${c.id} step ${i}: moving, the manual facing`);
+    });
+    assert.equal(on.out[30].facing, -1, `#${c.id}: running left it faces left, away from the enemy`);
+    assert.ok(on.out.slice(0, 60).every((s) => s.facing === -1 || !s.moving), `#${c.id}: never running backwards`);
+    // Let go: it slides on facing its way, then, stopped, turns to the enemy.
+    const stopped = on.out.findIndex((s, i) => i >= 60 && !s.moving);
+    assert.ok(stopped > 60, `#${c.id}: it came to a stop`);
+    assert.ok(on.out.slice(60, stopped).every((s) => s.facing === -1), `#${c.id}: sliding, still its way`);
+    assert.equal(on.out[stopped].facing, 1, `#${c.id}: stopped, it faces the enemy`);
+    assert.equal(off.out.at(-1).facing, -1, `#${c.id}: off, it never turns back by itself`);
   }
 });
 
-test('in the air: a jump, an air jump and air steering go exactly as with it off, and the facing follows the enemy across', () => {
+test('in the air: steered left or right it faces the way it steers; with nothing held it faces the enemy across, and the arc is the same as with it off', () => {
   const run = (automaticTurnAround) => {
     const r = rig({ automaticTurnAround });
     const x = r.player.body.x;
     const out = [];
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 60; i++) {
       if (i === 8) place(r.foe, x - 250);
       if (i === 30) place(r.foe, x + 250);
-      const input = i === 0 ? press('jump') : i === 20 ? press('jump') : { jump: i < 6, runLeft: i > 4 && i < 40 };
+      // A straight-up jump (nothing held), then left held from step 22 to 28,
+      // an air jump at 20.
+      const input = i === 0 ? press('jump') : i === 20 ? press('jump') : { jump: i < 6, runLeft: i >= 22 && i < 28 };
       r.tick(input);
-      out.push({ motion: motionOf(r.player), facing: r.player.facing, grounded: r.player.body.grounded, x: r.player.body.x });
+      out.push({ motion: motionOf(r.player), facing: r.player.facing, grounded: r.player.body.grounded });
     }
     return out;
   };
@@ -122,9 +135,29 @@ test('in the air: a jump, an air jump and air steering go exactly as with it off
   const off = run(false);
   assert.deepEqual(on.map((s) => s.motion), off.map((s) => s.motion), 'the same arc, step for step');
   assert.equal(on[10].grounded, false);
-  assert.equal(on[10].facing, -1, 'the enemy now on its left: faces left, in the air');
-  assert.equal(on[25].grounded, false, 'still in the air after the air jump');
-  assert.equal(on[32].facing, 1, 'the enemy back on the right: faces right, mid-air');
+  assert.equal(on[10].facing, -1, 'nothing held, the enemy on its left: faces left, in the air');
+  assert.equal(off[10].facing, 1, 'off: never turned');
+  assert.equal(on[25].facing, -1, 'left held in the air: faces left, its way');
+  assert.equal(on[33].grounded, false, 'still in the air');
+  assert.equal(on[33].facing, 1, 'nothing held, the enemy back on the right: faces right, mid-air');
+});
+
+test('an attack pressed or turned with a direction held faces that direction, as by hand; with nothing held it faces the enemy', () => {
+  const away = rig({ gap: -60 });
+  away.player.facing = -1;
+  away.tick({ ...press('attack1'), runRight: true });
+  assert.equal(away.player.combat.attack?.def.id, 'attack1');
+  assert.equal(away.player.facing, 1, 'right held: it strikes right, away from the enemy on its left');
+  away.tick({ runRight: true });
+  assert.equal(away.player.facing, 1, 'held on: still right');
+  away.tick();
+  assert.equal(away.player.facing, -1, 'let go mid-attack: it turns to the enemy');
+  away.tick({ runRight: true });
+  assert.equal(away.player.facing, 1, 'held again: right again');
+  const still = rig({ gap: -60 });
+  still.player.facing = 1;
+  still.tick(press('attack1'));
+  assert.equal(still.player.facing, -1, 'nothing held: it strikes the enemy behind it');
 });
 
 // ---- Off ------------------------------------------------------------------------------
@@ -168,10 +201,11 @@ test('no enemy: nothing turns it and nothing fails; its facing is manual until a
   assert.equal(r.player.turnAroundFacing(), null);
   for (let i = 0; i < 20; i++) r.tick({ runRight: true });
   assert.equal(r.player.facing, 1, 'Run turns it, as ever');
+  r.until(() => !r.player.movingSideways);
   r.player.opponent = r.foe;
   place(r.foe, r.player.body.x - 200);
   r.tick();
-  assert.equal(r.player.facing, -1, 'an enemy back: faced at once');
+  assert.equal(r.player.facing, -1, 'an enemy back, the fighter still: faced at once');
 });
 
 test('an enemy out of play (lost to the Void, waiting to respawn) is never faced: no turn, no error, until it is back', () => {
@@ -331,7 +365,7 @@ test('a technique and a summon\'s startup start facing the enemy too', () => {
 
 // ---- Committed moves --------------------------------------------------------------------
 
-test('a Dash and an air dash keep their own way: the enemy behind never turns or slows them, and it is faced again once they end', () => {
+test('a Dash and an air dash keep their own way: the enemy behind never turns or slows them, and it is faced again once they end and the fighter has stopped', () => {
   for (const air of [false, true]) {
     const why = air ? 'air dash' : 'Dash';
     const run = (automaticTurnAround) => {
@@ -354,8 +388,14 @@ test('a Dash and an air dash keep their own way: the enemy behind never turns or
     const off = run(false);
     assert.deepEqual(on.out, off.out, `${why}: the same, step for step, its facing included`);
     assert.ok(on.out.every((s) => s.facing === -1), `${why}: facing its own way throughout, the enemy behind it`);
+    // Sliding on from a ground Dash it still faces its way; once still (or
+    // drifting in the air with nothing held) it faces the enemy.
+    for (let i = 0; i < 120 && on.r.player.movingSideways; i++) {
+      assert.equal(on.r.player.facing, -1, `${why}: still sliding its way`);
+      on.r.tick();
+    }
     on.r.tick();
-    assert.equal(on.r.player.facing, 1, `${why}: over, it faces the enemy again`);
+    assert.equal(on.r.player.facing, 1, `${why}: over and still, it faces the enemy again`);
   }
 });
 

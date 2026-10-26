@@ -115,8 +115,10 @@ blocks every attack.
   fighter, and a layout of your own for every fighter (Settings ›
   Controls › Controller controls).
 - **Automatic turn-around** for the human player (on by default, in
-  Settings › Combat): the fighter faces the closest enemy by itself,
-  standing, running either way or in the air. It only turns: movement,
+  Settings › Combat): whenever the fighter isn't moving left or right,
+  it turns to face the closest enemy by itself, standing or in the air;
+  moving, it faces the way it goes (it never walks backwards). It only
+  turns: movement,
   attacks and combos stay entirely the player's, and a Dash or any move
   committed to a direction keeps its own way. Off, the fighter faces the
   way it moves, as ever. Never for a CPU.

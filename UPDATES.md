@@ -3357,3 +3357,24 @@ section, navigation), `i18n`, `ability-hud`, `controls-ui`,
 `facing`, `move-cancel`, `controller-input`, `ui-consistency` and the
 `player-rig` helper (the arena's facing pass) updated; the feel-metrics
 benchmark lost its assist handoff.
+
+### Follow-up: never walking backwards
+
+Asked for after the above: Automatic turn-around turns the fighter only
+when it is not moving left or right. Before, a player running away from
+its enemy ran backwards, still facing it. Now, while a direction is held,
+or while the fighter is still sliding on the ground from a run or a Dash
+(faster than `TURN_SPEED`, the 20 units/s past which a run turns a fighter
+by hand), the manual facing rules apply: it faces the way it goes. Once
+it stops, or in the air with nothing held, it turns to the closest enemy
+as before. An attack pressed or held with a direction faces that
+direction, as by hand. Movement is unchanged either way.
+
+**Code:** `js/game/fighters/fighter.js` (`TURN_SPEED`, `movingSideways`,
+`turnAroundFacing`, `updateFacing`, `settleFacing`); the specification
+(7.2.2, 7.2.4a), README, combat, movement and testing documents.
+
+**Tests:** `turn-around`: running either way faces the way it runs (the
+same facing and movement as with it off), sliding keeps it, stopping turns
+it; the air with and without a direction held; an attack with a direction
+held; the Dash and the air dash faced again once the fighter has stopped.
