@@ -1850,7 +1850,9 @@ each fighter's own values are in its character specification (7.2.9).
   `attack1` to `attack5`, each one's mid-air version `midair_attack1` to
   `midair_attack5` and one optional `extra_attack` (a throw, a projectile,
   a utility move of its own). Nothing else is a combat button: a
-  definition with an `actions` entry for any other name is refused. What the player
+  definition with an `actions` entry for any other name is refused. One
+  more move codename exists, `mash_attack`: a fighter's Mash Combo partner
+  with no button (7.2.4c), never a combat button. What the player
   calls a move (#0001's Jab, Red, Maximum Blue, Unlimited Void, Hollow
   Purple, High Kick) is its `abilityNames`, never its codename. The rules, checked for every
   definition as `js/data/characters.js` loads (`assertLoadout`; a
@@ -2863,7 +2865,10 @@ in saved settings (6.10) or on the HUD.
   queued to follow it, and nothing comes out after it (7.2.4, *The
   strict rules*). Mashing therefore plays whole attacks, each to its end
   and each again at once (an ordinary attack has no cooldown) or once its
-  3 s or 5 s cooldown is over.
+  3 s or 5 s cooldown is over. The one exception is the **Mash Combo**
+  (7.2.4c): five rapid presses of one of the fighter's two Mash Combo
+  moves' buttons on the ground set off its automatic series instead (the
+  repeats still start nothing on their own; they are counted).
 - **Combos are deliberate.** A different button pressed during an attack
   is a new request, which never cuts an attack that can harm short: it
   waits in the buffer to come out as the attack ends, or comes out in the
@@ -2887,6 +2892,87 @@ in saved settings (6.10) or on the HUD.
   launch it out of reach first. No move was retuned for either change.)
 - **Shown.** The ability HUD (7.3) and the touch buttons show cooldowns
   and restrictions only: there is no queued look.
+
+#### 7.2.4c Mash Combo
+
+A universal mechanic: every fighter has it, on every device and for the
+CPU, and it adds to the combat rules above without replacing any of them.
+Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
+`js/game/combat/mash-combo.js` and the Fighter; the guide is
+[docs/systems/combat.md](docs/systems/combat.md#mash-combo).
+
+- **The pair.** Every fighter has exactly two designated **grounded
+  close-range melee strikes**, its `mashCombo: { attacks: [A, B] }`:
+  ordinary, direct blows of its own body meant to connect at close
+  fighting distance (every strike's box within 64 units in front of it,
+  starting within 32). Never an aerial, a projectile, a summon, a
+  technique, a Special, a move with a 3 s or 5 s cooldown or an Energy
+  cost, a pull, a carry, a pass-through, a roll, a homing dash, a plunge
+  or a lift, the Deflect, or a strike reaching further: grounded melee is
+  not the same as close range (a long bite, phantom hands, tendrils, a
+  travelling tornado are melee and never close range). A Step-in no
+  faster than 400 units/s is allowed. Each move is a ground move one of
+  its buttons starts or, for a fighter whose every button is taken by
+  moves of another kind, its `mash_attack`: a close-range strike of its
+  own with no button, performed only as the series' partner turn. The
+  registry refuses a definition without a valid pair as it loads
+  (`assertMashCombo`, every problem named), now and for every future
+  fighter. A fighter may have other grounded melee moves; they
+  stay as they are.
+- **The trigger.** Five fresh presses of the same button of the pair
+  (its ground move), on the ground, each within 0.3 s of the last and all
+  five within a rolling 0.8 s, on the simulation clock. A held button is
+  one press; a key's autorepeat makes none; a press of any other combat
+  button, a press in the air, a gap too long or a hit starts the count
+  over. Presses made while the first press's move plays count (they start
+  nothing), so the five need no five whole moves. The fifth press is the
+  combo's and nothing else's. Recognized, the series starts on the first
+  step the fighter may legally start an attack: the move in progress plays
+  out unless its authored hit-confirmed window opens (never cut short
+  otherwise); one that cannot start within 0.6 s is dropped.
+- **The series.** Exactly twelve turns of exactly the two moves,
+  alternating, the mashed move first: through A, A B A B A B A B A B A B;
+  through B, B A B A B A B A B A B A. Six each; the twelfth is the
+  finisher. A turn is one whole activation of its move (a multi-hit move
+  strikes all its strikes each turn). Each turn plays twice as fast, its
+  startup, strikes, recovery, Step-in and clip together, from its first
+  frame, the next starting on the step the last ends. It never runs past
+  twelve, never loops, and presses during it never extend it or start
+  another.
+- **Launch.** Turns 1 to 11 have an effective Base Launch of 0 (every
+  strike of them): their damage still adds Launch Point, their hitstun,
+  hitstop and blockstun stay, they launch nothing. Turn 12 strikes with its
+  own Base Launch and Directional Launch, from the Launch Point the series
+  built (Base Launch × Launch Point, 7.2.7). No definition changes: outside
+  a series every move launches as authored.
+- **Non-cancellable.** Nothing the fighter's own controls ask for cuts it
+  short: no attack, Special, projectile, summon, technique, jump, Dash, air
+  dash, Shield, Deflect, hit-cancel or buffered press; and nothing pressed
+  during it (or on the step it ends) comes out after it.
+- **Interruptible.** It has no armour, invincibility or Shield bypass. A
+  hit that stuns, a paralysis, a launch, losing the ground, the Void, a
+  reset or a respawn ends it at once: the turn in progress with it, no
+  later turn, the rate and the launch rule gone, the fighter's hurt or
+  falling pose shown, its press count forgotten. A raised Shield blocks a
+  turn like any attack (a block, never a hit) and the series ends after
+  that turn. Two attacks landing on the same step still trade.
+- **Shown.** Its turns leave fading afterimages (the performing members
+  only, for a fighter drawn as several), each strike that lands a white
+  slash, the finisher a burst and a harder shake (none with reduced
+  motion); a compact counter over the fighter reads *Mash Combo 1/12* to
+  *12/12* (*Combo frénétique* in French), gold on the finisher, gone the
+  step it ends. Paint only: nothing drawn has a box or deals damage. No
+  setting turns it off, and it needs no button of its own.
+- **The CPU.** Every level can set one off, through the same five legal
+  presses (released between them, made while its first move plays), from
+  neutral against a grounded opponent in reach of both moves, or as a
+  hit-confirm while its stun holds; never against a raised Shield, from a
+  ledge at its back, onto a hazard's warning, against an opponent that
+  walls everything, or while protecting a lead; less often soon after its
+  last (the opponent expects it). The level decides how readily and how
+  well, never whether. It reads an opponent's series: committed to every
+  turn left, eleven turns that launch nothing, then the real finisher; a
+  Shield that ends it; a turn it can be hit out of.
 
 #### 7.2.5 Defense and Energy
 

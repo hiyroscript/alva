@@ -138,6 +138,13 @@ blocks every attack.
   description; Movement explains universal movement. Shared rosters place fighter identifiers
   (`#0001`, etc.) at the bottom-right of a translucent dark strip; small
   slot indices stay at the top-left.
+- **The Mash Combo**, every fighter's: five rapid presses of one of its
+  two close-range strikes' buttons on the ground set off twelve automatic
+  turns of the two, alternating at twice their speed, the first eleven
+  launching nothing and the twelfth with its full launch; nothing the
+  player presses cancels it, and a hit, a launch or a Shield stops it
+  ([combat](docs/systems/combat.md#mash-combo)). The CPU uses it at every
+  level, and reads it coming.
 
 ## Run it
 

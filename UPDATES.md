@@ -17,9 +17,12 @@ for where they moved). The game as it is now is specified in
 | **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49), then [#57](https://github.com/hiyroscript/alva/pull/57) ([second pass](#second-pass)) | `a34fbdd`, then `e75dbb6` | The shared movement feel, attack momentum and combo flow, first tuned on #0001 |
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
+| **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
 
 They were made in that order and build on each other: the effect update
-assumes the movement update, and the bounce update assumes both.
+assumes the movement update, and the bounce update assumes both. The Mash
+Combo update, much later, assumes the [strict combat
+rules](#strict-combat-rules) and the [universal Step-in](#universal-step-in-and-no-attack-steering).
 
 ## Movement update
 
@@ -3764,3 +3767,92 @@ which looks odd; fix it, in a new pull request.
 
 **Tests:** `fighter-0007` (the idle's frames, and its blink: eyes open
 2.75 s of every loop, one blink of 3/8 s).
+
+## Mash Combo update
+
+Asked for (the `max` brief, "ALVA — MASH COMBO UPDATE") as a new universal
+combat mechanic with strict fighter requirements, CPU support, and a fix for
+animations sticking on one frame. Every rule it brought is strict. It adds
+to the combat rules without replacing any: outside a series every move,
+cancel, buffer and cooldown works exactly as before.
+
+- **The mechanic** ([combat](./docs/systems/combat.md#mash-combo),
+  [`ALVA_SPEC.md`](./ALVA_SPEC.md) §7.2.4c). Five fresh presses of one
+  button of a fighter's pair, on the ground (each within 0.3 s of the last,
+  all five within a rolling 0.8 s, on the simulation clock; held buttons,
+  autorepeat, other buttons, aerial presses, slow presses and hits never
+  count; presses made while the first move plays do) set off twelve
+  automatic turns of the pair, alternating, the mashed move first, six
+  each. Each turn plays twice as fast (startup, strikes, recovery, Step-in
+  and clip; strike windows swept so none is skipped). Turns 1 to 11 launch
+  nothing (effective Base Launch 0 for every strike; their damage still
+  counts); turn 12 launches as authored from the Launch Point built.
+  Nothing the fighter's controls ask for cancels it; a stun, a paralysis,
+  a launch, losing the ground, the Void or a respawn ends it at once; a
+  turn a Shield blocks ends it there. No armour, no new button, no
+  setting.
+- **The pairs** (`mashCombo` in each definition; refused by the registry
+  if missing or invalid, for every future fighter too): #0001 Jab + High
+  Kick; #0002 One-Two + Rapid Kicks; #0003 Chakra Punch + Chakra
+  Haymaker; #0004 Dance Combo + Crescent Kick; #0005 Claw Swipe +
+  **Backhand Rake**; #0006 Power Punch (pink) + **Knockout Punch**
+  (green); #0007 Street Combo + Uppercut. #0005 and #0006 had no second
+  close-range strike and every button taken, so each gained a button-less
+  partner strike under the new codename `mash_attack` (#0005's on its
+  Deflect's claw-sweep frames, #0006's green on her Flying Punch's fist,
+  copied under the move's codename), performed only as a turn; nothing of
+  theirs was removed or changed.
+- **The CPU**: all four levels set one off through five legal presses
+  (from neutral, or as a hit-confirm), weigh the real launch rule, avoid
+  Shields, ledges at their back, hazards and walling opponents, never
+  while protecting a lead, and less often soon after the last; they read
+  an opponent's series (busy through its turns, its finisher coming) and
+  answer it with the Shield, which ends it.
+- **Shown**: afterimages of the performing fighter (or sister), a slash on
+  each strike that lands, a finisher burst and shake, and a *Mash Combo
+  7/12* counter (*Combo frénétique* in French) over the fighter.
+- **Stuck frames, fixed**: the same move started on the very step its
+  last activation ended kept the same clip key, so `SpriteAnimator.play`
+  skipped it and the whole new activation showed the old one's last frame
+  (reproduced for every fighter). Each move activation now restarts its
+  clip once as it begins (`activation`, in `SpriteAnimator` and
+  `EnsembleAnimator`); a clip with no usable fps holds its first frame.
+  The holds the art means (a single-frame pose, the Shield, an impact
+  freeze, a clip shorter than its move holding its last frame: 17 such
+  attacks, all authored) are unchanged.
+
+**Where to tune it:** `MASH_COMBO` in
+[`js/data/mash-combo.js`](./js/data/mash-combo.js) (presses, window, gap,
+turns, rate, arm wait, close range, Step-in limit); `HIT_FX.trail.mash*`,
+`HIT_FX.sparks.slash` / `finisher` and `HIT_FX.mash` in
+`js/game/rendering/hit-fx.js`; `MASH_COUNTER_STYLE` in
+`js/game/rendering/fighter-status.js`; the CPU's `MASH_MEMORY` in
+`js/game/ai/cpu-intelligence/brain.js` and `Evaluator.mashCombos`.
+
+**Code:** new `js/data/mash-combo.js` and `js/game/combat/mash-combo.js`;
+`js/config.js` (`MOVES.mash_attack`); `js/data/characters.js` (the
+check); every `js/data/characters/<id>.js` (its pair; #0005's and
+#0006's partner strikes and art); `js/game/fighters/fighter.js` (presses,
+start, turns, lock, interruption, activation); `js/game/combat/combat-state.js`
+(`sweepAttack`); `js/game/combat/combat.js` (swept windows, launch
+suppression, single-strike blocks recorded); `js/game/arena.js` (the
+Void, the counter); `js/game/rendering/` (`sprite-animator.js`,
+`ensemble.js`, `hit-fx.js`, `fighter-status.js`); the CPU
+(`capabilities.js`, `perception.js`, `situation.js`, `prediction.js`,
+`defense.js`, `evaluator.js`, `plans.js`, `brain.js`); the strings; the
+reviewed profile hashes; `codename_rule`; the specification and guides.
+
+**Tests:** new `tests/systems/mash-combo.test.mjs` and
+`tests/systems/animation-restart.test.mjs`; revised to keep their rules
+below the five-press exception: `direct-input` (mashing one press short of
+the count; a series' turns are its pair), `fighter-0002` (the flurry
+spam pressed as a hand chains flurries, never five in a row),
+`cpu-behaviour` (postures measured outside the CPU's own series, a
+neutral series counted as going in, eight seeds), `combat-ai` (every
+activation counted), `cpu-intelligence` (one more seed for a rare
+aerial), `jokull` (two seeds that break a wing); updated for the new
+moves, names, art and event fields: `fighter-0005`, `fighter-0006`,
+`codenames`, `ability-names`, `sample-fighter` (its pair),
+`cooldown-policy`, `launch`, `loadout`, `ui-consistency` (*Mash Combo*, a
+game term).
+

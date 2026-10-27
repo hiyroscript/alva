@@ -52,6 +52,22 @@ Menus read their own keys (`CONFIG.menuBindings`): the arrows or W A S D
 move, Enter, Space or J confirm, and Esc, Backspace or K go back. K does
 nothing in play.
 
+### Mash Combo input
+
+A [Mash Combo](combat.md#mash-combo) needs no button of its own: it is five
+fresh presses of one of the fighter's two Mash Combo moves' existing
+buttons, read from the same `…Pressed` edges every device produces, so it
+works the same on the keyboard, touch (either layout: each tap is one
+press; a held touch button is one press), a PlayStation or Xbox pad, any
+custom binding a player gives those moves, and the CPU's executor. Only
+fresh edges count: a held key or button is one press, and a key's
+operating-system autorepeat makes none (`InputManager` ignores `repeat`
+keydowns). A controller press resolved for the air (`pressedInAir`) never
+counts. The timing is on the simulation clock (60 Hz steps), never the
+frame rate; a sample takes one press per button per step, so presses
+faster than every other step (about 30 a second) are no faster for it. No
+universal input changes, and a controller layout never names it.
+
 ## Touch controls
 
 Touch controls show on touch-first devices only (a coarse pointer or an
@@ -683,6 +699,10 @@ them as a stack (`MenuNavigator.syncLayers`):
   custom layouts and the editor.
 - [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs):
   the codename vocabulary and the retired names that must stay gone.
+- [`tests/systems/mash-combo.test.mjs`](../../tests/systems/mash-combo.test.mjs):
+  a Mash Combo from the keyboard, touch, a DualSense, an Xbox pad and a
+  custom binding, through the real `InputManager`; a key's autorepeat
+  never a press.
 - [`tests/systems/dash.test.mjs`](../../tests/systems/dash.test.mjs),
   [`down.test.mjs`](../../tests/systems/down.test.mjs) and
   [`explicit-mouvement.test.mjs`](../../tests/systems/explicit-mouvement.test.mjs):

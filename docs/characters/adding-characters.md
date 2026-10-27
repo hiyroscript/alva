@@ -350,6 +350,34 @@ built by the shared schemas (so its hit effects and its classification are
 validated): never by writing a Launch Point, a stun or a paralysis
 directly, and never with its own idea of when a Shield counts.
 
+**Its Mash Combo pair (required).** Every fighter has the [Mash
+Combo](../systems/combat.md#mash-combo), so every fighter names exactly two
+**grounded close-range melee strikes** for it:
+
+```js
+mashCombo: { attacks: ['attack1', 'extra_attack'] },
+```
+
+Close range is what the move does, not its name or that it has a hitbox:
+a direct blow of the fighter's own body meant to connect at close fighting
+distance (every strike's box within 64 units in front, starting within 32;
+a Step-in no faster than 400). Never an aerial, a projectile, a summon, a
+technique, a Special, a move with a 3 s or 5 s cooldown or an Energy cost,
+a pull, a carry, a pass-through, a roll, homing dash, plunge or lift, or a
+long reach (a stretching neck, phantom hands, tendrils): those may be the
+fighter's other moves, untouched. Each named move is the ground move of
+one of its buttons. A fighter whose every button is taken by moves of
+another kind (techniques, summons, ranged or travelling moves) and has no
+second close-range strike authors one more, its partner: `mash_attack`, a
+close-range strike of its own with its own art (`<id>_mash_attack_<frame>.png`,
+or `<id>_mash_attack_<member>_<frame>.png`), no button, performed only as
+the series' partner turn; give it a name in `abilityNames` and a line in
+`abilityDescriptions`. Never relabel a long-range move to pass the check:
+the registry refuses a missing or invalid pair, every problem named
+(`mashComboProblems` in `js/data/mash-combo.js`). Its touch buttons,
+controller layout and keys need nothing: the combo is its existing
+buttons, pressed five times.
+
 ## 6. Defense, touch buttons and names
 
 - **Defense:** `defense: { type: 'shield', groundAnimation:

@@ -83,6 +83,57 @@ decision quality, never a rule):
   exhausted, and the evaluator weighs what is left after it (below), so
   projectiles stay in its game, used where they are worth their price.
 
+### Mash Combos
+
+The CPU has the [Mash Combo](combat.md#mash-combo) on every level, with
+nothing a player lacks and nothing more:
+
+- **Knowing it.** `analyzeCapabilities` models the fighter's pair
+  (`caps.mash`): its triggers (the pair's moves with a button), each
+  series' moves in order, its strikes over all twelve turns with the real
+  launch rule (turns 1 to 11 at Base Launch 0, the twelfth's own) and how
+  long it lasts at its rate.
+- **Choosing it** (`Evaluator.mashCombos`). From neutral: on the ground,
+  against a grounded opponent the first move reaches now (its own
+  candidate's geometry and odds), never one behind its Shield or off the
+  stage, never onto a hazard's warning, only when the level sees the
+  opening at all (its `punish` draw), and never while it keeps out of the
+  fight (a lead to protect, recovering: the objective's `wait`). Worth the
+  whole series' value (the eleven turns' Launch Point, then the finisher's
+  real launch from it, KOs included, `LaunchJudge.strikes`), against what
+  goes wrong: the first move blocked (its Shield ends the series), whiffed
+  (the whole series in the open), traded with (an opponent already
+  striking in reach), a stun that runs out before turn 1 starts, a ledge
+  at its back, an opponent that walls everything, and how soon after its
+  last one it is (`mashExpected`: an opponent expects it again for about
+  12 s). It must beat the first move on its own. As a follow-up
+  (`mashFollowUps`): off its own hit, while the opponent's stun outlasts
+  the presses, the move's window and the first turn's strike.
+- **Doing it** (the `mash` plan). Five fresh presses of the trigger
+  through the `Executor`, released between them as a hand does, at the
+  level's own rhythm (every other step at best, a looser hand a little
+  slower: its `timing`), the first starting the move as ever and the rest
+  made while it plays (they count; `moveReady` would refuse a repeat, so
+  the plan presses regardless and lets the Fighter's detector decide).
+  Done once the Fighter's own detector has started the series; failed if it
+  never does. While its series runs the brain decides nothing (it is
+  committed); a hit that breaks it hands control back as ever. Each turn is
+  counted as an attack in its move usage.
+- **Reading one.** Perception carries an opponent's combo as its counter
+  shows it (`view.mash`) and the attack's rate (`view.attackRate`). The
+  situation counts the opponent as busy through every turn left
+  (`op.mash.left`), the prediction runs its attack at its rate, and a
+  threat from a turn (`defense.meleeThreat`) carries the turn's strikes
+  with their launch suppressed and every strike still to come, the
+  finisher's real launch last: letting it through is costed for what it
+  is. A Shield that blocks a turn ends the series, so the Shield answer
+  scores higher against one (`threat.mash`).
+
+Difficulty never decides whether: Easy mashes now and then, Brutal when
+the opening is real (`tests/systems/mash-combo.test.mjs`: every level and
+fighter sets one off against an opponent in reach, through legal edges
+made while its first move plays).
+
 ## From the match to the buttons
 
 Four layers, each informing the one below and never reaching past it:

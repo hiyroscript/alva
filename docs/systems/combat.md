@@ -34,6 +34,8 @@ techniques); Launch is its own guide
 | [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A read-only view of a fighter's moves for presentation: `abilityGroups`, `moveCooldown`, `moveRestriction`, `abilityStatus`, `activeMove` and `activeSpecialAbility` (the move being performed now, and whether it is one of its fighter's Specials). |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `attackStartable`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), requests and cancellation (`pressRequest`, `repeatsMove`, `moveYields`, `canFollowUp`, `cutAttack`, `payEnergy`), the combat input buffer, hit-cancels, attack motion, summon startups, facing (`updateFacing`, `facingLocked`, `faceAttackTarget`, `updateAttackFacing`, `settleFacing`) and Automatic turn-around (`automaticTurnAround`, `enemies`, `turnAroundFacing`, `attackTargetFacing`). |
+| [`js/data/mash-combo.js`](../../js/data/mash-combo.js) | The Mash Combo's rules (`MASH_COMBO`: five presses, the 0.8 s window and 0.3 s gap, twelve turns, rate 2, close range) and a fighter's pair: `mashPairOf`, `mashTriggers`, `mashSequence`, `mashComboProblems`, `assertMashCombo`, `MASH_PARTNER` (the button-less `mash_attack`). |
+| [`js/game/combat/mash-combo.js`](../../js/game/combat/mash-combo.js) | `MashCombo`, one per fighter life: the press detector (idle), recognition (armed), the series (active, its `turn` and `sequence`), `lastEnd`; `resolveMashPair`. |
 | [`js/game/fighters/turn-around.js`](../../js/game/fighters/turn-around.js) | Automatic turn-around's targeting: `isValidEnemy` (a fighter in play with a real position, never itself, a projectile or an effect), `closestEnemy` (squared world distance, ties to the first listed) and `facingToward` (1, -1, or null at the same x). |
 
 ## Loadouts
@@ -728,7 +730,9 @@ or not) is gone.
    whose press started it (`combat.attack.button`: a ground attack carried
    into the air). Then the press is no request at all: never cut,
    restarted, buffered or kept to follow it; the attack plays on. Once it
-   has ended the move may be used again at once.
+   has ended the move may be used again at once. (Such a press still counts
+   toward a [Mash Combo](#mash-combo): its detector sees every fresh press
+   before this rule drops it.)
 4. **Eligibility and cancellation** (`tryAction`, `tryDeflect`,
    `trySpecial`, `tryMouvment`, the jump and the Shield in `update`): every
    check of the new move runs first (its art, its place, its airtime, its
@@ -777,6 +781,99 @@ plans with the very same checks (`moveReady`, `canFollowUp`,
 may cancel its own Deflect when a better move is open. Combos are
 deliberate presses within these rules: a hit-cancel, a jump or a Dash out
 of an attack that hit, a press buffered to come out as an attack ends.
+
+## Mash Combo
+
+A universal mechanic, the same for every fighter, human or CPU
+([`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4c). Every fighter declares
+exactly two grounded close-range melee strikes, its pair
+(`mashCombo: { attacks: [A, B] }`); five rapid presses of either one's
+button set off an automatic series of twelve turns of the two.
+
+**The trigger.** `Fighter.takeMashPress` hands every fresh combat press to
+the fighter's `MashCombo` before the ordinary request rules. A press
+counts when it is a trigger's (a pair move's button: its ground move), on
+the ground (a game controller's press made for the air never counts), and
+nothing holds the fighter (no stun, paralysis, technique, summon's
+startup). The same button five times, each gap no longer than
+`MASH_COMBO.maxGap` (0.3 s) and all five within the rolling
+`MASH_COMBO.window` (0.8 s) on the fighter's own fixed-step clock (an
+impact freeze's steps included): recognized. Any other combat press, an
+ineligible one, a gap too long or a hit starts the count over. A held
+button is one press, and a key's autorepeat never makes one
+(`InputManager` drops `repeat` keydowns). Presses made while the first
+move plays count even though they start nothing (see *Same move* above),
+so a player never has to wait for five whole moves. The press that
+completes the count is the combo's, never also an ordinary attack, and
+the buffered press is dropped.
+
+**Starting.** Recognized, the combo is *armed*: it starts on the first
+step the fighter may legally start an attack (`tryStartMash`: on the
+ground, `canFollowUp`, Shield not held), so the move its first press
+started plays out unless its authored hit-confirmed window opens. Armed
+for longer than `MASH_COMBO.armWait` without starting, it is dropped.
+
+**The series.** Twelve turns, `mashSequence`: the move whose button was
+mashed first, then the other, alternating (A B A B … or B A B A …), six
+each, the twelfth the finisher. Each turn is an ordinary activation of
+its move through `startAttack`, from frame one, carrying its turn
+(`record.mash`: `{ turn, turns, final }`) and the combo's rate
+(`record.rate`, 2). A turn that ends hands over to the next on the same
+step (`advanceMashCombo`), so no idle frame falls between turns; after
+the twelfth the series is `complete` and play is normal again. A turn is
+one activation, not one hit: a multi-hit move's turn strikes all its
+strikes, so a series may land many more than twelve hits.
+
+**Rate.** A turn's clock runs at `rate` (`sweepAttack` in
+`combat-state.js`): its startup, every strike window, its recovery, its
+Step-in and its clip together (the animator plays it at the same rate).
+A strike window a single fixed step long is never skipped: a faster
+attack lists every whole-step time of its own clock it reached in the step
+(`samples`), and `CombatSystem` checks each one (`activeNow`,
+`strikeLiveNow`). Hitstun, hitstop and blockstun are the strikes' own.
+
+**Launch.** Every strike of turns 1 to 11 has an effective Base Launch of
+0 (`applyHit`'s `suppressLaunch`): its damage still adds Launch Point
+(and restarts recovery), its hitstun and hitstop stay, it launches nothing.
+The twelfth turn's strikes launch with their own Base Launch and
+Directional Launch, from the Launch Point the series built (Base Launch ×
+Launch Point, as ever). The definitions are never touched: the event
+records the effective `baseLaunch`, the hit's own (`authoredBaseLaunch`)
+and the turn (`mash`). Out of a series the same move launches as authored.
+
+**The lock.** While it runs nothing the fighter's controls ask for cancels
+it: `canAct`, `canFollowUp` and `moveYields` are false, `cutAttack` cuts
+nothing, the jump is not free, and every combat press is the combo's
+(dropped). Nothing pressed during it, or on the step it ends, is kept for
+after it: the attack, Dash and jump buffers are emptied.
+
+**What ends it** (`mashBroken`, `endMashCombo`, then `lastEnd.reason`): a
+stun (any hit that stuns), a paralysis, a launch, losing the ground (a
+ledge, a vanished platform), a technique, a summon's startup or a Dash
+starting (none can while it runs, but any forced one would), the Void
+(`Arena.checkVoid`) or a reset or respawn (a fresh `MashCombo`):
+`interrupted` (or `void`), at once, the turn in progress with it, no later
+turn, no rate or launch rule left behind. A turn a raised Shield blocks
+is a block like any (no Launch Point, no launch, the Shield's Energy and
+stall), plays out its recovery, and ends the series there (`blocked`), as
+a blocked strike ends a multi-hit string: a series can never hammer a
+Shield. It has no armour: a hit landing on the same step as a turn's
+strike trades, as any attack's does.
+
+**The pair** (`mashComboProblems`, enforced by the registry for every
+fighter): two distinct moves, each a ground move one of its buttons
+starts, or the fighter's `mash_attack` (`MASH_PARTNER`); never a Special,
+an aerial, a projectile, a summon or technique, a move with a 3 s or 5 s
+cooldown or an Energy cost, a pull, a carry, a pass-through, a roll, dash,
+plunge or lift (a hover is allowed: it stands where it is on the ground),
+a Deflect, a Step-in faster than `MASH_COMBO.maxStep`, or a strike whose
+box reaches past `MASH_COMBO.reach` (64) or starts beyond
+`MASH_COMBO.nearEdge` (32) in front of its fighter. Generic grounded
+melee is not enough: a long bite, phantom hands, tendrils or a travelling
+spin are melee and never close range. A fighter whose buttons are all
+taken by moves of another kind authors `mash_attack`: a close-range strike
+of its own body with no button, performed only as the series' partner
+turn (its series is then triggered from the other move's button).
 
 ## Facing and Automatic turn-around
 

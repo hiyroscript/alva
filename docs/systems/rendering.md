@@ -8,12 +8,12 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | Module | Owns |
 | --- | --- |
 | [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the land pose, pending attacks and summon startups; the Dash and the air dash last the universal Dash's length, their clips played once across it), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
-| [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
+| [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows, and when a clip restarts (a new key, a new move activation). |
 | [`js/game/rendering/ensemble.js`](../../js/game/rendering/ensemble.js) | A fighter drawn as several members ([ensembles](#ensembles)): `EnsembleSprites` (its members' sprite sets as one), `EnsembleAnimator` (every member playing the fighter's state, its formation, glide and idle float), `fighterParts` (what is drawn of any fighter), `buildFighterSprites` and `createAnimator` (the factories every mode builds fighters' art with), `idlePose` (a menu's idle). |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
-| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark and fear mark drawn with each fighter. |
+| [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark, fear mark and Mash Combo counter drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
 | [`js/stages/`](../../js/stages/) | Stage themes (Yerma `desert`, Sol-Noir `city`, Asperitas, Adamaris, Jökull `jokull`, Practice Ground), the shared one-point perspective and the Void (drawn around the bounds the Arena hands it). Asperitas's theme draws its drifting clouds from the live runtime platforms the Arena hands it; Adamaris's draws its volcano, rocks, warnings and impacts from the live stage hazards (`opts.hazards`); Jökull's draws its glacier section by section from them too (each wing's cracks, contacts, break and falling pieces, the centre torn where one went) and its weather (snow, wind and the blizzard's whiteout over the battle canvas, never the HUD). |
 | [`js/ui/hud.js`](../../js/ui/hud.js), [`js/ui/sprite-art.js`](../../js/ui/sprite-art.js) | The DOM HUD and portraits (interface, not canvas). |
@@ -44,8 +44,28 @@ fighter's speed against the universal top speed, from its
 `minSpeedScale` up to its `maxSpeedScale` (1.6 unless the clip says
 otherwise) on a Dash's run-on; the Dash's and the air dash's clips are
 played once across the universal Dash, whatever their frame count; the
-land clip is a pose that running goes straight past. No frame is ever
-invented or interpolated: the art's own frames, played faster.
+land clip is a pose that running goes straight past; a Mash Combo turn's
+clip plays at the turn's rate (2), frame for frame with its strikes. No
+frame is ever invented or interpolated: the art's own frames, played faster.
+
+**When a clip restarts.** A clip starts from its first frame when the
+fighter's state key changes, when a caller asks (`restart`: an air jump, a
+Dash), and when a new **activation** of a move begins: `Fighter.updateState`
+hands the animator the record of the move playing (`activationOf`: the
+attack's, the technique's, the summon startup's, the Dash's), and a
+different record restarts the clip once, as it begins, never on every step.
+This fixed the stuck-frame bug: the same attack started on the very step
+its last activation ended (a fresh press landing on that step, a Mash
+Combo turn of the same move) kept the same key, so `play()` skipped it and
+the whole new activation showed the old one's last frame. Nothing else
+restarts a clip, so every legitimate hold stays: a single-frame pose, the
+Shield held, an impact freeze (`updateState(0)`), and a non-looping clip
+shorter than its move holding its last frame until the move ends (every
+attack's clip fits inside its attack: none is cut short). A clip with no
+usable `fps` holds its first frame, reported once, instead of looping on a
+zero-length frame. An ensemble's performers restart their own clips on a
+new activation; the members aside play their aside clip, belonging to
+none.
 
 ## Ensembles
 
@@ -262,6 +282,17 @@ the frightener has none.
 A floating fighter (a hit's `float`) needs no mark: it is drawn in its
 `midair_hurt` pose, rising.
 
+### The Mash Combo counter
+
+While a fighter's Mash Combo is armed or running (`mashCounterState`), a
+compact dark pill over it reads *Mash Combo!* (armed), then *Mash Combo
+7/12* (`hud.mashCombo`, *Combo frénétique* in French), with a thin bar
+filling turn by turn under the text: cyan through the series, gold on the
+twelfth turn. It sits above every mark that shows (`Arena.mashCounterRect`,
+included in `statusTop`, so Practice Ground's damage numbers float above
+it), scales with the world like the marks, and is gone the step the series
+ends. Read live from `fighter.mash`; drawn for Player 1 and a CPU alike.
+
 ## A burst's art
 
 A technique's burst may name the art it plays as it goes out (`burst.effect`,
@@ -295,7 +326,18 @@ impact spark, and on a fighter whose hit feeds on its opponent's fear, from
 the hit's `fed`, beside that hit's own effects), and a
 short slow-motion zoom on a launch predicted to reach the Void. Reduced
 motion drops the shake and the zoom. Tuning: `HIT_FX` (`shake`, `flash`,
-`sparks`, `trail`, `lethal`, `bounce`, `elimination`).
+`sparks`, `trail`, `mash`, `lethal`, `bounce`, `elimination`).
+
+**A Mash Combo** ([combat](combat.md#mash-combo)): while a series runs,
+fading afterimages of the fighter's strikes trail it (`trail.mashAlpha`,
+sampled every `trail.mashEvery`, at most `trail.count`, each gone after
+`trail.life`): for a fighter drawn as several members, only the members
+performing the turn (`fighterParts` filtered by `performing`). Every
+strike of a turn that lands adds a short white slash along the strike
+(`sparks.slash`) beside its ordinary spark; the finisher's a burst ring in
+amber (`sparks.finisher`) and a harder shake (`mash.finisherShake`, none
+with reduced motion). Afterimages and slashes are paint only: no box, no
+hit, no damage event; a trail is dropped once the series is over.
 
 **The elimination burst.** Whenever the Void takes a fighter (in any mode,
 two at once included), `Arena.checkVoid` hands it to
@@ -345,5 +387,13 @@ far; the colour flash and fade stay.
   [`tests/systems/fear.test.mjs`](../../tests/systems/fear.test.mjs); a
   burst's art played once behind the fighters:
   [`tests/systems/technique.test.mjs`](../../tests/systems/technique.test.mjs).
+- Clip restarts and holds:
+  [`tests/systems/animation-restart.test.mjs`](../../tests/systems/animation-restart.test.mjs)
+  (the stuck-frame bug for every fighter, one restart per activation,
+  changing moves without idle, a Mash Combo's twelve turns on every fighter
+  and #0006's sisters, a freeze, a hit, a respawn, the Shield's hold, a
+  last frame held on purpose, every clip fitting its attack, an unusable
+  fps); the Mash Combo's counter, slashes and afterimages:
+  [`tests/systems/mash-combo.test.mjs`](../../tests/systems/mash-combo.test.mjs).
 - The canvas is a recording stand-in in every test: layout, scale and
   paint still need a real browser.

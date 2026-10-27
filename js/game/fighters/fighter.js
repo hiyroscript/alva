@@ -27,7 +27,9 @@
 // nobody, and the Deflect, give way to any valid request. Automatic
 // turn-around is the human player's only: its controller says so (kind
 // 'player', with automaticTurnAround on), never a slot, a label or a
-// fighter. The simulation is
+// fighter. The Mash Combo (js/data/mash-combo.js, see takeMashPress) is
+// everyone's too: its presses, its turns and its lock are the same for a
+// player and a CPU. The simulation is
 // fixed-step and deterministic; rendering reads it (interpolate,
 // spriteFlip) and never feeds back.
 
@@ -1660,7 +1662,9 @@ export class Fighter {
   // combat button pressed for it, if any (see repeatsMove); the fighter's
   // moveStartedAt records the step (see moveYields). A fighter whose
   // attacks are aimed for it faces that way instead of `dir` (see
-  // faceAttackTarget).
+  // faceAttackTarget). `mash`, for a Mash Combo turn (see startMashTurn),
+  // is its turn: the activation then runs at MASH_COMBO.rate (its `rate`)
+  // and CombatSystem suppresses its launch unless it is the final turn.
   startAttack(atk, dir = 0, { button = null, mash = null } = {}) {
     const combat = this.combat;
     this.cutAttack();
