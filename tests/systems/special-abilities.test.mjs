@@ -50,11 +50,12 @@ const SPECIALS = Object.freeze({
   '0005': ['attack4', 'attack5'],
   '0006': ['attack4'],
   '0007': ['attack5'],
+  '0008': ['attack4', 'attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly eight Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath and the Rocket Launcher', () => {
+test('exactly ten Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast and the Gum-Gum Giant Pistol', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -64,7 +65,7 @@ test('exactly eight Specials across the roster: Unlimited Void and Hollow Purple
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 8);
+  assert.equal(total, 10);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
@@ -72,6 +73,12 @@ test('exactly eight Specials across the roster: Unlimited Void and Hollow Purple
   assert.deepEqual(specialAbilities(getCharacter('0005')).map((m) => name('0005', m)), ['Deadlights', 'Red Balloon']);
   assert.deepEqual(specialAbilities(getCharacter('0006')).map((m) => name('0006', m)), ['Ice Breath']);
   assert.deepEqual(specialAbilities(getCharacter('0007')).map((m) => name('0007', m)), ['Rocket Launcher']);
+  assert.deepEqual(specialAbilities(getCharacter('0008')).map((m) => name('0008', m)), ['Feast', 'Gum-Gum Giant Pistol']);
+  // The Gum-Gum Balloon turns projectiles back and the Gum-Gum Rocket
+  // homes in, and both are ordinary.
+  for (const move of ['attack3', 'midair_attack3', 'midair_attack2']) {
+    assert.equal(isSpecialAbility(getCharacter('0008'), move), false, `${name('0008', move)} is not Special`);
+  }
   // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
   for (const move of ['attack3', 'attack4']) {
     assert.equal(actionType(getCharacter('0007'), move), 'technique');
@@ -153,6 +160,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3', 'attack4', 'extra_attack'],
       air: ['attack1', 'attack2'],
       abilities: ['ground:attack5'],
+    },
+    '0008': {
+      ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3'],
+      abilities: ['ground:attack4', 'ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

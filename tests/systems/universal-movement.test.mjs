@@ -348,7 +348,11 @@ for (const c of ROSTER) {
       f.body.ground = null;
     }
     d.target.airJumps = 0;
-    const press = Object.keys(c.actions).find((a) => c.actions[a]?.air && d.attacker.attacks[c.actions[a].air]?.hitbox);
+    // An aerial whose box takes in its own body's height, so it meets a
+    // target beside it (a Stamp that only strikes below its feet, #0008's,
+    // would pass it by).
+    const beside = (hb) => !!hb && hb.y < -30;
+    const press = Object.keys(c.actions).find((a) => c.actions[a]?.air && beside(d.attacker.attacks[c.actions[a].air]?.hitbox));
     d.tick(P(press));
     d.until(() => d.events.some((e) => e.type === 'hit'), 40);
     assert.equal(d.target.airJumps, 2);

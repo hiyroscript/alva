@@ -256,11 +256,14 @@ const stroller = (n, self) => {
   return Math.abs(dx) > 260 ? (dx > 0 ? { runRight: true } : { runLeft: true }) : {};
 };
 
-// One break-off at Launch Point 90 with lots of time: when the CPU took up
+// One break-off at Launch Point 100 with lots of time: when the CPU took up
 // the stabilize objective and when it left it (still alive, and with what
-// Launch Point), and its telemetry.
+// Launch Point), and its telemetry. 100, so that the CPU is in danger
+// whoever its opponent is: at 90, #0008 (no launch that ends a life from
+// mid-stage at once, its upward bounce one hit away) does not yet put it in
+// danger, and a CPU that is not in danger rightly fights on.
 function breakOff(difficulty, cpuDef, foeDef, foe) {
-  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: 90, timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
+  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: 100, timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
   const out = { entered: null, left: null, lpLeft: null, scored: false };
   sc.run(25, (i) => {
     if (sc.foe.lostToVoid) out.scored = true;

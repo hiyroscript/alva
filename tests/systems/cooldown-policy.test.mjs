@@ -175,6 +175,12 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
     '0006': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, mash_attack: 0, attack3: 0, attack4: 3, attack5: 0, deflect: 0 },
     // The Rocket Launcher: its rocket deals 10.
     '0007': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, attack3: 0, attack4: 0, attack5: 5, deflect: 0 },
+    // The Feast: a heal. The Gum-Gum Giant Pistol: its giant fist deals 10.
+    // The Crescent Kick, its Mash Combo partner, is ordinary.
+    '0008': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0, mash_attack: 0,
+      attack4: 3, attack5: 5, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

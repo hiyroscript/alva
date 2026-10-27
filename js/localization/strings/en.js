@@ -210,6 +210,9 @@ export const EN = {
   'credits.sprites0006.sheetCredits': 'Sheet credits: Cosbydaf (NGC sprites), Kenshin Himura (rip), Misse-the-cat (revamped sprites)',
   'credits.sprites0007.title': '#0007 sprite source',
   'credits.sprites0007.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
+  'credits.sprites0008.title': '#0008 sprite source',
+  'credits.sprites0008.sheet': 'Sprite sheet by degue-1297 on DeviantArt',
+  'credits.sprites0008.sheetCredits': 'Sheet credits: ripped by Alejo & Grim',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -393,6 +396,7 @@ export const EN = {
   'discover.fighter.0005.playStyle': 'A creeping predator that strikes from far away and from behind, reeling opponents in, leaving them helpless in the air and feeding on their fear to heal itself. Its biggest moves are slow, readable commitments, and its tall body is easy to hit up close.',
   'discover.fighter.0006.playStyle': 'A quick, versatile trio that fights at every range: fast strikes up close, a lock-on rush, a long beam and a wave of sound from afar, and a freezing breath that leaves opponents open. Its ranged attacks root it in place, and its spinning attack is easy to punish when it misses.',
   'discover.fighter.0007.playStyle': 'A street fighter who mixes quick fists and feet up close with a ground-bound arsenal from afar, strong at punishing approaches with fast shots, a fire that burns where it lands and blasts to both sides. Its weapons never fire in the air, and its heaviest shot roots it in place.',
+  'discover.fighter.0008.playStyle': 'A rubber brawler that strikes from afar with its own stretched fists and feet, bounces shots back by blowing itself up and heals by eating, a threat at every range without ever throwing a thing. Its stretched limbs are still its body and can be hit, and its biggest blows are easy to see coming.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

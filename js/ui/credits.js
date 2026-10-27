@@ -4,7 +4,8 @@
 // Proper names (Finhj, ZetrasBlack, R0B4N, thespriteanimations, DeviantArt,
 // Dazz & Fret, The Spriters Resource, xmaygrrr, imhomiejaydev,
 // regularDor8go, NotEverything123, Cosbydaf, Kenshin Himura,
-// Misse-the-cat, xxalexsmashxx) stay as they are in every language. A line may also link to its source:
+// Misse-the-cat, xxalexsmashxx, degue-1297, Alejo & Grim) stay as they are
+// in every language. A line may also link to its source:
 // { label: key or [key, params], href }, the label still translated and
 // the address never.
 
@@ -39,6 +40,10 @@ const SPRITES_0006 = 'https://share.google/uwRM2BMytKaaK3Ycf';
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0007 is never named).
 const SPRITES_0007 = 'https://www.deviantart.com/xxalexsmashxx/art/955490753';
+// Where #0008's sprite sheet was published: its DeviantArt page, found by
+// the deviation's number alone (the page's title is left out of the
+// address: the character behind #0008 is never named).
+const SPRITES_0008 = 'https://www.deviantart.com/degue-1297/art/443591282';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -85,6 +90,12 @@ export const CREDITS = [
   {
     title: 'credits.sprites0007.title',
     lines: [{ label: 'credits.sprites0007.sheet', href: SPRITES_0007 }],
+  },
+  // #0008's sheet, linked to where it was published, and who ripped it,
+  // as the sheet itself says.
+  {
+    title: 'credits.sprites0008.title',
+    lines: [{ label: 'credits.sprites0008.sheet', href: SPRITES_0008 }, 'credits.sprites0008.sheetCredits'],
   },
   {
     title: 'credits.rights.title',

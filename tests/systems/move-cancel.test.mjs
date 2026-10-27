@@ -25,6 +25,7 @@ import { DASH_ENERGY_COST, DEFLECT_ENERGY_COST } from '../../js/game/combat/comb
 import { Projectile } from '../../js/game/combat/projectile.js';
 import { getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { specialAction } from '../../js/data/loadout.js';
+import { yieldsToRequests } from '../../js/game/combat/offense.js';
 import { COMBAT_BUTTONS } from '../../js/config.js';
 import { DT } from '../helpers/fighter-harness.mjs';
 import { playerRig, press, attackOf } from '../helpers/player-rig.mjs';
@@ -68,10 +69,14 @@ const RIGS = [['player', (c, o) => far(c, o)], ['cpu', (c, o) => driven(c, 'cpu'
 // The ground attack buttons `f` has (attacks, not specials).
 const groundAttacks = (f) => COMBAT_BUTTONS.filter((a) => !specialAction(f.def, a) && f.attackFor(a, true));
 
-// Every pair of different ground attack buttons of `f`.
+// Every pair of different ground attack buttons of `f`, the first one an
+// attack that keeps its commitment: a defense (one that turns projectiles
+// back, as #0008's Gum-Gum Balloon does) gives way to any request by
+// explicit rule, as the Deflect does (yieldsToRequests; tested below).
 function pairs(f) {
   const buttons = groundAttacks(f);
-  return buttons.flatMap((a) => buttons.filter((b) => f.attackFor(b) !== f.attackFor(a)).map((b) => [a, b]));
+  const committed = buttons.filter((a) => !yieldsToRequests(f.attacks[f.attackFor(a)].offense));
+  return committed.flatMap((a) => buttons.filter((b) => f.attackFor(b) !== f.attackFor(a)).map((b) => [a, b]));
 }
 
 // Airborne, rising from a held jump, free to act.
@@ -386,6 +391,34 @@ test('a Deflect cuts short only what may be cut: an aerial that has not hit play
       assert.equal(r.player.combat.attack, aerial, `#${c.id} ${who}: the aerial plays on`);
       assert.equal(r.player.combat.energy, 100, `#${c.id} ${who}: no Deflect paid`);
     }
+  }
+});
+
+test('a ground move that turns projectiles back is a defense too, so, like the Deflect, it gives way to a valid request (#0008\'s Gum-Gum Balloon)', () => {
+  const C8 = getCharacter('0008');
+  for (const [who, rig] of RIGS) {
+    for (const [label, request, check] of [
+      ['attack', press('attack1'), (p) => attackOf(p) === p.attackFor('attack1')],
+      ['jump', press('jump'), (p) => !p.grounded],
+      ['Dash', DASH, (p) => !!p.dash],
+    ]) {
+      const r = rig(C8);
+      r.tick(press('attack3'));
+      const balloon = r.player.combat.attack;
+      assert.equal(balloon?.def.id, 'attack3', `${who}: the Balloon`);
+      assert.equal(yieldsToRequests(balloon.def.offense), true, 'an attack and a defense');
+      assert.equal(balloon.def.offense.attack, true, 'still an attack: a raised Shield blocks it');
+      r.tick();
+      r.tick(request);
+      assert.notEqual(r.player.combat.attack, balloon, `${who} ${label}: the air let out`);
+      assert.ok(check(r.player), `${who} ${label}: started`);
+    }
+    // Never on its own step, and never into itself.
+    const r = rig(C8);
+    r.tick(press('attack3'));
+    const balloon = r.player.combat.attack;
+    r.tick(press('attack3'));
+    assert.equal(r.player.combat.attack, balloon, `${who}: never into itself`);
   }
 });
 
