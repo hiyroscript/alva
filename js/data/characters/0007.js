@@ -70,7 +70,7 @@ const UNIT_0007 = 88 / 52;
 // universal Dash's length, whatever these say: their clips are shown once
 // across it.)
 const FPS_0007 = Object.freeze({
-  idle: 4,
+  idle: 8,
   run: 12,
   mouvment: 12,
   midair_mouvment: 12,
@@ -120,6 +120,10 @@ const FLYING_KICK_0007 = [1, 2, 2, 1];
 // (2, held), the fists swung down through a wide arc (3), the arc low in
 // front (4), tucked (5).
 const HAMMER_FIST_0007 = [1, 2, 2, 3, 4, 5];
+// The standing stance's: the eyes open (1, held 2.75 s), then one quick
+// blink, half shut (2), shut (3), half shut (2). The three drawings differ
+// only in the eyes, so played straight through they blink without end.
+const STANCE_0007 = [...Array(22).fill(1), 2, 3, 2];
 // The Pistol's: aimed (1, held a frame), fired (2), the recoil kicking the
 // gun up (3), aimed again (1).
 const PISTOL_0007 = [1, 1, 2, 3, 1];
@@ -142,9 +146,9 @@ export const CHARACTER_0007 = {
   // Deflect's arc sweeps below its feet, the clip also says where the feet
   // are (`anchorY`, art pixels down from the top).
   animations: {
-    // The standing stance: upright, arms loose at its sides, its eyes
-    // looking on (1), glancing aside (2), a blink (3).
-    idle: { ...clip('idle', [1, 2, 3], FPS_0007.idle, 55, { anchorX: [16.5, 16.5, 16.5] }), loop: true },
+    // The standing stance: upright, arms loose at its sides, blinking now
+    // and then (see STANCE_0007).
+    idle: { ...clip('idle', STANCE_0007, FPS_0007.idle, 55, { anchorX: STANCE_0007.map(() => 16.5) }), loop: true },
     // The run: six frames, arms pumping. Its rate follows the speed, down
     // to 0.6 of it (and up past it on a Dash's run-on).
     run: {
