@@ -344,6 +344,13 @@ export const CHARACTER_0002 = {
     attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Spin Attack / the Blue Tornado
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): the One-Two and the Rapid
+  // Kicks, each a string of strikes of its own (every strike of a turn but the
+  // twelfth launches nothing). The Spin Attack rolls on through its target and
+  // the Whirlwind is thrown: neither is in it. Mashing either button sets off
+  // twelve turns.
+  mashCombo: { attacks: ['attack1', 'attack2'] },
+
   // Its Special abilities (js/data/special-abilities.js): none. The
   // Whirlwind's tornado is a projectile with a heavy finisher (and the
   // cooldown that finisher earns), but an ordinary attack all the same.

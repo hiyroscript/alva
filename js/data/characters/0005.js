@@ -32,6 +32,13 @@
 //            seize what they meet in front of it and reel it in (`pull`,
 //            in front only)
 //
+// Its Mash Combo (js/data/mash-combo.js) alternates the Claw Swipe with the
+// Backhand Rake (`mash_attack`), its claw swept round from behind it into
+// whatever stands right in front: its Long Bite, its Phantom Hands and its
+// Dark Tendrils all strike far out, and every button is taken, so this
+// close-range strike has no button of its own and is performed only as the
+// series' partner turn (triggered from the Claw Swipe's button).
+//
 // Its Shield is a thicket of the same black tendrils, held before its
 // face, on the ground. In the air the Shield button is its Deflect, a
 // claw swept round in a wide arc that turns projectiles back. Its Dash is
@@ -87,6 +94,7 @@ const FPS_0005 = Object.freeze({
   attack5: 12,
   attack5_object: 6,
   extra_attack: 15,
+  mash_attack: 15,
 });
 
 // A clip of codename `codename`'s files, in the order `order` plays them (a
@@ -171,6 +179,14 @@ export const CHARACTER_0005 = {
     // attack1, the Claw Swipe: 1 the claw drawn back, 2 the swipe with its
     // arc, 3 the claw raised.
     attack1: clip('attack1', [1, 2, 3], FPS_0005.attack1, 58, { anchorX: [25.5, 26.5, 26.5] }),
+    // mash_attack, the Backhand Rake (its Mash Combo partner): the claw
+    // raised high behind it (1), swept round in a wide arc from over its
+    // back to under it (2, held a frame), thrust out in front (3). The
+    // Deflect's sweep, drawn on the ground (its files are the Deflect's
+    // frames under this move's own codename).
+    mash_attack: clip('mash_attack', [1, 2, 2, 3], FPS_0005.mash_attack, 71, {
+      anchorX: [30.5, 35, 35, 31], anchorY: [51, 57, 57, 42],
+    }),
     // midair_attack1, the Claw Rake: 1 drifting, 2 the claws raised, 3 the
     // arc swept from over its back down under it, 4 the arc through the
     // front, low, 5 the claws held out.
@@ -336,6 +352,11 @@ export const CHARACTER_0005 = {
     attack5: { type: 'summon', id: 'attack5' }, // the Red Balloon
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): the Claw Swipe and the
+  // Backhand Rake, both claws at arm's length. Mashing the Claw Swipe's
+  // button sets off twelve turns, Swipe first, the Rake the finisher.
+  mashCombo: { attacks: ['attack1', 'mash_attack'] },
+
   // Its Special abilities (js/data/special-abilities.js): the Deadlights,
   // whose lights leave whoever sees them floating helpless, and the Red
   // Balloon, its phantom that bites from behind and leaves its prey afraid,
@@ -367,6 +388,7 @@ export const CHARACTER_0005 = {
     midair_attack3: 'Floating Hands',
     attack4: 'Deadlights',
     attack5: 'Red Balloon',
+    mash_attack: 'Backhand Rake',
   },
 
   // What each move does, in a line, for the controller editor (Settings ›
@@ -382,6 +404,7 @@ export const CHARACTER_0005 = {
     midair_attack3: 'Floats in place while ghostly hands burst out in a barrage. Once per airtime.',
     attack4: 'Opens its maw onto the lights within: everyone in front who is facing it floats up helpless for 1.6 s.',
     attack5: 'A bunch of red balloons rises behind the opponent and a phantom steps out to bite: for 2.5 s they are afraid, and your hits on them heal you.',
+    mash_attack: 'Only in its Mash Combo: its claw swept round from behind it into whoever stands right in front, knocking them away.',
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
@@ -656,6 +679,27 @@ export const CHARACTER_0005 = {
       hitstun: 0.4,
       blockstun: 0.15,
       hitstop: 0.06,
+      groundOnly: true,
+    },
+    // The Backhand Rake (mash_attack, its Mash Combo partner: no button
+    // performs it, see `mashCombo`): the claw raised high behind it (frame
+    // 1), swept round (frame 2, two frames, live: the front of its body
+    // from the head to the feet, out to 56 units), thrust out (frame 3): a
+    // little over a quarter of a second. 3, Base Launch 2 sideways: the
+    // finisher of a Mash Combo set off from the Claw Swipe. Its claw is its
+    // body: it leans in by the shared Step-in.
+    mash_attack: {
+      animation: 'mash_attack',
+      startup: 1 / FPS_0005.mash_attack,
+      active: 2 / FPS_0005.mash_attack,
+      recovery: 1 / FPS_0005.mash_attack,
+      damage: 3,
+      baseLaunch: 2,
+      directionalLaunch: 'horizontal',
+      hitbox: { x: 4, y: -96, w: 52, h: 92 },
+      hitstun: 0.3,
+      blockstun: 0.14,
+      hitstop: 1 / 30,
       groundOnly: true,
     },
     // Dark Tendrils (extra_attack): the tendrils pouring out of the maw

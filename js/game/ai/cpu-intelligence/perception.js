@@ -35,7 +35,7 @@ function blankSnap() {
   return {
     t: -Infinity, x: 0, y: 0, vx: 0, vy: 0, grounded: true, ground: null, halfW: 0, height: 0, gravityScale: 1, maxFall: 1500,
     facing: 1, state: 'idle', attack: null, attackDef: null, attackTime: 0, attackPhase: null, attackHit: false,
-    attackConfirmed: false, attackMotion: null, stun: 0, hitstop: 0, paralysis: 0, charm: 0, fear: 0, fearedBy: null,
+    attackConfirmed: false, attackMotion: null, attackRate: 1, attackMash: null, mash: null, stun: 0, hitstop: 0, paralysis: 0, charm: 0, fear: 0, fearedBy: null,
     shieldStun: 0, shielding: false,
     energy: 100, exhausted: false, lp: 0, dash: null, dashDir: 0, dashSpeed: 0, dashLeft: 0, dashAir: false,
     technique: null, techniqueDef: null, techniquePhase: null, techniqueReleaseIn: 0, techniqueEndIn: 0, techniqueFacing: 1,
@@ -69,6 +69,12 @@ function snap(s, f, t) {
   s.attackHit = !!a?.hasHit;
   s.attackConfirmed = !!a?.confirmed;
   s.attackMotion = a?.motion ? { ...a.motion, target: null } : null;
+  // A Mash Combo turn plays faster, its launch suppressed but on the last
+  // ({ turn, turns, final }); and the combo itself, armed or running, as
+  // its counter shows it over the fighter (see Fighter.mash).
+  s.attackRate = a?.rate ?? 1;
+  s.attackMash = a?.mash ?? null;
+  s.mash = f.mash?.engaged ? f.mash.view() : null;
   s.stun = c.stun;
   s.hitstop = c.hitstop;
   s.paralysis = c.paralysis;

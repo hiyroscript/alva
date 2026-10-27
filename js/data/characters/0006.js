@@ -39,6 +39,14 @@
 //            and streak at their opponent together, each in a burst of her
 //            own colour, striking as one (`homing`); one strike, one move
 //
+// Its Mash Combo (js/data/mash-combo.js) alternates pink's Power Punch with
+// green's Knockout Punch (`mash_attack`), green's fist thrown straight
+// ahead on the ground: the Tornado Spin travels and pulls, and every button
+// is taken, so this close-range strike has no button of its own and is
+// performed only as the series' partner turn (triggered from the Power
+// Punch's button). The two sisters take turns at the front, one fighter
+// throughout.
+//
 // Its Shield is three force-field bubbles, one each, on the ground. In the
 // air the Shield button is its Deflect, green alone whirling to bat
 // projectiles back. Its cooldowns are the shared policy's
@@ -101,6 +109,7 @@ const FPS_0006 = Object.freeze({
   attack5_release: 10,
   attack5_object: 12,
   extra_attack: 12,
+  mash_attack: 15,
 });
 
 // Member `member`'s clip of codename `codename`: its files in the order
@@ -163,6 +172,9 @@ const TORNADO_0006 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 10];
 // The Flying Punch's: drawn back (1, held two frames more), fist first, an
 // afterimage behind (2), the punch (3), drawn up (4).
 const FLYING_PUNCH_0006 = [1, 1, 1, 2, 3, 4];
+// The Knockout Punch's (green's, the Mash Combo partner): drawn back (1),
+// fist first with an afterimage behind (2), the punch (3), drawn up (4).
+const KNOCKOUT_PUNCH_0006 = [1, 2, 3, 4];
 // The Triple Strike's, each sister's own: streaking forward (1, held), wrapped
 // in a burst of her colour (2, 3, 2 again), and its ring spreading as she
 // strikes (4).
@@ -252,6 +264,12 @@ export const CHARACTER_0006 = {
           deflect: clip('green', 'deflect', DEFLECT_0006, FPS_0006.deflect, 33),
           // attack2, the Tornado Spin (see TORNADO_0006).
           attack2: clip('green', 'attack2', TORNADO_0006, FPS_0006.attack2, 30),
+          // mash_attack, the Knockout Punch (see KNOCKOUT_PUNCH_0006): her
+          // Flying Punch's fist, thrown on the ground (its files are those
+          // frames under this move's own codename).
+          mash_attack: clip('green', 'mash_attack', KNOCKOUT_PUNCH_0006, FPS_0006.mash_attack, 30, {
+            anchorX: [15.5, 24.5, 17.5, 14.5],
+          }),
           // midair_attack2, the Flying Punch (see FLYING_PUNCH_0006).
           midair_attack2: clip('green', 'midair_attack2', FLYING_PUNCH_0006, FPS_0006.midair_attack2, 30, {
             anchorX: [15.5, 15.5, 15.5, 24.5, 17.5, 14.5],
@@ -414,6 +432,12 @@ export const CHARACTER_0006 = {
     attack5: { type: 'technique', id: 'attack5' }, // the Sonic Scream
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): pink's Power Punch and
+  // green's Knockout Punch, fists at arm's length. Mashing the Power
+  // Punch's button sets off twelve turns, pink first, green's punch the
+  // finisher.
+  mashCombo: { attacks: ['attack1', 'mash_attack'] },
+
   // Its Special ability (js/data/special-abilities.js): Ice Breath, whose
   // gale freezes whoever it reaches solid. Heat Vision, the Sonic Scream
   // and the Triple Strike are ordinary to the player.
@@ -441,6 +465,7 @@ export const CHARACTER_0006 = {
     attack3: 'Heat Vision',
     attack4: 'Ice Breath',
     attack5: 'Sonic Scream',
+    mash_attack: 'Knockout Punch',
   },
 
   // What each move does, in a line, for the controller editor (Settings ›
@@ -455,6 +480,7 @@ export const CHARACTER_0006 = {
     attack3: 'Pink\'s eyes heat up and loose a red beam: the fastest shot of all, reaching far across the stage.',
     attack4: 'Pink breathes a freezing gale: everyone it reaches in front of her is frozen solid for 1.4 s.',
     attack5: 'Blue screams a wave of sound that blows whoever it meets away, turns projectiles back and pushes a Shield back.',
+    mash_attack: 'Only in its Mash Combo: green throws her fist straight ahead, a heavy punch that knocks the opponent away.',
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
@@ -667,6 +693,27 @@ export const CHARACTER_0006 = {
       motion: { type: 'roll', speed: 240, keep: 0.5, maxSpeed: 700, friction: 280, recoil: 220 },
       groundOnly: true,
       passThrough: true,
+    },
+    // The Knockout Punch (mash_attack, the Mash Combo partner: no button
+    // performs it, see `mashCombo`), green alone: drawn back (frame 1), then
+    // fist first and the punch (frames 2-3, live: at chest height out to 36
+    // units), drawn up (frame 4): 0.27 s. 3, Base Launch 2 sideways: the
+    // finisher of a Mash Combo set off from the Power Punch. Her fist is her
+    // body: she leans in by the shared Step-in.
+    mash_attack: {
+      animation: 'mash_attack',
+      members: ['green'],
+      startup: 1 / FPS_0006.mash_attack,
+      active: 2 / FPS_0006.mash_attack,
+      recovery: 1 / FPS_0006.mash_attack,
+      damage: 3,
+      baseLaunch: 2,
+      directionalLaunch: 'horizontal',
+      hitbox: { x: 6, y: -48, w: 30, h: 34 },
+      hitstun: 0.3,
+      blockstun: 0.14,
+      hitstop: 1 / 30,
+      groundOnly: true,
     },
     // The Flying Punch, green alone: drawn back (frames 1-3, 0.2 s: time to
     // see it coming), then fist first, an afterimage behind her, the punch

@@ -22,13 +22,13 @@ import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
 import { fighterParts } from './rendering/ensemble.js';
 import {
   drawEnergyBar, drawCooldownIndicators, drawSpecialMark, energyBarState, specialMarkRect, statusOnScreen,
-  charmMarkRect, drawCharmMark, fearMarkRect, drawFearMark,
+  charmMarkRect, drawCharmMark, fearMarkRect, drawFearMark, mashCounterState, mashCounterRect, drawMashCounter,
 } from './rendering/fighter-status.js';
 import { activeSpecialAbility } from './combat/move-status.js';
 import { drawShield } from './rendering/shield-fx.js';
 import { HIT_FX, HitEffects, whiteFrame } from './rendering/hit-fx.js';
 import { createTheme } from '../stages/index.js';
-import { slotLabel } from '../localization/i18n.js';
+import { slotLabel, t } from '../localization/i18n.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
 const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
@@ -314,6 +314,8 @@ export class Arena {
       this.fx.addVoidRipple(voidCrossing(f.body, this.stage.void), f);
       this.fx.addElimination(f);
       f.lostToVoid = true;
+      // A Mash Combo armed or running ends with its fighter's life.
+      f.endMashCombo?.('void');
     }
     for (const f of taken) this.onVoid(f);
   }
@@ -671,12 +673,23 @@ export class Arena {
     return fearMarkRect(x, below ? below.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
   }
 
-  // The highest point of what is drawn over `f`: the top of its fear mark,
-  // charm mark or Special ability mark while one shows, else of its Energy
-  // bar or name tag (see barTop). Practice Ground floats its damage numbers
-  // from here.
+  // Where `f`'s Mash Combo counter goes (see mashCounterRect in
+  // js/game/rendering/fighter-status.js), in device pixels, while its Mash
+  // Combo is armed or running (read live every frame); null otherwise.
+  // Above every mark that shows, else above its Energy bar or name tag.
+  mashCounterRect(f) {
+    if (!mashCounterState(f)) return null;
+    const [x] = this.markerAnchor(f);
+    const below = this.fearMarkRect(f) ?? this.charmMarkRect(f) ?? this.specialMarkRect(f);
+    return mashCounterRect(x, below ? below.y - 1 : this.barTop(f), this.view.scale, this.view.dpr);
+  }
+
+  // The highest point of what is drawn over `f`: the top of its Mash Combo
+  // counter, fear mark, charm mark or Special ability mark while one shows,
+  // else of its Energy bar or name tag (see barTop). Practice Ground floats
+  // its damage numbers from here.
   statusTop(f) {
-    const mark = this.fearMarkRect(f) ?? this.charmMarkRect(f) ?? this.specialMarkRect(f);
+    const mark = this.mashCounterRect(f) ?? this.fearMarkRect(f) ?? this.charmMarkRect(f) ?? this.specialMarkRect(f);
     return mark ? mark.y - 1 : this.barTop(f);
   }
 
@@ -701,6 +714,11 @@ export class Arena {
       if (charm) drawCharmMark(ctx, charm, view.dpr, this.fxTime, this.reducedMotion);
       const fear = this.fearMarkRect(f);
       if (fear) drawFearMark(ctx, fear, view.dpr, this.fxTime, this.reducedMotion);
+      const mash = mashCounterState(f);
+      if (mash) {
+        const label = mash.turn ? t('hud.mashCombo', { turn: mash.turn, turns: mash.turns }) : t('hud.mashComboReady');
+        drawMashCounter(ctx, this.mashCounterRect(f), mash, label, view.dpr, this.reducedMotion);
+      }
     }
   }
 

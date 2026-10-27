@@ -202,4 +202,9 @@ export const MOVES = Object.freeze({
   attack5: Object.freeze({ number: 5, air: false, label: 'Attack 5' }),
   midair_attack5: Object.freeze({ number: 5, air: true, label: 'Mid-air Attack 5' }),
   extra_attack: Object.freeze({ number: null, air: false, label: 'Extra attack' }),
+  // A fighter's Mash Combo partner (see js/data/mash-combo.js): a grounded
+  // close-range strike with no button of its own, authored only by a
+  // fighter whose buttons are all taken by moves of another kind, and
+  // performed only as a turn of its Mash Combo.
+  mash_attack: Object.freeze({ number: null, air: false, label: 'Mash attack' }),
 });

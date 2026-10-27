@@ -43,6 +43,7 @@ import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
+import { MashCombo, resolveMashPair } from '../combat/mash-combo.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -156,6 +157,11 @@ export class Fighter {
     this.techniqueDefs = Object.fromEntries(
       Object.entries(def.techniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec }, context)]),
     );
+    // Its Mash Combo pair (js/data/mash-combo.js: its two grounded
+    // close-range strikes and the buttons that trigger it), or null for a
+    // definition without one (a test fixture: every registered fighter has
+    // one). The combo itself (`mash`) is per life: see reset.
+    this.mashPair = resolveMashPair(def, this.attacks);
     // What the shared `shield` input does for this character: on the ground
     // its `defense` entry (null: nothing), in the air its Deflect (its
     // `deflect` entry, an attack: see tryDeflect; null: nothing).
@@ -302,6 +308,10 @@ export class Fighter {
     // A fresh combat state: 0 Launch Point, full Energy, Shield down and
     // every cooldown ready.
     this.combat = new CombatState(this.energyDef);
+    // Its Mash Combo (js/game/combat/mash-combo.js): no press counted, no
+    // series armed or running. A fresh life never carries one on.
+    this.mash = new MashCombo(this.mashPair);
+    this.mashEndedAt = -1;
     // Projectiles released this step, waiting for the battle to spawn them
     // (see spawnProjectiles in js/game/combat/projectile.js).
     this.releases = [];
@@ -397,6 +407,17 @@ export class Fighter {
     // here, on the fighter's next step, so two attacks that connect on the
     // same step still trade.
     if (combat.attack && (combat.stun > 0 || combat.immobilized)) combat.interruptAttack();
+    // ---- Mash Combo: its clock, what breaks it, its next turn --------------
+    // Interrupted (a stun, a paralysis, a launch, lost ground: see
+    // mashBroken) it ends at once, its turn in progress with it; a partial
+    // count is forgotten. A turn that ended this step hands over to the
+    // next on this same step, so no idle frame falls between turns.
+    this.mash.tick(dt);
+    if (this.mashBroken()) {
+      if (this.mash.engaged) this.endMashCombo('interrupted');
+      else this.mash.clearPresses();
+    }
+    if (this.mash.active && !combat.attack) this.advanceMashCombo();
     // ---- Projectile release ----------------------------------------------
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
@@ -427,7 +448,8 @@ export class Fighter {
       body.prevX = body.x - body.carryX;
       body.prevY = body.y - body.carryY;
       for (const pressed of COMBAT_ACTIONS) {
-        const action = input[`${pressed}Pressed`] ? this.pressRequest(pressed) : null;
+        if (!input[`${pressed}Pressed`] || this.takeMashPress(pressed, input)) continue;
+        const action = this.pressRequest(pressed);
         if (action) this.bufferAttack(action, pressPlace(input));
       }
       const frozenDash = this.dashAsked(input);
@@ -517,7 +539,10 @@ export class Fighter {
     let started = !body.grounded && !!input.shieldPressed && this.tryDeflect(held);
     if (started) this.bufferedAttack = null;
     for (const pressed of COMBAT_ACTIONS) {
-      if (!input[`${pressed}Pressed`] || (place && place !== here)) continue;
+      // A press the Mash Combo takes (one that completes its count, or any
+      // made while it is armed or running) is no ordinary request.
+      if (!input[`${pressed}Pressed`] || this.takeMashPress(pressed, input)) continue;
+      if (place && place !== here) continue;
       const action = this.pressRequest(pressed);
       if (!action) continue;
       if (shieldHeld || jumpFirst(this.steps)) {
@@ -532,6 +557,9 @@ export class Fighter {
         this.bufferAttack(action, place);
       }
     }
+    // A recognized Mash Combo starts its series on the first step its
+    // fighter may legally start an attack (see tryStartMash).
+    if (this.mash.armed && this.tryStartMash(shieldHeld)) started = true;
     const waiting = this.bufferedAttack;
     if ((waiting?.place && waiting.place !== here) || (waiting && this.repeatsMove(waiting.action))) {
       this.bufferedAttack = null;
@@ -726,7 +754,8 @@ export class Fighter {
     // straight into the air, under full gravity from this step. A tap is
     // the normal jump; Jump held a little longer makes it the higher jump
     // (see below).
-    const free = (canAct || combat.cancellable || this.dashCancellable || this.moveYields(this.jumpPressedAt)) &&
+    const free = !this.mash.active &&
+      (canAct || combat.cancellable || this.dashCancellable || this.moveYields(this.jumpPressedAt)) &&
       !(combat.shielding && combat.shieldStun > 0);
     let jumped = false;
     if (this.jumpBuffer > 0 && this.coyote > 0 && free) {
@@ -905,8 +934,125 @@ export class Fighter {
       if (this.bufferedDash.age > mv.attackBuffer + TIME_EPSILON) this.bufferedDash = null;
     }
 
+    // Nothing asked for during a Mash Combo is kept for after it: no attack,
+    // Dash or jump comes out of a press made while it ran (the step it ends
+    // on included).
+    if (this.mash.active || this.mashEndedAt === this.steps) this.dropRequests();
+
     this.updateFacing(dir, held);
     this.updateState(dt);
+  }
+
+  // Every request waiting in a buffer is dropped: an attack, a Dash, a jump.
+  dropRequests() {
+    this.bufferedAttack = null;
+    this.bufferedDash = null;
+    this.jumpBuffer = 0;
+  }
+
+  // ---- Mash Combo (js/game/combat/mash-combo.js, js/data/mash-combo.js) ----
+  //
+  // Five fresh presses of one of its pair's buttons, on the ground, set it
+  // off; it then plays twelve turns of its pair, alternating, each
+  // MASH_COMBO.rate times faster, the launch of every turn but the last
+  // suppressed (CombatSystem.applyHit). It is the fighter's own attacks,
+  // started through startAttack and struck, blocked and interrupted like
+  // any: nothing about it is armour. Human or CPU alike.
+
+  // Whether a fresh press of combat button `button` (this step's `input`)
+  // is the Mash Combo's: the press that completes its count (recognized:
+  // the series is armed, and the press starts nothing else), or any press
+  // while it is armed or running (dropped: nothing cancels the series, and
+  // nothing pressed during it comes out later). Every other press counts or
+  // resets the count as the detector decides, and goes on to be an
+  // ordinary request.
+  takeMashPress(button, input) {
+    const mash = this.mash;
+    if (mash.engaged || this.mashEndedAt === this.steps) return true;
+    const eligible = this.body.grounded && pressPlace(input) !== 'air' && this.mashMayCount();
+    if (mash.press(button, eligible) !== 'armed') return false;
+    // The fifth press is the combo's, never also an ordinary attack.
+    this.bufferedAttack = null;
+    return true;
+  }
+
+  // Whether a press may count toward a Mash Combo now: the fighter has a
+  // pair and nothing holds it (no stun, paralysis, technique or summon's
+  // startup, not out of play). The move its first press started playing
+  // never stops the count.
+  mashMayCount() {
+    const c = this.combat;
+    return !!this.mashPair && c.stun <= 0 && !c.immobilized && !this.technique && !this.pendingSummon && !this.lostToVoid;
+  }
+
+  // Whether something has broken the Mash Combo (or would forbid one): a
+  // stun, a paralysis, a launch, the ground lost, a technique, a summon's
+  // startup or a Dash, or the Void.
+  mashBroken() {
+    const c = this.combat;
+    return c.stun > 0 || c.immobilized || !this.body.grounded || !!this.launch || !!this.technique ||
+      !!this.pendingSummon || !!this.dash || this.lostToVoid;
+  }
+
+  // Starts the armed series, if its fighter may start an attack now: on the
+  // ground, free to follow up (free, or the move in progress past an
+  // authored hit-confirmed window: never cutting a move short otherwise),
+  // its Shield not held. Its first move must be startable (its art); a
+  // series that cannot start at all is dropped. True when it started.
+  tryStartMash(shieldHeld = false) {
+    const mash = this.mash;
+    if (!mash.armed || shieldHeld || !this.body.grounded || !this.canFollowUp()) return false;
+    const first = this.attacks[mash.first];
+    if (!this.attackStartable(first, true)) {
+      this.endMashCombo('refused');
+      return false;
+    }
+    this.cutAttack();
+    if (this.combat.attack) return false;
+    this.dropRequests();
+    mash.start();
+    this.startMashTurn();
+    return true;
+  }
+
+  // Starts the series' next turn: its move, from frame one, at the combo's
+  // rate, carrying its turn (see startAttack). A move that cannot start
+  // ends the series.
+  startMashTurn() {
+    const mash = this.mash;
+    const turn = mash.nextTurn();
+    const atk = turn ? this.attacks[turn.id] : null;
+    if (!turn || !this.attackStartable(atk, true)) {
+      this.endMashCombo('refused');
+      return;
+    }
+    this.startAttack(atk, 0, { mash: turn });
+    mash.record = this.combat.attack;
+  }
+
+  // The turn in progress has ended by itself: the series is over after its
+  // last turn, or after a turn a Shield blocked (a block stops it there, as
+  // it stops a multi-hit string); otherwise the next turn starts now.
+  advanceMashCombo() {
+    const mash = this.mash;
+    if (mash.record?.blocked) this.endMashCombo('blocked');
+    else if (mash.turn >= mash.turns) this.endMashCombo('complete');
+    else this.startMashTurn();
+  }
+
+  // Ends the Mash Combo, armed or running, for `reason` (see
+  // js/game/combat/mash-combo.js): a turn still playing goes with it
+  // (nothing of it is left to strike), and nothing asked for meanwhile is
+  // kept. Its turns' rate and launch rule leave with their records.
+  endMashCombo(reason) {
+    const mash = this.mash;
+    if (!mash.engaged) return;
+    if (mash.active && this.combat.attack?.mash) this.combat.interruptAttack();
+    mash.end(reason);
+    // The step it ends on is still its own: a press made on it is dropped
+    // with the rest (see takeMashPress and update).
+    this.mashEndedAt = this.steps;
+    this.dropRequests();
   }
 
   // One step of ordinary horizontal locomotion toward `dir`: the shared
@@ -1004,7 +1150,7 @@ export class Fighter {
   // fighter, human or CPU.
   moveYields(at = this.steps) {
     const { combat } = this;
-    if (at <= this.moveStartedAt || this.dash) return false;
+    if (at <= this.moveStartedAt || this.dash || this.mash.active) return false;
     if (combat.hitstop > 0 || combat.stun > 0 || combat.shieldStun > 0 || combat.immobilized) return false;
     if (this.technique) return !!this.technique.def.freeCancel;
     if (this.pendingSummon) return !!this.summonDefs[this.pendingSummon.id]?.freeCancel;
@@ -1027,6 +1173,10 @@ export class Fighter {
   // so a wall can never keep a combo going. A hit that launches nothing
   // leaves the sequence it is flying in as it is.
   takeHit(event) {
+    // A count toward a Mash Combo does not survive a hit (a combo already
+    // running ends on the stun, the paralysis or the launch it deals: see
+    // mashBroken).
+    this.mash.clearPresses();
     // The human player's requests made before the hit are stale: none of
     // them comes out after the stun (presses made from now on are kept as
     // ever).
@@ -1065,6 +1215,8 @@ export class Fighter {
   // given back.
   cutAttack() {
     const { combat } = this;
+    // A Mash Combo's turns are never cut short.
+    if (this.mash.active) return;
     if (this.technique) {
       if (this.technique.def.freeCancel) this.endTechnique('cancel');
     } else if (this.pendingSummon) {
@@ -1081,6 +1233,9 @@ export class Fighter {
   // waits for it to end), or in a move that yields to that request (see
   // moveYields). Shared by every fighter's input and the CPU's planning.
   canFollowUp(at = this.steps) {
+    // Nothing follows up out of a Mash Combo: its lock overrides every
+    // window, a hit-confirmed one included.
+    if (this.mash.active) return false;
     return this.canAct() || (this.combat.cancellable && !this.technique && !this.dash) || this.dashCancellable ||
       this.moveYields(at);
   }
@@ -1100,7 +1255,7 @@ export class Fighter {
   // fighter and it is not dashing (on the ground or in the air). Its Launch
   // Point, however high, and the Energy it has left never matter.
   canAct() {
-    return this.combat.canAct() && !this.technique && !this.dash && !this.pendingSummon;
+    return this.combat.canAct() && !this.technique && !this.dash && !this.pendingSummon && !this.mash.active;
   }
 
   // A hit landing now would meet a perfect Shield: one raised no more than
@@ -1506,7 +1661,7 @@ export class Fighter {
   // moveStartedAt records the step (see moveYields). A fighter whose
   // attacks are aimed for it faces that way instead of `dir` (see
   // faceAttackTarget).
-  startAttack(atk, dir = 0, { button = null } = {}) {
+  startAttack(atk, dir = 0, { button = null, mash = null } = {}) {
     const combat = this.combat;
     this.cutAttack();
     if (this.dash) this.endDash();
@@ -1517,6 +1672,10 @@ export class Fighter {
       def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, released: false,
       step: activationStep(atk, this.body.grounded), stepped: false,
       struck: null, blocked: false, motion: null, airborne: !this.body.grounded, button,
+      // A Mash Combo turn ({ turn, turns, final }, see startMashTurn) plays
+      // `rate` times faster, its launch suppressed unless it is the final
+      // one (CombatSystem.applyHit); any other activation at its own pace.
+      mash, rate: mash ? this.mash.rules.rate : 1, samples: null,
     };
     this.moveStartedAt = this.steps;
     if (atk.airUses > 0 && !this.body.grounded) this.airAttacks.set(atk.id, (this.airAttacks.get(atk.id) ?? 0) + 1);
@@ -1955,7 +2114,9 @@ export class Fighter {
     }
 
     const move = this.performedMove(next);
-    this.animator.play(this.animationFor(next), { restart, performers: move?.members ?? null, formation: move?.formation ?? null });
+    this.animator.play(this.animationFor(next), {
+      restart, performers: move?.members ?? null, formation: move?.formation ?? null, activation: this.activationOf(next),
+    });
     if (next === 'run') {
       // The clip's own rate at top speed, following the speed: down to its
       // minSpeedScale, and faster still above top speed (a Dash's burst run
@@ -1969,10 +2130,27 @@ export class Fighter {
       const pass = this.sprites.duration(this.dash.animation);
       const duration = this.dash.duration;
       this.animator.setSpeed(pass > 0 && duration > 0 ? pass / duration : 1);
+    } else if (next === 'attack') {
+      // An attack's clip at its own rate (a Mash Combo turn's runs as fast
+      // as the turn does, frame for frame with its strikes).
+      const rate = combat.attack.rate ?? 1;
+      this.animator.setSpeed(rate, { glide: rate });
     } else {
       this.animator.setSpeed(1);
     }
     this.animator.update(dt, this.visualFacing);
+  }
+
+  // The move activation visual state `state` shows (see SpriteAnimator):
+  // the record of the attack, technique, summon's startup or Dash playing,
+  // so each new one starts its clip from frame one, even under the same
+  // key; null for a state no move owns.
+  activationOf(state) {
+    if (state === 'attack') return this.combat.attack;
+    if (state === 'technique') return this.technique;
+    if (state === 'summon') return this.pendingSummon;
+    if (state === 'dash') return this.dash;
+    return null;
   }
 
   // The move `state` shows, when it is one some of an ensemble's members

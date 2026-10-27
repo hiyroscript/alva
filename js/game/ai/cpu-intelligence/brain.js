@@ -67,6 +67,11 @@ import { riseOf, KO_VALUE } from './values.js';
 import { analyzeCapabilities, moveReady } from './capabilities.js';
 import { StageModel } from './stage-model.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
+import { MASH_COMBO } from '../../../data/mash-combo.js';
+
+// How long (seconds) an opponent remembers the CPU's last Mash Combos (see
+// mashExpected).
+const MASH_MEMORY = 12;
 
 // How far ahead a recognized threat is answered (seconds to contact).
 const THREAT_HORIZON = 0.9;
@@ -289,6 +294,13 @@ export class CpuIntelligence {
       return;
     }
     this.trackOwnHits(s);
+    // Its own Mash Combo running: committed to every turn (nothing it
+    // presses could change it), so there is nothing to decide until it
+    // ends or is broken.
+    if (self.mash?.active) {
+      this.plan = null;
+      return;
+    }
     // Forced states: a stun, a freeze, a paralysis. Nothing to choose but
     // the direction a launch is steered.
     if (me.stun > 0 || me.paralysis > 0 || (me.hitstop > 0 && !me.attack)) {
@@ -560,6 +572,9 @@ export class CpuIntelligence {
         this.whiffAt = this.clock;
       }
     }
+    // Each Mash Combo turn is an attack of its own (twelve in a series),
+    // whatever presses set it off.
+    if (a?.mash && a !== prev) this.telemetry.used(`${a.def.id}:mash`);
     this.ownAttack = a ?? null;
     const events = s.world?.combat?.events;
     if (!events?.length) return;
@@ -650,6 +665,17 @@ export class CpuIntelligence {
 
   planFromCandidate(c, why) {
     const reason = why ? `${why}: ${c.reason}` : c.reason;
+    if (c.kind === 'mash') {
+      const t = c.trigger;
+      const u = this.usage.get('mash') ?? { n: 0, at: -Infinity };
+      u.n = u.n * Math.exp(-(this.clock - u.at) / MASH_MEMORY) + 1;
+      u.at = this.clock;
+      this.usage.set('mash', u);
+      return makePlan('mash', {
+        cand: c, move: t.move, action: t.action, need: MASH_COMBO.presses, presses: 0, nextAt: this.clock, lastPress: -Infinity,
+        combo: !!c.combo, reason, until: this.clock + 1.2,
+      }, this);
+    }
     if (c.kind === 'jumpStrike' || c.kind === 'dashStrike') this.markPattern(c.kind);
     if (c.kind === 'dashStrike') return makePlan('dashStrike', { cand: c, reason, until: this.clock + 0.6 }, this);
     if (c.kind === 'jumpStrike') return makePlan('jumpStrike', { cand: c, reason, until: this.clock + (c.pressK + 30) * STEP }, this);
@@ -1235,6 +1261,16 @@ export class CpuIntelligence {
     const own = Math.min(0.3, Math.max(0, decayed(m.key) - 1.2) * 0.07);
     const how = kind === 'jumpStrike' || kind === 'dashStrike' ? Math.min(0.25, Math.max(0, decayed(kind) - 2) * 0.05) : 0;
     return Math.min(0.4, own + how);
+  }
+
+  // How readily the opponent expects another Mash Combo (0-0.7): a series
+  // is a big, telegraphed commitment, so one tried again soon after the
+  // last is read and covered; the memory fades over about MASH_MEMORY
+  // seconds. Keeps any level from leaning on it.
+  mashExpected() {
+    const u = this.usage.get('mash');
+    const n = u ? u.n * Math.exp(-(this.clock - u.at) / MASH_MEMORY) : 0;
+    return Math.min(0.7, n * 0.35);
   }
 
   // Remembers the way a strike was delivered (a jump-in, a Dash-in).

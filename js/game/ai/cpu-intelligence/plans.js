@@ -6,6 +6,12 @@
 //
 //   strike      press one move (an attack, a projectile, a technique, a
 //               summon, the Deflect) now or at a planned step
+//   mash        a Mash Combo (js/data/mash-combo.js): five fresh presses of
+//               one of its pair's buttons, released between them as a hand
+//               does, at the level's own rhythm (never faster than every
+//               other step), the first starting that move as ever and the
+//               rest made while it plays; done once the fighter's own
+//               detector has started the series, failed if it never does
 //   dashStrike  Dash in, then strike out of the Dash past its cancel time
 //   jumpStrike  jump (the normal or the higher jump, or an air jump),
 //               steer the arc that was planned, press the aerial on the
@@ -162,6 +168,36 @@ function pressMove(plan, brain, s, ex, m) {
 }
 
 const STEPS = {
+  mash(plan, brain, s, ex) {
+    const self = s.self;
+    const mash = self.mash;
+    if (mash?.active) {
+      brain.telemetry.count('mashCombos');
+      return 'done';
+    }
+    if (plan.presses >= plan.need) {
+      // All pressed: recognized, it waits for the move in progress; never
+      // recognized, nothing more will come of it.
+      if (mash?.armed) return 'run';
+      return brain.clock - plan.lastPress > 2 * STEP ? 'fail' : 'run';
+    }
+    if (!s.me.grounded || s.me.shielding) return 'fail';
+    // Its first press starts the move as ever; a hit-confirm's presses are
+    // made while its own move still plays (they count, starting nothing).
+    if (plan.presses === 0 && !plan.combo && !moveReady(self, plan.move)) return 'fail';
+    if (brain.clock + 1e-9 < plan.nextAt) return 'run';
+    if (ex.press(plan.action)) {
+      plan.presses++;
+      plan.lastPress = brain.clock;
+      // The next press after a release step at least; a looser hand waits
+      // a little longer (the level's timing), always well inside the
+      // combo's own window.
+      const extra = Math.min(3, Math.round((brain.rng() * brain.profile.timing) / STEP));
+      plan.nextAt = brain.clock + (1 + extra) * STEP;
+    }
+    return 'run';
+  },
+
   strike(plan, brain, s, ex) {
     const m = plan.cand?.move ?? plan.move;
     if (plan.pressAt != null && brain.clock < plan.pressAt) {
@@ -594,7 +630,7 @@ export function makePlan(kind, spec, brain) {
 // (only a threat or the plan's own end does). A hold, a retreat and the
 // footwork are reconsidered on every reassessment (an opening is taken
 // from a wait as from anywhere).
-export const COMMITTED = new Set(['strike', 'press', 'dashStrike', 'jumpStrike', 'shield', 'deflect', 'dash', 'jump', 'recover', 'move', 'airDrift']);
+export const COMMITTED = new Set(['mash', 'strike', 'press', 'dashStrike', 'jumpStrike', 'shield', 'deflect', 'dash', 'jump', 'recover', 'move', 'airDrift']);
 
 // Kinds a reassessment may carry on with rather than start afresh (their
 // state, such as a dead band or how long a wait has run, is kept).

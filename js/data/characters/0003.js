@@ -280,6 +280,11 @@ export const CHARACTER_0003 = {
     attack4: { type: 'technique', id: 'attack4' }, // the Mystical Palm Technique
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): the Chakra Punch and the
+  // Chakra Haymaker, its fists. The Heel Drop's ground impact and its
+  // techniques stay out of it. Mashing either button sets off twelve turns.
+  mashCombo: { attacks: ['attack1', 'extra_attack'] },
+
   // Its Special abilities (js/data/special-abilities.js): the Mystical Palm
   // Technique alone, the one move that heals its own Launch Point. Cherry
   // Blossom Impact is a technique too, but an ordinary ground attack to the

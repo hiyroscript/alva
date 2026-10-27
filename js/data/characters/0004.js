@@ -361,6 +361,12 @@ export const CHARACTER_0004 = {
     attack5: { type: 'technique', id: 'attack5' }, // World is Mine
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): the Dance Combo and the
+  // Crescent Kick, its own body's strikes: never the Leek Swing (a swung
+  // leek), the Melody (a projectile) or its techniques. Mashing either button
+  // sets off twelve turns.
+  mashCombo: { attacks: ['attack1', 'attack3'] },
+
   // Its Special abilities (js/data/special-abilities.js): World is Mine
   // alone, the song that charms, turning its opponents' hits into its own
   // healing. Ievan Polkka is a technique too, but an ordinary ground attack

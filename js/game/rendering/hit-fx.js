@@ -17,6 +17,12 @@
 // - Speed trails: fading afterimages behind a fighter launched hard enough
 //   to tumble, while it flies fast, and fainter ones behind a Dash or an air
 //   dash while it lasts.
+// - A Mash Combo (js/data/mash-combo.js): fading afterimages of the
+//   fighter's own strikes trailing it for as long as the series runs (the
+//   members performing each turn, for a fighter drawn as several), a white
+//   slash streaked along each strike that lands, and on the twelfth turn's
+//   a bigger burst and a harder shake. Paint only: an afterimage has no box
+//   and strikes nothing.
 // - A short slow-motion zoom on a launch that will carry its fighter into
 //   the Void if it does nothing (see launchIsLethal).
 // - A launch's rebound off a wall, floor or ceiling (see
@@ -63,7 +69,7 @@ export const HIT_FX = Object.freeze({
     time: 0.22, // seconds to die away (longer for bigger shakes, below)
   },
   flash: 1 / 60, // the white flash: one frame at 60 Hz, at least one frame drawn
-  sparks: { hit: 0.26, block: 0.2, perfect: 0.32, heal: 0.7 }, // lifetimes
+  sparks: { hit: 0.26, block: 0.2, perfect: 0.32, heal: 0.7, slash: 0.16, finisher: 0.42 }, // lifetimes
   trail: {
     speed: 900, // world units/s: a tumbling fighter this fast leaves a trail
     every: 1 / 40, // seconds between afterimages
@@ -71,6 +77,13 @@ export const HIT_FX = Object.freeze({
     life: 0.16, // seconds each afterimage takes to fade
     alpha: 0.42,
     dashAlpha: 0.26, // a Dash's (or air dash's) afterimages: fainter
+    mashAlpha: 0.38, // a Mash Combo's afterimages
+    mashEvery: 1 / 30, // ...a little sparser, so the strikes stay readable
+  },
+  // A Mash Combo's finisher (its slashes' and burst's lifetimes are with
+  // the sparks'): the shake it adds.
+  mash: {
+    finisherShake: 7, // px, none with reduced motion
   },
   bounce: {
     shakeSpeed: 900, // world units/s into the surface: slower rebounds do not shake
@@ -216,6 +229,11 @@ export class HitEffects {
       this.addShake(Math.min(s.max, s.base + e.damage * s.perDamage + e.launchSpeed * s.perSpeed));
       this.flashes.set(e.target, HIT_FX.flash);
       this.addSpark('hit', e);
+      // A Mash Combo's strike: a slash along it; its finisher a burst.
+      if (e.mash) {
+        this.addSpark(e.mash.final ? 'finisher' : 'slash', e);
+        if (e.mash.final) this.addShake(HIT_FX.mash.finisherShake);
+      }
       if (!this.slow && launchIsLethal(e, arena.stage, arena.gravity, arena.step)) {
         this.slow = { time: 0, focus: e.target };
         this.addShake(s.lethal);
@@ -284,7 +302,10 @@ export class HitEffects {
   addSpark(kind, e) {
     const point = e.point ?? { x: e.target.body.x, y: e.target.body.y - e.target.body.height / 2 };
     const speed = e.launchSpeed ?? 0;
-    const dir = speed > 0 ? { x: e.finalLaunch.x / speed, y: e.finalLaunch.y / speed } : { x: 0, y: 0 };
+    // A slash runs the way the strike went: from its attacker toward its
+    // target.
+    const along = kind === 'slash' || kind === 'finisher' ? Math.sign(e.target.body.x - (e.attacker?.body.x ?? e.target.body.x)) || 1 : 0;
+    const dir = along ? { x: along, y: 0 } : speed > 0 ? { x: e.finalLaunch.x / speed, y: e.finalLaunch.y / speed } : { x: 0, y: 0 };
     const size = kind === 'hit' ? Math.min(2.2, 0.8 + e.damage / 10 + speed / 2500) : kind === 'perfect' ? 1.4 : 1;
     this.sparks.push({
       kind, x: point.x, y: point.y, dx: dir.x, dy: dir.y, size,
@@ -366,14 +387,15 @@ export class HitEffects {
     return this.flashes.has(f);
   }
 
-  // Records `f`'s afterimage while it tumbles fast or Dashes (a Dash or an
-  // air dash), called once per frame with its current frame and
-  // interpolated position; old ones fade.
+  // Records `f`'s afterimage while it tumbles fast, Dashes (a Dash or an
+  // air dash) or runs a Mash Combo, called once per frame with its current
+  // frame and interpolated position; old ones fade.
   sampleTrail(f, dt) {
     let trail = this.trails.get(f);
     const tumbling = f.tumbling && Math.hypot(f.body.vx, f.body.vy) >= HIT_FX.trail.speed;
     const dashing = !!f.dash;
-    const fast = (tumbling || dashing) && !f.lostToVoid;
+    const mashing = !!f.mash?.active && !!f.combat?.attack;
+    const fast = (tumbling || dashing || mashing) && !f.lostToVoid;
     if (!trail) {
       if (!fast) return;
       trail = { ghosts: [], since: Infinity };
@@ -384,11 +406,18 @@ export class HitEffects {
     trail.since += dt;
     // Everything drawn of it (every member of a fighter drawn as several);
     // the first part also stands for the whole.
-    const parts = fighterParts(f);
-    if (fast && parts.length && trail.since >= HIT_FX.trail.every) {
+    // A Mash Combo's afterimages show the strike only: for a fighter drawn
+    // as several members, those performing the turn.
+    const all = fighterParts(f);
+    const performing = mashing && f.animator?.members ? new Set(f.animator.members.filter((m) => m.performing).map((m) => m.id)) : null;
+    const parts = performing ? all.filter((p) => performing.has(p.member)) : all;
+    const every = mashing && !tumbling && !dashing ? HIT_FX.trail.mashEvery : HIT_FX.trail.every;
+    if (fast && parts.length && trail.since >= every) {
       trail.since = 0;
       const [{ frame, flip }] = parts;
-      trail.ghosts.push({ x: f.renderX, y: f.renderY, frame, flip, parts, age: 0, dash: !tumbling });
+      trail.ghosts.push({
+        x: f.renderX, y: f.renderY, frame, flip, parts, age: 0, dash: !tumbling && !mashing, mash: mashing && !tumbling && !dashing,
+      });
       if (trail.ghosts.length > HIT_FX.trail.count) trail.ghosts.shift();
     }
     if (!fast && !trail.ghosts.length) this.trails.delete(f);
@@ -398,8 +427,8 @@ export class HitEffects {
   ghosts(f) {
     const trail = this.trails.get(f);
     if (!trail) return [];
-    const { life, alpha, dashAlpha } = HIT_FX.trail;
-    return trail.ghosts.map((g) => ({ ...g, alpha: (g.dash ? dashAlpha : alpha) * (1 - g.age / life) }));
+    const { life, alpha, dashAlpha, mashAlpha } = HIT_FX.trail;
+    return trail.ghosts.map((g) => ({ ...g, alpha: (g.mash ? mashAlpha : g.dash ? dashAlpha : alpha) * (1 - g.age / life) }));
   }
 
   // Draws every live spark. `toScreen(x, y)` maps world to device pixels and
@@ -437,6 +466,36 @@ export class HitEffects {
             ctx.lineTo(px0, py0 + arm);
             ctx.stroke();
           }
+        }
+      } else if (s.kind === 'slash' || s.kind === 'finisher') {
+        // A Mash Combo strike: a white slash streaked along the strike over
+        // a thin dark line, short and quick; the finisher a ring bursting
+        // open round it in the sparks' amber too.
+        const final = s.kind === 'finisher';
+        const len = px * (final ? 46 : 30) * (0.6 + 0.4 * k);
+        const dx = s.dx || 1;
+        const tilt = (seeded(s.seed)() - 0.5) * 0.6;
+        const x0 = x - dx * len * 0.55;
+        const x1 = x + dx * len * 0.45;
+        const y0 = y + tilt * len * 0.5;
+        const y1 = y - tilt * len * 0.5;
+        const width = Math.max(1, px * (final ? 4 : 2.6) * fade);
+        for (const [color, w] of [['rgba(0, 0, 0, 0.35)', width + 2 * dpr], ['#ffffff', width]]) {
+          ctx.globalAlpha = fade;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = w;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        }
+        if (final) {
+          ctx.globalAlpha = fade;
+          ctx.strokeStyle = AMBER;
+          ctx.lineWidth = Math.max(1, px * 3.5 * fade);
+          ctx.beginPath();
+          ctx.arc(x, y, px * (10 + 40 * k), 0, Math.PI * 2);
+          ctx.stroke();
         }
       } else if (s.kind === 'hit') {
         const rnd = seeded(s.seed);

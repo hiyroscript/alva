@@ -530,8 +530,8 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(115, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
-    'ability', 'attack', 'attacker', 'baseLaunch', 'charm', 'damage', 'directionalLaunch', 'energyCost', 'fear', 'fed', 'finalLaunch', 'float', 'hazard', 'hitstun',
-    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'paralysis', 'perfect', 'point',
+    'ability', 'attack', 'attacker', 'authoredBaseLaunch', 'baseLaunch', 'charm', 'damage', 'directionalLaunch', 'energyCost', 'fear', 'fed', 'finalLaunch', 'float', 'hazard', 'hitstun',
+    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'mash', 'move', 'paralysis', 'perfect', 'point',
     'projectile', 'redirected', 'source', 'stall', 'summon', 'target', 'technique', 'type',
   ]);
   assert.deepEqual([event.attack, event.source, event.ability, event.redirected], [true, 'melee', 'extra_attack', false],
@@ -544,6 +544,8 @@ test('a hit event describes the new system and nothing of the old one', () => {
     ['hit', attacker, target, 'extra_attack', 5, 115, 120],
   );
   assert.equal(event.baseLaunch, 2, 'the integer multiplier, not a vector');
+  // Outside a Mash Combo the effective Base Launch is the hit's own.
+  assert.deepEqual([event.authoredBaseLaunch, event.mash], [2, null]);
   assert.equal(event.directionalLaunch, 'vertical');
   assert.equal(event.launchStrength, 240);
   assert.deepEqual(event.finalLaunch, { x: 0, y: -240 * U });

@@ -352,3 +352,71 @@ export function drawFearMark(ctx, rect, dpr = 1, time = 0, reducedMotion = false
   ctx.fill();
   ctx.restore();
 }
+
+// The Mash Combo counter: a compact dark pill over a fighter while its Mash
+// Combo (js/data/mash-combo.js) is recognized or running, its name and the
+// turn playing ("Mash Combo 7/12"), a thin bar filling turn by turn under
+// it. Cyan through the series, gold on the twelfth turn, the finisher. It
+// says nothing a player could not see, and is gone the step the series
+// ends. Over any stage and the Void, like the marks.
+export const MASH_COUNTER_STYLE = Object.freeze({
+  fill: '#4de1ff',
+  finisher: '#ffd27a',
+  back: 'rgba(8, 8, 8, 0.72)',
+  track: 'rgba(255, 255, 255, 0.22)',
+  outline: '#000000',
+});
+
+// What the counter shows for `fighter`, or null while no Mash Combo is
+// armed or running: { turn (0 while armed), turns, final, progress (0-1) }.
+export function mashCounterState(fighter) {
+  const mash = fighter?.mash;
+  if (!mash?.engaged) return null;
+  const turns = mash.turns;
+  const turn = mash.active ? mash.turn : 0;
+  return { turn, turns, final: mash.active && turn === turns, progress: turns > 0 ? turn / turns : 0 };
+}
+
+// Where the counter goes over a status column centred on device pixel `x`
+// whose topmost status starts at device pixel `top`: { x, y, h } (x its
+// centre, y its top; its width follows its text), a small gap above it,
+// never smaller than 13 CSS pixels tall nor larger than 22.
+export function mashCounterRect(x, top, scale, dpr = 1) {
+  const h = Math.round(Math.min(Math.max(13 * dpr, 12 * scale), 22 * dpr));
+  const gap = Math.round(Math.max(4 * dpr, 4 * scale));
+  return { x: Math.round(x), y: Math.round(top - gap - h), h };
+}
+
+// The counter for `state` (mashCounterState) in `rect` (mashCounterRect),
+// reading `label` (already in the interface language). A turn just begun
+// pops a little larger for an instant, never with reduced motion.
+export function drawMashCounter(ctx, rect, state, label, dpr = 1, reducedMotion = false) {
+  if (!state) return false;
+  const { h } = rect;
+  const font = Math.round(h * 0.62);
+  ctx.save();
+  ctx.font = `800 ${font}px ${MONO}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = Math.round(ctx.measureText(label).width + h * 0.9);
+  const pop = reducedMotion || !state.final ? 1 : 1.08;
+  const pw = Math.round(w * pop);
+  const ph = Math.round(h * pop);
+  const left = Math.round(rect.x - pw / 2);
+  const top = Math.round(rect.y - (ph - h) / 2);
+  const color = state.final ? MASH_COUNTER_STYLE.finisher : MASH_COUNTER_STYLE.fill;
+  const o = Math.max(1, Math.round(dpr));
+  ctx.fillStyle = MASH_COUNTER_STYLE.outline;
+  ctx.fillRect(left - o, top - o, pw + o * 2, ph + o * 2);
+  ctx.fillStyle = MASH_COUNTER_STYLE.back;
+  ctx.fillRect(left, top, pw, ph);
+  // The bar along its bottom: the turns played so far.
+  const barH = Math.max(o, Math.round(ph * 0.12));
+  ctx.fillStyle = MASH_COUNTER_STYLE.track;
+  ctx.fillRect(left, top + ph - barH, pw, barH);
+  ctx.fillStyle = color;
+  ctx.fillRect(left, top + ph - barH, Math.round(pw * state.progress), barH);
+  ctx.fillText(label, Math.round(rect.x), Math.round(top + (ph - barH) / 2 + o));
+  ctx.restore();
+  return true;
+}

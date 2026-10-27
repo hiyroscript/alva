@@ -39,6 +39,7 @@ import { stepInTravel } from '../../fighters/movement.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../../data/movement.js';
 import { CONFIG } from '../../../config.js';
 import { attackOffense, summonOffense, techniqueOffense } from '../../combat/offense.js';
+import { MASH_COMBO, mashSequence } from '../../../data/mash-combo.js';
 
 // Every role a move can be given (a move may have several at once).
 export const MOVE_ROLES = Object.freeze([
@@ -246,6 +247,46 @@ function summonMove(f, special, entry) {
   };
 }
 
+// A fighter's Mash Combo (js/data/mash-combo.js) as the intelligence
+// weighs it, or null without a pair: its `triggers` (the ground moves whose
+// button sets it off, each with the series it starts), and per series its
+// `strikes` in order over all twelve turns (every strike of turns 1 to 11
+// with Base Launch 0, the twelfth's its own: the real launch rule) and its
+// `duration` (seconds from turn 1 to the end of turn 12 at the combo's
+// rate, impact freezes aside). The same for the CPU's own fighter and for
+// its opponent's, so it knows what it commits to and what is coming.
+function mashModel(f, moves) {
+  const pair = f.mashPair;
+  if (!pair) return null;
+  const rate = MASH_COMBO.rate;
+  const triggers = [];
+  for (const [action, first] of pair.triggers) {
+    const move = moves.find((m) => m.action === action && !m.air && m.id === first);
+    if (!move) continue;
+    const sequence = mashSequence(pair.attacks, first, MASH_COMBO.turns);
+    const strikes = [];
+    // Where each turn's strikes start in `strikes`.
+    const starts = [];
+    let duration = 0;
+    for (const [i, id] of sequence.entries()) {
+      const atk = f.attacks[id];
+      const final = i === sequence.length - 1;
+      starts.push(strikes.length);
+      for (const st of attackStrikes(atk)) strikes.push(final ? st : Object.freeze({ ...st, baseLaunch: 0 }));
+      duration += atk.total / rate;
+    }
+    triggers.push(Object.freeze({
+      action, move, first, sequence: Object.freeze(sequence), strikes: Object.freeze(strikes), starts: Object.freeze(starts), duration,
+    }));
+  }
+  if (!triggers.length) return null;
+  const turnTime = Object.fromEntries(pair.attacks.map((id) => [id, f.attacks[id].total / rate]));
+  return Object.freeze({
+    pair: pair.attacks, rate, turns: MASH_COMBO.turns, presses: MASH_COMBO.presses, triggers: Object.freeze(triggers),
+    turnTime: Object.freeze(turnTime),
+  });
+}
+
 // Everything fighter `f` can do, cached (see the header).
 export function analyzeCapabilities(f) {
   const cached = CACHE.get(f);
@@ -296,6 +337,7 @@ export function analyzeCapabilities(f) {
     }),
     energy: f.energyDef,
     launchReaction: f.launchReaction,
+    mash: mashModel(f, moves),
   };
   CACHE.set(f, Object.freeze(caps));
   return caps;

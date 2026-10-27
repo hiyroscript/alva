@@ -125,9 +125,12 @@ export class Defense {
     let first = null;
     let top = Infinity;
     const boxes = [];
-    const steps = Math.min(90, Math.ceil((def.startup + def.active - tNow) / STEP) + 1);
+    // A Mash Combo turn plays at its rate: its strikes come that much
+    // sooner.
+    const rate = s.op.attackRate ?? 1;
+    const steps = Math.min(90, Math.ceil((def.startup + def.active - tNow) / (STEP * rate)) + 1);
     for (let k = 0; k < steps; k++) {
-      const t = tNow + (k + 1) * STEP;
+      const t = tNow + (k + 1) * STEP * rate;
       const fk = s.foeTrack.i(k);
       const fx = s.foeTrack.x[fk];
       const fy = s.foeTrack.y[fk];
@@ -168,14 +171,30 @@ export class Defense {
     }
     if (contact < 0) return;
     const pos = { x: s.me.x, y: s.me.y, grounded: s.me.grounded, halfW: s.me.halfW, height: s.me.height };
+    // A Mash Combo turn before its last launches nothing (its Base Launch
+    // is 0 whatever the move's own), and every turn still to come follows
+    // it: the series' strikes left, the last with its real launch, are what
+    // letting it through costs. A Shield that blocks a turn ends the series.
+    const turn = v.attackMash;
+    const suppressed = !!turn && !turn.final;
     const list = def.hits ? def.hits.map((h) => ({ ...h, dir: h.directionalLaunch })) : [{ ...def, dir: def.directionalLaunch }];
+    if (suppressed) for (const h of list) h.baseLaunch = 0;
     if (impact) list.push({ ...impact.hit, dir: impact.hit.directionalLaunch });
-    const sev = this.brain.evaluator.judge.strikes(s, 'me', list, Math.max(1, Math.min(n, list.length)), pos, face0, this.hv);
+    const series = s.op.mash;
+    let count = Math.max(1, Math.min(n, list.length));
+    if (turn && series?.trigger) {
+      const next = series.trigger.starts[turn.turn] ?? series.trigger.strikes.length;
+      const rest = series.trigger.strikes.slice(next);
+      list.push(...rest);
+      count += rest.length;
+    }
+    const sev = this.brain.evaluator.judge.strikes(s, 'me', list, count, pos, face0, this.hv);
     out.push({
       kind: 'melee', ref: v.attack, def, contact: (contact + 1) * STEP, end: (end + 1) * STEP + 0.02, boxes, top,
       from: Math.sign(s.op.x - s.me.x) || -s.me.facing, severity: sev.value, ko: sev.ko,
       blockPush: first.blockPush ?? def.blockPush ?? 0,
-      strikesLeft: n, foeRecovery: def.total - tNow - (contact + 1) * STEP,
+      strikesLeft: n, foeRecovery: (def.total - tNow) / rate - (contact + 1) * STEP,
+      mash: turn ? { turn: turn.turn, turnsLeft: series?.turnsLeft ?? 0, final: turn.final } : null,
     });
   }
 
@@ -327,6 +346,9 @@ export class Defense {
       let score = -0.3 - (cost / 25) * (0.4 + p.energySense) - (exhausts ? 8 * p.energySense : 0) - (pushedOff ? sev * 0.9 : 0);
       // Blocking leaves the attacker its recovery: a punish, if long enough.
       if (threat.kind === 'melee' && threat.foeRecovery > s.caps.fastest.ground + 0.05) score += 2 + threat.foeRecovery * 4;
+      // A Mash Combo turn blocked ends the whole series there: every turn
+      // still to come is saved, the finisher's launch with them.
+      if (threat.mash) score += 1.5 + threat.mash.turnsLeft * 0.4;
       const rearmed = self.shieldDownTime >= (shield.perfectRearm ?? 0);
       const perfect = shield.perfectWindow > 0 && rearmed && brain.rng() < p.perfectShield && threat.contact > 0.08;
       const raiseIn = perfect ? Math.max(0, threat.contact - shield.perfectWindow * 0.6) : Math.max(0, threat.contact - 0.16 - (1 - p.guard) * 0.1);
