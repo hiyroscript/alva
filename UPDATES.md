@@ -3568,7 +3568,9 @@ time.
   a Step-in counts toward `approach` or `mobility` only when it really
   travels (`lunge`, from `stepInTravel`, at least 32 units: none does
   today), and the threat reach adds the real travel; the executor holds no
-  direction through a grounded attack and steers in the air as ever.
+  direction through a grounded attack, and in the air steers its own
+  aerials only while steering home (`Executor.dir`'s `homeward`), so they
+  play out where it planned them.
 
 **Consequences.** Running into an attack and holding on no longer keeps
 the run: it runs down at the universal deceleration (a Dash attack at the
@@ -3607,7 +3609,8 @@ none in the air or on landing; a turn after it never redirecting it; a CPU's and
 player's Run alike; normal movement back at once; the CPU's prediction
 matching the Fighter step for step; a wall; a summon and its phantom
 never moving; the CPU's lunge reading); `attack-mobility` removed;
-`movement-rules`, `movement`, `slam`, `pull`, `defense`, `combat-ai`, the
+`movement-rules`, `movement`, `slam`, `pull`, `defense`, `combat-ai`,
+`cpu-intelligence` (the level-by-level head-to-head plays two seeds), the
 #0001, #0002 and #0006 suites and the test fixtures updated;
 `tests/benchmarks/feel-metrics.mjs` now measures the Step-in, the
 displacement a held direction adds to a ground attack (0) and to an
