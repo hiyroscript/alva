@@ -3,8 +3,8 @@
 // fighter.
 //
 // Purpose: how ground acceleration and braking, turning, air steering,
-// overspeed, an attack's momentum, the hitstun drift, the fast fall, the
-// air jump and the higher jump work. No fighter changes these rules or their numbers.
+// overspeed, an attack's momentum and Step-in (never steered), the hitstun
+// drift, the fast fall, the air jump and the higher jump work. No fighter changes these rules or their numbers.
 //
 // Inputs: the movement values (`mv`: BASE_FIGHTER_MOVEMENT in
 // js/data/movement.js, which lists every field), an attack definition
@@ -35,16 +35,11 @@ import { approach, sign } from '../../core/utils.js';
 const EPSILON = 1e-6;
 
 // One step of horizontal steering on whatever `body` stands on (or in the
-// air), with `control` (0-1) of the normal steering authority: that share
-// of the acceleration (and of the turn's braking). `speed` (0-1, all of it
-// by default) is the share of top speed the steering builds toward, apart
-// from the authority: a strike may steer with 0.8 of the authority and
-// still hold the whole run, or with a quarter of it toward a third of the
-// run. `friction` scales the ground deceleration that slows it while it is
-// not steering. `mv` is the movement values and `dir` the direction held
-// (-1, 0 or 1). `burst`: the speed above top speed is the fighter's own (a
-// Dash's or an air dash's; see Fighter.burst), so it bleeds off in the air
-// too.
+// air): ordinary locomotion, never an attack's (see attackDrift). `mv` is
+// the movement values and `dir` the direction held (-1, 0 or 1).
+// `friction` scales the ground deceleration that slows it while nothing is
+// held. `burst`: the speed above top speed is the fighter's own (a Dash's
+// or an air dash's; see Fighter.burst), so it bleeds off in the air too.
 //
 // Ground: from rest to top speed at `acceleration`; letting go stops it at
 // `deceleration`; pressing against the way it moves brakes at
@@ -57,23 +52,20 @@ const EPSILON = 1e-6;
 // Air: the same shape with `airAcceleration`, `airTurnBoost` and the gentle
 // `airDeceleration` drag, so steering bends the drift instead of replacing
 // it; a burst above top speed bleeds off at `airOverspeedDeceleration`, and
-// any other speed (a launch's) only under the drag. Held to a `speed`
-// under 1, the speed over that share runs down at the rate letting go
-// would (the overspeed rates above top speed), so a heavy swing slows a run
-// it is thrown at, never at once.
-export function steer(body, mv, dir, control, friction, dt, burst = false, speed = 1) {
+// any other speed (a launch's) only under the drag.
+export function steer(body, mv, dir, dt, burst = false, friction = 1) {
   const grounded = body.grounded;
   const v = body.vx;
-  const top = mv.maxSpeed * speed;
-  const accel = (grounded ? mv.acceleration : mv.airAcceleration) * control;
+  const top = mv.maxSpeed;
+  const accel = grounded ? mv.acceleration : mv.airAcceleration;
   const boost = grounded ? mv.turnBoost : mv.airTurnBoost;
-  const ahead = dir !== 0 && control > 0 && v !== 0 && sign(v) === dir;
+  const ahead = dir !== 0 && v !== 0 && sign(v) === dir;
   let drag = grounded ? mv.deceleration * friction : mv.airDeceleration;
   if (Math.abs(v) > mv.maxSpeed + EPSILON) {
     if (grounded) drag = ahead ? mv.overspeedHoldDeceleration : Math.max(drag, mv.overspeedDeceleration);
     else if (burst) drag = Math.max(drag, mv.airOverspeedDeceleration);
   }
-  if (!dir || control <= 0) {
+  if (!dir) {
     body.vx = approach(v, 0, drag * dt);
   } else if (v !== 0 && sign(v) !== dir) {
     // Reversing: brake hard (never softer than letting go), then whatever
@@ -87,35 +79,56 @@ export function steer(body, mv, dir, control, friction, dt, burst = false, speed
   }
 }
 
-// One step of attack record `atk`'s own movement (see the attack fields in
-// js/game/combat/attacks.js) for a fighter facing `facing`: its step-in once
-// its time reaches it (on the ground only: never slower than the fighter
-// already goes that way), then steering with the attack's share of the
-// steering authority toward its share of top speed (its mobility tier's,
-// js/data/attack-mobility.js, unless it writes its own) over the speed it
-// started with, the rest running down under its friction. `burst` as for
-// steer.
-export function steerAttack(body, mv, facing, atk, dir, dt, burst = false) {
-  const def = atk.def;
-  const step = def.step;
+// One step of the horizontal movement of attack record `atk` (its `def`,
+// its `time`, the `step` this activation makes and whether it has
+// `stepped`) for a fighter facing `facing`: its Step-in once its time
+// reaches it (see js/data/attack-movement.js), the way the strike faces
+// then (an attack turned before it turns its lunge with it; once made,
+// nothing redirects it), then the speed running down
+// as if nothing were held, under its friction x the ground deceleration (the
+// air drag in the air; overspeed as steer has it). No direction is taken:
+// nothing held moves a fighter while an attack plays. The Step-in raises the
+// forward speed to at least its own, once, on the ground only: a fighter
+// off the ground as its time comes never makes it (never later either).
+// `burst` as for steer.
+export function attackDrift(body, mv, facing, atk, dt, burst = false) {
+  const step = atk.step;
   if (step && !atk.stepped && atk.time >= step.at - EPSILON) {
     atk.stepped = true;
     if (body.grounded && body.vx * facing < step.speed) body.vx = facing * step.speed;
   }
-  const grounded = body.grounded;
-  steer(
-    body, mv, dir, grounded ? def.control : def.airControl, grounded ? def.friction : 1, dt, burst,
-    grounded ? def.topSpeed : def.airTopSpeed,
-  );
+  steer(body, mv, 0, dt, burst, body.grounded ? atk.def.friction : 1);
+}
+
+// The Step-in an activation of attack definition `def` makes, started on
+// the ground (`grounded`) or in the air: its `step` on the ground, none in
+// the air (see js/data/attack-movement.js). Recorded as the attack starts.
+export function activationStep(def, grounded) {
+  return grounded ? def.step ?? null : null;
+}
+
+// How far (world units) attack definition `def`'s Step-in carries a
+// fighter that starts it standing still on flat ground, nothing held: its
+// step's speed run down by attackDrift's own rule, one fixed step `dt` at a
+// time. 0 without a step. For readers that plan with it (the CPU), never
+// for moving anyone.
+export function stepInTravel(def, mv, dt) {
+  const step = def?.step;
+  if (!step) return 0;
+  const body = { vx: step.speed, grounded: true };
+  let travel = 0;
+  for (let k = 0; k < 600 && body.vx > 0; k++) {
+    steer(body, mv, 0, dt, false, def.friction);
+    travel += body.vx * dt;
+  }
+  return travel;
 }
 
 // The horizontal speed an attack definition `atk` starting now keeps of
 // `vx`: its momentum share (airMomentum in the air), which is all of it
 // unless the attack says otherwise. Never capped at top speed: a Dash's
-// burst carries on into the attack and bleeds off as overspeed does. An
-// attack that leaves normal locomotion on keeps all of it.
+// burst carries on into the attack and bleeds off as overspeed does.
 export function attackStartSpeed(atk, vx, grounded) {
-  if (!atk.lockMovement) return vx;
   return vx * (grounded ? atk.momentum : atk.airMomentum);
 }
 

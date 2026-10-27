@@ -26,12 +26,12 @@ const STEP = 1 / 60;
 
 function threatReach(caps) {
   // How far the fighter's quick ground strikes reach from its origin, motion
-  // included (a roll's path, a step-in), and its lunges.
+  // included (a roll's path, a Step-in's real travel), and its lunges.
   let poke = 0;
   let lunge = 0;
   for (const m of caps.moves) {
     if (m.air || !m.reach) continue;
-    const front = m.reach.x + m.reach.w + (m.step ? m.step.speed * Math.max(0, m.startup - m.step.at) : 0);
+    const front = m.reach.x + m.reach.w + (m.lunge ?? 0);
     if (m.lead <= 0.2) poke = Math.max(poke, front);
     lunge = Math.max(lunge, front);
   }

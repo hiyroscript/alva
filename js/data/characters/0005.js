@@ -308,8 +308,8 @@ export const CHARACTER_0005 = {
   // here sideways, the way the claw sweeps; while the arc is live it turns
   // the other fighter's projectiles back at their thrower, now #0005's. A
   // little over a quarter of a second in all, keeping the whole of its
-  // drift, steered as a medium strike (js/data/attack-mobility.js); no
-  // cooldown of its own.
+  // drift, never steered and never stepping in (a defense:
+  // js/data/attack-movement.js); no cooldown of its own.
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0005.deflect,
@@ -320,7 +320,6 @@ export const CHARACTER_0005 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    mobility: 'medium',
     deflectProjectiles: true,
   },
 
@@ -483,16 +482,19 @@ export const CHARACTER_0005 = {
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). None has a cooldown (the cooldown policy's: none
-  // deals 10, paralyzes, floats or frightens) but the phantom's bite. Each moves by the mobility tier its role gives
-  // it (js/data/attack-mobility.js): the claws quick, the bites and hands
-  // medium, the Long Bite heavy, the tendrils planted.
+  // deals 10, paralyzes, floats or frightens) but the phantom's bite. Each
+  // moves by the shared attack movement (js/data/attack-movement.js): never
+  // steered; the Claw Swipe and the Long Bite step in by the shared
+  // Step-in, the Phantom Hands and the Dark Tendrils never (the hands and
+  // the tendrils are what strike, conjured away from its body), nor the
+  // aerials or the phantom's bite.
   attacks: {
     // The Claw Swipe: the claw drawn back (frame 1), the swipe (frame 2,
     // live: its arc in front, from the chest to the hips, out to 60 units),
     // the claw raised (frame 3): a quarter of a second in all. Light and
     // quick (3, Base Launch 1 sideways); it opens a follow-up once it has
-    // hit. A quick strike: it keeps all the speed it is thrown at and the
-    // run on through it.
+    // hit. It keeps all the speed it is thrown at and steps in by the shared
+    // Step-in.
     attack1: {
       animation: 'attack1',
       startup: 1 / FPS_0005.attack1,
@@ -506,7 +508,6 @@ export const CHARACTER_0005 = {
       blockstun: 0.14,
       hitstop: 1 / 30,
       groundOnly: true,
-      mobility: 'quick',
       hitCancel: 2 / FPS_0005.attack1,
     },
     // The Claw Rake: drifting and the claws raised (frames 1-2), then two
@@ -514,8 +515,8 @@ export const CHARACTER_0005 = {
     // no launch, a stun that holds its target for the next. The arc through
     // the front, low (frame 4): 3, Base Launch 1 downward, driving the
     // target down (off the stage, a spike). The claws held out (frame 5): a
-    // third of a second in all. A quick strike, steered almost as well as
-    // it drifts, and a hit opens a follow-up from frame 5.
+    // third of a second in all. Its drift carried on, never steered, and a
+    // hit opens a follow-up from frame 5.
     midair_attack1: {
       animation: 'midair_attack1',
       recovery: 1 / FPS_0005.midair_attack1,
@@ -529,7 +530,6 @@ export const CHARACTER_0005 = {
           damage: 3, baseLaunch: 1, directionalLaunch: 'reverseVertical',
         },
       ],
-      mobility: 'quick',
       hitCancel: 4 / FPS_0005.midair_attack1,
     },
     // The Long Bite: crouched, its head shooting out from its face on its
@@ -543,8 +543,9 @@ export const CHARACTER_0005 = {
     // and flung far away: its finisher. The jaws shut and the neck drawn
     // back (frames 9-13, a third of a second): 0.87 s in all, its longest
     // ordinary commitment. The longest reach in the roster, and its
-    // slowest ordinary move: heavy, slowed to a walk and steered only a
-    // little, keeping less of a run as it starts.
+    // slowest ordinary move: never steered, keeping less of a run as it
+    // starts (0.4 of it). Its head is its body: it leans in by the shared
+    // Step-in, a slight lean beside the neck's reach.
     attack2: {
       animation: 'attack2',
       recovery: 5 / FPS_0005.attack2,
@@ -559,7 +560,6 @@ export const CHARACTER_0005 = {
         { at: 7 / FPS_0005.attack2, active: 1 / FPS_0005.attack2, damage: 5, baseLaunch: 3, directionalLaunch: 'horizontal', hitstun: 0.42, hitstop: 0.08 },
       ],
       groundOnly: true,
-      mobility: 'heavy',
       momentum: 0.4,
     },
     // Snapping Jaws: the head out from its face (frames 1-2), then three
@@ -568,7 +568,7 @@ export const CHARACTER_0005 = {
     // tip: the bite (frame 3) and a chew (frame 5), 1 each, holding its
     // prey; the last chew (frame 7): 3, Base Launch 2 sideways. Closed and
     // drawn back (frames 8-10): half a second in all.
-    // A medium strike, keeping a little over half its drift as it starts.
+    // Never steered, keeping a little over half its drift as it starts.
     midair_attack2: {
       animation: 'midair_attack2',
       recovery: 3 / FPS_0005.midair_attack2,
@@ -581,7 +581,6 @@ export const CHARACTER_0005 = {
         { at: 4 / FPS_0005.midair_attack2, active: 1 / FPS_0005.midair_attack2, damage: 1 },
         { at: 6 / FPS_0005.midair_attack2, active: 1 / FPS_0005.midair_attack2, damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.4 },
       ],
-      mobility: 'medium',
       airMomentum: 0.6,
     },
     // Phantom Hands: the hands drawn back behind it (frame 1, held two
@@ -589,7 +588,8 @@ export const CHARACTER_0005 = {
     // the head to below the hips, 26 to 116 units out, where the hands
     // land): 1 each, holding the target, the last 3 at Base Launch 2
     // straight up, the hands hurling it into the air; a hand held out
-    // (frame 6): 0.58 s in all. A medium strike.
+    // (frame 6): 0.58 s in all. The phantom hands are what strike, out where
+    // they land, never #0005's own body: it never steps in (`step: false`).
     attack3: {
       animation: 'attack3',
       recovery: 1 / FPS_0005.attack3,
@@ -597,6 +597,7 @@ export const CHARACTER_0005 = {
       hitstun: 0.3,
       blockstun: 0.12,
       hitstop: 1 / 30,
+      step: false,
       hits: [
         { at: 2 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 1 },
         { at: 3 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 1 },
@@ -604,14 +605,13 @@ export const CHARACTER_0005 = {
         { at: 5 / FPS_0005.attack3, active: 1 / FPS_0005.attack3, damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.38 },
       ],
       groundOnly: true,
-      mobility: 'medium',
     },
     // Floating Hands: #0005 floats where it is (motion `hover`) as a hand
     // is drawn back (frames 1-2), then four bursts of hands (frames 3-6,
     // live: 24 to 132 units out, from over the head to below the hips), 1
     // each, the last 3 at Base Launch 2 sideways; a hand held out (frame
-    // 7): 0.58 s in all, the hang taking most of its drift, steered as a
-    // medium strike. Once per airtime.
+    // 7): 0.58 s in all, the hang taking most of its drift, never steered.
+    // Once per airtime.
     midair_attack3: {
       animation: 'midair_attack3',
       recovery: 1 / FPS_0005.midair_attack3,
@@ -627,7 +627,6 @@ export const CHARACTER_0005 = {
       ],
       airUses: 1,
       motion: { type: 'hover' },
-      mobility: 'medium',
       airMomentum: 0.4,
     },
     // The Red Balloon's bite (the phantom's attack, see `summons`; no
@@ -638,8 +637,8 @@ export const CHARACTER_0005 = {
     // (frame 5). 3, Base Launch 1 along the phantom's facing (toward
     // #0005), and it frightens its prey for 2.5 s (`fear`), less than the
     // summon's own 3 s: until the fear runs out, every hit #0005 lands on
-    // it takes that much off #0005's own Launch Point too. Planted (the
-    // phantom has no body to move).
+    // it takes that much off #0005's own Launch Point too. It never steps in
+    // (`step: false`): the phantom has no body to move.
     attack5: {
       animation: 'attack5',
       startup: 3 / FPS_0005.attack5,
@@ -649,12 +648,12 @@ export const CHARACTER_0005 = {
       baseLaunch: 1,
       directionalLaunch: 'horizontal',
       fear: 2.5,
+      step: false,
       hitbox: { x: 22, y: -100, w: 76, h: 92 },
       hitstun: 0.4,
       blockstun: 0.15,
       hitstop: 0.06,
       groundOnly: true,
-      mobility: 'planted',
     },
     // Dark Tendrils (extra_attack): the tendrils pouring out of the maw
     // (frames 1-4, a good quarter of a second), then at full length (frame
@@ -664,9 +663,10 @@ export const CHARACTER_0005 = {
     // within 280 units of its maw is reeled in toward it (`pull`, in front
     // only: one behind it is left where it is; a raised Shield holds its
     // ground and blocks the seizing). Snapped back in (frames 3 and 1):
-    // 0.6 s in all. It roots #0005 where it stands (planted): none of the
-    // speed it was moving at is kept, and it is never steered. Once it has seized, a follow-up may cut the
-    // snapping back short; the seized prey is still held as the Deadlights
+    // 0.6 s in all. It roots #0005 where it stands: none of the speed it was
+    // moving at is kept (`momentum: 0`), it never steps in (`step: false`:
+    // the tendrils are what reach out) and nothing steers it. Once it has
+    // seized, a follow-up may cut the snapping back short; the seized prey is still held as the Deadlights
     // let go, cast once the tendrils are back, if it faced #0005.
     extra_attack: {
       animation: 'extra_attack',
@@ -679,8 +679,8 @@ export const CHARACTER_0005 = {
       hitstop: 1 / 30,
       pull: { radius: 280, speed: 1100, offset: { x: 40, y: -55 }, front: true },
       groundOnly: true,
-      mobility: 'planted',
       momentum: 0,
+      step: false,
       hitCancel: 7 / FPS_0005.extra_attack,
     },
   },

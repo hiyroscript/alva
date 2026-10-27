@@ -10,26 +10,30 @@
 //
 //   reverse        steps from full speed one way to full speed the other
 //                  (ground, then air)
-//   run → attack   running right at top speed, an ordinary ground attack
-//                  pressed with right still held: its speed one step in
-//                  and as it ends (and the lowest in between), and how far
-//                  it travels while it plays; then the same with nothing
-//                  held after the press
-//   steer          from a standstill, the attack pressed with right held:
-//                  how far the player can move it while it plays
-//   back-space     running right, the attack pressed and left held at
-//                  once: how far it drifts back (negative is backward)
-//   air steer      drifting right at top speed at a jump's apex, an
-//                  ordinary aerial pressed with left held: the drift it
-//                  ends with (how much the player turned round), and with
-//                  right held (how much of the drift it keeps)
+//   step-in        from a standstill, an ordinary ground attack pressed
+//                  with nothing held: how far its Step-in carries it while
+//                  it plays, and how many times its speed rises (once at
+//                  most)
+//   steered        the same attack with Run held, then held back, through
+//                  it, aimed the way it faces (so nothing held can turn it):
+//                  how much further either moves it than nothing held (0:
+//                  attacks are never steered), from a standstill and from a
+//                  run
+//   run → attack   running right at top speed, the attack pressed: its
+//                  speed one step in and as it ends, how far it carries on
+//                  with nothing held, and the steps after it ends before
+//                  Run held moves it again (1: normal movement back at once)
+//   air drift      drifting right at top speed at a jump's apex, an
+//                  ordinary aerial pressed: the drift it ends with, and how
+//                  much Run or left held changes it (0)
 //   dash → attack  Attack 1 at the Dash's first cancel step: the speed it
 //                  starts with and six steps on
 //   dashes / 10 s  Dashes started by pressing the Dash every step it is
 //                  allowed, alternating sides, from a full bar
 //
-// These are proxies: they show whether control and momentum survive a
-// change of action, never whether the game is fun. Nothing here is
+// These are proxies: they show whether momentum survives a change of
+// action, that the Step-in is slight and that nothing steers an attack,
+// never whether the game is fun. Nothing here is
 // asserted; the tests assert the rules.
 
 import { writeFileSync } from 'node:fs';
@@ -74,31 +78,47 @@ function running(makeFighter) {
   return h;
 }
 
-function groundAttack(makeFighter, action, { during, pressHeld }) {
-  const h = pressHeld === 'stand' ? makeFighter({ x: 600 }) : running(makeFighter);
+// An ordinary ground attack `action`, from a standstill (`from` 'stand')
+// or a run, with `during` held through it: its speed one step in and as it
+// ends, how far it travels while it plays, how many times its speed rises
+// (its Step-in) and, `during` still held, the steps after it before the
+// fighter moves on under Run again.
+function groundAttack(makeFighter, action, { from, during }) {
+  const h = from === 'stand' ? makeFighter({ x: 600 }) : running(makeFighter);
+  h.fighter.controller.attackFacing = () => h.fighter.facing;
   const x0 = h.fighter.body.x;
-  h.step({ ...(pressHeld === 'stand' ? RIGHT : pressHeld), ...P(action) });
+  // Pressed with nothing held (a direction held as it is pressed only
+  // chooses the way it faces), `during` held from the next step on.
+  h.step(P(action));
   const first = h.fighter.body.vx;
   const samples = playOut(h, during);
-  const end = samples.at(-1) ?? { x: h.fighter.body.x, vx: h.fighter.body.vx };
-  return {
-    first: round(first),
-    end: round(end.vx),
-    min: round(Math.min(first, ...samples.map((s) => s.vx))),
-    travel: round(end.x - x0),
-    steps: samples.length + 1,
-  };
+  const playing = samples.slice(0, -1);
+  const end = playing.at(-1) ?? { x: h.fighter.body.x, vx: h.fighter.body.vx };
+  let rises = 0;
+  let last = first;
+  for (const { vx } of playing) {
+    if (vx > last + 1e-9) rises++;
+    last = vx;
+  }
+  let restored = 0;
+  const v = h.fighter.body.vx;
+  for (let i = 0; i < 30 && h.fighter.body.vx <= v + 1e-9; i++) {
+    h.step(RIGHT);
+    restored++;
+  }
+  return { first: round(first), end: round(end.vx), travel: round(end.x - x0, 1), rises, restored };
 }
 
 function airAttack(makeFighter, action, held) {
   const h = running(makeFighter);
+  h.fighter.controller.attackFacing = () => h.fighter.facing;
   h.step({ ...RIGHT, ...P('jump') });
   for (let i = 0; i < 120 && h.fighter.body.vy < 0; i++) h.step(RIGHT);
   const before = h.fighter.body.vx;
   h.step({ ...held, ...P(action) });
   const samples = playOut(h, held);
-  const end = samples.at(-1)?.vx ?? h.fighter.body.vx;
-  return { before: round(before), end: round(end), turned: round(before - end) };
+  const end = samples.at(-2)?.vx ?? h.fighter.body.vx;
+  return { before: round(before), end: round(end, 1) };
 }
 
 function reverseSteps(makeFighter, air) {
@@ -162,16 +182,30 @@ for (const c of playableCharacters()) {
   const probe = makeFighter().fighter;
   const ground = {};
   for (const { action, id } of attacksOf(c, probe, 'ground')) {
+    const stand = groundAttack(makeFighter, action, { from: 'stand', during: {} });
+    const run = groundAttack(makeFighter, action, { from: 'run', during: {} });
     ground[id] = {
-      runHeld: groundAttack(makeFighter, action, { pressHeld: RIGHT, during: RIGHT }),
-      runReleased: groundAttack(makeFighter, action, { pressHeld: RIGHT, during: {} }),
-      standSteer: groundAttack(makeFighter, action, { pressHeld: 'stand', during: RIGHT }),
-      backSpace: groundAttack(makeFighter, action, { pressHeld: RIGHT, during: LEFT }),
+      stand,
+      run,
+      steered: {
+        standRun: round(groundAttack(makeFighter, action, { from: 'stand', during: RIGHT }).travel - stand.travel, 3),
+        standBack: round(groundAttack(makeFighter, action, { from: 'stand', during: LEFT }).travel - stand.travel, 3),
+        runRun: round(groundAttack(makeFighter, action, { from: 'run', during: RIGHT }).travel - run.travel, 3),
+        runBack: round(groundAttack(makeFighter, action, { from: 'run', during: LEFT }).travel - run.travel, 3),
+      },
+      restored: groundAttack(makeFighter, action, { from: 'run', during: RIGHT }).restored,
     };
   }
   const air = {};
   for (const { action, id } of attacksOf(c, probe, 'air')) {
-    air[id] = { back: airAttack(makeFighter, action, LEFT), on: airAttack(makeFighter, action, RIGHT) };
+    const free = airAttack(makeFighter, action, {});
+    air[id] = {
+      free,
+      steered: {
+        run: round(airAttack(makeFighter, action, RIGHT).end - free.end, 3),
+        back: round(airAttack(makeFighter, action, LEFT).end - free.end, 3),
+      },
+    };
   }
   results.fighters[c.id] = { ground, air, dashAttack: dashAttack(makeFighter) };
 }
@@ -181,16 +215,17 @@ console.log(`reverse: ground ${u.reverseGroundSteps} steps, air ${u.reverseAirSt
 console.log(`dashes / 10 s: ${u.dashesIn10s}`);
 for (const [id, f] of Object.entries(results.fighters)) {
   console.log(`\n#${id}  dash → Attack 1: ${f.dashAttack.start} → ${f.dashAttack.later} units/s`);
-  console.log('  ground attack        run held: first/min/end travel | released: end travel | stand steer | back-space');
+  console.log('  ground attack        step-in travel/rises | steered: stand run/back, run run/back | run → attack first/end travel | restored');
   for (const [atk, m] of Object.entries(f.ground)) {
+    const st = m.steered;
     console.log(
-      `  ${atk.padEnd(20)} ${`${m.runHeld.first}/${m.runHeld.min}/${m.runHeld.end}`.padStart(13)} ${String(m.runHeld.travel).padStart(5)}` +
-      ` | ${String(m.runReleased.end).padStart(5)} ${String(m.runReleased.travel).padStart(5)}` +
-      ` | ${String(m.standSteer.travel).padStart(5)} | ${String(m.backSpace.travel).padStart(5)}`,
+      `  ${atk.padEnd(20)} ${`${m.stand.travel}/${m.stand.rises}`.padStart(19)}` +
+      ` | ${`${st.standRun}/${st.standBack}, ${st.runRun}/${st.runBack}`.padStart(30)}` +
+      ` | ${`${m.run.first}/${m.run.end} ${m.run.travel}`.padStart(25)} | ${m.restored}`,
     );
   }
   for (const [atk, m] of Object.entries(f.air)) {
-    console.log(`  ${atk.padEnd(20)} air drift ${m.back.before} → left held ${m.back.end}, right held ${m.on.end}`);
+    console.log(`  ${atk.padEnd(20)} air drift ${m.free.before} → ${m.free.end}; steered: run ${m.steered.run}, back ${m.steered.back}`);
   }
 }
 

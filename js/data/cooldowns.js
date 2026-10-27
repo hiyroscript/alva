@@ -80,7 +80,7 @@ export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm', '
 export const ROUTINE_EFFECTS = Object.freeze([
   'damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'blockstun', 'hitstop',
   'blockPush', 'quake', 'gaze', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
-  'motion', 'step', 'mobility', 'hits', 'projectile', 'burst', 'deflectProjectiles', 'passThrough', 'hurtboxes',
+  'motion', 'step', 'momentum', 'hits', 'projectile', 'burst', 'deflectProjectiles', 'passThrough', 'hurtboxes',
   'airUses', 'freeFall', 'groundOnly', 'hitCancel',
 ]);
 

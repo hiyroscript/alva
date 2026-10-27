@@ -33,6 +33,8 @@ import {
 } from '../../js/game/rendering/shield-fx.js';
 import { fighterParts } from '../../js/game/rendering/ensemble.js';
 import { applyPulls } from '../../js/game/combat/pull.js';
+import { createAttackDefinition } from '../../js/game/combat/attacks.js';
+import { stepInTravel } from '../../js/game/fighters/movement.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../js/data/movement.js';
 import { EDGE_RED } from '../../js/core/organic-edge.js';
@@ -1034,7 +1036,11 @@ test('each blocked hit costs exactly 15: 100 -> 85 -> 70 -> 55 -> 40 -> 25 -> 10
   const d = duel({ targetCharacter: NO_REGEN });
   raiseShield(d);
   const trail = [];
+  const x0 = d.attacker.body.x;
   for (const expected of [85, 70, 55, 40, 25, 10, 0]) {
+    // Each Jab steps in a little (the shared Step-in): back to the same
+    // spacing for every one (this duel has no pushboxes to stop it).
+    d.attacker.body.x = x0;
     const [event, ...rest] = blockedAttack(d);
     assert.deepEqual(rest, [], 'one event per attack');
     assert.equal(event.type, 'block');
@@ -1135,11 +1141,14 @@ test('a missed attack costs nothing: no hit, no block event, no Energy', () => {
 });
 
 test('blocking uses the fighter\'s own hurtboxes, never the bigger circle drawn round it', () => {
-  // attack1's fist ends 46 units in front of the attacker; at a gap where it
+  // attack1's fist ends 46 units in front of the attacker, past its Step-in;
+  // at a gap where it
   // stops 4 units short of the target's hurtboxes it is well inside the
   // drawn Shield (radius ~66 round the target's middle) but touches
   // nothing: nothing happens.
-  const reach = def.attacks.attack1.hitbox.x + def.attacks.attack1.hitbox.w;
+  // Its reach as it strikes: the box, and the Step-in that carries it there.
+  const lunge = stepInTravel(createAttackDefinition({ ...def.attacks.attack1, id: 'attack1' }), BASE_FIGHTER_MOVEMENT, DT);
+  const reach = def.attacks.attack1.hitbox.x + def.attacks.attack1.hitbox.w + lunge;
   const gap = reach - Math.min(...def.hurtboxes.map((h) => h.x)) + 4;
   const d = duel({ gap });
   assert.ok(gap - reach < shieldRadius(def) * (1 - SHIELD_SHAPE.amp), 'inside the circle, wherever its edge is');

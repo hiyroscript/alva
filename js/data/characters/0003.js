@@ -254,8 +254,8 @@ export const CHARACTER_0003 = {
   // Launch 2, here upward, the way the hand sweeps; while the sweep is live
   // it turns the other fighter's projectiles back at their thrower, now
   // #0003's. A quarter of a second in all, falling as it sweeps and
-  // carrying the whole of its drift, steered as a medium strike
-  // (js/data/attack-mobility.js); no cooldown of its own.
+  // carrying the whole of its drift, never steered and never stepping in
+  // (a defense: js/data/attack-movement.js); no cooldown of its own.
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0003.deflect,
@@ -266,7 +266,6 @@ export const CHARACTER_0003 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    mobility: 'medium',
     deflectProjectiles: true,
   },
 
@@ -416,16 +415,17 @@ export const CHARACTER_0003 = {
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). None has a cooldown (the cooldown policy's: none
-  // deals 10 or paralyzes). Each moves by the mobility
-  // tier its role gives it (js/data/attack-mobility.js): the punch quick,
-  // the everyday kicks medium, the finishers and the plunge heavy.
+  // deals 10 or paralyzes). Each moves by the shared attack movement
+  // (js/data/attack-movement.js): never steered; the punch steps in by the
+  // shared Step-in, the Heel Drop and the Haymaker by their own, and the
+  // aerials never.
   attacks: {
     // The Chakra Punch: frames 1-2 the wind-up, 3-4 the straight (its box
     // out to 40 units, at the shoulders), 5-6 back, 0.3 s in all. Light and
     // quick (3, Base Launch 1 sideways), and the chakra in it shoves a
     // Shield that blocks it back (360 units/s). It opens a follow-up once it
-    // has hit. A quick strike: it keeps all the speed it is thrown at and
-    // the run on through it.
+    // has hit. It keeps all the speed it is thrown at and steps in by the
+    // shared Step-in.
     attack1: {
       animation: 'attack1',
       startup: 2 / FPS_0003.attack1,
@@ -440,7 +440,6 @@ export const CHARACTER_0003 = {
       hitstop: 1 / 30,
       blockPush: 360,
       groundOnly: true,
-      mobility: 'quick',
       hitCancel: 2 / FPS_0003.attack1,
     },
     // The Leaping Kick: tucked for a frame (a hang), then a chakra-driven
@@ -449,9 +448,8 @@ export const CHARACTER_0003 = {
     // out to 40 units), and carries on up from there, about 90 units in
     // all: its anti-air, and its one way back to the stage besides the
     // jumps. 3, Base Launch 2 sideways: a chakra kick that can finish off
-    // the stage. Once per airtime; a medium strike, its lift steered a
-    // little (half the steering, toward half of top speed), and a hit opens
-    // a follow-up at once.
+    // the stage. Once per airtime, its lift never steered (its drift carried
+    // on), and a hit opens a follow-up at once.
     midair_attack1: {
       animation: 'midair_attack1',
       startup: 1 / FPS_0003.midair_attack1,
@@ -466,10 +464,7 @@ export const CHARACTER_0003 = {
       hitstop: 1 / 30,
       airUses: 1,
       motion: { type: 'rise', speed: 420 },
-      mobility: 'medium',
       airMomentum: 0.8,
-      airControl: 0.5,
-      airTopSpeed: 0.5,
       hitCancel: 1 / FPS_0003.midair_attack1,
     },
     // The Heel Drop: the crouch and the hop (frames 1-2, stepping in at 220
@@ -481,8 +476,8 @@ export const CHARACTER_0003 = {
     // opponent still standing on it (a quake), so a target the heel drove
     // down too gently to rebound is popped up for a follow-up. Frames 8-10
     // pull the heel out, the last held two frames more (0.4 s in all); a
-    // hit opens a follow-up from frame 8. A medium strike: steerable, its
-    // run held a little under full.
+    // hit opens a follow-up from frame 8. Its hop is its own Step-in (no
+    // other is added); nothing steers it.
     attack2: {
       animation: 'attack2',
       recovery: 5 / FPS_0003.attack2,
@@ -498,22 +493,20 @@ export const CHARACTER_0003 = {
         },
       ],
       groundOnly: true,
-      mobility: 'medium',
       step: { at: 1 / FPS_0003.attack2, speed: 220 },
       hitCancel: 7 / FPS_0003.attack2,
     },
     // The Heavenly Foot of Pain: the leg raised and the heel brought down
     // (frames 1-2, a hang of 2/15 s), then the plunge heel-first at 1500
-    // units/s (steering a little) for up to 0.9 s. Anything the heel meets
-    // on the way is driven down (3, Base Launch 1 downward) and the plunge
+    // units/s (its drift carried on, never steered) for up to 0.9 s.
+    // Anything the heel meets on the way is driven down (3, Base Launch 1 downward) and the plunge
     // goes on through. Where it lands, the ground splits: every opponent
     // standing on it within 110 units either side is thrown upward (5, Base
     // Launch 3: a quake, so one in the air is untouched), and a Shield is
     // shoved back. Then 4/15 s with the heel in the ground (its impact
     // clip), a follow-up open from the second frame of it once anything
     // has been hit. Once per airtime, never while flying from a launch;
-    // off the stage it plunges into the Void. Heavy, its plunge's drift its
-    // own (a little steering, toward 0.4 of top speed).
+    // off the stage it plunges into the Void.
     midair_attack2: {
       animation: 'midair_attack2',
       startup: SLAM_HANG_0003,
@@ -539,10 +532,7 @@ export const CHARACTER_0003 = {
           animation: 'midair_attack2_impact',
         },
       },
-      mobility: 'heavy',
       airMomentum: 0.5,
-      airControl: 0.4,
-      airTopSpeed: 0.4,
       hitCancel: SLAM_HANG_0003 + SLAM_PLUNGE_0003 + 2 / FPS_0003.midair_attack2,
     },
     // The Chakra Haymaker (extra_attack): the glove tugged tight and the
@@ -553,8 +543,8 @@ export const CHARACTER_0003 = {
     // weight of its strength: 5, the heavy tier, Base Launch 3 sideways,
     // and a Shield that blocks it is driven back across the ground (620
     // units/s). A good quarter of a second to see it coming, and no
-    // follow-up: it is the end of a string. Heavy: slowed to a walk, steered
-    // only a little, its lunge sliding on under 0.7 of the ground
+    // follow-up: it is the end of a string. Never steered; its lunge is its
+    // own Step-in (no other is added), sliding on under 0.7 of the ground
     // deceleration as authored.
     extra_attack: {
       animation: 'extra_attack',
@@ -570,7 +560,6 @@ export const CHARACTER_0003 = {
       hitstop: 0.1,
       blockPush: 620,
       groundOnly: true,
-      mobility: 'heavy',
       friction: 0.7,
       step: { at: 3 / FPS_0003.extra_attack, speed: 360 },
     },

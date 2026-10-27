@@ -489,7 +489,7 @@ test('the Power Punch: pink alone at the front, a jab that holds (1) then a cros
   const { fighter: f } = solo();
   assert.ok(near(f.attacks.attack1.total, 4 / 15), 'four frames at 15 fps');
   assert.equal(f.attacks.attack1.groundOnly, true);
-  assert.equal(f.attacks.attack1.mobility, 'quick');
+  assert.equal(f.attacks.attack1.stepIn, 'universal', 'a grounded punch: the shared Step-in');
 });
 
 test('the Flying Kick: blue alone kicks out feet first in the air, 3 and Base Launch 1 sideways', () => {
@@ -528,7 +528,7 @@ test('the Tornado Spin: green spins up, then rolls on as a tornado, drawing in w
   assert.ok(caught.length >= 4 && caught.at(-1).damage === 3, caught.map((e) => e.damage).join(', '));
   const atk = solo().fighter.attacks.attack2;
   assert.ok(near(atk.total, 11 / 15), '0.73 s: a commitment');
-  assert.deepEqual([atk.groundOnly, atk.mobility, atk.motion.type, atk.passThrough], [true, 'planted', 'roll', true]);
+  assert.deepEqual([atk.groundOnly, atk.stepIn, atk.motion.type, atk.passThrough], [true, 'exempt', 'roll', true]);
   assert.equal(atk.pull.radius, 120);
 });
 
@@ -548,7 +548,7 @@ test('the Flying Punch: green alone throws her fist forward in the air, its fini
   }
   const atk = solo().fighter.attacks.midair_attack2;
   assert.ok(near(atk.startup, 0.2), 'a fifth of a second to see it coming');
-  assert.deepEqual([atk.airUses, atk.mobility], [1, 'heavy']);
+  assert.equal(atk.airUses, 1);
 });
 
 test('the Triple Strike: all three lock on and streak at the opponent together, one hit for 5 (Base Launch 2 sideways), whoever draws it', () => {

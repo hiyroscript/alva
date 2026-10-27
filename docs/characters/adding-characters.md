@@ -251,18 +251,22 @@ refused as the registry loads: [combat](../systems/combat.md#damage));
 its `baseLaunch` (0 to
 3: by `codename_rule`'s launch levels, 1 for light, 2 for medium, 3 for
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
-`'vertical'` or `'reverseVertical'`), each authored separately. Add how
-it moves: its mobility tier (`mobility`: `'quick'` for a light, fast
-strike, `'medium'` for one with a clear wind-up or recovery or an
-ordinary cast, `'heavy'` for a deliberate commitment, `'planted'` for a
-move that roots its fighter; chosen for what the move does, never its
-name, slot, damage or length, with a comment saying why), plus only the
-movement fields its own mechanic needs over the tier's (`momentum`,
-`control`, `topSpeed`, `friction` and their air versions, `step`, a
-step-in that moves its fighter only on the ground; a
-plunge or lift writes its `airTopSpeed` equal to its `airControl`:
-[attack movement](../systems/movement.md#5-attack-movement)); and
-whether a hit opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
+`'vertical'` or `'reverseVertical'`), each authored separately. Its movement
+is mostly not yours to write: nothing held ever steers an attack, and
+every grounded direct strike steps in slightly by itself, the shared
+Step-in ([attack movement](../systems/movement.md#5-attack-movement)).
+Write only what the move's own mechanic needs, with a comment saying why:
+`momentum` / `airMomentum` (the share of its speed it keeps as it starts,
+all of it by default; 0 roots it), `friction` (how fast its slide runs
+down), `step: { at, speed }` for a lunge of its own (it replaces the
+shared one, on the ground only), or `step: false` for a strike that never
+lunges (it roots its fighter, or what strikes is something it conjures
+away from its body, not its body's own). A throw, a move with a motion of
+its own and the Deflect never take the shared one, and nothing started in
+the air steps in.
+The retired Attack Mobility fields (`mobility`, `control`, `airControl`,
+`topSpeed`, `airTopSpeed`, `lockMovement`) are refused as the registry
+loads. Say whether a hit opens a follow-up (`hitCancel`). Leave `cooldown` out: the cooldown
 policy derives it from what the move does (5 s for 10 damage, 3 s for a
 heal, a paralysis or a charm, else none at all; a 3 s or 5 s one starts
 as the move is released, never on the press), and a value it does not give

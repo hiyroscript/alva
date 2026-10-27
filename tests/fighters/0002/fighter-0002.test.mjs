@@ -403,12 +403,23 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   assert.equal(def.cooldown, 0, 'an ordinary move: no cooldown at all');
   // Pressed over and over, flurries string only until their fling, growing
   // with the Launch Point, carries the target out of reach: never a loop.
+  // Each flurry's Step-in carries #0002 a little way on, so a later flurry
+  // may reach the target again, but only once it is free (its stun over):
+  // a new string, never one long one.
   const spam = versus({ gap: 44 });
-  for (let i = 0; i < steps(4); i++) spam.tick(P('attack2'));
-  const strung = spam.events.length;
-  assert.ok(strung > 4 && strung <= 12, `a few flurries at most (${strung} kicks)`);
-  for (let i = 0; i < steps(4); i++) spam.tick(P('attack2'));
-  assert.equal(spam.events.length, strung, 'then the target is out of its reach for good');
+  const strings = [];
+  let seen = 0;
+  for (let i = 0; i < steps(8); i++) {
+    const c = spam.target.combat;
+    const held = c.stun > 0 || c.hitstop > 0;
+    spam.tick(P('attack2'));
+    for (; seen < spam.events.length; seen++) {
+      if (held && strings.length) strings[strings.length - 1]++;
+      else strings.push(1);
+    }
+  }
+  const longest = Math.max(...strings);
+  assert.ok(longest > 4 && longest <= 12, `a few flurries at most in one string (${strings.join(', ')} kicks)`);
 });
 
 test('a Shield stops the flurry at the kick it blocks: one block, one Energy cost, no later kick', () => {

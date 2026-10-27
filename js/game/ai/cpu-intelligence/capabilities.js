@@ -35,6 +35,9 @@
 
 import { readMoveset } from '../moveset.js';
 import { attackReach } from '../../combat/attacks.js';
+import { stepInTravel } from '../../fighters/movement.js';
+import { BASE_FIGHTER_MOVEMENT } from '../../../data/movement.js';
+import { CONFIG } from '../../../config.js';
 import { attackOffense, summonOffense, techniqueOffense } from '../../combat/offense.js';
 
 // Every role a move can be given (a move may have several at once).
@@ -45,6 +48,16 @@ export const MOVE_ROLES = Object.freeze([
 ]);
 
 const CACHE = new WeakMap();
+
+// How far a Step-in must carry its fighter (world units, from a standstill)
+// before its move counts as one that travels (an approach, mobility): about
+// a fighter's width. The shared Step-in (about 11) never does.
+const MAJOR_LUNGE = 32;
+
+// The ground travel of attack `atk`'s Step-in (see stepInTravel).
+function stepTravel(atk) {
+  return stepInTravel(atk, BASE_FIGHTER_MOVEMENT, CONFIG.sim.step);
+}
 
 // One strike as the intelligence weighs it.
 function strikeOf(h, at, end) {
@@ -135,7 +148,10 @@ function rolesOf(m, height, fastest) {
   const motion = m.motion;
   if (melee && m.lead <= Math.max(0.13, fastest * 1.25) && m.commitment <= 0.4) r.add('poke');
   if (melee && (m.lead <= Math.max(0.17, fastest * 1.6) || m.damage >= 5)) r.add('punish');
-  if (motion === 'homing' || motion === 'roll' || m.step) r.add('approach');
+  // A lunge counts only when it really travels (MAJOR_LUNGE): the shared
+  // Step-in, a lean into the blow, never makes a jab an approach.
+  const lunges = m.lunge >= MAJOR_LUNGE;
+  if (motion === 'homing' || motion === 'roll' || lunges) r.add('approach');
   const plunge = motion === 'bounce' || motion === 'slam';
   if (m.maxBaseLaunch >= 2 || (fin.dir === 'vertical' && fin.baseLaunch >= 1)) r.add('launcher');
   if (m.hitCancel != null || m.paralyze > 0 || m.pull || m.strikes.some((s) => s.baseLaunch === 0 && s.damage > 0)) r.add('comboStarter');
@@ -148,7 +164,7 @@ function rolesOf(m, height, fastest) {
   if (shot && shot.range >= 250) r.add('zoning');
   if ((shot && ((shot.speed <= 420 && shot.lifetime >= 1) || shot.pull || shot.pierce)) || m.paralyze > 0 || m.kind === 'summon') r.add('trap');
   if (m.deflectProjectiles || shot?.repel || shot?.erase) r.add('counterProjectile');
-  if (motion === 'homing' || motion === 'roll' || motion === 'rise' || plunge || m.step ||
+  if (motion === 'homing' || motion === 'roll' || motion === 'rise' || plunge || lunges ||
       (motion === 'hover' && m.air && m.total >= 0.3)) r.add('mobility');
   if (m.air && (motion === 'rise' || motion === 'homing' || (motion === 'hover' && m.total >= 0.3))) r.add('recovery');
   if (m.blockPush > 0 || m.strikes.length > 1 || shot?.pierce) r.add('shieldPressure');
@@ -178,9 +194,8 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
     motion: atk.motion?.type ?? null, motionSpec: atk.motion ?? null, pull: atk.pull ?? projectile?.pull ?? null,
     cooldown: atk.cooldown, abilityCooldown: 0, airUses: atk.airUses, freeFall: !!atk.freeFall,
     groundOnly: !!atk.groundOnly, hitCancel: atk.hitCancel, energyCost,
-    lockMovement: atk.lockMovement, mobility: atk.mobility, momentum: atk.momentum, airMomentum: atk.airMomentum,
-    control: atk.control, airControl: atk.airControl, topSpeed: atk.topSpeed, airTopSpeed: atk.airTopSpeed,
-    friction: atk.friction, step: atk.step,
+    momentum: atk.momentum, airMomentum: atk.airMomentum, friction: atk.friction,
+    step: air ? null : atk.step, stepIn: atk.stepIn, lunge: air ? 0 : stepTravel(atk),
     passThrough: !!atk.passThrough, deflectProjectiles: !!atk.deflectProjectiles, carry: atk.carry,
   };
 }
@@ -206,8 +221,7 @@ function techniqueMove(f, special, sprites) {
     blockstun: burstHit?.blockstun ?? 0, hitstop: burstHit?.hitstop ?? 0, reach: t.burst ? { ...t.burst.hitbox } : null,
     hitbox: t.burst?.hitbox ?? null, motion: null, motionSpec: null, pull: projectile?.pull ?? null,
     cooldown: 0, abilityCooldown: t.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
-    energyCost: t.energyCost, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
-    topSpeed: 0, airTopSpeed: 0, friction: 1, step: null,
+    energyCost: t.energyCost, momentum: 0, airMomentum: 0, friction: 1, step: null, stepIn: 'exempt', lunge: 0,
     passThrough: false, deflectProjectiles: false, carry: null,
   };
 }
@@ -227,8 +241,7 @@ function summonMove(f, special, entry) {
     burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, impact: null, heal: 0, ...sum,
     blockstun: atk.blockstun, hitstop: atk.hitstop, reach: null, hitbox: atk.hitbox, motion: null, motionSpec: null,
     pull: null, cooldown: 0, abilityCooldown: s.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
-    energyCost: s.energyCost, lockMovement: true, mobility: 'planted', momentum: 0, airMomentum: 0, control: 0, airControl: 0,
-    topSpeed: 0, airTopSpeed: 0, friction: 1, step: null,
+    energyCost: s.energyCost, momentum: 0, airMomentum: 0, friction: 1, step: null, stepIn: 'exempt', lunge: 0,
     passThrough: false, deflectProjectiles: false, carry: null,
   };
 }

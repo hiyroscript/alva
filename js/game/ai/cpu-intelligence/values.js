@@ -101,11 +101,12 @@ export class LaunchJudge {
 const NONE = Object.freeze({ ko: 0, offstage: false, speed: 0 });
 
 // The lifting move a fighter may use to get back (a rising air attack), as
-// the recovery simulation takes it: { speed, time, control, topSpeed } (its
-// air steering authority and the share of top speed it steers toward), or
-// null.
+// the recovery simulation takes it: { speed, time, hang, airMomentum } (its
+// lift's speed and length, its hang before it and the share of its drift it
+// keeps as it starts; nothing steers it), or null. A recovery move for its
+// upward motion alone.
 export function riseOf(caps) {
   const m = caps.aerial.find((a) => a.motion === 'rise');
   if (!m) return null;
-  return { speed: m.motionSpec.speed, time: m.active, control: m.airControl, topSpeed: m.airTopSpeed, move: m };
+  return { speed: m.motionSpec.speed, time: m.active, hang: m.startup, airMomentum: m.airMomentum, move: m };
 }

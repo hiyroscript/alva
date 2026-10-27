@@ -384,8 +384,9 @@ export const CHARACTER_0006 = {
   // frame more. Every Deflect's 3, Base Launch 2, here sideways, the way
   // the arc sweeps; while it is live it turns the other fighter's
   // projectiles back at their thrower, now #0006's. A little over a
-  // quarter of a second in all, keeping the whole of its drift, steered as
-  // a medium strike (js/data/attack-mobility.js); no cooldown of its own.
+  // quarter of a second in all, keeping the whole of its drift, never
+  // steered and never stepping in (a defense: js/data/attack-movement.js);
+  // no cooldown of its own.
   deflect: {
     animation: 'deflect',
     members: ['green'],
@@ -397,7 +398,6 @@ export const CHARACTER_0006 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    mobility: 'medium',
     deflectProjectiles: true,
   },
 
@@ -584,17 +584,17 @@ export const CHARACTER_0006 = {
   // her art at the front of the group, where she stands for it (the
   // fighter's origin; facing right, mirrored with facing). None has a
   // cooldown (the cooldown policy's: none deals 10, paralyzes, floats or
-  // frightens). Each moves by the mobility tier its role
-  // gives it (js/data/attack-mobility.js): the punch and the kick quick,
-  // the Flying Punch heavy, the tornado planted (it rolls on by itself),
-  // the strike medium (its dash is its own).
+  // frightens). Each moves by the shared attack movement
+  // (js/data/attack-movement.js): never steered; the Power Punch steps in
+  // by the shared Step-in, the tornado rolls and the strike dashes by
+  // themselves (no Step-in added), and the aerials never step in.
   attacks: {
     // The Power Punch, pink alone: guard up (frame 1), the jab (frame 2,
     // live: 1, no launch, a stun that holds its target for the next), the
     // cross (frame 3, live: 3, Base Launch 1 sideways), guard up again:
-    // 0.27 s in all, at chest height out to 40 units. A quick strike: it
-    // keeps the whole run and is steered almost as well; a hit opens a
-    // follow-up from the cross on.
+    // 0.27 s in all, at chest height out to 40 units. It keeps the speed it
+    // is thrown at and steps in once for the pair; a hit opens a follow-up
+    // from the cross on.
     attack1: {
       animation: 'attack1',
       members: ['pink'],
@@ -610,14 +610,13 @@ export const CHARACTER_0006 = {
         },
       ],
       groundOnly: true,
-      mobility: 'quick',
       hitCancel: 3 / FPS_0006.attack1,
     },
     // The Flying Kick, blue alone: drawn up (frame 1), then the kick, feet
     // first with an afterimage streaming behind, and the foot thrust low
     // (frames 2-3, live: from her head to her feet, out to 38 units), drawn
     // up again: 0.27 s, carried on by her drift. 3, Base Launch 1 sideways.
-    // A quick strike; a hit opens a follow-up.
+    // Never steered; a hit opens a follow-up.
     midair_attack1: {
       animation: 'midair_attack1',
       members: ['blue'],
@@ -631,7 +630,6 @@ export const CHARACTER_0006 = {
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 1 / 30,
-      mobility: 'quick',
       hitCancel: 3 / FPS_0006.midair_attack1,
     },
     // The Tornado Spin, green alone: spinning up and turning round (frames
@@ -643,7 +641,7 @@ export const CHARACTER_0006 = {
     // catches along inside it (`carry`); the fifth (frame 10) sweeps them
     // up into the air (3, Base Launch 2 upward). Then she slows to a stop
     // (frame 11): 0.73 s in all. A Shield stops it dead, bouncing her back.
-    // Planted: never steered, but it rolls on by itself.
+    // Never steered, but it rolls on by itself (its own motion: no Step-in).
     attack2: {
       animation: 'attack2',
       members: ['green'],
@@ -666,7 +664,6 @@ export const CHARACTER_0006 = {
       pull: { radius: 120, speed: 600, offset: { x: 10, y: -30 } },
       motion: { type: 'roll', speed: 240, keep: 0.5, maxSpeed: 700, friction: 280, recoil: 220 },
       groundOnly: true,
-      mobility: 'planted',
       passThrough: true,
     },
     // The Flying Punch, green alone: drawn back (frames 1-3, 0.2 s: time to
@@ -674,8 +671,8 @@ export const CHARACTER_0006 = {
     // (frames 4-5, live: at chest height out to 34 units), drawn up (frame
     // 6): 0.4 s. 5, Base Launch 3 sideways: the
     // big blow of the toughest sister, sending its target flying, the
-    // fighter's finisher. Once per airtime. Heavy: it keeps most of its
-    // drift but is hardly steered.
+    // fighter's finisher. Once per airtime. It keeps its drift, never
+    // steered.
     midair_attack2: {
       animation: 'midair_attack2',
       members: ['green'],
@@ -690,7 +687,6 @@ export const CHARACTER_0006 = {
       blockstun: 0.16,
       hitstop: 0.07,
       airUses: 1,
-      mobility: 'heavy',
     },
     // The Triple Strike (extra_attack), all three together, each in her own
     // art: streaking forward (frames 1-2, the lock-on: a sixth of a second
@@ -702,7 +698,7 @@ export const CHARACTER_0006 = {
     // green's heads, out to 50 units: 5, Base Launch 2 sideways, whoever it
     // meets knocked away, and the sisters spring back off it. One move: one hit, however
     // many sisters it is drawn with. On the ground and once per airtime.
-    // Its dash is its own; the recovery steers as a medium strike's.
+    // Its dash is its own (no Step-in added); nothing steers it.
     extra_attack: {
       animation: 'extra_attack',
       members: ['pink', 'green', 'blue'],
@@ -718,7 +714,6 @@ export const CHARACTER_0006 = {
       hitstop: 0.07,
       airUses: 1,
       motion: { type: 'homing', range: 220, speed: 1000, rebound: 380, recoil: 160, exit: 0.3 },
-      mobility: 'medium',
       airMomentum: 0.6,
     },
   },

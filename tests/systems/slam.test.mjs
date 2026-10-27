@@ -35,7 +35,7 @@ const STOMPER = {
     midair_attack2: {
       animation: 'midair_attack2', startup: HANG, active: PLUNGE, recovery: LANDING,
       damage: 3, baseLaunch: 1, directionalLaunch: 'reverseVertical', hitbox: { x: -20, y: -40, w: 40, h: 50 },
-      hitstun: 0.3, airUses: 1, airControl: 0,
+      hitstun: 0.3, airUses: 1,
       motion: {
         type: 'slam', fallSpeed: 1500,
         impact: { hitbox: IMPACT, hit: { damage: 5, baseLaunch: 2, directionalLaunch: 'vertical', quake: true }, animation: 'midair_attack2_impact' },

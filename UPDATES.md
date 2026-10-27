@@ -3505,3 +3505,98 @@ controllers); `cooldown-policy`, `combat-rules`, `energy`, `dash`, `combo`,
 `cpu-intelligence` (rare moves get extra seeds rather than a lower bar),
 `controller-input`, `ability-hud`, `controls-ui`, `discover`,
 `practice-ground` and the fighter suites updated to the new rules.
+
+## Universal Step-in and no attack steering
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max` as two strict, universal rules for every fighter, present and
+future, player and CPU alike, superseding the
+[combat feel overhaul](#combat-feel-overhaul-and-shield-walking)'s attack
+mobility tiers and every entry or document that describes steering an
+attack. Those entries stay as the record of what each change was at the
+time.
+
+**What it changed.**
+
+- **Attack Steering removed.** Nothing held moves a fighter while an attack
+  plays: no direction, no Run, no switch, in any phase, on the ground or in
+  the air, whatever the move (strikes, throws, aerials, the Deflect,
+  Specials, 3 s and 5 s cooldown moves). `steerAttack` is gone; every attack
+  moves through `attackDrift` (`js/game/fighters/movement.js`), which takes
+  no direction: its Step-in, then its speed running down under `friction` x
+  the ground deceleration (the air drag in the air). The motions' drift (a
+  hover, a plunge, a lift, a roll's curl, a homing dash's recovery) goes
+  through it too. `lockMovement` and its normal-locomotion bypass are gone
+  (`Fighter.moveDir` is 0 through any attack). `js/data/attack-mobility.js`
+  and its tiers (`quick`, `medium`, `heavy`, `planted`) are deleted, and an
+  attack declaring `mobility`, `control`, `airControl`, `topSpeed`,
+  `airTopSpeed` or `lockMovement` is refused (`STEERING_FIELDS`). `steer`
+  lost its steering-share and speed-share parameters: it is ordinary
+  locomotion only. What an attack keeps of its entry speed is now
+  `momentum` / `airMomentum` (1 unless written) and its slide's `friction`
+  (1 unless written): the authored values stay (#0002's Rapid Kicks 0.8,
+  #0005's Long Bite 0.4 and Dark Tendrils 0, the air shares of the hovers
+  and motions, the High Kick's and the Haymaker's lunge friction); the
+  tiers' values are gone.
+- **The universal Step-in** (`js/data/attack-movement.js`, new). Every
+  grounded direct melee strike steps in by itself, once per activation:
+  as its time reaches half way to its first strike its forward speed is
+  raised to at least 360 (`STEP_IN`), the way the strike faces then, and
+  runs down: about 11 units from a standstill. Each definition records the
+  verdict (`stepIn`): `authored` (its own `step`: #0001's High Kick, #0003's
+  Heel Drop and Chakra Haymaker, unchanged), `universal`, `declined`
+  (`step: false`, new: #0005's Phantom Hands and Dark Tendrils, whose hands
+  and tendrils strike, and the phantom's bite) or `exempt` (throws, motions,
+  the Deflect, pending moves). The activation records its Step-in
+  (`activationStep`: none in the air): an aerial never steps in, landing
+  never makes it lunge, a grounded one off the ground by its time skips
+  it, and once made nothing redirects it. `step: null`
+  is refused (write `false`).
+- **CPU.** Its predictions call the same `attackDrift` and
+  `activationStep` (a predicted strike gains its real Step-in, a throw
+  none); the recovery simulation plays a lift's hang and lift with its
+  drift carried on, never steered (`riseOf` gives `hang` and `airMomentum`);
+  a Step-in counts toward `approach` or `mobility` only when it really
+  travels (`lunge`, from `stepInTravel`, at least 32 units: none does
+  today), and the threat reach adds the real travel; the executor holds no
+  direction while any attack plays.
+
+**Consequences.** Running into an attack and holding on no longer keeps
+the run: it runs down at the universal deceleration (a Dash attack at the
+overspeed brake: #0001's Dash Jab goes from 1160 to 620 units/s in six
+steps, where it went from 1210 to 970 before). An aerial keeps its drift share and the air drag
+alone: no turning it round. Holding a direction during an attack still
+turns it. Grounded strikes now lean in about 11 units, so repeated strikes
+creep forward (a fresh flurry may reach a target its last one flung,
+once it is free again); #0001's High Kick, #0003's Heel Drop and Haymaker
+keep their own lunges. No move's damage, timing, hitbox, launch, stun,
+cooldown or Energy changed.
+
+**Where to tune it.** `STEP_IN` (speed, lead) in
+`js/data/attack-movement.js`; a move's own `step`, `momentum`,
+`airMomentum` and `friction` in its fighter's definition; `MAJOR_LUNGE` in
+`js/game/ai/cpu-intelligence/capabilities.js`.
+
+**Code:** new `js/data/attack-movement.js`; `js/data/attack-mobility.js`
+deleted; `js/game/fighters/movement.js`, `js/game/fighters/fighter.js`,
+`js/game/combat/attacks.js`, `combat-state.js`, `deflect.js`,
+`js/data/cooldowns.js`, every fighter's definition (steering fields and
+tier comments removed, `step: false` on #0005's hands, tendrils and
+phantom bite) and its reviewed profile hash; `js/game/ai/cpu-intelligence/`
+(`prediction.js`, `capabilities.js`, `values.js`, `situation.js`,
+`executor.js`); the specification (7.2.2, 7.2.3, 7.2.4), the movement,
+combat, defense and AI guides, module responsibilities, adding characters,
+testing and every fighter's specification.
+
+**Tests:** new `tests/systems/step-in.test.mjs` (the policy and its
+refusals; every fighter's verdicts; every playable fighter's every move
+from rest, a run, a Dash and a jump with nothing, Run, back, switching and
+late Run held: identical paths; the Step-in from rest, slight and once;
+none in the air or on landing; a turn after it never redirecting it; a CPU's and a
+player's Run alike; normal movement back at once; the CPU's prediction
+matching the Fighter step for step; a wall; a summon and its phantom
+never moving; the CPU's lunge reading); `attack-mobility` removed;
+`movement-rules`, `movement`, `slam`, `pull`, `defense`, `combat-ai`, the
+#0001, #0002 and #0006 suites and the test fixtures updated;
+`tests/benchmarks/feel-metrics.mjs` now measures the Step-in, the
+displacement a held direction adds (0) and normal movement's return.

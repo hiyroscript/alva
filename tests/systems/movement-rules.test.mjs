@@ -2,7 +2,8 @@
 // The shared movement rules (js/game/fighters/movement.js) against the
 // values they are given, not against the universal ones: ground and air
 // steering, turning, braking, overspeed (held, let go, reversed; a burst in
-// the air), attack momentum, the hitstun drift, the fast fall, the air
+// the air), attack momentum and the Step-in (never steered), the hitstun
+// drift, the fast fall, the air
 // jump and the higher jump's lift, each checked
 // with made-up values. Whatever the numbers, the same rules turn them into
 // motion; the numbers every fighter actually runs on are checked in
@@ -10,10 +11,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
+  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
 } from '../../js/game/fighters/movement.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
-import { ATTACK_MOBILITY } from '../../js/data/attack-mobility.js';
 import { CONFIG } from '../../js/config.js';
 import { DT } from '../helpers/fighter-harness.mjs';
 
@@ -33,7 +33,7 @@ const body = (fields = {}) => ({ x: 0, y: 0, vx: 0, vy: 0, grounded: true, gravi
 // Steps of `steer` from `b` holding `dir` until `done`, with `mv`.
 function steerUntil(b, mv, dir, done, limit = 600) {
   for (let n = 1; n <= limit; n++) {
-    steer(b, mv, dir, 1, 1, DT);
+    steer(b, mv, dir, DT);
     if (done(b)) return n;
   }
   throw new Error('never reached');
@@ -63,125 +63,123 @@ test('ground steering: top speed at the supplied acceleration, a stop at the sup
 
 test('turning brakes at acceleration x turnBoost, never softer than letting go; air steering uses the air values', () => {
   const b = body({ vx: 400 });
-  steer(b, VALUES, -1, 1, 1, DT);
+  steer(b, VALUES, -1, DT);
   near(b.vx, 400 - VALUES.acceleration * VALUES.turnBoost * DT, 1e-9, 'one braking step');
   const soft = { ...VALUES, turnBoost: 0.1 };
   const c = body({ vx: 400 });
-  steer(c, soft, -1, 1, 1, DT);
+  steer(c, soft, -1, DT);
   near(c.vx, 400 - VALUES.deceleration * DT, 1e-9, 'never softer than the deceleration');
   // In the air: airAcceleration, airTurnBoost and the gentle airDeceleration drag.
   const air = body({ grounded: false });
-  steer(air, VALUES, 1, 1, 1, DT);
+  steer(air, VALUES, 1, DT);
   near(air.vx, VALUES.airAcceleration * DT, 1e-9, 'air acceleration');
   const turning = body({ grounded: false, vx: 400 });
-  steer(turning, VALUES, -1, 1, 1, DT);
+  steer(turning, VALUES, -1, DT);
   near(turning.vx, 400 - VALUES.airAcceleration * VALUES.airTurnBoost * DT, 1e-9, 'air turn');
   const drifting = body({ grounded: false, vx: 400 });
-  steer(drifting, VALUES, 0, 1, 1, DT);
+  steer(drifting, VALUES, 0, DT);
   near(drifting.vx, 400 - VALUES.airDeceleration * DT, 1e-9, 'air drag');
 });
 
 test('overspeed on the ground: held on it bleeds off gently, let go it brakes, pressed back it turns hard; never at once', () => {
   const held = body({ vx: 900 });
-  steer(held, VALUES, 1, 1, 1, DT);
+  steer(held, VALUES, 1, DT);
   near(held.vx, 900 - VALUES.overspeedHoldDeceleration * DT, 1e-9, 'held the way it goes: the gentle rate');
   const letGo = body({ vx: 900 });
-  steer(letGo, VALUES, 0, 1, 1, DT);
+  steer(letGo, VALUES, 0, DT);
   near(letGo.vx, 900 - VALUES.overspeedDeceleration * DT, 1e-9, 'let go: the overspeed brake');
   // Pressed back: the harder of the turn and the brake.
   const back = body({ vx: 900 });
-  steer(back, VALUES, -1, 1, 1, DT);
+  steer(back, VALUES, -1, DT);
   near(back.vx, 900 - VALUES.acceleration * VALUES.turnBoost * DT, 1e-9, 'pressed back: the turn, when it is harder');
   const soft = { ...VALUES, turnBoost: 1 };
   const turn = body({ vx: 900 });
-  steer(turn, soft, -1, 1, 1, DT);
+  steer(turn, soft, -1, DT);
   near(turn.vx, 900 - soft.overspeedDeceleration * DT, 1e-9, 'never softer than letting go');
   // Holding on, it settles at top speed and stays there: never below it.
   const settle = body({ vx: 900 });
   const n = steerUntil(settle, VALUES, 1, (x) => x.vx <= VALUES.maxSpeed);
   assert.equal(settle.vx, VALUES.maxSpeed);
   assert.equal(n, Math.ceil(500 / (VALUES.overspeedHoldDeceleration * DT) - 1e-9), 'over the whole excess, at the held rate');
-  // An attack's friction never softens the brake above top speed.
+  // A softer friction never softens the brake above top speed.
   const sliding = body({ vx: 900 });
-  steer(sliding, VALUES, 0, 0, 0.2, DT);
+  steer(sliding, VALUES, 0, DT, false, 0.2);
   near(sliding.vx, 900 - VALUES.overspeedDeceleration * DT, 1e-9);
 });
 
 test('overspeed in the air: a burst of the fighter\'s own bleeds off, a launch\'s flies on under the drag', () => {
   const burst = body({ grounded: false, vx: 900 });
-  steer(burst, VALUES, 1, 1, 1, DT, true);
+  steer(burst, VALUES, 1, DT, true);
   near(burst.vx, 900 - VALUES.airOverspeedDeceleration * DT, 1e-9, 'a burst, held on');
   const neutral = body({ grounded: false, vx: 900 });
-  steer(neutral, VALUES, 0, 1, 1, DT, true);
+  steer(neutral, VALUES, 0, DT, true);
   near(neutral.vx, 900 - VALUES.airOverspeedDeceleration * DT, 1e-9, 'a burst, let go');
   const launched = body({ grounded: false, vx: 900 });
-  steer(launched, VALUES, 1, 1, 1, DT, false);
+  steer(launched, VALUES, 1, DT, false);
   near(launched.vx, 900 - VALUES.airDeceleration * DT, 1e-9, 'not a burst: the drag only');
   // Below top speed a burst changes nothing.
   const slow = body({ grounded: false, vx: 300 });
-  steer(slow, VALUES, 0, 1, 1, DT, true);
+  steer(slow, VALUES, 0, DT, true);
   near(slow.vx, 300 - VALUES.airDeceleration * DT, 1e-9);
 });
 
-test('`control` scales the steering authority and `speed` the top speed it steers toward, apart', () => {
-  // Half the authority: half the acceleration, but the whole top speed.
-  const half = body();
-  steer(half, VALUES, 1, 0.5, 1, DT);
-  near(half.vx, VALUES.acceleration * 0.5 * DT, 1e-9, 'half the acceleration');
-  for (let i = 0; i < 120; i++) steer(half, VALUES, 1, 0.5, 1, DT);
-  assert.equal(half.vx, VALUES.maxSpeed, 'half the authority: still the whole top speed');
-  // Full authority toward half the top speed: as quick to steer, capped at half.
-  const capped = body();
-  steer(capped, VALUES, 1, 1, 1, DT, false, 0.5);
-  near(capped.vx, VALUES.acceleration * DT, 1e-9, 'the whole acceleration');
-  for (let i = 0; i < 120; i++) steer(capped, VALUES, 1, 1, 1, DT, false, 0.5);
-  assert.equal(capped.vx, 200, 'half the top speed');
-  // A run held into a lower share runs down to it at the release rate, never at once.
-  const run = body({ vx: VALUES.maxSpeed });
-  steer(run, VALUES, 1, 1, 0.5, DT, false, 0.5);
-  near(run.vx, VALUES.maxSpeed - VALUES.deceleration * 0.5 * DT, 1e-9, 'eased toward the share');
-  for (let i = 0; i < 120; i++) steer(run, VALUES, 1, 1, 0.5, DT, false, 0.5);
-  assert.equal(run.vx, 200);
-  // Turning: the authority scales the turn's braking, whatever the speed share.
-  const turn = body({ vx: 300 });
-  steer(turn, VALUES, -1, 0.5, 1, DT);
-  near(turn.vx, 300 - VALUES.acceleration * 0.5 * VALUES.turnBoost * DT, 1e-9, 'braked at half the turn');
-  // None: no steering at all, only the friction.
-  const none = body({ vx: 300 });
-  steer(none, VALUES, 1, 0, 0.5, DT);
-  near(none.vx, 300 - VALUES.deceleration * 0.5 * DT, 1e-9, 'no authority: the held direction is nothing');
+test('`friction` scales the ground deceleration while nothing is held, never the steering', () => {
+  const slide = body({ vx: 300 });
+  steer(slide, VALUES, 0, DT, false, 0.5);
+  near(slide.vx, 300 - VALUES.deceleration * 0.5 * DT, 1e-9, 'half the deceleration');
+  const held = body({ vx: 100 });
+  steer(held, VALUES, 1, DT, false, 0.5);
+  near(held.vx, 100 + VALUES.acceleration * DT, 1e-9, 'held: the whole acceleration');
+  const air = body({ grounded: false, vx: 300 });
+  steer(air, VALUES, 0, DT, false, 0.5);
+  near(air.vx, 300 - VALUES.airDeceleration * DT, 1e-9, 'in the air: the drag alone');
 });
 
 // ---- Attacks ------------------------------------------------------------------------
 
-test('attack momentum: an attack keeps its share of the speed, never capped at top speed', () => {
+test('attack momentum: an attack keeps its share of the speed, all of it unless it says otherwise, never capped', () => {
   const atk = createAttackDefinition({ id: 'fixture', animation: 'x', damage: 1, momentum: 0.5, airMomentum: 0.25 });
   assert.equal(attackStartSpeed(atk, 300, true), 150);
   assert.equal(attackStartSpeed(atk, 1200, true), 600, 'a Dash\'s burst carries on: no cap');
   assert.equal(attackStartSpeed(atk, -1200, true), -600);
   assert.equal(attackStartSpeed(atk, 900, false), 225, 'in the air: airMomentum');
-  const whole = createAttackDefinition({ id: 'whole', animation: 'x', damage: 1, mobility: 'quick' });
-  assert.equal(attackStartSpeed(whole, 1250, true), 1250, 'a quick strike: all of it');
-  assert.equal(attackStartSpeed(whole, -1250, false), -1250);
   const plain = createAttackDefinition({ id: 'plain', animation: 'x', damage: 1 });
-  assert.equal(plain.mobility, 'medium', 'an attack naming no tier is medium');
-  assert.equal(attackStartSpeed(plain, 1000, true), 1000 * ATTACK_MOBILITY.medium.momentum, 'its tier\'s share');
-  const free = createAttackDefinition({ id: 'free', animation: 'x', damage: 1, lockMovement: false });
-  assert.equal(attackStartSpeed(free, 900, true), 900, 'normal locomotion kept: all of it');
-  // Its step-in raises the forward speed once its time reaches `at`, never
-  // lowers it, then its own control steers.
-  const stepping = createAttackDefinition({ id: 's', animation: 'x', damage: 1, step: { at: 0.05, speed: 250 }, mobility: 'planted' });
-  const record = { def: stepping, time: 0, stepped: false };
+  assert.deepEqual([plain.momentum, plain.airMomentum, plain.friction], [1, 1, 1]);
+  assert.equal(attackStartSpeed(plain, 1250, true), 1250, 'all of it');
+  assert.equal(attackStartSpeed(plain, -1250, false), -1250);
+});
+
+test('an attack\'s drift: its Step-in once, on the ground, the way it faces; then its speed runs down, whatever it is given', () => {
+  const stepping = createAttackDefinition({ id: 's', animation: 'x', damage: 1, step: { at: 0.05, speed: 250 }, friction: 0.5 });
+  const record = { def: stepping, time: 0, step: activationStep(stepping, true), stepped: false };
   const b = body();
-  steerAttack(b, VALUES, -1, record, 0, DT);
+  attackDrift(b, VALUES, -1, record, DT);
   assert.equal(b.vx, 0, 'not yet');
   record.time = 0.05;
-  steerAttack(b, VALUES, -1, record, 0, DT);
-  near(b.vx, -250 + VALUES.deceleration * DT, 1e-9, 'stepped in the way it faces, then braking');
+  attackDrift(b, VALUES, -1, record, DT);
+  near(b.vx, -250 + VALUES.deceleration * 0.5 * DT, 1e-9, 'stepped in the way it faces, then running down under its friction');
   assert.equal(record.stepped, true);
+  const after = b.vx;
+  record.time = 0.1;
+  attackDrift(b, VALUES, -1, record, DT);
+  near(b.vx, after + VALUES.deceleration * 0.5 * DT, 1e-9, 'once only');
   const fast = body({ vx: -600 });
-  steerAttack(fast, VALUES, -1, { def: stepping, time: 0.05, stepped: false }, 0, DT);
+  attackDrift(fast, VALUES, -1, { def: stepping, time: 0.05, step: stepping.step, stepped: false }, DT);
   near(fast.vx, -600 + VALUES.overspeedDeceleration * DT, 1e-9, 'already faster: the step-in never slows it');
+  // Off the ground as its time comes: never made, and never later.
+  const air = body({ grounded: false });
+  const late = { def: stepping, time: 0.05, step: stepping.step, stepped: false };
+  attackDrift(air, VALUES, 1, late, DT);
+  assert.deepEqual([air.vx, late.stepped], [0, true], 'skipped in the air');
+  air.grounded = true;
+  late.time = 0.1;
+  attackDrift(air, VALUES, 1, late, DT);
+  assert.equal(air.vx, 0, 'never fired late on landing');
+  // Started in the air: no Step-in at all.
+  assert.equal(activationStep(stepping, false), null);
+  assert.equal(activationStep(stepping, true), stepping.step);
+  // It takes no direction: there is nothing to steer it with.
+  assert.equal(attackDrift.length, 5, 'body, values, facing, record, dt (and the burst): no direction');
 });
 
 // ---- The rest ------------------------------------------------------------------------

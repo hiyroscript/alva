@@ -75,32 +75,42 @@ test('a Jab that hits can be cut short into a High Kick, but never an immediate 
   assert.equal(whiff.fighter.combat.attack?.def.id, 'attack1', 'still in its own recovery');
 });
 
-test('a running Jab is a quick strike: the run carries on through it while held, and it slides on when let go', () => {
-  assert.equal(A.attack1.mobility, 'quick');
-  const { fighter, step } = solo({ x: 300 });
-  const jab = fighter.attacks.attack1;
-  for (let i = 0; i < 40; i++) step({ runRight: true });
-  const speed = fighter.body.vx;
-  step({ runRight: true, ...P('attack1') });
-  assert.equal(jab.momentum, 1, 'all of it');
-  assert.equal(fighter.body.vx, speed, 'the run carried in, whole');
-  while (fighter.combat.attack) {
-    step({ runRight: true });
-    assert.equal(fighter.body.vx, speed, 'held: the whole run, never braked');
+test('a running Jab carries the run in and lets it run down, whatever is held; a direction held turns it but never steers it', () => {
+  const jab = solo().fighter.attacks.attack1;
+  assert.equal(jab.stepIn, 'universal');
+  assert.equal(jab.momentum, 1, 'all of the run kept');
+  // The same running Jab, Run held through it and nothing held.
+  const play = (held) => {
+    const h = solo({ x: 300 });
+    for (let i = 0; i < 40; i++) h.step({ runRight: true });
+    const speed = h.fighter.body.vx;
+    h.step({ runRight: true, ...P('attack1') });
+    assert.equal(h.fighter.body.vx, speed - MOVEMENT.deceleration * jab.friction * DT, 'the run carried in, running down at once');
+    const xs = [];
+    // Every step it still plays (the step it ends on, normal movement is
+    // free again).
+    for (;;) {
+      h.step(held);
+      if (!h.fighter.combat.attack) break;
+      xs.push(h.fighter.body.x);
+    }
+    return { h, xs };
+  };
+  const neutral = play({});
+  const run = play({ runRight: true });
+  assert.deepEqual(run.xs, neutral.xs, 'Run held moves it no further');
+  // Held back: it turns (a direction held turns an attack) but its speed
+  // runs down exactly as if nothing were held.
+  const back = solo({ x: 300 });
+  const still = solo({ x: 300 });
+  for (const h of [back, still]) {
+    for (let i = 0; i < 40; i++) h.step({ runRight: true });
+    h.step({ runRight: true, ...P('attack1') });
   }
-  // Let go: it slides on under its friction, never stopped at once.
-  const slide = solo({ x: 300 });
-  for (let i = 0; i < 40; i++) slide.step({ runRight: true });
-  slide.step({ runRight: true, ...P('attack1') });
-  const before = slide.fighter.body.vx;
-  slide.step({});
-  const kept = before - MOVEMENT.deceleration * jab.friction * DT;
-  assert.ok(jab.friction < 1 && Math.abs(slide.fighter.body.vx - kept) < 1e-9, `slides on (${slide.fighter.body.vx})`);
-  // Held back: it turns (a direction held turns an attack) and steers the
-  // new way with its share of the steering, braking first.
-  slide.step({ runLeft: true });
-  assert.equal(slide.fighter.facing, -1, 'turned');
-  assert.ok(slide.fighter.body.vx < kept, 'steered back');
+  back.step({ runLeft: true });
+  still.step({});
+  assert.equal(back.fighter.facing, -1, 'turned');
+  assert.equal(back.fighter.body.vx, still.fighter.body.vx, 'never steered back');
 });
 
 // ---- Standing on the air -------------------------------------------------------------
