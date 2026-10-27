@@ -1,993 +1,1222 @@
-ALVA — Strict Universal Step-in and Attack Steering Rules
+ALVA — Universal Grounded Melee Step-in and Complete Removal of Attack Steering
 
 Objective
 
-Implement a new, strict, universal movement policy for all current and future playable fighters in Alva, covering human players and CPU-controlled fighters.
+Implement two new, strict, universal gameplay rules across Alva:
 
-This is an actual gameplay mechanics update, not merely a change to documentation, move descriptions, animations, or visual effects.
+1. Every eligible grounded melee attack must automatically perform a slight Step-in (Attack Lunge), unless that move’s actual, deliberately authored mechanics already determine that it should or should not Step-in.
+2. Completely remove Attack Steering (Attack Mobility) from the game. Players and CPUs must no longer be able to move their fighters by holding Run/left/right during an ongoing attack or combat-move animation.
 
-There are two separate mechanics involved:
+These rules must apply to all current and future fighters, human players, and CPU-controlled fighters.
 
-1. Step-in (Attack Lunge): Automatic, slight forward movement during a melee attack, regardless of whether the player holds a movement direction.
-2. Attack Steering (Attack Mobility): Player-controlled movement during an ongoing move animation, using Alva’s existing attack-specific momentum, control, top-speed, and friction system.
+This is a real combat-engine change, not an animation-only adjustment, character-by-character balancing patch, or documentation update.
 
-These mechanics must remain independent.
+Important: This request supersedes the repository’s previous max specification and any existing documentation requiring Attack Steering, attack-mobility tiers, or steering during attacks. Do not implement the old policy that makes ordinary attacks steerable. The new policy is the opposite: Attack Steering must be fully removed.
 
-Implement the following rules consistently, preserve every move’s deliberately authored mechanics, and ensure CPU Intelligence understands, predicts, and uses the resulting behavior.
+The two requirements must remain independent:
 
-Do not treat these requirements as suggestions. They are the new universal gameplay rules.
+* Step-in is automatic forward movement authored by an eligible melee attack.
+* Attack Steering is movement caused by holding or changing directional input while an attack animation plays.
+
+Keep Step-in. Eliminate Attack Steering.
+
+Preserve genuine, intentionally designed movement mechanics belonging to individual moves. Do not confuse automatic attack motion, existing momentum, or external physical forces with Attack Steering.
 
 ⸻
 
-1. Understand the existing project before making changes
+PART 1 — Understand Alva’s existing architecture
 
-Inspect the actual implementation, including:
+Before editing, inspect the actual game code, documentation, character definitions, and tests.
 
-Combat and movement
+Core combat and movement
+
+Examine at least:
 
 * js/game/combat/attacks.js
 * js/game/fighters/movement.js
 * js/game/fighters/fighter.js
 * js/data/attack-mobility.js
+* js/data/movement.js
+* js/game/physics.js
+* js/game/combat/offense.js
+* js/game/combat/deflect.js
+* js/game/combat/projectile.js
+* js/game/combat/summon.js
+* js/game/combat/technique.js
+* js/data/loadout.js
 * js/data/cooldowns.js
 * js/data/special-abilities.js
-* js/data/loadout.js
-* js/game/combat/offense.js
-* js/game/combat/technique.js
-* js/game/combat/summon.js
-* js/game/combat/projectile.js
-* js/game/combat/deflect.js
 
-Character data
+Complete fighter roster
+
+Inspect:
 
 * js/data/characters.js
-* js/data/characters/0001.js through 0006.js
-* The associated files in docs/characters/
-* The existing attack, summon, technique, projectile, and animation definitions
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* js/data/characters/0003.js
+* js/data/characters/0004.js
+* js/data/characters/0005.js
+* js/data/characters/0006.js
+* Every relevant docs/characters/ document
+* All actual move mappings, including ground/air alternatives, extra_attack, Deflect, techniques, and summons
+
+Do not assume every attack is executable directly by its owner. Some attack definitions are used by clones or other entities.
 
 CPU Intelligence
+
+Inspect:
 
 * js/game/ai/combat-ai.js
 * js/game/ai/moveset.js
 * js/game/ai/cpu-intelligence/capabilities.js
 * js/game/ai/cpu-intelligence/prediction.js
+* js/game/ai/cpu-intelligence/values.js
 * js/game/ai/cpu-intelligence/evaluator.js
 * js/game/ai/cpu-intelligence/executor.js
 * js/game/ai/cpu-intelligence/brain.js
 * js/game/ai/cpu-intelligence/plans.js
-* Relevant stage-safety and behavior modules
+* Relevant recovery, defense, and stage-safety code
 
-Project contracts and tests
+Specifications and tests
+
+Examine:
 
 * ALVA_SPEC.md
-* CLAUDE.md
 * docs/systems/movement.md
 * docs/systems/combat.md
 * docs/systems/ai.md
 * docs/development/testing.md
-* Existing movement, cooldown, character, and CPU tests
+* Relevant repository-level development instructions
+* Existing movement, attack-mobility, attack-classification, fighter, CPU, and integration tests
+* Existing combat-feel and CPU benchmarks
 
-Follow Alva’s architecture: shared mechanics belong in shared systems; character definitions supply genuinely character-specific mechanics.
+Use the real code as the authority for how each move currently functions.
 
-Never implement these rules by hardcoding fighter IDs or numbered attack buttons.
+Do not rely solely on move names, animation names, numbered attack buttons, or comments.
 
 ⸻
 
-PART A — STEP-IN (ATTACK LUNGE)
+PART 2 — STRICT UNIVERSAL STEP-IN RULE
 
-2. Universal rule: every ordinary grounded melee attack must Step-in
+2.1 Every eligible grounded melee attack must Step-in
 
-Every grounded melee attack must automatically make its fighter advance slightly forward during the attack animation.
+Every eligible grounded direct melee attack must automatically advance its fighter a short, controlled distance forward during that attack.
 
-This applies to:
+This applies to ordinary grounded:
 
-* Basic punches
-* Basic kicks
-* Swipes
-* Claw attacks
+* Punches and jabs
+* Kicks
+* Claw strikes and swipes
+* Direct physical weapon strikes
 * Grounded melee combinations
-* Grounded multi-hit melee attacks
-* Grounded launchers and finishers
-* Grounded close-range physical attacks
-* Grounded melee attacks regardless of their current mobility tier
-* Future grounded melee attacks added to the roster
+* Multi-hit melee strings
+* Grounded close-range strikes
+* Launchers
+* Finishers
+* Direct melee attacks on extra_attack
+* Other genuinely direct, grounded melee attacks
+* Future attacks meeting the same conditions
 
-The Step-in must not depend on a movement input.
+The behavior must be universal, not limited to attacks manually given a step field.
 
-A player who stands still and presses a grounded melee attack must still advance slightly forward.
+A fighter standing completely still, with no Run or directional input held, must still move slightly forward when starting an eligible grounded melee attack.
 
-The Step-in is an intentional part of the attack, not an ordinary run, Dash, or change of position caused by sprite animation.
+An eligible attack must Step-in regardless of whether its previous mobility tier was quick, medium, heavy, or planted.
 
-Required behavior
+However, a genuinely authored no-Step-in mechanic takes precedence. Do not blindly override an individual move intentionally designed to remain rooted, stationary, or controlled by another movement mechanic.
 
-* Apply the Step-in in the fighter’s current attack-facing direction.
-* Use a small, controlled advance consistent with the attack’s animation.
-* Trigger it once per attack activation, at an appropriate point in the attack’s startup or strike.
-* Preserve the attack’s startup, active, and recovery timings.
-* Do not change hitbox damage, launch, hitstun, cooldown, or cancel behavior.
-* Never teleport or snap the fighter forward.
-* Respect collision, walls, stage geometry, and ordinary movement physics.
-* Do not push through a wall or create an unintended stage bypass.
-* Do not reapply the Step-in each animation frame.
-* Do not continuously accelerate the fighter throughout the entire attack.
+2.2 Step-in is automatic, not player-controlled
 
-An existing, intentionally authored Step-in should continue behaving as authored instead of receiving an additional default Step-in.
+The Step-in:
 
-One attack activation must not receive two lunges because it qualifies for both an authored Step-in and the universal default.
+1. Occurs automatically without directional input.
+2. Uses the attack’s valid facing direction.
+3. Is slight, deliberate, and visually consistent with the strike.
+4. Triggers at most once per attack activation.
+5. Occurs at an appropriate point in the startup or strike, rather than arbitrarily during recovery.
+6. Advances the actual fighter body through the real physics engine.
+7. Respects walls, collision, ledges, and stage geometry.
+8. Does not teleport or snap the fighter.
+9. Does not seek or home toward the opponent.
+10. Does not continuously accelerate the fighter.
+11. Does not repeat for every hit of a multi-hit attack.
+12. Does not change damage, hitbox size, stun, launch, cooldown, or attack timing.
 
-3. Reuse Alva’s existing Step-in implementation
+The impulse should be small enough to remain an attack lunge rather than a Dash.
 
-Alva already supports:
+Do not invent excessive movement speeds. Choose a universal default using Alva’s existing movement scale, animation timings, and fixed simulation step.
+
+Prefer deriving the trigger from the attack’s actual startup or first strike window.
+
+For multi-hit attacks, apply one Step-in for the activation, not one per hit.
+
+2.3 Build on the existing Step-in mechanic
+
+Alva already uses:
 
 step: { at, speed }
 
-The shared steerAttack() function in js/game/fighters/movement.js currently checks when attack time reaches step.at and raises the fighter’s forward velocity to at least the configured speed while grounded.
+The existing steerAttack() implementation applies this event once after attack time reaches step.at, raising forward velocity to at least the specified speed while grounded.
 
-Build on this mechanism instead of inventing a separate physics system.
+Preserve this fundamental behavior.
 
-However, the universal rule cannot depend solely on character authors manually supplying a step property.
+However, do not leave Step-in dependent on every character author manually supplying step.
 
-Introduce a shared, consistently resolved default for eligible grounded melee attacks.
+Create a shared, deterministic resolution policy so eligible grounded melee attacks automatically receive an effective default Step-in.
 
-Possible implementation approaches include:
+An architecture-consistent approach is to resolve the Step-in when constructing or executing the attack, using:
 
-* Resolving an effective Step-in policy when the attack definition is created.
-* Computing a default Step-in from the resolved attack classification and timing.
-* A small, well-defined shared policy module if it makes ownership clearer.
+* The original attack data
+* Its actual offensive mechanics
+* Whether the real fighter is executing it
+* Its ground/air execution context
+* Any explicitly authored Step-in
+* Any deliberately authored Step-in prohibition
+* Any intrinsic scripted movement
 
-Choose the smallest architecture-consistent solution.
+The final resolved definition should remain validated and immutable where Alva expects immutable definitions.
 
-The implementation must support:
+2.4 Authored movement always takes precedence over the generic Step-in
 
-* A sensible shared default Step-in timing.
-* A sensible shared default Step-in strength.
-* An attack’s explicitly authored timing and strength taking precedence.
-* Deliberate move-specific exceptions.
-* Consistent behavior across all fighters.
+This requirement is especially important.
 
-The advance must remain slight. It should improve grounded melee connection and visual commitment without turning ordinary attacks into unintended dashes or homing attacks.
+If a move already contains an intentionally authored Step-in, preserve its specific:
 
-Do not simply apply an arbitrary high velocity to every melee move.
+* Trigger time
+* Impulse speed
+* Direction
+* Interaction with momentum
+* Motion timing
 
-If different timing is justified for single-hit and multi-hit attacks, derive it from their real strike windows and existing authored animation timing.
+Do not add a second universal Step-in.
 
-4. Aerial melee attacks must NOT receive automatic Step-in
+If a move is intentionally designed not to Step-in, preserve that behavior. This includes legitimate planted moves and attacks that are intended to act from a fixed location.
 
-Aerial melee attacks must never acquire a Step-in solely because of this universal update.
+If a move already moves itself through a dash, roll, homing action, lift, plunge, rebound, or other scripted motion, preserve that mechanic and do not stack an unnecessary generic lunge on top.
+
+Do not interpret the absence of an existing step property as an intentional prohibition. Most current melee attacks simply do not specify one.
+
+There must be a reliable distinction between:
+
+* Missing Step-in data, meaning the universal policy applies
+* Explicitly authored Step-in data
+* Explicitly authored no-Step-in behavior
+* Intrinsic movement that makes an additional Step-in inappropriate
+
+Where new metadata is necessary, give it precise, validated semantics. Do not infer intention from already-resolved default values.
+
+2.5 Ground and air execution must be evaluated correctly
+
+Use the move’s actual execution context.
+
+An attack that begins on the ground may qualify for universal Step-in even if the same action or definition is usable in the air.
+
+An attack started while airborne must never receive a new universal Step-in.
+
+The policy must not depend solely on prefixes like attack1 or midair_attack1, since some definitions are usable in both contexts.
+
+Record the attack’s start context if necessary so that:
+
+* Aerial attacks do not gain Step-in after landing.
+* Grounded attacks do not unexpectedly gain a second Step-in after leaving and re-entering the ground.
+* A scheduled generic ground Step-in does not suddenly fire in midair.
+* A skipped generic Step-in does not fire late after its intended timing.
+* Cancelling an attack cleans up its pending Step-in correctly.
+
+⸻
+
+PART 3 — ABSOLUTE EXCLUSION OF AUTOMATIC STEP-IN FROM AERIAL ATTACKS
+
+3.1 No new default Step-in in the air
+
+Aerial melee attacks must never receive the new universal Step-in.
+
+This covers:
+
+* Aerial punches
+* Aerial kicks
+* Airborne claw attacks
+* Aerial combos
+* Aerial finishers
+* Air Deflects
+* Falling melee strikes
+* Air launchers
+* Any attack activated while the fighter is airborne
+
+An ordinary aerial melee strike must not generate an automatic horizontal forward impulse merely because it has a melee hitbox.
+
+3.2 Preserve genuine aerial movement mechanics
+
+This change must not destroy aerial moves whose movement is actually part of the move’s design.
+
+For example, preserve existing:
+
+* Homing dashes
+* Flying attacks with scripted propulsion
+* Rising attacks
+* Bounces
+* Slams
+* Plunges
+* Rebounds
+* Recoils
+* Hovering and suspension behavior
+* Explicit, authored air lunges or directional impulses
+
+Examples in Alva include aerial homing attacks, rising spins, landing-impact attacks, and bounce attacks.
+
+These movements remain allowed because they are intrinsic attack mechanics, not the new generic Step-in.
+
+An aerial homing attack should still follow its target as designed.
+
+An aerial plunge should still descend and produce its authored impact or bounce.
+
+An aerial hover should still suspend the fighter according to its own rules.
+
+Do not add a generic forward impulse to these moves.
+
+Important distinction: Preserving automatic or scripted motion does not authorize retaining Attack Steering. If an aerial move currently derives horizontal control from the old attack-mobility system, that old input-driven steering must still be removed under Part 5.
+
+⸻
+
+PART 4 — NO GENERIC STEP-IN FOR PROJECTILES, SUMMONS, CLONES, OR OBJECT MOVES
+
+4.1 Projectiles are excluded
+
+Projectile attacks must not gain an automatic Step-in merely because the user activates them from the ground.
 
 Examples:
 
-* Midair punches
-* Midair kicks
-* Air swipes
-* Midair melee combinations
-* Falling melee attacks
-* Air launchers
-* Air finishers
-
-Do not automatically add or inherit the grounded melee Step-in for:
-
-* midair_attack1
-* midair_attack2
-* midair_attack3
-* Other aerial attacks
-* Any attack activated while airborne
-
-This must be based on the actual attack context and mechanics, not only a filename or naming convention.
-
-Critical exception: preserve actual move mechanics
-
-Some aerial attacks have deliberately scripted movement intrinsic to the move, such as:
-
-* Homing dashes
-* Rising attacks
-* Falling plunges
-* Bouncing attacks
-* Slams
-* Hovering attacks
-* Authored aerial lunges or propulsion
-
-Do not remove, disable, rewrite, weaken, or reinterpret such movement merely because the move is aerial.
-
-The prohibition is against the new automatic/default Step-in, not against an aerial move’s own legitimate movement mechanic.
-
-For example, an aerial homing kick must still home toward its target as designed.
-
-An aerial slam must still plunge downward and produce its authored landing behavior.
-
-Do not add an additional generic forward impulse to either.
-
-If an aerial attack has intentionally authored behavior resembling a lunge, preserve that behavior while keeping it distinct from the new grounded-melee default.
-
-Also handle cases where a fighter leaves the ground or lands during an attack. Do not accidentally create a late or repeated automatic lunge because grounded state changed.
-
-⸻
-
-5. Projectiles, summons, clones, and object-based moves must NOT receive automatic Step-in
-
-By default, moves whose offense is delivered through a projectile, spawned object, summoned entity, clone, trap, field, or comparable construct must not receive the universal Step-in.
-
-This includes:
-
-* Projectile throws
-* Beams
 * Energy shots
+* Beams
 * Orbs
-* Summoned clones
-* Summoned companions
+* Thrown effects
+* Launched objects
+* Tornado projectiles
+* Traps
+* Persistent projectile constructs
+
+Casting or releasing a projectile must not automatically push the fighter forward.
+
+Keep the existing projectile spawn time, spawn position relative to the fighter, facing, and flight behavior.
+
+If the actual authored move deliberately includes a forward lunge before or during projectile release, preserve it.
+
+But do not infer a lunge from the projectile’s movement or the animation alone.
+
+4.2 Summons and clones are excluded
+
+Summoning a clone or other entity must not cause an automatic owner-fighter Step-in.
+
+The spawned entity must not receive an unintended forward impulse from the owner’s universal melee rules.
+
+In Alva, a clone can execute one of the owner’s attack definitions, but the clone is not a normal Fighter with ordinary locomotion.
+
+Respect that distinction.
+
+Preserve:
+
+* Summon startup
+* Spawn timing
+* Spawn position
+* Clone placement
+* Clone facing
+* Clone attack animation
+* Clone hitboxes
+* Clone lifetime
+* The clone’s genuinely authored behavior
+
+If an attack definition is shared between a playable fighter and a clone, the generic Step-in applies only when the real eligible grounded fighter executes it, not merely because the definition contains melee data.
+
+4.3 Techniques and other object-based attacks are excluded
+
+Do not automatically add Step-in to:
+
+* Techniques producing an effect away from the body
 * Spawned attack objects
-* Placed traps
-* Persistent damage fields
-* Object-based techniques
-* Object-based special abilities
-* Other attacks whose offensive action is primarily executed by a separate spawned entity or effect
+* Traps
+* Persistent fields
+* Summoned hands or tendrils acting as constructs
+* Object-based specials
+* Other moves whose offense is primarily delivered by a separate object or effect
 
-The fighter should not automatically advance merely because it casts, releases, places, or summons something.
+A move having a rectangular hitbox does not automatically mean it is a direct physical melee strike.
 
-Critical exception: preserve explicitly authored move mechanics
+Investigate what actually deals the damage.
 
-If a particular projectile, summon, clone, or object-based move intentionally includes its own forward movement as a fundamental part of the move, preserve that movement exactly as designed.
+In particular, consider attacks such as Phantom Hands and Dark Tendrils, which use attack hitboxes but have distinctive object-like or deliberately planted behavior.
 
-For example, a move may deliberately involve:
+Do not blindly apply universal Step-in based only on hitbox !== null.
 
-* A forward-moving casting pose
-* A lunge followed by projectile release
-* An advance before placing a trap
-* A dash that creates a projectile
-* Movement intrinsic to a summoning technique
+4.4 Hybrid moves
 
-Do not remove such movement.
+Handle hybrids carefully:
 
-Likewise, if a move is intentionally stationary, do not introduce a Step-in.
+* Direct melee strike plus projectile
+* Melee strike plus generated effect
+* Melee hitbox plus projectile deflection
+* Physical attack plus persistent construct
+* Scripted movement plus object release
 
-Hybrid attacks
+Classify from the actual authored action.
 
-Explicitly handle hybrid moves that combine:
+A hybrid primarily executed through a construct should not receive a generic Step-in simply because it has a hitbox.
 
-* A direct melee hitbox and a projectile
-* A direct strike and a spawned effect
-* A melee attack and an object
-* An attack and projectile deflection
+An explicitly authored physical lunge remains valid.
 
-Do not assume every hitbox represents a pure melee move, or that every projectile-containing move has no direct melee component.
+For genuinely ambiguous cases, make the intended classification explicit in move data after reviewing its mechanics.
 
-Classify the move from its actual mechanics.
-
-When a move fundamentally delivers its offense through a construct, the safe default is no automatic Step-in. A deliberate direct-melee lunge can still be preserved through authored behavior.
-
-Clone execution
-
-A clone using an attack definition is not the same as the owning fighter personally executing that attack.
-
-Do not accidentally apply the universal fighter Step-in to clone positions, summon positions, projectile positions, or other spawned entities.
-
-Existing clone movement and placement mechanics must remain intact.
+Do not create rules that silently convert object moves into lunging punches.
 
 ⸻
 
-PART B — ATTACK STEERING (ATTACK MOBILITY)
+PART 5 — COMPLETELY REMOVE ATTACK STEERING / ATTACK MOBILITY
 
-6. Universal rule: all ordinary moves must allow Attack Steering
+5.1 This is a total removal, not a reduction
 
-Every move must allow Attack Steering by default unless it is a Special ability, has a 3-second or 5-second cooldown, or has a genuine authored movement mechanic requiring different behavior.
+Attack Steering must be fully removed from Alva.
 
-Attack Steering means the fighter can respond to held directional movement input while the move animation is playing.
+Players must no longer be able to move the fighter left or right through ordinary locomotion during an ongoing attack animation.
 
-A player should be able to hold left or right and move during an eligible move rather than being unnecessarily rooted until the animation ends.
+Holding Run, changing direction, reversing direction, or pressing directional movement must not introduce horizontal acceleration or steering while an attack controls the fighter.
 
-The movement may be slower than normal running, using the move’s mobility settings.
+This applies during:
 
-This includes eligible:
-
-* Grounded melee moves
-* Aerial melee moves
-* Projectiles
+* Startup
+* Active frames
+* Recovery
+* Grounded melee attacks
+* Aerial melee attacks
 * Projectile-throwing attacks
-* Object-based attacks
-* Ordinary techniques
-* Ordinary summons with meaningful owner startup
-* Basic attacks
 * Extra attacks
-* Other ordinary combat moves
+* Deflect animations
+* Technique casts
+* Summon startup animations
+* Ordinary moves
+* Special abilities
+* Moves with zero cooldown
+* Moves with three-second cooldowns
+* Moves with five-second cooldowns
+* Any other attack or move execution state previously governed by Attack Mobility
 
-Do not classify every technique or summon as non-steerable simply because of its implementation type.
+There is no longer a category of attacks that remains steerable because it is quick, ordinary, zero-cooldown, non-Special, or airborne.
 
-A move can be a technique, summon, or projectile attack without being a Special or having a 3-second/5-second cooldown.
+Do not preserve the previous policy where ordinary moves could steer but Specials or cooldown moves could not.
 
-Use the existing mobility system
+That entire Attack Steering policy is obsolete.
 
-Alva already defines:
+5.2 Remove the attack-mobility tier system
 
-* mobility
-* momentum
-* airMomentum
-* control
-* airControl
-* topSpeed
-* airTopSpeed
-* friction
-* lockMovement
+Alva currently defines:
 
-Retain the existing quick, medium, heavy, and planted tiers where appropriate.
+ATTACK_MOBILITY
+DEFAULT_ATTACK_MOBILITY
+MOBILITY_TIERS
+MOBILITY_FIELDS
+resolveMobility()
 
-For moves that allow steering, movement must remain consistent with their resolved mobility behavior.
+And the attack mobility tiers:
 
-Do not make every move accelerate to full running speed.
+quick
+medium
+heavy
+planted
 
-The rule is that eligible moves allow directional control, not that they all move equally fast.
+These currently supply attack-specific movement properties:
 
-Steering should work during startup, active, and recovery where the move’s mechanics permit it.
+mobility
+momentum
+airMomentum
+control
+airControl
+topSpeed
+airTopSpeed
+friction
 
-7. No ordinary Attack Steering during Special abilities
+Remove the attack-mobility tier system and its directional-steering behavior.
 
-Moves explicitly classified as Special abilities must not allow the new/default Attack Steering.
+Do not merely:
 
-Use Alva’s actual Special classification:
+* Set every tier’s control to zero
+* Set topSpeed to zero
+* Force every attack to use planted
+* Leave dead tier definitions behind
+* Retain unused attack-mobility imports
+* Hide the feature while leaving it active through another movement path
+* Preserve the old system for CPUs
+* Replace it with another differently named attack-steering system
 
-isSpecialAbility(def, move)
+Clean the attack schema, character data, runtime, CPU capability model, tests, and documentation.
 
-as determined from the character’s specialAbilities list.
+If js/data/attack-mobility.js no longer serves a legitimate purpose, delete it and all references.
 
-Do not infer Special status merely from:
+Do not remove ordinary locomotion or air control when the fighter is not performing a move. Only the attack-specific mobility system is being removed.
 
-* An attack button number
-* extra_attack
-* A dramatic animation
-* High damage
-* A projectile
-* A technique
-* A summon
-* A projectile’s visual size
-* The CPU capability analyzer’s existing “specials” execution category
+5.3 Preserve momentum without allowing steering
 
-A move is a Special because its character definition explicitly classifies it that way.
+Removing Attack Steering does not mean every attack must freeze the fighter or erase all existing velocity.
 
-Exception: inherent movement
+These concepts are separate:
 
-If a Special’s actual design deliberately allows steering or gives the player meaningful directional control, retain that mechanic.
+1. Preexisting momentum: Speed carried into an attack from running, jumping, falling, or a Dash.
+2. Step-in: A one-time automatic forward impulse caused by the attack.
+3. Scripted attack motion: A dash, roll, rise, plunge, rebound, etc., directly belonging to the move.
+4. External forces: Knockback, pull, launch, stage movement, and related physics.
+5. Attack Steering: New or redirected movement caused by held directional input during the attack.
 
-If a Special’s own mechanic requires the fighter to move automatically, retain that movement too.
+Remove only category 5 as a player-controlled system.
 
-However, a Special without an explicit intrinsic steering mechanic must not gain general-purpose Attack Steering from the universal defaults.
+The other categories must continue to behave according to their actual mechanics.
 
-Do not erase a designed dash, roll, homing movement, or directional movement effect simply to make the move stationary.
+A fighter may still travel during an attack because:
 
-Disabling Attack Steering must disable movement control, not every possible source of movement.
+* It entered the attack while already moving.
+* It received an automatic Step-in.
+* The move has scripted movement.
+* Gravity is acting on it.
+* An outside force moved it.
+* A platform carries it.
 
-8. No ordinary Attack Steering during 3-second or 5-second cooldown moves
+None of those by itself constitutes Attack Steering.
 
-Alva’s cooldown policy already defines:
+An appropriate general solution is neutral, input-independent velocity evolution while the attack is active, using Alva’s existing physics.
 
-* Ordinary move: 0 seconds
-* Exceptional move: 3 seconds
-* Ten-damage move: 5 seconds
-
-Any move with an effective 3-second or 5-second cooldown must not allow default Attack Steering.
-
-This applies regardless of whether the move is visually labeled Special.
+Preserve truly authored entry-momentum behavior where mechanically essential.
 
 For example:
 
-* A non-Special move with a 3-second cooldown must still have default steering disabled.
-* A non-Special move with a 5-second cooldown must still have default steering disabled.
-* A Special with no cooldown must still have default steering disabled because of its Special classification.
-* An ordinary non-Special move with no cooldown should allow steering unless its actual mechanics explicitly prevent it.
+* A move that deliberately retains incoming speed must still retain it.
+* A move that deliberately starts stationary must still do so.
+* A roll that scales from incoming run speed must still use that initial speed.
+* A rebound must still apply its prescribed velocity.
+* A lunge must still produce its prescribed impulse.
 
-Use the resolved effective cooldown, not a guessed duration or simply the presence of a cooldown field in raw character data.
+If old attack-mobility fields also store such genuinely authored non-steering mechanics, migrate only the necessary mechanics into a clearly separate, minimal representation.
 
-Apply this consistently to attacks, techniques, and summons.
+Do not continue to depend on the old tier system to implement them.
 
-Do not change the existing cooldown policy or when cooldowns begin.
+5.4 Directional input must not control movement during an attack
 
-Exception: intrinsic movement control
+Once an attack begins, left/right movement input must not:
 
-A cooldown move that intentionally supports steering as part of its actual mechanics must retain it.
+* Accelerate the fighter
+* Reverse its velocity
+* Steer an automatic Step-in
+* Add run speed to an attack
+* Maintain speed using attack-specific held-direction bonuses
+* Cancel passive deceleration merely because Run is held
+* Redirect an aerial attack’s horizontal drift through the old mobility system
+* Redirect a plunge or rise through attack steering
+* Bypass movement commitment because lockMovement is false
 
-A cooldown move with scripted automatic movement must also retain that scripted movement.
+The input may still affect initial attack facing when the move begins, according to Alva’s existing rules.
 
-But do not accidentally count automatic momentum, knockback, or scripted motion as permission for unrestricted player steering.
+Preserve legitimate attack-facing behavior, Automatic turn-around, and CPU target-facing rules unless a specific change is needed to prevent movement redirection.
 
-9. Preserve move-specific movement mechanics
+Facing and aiming are not automatically the same thing as horizontal Attack Steering.
 
-This is a fundamental requirement.
+Do not unintentionally redirect an already committed scripted movement or one-time Step-in because its sprite faces a different direction later.
 
-The new universal rules must not override intentionally authored behavior.
+5.5 Explicitly eliminate the lockMovement: false loophole
 
-Inspect actual move data, associated character documentation, and real runtime mechanics to distinguish:
+Currently, Fighter.update() can route attacks with lockMovement: false through normal locomotion instead of steerAttack().
 
-1. A move deliberately designed to be steerable.
-2. A move deliberately designed to remain planted.
-3. A move deliberately designed to move under its own scripted motion.
-4. A move simply receiving old default mobility behavior without an intentional design reason.
+That must no longer provide an attack-steering bypass.
 
-Only the fourth category should automatically change when it conflicts with the new policy.
+Review whether lockMovement is still needed for anything other than the obsolete movement system.
 
-In particular:
+If it is no longer necessary, remove or replace it cleanly.
 
-* Preserve homing-dash movement.
-* Preserve roll movement.
-* Preserve bounce and slam mechanics.
-* Preserve rise and hover mechanics.
-* Preserve authored recoil and rebounds.
-* Preserve intentionally stationary casts.
-* Preserve intentionally mobile casts.
-* Preserve intentionally authored mobility overrides.
-* Preserve movement tied to hit-confirmed or other real move-specific mechanics.
+If another non-steering mechanic still needs movement-state metadata, use clearly defined semantics that do not grant regular player locomotion during attack execution.
 
-Do not automatically treat an old planted value as proof that an entire category of moves must remain stationary. Determine whether the restriction is truly part of that individual move’s intended mechanics.
+A move cannot remain steerable simply because it previously used lockMovement: false.
 
-Conversely, do not erase an explicitly designed planted move simply to make every ordinary move steerable.
+5.6 Remove steering from scripted-motion support paths
 
-The universal defaults must be strong, but authored mechanics must remain authoritative.
+Inspect the implementation of:
 
-⸻
+homing
+bounce
+slam
+rise
+roll
+hover
 
-PART C — STRICT POLICY AND PRECEDENCE
+These attacks currently interact with moveAttack() or attack-mobility settings in different phases.
 
-10. Establish a single shared policy
+Preserve their automatic movement mechanisms.
 
-Implement a clear, testable, reusable policy that resolves:
+However, where horizontal player steering currently comes from:
 
-* Whether a move is eligible for automatic Step-in.
-* Whether a move permits player-controlled Attack Steering.
-* Whether the move has an authored exception.
-* Whether the movement is scripted, steerable, or both.
+control
+airControl
+topSpeed
+airTopSpeed
 
-Do not scatter unrelated ad hoc checks throughout multiple characters and CPU modules.
+remove that directional influence.
 
-Prefer centralized logic that both the runtime and CPU can read.
+Examples:
 
-The policy must work for future characters without engine modifications.
+* A homing attack still homes automatically.
+* A roll still moves by its scripted roll velocity.
+* A rise still rises.
+* A slam still falls and lands.
+* A bounce still bounces.
+* A hover still hovers.
+* A grounded melee Step-in still moves forward once.
 
-Required Step-in decision order
+But holding Run during any of these attacks must not produce general Attack Steering.
 
-1. Identify the real move and its execution context.
-2. Preserve any explicitly authored intrinsic movement.
-3. Determine whether the move is being executed by the fighter or by a spawned object/clone.
-4. Reject automatic Step-in for aerial attacks.
-5. Reject automatic Step-in for projectile-, summon-, clone-, and object-based moves.
-6. Apply the automatic Step-in to eligible grounded melee attacks.
-7. Use an explicitly authored Step-in instead of the default when one exists.
-8. Never apply the automatic Step-in twice.
+A move’s scripted travel is not permission to retain the generic steering system.
 
-Required Attack Steering decision order
+5.7 Clean up steerAttack() appropriately
 
-1. Identify the real move and its actual mechanics.
-2. Preserve explicit, intentional steering or non-steering mechanics.
-3. Determine whether the move is a Special ability.
-4. Determine whether its effective cooldown is 3 or 5 seconds.
-5. Disable ordinary Attack Steering if either restriction applies.
-6. Otherwise allow Attack Steering using the move’s resolved mobility settings.
-7. Never replace a scripted movement mechanic with generic steering.
+The existing steerAttack() combines:
 
-The first two rules above are about preserving genuine authored mechanics, not allowing an old implicit default to bypass the new universal requirements.
+1. One-time Step-in
+2. Attack-specific directional movement
 
-Avoid contradictory state
+These must be separated.
 
-Do not allow a move to be simultaneously described as default-steerable and default-non-steerable depending on which game subsystem reads it.
+Prefer a clean shared movement function or functions that implement:
 
-Where necessary, expose effective resolved movement properties to the Fighter and CPU.
+* Resolved Step-in
+* Existing passive momentum behavior
+* Neutral physical deceleration
+* Attack-specific scripted movement where applicable
 
-Maintain the distinction between:
+But no attack-specific response to ongoing held movement direction.
 
-* Initial momentum
-* Automatic Step-in
-* Player-directed steering
-* Scripted motion
-* Knockback or external forces
+Keep steer() available for ordinary, out-of-attack fighter locomotion.
+
+Do not inadvertently remove universal walking, running, jumping, air control, turning, or Dash mechanics.
 
 ⸻
 
-11. Strict expected behavior matrix
+PART 6 — COMPLETE ROSTER AUDIT
 
-Move category	Automatic Step-in	Default Attack Steering
-Ordinary grounded melee, 0 s cooldown, not Special	Yes	Yes
-Grounded melee classified Special	Yes, unless intrinsic mechanic dictates otherwise	No, unless intrinsically steerable
-Grounded melee with 3 s cooldown	Yes, unless intrinsic mechanic dictates otherwise	No, unless intrinsically steerable
-Grounded melee with 5 s cooldown	Yes, unless intrinsic mechanic dictates otherwise	No, unless intrinsically steerable
-Ordinary aerial melee	No	Yes
-Aerial melee classified Special or with 3/5 s cooldown	No	No, unless intrinsically steerable
-Ordinary projectile attack	No	Yes, unless inherently stationary
-Special or 3/5 s projectile attack	No	No, unless intrinsically steerable
-Ordinary technique, not Special, 0 s cooldown	No if object/effect-based	Yes, unless inherently stationary
-Special or 3/5 s technique	No if object/effect-based	No, unless intrinsically steerable
-Ordinary summon startup	No	Yes, unless inherently stationary
-Special or 3/5 s summon startup	No	No, unless intrinsically steerable
-Clone’s own attack	No new owner-fighter Step-in	Preserve clone’s own mechanics
-Scripted movement attack	Preserve intrinsic movement; no duplicate default	Preserve its intentional control model
+6.1 Audit every playable move
 
-The two rules are independent: a grounded melee move can Step-in automatically while not allowing any player-controlled steering.
+Do not change only one character or one attack.
+
+For every fighter and every executable move, determine:
+
+1. Fighter ID.
+2. Action/button mapping.
+3. Actual move definition.
+4. Ground or air availability.
+5. Whether the fighter itself executes it.
+6. Whether a clone or other entity executes it.
+7. Whether the offense is direct melee, projectile, object, technique, summon, or hybrid.
+8. Whether it has an authored Step-in.
+9. Whether it explicitly should not Step-in.
+10. Whether it has intrinsic movement.
+11. Whether it has deliberate entry-momentum behavior.
+12. What old Attack Mobility currently changes.
+13. Whether a universal grounded Step-in is applicable.
+14. What existing movement must survive after steering removal.
+
+Build a complete audit table internally before editing.
+
+Do not apply an arbitrary blanket rewrite without checking the moves.
+
+6.2 Real Alva examples to protect
+
+Fighter #0001
+
+* Jab: Direct grounded melee; must receive universal Step-in.
+* Red: Projectile cast; no generic Step-in.
+* Maximum Blue: Projectile cast; no generic Step-in.
+* Red Kick: Aerial homing attack; no generic Step-in; preserve homing.
+* Floating Straight: Aerial hover attack; no generic Step-in; preserve hover, remove steering.
+* High Kick: Already has an authored step; preserve its intended ground lunge without stacking another.
+* Unlimited Void and Hollow Purple: Techniques; no generic Step-in or Attack Steering.
+
+High Kick is especially important because its attack definition is usable in more than one execution context. Preserve the legitimate authored ground behavior without accidentally applying a new air Step-in.
+
+Fighter #0002
+
+* Grounded punches and Rapid Kicks: Apply universal melee Step-in as appropriate.
+* Homing Attack: Preserve homing, no generic aerial Step-in.
+* Bounce Attack: Preserve bounce and descent, remove aerial steering.
+* Spin Attack: Preserve its self-propelled roll, without an unintended extra lunge.
+* Blue Tornado: Preserve rising attack motion, remove input-driven attack steering.
+* Whirlwind: Projectile/object move; no generic Step-in.
+
+Fighter #0003
+
+* Chakra Punch: Eligible grounded direct melee; Step-in.
+* Heel Drop: Has an authored step; preserve without duplication.
+* Chakra Haymaker: Has an authored step; preserve without duplication.
+* Heavenly Foot of Pain: Aerial slam; no new Step-in; retain plunge and landing impact.
+* Cherry Blossom Impact: Technique; no generic Step-in or steering.
+* Mystical Palm Technique: Technique; preserve intended stationary casting and healing.
+
+Fighter #0004
+
+* Dance Combo, Leek Swing, Crescent Kick: Review as grounded direct melee and apply universal Step-in.
+* Air Dance: No generic aerial Step-in.
+* Leekspin: Preserve its rising motion, remove attack steering.
+* Stage Dive: Preserve scripted dive and impact, no new Step-in.
+* The Melody: Projectile; no generic Step-in.
+* Ievan Polkka and World is Mine: Techniques; no generic Step-in or Attack Steering.
+
+Fighter #0005
+
+* Grounded Claw Slash: Direct melee; Step-in.
+* Long Bite: Review as a direct body-origin melee attack with extended reach; avoid an excessive or mechanically inappropriate lunge.
+* Phantom Hands: Inspect the actual hit-delivery mechanic before deciding Step-in eligibility.
+* Dark Tendrils: Deliberately roots the fighter in place, including an authored zero-momentum behavior. Preserve its intentional no-Step-in/rooted mechanic.
+* Floating Hands: No generic aerial Step-in.
+* Deadlights: Technique; no generic Step-in.
+* Red Balloon: Summon; no owner Step-in; clone positioning and attack must remain correct.
+* The clone’s bite: Must not receive automatic fighter movement merely because its attack definition has a direct hitbox.
+
+Fighter #0006
+
+* Power Punch: Grounded direct melee; Step-in.
+* Flying Kick and Flying Punch: No generic aerial Step-in.
+* Tornado Spin: Preserve its scripted roll and momentum interaction; no duplicate generic lunge.
+* Triple Strike: Preserve the authored homing dash; do not add a generic Step-in on top.
+* Heat Vision, Ice Breath, Sonic Scream: Techniques/effects; no generic Step-in and no Attack Steering.
+
+These examples are mandatory regression cases, not a substitute for auditing all current and future moves.
 
 ⸻
 
-PART D — ALVA-SPECIFIC IMPLEMENTATION DETAILS
+PART 7 — CPU INTELLIGENCE MUST FOLLOW THE SAME RULES
 
-12. Fix all affected runtime paths
+7.1 Player and CPU mechanical parity
 
-Inspect Fighter.update, Fighter.startAttack, Fighter.moveAttack, Fighter.moveMotion, and the shared movement functions.
+All movement rules must be authoritative and shared.
 
-Ensure the effective movement policy is honored consistently.
+A CPU executing a move must behave physically like a player executing that move from the same initial state.
 
-Pay particular attention to:
+This includes:
 
-* Attack-start momentum retention.
-* Step-in timing and one-time triggering.
-* Ground versus air execution context.
-* Whether an attack uses lockMovement: true or false.
-* Attacks with motion.
-* Techniques and their casting/release states.
-* Summon startup and release.
-* Buffered attacks.
-* Hitstop.
-* Stun and paralysis.
-* Dash-to-attack transitions.
-* Landing during an attack.
-* Attack cancel and interrupt behavior.
-* Stage ledges and wall collisions.
+* The same automatic Step-in eligibility
+* The same Step-in timing
+* The same forward impulse
+* The same movement restrictions
+* The same collision and friction
+* The same carried momentum
+* The same scripted motion
+* The same lack of Attack Steering
 
-Important: lockMovement: false
+No CPU-only movement bonuses.
 
-The current runtime can route these attacks through ordinary locomotion rather than steerAttack().
+No CPU-only attack steering.
 
-Do not allow that routing distinction to accidentally skip an automatic Step-in on an otherwise eligible grounded melee attack.
+No special exception for Hard or Brutal difficulty.
 
-Likewise, do not allow it to bypass a required non-steerable Special/cooldown rule.
+Difficulty can change planning quality, not the mechanical rules.
 
-Fix the routing or centralize the effective policy appropriately.
-
-Important: techniques and summons
-
-At present, the Fighter explicitly sets horizontal velocity to zero during techniques and summon startup.
-
-Investigate this carefully.
-
-Do not leave all ordinary techniques and summons automatically immobile merely because these categories share a hardcoded stationary runtime path.
-
-For a non-Special, zero-cooldown technique or summon startup whose own design does not require standing still, Attack Steering must be supported.
-
-For a move with a genuine fixed-position casting mechanic, preserve it.
-
-If the owner moves during a cast, make sure released projectiles, bursts, and summon spawn points use the correct owner position and preserve all existing authored facing/release rules.
-
-Do not accidentally make the spawned object itself steer according to the fighter’s directional input.
-
-Important: never confuse Attack Steering with Dash
-
-Ordinary Attack Steering uses held movement directions.
-
-Do not make it dependent on pressing the dedicated mouvment Dash command.
-
-Do not trigger a Dash automatically.
-
-Do not change the Dash’s Energy cost, cooldown, burst physics, or cancellation behavior.
-
-⸻
-
-PART E — CPU INTELLIGENCE
-
-13. CPUs must obey exactly the same rules as human players
-
-This update must work equally for CPUs.
-
-A CPU must:
-
-* Execute the same automatic grounded melee Step-ins.
-* Receive no automatic aerial Step-ins.
-* Receive no automatic Step-ins on object-based moves unless deliberately authored.
-* Be able to steer during eligible moves.
-* Be unable to steer during restricted Specials and 3/5-second cooldown moves unless intentionally supported by the move.
-* Respect the same mobility tiers and movement authority.
-* Preserve scripted moves.
-* Respect collisions and ledges.
-* Use normal legal FighterInput snapshots.
-
-Do not create CPU-only movement speeds, stronger Step-ins, extra steering authority, or movement permissions unavailable to human players.
-
-This must work at every CPU difficulty.
-
-Difficulty may affect decision quality, not movement rules.
-
-14. Remove the CPU’s blanket grounded attack-steering suppression
-
-The existing Executor.finish() includes a rule that neutralizes directional input while an ordinary grounded, movement-locked, non-motion attack is active.
-
-Its purpose is to prevent execution from disagreeing with the CPU’s currently unsteered attack predictions.
-
-This blanket suppression cannot remain the general behavior for steerable attacks.
-
-Update the CPU so that:
-
-* It can deliberately hold left or right during a steerable grounded attack.
-* It can steer during eligible aerial attacks.
-* It can choose to hold no direction when that is tactically preferable.
-* It does not send ineffective steering input for genuinely non-steerable moves.
-* Its real movement matches the movement used when planning the attack.
-
-Do not simply delete the restriction without updating the predictive system.
-
-That would let CPUs move away from their own predicted hit positions.
-
-15. Update CPU movement prediction
-
-Inspect js/game/ai/cpu-intelligence/prediction.js.
-
-Its current attack simulations call steerAttack() with a neutral movement direction in several paths.
-
-Update the predictive model to account for:
-
-* The new automatic grounded Step-in.
-* The absence of default aerial and object-move Step-ins.
-* Whether a move permits Attack Steering.
-* The steering direction the CPU plans to hold.
-* Attack-specific momentum and movement tiers.
-* Authored exceptions.
-* Scripted motion that owns the fighter’s velocity.
-
-The CPU must simulate the same physics and policy as the actual Fighter.
-
-Prefer reusing shared movement functions rather than implementing approximate duplicate movement rules.
-
-Ensure the prediction for a candidate attack is consistent with the direction the executor will actually hold.
-
-CPU tactical behavior
-
-A CPU should be capable of:
-
-* Advancing slightly during a grounded melee attack via automatic Step-in.
-* Steering toward an opponent during an eligible attack to improve connection.
-* Holding position to avoid overshooting.
-* Steering away when tactically appropriate and legal.
-* Controlling aerial drift during eligible aerial attacks.
-* Choosing attack direction appropriately after an opponent changes sides.
-* Recognizing that a non-steerable Special is a committed action.
-* Accounting for the new approach distance of grounded melee attacks.
-* Avoiding unsafe movement toward stage edges.
-
-Do not force CPUs to steer on every attack. They must have the same capability as the player and use it intelligently.
-
-16. Update CPU capability analysis and evaluation
+7.2 Update the CPU executor
 
 Inspect:
 
-* capabilities.js
-* prediction.js
-* evaluator.js
-* executor.js
-* brain.js
-* Relevant planning and defensive systems
+js/game/ai/cpu-intelligence/executor.js
 
-The capability analyzer should know each move’s effective movement behavior.
+Its existing finish() logic suppresses some grounded attack directions because the predictor assumes attacks are unsteered.
 
-The evaluator must not use the old attack position or reach assumptions when a Step-in changes the fighter’s trajectory.
+After this update, unsteered movement must be enforced by the shared fighter runtime, not merely by the CPU choosing neutral input.
 
-Ensure that:
+Update or simplify the CPU’s attack-input handling accordingly.
 
-* Step-in distance is factored into actual candidate contact simulation.
-* A move with automatic Step-in does not receive additional imaginary reach.
-* The CPU considers steering only when the move actually permits it.
-* Projectiles and object attacks are not incorrectly treated as melee lunges.
-* Moves with deliberately scripted movement remain correctly represented.
-* CPU defense can predict the changed grounded melee attack trajectories.
-* AI planning and execution remain deterministic.
+An input direction during an attack may be retained for future navigation or valid facing behavior, but it must not move the fighter while the attack is underway.
 
-Review CPU approach and mobility roles if the newly added default Step-ins change role classification. A tiny universal Step-in must not automatically turn every basic punch into a major movement or recovery ability.
+Do not rely on CPU input suppression as the only implementation of the rule.
 
-Preserve meaningful CPU behavior across Quick Battle and Watch Mode.
+Do not leave hidden steering available to the player.
 
-⸻
+7.3 Update CPU attack prediction
 
-PART F — AUDIT ALL EXISTING FIGHTERS
+Inspect:
 
-17. Perform a complete roster-wide move audit
+js/game/ai/cpu-intelligence/prediction.js
 
-Audit every currently playable fighter and every real action mapped through its loadout.
+The current predictor calls steerAttack() with neutral direction in several attack-simulation paths.
 
-For each move, determine:
+It must now simulate:
 
-1. Which fighter owns it.
-2. Which button or action executes it.
-3. Its actual runtime type: melee, projectile, technique, summon, etc.
-4. Whether it is available on the ground, in the air, or both.
-5. Whether it is classified as a Special.
-6. Its resolved cooldown: 0, 3, or 5 seconds.
-7. Its authored movement properties.
-8. Whether it already has an explicit Step-in.
-9. Whether it has scripted movement.
-10. Whether its existing stationary behavior is intentional.
-11. Its required effective Step-in behavior.
-12. Its required effective steering behavior.
+1. The correct resolved automatic Step-in.
+2. No automatic aerial Step-in.
+3. No automatic object-move Step-in.
+4. Explicit authored Step-ins and opt-outs.
+5. Preexisting velocity.
+6. Input-independent passive momentum.
+7. Scripted movement.
+8. Ground transitions and collisions.
+9. Attack timing, hitstop, cancellation, and interruption.
+10. Zero Attack Steering.
 
-Do not only edit attack1 or the first character.
+Do not allow the CPU predictor to use different movement mathematics from the actual Fighter.
 
-This must work for every playable character and extend automatically to future ones.
+Where possible, call the same shared functions with the same resolved movement information.
 
-Concrete existing moves to verify
+A predicted grounded melee attack must gain the actual distance its Step-in creates.
 
-Use these real Alva examples as regression cases, while continuing to audit the entire roster:
+A predicted projectile attack must not gain imaginary owner displacement.
 
-#0001
+A predicted aerial attack must not gain the removed steering capability.
 
-* Jab: grounded direct melee; gains the universal Step-in if no equivalent authored behavior exists.
-* Red and Maximum Blue: ordinary projectile attacks; no generic Step-in, but normal Attack Steering must be available unless their individual mechanics deliberately forbid it.
-* Red Kick: aerial homing attack; preserve its homing movement without applying a generic aerial Step-in.
-* Unlimited Void: Special and 3-second cooldown; default Attack Steering prohibited.
-* Hollow Purple: Special and 5-second cooldown; default Attack Steering prohibited.
-* High Kick: preserve its existing authored Step-in rather than stacking another one.
+7.4 Update recovery and tactical evaluation
 
-#0002
+The CPU’s recovery logic currently obtains attack-specific air-control information for rising attacks.
 
-* Grounded punches and kicks: must follow the grounded melee default.
-* Air homing and bounce attacks: no generic aerial Step-in; preserve their intrinsic motions.
-* Whirlwind: projectile/object-based behavior; no automatic Step-in.
-* Spin and other planted or motion-based moves: inspect their real authored intent before modifying steering.
+Remove reliance on obsolete attack-steering fields.
 
-#0003
+A rising attack remains a possible recovery action because of its authored upward motion, not because it allows extra horizontal steering.
 
-* Chakra Punch: eligible grounded melee Step-in.
-* Heel Drop: already has an authored Step-in; preserve it exactly rather than duplicating it.
-* Heavenly Foot of Pain: aerial slam; no new forward Step-in, preserve the plunge and landing impact.
-* Cherry Blossom Impact: ordinary technique, not classified Special and with no cooldown; evaluate normal steering against its genuine casting mechanic.
-* Mystical Palm Technique: Special with a 3-second cooldown; preserve the intended committed cast.
-* Chakra Haymaker: already has an authored Step-in; retain its authored timing and strength.
+Update trajectory prediction and recovery planning accordingly.
 
-#0004
+Also inspect capabilities.js, values.js, evaluator.js, and relevant planning code.
 
-* Grounded dance and melee attacks: enforce the new Step-in default as applicable.
-* Aerial attacks and dives: exclude generic aerial Step-in.
-* Object-based and technique moves: no generic Step-in.
-* Ievan Polkka: do not automatically call it Special merely because it is a technique.
-* World is Mine: respect its explicit Special classification and effective cooldown.
+Important: Alva’s CPU uses generic tactical labels such as mobility and approach. Those labels are not necessarily the removed Attack Mobility system.
 
-#0005
+Do not delete legitimate AI concepts simply because they contain the word “mobility”.
 
-* Grounded claws, bites, and direct melee: apply appropriate default Step-in.
-* Aerial attacks: no generic Step-in.
-* Phantom Hands and Dark Tendrils: inspect direct-hit versus object-based behavior and intentionally planted movement carefully.
-* Deadlights and Red Balloon: respect their Special classification.
-* Red Balloon’s clone must not inherit a new automatic fighter Step-in or become steerable merely because the shared melee system changed.
+A tiny universal Step-in also must not cause every basic jab to be treated as a major approach, escape, or recovery move.
 
-#0006
+Review any AI role assignment currently triggered by m.step.
 
-* Grounded physical attacks: apply the universal Step-in when eligible.
-* Flying Kick and Flying Punch: preserve their intended aerial movement without generic Step-in.
-* Tornado Spin: inspect its authored planted and attack-motion behavior.
-* Heat Vision: ordinary technique, not automatically Special; no Step-in if object-based, and evaluate steering under the new rule.
-* Ice Breath: explicitly Special; no default Attack Steering.
-* Sonic Scream: determine behavior from its actual classification, cooldown, and authored mechanics, not from its name.
+Distinguish:
 
-These are regression examples, not hardcoded exceptions.
+* Small universal melee lunge
+* Major authored displacement attack
+* True approach ability
+* Recovery movement
+
+CPU candidate scoring must use realistic movement and contact positions rather than inflated reach or guessed movement.
+
+7.5 CPU mode coverage
+
+Verify behavior in:
+
+* Player versus CPU
+* CPU versus CPU
+* Quick Battle
+* Watch Mode
+* All CPU difficulty levels
+* Multiple stages
+* Ledges, walls, and platforms
+* Close-range and long-range exchanges
+* Recovery scenarios
+* Punishes, counters, and combo follow-ups
+
+The CPU must adapt to the fact that holding a movement direction no longer corrects a committed attack’s spacing.
+
+It should approach to the right range before committing, account for automatic melee lunges, and choose attacks accordingly.
 
 ⸻
 
-PART G — REQUIRED TESTS
+PART 8 — STRICT MOVEMENT POLICY AND PRECEDENCE
 
-18. Add thorough automated coverage
+Implement one coherent shared policy.
 
-Use Alva’s existing Node test architecture.
+The effective behavior should follow this conceptual precedence:
 
-The project uses:
+Step-in precedence
+
+1. Determine whether the action is being executed by a real fighter or a spawned entity.
+2. Identify the actual move and its offensive mechanics.
+3. Identify whether this activation began grounded or airborne.
+4. Preserve explicit authored movement and intentional no-Step-in behavior.
+5. Never create a generic Step-in for aerial activations.
+6. Never create a generic Step-in for projectile-, summon-, clone-, or object-based actions.
+7. Avoid duplicating scripted motions such as rolls and homing dashes.
+8. For eligible grounded direct melee, use an authored Step-in if present.
+9. Otherwise resolve a small universal Step-in.
+10. Apply it at most once, through normal physics.
+
+Attack Steering precedence
+
+There is no eligibility calculation.
+
+Attack Steering is removed universally.
+
+For every move:
+
+1. Preserve valid initial facing and move activation.
+2. Preserve actual authored automatic movement.
+3. Preserve legitimate incoming momentum and external physics.
+4. Do not run player-directed horizontal attack steering.
+5. Resume normal locomotion only when the fighter is actually free to move again.
+
+A move’s Special classification, cooldown duration, former mobility tier, or original lockMovement value must not re-enable Attack Steering.
+
+Required behavior matrix
+
+Move type	New automatic Step-in	Attack Steering
+Ordinary grounded direct melee	Yes	Removed
+Grounded multi-hit direct melee	Yes, once per activation	Removed
+Grounded melee with existing authored Step-in	Preserve authored lunge, no duplicate	Removed
+Grounded melee intentionally designed not to lunge	Preserve authored exception	Removed
+Grounded attack with its own dash or roll	Preserve intrinsic motion; no duplicate generic lunge	Removed
+Aerial melee	No	Removed
+Aerial homing/rise/bounce/slam	No generic Step-in; preserve intrinsic motion	Removed
+Grounded projectile attack	No	Removed
+Projectile with an authored owner lunge	Preserve authored lunge	Removed
+Object-based attack	No, unless deliberately authored	Removed
+Technique	No generic Step-in	Removed
+Summon startup	No generic Step-in	Removed
+Clone’s attack	No generic fighter Step-in	Removed
+Air Deflect	No generic Step-in	Removed
+Special attack	According to actual melee/context rules	Removed
+Three- or five-second cooldown attack	According to actual melee/context rules	Removed
+Ordinary movement outside an attack	Not applicable	Normal movement remains
+
+⸻
+
+PART 9 — IMPLEMENTATION SAFETY
+
+9.1 Prevent movement bypasses
+
+Inspect every path that can move the fighter while a move is active.
+
+Pay attention to:
+
+* Fighter.update()
+* Fighter.startAttack()
+* Fighter.moveAttack()
+* Fighter.moveMotion()
+* Normal moveHorizontal() routing
+* Attack-start momentum
+* lockMovement
+* Buffered attacks
+* Hitstop
+* Landing and leaving the ground
+* Attack cancels
+* Deflects
+* Technique startup and release
+* Summon startup and completion
+* Scripted motion completion
+* End-of-attack recovery
+* Dash-to-attack transitions
+
+A single attack must not become steerable through a less-obvious branch after its motion ends or it changes phase.
+
+9.2 Preserve everything outside the requested scope
+
+Do not unnecessarily change:
+
+* Universal running
+* Universal jumping
+* Normal airborne control outside attacks
+* Dash and air dash
+* Dash Energy costs
+* Movement input mappings
+* Controller and touch controls
+* Attack animations and frame rates
+* Startup, active, and recovery durations
+* Hitboxes and hurtboxes
+* Damage
+* Launch
+* Hitstun and blockstun
+* Hitstop
+* Shield
+* Deflect projectile redirection
+* Hit-confirmed cancels
+* Input buffering
+* Cooldown policies
+* Energy policies
+* Projectile behavior
+* Summon/clone behavior
+* Technique release behavior
+* Stage hazards and collision
+
+Normal Run input should work immediately again once the move ends or is legitimately cancelled.
+
+A projectile already in flight must not keep its fighter in an attack movement lock beyond the actual move animation.
+
+9.3 Preserve deterministic physics
+
+Alva runs a fixed-step simulation.
+
+Do not introduce:
+
+* Frame-rate-dependent impulses
+* Repeated Step-ins
+* NaN velocities
+* Arbitrary teleports
+* Collision bypasses
+* Direction-dependent steering loopholes
+* Attack-cancel velocity exploits
+* CPU-specific physics
+* Different results for otherwise identical input and game states
+
+Keep all behavior deterministic under fixed initial conditions and seeds.
+
+⸻
+
+PART 10 — TESTING REQUIREMENTS
+
+10.1 Create dedicated universal Step-in tests
+
+Test every playable fighter’s real mapped attacks.
+
+Verify:
+
+* Every eligible grounded direct melee attack Steps-in from rest.
+* Step-in works with no movement input.
+* Step-in works while Run is held.
+* Step-in uses legal attack facing.
+* Step-in happens once.
+* Multi-hit strings do not produce repeated Step-ins.
+* Generic Step-in distance remains modest.
+* Existing authored Steps-in are not duplicated.
+* Authored no-Step-in moves remain stationary as intended.
+* Aerial melee attacks never gain generic Step-in.
+* Landing does not cause an aerial Step-in.
+* Leaving the ground does not produce a late generic lunge in the air.
+* Projectile attacks do not gain generic Step-in.
+* Techniques and summons do not gain generic Step-in.
+* Clones do not gain owner-fighter displacement.
+* Object-based hitboxes are classified correctly.
+* Scripted movement attacks do not gain duplicate lunges.
+* Stage walls and ledges behave correctly.
+
+10.2 Prove Attack Steering is actually gone
+
+For every applicable attack category, test:
+
+* Neutral input
+* Left held
+* Right held
+* Holding the same direction as incoming momentum
+* Holding the opposite direction
+* Switching directions during startup
+* Switching directions during active frames
+* Switching directions during recovery
+* Pressing Run after the attack starts
+
+Under equivalent initial movement, facing, targeting, and attack state, the directional inputs must not alter horizontal movement through Attack Steering.
+
+Movement differences may only arise from legitimate non-steering mechanics or independent changes in facing/targeting that the game’s rules permit.
+
+Confirm:
+
+* Ground attacks have no steering.
+* Aerial attacks have no steering.
+* Deflect has no steering.
+* Projectile attacks have no steering.
+* Techniques have no steering.
+* Summon startup has no steering.
+* Special attacks have no steering.
+* Quick attacks do not secretly retain steering.
+* Heavy attacks do not secretly retain steering.
+* lockMovement: false does not bypass the rule.
+* A scripted motion’s startup or recovery does not accidentally revert to steerable locomotion.
+* Normal movement resumes at the correct time.
+
+Test that a fighter can still move automatically during a Step-in, carry existing inertia, or execute a scripted movement move.
+
+Those movements must not be mistaken for steering.
+
+10.3 Verify authored mechanics
+
+Use real roster examples to test:
+
+* High Kick’s authored lunge.
+* Heel Drop’s authored lunge.
+* Chakra Haymaker’s authored lunge.
+* Dark Tendrils’ planted/rooted behavior.
+* Homing attacks.
+* Ground rolls.
+* Aerial bounces.
+* Aerial rises.
+* Slams and landing impacts.
+* Hovering moves.
+* Clone attacks.
+* Projectile casts.
+
+Include tests for forward and backward facing, attacks started from rest, running attacks, and attacks following a Dash.
+
+10.4 CPU prediction parity tests
+
+For the same fighter, move, stage, starting position, velocity, and target:
+
+1. Run the real Fighter simulation.
+2. Run the CPU’s prediction.
+3. Compare the resulting position and velocity over time.
+4. Compare predicted and actual attack contact.
+
+Test ordinary Step-in attacks, authored lunges, aerial attacks, projectile attacks, and scripted-motion attacks.
+
+The predictor and actual simulation should agree within justified fixed-step tolerances.
+
+Verify CPUs cannot gain movement by sending Run input during attacks.
+
+Also verify CPUs still navigate and attack effectively after their moves finish.
+
+10.5 Update obsolete tests instead of preserving the obsolete feature
+
+Existing tests in:
+
+tests/systems/attack-mobility.test.mjs
+tests/systems/movement-rules.test.mjs
+tests/systems/movement.test.mjs
+tests/systems/cpu-intelligence.test.mjs
+tests/systems/cpu-behaviour.test.mjs
+
+may currently assert that attack steering exists.
+
+These assertions must be replaced with tests of the new rules, not preserved.
+
+If an old attack-mobility test module is no longer meaningful, replace it with a dedicated universal Step-in and no-steering test suite.
+
+Do not simply delete all movement coverage.
+
+Preserve tests of legitimate momentum, physics, Dash, recoil, authored motion, and cancellation.
+
+Review per-fighter tests and test fixtures for outdated mobility expectations.
+
+10.6 Run comprehensive regression tests
+
+Run:
 
 node --test
 
-Extend relevant tests, including:
+Also run:
 
-* tests/systems/movement-rules.test.mjs
-* tests/systems/movement.test.mjs
-* tests/systems/attack-mobility.test.mjs
-* tests/systems/cooldown-policy.test.mjs
-* tests/systems/special-abilities.test.mjs
-* tests/systems/cpu-intelligence.test.mjs
-* tests/systems/cpu-behaviour.test.mjs
-* Relevant per-fighter tests
-* Relevant integration tests
+node tests/benchmarks/feel-metrics.mjs
+node tests/benchmarks/cpu-benchmark.mjs
 
-Add a dedicated universal movement-policy test file if appropriate.
+The feel benchmark currently measures steering-related behavior. Update obsolete measurements so it now verifies meaningful properties such as:
 
-Mandatory Step-in tests
+* Grounded Step-in travel distance
+* One-time Step-in behavior
+* No input-driven displacement during attacks
+* Carried momentum
+* Motion-specific movement
+* Normal movement restoration
+* Dash-to-attack behavior
+* Airborne drift without attack steering
 
-Verify that:
+Do not preserve a metric that requires the removed feature to exist.
 
-* Every eligible grounded melee attack Step-ins even with no directional input.
-* The Step-in follows the fighter’s attack facing.
-* It is noticeable but remains a short advance.
-* It occurs once, not every frame.
-* Existing authored Step-ins are not duplicated.
-* Air melee attacks receive no generic Step-in.
-* Aerial homing, rise, bounce, slam, and hover still work.
-* Projectiles receive no generic Step-in.
-* Techniques, summons, clones, and other object moves receive no generic Step-in.
-* Authored exceptions remain functional.
-* Hybrid attack classification is correct.
-* Walls and stage boundaries are respected.
-* Aerial-to-ground transitions do not create retroactive or repeated Step-ins.
+Use the CPU benchmark to detect regressions in combat competence, attack usage, spacing, recovery, edge safety, inactivity, and navigation.
 
-Mandatory Attack Steering tests
-
-Verify that:
-
-* An ordinary zero-cooldown, non-Special melee attack can steer.
-* An eligible aerial attack can steer.
-* An eligible ordinary projectile attack can steer without altering the projectile’s flight.
-* Eligible ordinary techniques and summons can steer unless intrinsically stationary.
-* An explicitly Special zero-cooldown move cannot gain default steering.
-* A non-Special 3-second cooldown move cannot gain default steering.
-* A non-Special 5-second cooldown move cannot gain default steering.
-* An ordinary zero-cooldown move remains steerable where appropriate.
-* Explicitly designed steering on restricted moves is preserved.
-* Explicitly designed stationary behavior on ordinary moves is preserved.
-* Scripted automatic motion survives the steering restrictions.
-* Neutral input, left input, and right input behave correctly.
-* All movement phases and interruptions remain consistent.
-
-Mandatory CPU tests
-
-Verify that:
-
-* CPU and player movement are identical for the same fighter, move, initial state, and input sequence.
-* CPU grounded melee attacks receive the new Step-in.
-* CPU air attacks do not receive default Step-in.
-* CPU projectile and summon moves receive no generic Step-in.
-* CPU steering is actually possible during eligible grounded moves.
-* CPU steering is possible during eligible aerial moves.
-* CPU steering is ineffective during restricted moves except for authored exceptions.
-* The CPU’s predicted attack trajectory agrees with real execution.
-* CPU hit predictions incorporate the new Step-in.
-* CPUs can select and execute useful steering directions.
-* CPUs do not steer off dangerous edges unintentionally.
-* CPUs at every difficulty obey the same mechanics.
-* Both CPU-versus-player and CPU-versus-CPU modes work.
-* CPU simulations remain deterministic under fixed seeds.
-
-Regression tests
-
-Verify that the update does not break:
-
-* Existing combos.
-* Hit-confirmed attack cancels.
-* Dash cancels.
-* Hitstop.
-* Hitstun and launch.
-* Cooldown start and expiration.
-* Energy costs.
-* Deflect.
-* Shield.
-* Projectile spawn timing.
-* Summon startup and clone behavior.
-* Technique cast/release timing.
-* Stage collision.
-* Character-specific special mechanics.
-* Automatic turn-around and attack-facing rules.
-* Existing controller and touch controls.
-
-Do not weaken or delete important old assertions merely to obtain a passing test suite. Update expectations when the new rule genuinely changes expected behavior, and explain each such change.
+If full browser testing is available, also play or observe actual matches using keyboard, controller, and CPU inputs.
 
 ⸻
 
-PART H — ENGINEERING REQUIREMENTS
+PART 11 — DOCUMENTATION AND PROJECT CLEANUP
 
-19. Keep the change clean and future-proof
-
-Implementation requirements:
-
-* One shared ruleset for every fighter.
-* Player and CPU use the same authoritative mechanics.
-* No fighter-ID checks in universal systems.
-* No action-slot heuristics when real move metadata is available.
-* No blanket assumption that all techniques are Specials.
-* No duplicate physics.
-* No unnecessary alterations to the combat balance systems.
-* No new input buttons.
-* No required new animations or sprite assets.
-* No broken controller mappings.
-* No uncapped movement exploits.
-* No hidden movement cheats for CPUs.
-* Preserve fixed-step deterministic behavior.
-* Keep attack definitions validated and immutable.
-* Make exceptions explicit, purposeful, and inspectable.
-* Ensure future fighters inherit the defaults automatically.
-
-If new move metadata is needed, choose clear semantics distinguishing:
-
-* Automatic default behavior
-* Explicit authored behavior
-* Explicit intentional override
-
-Do not overload existing fields in a way that makes an implicit default indistinguishable from a deliberately authored rule.
-
-Keep data validation and documentation consistent with any new fields.
-
-20. Documentation
-
-Update the applicable parts of:
+Update all affected project documentation, especially:
 
 * ALVA_SPEC.md
 * docs/systems/movement.md
 * docs/systems/combat.md
 * docs/systems/ai.md
-* Any affected character documentation
-* docs/development/testing.md if test coverage or methodology changes
+* docs/characters/
+* docs/characters/adding-characters.md
+* docs/development/testing.md
+* Relevant comments and update notes
 
-Document:
+Document the new universal rules clearly.
 
-* The universal grounded melee Step-in rule.
-* The aerial and object-move exclusions.
-* How authored Step-in exceptions work.
-* The default Attack Steering rule.
-* The Special and 3/5-second restrictions.
-* The fact that Special classification is independent of implementation type.
-* How the CPU plans and executes steering.
-* How future character authors use or override the policy.
+Remove obsolete statements such as:
 
-Preserve project conventions, including the protected character_rule file.
+* Every attack has an Attack Mobility tier.
+* A quick attack can retain directional run control.
+* Heavy attacks allow slower steering.
+* Aerial attacks can be steered using airControl.
+* Ordinary moves permit steering except for Specials or certain cooldowns.
+* The CPU deliberately chooses neutral steering while the player retains steering.
 
-If changing character definitions, review the Discover profiles and update their reviewed source hashes only after verifying the changes, as required by the project’s tests.
+Those statements are no longer valid.
+
+If the repository’s existing max document is retained, revise or explicitly supersede its contradictory steering requirements. Do not leave an authoritative-looking specification that instructs a future developer to reintroduce Attack Steering.
+
+Keep unrelated ordinary movement documentation intact.
+
+Where character definitions change, follow Alva’s profile-review process. Recheck the relevant Discover profiles and update their reviewed source hashes only after reviewing the resulting fighter data.
 
 ⸻
 
-PART I — COMPLETION AND ACCEPTANCE CRITERIA
+PART 12 — ENGINEERING CONSTRAINTS
 
-21. Deliver an actual fully implemented update
+The implementation must be:
 
-Do not stop after writing a proposal or creating a list of recommendations.
+* Shared across the roster.
+* Independent of fighter IDs.
+* Independent of numbered attack buttons.
+* Consistent between human players and CPUs.
+* Based on the move’s actual mechanics.
+* Deterministic.
+* Testable.
+* Compatible with future fighter definitions.
+* Free from duplicated physics code.
+* Free from dead Attack Mobility configuration.
+* Free from hidden steering through fallback branches.
+* Careful with hybrid attacks.
+* Careful with attacks used by clones.
+* Careful with attacks executable in both ground and air contexts.
 
-Implement the code changes, update the tests and documentation, and validate the resulting gameplay.
+Do not add unnecessary animation assets or input buttons.
 
-Before considering the work complete:
+Do not change gameplay balance parameters unrelated to these rules.
 
-1. Audit all current moves.
-2. Implement the universal movement policy.
-3. Update the real Fighter movement paths.
-4. Update technique and summon owner movement where required.
-5. Update CPU capability analysis and predictions.
-6. Update CPU execution and tactical steering.
-7. Add comprehensive universal and roster-wide tests.
-8. Run the full test suite with node --test.
-9. Run relevant feel metrics and CPU behavior checks.
-10. Inspect any regressions and correct them.
-11. Report the final affected files, exceptions, and test results.
+Do not remove general AI tactical mobility or ordinary fighter movement merely because they use similar terminology.
 
-Also run, where feasible:
+Where a move-specific exception is necessary, make it explicit, validated, and documented rather than hardcoding a condition for a named fighter.
 
-node tests/benchmarks/feel-metrics.mjs
+⸻
 
-node tests/benchmarks/cpu-benchmark.mjs
+PART 13 — FINAL ACCEPTANCE CRITERIA
 
-Make sure changes in movement do not introduce serious AI prediction failures or obvious combat behavior regressions.
+Consider the task complete only when all conditions hold:
 
-If browser testing is available, verify both human and CPU execution visually in a real match, including grounded melee, aerial melee, projectiles, Specials, and object-based attacks.
-
-22. Final verification checklist
-
-The implementation is only complete when all of the following are true:
-
-* [ ]	All eligible grounded melee moves automatically Step-in.
-* [ ]	Aerial melee moves receive no new default Step-in.
-* [ ]	Projectile, summon, clone, and object-based moves receive no new default Step-in.
-* [ ]	Authored movement mechanics and exceptions remain intact.
-* [ ]	Every eligible ordinary move supports Attack Steering.
-* [ ]	Explicit Specials do not receive default Attack Steering.
-* [ ]	All 3-second cooldown moves do not receive default Attack Steering.
-* [ ]	All 5-second cooldown moves do not receive default Attack Steering.
-* [ ]	Intentionally authored steering exceptions still work.
-* [ ]	Grounded melee Step-in and Attack Steering work independently.
-* [ ]	CPU fighters receive the same mechanical behavior as players.
-* [ ]	CPU fighters can deliberately use steering where permitted.
-* [ ]	CPU predictions reflect actual Step-in and steering physics.
-* [ ]	All playable fighters are covered.
-* [ ]	New fighters inherit the rules automatically.
-* [ ]	Relevant automated tests pass.
+* [ ]	Every eligible grounded direct melee attack automatically Steps-in.
+* [ ]	The generic Step-in works without Run input.
+* [ ]	Generic Step-in happens only once per activation.
+* [ ]	Existing authored Step-ins remain unchanged and are not duplicated.
+* [ ]	Authored no-Step-in exceptions remain intact.
+* [ ]	Aerial attacks never acquire a new universal Step-in.
+* [ ]	Projectile moves never acquire a generic Step-in.
+* [ ]	Object-based moves never acquire a generic Step-in.
+* [ ]	Summons do not move their owners through generic Step-in.
+* [ ]	Clones do not inherit unintended fighter Step-in movement.
+* [ ]	Real scripted movement mechanics remain operational.
+* [ ]	All Attack Steering is removed from runtime gameplay.
+* [ ]	Attack Mobility tiers and obsolete configuration are removed.
+* [ ]	Holding left/right during an attack does not steer the fighter.
+* [ ]	No attack-phase or lockMovement bypass remains.
+* [ ]	Ordinary movement outside attacks still works normally.
+* [ ]	Legitimate momentum and external physics remain functional.
+* [ ]	CPU fighters obey exactly the same rules as players.
+* [ ]	CPU predictions include correct automatic Step-ins.
+* [ ]	CPU predictions do not include obsolete steering.
+* [ ]	CPU recovery and combat evaluation use the new physics correctly.
+* [ ]	All six current fighters and all move categories are audited.
+* [ ]	Future eligible melee attacks inherit the Step-in default.
+* [ ]	Tests and benchmarks reflect the new policy.
 * [ ]	Existing essential combat mechanics remain intact.
+* [ ]	Documentation no longer describes the removed feature.
+* [ ]	The full applicable test suite passes.
 
-Final instruction
+Required final delivery
 
-Implement these changes as strict universal rules of Alva’s combat and movement systems, not as manually applied tweaks to a few existing attacks.
+Do not stop after proposing an approach.
 
-The guiding distinction is:
+Actually implement the new gameplay rules, update the affected code and tests, run validation, and provide a final engineering report containing:
 
-Step-in is automatic movement belonging to an eligible grounded melee attack. Attack Steering is directional movement controlled by the fighter during an eligible move.
+1. The modified and removed files.
+2. The central Step-in policy and how it resolves eligibility.
+3. The attack-steering code and data removed.
+4. The authored movement exceptions preserved.
+5. A roster-wide movement audit summary.
+6. The CPU prediction and execution changes.
+7. Automated test and benchmark results.
+8. Any remaining limitations or issues.
 
-Aerial attacks and object-based moves must not receive automatic Step-in. Specials and 3/5-second cooldown moves must not receive generic Attack Steering.
+Final non-negotiable instruction:
 
-In every category, deliberately authored movement behavior takes precedence over a newly introduced generic default.
+In Alva, every eligible grounded direct melee attack must automatically advance slightly forward with Step-in. Aerial attacks, projectiles, summons, clones, and object-based moves must not gain that generic movement. Moves with deliberately authored movement—or deliberately authored absence of Step-in—must retain their actual mechanics.
 
-Above all, the human player and CPU must operate under exactly the same rules. The CPU must understand the movement, simulate it accurately, and be capable of using it in real combat.
+Attack Steering / Attack Mobility must be completely removed for both human players and CPUs.
+
+A fighter may still move because of a Step-in, preexisting momentum, an attack’s scripted movement, gravity, or an external force. It must not move because the player or CPU holds Run during the attack.
+
+Implement these as strict, universal, future-proof combat rules across the complete game.
