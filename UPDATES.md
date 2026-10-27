@@ -3568,9 +3568,10 @@ time.
   a Step-in counts toward `approach` or `mobility` only when it really
   travels (`lunge`, from `stepInTravel`, at least 32 units: none does
   today), and the threat reach adds the real travel; the executor holds no
-  direction through a grounded attack, and in the air steers its own
-  aerials only while steering home (`Executor.dir`'s `homeward`), so they
-  play out where it planned them.
+  direction through a grounded attack; in the air, over ground, its own
+  aerials play out where it planned them, and over the Void (or steering
+  home: `Executor.dir`'s `homeward`) it steers them toward ground
+  (`Executor.towardGround`).
 
 **Consequences.** Running into an attack and holding on no longer keeps
 the run: it runs down at the universal deceleration (a Dash attack at the

@@ -137,10 +137,12 @@ export class Executor {
     // (the Fighter ignores it then, a player's or a CPU's: see attackDrift)
     // and its attacks are aimed by attackFacing, so it holds none: the
     // ledge guard below never counts a walk that cannot happen. In the air
-    // every move keeps the universal air control, a CPU's as a player's: its
-    // own aerials play out where it planned them (its predictions play them
-    // with nothing held), so it steers one only when it is steering home.
-    if (self.combat.attack && (b.grounded || !this.homeward)) d = 0;
+    // every move keeps the universal air control, a CPU's as a player's:
+    // over ground its own aerials play out where it planned them (its
+    // predictions play them with nothing held); over the Void it steers
+    // them toward ground, as it does steering home.
+    if (self.combat.attack && b.grounded) d = 0;
+    else if (self.combat.attack && !this.homeward) d = this.groundAhead(self, stage, 0, 0) ? 0 : this.towardGround(self, stage, d);
     if (!b.grounded) held.shield = held.shield && this.pressed === 'shield';
     if (d && b.grounded && !this.allowEdge) {
       const decel = self.movement.deceleration;
@@ -185,6 +187,16 @@ export class Executor {
   }
 
   // Whether there is anything to stand on `ahead` units past the body's side going `dir`.
+  // The way (-1 or 1) to the nearest ground beside a fighter over the Void,
+  // `d` first when it leads there too, or 0 with none in reach.
+  towardGround(self, stage, d) {
+    const first = d || 1;
+    for (const ahead of [60, 120, 240, 480]) {
+      for (const dir of [first, -first]) if (this.groundAhead(self, stage, dir, ahead)) return dir;
+    }
+    return 0;
+  }
+
   groundAhead(self, stage, dir, ahead) {
     const b = self.body;
     const x = b.x + dir * (b.halfW + ahead);

@@ -2426,7 +2426,7 @@ each fighter's own values are in its character specification (7.2.9).
     steering a grounded one, and it plans its spacing before it commits,
     since nothing corrects a committed grounded attack's spacing; in the
     air its aerials have the same air control as anyone's, which it uses
-    while steering home.
+    over the Void to steer them back toward ground.
   - *Combat input buffer.* An ordinary attack press the fighter cannot act
     on yet (an attack or its recovery, a stun, a Dash before its cancel
     time, a 3 s or 5 s cooldown, `shield` held for its Shield) is kept for the
