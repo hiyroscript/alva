@@ -3721,3 +3721,31 @@ eight Specials, `strict-combat-rules`, `step-in`, `controller-profiles`),
 `empty-roster`, `discover`, `practice-ground`, `watch-mode`,
 `quick-battle`, `settings` (its credits), each fighter's roster list and
 `cpu-behaviour` (K, above).
+
+## #0007's standing idle
+
+Not a named update. Asked for as: make #0007's idle the sheet's first
+three stance frames instead of its last three, in a new pull request.
+
+- **Its idle** is now the standing stance (`0007_idle_1` to `_3`, cut
+  from the sheet's first three STANCE frames at 1× like the rest: upright,
+  arms loose, its eyes looking on, glancing aside, a blink), looped at 4
+  fps, anchored on its vest. It was the crouched fighting stance (two
+  files, its third drawing a repeat of its first).
+- **Its reference height** follows its idle: 55 art pixels (from 44), so
+  `visual.height` is about 93 units (from 74) and every clip's
+  `heightRatio` is over 55; every frame still draws at one art pixel per
+  file pixel, the roster's size.
+- **Its body** is measured from its idle, as every fighter's is: collider
+  28 × 90 (from 72), hurtboxes `{ -16, -94, 32, 47 }` and `{ -18, -47, 36,
+  47 }`, so the standing head is inside it.
+- **Balance**, the same runs as before (144 matches a level): 0.43 at
+  Medium, 0.49 at Hard, 0.56 at Brutal (from 0.47, 0.52, 0.59): a taller
+  target; nothing else retuned.
+
+**Code:** `js/data/characters/0007.js` (`ART_0007`, the idle clip, `FPS_0007.idle`,
+`visual`, the body) and its reviewed profile hash; three frames in
+`assets/characters/0007/`; `docs/characters/0007.md`.
+
+**Tests:** `fighter-0007` (78 files, the idle's frames and height, the
+reference height, the portrait).

@@ -51,13 +51,13 @@
 
 import { framePath, pad, flick } from './helpers.js';
 
-// Height in art pixels of #0007's idle, its fighting stance (its reference
+// Height in art pixels of #0007's idle, its standing stance (its reference
 // clip). Its art is 1x (one file pixel per art pixel, cut from one sprite
 // sheet with its flat background made transparent), so no pixel grid is
 // ever looked for in it (`visual.pixelSize: 1`): each clip's heightRatio,
 // its tallest frame over this, is what sizes it, at exactly one art pixel
 // per file pixel.
-const ART_0007 = 44;
+const ART_0007 = 55;
 
 // World units per art pixel: the roster's common art-pixel size.
 const UNIT_0007 = 88 / 52;
@@ -70,7 +70,7 @@ const UNIT_0007 = 88 / 52;
 // universal Dash's length, whatever these say: their clips are shown once
 // across it.)
 const FPS_0007 = Object.freeze({
-  idle: 6,
+  idle: 4,
   run: 12,
   mouvment: 12,
   midair_mouvment: 12,
@@ -142,9 +142,9 @@ export const CHARACTER_0007 = {
   // Deflect's arc sweeps below its feet, the clip also says where the feet
   // are (`anchorY`, art pixels down from the top).
   animations: {
-    // The fighting stance: crouched, fists up, bobbing down (2) and up
-    // again (1).
-    idle: { ...clip('idle', [1, 2], FPS_0007.idle, 44, { anchorX: [23.5, 26] }), loop: true },
+    // The standing stance: upright, arms loose at its sides, its eyes
+    // looking on (1), glancing aside (2), a blink (3).
+    idle: { ...clip('idle', [1, 2, 3], FPS_0007.idle, 55, { anchorX: [16.5, 16.5, 16.5] }), loop: true },
     // The run: six frames, arms pumping. Its rate follows the speed, down
     // to 0.6 of it (and up past it on a Dash's run-on).
     run: {
@@ -255,9 +255,9 @@ export const CHARACTER_0007 = {
   },
 
   visual: {
-    // Its 44-pixel fighting stance at the roster's common art-pixel size,
+    // Its 55-pixel standing stance at the roster's common art-pixel size,
     // 88/52 world units per art pixel (so every fighter's pixels are the
-    // same size on screen): about 74 units, crouched as it is.
+    // same size on screen): about 93 units, standing upright.
     height: ART_0007 * UNIT_0007,
     referenceAnimation: 'idle',
     anchor: 'torso',
@@ -269,14 +269,13 @@ export const CHARACTER_0007 = {
     eliminationPalette: ['#f3f2f4', '#4d81a9', '#31526a', '#9e4b01', '#150b00'],
   },
 
-  // Its body, measured from its fighting stance: the head and the
-  // shoulders, then the legs, set wide. Collision is independent of the
-  // art.
-  collider: { width: 28, height: 72 },
+  // Its body, measured from its standing stance: the head and the
+  // shoulders, then the legs. Collision is independent of the art.
+  collider: { width: 28, height: 90 },
   pushbox: { width: 32 },
   hurtboxes: [
-    { x: -16, y: -76, w: 32, h: 38 }, // head and torso
-    { x: -20, y: -38, w: 40, h: 38 }, // legs
+    { x: -16, y: -94, w: 32, h: 47 }, // head and torso
+    { x: -18, y: -47, w: 36, h: 47 }, // legs
   ],
 
   // How #0007 responds to being launched (see resolveLaunchReaction in
