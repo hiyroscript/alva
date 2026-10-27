@@ -3749,3 +3749,18 @@ three stance frames instead of its last three, in a new pull request.
 
 **Tests:** `fighter-0007` (78 files, the idle's frames and height, the
 reference height, the portrait).
+
+## #0007's blink
+
+Not a named update. Asked for as: #0007's standing idle blinks rapidly,
+which looks odd; fix it, in a new pull request.
+
+- Its three idle drawings differ only in the eyes (open, half shut, shut),
+  so looped straight through at 4 fps they blinked every 0.75 s. The idle
+  now holds the eyes open for 2.75 s, then blinks once, quickly (half
+  shut, shut, half shut: 3/8 s), at 8 fps (`STANCE_0007` in
+  `js/data/characters/0007.js`): the same three files, nothing redrawn,
+  added or removed.
+
+**Tests:** `fighter-0007` (the idle's frames, and its blink: eyes open
+2.75 s of every loop, one blink of 3/8 s).

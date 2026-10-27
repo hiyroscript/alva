@@ -62,7 +62,7 @@ const { images: IMAGES, sprites: REAL } = realArt(DEF);
 // Every clip and the files it plays, in order (a file shown twice is one
 // file on disk).
 const CLIPS = {
-  idle: named('idle', 3),
+  idle: named('idle', [...Array(22).fill(1), 2, 3, 2]),
   run: named('run', 6),
   jump: named('jump', 2),
   fall: named('fall', 1),
@@ -288,6 +288,18 @@ test('anchors keep the body in place: authored on its vest wherever its fists, s
   for (const key of ['idle', 'run', 'hurt', 'shielding', 'attack1', 'attack2', 'extra_attack', 'attack4_release']) {
     for (const f of REAL.animations[key].frames) assert.equal(f.anchorArtY, f.artH, `${key}: stands on the bottom of its art`);
   }
+});
+
+test('its stance blinks now and then: its eyes open for most of every loop, one quick blink', () => {
+  const idle = DEF.animations.idle;
+  assert.equal(idle.loop, true);
+  const seconds = (pred) => idle.frames.filter((url) => pred(file(url))).length / idle.fps;
+  const open = seconds((name) => name === '0007_idle_1.png');
+  const blink = seconds((name) => name !== '0007_idle_1.png');
+  assert.ok(near(open, 2.75) && near(blink, 3 / 8), `eyes open ${open} s, a blink of ${blink} s`);
+  // The three drawings differ only in the eyes: half shut and shut come
+  // once each way, inside one blink, never back to back with another.
+  assert.deepEqual(idle.frames.slice(-3).map(file), ['0007_idle_2.png', '0007_idle_3.png', '0007_idle_2.png']);
 });
 
 test('the roster portrait is its face', () => {
