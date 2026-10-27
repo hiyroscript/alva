@@ -20,7 +20,7 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/data/movement.js`](../../js/data/movement.js) | The numbers: `BASE_FIGHTER_MOVEMENT`, one frozen object every Fighter reads (`MOVEMENT_FIELDS` lists them). `movementProblems` / `assertUniversalMovement`, which the registry uses to refuse a definition that declares movement of its own. And the Discover copy (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`). |
-| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ordinary locomotion: ground and air acceleration, braking, turning, overspeed), `attackDrift` (an attack's horizontal movement: its Step-in, then its speed running down, taking no direction at all), `activationStep` (the Step-in an activation makes: its move's on the ground, none in the air), `attackStartSpeed` (the momentum an attack keeps), `stepInTravel` (how far a Step-in carries a fighter, for planners), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
+| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ordinary locomotion: ground and air acceleration, braking, turning, overspeed), `attackDrift` (an attack's horizontal movement: its Step-in, then on the ground its speed running down whatever is held, in the air the universal air control), `activationStep` (the Step-in an activation makes: its move's on the ground, none in the air), `attackStartSpeed` (the momentum an attack keeps), `stepInTravel` (how far a Step-in carries a fighter, for planners), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
 | [`js/data/attack-movement.js`](../../js/data/attack-movement.js) | How an attack moves its fighter, the same rules for everyone: the shared Step-in (`STEP_IN`) and its verdict per move (`resolveStepIn`, `stepInEligible`), what an attack keeps of its speed (`resolveAttackCarry`), and the retired steering fields it refuses (`STEERING_FIELDS`). See [attack movement](#5-attack-movement). |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms, moving ones included (`carryBody` carries a fighter standing on one by exactly its movement before its own step; `releaseGround` lets go of one that has vanished; see [stages](../gameplay/stages.md#platform-hazards)). It never knows why a body moves. |
@@ -48,8 +48,8 @@ horizontal movement is chosen, in priority: standing still (a summon's
 startup, a technique's cast, a paralysis), the hitstun drift, the Dash's
 or the air dash's speed (an air dash also holds the fall off), the
 Shield's stand (no steering at all), an attack's
-own motion, an attack's drift (its Step-in, never steered), or normal
-steering.
+own motion, an attack's drift (its Step-in; never steered on the ground,
+the universal air control in the air), or normal steering.
 Then the jump (buffered, with coyote time), the air jump, the higher
 jump's lift and the fast fall; then the body is integrated and collided;
 then launch rebounds, landing resets (air jumps, air dashes, per-airtime
@@ -115,8 +115,9 @@ away:
 - **Attacks.** An attack keeps its `momentum` share of the speed it starts
   with (`airMomentum` in the air: all of it unless its data says
   otherwise), never capped at top speed: a Dash's burst carries on into
-  the attack. From there it runs down as if nothing were held: nothing
-  steers an attack. A rooted attack is a choice its data makes (a
+  the attack. From there, on the ground, it runs down as if nothing were
+  held (nothing steers a grounded attack); in the air the universal air
+  control applies as ever. A rooted attack is a choice its data makes (a
   `momentum` of 0), never the default.
 - **Dashes.** A Dash or air dash goes at its speed or at the fighter's own
   speed that way if that is faster: it never slows anyone down. When it
@@ -164,30 +165,38 @@ both. Free fall (after a move that spends the airtime) rules them out.
 
 ## 5. Attack movement
 
-Two universal rules ([`js/data/attack-movement.js`](../../js/data/attack-movement.js)),
+Three universal rules ([`js/data/attack-movement.js`](../../js/data/attack-movement.js)),
 the same for every fighter, a player's or a CPU's, and kept apart:
 
-**No steering.** Nothing held moves a fighter while an attack plays: no
-direction, no Run, no switch of direction, in its startup, its strike or
-its recovery, on the ground or in the air, whatever the move (an ordinary
-strike, a throw, an aerial, the Deflect, a Special, one with a 3 s or 5 s
-cooldown). The Fighter routes every attack through `attackDrift`, which
-takes no direction at all; a technique's cast and a summon's startup
-hold the fighter still. A direction held still **turns** an attack (7.2.2
-of the specification; a CPU's attacks and, with Automatic turn-around on,
-a player's are aimed instead), but turning moves nothing. What carries a
-fighter through an attack is only:
+**No steering on the ground.** Nothing held moves a fighter through a
+grounded attack: no direction, no Run, no switch of direction, in its
+startup, its strike or its recovery, whatever the move (an ordinary
+strike, a throw, a Special, one with a 3 s or 5 s cooldown). The Fighter
+routes every attack through `attackDrift`, which ignores the direction
+held on the ground; a technique's cast and a summon's startup hold the
+fighter still. A direction held still **turns** an attack (7.2.2 of the
+specification; a CPU's attacks and, with Automatic turn-around on, a
+player's are aimed instead), but turning moves nothing. What carries a
+fighter through a grounded attack is only:
 
 - what it already had: the attack's `momentum` share of the speed it
-  started with (`airMomentum` in the air), all of it unless the move says
-  otherwise, then running down under `friction` × the ground deceleration
-  (1 unless the move says otherwise; above top speed the overspeed brake;
-  in the air the air drag, a burst's air overspeed rate);
+  started with, all of it unless the move says otherwise, then running
+  down under `friction` × the ground deceleration (1 unless the move says
+  otherwise; above top speed the overspeed brake);
 - its Step-in (below);
-- its own `motion` (a homing dash, a roll, a plunge, a lift, a hover:
-  [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)), whose
-  drift is never steered either;
-- gravity and outside forces (a hit, a pull, a moving platform).
+- its own `motion` (a roll, a homing dash:
+  [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox));
+- outside forces (a hit, a pull, a moving platform).
+
+**Air control in the air.** In the air every move, whatever it is (an
+aerial, a hover, a plunge, a lift, the Deflect, a homing dash's hang and
+recovery, a grounded attack carried off a ledge), keeps the **universal
+air control**: exactly the air steering a fighter has outside an attack
+(`airAcceleration`, `airTurnBoost`, the `airDeceleration` drag), from its
+`airMomentum` share of the drift it started with. No move has air control
+of its own, better or worse; only a motion that sets the horizontal speed
+itself (a homing dash's dash, a roll flying off a ledge) overrides it
+while it does.
 
 Normal locomotion comes back the step the attack is over (or cut short).
 The retired Attack Mobility system (its tiers `quick`, `medium`, `heavy`,
@@ -224,8 +233,10 @@ The CPU obeys exactly the same rules through the same functions: its
 predictions (`moveContact`, `predictTrack` in
 [`js/game/ai/cpu-intelligence/prediction.js`](../../js/game/ai/cpu-intelligence/prediction.js))
 call `attackDrift` and `activationStep`, so a predicted strike gains its
-real Step-in and nothing else, and its executor holds no direction while
-an attack plays (nothing would come of one).
+real Step-in and nothing else (an aerial is predicted with nothing held,
+its air control being the CPU's own choice), and its executor holds no
+direction through a grounded attack (nothing would come of one) while
+steering in the air as ever.
 
 ## 6. The Dash and the air dash
 
@@ -384,8 +395,9 @@ jump, momentum kept through every change of action, and Dashes that flow
 into attacks and jumps. The old values are kept in
 [`UPDATES.md`](../../UPDATES.md).
 [Universal Step-in and no attack steering](../../UPDATES.md#universal-step-in-and-no-attack-steering)
-retired the attack mobility tiers and every way of steering an attack,
-and gave every grounded direct strike the shared Step-in.
+retired the attack mobility tiers and steering grounded attacks, gave
+every move the universal air control in the air, and gave every grounded
+direct strike the shared Step-in.
 
 ## Tests
 
@@ -412,14 +424,17 @@ and gave every grounded direct strike the shared Step-in.
   every playable fighter and every move it can press: the Step-in from
   rest (slight, once, the way it faces, none for a throw, a cast, a
   summon, a motion or a declined move, none in the air or on landing),
-  that no direction, Run or switch held through any move, from rest, a
-  run, a Dash or a jump, changes its path, a CPU's and a player's alike,
+  that no direction, Run or switch held through any grounded move, from
+  rest, a run or a Dash, changes its path, that every aerial and the
+  Deflect move under exactly the universal air control, a CPU's and a
+  player's alike,
   normal movement back at once, the CPU's prediction walking the
   Fighter's own path, a wall stopping a Step-in, and a clone never moving.
 - [`tests/benchmarks/feel-metrics.mjs`](../../tests/benchmarks/feel-metrics.mjs)
   (by hand, not part of `node --test`): responsiveness proxies measured
   with identical scripted inputs (Step-in travel and how often it rises,
-  the displacement Run or a held-back direction adds to an attack (0),
+  the displacement Run or a held-back direction adds to a grounded attack
+  (0) and to an aerial (the air control),
   run → attack, normal movement's return, aerial drift, Dash → attack,
   Dashes per 10 s), to compare two revisions number for number.
 - [`tests/systems/air-mouvment.test.mjs`](../../tests/systems/air-mouvment.test.mjs):

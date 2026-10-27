@@ -419,11 +419,11 @@ test('the High Kick steps in on its leap frame (its own Step-in, no other); a ca
   assert.equal(cast.fighter.body.x, x1, 'from a standstill it stays where it casts');
 });
 
-test('aerials keep their share of the drift and are never steered; landing cuts only their recovery and never steps them in', () => {
+test('aerials keep their share of the drift and the universal air control; landing cuts only their recovery and never steps them in', () => {
   const play = (held) => {
     const h = running();
     h.step({ ...RIGHT, ...JUMP });
-    h.step({ ...RIGHT, ...P('attack1') });
+    h.step(P('attack1'));
     const atk = h.fighter.combat.attack;
     const log = [h.fighter.body.vx];
     while (h.fighter.combat.attack === atk) {
@@ -435,11 +435,15 @@ test('aerials keep their share of the drift and are never steered; landing cuts 
   const { atk, log } = play({});
   assert.equal(atk.def.id, 'midair_attack1');
   assert.equal(atk.step, null, 'no Step-in in the air');
-  // Its share of the drift (airMomentum), then the air drag, whatever is held.
+  // Its share of the drift (airMomentum), then the air drag with nothing
+  // held, and the air control, as ever, with a direction held.
   const drift = MOVEMENT.maxSpeed * atk.def.airMomentum;
   assert.ok(close(log[0], drift - mv.airDeceleration * DT), 'its share of the drift');
-  assert.deepEqual(play(LEFT).log, log, 'held back: never steered');
-  assert.deepEqual(play(RIGHT).log, log, 'held on: never steered');
+  const back = play(LEFT).log;
+  assert.ok(close(back[1], log[0] - mv.airAcceleration * mv.airTurnBoost * DT), 'held back: the air turn, as outside an attack');
+  assert.ok(back.at(-1) < log.at(-1) - 100, 'turned round by the air control');
+  const on = play(RIGHT).log;
+  assert.ok(on.at(-1) > log.at(-1), 'held on: back up toward top speed');
   // A plain aerial started just before touchdown plays its startup and
   // strike on after landing; its recovery is cut by the ground (the landing
   // cancel), and the fighter acts at once.
@@ -497,8 +501,8 @@ test('attack movement is data with defaults: an attack that declares none keeps 
   assert.equal(a.fighter.moveDir, 0, 'no locomotion while it plays');
   for (const field of ['mobility', 'control', 'airControl', 'topSpeed', 'airTopSpeed', 'lockMovement']) {
     const value = field === 'mobility' ? 'quick' : field === 'lockMovement' ? false : 0.5;
-    assert.throws(() => createAttackDefinition({ ...plain, id: 'x', [field]: value }), /never steered/, field);
-    assert.throws(() => makeFighter({ character: { ...character, attacks: { ...character.attacks, plain: { ...plain, [field]: value } } } }), /never steered/, `${field}: the fighter refuses it`);
+    assert.throws(() => createAttackDefinition({ ...plain, id: 'x', [field]: value }), /steering of its own/, field);
+    assert.throws(() => makeFighter({ character: { ...character, attacks: { ...character.attacks, plain: { ...plain, [field]: value } } } }), /steering of its own/, `${field}: the fighter refuses it`);
   }
 });
 

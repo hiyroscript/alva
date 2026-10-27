@@ -103,8 +103,9 @@ const scratch2 = {};
 
 // One step of an attack's own movement, exactly as the Fighter runs it
 // (Fighter.moveMotion and moveAttack): returns the share of gravity the
-// body falls under. Nothing held steers it, so it takes no direction.
-// `rec` is { def, time, step, stepped, motion } (step: the Step-in this
+// body falls under. It plays the move with nothing held (on the ground
+// nothing held would steer it anyway; in the air its air control is the
+// CPU's own choice, never assumed). `rec` is { def, time, step, stepped, motion } (step: the Step-in this
 // activation makes, see activationStep) where motion is
 // the scratch motion state ({ done, aimed, dirX, dirY, speed, rolling,
 // target: { x, y } | null, range }); `target` is the opponent's middle this
@@ -117,7 +118,7 @@ function attackStep(body, rec, face, target, burst) {
     const phase = attackPhase(def, rec.time);
     if (spec.type === 'roll') {
       if (phase === 'startup' && !m.rolling) {
-        attackDrift(body, MV, face, rec, STEP, burst);
+        attackDrift(body, MV, face, rec, 0, STEP, burst);
         return 1;
       }
       if (body.wall === face) m.speed = 0;
@@ -127,7 +128,7 @@ function attackStep(body, rec, face, target, burst) {
       return 1;
     }
     if (spec.type === 'hover') {
-      attackDrift(body, MV, face, rec, STEP, burst);
+      attackDrift(body, MV, face, rec, 0, STEP, burst);
       body.vy = 0;
       return 0;
     }
@@ -137,7 +138,7 @@ function attackStep(body, rec, face, target, burst) {
         body.vx *= spec.exit;
         body.vy *= spec.exit;
       }
-      attackDrift(body, MV, face, rec, STEP, burst);
+      attackDrift(body, MV, face, rec, 0, STEP, burst);
       return 1;
     }
     if (spec.type === 'homing') {
@@ -170,12 +171,12 @@ function attackStep(body, rec, face, target, burst) {
       body.vy = m.dirY * spec.speed;
       return 0;
     }
-    attackDrift(body, MV, face, rec, STEP, burst);
+    attackDrift(body, MV, face, rec, 0, STEP, burst);
     if (phase === 'startup') body.vy = 0;
     else body.vy = spec.type === 'rise' ? -spec.speed : spec.fallSpeed;
     return 0;
   }
-  attackDrift(body, MV, face, rec, STEP, burst);
+  attackDrift(body, MV, face, rec, 0, STEP, burst);
   return 1;
 }
 
@@ -561,8 +562,8 @@ const recBody = {};
 // `res` ({ airJumps, airDash (distance > 0 when it has one left), dashOk
 // (not exhausted, not still flying from a launch), rise ({ speed, time,
 // hang, airMomentum } of a lifting move it may still start, or null: its
-// hang, then its lift, its drift carried on and never steered, as the
-// Fighter plays it), hover (seconds of a stalling move, or 0) }), by a sensible recovery: hold toward the stage,
+// hang, then its lift under the universal air control, as the Fighter
+// plays it), hover (seconds of a stalling move, or 0) }), by a sensible recovery: hold toward the stage,
 // air jump as it falls past the ledge's height (the threshold
 // `policy.jumpBelow` units under it), air dash home when far out, a lift
 // when nothing else is left. Returns { ok, fell (into the Void), t, x, y,
@@ -606,8 +607,9 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}, trac
       dashLeft -= STEP;
       burst = true;
     } else if (riseHang > 0 || riseLeft > 0) {
-      // Nothing held steers the lift (attackDrift: no Step-in in the air).
-      steer(b, MV, 0, STEP, burst);
+      // Held toward the stage: an aerial keeps the universal air control
+      // (attackDrift in the air).
+      steer(b, MV, dir, STEP, burst);
       share = 0;
       if (riseHang > 0) {
         b.vy = 0;

@@ -384,8 +384,9 @@ export const CHARACTER_0006 = {
   // frame more. Every Deflect's 3, Base Launch 2, here sideways, the way
   // the arc sweeps; while it is live it turns the other fighter's
   // projectiles back at their thrower, now #0006's. A little over a
-  // quarter of a second in all, keeping the whole of its drift, never
-  // steered and never stepping in (a defense: js/data/attack-movement.js);
+  // quarter of a second in all, keeping the whole of its drift, under the
+  // universal air control, never stepping in (a defense:
+  // js/data/attack-movement.js);
   // no cooldown of its own.
   deflect: {
     animation: 'deflect',
@@ -585,7 +586,8 @@ export const CHARACTER_0006 = {
   // fighter's origin; facing right, mirrored with facing). None has a
   // cooldown (the cooldown policy's: none deals 10, paralyzes, floats or
   // frightens). Each moves by the shared attack movement
-  // (js/data/attack-movement.js): never steered; the Power Punch steps in
+  // (js/data/attack-movement.js): never steered on the ground, its aerials
+  // under the universal air control; the Power Punch steps in
   // by the shared Step-in, the tornado rolls and the strike dashes by
   // themselves (no Step-in added), and the aerials never step in.
   attacks: {
@@ -616,7 +618,7 @@ export const CHARACTER_0006 = {
     // first with an afterimage streaming behind, and the foot thrust low
     // (frames 2-3, live: from her head to her feet, out to 38 units), drawn
     // up again: 0.27 s, carried on by her drift. 3, Base Launch 1 sideways.
-    // Never steered; a hit opens a follow-up.
+    // Under the universal air control; a hit opens a follow-up.
     midair_attack1: {
       animation: 'midair_attack1',
       members: ['blue'],
@@ -671,8 +673,8 @@ export const CHARACTER_0006 = {
     // (frames 4-5, live: at chest height out to 34 units), drawn up (frame
     // 6): 0.4 s. 5, Base Launch 3 sideways: the
     // big blow of the toughest sister, sending its target flying, the
-    // fighter's finisher. Once per airtime. It keeps its drift, never
-    // steered.
+    // fighter's finisher. Once per airtime. It keeps its drift, under the
+    // universal air control.
     midair_attack2: {
       animation: 'midair_attack2',
       members: ['green'],
@@ -698,7 +700,8 @@ export const CHARACTER_0006 = {
     // green's heads, out to 50 units: 5, Base Launch 2 sideways, whoever it
     // meets knocked away, and the sisters spring back off it. One move: one hit, however
     // many sisters it is drawn with. On the ground and once per airtime.
-    // Its dash is its own (no Step-in added); nothing steers it.
+    // Its dash is its own (no Step-in added); in the air its hang and its
+    // recovery are under the universal air control.
     extra_attack: {
       animation: 'extra_attack',
       members: ['pink', 'green', 'blue'],

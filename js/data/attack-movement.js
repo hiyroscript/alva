@@ -1,7 +1,7 @@
 // Attack movement: how an attack moves its fighter while it plays, the same
 // rules for every fighter, every move and every controller.
 //
-// Purpose: two universal rules, kept apart.
+// Purpose: three universal rules, kept apart.
 //
 //   The Step-in   every grounded direct melee strike carries its fighter a
 //                 slight way forward, once per activation, by itself: no
@@ -17,14 +17,20 @@
 //                 neither does a clone or anything else that is not the
 //                 fighter itself performing the move (only the Fighter, and
 //                 the CPU's prediction of it, apply a Step-in).
-//   No steering   nothing held moves a fighter while an attack plays: no
-//                 direction, no Run, on the ground or in the air, whatever the
-//                 move, its cooldown or its class. What carries it is only
-//                 what it already had (`momentum`: the share of its speed the
-//                 attack keeps as it starts, `airMomentum` in the air), its
-//                 Step-in, its own motion, gravity and outside forces; the
-//                 speed it is not given runs down under the universal ground
-//                 deceleration (x its `friction`) or the air drag.
+//   No steering   on the ground nothing held moves a fighter while an
+//                 attack plays: no direction, no Run, whatever the move, its
+//                 cooldown or its class. What carries it is only what it
+//                 already had (`momentum`: the share of its speed the attack
+//                 keeps as it starts), its Step-in, its own motion and
+//                 outside forces; that speed runs down under the universal
+//                 ground deceleration (x its `friction`).
+//   Air control   in the air every move, whatever it is, keeps the
+//                 universal air control: the same air steering as outside
+//                 any attack, from its `airMomentum` share of the drift it
+//                 started with (only a motion that sets the speed itself, a
+//                 homing dash's dash or a roll, overrides it while it does).
+//                 No attack has air control of its own: the retired Attack
+//                 Mobility shares are refused.
 //
 // The verdict is recorded on every attack definition (`stepIn`): 'authored'
 // (its own step), 'universal' (the shared one: STEP_IN), 'declined' (`step:
@@ -73,7 +79,7 @@ const SHARES = Object.freeze(['momentum', 'airMomentum']);
 export function resolveAttackCarry(spec, owner = 'An attack') {
   const steering = STEERING_FIELDS.filter((field) => spec?.[field] !== undefined);
   if (steering.length) {
-    throw new Error(`[Alva] ${owner} declares ${steering.join(', ')}: attacks are never steered (js/data/attack-movement.js)`);
+    throw new Error(`[Alva] ${owner} declares ${steering.join(', ')}: no attack has steering of its own (js/data/attack-movement.js)`);
   }
   const out = {};
   for (const [field, fallback] of Object.entries(ATTACK_CARRY_DEFAULTS)) {

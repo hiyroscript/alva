@@ -308,7 +308,7 @@ export const CHARACTER_0005 = {
   // here sideways, the way the claw sweeps; while the arc is live it turns
   // the other fighter's projectiles back at their thrower, now #0005's. A
   // little over a quarter of a second in all, keeping the whole of its
-  // drift, never steered and never stepping in (a defense:
+  // drift, under the universal air control, never stepping in (a defense:
   // js/data/attack-movement.js); no cooldown of its own.
   deflect: {
     animation: 'deflect',
@@ -484,7 +484,8 @@ export const CHARACTER_0005 = {
   // mirrored with facing). None has a cooldown (the cooldown policy's: none
   // deals 10, paralyzes, floats or frightens) but the phantom's bite. Each
   // moves by the shared attack movement (js/data/attack-movement.js): never
-  // steered; the Claw Swipe and the Long Bite step in by the shared
+  // steered on the ground, its aerials under the universal air control;
+  // the Claw Swipe and the Long Bite step in by the shared
   // Step-in, the Phantom Hands and the Dark Tendrils never (the hands and
   // the tendrils are what strike, conjured away from its body), nor the
   // aerials or the phantom's bite.
@@ -515,8 +516,8 @@ export const CHARACTER_0005 = {
     // no launch, a stun that holds its target for the next. The arc through
     // the front, low (frame 4): 3, Base Launch 1 downward, driving the
     // target down (off the stage, a spike). The claws held out (frame 5): a
-    // third of a second in all. Its drift carried on, never steered, and a
-    // hit opens a follow-up from frame 5.
+    // third of a second in all. Its drift under the universal air control,
+    // and a hit opens a follow-up from frame 5.
     midair_attack1: {
       animation: 'midair_attack1',
       recovery: 1 / FPS_0005.midair_attack1,
@@ -568,7 +569,8 @@ export const CHARACTER_0005 = {
     // tip: the bite (frame 3) and a chew (frame 5), 1 each, holding its
     // prey; the last chew (frame 7): 3, Base Launch 2 sideways. Closed and
     // drawn back (frames 8-10): half a second in all.
-    // Never steered, keeping a little over half its drift as it starts.
+    // Under the universal air control, keeping a little over half its drift
+    // as it starts.
     midair_attack2: {
       animation: 'midair_attack2',
       recovery: 3 / FPS_0005.midair_attack2,
@@ -610,7 +612,8 @@ export const CHARACTER_0005 = {
     // is drawn back (frames 1-2), then four bursts of hands (frames 3-6,
     // live: 24 to 132 units out, from over the head to below the hips), 1
     // each, the last 3 at Base Launch 2 sideways; a hand held out (frame
-    // 7): 0.58 s in all, the hang taking most of its drift, never steered.
+    // 7): 0.58 s in all, the hang taking most of its drift, under the
+    // universal air control.
     // Once per airtime.
     midair_attack3: {
       animation: 'midair_attack3',

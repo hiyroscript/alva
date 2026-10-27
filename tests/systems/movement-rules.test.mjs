@@ -149,37 +149,43 @@ test('attack momentum: an attack keeps its share of the speed, all of it unless 
   assert.equal(attackStartSpeed(plain, -1250, false), -1250);
 });
 
-test('an attack\'s drift: its Step-in once, on the ground, the way it faces; then its speed runs down, whatever it is given', () => {
+test('an attack\'s drift: its Step-in once, on the ground, the way it faces; no steering on the ground, the air control in the air', () => {
   const stepping = createAttackDefinition({ id: 's', animation: 'x', damage: 1, step: { at: 0.05, speed: 250 }, friction: 0.5 });
   const record = { def: stepping, time: 0, step: activationStep(stepping, true), stepped: false };
   const b = body();
-  attackDrift(b, VALUES, -1, record, DT);
-  assert.equal(b.vx, 0, 'not yet');
+  attackDrift(b, VALUES, -1, record, -1, DT);
+  assert.equal(b.vx, 0, 'not yet, and the direction held moves nothing on the ground');
   record.time = 0.05;
-  attackDrift(b, VALUES, -1, record, DT);
-  near(b.vx, -250 + VALUES.deceleration * 0.5 * DT, 1e-9, 'stepped in the way it faces, then running down under its friction');
+  attackDrift(b, VALUES, -1, record, 1, DT);
+  near(b.vx, -250 + VALUES.deceleration * 0.5 * DT, 1e-9, 'stepped in the way it faces, then running down under its friction, held back or not');
   assert.equal(record.stepped, true);
   const after = b.vx;
   record.time = 0.1;
-  attackDrift(b, VALUES, -1, record, DT);
-  near(b.vx, after + VALUES.deceleration * 0.5 * DT, 1e-9, 'once only');
+  attackDrift(b, VALUES, -1, record, -1, DT);
+  near(b.vx, after + VALUES.deceleration * 0.5 * DT, 1e-9, 'once only, and held on it runs down all the same');
   const fast = body({ vx: -600 });
-  attackDrift(fast, VALUES, -1, { def: stepping, time: 0.05, step: stepping.step, stepped: false }, DT);
-  near(fast.vx, -600 + VALUES.overspeedDeceleration * DT, 1e-9, 'already faster: the step-in never slows it');
+  attackDrift(fast, VALUES, -1, { def: stepping, time: 0.05, step: stepping.step, stepped: false }, -1, DT);
+  near(fast.vx, -600 + VALUES.overspeedDeceleration * DT, 1e-9, 'already faster: the step-in never slows it, held on or not');
   // Off the ground as its time comes: never made, and never later.
   const air = body({ grounded: false });
   const late = { def: stepping, time: 0.05, step: stepping.step, stepped: false };
-  attackDrift(air, VALUES, 1, late, DT);
+  attackDrift(air, VALUES, 1, late, 0, DT);
   assert.deepEqual([air.vx, late.stepped], [0, true], 'skipped in the air');
   air.grounded = true;
   late.time = 0.1;
-  attackDrift(air, VALUES, 1, late, DT);
+  attackDrift(air, VALUES, 1, late, 0, DT);
   assert.equal(air.vx, 0, 'never fired late on landing');
   // Started in the air: no Step-in at all.
   assert.equal(activationStep(stepping, false), null);
   assert.equal(activationStep(stepping, true), stepping.step);
-  // It takes no direction: there is nothing to steer it with.
-  assert.equal(attackDrift.length, 5, 'body, values, facing, record, dt (and the burst): no direction');
+  // In the air: the universal air control, exactly as outside an attack.
+  for (const [vx, dir] of [[0, 1], [300, -1], [300, 0], [900, 1]]) {
+    const during = body({ grounded: false, vx });
+    const free = body({ grounded: false, vx });
+    attackDrift(during, VALUES, 1, { def: stepping, time: 0.2, step: null, stepped: true }, dir, DT, true);
+    steer(free, VALUES, dir, DT, true);
+    assert.equal(during.vx, free.vx, `${vx} held ${dir}: the air control`);
+  }
 });
 
 // ---- The rest ------------------------------------------------------------------------

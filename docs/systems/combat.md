@@ -106,7 +106,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `cooldown` | policy | 0 for an ordinary move, else 3 s or 5 s from its release: derived by the [cooldown policy](#cooldowns); leave it out. |
 | `energyCost` | policy | 15 for an ordinary attack that throws a projectile (a construct), else 0: derived by the [Energy policy](energy.md#construct-moves); leave it out. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
-| `momentum` / `airMomentum` / `friction` | 1 / 1 / 1 | What it keeps of the speed it starts with (on the ground, in the air) and × the ground deceleration its speed runs down under ([movement](movement.md#5-attack-movement)). Nothing steers an attack: `mobility`, `control`, `airControl`, `topSpeed`, `airTopSpeed` and `lockMovement` are refused. |
+| `momentum` / `airMomentum` / `friction` | 1 / 1 / 1 | What it keeps of the speed it starts with (on the ground, in the air) and × the ground deceleration its speed runs down under ([movement](movement.md#5-attack-movement)). Nothing held steers a grounded attack; in the air every attack keeps the universal air control. `mobility`, `control`, `airControl`, `topSpeed`, `airTopSpeed` and `lockMovement` are refused. |
 | `step` | the shared Step-in | `{ at, speed }` for a lunge of its own, `false` for a move that never lunges; left out, a grounded direct strike gets the shared Step-in and anything else none. The definition records the verdict (`stepIn`: `authored`, `universal`, `declined`, `exempt`; [movement](movement.md#5-attack-movement)). |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. The only way a request ever cuts an attack that can harm short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
@@ -191,7 +191,7 @@ today):
 - **Motion** (`motion: { type, ... }`, `MOTION_DEFAULTS`): movement the
   attack makes itself, owning the body while it lasts. `hover` (no
   fields): the fighter stands on the air for the whole attack, its drift
-  (its `airMomentum` share) carried on, never steered (#0001's Floating
+  (its `airMomentum` share) under the universal air control (#0001's Floating
   Straight, Blue and air High Kick). `homing` (`range`,
   `speed` required; `rebound`, `recoil`, `exit`): hang, lock on, dash at
   the target, spring off what it meets. `bounce` (`fallSpeed` required;

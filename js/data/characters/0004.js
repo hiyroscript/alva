@@ -332,8 +332,9 @@ export const CHARACTER_0004 = {
   // fist raised a frame more. Every Deflect's 3, Base Launch 2, here
   // upward, the way the uppercut goes; while the arc is live it turns the
   // other fighter's projectiles back at their thrower, now #0004's. A
-  // quarter of a second in all, keeping the whole of its drift, never
-  // steered and never stepping in (a defense: js/data/attack-movement.js);
+  // quarter of a second in all, keeping the whole of its drift, under the
+  // universal air control, never stepping in (a defense:
+  // js/data/attack-movement.js);
   // no cooldown of its own.
   deflect: {
     animation: 'deflect',
@@ -502,8 +503,8 @@ export const CHARACTER_0004 = {
   // mirrored with facing). None has a cooldown (the cooldown policy's: none
   // deals 10, paralyzes or charms); the Melody, an ordinary projectile,
   // costs 15 Energy. Each moves by the shared attack movement
-  // (js/data/attack-movement.js): never steered, the run and the drift
-  // carried on; its grounded strikes (the Dance Combo, the Leek Swing, the
+  // (js/data/attack-movement.js): the run carried on, never steered on the
+  // ground, the aerials under the universal air control; its grounded strikes (the Dance Combo, the Leek Swing, the
   // Crescent Kick) step in by the shared Step-in, the Melody and the
   // aerials never.
   attacks: {
@@ -530,7 +531,8 @@ export const CHARACTER_0004 = {
     // strikes. The low sweep (frame 3): its trail under the body, 1, no
     // launch. The rising crescent and the high kick (frames 4-5): 3, Base
     // Launch 2 upward. Back on frames 6-7: 0.35 s in all. Its drift carried
-    // on, never steered, and a hit opens a follow-up from frame 6.
+    // on under the universal air control, and a hit opens a follow-up from
+    // frame 6.
     midair_attack1: {
       animation: 'midair_attack1',
       recovery: 2 / FPS_0004.midair_attack1,
@@ -570,7 +572,7 @@ export const CHARACTER_0004 = {
     // and whoever they catch is carried up with it (`carry`, at its own
     // speed). The swing down (frame 4): 3, Base Launch 2 sideways, flung
     // away from the top of the climb. Drifting on frame 5. Once per
-    // airtime, its lift never steered.
+    // airtime, its lift under the universal air control.
     midair_attack2: {
       animation: 'midair_attack2',
       recovery: 1 / FPS_0004.midair_attack2,
@@ -609,7 +611,7 @@ export const CHARACTER_0004 = {
       hitCancel: 6 / FPS_0004.attack3,
     },
     // The Stage Dive: tucked (frame 1, a hang of 1/15 s), then the dive,
-    // legs first, at 1300 units/s (its drift carried on, never steered) for
+    // legs first, at 1300 units/s (its drift under the universal air control) for
     // up to 0.8 s. Anything the feet meet on the way is driven down (3,
     // Base Launch 2 downward: off the stage, a spike) and the dive goes on
     // through. Where it lands, whoever stands within 56 units of the spot,

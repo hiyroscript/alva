@@ -3509,24 +3509,32 @@ controllers); `cooldown-policy`, `combat-rules`, `energy`, `dash`, `combo`,
 ## Universal Step-in and no attack steering
 
 Not a named update (it can become one if the owner names it). Asked for in
-`max` as two strict, universal rules for every fighter, present and
-future, player and CPU alike, superseding the
+`max` as strict, universal rules for every fighter, present and future,
+player and CPU alike, superseding the
 [combat feel overhaul](#combat-feel-overhaul-and-shield-walking)'s attack
-mobility tiers and every entry or document that describes steering an
-attack. Those entries stay as the record of what each change was at the
+mobility tiers and every entry or document that describes steering a
+grounded attack; the owner then asked that every move keep moving in the
+air, whatever it is. Those entries stay as the record of what each change was at the
 time.
 
 **What it changed.**
 
-- **Attack Steering removed.** Nothing held moves a fighter while an attack
-  plays: no direction, no Run, no switch, in any phase, on the ground or in
-  the air, whatever the move (strikes, throws, aerials, the Deflect,
-  Specials, 3 s and 5 s cooldown moves). `steerAttack` is gone; every attack
-  moves through `attackDrift` (`js/game/fighters/movement.js`), which takes
-  no direction: its Step-in, then its speed running down under `friction` x
-  the ground deceleration (the air drag in the air). The motions' drift (a
-  hover, a plunge, a lift, a roll's curl, a homing dash's recovery) goes
-  through it too. `lockMovement` and its normal-locomotion bypass are gone
+- **Attack Steering removed on the ground.** Nothing held moves a fighter
+  through a grounded attack: no direction, no Run, no switch, in any phase,
+  whatever the move (strikes, throws, Specials, 3 s and 5 s cooldown
+  moves). `steerAttack` is gone; every attack moves through `attackDrift`
+  (`js/game/fighters/movement.js`): its Step-in, then on the ground its
+  speed running down under `friction` x the ground deceleration, the
+  direction held ignored.
+- **Universal air control in the air.** In the air every move, whatever it
+  is (aerials, hovers, plunges, lifts, the Deflect, a homing dash's hang
+  and recovery, a grounded attack carried off a ledge), keeps exactly the
+  air control a fighter has outside an attack (`attackDrift` in the air is
+  `steer` with the direction held), from its `airMomentum` share of the
+  drift. No move has air control of its own any more (the tiers' and the
+  plunges' and lifts' reduced `airControl` / `airTopSpeed` are gone); only
+  a motion setting the speed itself (a homing dash's dash, a roll off a
+  ledge) overrides it while it does. `lockMovement` and its normal-locomotion bypass are gone
   (`Fighter.moveDir` is 0 through any attack). `js/data/attack-mobility.js`
   and its tiers (`quick`, `medium`, `heavy`, `planted`) are deleted, and an
   attack declaring `mobility`, `control`, `airControl`, `topSpeed`,
@@ -3555,17 +3563,19 @@ time.
 - **CPU.** Its predictions call the same `attackDrift` and
   `activationStep` (a predicted strike gains its real Step-in, a throw
   none); the recovery simulation plays a lift's hang and lift with its
-  drift carried on, never steered (`riseOf` gives `hang` and `airMomentum`);
+  held toward the stage under the universal air control (`riseOf` gives
+  `hang` and `airMomentum`);
   a Step-in counts toward `approach` or `mobility` only when it really
   travels (`lunge`, from `stepInTravel`, at least 32 units: none does
   today), and the threat reach adds the real travel; the executor holds no
-  direction while any attack plays.
+  direction through a grounded attack and steers in the air as ever.
 
 **Consequences.** Running into an attack and holding on no longer keeps
 the run: it runs down at the universal deceleration (a Dash attack at the
 overspeed brake: #0001's Dash Jab goes from 1160 to 620 units/s in six
-steps, where it went from 1210 to 970 before). An aerial keeps its drift share and the air drag
-alone: no turning it round. Holding a direction during an attack still
+steps, where it went from 1210 to 970 before). Every aerial now has the
+full air control (it reaches top speed either way), where the tiers gave
+most a share of it and plunges and lifts less. Holding a direction during an attack still
 turns it. Grounded strikes now lean in about 11 units, so repeated strikes
 creep forward (a fresh flurry may reach a target its last one flung,
 once it is free again); #0001's High Kick, #0003's Heel Drop and Haymaker
@@ -3590,8 +3600,9 @@ testing and every fighter's specification.
 
 **Tests:** new `tests/systems/step-in.test.mjs` (the policy and its
 refusals; every fighter's verdicts; every playable fighter's every move
-from rest, a run, a Dash and a jump with nothing, Run, back, switching and
-late Run held: identical paths; the Step-in from rest, slight and once;
+on the ground from rest, a run and a Dash with nothing, Run, back,
+switching and late Run held: identical paths; every aerial and the
+Deflect under exactly the universal air control; the Step-in from rest, slight and once;
 none in the air or on landing; a turn after it never redirecting it; a CPU's and a
 player's Run alike; normal movement back at once; the CPU's prediction
 matching the Fighter step for step; a wall; a summon and its phantom
@@ -3599,4 +3610,5 @@ never moving; the CPU's lunge reading); `attack-mobility` removed;
 `movement-rules`, `movement`, `slam`, `pull`, `defense`, `combat-ai`, the
 #0001, #0002 and #0006 suites and the test fixtures updated;
 `tests/benchmarks/feel-metrics.mjs` now measures the Step-in, the
-displacement a held direction adds (0) and normal movement's return.
+displacement a held direction adds to a ground attack (0) and to an
+aerial (the air control), and normal movement's return.

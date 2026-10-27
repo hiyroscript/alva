@@ -17,23 +17,25 @@
 //   steered        the same attack with Run held, then held back, through
 //                  it, aimed the way it faces (so nothing held can turn it):
 //                  how much further either moves it than nothing held (0:
-//                  attacks are never steered), from a standstill and from a
-//                  run
+//                  ground attacks are never steered), from a standstill and
+//                  from a run
 //   run → attack   running right at top speed, the attack pressed: its
 //                  speed one step in and as it ends, how far it carries on
 //                  with nothing held, and the steps after it ends before
 //                  Run held moves it again (1: normal movement back at once)
 //   air drift      drifting right at top speed at a jump's apex, an
 //                  ordinary aerial pressed: the drift it ends with, and how
-//                  much Run or left held changes it (0)
+//                  much Run or left held changes it (every aerial keeps the
+//                  universal air control)
 //   dash → attack  Attack 1 at the Dash's first cancel step: the speed it
 //                  starts with and six steps on
 //   dashes / 10 s  Dashes started by pressing the Dash every step it is
 //                  allowed, alternating sides, from a full bar
 //
 // These are proxies: they show whether momentum survives a change of
-// action, that the Step-in is slight and that nothing steers an attack,
-// never whether the game is fun. Nothing here is
+// action, that the Step-in is slight, that nothing steers a ground attack
+// and that every aerial keeps the air control, never whether the game is
+// fun. Nothing here is
 // asserted; the tests assert the rules.
 
 import { writeFileSync } from 'node:fs';

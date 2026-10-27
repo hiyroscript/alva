@@ -252,7 +252,8 @@ its `baseLaunch` (0 to
 3: by `codename_rule`'s launch levels, 1 for light, 2 for medium, 3 for
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Its movement
-is mostly not yours to write: nothing held ever steers an attack, and
+is mostly not yours to write: nothing held ever steers a grounded attack,
+every move keeps the universal air control in the air, and
 every grounded direct strike steps in slightly by itself, the shared
 Step-in ([attack movement](../systems/movement.md#5-attack-movement)).
 Write only what the move's own mechanic needs, with a comment saying why:

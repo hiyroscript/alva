@@ -3,8 +3,10 @@
 // fighter.
 //
 // Purpose: how ground acceleration and braking, turning, air steering,
-// overspeed, an attack's momentum and Step-in (never steered), the hitstun
-// drift, the fast fall, the air jump and the higher jump work. No fighter changes these rules or their numbers.
+// overspeed, an attack's momentum and Step-in (never steered on the
+// ground, the universal air control in the air), the hitstun drift, the
+// fast fall, the air jump and the higher jump work. No fighter changes
+// these rules or their numbers.
 //
 // Inputs: the movement values (`mv`: BASE_FIGHTER_MOVEMENT in
 // js/data/movement.js, which lists every field), an attack definition
@@ -84,20 +86,23 @@ export function steer(body, mv, dir, dt, burst = false, friction = 1) {
 // `stepped`) for a fighter facing `facing`: its Step-in once its time
 // reaches it (see js/data/attack-movement.js), the way the strike faces
 // then (an attack turned before it turns its lunge with it; once made,
-// nothing redirects it), then the speed running down
-// as if nothing were held, under its friction x the ground deceleration (the
-// air drag in the air; overspeed as steer has it). No direction is taken:
-// nothing held moves a fighter while an attack plays. The Step-in raises the
-// forward speed to at least its own, once, on the ground only: a fighter
-// off the ground as its time comes never makes it (never later either).
-// `burst` as for steer.
-export function attackDrift(body, mv, facing, atk, dt, burst = false) {
+// nothing redirects it). Then, on the ground, its speed runs down as if
+// nothing were held, under its friction x the ground deceleration
+// (overspeed as steer has it): `dir`, the direction held, is ignored there,
+// so nothing held moves a fighter through a grounded attack. In the air it
+// is the universal air control, exactly as outside any attack (steer with
+// `dir`): every move, whatever it is, lets its fighter move in the air.
+// The Step-in raises the forward speed to at least its own, once, on the
+// ground only: a fighter off the ground as its time comes never makes it
+// (never later either). `burst` as for steer.
+export function attackDrift(body, mv, facing, atk, dir, dt, burst = false) {
   const step = atk.step;
   if (step && !atk.stepped && atk.time >= step.at - EPSILON) {
     atk.stepped = true;
     if (body.grounded && body.vx * facing < step.speed) body.vx = facing * step.speed;
   }
-  steer(body, mv, 0, dt, burst, body.grounded ? atk.def.friction : 1);
+  if (body.grounded) steer(body, mv, 0, dt, burst, atk.def.friction);
+  else steer(body, mv, dir, dt, burst);
 }
 
 // The Step-in an activation of attack definition `def` makes, started on

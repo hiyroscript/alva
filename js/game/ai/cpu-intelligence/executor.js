@@ -56,6 +56,7 @@ export class Executor {
     this.allowEdge = false;
     this.pressed = null;
     this.wantDir = 0;
+    this.homeward = false;
     this.heldBack = false;
   }
 
@@ -67,11 +68,15 @@ export class Executor {
     this.mouvement = 0;
     this.pressed = null;
     this.wantDir = 0;
+    this.homeward = false;
   }
 
   // Hold a direction (-1, 0 or 1).
-  dir(d) {
+  // `homeward`: it is steering back to the stage, which a move of its own
+  // playing in the air does not stop (see finish).
+  dir(d, { homeward = false } = {}) {
     this.wantDir = d || 0;
+    this.homeward = homeward;
   }
 
   // Press `action` this step if it can be a fresh press; true when it is.
@@ -128,11 +133,14 @@ export class Executor {
     if (this.clock <= this.jumpHoldUntil) held.jump = true;
     const b = self.body;
     let d = this.wantDir;
-    // While an attack plays nothing held moves the fighter (the Fighter
-    // takes no direction then, a player's or a CPU's: see attackDrift), and
-    // its attacks are aimed by attackFacing, so it holds none: the ledge
-    // guard below never counts a walk that cannot happen.
-    if (self.combat.attack) d = 0;
+    // While an attack plays on the ground nothing held moves the fighter
+    // (the Fighter ignores it then, a player's or a CPU's: see attackDrift)
+    // and its attacks are aimed by attackFacing, so it holds none: the
+    // ledge guard below never counts a walk that cannot happen. In the air
+    // every move keeps the universal air control, a CPU's as a player's: its
+    // own aerials play out where it planned them (its predictions play them
+    // with nothing held), so it steers one only when it is steering home.
+    if (self.combat.attack && (b.grounded || !this.homeward)) d = 0;
     if (!b.grounded) held.shield = held.shield && this.pressed === 'shield';
     if (d && b.grounded && !this.allowEdge) {
       const decel = self.movement.deceleration;

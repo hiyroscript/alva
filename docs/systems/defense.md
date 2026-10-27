@@ -109,8 +109,8 @@ In the air the same button is the fighter's **Deflect**, its `deflect`
 entry: an attack in every way (it goes through `createAttackDefinition`,
 plays its own `deflect` clip, has a startup, an active phase, a recovery,
 a melee hitbox, its stuns and hitstop, its cooldown (none: an ordinary
-move), the share of its drift it keeps (never steered, never stepping
-in)), resolved by the same `CombatSystem` as
+move), the share of its drift it keeps, under the universal air control,
+never stepping in), resolved by the same `CombatSystem` as
 any attack. Attack though it is, it is **cancellable** by explicit rule
 (below).
 It costs 15 Energy (`DEFLECT_ENERGY_COST`), paid once as it starts. Its strike

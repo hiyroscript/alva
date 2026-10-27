@@ -298,8 +298,8 @@ little nearer the centre.
 
 Each candidate (a move now, out of a Dash of a few lengths, or out of a
 jump arc) is simulated on the game's own rules (`stepBody`, `steer`,
-`attackDrift` and `activationStep`: an attack's real Step-in and nothing
-held steering it, the attack's own motion) against the opponent's
+`attackDrift` and `activationStep`: an attack's real Step-in, nothing held
+steering a grounded one, the attack's own motion) against the opponent's
 predicted path, and scored as expected utility:
 
 - **P(hit), P(block), P(miss):** the room it has against how far the
@@ -366,9 +366,9 @@ and a slam stands through its landing where it lands. A move's Step-in is
 counted as the distance it really travels (`lunge`, from `stepInTravel`):
 the shared Step-in, a lean of about 11 units, never makes a strike an
 `approach` or a `mobility` move; only a lunge of about a fighter's width
-would. A lifting move is a `recovery` for its upward motion alone: the
-recovery simulation plays its hang and its lift with its drift carried on,
-never steered. A
+would. A lifting move is a `recovery`: the recovery simulation plays its hang
+and its lift held toward the stage, under the universal air control every
+aerial keeps. A
 heal is no attack: the CPU casts it when it has taken enough for the
 whole heal to count and the opponent, busy as long as it is and then
 closing in with a Dash and a run, could not reach it before the cast lets

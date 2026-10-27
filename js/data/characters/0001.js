@@ -322,8 +322,8 @@ export const CHARACTER_0001 = {
   // Every Deflect's 3, Base Launch 2, here upward, the way the arm sweeps;
   // while the sweep is live it turns the other fighter's projectiles back
   // at their thrower, now #0001's. A third of a second in all, falling as
-  // it sweeps and carrying the whole of its drift, never steered and never
-  // stepping in (a defense: js/data/attack-movement.js); no cooldown (the sweep itself,
+  // it sweeps and carrying the whole of its drift, under the universal air
+  // control, never stepping in (a defense: js/data/attack-movement.js); no cooldown (the sweep itself,
   // and its Energy, are its only limits: see js/data/cooldowns.js).
   deflect: {
     animation: 'deflect',
@@ -502,9 +502,10 @@ export const CHARACTER_0001 = {
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). Each moves by the shared attack movement
   // (js/data/attack-movement.js): it carries the speed it is thrown at,
-  // never steered; the Jab steps in by the shared Step-in, the High Kick
-  // by its own leap, and the casts (Red, Maximum Blue) and the aerials
-  // never step in. None has a cooldown (the cooldown policy's: none of them deals
+  // never steered on the ground, its aerials under the universal air
+  // control; the Jab steps in by the shared Step-in, the High Kick by its
+  // own leap, and the casts (Red, Maximum Blue) and the aerials never step
+  // in. None has a cooldown (the cooldown policy's: none of them deals
   // 10 or paralyzes); Red and Maximum Blue, ordinary throws, cost 15 Energy
   // each as they start.
   attacks: {
@@ -533,7 +534,8 @@ export const CHARACTER_0001 = {
     // The Floating Straight: frames 1-2 the wind-up, 3-4 the lunging
     // punch (3, Base Launch 1 sideways), 5 recovering, standing on the air
     // throughout (no fall: motion `hover`), drifting on most of its speed
-    // (an air dash's burst carries it into a flying punch), never steered.
+    // (an air dash's burst carries it into a flying punch), under the
+    // universal air control.
     // Twice per airtime.
     midair_attack1: {
       animation: 'midair_attack1',
@@ -571,7 +573,8 @@ export const CHARACTER_0001 = {
     // behind it, re-aimed every step. The hit blasts the target away (3,
     // Base Launch 2 sideways), a Shield is shoved back, and #0001 springs
     // off what it met (620 up, 240 back). Once per airtime. The dash is its
-    // own motion; a commitment, never steered.
+    // own motion; its hang and its recovery under the universal air
+    // control.
     midair_attack2: {
       animation: 'midair_attack2',
       startup: 3 / FPS_0001.midair_attack2,
@@ -608,7 +611,7 @@ export const CHARACTER_0001 = {
     // last, an opponent within 190 units of the palm is yanked in to it at
     // up to 1300 units/s, and the palm strikes whoever it brought (3, Base
     // Launch 1 upward). Standing on the air throughout, the hang taking
-    // some of its drift, never steered. Once per airtime.
+    // some of its drift, under the universal air control. Once per airtime.
     midair_attack3: {
       animation: 'midair_attack3',
       startup: 1 / FPS_0001.midair_attack3,
@@ -636,7 +639,8 @@ export const CHARACTER_0001 = {
     // upward. It keeps the speed it is thrown at, never steered, its leap
     // (its own Step-in: no other is added) sliding on under 0.6 of the
     // ground deceleration. Started in the air it never leaps: it stands on
-    // the air while it kicks, once per airtime.
+    // the air while it kicks (under the universal air control), once per
+    // airtime.
     extra_attack: {
       animation: 'extra_attack',
       startup: 3 / FPS_0001.extra_attack,

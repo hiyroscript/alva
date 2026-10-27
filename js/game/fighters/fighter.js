@@ -656,16 +656,16 @@ export class Fighter {
     // ---- Horizontal movement ---------------------------------------------
     // See moveHorizontal, and moveAttack while an attack plays (moveMotion
     // while an attack's own motion owns the body, and then the share of
-    // gravity it falls under this step). Nothing held steers an attack, in
-    // any phase, on the ground or in the air: neither takes a direction. A
-    // summon's startup holds the fighter still where it stands, as a
+    // gravity it falls under this step). Nothing held steers an attack on
+    // the ground, in any phase; in the air every move keeps the universal
+    // air control (see attackDrift). A summon's startup holds the fighter still where it stands, as a
     // technique does. An air dash owns the body too: straight across at its
     // speed, no fall.
     const atk = combat.attack;
     let gravityShare = 1;
     let dir = held;
     if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash || this.pendingSummon) dir = 0;
-    // Normal locomotion only: an attack is never steered.
+    // Normal locomotion only (the running pose): an attack runs nowhere.
     this.moveDir = atk ? 0 : dir;
 
     if (this.technique || this.pendingSummon) {
@@ -700,9 +700,9 @@ export class Fighter {
       // runs down under the normal deceleration.
       this.moveHorizontal(0, dt);
     } else if (atk?.motion && !atk.motion.done) {
-      gravityShare = this.moveMotion(atk, dt);
+      gravityShare = this.moveMotion(atk, dir, dt);
     } else if (atk) {
-      this.moveAttack(atk, dt);
+      this.moveAttack(atk, dir, dt);
     } else {
       this.moveHorizontal(dir, dt);
     }
@@ -916,11 +916,12 @@ export class Fighter {
     steer(this.body, this.movement, dir, dt, this.burst);
   }
 
-  // One step of an attack's own horizontal movement: its Step-in, then its
-  // speed running down, whatever is held (attackDrift in
-  // js/game/fighters/movement.js). It takes no direction.
-  moveAttack(atk, dt) {
-    attackDrift(this.body, this.movement, this.facing, atk, dt, this.burst);
+  // One step of an attack's own horizontal movement: its Step-in, then on
+  // the ground its speed running down whatever is held, in the air the
+  // universal air control toward `dir` (attackDrift in
+  // js/game/fighters/movement.js).
+  moveAttack(atk, dir, dt) {
+    attackDrift(this.body, this.movement, this.facing, atk, dir, dt, this.burst);
   }
 
   // The horizontal speed an attack starting now keeps of `vx` (see
@@ -1562,9 +1563,10 @@ export class Fighter {
   // One step of attack `atk`'s motion: the velocity it owns, set here. Returns
   // the share of gravity the body falls under this step: none while the
   // motion holds it (a hang, a dash, a plunge, a lift or a hover), all of it
-  // otherwise. Nothing held steers it: what it does not set itself drifts on
-  // as any attack's speed does (moveAttack).
-  moveMotion(atk, dt) {
+  // otherwise. What it does not set itself moves as any attack's speed does
+  // (moveAttack): never steered on the ground, the universal air control
+  // toward `dir`, the direction held, in the air.
+  moveMotion(atk, dir, dt) {
     const { body } = this;
     const spec = atk.def.motion;
     const m = atk.motion;
@@ -1573,7 +1575,7 @@ export class Fighter {
       // The curl (the startup) slides on like any attack; the roll itself
       // starts as the strike goes live.
       if (phase === 'startup' && !m.rolling) {
-        this.moveAttack(atk, dt);
+        this.moveAttack(atk, dir, dt);
         return 1;
       }
       if (body.wall === m.dir) m.speed = 0;
@@ -1583,9 +1585,9 @@ export class Fighter {
       return 1;
     }
     if (spec.type === 'hover') {
-      // Standing on the air for the whole attack: no fall, the drift
-      // carried on (its air momentum's share), never steered.
-      this.moveAttack(atk, dt);
+      // Standing on the air for the whole attack: no fall, the drift (its
+      // air momentum's share) under the universal air control.
+      this.moveAttack(atk, dir, dt);
       body.vy = 0;
       return 0;
     }
@@ -1597,13 +1599,14 @@ export class Fighter {
         body.vx *= spec.exit;
         body.vy *= spec.exit;
       }
-      this.moveAttack(atk, dt);
+      this.moveAttack(atk, dir, dt);
       return 1;
     }
     if (spec.type === 'homing') {
       if (phase === 'startup') {
-        // Hanging, the drift braking: the lock-on.
-        this.moveHorizontal(0, dt);
+        // Hanging (the lock-on): the drift braking on the ground, the
+        // universal air control in the air.
+        this.moveHorizontal(body.grounded ? 0 : dir, dt);
         body.vy = 0;
         return 0;
       }
@@ -1614,7 +1617,7 @@ export class Fighter {
       if (Math.abs(m.dirX) > 1e-6) this.facing = Math.sign(m.dirX);
       return 0;
     }
-    this.moveAttack(atk, dt);
+    this.moveAttack(atk, dir, dt);
     if (phase === 'startup') body.vy = 0;
     else body.vy = spec.type === 'rise' ? -spec.speed : spec.fallSpeed;
     return 0;

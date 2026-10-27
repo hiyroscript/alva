@@ -84,14 +84,15 @@
 //
 // Every attack moves its fighter by the same rules (see
 // js/data/attack-movement.js and attackDrift in
-// js/game/fighters/movement.js). Nothing held steers it: no direction, no
-// Run, on the ground or in the air. It keeps a share of the speed the
+// js/game/fighters/movement.js). It keeps a share of the speed the
 // fighter carried into it (`momentum` on the ground, `airMomentum` in the
-// air: all of it unless it says otherwise), and the speed it is not given
-// runs down under `friction` x the universal ground deceleration (1 unless
-// it says otherwise; the air drag in the air). Declaring any field of the
-// retired Attack Mobility system (`mobility`, `control`, `airControl`,
-// `topSpeed`, `airTopSpeed`, `lockMovement`) is refused.
+// air: all of it unless it says otherwise). On the ground nothing held
+// steers it (no direction, no Run): that speed runs down under `friction`
+// x the universal ground deceleration (1 unless it says otherwise). In the
+// air every attack keeps the universal air control, the same as outside
+// any attack. Declaring any field of the retired Attack Mobility system
+// (`mobility`, `control`, `airControl`, `topSpeed`, `airTopSpeed`,
+// `lockMovement`) is refused.
 //
 // A grounded direct strike also steps in: once per activation, the
 // fighter's forward speed is raised to at least the Step-in's speed as its
@@ -172,13 +173,13 @@
 //           and `recoil` back. A dash that ends without contact keeps
 //           `exit` of its velocity; one that reaches the ground stops there.
 //   bounce  the plunge. The startup hangs, then the fighter drops at a fixed
-//           `fallSpeed` (no gravity; its drift carried on, never steered)
-//           until it meets the ground or an opponent: either sends
+//           `fallSpeed` (no gravity; its drift under the universal air
+//           control) until it meets the ground or an opponent: either sends
 //           it back up at `rebound` and ends the attack at once, so it can
 //           bounce again. Meeting the ground this way is no landing.
 //   slam    the plunge that lands. The startup hangs, then the fighter
-//           drops at a fixed `fallSpeed` (no gravity; its drift carried on,
-//           never steered) until it meets the ground, striking
+//           drops at a fixed `fallSpeed` (no gravity; its drift under the
+//           universal air control) until it meets the ground, striking
 //           whatever it passes on the way (an opponent never stops it).
 //           Meeting the ground ends the plunge there: the fighter stands
 //           where it landed, its `impact` (if any: `{ hitbox, hit,
@@ -190,7 +191,7 @@
 //           if it names one. A plunge whose active phase runs out in the
 //           air lands nothing: it carries on under gravity.
 //   rise    the lift. The startup hangs, then the fighter rises at `speed`
-//           (no gravity; its drift carried on, never steered) for the
+//           (no gravity; its drift under the universal air control) for the
 //           active phase, and carries on up from there under gravity.
 //   roll    the ground roll. Through the startup the fighter curls up,
 //           sliding on as any attack does; then it rolls the way it
@@ -198,8 +199,8 @@
 //           attack started (never more than `maxSpeed`), losing `friction`
 //           units/s every second on the ground and nothing in the air (off
 //           a ledge it flies on), for the rest of the attack; a wall stops
-//           it. No steering. A Shield that blocks it stops it dead, sending
-//           it back at `recoil`.
+//           it. Nothing steers the roll itself. A Shield that blocks it
+//           stops it dead, sending it back at `recoil`.
 //
 // A motion attack never turns while it plays (a homing dash faces the way
 // it flies), and never starts while its fighter is still flying from a

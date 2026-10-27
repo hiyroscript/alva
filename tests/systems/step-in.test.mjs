@@ -1,23 +1,26 @@
 // Run with node --test tests/systems/step-in.test.mjs (no dependencies).
 // The shared attack movement (js/data/attack-movement.js): every grounded
 // direct melee strike steps in, once, by itself; nothing held ever steers a
-// fighter while a move plays. Checked: the policy and its refusals; every
+// fighter through a move on the ground, and in the air every move keeps the
+// universal air control. Checked: the policy and its refusals; every
 // fighter's verdicts, move by move (the real roster cases); and on the real
 // Fighter, physics and combat for every playable fighter and every move it
 // can press, on the ground and in the air: the Step-in from rest (slight,
 // once, the way it faces, never for a throw, a cast, a summon, a motion of
 // its own or a move that declines it, never in the air, never on landing),
-// that no direction, Run or switch of direction held through any move, from
-// rest, a run, a Dash or a jump, changes its path at all, and that the CPU's
-// prediction of each move walks the very path the Fighter does. Shared
-// rules, run on each fighter's own data (see tests/helpers/fighter-harness.mjs).
+// that no direction, Run or switch of direction held through any move on
+// the ground, from rest, a run or a Dash, changes its path at all, that
+// every aerial and the Deflect move under exactly the air control a fighter
+// has outside an attack, and that the CPU's prediction of each move walks
+// the very path the Fighter does. Shared rules, run on each fighter's own
+// data (see tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ATTACK_CARRY_DEFAULTS, STEERING_FIELDS, STEP_IN, STEP_IN_VERDICTS, resolveStepIn, stepInEligible,
 } from '../../js/data/attack-movement.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
-import { stepInTravel } from '../../js/game/fighters/movement.js';
+import { steer, stepInTravel } from '../../js/game/fighters/movement.js';
 import { CHARACTERS, getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { analyzeCapabilities } from '../../js/game/ai/cpu-intelligence/capabilities.js';
 import { Track, moveContact } from '../../js/game/ai/cpu-intelligence/prediction.js';
@@ -85,7 +88,7 @@ test('refusals: a malformed step, `step: null`, a pending move\'s step, any stee
   assert.throws(() => createAttackDefinition({ ...ATTACK, friction: -1 }), /rate from 0/);
   assert.deepEqual([...STEERING_FIELDS], ['mobility', 'control', 'airControl', 'topSpeed', 'airTopSpeed', 'lockMovement']);
   for (const field of STEERING_FIELDS) {
-    assert.throws(() => createAttackDefinition({ ...ATTACK, [field]: field === 'mobility' ? 'quick' : 0.5 }), /never steered/, field);
+    assert.throws(() => createAttackDefinition({ ...ATTACK, [field]: field === 'mobility' ? 'quick' : 0.5 }), /steering of its own/, field);
   }
   // No fighter's data carries one, its Deflect's included.
   for (const c of CHARACTERS) {
@@ -270,8 +273,8 @@ for (const c of playableCharacters()) {
     }
   });
 
-  test(`${name}: no direction, Run or switch held through any move changes its path: from rest, a run, a Dash or a jump`, () => {
-    for (const [setup, moves] of [['rest', ground], ['run', ground], ['dash', ground], ['air', air]]) {
+  test(`${name}: on the ground, no direction, Run or switch held through any move changes its path: from rest, a run or a Dash`, () => {
+    for (const [setup, moves] of [['rest', ground], ['run', ground], ['dash', ground]]) {
       let tried = 0;
       for (const move of moves) {
         const neutral = trace(makeFighter, move, setup);
@@ -289,6 +292,51 @@ for (const c of playableCharacters()) {
         }
       }
       assert.ok(tried > 0, `${setup}: moves tried`);
+    }
+  });
+
+  test(`${name}: in the air, every move keeps the universal air control: held, it moves the fighter exactly as outside an attack`, () => {
+    for (const move of air) {
+      const neutral = trace(makeFighter, move, 'air');
+      assert.ok(neutral.started, `${move.id}: started`);
+      const right = trace(makeFighter, move, 'air', () => RIGHT);
+      const left = trace(makeFighter, move, 'air', () => LEFT);
+      const k = Math.min(neutral.path.length, right.path.length, left.path.length) - 1;
+      assert.ok(right.path[k][0] > neutral.path[k][0] && left.path[k][0] < neutral.path[k][0],
+        `${move.id}: held right it goes right, held left it goes left (${left.path[k][0]} < ${neutral.path[k][0]} < ${right.path[k][0]})`);
+      // The same for a CPU's controller and a player's.
+      for (const kind of ['cpu', 'player']) {
+        const other = trace((o) => {
+          const h = makeFighter(o);
+          h.fighter.controller.kind = kind;
+          return h;
+        }, move, 'air', () => RIGHT);
+        assert.deepEqual(other.path, right.path, `${move.id}: a ${kind}'s air control alike`);
+      }
+      // Step by step, wherever its own motion does not set the speed
+      // itself (a homing dash, a roll), the speed changes exactly as the
+      // universal air control changes it outside an attack.
+      const type = move.def.motion?.type;
+      if (type === 'homing' || type === 'roll') continue;
+      const h = makeFighter({ x: 400 });
+      aim(h.fighter);
+      for (let i = 0; i < 5; i++) h.step({});
+      h.step(P('jump'));
+      for (let i = 0; i < 6; i++) h.step({});
+      h.step({ ...RIGHT, ...P(move.action) });
+      const record = h.fighter.combat.attack;
+      let checked = 0;
+      for (let i = 0; i < 400 && h.fighter.combat.attack === record; i++) {
+        const before = { vx: h.fighter.body.vx, grounded: false };
+        const burst = h.fighter.burst;
+        const airborne = !h.fighter.body.grounded;
+        h.step(LEFT);
+        if (!airborne || h.fighter.body.grounded || h.fighter.combat.attack !== record) continue;
+        steer(before, MV, -1, DT, burst);
+        assert.ok(Math.abs(h.fighter.body.vx - before.vx) < 1e-9, `${move.id}, step ${i}: ${h.fighter.body.vx} vs the air control's ${before.vx}`);
+        checked++;
+      }
+      assert.ok(checked > 0, `${move.id}: checked in the air`);
     }
   });
 

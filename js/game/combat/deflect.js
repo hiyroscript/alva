@@ -35,7 +35,7 @@
 // Its strike is the same for every fighter: DEFLECT_DAMAGE (3) Launch
 // Points at Base Launch DEFLECT_BASE_LAUNCH (2). A fighter authors the rest
 // (its clip, timing, box, stuns, freeze, direction and the share of its
-// drift it keeps: it is never steered and never steps in). Its
+// drift it keeps, under the universal air control; it never steps in). Its
 // cooldown is the cooldown policy's (js/data/cooldowns.js): none at all,
 // since its 3 damage is no special class (Energy is what limits it). An
 // entry may leave `cooldown` out or declare 0; any other is refused.

@@ -103,8 +103,8 @@ const NONE = Object.freeze({ ko: 0, offstage: false, speed: 0 });
 // The lifting move a fighter may use to get back (a rising air attack), as
 // the recovery simulation takes it: { speed, time, hang, airMomentum } (its
 // lift's speed and length, its hang before it and the share of its drift it
-// keeps as it starts; nothing steers it), or null. A recovery move for its
-// upward motion alone.
+// keeps as it starts; it is steered by the universal air control, as any
+// aerial is), or null.
 export function riseOf(caps) {
   const m = caps.aerial.find((a) => a.motion === 'rise');
   if (!m) return null;

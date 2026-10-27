@@ -320,7 +320,7 @@ export const CHARACTER_0002 = {
   // the hand swats; while the swat is live it knocks the other fighter's
   // projectiles back at their thrower, now #0002's. A quarter of a second
   // in all, falling as it swats and carrying the whole of its drift,
-  // never steered and never stepping in (a defense:
+  // under the universal air control, never stepping in (a defense:
   // js/data/attack-movement.js), with no cooldown (the shared policy's for every Deflect: js/data/cooldowns.js).
   deflect: {
     animation: 'deflect',
@@ -437,8 +437,9 @@ export const CHARACTER_0002 = {
   // here: the Whirlwind, whose tornado's finisher deals 10, waits 5 seconds
   // from the moment its tornado leaves; every other move none at all. Neither
   // changes startup, strikes or recovery. Each moves by the shared attack
-  // movement (js/data/attack-movement.js): never steered, its grounded
-  // strikes stepping in by the shared Step-in; its speed is in its moves'
+  // movement (js/data/attack-movement.js): never steered on the ground, its
+  // aerials under the universal air control, its grounded strikes stepping
+  // in by the shared Step-in; its speed is in its moves'
   // own motions (the homing dash, the roll, the plunge, the lift), never in
   // a faster run.
   attacks: {
@@ -473,7 +474,8 @@ export const CHARACTER_0002 = {
     // target up (3, Base Launch 1 upward) and #0002 springs off it (760
     // up, 140 back) with both its air jumps back: the chain canon is
     // famous for. Once per airtime (landing or being hit gives it back).
-    // The dash is its own motion (no Step-in); nothing steers it.
+    // The dash is its own motion (no Step-in); its hang and its recovery are
+    // under the universal air control.
     midair_attack1: {
       animation: 'midair_attack1',
       startup: 7 / 60,
@@ -525,7 +527,7 @@ export const CHARACTER_0002 = {
       hitCancel: 8 / FPS_0002.attack2,
     },
     // The Bounce Attack. Curled up, it hangs for a moment (5/60 s), then
-    // plunges at 1400 units/s (its drift carried on, never steered) until
+    // plunges at 1400 units/s (its drift under the universal air control) until
     // it meets the ground or an opponent, and bounces back up off either
     // at 900 (about a jump's height): the attack is over, so it can bounce
     // again, twice per airtime. A hit spikes the target (3, Base Launch 2
@@ -575,7 +577,7 @@ export const CHARACTER_0002 = {
       hurtboxes: [{ x: -20, y: -50, w: 40, h: 50 }],
     },
     // The Blue Tornado. Spun into a tornado it rises at 460 units/s
-    // (its drift carried on, never steered) for as long as it strikes,
+    // (its drift under the universal air control) for as long as it strikes,
     // then carries on up: about 175 units in all, its way back to the
     // stage. Three strikes of 1 carry its target up with it (carry), the
     // fourth flings it upward (3, Base Launch 2). Once per airtime, and it

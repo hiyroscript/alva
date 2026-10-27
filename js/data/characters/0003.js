@@ -254,8 +254,8 @@ export const CHARACTER_0003 = {
   // Launch 2, here upward, the way the hand sweeps; while the sweep is live
   // it turns the other fighter's projectiles back at their thrower, now
   // #0003's. A quarter of a second in all, falling as it sweeps and
-  // carrying the whole of its drift, never steered and never stepping in
-  // (a defense: js/data/attack-movement.js); no cooldown of its own.
+  // carrying the whole of its drift, under the universal air control, never
+  // stepping in (a defense: js/data/attack-movement.js); no cooldown of its own.
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0003.deflect,
@@ -416,7 +416,8 @@ export const CHARACTER_0003 = {
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). None has a cooldown (the cooldown policy's: none
   // deals 10 or paralyzes). Each moves by the shared attack movement
-  // (js/data/attack-movement.js): never steered; the punch steps in by the
+  // (js/data/attack-movement.js): never steered on the ground, the aerials
+  // under the universal air control; the punch steps in by the
   // shared Step-in, the Heel Drop and the Haymaker by their own, and the
   // aerials never.
   attacks: {
@@ -448,8 +449,8 @@ export const CHARACTER_0003 = {
     // out to 40 units), and carries on up from there, about 90 units in
     // all: its anti-air, and its one way back to the stage besides the
     // jumps. 3, Base Launch 2 sideways: a chakra kick that can finish off
-    // the stage. Once per airtime, its lift never steered (its drift carried
-    // on), and a hit opens a follow-up at once.
+    // the stage. Once per airtime, its lift under the universal air
+    // control, and a hit opens a follow-up at once.
     midair_attack1: {
       animation: 'midair_attack1',
       startup: 1 / FPS_0003.midair_attack1,
@@ -498,7 +499,7 @@ export const CHARACTER_0003 = {
     },
     // The Heavenly Foot of Pain: the leg raised and the heel brought down
     // (frames 1-2, a hang of 2/15 s), then the plunge heel-first at 1500
-    // units/s (its drift carried on, never steered) for up to 0.9 s.
+    // units/s (its drift under the universal air control) for up to 0.9 s.
     // Anything the heel meets on the way is driven down (3, Base Launch 1 downward) and the plunge
     // goes on through. Where it lands, the ground splits: every opponent
     // standing on it within 110 units either side is thrown upward (5, Base
