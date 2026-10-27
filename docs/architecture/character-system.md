@@ -2,8 +2,8 @@
 
 Alva is built around one universal character system: shared game systems
 that work for any fighter, and fighter definitions that supply everything
-that makes a fighter itself. #0001, #0002, #0003, #0004, #0005 and #0006 are
-members of the roster, not templates: none is the default that shared code falls back
+that makes a fighter itself. #0001, #0002, #0003, #0004, #0005, #0006 and
+#0007 are members of the roster, not templates: none is the default that shared code falls back
 to, and adding another means writing its definition, not copying one.
 
 **All fighters share universal baseline locomotion. Character identity

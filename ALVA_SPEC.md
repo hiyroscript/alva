@@ -89,8 +89,9 @@ behave, and how it must look.
 - Each fighter's art lives in `assets/characters/<id>/` and nowhere else
   (none at the repository root): `assets/characters/0001/`,
   `assets/characters/0002/`, `assets/characters/0003/`,
-  `assets/characters/0004/`, `assets/characters/0005/` and
-  `assets/characters/0006/` (its three members' frames) are the only
+  `assets/characters/0004/`, `assets/characters/0005/`,
+  `assets/characters/0006/` (its three members' frames) and
+  `assets/characters/0007/` are the only
   fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
@@ -127,9 +128,9 @@ behave, and how it must look.
   fighter's facing, movement, hurtboxes and hitboxes never change with it.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
-  never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's and
-  #0006's art faces right; #0001's three orbs, #0004's note and #0005's balloons
-  are direction-neutral.)
+  never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's,
+  #0006's and #0007's art faces right; #0001's three orbs, #0004's note,
+  #0005's balloons and #0007's molotov fire are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -139,8 +140,8 @@ behave, and how it must look.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
-  artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's or any
-  later fighter's). Do not download
+  artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's,
+  #0007's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -628,10 +629,10 @@ no header, build label, eyebrow or keyboard hint bar.
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
   (silhouette + lock). No invented names or power ratings.
-- **Today six slots are selectable:** `#0001` in slot 01 (selected and
+- **Today seven slots are selectable:** `#0001` in slot 01 (selected and
   focused by default, as the first playable fighter), `#0002` in slot 02,
-  `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05 and `#0006` in
-  slot 06; the other 42 are locked. A fighter that is not
+  `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
+  slot 06 and `#0007` in slot 07; the other 41 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -813,6 +814,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
     credits the sheet itself gives: Cosbydaf (NGC sprites), Kenshin Himura
     (rip), Misse-the-cat (revamped sprites), each one's part said without
     the name of the work they come from.
+  - **#0007 sprite source** — sprite sheet by xxalexsmashxx on
+    DeviantArt, the line linked to the sheet's page (by the deviation's
+    number alone, so the address names nothing).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -824,8 +828,8 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
 - The UI does not name the character behind #0001, #0002, #0003, #0004,
-  #0005 or #0006 (or any fighter): each stays `#0001` / `#0002` / `#0003` /
-  `#0004` / `#0005` / `#0006` in game, and
+  #0005, #0006 or #0007 (or any fighter): each stays `#0001` / `#0002` /
+  `#0003` / `#0004` / `#0005` / `#0006` / `#0007` in game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
@@ -1361,8 +1365,8 @@ English and French.
   attacks**, **Special abilities** (only the moves the fighter classifies
   as Special, its `specialAbilities`, 7.2.1: #0001's Unlimited Void and
   Hollow Purple, #0003's Mystical Palm Technique, #0004's World is Mine,
-  #0005's Deadlights and Red Balloon, #0006's Ice Breath, marked Ground or
-  Air;
+  #0005's Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
+  Launcher, marked Ground or Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -1773,12 +1777,13 @@ each fighter's own values are in its character specification (7.2.9).
 #### 7.2.1 Roster and the character system
 
 - **Roster and availability.** `CHARACTERS` (the registry,
-  `js/data/characters.js`) holds six definitions today, each in a module
+  `js/data/characters.js`) holds seven definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
-  `0004.js`, `0005.js`, `0006.js`): `#0001` in roster slot 01, `#0002` in
-  slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05 and
-  `#0006` in slot 06, each fully implemented (7.2.9) and playable:
-  `available: true`. All six are preloaded at startup, and #0001, the first
+  `0004.js`, `0005.js`, `0006.js`, `0007.js`): `#0001` in roster slot 01,
+  `#0002` in slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in
+  slot 05, `#0006` in slot 06 and `#0007` in slot 07, each fully
+  implemented (7.2.9) and playable: `available: true`. All seven are
+  preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
   (`getCharacter`, which the engine and its tests build fighters from) is
@@ -1905,6 +1910,11 @@ each fighter's own values are in its character specification (7.2.9).
   `midair_attack3`, Floating Hands) are ordinary attacks, `attack4` (the
   Deadlights) a technique and `attack5` (the Red Balloon) a summon, and
   `extra_attack` is its Dark Tendrils.
+  #0007 has five: `attack1` (the Street Combo; `midair_attack1`, the
+  Flying Kick) and `attack2` (the Uppercut; `midair_attack2`, the Hammer
+  Fist) are ordinary attacks, `attack3` (the Molotov Cocktail), `attack4`
+  (the Sawn-Offs) and `attack5` (the Rocket Launcher) techniques, and
+  `extra_attack` is its Pistol.
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -1915,10 +1925,11 @@ each fighter's own values are in its character specification (7.2.9).
   a summon because of how it is executed, and no name, button or fighter
   id decides it. #0001: Unlimited Void and Hollow Purple; #0002: none;
   #0003: the Mystical Palm Technique; #0004: World is Mine; #0005: the
-  Deadlights and the Red Balloon; #0006: Ice Breath: seven across the
-  roster. Red, Maximum Blue, the Whirlwind, Cherry Blossom Impact, Ievan
-  Polkka, Dark Tendrils, Heat Vision, the Sonic Scream and the Triple
-  Strike are ordinary. The
+  Deadlights and the Red Balloon; #0006: Ice Breath; #0007: the Rocket
+  Launcher: eight across the roster. Red, Maximum Blue, the Whirlwind,
+  Cherry Blossom Impact, Ievan Polkka, Dark Tendrils, Heat Vision, the
+  Sonic Scream, the Triple Strike, the Molotov Cocktail, the Sawn-Offs and
+  the Pistol are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -2350,10 +2361,12 @@ each fighter's own values are in its character specification (7.2.9).
     Mystical Palm Technique 3 s (its heal); #0004 Ievan Polkka 5 s (its
     double's six strikes add up to 10) and World is Mine 3 s (its charm);
     #0005 the Deadlights 3 s (its float) and the Red Balloon 3 s (its
-    phantom's fear), #0006 Ice Breath 3 s (its freeze); every other move of
-    the six, Red, Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly
-    Foot of Pain, the Stage Dive, Dark Tendrils, the Tornado Spin, Heat
-    Vision and the Sonic Scream included, none at all (the ordinary ones
+    phantom's fear), #0006 Ice Breath 3 s (its freeze), #0007 the Rocket
+    Launcher 5 s (its 10-damage rocket); every other move of the seven,
+    Red, Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly Foot of
+    Pain, the Stage Dive, Dark Tendrils, the Tornado Spin, Heat Vision, the
+    Sonic Scream, the Molotov Cocktail and the Sawn-Offs included, none at
+    all (the ordinary ones
     that create a construct cost 15 Energy instead, 7.2.5). The player, the
     CPU and the ability HUD all read the same built definitions and combat
     state (`js/game/combat/move-status.js` for presentation).
@@ -3103,7 +3116,8 @@ in saved settings (6.10) or on the HUD.
   repeat delay is gone); one with a 3 s or 5 s cooldown pays nothing for
   its construct, its cooldown being its limit. The roster's ordinary
   construct moves: #0001 Red and Maximum Blue, #0003 Cherry Blossom
-  Impact, #0004 the Melody, #0006 Heat Vision and the Sonic Scream. One
+  Impact, #0004 the Melody, #0006 Heat Vision and the Sonic Scream, #0007
+  the Pistol, the Molotov Cocktail and the Sawn-Offs. One
   activation pays once: never per projectile update, per hit (a piercing
   orb's several strikes), per frame a construct lives, per clone strike,
   per projectile turned back or per phase; a refused press pays nothing
@@ -3112,7 +3126,7 @@ in saved settings (6.10) or on the HUD.
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14, #0006 14). The maximum and every
+  14, #0006 14, #0007 14). The maximum and every
   cost are universal (a move's own `energyCost` too: one it declares must
   agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
@@ -3174,6 +3188,8 @@ in saved settings (6.10) or on the HUD.
   World is Mine 3 s (its charm), #0005 the Deadlights 3 s (its float) and
   the Red Balloon 3 s (its phantom's fear), #0006 Ice Breath 3 s (its
   freeze) and Heat Vision and the Sonic Scream none (15 Energy each),
+  #0007 the Rocket Launcher 5 s (its 10-damage rocket) and the Molotov
+  Cocktail and the Sawn-Offs none (15 Energy each),
   with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
@@ -3775,6 +3791,13 @@ there, and nothing in one is a rule for another fighter.
   Heat Vision and Ice Breath (its Special, a freeze), green's Tornado Spin,
   Flying Punch and whirling Deflect, blue's Flying Kick and Sonic Scream,
   and the Triple Strike of all three, locking on together).
+- **#0007**: [docs/characters/0007.md](docs/characters/0007.md) (the
+  street soldier, half fists and feet, half weapons: the Street Combo and
+  the Flying Kick, the Uppercut and the Hammer Fist, every one of them
+  close range; the Pistol, the Molotov Cocktail's fire burning where it
+  lands, the Sawn-Offs blasting both sides at once and the Rocket Launcher
+  (its Special) as techniques, every weapon fired on the ground; a boxer's
+  high guard, a combat roll and a dive, and its swatting Deflect).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -3790,7 +3813,7 @@ reviewed. Recheck its difficulty and play-style description, then update
 reviewedSourceHash"), and whenever a playable fighter has no valid profile
 or description in both languages, so every change to a fighter brings its
 profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
-#0004 4/5, #0005 4/5.
+#0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -3847,7 +3870,7 @@ Adding one is described in
   techniques (#0001 Unlimited Void 3 s, Hollow Purple 5 s, #0002 Whirlwind
   5 s, #0003 Mystical Palm Technique 3 s, #0004 Ievan Polkka 5 s and World
   is Mine 3 s, #0005 Deadlights 3 s and Red Balloon 3 s, #0006 Ice Breath
-  3 s). The fighter the
+  3 s, #0007 Rocket Launcher 5 s). The fighter the
   ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
@@ -3938,7 +3961,9 @@ Adding one is described in
     Balloon and Dark Tendrils, air the Claw Rake, Snapping Jaws and
     Floating Hands; #0006: ground the Power Punch, Tornado Spin, Heat
     Vision, Ice Breath, Sonic Scream and Triple Strike, air the Flying Kick,
-    Flying Punch and Triple Strike.
+    Flying Punch and Triple Strike; #0007: ground the Street Combo,
+    Uppercut, Molotov Cocktail, Sawn-Offs, Rocket Launcher and Pistol, air
+    the Flying Kick and Hammer Fist.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -4125,7 +4150,8 @@ Adding one is described in
   Dive in the air), M Ievan Polkka and `,` World is Mine; for #0005, O is
   Phantom Hands (Floating Hands in the air), M the Deadlights and `,` the
   Red Balloon; for #0006, O is Heat Vision, M Ice Breath and `,` the Sonic
-  Scream. The input
+  Scream; for #0007, O is the Molotov Cocktail, M the Sawn-Offs and `,` the
+  Rocket Launcher. The input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
   auto-repeat), touch and Player 1's controller (7.4a). Run edges
@@ -4242,7 +4268,8 @@ Adding one is described in
   Unlimited Void in slot 4 and Hollow Purple in slot 5; #0004: Ievan Polkka
   in slot 4 and World is Mine in slot 5; #0005: the Deadlights in slot 4
   and the Red Balloon in slot 5; #0006: Heat Vision in slot 3, Ice Breath
-  in slot 4 and the Sonic Scream in slot 5). A summon or technique button is
+  in slot 4 and the Sonic Scream in slot 5; #0007: the Molotov Cocktail in
+  slot 3, the Sawn-Offs in slot 4 and the Rocket Launcher in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -4545,7 +4572,10 @@ codename is sent, never what an action does.
   Triangle, Floating Hands Circle. #0006: Power Punch Square, Tornado Spin
   Triangle, Triple Strike Circle, Heat Vision R2, Ice Breath L2, Sonic
   Scream the right stick forward; in the air Flying Kick Square, Flying
-  Punch Triangle, Triple Strike Circle. A fighter without a layout gets a safe,
+  Punch Triangle, Triple Strike Circle. #0007: Street Combo Square,
+  Uppercut Triangle, Sawn-Offs Circle, Pistol R2, Rocket Launcher L2,
+  Molotov Cocktail the right stick forward; in the air Flying Kick Square,
+  Hammer Fist Triangle. A fighter without a layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter
   ships its own.
 - **Customization** (6.10b): every action of every fighter, the universal

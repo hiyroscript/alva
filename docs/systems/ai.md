@@ -517,7 +517,10 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs):
   the CPU playing #0005 against each fighter, every move used;
   [`tests/fighters/0006/fighter-0006.test.mjs`](../../tests/fighters/0006/fighter-0006.test.mjs):
-  the CPU playing #0006's whole kit through its one fighter.
+  the CPU playing #0006's whole kit through its one fighter;
+  [`tests/fighters/0007/fighter-0007.test.mjs`](../../tests/fighters/0007/fighter-0007.test.mjs):
+  the CPU playing #0007's whole kit, its fists and feet, its gun, its fire,
+  its blasts and its rocket.
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle` (with how each side played: presses,
