@@ -1,0 +1,1196 @@
+ALVA — MASH COMBO UPDATE
+
+New Universal Combat Mechanic, Strict Fighter Requirements, CPU Integration, and Animation System Fixes
+
+PRIMARY OBJECTIVE
+
+Implement a completely new universal combat feature called Mash Combo in ALVA.
+
+A Mash Combo activates when a fighter rapidly presses the same eligible grounded close-range melee attack button five times.
+
+Upon successful activation, the fighter automatically performs an extremely fast, visually enhanced, 12-turn attack sequence consisting of exactly two designated grounded close-range melee attacks alternating with one another.
+
+Each attack must be performed six times, producing 12 total attack activations.
+
+During this sequence, all attacks except the final one must have an effective Base Launch of 0. The 12th and final attack must restore its original Base Launch to deliver its proper finishing launch.
+
+Mash Combos must be non-cancellable through ordinary player inputs but interruptible by legitimate enemy attacks and forced combat states.
+
+This mechanic must work for every playable fighter, every supported input device, and CPU-controlled fighters.
+
+Also investigate and permanently fix the existing issue where character animations occasionally become stuck on a single frame.
+
+EVERY RULE INTRODUCED HERE IS A NEW STRICT RULE.
+
+This update is additive. It must not replace, remove, or fundamentally rewrite Alva’s established combat mechanics.
+
+⸻
+
+PART 1 — UNDERSTAND THE EXISTING GAME BEFORE IMPLEMENTATION
+
+Read the actual repository and understand how the following systems interact before modifying anything.
+
+Combat architecture
+
+* js/game/fighters/fighter.js
+* js/game/fighters/fighter-controller.js
+* js/game/combat/attacks.js
+* js/game/combat/combat-state.js
+* js/game/combat/combat.js
+* js/game/combat/offense.js
+* js/data/cooldowns.js
+* js/data/loadout.js
+* js/data/launch.js
+* js/data/attack-movement.js
+
+Character data and registration
+
+* js/data/characters.js
+* js/data/characters/0001.js through 0007.js
+* js/data/special-abilities.js
+* js/data/ensemble.js
+* js/data/controller-profiles.js
+
+Animation and effects
+
+* js/game/rendering/sprite-animator.js
+* js/game/rendering/sprite-normalizer.js
+* js/game/rendering/ensemble.js
+* js/game/rendering/hit-fx.js
+* js/game/rendering/fighter-status.js
+
+CPU intelligence
+
+* js/game/ai/moveset.js
+* js/game/ai/cpu-intelligence/brain.js
+* js/game/ai/cpu-intelligence/capabilities.js
+* js/game/ai/cpu-intelligence/evaluator.js
+* js/game/ai/cpu-intelligence/executor.js
+* js/game/ai/cpu-intelligence/plans.js
+* js/game/ai/cpu-intelligence/prediction.js
+
+Read ALVA_SPEC.md, CLAUDE.md, codename_rule, character_rule, and the relevant system documentation.
+
+Follow the existing architecture: combat rules must be shared, while fighter-specific moves and eligibility must come from character data.
+
+Never hardcode a character ID into the universal Mash Combo execution logic.
+
+Do not modify the protected character_rule file.
+
+Alva operates on a fixed 60 Hz simulation, uses Canvas 2D sprite rendering, and treats Launch Point rather than health as its cumulative damage system. All new logic must respect these foundations.
+
+⸻
+
+PART 2 — STRICT DEFINITION OF MASH COMBO
+
+A Mash Combo is a special automatic attack sequence triggered by rapid repeated inputs.
+
+It is NOT a replacement for ordinary attacks, existing multi-hit attacks, existing hit-cancel combos, or traditional player-controlled strings.
+
+Activation
+
+A Mash Combo begins when all the following requirements are met:
+
+1. The fighter is grounded.
+2. The player presses the same eligible grounded close-range melee attack button five times rapidly.
+3. All five presses are genuine, distinct input edges.
+4. The attack is one of that fighter’s two designated Mash Combo attacks.
+5. The fighter is not already performing a Mash Combo.
+6. The fighter is not stunned, paralyzed, eliminated, or otherwise in a state that prohibits activation.
+7. Neither designated move is a Special ability or subject to a 3-second or 5-second cooldown.
+
+The five presses must be detected correctly even if the currently playing attack has not yet finished.
+
+This is critical.
+
+Currently, Fighter.pressRequest() and Fighter.repeatsMove() intentionally discard repeated inputs for a move already playing.
+
+Keep their existing ordinary combat behavior, but add a separate Mash Combo press-detection mechanism that can count those otherwise discarded repeat presses.
+
+Do not require the character to finish five separate normal attack animations before Mash Combo activates.
+
+Do not detect mashing by measuring damage, successful hits, animation completions, or button-hold duration.
+
+A Mash Combo is triggered by five rapid legitimate presses of the same designated attack button.
+
+Input timing
+
+Implement a shared configurable timing policy for Mash Combo recognition.
+
+Recommended initial behavior:
+
+* Five distinct presses are required.
+* Use an approximately 0.8-second rolling recognition window, subject to gameplay testing and tuning.
+* Reject sequences with excessive gaps between consecutive presses.
+* Holding the button continuously must not count as repeated pressing.
+* Operating-system keyboard autorepeat must not generate artificial mash presses.
+* The timing must behave consistently on keyboard, touch, PlayStation controllers, Xbox controllers, and custom controller bindings.
+
+Use simulation-consistent timing, not rendering-frame counts.
+
+A player with sufficient clicking speed must be able to reliably trigger the feature.
+
+If five presses are not completed inside the allowed window, the partial sequence expires normally.
+
+Pressing another combat attack should reset the partial mash count rather than combining different attacks.
+
+Existing attack recovery
+
+The Mash Combo activation process must not illegally cancel an existing attack.
+
+If the fifth press arrives while the initiating ordinary attack is still committed, recognize and arm the Mash Combo, then begin its automatic sequence at the first valid transition permitted by the Mash Combo activation rules.
+
+It must not accidentally double-count the fifth initiating press as an extra attack turn.
+
+The five manual trigger presses are separate from the automatic twelve-turn series.
+
+⸻
+
+PART 3 — EXACTLY TWO ATTACKS, EXACTLY TWELVE TURNS
+
+THIS IS ONE OF THE MOST IMPORTANT STRICT RULES.
+
+Every fighter must have exactly two specific, designated grounded close-range melee attacks supporting Mash Combo.
+
+Call these two attacks A and B.
+
+If the player triggers Mash Combo by repeatedly pressing A, the automatic series is:
+
+Turn	Attack	Effective Base Launch
+1	A	0
+2	B	0
+3	A	0
+4	B	0
+5	A	0
+6	B	0
+7	A	0
+8	B	0
+9	A	0
+10	B	0
+11	A	0
+12	B	Original Base Launch of B
+
+This produces six activations of A and six activations of B.
+
+If the player triggers Mash Combo using B instead, reverse the sequence:
+
+B → A → B → A → B → A → B → A → B → A → B → A.
+
+In that case, the 12th attack uses A’s original Base Launch.
+
+Strict sequence restrictions
+
+* Exactly 12 attack turns.
+* Exactly six uses of each designated attack.
+* Exactly two distinct moves in the sequence.
+* Strict alternation.
+* The triggering attack always goes first.
+* No third attack can join the series.
+* No projectile, summon, technique, Special, or unrelated attack can automatically become part of the sequence.
+* The sequence cannot extend beyond turn 12 through continued button presses.
+* The sequence must not loop indefinitely.
+* Each attack turn must actually execute its assigned attack.
+* Every turn must have a valid animation and collision window.
+
+A turn means one complete activation of a designated move, not one animation frame or one individual hit event.
+
+Some existing ALVA attacks contain several authored hits within a single activation. Preserve that distinction.
+
+A 12-turn Mash Combo may therefore produce more than 12 individual hit events when using existing multi-hit attacks.
+
+Never confuse the 12-turn requirement with a requirement to produce exactly 12 damage events.
+
+When the 12th turn finishes, the fighter returns to normal combat.
+
+Do not automatically restart another Mash Combo from button presses that occurred during the active sequence.
+
+⸻
+
+PART 4 — STRICT GROUNDED CLOSE-RANGE MELEE REQUIREMENTS
+
+NOT EVERY GROUNDED MELEE ATTACK IS A CLOSE-RANGE MELEE ATTACK.
+
+This distinction must be maintained throughout the game.
+
+A grounded close-range melee attack should be an ordinary direct physical strike intended to connect against an opponent within close fighting distance.
+
+Examples include punches, short-range kicks, uppercuts, close claw swipes, and similar direct strikes.
+
+An attack does not qualify merely because the engine recognizes it as melee or because its hitbox overlaps a nearby opponent.
+
+Explicitly exclude
+
+* Air attacks.
+* Projectiles.
+* Ranged or extended-reach strikes.
+* Long-distance bites or tendrils.
+* Long-distance phantom strikes.
+* Summons.
+* Techniques.
+* Special abilities.
+* Attacks with 3-second cooldowns.
+* Attacks with 5-second cooldowns.
+* Homing attacks.
+* Traveling rolls or attacks whose primary identity is moving through opponents.
+* Attacks whose extended area, pull radius, or unusual movement makes them unsuitable for a stationary close-range alternating sequence.
+
+An ordinary Step-in movement alone does not necessarily disqualify an otherwise genuine close-range physical attack.
+
+Eligibility should reflect what the move actually does, not merely its name or whether it has a hitbox.
+
+New fighter-wide validation rule
+
+Every playable fighter must possess at least two genuine grounded close-range melee attacks, with exactly two explicitly designated as that fighter’s Mash Combo pair.
+
+A fighter may have additional grounded melee attacks that are not eligible for Mash Combo.
+
+Those attacks must remain normal and fully functional.
+
+A fighter may also possess ranged attacks, air attacks, Specials, and other unusual attacks. None of those categories need to become close-range.
+
+Do not reinterpret this requirement as “make all melee attacks close-range.”
+
+Implement explicit per-fighter eligibility metadata, with proper shared validation rather than brittle attack-number assumptions.
+
+For example, an appropriate conceptual representation would be:
+
+mashCombo: {
+  attacks: ['attack1', 'extra_attack']
+}
+
+The exact schema may be refined to suit the repository.
+
+The validator must ensure that the specified attacks:
+
+* Are two distinct attack identities.
+* Are executable from the ground.
+* Are genuine direct close-range melee moves.
+* Have valid animation and hitbox definitions.
+* Are ordinary, eligible attacks.
+* Are not Specials.
+* Have a derived cooldown of zero.
+* Are actually available through the fighter’s supported move system.
+* Do not depend on incompatible mechanics.
+
+Never assume that attack1 and attack2 always qualify.
+
+Existing roster audit
+
+Use the following findings as the starting point for the roster audit, then verify them against the actual definitions and runtime behavior.
+
+Fighter	Candidate Mash Combo pair	Important considerations
+#0001	Jab + High Kick (attack1, extra_attack)	Red and Maximum Blue are projectiles; do not use them
+#0002	One-Two + Rapid Kicks (attack1, attack2)	Both are close melee, but each contains multiple strikes
+#0003	Chakra Punch + Chakra Haymaker (attack1, extra_attack)	Keep the Heel Drop’s ground-impact mechanics outside Mash Combo
+#0004	Dance Combo + Crescent Kick (attack1, attack3)	Both are direct grounded strikes; do not confuse Leekspin or techniques with eligible moves
+#0005	Claw Swipe + a genuinely close-range second attack	Long Bite has extended reach, Phantom Hands has substantial reach, and Dark Tendrils is not ordinary close-range melee
+#0006	Power Punch + a genuinely close-range second attack	Tornado Spin travels and pulls opponents, so it must not automatically qualify
+#0007	Street Combo + Uppercut (attack1, attack2)	Preserve the existing distinctions between fists, kicks, and weapon attacks
+
+These are implementation candidates, not permission to misclassify moves.
+
+Special handling for fighters lacking a valid pair
+
+For #0005, #0006, or any future fighter that lacks two qualifying attacks, introduce the missing close-range attack support without deleting or replacing existing abilities.
+
+Preserve established moves, identity, animations, attacks, ranged options, and Specials.
+
+If the existing loadout cannot accommodate a new distinct ordinary attack without violating codename_rule, the one-button-per-numbered-attack contract, the five-numbered-attack maximum, or controller comfort rules, design a coherent additive solution.
+
+That solution may involve a clearly defined close-range variant or a carefully integrated extension to the move system, but it must genuinely satisfy the requirement that the fighter has two usable grounded close-range melee attacks.
+
+Do not create a fake eligibility flag on a long-range attack simply to pass tests.
+
+Do not quietly turn a long-range attack into a close-range attack and thereby remove its existing behavior.
+
+If new normal moves or variants require additional artwork, animations, button metadata, input routing, or UI representation, integrate them properly.
+
+For #0006 specifically, remember it is an ensemble fighter consisting of several members representing one fighter. Respect member-specific animation ownership and formation.
+
+The Mash Combo must function for that fighter without separating it into independent gameplay entities.
+
+This new minimum requirement must also apply when registering future fighters.
+
+⸻
+
+PART 5 — BASE LAUNCH OVERRIDE
+
+During Mash Combo, the intermediate attacks must not launch the opponent away.
+
+For attack turns 1 through 11:
+
+Effective Base Launch = 0.
+
+For attack turn 12:
+
+Effective Base Launch = the original Base Launch defined for that attack.
+
+The original Base Launch values must not be permanently changed.
+
+Important
+
+Do not modify the source character attack definitions to have Base Launch 0.
+
+Do not mutate shared frozen attack definitions.
+
+Do not permanently change the base launch of either move.
+
+Instead, introduce an execution-context override that applies only while the relevant attack is being performed as part of a Mash Combo.
+
+For example, conceptually:
+
+effectiveBaseLaunch =
+  mashComboActive && turnIndex < 11
+    ? 0
+    : originalAttackBaseLaunch;
+
+This is illustrative, not a substitute for properly integrating with the hit resolver.
+
+ALVA already calculates launch using Base Launch multiplied by the opponent’s accumulated Launch Point.
+
+Keep that existing formula.
+
+During the first 11 turns, damage must still contribute normally to Launch Point.
+
+However, those intermediate attacks must not produce ordinary directional knockback from their Base Launch.
+
+The last attack must use its real authored Base Launch and Directional Launch.
+
+Multi-hit attack handling
+
+If a Mash Combo move already contains several strikes, apply the intermediate zero-launch override to every strike in turns 1–11, including that move’s normal finisher.
+
+For the 12th turn, restore the original authored launch behavior of that final move and its constituent strikes.
+
+Do not accidentally allow an earlier sub-hit to launch the opponent during a supposed zero-launch turn.
+
+Preserve existing damage values, legitimate hitstun, hitstop, and normal blocking behavior.
+
+Do not introduce invisible launch forces through unrelated effects.
+
+Check how carry, pull, attack movement, vertical motion, and ground-impact behavior may influence the opponent’s spacing.
+
+Select Mash Combo pairs whose mechanics are compatible with the goal of sustaining a close-range attack sequence.
+
+Do not make the opponent invulnerable, immobilized by an unbreakable new status, or artificially teleported back after each hit.
+
+The intended result is a fast melee sequence that keeps a nearby opponent within ordinary striking distance until the finisher, while still allowing genuine defensive and interrupt interactions.
+
+Completion
+
+The 12th attack must be the decisive normal-launch finisher.
+
+After that attack completes:
+
+* Clear the active Mash Combo state.
+* Restore ordinary execution rules.
+* Restore normal animation speed.
+* Remove Mash Combo-specific visual effects.
+* Restore standard input handling.
+* Keep the accumulated Launch Point damage.
+* Apply no hidden extra damage or launch.
+* Do not impose a new 3-second or 5-second cooldown on the Mash Combo itself.
+
+⸻
+
+PART 6 — RAPID ANIMATIONS AND AFTER-EFFECTS
+
+Mash Combo must feel dramatically faster and more intense than ordinary close-range melee combat.
+
+The sequence must have rapid alternating movement, readable attacks, and visible after-effects.
+
+Animation speed
+
+Make both designated attack animations substantially faster while they are being performed inside Mash Combo.
+
+Start by testing approximately 2× normal speed, tuning as necessary to maintain clarity and deterministic hit registration.
+
+This acceleration must affect the actual attack execution timing, not only visual sprite playback.
+
+Synchronize:
+
+* Startup timing.
+* Active hitbox windows.
+* Multi-hit strike timing.
+* Recovery timing.
+* Animation frame progression.
+* Step-in events.
+* Hitstop interaction.
+* Transitions between turns.
+
+Do not visually play an attack twice as fast while leaving its collision active at the ordinary timing.
+
+The animation, collision, damage, and turn counter must remain synchronized.
+
+Respect Alva’s 60 Hz fixed-step simulation.
+
+Fast attacks must not skip narrow active windows simply because their accelerated timing crosses several authored event boundaries in one simulation step.
+
+Use robust deterministic scheduling or event-boundary handling.
+
+Ensure each authored attack activation can correctly produce its intended strikes.
+
+Animation continuity
+
+The sequence should transition rapidly from one move to the other.
+
+Avoid unnecessary idle frames, animation pops, repeated startup stalls, or visible pauses between turns.
+
+Each turn must start from the correct animation frame.
+
+Maintain the fighter’s legitimate position, facing, hitboxes, and grounded state.
+
+Animation speed must return to normal whenever the series ends or is interrupted.
+
+After-effects
+
+Mash Combo attacks must have noticeably enhanced visual effects.
+
+Reuse or extend ALVA’s existing Canvas-based hit effects and afterimage infrastructure, particularly js/game/rendering/hit-fx.js.
+
+Add suitable effects such as:
+
+* Fast fading sprite afterimages.
+* Motion streaks following punches and kicks.
+* Short-lived strike trails.
+* Stronger but controlled impact flashes.
+* Small bursts or highlights on successful contacts.
+* Brief visual emphasis on the twelfth finishing attack.
+
+The effects should communicate speed and momentum rather than obscure the characters.
+
+The fighter’s actual collision box must never become larger just because its visual afterimage extends farther.
+
+Afterimages are visual only; they cannot hit opponents.
+
+Visual effects must not create additional damage events.
+
+For #0006, afterimages should correctly reflect the relevant ensemble members rather than showing an incorrect or disconnected sprite.
+
+Manage effect lifetime and memory carefully, particularly for mobile devices.
+
+Respect any existing reduced-motion settings.
+
+Maintain the existing sprite and pixel-art aesthetic.
+
+⸻
+
+PART 7 — NON-CANCELLABLE BUT INTERRUPTIBLE
+
+A Mash Combo is non-cancellable, but it is not invincible or uninterruptible.
+
+These are separate requirements.
+
+Non-cancellable
+
+Once the automatic twelve-turn sequence begins, the player cannot voluntarily cancel it with:
+
+* Another attack.
+* The same attack button.
+* A different melee attack.
+* A Special.
+* A projectile.
+* A summon or technique.
+* Jump.
+* Dash.
+* Air dash.
+* Shield.
+* Deflect.
+* Ordinary hit-cancel rules.
+* The existing attack input buffer.
+* A move’s normal free-cancel behavior.
+
+Ordinary movement inputs must not cause the fighter to abandon the automatic sequence.
+
+Do not allow a move’s normal hitCancel property to terminate the Mash Combo or replace its next scheduled turn.
+
+Do not allow Fighter.canFollowUp() to override the Mash Combo lock.
+
+Player presses during an active Mash Combo should not unexpectedly become delayed attacks when the series finishes.
+
+Interruptible
+
+The Mash Combo must stop if the fighter is legitimately interrupted by an opponent or forced combat state.
+
+This includes:
+
+* Taking an enemy hit that interrupts its attack.
+* Entering hitstun.
+* Being paralyzed or otherwise forcibly immobilized.
+* Being launched away.
+* Being eliminated by the Void.
+* Losing its active combat state through a legitimate match reset or respawn.
+* Other existing engine-recognized hard interruptions.
+
+If the fighter genuinely leaves the ground because its support disappears or it is forcibly displaced, terminate the grounded-only sequence rather than continuing it as an aerial combo.
+
+The fighter must remain vulnerable.
+
+The opponent must still be able to defend, counterattack, and potentially interrupt the series.
+
+A raised Shield must still block Mash Combo attacks according to existing universal Shield rules.
+
+Do not give Mash Combo attacks armor, invincibility, automatic Shield bypass, or unblockable damage.
+
+A successful block must remain a block, not a confirmed hit.
+
+Define explicitly and test how Shield blocks affect continuation of the sequence, without introducing an exploit that repeatedly bypasses Shield’s established multi-hit protections.
+
+Cleanup after interruption
+
+When interrupted:
+
+1. Stop the automatic sequence immediately.
+2. Prevent remaining turns from executing.
+3. Remove Mash Combo-specific launch overrides.
+4. Clear pending Mash Combo-generated attacks.
+5. Reset the animation playback modifier.
+6. Begin the correct hurt, launch, or forced-state animation.
+7. Clear active aftereffects appropriately.
+8. Reset the mash detector so the interrupted sequence cannot resume automatically.
+
+If the fighter is hit during turn 7, turns 8–12 must not secretly execute later.
+
+If both fighters attack on the same fixed step, preserve Alva’s existing legitimate hit-trade behavior.
+
+A Mash Combo must never create an interruption immunity that normal melee attacks do not possess.
+
+⸻
+
+PART 8 — SHARED MASH COMBO STATE MACHINE
+
+Implement the mechanic in an organized, reusable way.
+
+Prefer a dedicated shared module, for example:
+
+js/game/combat/mash-combo.js
+
+The exact filename can differ if existing architecture suggests a better location.
+
+The system should explicitly represent:
+
+* Idle state.
+* Rapid-input recognition.
+* Mash Combo armed or pending state.
+* Active automatic sequence.
+* Completed state.
+* Interrupted state and cleanup.
+
+Suggested state fields include:
+
+{
+  pair: ['attack1', 'extra_attack'],
+  triggeringAction: 'attack1',
+  pressCount: 0,
+  firstPressTime: 0,
+  lastPressTime: 0,
+  armed: false,
+  active: false,
+  turnIndex: 0,
+  totalTurns: 12,
+  currentAttack: null,
+  interrupted: false
+}
+
+This is only conceptual pseudocode.
+
+Use clean state ownership rather than duplicating these values across unrelated modules.
+
+Single source of truth
+
+The universal Mash Combo system must decide:
+
+* Whether a fighter qualifies.
+* Whether a press counts.
+* When five presses have been registered.
+* When the automatic sequence starts.
+* Which attack executes next.
+* How many turns remain.
+* Whether launch suppression applies.
+* Whether the sequence can be interrupted.
+* When the sequence ends and cleans up.
+
+Character definitions should declare the valid attack pair, not implement their own sequencing rules.
+
+Avoid fragile implementation
+
+Do not implement Mash Combo by:
+
+* Calling the normal input handler recursively.
+* Injecting fake keyboard events.
+* Mutating globally shared attack definitions.
+* Repeatedly forcing animation names without tracking attack identity.
+* Reusing the normal input buffer as the entire mash detector.
+* Inserting hidden cooldowns.
+* Special-casing each fighter inside Fighter.update().
+* Using rendering frame rate as a gameplay clock.
+* Giving CPUs direct access to mutate fighter Mash Combo state.
+
+Use explicit automatic attack transitions backed by the same combat and collision rules as ordinary attacks.
+
+⸻
+
+PART 9 — FULL CPU SUPPORT
+
+CPUs MUST UNDERSTAND AND BE ABLE TO PERFORM MASH COMBOS.
+
+This feature is not player-exclusive.
+
+Every CPU-controlled fighter must have access to its designated Mash Combo pair.
+
+The CPU must respect the same eligibility requirements, input detection, attack timing, 12-turn sequence, launch behavior, vulnerability, and interruption rules as a human player.
+
+CPU activation
+
+The CPU must be able to deliberately initiate a Mash Combo by producing five rapid, legitimate presses of the same eligible grounded close-range attack button.
+
+Those presses must pass through the existing CPU input pipeline.
+
+The CPU must not bypass the detector by simply setting the Mash Combo state to active.
+
+Look carefully at Executor.press() and the CPU’s …Pressed edge generation.
+
+The CPU must release the action between presses when needed, exactly as a real input device would.
+
+Its Mash Combo initiation plan must remain active long enough to generate all five presses, even if the initiating normal attack is still playing.
+
+Do not let normal CPU move-readiness logic prevent intentional mash-input attempts merely because the same attack is still active.
+
+Tactical decision-making
+
+Teach the CPU when Mash Combo is strategically appropriate.
+
+The CPU should recognize opportunities such as:
+
+* A nearby grounded opponent.
+* An opponent in range of both eligible attacks.
+* An opponent who has committed to a punishable move.
+* A favorable close-range pressure situation.
+* A potential finishing opportunity with the twelfth attack’s launch.
+
+It should also recognize reasons not to mash:
+
+* The opponent is far away.
+* The opponent is airborne beyond close-range reach.
+* The CPU is dangerously close to an unprotected ledge.
+* A nearby hazard makes commitment dangerous.
+* The opponent can easily interrupt the series.
+* The opponent is consistently defending successfully.
+* A more valuable defensive or recovery action is needed.
+
+Difficulty levels
+
+All four difficulty levels must be capable of performing Mash Combo:
+
+* Easy
+* Medium
+* Hard
+* Brutal
+
+Difficulty should affect decision quality, reaction, frequency, and tactical reliability, not whether the mechanic is available.
+
+Harder CPUs should generally exploit good Mash Combo openings more effectively.
+
+Do not guarantee that every CPU uses Mash Combo constantly.
+
+A CPU must not gain a stronger version of the mechanic than the human player.
+
+Opponent awareness
+
+CPU intelligence must also understand an opponent currently performing Mash Combo.
+
+It should recognize:
+
+* The opponent’s commitment to a non-cancellable sequence.
+* The rapid incoming attack pressure.
+* That the first eleven turns have zero effective Base Launch.
+* That the final turn restores normal launch.
+* That the opponent can be interrupted.
+* That Shield and positioning remain meaningful defenses.
+
+Update relevant candidate evaluation, threat prediction, and opponent modeling so CPU decisions are based on Mash Combo’s real mechanics.
+
+Game modes
+
+Confirm Mash Combo works in:
+
+* Regular Play.
+* Custom Play.
+* CPU versus player.
+* CPU versus CPU Watch Mode.
+* Mirror matches.
+* Practice Ground for the player.
+
+Preserve the Practice Ground’s existing non-attacking dummy behavior unless a separate attacking CPU is explicitly used.
+
+No mode should require a character-specific hack.
+
+⸻
+
+PART 10 — FIX ANIMATIONS GETTING STUCK ON ONE FRAME
+
+There is an existing problem where certain character animations occasionally get stuck on a single frame.
+
+Investigate this independently of Mash Combo and implement a proper engine-level fix.
+
+Do not cover up the bug by continuously resetting every animation.
+
+Critical investigation area
+
+Inspect:
+
+js/game/rendering/sprite-animator.js
+
+In particular, inspect the logic in SpriteAnimator.play() that skips playback changes when stateKey has not changed.
+
+Also inspect:
+
+* Fighter.updateState()
+* Fighter.startAttack()
+* Fighter.animationFor()
+* CombatState.endAttack()
+* CombatState.interruptAttack()
+* EnsembleAnimator.play()
+* Sprite fallback and frame-hold behavior.
+* Animation startup and recovery timing.
+* Impact-freeze handling.
+
+Likely failure mechanism
+
+When an attack starts again using the same animation key, the renderer may treat it as the same animation session and refuse to restart at frame zero.
+
+This can leave the sprite displaying the last frame of the previous activation.
+
+The problem may also appear when a new attack replaces another activation without the logical attack state changing.
+
+Verify this failure mode through tests or reproduction before treating it as the only cause.
+
+Required fix
+
+Introduce reliable animation-activation identity or an equivalent restart mechanism.
+
+A new attack activation must restart its corresponding animation correctly, even if:
+
+* The fighter remains in the logical attack state.
+* The new move has the same animation key.
+* The same button is pressed again after an attack finishes.
+* A legitimate hit-cancel begins another attack.
+* A Mash Combo advances to another turn.
+* A Mash Combo alternates rapidly between two animations.
+* A CPU initiates the attack.
+* The fighter is an ensemble.
+
+Each new attack should restart once when its activation begins, not once every update frame.
+
+Do not introduce flickering by resetting an animation continuously.
+
+Preserve legitimate animation holds
+
+Differentiate between a genuine stuck animation and an intentional held frame.
+
+The following must continue behaving correctly:
+
+* Single-frame idle or falling poses.
+* Shield hold animations.
+* Authored static frames.
+* Legitimate recovery-frame holds.
+* Hitstop or impact freeze.
+* Non-looping clips that intentionally hold their final frame until the current move ends.
+
+Fix unintended permanent or incorrect frame holds without breaking these expected behaviors.
+
+Additional validation
+
+Investigate whether any animation becomes stuck because of:
+
+* Missing or invalid frame data.
+* Invalid animation FPS.
+* Mismatched animation duration and combat duration.
+* Incorrect animation state priority.
+* A stale animation key after interruption.
+* Incorrect pause/resume behavior.
+* A stuck attack record.
+* Missing animation restart when a new activation starts.
+* Broken ensemble member synchronization.
+
+After any interruption, the character must transition into the proper hurt, launch, falling, or idle animation.
+
+After Mash Combo, it must return to normal playback.
+
+The animation bug fix must improve the entire game, not just the new Mash Combo.
+
+⸻
+
+PART 11 — PRESERVE EXISTING SYSTEMS
+
+This update must not regress any established mechanic.
+
+Preserve:
+
+* Ordinary attacks and their normal damage and launch.
+* Existing multi-hit attacks.
+* Hit-confirmed follow-ups.
+* Existing attack cancellation rules outside Mash Combo.
+* Existing input buffering.
+* Normal attack repeat behavior outside Mash Combo.
+* Dash and air dash.
+* Jumps and aerial combat.
+* Shield and perfect Shield.
+* Deflect.
+* Energy.
+* 3-second and 5-second cooldown policy.
+* Specials.
+* Projectiles.
+* Summons.
+* Techniques.
+* Launch Point accumulation and recovery.
+* Launch steering and stage bounce.
+* Ground movement and Step-in.
+* Character-specific mechanics.
+* CPU difficulty differences.
+* Practice Ground.
+* Watch Mode.
+* Mobile/touch controls.
+* Controller rebinding.
+* English and French localization.
+* Ensemble fighter behavior.
+* Existing hit effects and rendering.
+
+The new rules must take precedence where specifically required during an active Mash Combo, without modifying normal behavior elsewhere.
+
+For example:
+
+Outside Mash Combo: an eligible attack uses its original timing, Base Launch, animation speed, and normal hit-cancel rules.
+
+Inside Mash Combo: the same attack uses Mash Combo timing, interim launch suppression, automatic sequencing, and its non-cancellable commitment.
+
+Do not accidentally make every rapidly repeated attack auto-combo.
+
+Do not allow Mash Combo rules to leak into air attacks.
+
+⸻
+
+PART 12 — INPUT AND USER INTERFACE INTEGRATION
+
+Mash Combo activation must work through existing logical combat actions.
+
+Ensure full support for:
+
+* Keyboard.
+* Touchscreen buttons.
+* Joystick touch layout.
+* Classic touch layout.
+* PlayStation controllers.
+* Xbox controllers.
+* Custom controller bindings.
+* CPU-generated inputs.
+
+Do not require a new dedicated Mash Combo button.
+
+The mechanic is activated by repeatedly pressing one of the fighter’s two eligible existing combat actions.
+
+If a fighter needs additive close-range move support, ensure its corresponding controls are properly available and respect all existing controller-comfort rules.
+
+Avoid changing universal button assignments.
+
+If visual feedback helps readability, add restrained indicators such as:
+
+* A subtle activation flash.
+* A compact Mash Combo notification.
+* An unobtrusive turn counter showing progress from 1 to 12.
+* A visibly stronger twelfth strike.
+
+Any new player-facing text must support both English and French.
+
+Do not overload the HUD or obscure the fight.
+
+No new settings toggle is required: Mash Combo is an always-available universal mechanic for eligible fighters.
+
+⸻
+
+PART 13 — AUTOMATED TESTING
+
+Add comprehensive automated tests.
+
+Create a focused new suite such as:
+
+tests/systems/mash-combo.test.mjs
+
+Also extend appropriate existing tests.
+
+Mandatory activation tests
+
+Verify that:
+
+1. Five sufficiently rapid presses of the same eligible grounded attack activate Mash Combo.
+2. Four presses do not.
+3. Slow presses do not.
+4. A held button does not.
+5. Keyboard autorepeat does not fake multiple presses.
+6. Mixed attack presses do not qualify.
+7. An ineligible move does not qualify.
+8. An attack with a 3-second cooldown does not qualify.
+9. An attack with a 5-second cooldown does not qualify.
+10. A Special does not qualify.
+11. An air attack does not qualify.
+12. The fighter must be grounded at activation.
+13. Repeated inputs during an ordinary attack can contribute to recognition without restarting that ordinary attack.
+14. Valid press detection behaves consistently through normal recovery and hitstop.
+15. Stale or interrupted partial input sequences are cleared correctly.
+
+Mandatory sequence tests
+
+Verify that:
+
+1. Exactly 12 automatic turns execute.
+2. Exactly two distinct attack identities are used.
+3. Each attack executes six times.
+4. The attacks alternate perfectly.
+5. Triggering through A starts with A.
+6. Triggering through B starts with B.
+7. The 12th turn uses the correct finishing attack.
+8. Every turn has a valid animation.
+9. Every turn has a valid collision opportunity.
+10. The sequence ends naturally after the twelfth turn.
+11. No 13th attack is automatically created.
+12. Continued button holding or pressing during the series does not indefinitely extend it.
+
+Mandatory launch tests
+
+For turns 1–11:
+
+* Effective Base Launch is exactly 0.
+* Launch Point damage still accumulates.
+* No normal Base Launch knockback occurs.
+* Every strike of an existing multi-hit attack respects the override.
+
+For turn 12:
+
+* Original Base Launch is restored.
+* Original Directional Launch applies.
+* Launch uses the correctly accumulated Launch Point.
+
+After termination:
+
+* Normal attacks use their original Base Launch.
+* No attack definition has been permanently modified.
+* No stale launch override survives.
+
+Mandatory interruption tests
+
+Verify Mash Combo cannot be voluntarily cancelled through ordinary requests.
+
+Then verify that genuine enemy attacks, hitstun, paralysis, launch, Void elimination, loss of required grounded state, and respawn properly terminate the sequence.
+
+Check that neither pending attacks nor speed modifiers survive the interruption.
+
+Ensure existing Shield interactions work correctly.
+
+Mandatory fighter coverage
+
+Test every currently playable fighter.
+
+Validate that each has two genuine qualifying grounded close-range melee attacks and exactly one designated pair.
+
+Test #0005 and #0006 particularly carefully.
+
+Test #0006’s member animation ownership and ensemble rendering.
+
+Test registration rejection for new fighter definitions without a valid pair.
+
+Mandatory CPU tests
+
+Verify that:
+
+* All four CPU difficulties can execute Mash Combo.
+* CPU presses are actual legal input edges.
+* The CPU can make five rapid presses while its current ordinary attack is playing.
+* CPUs respect the same grounded restrictions.
+* CPUs cannot ignore the non-cancellable lock.
+* CPUs can be interrupted.
+* CPU versus CPU matches support Mash Combo.
+* CPU reasoning accounts for the interim zero launch and final real launch.
+* Opposing CPUs can recognize and defend against Mash Combo.
+* CPU plans do not become stuck attempting to mash an ineligible move.
+
+Mandatory animation regression tests
+
+Test repeated activation of the same attack animation.
+
+Test changing attacks without transitioning through idle.
+
+Test Mash Combo’s 12 rapid attack transitions.
+
+Test hitstop, interruption, recovery, and respawn.
+
+Test both SpriteAnimator and EnsembleAnimator.
+
+Verify animations advance through their intended frames and correctly restart for new activations.
+
+Existing intentional frame holds must continue to work.
+
+Existing tests to review
+
+Pay particular attention to:
+
+* tests/systems/basic-strings.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/move-cancel.test.mjs
+* tests/systems/cooldown-policy.test.mjs
+* tests/systems/attack-classification.test.mjs
+* tests/systems/combat-ai.test.mjs
+* tests/systems/cpu-behaviour.test.mjs
+* tests/systems/cpu-intelligence.test.mjs
+* tests/systems/strict-combat-rules.test.mjs
+
+Some existing tests explicitly assume that pressing the same button during an attack cannot create a sequence.
+
+Preserve that behavior for ordinary, non-mashing input, but update those tests to recognize the new valid five-press Mash Combo exception.
+
+Do not simply delete tests that conflict with the new requirements.
+
+Instead, revise them to enforce the correct combined behavior.
+
+Run:
+
+node --test
+
+Ensure existing and new tests pass.
+
+⸻
+
+PART 14 — MANUAL GAMEPLAY VERIFICATION
+
+Automated tests alone are insufficient.
+
+Use the playable browser game for manual validation wherever the development environment permits.
+
+Check every fighter in an actual match.
+
+Test Mash Combo at different opponent distances and Launch Point values.
+
+Confirm that:
+
+* The five-press trigger feels responsive.
+* The automatic series is visually obvious.
+* The attacks are dramatically faster.
+* Afterimages and impact effects are visible.
+* Both designated attacks remain distinguishable.
+* All twelve turns play in the correct order.
+* The target generally remains reachable during the zero-launch turns.
+* The finisher launches using the correct original Base Launch.
+* The sequence can be punished or interrupted.
+* Normal attacks still work when the player does not mash.
+* No character gets stuck on a single animation frame.
+* Mobile gameplay remains performant.
+
+Check gameplay near walls, platforms, stage ledges, and Void boundaries.
+
+Check opponents who are shielding, stunned, airborne, moving away, or attempting to counterattack.
+
+Check match-ending hits and respawn during Mash Combo.
+
+There must be no hidden duplicated hits, invisible attacks, accidental extra turns, or infinite loops.
+
+⸻
+
+PART 15 — DOCUMENTATION AND STRICT RULE ENFORCEMENT
+
+Update the relevant documentation to accurately describe this feature.
+
+At minimum, review and update:
+
+* ALVA_SPEC.md
+* docs/systems/combat.md
+* docs/systems/input.md
+* docs/systems/ai.md
+* docs/systems/rendering.md
+* docs/architecture/character-system.md
+* Relevant individual character documentation.
+* docs/characters/adding-characters.md
+* UPDATES.md
+* README.md, where appropriate.
+
+Document Mash Combo as a new universal mechanic.
+
+Document the new permanent fighter requirement: every fighter needs two specific Mash Combo-compatible grounded close-range melee attacks.
+
+Document the distinction between generic grounded melee and designated close-range melee.
+
+Document the five-press trigger, 12-turn sequence, launch suppression, final launch, non-cancellable behavior, interruption conditions, and CPU support.
+
+Update any affected codename or loadout specifications coherently if additional attack support requires extending them.
+
+Do not create contradictory documentation.
+
+Do not edit the protected character_rule file.
+
+This is a new strict rule, not a temporary workaround.
+
+⸻
+
+PART 16 — DEFINITION OF DONE
+
+The implementation is not complete unless every condition below is satisfied.
+
+* [ ]	Mash Combo is implemented as a new additive universal mechanic.
+* [ ]	Five rapid presses of one eligible grounded melee action trigger it.
+* [ ]	Each fighter has two explicitly designated genuine grounded close-range melee attacks.
+* [ ]	The new requirement is validated for the existing roster and future fighters.
+* [ ]	Non-close-range attacks are not silently misclassified.
+* [ ]	3-second and 5-second cooldown moves are excluded.
+* [ ]	Specials are excluded.
+* [ ]	Air attacks are excluded.
+* [ ]	Exactly two attacks participate in each Mash Combo.
+* [ ]	Both attacks occur six times.
+* [ ]	Exactly 12 turns execute.
+* [ ]	All 12 attacks play substantially faster.
+* [ ]	The sequence has visible after-effects.
+* [ ]	Turns 1–11 use Base Launch 0.
+* [ ]	Turn 12 restores the final attack’s original Base Launch.
+* [ ]	Original character attack data remains intact.
+* [ ]	Mash Combo cannot be voluntarily cancelled.
+* [ ]	Enemy attacks and legitimate forced states can interrupt it.
+* [ ]	All CPU difficulty levels can initiate and perform it.
+* [ ]	CPU intelligence recognizes the mechanic offensively and defensively.
+* [ ]	Keyboard, touch, and controllers all work.
+* [ ]	Every character, including the ensemble, works correctly.
+* [ ]	The animation stuck-frame bug is diagnosed and fixed.
+* [ ]	Existing combat mechanics remain functional.
+* [ ]	New tests cover the requirements.
+* [ ]	Existing regression tests pass.
+* [ ]	Documentation is updated.
+* [ ]	No character-specific exceptions are hardcoded in the universal engine.
+
+FINAL IMPLEMENTATION INSTRUCTIONS
+
+Do not stop after implementing only the input detector.
+
+Do not stop after creating the twelve-turn sequence.
+
+Do not stop after changing animation speed.
+
+Do not stop after adding the feature to one fighter.
+
+Implement the feature across the complete game, including character eligibility, engine rules, launch resolution, animations, visual effects, input devices, CPU intelligence, documentation, and testing.
+
+Resolve architectural conflicts instead of ignoring requirements.
+
+Prioritize correctness, deterministic combat behavior, maintainable shared systems, and preservation of the existing game.
+
+At completion, provide a detailed implementation report identifying:
+
+1. Every modified and newly created file.
+2. The final two Mash Combo moves assigned to each fighter.
+3. How the five-press input detector works.
+4. How the twelve turns are scheduled and executed.
+5. How Base Launch is suppressed and restored.
+6. How cancellation is prevented and interruption works.
+7. How CPUs decide to trigger and perform Mash Combos.
+8. The confirmed cause and implemented fix for stuck animations.
+9. The tests added and their results.
+10. Any remaining known limitations.
+
+The final result must be a fully functional, universal Mash Combo system—not a prototype, not a character-specific implementation, and not a replacement for ALVA’s existing combat.
+
+All requested changes are new strict rules.
