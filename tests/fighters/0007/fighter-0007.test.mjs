@@ -62,7 +62,7 @@ const { images: IMAGES, sprites: REAL } = realArt(DEF);
 // Every clip and the files it plays, in order (a file shown twice is one
 // file on disk).
 const CLIPS = {
-  idle: named('idle', 2),
+  idle: named('idle', 3),
   run: named('run', 6),
   jump: named('jump', 2),
   fall: named('fall', 1),
@@ -96,7 +96,7 @@ const FILES = [...new Set([...Object.values(CLIPS), ...Object.values(OBJECTS)].f
 
 // The tallest frame of each clip, in art pixels (one per file pixel).
 const HEIGHTS = {
-  idle: 44, run: 49, jump: 51, fall: 51, land: 41, mouvment: 34, midair_mouvment: 47, hurt: 48, midair_hurt: 44,
+  idle: 55, run: 49, jump: 51, fall: 51, land: 41, mouvment: 34, midair_mouvment: 47, hurt: 48, midair_hurt: 44,
   prepshield: 42, shielding: 43, releaseshield: 45, deflect: 67, attack1: 45, midair_attack1: 49, attack2: 61,
   midair_attack2: 55, attack3_cast: 51, attack3_release: 43, attack4_cast: 37, attack4_release: 39, attack5_cast: 55,
   attack5_release: 55, extra_attack: 60,
@@ -227,7 +227,7 @@ test('its recommended controller layout: fists and feet on Square and Triangle b
 
 test('its folder holds exactly the frames its clips and objects play: every file named <id>_<codename>_<frame>.png, none a copy within its codename', () => {
   assert.deepEqual(readdirSync(`${ROOT}${DIR}`).sort(), FILES);
-  assert.equal(FILES.length, 77);
+  assert.equal(FILES.length, 78);
   for (const [key, want] of Object.entries(CLIPS)) assert.deepEqual(DEF.animations[key].frames.map(file), want, key);
   assert.deepEqual(Object.keys(DEF.animations).sort(), Object.keys(CLIPS).sort());
   for (const [key, want] of Object.entries(OBJECTS)) assert.deepEqual(DEF.projectileAnimations[key].frames.map(file), want, key);
@@ -258,9 +258,9 @@ test('every frame is cut clean: none of the sheet\'s teal background left, fully
 test('the real art normalizes at one art pixel per file pixel, the roster\'s size per art pixel', () => {
   assert.equal(REAL.usable, true);
   assert.deepEqual(REAL.missing, []);
-  assert.equal(REAL.refArtHeight, 44);
+  assert.equal(REAL.refArtHeight, 55);
   assert.ok(near(REAL.worldPerArt, 88 / 52), 'the same world size per art pixel as the rest of the roster');
-  assert.ok(near(DEF.visual.height, 44 * 88 / 52), 'about 74 units tall, crouched in its stance');
+  assert.ok(near(DEF.visual.height, 55 * 88 / 52), 'about 93 units tall, standing');
   for (const [key, anim] of Object.entries(REAL.animations)) {
     assert.ok(near(anim.maxArtH, HEIGHTS[key]), `${key}: tallest frame ${anim.maxArtH}`);
     for (const f of anim.frames) {
@@ -293,7 +293,7 @@ test('anchors keep the body in place: authored on its vest wherever its fists, s
 test('the roster portrait is its face', () => {
   const portrait = withFakeCanvas(() => REAL.makePortrait());
   assert.ok(portrait, 'a portrait canvas');
-  assert.equal(portrait.width, Math.round(44 * DEF.visual.portrait.size));
+  assert.equal(portrait.width, Math.round(55 * DEF.visual.portrait.size));
 });
 
 // ---- Its melee -------------------------------------------------------------------------
