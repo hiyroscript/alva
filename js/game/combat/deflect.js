@@ -34,7 +34,8 @@
 //
 // Its strike is the same for every fighter: DEFLECT_DAMAGE (3) Launch
 // Points at Base Launch DEFLECT_BASE_LAUNCH (2). A fighter authors the rest
-// (its clip, timing, box, stuns, freeze, direction and movement). Its
+// (its clip, timing, box, stuns, freeze, direction and the share of its
+// drift it keeps, under the universal air control; it never steps in). Its
 // cooldown is the cooldown policy's (js/data/cooldowns.js): none at all,
 // since its 3 damage is no special class (Energy is what limits it). An
 // entry may leave `cooldown` out or declare 0; any other is refused.
@@ -57,7 +58,7 @@
 //     startup: 1 / 15, active: 2 / 15, recovery: 2 / 15,
 //     hitbox: { x: 6, y: -118, w: 44, h: 98 },
 //     directionalLaunch: 'vertical', hitstun: 0.32, blockstun: 0.14, hitstop: 0.06,
-//     airMomentum: 0.7, airControl: 0.3,
+//     airMomentum: 0.7,
 //     deflectProjectiles: true,
 //   }
 //

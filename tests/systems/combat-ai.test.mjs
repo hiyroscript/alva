@@ -372,10 +372,11 @@ test('it never walks off the main floor after an opponent hovering past the ledg
         assert.ok(r.cpu.body.y < 900, `${difficulty}/${seed}: never falls (step ${i})`);
       }
       // Its opponent drops back onto the floor: whatever it was doing out
-      // there, it comes back to the floor.
+      // there, it comes back to the floor (attacking on its way down
+      // included: an aerial's hang is never steered short).
       Object.assign(r.foe.body, { x: right - 400, y: 800, vx: 0, vy: 0, gravityScale: r.foe.movement.gravityScale });
       let back = false;
-      for (let i = 0; i < seconds(2) && !back; i++) {
+      for (let i = 0; i < seconds(3) && !back; i++) {
         r.step();
         assert.ok(r.cpu.body.y < 900, `${difficulty}/${seed}: never falls`);
         back = r.cpu.body.grounded && r.cpu.body.ground === FLAT.floor;

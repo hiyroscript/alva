@@ -668,15 +668,17 @@ test('level by level, against the same reference opponent: Easy, a casual player
 });
 
 test('level by level, head to head: the stronger level takes more points', () => {
-  // Each pairing on one stage, both fighters each way round (the full
-  // series is the benchmark's).
+  // Each pairing on one stage, both fighters each way round, on two seeds
+  // (the full series is the benchmark's).
   for (const [hi, lo, map] of [['medium', 'easy', 'desert'], ['hard', 'medium', 'city'], ['brutal', 'hard', 'desert']]) {
     let mine = 0;
     let theirs = 0;
-    for (const [x, y] of [[0, 1], [1, 0]]) {
-      const m = runMatch({ a: hi, b: lo, defA: FIGHTERS[x], defB: FIGHTERS[y], map, seed: 2, maxSeconds: 240 });
-      mine += m.stats.p1.points;
-      theirs += m.stats.p2.points;
+    for (const seed of [2, 3]) {
+      for (const [x, y] of [[0, 1], [1, 0]]) {
+        const m = runMatch({ a: hi, b: lo, defA: FIGHTERS[x], defB: FIGHTERS[y], map, seed, maxSeconds: 240 });
+        mine += m.stats.p1.points;
+        theirs += m.stats.p2.points;
+      }
     }
     assert.ok(mine > theirs, `${hi} ${mine} : ${lo} ${theirs}`);
   }

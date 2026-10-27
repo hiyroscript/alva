@@ -27,7 +27,7 @@ const PLAIN = Object.freeze({
   startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
   hitbox: { x: 4, y: -60, w: 40, h: 50 },
   damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal',
-  hitstun: 0.3, blockstun: 0.12, hitstop: 1 / 30, mobility: 'quick',
+  hitstun: 0.3, blockstun: 0.12, hitstop: 1 / 30,
 });
 
 export const ENSEMBLE_FIGHTER = {

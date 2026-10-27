@@ -106,8 +106,8 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `cooldown` | policy | 0 for an ordinary move, else 3 s or 5 s from its release: derived by the [cooldown policy](#cooldowns); leave it out. |
 | `energyCost` | policy | 15 for an ordinary attack that throws a projectile (a construct), else 0: derived by the [Energy policy](energy.md#construct-moves); leave it out. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
-| `mobility` | `'medium'` | Its mobility tier (`quick`, `medium`, `heavy`, `planted`: [`js/data/attack-mobility.js`](../../js/data/attack-mobility.js)), chosen for what the move does; it supplies the six numbers below. Every roster attack names its own. |
-| `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `topSpeed`, `airTopSpeed`, `friction`, `step` | true, its tier's, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): the share of its speed it keeps, the share of the steering authority it leaves and, apart from it, the share of top speed it steers toward, the friction on what is not steered; each written field wins over the tier's. |
+| `momentum` / `airMomentum` / `friction` | 1 / 1 / 1 | What it keeps of the speed it starts with (on the ground, in the air) and × the ground deceleration its speed runs down under ([movement](movement.md#5-attack-movement)). Nothing held steers a grounded attack; in the air every attack keeps the universal air control. `mobility`, `control`, `airControl`, `topSpeed`, `airTopSpeed` and `lockMovement` are refused. |
+| `step` | the shared Step-in | `{ at, speed }` for a lunge of its own, `false` for a move that never lunges; left out, a grounded direct strike gets the shared Step-in and anything else none. The definition records the verdict (`stepIn`: `authored`, `universal`, `declined`, `exempt`; [movement](movement.md#5-attack-movement)). |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. The only way a request ever cuts an attack that can harm short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
@@ -191,7 +191,7 @@ today):
 - **Motion** (`motion: { type, ... }`, `MOTION_DEFAULTS`): movement the
   attack makes itself, owning the body while it lasts. `hover` (no
   fields): the fighter stands on the air for the whole attack, its drift
-  steered as its `airMomentum` and `airControl` allow (#0001's Floating
+  (its `airMomentum` share) under the universal air control (#0001's Floating
   Straight, Blue and air High Kick). `homing` (`range`,
   `speed` required; `rebound`, `recoil`, `exit`): hang, lock on, dash at
   the target, spring off what it meets. `bounce` (`fallSpeed` required;
@@ -833,8 +833,9 @@ or changes a hitbox, a range or a stun. The rules are
   attack with a `motion` (a roll, a homing dash, a plunge, a lift, a
   hover): turning those would rewrite a committed course. An ordinary
   attack turns with its enemy, physical facing and art together (its
-  hitbox, step and unreleased projectile follow), as a CPU's does; a
-  motion attack or a technique turns its art only (`attackVisualFacing`),
+  hitbox, a Step-in still to come and unreleased projectile follow), as a
+  CPU's does; a motion attack or a technique turns its art only
+  (`attackVisualFacing`),
   its course and hitboxes untouched. A released projectile keeps its own
   `direction` for good. The facing is free again the step a lock ends.
 - **Off.** `updateFacing`'s manual rules, exactly as before: the run or the

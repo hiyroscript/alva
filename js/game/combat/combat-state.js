@@ -170,11 +170,13 @@ export class CombatState {
     this.shieldStun = 0;    // blockstun remaining, held in the Shield
     this.hitstop = 0;       // freeze frames on impact
     // { def, time, hasHit, confirmed, confirmedAt, projectileSpawned,
-    // released, stepped, struck, blocked, motion }: released once it has
-    // emitted what it authors (see releaseAttack), hasHit once its hitbox (any of its
-    // strikes) has struck anyone, confirmed (at its time confirmedAt) only
-    // for a hit a Shield did not block, stepped once its `step` has moved
-    // the fighter. A multi-hit attack also keeps the strikes it has dealt
+    // released, step, stepped, struck, blocked, motion }:
+    // released once it has emitted what it authors (see releaseAttack),
+    // hasHit once its hitbox (any of its strikes) has struck anyone,
+    // confirmed (at its time confirmedAt) only for a hit a Shield did not
+    // block, `step` the Step-in this activation makes (none when it started
+    // in the air: see activationStep in js/game/fighters/movement.js),
+    // stepped once its time has come. A multi-hit attack also keeps the strikes it has dealt
     // (`struck`, by index) and whether a Shield stopped it (`blocked`); a
     // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;

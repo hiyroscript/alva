@@ -271,6 +271,8 @@ test('a pull that lets go of a fighter still rushing in never shoves its owner b
         ...def.attacks.attack1, startup: 0.1, active: 0.1, recovery: 0.3, hitCancel: null, baseLaunch: 0, directionalLaunch: null,
         hitbox: { x: 20, y: -100, w: 300, h: 80 }, hitstun: 0.8,
         pull: { radius: 300, speed: 1100, offset: { x: 40, y: -50 } },
+        // A reach that seizes from afar (tendrils): it never steps in.
+        step: false,
       },
     },
   };

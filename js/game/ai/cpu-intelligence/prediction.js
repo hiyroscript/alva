@@ -2,10 +2,10 @@
 //
 // Purpose: where things will be, by the game's own rules. Every prediction
 // here steps a scratch body through the shared physics (stepBody in
-// js/game/physics.js) and the shared movement rules (steer, steerAttack,
-// attackStartSpeed and airJump in js/game/fighters/movement.js) with the
-// universal movement values, so the CPU never runs a second physics with
-// rules of its own. It predicts:
+// js/game/physics.js) and the shared movement rules (steer, attackDrift,
+// activationStep, attackStartSpeed and airJump in
+// js/game/fighters/movement.js) with the universal movement values, so the
+// CPU never runs a second physics with rules of its own. It predicts:
 //
 //   - a fighter's motion from what is visible of it (its velocity, a stun
 //     or a paralysis running down, its attack's own motion, a Dash),
@@ -28,7 +28,7 @@
 
 import { CONFIG } from '../../../config.js';
 import { stepBody } from '../../physics.js';
-import { steer, steerAttack, attackStartSpeed, airJump } from '../../fighters/movement.js';
+import { steer, attackDrift, activationStep, attackStartSpeed, airJump } from '../../fighters/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
@@ -103,7 +103,10 @@ const scratch2 = {};
 
 // One step of an attack's own movement, exactly as the Fighter runs it
 // (Fighter.moveMotion and moveAttack): returns the share of gravity the
-// body falls under. `rec` is { def, time, stepped, motion } where motion is
+// body falls under. It plays the move with nothing held (on the ground
+// nothing held would steer it anyway; in the air its air control is the
+// CPU's own choice, never assumed). `rec` is { def, time, step, stepped, motion } (step: the Step-in this
+// activation makes, see activationStep) where motion is
 // the scratch motion state ({ done, aimed, dirX, dirY, speed, rolling,
 // target: { x, y } | null, range }); `target` is the opponent's middle this
 // step (for a homing dash's aim), `face` the way it faces.
@@ -115,7 +118,7 @@ function attackStep(body, rec, face, target, burst) {
     const phase = attackPhase(def, rec.time);
     if (spec.type === 'roll') {
       if (phase === 'startup' && !m.rolling) {
-        steerAttack(body, MV, face, rec, 0, STEP, burst);
+        attackDrift(body, MV, face, rec, 0, STEP, burst);
         return 1;
       }
       if (body.wall === face) m.speed = 0;
@@ -125,7 +128,7 @@ function attackStep(body, rec, face, target, burst) {
       return 1;
     }
     if (spec.type === 'hover') {
-      steerAttack(body, MV, face, rec, 0, STEP, burst);
+      attackDrift(body, MV, face, rec, 0, STEP, burst);
       body.vy = 0;
       return 0;
     }
@@ -135,12 +138,12 @@ function attackStep(body, rec, face, target, burst) {
         body.vx *= spec.exit;
         body.vy *= spec.exit;
       }
-      if (def.lockMovement) steerAttack(body, MV, face, rec, 0, STEP, burst);
+      attackDrift(body, MV, face, rec, 0, STEP, burst);
       return 1;
     }
     if (spec.type === 'homing') {
       if (phase === 'startup') {
-        steer(body, MV, 0, 0, 1, STEP, burst);
+        steer(body, MV, 0, STEP, burst);
         body.vy = 0;
         return 0;
       }
@@ -168,21 +171,22 @@ function attackStep(body, rec, face, target, burst) {
       body.vy = m.dirY * spec.speed;
       return 0;
     }
-    steerAttack(body, MV, face, rec, 0, STEP, burst);
+    attackDrift(body, MV, face, rec, 0, STEP, burst);
     if (phase === 'startup') body.vy = 0;
     else body.vy = spec.type === 'rise' ? -spec.speed : spec.fallSpeed;
     return 0;
   }
-  if (def.lockMovement) steerAttack(body, MV, face, rec, 0, STEP, burst);
-  else steer(body, MV, 0, 1, 1, STEP, burst);
+  attackDrift(body, MV, face, rec, 0, STEP, burst);
   return 1;
 }
 
 // A fresh scratch attack record for `def` starting now at running speed
-// `running` facing `face`, its motion set going as Fighter.startMotion does.
-function attackRecord(def, face, running, out = {}) {
+// `running` facing `face`, on the ground (`grounded`) or in the air, its
+// Step-in and its motion set going as Fighter.startAttack and startMotion do.
+function attackRecord(def, face, running, grounded, out = {}) {
   out.def = def;
   out.time = 0;
+  out.step = activationStep(def, grounded);
   out.stepped = false;
   const spec = def.motion;
   if (spec) {
@@ -226,6 +230,9 @@ export function predictTrack(track, stage, gravity, st, { steps = 90, horizon = 
     rec = foeRec;
     rec.def = st.attack.def;
     rec.time = st.attack.time;
+    // Its Step-in, where the state says (a fighter's own record does; a
+    // perceived opponent's attack does not, so none is guessed at).
+    rec.step = st.attack.step ?? null;
     rec.stepped = st.attack.stepped ?? true;
     const mo = st.attack.motion;
     rec.motion = mo ? { ...mo } : null;
@@ -263,7 +270,7 @@ export function predictTrack(track, stage, gravity, st, { steps = 90, horizon = 
       else share = attackStep(b, rec, face, target, false);
     } else {
       free += STEP;
-      if (free > horizon) steer(b, MV, 0, 1, 1, STEP, false);
+      if (free > horizon) steer(b, MV, 0, STEP, false);
       else if (!b.grounded) b.vx -= Math.sign(b.vx) * Math.min(Math.abs(b.vx), MV.airDeceleration * STEP);
     }
     stepBody(b, STEP, stage, gravity * share, b.maxFall);
@@ -310,7 +317,7 @@ export function arcTrack(track, stage, gravity, st, { jump = 'ground', dir = 0, 
   }
   for (let k = 0; k < steps; k++) {
     const d = toX != null ? driftDir(b.x, b.vx, toX) : dir;
-    steer(b, MV, d, 1, 1, STEP, false);
+    steer(b, MV, d, STEP, false);
     if (fastFallAt != null && k * STEP >= fastFallAt && b.vy > 0) b.vy = Math.min(MV.fastFallSpeed, b.vy + MV.fastFallAcceleration * STEP);
     const share = b.vy < 0 && lift < 1 ? lift : 1;
     stepBody(b, STEP, stage, gravity * share, b.maxFall);
@@ -354,8 +361,8 @@ export function moveContact(stage, gravity, m, st, face, foe, hurt, self, out = 
   const turns = !def.motion;
   const b = bodyFrom(st, scratch2);
   const running = b.vx;
-  if (def.lockMovement) b.vx = attackStartSpeed(def, b.vx, b.grounded);
-  const rec = attackRecord(def, face, running, myRec);
+  b.vx = attackStartSpeed(def, b.vx, b.grounded);
+  const rec = attackRecord(def, face, running, b.grounded, myRec);
   if (def.motion && def.motion.type !== 'roll') b.vy = 0;
   const steps = Math.min(self.cap, Math.ceil(def.total / STEP) + 1);
   out.contact = -1;
@@ -553,9 +560,10 @@ const recBody = {};
 
 // Whether a fighter in the air at `st` can get back onto a surface with
 // `res` ({ airJumps, airDash (distance > 0 when it has one left), dashOk
-// (not exhausted, not still flying from a launch), rise ({ speed, time }
-// of a lifting move it may still start, or null), hover (seconds of a
-// stalling move, or 0) }), by a sensible recovery: hold toward the stage,
+// (not exhausted, not still flying from a launch), rise ({ speed, time,
+// hang, airMomentum } of a lifting move it may still start, or null: its
+// hang, then its lift under the universal air control, as the Fighter
+// plays it), hover (seconds of a stalling move, or 0) }), by a sensible recovery: hold toward the stage,
 // air jump as it falls past the ledge's height (the threshold
 // `policy.jumpBelow` units under it), air dash home when far out, a lift
 // when nothing else is left. Returns { ok, fell (into the Void), t, x, y,
@@ -574,6 +582,7 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}, trac
   let dashDir = 0;
   let rise = res.rise ?? null;
   let riseLeft = 0;
+  let riseHang = 0;
   let launched = !!res.launched;
   out.ok = false;
   out.fell = false;
@@ -597,14 +606,21 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}, trac
       share = 0;
       dashLeft -= STEP;
       burst = true;
-    } else if (riseLeft > 0) {
-      steer(b, MV, dir, rise.control ?? 0.5, 1, STEP, burst, rise.topSpeed ?? rise.control ?? 0.5);
-      b.vy = -rise.speed;
+    } else if (riseHang > 0 || riseLeft > 0) {
+      // Held toward the stage: an aerial keeps the universal air control
+      // (attackDrift in the air).
+      steer(b, MV, dir, STEP, burst);
       share = 0;
-      riseLeft -= STEP;
-      if (riseLeft <= 0) rise = null;
+      if (riseHang > 0) {
+        b.vy = 0;
+        riseHang -= STEP;
+      } else {
+        b.vy = -rise.speed;
+        riseLeft -= STEP;
+        if (riseLeft <= 0) rise = null;
+      }
     } else {
-      steer(b, MV, dir, 1, 1, STEP, burst);
+      steer(b, MV, dir, STEP, burst);
       const below = b.y - target.y;
       if (over) {
         // Falling onto the stage: let it land.
@@ -620,6 +636,8 @@ export function recoverySim(model, gravity, st, res, policy = {}, out = {}, trac
         launched = false;
       } else if (!jumps && rise && b.vy > 0 && below > -20) {
         riseLeft = rise.time;
+        riseHang = rise.hang ?? 0;
+        b.vx *= rise.airMomentum ?? 1;
         launched = false;
         out.rose = true;
       } else if (launched && b.vy > 0) {

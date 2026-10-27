@@ -322,8 +322,8 @@ export const CHARACTER_0001 = {
   // Every Deflect's 3, Base Launch 2, here upward, the way the arm sweeps;
   // while the sweep is live it turns the other fighter's projectiles back
   // at their thrower, now #0001's. A third of a second in all, falling as
-  // it sweeps and carrying the whole of its drift, steered as a medium
-  // strike is (js/data/attack-mobility.js); no cooldown (the sweep itself,
+  // it sweeps and carrying the whole of its drift, under the universal air
+  // control, never stepping in (a defense: js/data/attack-movement.js); no cooldown (the sweep itself,
   // and its Energy, are its only limits: see js/data/cooldowns.js).
   deflect: {
     animation: 'deflect',
@@ -335,7 +335,6 @@ export const CHARACTER_0001 = {
     hitstun: 0.32,
     blockstun: 0.14,
     hitstop: 0.05,
-    mobility: 'medium',
     deflectProjectiles: true,
   },
 
@@ -501,11 +500,12 @@ export const CHARACTER_0001 = {
   // Attack definitions (schema: createAttackDefinition in
   // js/game/combat/attacks.js). Phases are whole frames of each clip, and
   // every hitbox is measured from its art (facing right from the origin,
-  // mirrored with facing). Each moves by the mobility tier its role gives
-  // it (js/data/attack-mobility.js): its quick strikes carry the run and
-  // the drift on through them, its launcher and its pull steer as medium
-  // ones, and its casts (Red, Maximum Blue) are heavy, slowing it as it
-  // casts. None has a cooldown (the cooldown policy's: none of them deals
+  // mirrored with facing). Each moves by the shared attack movement
+  // (js/data/attack-movement.js): it carries the speed it is thrown at,
+  // never steered on the ground, its aerials under the universal air
+  // control; the Jab steps in by the shared Step-in, the High Kick by its
+  // own leap, and the casts (Red, Maximum Blue) and the aerials never step
+  // in. None has a cooldown (the cooldown policy's: none of them deals
   // 10 or paralyzes); Red and Maximum Blue, ordinary throws, cost 15 Energy
   // each as they start.
   attacks: {
@@ -513,9 +513,9 @@ export const CHARACTER_0001 = {
     // units, at the shoulders, just short of the fist's tip), 5-6 back,
     // 0.3 s in all. Light and quick (3), with a crisp two-step freeze, it
     // pushes (Base Launch 1 sideways) and opens a follow-up once it has
-    // hit (never into itself: a Jab plays out before the next). A quick
-    // strike: it keeps all the speed it is thrown at (a Dash's included)
-    // and the run on through it while a direction is held.
+    // hit (never into itself: a Jab plays out before the next). It keeps
+    // all the speed it is thrown at (a Dash's included) and steps in by
+    // the shared Step-in.
     attack1: {
       animation: 'attack1',
       startup: 2 / FPS_0001.attack1,
@@ -529,14 +529,14 @@ export const CHARACTER_0001 = {
       blockstun: 0.14,
       hitstop: 1 / 30,
       groundOnly: true,
-      mobility: 'quick',
       hitCancel: 2 / FPS_0001.attack1,
     },
     // The Floating Straight: frames 1-2 the wind-up, 3-4 the lunging
     // punch (3, Base Launch 1 sideways), 5 recovering, standing on the air
     // throughout (no fall: motion `hover`), drifting on most of its speed
-    // (an air dash's burst carries it into a flying punch) and steered as a
-    // quick strike is. Twice per airtime.
+    // (an air dash's burst carries it into a flying punch), under the
+    // universal air control.
+    // Twice per airtime.
     midair_attack1: {
       animation: 'midair_attack1',
       startup: 2 / FPS_0001.midair_attack1,
@@ -551,14 +551,13 @@ export const CHARACTER_0001 = {
       hitstop: 1 / 30,
       airUses: 2,
       motion: { type: 'hover' },
-      mobility: 'quick',
       airMomentum: 0.8,
       hitCancel: 2 / FPS_0001.midair_attack1,
     },
     // Red: frames 1-3 the hand sign, 4 the palms thrust out (the orb leaves
     // them, see projectiles.attack2_object), 5 the lunge after, held a
-    // frame longer. No melee hitbox: Red is the attack. A cast, and heavy:
-    // it keeps part of a run, slowed to a walk, steered only a little.
+    // frame longer. No melee hitbox: Red is the attack. A cast: it never
+    // steps in, and a run it is thrown at runs down under it.
     attack2: {
       animation: 'attack2',
       startup: 3 / FPS_0001.attack2,
@@ -567,7 +566,6 @@ export const CHARACTER_0001 = {
       hitbox: null,
       projectile: { id: 'attack2_object', spawnAt: 3 / FPS_0001.attack2, offset: { x: 44, y: -70 } },
       groundOnly: true,
-      mobility: 'heavy',
     },
     // The Red Kick: tucked, rolling and laid out (frames 1-3, the lock-on:
     // it hangs a tenth of a second), then the flying kick: a dash at 1050
@@ -575,7 +573,8 @@ export const CHARACTER_0001 = {
     // behind it, re-aimed every step. The hit blasts the target away (3,
     // Base Launch 2 sideways), a Shield is shoved back, and #0001 springs
     // off what it met (620 up, 240 back). Once per airtime. The dash is its
-    // own motion; a heavy commitment, only its recovery steered a little.
+    // own motion; its hang and its recovery under the universal air
+    // control.
     midair_attack2: {
       animation: 'midair_attack2',
       startup: 3 / FPS_0001.midair_attack2,
@@ -591,14 +590,14 @@ export const CHARACTER_0001 = {
       blockPush: 400,
       airUses: 1,
       motion: { type: 'homing', range: 230, speed: 1050, rebound: 620, recoil: 240, exit: 0.3 },
-      mobility: 'heavy',
       airMomentum: 0.6,
       hitCancel: 3 / FPS_0001.midair_attack2,
     },
     // Maximum Blue: frames 1-4 Blue gathering in the raised hand, 5 the
     // palm out as the orb leaves it (see projectiles.attack3_object), held
-    // two frames more. A trap to set; a cast, heavy (slowed to a walk as it
-    // casts), and the whole cast is all that holds back the next one.
+    // two frames more. A trap to set; a cast (it never steps in, a run
+    // running down under it), and the whole cast is all that holds back the
+    // next one.
     attack3: {
       animation: 'attack3',
       startup: 4 / FPS_0001.attack3,
@@ -607,13 +606,12 @@ export const CHARACTER_0001 = {
       hitbox: null,
       projectile: { id: 'attack3_object', spawnAt: 4 / FPS_0001.attack3, offset: { x: 78, y: -69 } },
       groundOnly: true,
-      mobility: 'heavy',
     },
     // Blue: frame 1, then the palm thrust and the point (2-3): while they
     // last, an opponent within 190 units of the palm is yanked in to it at
     // up to 1300 units/s, and the palm strikes whoever it brought (3, Base
     // Launch 1 upward). Standing on the air throughout, the hang taking
-    // some of its drift, steered as a medium strike. Once per airtime.
+    // some of its drift, under the universal air control. Once per airtime.
     midair_attack3: {
       animation: 'midair_attack3',
       startup: 1 / FPS_0001.midair_attack3,
@@ -629,7 +627,6 @@ export const CHARACTER_0001 = {
       airUses: 1,
       pull: { radius: 190, speed: 1300, offset: { x: 50, y: -72 } },
       motion: { type: 'hover' },
-      mobility: 'medium',
       airMomentum: 0.6,
       hitCancel: 1 / FPS_0001.midair_attack3,
     },
@@ -639,10 +636,11 @@ export const CHARACTER_0001 = {
     // frame more. #0001's launcher, and so still telegraphed (a quarter of a
     // second before it lands, its old rate: any quicker and the Jab strings
     // into it far longer) and punishable: 5, the heavy tier, Base Launch 2
-    // upward. It keeps the speed it is thrown at, steered as a medium
-    // strike (its run held a little under full), its leap sliding on under
-    // 0.6 of the ground deceleration. In the air it stands on
-    // the air while it kicks, once per airtime.
+    // upward. It keeps the speed it is thrown at, never steered, its leap
+    // (its own Step-in: no other is added) sliding on under 0.6 of the
+    // ground deceleration. Started in the air it never leaps: it stands on
+    // the air while it kicks (under the universal air control), once per
+    // airtime.
     extra_attack: {
       animation: 'extra_attack',
       startup: 3 / FPS_0001.extra_attack,
@@ -655,8 +653,6 @@ export const CHARACTER_0001 = {
       hitstun: 0.3,
       blockstun: 0.15,
       hitstop: 0.08,
-      mobility: 'medium',
-      momentum: 1,
       friction: 0.6,
       step: { at: 1 / FPS_0001.extra_attack, speed: 300 },
       airUses: 1,

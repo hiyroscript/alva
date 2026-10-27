@@ -89,7 +89,7 @@ export const SAMPLE_FIGHTER = Object.freeze({
       damage: 5, baseLaunch: 1, directionalLaunch: 'horizontal',
       hitbox: { x: 10, y: -80, w: 34, h: 30 },
       hitstun: 0.25, blockstun: 0.12, hitstop: 0.06,
-      airMomentum: 1, airControl: 0.5,
+      airMomentum: 1,
     },
     attack1: {
       animation: 'attack1', startup: 1 / FPS, active: 1 / FPS, recovery: 2 / FPS,
@@ -103,7 +103,7 @@ export const SAMPLE_FIGHTER = Object.freeze({
       damage: 3, baseLaunch: 2, directionalLaunch: 'vertical',
       hitbox: { x: 14, y: -100, w: 22, h: 80 },
       hitstun: 0.32, blockstun: 0.15, hitstop: 0.05,
-      airMomentum: 1, airControl: 0.85, hitCancel: 2 / FPS,
+      airMomentum: 1, hitCancel: 2 / FPS,
     },
     attack2: {
       animation: 'attack2', startup: 1 / FPS, active: 1 / FPS, recovery: 1 / FPS,
@@ -116,7 +116,7 @@ export const SAMPLE_FIGHTER = Object.freeze({
       damage: 5, baseLaunch: 2, directionalLaunch: 'reverseVertical',
       hitbox: { x: 8, y: -44, w: 40, h: 40 },
       hitstun: 0.28, blockstun: 0.14, hitstop: 0.08,
-      airMomentum: 1, airControl: 0.7, hitCancel: 2 / FPS,
+      airMomentum: 1, hitCancel: 2 / FPS,
     },
   },
 });

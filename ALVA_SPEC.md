@@ -1958,8 +1958,9 @@ each fighter's own values are in its character specification (7.2.9).
   never the stale way). **During an action of its own** (an attack or the
   Shield) the direction held turns it at once, left to right or right to
   left, as often as the player likes (`Fighter.updateFacing`): the hitbox,
-  a step-in still to come and a projectile not yet released (e.g. #0001's
-  Red) all go the new way. Turning never walks or runs. A technique faces the direction held
+  a Step-in still to come and a projectile not yet released (e.g. #0001's
+  Red) all go the new way. Turning never walks, runs or steers: a Step-in
+  already made, or the speed carried in, is never redirected. A technique faces the direction held
   on the step it starts (so #0001's Hollow Purple pressed with Left held
   sends its sphere left). A spawn or respawn takes the spawn's `facing`,
   and otherwise it keeps its last facing: it never auto-faces. With
@@ -2047,7 +2048,7 @@ each fighter's own values are in its character specification (7.2.9).
   gives one fighter better locomotion. A fighter's lore, archetype or look
   (a "speedster", a heavy body) never changes them: its identity is its
   moves, and a move may travel in its own way (a homing dash, a roll, a
-  plunge, a lift, a hover, a step-in) because that motion is the move.
+  plunge, a lift, a hover, a Step-in) because that motion is the move.
   Identical movement-only input from the same start gives #0001, #0002,
   #0003, #0004 and #0005 the identical trajectory. Whether a fighter has the Dash and the air dash
   at all is its art (`mouvment`, `midair_mouvment`); every playable fighter
@@ -2075,14 +2076,15 @@ each fighter's own values are in its character specification (7.2.9).
     it, and a running jump carries its speed.
   - *Momentum.* A legal change of action never throws speed away: a jump
     and an air jump keep the sideways speed they find, an attack keeps its
-    `momentum` share of it (its mobility tier's, all of it for a quick
-    strike, a Dash's burst included: 7.2.4) and the player may steer it on
-    from there, a Dash never slows a faster fighter and its
+    `momentum` share of it (all of it unless its data says otherwise, a
+    Dash's burst included: 7.2.4) and lets it run down from there, never
+    steered on the ground (in the air the air control applies as ever),
+    a Dash never slows a faster fighter and its
     speed carries on after it, landing keeps the speed it lands with, and
     the impact freeze holds a velocity without losing it. Only real forces
     change momentum: a hit, a launch, a carry, a pull, a rebound, a wall, a
-    move whose own mechanic redirects the body (a motion, a step-in, a
-    technique's or summon's planted cast, a paralysis), the Void; and the
+    move whose own mechanic redirects the body (a motion, a Step-in, a
+    technique's or summon's rooted cast, a paralysis), the Void; and the
     one stop a player chooses, the ground Shield going up, which ends the
     fighter's own sideways speed on that step (7.2.5).
   - *Jump.* Its strength is the universal `jumpVelocity` (920 units/s,
@@ -2366,46 +2368,65 @@ each fighter's own values are in its character specification (7.2.9).
   `hitbox: null` and a `projectile` release instead (below). A *pending*
   attack (`pending: true`) is art only: one pass of its clip, no hit, and
   declaring combat fields on one is refused.
-  - *Attack movement.* Normal locomotion is off while an attack plays, but
-    that is not the same as standing still, or as losing control: an
-    attack keeps its share of the horizontal speed it started with
-    (`momentum` on the ground, `airMomentum` in the air: never capped at
-    top speed, so a Dash's burst carries into a Dash attack), lets the
-    player steer it with a share of the normal steering authority
-    (`control`, `airControl`: how quickly the held direction changes its
-    velocity, the turn's braking included) toward a share of top speed
-    (`topSpeed`, `airTopSpeed`), the two apart (a strike with 0.8 of the
-    authority may still hold the whole run), lets the speed it is not
-    steering run down under `friction` × the ground deceleration (above
-    top speed the overspeed brake; the air drag in the air), and may move
-    by itself (`step: { at, speed }`: forward speed raised to at least
-    `speed` as its time crosses `at`, on the ground, never lowered).
-    Steering works through the startup, the strike and the recovery; a
-    direction held also turns the attack, as ever, so steering back turns
-    it and carries it the new way.
-    - *Mobility tiers.* An attack names its tier (`mobility`, chosen by
-      what it does, never by its name, slot, damage or clip length) and the
-      tier supplies those numbers (`ATTACK_MOBILITY` in
-      `js/data/attack-mobility.js`, the same for every fighter); a field
-      the attack writes itself wins over its tier's:
+  - *Attack movement* (`js/data/attack-movement.js`). Three universal
+    rules, the same for every fighter, present or future, a player's or a
+    CPU's, kept apart:
+    - *No attack steering on the ground.* Nothing held moves a fighter
+      through a grounded attack: no direction, no Run, no switch of
+      direction, in its startup, its strike or its recovery, whatever the
+      move (a strike, a throw, a Special, a move with a 3 s or 5 s
+      cooldown). The attack keeps its share of the horizontal speed it
+      started with (`momentum`: all of it unless its data says otherwise,
+      never capped at top speed, so a Dash's burst carries into a Dash
+      attack), and that speed runs down as if nothing were held, under
+      `friction` × the ground deceleration (1 unless its data says
+      otherwise; above top speed the overspeed brake). A fighter still
+      travels through a grounded attack by that carried speed, its
+      Step-in, its own motion and outside forces, never by what is held.
+    - *Air control in the air.* In the air every move, whatever it is (an
+      aerial, a hover, a plunge, a lift, the Deflect, a homing dash's hang
+      and recovery, a grounded attack carried off a ledge), keeps the
+      universal air control: exactly the air steering a fighter has
+      outside an attack (7.2.3), from its `airMomentum` share of the drift
+      it started with (all of it unless its data says otherwise). No move
+      has air control of its own, better or worse; only a motion that
+      sets the horizontal speed itself (a homing dash's dash, a roll flying
+      off a ledge) overrides it while it does.
 
-      | Tier | `control` / `airControl` | `topSpeed` / `airTopSpeed` | `momentum` / `airMomentum` | `friction` | For |
-      | --- | --- | --- | --- | --- | --- |
-      | `quick` | 0.8 / 0.9 | 1 / 1 | 1 / 1 | 0.6 | light, fast strikes: the run and the drift carry on through them |
-      | `medium` | 0.55 / 0.7 | 0.6 / 0.9 | 0.9 / 1 | 0.8 | strikes with a clear wind-up or recovery, ordinary casts, everyday aerials with a motion of their own |
-      | `heavy` | 0.2 / 0.4 | 0.25 / 0.6 | 0.6 / 0.9 | 1 | deliberate commitments: finishers, long flurries, trap casts, plunges |
-      | `planted` | 0 / 0 | — | 1 / 1 | 1 | no steering: a move that roots its fighter, a roll's curl |
+    A direction held still turns an attack (7.2.2), and normal locomotion
+    is back the step the attack is over or cut short. The retired Attack
+    Mobility system (the tiers `quick`, `medium`, `heavy`, `planted`, and
+    `mobility`, `control`, `airControl`, `topSpeed`, `airTopSpeed`,
+    `lockMovement`) is refused as the registry loads. A technique holds its
+    fighter still and a clone never moves.
+    - *The Step-in.* Every grounded direct melee strike carries its
+      fighter a slight way forward by itself, once per activation, with
+      nothing held: as its time reaches half way to its first strike its
+      forward speed is raised to at least 360 units/s (never lowered), the
+      way the strike faces then (once made, nothing redirects it: a turn
+      only bends the strike), through the real physics (a wall
+      stops it): about 11 units from a standstill, a lean into the blow,
+      never a Dash. A multi-hit string steps in once. A move that writes
+      its own `step: { at, speed }` lunges as written instead (#0001's High
+      Kick, #0003's Heel Drop and Chakra Haymaker), never twice; one that
+      writes `step: false` never lunges (it roots its fighter, or what
+      strikes is something it conjures away from its body: #0005's Phantom
+      Hands and Dark Tendrils, the phantom's bite). A throw, a move with a
+      motion of its own (a homing dash, a roll, a plunge, a lift, a
+      hover), the Deflect, a technique, a summon and a pending move never
+      take the shared one. An activation started in the air never steps
+      in, landing never makes it lunge, a grounded one off the ground by
+      its time skips it (never later), and only the fighter itself makes
+      one (a clone performing a move never moves). Each definition records
+      the verdict (`stepIn`: `authored`, `universal`, `declined`,
+      `exempt`).
 
-      An attack that names none is `medium`: no attack stands its fighter
-      still unless its own data says so. Every roster attack names its
-      tier, and each fighter's definition says why (its specification in
-      `docs/characters/` lists them). A plunge's or a lift's drift
-      (`slam`, `bounce`, `rise`) is the motion's own: its `airTopSpeed` is
-      its `airControl`, as authored.
-    `lockMovement: false` keeps full locomotion. A technique holds its
-    fighter still instead and a clone never moves: neither reads these.
-    The CPU obeys the same steering; on the ground it holds no direction
-    through its own strike, which it plans unsteered.
+    The CPU obeys exactly the same rules through the same functions: its
+    predictions play every move with its real Step-in and nothing held
+    steering a grounded one, and it plans its spacing before it commits,
+    since nothing corrects a committed grounded attack's spacing; in the
+    air its aerials have the same air control as anyone's, and it steers
+    them as its plan wants.
   - *Combat input buffer.* An ordinary attack press the fighter cannot act
     on yet (an attack or its recovery, a stun, a Dash before its cancel
     time, a 3 s or 5 s cooldown, `shield` held for its Shield) is kept for the
@@ -2500,7 +2521,8 @@ each fighter's own values are in its character specification (7.2.9).
     be cut): nothing it had not struck or released ever is, no hitbox,
     lock, pending effect or stale input lingers, and the new move starts
     exactly once. **Run is never a request**: holding, turning or pressing
-    a direction (keyboard, touch or stick) only steers, and turns as ever
+    a direction (keyboard, touch or stick) only steers (never during a
+    grounded attack, 7.2.4), and turns as ever
     with Automatic turn-around off (an attack still turns to the direction
     held; with it on, the attack faces its enemy, 7.2.4a); a Dash is only
     ever the explicit Mouvement request (7.2.3). One step accepts at most
@@ -2576,7 +2598,8 @@ each fighter's own values are in its character specification (7.2.9).
     struck it (the attacker's body, or the projectile), less `lift` upward.
   - **Motion** (`motion`, one of six kinds; a motion attack never changes physical facing for a visual turn
     while it plays): `hover` stands on the air for the whole attack (no
-    fall, its drift steered as its `airMomentum` and `airControl` allow);
+    fall, its drift, its `airMomentum` share, under the universal air
+    control);
     `homing` hangs through its startup (no gravity), then
     locks on to its opponent if in play, within `range` of its middle and
     not behind it, and dashes at `speed`, re-aimed at the target's middle
@@ -2772,8 +2795,9 @@ every fighter, now and later, has it alike.
 - **Then always.** Standing still, in the air, the Shield up (blockstun
   included), and through an ordinary attack pressed with no direction
   held: the attack starts facing its enemy, and an enemy that switches
-  sides during it turns it (its hitbox, a step-in still to come and a projectile not yet
-  released go the new way, its art with them), exactly as a CPU's attack
+  sides during it turns it (its hitbox, a Step-in still to come and a
+  projectile not yet released go the new way, its art with them), exactly
+  as a CPU's attack
   is aimed (7.2.2). A technique and a summon's startup start facing it.
   An attack pressed, or held, with a direction faces that direction, as by
   hand; let go during it, it turns to its enemy.
@@ -2960,7 +2984,7 @@ in saved settings (6.10) or on the HUD.
 - **Deflect.** In the air, a fresh `shield` press (`shieldPressed`,
   never the button held) is the fighter's Deflect: an attack in every
   way, through `createAttackDefinition` (its own `deflect` clip, startup,
-  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (the policy's: an ordinary move, so none, 7.2.4), momentum and steering), resolved by the same `CombatSystem` as any
+  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (the policy's: an ordinary move, so none, 7.2.4), the share of its drift it keeps, under the universal air control, never stepping in), resolved by the same `CombatSystem` as any
   attack, trading, interrupted and punished as one. Its strike is the
   same for every fighter: **3** Launch Points at **Base Launch 2**
   (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`; a fighter authors neither, and

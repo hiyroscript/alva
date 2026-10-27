@@ -320,8 +320,8 @@ export const CHARACTER_0002 = {
   // the hand swats; while the swat is live it knocks the other fighter's
   // projectiles back at their thrower, now #0002's. A quarter of a second
   // in all, falling as it swats and carrying the whole of its drift,
-  // steered as a medium strike (js/data/attack-mobility.js), with no
-  // cooldown (the shared policy's for every Deflect: js/data/cooldowns.js).
+  // under the universal air control, never stepping in (a defense:
+  // js/data/attack-movement.js), with no cooldown (the shared policy's for every Deflect: js/data/cooldowns.js).
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0002.deflect,
@@ -332,7 +332,6 @@ export const CHARACTER_0002 = {
     hitstun: 0.3,
     blockstun: 0.12,
     hitstop: 0.05,
-    mobility: 'medium',
     deflectProjectiles: true,
   },
 
@@ -437,17 +436,19 @@ export const CHARACTER_0002 = {
   // Cooldowns are the shared policy's (js/data/cooldowns.js), never authored
   // here: the Whirlwind, whose tornado's finisher deals 10, waits 5 seconds
   // from the moment its tornado leaves; every other move none at all. Neither
-  // changes startup, strikes or recovery. Each moves by the mobility tier
-  // its role gives it (js/data/attack-mobility.js); its speed is in its
-  // moves' own motions (the homing dash, the roll, the plunge, the lift),
-  // never in a faster run.
+  // changes startup, strikes or recovery. Each moves by the shared attack
+  // movement (js/data/attack-movement.js): never steered on the ground, its
+  // aerials under the universal air control, its grounded strikes stepping
+  // in by the shared Step-in; its speed is in its moves'
+  // own motions (the homing dash, the roll, the plunge, the lift), never in
+  // a faster run.
   attacks: {
     // The One-Two: two strikes in one press, light and quick (a quarter of
     // a second in all). The jab (frame 2, 1) holds the target for the
     // straight (frame 4, 3), which pushes it away. Frame 4 is held one more
     // frame to recover. A hit opens a follow-up once the straight is out.
-    // A quick strike: it keeps all the speed it is thrown at and the run on
-    // through it.
+    // It keeps all the speed it is thrown at and steps in once, by the
+    // shared Step-in, for the pair.
     attack1: {
       animation: 'attack1',
       recovery: 1 / FPS_0002.attack1,
@@ -463,7 +464,6 @@ export const CHARACTER_0002 = {
         },
       ],
       groundOnly: true,
-      mobility: 'quick',
       hitCancel: 4 / FPS_0002.attack1,
     },
     // The Homing Attack. Curled up, it hangs for a moment (the lock-on,
@@ -474,8 +474,8 @@ export const CHARACTER_0002 = {
     // target up (3, Base Launch 1 upward) and #0002 springs off it (760
     // up, 140 back) with both its air jumps back: the chain canon is
     // famous for. Once per airtime (landing or being hit gives it back).
-    // The dash is its own motion; its short recovery steers as a medium
-    // strike does.
+    // The dash is its own motion (no Step-in); its hang and its recovery are
+    // under the universal air control.
     midair_attack1: {
       animation: 'midair_attack1',
       startup: 7 / 60,
@@ -490,7 +490,6 @@ export const CHARACTER_0002 = {
       hitstop: 0.05,
       airUses: 1,
       motion: { type: 'homing', range: 240, speed: 1100, rebound: 760, recoil: 140, exit: 0.25 },
-      mobility: 'medium',
       airMomentum: 0.6,
       hitCancel: 7 / 60,
     },
@@ -505,8 +504,8 @@ export const CHARACTER_0002 = {
     // land, not the trails' tips. Pressed again and again, each flurry
     // plays out before the next; different-move follow-ups can
     // still chase the fling. A Shield stops the flurry at the kick it blocks. It keeps most
-    // of a run as it starts, but it is heavy: slowed to a walk and steered
-    // only a little, so the flurry stays on its target.
+    // of a run as it starts (0.8 of it), steps in once by the shared
+    // Step-in and is never steered, so the flurry stays on its target.
     attack2: {
       animation: 'attack2',
       recovery: 2 / FPS_0002.attack2,
@@ -524,17 +523,15 @@ export const CHARACTER_0002 = {
         },
       ],
       groundOnly: true,
-      mobility: 'heavy',
       momentum: 0.8,
       hitCancel: 8 / FPS_0002.attack2,
     },
     // The Bounce Attack. Curled up, it hangs for a moment (5/60 s), then
-    // plunges at 1400 units/s (steering half as well as it drifts) until
+    // plunges at 1400 units/s (its drift under the universal air control) until
     // it meets the ground or an opponent, and bounces back up off either
     // at 900 (about a jump's height): the attack is over, so it can bounce
     // again, twice per airtime. A hit spikes the target (3, Base Launch 2
-    // downward). The plunge's drift is its own: half the steering, toward
-    // half of top speed.
+    // downward).
     midair_attack2: {
       animation: 'midair_attack2',
       startup: 5 / 60,
@@ -549,10 +546,7 @@ export const CHARACTER_0002 = {
       hitstop: 0.05,
       airUses: 2,
       motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 },
-      mobility: 'heavy',
       airMomentum: 0.8,
-      airControl: 0.5,
-      airTopSpeed: 0.5,
     },
     // The Spin Attack. It curls into a ball (8/60 s, sliding on: time to
     // see it coming), then rolls the way it faces at 400 units/s plus 0.8
@@ -563,7 +557,8 @@ export const CHARACTER_0002 = {
     // rolls on through the opponent it bowls over (3, Base Launch 1
     // sideways, too short a stun to chase); a Shield stops it dead instead,
     // bouncing it back. Off a ledge it flies on. Its curl-up and long roll
-    // make it an opener, not a string. Planted: the curl is never steered.
+    // make it an opener, not a string. The roll is its own motion: no
+    // Step-in, and nothing steers the curl or the roll.
     attack3: {
       animation: 'attack3',
       startup: 8 / 60,
@@ -578,18 +573,16 @@ export const CHARACTER_0002 = {
       hitstop: 0.06,
       groundOnly: true,
       motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 1000, friction: 420, recoil: 260 },
-      mobility: 'planted',
       passThrough: true,
       hurtboxes: [{ x: -20, y: -50, w: 40, h: 50 }],
     },
     // The Blue Tornado. Spun into a tornado it rises at 460 units/s
-    // (steering half as well as it drifts) for as long as it strikes,
+    // (its drift under the universal air control) for as long as it strikes,
     // then carries on up: about 175 units in all, its way back to the
     // stage. Three strikes of 1 carry its target up with it (carry), the
     // fourth flings it upward (3, Base Launch 2). Once per airtime, and it
     // spends the airtime: after it, no attack or air jump until landing
-    // (free fall). Heavy, its lift's drift its own (half the steering,
-    // toward half of top speed).
+    // (free fall).
     midair_attack3: {
       animation: 'midair_attack3',
       recovery: 0.15,
@@ -610,16 +603,13 @@ export const CHARACTER_0002 = {
       airUses: 1,
       freeFall: true,
       motion: { type: 'rise', speed: 460 },
-      mobility: 'heavy',
       airMomentum: 0.6,
-      airControl: 0.5,
-      airTopSpeed: 0.5,
     },
     // The Whirlwind (extra_attack). It turns and spins up a whirlwind
     // (frames 1-5), sends it off as a tornado (extra_attack_object) as
     // frame 6 shows, and spins down (7-9). No melee hitbox: the tornado
     // is the attack: a trap to set, its long spin-up the price of each. A
-    // cast, and heavy: slowed to a walk while it spins up.
+    // cast: it never steps in, a run running down under its spin-up.
     extra_attack: {
       animation: 'extra_attack',
       startup: 5 / FPS_0002.extra_attack,
@@ -628,7 +618,6 @@ export const CHARACTER_0002 = {
       hitbox: null,
       projectile: { id: 'extra_attack_object', spawnAt: 5 / FPS_0002.extra_attack, offset: { x: 44, y: -39 } },
       groundOnly: true,
-      mobility: 'heavy',
     },
   },
 };

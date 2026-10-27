@@ -109,7 +109,8 @@ In the air the same button is the fighter's **Deflect**, its `deflect`
 entry: an attack in every way (it goes through `createAttackDefinition`,
 plays its own `deflect` clip, has a startup, an active phase, a recovery,
 a melee hitbox, its stuns and hitstop, its cooldown (none: an ordinary
-move), its momentum and steering), resolved by the same `CombatSystem` as
+move), the share of its drift it keeps, under the universal air control,
+never stepping in), resolved by the same `CombatSystem` as
 any attack. Attack though it is, it is **cancellable** by explicit rule
 (below).
 It costs 15 Energy (`DEFLECT_ENERGY_COST`), paid once as it starts. Its strike
@@ -122,7 +123,7 @@ any other value is refused. Its direction is the fighter's own.
 | `animation` | Its clip (`deflect`). Required; missing art refuses it (logged once), never faked. |
 | `startup` / `active` / `recovery` | Its phases, whole frames of its clip. |
 | `hitbox` | Its live box, facing right from the fighter's origin: what its strike meets, and what it catches projectiles with. Required. |
-| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `airMomentum`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
+| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `airMomentum`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
 | `cooldown` | Never authored but as 0: the policy gives every Deflect none. |
 | `deflectProjectiles` | `true`: while it is live its box turns projectiles back (below). |
 | `damage` / `baseLaunch` | Never authored: always 3 and 2. |
