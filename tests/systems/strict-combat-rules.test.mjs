@@ -263,6 +263,9 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // The Pistol, an ordinary shot; the Molotov Cocktail's fire and the
     // Sawn-Offs' burst, ordinary casts; the Rocket Launcher (5 s).
     '0007': { extra_attack: 15, 'tech:attack3': 15, 'tech:attack4': 15, 'tech:attack5': 0 },
+    // Every move its own body, nothing created: the Feast (a heal, 3 s) and
+    // the Gum-Gum Giant Pistol (5 s) pay nothing.
+    '0008': { 'tech:attack4': 0, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

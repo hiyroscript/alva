@@ -219,8 +219,13 @@ Every fixed step, in this order:
    it), a jump over it (timed if it is still far), a step or a Dash out of
    reach, drifting away, the Deflect (timed so the swat is live as the
    shot arrives, and worth more when the turned-back shot can still hit
-   its thrower), a strike that lands first, or a projectile that erases or
-   repels it. Every threat is an attack and every attack is blockable, so
+   its thrower), a strike that lands first, a projectile that erases or
+   repels it, or any other move of its own whose box turns projectiles back
+   (`deflectProjectiles` on a move other than its Deflect: #0008's Gum-Gum
+   Balloon), pressed when its box will be live as the shot arrives, on the
+   ground or in the air as the move is, and worth more, as the Deflect is,
+   when the turned-back shot can still hit its thrower. Every threat is an
+   attack and every attack is blockable, so
    the Shield is weighed against all of them: a technique's burst (Unlimited
    Void), a sphere (Hollow Purple), a clone's strike and a Deflect's as
    surely as a jab; it is chosen when it scores best, never forced (breaking
@@ -571,7 +576,11 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   the CPU playing #0006's whole kit through its one fighter;
   [`tests/fighters/0007/fighter-0007.test.mjs`](../../tests/fighters/0007/fighter-0007.test.mjs):
   the CPU playing #0007's whole kit, its fists and feet, its gun, its fire,
-  its blasts and its rocket.
+  its blasts and its rocket;
+  [`tests/fighters/0008/fighter-0008.test.mjs`](../../tests/fighters/0008/fighter-0008.test.mjs):
+  the CPU playing #0008's whole kit, its fists, its stretched punches and
+  stamps, its slingshot, its balloon (against a shot, timed to bounce it
+  back), its meal and its giant fist.
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle` (with how each side played: presses,

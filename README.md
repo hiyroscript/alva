@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Seven playable fighters** on a 48-slot roster:
+- **Eight playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -64,18 +64,26 @@ blocks every attack.
   together, and each move is performed by the sister whose power it is
   while the others step back: pink's heat-vision beam and freezing breath,
   green's tornado, blue's sonic scream, and all three streaking at their
-  foe together), and [#0007](docs/characters/0007.md), the street
+  foe together), [#0007](docs/characters/0007.md), the street
   soldier, half fists and feet and half weapons (a string of punches, an
   uppercut, a flying kick and a hammer fist, all up close; a pistol, a
   molotov cocktail whose fire burns where it lands, a sawn-off in each
   hand fired to both sides at once and a rocket launcher, all fired
-  standing on the ground). All seven Shield on the ground and Deflect in
+  standing on the ground), and [#0008](docs/characters/0008.md), the
+  rubber pirate, who fights with nothing but its own body, stretched (a
+  long-armed pistol of a punch, a barrage of stretched fists, both legs
+  stretched down to stamp from high above, a slingshot dive at its
+  opponent, a body blown up into a balloon that bounces projectiles back,
+  a meal that heals it and a fist blown up to a giant's; its stretched
+  limbs are still its body, and can be hit, and launched into a wall it
+  rebounds like rubber). All eight Shield on the ground and Deflect in
   the air (a strike that knocks projectiles back at their thrower), and
-  all seven Dash on the ground and air dash. Each fighter
+  all eight Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
-  #0006's Ice Breath, #0007's Rocket Launcher): an orange exclamation
+  #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
+  Giant Pistol): an orange exclamation
   mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
@@ -293,6 +301,10 @@ own credits: Cosbydaf (NGC sprites), Kenshin Himura (rip), Misse-the-cat
 
 **#0007 sprite source.** Sprite sheet by xxalexsmashxx on
 [DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/955490753).
+
+**#0008 sprite source.** Sprite sheet by degue-1297 on
+[DeviantArt](https://www.deviantart.com/degue-1297/art/443591282); the
+sheet's own credit: ripped by Alejo & Grim.
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

@@ -141,6 +141,18 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0007.playStyle',
     reviewedSourceHash: '74ae16cd9d7769a152417df5151be96e741d69dbcde060052e529b861060941e',
   }),
+  // A rubber brawler that fights at every range with nothing but its own
+  // body: plain fists up close, stretched fists, feet and a giant's fist
+  // from afar, a slingshot dive, a balloon that bounces shots back and a
+  // meal that heals it. Approachable: every tool does one clear thing; the
+  // depth is in its exposed limbs (a stretched arm or leg is still its
+  // body), reading shots for the balloon, finding room to eat, and landing
+  // the giant fist's long, breakable wind-up.
+  '0008': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0008.playStyle',
+    reviewedSourceHash: 'c2956192dff56a1a0db543de3b69f7574d427a8274684277c130d1b2781fe381',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

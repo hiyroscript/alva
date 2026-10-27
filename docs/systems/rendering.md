@@ -187,7 +187,7 @@ centered row shows only active cooldowns with a duration **above 0.5 seconds**
 (the cooldown policy's 3 s and 5 s, [combat](combat.md#cooldowns)):
 #0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s),
 #0003 Mystical Palm Technique (3 s), #0004 Ievan Polkka (5 s) and World is
-Mine (3 s), #0005 Deadlights (3 s) and Red Balloon (3 s), #0006 Ice Breath (3 s), #0007 Rocket Launcher (5 s), long ordinary attacks as well as summons
+Mine (3 s), #0005 Deadlights (3 s) and Red Balloon (3 s), #0006 Ice Breath (3 s), #0007 Rocket Launcher (5 s), #0008 Feast (3 s) and Gum-Gum Giant Pistol (5 s), long ordinary attacks as well as summons
 and techniques. The fighter the ability HUD shows
 ([input](input.md#the-ability-hud)) has no rings while that HUD is on show
 (`Arena.hudCooldownsFor`, set by the screen each frame): the HUD carries its
@@ -216,7 +216,7 @@ ready timers draw nothing and leave no gap in the centered row.
 While a fighter performs one of its **Special abilities**
 ([combat](combat.md#special-abilities): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
-Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher), a bright orange (`#ff9f1c`)
+Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol), a bright orange (`#ff9f1c`)
 exclamation mark with a dark outline floats over it, centered above the
 top of its status column (its Energy bar while that shows, else its name
 tag: `Arena.specialMarkRect`, `specialMarkRect` in
@@ -376,7 +376,10 @@ far; the colour flash and fade stay.
   [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs),
   [`tests/fighters/0006/fighter-0006.test.mjs`](../../tests/fighters/0006/fighter-0006.test.mjs)
   (three members, one scale),
-  [`tests/fighters/0007/fighter-0007.test.mjs`](../../tests/fighters/0007/fighter-0007.test.mjs).
+  [`tests/fighters/0007/fighter-0007.test.mjs`](../../tests/fighters/0007/fighter-0007.test.mjs),
+  [`tests/fighters/0008/fighter-0008.test.mjs`](../../tests/fighters/0008/fighter-0008.test.mjs)
+  (anchors authored where its limbs stretch far from its body, and where
+  its legs reach below its feet).
 - Ensembles: [`tests/systems/ensemble.test.mjs`](../../tests/systems/ensemble.test.mjs)
   (every member on the fighter's state on the same step, the formation,
   gliding, the float, the facing, determinism at any frame rate, the parts

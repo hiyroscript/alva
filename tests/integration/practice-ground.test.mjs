@@ -1062,8 +1062,8 @@ test('the dialog shows the full configured roster; locked slots stay non-interac
   assert.equal(grid.children.length, CONFIG.roster.totalSlots);
   const available = slots.filter((s) => s._def?.available);
   const locked = slots.filter((s) => !s._def?.available);
-  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '0003', 'test-moveless', 'test-sample', '9999', '0007', 'test-a']);
-  assert.equal(locked.length, CONFIG.roster.totalSlots - 8);
+  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '0003', 'test-moveless', 'test-sample', '9999', '0007', '0008', 'test-a']);
+  assert.equal(locked.length, CONFIG.roster.totalSlots - 9);
   assert.equal(slots[0]._def.id, '0001', 'slot 01 holds #0001');
   assert.ok(available.includes(slots[0]), 'open, like any playable fighter\'s');
   for (const s of locked) {

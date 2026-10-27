@@ -3856,3 +3856,122 @@ moves, names, art and event fields: `fighter-0005`, `fighter-0006`,
 `cooldown-policy`, `launch`, `loadout`, `ui-consistency` (*Mash Combo*, a
 game term).
 
+
+## #0008, the rubber pirate
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add character 0008
+from a supplied sprite sheet, then open a pull request. `character_rule`
+asks for abilities with real mechanics from the character's canon (not
+only animations and damage), no move the character cannot perform in
+canon, the sheet's DeviantArt page credited and the character named
+nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0008 in roster slot 08, playable: 104 frames cut from
+  the sheet into `assets/characters/0008/` (1× crops, each tight to its own
+  art, the flat teal background (0, 102, 102) made transparent, nothing
+  redrawn or recoloured, the white sparks of a snap kept with the frame
+  they touch, every file `0008_<codename>_<frame>.png`), all of the
+  fighter: it throws nothing. Drawn at the roster's art-pixel size (a
+  47-pixel fighting stance, about 80 units tall); its stretched limbs, its
+  balloon and its giant fist reach far from its body, so every clip
+  authors its own `anchorX` on its blue shorts (and the Stamp its
+  `anchorY`, its legs reaching below its feet). Movement is the universal
+  one; its Energy refills at the shared 12 a second (no move of its costs
+  any).
+- **Every move its own body**, from its canon (a pirate whose whole body
+  is rubber, who fights by stretching it, blows himself up so that bullets
+  bounce off, and recovers by eating), each with a mechanic: **Jab and
+  Straight** (1 that holds, then 3) and the **Gum-Gum Gatling** (five
+  stretched fists out to 110 units that hold, then 3 at Base Launch 2);
+  the **Gum-Gum Pistol** (the arm stretched far back, then the fist out to
+  96 units: 5 at Base Launch 3); the **Gum-Gum Stamp** (both legs stretched
+  down 122 units below its feet, a spike); the **Gum-Gum Rocket** (a homing
+  slingshot, once per airtime); the **Gum-Gum Balloon** (blown up all round
+  it: projectiles that meet it are bounced back at their thrower, whoever
+  touches it bounced up; the **Floating Balloon** in the air hovers); the
+  **Feast** (a technique and a Special: two joints of meat devoured to
+  heal 10; 3 s) and the **Gum-Gum Giant Pistol** (a technique and a
+  Special: 0.75 s blowing a fist up to a giant's and swinging it back, any
+  hit breaking it, then 10 at Base Launch 3 out to 224 units that drives a
+  raised Shield back; 5 s). Its stretched limbs are still its body: while
+  the Pistol, the Gatling and the Stamp play, its hurtboxes take in the
+  arm or legs, so a blow or a shot that meets them strikes it. Its Mash
+  Combo pairs Jab and Straight with the **Crescent Kick**, a button-less
+  close-range partner (every other ground move reaches far, surrounds it
+  or strikes nobody). Its guard is its arms wound into a rubber wall; its
+  Deflect a whirl of its limbs; its Dash a blurred lunge, its air dash a
+  flat flight.
+- **Its rubber body**: the first fighter with a `launchBounce` of its own.
+  Launched into a wall, the floor or a ceiling it rebounds from 400 units/s
+  (everyone else 500) and sends back more of it (0.9, 0.8, 0.85 against
+  0.72, 0.6, 0.65).
+- **The shared engine, used as it is**: strikes (`hits`) and `hitCancel`,
+  `hurtboxes` while a move plays, `motion` (`homing`, `hover`),
+  `deflectProjectiles` on an ordinary attack (until now only the Deflects
+  had it; a move that has it is a defense too, so it gives way to any
+  request, by the rule the Deflect already follows), a technique's `heal`
+  and `burst`, `blockPush`, `launchBounce`, the policy's cooldowns.
+- **One CPU addition, for any fighter**: a shot coming at the CPU may be
+  answered with any move of its own whose box turns projectiles back (not
+  only its Deflect), pressed when that box will be live as the shot
+  arrives, weighed like the Deflect (worth more when the turned-back shot
+  can still reach its thrower). Without it the CPU never used the Balloon.
+- **Its controller layout** by the comfort rules (Square Jab and Straight
+  / Gum-Gum Stamp, Triangle Gum-Gum Gatling / Gum-Gum Rocket, Circle the
+  Balloon both ways, R2 the Gum-Gum Pistol, L2 the Feast, the right stick
+  forward the Giant Pistol), touch buttons, names and descriptions in
+  English and French (the French names as the French translations give
+  them, *Gomu Gomu no …*), a Discover profile (3/5) and its credits (the
+  sheet by degue-1297 on DeviantArt, linked by the deviation's number
+  alone, and the sheet's own credit: ripped by Alejo & Grim).
+
+Found on the way: two shared tests assumed what #0008 is not.
+`universal-movement`'s "a hit restores both air jumps" pressed the first
+aerial with a hitbox and expected it to hit a target beside it; the Stamp
+only strikes below, so it now picks an aerial whose box takes in the
+fighter's own height. `move-cancel`'s rule-A and buffer tests assumed every
+ground attack keeps its commitment; a defense gives way by explicit rule,
+so they now pair only committed attacks first, and a new test covers the
+Balloon giving way. `cpu-behaviour` E now starts its CPU at 100 Launch
+Point (from 90): at 90, #0008 (no launch that ends a life from mid-stage
+at once) does not yet put #0007's CPU in danger, so at Medium it rightly
+kept fighting and landed a Mash Combo before breaking off. The roster-wide
+tables, lists and credits gained #0008.
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 168 matches a level): #0008 wins 0.61 at
+Medium, 0.52 at Hard and 0.44 at Brutal, inside the roster's usual range;
+strongest against #0001 and #0005, weakest against #0006 (and #0007 at
+Medium). As first written it won 0.64, 0.44 and 0.44; the steps from there
+are in [#0008's specification](docs/characters/0008.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0008.js`: the
+moves' phases are whole frames of their clips at `FPS_0008` (the orders
+`JAB_STRAIGHT_0008`, `GATLING_0008`, `PISTOL_0008` and the rest); reaches
+are the attacks' `hitbox` and the Giant Pistol's `burst`; the limbs open to
+a hit are the attacks' `hurtboxes`; the Rocket is its `motion`; the rubber
+rebound is `launchBounce`; the heal is `techniques.attack4.heal`.
+
+**Code:** `js/data/characters/0008.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/ai/cpu-intelligence/defense.js` (the projectile answer);
+the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0008.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy, input,
+launch, rendering, the AI, testing).
+
+**Tests:** new `tests/fighters/0008/fighter-0008.test.mjs` (registration
+and kit; every move its body, none costing Energy; its Mash Combo; its
+names, touch buttons and controller layout; the 104 files, clean and
+tight, none a copy, at one scale, anchored on its body; every move's
+mechanic, its outstretched arm struck by a shot and its legs open to a
+hit; the Balloon bouncing a shot back into its thrower; its rubber
+rebound; the CPU playing its whole kit; its source named nowhere); the
+roster-wide tables (`cooldown-policy`, `special-abilities`: ten Specials,
+`strict-combat-rules`, `step-in`, `mash-combo`), `empty-roster`,
+`discover`, `practice-ground`, `watch-mode`, `settings` (its credits), each
+fighter's roster list, `move-cancel`, `universal-movement` and
+`cpu-behaviour` (above).

@@ -461,7 +461,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0004](../characters/0004.md#controller-layout),
 [#0005](../characters/0005.md#controller-layout),
 [#0006](../characters/0006.md#controller-layout),
-[#0007](../characters/0007.md#controller-layout).
+[#0007](../characters/0007.md#controller-layout),
+[#0008](../characters/0008.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -479,6 +480,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0006 air | Flying Kick | Flying Punch | Triple Strike | | | |
 | #0007 ground | Street Combo | Uppercut | Sawn-Offs | Pistol | Rocket Launcher | forward: Molotov Cocktail |
 | #0007 air | Flying Kick | Hammer Fist | | | | |
+| #0008 ground | Jab and Straight | Gum-Gum Gatling | Gum-Gum Balloon | Gum-Gum Pistol | Feast | forward: Gum-Gum Giant Pistol |
+| #0008 air | Gum-Gum Stamp | Gum-Gum Rocket | Floating Balloon | | | |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -509,8 +512,9 @@ rows have none. **Special abilities** holds only the moves the fighter
 itself classifies as Special (its `specialAbilities`,
 [combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
-Deadlights and Red Balloon, #0006's Ice Breath and #0007's Rocket
-Launcher, each tagged Ground or Air. Every other move, a
+Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
+Launcher and #0008's Feast and Gum-Gum Giant Pistol, each tagged Ground or
+Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

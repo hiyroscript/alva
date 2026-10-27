@@ -453,6 +453,20 @@ export class Defense {
         }
       }
     }
+    // Meet a projectile with a move of its own whose box turns projectiles
+    // back (`deflectProjectiles` on a move other than its Deflect, which is
+    // timed above): pressed now, its box live as the projectile arrives,
+    // where the CPU stands (on the ground or in the air, as the move is).
+    if ((threat.kind === 'projectile' || threat.kind === 'throw' || threat.kind === 'technique') && threat.def && free &&
+        !(s.me.charmed > 0)) {
+      for (const m of s.caps.moves) {
+        if (!m.deflectProjectiles || m.kind === 'deflect' || m.air === me.grounded || !moveReady(self, m)) continue;
+        if (m.startup + STEP > threat.contact || m.startup + m.active < threat.contact + STEP) continue;
+        const flight = Math.max(0, (threat.def.lifetime ?? 0) - (threat.age ?? 0) - threat.contact) * (threat.def.speed ?? 0);
+        const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + (threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
+        options.push({ score: 0.3 + back, plan: { kind: 'press', move: m, why: 'turns it back' }, why: 'turns it back' });
+      }
+    }
     this.weighed = options.map((o) => ({ why: o.why, score: o.score, threat }));
     // The level's judgement: noise on every option, and a lower level
     // sometimes misses the better answer or freezes.

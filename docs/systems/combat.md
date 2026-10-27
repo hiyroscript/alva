@@ -89,8 +89,8 @@ For example, #0001 has five (attack4 and attack5 techniques), #0002
 three ordinary ones, #0003 four (attack3 and attack4 techniques),
 #0004 five (attack4 and attack5 techniques), #0005 five (attack4 a
 technique, attack5 a summon), #0006 five (attack3 to attack5
-techniques) and #0007 five (attack3 to attack5 techniques)
-([character docs](../characters/README.md)).
+techniques), #0007 five (attack3 to attack5 techniques) and #0008 five
+(attack4 and attack5 techniques) ([character docs](../characters/README.md)).
 
 ## Attacks
 
@@ -176,7 +176,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0007 use them between them
+is built, and usable by any fighter (#0001 to #0008 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -279,11 +279,17 @@ today):
 - **Turning projectiles back** (`deflectProjectiles: true`): while its
   active phase is open, its hitbox turns back every other fighter's
   projectile it meets, before any projectile strikes that step
-  (`CombatSystem.deflectProjectiles`). Only every fighter's Deflect has it
-  ([defense](defense.md#the-deflect)); it needs a hitbox.
+  (`CombatSystem.deflectProjectiles`). Every fighter's Deflect has it
+  ([defense](defense.md#the-deflect)), and so does #0008's Gum-Gum
+  Balloon, an ordinary attack on the ground and floating in the air; it
+  needs a hitbox. A move that has it is a defense as well as an attack,
+  and gives way to a valid request as the Deflect does ([requests and
+  cancellation](#requests-and-cancellation)).
 - **Per airtime** (`airUses`) and **free fall** (`freeFall: true`).
 - **Body** (`passThrough: true`: no pushbox while it plays; `hurtboxes`:
-  the fighter's own replaced while it plays).
+  the fighter's own replaced while it plays: #0002's Spin Attack a smaller
+  ball, #0008's stretched arms and legs a bigger target, its body and the
+  limb it stretches out, so a hit on the limb is a hit on it).
 
 ## Attack classification
 
@@ -355,6 +361,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0005 | `['attack4', 'attack5']` | the Deadlights (whoever faces them floats helpless), the Red Balloon (a phantom that bites from behind, its fear feeding #0005) | Dark Tendrils |
 | #0006 | `['attack4']` | Ice Breath (a gale that freezes whoever it reaches) | Heat Vision, the Sonic Scream, the Triple Strike |
 | #0007 | `['attack5']` | the Rocket Launcher (a 10-damage rocket after a long heave) | the Molotov Cocktail, the Sawn-Offs, the Pistol |
+| #0008 | `['attack4', 'attack5']` | the Feast (heals its own Launch Point), the Gum-Gum Giant Pistol (a 10-damage giant fist after a long wind-up) | the Gum-Gum Balloon, the Gum-Gum Rocket, the Gum-Gum Gatling |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -679,12 +686,15 @@ The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
 (heal); #0004's Ievan Polkka 5 s (its double's six strikes add up to 10)
 and World is Mine 3 s (charm); #0005's Deadlights 3 s (float) and Red
 Balloon 3 s (its phantom's fear); #0006's Ice Breath 3 s (a freeze, its
-paralysis); #0007's Rocket Launcher 5 s (a 10-damage rocket). Everything else, Red, Blue and Maximum Blue (a pull earns
+paralysis); #0007's Rocket Launcher 5 s (a 10-damage rocket); #0008's
+Feast 3 s (a heal) and Gum-Gum Giant Pistol 5 s (a 10-damage fist). Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
 Spin (a pull and a carry), Heat Vision and Sonic Scream (a carry, a repel,
 a block push), #0007's Molotov Cocktail (a fire that strikes four times,
-6 in all) and Sawn-Offs included, has no cooldown, and every Deflect none.
+6 in all) and Sawn-Offs, #0008's Gatling (8 at the most), Balloon (a
+turn-back and a block push) and Rocket (a homing dash) included, has no
+cooldown, and every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs) cost 15 Energy instead ([energy](energy.md#construct-moves)).
@@ -747,7 +757,9 @@ or not) is gone.
      cuts an attack short, not even one that hit.
    - **A move that harms nobody** (a technique that only heals, a pending
      attack) **and the Deflect** (by explicit rule: it is a defense; see
-     `yieldsToRequests` in `js/game/combat/offense.js`) give way to any
+     `yieldsToRequests` in `js/game/combat/offense.js`), **and any other
+     move that turns projectiles back** (a defense too, by the same rule:
+     #0008's Gum-Gum Balloon, on the ground and in the air) give way to any
      valid request (`moveYields(at)`): another attack, a special (on the
      ground), a jump or air jump, a Dash or air dash, a fresh Shield press.
      Only a request made after the move began (`moveStartedAt`), never
