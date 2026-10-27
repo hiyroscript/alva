@@ -260,6 +260,9 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     '0005': { 'summon:attack5': 0, 'tech:attack4': 0 },
     // Two ordinary projectile techniques; Ice Breath (3 s).
     '0006': { 'tech:attack3': 15, 'tech:attack5': 15, 'tech:attack4': 0 },
+    // The Pistol, an ordinary shot; the Molotov Cocktail's fire and the
+    // Sawn-Offs' burst, ordinary casts; the Rocket Launcher (5 s).
+    '0007': { extra_attack: 15, 'tech:attack3': 15, 'tech:attack4': 15, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

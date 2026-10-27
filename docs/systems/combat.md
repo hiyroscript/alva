@@ -86,8 +86,8 @@ definition that breaks one is refused, every problem named):
 For example, #0001 has five (attack4 and attack5 techniques), #0002
 three ordinary ones, #0003 four (attack3 and attack4 techniques),
 #0004 five (attack4 and attack5 techniques), #0005 five (attack4 a
-technique, attack5 a summon) and #0006 five (attack3 to attack5
-techniques)
+technique, attack5 a summon), #0006 five (attack3 to attack5
+techniques) and #0007 five (attack3 to attack5 techniques)
 ([character docs](../characters/README.md)).
 
 ## Attacks
@@ -174,7 +174,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0006 use them between them
+is built, and usable by any fighter (#0001 to #0007 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -352,6 +352,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0004 | `['attack5']` | World is Mine (a charm: its opponents' hits heal it) | Ievan Polkka, the Melody |
 | #0005 | `['attack4', 'attack5']` | the Deadlights (whoever faces them floats helpless), the Red Balloon (a phantom that bites from behind, its fear feeding #0005) | Dark Tendrils |
 | #0006 | `['attack4']` | Ice Breath (a gale that freezes whoever it reaches) | Heat Vision, the Sonic Scream, the Triple Strike |
+| #0007 | `['attack5']` | the Rocket Launcher (a 10-damage rocket after a long heave) | the Molotov Cocktail, the Sawn-Offs, the Pistol |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -676,14 +677,15 @@ The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
 (heal); #0004's Ievan Polkka 5 s (its double's six strikes add up to 10)
 and World is Mine 3 s (charm); #0005's Deadlights 3 s (float) and Red
 Balloon 3 s (its phantom's fear); #0006's Ice Breath 3 s (a freeze, its
-paralysis). Everything else, Red, Blue and Maximum Blue (a pull earns
+paralysis); #0007's Rocket Launcher 5 s (a 10-damage rocket). Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
 Spin (a pull and a carry), Heat Vision and Sonic Scream (a carry, a repel,
-a block push) included, has no cooldown, and every Deflect none. The
-ordinary ones that create a construct (Red, Maximum Blue, the
-Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream) cost 15
-Energy instead ([energy](energy.md#construct-moves)).
+a block push), #0007's Molotov Cocktail (a fire that strikes four times,
+6 in all) and Sawn-Offs included, has no cooldown, and every Deflect none.
+The ordinary ones that create a construct (Red, Maximum Blue, the
+Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
+the Molotov Cocktail, the Sawn-Offs) cost 15 Energy instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and
 `CombatState.abilityCooldowns` are the only stores. The player's presses,

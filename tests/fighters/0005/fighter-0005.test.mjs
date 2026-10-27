@@ -110,7 +110,7 @@ test('#0005 is a real CHARACTERS entry: available, in roster slot 05, after #000
   assert.equal(DEF.displayName, '#0005');
   assert.equal(DEF.available, true);
   assert.equal(DEF.rosterSlot, 4);
-  assert.deepEqual(playableCharacters().map((c) => c.id), ['0001', '0002', '0003', '0004', '0005', '0006']);
+  assert.deepEqual(playableCharacters().map((c) => c.id), ['0001', '0002', '0003', '0004', '0005', '0006', '0007']);
   assert.equal(new Set(CHARACTERS.map((c) => c.rosterSlot)).size, CHARACTERS.length, 'one fighter per slot');
   assert.equal(DEF.movement, undefined, 'no movement of its own');
   assert.deepEqual(Object.keys(DEF.energy), ['regen'], 'its refill rate only');

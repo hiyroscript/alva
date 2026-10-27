@@ -221,12 +221,15 @@ test('K: in late overtime the closing Void makes the stage more dangerous to it,
     // launch lethal, and nearer the closing Void sooner).
     const lethal = (overtime) => {
       const sc = scenario({ difficulty: 'brutal', cpuDef, foeDef, overtime, timeLeft: overtime ? 4 : 200, cpuX: 1800, foeX: 1700 });
+      // The spots are on the ground, where it starts: by 0.05 s in it may
+      // already have jumped (a jump-in is its opening for some fighters).
+      const floor = sc.cpu.body.y;
       sc.run(0.05);
       const s = sc.ai.situation;
       sc.ai.evaluator.begin(s);
       let n = 0;
       for (let x = 2200; x <= 2470; x += 15) {
-        for (let extra = 5; extra <= 80; extra += 5) n += sc.ai.strategy.dangerAt(s, sc.ai.evaluator.judge, x, s.me.y, extra) > 0.5 ? 1 : 0;
+        for (let extra = 5; extra <= 80; extra += 5) n += sc.ai.strategy.dangerAt(s, sc.ai.evaluator.judge, x, floor, extra) > 0.5 ? 1 : 0;
       }
       return n;
     };

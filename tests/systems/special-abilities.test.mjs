@@ -49,11 +49,12 @@ const SPECIALS = Object.freeze({
   '0004': ['attack5'],
   '0005': ['attack4', 'attack5'],
   '0006': ['attack4'],
+  '0007': ['attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly seven Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon and Ice Breath', () => {
+test('exactly eight Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath and the Rocket Launcher', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -63,13 +64,19 @@ test('exactly seven Specials across the roster: Unlimited Void and Hollow Purple
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 7);
+  assert.equal(total, 8);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
   assert.deepEqual(specialAbilities(getCharacter('0004')).map((m) => name('0004', m)), ['World is Mine']);
   assert.deepEqual(specialAbilities(getCharacter('0005')).map((m) => name('0005', m)), ['Deadlights', 'Red Balloon']);
   assert.deepEqual(specialAbilities(getCharacter('0006')).map((m) => name('0006', m)), ['Ice Breath']);
+  assert.deepEqual(specialAbilities(getCharacter('0007')).map((m) => name('0007', m)), ['Rocket Launcher']);
+  // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
+  for (const move of ['attack3', 'attack4']) {
+    assert.equal(actionType(getCharacter('0007'), move), 'technique');
+    assert.equal(isSpecialAbility(getCharacter('0007'), move), false, `${name('0007', move)} is not Special`);
+  }
   // Heat Vision and the Sonic Scream are techniques too, and ordinary.
   for (const move of ['attack3', 'attack5']) {
     assert.equal(actionType(getCharacter('0006'), move), 'technique');
@@ -141,6 +148,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3', 'attack5', 'extra_attack'],
       air: ['attack1', 'attack2', 'extra_attack'],
       abilities: ['ground:attack4'],
+    },
+    '0007': {
+      ground: ['attack1', 'attack2', 'attack3', 'attack4', 'extra_attack'],
+      air: ['attack1', 'attack2'],
+      abilities: ['ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

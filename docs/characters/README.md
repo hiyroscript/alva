@@ -16,8 +16,9 @@ pages are part of the product specification
 | #0004 | 04 | yes | 5: Dance Combo / Air Dance, Leek Swing / Leekspin, Crescent Kick / Stage Dive, Ievan Polkka (technique), World is Mine (technique); extra attack: the Melody | [0004.md](0004.md) |
 | #0005 | 05 | yes | 5: Claw Swipe / Claw Rake, Long Bite / Snapping Jaws, Phantom Hands / Floating Hands, Deadlights (technique), Red Balloon (summon); extra attack: Dark Tendrils | [0005.md](0005.md) |
 | #0006 | 06 | yes | 5: Power Punch / Flying Kick, Tornado Spin / Flying Punch, Heat Vision (technique), Ice Breath (technique), Sonic Scream (technique); extra attack: the Triple Strike; three members drawn as one fighter (an ensemble), each move performed by its sister(s) | [0006.md](0006.md) |
+| #0007 | 07 | yes | 5: Street Combo / Flying Kick, Uppercut / Hammer Fist (its melee), Molotov Cocktail (technique), Sawn-Offs (technique), Rocket Launcher (technique) (its weapons); extra attack: the Pistol; half melee, half weapons | [0007.md](0007.md) |
 
-The other 42 of the 48 roster slots are locked placeholders. #0001 is the
+The other 41 of the 48 roster slots are locked placeholders. #0001 is the
 first playable fighter, so it is what
 startup preloads first, Quick Battle's initial pick, both Watch Mode CPUs
 and the Practice Ground default; that is an ordering, not a special role:
@@ -30,7 +31,7 @@ Where things are:
 | | |
 | --- | --- |
 | Definitions | [`js/data/characters/<id>.js`](../../js/data/characters/), registered in [`js/data/characters.js`](../../js/data/characters.js) |
-| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
+| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
 | Art | [`assets/characters/<id>/`](../../assets/characters/) |
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | A fighter drawn as several members (#0006) | its `ensemble` ([the character system](../architecture/character-system.md#ensembles-one-fighter-several-members), [adding a fighter](adding-characters.md#a-fighter-of-several-members)) |

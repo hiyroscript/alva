@@ -3623,3 +3623,101 @@ never moving; the CPU's lunge reading); `attack-mobility` removed;
 `tests/benchmarks/feel-metrics.mjs` now measures the Step-in, the
 displacement a held direction adds to a ground attack (0) and to an
 aerial (the air control), and normal movement's return.
+
+## #0007, the street soldier
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add #0007 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon (not only
+animations and damage), no move the character cannot perform in canon,
+the sheet's DeviantArt page credited, the character named nowhere, and a
+moveset half melee and half weapons, every melee attack close range.
+`character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0007 in roster slot 07, playable: 77 frames cut from
+  the sheet into `assets/characters/0007/` (1× crops, each tight to its own
+  art, the flat teal background (0, 119, 120) made transparent, nothing
+  redrawn or recoloured, every file `0007_<codename>_<frame>.png`): 65 of
+  the fighter, 12 of what its weapons send out (the Pistol's flash and
+  bullet, the Molotov Cocktail's fire, the rocket). Two of the sheet's
+  frames touched and were parted where they meet; two drawings the sheet
+  repeats within a move (the stance's third, the kick's tuck) are played
+  again from one file, never copied. Drawn at the roster's art-pixel size
+  (a 44-pixel fighting stance, about 74 units tall); its fists, kicks,
+  swings and blasts reach far from its body, so every clip authors its own
+  `anchorX` on its white vest (and the Deflect its `anchorY`). Movement is
+  the universal one; its Energy refills at 14 a second.
+- **Half melee, half weapons**, four of each, from its canon (a fighter of
+  the streets who learns boxing and other fighting styles and uses the
+  weapons he picks up; a heavy weapon cannot be fired off the ground, and
+  he fires none in mid-air). Its melee are its two ordinary attacks with
+  their mid-air versions, each reaching no further than an arm's or a
+  leg's length: the **Street Combo** (a jab and a cross that hold, then a
+  hook: 1, 1, 3), the **Uppercut** (5, straight up, and a jump may chase
+  its target), the **Flying Kick** (3, Base Launch 2) and the **Hammer
+  Fist** (3, a spike). Its weapons are its three techniques and its extra
+  attack, every one fired standing on the ground: the **Pistol** (a fast
+  shot out to 560 units, 15 Energy), the **Molotov Cocktail** (a technique:
+  a lit bottle that bursts into flames 150 units ahead, a fire that never
+  moves and burns whoever stays in it four times, 1, 1, 1, then 3 straight
+  up, never at #0007's feet; 15 Energy), the **Sawn-Offs** (a technique: a
+  sawn-off in each hand fired to both sides at once, 5 straight up to
+  whoever is in front or behind; 15 Energy) and the **Rocket Launcher** (a
+  technique, its Special: 0.75 s heaving it up and aiming, any hit breaking
+  it, then a rocket for 10 at Base Launch 3 that drives a raised Shield
+  back; 5 s). Its guard is a boxer's high guard; its Dash the combat roll,
+  its air dash the dive; its Deflect a two-fisted swat. The sheet's sniper
+  rifle, submachine gun and assault rifle, its katana and shovel, its
+  aerial rocket launcher, its motorcycle and train, its intro, wins and
+  losses are no move.
+- **No new engine feature.** Every mechanic is shared data any fighter can
+  use: strikes (`hits`) and `hitCancel`, a projectile with no `speed` that
+  `pierce`s (as #0004's dancing double), a technique's burst round its
+  fighter, `blockPush`, the policy's cooldowns and Energy.
+- **Its controller layout** by the comfort rules (Square the Street Combo /
+  Flying Kick, Triangle the Uppercut / Hammer Fist, Circle the Sawn-Offs,
+  R2 the Pistol, L2 the Rocket Launcher, the right stick forward the
+  Molotov Cocktail), touch buttons, names and descriptions in English and
+  French, a Discover profile (3/5) and its credits (the sheet by
+  xxalexsmashxx on DeviantArt, linked by the deviation's number alone).
+
+Found on the way: the CPU behaviour test of the closing Void in overtime
+(K) measured its danger at the CPU's own height 0.05 s into the
+scenario, where #0007's CPU has already jumped in; it now measures at the
+floor where the CPU starts, as it means to. The disabled test fighter
+moved from slot 07 (now #0007's) to slot 11.
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 144 matches a level): #0007 wins 0.47 at
+Medium, 0.52 at Hard and 0.59 at Brutal, inside the roster's usual range;
+strongest against #0001, weakest against #0002. As first written it won
+0.67 at Medium and Brutal, on a Pistol fired a fifteenth of a second after
+the press; the steps from there are in [#0007's
+specification](docs/characters/0007.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0007.js`:
+the moves' phases are whole frames of their clips at `FPS_0007`; the
+weapons' reach and power are its `projectiles` and its techniques'
+`burst`; the Rocket Launcher's heave is `FPS_0007.attack5_cast`; the fire's
+burns are `attack3_object.pierce`.
+
+**Code:** `js/data/characters/0007.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings; the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0007.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy, input,
+launch, rendering, the AI, testing).
+
+**Tests:** new `tests/fighters/0007/fighter-0007.test.mjs` (registration
+and kit; half melee and half weapons, every melee move close range and no
+weapon in the air; its names, touch buttons and controller layout; the 77
+files, clean and tight, none a copy, at one scale, anchored on its body;
+every move's mechanic; the CPU playing its whole kit; its source named
+nowhere); the roster-wide tables (`cooldown-policy`, `special-abilities`:
+eight Specials, `strict-combat-rules`, `step-in`, `controller-profiles`),
+`empty-roster`, `discover`, `practice-ground`, `watch-mode`,
+`quick-battle`, `settings` (its credits), each fighter's roster list and
+`cpu-behaviour` (K, above).

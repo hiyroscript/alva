@@ -194,7 +194,7 @@ const { PlayerController } = await import('../../js/game/fighters/fighter-contro
 
 // Beside #0001 and #0002: Test A (slot 09), #9999 (#0001's art under another
 // id, slot 06), the sample fighter's different moves (slot 05) and a
-// disabled fighter (slot 07) no route may pick.
+// disabled fighter (slot 11) no route may pick.
 const DEF_9999 = testFighter('9999', '#9999', 5);
 useTestFighters(TEST_A, DEF_9999, TEST_SAMPLE, TEST_DISABLED);
 

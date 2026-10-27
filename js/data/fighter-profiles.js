@@ -129,6 +129,18 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0006.playStyle',
     reviewedSourceHash: '8318977e70f4b7f2d10cb2470b1179bbf64334a2363ccbff10c7facd83ed4ab4',
   }),
+  // A street fighter split down the middle: plain, quick fists and feet up
+  // close (a holding string, a launcher, a spike) and ground-bound weapons
+  // from afar (a fast shot, a fire that burns where it lands, blasts to
+  // both sides, a heavy rocket). Approachable: every tool does one clear
+  // thing; the depth is in spending its Energy between shots, placing the
+  // fire ahead of an approach, turning the launcher into air chases, and
+  // finding room for the rocket's long, breakable aim.
+  '0007': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0007.playStyle',
+    reviewedSourceHash: '1b096dc7e009cfeafed2bdeb6bf49a1d3e8909f64fe829844ddd6f731ba6d9d7',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

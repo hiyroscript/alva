@@ -108,6 +108,7 @@ const VERDICTS = {
   '0004': { attack1: 'universal', attack2: 'universal', attack3: 'universal', extra_attack: 'exempt' },
   '0005': { attack1: 'universal', attack2: 'universal', attack3: 'declined', extra_attack: 'declined', attack5: 'declined' },
   '0006': { attack1: 'universal', attack2: 'exempt', extra_attack: 'exempt' },
+  '0007': { attack1: 'universal', attack2: 'universal', extra_attack: 'exempt' },
 };
 
 test('every fighter\'s verdicts, as its moves really work', () => {

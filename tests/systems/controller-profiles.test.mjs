@@ -545,7 +545,7 @@ function savedThen(def, changes = {}) {
 }
 
 // The fighters playable when settings version 5 saved profiles: a fighter
-// added since (#0006) recommended nothing then, so it keeps no layout of
+// added since (#0006, #0007) recommended nothing then, so it keeps no layout of
 // then.
 const PLAYABLE_THEN = Object.freeze(['0001', '0002', '0003', '0004', '0005']);
 

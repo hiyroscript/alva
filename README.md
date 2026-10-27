@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Six playable fighters** on a 48-slot roster:
+- **Seven playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -57,20 +57,26 @@ blocks every attack.
   Balloon, a phantom that rises out of a bunch of balloons behind its prey
   to bite, leaving it afraid, so that for a while every hit on it heals
   #0005; black tendrils that reel opponents in; a head that stretches out
-  on a long neck to bite across the stage; claws and ghostly hands), and
+  on a long neck to bite across the stage; claws and ghostly hands),
   [#0006](docs/characters/0006.md), three flying sisters who are one
   fighter, drawn as three members (an **ensemble**: one body, one hurtbox,
   one Launch Point, one Shield; all three move, guard, get hurt and fly off
   together, and each move is performed by the sister whose power it is
   while the others step back: pink's heat-vision beam and freezing breath,
   green's tornado, blue's sonic scream, and all three streaking at their
-  foe together). All six Shield on the ground and Deflect in the air (a
-  strike that knocks projectiles back at their thrower), and all six Dash
-  on the ground and air dash. Each fighter
+  foe together), and [#0007](docs/characters/0007.md), the street
+  soldier, half fists and feet and half weapons (a string of punches, an
+  uppercut, a flying kick and a hammer fist, all up close; a pistol, a
+  molotov cocktail whose fire burns where it lands, a sawn-off in each
+  hand fired to both sides at once and a rocket launcher, all fired
+  standing on the ground). All seven Shield on the ground and Deflect in
+  the air (a strike that knocks projectiles back at their thrower), and
+  all seven Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
-  #0006's Ice Breath): an orange exclamation mark floats over
+  #0006's Ice Breath, #0007's Rocket Launcher): an orange exclamation
+  mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
@@ -277,6 +283,9 @@ sheet's own credit: sprites by regularDor8go.
 ([where it was found](https://share.google/uwRM2BMytKaaK3Ycf)); the sheet's
 own credits: Cosbydaf (NGC sprites), Kenshin Himura (rip), Misse-the-cat
 (revamped sprites).
+
+**#0007 sprite source.** Sprite sheet by xxalexsmashxx on
+[DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/955490753).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related
