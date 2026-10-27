@@ -3588,7 +3588,7 @@ cooldown or Energy changed.
 matchup over every pairing, both stages; the code before the change, then
 after): Brutal v Hard 93.1% [88-96] then 93.1% [88-96], points 2.88 : 0.76
 then 2.90 : 0.92; Hard v Medium 93.1% [88-96] then 89.6% [84-94]; Medium v
-Easy 99.3% then 99.3%; Brutal v the balanced reference 100% then 100%,
+Easy 99.3% [96-100] then 100% [97-100]; Brutal v the balanced reference 100% then 100%,
 its self-eliminations 1 then 4 in 144 games. Inactivity and stuck
 navigation stayed at 0 throughout.
 
