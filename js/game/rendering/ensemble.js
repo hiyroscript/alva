@@ -284,19 +284,29 @@ export class EnsembleAnimator {
   // The fighter's visual state `stateKey`, for every member on this step:
   // the members `performers` names play it (all of them when null), the
   // others their aside clip; `formation`, the move's own places.
-  play(stateKey, { restart = false, performers = null, formation = null } = {}) {
+  // `activation` is the move activation it belongs to (see SpriteAnimator):
+  // each performer restarts its clip once as a new one begins; a member
+  // aside belongs to none.
+  play(stateKey, { restart = false, performers = null, formation = null, activation } = {}) {
     this.stateKey = stateKey;
     this.performers = performers;
     this.formation = formation;
     for (const m of this.members) {
       m.performing = !performers || performers.includes(m.id);
-      m.animator.play(m.performing ? stateKey : this.spec.aside, { restart: restart && m.performing });
+      m.animator.play(m.performing ? stateKey : this.spec.aside, {
+        restart: restart && m.performing,
+        activation: activation === undefined ? undefined : m.performing ? activation : null,
+      });
     }
   }
 
-  // Playback speed (a run's stride, a Dash's single pass): every member's.
-  setSpeed(scale) {
+  // Playback speed (a run's stride, a Dash's single pass, a Mash Combo
+  // turn's rate): every performer's. `glide` speeds the members' steps
+  // between places by as much (a Mash Combo hands the front from one
+  // sister to the next at its own pace); 1 otherwise.
+  setSpeed(scale, { glide = 1 } = {}) {
     for (const m of this.members) m.animator.setSpeed(m.performing ? scale : 1);
+    this.glideScale = glide;
   }
 
   // One fixed step: every member's clip advances, then every member moves
@@ -306,7 +316,7 @@ export class EnsembleAnimator {
     this.facing = facing;
     this.time += dt;
     const targets = formationTargets(this.members, this.performers, this.spec, this.formation);
-    const reach = this.spec.glide * dt;
+    const reach = this.spec.glide * (this.glideScale ?? 1) * dt;
     const { height, period } = this.spec.float;
     for (const m of this.members) {
       m.animator.update(dt);

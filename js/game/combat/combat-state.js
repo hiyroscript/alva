@@ -145,6 +145,29 @@ export class CooldownTimers {
   }
 }
 
+// One step of attack record `a`'s clock: `dt` x its `rate` (1 for any
+// ordinary activation; a Mash Combo turn's is MASH_COMBO.rate, see
+// js/data/mash-combo.js). A faster attack crosses more of its own time in a
+// step than one fixed step: `samples` then lists every whole-step time of
+// its own clock it reached on the way (at rate 2, the step's middle and its
+// end), so a strike window only one step long is never skipped over: hit
+// resolution checks each of them (see CombatSystem.update). At its own pace
+// (or frozen) `samples` is null and only `time` counts, exactly as ever.
+export function sweepAttack(a, dt) {
+  const rate = a.rate ?? 1;
+  const from = a.time;
+  a.time += dt * rate;
+  if (!(rate > 1)) {
+    a.samples = null;
+    return;
+  }
+  const n = Math.ceil(rate - PHASE_EPSILON);
+  const out = a.samples ?? [];
+  out.length = n;
+  for (let k = 1; k <= n; k++) out[k - 1] = from + ((a.time - from) * k) / n;
+  a.samples = out;
+}
+
 // Per-fighter combat state.
 export class CombatState {
   constructor(energy = resolveEnergy()) {
@@ -472,6 +495,8 @@ export class CombatState {
       if (!this.fear) this.frightenedBy = null;
     }
     if (this.hitstop > 0) {
+      // Frozen: the attack reaches no new time this step (see sweepAttack).
+      if (this.attack) this.attack.samples = null;
       // To within a little slack, so a freeze a whole number of steps long
       // (0.05 s) lasts exactly that many.
       this.hitstop = this.hitstop - dt <= PHASE_EPSILON ? 0 : this.hitstop - dt;
@@ -486,7 +511,7 @@ export class CombatState {
     if (this.floating > 0) this.floating = this.floating - dt <= PHASE_EPSILON || !this.paralysis ? 0 : this.floating - dt;
     if (this.attack) {
       const a = this.attack;
-      a.time += dt;
+      sweepAttack(a, dt);
       // Nothing comes out of an attack while its fighter is stunned or held
       // (Fighter.update takes the attack away on this same step).
       const free = this.stun <= 0 && !this.immobilized;

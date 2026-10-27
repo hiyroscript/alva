@@ -81,6 +81,9 @@ const CLIPS = {
   releaseshield: named('releaseshield', 2),
   deflect: named('deflect', [1, 2, 2, 3]),
   attack1: named('attack1', 3),
+  // The Backhand Rake, its Mash Combo partner: the Deflect's claw sweep under
+  // its own codename.
+  mash_attack: named('mash_attack', [1, 2, 2, 3]),
   midair_attack1: named('midair_attack1', 5),
   attack2: named('attack2', [1, 2, 3, 4, 5, 6, 7, 8, 9, 4, 3, 2, 1]),
   midair_attack2: named('midair_attack2', [1, 2, 3, 4, 5, 6, 6, 7, 2, 1]),
@@ -98,7 +101,7 @@ const FILES = [...new Set([...Object.values(CLIPS), ...Object.values(OBJECTS)].f
 // The tallest frame of each clip, in art pixels (one per file pixel).
 const HEIGHTS = {
   idle: 64, run: 47, jump: 61, fall: 61, land: 42, mouvment: 51, midair_mouvment: 47, hurt: 53, midair_hurt: 55,
-  prepshield: 56, shielding: 59, releaseshield: 56, deflect: 71, attack1: 58, midair_attack1: 71, attack2: 51,
+  prepshield: 56, shielding: 59, releaseshield: 56, deflect: 71, attack1: 58, mash_attack: 71, midair_attack1: 71, attack2: 51,
   midair_attack2: 50, attack3: 67, midair_attack3: 77, attack4_cast: 56, attack4_release: 56, attack5_summon: 64,
   attack5: 62, extra_attack: 64,
 };
@@ -133,9 +136,11 @@ test('five numbered attacks, each a button of its own: three ordinary with mid-a
     types: { attack1: 'attack', attack2: 'attack', attack3: 'attack', attack4: 'technique', attack5: 'summon' },
     extra: true,
   });
-  // attack5 is the phantom's bite: the attack the summon's clone performs.
+  // attack5 is the phantom's bite: the attack the summon's clone performs;
+  // mash_attack the Backhand Rake, its Mash Combo partner, no button's.
   assert.deepEqual(Object.keys(DEF.attacks).sort(),
-    ['attack1', 'attack2', 'attack3', 'attack5', 'extra_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3']);
+    ['attack1', 'attack2', 'attack3', 'attack5', 'extra_attack', 'mash_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3']);
+  assert.deepEqual(DEF.mashCombo, { attacks: ['attack1', 'mash_attack'] });
   assert.deepEqual(Object.keys(DEF.techniques), ['attack4']);
   assert.deepEqual(Object.keys(DEF.summons), ['attack5']);
   assert.equal(DEF.summons.attack5.attack, 'attack5');
@@ -166,8 +171,9 @@ test('its in-game names and touch buttons name each move, in English and French,
   };
   assert.deepEqual(buttons('en'), ['Dark Tendrils', 'Claw Swipe', 'Long Bite', 'Phantom Hands', 'Deadlights', 'Red Balloon']);
   assert.deepEqual(buttons('fr'), ['Tentacules sombres', 'Coup de griffes', 'Morsure allongée', 'Mains fantômes', 'Lumières mortes', 'Ballon rouge']);
-  assert.deepEqual(['midair_attack1', 'midair_attack2', 'midair_attack3'].map((m) => STRINGS.fr[`ability.0005.${m}`]),
-    ['Griffes plongeantes', 'Mâchoires claquantes', 'Mains flottantes']);
+  assert.deepEqual(['midair_attack1', 'midair_attack2', 'midair_attack3', 'mash_attack'].map((m) => STRINGS.fr[`ability.0005.${m}`]),
+    ['Griffes plongeantes', 'Mâchoires claquantes', 'Mains flottantes', 'Revers de griffes']);
+  assert.equal(abilityName(DEF, 'mash_attack'), 'Backhand Rake', 'its Mash Combo partner');
   const art = (a, air = false) => previewFrame(DEF, a, air)?.url.split('/').pop() ?? null;
   assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'].map((a) => art(a)), [
     '0005_extra_attack_4.png', '0005_attack1_2.png', '0005_attack2_5.png', '0005_attack3_3.png', '0005_attack4_3.png', '0005_attack5_4.png',
@@ -200,7 +206,7 @@ test('its recommended controller layout: claws, jaws and hands on the face both 
 
 test('its folder holds exactly the frames its clips and objects play: every file named <id>_<codename>_<frame>.png, none a copy within a clip', () => {
   assert.deepEqual(readdirSync(`${ROOT}${DIR}`).sort(), FILES);
-  assert.equal(FILES.length, 80);
+  assert.equal(FILES.length, 83);
   for (const [key, want] of Object.entries(CLIPS)) assert.deepEqual(DEF.animations[key].frames.map(file), want, key);
   assert.deepEqual(Object.keys(DEF.animations).sort(), Object.keys(CLIPS).sort());
   assert.deepEqual(DEF.effectAnimations.attack5_object.frames.map(file), OBJECTS.attack5_object);

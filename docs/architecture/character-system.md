@@ -75,8 +75,12 @@ way past a Shield (`unblockable` and every other Shield bypass), any
 `offensive` agreeing with what the move does, a summon's clone performing
 an attack that strikes, and no Energy maximum or cost of its own), and
 its `specialAbilities` (`assertSpecialAbilities`: only moves it really
-performs, each once); one that breaks a rule is refused with the problem
-named.
+performs, each once), and its Mash Combo pair (`assertMashCombo`: exactly
+two distinct grounded close-range melee strikes, each a button's ground
+move or its button-less `mash_attack`, never a Special, aerial,
+projectile, summon, technique, 3 s / 5 s move, pull, carry, roll or dash,
+or a strike reaching past close range: [combat](../systems/combat.md#mash-combo));
+one that breaks a rule is refused with the problem named.
 
 ## What a definition holds
 
@@ -96,6 +100,7 @@ named.
 | `mobileAbilities` | touch controls ([input](../systems/input.md#touch-controls)) | no (neutral glyphs and names) |
 | `abilityNames` | localization, touch labels | no (neutral names) |
 | `specialAbilities` | the controller editor's Special abilities category, the Special ability mark ([combat](../systems/combat.md#special-abilities)) | no (none Special); each entry a move it really performs |
+| `mashCombo` | the [Mash Combo](../systems/combat.md#mash-combo): the Fighter (`mashPair`), the CPU (`caps.mash`) | yes: `{ attacks: [A, B] }`, its two grounded close-range melee strikes (`mash_attack`, a button-less partner, only where every button is taken by other kinds of moves) |
 
 Character-specific constants (playback rates, art measurements, shared
 hitboxes) live beside the definition in the same module.

@@ -188,5 +188,6 @@ test('its ability names are its own; unnamed moves, and moves it does not have, 
     attack5: 'Attack 5',
     midair_attack5: 'Mid-air Attack 5',
     extra_attack: 'Palm Strike',
+    mash_attack: 'Mash attack',
   });
 });

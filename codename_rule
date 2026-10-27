@@ -31,6 +31,7 @@ Use lowercase codenames and underscores. Numbered frames start at 1 and play in 
 | Summon startup (the owner's own pose before its summon appears) | <id>_attackN_summon_<frame>.png |
 | Mid-air numbered attack | <id>_midair_attackN_<frame>.png |
 | Extra attack | <id>_extra_attack_<frame>.png |
+| Mash Combo partner (only where needed, see below) | <id>_mash_attack_<frame>.png |
 
 Replace N with the attack number, from 1 through 5. Preserve the codename spelling mouvment for animation keys and assets, including midair_mouvment.
 
@@ -51,6 +52,10 @@ Attack numbers identify moves; they do not prescribe damage, effects or mechanic
 extra_attack is a separate, additional character-specific action. It may be a projectile, throw, utility move or other unique attack. It does not count toward the 2–5 numbered attack limit, so a character may have five numbered attacks plus extra_attack. Its airborne availability is defined by the character's loadout.
 
 Shield, Deflect, movement, mid-air movement, jump and down are not numbered attacks.
+
+## Mash Combo partner
+
+Every character's Mash Combo is made of two grounded close-range melee strikes it already has on its buttons (for example attack1 and extra_attack). A character whose every button is taken by moves of another kind (techniques, summons, ranged or travelling moves) and that has no second close-range strike adds one more move under the shared codename mash_attack: a grounded close-range strike of its own body with no button and no mid-air version, performed only as the Mash Combo's partner turn. It is never a combat button, never counted among the numbered attacks and never a logical action a controller binding can send. Its art is <id>_mash_attack_<frame>.png (a member's <id>_mash_attack_<member>_<frame>.png), and its in-game name is the character's own, in abilityNames.
 
 ## Attack launch levels
 
@@ -142,7 +147,7 @@ A summon may explicitly reuse its owner's animation clips and hit data. Shared a
 
 ## Internal codenames and display names
 
-Use attack1 through attack5, midair_attack1 through midair_attack5 and extra_attack as the shared internal vocabulary. Do not introduce alternate internal move names based on a character, technique or player-facing label.
+Use attack1 through attack5, midair_attack1 through midair_attack5, extra_attack and mash_attack as the shared internal vocabulary. Do not introduce alternate internal move names based on a character, technique or player-facing label.
 
 Legacy terms such as ba, maba, cba and uniqueba are not live attack IDs. They may appear only when documenting history or reading older saved data for migration.
 

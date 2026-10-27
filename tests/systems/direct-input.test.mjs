@@ -22,6 +22,7 @@ import { blankInput } from '../../js/game/fighters/fighter-controller.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { attackReach, isMeleeAttack, isRangedAttack } from '../../js/game/combat/attacks.js';
 import { specialAction } from '../../js/data/loadout.js';
+import { MASH_COMBO } from '../../js/data/mash-combo.js';
 import { getCharacter, playableCharacters } from '../../js/data/characters.js';
 import { DT } from '../helpers/fighter-harness.mjs';
 import { playerRig, press } from '../helpers/player-rig.mjs';
@@ -76,7 +77,12 @@ test('the press for the attack already playing, mashed or held, never cuts, rest
         const why = `#${c.id} ${action}${held ? ' held' : ' mashed'}`;
         // Close enough to strike: the repeats meet a real hit and its freeze.
         const r = playerRig({ character: c, gap: 40 });
-        r.tick(press(action));
+        // Mashed, a Mash Combo trigger is pressed one press short of its
+        // count (five set the series off: the exception covered in
+        // tests/systems/mash-combo.test.mjs); any other button throughout.
+        let presses = r.player.mashPair?.triggers.has(action) ? MASH_COMBO.presses - 1 : Infinity;
+        const mash = () => (presses-- > 0 ? press(action) : {});
+        r.tick(mash());
         const rec = r.player.combat.attack;
         const combat = r.player.combat;
         let ends = 0;
@@ -97,7 +103,8 @@ test('the press for the attack already playing, mashed or held, never cuts, rest
         while (r.player.combat.attack === rec) {
           // A cooldown, if it has one, only from its release (an ordinary move none at all).
           assert.equal(combat.cooldowns.has(rec.def.id), !!rec.released && rec.def.cooldown > 0, `${why}: no cooldown before its release`);
-          r.tick(held ? { [action]: true } : press(action));
+          r.tick(held ? { [action]: true } : mash());
+          assert.equal(r.player.mash.engaged, false, `${why}: no Mash Combo below its count`);
           for (const p of r.projectiles) if (p.ability === rec.def.id) thrown.add(p);
           if (r.player.combat.attack !== rec) break;
           assert.ok(rec.time >= lastTime - EPS, `${why}: never restarted`);
@@ -129,6 +136,10 @@ test('mashing one button never beats the definitions: only its own attack, each 
     for (const action of ['attack1', 'attack2']) {
       const why = `#${c.id} ${action}`;
       const r = playerRig({ character: c, gap: 40 });
+      // A Mash Combo trigger mashed this fast sets the series off (its pair,
+      // alternating, as its own rules say: tests/systems/mash-combo.test.mjs);
+      // every other activation is the button's own.
+      const pair = r.player.mashPair?.triggers.has(action) ? r.player.mashPair.attacks : [];
       const own = [true, false].map((ground) => r.player.attackFor(action, ground));
       const played = new Map();
       for (let i = 0; i < 240; i++) {
@@ -145,7 +156,8 @@ test('mashing one button never beats the definitions: only its own attack, each 
       const runs = [...played].map(([rec, t]) => ({ rec, ...t })).filter((x) => x.end != null);
       assert.ok(runs.length >= 2, `${why}: ${runs.map((x) => x.rec.def.id)}`);
       runs.forEach((x, i) => {
-        assert.ok(own.includes(x.rec.def.id), `${why}: only its own attack (${x.rec.def.id})`);
+        if (x.rec.mash) assert.ok(pair.includes(x.rec.def.id), `${why}: a Mash Combo turn is one of its pair (${x.rec.def.id})`);
+        else assert.ok(own.includes(x.rec.def.id), `${why}: only its own attack (${x.rec.def.id})`);
         if (i > 0) assert.ok(x.start >= runs[i - 1].end, `${why}: never before the last one ended`);
         const last = runs.slice(0, i).findLast((y) => y.rec.def.id === x.rec.def.id);
         if (last) assert.ok(x.start - last.end >= Math.round(x.rec.def.cooldown / DT), `${why}: again only once its cooldown is over`);

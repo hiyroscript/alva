@@ -107,8 +107,10 @@ const FIGHT_SECONDS = 50;
 // Two seeds each: a level's rarest moves (Easy's above all) are used a
 // handful of times a fight, so one fight's luck is never what decides.
 const FIGHT_SEEDS = [3, 4];
-// More seeds, only where a rare move has not come up in the shared fights.
-const EXTRA_SEEDS = [5, 6];
+// More seeds, only where a rare move has not come up in the shared fights
+// (Mash Combos take up some of every fight's time, so a level's rarest
+// aerial may need one more).
+const EXTRA_SEEDS = [5, 6, 7, 8];
 const fights = new Map();
 function fightsAt(difficulty) {
   if (!fights.has(difficulty)) {

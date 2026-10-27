@@ -191,7 +191,9 @@ test('menu labels, titles and buttons are in sentence case', () => {
   const PROPER = new Set(['Alva', 'ALVA', 'CPU', 'Player', 'Launch', 'Point', 'Base', 'Directional', 'Void', 'Shield',
     'Deflect', 'Dash', 'Energy', 'Attack', 'PlayStation', 'Xbox', 'Nintendo', 'Bluetooth', 'Safari', 'Chrome', 'Edge',
     'Firefox', 'Enter', 'Esc', 'A', 'D-pad', 'Run', 'Discover', 'Settings', 'Quick', 'Watch', 'Practice', 'Custom',
-    'Regular', 'Combat', 'Mobile', 'Controls', 'Movement', 'Launch', 'Fighters', 'Up', 'Down', 'Page']);
+    'Regular', 'Combat', 'Mobile', 'Controls', 'Movement', 'Launch', 'Fighters', 'Up', 'Down', 'Page',
+    // The Mash Combo, a game term like the Shield or the Dash.
+    'Mash', 'Combo']);
   for (const [key, value] of Object.entries(EN)) {
     if (typeof value !== 'string' || key.startsWith('banner.') || key.startsWith('ability.') || key.startsWith('credits.')) continue;
     if (/[.!?…:]/.test(value) || value.split(' ').length > 5) continue; // sentences and prose

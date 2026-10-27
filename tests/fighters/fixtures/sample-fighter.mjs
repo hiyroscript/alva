@@ -62,6 +62,9 @@ export const SAMPLE_FIGHTER = Object.freeze({
     attack2: { ground: 'attack2', air: 'midair_attack2' },
     attack3: { type: 'summon', id: 'attack3' },
   },
+  // Its Mash Combo pair (js/data/mash-combo.js): the Jab and the Palm
+  // Strike, both close-range blows of its own body.
+  mashCombo: { attacks: ['attack1', 'extra_attack'] },
   summons: {
     attack3: {
       attack: 'attack2',

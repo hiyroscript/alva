@@ -145,7 +145,8 @@ test('while its own attack plays it never turns away from where it sees its oppo
         seen.clear();
         r.step();
         for (const { f, atk, facing } of before) {
-          if (!atk && f.combat.attack) attacks++;
+          // Every activation counts (a Mash Combo's turns each one).
+          if (f.combat.attack && f.combat.attack !== atk) attacks++;
           if (!atk || f.combat.attack !== atk || f.facing === facing || atk.def.motion) continue;
           assert.equal(f.facing, seen.get(f), `${difficulty} seed ${seed}: ${f.label} turned away from where it sees its opponent at step ${r.n}`);
         }

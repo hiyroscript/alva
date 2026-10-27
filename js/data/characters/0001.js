@@ -351,6 +351,12 @@ export const CHARACTER_0001 = {
     attack5: { type: 'technique', id: 'attack5' }, // Hollow Purple
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): the Jab and the High Kick,
+  // both at arm's and leg's length. Red and Maximum Blue are orbs
+  // (projectiles), never in it. Mashing either button sets off twelve turns,
+  // that move first, the other the finisher.
+  mashCombo: { attacks: ['attack1', 'extra_attack'] },
+
   // Its Special abilities (js/data/special-abilities.js): what the game
   // presents to the player as Special, its two most distinctive moves.
   // Unlimited Void paralyzes everyone close round it; Hollow Purple's

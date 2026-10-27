@@ -38,6 +38,9 @@ test('#0001 names the moves it has names for; the rest keep their neutral names'
     attack5: 'Hollow Purple',
     midair_attack5: 'Mid-air Attack 5',
     extra_attack: 'High Kick',
+    // #0001's Mash Combo pairs two moves of its buttons: it authors no
+    // button-less partner, so that codename keeps its neutral name.
+    mash_attack: 'Mash attack',
   });
 });
 

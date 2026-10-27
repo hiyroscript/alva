@@ -125,11 +125,15 @@ test('the combat buttons are extra_attack and attack1 to attack5; shield, jump a
   assert.deepEqual([...ABILITY_ACTIONS], [...COMBAT_BUTTONS], 'the touch buttons a fighter presents');
 });
 
-test('the move codenames are universal and neutral: numbered attacks, their mid-air versions and the extra attack', () => {
+test('the move codenames are universal and neutral: numbered attacks, their mid-air versions, the extra attack and the Mash Combo partner', () => {
   assert.deepEqual(Object.keys(MOVES), [
     'attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3',
-    'attack4', 'midair_attack4', 'attack5', 'midair_attack5', 'extra_attack',
+    'attack4', 'midair_attack4', 'attack5', 'midair_attack5', 'extra_attack', 'mash_attack',
   ]);
+  // The Mash Combo partner (js/data/mash-combo.js): no number, no button,
+  // never an aerial.
+  assert.deepEqual({ ...MOVES.mash_attack }, { number: null, air: false, label: 'Mash attack' });
+  assert.equal(COMBAT_BUTTONS.includes('mash_attack'), false, 'no button of its own');
   for (const [i, id] of NUMBERED_ATTACKS.entries()) {
     assert.deepEqual({ ...MOVES[id] }, { number: i + 1, air: false, label: `Attack ${i + 1}` });
     assert.deepEqual({ ...MOVES[`midair_${id}`] }, { number: i + 1, air: true, label: `Mid-air Attack ${i + 1}` });

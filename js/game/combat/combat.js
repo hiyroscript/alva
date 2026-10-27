@@ -62,7 +62,7 @@
 // js/game/combat/defense.js): a melee attacker freezes in it.
 
 import { resolveLaunchStrength, resolveDirectionalLaunch } from '../../data/launch.js';
-import { strikeLive } from './attacks.js';
+import { attackPhase, strikeLive } from './attacks.js';
 import { hitReaches } from './hit-effects.js';
 
 // How a fighter responds to being launched (the character's
@@ -160,6 +160,31 @@ const NO_LAUNCH = Object.freeze({ x: 0, y: 0 });
 // ATTACK_SOURCES. It has no attacker and credits nobody.
 export const HAZARD_SOURCE = 'hazard';
 
+// Whether attack record `atk`'s active phase is open at any time its clock
+// reached this step: its `samples` when it ran faster than the fixed step
+// (a Mash Combo turn, see sweepAttack in js/game/combat/combat-state.js),
+// else its time now.
+function activeNow(atk) {
+  const s = atk.samples;
+  if (!s) return attackPhase(atk.def, atk.time) === 'active';
+  for (let i = 0; i < s.length; i++) if (attackPhase(atk.def, s[i]) === 'active') return true;
+  return false;
+}
+
+// Whether multi-hit strike `h` of attack record `atk` is live at any time
+// its clock reached this step (see activeNow).
+function strikeLiveNow(h, atk) {
+  const s = atk.samples;
+  if (!s) return strikeLive(h, atk.time);
+  for (let i = 0; i < s.length; i++) if (strikeLive(h, s[i])) return true;
+  return false;
+}
+
+// Whether a hit of attack record `atk` has its launch suppressed: a Mash
+// Combo turn before its last (js/data/mash-combo.js). Its Base Launch is
+// then 0 for every strike of it; the final turn's is its own.
+const launchSuppressed = (atk) => !!atk.mash && !atk.mash.final;
+
 const scratchHit = {};
 const scratchHurt = {};
 const scratchBurst = {};
@@ -230,7 +255,7 @@ export class CombatSystem {
     for (const attacker of fighters) {
       const atk = attacker.combat.attack;
       if (atk?.impactDue) this.impact(attacker, atk, fighters);
-      if (!atk || attacker.combat.phase !== 'active') continue;
+      if (!atk || !activeNow(atk)) continue;
       if (atk.def.hits) {
         this.strike(attacker, atk, fighters);
         continue;
@@ -245,9 +270,12 @@ export class CombatSystem {
         // One hit per attack, blocked or not; only a real hit (never a
         // block) opens its hitCancel.
         atk.hasHit = true;
-        const event = this.applyHit(attacker, target, atk.def, { point, velocity: bodyVelocity(attacker) });
+        const event = this.applyHit(attacker, target, atk.def, {
+          point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null,
+        });
         atk.confirmed = event.type === 'hit';
         atk.confirmedAt = atk.time;
+        if (event.type === 'block') atk.blocked = true;
         attacker.attackContact?.(atk, event);
         break;
       }
@@ -362,7 +390,7 @@ export class CombatSystem {
     atk.struck ??= new Set();
     for (const h of atk.def.hits) {
       if (atk.blocked) return;
-      if (atk.struck.has(h.index) || !strikeLive(h, atk.time)) continue;
+      if (atk.struck.has(h.index) || !strikeLiveNow(h, atk)) continue;
       const box = worldBox(attacker, h.hitbox, scratchHit);
       for (const target of fighters) {
         if (target === attacker || !hitReaches(h, target, attacker.body.x)) continue;
@@ -370,7 +398,9 @@ export class CombatSystem {
         if (!point) continue;
         atk.struck.add(h.index);
         atk.hasHit = true;
-        const event = this.applyHit(attacker, target, h, { point, velocity: bodyVelocity(attacker) });
+        const event = this.applyHit(attacker, target, h, {
+          point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null,
+        });
         if (event.type === 'block') atk.blocked = true;
         else if (event.type === 'hit' && !atk.confirmed) {
           atk.confirmed = true;
@@ -454,9 +484,19 @@ export class CombatSystem {
   // A hit whose attacker is charmed by its target (its charm still running,
   // see `charm` in hit-effects.js) and that the target does not block is
   // no hit at all: see charmed. The Shield rule comes first all the same.
+  //
+  // A strike of a Mash Combo turn before its last (`suppressLaunch`, see
+  // js/data/mash-combo.js) has an effective Base Launch of 0: its damage
+  // still adds Launch Point and its hitstun, hitstop and blockstun stay,
+  // but it launches nothing. The definition is never touched: the event
+  // records the effective `baseLaunch` and the hit's own
+  // (`authoredBaseLaunch`), and `mash` the turn ({ turn, turns, final }) or
+  // null. The final turn launches with its own Base Launch, from the
+  // Launch Point the series has built.
   applyHit(attacker, target, def, {
     facing = attacker?.facing ?? 1, projectile = null, summon = null, technique = null, hazard = null,
     detached = !!(projectile || summon || technique || hazard), point = bodyPoint(target), velocity = null,
+    suppressLaunch = false, mash = null,
   } = {}) {
     const tc = target.combat;
     // The universal Shield rule: up at contact, it blocks. Nothing about the
@@ -482,7 +522,8 @@ export class CombatSystem {
     // A block leaves the existing schedule untouched.
     if (!blocked) tc.resetLaunchRecovery();
     const launchPointAfter = tc.launchPoint;
-    const launchStrength = blocked ? 0 : resolveLaunchStrength(def.baseLaunch, launchPointAfter);
+    const baseLaunch = suppressLaunch ? 0 : def.baseLaunch;
+    const launchStrength = blocked ? 0 : resolveLaunchStrength(baseLaunch, launchPointAfter);
     // The target may bend its launch a little with the direction it holds
     // as the hit lands (launch steering: never the strength, only the angle;
     // see steerLaunch), and a harder launch stuns it longer.
@@ -545,7 +586,8 @@ export class CombatSystem {
     const event = {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
       damage, energyCost, launchPointBefore, launchPointAfter,
-      baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
+      baseLaunch, authoredBaseLaunch: def.baseLaunch, mash,
+      directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || launched ? 0 : Math.max(def.paralyze ?? 0, def.float ?? 0),
       float: blocked || launched ? 0 : def.float ?? 0, charm: blocked ? 0 : def.charm ?? 0,

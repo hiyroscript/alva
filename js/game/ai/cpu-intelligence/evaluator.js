@@ -107,6 +107,7 @@ export class Evaluator {
       if (c) out.push(c);
     }
     if (s.me.grounded && (self.canFollowUp() || combo) && !s.me.shielding) this.dashStrikes(s, out, combo, k0);
+    this.mashCombos(s, out, combo, k0);
     // The jump arcs are the heaviest search: at most every 70 ms (a combo's
     // follow-up always gets one).
     if (combo || this.brain.clock - (this.jumpEvalAt ?? -1) >= 0.07) {
@@ -240,6 +241,130 @@ export class Evaluator {
       move: m, k0: 0, contactK: kHit, margin: overlapX, marginUp: overlapY, strikes: m.strikes.length, face: facing, detached: true,
       endX: s.me.x, endY: s.me.y, endGrounded: true, endK: k1,
     };
+  }
+
+  // A Mash Combo set off from here (js/data/mash-combo.js): five presses of
+  // one of its pair's buttons, the first starting that move as ever, then
+  // the twelve-turn series. What it is worth: the first move landing (its
+  // own candidate's odds, read from the same geometry and timing), then
+  // every strike of the series, the eleven turns' launching nothing and
+  // the twelfth's with its real launch from the Launch Point they built
+  // (the real rule, see capabilities' mashModel). What it risks: a Shield
+  // blocking its first turn ends it there, a whiff commits the CPU to the
+  // whole series in the open, and no turn has armour, so a counter-hit
+  // breaks it. Only on the ground against a grounded opponent in reach,
+  // never one behind its Shield, never with a hazard's warning underfoot or
+  // a ledge at its back, never an opponent that walls everything; and
+  // only when the CPU sees the opening at all (the level's own punish
+  // chance, drawn each reassessment): an Easy CPU mashes now and then, a
+  // Brutal one whenever the opening is real. Read-only, like every
+  // candidate.
+  //
+  // As a follow-up (`combo`: its own hit just landed, `k0` steps before it
+  // may start anything) it is the hit-confirm: the five presses made while
+  // its move still plays (they count, starting nothing), the series coming
+  // out as soon as the move allows, worth it only if the opponent is still
+  // reeling when the first turn strikes.
+  mashCombos(s, out, combo = false, k0 = 0) {
+    const brain = this.brain;
+    const self = s.self;
+    const model = s.caps.mash;
+    const me = s.me;
+    const op = s.op;
+    if (!model || !s.present || !me.grounded || me.shielding || self.mash?.engaged) return;
+    // Keeping out of the fight (protecting a lead, recovering): no long
+    // commitment at all, not even off a hit.
+    if (brain.objective.wait >= 0.8) return;
+    if (combo) {
+      this.mashFollowUps(s, out, k0);
+      return;
+    }
+    if (!brain.sees.opening) return;
+    if (!op.grounded || op.shielding || op.offstage) return;
+    if (s.model.dangerZones.length && s.model.dangerAt(me.x, me.halfW, 6)) return;
+    const p = brain.profile;
+    const opp = brain.opponent;
+    for (const t of model.triggers) {
+      if (!moveReady(self, t.move)) continue;
+      const first = this.now(s, t.move, false, 0);
+      if (!first || first.p < 0.2) continue;
+      const tC = (first.contactK + 1) * STEP;
+      const fk = s.foeTrack.i(first.contactK);
+      const fpos = { x: s.foeTrack.x[fk], y: s.foeTrack.y[fk], grounded: !!s.foeTrack.g[fk], halfW: op.halfW, height: op.height };
+      if (!fpos.grounded) continue;
+      // The whole series against where it meets the opponent: the eleven
+      // suppressed turns' Launch Point, then the finisher's real launch.
+      const hv = this.judge.strikes(s, 'foe', t.strikes, t.strikes.length, fpos, first.face, this.hv);
+      // An opponent that blocks what comes, or has walled the CPU's
+      // attacks, stops the series at its first turn.
+      const walls = clamp(opp.shieldy * 0.8 + opp.walls * 0.5, 0, 0.8);
+      // The series starts once the first move allows it (its hit-confirmed
+      // window, else its end): a stun that runs out before then lets the
+      // opponent act first, and break the series with any hit.
+      const m = t.move;
+      const lastStrike = m.strikes[m.strikes.length - 1];
+      const turnOneIn = (m.hitCancel ?? m.total) - (lastStrike?.at ?? m.lead);
+      const holds = (lastStrike?.hitstun ?? 0) + (lastStrike?.hitstop ?? 0) >= turnOneIn + FOE_REACT * 0.5;
+      // An opponent already striking in reach trades with it: no turn has
+      // armour.
+      const striking = !!op.attackDef?.hitbox && op.view.attackPhase !== 'recovery' && s.dist < s.foeReach.lunge + 30;
+      const pHit = first.p * (1 - walls) * (holds ? 1 : 0.45) * (striking ? 0.3 : 1) * (1 - brain.mashExpected());
+      const pBlock = Math.min(1 - pHit, first.pBlock + walls * first.pg);
+      const pMiss = Math.max(0, 1 - pHit - pBlock);
+      const risk = brain.strategy.params.risk * (0.4 + p.riskSense * 0.6);
+      // A whiff is the whole series in the open; a block, the first turn's
+      // recovery then free to be punished.
+      const exposure = Math.max(this.foePunish, brain.strategy.danger * KO_VALUE * s.match.koAgainst * 0.8);
+      const vMiss = -exposure * clamp(t.duration / 0.5, 1, 3) * (1 + opp.punishing * 0.6);
+      const vBlock = -this.foePunish * 0.7;
+      // A ledge behind the CPU: interrupted there, it is launched off it.
+      const back = s.myEdge;
+      const ledge = back < me.halfW + 70 ? (1 - back / (me.halfW + 70)) * exposure * 1.5 * p.riskSense : 0;
+      let utility = pHit * hv.value * (0.55 + 0.45 * p.comboReliability) + (pBlock * vBlock + pMiss * vMiss) * risk - ledge;
+      if (utility > 0) utility /= 1 + Math.max(0, tC - 0.3) * 0.6;
+      // What the first move alone was worth is already a candidate: the
+      // series must beat it.
+      if (!(utility > first.utility)) continue;
+      out.push({
+        ...first, kind: 'mash', trigger: t, utility, p: pHit, pBlock, value: hv.value, ko: hv.ko,
+        reason: `Mash Combo from ${t.move.id}: ${t.strikes.length} strikes, the last launching${hv.ko > 0.3 ? ` (ends a life ${Math.round(hv.ko * 100)}%)` : ''}`,
+      });
+    }
+  }
+
+  // The hit-confirm into a Mash Combo (see mashCombos): from the CPU's own
+  // move that just hit, every trigger its pair offers, if the opponent's
+  // stun (`busy`, the follow-up search's) outlasts the presses, the move's
+  // end or hit-confirmed window, and the first turn's strike.
+  mashFollowUps(s, out, k0) {
+    const brain = this.brain;
+    const p = brain.profile;
+    const model = s.caps.mash;
+    const busy = s.op.busy;
+    const fk = s.foeTrack.i(k0);
+    if (!s.foeTrack.g[fk]) return;
+    const fpos = { x: s.foeTrack.x[fk], y: s.foeTrack.y[fk], grounded: true, halfW: s.op.halfW, height: s.op.height };
+    const face = Math.sign(fpos.x - s.me.x) || s.me.facing;
+    const presses = (model.presses * 2 - 1) * STEP;
+    for (const t of model.triggers) {
+      const firstTurn = s.self.attacks[t.first];
+      const lead = (firstTurn.hits?.[0]?.at ?? firstTurn.startup) / model.rate;
+      const strikesAt = Math.max(k0 * STEP, presses) + lead;
+      if (busy < strikesAt + 0.02) continue;
+      // In reach then: the opponent no further than the first turn's box
+      // (its Step-in aside).
+      const box = firstTurn.hitbox;
+      if (!box || Math.abs(fpos.x - s.me.x) > box.x + box.w + s.op.halfW + 4) continue;
+      const hv = this.judge.strikes(s, 'foe', t.strikes, t.strikes.length, fpos, face, this.hv);
+      const pHit = clamp(0.92 * (1 - 0.5 * brain.opponent.walls), 0, 1) * (1 - brain.mashExpected());
+      const utility = pHit * hv.value * (0.55 + 0.45 * p.comboReliability);
+      out.push({
+        move: t.move, kind: 'mash', trigger: t, combo: true, k0, contactK: Math.round(strikesAt / STEP), margin: 0, marginUp: 0,
+        strikes: t.strikes.length, face, p: pHit, pBlock: 0, pg: pHit, value: hv.value, ko: hv.ko, utility, open: true, elim: 0,
+        endX: s.me.x, endY: s.me.y, endGrounded: true, endK: k0,
+        reason: `follow-up: Mash Combo from ${t.move.id}, the opponent still reeling`,
+      });
+    }
   }
 
   // Dashing in and striking out of the Dash (cut short past its cancel

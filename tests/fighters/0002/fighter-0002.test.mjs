@@ -405,14 +405,19 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   // with the Launch Point, carries the target out of reach: never a loop.
   // Each flurry's Step-in carries #0002 a little way on, so a later flurry
   // may reach the target again, but only once it is free (its stun over):
-  // a new string, never one long one.
+  // a new string, never one long one. Pressed again on the last steps of
+  // each flurry (and whenever it is free), so each flurry follows the last
+  // at once, never five presses in a row while one plays: the Mash Combo's
+  // own series is apart (see tests/systems/mash-combo.test.mjs).
   const spam = versus({ gap: 44 });
   const strings = [];
   let seen = 0;
   for (let i = 0; i < steps(8); i++) {
     const c = spam.target.combat;
     const held = c.stun > 0 || c.hitstop > 0;
-    spam.tick(P('attack2'));
+    const a = spam.attacker.combat.attack;
+    spam.tick(!a || a.time >= a.def.total - 2 * DT - 1e-9 ? P('attack2') : {});
+    assert.equal(spam.attacker.mash.engaged, false, 'bursts of four never set off a Mash Combo');
     for (; seen < spam.events.length; seen++) {
       if (held && strings.length) strings[strings.length - 1]++;
       else strings.push(1);

@@ -72,7 +72,7 @@ const airborne = (tick, rise = 8) => {
 // How many files each member's clips have, by codename (the rest: one).
 const COUNTS = {
   pink: { idle: 6, run: 7, midair_hurt: 3, mouvment: 2, attack1: 3, attack3: 4, attack4: 10, extra_attack: 4 },
-  green: { idle: 3, run: 5, midair_hurt: 3, mouvment: 2, deflect: 3, attack2: 10, midair_attack2: 4, extra_attack: 4 },
+  green: { idle: 3, run: 5, midair_hurt: 3, mouvment: 2, deflect: 3, attack2: 10, midair_attack2: 4, mash_attack: 4, extra_attack: 4 },
   blue: { idle: 3, run: 6, midair_hurt: 3, mouvment: 2, midair_attack1: 3, attack5: 8, extra_attack: 4 },
 };
 const SINGLES = ['jump', 'fall', 'land', 'hurt', 'prepshield', 'shielding', 'releaseshield', 'midair_mouvment'];
@@ -90,7 +90,7 @@ const HEIGHTS = {
   },
   green: {
     idle: 30, run: 29, jump: 36, fall: 30, land: 30, hurt: 29, midair_hurt: 29, prepshield: 33, shielding: 42, releaseshield: 29, mouvment: 25, midair_mouvment: 28,
-    deflect: 33, attack2: 30, midair_attack2: 30, extra_attack: 38,
+    deflect: 33, attack2: 30, midair_attack2: 30, mash_attack: 30, extra_attack: 38,
   },
   blue: {
     idle: 30, run: 29, jump: 36, fall: 30, land: 30, hurt: 32, midair_hurt: 32, prepshield: 30, shielding: 43, releaseshield: 29, mouvment: 25, midair_mouvment: 28,
@@ -139,7 +139,10 @@ test('five numbered attacks, each a button of its own: two ordinary with mid-air
     types: { attack1: 'attack', attack2: 'attack', attack3: 'technique', attack4: 'technique', attack5: 'technique' },
     extra: true,
   });
-  assert.deepEqual(Object.keys(DEF.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2']);
+  // mash_attack is green's Knockout Punch, its Mash Combo partner: no
+  // button performs it.
+  assert.deepEqual(Object.keys(DEF.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'mash_attack', 'midair_attack1', 'midair_attack2']);
+  assert.deepEqual(DEF.mashCombo, { attacks: ['attack1', 'mash_attack'] });
   assert.deepEqual(Object.keys(DEF.techniques), ['attack3', 'attack4', 'attack5']);
   assert.deepEqual(Object.keys(DEF.projectiles), ['attack3_object', 'attack5_object']);
   assert.equal(DEF.summons, undefined);
@@ -148,6 +151,7 @@ test('five numbered attacks, each a button of its own: two ordinary with mid-air
   const who = Object.fromEntries([...Object.entries(DEF.attacks), ...Object.entries(DEF.techniques)].map(([id, s]) => [id, s.members]));
   assert.deepEqual(who, {
     attack1: ['pink'], midair_attack1: ['blue'], attack2: ['green'], midair_attack2: ['green'], extra_attack: ['pink', 'green', 'blue'],
+    mash_attack: ['green'],
     attack3: ['pink'], attack4: ['pink'], attack5: ['blue'],
   });
   // Its cooldowns are the policy's: Ice Breath's freeze 3 s, none for the
@@ -183,7 +187,9 @@ test('its in-game names and touch buttons name each move, in English and French,
   };
   assert.deepEqual(buttons('en'), ['Triple Strike', 'Power Punch', 'Tornado Spin', 'Heat Vision', 'Ice Breath', 'Sonic Scream']);
   assert.deepEqual(buttons('fr'), ['Triple frappe', 'Coup de poing', 'Tornade', 'Vision laser', 'Souffle glacé', 'Cri sonique']);
-  assert.deepEqual(['midair_attack1', 'midair_attack2'].map((m) => STRINGS.fr[`ability.0006.${m}`]), ['Coup de pied volant', 'Coup de poing volant']);
+  assert.deepEqual(['midair_attack1', 'midair_attack2', 'mash_attack'].map((m) => STRINGS.fr[`ability.0006.${m}`]),
+    ['Coup de pied volant', 'Coup de poing volant', 'Coup de poing assommant']);
+  assert.equal(abilityName(DEF, 'mash_attack'), 'Knockout Punch', 'its Mash Combo partner');
   // Each button's picture is the move's own art, from the sister who
   // performs it: pink's burst, her jab, green's tornado, the beam, pink's
   // gale, blue's scream; in the air blue's kick and green's punch.
@@ -237,7 +243,7 @@ test('three members, back to front pink, green and blue: pink hovering in the mi
 test('its folder holds exactly the frames its members\' clips and its objects play: every file <id>_<codename>_<member>_<frame>.png', () => {
   const files = readdirSync(`${ROOT}${DIR}`).sort();
   assert.deepEqual(files, FILES);
-  assert.equal(files.length, 131);
+  assert.equal(files.length, 135);
   assert.deepEqual(characterFramePaths(DEF).map(file).sort(), FILES, 'every file loaded, none missing');
   for (const m of DEF.ensemble.members) {
     for (const [key, clip] of Object.entries(m.animations)) {

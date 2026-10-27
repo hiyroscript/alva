@@ -352,6 +352,11 @@ export const CHARACTER_0007 = {
     attack5: { type: 'technique', id: 'attack5' }, // the Rocket Launcher
   },
 
+  // Its Mash Combo pair (js/data/mash-combo.js): the Street Combo and the
+  // Uppercut, its fists: never a weapon (the Pistol, the Molotov Cocktail or
+  // its other weapon techniques). Mashing either button sets off twelve turns.
+  mashCombo: { attacks: ['attack1', 'attack2'] },
+
   // Its Special abilities (js/data/special-abilities.js): the Rocket
   // Launcher, its heaviest weapon, a 10-damage rocket that can end a stock
   // from across the stage. The Molotov Cocktail's fire and the Sawn-Offs'

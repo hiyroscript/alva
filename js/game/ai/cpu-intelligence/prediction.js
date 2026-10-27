@@ -230,6 +230,8 @@ export function predictTrack(track, stage, gravity, st, { steps = 90, horizon = 
     rec = foeRec;
     rec.def = st.attack.def;
     rec.time = st.attack.time;
+    // A Mash Combo turn's clock runs at its rate.
+    rec.rate = st.attack.rate ?? 1;
     // Its Step-in, where the state says (a fighter's own record does; a
     // perceived opponent's attack does not, so none is guessed at).
     rec.step = st.attack.step ?? null;
@@ -265,7 +267,7 @@ export function predictTrack(track, stage, gravity, st, { steps = 90, horizon = 
       dash.left -= STEP;
       if (dash.left <= EPS) dash = null;
     } else if (rec) {
-      rec.time += STEP;
+      rec.time += STEP * (rec.rate ?? 1);
       if (rec.time >= rec.def.total - EPS) rec = null;
       else share = attackStep(b, rec, face, target, false);
     } else {

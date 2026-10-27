@@ -129,7 +129,9 @@ export class Situation {
     op.freeFall = v.freeFall;
     op.launched = v.launched;
     op.attackDef = v.attackDef;
-    op.attackTime = v.attackDef ? v.attackTime + op.age : 0;
+    // A Mash Combo turn's clock runs at its rate.
+    op.attackRate = v.attackRate ?? 1;
+    op.attackTime = v.attackDef ? v.attackTime + op.age * op.attackRate : 0;
     op.technique = v.techniqueDef;
     // The opponent's path from the perceived picture, carried to now and on.
     const age = op.age;
@@ -138,7 +140,7 @@ export class Situation {
       x: v.x, y: v.y, vx: v.vx, vy: v.vy, grounded: v.grounded, ground: v.ground, halfW: v.halfW, height: v.height,
       gravityScale: v.gravityScale, maxFall: v.maxFall, facing: v.facing,
       stun: v.stun, paralysis: v.paralysis, hitstop: v.hitstop,
-      attack: v.attackDef ? { def: v.attackDef, time: v.attackTime, motion: v.attackMotion } : null,
+      attack: v.attackDef ? { def: v.attackDef, time: v.attackTime, motion: v.attackMotion, rate: v.attackRate ?? 1 } : null,
       dash: v.dashDir ? { dir: v.dashDir, speed: v.dashSpeed, left: v.dashLeft, air: v.dashAir } : null,
       technique: v.techniqueDef ? v.techniqueEndIn : 0,
     };
@@ -181,7 +183,11 @@ export class Situation {
     // it shows (its attack's remaining frames, a stun, a paralysis, a Dash,
     // a technique, a summon's startup), counted from now.
     let busy = Math.max(v.stun, v.paralysis, v.shieldStun) + v.hitstop;
-    if (v.attackDef) busy = Math.max(busy, v.attackDef.total - v.attackTime);
+    if (v.attackDef) busy = Math.max(busy, (v.attackDef.total - v.attackTime) / (v.attackRate ?? 1));
+    // A Mash Combo running commits it to every turn still to come: it can do
+    // nothing else until the series ends (or is broken).
+    op.mash = mashOutlook(v, this.foeCaps, age);
+    if (op.mash) busy = Math.max(busy, op.mash.left + age);
     if (v.dashDir) busy = Math.max(busy, v.dashLeft);
     if (v.techniqueDef) busy = Math.max(busy, v.techniqueEndIn);
     if (v.summon) busy = Math.max(busy, v.summonLeft);
@@ -220,4 +226,27 @@ export class Situation {
       koAgainst: theirs >= toWin - 1 ? 1.6 : 1,
     };
   }
+}
+
+// What the CPU makes of an opponent's Mash Combo as it sees it (perception
+// view `v`, `age` seconds old; the opponent's capabilities `caps`), or null
+// when none is armed
+// or running: `turn`, `turnsLeft` (after the one playing), `left` (seconds
+// until the series is over, at its rate), whether the turn playing or the
+// next is the `final` one (its launch the real one: every earlier strike
+// launches nothing) and the `strikes` still to come.
+function mashOutlook(v, caps, age = 0) {
+  const m = v.mash;
+  const model = caps?.mash;
+  if (!m || !model) return null;
+  const trigger = model.triggers.find((t) => t.first === m.first) ?? model.triggers[0];
+  const turn = m.turn ?? 0;
+  const turnsLeft = Math.max(0, model.turns - turn);
+  let left = 0;
+  for (let i = turn; i < model.turns; i++) left += model.turnTime[trigger.sequence[i]] ?? 0;
+  if (v.attackDef && turn > 0) left += Math.max(0, (v.attackDef.total - v.attackTime) / (v.attackRate ?? 1));
+  else if (v.attackDef) left += Math.max(0, v.attackDef.total - v.attackTime);
+  // Counted from now: the picture is `age` old.
+  left = Math.max(0, left - age);
+  return { armed: m.state === 'armed', turn, turnsLeft, left, final: turn >= model.turns - 1, finalNow: turn === model.turns, trigger };
 }

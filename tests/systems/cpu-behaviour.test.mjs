@@ -122,25 +122,32 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
 // own hit nor striking first against a threat, as in watch above) and how
 // much of the time it moves toward it, per second; and the Launch Point it
 // takes per second. (A higher level goes in from the ground only about once
-// every two seconds, so fewer seeds leave too few to compare.)
+// every two seconds, so fewer seeds leave too few to compare.) A Mash Combo
+// set off from neutral (js/data/mash-combo.js) is going in too. The time
+// the CPU spends inside a series of its own is left out: committed to its
+// turns, it decides nothing there, whatever its objective (and a series
+// often ends a run early with a fall, so eight seeds rather than four keep
+// the comparison steady).
 function posture(base, score, timeLeft, objectives) {
   let t = 0;
   let initiate = 0;
   let toward = 0;
   let taken = 0;
   for (const [cpuDef, foeDef] of PAIRS) {
-    for (const seed of [5, 6, 7, 8]) {
+    for (const seed of [5, 6, 7, 8, 9, 10, 11, 12]) {
       const sc = scenario({ ...base, cpuDef, foeDef, seed, score, timeLeft });
       let prev = null;
       let lp = sc.cpu.combat.launchPoint;
       sc.run(6, () => {
         if (sc.foe.lostToVoid || sc.cpu.lostToVoid) return false;
-        const inside = objectives.includes(sc.ai.objective.kind);
+        const inside = objectives.includes(sc.ai.objective.kind) && !sc.cpu.mash.engaged;
         const p = sc.ai.plan;
         if (inside) {
           t += DT;
           const fresh = p && p !== prev && p.cand && !p.cand.open && !/^(combo|strikes first)/.test(p.reason ?? '');
-          if (fresh && (p.cand.kind === 'dashStrike' || (p.cand.kind === 'jumpStrike' && p.cand.jump && p.cand.jump !== 'air'))) initiate++;
+          const goesIn = fresh && (p.cand.kind === 'dashStrike' || (p.cand.kind === 'jumpStrike' && p.cand.jump && p.cand.jump !== 'air') ||
+            (p.cand.kind === 'mash' && !p.cand.combo));
+          if (goesIn) initiate++;
           if (sc.cpu.body.grounded && sc.cpu.body.vx * Math.sign(sc.foe.body.x - sc.cpu.body.x) > 60) toward += DT;
           taken += Math.max(0, sc.cpu.combat.launchPoint - lp);
         }

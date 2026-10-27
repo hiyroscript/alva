@@ -19,6 +19,7 @@ import { DIFFICULTIES } from '../../data/difficulty.js';
 import { MAPS, traitId } from '../../data/maps.js';
 import { abilityName } from '../../data/abilities.js';
 import { CHARACTERS } from '../../data/characters.js';
+import { MASH_PARTNER } from '../../data/mash-combo.js';
 
 // A Directional Launch's key part: its id, or 'none'.
 const directionKey = (id) => id ?? 'none';
@@ -34,6 +35,9 @@ function registryStrings() {
     for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) {
       if (own?.label) out[`ability.${def.id}.${action}`] = own.label;
     }
+    // A Mash Combo partner (js/data/mash-combo.js) has no button, so no
+    // touch label: its in-game name.
+    if (def.attacks?.[MASH_PARTNER]) out[`ability.${def.id}.${MASH_PARTNER}`] = abilityName(def, MASH_PARTNER);
     for (const [move, text] of Object.entries(def.abilityDescriptions ?? {})) {
       out[`ability.${def.id}.${move}.description`] = text;
     }
@@ -330,6 +334,8 @@ export const EN = {
   'hud.pauseOvertime': 'Pause game, overtime, {left} remaining',
   'hud.round': 'Round {n}',
   'hud.overtime': 'Overtime',
+  'hud.mashCombo': 'Mash Combo {turn}/{turns}',
+  'hud.mashComboReady': 'Mash Combo!',
   'hud.practiceMenu': 'Practice menu',
   'abilityHud.label': 'Abilities',
   'abilityHud.groundCurrent': 'Ground moves, current',

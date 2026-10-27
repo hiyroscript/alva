@@ -167,10 +167,12 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
     // Ievan Polkka's double: six strikes adding up to 10; World is Mine: a charm.
     '0004': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0, attack4: 5, attack5: 3, deflect: 0 },
     // The Deadlights: a float; the Red Balloon: its phantom's bite frightens
-    // (the bite itself, its attack5, the same: a fear).
-    '0005': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack5: 3, extra_attack: 0, attack4: 3, deflect: 0 },
-    // Ice Breath: a freeze.
-    '0006': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, attack3: 0, attack4: 3, attack5: 0, deflect: 0 },
+    // (the bite itself, its attack5, the same: a fear). The Backhand Rake,
+    // its Mash Combo partner, is ordinary (every Mash Combo move is).
+    '0005': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack5: 3, extra_attack: 0, mash_attack: 0, attack4: 3, deflect: 0 },
+    // Ice Breath: a freeze. The Knockout Punch, its Mash Combo partner, is
+    // ordinary.
+    '0006': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, mash_attack: 0, attack3: 0, attack4: 3, attack5: 0, deflect: 0 },
     // The Rocket Launcher: its rocket deals 10.
     '0007': { attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, attack3: 0, attack4: 0, attack5: 5, deflect: 0 },
   };
