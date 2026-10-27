@@ -3568,10 +3568,9 @@ time.
   a Step-in counts toward `approach` or `mobility` only when it really
   travels (`lunge`, from `stepInTravel`, at least 32 units: none does
   today), and the threat reach adds the real travel; the executor holds no
-  direction through a grounded attack; in the air, over ground, its own
-  aerials play out where it planned them, and over the Void (or steering
-  home: `Executor.dir`'s `homeward`) it steers them toward ground
-  (`Executor.towardGround`).
+  direction through a grounded attack and steers its aerials in the air as
+  its plan wants (holding nothing through them, or only toward ground over
+  the Void, measured worse: an edge-guard plunge then fell into the Void).
 
 **Consequences.** Running into an attack and holding on no longer keeps
 the run: it runs down at the universal deceleration (a Dash attack at the
@@ -3584,6 +3583,14 @@ creep forward (a fresh flurry may reach a target its last one flung,
 once it is free again); #0001's High Kick, #0003's Heel Drop and Haymaker
 keep their own lunges. No move's damage, timing, hitbox, launch, stun,
 cooldown or Energy changed.
+
+**Measured** (`tests/benchmarks/cpu-benchmark.mjs --seeds 1`, 144 games a
+matchup over every pairing, both stages; the code before the change, then
+after): Brutal v Hard 93.1% [88-96] then 93.1% [88-96], points 2.88 : 0.76
+then 2.90 : 0.92; Hard v Medium 93.1% [88-96] then 89.6% [84-94]; Medium v
+Easy 99.3% then 99.3%; Brutal v the balanced reference 100% then 100%,
+its self-eliminations 1 then 4 in 144 games. Inactivity and stuck
+navigation stayed at 0 throughout.
 
 **Where to tune it.** `STEP_IN` (speed, lead) in
 `js/data/attack-movement.js`; a move's own `step`, `momentum`,

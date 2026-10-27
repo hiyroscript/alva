@@ -56,7 +56,6 @@ export class Executor {
     this.allowEdge = false;
     this.pressed = null;
     this.wantDir = 0;
-    this.homeward = false;
     this.heldBack = false;
   }
 
@@ -68,15 +67,11 @@ export class Executor {
     this.mouvement = 0;
     this.pressed = null;
     this.wantDir = 0;
-    this.homeward = false;
   }
 
   // Hold a direction (-1, 0 or 1).
-  // `homeward`: it is steering back to the stage, which a move of its own
-  // playing in the air does not stop (see finish).
-  dir(d, { homeward = false } = {}) {
+  dir(d) {
     this.wantDir = d || 0;
-    this.homeward = homeward;
   }
 
   // Press `action` this step if it can be a fresh press; true when it is.
@@ -137,12 +132,9 @@ export class Executor {
     // (the Fighter ignores it then, a player's or a CPU's: see attackDrift)
     // and its attacks are aimed by attackFacing, so it holds none: the
     // ledge guard below never counts a walk that cannot happen. In the air
-    // every move keeps the universal air control, a CPU's as a player's:
-    // over ground its own aerials play out where it planned them (its
-    // predictions play them with nothing held); over the Void it steers
-    // them toward ground, as it does steering home.
+    // every move keeps the universal air control, a CPU's as a player's, and
+    // it steers as its plan wants.
     if (self.combat.attack && b.grounded) d = 0;
-    else if (self.combat.attack && !this.homeward) d = this.groundAhead(self, stage, 0, 0) ? 0 : this.towardGround(self, stage, d);
     if (!b.grounded) held.shield = held.shield && this.pressed === 'shield';
     if (d && b.grounded && !this.allowEdge) {
       const decel = self.movement.deceleration;
@@ -187,16 +179,6 @@ export class Executor {
   }
 
   // Whether there is anything to stand on `ahead` units past the body's side going `dir`.
-  // The way (-1 or 1) to the nearest ground beside a fighter over the Void,
-  // `d` first when it leads there too, or 0 with none in reach.
-  towardGround(self, stage, d) {
-    const first = d || 1;
-    for (const ahead of [60, 120, 240, 480]) {
-      for (const dir of [first, -first]) if (this.groundAhead(self, stage, dir, ahead)) return dir;
-    }
-    return 0;
-  }
-
   groundAhead(self, stage, dir, ahead) {
     const b = self.body;
     const x = b.x + dir * (b.halfW + ahead);

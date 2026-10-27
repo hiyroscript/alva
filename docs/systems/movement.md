@@ -235,9 +235,8 @@ predictions (`moveContact`, `predictTrack` in
 call `attackDrift` and `activationStep`, so a predicted strike gains its
 real Step-in and nothing else (an aerial is predicted with nothing held,
 its air control being the CPU's own choice), and its executor holds no
-direction through a grounded attack (nothing would come of one); in the
-air, over ground, its own aerials play out where it planned them, and over
-the Void (or steering home) it steers them toward ground.
+direction through a grounded attack (nothing would come of one) and steers
+its aerials in the air as its plan wants, as any fighter may.
 
 ## 6. The Dash and the air dash
 

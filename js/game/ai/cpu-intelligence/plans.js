@@ -470,7 +470,7 @@ const STEPS = {
       if (brain.rng() < brain.profile.diSkill) ex.dir(sign(dx));
       return 'run';
     }
-    ex.dir(Math.abs(dx) > 2 ? sign(dx) : 0, { homeward: true });
+    ex.dir(Math.abs(dx) > 2 ? sign(dx) : 0);
     // Already over the stage: nothing more to spend, just land.
     if (s.model.supported(me.x, me.halfW, me.y)) return brain.clock > plan.until ? 'fail' : 'run';
     const free = self.canFollowUp();
