@@ -1,1222 +1,1196 @@
-ALVA — Universal Grounded Melee Step-in and Complete Removal of Attack Steering
+ALVA — MASH COMBO UPDATE
 
-Objective
+New Universal Combat Mechanic, Strict Fighter Requirements, CPU Integration, and Animation System Fixes
 
-Implement two new, strict, universal gameplay rules across Alva:
+PRIMARY OBJECTIVE
 
-1. Every eligible grounded melee attack must automatically perform a slight Step-in (Attack Lunge), unless that move’s actual, deliberately authored mechanics already determine that it should or should not Step-in.
-2. Completely remove Attack Steering (Attack Mobility) from the game. Players and CPUs must no longer be able to move their fighters by holding Run/left/right during an ongoing attack or combat-move animation.
+Implement a completely new universal combat feature called Mash Combo in ALVA.
 
-These rules must apply to all current and future fighters, human players, and CPU-controlled fighters.
+A Mash Combo activates when a fighter rapidly presses the same eligible grounded close-range melee attack button five times.
 
-This is a real combat-engine change, not an animation-only adjustment, character-by-character balancing patch, or documentation update.
+Upon successful activation, the fighter automatically performs an extremely fast, visually enhanced, 12-turn attack sequence consisting of exactly two designated grounded close-range melee attacks alternating with one another.
 
-Important: This request supersedes the repository’s previous max specification and any existing documentation requiring Attack Steering, attack-mobility tiers, or steering during attacks. Do not implement the old policy that makes ordinary attacks steerable. The new policy is the opposite: Attack Steering must be fully removed.
+Each attack must be performed six times, producing 12 total attack activations.
 
-The two requirements must remain independent:
+During this sequence, all attacks except the final one must have an effective Base Launch of 0. The 12th and final attack must restore its original Base Launch to deliver its proper finishing launch.
 
-* Step-in is automatic forward movement authored by an eligible melee attack.
-* Attack Steering is movement caused by holding or changing directional input while an attack animation plays.
+Mash Combos must be non-cancellable through ordinary player inputs but interruptible by legitimate enemy attacks and forced combat states.
 
-Keep Step-in. Eliminate Attack Steering.
+This mechanic must work for every playable fighter, every supported input device, and CPU-controlled fighters.
 
-Preserve genuine, intentionally designed movement mechanics belonging to individual moves. Do not confuse automatic attack motion, existing momentum, or external physical forces with Attack Steering.
+Also investigate and permanently fix the existing issue where character animations occasionally become stuck on a single frame.
+
+EVERY RULE INTRODUCED HERE IS A NEW STRICT RULE.
+
+This update is additive. It must not replace, remove, or fundamentally rewrite Alva’s established combat mechanics.
 
 ⸻
 
-PART 1 — Understand Alva’s existing architecture
+PART 1 — UNDERSTAND THE EXISTING GAME BEFORE IMPLEMENTATION
 
-Before editing, inspect the actual game code, documentation, character definitions, and tests.
+Read the actual repository and understand how the following systems interact before modifying anything.
 
-Core combat and movement
+Combat architecture
 
-Examine at least:
-
-* js/game/combat/attacks.js
-* js/game/fighters/movement.js
 * js/game/fighters/fighter.js
-* js/data/attack-mobility.js
-* js/data/movement.js
-* js/game/physics.js
+* js/game/fighters/fighter-controller.js
+* js/game/combat/attacks.js
+* js/game/combat/combat-state.js
+* js/game/combat/combat.js
 * js/game/combat/offense.js
-* js/game/combat/deflect.js
-* js/game/combat/projectile.js
-* js/game/combat/summon.js
-* js/game/combat/technique.js
-* js/data/loadout.js
 * js/data/cooldowns.js
-* js/data/special-abilities.js
+* js/data/loadout.js
+* js/data/launch.js
+* js/data/attack-movement.js
 
-Complete fighter roster
-
-Inspect:
+Character data and registration
 
 * js/data/characters.js
-* js/data/characters/0001.js
-* js/data/characters/0002.js
-* js/data/characters/0003.js
-* js/data/characters/0004.js
-* js/data/characters/0005.js
-* js/data/characters/0006.js
-* Every relevant docs/characters/ document
-* All actual move mappings, including ground/air alternatives, extra_attack, Deflect, techniques, and summons
+* js/data/characters/0001.js through 0007.js
+* js/data/special-abilities.js
+* js/data/ensemble.js
+* js/data/controller-profiles.js
 
-Do not assume every attack is executable directly by its owner. Some attack definitions are used by clones or other entities.
+Animation and effects
 
-CPU Intelligence
+* js/game/rendering/sprite-animator.js
+* js/game/rendering/sprite-normalizer.js
+* js/game/rendering/ensemble.js
+* js/game/rendering/hit-fx.js
+* js/game/rendering/fighter-status.js
 
-Inspect:
+CPU intelligence
 
-* js/game/ai/combat-ai.js
 * js/game/ai/moveset.js
+* js/game/ai/cpu-intelligence/brain.js
 * js/game/ai/cpu-intelligence/capabilities.js
-* js/game/ai/cpu-intelligence/prediction.js
-* js/game/ai/cpu-intelligence/values.js
 * js/game/ai/cpu-intelligence/evaluator.js
 * js/game/ai/cpu-intelligence/executor.js
-* js/game/ai/cpu-intelligence/brain.js
 * js/game/ai/cpu-intelligence/plans.js
-* Relevant recovery, defense, and stage-safety code
+* js/game/ai/cpu-intelligence/prediction.js
 
-Specifications and tests
+Read ALVA_SPEC.md, CLAUDE.md, codename_rule, character_rule, and the relevant system documentation.
 
-Examine:
+Follow the existing architecture: combat rules must be shared, while fighter-specific moves and eligibility must come from character data.
 
-* ALVA_SPEC.md
-* docs/systems/movement.md
-* docs/systems/combat.md
-* docs/systems/ai.md
-* docs/development/testing.md
-* Relevant repository-level development instructions
-* Existing movement, attack-mobility, attack-classification, fighter, CPU, and integration tests
-* Existing combat-feel and CPU benchmarks
+Never hardcode a character ID into the universal Mash Combo execution logic.
 
-Use the real code as the authority for how each move currently functions.
+Do not modify the protected character_rule file.
 
-Do not rely solely on move names, animation names, numbered attack buttons, or comments.
+Alva operates on a fixed 60 Hz simulation, uses Canvas 2D sprite rendering, and treats Launch Point rather than health as its cumulative damage system. All new logic must respect these foundations.
 
 ⸻
 
-PART 2 — STRICT UNIVERSAL STEP-IN RULE
+PART 2 — STRICT DEFINITION OF MASH COMBO
 
-2.1 Every eligible grounded melee attack must Step-in
+A Mash Combo is a special automatic attack sequence triggered by rapid repeated inputs.
 
-Every eligible grounded direct melee attack must automatically advance its fighter a short, controlled distance forward during that attack.
+It is NOT a replacement for ordinary attacks, existing multi-hit attacks, existing hit-cancel combos, or traditional player-controlled strings.
 
-This applies to ordinary grounded:
+Activation
 
-* Punches and jabs
-* Kicks
-* Claw strikes and swipes
-* Direct physical weapon strikes
-* Grounded melee combinations
-* Multi-hit melee strings
-* Grounded close-range strikes
-* Launchers
-* Finishers
-* Direct melee attacks on extra_attack
-* Other genuinely direct, grounded melee attacks
-* Future attacks meeting the same conditions
+A Mash Combo begins when all the following requirements are met:
 
-The behavior must be universal, not limited to attacks manually given a step field.
+1. The fighter is grounded.
+2. The player presses the same eligible grounded close-range melee attack button five times rapidly.
+3. All five presses are genuine, distinct input edges.
+4. The attack is one of that fighter’s two designated Mash Combo attacks.
+5. The fighter is not already performing a Mash Combo.
+6. The fighter is not stunned, paralyzed, eliminated, or otherwise in a state that prohibits activation.
+7. Neither designated move is a Special ability or subject to a 3-second or 5-second cooldown.
 
-A fighter standing completely still, with no Run or directional input held, must still move slightly forward when starting an eligible grounded melee attack.
+The five presses must be detected correctly even if the currently playing attack has not yet finished.
 
-An eligible attack must Step-in regardless of whether its previous mobility tier was quick, medium, heavy, or planted.
+This is critical.
 
-However, a genuinely authored no-Step-in mechanic takes precedence. Do not blindly override an individual move intentionally designed to remain rooted, stationary, or controlled by another movement mechanic.
+Currently, Fighter.pressRequest() and Fighter.repeatsMove() intentionally discard repeated inputs for a move already playing.
 
-2.2 Step-in is automatic, not player-controlled
+Keep their existing ordinary combat behavior, but add a separate Mash Combo press-detection mechanism that can count those otherwise discarded repeat presses.
 
-The Step-in:
+Do not require the character to finish five separate normal attack animations before Mash Combo activates.
 
-1. Occurs automatically without directional input.
-2. Uses the attack’s valid facing direction.
-3. Is slight, deliberate, and visually consistent with the strike.
-4. Triggers at most once per attack activation.
-5. Occurs at an appropriate point in the startup or strike, rather than arbitrarily during recovery.
-6. Advances the actual fighter body through the real physics engine.
-7. Respects walls, collision, ledges, and stage geometry.
-8. Does not teleport or snap the fighter.
-9. Does not seek or home toward the opponent.
-10. Does not continuously accelerate the fighter.
-11. Does not repeat for every hit of a multi-hit attack.
-12. Does not change damage, hitbox size, stun, launch, cooldown, or attack timing.
+Do not detect mashing by measuring damage, successful hits, animation completions, or button-hold duration.
 
-The impulse should be small enough to remain an attack lunge rather than a Dash.
+A Mash Combo is triggered by five rapid legitimate presses of the same designated attack button.
 
-Do not invent excessive movement speeds. Choose a universal default using Alva’s existing movement scale, animation timings, and fixed simulation step.
+Input timing
 
-Prefer deriving the trigger from the attack’s actual startup or first strike window.
+Implement a shared configurable timing policy for Mash Combo recognition.
 
-For multi-hit attacks, apply one Step-in for the activation, not one per hit.
+Recommended initial behavior:
 
-2.3 Build on the existing Step-in mechanic
+* Five distinct presses are required.
+* Use an approximately 0.8-second rolling recognition window, subject to gameplay testing and tuning.
+* Reject sequences with excessive gaps between consecutive presses.
+* Holding the button continuously must not count as repeated pressing.
+* Operating-system keyboard autorepeat must not generate artificial mash presses.
+* The timing must behave consistently on keyboard, touch, PlayStation controllers, Xbox controllers, and custom controller bindings.
 
-Alva already uses:
+Use simulation-consistent timing, not rendering-frame counts.
 
-step: { at, speed }
+A player with sufficient clicking speed must be able to reliably trigger the feature.
 
-The existing steerAttack() implementation applies this event once after attack time reaches step.at, raising forward velocity to at least the specified speed while grounded.
+If five presses are not completed inside the allowed window, the partial sequence expires normally.
 
-Preserve this fundamental behavior.
+Pressing another combat attack should reset the partial mash count rather than combining different attacks.
 
-However, do not leave Step-in dependent on every character author manually supplying step.
+Existing attack recovery
 
-Create a shared, deterministic resolution policy so eligible grounded melee attacks automatically receive an effective default Step-in.
+The Mash Combo activation process must not illegally cancel an existing attack.
 
-An architecture-consistent approach is to resolve the Step-in when constructing or executing the attack, using:
+If the fifth press arrives while the initiating ordinary attack is still committed, recognize and arm the Mash Combo, then begin its automatic sequence at the first valid transition permitted by the Mash Combo activation rules.
 
-* The original attack data
-* Its actual offensive mechanics
-* Whether the real fighter is executing it
-* Its ground/air execution context
-* Any explicitly authored Step-in
-* Any deliberately authored Step-in prohibition
-* Any intrinsic scripted movement
+It must not accidentally double-count the fifth initiating press as an extra attack turn.
 
-The final resolved definition should remain validated and immutable where Alva expects immutable definitions.
-
-2.4 Authored movement always takes precedence over the generic Step-in
-
-This requirement is especially important.
-
-If a move already contains an intentionally authored Step-in, preserve its specific:
-
-* Trigger time
-* Impulse speed
-* Direction
-* Interaction with momentum
-* Motion timing
-
-Do not add a second universal Step-in.
-
-If a move is intentionally designed not to Step-in, preserve that behavior. This includes legitimate planted moves and attacks that are intended to act from a fixed location.
-
-If a move already moves itself through a dash, roll, homing action, lift, plunge, rebound, or other scripted motion, preserve that mechanic and do not stack an unnecessary generic lunge on top.
-
-Do not interpret the absence of an existing step property as an intentional prohibition. Most current melee attacks simply do not specify one.
-
-There must be a reliable distinction between:
-
-* Missing Step-in data, meaning the universal policy applies
-* Explicitly authored Step-in data
-* Explicitly authored no-Step-in behavior
-* Intrinsic movement that makes an additional Step-in inappropriate
-
-Where new metadata is necessary, give it precise, validated semantics. Do not infer intention from already-resolved default values.
-
-2.5 Ground and air execution must be evaluated correctly
-
-Use the move’s actual execution context.
-
-An attack that begins on the ground may qualify for universal Step-in even if the same action or definition is usable in the air.
-
-An attack started while airborne must never receive a new universal Step-in.
-
-The policy must not depend solely on prefixes like attack1 or midair_attack1, since some definitions are usable in both contexts.
-
-Record the attack’s start context if necessary so that:
-
-* Aerial attacks do not gain Step-in after landing.
-* Grounded attacks do not unexpectedly gain a second Step-in after leaving and re-entering the ground.
-* A scheduled generic ground Step-in does not suddenly fire in midair.
-* A skipped generic Step-in does not fire late after its intended timing.
-* Cancelling an attack cleans up its pending Step-in correctly.
+The five manual trigger presses are separate from the automatic twelve-turn series.
 
 ⸻
 
-PART 3 — ABSOLUTE EXCLUSION OF AUTOMATIC STEP-IN FROM AERIAL ATTACKS
+PART 3 — EXACTLY TWO ATTACKS, EXACTLY TWELVE TURNS
 
-3.1 No new default Step-in in the air
+THIS IS ONE OF THE MOST IMPORTANT STRICT RULES.
 
-Aerial melee attacks must never receive the new universal Step-in.
+Every fighter must have exactly two specific, designated grounded close-range melee attacks supporting Mash Combo.
 
-This covers:
+Call these two attacks A and B.
 
-* Aerial punches
-* Aerial kicks
-* Airborne claw attacks
-* Aerial combos
-* Aerial finishers
-* Air Deflects
-* Falling melee strikes
-* Air launchers
-* Any attack activated while the fighter is airborne
+If the player triggers Mash Combo by repeatedly pressing A, the automatic series is:
 
-An ordinary aerial melee strike must not generate an automatic horizontal forward impulse merely because it has a melee hitbox.
+Turn	Attack	Effective Base Launch
+1	A	0
+2	B	0
+3	A	0
+4	B	0
+5	A	0
+6	B	0
+7	A	0
+8	B	0
+9	A	0
+10	B	0
+11	A	0
+12	B	Original Base Launch of B
 
-3.2 Preserve genuine aerial movement mechanics
+This produces six activations of A and six activations of B.
 
-This change must not destroy aerial moves whose movement is actually part of the move’s design.
+If the player triggers Mash Combo using B instead, reverse the sequence:
 
-For example, preserve existing:
+B → A → B → A → B → A → B → A → B → A → B → A.
 
-* Homing dashes
-* Flying attacks with scripted propulsion
-* Rising attacks
-* Bounces
-* Slams
-* Plunges
-* Rebounds
-* Recoils
-* Hovering and suspension behavior
-* Explicit, authored air lunges or directional impulses
+In that case, the 12th attack uses A’s original Base Launch.
 
-Examples in Alva include aerial homing attacks, rising spins, landing-impact attacks, and bounce attacks.
+Strict sequence restrictions
 
-These movements remain allowed because they are intrinsic attack mechanics, not the new generic Step-in.
+* Exactly 12 attack turns.
+* Exactly six uses of each designated attack.
+* Exactly two distinct moves in the sequence.
+* Strict alternation.
+* The triggering attack always goes first.
+* No third attack can join the series.
+* No projectile, summon, technique, Special, or unrelated attack can automatically become part of the sequence.
+* The sequence cannot extend beyond turn 12 through continued button presses.
+* The sequence must not loop indefinitely.
+* Each attack turn must actually execute its assigned attack.
+* Every turn must have a valid animation and collision window.
 
-An aerial homing attack should still follow its target as designed.
+A turn means one complete activation of a designated move, not one animation frame or one individual hit event.
 
-An aerial plunge should still descend and produce its authored impact or bounce.
+Some existing ALVA attacks contain several authored hits within a single activation. Preserve that distinction.
 
-An aerial hover should still suspend the fighter according to its own rules.
+A 12-turn Mash Combo may therefore produce more than 12 individual hit events when using existing multi-hit attacks.
 
-Do not add a generic forward impulse to these moves.
+Never confuse the 12-turn requirement with a requirement to produce exactly 12 damage events.
 
-Important distinction: Preserving automatic or scripted motion does not authorize retaining Attack Steering. If an aerial move currently derives horizontal control from the old attack-mobility system, that old input-driven steering must still be removed under Part 5.
+When the 12th turn finishes, the fighter returns to normal combat.
 
-⸻
-
-PART 4 — NO GENERIC STEP-IN FOR PROJECTILES, SUMMONS, CLONES, OR OBJECT MOVES
-
-4.1 Projectiles are excluded
-
-Projectile attacks must not gain an automatic Step-in merely because the user activates them from the ground.
-
-Examples:
-
-* Energy shots
-* Beams
-* Orbs
-* Thrown effects
-* Launched objects
-* Tornado projectiles
-* Traps
-* Persistent projectile constructs
-
-Casting or releasing a projectile must not automatically push the fighter forward.
-
-Keep the existing projectile spawn time, spawn position relative to the fighter, facing, and flight behavior.
-
-If the actual authored move deliberately includes a forward lunge before or during projectile release, preserve it.
-
-But do not infer a lunge from the projectile’s movement or the animation alone.
-
-4.2 Summons and clones are excluded
-
-Summoning a clone or other entity must not cause an automatic owner-fighter Step-in.
-
-The spawned entity must not receive an unintended forward impulse from the owner’s universal melee rules.
-
-In Alva, a clone can execute one of the owner’s attack definitions, but the clone is not a normal Fighter with ordinary locomotion.
-
-Respect that distinction.
-
-Preserve:
-
-* Summon startup
-* Spawn timing
-* Spawn position
-* Clone placement
-* Clone facing
-* Clone attack animation
-* Clone hitboxes
-* Clone lifetime
-* The clone’s genuinely authored behavior
-
-If an attack definition is shared between a playable fighter and a clone, the generic Step-in applies only when the real eligible grounded fighter executes it, not merely because the definition contains melee data.
-
-4.3 Techniques and other object-based attacks are excluded
-
-Do not automatically add Step-in to:
-
-* Techniques producing an effect away from the body
-* Spawned attack objects
-* Traps
-* Persistent fields
-* Summoned hands or tendrils acting as constructs
-* Object-based specials
-* Other moves whose offense is primarily delivered by a separate object or effect
-
-A move having a rectangular hitbox does not automatically mean it is a direct physical melee strike.
-
-Investigate what actually deals the damage.
-
-In particular, consider attacks such as Phantom Hands and Dark Tendrils, which use attack hitboxes but have distinctive object-like or deliberately planted behavior.
-
-Do not blindly apply universal Step-in based only on hitbox !== null.
-
-4.4 Hybrid moves
-
-Handle hybrids carefully:
-
-* Direct melee strike plus projectile
-* Melee strike plus generated effect
-* Melee hitbox plus projectile deflection
-* Physical attack plus persistent construct
-* Scripted movement plus object release
-
-Classify from the actual authored action.
-
-A hybrid primarily executed through a construct should not receive a generic Step-in simply because it has a hitbox.
-
-An explicitly authored physical lunge remains valid.
-
-For genuinely ambiguous cases, make the intended classification explicit in move data after reviewing its mechanics.
-
-Do not create rules that silently convert object moves into lunging punches.
+Do not automatically restart another Mash Combo from button presses that occurred during the active sequence.
 
 ⸻
 
-PART 5 — COMPLETELY REMOVE ATTACK STEERING / ATTACK MOBILITY
+PART 4 — STRICT GROUNDED CLOSE-RANGE MELEE REQUIREMENTS
 
-5.1 This is a total removal, not a reduction
+NOT EVERY GROUNDED MELEE ATTACK IS A CLOSE-RANGE MELEE ATTACK.
 
-Attack Steering must be fully removed from Alva.
+This distinction must be maintained throughout the game.
 
-Players must no longer be able to move the fighter left or right through ordinary locomotion during an ongoing attack animation.
+A grounded close-range melee attack should be an ordinary direct physical strike intended to connect against an opponent within close fighting distance.
 
-Holding Run, changing direction, reversing direction, or pressing directional movement must not introduce horizontal acceleration or steering while an attack controls the fighter.
+Examples include punches, short-range kicks, uppercuts, close claw swipes, and similar direct strikes.
 
-This applies during:
+An attack does not qualify merely because the engine recognizes it as melee or because its hitbox overlaps a nearby opponent.
 
-* Startup
-* Active frames
-* Recovery
-* Grounded melee attacks
-* Aerial melee attacks
-* Projectile-throwing attacks
-* Extra attacks
-* Deflect animations
-* Technique casts
-* Summon startup animations
-* Ordinary moves
-* Special abilities
-* Moves with zero cooldown
-* Moves with three-second cooldowns
-* Moves with five-second cooldowns
-* Any other attack or move execution state previously governed by Attack Mobility
+Explicitly exclude
 
-There is no longer a category of attacks that remains steerable because it is quick, ordinary, zero-cooldown, non-Special, or airborne.
+* Air attacks.
+* Projectiles.
+* Ranged or extended-reach strikes.
+* Long-distance bites or tendrils.
+* Long-distance phantom strikes.
+* Summons.
+* Techniques.
+* Special abilities.
+* Attacks with 3-second cooldowns.
+* Attacks with 5-second cooldowns.
+* Homing attacks.
+* Traveling rolls or attacks whose primary identity is moving through opponents.
+* Attacks whose extended area, pull radius, or unusual movement makes them unsuitable for a stationary close-range alternating sequence.
 
-Do not preserve the previous policy where ordinary moves could steer but Specials or cooldown moves could not.
+An ordinary Step-in movement alone does not necessarily disqualify an otherwise genuine close-range physical attack.
 
-That entire Attack Steering policy is obsolete.
+Eligibility should reflect what the move actually does, not merely its name or whether it has a hitbox.
 
-5.2 Remove the attack-mobility tier system
+New fighter-wide validation rule
 
-Alva currently defines:
+Every playable fighter must possess at least two genuine grounded close-range melee attacks, with exactly two explicitly designated as that fighter’s Mash Combo pair.
 
-ATTACK_MOBILITY
-DEFAULT_ATTACK_MOBILITY
-MOBILITY_TIERS
-MOBILITY_FIELDS
-resolveMobility()
+A fighter may have additional grounded melee attacks that are not eligible for Mash Combo.
 
-And the attack mobility tiers:
+Those attacks must remain normal and fully functional.
 
-quick
-medium
-heavy
-planted
+A fighter may also possess ranged attacks, air attacks, Specials, and other unusual attacks. None of those categories need to become close-range.
 
-These currently supply attack-specific movement properties:
+Do not reinterpret this requirement as “make all melee attacks close-range.”
 
-mobility
-momentum
-airMomentum
-control
-airControl
-topSpeed
-airTopSpeed
-friction
+Implement explicit per-fighter eligibility metadata, with proper shared validation rather than brittle attack-number assumptions.
 
-Remove the attack-mobility tier system and its directional-steering behavior.
+For example, an appropriate conceptual representation would be:
 
-Do not merely:
+mashCombo: {
+  attacks: ['attack1', 'extra_attack']
+}
 
-* Set every tier’s control to zero
-* Set topSpeed to zero
-* Force every attack to use planted
-* Leave dead tier definitions behind
-* Retain unused attack-mobility imports
-* Hide the feature while leaving it active through another movement path
-* Preserve the old system for CPUs
-* Replace it with another differently named attack-steering system
+The exact schema may be refined to suit the repository.
 
-Clean the attack schema, character data, runtime, CPU capability model, tests, and documentation.
+The validator must ensure that the specified attacks:
 
-If js/data/attack-mobility.js no longer serves a legitimate purpose, delete it and all references.
+* Are two distinct attack identities.
+* Are executable from the ground.
+* Are genuine direct close-range melee moves.
+* Have valid animation and hitbox definitions.
+* Are ordinary, eligible attacks.
+* Are not Specials.
+* Have a derived cooldown of zero.
+* Are actually available through the fighter’s supported move system.
+* Do not depend on incompatible mechanics.
 
-Do not remove ordinary locomotion or air control when the fighter is not performing a move. Only the attack-specific mobility system is being removed.
+Never assume that attack1 and attack2 always qualify.
 
-5.3 Preserve momentum without allowing steering
+Existing roster audit
 
-Removing Attack Steering does not mean every attack must freeze the fighter or erase all existing velocity.
+Use the following findings as the starting point for the roster audit, then verify them against the actual definitions and runtime behavior.
 
-These concepts are separate:
+Fighter	Candidate Mash Combo pair	Important considerations
+#0001	Jab + High Kick (attack1, extra_attack)	Red and Maximum Blue are projectiles; do not use them
+#0002	One-Two + Rapid Kicks (attack1, attack2)	Both are close melee, but each contains multiple strikes
+#0003	Chakra Punch + Chakra Haymaker (attack1, extra_attack)	Keep the Heel Drop’s ground-impact mechanics outside Mash Combo
+#0004	Dance Combo + Crescent Kick (attack1, attack3)	Both are direct grounded strikes; do not confuse Leekspin or techniques with eligible moves
+#0005	Claw Swipe + a genuinely close-range second attack	Long Bite has extended reach, Phantom Hands has substantial reach, and Dark Tendrils is not ordinary close-range melee
+#0006	Power Punch + a genuinely close-range second attack	Tornado Spin travels and pulls opponents, so it must not automatically qualify
+#0007	Street Combo + Uppercut (attack1, attack2)	Preserve the existing distinctions between fists, kicks, and weapon attacks
 
-1. Preexisting momentum: Speed carried into an attack from running, jumping, falling, or a Dash.
-2. Step-in: A one-time automatic forward impulse caused by the attack.
-3. Scripted attack motion: A dash, roll, rise, plunge, rebound, etc., directly belonging to the move.
-4. External forces: Knockback, pull, launch, stage movement, and related physics.
-5. Attack Steering: New or redirected movement caused by held directional input during the attack.
+These are implementation candidates, not permission to misclassify moves.
 
-Remove only category 5 as a player-controlled system.
+Special handling for fighters lacking a valid pair
 
-The other categories must continue to behave according to their actual mechanics.
+For #0005, #0006, or any future fighter that lacks two qualifying attacks, introduce the missing close-range attack support without deleting or replacing existing abilities.
 
-A fighter may still travel during an attack because:
+Preserve established moves, identity, animations, attacks, ranged options, and Specials.
 
-* It entered the attack while already moving.
-* It received an automatic Step-in.
-* The move has scripted movement.
-* Gravity is acting on it.
-* An outside force moved it.
-* A platform carries it.
+If the existing loadout cannot accommodate a new distinct ordinary attack without violating codename_rule, the one-button-per-numbered-attack contract, the five-numbered-attack maximum, or controller comfort rules, design a coherent additive solution.
 
-None of those by itself constitutes Attack Steering.
+That solution may involve a clearly defined close-range variant or a carefully integrated extension to the move system, but it must genuinely satisfy the requirement that the fighter has two usable grounded close-range melee attacks.
 
-An appropriate general solution is neutral, input-independent velocity evolution while the attack is active, using Alva’s existing physics.
+Do not create a fake eligibility flag on a long-range attack simply to pass tests.
 
-Preserve truly authored entry-momentum behavior where mechanically essential.
+Do not quietly turn a long-range attack into a close-range attack and thereby remove its existing behavior.
 
-For example:
+If new normal moves or variants require additional artwork, animations, button metadata, input routing, or UI representation, integrate them properly.
 
-* A move that deliberately retains incoming speed must still retain it.
-* A move that deliberately starts stationary must still do so.
-* A roll that scales from incoming run speed must still use that initial speed.
-* A rebound must still apply its prescribed velocity.
-* A lunge must still produce its prescribed impulse.
+For #0006 specifically, remember it is an ensemble fighter consisting of several members representing one fighter. Respect member-specific animation ownership and formation.
 
-If old attack-mobility fields also store such genuinely authored non-steering mechanics, migrate only the necessary mechanics into a clearly separate, minimal representation.
+The Mash Combo must function for that fighter without separating it into independent gameplay entities.
 
-Do not continue to depend on the old tier system to implement them.
-
-5.4 Directional input must not control movement during an attack
-
-Once an attack begins, left/right movement input must not:
-
-* Accelerate the fighter
-* Reverse its velocity
-* Steer an automatic Step-in
-* Add run speed to an attack
-* Maintain speed using attack-specific held-direction bonuses
-* Cancel passive deceleration merely because Run is held
-* Redirect an aerial attack’s horizontal drift through the old mobility system
-* Redirect a plunge or rise through attack steering
-* Bypass movement commitment because lockMovement is false
-
-The input may still affect initial attack facing when the move begins, according to Alva’s existing rules.
-
-Preserve legitimate attack-facing behavior, Automatic turn-around, and CPU target-facing rules unless a specific change is needed to prevent movement redirection.
-
-Facing and aiming are not automatically the same thing as horizontal Attack Steering.
-
-Do not unintentionally redirect an already committed scripted movement or one-time Step-in because its sprite faces a different direction later.
-
-5.5 Explicitly eliminate the lockMovement: false loophole
-
-Currently, Fighter.update() can route attacks with lockMovement: false through normal locomotion instead of steerAttack().
-
-That must no longer provide an attack-steering bypass.
-
-Review whether lockMovement is still needed for anything other than the obsolete movement system.
-
-If it is no longer necessary, remove or replace it cleanly.
-
-If another non-steering mechanic still needs movement-state metadata, use clearly defined semantics that do not grant regular player locomotion during attack execution.
-
-A move cannot remain steerable simply because it previously used lockMovement: false.
-
-5.6 Remove steering from scripted-motion support paths
-
-Inspect the implementation of:
-
-homing
-bounce
-slam
-rise
-roll
-hover
-
-These attacks currently interact with moveAttack() or attack-mobility settings in different phases.
-
-Preserve their automatic movement mechanisms.
-
-However, where horizontal player steering currently comes from:
-
-control
-airControl
-topSpeed
-airTopSpeed
-
-remove that directional influence.
-
-Examples:
-
-* A homing attack still homes automatically.
-* A roll still moves by its scripted roll velocity.
-* A rise still rises.
-* A slam still falls and lands.
-* A bounce still bounces.
-* A hover still hovers.
-* A grounded melee Step-in still moves forward once.
-
-But holding Run during any of these attacks must not produce general Attack Steering.
-
-A move’s scripted travel is not permission to retain the generic steering system.
-
-5.7 Clean up steerAttack() appropriately
-
-The existing steerAttack() combines:
-
-1. One-time Step-in
-2. Attack-specific directional movement
-
-These must be separated.
-
-Prefer a clean shared movement function or functions that implement:
-
-* Resolved Step-in
-* Existing passive momentum behavior
-* Neutral physical deceleration
-* Attack-specific scripted movement where applicable
-
-But no attack-specific response to ongoing held movement direction.
-
-Keep steer() available for ordinary, out-of-attack fighter locomotion.
-
-Do not inadvertently remove universal walking, running, jumping, air control, turning, or Dash mechanics.
+This new minimum requirement must also apply when registering future fighters.
 
 ⸻
 
-PART 6 — COMPLETE ROSTER AUDIT
+PART 5 — BASE LAUNCH OVERRIDE
 
-6.1 Audit every playable move
+During Mash Combo, the intermediate attacks must not launch the opponent away.
 
-Do not change only one character or one attack.
+For attack turns 1 through 11:
 
-For every fighter and every executable move, determine:
+Effective Base Launch = 0.
 
-1. Fighter ID.
-2. Action/button mapping.
-3. Actual move definition.
-4. Ground or air availability.
-5. Whether the fighter itself executes it.
-6. Whether a clone or other entity executes it.
-7. Whether the offense is direct melee, projectile, object, technique, summon, or hybrid.
-8. Whether it has an authored Step-in.
-9. Whether it explicitly should not Step-in.
-10. Whether it has intrinsic movement.
-11. Whether it has deliberate entry-momentum behavior.
-12. What old Attack Mobility currently changes.
-13. Whether a universal grounded Step-in is applicable.
-14. What existing movement must survive after steering removal.
+For attack turn 12:
 
-Build a complete audit table internally before editing.
+Effective Base Launch = the original Base Launch defined for that attack.
 
-Do not apply an arbitrary blanket rewrite without checking the moves.
+The original Base Launch values must not be permanently changed.
 
-6.2 Real Alva examples to protect
+Important
 
-Fighter #0001
+Do not modify the source character attack definitions to have Base Launch 0.
 
-* Jab: Direct grounded melee; must receive universal Step-in.
-* Red: Projectile cast; no generic Step-in.
-* Maximum Blue: Projectile cast; no generic Step-in.
-* Red Kick: Aerial homing attack; no generic Step-in; preserve homing.
-* Floating Straight: Aerial hover attack; no generic Step-in; preserve hover, remove steering.
-* High Kick: Already has an authored step; preserve its intended ground lunge without stacking another.
-* Unlimited Void and Hollow Purple: Techniques; no generic Step-in or Attack Steering.
+Do not mutate shared frozen attack definitions.
 
-High Kick is especially important because its attack definition is usable in more than one execution context. Preserve the legitimate authored ground behavior without accidentally applying a new air Step-in.
+Do not permanently change the base launch of either move.
 
-Fighter #0002
+Instead, introduce an execution-context override that applies only while the relevant attack is being performed as part of a Mash Combo.
 
-* Grounded punches and Rapid Kicks: Apply universal melee Step-in as appropriate.
-* Homing Attack: Preserve homing, no generic aerial Step-in.
-* Bounce Attack: Preserve bounce and descent, remove aerial steering.
-* Spin Attack: Preserve its self-propelled roll, without an unintended extra lunge.
-* Blue Tornado: Preserve rising attack motion, remove input-driven attack steering.
-* Whirlwind: Projectile/object move; no generic Step-in.
+For example, conceptually:
 
-Fighter #0003
+effectiveBaseLaunch =
+  mashComboActive && turnIndex < 11
+    ? 0
+    : originalAttackBaseLaunch;
 
-* Chakra Punch: Eligible grounded direct melee; Step-in.
-* Heel Drop: Has an authored step; preserve without duplication.
-* Chakra Haymaker: Has an authored step; preserve without duplication.
-* Heavenly Foot of Pain: Aerial slam; no new Step-in; retain plunge and landing impact.
-* Cherry Blossom Impact: Technique; no generic Step-in or steering.
-* Mystical Palm Technique: Technique; preserve intended stationary casting and healing.
+This is illustrative, not a substitute for properly integrating with the hit resolver.
 
-Fighter #0004
+ALVA already calculates launch using Base Launch multiplied by the opponent’s accumulated Launch Point.
 
-* Dance Combo, Leek Swing, Crescent Kick: Review as grounded direct melee and apply universal Step-in.
-* Air Dance: No generic aerial Step-in.
-* Leekspin: Preserve its rising motion, remove attack steering.
-* Stage Dive: Preserve scripted dive and impact, no new Step-in.
-* The Melody: Projectile; no generic Step-in.
-* Ievan Polkka and World is Mine: Techniques; no generic Step-in or Attack Steering.
+Keep that existing formula.
 
-Fighter #0005
+During the first 11 turns, damage must still contribute normally to Launch Point.
 
-* Grounded Claw Slash: Direct melee; Step-in.
-* Long Bite: Review as a direct body-origin melee attack with extended reach; avoid an excessive or mechanically inappropriate lunge.
-* Phantom Hands: Inspect the actual hit-delivery mechanic before deciding Step-in eligibility.
-* Dark Tendrils: Deliberately roots the fighter in place, including an authored zero-momentum behavior. Preserve its intentional no-Step-in/rooted mechanic.
-* Floating Hands: No generic aerial Step-in.
-* Deadlights: Technique; no generic Step-in.
-* Red Balloon: Summon; no owner Step-in; clone positioning and attack must remain correct.
-* The clone’s bite: Must not receive automatic fighter movement merely because its attack definition has a direct hitbox.
+However, those intermediate attacks must not produce ordinary directional knockback from their Base Launch.
 
-Fighter #0006
+The last attack must use its real authored Base Launch and Directional Launch.
 
-* Power Punch: Grounded direct melee; Step-in.
-* Flying Kick and Flying Punch: No generic aerial Step-in.
-* Tornado Spin: Preserve its scripted roll and momentum interaction; no duplicate generic lunge.
-* Triple Strike: Preserve the authored homing dash; do not add a generic Step-in on top.
-* Heat Vision, Ice Breath, Sonic Scream: Techniques/effects; no generic Step-in and no Attack Steering.
+Multi-hit attack handling
 
-These examples are mandatory regression cases, not a substitute for auditing all current and future moves.
+If a Mash Combo move already contains several strikes, apply the intermediate zero-launch override to every strike in turns 1–11, including that move’s normal finisher.
+
+For the 12th turn, restore the original authored launch behavior of that final move and its constituent strikes.
+
+Do not accidentally allow an earlier sub-hit to launch the opponent during a supposed zero-launch turn.
+
+Preserve existing damage values, legitimate hitstun, hitstop, and normal blocking behavior.
+
+Do not introduce invisible launch forces through unrelated effects.
+
+Check how carry, pull, attack movement, vertical motion, and ground-impact behavior may influence the opponent’s spacing.
+
+Select Mash Combo pairs whose mechanics are compatible with the goal of sustaining a close-range attack sequence.
+
+Do not make the opponent invulnerable, immobilized by an unbreakable new status, or artificially teleported back after each hit.
+
+The intended result is a fast melee sequence that keeps a nearby opponent within ordinary striking distance until the finisher, while still allowing genuine defensive and interrupt interactions.
+
+Completion
+
+The 12th attack must be the decisive normal-launch finisher.
+
+After that attack completes:
+
+* Clear the active Mash Combo state.
+* Restore ordinary execution rules.
+* Restore normal animation speed.
+* Remove Mash Combo-specific visual effects.
+* Restore standard input handling.
+* Keep the accumulated Launch Point damage.
+* Apply no hidden extra damage or launch.
+* Do not impose a new 3-second or 5-second cooldown on the Mash Combo itself.
 
 ⸻
 
-PART 7 — CPU INTELLIGENCE MUST FOLLOW THE SAME RULES
+PART 6 — RAPID ANIMATIONS AND AFTER-EFFECTS
 
-7.1 Player and CPU mechanical parity
+Mash Combo must feel dramatically faster and more intense than ordinary close-range melee combat.
 
-All movement rules must be authoritative and shared.
+The sequence must have rapid alternating movement, readable attacks, and visible after-effects.
 
-A CPU executing a move must behave physically like a player executing that move from the same initial state.
+Animation speed
+
+Make both designated attack animations substantially faster while they are being performed inside Mash Combo.
+
+Start by testing approximately 2× normal speed, tuning as necessary to maintain clarity and deterministic hit registration.
+
+This acceleration must affect the actual attack execution timing, not only visual sprite playback.
+
+Synchronize:
+
+* Startup timing.
+* Active hitbox windows.
+* Multi-hit strike timing.
+* Recovery timing.
+* Animation frame progression.
+* Step-in events.
+* Hitstop interaction.
+* Transitions between turns.
+
+Do not visually play an attack twice as fast while leaving its collision active at the ordinary timing.
+
+The animation, collision, damage, and turn counter must remain synchronized.
+
+Respect Alva’s 60 Hz fixed-step simulation.
+
+Fast attacks must not skip narrow active windows simply because their accelerated timing crosses several authored event boundaries in one simulation step.
+
+Use robust deterministic scheduling or event-boundary handling.
+
+Ensure each authored attack activation can correctly produce its intended strikes.
+
+Animation continuity
+
+The sequence should transition rapidly from one move to the other.
+
+Avoid unnecessary idle frames, animation pops, repeated startup stalls, or visible pauses between turns.
+
+Each turn must start from the correct animation frame.
+
+Maintain the fighter’s legitimate position, facing, hitboxes, and grounded state.
+
+Animation speed must return to normal whenever the series ends or is interrupted.
+
+After-effects
+
+Mash Combo attacks must have noticeably enhanced visual effects.
+
+Reuse or extend ALVA’s existing Canvas-based hit effects and afterimage infrastructure, particularly js/game/rendering/hit-fx.js.
+
+Add suitable effects such as:
+
+* Fast fading sprite afterimages.
+* Motion streaks following punches and kicks.
+* Short-lived strike trails.
+* Stronger but controlled impact flashes.
+* Small bursts or highlights on successful contacts.
+* Brief visual emphasis on the twelfth finishing attack.
+
+The effects should communicate speed and momentum rather than obscure the characters.
+
+The fighter’s actual collision box must never become larger just because its visual afterimage extends farther.
+
+Afterimages are visual only; they cannot hit opponents.
+
+Visual effects must not create additional damage events.
+
+For #0006, afterimages should correctly reflect the relevant ensemble members rather than showing an incorrect or disconnected sprite.
+
+Manage effect lifetime and memory carefully, particularly for mobile devices.
+
+Respect any existing reduced-motion settings.
+
+Maintain the existing sprite and pixel-art aesthetic.
+
+⸻
+
+PART 7 — NON-CANCELLABLE BUT INTERRUPTIBLE
+
+A Mash Combo is non-cancellable, but it is not invincible or uninterruptible.
+
+These are separate requirements.
+
+Non-cancellable
+
+Once the automatic twelve-turn sequence begins, the player cannot voluntarily cancel it with:
+
+* Another attack.
+* The same attack button.
+* A different melee attack.
+* A Special.
+* A projectile.
+* A summon or technique.
+* Jump.
+* Dash.
+* Air dash.
+* Shield.
+* Deflect.
+* Ordinary hit-cancel rules.
+* The existing attack input buffer.
+* A move’s normal free-cancel behavior.
+
+Ordinary movement inputs must not cause the fighter to abandon the automatic sequence.
+
+Do not allow a move’s normal hitCancel property to terminate the Mash Combo or replace its next scheduled turn.
+
+Do not allow Fighter.canFollowUp() to override the Mash Combo lock.
+
+Player presses during an active Mash Combo should not unexpectedly become delayed attacks when the series finishes.
+
+Interruptible
+
+The Mash Combo must stop if the fighter is legitimately interrupted by an opponent or forced combat state.
 
 This includes:
 
-* The same automatic Step-in eligibility
-* The same Step-in timing
-* The same forward impulse
-* The same movement restrictions
-* The same collision and friction
-* The same carried momentum
-* The same scripted motion
-* The same lack of Attack Steering
+* Taking an enemy hit that interrupts its attack.
+* Entering hitstun.
+* Being paralyzed or otherwise forcibly immobilized.
+* Being launched away.
+* Being eliminated by the Void.
+* Losing its active combat state through a legitimate match reset or respawn.
+* Other existing engine-recognized hard interruptions.
 
-No CPU-only movement bonuses.
+If the fighter genuinely leaves the ground because its support disappears or it is forcibly displaced, terminate the grounded-only sequence rather than continuing it as an aerial combo.
 
-No CPU-only attack steering.
+The fighter must remain vulnerable.
 
-No special exception for Hard or Brutal difficulty.
+The opponent must still be able to defend, counterattack, and potentially interrupt the series.
 
-Difficulty can change planning quality, not the mechanical rules.
+A raised Shield must still block Mash Combo attacks according to existing universal Shield rules.
 
-7.2 Update the CPU executor
+Do not give Mash Combo attacks armor, invincibility, automatic Shield bypass, or unblockable damage.
 
-Inspect:
+A successful block must remain a block, not a confirmed hit.
 
-js/game/ai/cpu-intelligence/executor.js
+Define explicitly and test how Shield blocks affect continuation of the sequence, without introducing an exploit that repeatedly bypasses Shield’s established multi-hit protections.
 
-Its existing finish() logic suppresses some grounded attack directions because the predictor assumes attacks are unsteered.
+Cleanup after interruption
 
-After this update, unsteered movement must be enforced by the shared fighter runtime, not merely by the CPU choosing neutral input.
+When interrupted:
 
-Update or simplify the CPU’s attack-input handling accordingly.
+1. Stop the automatic sequence immediately.
+2. Prevent remaining turns from executing.
+3. Remove Mash Combo-specific launch overrides.
+4. Clear pending Mash Combo-generated attacks.
+5. Reset the animation playback modifier.
+6. Begin the correct hurt, launch, or forced-state animation.
+7. Clear active aftereffects appropriately.
+8. Reset the mash detector so the interrupted sequence cannot resume automatically.
 
-An input direction during an attack may be retained for future navigation or valid facing behavior, but it must not move the fighter while the attack is underway.
+If the fighter is hit during turn 7, turns 8–12 must not secretly execute later.
 
-Do not rely on CPU input suppression as the only implementation of the rule.
+If both fighters attack on the same fixed step, preserve Alva’s existing legitimate hit-trade behavior.
 
-Do not leave hidden steering available to the player.
-
-7.3 Update CPU attack prediction
-
-Inspect:
-
-js/game/ai/cpu-intelligence/prediction.js
-
-The current predictor calls steerAttack() with neutral direction in several attack-simulation paths.
-
-It must now simulate:
-
-1. The correct resolved automatic Step-in.
-2. No automatic aerial Step-in.
-3. No automatic object-move Step-in.
-4. Explicit authored Step-ins and opt-outs.
-5. Preexisting velocity.
-6. Input-independent passive momentum.
-7. Scripted movement.
-8. Ground transitions and collisions.
-9. Attack timing, hitstop, cancellation, and interruption.
-10. Zero Attack Steering.
-
-Do not allow the CPU predictor to use different movement mathematics from the actual Fighter.
-
-Where possible, call the same shared functions with the same resolved movement information.
-
-A predicted grounded melee attack must gain the actual distance its Step-in creates.
-
-A predicted projectile attack must not gain imaginary owner displacement.
-
-A predicted aerial attack must not gain the removed steering capability.
-
-7.4 Update recovery and tactical evaluation
-
-The CPU’s recovery logic currently obtains attack-specific air-control information for rising attacks.
-
-Remove reliance on obsolete attack-steering fields.
-
-A rising attack remains a possible recovery action because of its authored upward motion, not because it allows extra horizontal steering.
-
-Update trajectory prediction and recovery planning accordingly.
-
-Also inspect capabilities.js, values.js, evaluator.js, and relevant planning code.
-
-Important: Alva’s CPU uses generic tactical labels such as mobility and approach. Those labels are not necessarily the removed Attack Mobility system.
-
-Do not delete legitimate AI concepts simply because they contain the word “mobility”.
-
-A tiny universal Step-in also must not cause every basic jab to be treated as a major approach, escape, or recovery move.
-
-Review any AI role assignment currently triggered by m.step.
-
-Distinguish:
-
-* Small universal melee lunge
-* Major authored displacement attack
-* True approach ability
-* Recovery movement
-
-CPU candidate scoring must use realistic movement and contact positions rather than inflated reach or guessed movement.
-
-7.5 CPU mode coverage
-
-Verify behavior in:
-
-* Player versus CPU
-* CPU versus CPU
-* Quick Battle
-* Watch Mode
-* All CPU difficulty levels
-* Multiple stages
-* Ledges, walls, and platforms
-* Close-range and long-range exchanges
-* Recovery scenarios
-* Punishes, counters, and combo follow-ups
-
-The CPU must adapt to the fact that holding a movement direction no longer corrects a committed attack’s spacing.
-
-It should approach to the right range before committing, account for automatic melee lunges, and choose attacks accordingly.
+A Mash Combo must never create an interruption immunity that normal melee attacks do not possess.
 
 ⸻
 
-PART 8 — STRICT MOVEMENT POLICY AND PRECEDENCE
+PART 8 — SHARED MASH COMBO STATE MACHINE
 
-Implement one coherent shared policy.
+Implement the mechanic in an organized, reusable way.
 
-The effective behavior should follow this conceptual precedence:
+Prefer a dedicated shared module, for example:
 
-Step-in precedence
+js/game/combat/mash-combo.js
 
-1. Determine whether the action is being executed by a real fighter or a spawned entity.
-2. Identify the actual move and its offensive mechanics.
-3. Identify whether this activation began grounded or airborne.
-4. Preserve explicit authored movement and intentional no-Step-in behavior.
-5. Never create a generic Step-in for aerial activations.
-6. Never create a generic Step-in for projectile-, summon-, clone-, or object-based actions.
-7. Avoid duplicating scripted motions such as rolls and homing dashes.
-8. For eligible grounded direct melee, use an authored Step-in if present.
-9. Otherwise resolve a small universal Step-in.
-10. Apply it at most once, through normal physics.
+The exact filename can differ if existing architecture suggests a better location.
 
-Attack Steering precedence
+The system should explicitly represent:
 
-There is no eligibility calculation.
+* Idle state.
+* Rapid-input recognition.
+* Mash Combo armed or pending state.
+* Active automatic sequence.
+* Completed state.
+* Interrupted state and cleanup.
 
-Attack Steering is removed universally.
+Suggested state fields include:
 
-For every move:
+{
+  pair: ['attack1', 'extra_attack'],
+  triggeringAction: 'attack1',
+  pressCount: 0,
+  firstPressTime: 0,
+  lastPressTime: 0,
+  armed: false,
+  active: false,
+  turnIndex: 0,
+  totalTurns: 12,
+  currentAttack: null,
+  interrupted: false
+}
 
-1. Preserve valid initial facing and move activation.
-2. Preserve actual authored automatic movement.
-3. Preserve legitimate incoming momentum and external physics.
-4. Do not run player-directed horizontal attack steering.
-5. Resume normal locomotion only when the fighter is actually free to move again.
+This is only conceptual pseudocode.
 
-A move’s Special classification, cooldown duration, former mobility tier, or original lockMovement value must not re-enable Attack Steering.
+Use clean state ownership rather than duplicating these values across unrelated modules.
 
-Required behavior matrix
+Single source of truth
 
-Move type	New automatic Step-in	Attack Steering
-Ordinary grounded direct melee	Yes	Removed
-Grounded multi-hit direct melee	Yes, once per activation	Removed
-Grounded melee with existing authored Step-in	Preserve authored lunge, no duplicate	Removed
-Grounded melee intentionally designed not to lunge	Preserve authored exception	Removed
-Grounded attack with its own dash or roll	Preserve intrinsic motion; no duplicate generic lunge	Removed
-Aerial melee	No	Removed
-Aerial homing/rise/bounce/slam	No generic Step-in; preserve intrinsic motion	Removed
-Grounded projectile attack	No	Removed
-Projectile with an authored owner lunge	Preserve authored lunge	Removed
-Object-based attack	No, unless deliberately authored	Removed
-Technique	No generic Step-in	Removed
-Summon startup	No generic Step-in	Removed
-Clone’s attack	No generic fighter Step-in	Removed
-Air Deflect	No generic Step-in	Removed
-Special attack	According to actual melee/context rules	Removed
-Three- or five-second cooldown attack	According to actual melee/context rules	Removed
-Ordinary movement outside an attack	Not applicable	Normal movement remains
+The universal Mash Combo system must decide:
+
+* Whether a fighter qualifies.
+* Whether a press counts.
+* When five presses have been registered.
+* When the automatic sequence starts.
+* Which attack executes next.
+* How many turns remain.
+* Whether launch suppression applies.
+* Whether the sequence can be interrupted.
+* When the sequence ends and cleans up.
+
+Character definitions should declare the valid attack pair, not implement their own sequencing rules.
+
+Avoid fragile implementation
+
+Do not implement Mash Combo by:
+
+* Calling the normal input handler recursively.
+* Injecting fake keyboard events.
+* Mutating globally shared attack definitions.
+* Repeatedly forcing animation names without tracking attack identity.
+* Reusing the normal input buffer as the entire mash detector.
+* Inserting hidden cooldowns.
+* Special-casing each fighter inside Fighter.update().
+* Using rendering frame rate as a gameplay clock.
+* Giving CPUs direct access to mutate fighter Mash Combo state.
+
+Use explicit automatic attack transitions backed by the same combat and collision rules as ordinary attacks.
 
 ⸻
 
-PART 9 — IMPLEMENTATION SAFETY
+PART 9 — FULL CPU SUPPORT
 
-9.1 Prevent movement bypasses
+CPUs MUST UNDERSTAND AND BE ABLE TO PERFORM MASH COMBOS.
 
-Inspect every path that can move the fighter while a move is active.
+This feature is not player-exclusive.
 
-Pay attention to:
+Every CPU-controlled fighter must have access to its designated Mash Combo pair.
 
-* Fighter.update()
+The CPU must respect the same eligibility requirements, input detection, attack timing, 12-turn sequence, launch behavior, vulnerability, and interruption rules as a human player.
+
+CPU activation
+
+The CPU must be able to deliberately initiate a Mash Combo by producing five rapid, legitimate presses of the same eligible grounded close-range attack button.
+
+Those presses must pass through the existing CPU input pipeline.
+
+The CPU must not bypass the detector by simply setting the Mash Combo state to active.
+
+Look carefully at Executor.press() and the CPU’s …Pressed edge generation.
+
+The CPU must release the action between presses when needed, exactly as a real input device would.
+
+Its Mash Combo initiation plan must remain active long enough to generate all five presses, even if the initiating normal attack is still playing.
+
+Do not let normal CPU move-readiness logic prevent intentional mash-input attempts merely because the same attack is still active.
+
+Tactical decision-making
+
+Teach the CPU when Mash Combo is strategically appropriate.
+
+The CPU should recognize opportunities such as:
+
+* A nearby grounded opponent.
+* An opponent in range of both eligible attacks.
+* An opponent who has committed to a punishable move.
+* A favorable close-range pressure situation.
+* A potential finishing opportunity with the twelfth attack’s launch.
+
+It should also recognize reasons not to mash:
+
+* The opponent is far away.
+* The opponent is airborne beyond close-range reach.
+* The CPU is dangerously close to an unprotected ledge.
+* A nearby hazard makes commitment dangerous.
+* The opponent can easily interrupt the series.
+* The opponent is consistently defending successfully.
+* A more valuable defensive or recovery action is needed.
+
+Difficulty levels
+
+All four difficulty levels must be capable of performing Mash Combo:
+
+* Easy
+* Medium
+* Hard
+* Brutal
+
+Difficulty should affect decision quality, reaction, frequency, and tactical reliability, not whether the mechanic is available.
+
+Harder CPUs should generally exploit good Mash Combo openings more effectively.
+
+Do not guarantee that every CPU uses Mash Combo constantly.
+
+A CPU must not gain a stronger version of the mechanic than the human player.
+
+Opponent awareness
+
+CPU intelligence must also understand an opponent currently performing Mash Combo.
+
+It should recognize:
+
+* The opponent’s commitment to a non-cancellable sequence.
+* The rapid incoming attack pressure.
+* That the first eleven turns have zero effective Base Launch.
+* That the final turn restores normal launch.
+* That the opponent can be interrupted.
+* That Shield and positioning remain meaningful defenses.
+
+Update relevant candidate evaluation, threat prediction, and opponent modeling so CPU decisions are based on Mash Combo’s real mechanics.
+
+Game modes
+
+Confirm Mash Combo works in:
+
+* Regular Play.
+* Custom Play.
+* CPU versus player.
+* CPU versus CPU Watch Mode.
+* Mirror matches.
+* Practice Ground for the player.
+
+Preserve the Practice Ground’s existing non-attacking dummy behavior unless a separate attacking CPU is explicitly used.
+
+No mode should require a character-specific hack.
+
+⸻
+
+PART 10 — FIX ANIMATIONS GETTING STUCK ON ONE FRAME
+
+There is an existing problem where certain character animations occasionally get stuck on a single frame.
+
+Investigate this independently of Mash Combo and implement a proper engine-level fix.
+
+Do not cover up the bug by continuously resetting every animation.
+
+Critical investigation area
+
+Inspect:
+
+js/game/rendering/sprite-animator.js
+
+In particular, inspect the logic in SpriteAnimator.play() that skips playback changes when stateKey has not changed.
+
+Also inspect:
+
+* Fighter.updateState()
 * Fighter.startAttack()
-* Fighter.moveAttack()
-* Fighter.moveMotion()
-* Normal moveHorizontal() routing
-* Attack-start momentum
-* lockMovement
-* Buffered attacks
-* Hitstop
-* Landing and leaving the ground
-* Attack cancels
-* Deflects
-* Technique startup and release
-* Summon startup and completion
-* Scripted motion completion
-* End-of-attack recovery
-* Dash-to-attack transitions
+* Fighter.animationFor()
+* CombatState.endAttack()
+* CombatState.interruptAttack()
+* EnsembleAnimator.play()
+* Sprite fallback and frame-hold behavior.
+* Animation startup and recovery timing.
+* Impact-freeze handling.
 
-A single attack must not become steerable through a less-obvious branch after its motion ends or it changes phase.
+Likely failure mechanism
 
-9.2 Preserve everything outside the requested scope
+When an attack starts again using the same animation key, the renderer may treat it as the same animation session and refuse to restart at frame zero.
 
-Do not unnecessarily change:
+This can leave the sprite displaying the last frame of the previous activation.
 
-* Universal running
-* Universal jumping
-* Normal airborne control outside attacks
-* Dash and air dash
-* Dash Energy costs
-* Movement input mappings
-* Controller and touch controls
-* Attack animations and frame rates
-* Startup, active, and recovery durations
-* Hitboxes and hurtboxes
-* Damage
-* Launch
-* Hitstun and blockstun
-* Hitstop
-* Shield
-* Deflect projectile redirection
-* Hit-confirmed cancels
-* Input buffering
-* Cooldown policies
-* Energy policies
-* Projectile behavior
-* Summon/clone behavior
-* Technique release behavior
-* Stage hazards and collision
+The problem may also appear when a new attack replaces another activation without the logical attack state changing.
 
-Normal Run input should work immediately again once the move ends or is legitimately cancelled.
+Verify this failure mode through tests or reproduction before treating it as the only cause.
 
-A projectile already in flight must not keep its fighter in an attack movement lock beyond the actual move animation.
+Required fix
 
-9.3 Preserve deterministic physics
+Introduce reliable animation-activation identity or an equivalent restart mechanism.
 
-Alva runs a fixed-step simulation.
+A new attack activation must restart its corresponding animation correctly, even if:
 
-Do not introduce:
+* The fighter remains in the logical attack state.
+* The new move has the same animation key.
+* The same button is pressed again after an attack finishes.
+* A legitimate hit-cancel begins another attack.
+* A Mash Combo advances to another turn.
+* A Mash Combo alternates rapidly between two animations.
+* A CPU initiates the attack.
+* The fighter is an ensemble.
 
-* Frame-rate-dependent impulses
-* Repeated Step-ins
-* NaN velocities
-* Arbitrary teleports
-* Collision bypasses
-* Direction-dependent steering loopholes
-* Attack-cancel velocity exploits
-* CPU-specific physics
-* Different results for otherwise identical input and game states
+Each new attack should restart once when its activation begins, not once every update frame.
 
-Keep all behavior deterministic under fixed initial conditions and seeds.
+Do not introduce flickering by resetting an animation continuously.
+
+Preserve legitimate animation holds
+
+Differentiate between a genuine stuck animation and an intentional held frame.
+
+The following must continue behaving correctly:
+
+* Single-frame idle or falling poses.
+* Shield hold animations.
+* Authored static frames.
+* Legitimate recovery-frame holds.
+* Hitstop or impact freeze.
+* Non-looping clips that intentionally hold their final frame until the current move ends.
+
+Fix unintended permanent or incorrect frame holds without breaking these expected behaviors.
+
+Additional validation
+
+Investigate whether any animation becomes stuck because of:
+
+* Missing or invalid frame data.
+* Invalid animation FPS.
+* Mismatched animation duration and combat duration.
+* Incorrect animation state priority.
+* A stale animation key after interruption.
+* Incorrect pause/resume behavior.
+* A stuck attack record.
+* Missing animation restart when a new activation starts.
+* Broken ensemble member synchronization.
+
+After any interruption, the character must transition into the proper hurt, launch, falling, or idle animation.
+
+After Mash Combo, it must return to normal playback.
+
+The animation bug fix must improve the entire game, not just the new Mash Combo.
 
 ⸻
 
-PART 10 — TESTING REQUIREMENTS
+PART 11 — PRESERVE EXISTING SYSTEMS
 
-10.1 Create dedicated universal Step-in tests
+This update must not regress any established mechanic.
 
-Test every playable fighter’s real mapped attacks.
+Preserve:
 
-Verify:
+* Ordinary attacks and their normal damage and launch.
+* Existing multi-hit attacks.
+* Hit-confirmed follow-ups.
+* Existing attack cancellation rules outside Mash Combo.
+* Existing input buffering.
+* Normal attack repeat behavior outside Mash Combo.
+* Dash and air dash.
+* Jumps and aerial combat.
+* Shield and perfect Shield.
+* Deflect.
+* Energy.
+* 3-second and 5-second cooldown policy.
+* Specials.
+* Projectiles.
+* Summons.
+* Techniques.
+* Launch Point accumulation and recovery.
+* Launch steering and stage bounce.
+* Ground movement and Step-in.
+* Character-specific mechanics.
+* CPU difficulty differences.
+* Practice Ground.
+* Watch Mode.
+* Mobile/touch controls.
+* Controller rebinding.
+* English and French localization.
+* Ensemble fighter behavior.
+* Existing hit effects and rendering.
 
-* Every eligible grounded direct melee attack Steps-in from rest.
-* Step-in works with no movement input.
-* Step-in works while Run is held.
-* Step-in uses legal attack facing.
-* Step-in happens once.
-* Multi-hit strings do not produce repeated Step-ins.
-* Generic Step-in distance remains modest.
-* Existing authored Steps-in are not duplicated.
-* Authored no-Step-in moves remain stationary as intended.
-* Aerial melee attacks never gain generic Step-in.
-* Landing does not cause an aerial Step-in.
-* Leaving the ground does not produce a late generic lunge in the air.
-* Projectile attacks do not gain generic Step-in.
-* Techniques and summons do not gain generic Step-in.
-* Clones do not gain owner-fighter displacement.
-* Object-based hitboxes are classified correctly.
-* Scripted movement attacks do not gain duplicate lunges.
-* Stage walls and ledges behave correctly.
+The new rules must take precedence where specifically required during an active Mash Combo, without modifying normal behavior elsewhere.
 
-10.2 Prove Attack Steering is actually gone
+For example:
 
-For every applicable attack category, test:
+Outside Mash Combo: an eligible attack uses its original timing, Base Launch, animation speed, and normal hit-cancel rules.
 
-* Neutral input
-* Left held
-* Right held
-* Holding the same direction as incoming momentum
-* Holding the opposite direction
-* Switching directions during startup
-* Switching directions during active frames
-* Switching directions during recovery
-* Pressing Run after the attack starts
+Inside Mash Combo: the same attack uses Mash Combo timing, interim launch suppression, automatic sequencing, and its non-cancellable commitment.
 
-Under equivalent initial movement, facing, targeting, and attack state, the directional inputs must not alter horizontal movement through Attack Steering.
+Do not accidentally make every rapidly repeated attack auto-combo.
 
-Movement differences may only arise from legitimate non-steering mechanics or independent changes in facing/targeting that the game’s rules permit.
+Do not allow Mash Combo rules to leak into air attacks.
 
-Confirm:
+⸻
 
-* Ground attacks have no steering.
-* Aerial attacks have no steering.
-* Deflect has no steering.
-* Projectile attacks have no steering.
-* Techniques have no steering.
-* Summon startup has no steering.
-* Special attacks have no steering.
-* Quick attacks do not secretly retain steering.
-* Heavy attacks do not secretly retain steering.
-* lockMovement: false does not bypass the rule.
-* A scripted motion’s startup or recovery does not accidentally revert to steerable locomotion.
-* Normal movement resumes at the correct time.
+PART 12 — INPUT AND USER INTERFACE INTEGRATION
 
-Test that a fighter can still move automatically during a Step-in, carry existing inertia, or execute a scripted movement move.
+Mash Combo activation must work through existing logical combat actions.
 
-Those movements must not be mistaken for steering.
+Ensure full support for:
 
-10.3 Verify authored mechanics
+* Keyboard.
+* Touchscreen buttons.
+* Joystick touch layout.
+* Classic touch layout.
+* PlayStation controllers.
+* Xbox controllers.
+* Custom controller bindings.
+* CPU-generated inputs.
 
-Use real roster examples to test:
+Do not require a new dedicated Mash Combo button.
 
-* High Kick’s authored lunge.
-* Heel Drop’s authored lunge.
-* Chakra Haymaker’s authored lunge.
-* Dark Tendrils’ planted/rooted behavior.
-* Homing attacks.
-* Ground rolls.
-* Aerial bounces.
-* Aerial rises.
-* Slams and landing impacts.
-* Hovering moves.
-* Clone attacks.
-* Projectile casts.
+The mechanic is activated by repeatedly pressing one of the fighter’s two eligible existing combat actions.
 
-Include tests for forward and backward facing, attacks started from rest, running attacks, and attacks following a Dash.
+If a fighter needs additive close-range move support, ensure its corresponding controls are properly available and respect all existing controller-comfort rules.
 
-10.4 CPU prediction parity tests
+Avoid changing universal button assignments.
 
-For the same fighter, move, stage, starting position, velocity, and target:
+If visual feedback helps readability, add restrained indicators such as:
 
-1. Run the real Fighter simulation.
-2. Run the CPU’s prediction.
-3. Compare the resulting position and velocity over time.
-4. Compare predicted and actual attack contact.
+* A subtle activation flash.
+* A compact Mash Combo notification.
+* An unobtrusive turn counter showing progress from 1 to 12.
+* A visibly stronger twelfth strike.
 
-Test ordinary Step-in attacks, authored lunges, aerial attacks, projectile attacks, and scripted-motion attacks.
+Any new player-facing text must support both English and French.
 
-The predictor and actual simulation should agree within justified fixed-step tolerances.
+Do not overload the HUD or obscure the fight.
 
-Verify CPUs cannot gain movement by sending Run input during attacks.
+No new settings toggle is required: Mash Combo is an always-available universal mechanic for eligible fighters.
 
-Also verify CPUs still navigate and attack effectively after their moves finish.
+⸻
 
-10.5 Update obsolete tests instead of preserving the obsolete feature
+PART 13 — AUTOMATED TESTING
 
-Existing tests in:
+Add comprehensive automated tests.
 
-tests/systems/attack-mobility.test.mjs
-tests/systems/movement-rules.test.mjs
-tests/systems/movement.test.mjs
-tests/systems/cpu-intelligence.test.mjs
-tests/systems/cpu-behaviour.test.mjs
+Create a focused new suite such as:
 
-may currently assert that attack steering exists.
+tests/systems/mash-combo.test.mjs
 
-These assertions must be replaced with tests of the new rules, not preserved.
+Also extend appropriate existing tests.
 
-If an old attack-mobility test module is no longer meaningful, replace it with a dedicated universal Step-in and no-steering test suite.
+Mandatory activation tests
 
-Do not simply delete all movement coverage.
+Verify that:
 
-Preserve tests of legitimate momentum, physics, Dash, recoil, authored motion, and cancellation.
+1. Five sufficiently rapid presses of the same eligible grounded attack activate Mash Combo.
+2. Four presses do not.
+3. Slow presses do not.
+4. A held button does not.
+5. Keyboard autorepeat does not fake multiple presses.
+6. Mixed attack presses do not qualify.
+7. An ineligible move does not qualify.
+8. An attack with a 3-second cooldown does not qualify.
+9. An attack with a 5-second cooldown does not qualify.
+10. A Special does not qualify.
+11. An air attack does not qualify.
+12. The fighter must be grounded at activation.
+13. Repeated inputs during an ordinary attack can contribute to recognition without restarting that ordinary attack.
+14. Valid press detection behaves consistently through normal recovery and hitstop.
+15. Stale or interrupted partial input sequences are cleared correctly.
 
-Review per-fighter tests and test fixtures for outdated mobility expectations.
+Mandatory sequence tests
 
-10.6 Run comprehensive regression tests
+Verify that:
+
+1. Exactly 12 automatic turns execute.
+2. Exactly two distinct attack identities are used.
+3. Each attack executes six times.
+4. The attacks alternate perfectly.
+5. Triggering through A starts with A.
+6. Triggering through B starts with B.
+7. The 12th turn uses the correct finishing attack.
+8. Every turn has a valid animation.
+9. Every turn has a valid collision opportunity.
+10. The sequence ends naturally after the twelfth turn.
+11. No 13th attack is automatically created.
+12. Continued button holding or pressing during the series does not indefinitely extend it.
+
+Mandatory launch tests
+
+For turns 1–11:
+
+* Effective Base Launch is exactly 0.
+* Launch Point damage still accumulates.
+* No normal Base Launch knockback occurs.
+* Every strike of an existing multi-hit attack respects the override.
+
+For turn 12:
+
+* Original Base Launch is restored.
+* Original Directional Launch applies.
+* Launch uses the correctly accumulated Launch Point.
+
+After termination:
+
+* Normal attacks use their original Base Launch.
+* No attack definition has been permanently modified.
+* No stale launch override survives.
+
+Mandatory interruption tests
+
+Verify Mash Combo cannot be voluntarily cancelled through ordinary requests.
+
+Then verify that genuine enemy attacks, hitstun, paralysis, launch, Void elimination, loss of required grounded state, and respawn properly terminate the sequence.
+
+Check that neither pending attacks nor speed modifiers survive the interruption.
+
+Ensure existing Shield interactions work correctly.
+
+Mandatory fighter coverage
+
+Test every currently playable fighter.
+
+Validate that each has two genuine qualifying grounded close-range melee attacks and exactly one designated pair.
+
+Test #0005 and #0006 particularly carefully.
+
+Test #0006’s member animation ownership and ensemble rendering.
+
+Test registration rejection for new fighter definitions without a valid pair.
+
+Mandatory CPU tests
+
+Verify that:
+
+* All four CPU difficulties can execute Mash Combo.
+* CPU presses are actual legal input edges.
+* The CPU can make five rapid presses while its current ordinary attack is playing.
+* CPUs respect the same grounded restrictions.
+* CPUs cannot ignore the non-cancellable lock.
+* CPUs can be interrupted.
+* CPU versus CPU matches support Mash Combo.
+* CPU reasoning accounts for the interim zero launch and final real launch.
+* Opposing CPUs can recognize and defend against Mash Combo.
+* CPU plans do not become stuck attempting to mash an ineligible move.
+
+Mandatory animation regression tests
+
+Test repeated activation of the same attack animation.
+
+Test changing attacks without transitioning through idle.
+
+Test Mash Combo’s 12 rapid attack transitions.
+
+Test hitstop, interruption, recovery, and respawn.
+
+Test both SpriteAnimator and EnsembleAnimator.
+
+Verify animations advance through their intended frames and correctly restart for new activations.
+
+Existing intentional frame holds must continue to work.
+
+Existing tests to review
+
+Pay particular attention to:
+
+* tests/systems/basic-strings.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/move-cancel.test.mjs
+* tests/systems/cooldown-policy.test.mjs
+* tests/systems/attack-classification.test.mjs
+* tests/systems/combat-ai.test.mjs
+* tests/systems/cpu-behaviour.test.mjs
+* tests/systems/cpu-intelligence.test.mjs
+* tests/systems/strict-combat-rules.test.mjs
+
+Some existing tests explicitly assume that pressing the same button during an attack cannot create a sequence.
+
+Preserve that behavior for ordinary, non-mashing input, but update those tests to recognize the new valid five-press Mash Combo exception.
+
+Do not simply delete tests that conflict with the new requirements.
+
+Instead, revise them to enforce the correct combined behavior.
 
 Run:
 
 node --test
 
-Also run:
-
-node tests/benchmarks/feel-metrics.mjs
-node tests/benchmarks/cpu-benchmark.mjs
-
-The feel benchmark currently measures steering-related behavior. Update obsolete measurements so it now verifies meaningful properties such as:
-
-* Grounded Step-in travel distance
-* One-time Step-in behavior
-* No input-driven displacement during attacks
-* Carried momentum
-* Motion-specific movement
-* Normal movement restoration
-* Dash-to-attack behavior
-* Airborne drift without attack steering
-
-Do not preserve a metric that requires the removed feature to exist.
-
-Use the CPU benchmark to detect regressions in combat competence, attack usage, spacing, recovery, edge safety, inactivity, and navigation.
-
-If full browser testing is available, also play or observe actual matches using keyboard, controller, and CPU inputs.
+Ensure existing and new tests pass.
 
 ⸻
 
-PART 11 — DOCUMENTATION AND PROJECT CLEANUP
+PART 14 — MANUAL GAMEPLAY VERIFICATION
 
-Update all affected project documentation, especially:
+Automated tests alone are insufficient.
+
+Use the playable browser game for manual validation wherever the development environment permits.
+
+Check every fighter in an actual match.
+
+Test Mash Combo at different opponent distances and Launch Point values.
+
+Confirm that:
+
+* The five-press trigger feels responsive.
+* The automatic series is visually obvious.
+* The attacks are dramatically faster.
+* Afterimages and impact effects are visible.
+* Both designated attacks remain distinguishable.
+* All twelve turns play in the correct order.
+* The target generally remains reachable during the zero-launch turns.
+* The finisher launches using the correct original Base Launch.
+* The sequence can be punished or interrupted.
+* Normal attacks still work when the player does not mash.
+* No character gets stuck on a single animation frame.
+* Mobile gameplay remains performant.
+
+Check gameplay near walls, platforms, stage ledges, and Void boundaries.
+
+Check opponents who are shielding, stunned, airborne, moving away, or attempting to counterattack.
+
+Check match-ending hits and respawn during Mash Combo.
+
+There must be no hidden duplicated hits, invisible attacks, accidental extra turns, or infinite loops.
+
+⸻
+
+PART 15 — DOCUMENTATION AND STRICT RULE ENFORCEMENT
+
+Update the relevant documentation to accurately describe this feature.
+
+At minimum, review and update:
 
 * ALVA_SPEC.md
-* docs/systems/movement.md
 * docs/systems/combat.md
+* docs/systems/input.md
 * docs/systems/ai.md
-* docs/characters/
+* docs/systems/rendering.md
+* docs/architecture/character-system.md
+* Relevant individual character documentation.
 * docs/characters/adding-characters.md
-* docs/development/testing.md
-* Relevant comments and update notes
+* UPDATES.md
+* README.md, where appropriate.
 
-Document the new universal rules clearly.
+Document Mash Combo as a new universal mechanic.
 
-Remove obsolete statements such as:
+Document the new permanent fighter requirement: every fighter needs two specific Mash Combo-compatible grounded close-range melee attacks.
 
-* Every attack has an Attack Mobility tier.
-* A quick attack can retain directional run control.
-* Heavy attacks allow slower steering.
-* Aerial attacks can be steered using airControl.
-* Ordinary moves permit steering except for Specials or certain cooldowns.
-* The CPU deliberately chooses neutral steering while the player retains steering.
+Document the distinction between generic grounded melee and designated close-range melee.
 
-Those statements are no longer valid.
+Document the five-press trigger, 12-turn sequence, launch suppression, final launch, non-cancellable behavior, interruption conditions, and CPU support.
 
-If the repository’s existing max document is retained, revise or explicitly supersede its contradictory steering requirements. Do not leave an authoritative-looking specification that instructs a future developer to reintroduce Attack Steering.
+Update any affected codename or loadout specifications coherently if additional attack support requires extending them.
 
-Keep unrelated ordinary movement documentation intact.
+Do not create contradictory documentation.
 
-Where character definitions change, follow Alva’s profile-review process. Recheck the relevant Discover profiles and update their reviewed source hashes only after reviewing the resulting fighter data.
+Do not edit the protected character_rule file.
+
+This is a new strict rule, not a temporary workaround.
 
 ⸻
 
-PART 12 — ENGINEERING CONSTRAINTS
+PART 16 — DEFINITION OF DONE
 
-The implementation must be:
+The implementation is not complete unless every condition below is satisfied.
 
-* Shared across the roster.
-* Independent of fighter IDs.
-* Independent of numbered attack buttons.
-* Consistent between human players and CPUs.
-* Based on the move’s actual mechanics.
-* Deterministic.
-* Testable.
-* Compatible with future fighter definitions.
-* Free from duplicated physics code.
-* Free from dead Attack Mobility configuration.
-* Free from hidden steering through fallback branches.
-* Careful with hybrid attacks.
-* Careful with attacks used by clones.
-* Careful with attacks executable in both ground and air contexts.
+* [ ]	Mash Combo is implemented as a new additive universal mechanic.
+* [ ]	Five rapid presses of one eligible grounded melee action trigger it.
+* [ ]	Each fighter has two explicitly designated genuine grounded close-range melee attacks.
+* [ ]	The new requirement is validated for the existing roster and future fighters.
+* [ ]	Non-close-range attacks are not silently misclassified.
+* [ ]	3-second and 5-second cooldown moves are excluded.
+* [ ]	Specials are excluded.
+* [ ]	Air attacks are excluded.
+* [ ]	Exactly two attacks participate in each Mash Combo.
+* [ ]	Both attacks occur six times.
+* [ ]	Exactly 12 turns execute.
+* [ ]	All 12 attacks play substantially faster.
+* [ ]	The sequence has visible after-effects.
+* [ ]	Turns 1–11 use Base Launch 0.
+* [ ]	Turn 12 restores the final attack’s original Base Launch.
+* [ ]	Original character attack data remains intact.
+* [ ]	Mash Combo cannot be voluntarily cancelled.
+* [ ]	Enemy attacks and legitimate forced states can interrupt it.
+* [ ]	All CPU difficulty levels can initiate and perform it.
+* [ ]	CPU intelligence recognizes the mechanic offensively and defensively.
+* [ ]	Keyboard, touch, and controllers all work.
+* [ ]	Every character, including the ensemble, works correctly.
+* [ ]	The animation stuck-frame bug is diagnosed and fixed.
+* [ ]	Existing combat mechanics remain functional.
+* [ ]	New tests cover the requirements.
+* [ ]	Existing regression tests pass.
+* [ ]	Documentation is updated.
+* [ ]	No character-specific exceptions are hardcoded in the universal engine.
 
-Do not add unnecessary animation assets or input buttons.
+FINAL IMPLEMENTATION INSTRUCTIONS
 
-Do not change gameplay balance parameters unrelated to these rules.
+Do not stop after implementing only the input detector.
 
-Do not remove general AI tactical mobility or ordinary fighter movement merely because they use similar terminology.
+Do not stop after creating the twelve-turn sequence.
 
-Where a move-specific exception is necessary, make it explicit, validated, and documented rather than hardcoding a condition for a named fighter.
+Do not stop after changing animation speed.
 
-⸻
+Do not stop after adding the feature to one fighter.
 
-PART 13 — FINAL ACCEPTANCE CRITERIA
+Implement the feature across the complete game, including character eligibility, engine rules, launch resolution, animations, visual effects, input devices, CPU intelligence, documentation, and testing.
 
-Consider the task complete only when all conditions hold:
+Resolve architectural conflicts instead of ignoring requirements.
 
-* [ ]	Every eligible grounded direct melee attack automatically Steps-in.
-* [ ]	The generic Step-in works without Run input.
-* [ ]	Generic Step-in happens only once per activation.
-* [ ]	Existing authored Step-ins remain unchanged and are not duplicated.
-* [ ]	Authored no-Step-in exceptions remain intact.
-* [ ]	Aerial attacks never acquire a new universal Step-in.
-* [ ]	Projectile moves never acquire a generic Step-in.
-* [ ]	Object-based moves never acquire a generic Step-in.
-* [ ]	Summons do not move their owners through generic Step-in.
-* [ ]	Clones do not inherit unintended fighter Step-in movement.
-* [ ]	Real scripted movement mechanics remain operational.
-* [ ]	All Attack Steering is removed from runtime gameplay.
-* [ ]	Attack Mobility tiers and obsolete configuration are removed.
-* [ ]	Holding left/right during an attack does not steer the fighter.
-* [ ]	No attack-phase or lockMovement bypass remains.
-* [ ]	Ordinary movement outside attacks still works normally.
-* [ ]	Legitimate momentum and external physics remain functional.
-* [ ]	CPU fighters obey exactly the same rules as players.
-* [ ]	CPU predictions include correct automatic Step-ins.
-* [ ]	CPU predictions do not include obsolete steering.
-* [ ]	CPU recovery and combat evaluation use the new physics correctly.
-* [ ]	All six current fighters and all move categories are audited.
-* [ ]	Future eligible melee attacks inherit the Step-in default.
-* [ ]	Tests and benchmarks reflect the new policy.
-* [ ]	Existing essential combat mechanics remain intact.
-* [ ]	Documentation no longer describes the removed feature.
-* [ ]	The full applicable test suite passes.
+Prioritize correctness, deterministic combat behavior, maintainable shared systems, and preservation of the existing game.
 
-Required final delivery
+At completion, provide a detailed implementation report identifying:
 
-Do not stop after proposing an approach.
+1. Every modified and newly created file.
+2. The final two Mash Combo moves assigned to each fighter.
+3. How the five-press input detector works.
+4. How the twelve turns are scheduled and executed.
+5. How Base Launch is suppressed and restored.
+6. How cancellation is prevented and interruption works.
+7. How CPUs decide to trigger and perform Mash Combos.
+8. The confirmed cause and implemented fix for stuck animations.
+9. The tests added and their results.
+10. Any remaining known limitations.
 
-Actually implement the new gameplay rules, update the affected code and tests, run validation, and provide a final engineering report containing:
+The final result must be a fully functional, universal Mash Combo system—not a prototype, not a character-specific implementation, and not a replacement for ALVA’s existing combat.
 
-1. The modified and removed files.
-2. The central Step-in policy and how it resolves eligibility.
-3. The attack-steering code and data removed.
-4. The authored movement exceptions preserved.
-5. A roster-wide movement audit summary.
-6. The CPU prediction and execution changes.
-7. Automated test and benchmark results.
-8. Any remaining limitations or issues.
-
-Final non-negotiable instruction:
-
-In Alva, every eligible grounded direct melee attack must automatically advance slightly forward with Step-in. Aerial attacks, projectiles, summons, clones, and object-based moves must not gain that generic movement. Moves with deliberately authored movement—or deliberately authored absence of Step-in—must retain their actual mechanics.
-
-Attack Steering / Attack Mobility must be completely removed for both human players and CPUs.
-
-A fighter may still move because of a Step-in, preexisting momentum, an attack’s scripted movement, gravity, or an external force. It must not move because the player or CPU holds Run during the attack.
-
-Implement these as strict, universal, future-proof combat rules across the complete game.
+All requested changes are new strict rules.
