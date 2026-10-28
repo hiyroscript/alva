@@ -73,8 +73,6 @@ export const CONFIG = Object.freeze({
       maxWaveSpeedMultiplier: 4,
     },
     introSeconds: 1.7,
-    timeUpSeconds: 1.4,
-    koSeconds: 1.4,        // the KO beat after the match-winning point, before the result
     // First to this many points wins: a point for each time the opponent
     // falls into the Void. The HUD shows one score dot per point.
     pointsToWin: 3,

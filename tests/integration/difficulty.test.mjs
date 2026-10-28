@@ -604,7 +604,7 @@ test('a higher level beats a lower one: Brutal against Easy, seeded', () => {
   battle.p1.controller = new CombatAIController({ difficulty: 'easy', rng: mulberry32(3) });
   battle.setPhase('fight');
   let steps = 0;
-  while (battle.phase !== 'result' && steps++ < Math.ceil(110 / DT)) battle.update(DT);
+  while (!battle.matchOver && steps++ < Math.ceil(110 / DT)) battle.update(DT);
   assert.equal(battle.result.outcome, 'p2', `Brutal wins (${battle.score.p1} - ${battle.score.p2})`);
   assert.ok(battle.score.p2 > battle.score.p1);
 });

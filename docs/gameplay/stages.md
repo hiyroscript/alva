@@ -40,8 +40,8 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   of play at once (not drawn, hit, targeted or framed), and back at its own
   spawn 2 seconds later (`CONFIG.battle.respawnSeconds`, on the simulation
   clock), fresh. In Quick Battle each fall is also a point for the opponent,
-  and the third point ends the match instead (a short **K.O.** beat, then
-  the result). Every fall bursts where the fighter went in, in its own
+  and the third point ends the match instead (at once: the loser stays
+  out, and after the match nobody respawns). Every fall bursts where the fighter went in, in its own
   colours (`visual.eliminationPalette`), paint only, and the Void itself
   ripples where the fighter's centre crossed its boundary (every side and
   corner, overtime's closed edge included): a bright pulse there, its black

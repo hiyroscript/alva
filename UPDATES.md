@@ -3975,3 +3975,79 @@ roster-wide tables (`cooldown-policy`, `special-abilities`: ten Specials,
 `discover`, `practice-ground`, `watch-mode`, `settings` (its credits), each
 fighter's roster list, `move-cancel`, `universal-movement` and
 `cpu-behaviour` (above).
+
+## The match's end: celebration, result toast and Match Results
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: a match that ends without stopping the world, its own announcement,
+CPU celebrations, a result toast, a Match Results dialog with full match
+statistics and real navigation, Settings and an X on every dialog that
+pauses play, and the teams named in Roman numerals.
+
+**What it changed.**
+
+- **The lifecycle** (`js/game/battle.js`). The phases are `intro`, `fight`
+  and `celebration`: `timeup`, `ko` and `result` are gone, with
+  `CONFIG.battle.timeUpSeconds` and `koSeconds`. `Battle.finishMatch` ends
+  the match exactly once, the moment it is decided (the third point inside
+  its step, the clock or overtime at the start of one), and freezes
+  `Battle.final` (outcome, reason, winner, score, both Launch Points,
+  overtime, length, statistics). `Battle.result` returns the frozen result
+  once there is one (the old rule is `liveResult`). Inputs are locked in
+  the intro only; respawns, hazards and scoring run only while
+  `matchLive`; the clock stops and every respawn wait is called off at the
+  end. The world, the camera and the player's controls go on.
+- **CPU celebrations** (`js/game/ai/celebration.js`, new). A CPU's combat
+  AI makes way for a `CelebrationController` on its own seeded stream
+  (`CELEBRATION_STREAMS`) and comes back on a restart: the winner picks
+  among ability spam, the Void run, idle, a dash dance and jump spam; a
+  loser idles; after a draw both idle, dash dance or jump.
+- **Match statistics** (`js/game/match-stats.js`, new; `CombatState`'s
+  new `energySpent` and `launchPointRecovered` totals). One counter set per
+  side, from the combat events and deflections and those totals, kept
+  across lives, frozen into the result.
+- **The battle screen** (`js/screens/battle-screen.js`). VICTORY! /
+  DEFEAT. / GAME. (Watch Mode: VICTORY! over TEAM I or TEAM II) replace the
+  K.O. and TIME beats; a non-modal result toast at the bottom centre ("Team
+  I wins!", "Team II wins!", "No winner, game ended with a draw.", green
+  View match results); the Match Results dialog (outcome, both teams,
+  ending, length, statistics table, Rematch, Change fighters, Change stage,
+  Return to home screen, an X), which pauses nothing; once the match is
+  over the pause controls open it. The old result menu, its kickers and the
+  final-fall line ("… fell into the Void for the final point.") are gone.
+- **Settings and the X** on the pause menu, Practice Ground's menu and
+  roster dialogs, and Return to home? over a paused battle
+  (`dialogControls`, `js/ui/components.js`; `ConfirmDialog`'s `onSettings`).
+  Settings opens over them with play still frozen.
+- **Navigation.** `ScreenManager.backTo` (Change fighters back to Select
+  Fighter or Watch Mode's Select CPU 1).
+- **Team names.** Team I and Team II (Équipe I, Équipe II) wherever a side
+  is named; the HUD's cards are named for their teams for screen readers.
+
+**Where to tune it:** `FINAL_BANNER_SECONDS` (`js/screens/battle-screen.js`);
+the celebration's `WEIGHTS`, `DURATIONS`, `DANCE_RADIUS`, `DANCE_TURN`,
+`ABILITY_GAP`, `JUMP_GAP`, `AIR_CHANCE` and `STALL_JUMP`
+(`js/game/ai/celebration.js`); the toast and dialog styles
+(`css/battle-overlays.css`).
+
+**Code:** `js/game/battle.js`, `js/game/match-stats.js` (new),
+`js/game/ai/celebration.js` (new), `js/game/combat/combat-state.js`,
+`js/config.js`, `js/screens/battle-screen.js`,
+`js/screens/practice-screen.js`, `js/core/screen-manager.js`,
+`js/ui/components.js`, `js/ui/overlays.js`, `js/ui/hud.js`,
+`js/localization/strings/`, `css/battle-overlays.css`, `css/settings.css`,
+`css/overlays.css`.
+
+**Tests:** `tests/systems/celebration.test.mjs` and
+`tests/systems/match-stats.test.mjs` (new);
+`tests/interface/battle-screen.test.mjs` (the announcements, the toast,
+the Match Results, its navigation, the pause menu's Settings and X),
+`tests/integration/quick-battle.test.mjs` (Change fighters, Return to home
+screen), `tests/integration/watch-mode.test.mjs`,
+`tests/integration/match-score.test.mjs`,
+`tests/integration/overtime.test.mjs`,
+`tests/integration/practice-ground.test.mjs`,
+`tests/interface/ability-hud.test.mjs`,
+`tests/interface/ui-consistency.test.mjs`,
+`tests/systems/platform-hazards.test.mjs` and the CPU match helpers
+updated.

@@ -67,6 +67,23 @@ export class ScreenManager {
     return true;
   }
 
+  // Back to screen `id` where it already is in the back stack, everything
+  // after it dropped (as Back pressed that many times would); else straight
+  // on to it in place of the current screen. Either way it opens as when
+  // Back returns to it.
+  backTo(id) {
+    const i = this.stack.lastIndexOf(id);
+    const next = this.screens.get(id);
+    if (!next) throw new Error(`[Alva] Unknown screen "${id}"`);
+    if (i < 0) {
+      this.swap(this.current, next, { fromBack: true }, 'back');
+      return false;
+    }
+    this.stack.length = i;
+    this.swap(this.current, next, { fromBack: true }, 'back');
+    return true;
+  }
+
   swap(prev, next, params, direction) {
     const reduced = this.app.device.reducedMotion;
     if (prev && prev !== next) {

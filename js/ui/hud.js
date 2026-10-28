@@ -17,7 +17,8 @@
 // P1 and CPU in Quick Battle, CPU 1 and CPU 2 in Watch Mode. Under it, in a
 // Battle only, one dot per point the match is played to
 // (CONFIG.battle.pointsToWin), filled for each point the fighter has scored.
-// The right-hand card mirrors the left-hand one. Energy and the summon and
+// The right-hand card mirrors the left-hand one. In a Battle each card and
+// its dots are one group named for its team (Team I, Team II). Energy and the summon and
 // technique cooldowns are drawn over the fighter itself
 // (js/game/rendering/fighter-status.js); the card only describes Energy to screen
 // readers.
@@ -28,7 +29,7 @@
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { t, tattr, plural, slotLabel } from '../localization/i18n.js';
+import { t, tattr, plural, slotLabel, setAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { paintPortrait, portraitSourceFacing } from './sprite-art.js';
 
@@ -132,6 +133,13 @@ export class HUD {
     this.root = root;
     this.left = sidePanel('p1', { inward: 1, points: pointsToWin });
     this.right = sidePanel('p2', { inward: -1, points: pointsToWin });
+    // Each side is its team for screen readers: Team I on the left, Team II
+    // on the right, in every mode (the card's tag still says who plays it).
+    for (const [panel, slot] of [[this.left, 'p1'], [this.right, 'p2']]) {
+      panel.wrap.setAttribute('role', 'group');
+      panel.wrap.dataset.team = slot;
+      setAttr(panel.wrap, 'aria-label', `team.${slot}`);
+    }
     this.roundLabel = el('span', { class: 'hud-round' });
     this.timer = el('span', { class: 'hud-timer' });
     // Timer and pause are two halves of one glass control; either pauses.

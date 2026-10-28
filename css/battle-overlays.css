@@ -1,6 +1,7 @@
-/* Battle overlays: the round banner and the pause and result panels. One
-   part of the stylesheet index.html loads in order (css/base.css first;
-   see docs/development/conventions.md). */
+/* Battle overlays: the round banner and the final announcement, the pause
+   panel, the result toast and the Match Results. One part of the stylesheet
+   index.html loads in order (css/base.css first; see
+   docs/development/conventions.md). */
 
 /* Banner ---------------------------------------------------------------- */
 
@@ -43,6 +44,16 @@
 /* OVERTIME shows while the fight goes on: a size smaller than the beats
    that stop it, so it reads at once and hides less of the stage. */
 .battle-banner[data-state="overtime"] .banner-main { font-size: clamp(30px, 8vh, 80px); }
+/* The final announcement (VICTORY!, DEFEAT., GAME.): it lands with a
+   little more weight, then the screen hides it after its beat
+   (FINAL_BANNER_SECONDS) while the celebration plays on. */
+.battle-banner.is-final.is-shown { animation: banner-final-in 0.6s var(--ease) both; }
+@keyframes banner-final-in {
+  0% { opacity: 0; transform: scale(1.18); }
+  60% { opacity: 1; transform: scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+.battle-banner[data-state="defeat"] .banner-main { color: var(--scrim-text-muted); }
 
 /* Pause + result overlays: glass panels over a dimmed battle ----------- */
 
@@ -54,14 +65,17 @@
   padding: max(var(--safe-t), 12px) max(var(--safe-r), 12px) max(var(--safe-b), 12px) max(var(--safe-l), 12px);
 }
 .overlay[hidden] { display: none; }
-.pause-overlay, .result-overlay {
+.pause-overlay {
   z-index: 6;
   background: var(--scrim);
   animation: dim-in 0.18s ease both;
 }
 /* Glass overlays fade their dim and their panel separately: fading the whole
    overlay's opacity would cut the panel's blur off from the battle behind. */
-.pause-overlay > .pause-panel, .result-overlay > .pause-panel { animation: fade-in 0.18s ease both; }
+.pause-overlay > .pause-panel { animation: fade-in 0.18s ease both; }
+/* The pause menu's heading, with Settings and the X at its top right. */
+.pause-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pause-heading { display: grid; gap: clamp(8px, 1.8vh, 14px); min-width: 0; }
 .pause-panel {
   width: min(400px, 100%);
   max-height: 100%;
@@ -73,7 +87,7 @@
   overflow: hidden;
 }
 .pause-view { display: grid; gap: clamp(8px, 1.8vh, 14px); min-height: 0; }
-.pause-title, .result-title {
+.pause-title {
   font-weight: 700;
   font-size: clamp(22px, 5vh, 34px);
   line-height: 1.1;
@@ -104,5 +118,149 @@
    muted label, no hover or press response. Kept after the interactive
    states so it overrides them. */
 .pause-btn-item:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
-.result-sub { color: var(--text-secondary); font-size: 14px; }
+
+/* The result toast: a glass strip at the bottom centre, the outcome on the
+   left and View match results (the green primary action) on the right.
+   Only its panel takes a press; it stays for the whole celebration. */
+.match-toast {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(calc(var(--safe-b) + 12px), clamp(14px, 3vh, 28px));
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  padding: 0 max(var(--safe-r), 16px) 0 max(var(--safe-l), 16px);
+  pointer-events: none;
+}
+.match-toast[hidden] { display: none; }
+.match-toast-panel {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 22px);
+  max-width: min(640px, 100%);
+  padding: clamp(8px, 1.6vh, 12px) clamp(10px, 1.6vh, 12px) clamp(8px, 1.6vh, 12px) clamp(14px, 2vw, 22px);
+  border-radius: var(--radius-menu);
+  color: var(--text-strong);
+  animation: toast-in 0.32s var(--ease) both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.match-toast-text { font-weight: 700; font-size: clamp(14px, 2.4vh, 18px); line-height: 1.25; min-width: 0; }
+.match-toast-action { flex: none; padding: 0 18px; }
+/* Out of the way while the pause menu is up, back with it gone. */
+.is-paused .match-toast { visibility: hidden; }
+
+/* The Match Results: a larger glass dialog over the battle, which plays on
+   undimmed behind it (it is no pause). Its header and actions stay put;
+   only its body scrolls. */
+.results-overlay {
+  z-index: 6;
+  background: transparent;
+}
+.results-overlay > .results-panel { animation: fade-in 0.18s ease both; }
+.results-panel {
+  width: min(760px, 100%);
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  color: var(--text);
+  color-scheme: dark;
+  border-radius: var(--radius-menu);
+  overflow: hidden;
+}
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: clamp(10px, 2.2vh, 18px) clamp(14px, 2.2vw, 22px) clamp(8px, 1.4vh, 12px);
+  border-bottom: 1px solid var(--glass-seam);
+}
+.results-title {
+  font-weight: 800;
+  font-size: clamp(18px, 3.6vh, 26px);
+  letter-spacing: 0.08em;
+  color: var(--text-strong);
+}
+.results-body {
+  display: grid;
+  gap: clamp(10px, 1.8vh, 16px);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(10px, 2vh, 16px) clamp(14px, 2.2vw, 22px);
+}
+.results-line { display: flex; flex-wrap: wrap; gap: 4px 16px; font-weight: 800; letter-spacing: 0.06em; font-size: clamp(13px, 2.2vh, 16px); }
+.results-line-part.is-winner { color: var(--white); }
+.results-line-part.is-defeated, .results-line-part.is-draw { color: var(--scrim-text-muted); }
+.results-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.results-team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-menu);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.results-team--p2 { flex-direction: row-reverse; text-align: right; }
+.results-team.is-winner { border-color: var(--action); background: rgba(25, 122, 61, 0.16); }
+.results-portrait { flex: none; width: clamp(40px, 8vh, 56px); height: clamp(40px, 8vh, 56px); object-fit: contain; }
+.results-team:not(.has-portrait) .results-portrait { visibility: hidden; }
+.results-portrait.is-mirrored { transform: scaleX(-1); }
+.results-team-text { display: grid; gap: 2px; min-width: 0; }
+.results-team-name { font-weight: 700; font-size: clamp(14px, 2.4vh, 17px); color: var(--text-strong); }
+.results-team-who { display: flex; gap: 6px; min-width: 0; color: var(--text-secondary); font-size: 13px; }
+.results-team--p2 .results-team-who { justify-content: flex-end; }
+.results-team-tag { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-muted); align-self: center; }
+.results-team-fighter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results-team-status { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-muted); }
+.results-team.is-winner .results-team-status { color: var(--white); }
+.results-meta { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.results-meta li {
+  padding: 3px 9px;
+  border-radius: var(--radius-menu);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.results-table-wrap { min-width: 0; overflow-x: auto; }
+.results-table { width: 100%; border-collapse: collapse; font-size: clamp(12px, 1.9vh, 14px); }
+.results-table th, .results-table td { padding: 6px 10px; border-bottom: 1px solid var(--glass-seam); }
+.results-table thead th { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--text-muted); text-align: right; }
+.results-table thead th.results-stat, .results-stat { text-align: left; }
+.results-stat { font-weight: 500; color: var(--text-secondary); }
+.results-cell { width: 22%; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.results-cell.is-winner { color: var(--white); font-weight: 700; background: rgba(25, 122, 61, 0.12); }
+.results-table thead th.is-winner { color: var(--white); }
+.results-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: clamp(10px, 2vh, 14px) clamp(14px, 2.2vw, 22px);
+  border-top: 1px solid var(--glass-seam);
+}
+.results-actions .pause-btn-item { justify-content: center; text-align: center; padding: 0 10px; line-height: 1.15; }
+/* Narrow screens: two actions a row, the team cards and the toast stacked. */
+@media (max-width: 640px) {
+  .results-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .results-teams { grid-template-columns: 1fr; }
+  .results-team--p2 { flex-direction: row; text-align: left; }
+  .results-team--p2 .results-team-who { justify-content: flex-start; }
+  .match-toast-panel { flex-direction: column; align-items: stretch; text-align: center; }
+}
+/* Short landscape phones: the actions on one row again, the header and
+   rows tighter, the body scrolling. */
+@media (max-height: 440px) and (min-width: 641px) {
+  .results-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .results-actions .pause-btn-item { height: 36px; font-size: 12px; }
+  .results-table th, .results-table td { padding: 4px 8px; }
+}
 

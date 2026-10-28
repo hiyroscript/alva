@@ -188,6 +188,7 @@ const { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } = await impo
 const { BattleScreen } = await import('../../js/screens/battle-screen.js');
 const { Battle, BATTLE_MODES } = await import('../../js/game/battle.js');
 const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+const { CelebrationController, CELEBRATIONS, LOSER_CELEBRATIONS, DRAW_CELEBRATIONS } = await import('../../js/game/ai/celebration.js');
 const { PlayerController } = await import('../../js/game/fighters/fighter-controller.js');
 
 // The test-only playable fighters beside #0001 (slot 01), registered before
@@ -876,8 +877,9 @@ test('a full seeded Watch match plays out under the normal rules: first to 3 or 
   battle.setPhase('fight');
   let steps = 0;
   const limit = CONFIG.battle.matchSeconds + CONFIG.battle.overtimeSeconds + 10;
-  while (battle.phase !== 'result' && steps++ < Math.ceil(limit / DT)) battle.update(DT);
-  assert.equal(battle.phase, 'result', 'the match ends');
+  while (!battle.matchOver && steps++ < Math.ceil(limit / DT)) battle.update(DT);
+  assert.equal(battle.matchOver, true, 'the match ends');
+  assert.equal(battle.phase, 'celebration');
   const { outcome, reason } = battle.result;
   const { p1, p2 } = battle.score;
   if (reason === 'void') assert.equal(Math.max(p1, p2), CONFIG.battle.pointsToWin);
@@ -1108,7 +1110,13 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   screen.restart();
   off();
   screen.battle.score.p1 = CONFIG.battle.pointsToWin;
-  screen.finishBattle();
+  screen.battle.finishMatch();
+  screen.update(DT);
+  off();
+  assert.equal(screen.toast.hidden, false, 'the result toast, for spectators too');
+  screen.openResults();
+  off();
+  screen.closeResults();
   off();
   screen.rematch();
   off();
@@ -1156,7 +1164,7 @@ test('pause still works while spectating: P, Esc, gamepad Start and the HUD, wit
   const { app, screens } = booted;
   const screen = screens.battle;
   await startWatch(booted);
-  const items = () => screen.pauseMenuView.querySelectorAll('[data-nav]').map((b) => b.textContent);
+  const items = () => screen.pauseMenuView.querySelector('.pause-menu').querySelectorAll('[data-nav]').map((b) => b.textContent);
 
   app.input.key('KeyP');
   assert.equal(screen.paused, true, 'P pauses');
@@ -1225,30 +1233,42 @@ test('Restart Battle and Rematch keep both CPUs, their fighters, the level, the 
   assert.equal(screen.paused, false);
   play();
   battle.score.p2 = CONFIG.battle.pointsToWin;
-  screen.finishBattle();
-  byText(screen.resultOverlay, 'Rematch').click();
+  battle.finishMatch();
+  // Both CPUs celebrate meanwhile: the winner freely, the loser calmly.
+  assert.ok(battle.p2.controller instanceof CelebrationController);
+  assert.deepEqual(battle.p2.controller.behaviours, CELEBRATIONS);
+  assert.deepEqual(battle.p1.controller.behaviours, LOSER_CELEBRATIONS);
+  screen.openResults();
+  byText(screen.resultsOverlay, 'Rematch').click();
   check('rematch');
-  assert.equal(screen.resultOverlay.hidden, true);
-  // Gamepad Start on the result is Rematch too.
+  assert.equal(screen.resultsOverlay.hidden, true);
+  // Gamepad Start on the Match Results only closes them: it never rematches.
   battle.score.p1 = CONFIG.battle.pointsToWin;
-  screen.finishBattle();
+  battle.finishMatch();
+  screen.openResults();
   booted.app.input.pad('start');
-  check('rematch from Start');
+  assert.equal(screen.resultsOverlay.hidden, true);
+  assert.equal(battle.phase, 'celebration', 'no rematch from Start');
+  assert.equal(screen.toast.hidden, false);
+  booted.app.input.pad('start');
+  assert.equal(screen.resultsOverlay.hidden, false, 'Start opens them again');
+  byText(screen.resultsOverlay, 'Rematch').click();
+  check('rematch after Start');
   screen.exit();
 });
 
-test('results name CPU 1 and CPU 2 in Watch Mode; Quick Battle\'s wording is unchanged', async () => {
+test('the result names Team I and Team II in both modes: the toast, the Match Results and their tags', async () => {
   const cases = [
-    // [mode, winner, how, title, line]
-    ['watch', 'p1', 'void', 'CPU 1 wins', 'CPU 2 fell into the Void for the final point.'],
-    ['watch', 'p2', 'void', 'CPU 2 wins', 'CPU 1 fell into the Void for the final point.'],
-    ['watch', 'p1', 'points', 'CPU 1 wins', 'Time ran out. More points wins the match.'],
-    ['watch', 'p2', 'time', 'CPU 2 wins', 'Time ran out with the points level. Lower Launch Point wins.'],
-    ['quick-battle', 'p1', 'void', 'Player 1 wins', 'The CPU fell into the Void for the final point.'],
-    ['quick-battle', 'p2', 'void', 'CPU wins', 'Player 1 fell into the Void for the final point.'],
-    ['quick-battle', 'p2', 'points', 'CPU wins', 'Time ran out. More points wins the match.'],
+    // [mode, winner, how, toast, tags]
+    ['watch', 'p1', 'void', 'Team I wins!', ['CPU 1', 'CPU 2']],
+    ['watch', 'p2', 'void', 'Team II wins!', ['CPU 1', 'CPU 2']],
+    ['watch', 'p1', 'points', 'Team I wins!', ['CPU 1', 'CPU 2']],
+    ['watch', 'p2', 'time', 'Team II wins!', ['CPU 1', 'CPU 2']],
+    ['quick-battle', 'p1', 'void', 'Team I wins!', ['P1', 'CPU']],
+    ['quick-battle', 'p2', 'void', 'Team II wins!', ['P1', 'CPU']],
+    ['quick-battle', 'p2', 'points', 'Team II wins!', ['P1', 'CPU']],
   ];
-  for (const [mode, winner, how, title, line] of cases) {
+  for (const [mode, winner, how, toast, tags] of cases) {
     const booted = boot();
     const screen = booted.screens.battle;
     const battle = mode === 'watch' ? await startWatch(booted) : await startQuickBattle(booted);
@@ -1257,19 +1277,22 @@ test('results name CPU 1 and CPU 2 in Watch Mode; Quick Battle\'s wording is unc
     else if (how === 'points') battle.score[winner] = 1;
     else battle[loser].combat.launchPoint = 50;
     assert.deepEqual(battle.result, { outcome: winner, reason: how });
-    screen.finishBattle();
-    assert.equal(screen.resultOverlay.hidden, false);
-    assert.equal(screen.resultTitle.textContent, title, `${mode} ${winner} ${how}`);
-    assert.equal(screen.resultSub.textContent, line);
-    assert.equal(screen.resultKicker.textContent, how === 'void' ? 'K.O.' : 'Time over');
-    assert.equal(screen.resultOverlay.getAttribute('aria-labelledby'), screen.resultTitle.id, 'the dialog is announced by its title');
-    assert.doesNotMatch(screen.resultOverlay.textContent, mode === 'watch' ? /Player 1|The CPU/ : /CPU 1|CPU 2/);
+    battle.finishMatch();
+    screen.update(DT);
+    assert.equal(screen.toastText.textContent, toast, `${mode} ${winner} ${how}`);
+    assert.equal(screen.resultsOverlay.hidden, true, 'no dialog by itself');
+    screen.toastButton.click();
+    assert.equal(screen.resultsOverlay.hidden, false);
+    const teamName = (slot) => (slot === 'p1' ? 'TEAM I' : 'TEAM II');
+    assert.deepEqual(screen.resultsLine.children.map((c) => c.textContent), [`${teamName(winner)} — WINNER`, `${teamName(loser)} — DEFEATED`]);
+    assert.deepEqual(screen.resultsOverlay.querySelectorAll('.results-team-tag').map((c) => c.textContent), tags);
+    assert.equal(screen.resultsOverlay.getAttribute('aria-labelledby'), 'results-title', 'the dialog is announced by its title');
+    assert.doesNotMatch(screen.resultsOverlay.textContent + screen.toast.textContent, /Team [12]\b|fell into the Void|K\.O\./);
     assert.equal(document.activeElement.textContent, 'Rematch');
     screen.exit();
   }
-  // A tie (points and Launch Point equal as overtime runs out) ends the
-  // match on the result menu too, naming neither CPU; Rematch starts a clean
-  // one.
+  // A tie (points and Launch Point equal as overtime runs out) names no
+  // winner; Rematch starts a clean one.
   const booted = boot();
   const screen = booted.screens.battle;
   const battle = await startWatch(booted);
@@ -1281,21 +1304,22 @@ test('results name CPU 1 and CPU 2 in Watch Mode; Quick Battle\'s wording is unc
   battle.p2.combat.launchPoint = 25;
   battle.timeLeft = 0.01;
   battle.update(DT);
-  battle.phase = 'result';
+  assert.equal(battle.phase, 'celebration');
   assert.deepEqual(battle.result, { outcome: 'draw', reason: 'overtimeLaunchPoint' });
-  screen.finishBattle();
-  assert.equal(screen.resultOverlay.hidden, false, 'the result menu, not a fresh battle');
-  assert.equal(battle.phase, 'result');
-  assert.equal(screen.resultKicker.textContent, 'End of overtime');
-  assert.equal(screen.resultTitle.textContent, 'Tie');
-  assert.equal(screen.resultSub.textContent, 'Overtime ended with the points and Launch Point equal.');
-  assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|The CPU/);
-  assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change stage', 'Return to home']);
-  byText(screen.resultOverlay, 'Rematch').click();
+  // Both CPUs move about harmlessly: neither is named the winner.
+  assert.deepEqual([battle.p1.controller.behaviours, battle.p2.controller.behaviours], [DRAW_CELEBRATIONS, DRAW_CELEBRATIONS]);
+  screen.update(DT);
+  assert.equal(screen.toastText.textContent, 'No winner, game ended with a draw.');
+  screen.openResults();
+  assert.deepEqual(screen.resultsLine.children.map((c) => c.textContent), ['DRAW — NO WINNER']);
+  assert.deepEqual(screen.resultsOverlay.querySelector('.results-actions').querySelectorAll('[data-nav]').map((b) => b.textContent),
+    ['Rematch', 'Change fighters', 'Change stage', 'Return to home screen']);
+  byText(screen.resultsOverlay, 'Rematch').click();
   assert.equal(battle.overtime, false);
   assert.deepEqual(battle.score, { p1: 0, p2: 0 });
   assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [0, 0]);
   assert.equal(battle.mode, 'watch');
+  assert.ok(battle.p1.controller instanceof CombatAIController && battle.p2.controller instanceof CombatAIController);
   screen.exit();
 });
 
@@ -1304,8 +1328,9 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   const { app, screens } = booted;
   const battle = await startWatch(booted, { mapId: 'city' });
   battle.score.p1 = CONFIG.battle.pointsToWin;
-  screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change stage').click();
+  screens.battle.battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change stage').click();
   assert.equal(current(app), 'watch-map');
   assert.equal(screens.battle.battle, null, 'the battle is over');
   assert.equal(document.activeElement, mapCard(screens.watchMap, 'city'), 'on the stage it was played on');
@@ -1326,8 +1351,9 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
 
   const quick = await startQuickBattle(booted);
   quick.score.p2 = CONFIG.battle.pointsToWin;
-  screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change stage').click();
+  screens.battle.battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change stage').click();
   assert.equal(current(app), 'map', 'Quick Battle\'s own Select Stage');
 });
 

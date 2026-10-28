@@ -926,10 +926,15 @@ test('More freezes practice under a translucent menu: Change Fighter, Change CPU
   assert.equal(menuOverlay.getAttribute('role'), 'dialog');
   assert.equal(menuOverlay.getAttribute('aria-modal'), 'true');
   assert.ok(menuOverlay.children[0].classList.contains('glass'));
-  assert.deepEqual(labels(menuOverlay), PRACTICE_MENU);
-  assert.deepEqual(app.nav.candidates(menuOverlay), [screen.changeBtn, screen.cpuBtn, screen.returnBtn]);
+  const menu = menuOverlay.querySelector('.pause-menu');
+  assert.deepEqual(labels(menu), PRACTICE_MENU);
+  // Settings and the X at the top right, then the three items.
+  const { settings, close } = screen.menuControls;
+  assert.deepEqual(app.nav.candidates(menuOverlay), [settings, close, screen.changeBtn, screen.cpuBtn, screen.returnBtn]);
+  assert.equal(settings.getAttribute('aria-label'), 'Open settings');
+  assert.equal(close.getAttribute('aria-label'), 'Close and resume');
   for (const hidden of ['Resume', 'Restart', 'Restart battle', 'Help', 'Settings', 'Change stage', 'Allow infinite energy', 'Revoke infinite energy']) {
-    assert.ok(!labels(menuOverlay).includes(hidden), `no ${hidden}`);
+    assert.ok(!labels(menu).includes(hidden), `no ${hidden}`);
   }
   assert.ok(!menuOverlay.textContent.match(/energy/i), 'no Energy anywhere in the menu');
   assert.equal('energyBtn' in screen, false);
@@ -2185,7 +2190,7 @@ test('a fresh visit starts with the default CPU again and a fresh fighter at 0 L
   assert.equal(screen.hud.cpuPanel.wrap.hidden, false);
   assert.equal(screen.hud.cpuPanel.name.textContent, '#0001');
   screen.openMenu();
-  assert.deepEqual(labels(screen.menuOverlay), PRACTICE_MENU);
+  assert.deepEqual(labels(screen.menuOverlay.querySelector('.pause-menu')), PRACTICE_MENU);
   screen.cpuBtn.click();
   assert.equal(screen.cpuRosterTitle.textContent, 'Change CPU');
   assert.equal(screen.disableCpuBtn.hidden, false, 'disabling it still works');
@@ -2417,4 +2422,47 @@ test('play-style dialogs over both Practice rosters restore their scope and keep
     if (cpu) screen.closeCpuRoster();
     else screen.closeRoster();
   }
+});
+
+test('the Practice menu and its roster dialogs have Settings then the X: the menu\'s X resumes, a roster\'s X goes back to the menu, Settings keeps everything frozen', async () => {
+  const { app, screen } = await enterPractice();
+  const opened = [];
+  app.settingsDialog = { isOpen: false, open(opts) { this.isOpen = true; opened.push(opts); } };
+  let frames = 0;
+  screen.session.frame = () => { frames++; };
+  screen.openMenu();
+  // The menu: Settings opens over it, and nothing beneath resumes.
+  const { settings, close } = screen.menuControls;
+  assert.deepEqual(screen.menuControls.root.children, [settings, close]);
+  settings.click();
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].returnFocus, settings, 'focus comes back to the gear');
+  screen.onKey({ code: 'KeyP', repeat: false, preventDefault() {} });
+  screen.resume();
+  screen.update(1 / 60);
+  assert.equal(screen.menuOpen, true, 'still frozen under Settings');
+  assert.equal(frames, 0);
+  app.settingsDialog.isOpen = false;
+  // A roster dialog: its X goes back to the menu, never past it.
+  screen.changeBtn.click();
+  assert.equal(screen.rosterOpen, true);
+  const rosterControls = screen.rosterOverlay.querySelector('.dialog-controls');
+  const [rosterSettings, rosterClose] = rosterControls.children;
+  assert.equal(rosterClose.getAttribute('aria-label'), 'Close and go back to the menu');
+  rosterSettings.click();
+  assert.equal(opened.at(-1).returnFocus, rosterSettings);
+  app.settingsDialog.isOpen = false;
+  rosterClose.click();
+  assert.equal(screen.rosterOpen, false);
+  assert.equal(screen.menuOpen, true, 'back on the menu, practice still frozen');
+  assert.equal(document.activeElement, screen.changeBtn);
+  // The CPU dialog's X likewise.
+  screen.cpuBtn.click();
+  screen.cpuRosterOverlay.querySelector('.dialog-controls').children[1].click();
+  assert.equal(screen.cpuRosterOpen, false);
+  assert.equal(screen.menuOpen, true);
+  // The menu's X resumes.
+  close.click();
+  assert.equal(screen.menuOpen, false);
+  assert.equal(screen.isRunning, true);
 });

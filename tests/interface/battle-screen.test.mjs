@@ -1,21 +1,26 @@
 // Run with node --test tests/interface/battle-screen.test.mjs (no dependencies).
-// Pause menu, the HUD (fighter cards with portrait, name and Launch Point, the
-// score dots under them; timer and pause controls) and end-of-battle flow
-// on a minimal fake DOM; layout/paint still needs real-browser verification.
+// Pause menu (with Settings and the X), the HUD (fighter cards with
+// portrait, name and Launch Point, the score dots under them; timer and
+// pause controls) and the match's end (the final announcement, the result
+// toast, the Match Results dialog and its navigation, all while the world
+// plays on) on a minimal fake DOM; layout/paint still needs real-browser
+// verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BattleScreen } from '../../js/screens/battle-screen.js';
+import { BattleScreen, FINAL_BANNER_SECONDS } from '../../js/screens/battle-screen.js';
 import { MenuNavigator } from '../../js/core/menu-navigator.js';
 import { ConfirmDialog } from '../../js/ui/overlays.js';
 import { Settings } from '../../js/core/settings.js';
 import { readFileSync } from 'node:fs';
 import { Battle } from '../../js/game/battle.js';
+import { STAT_KEYS } from '../../js/game/match-stats.js';
 import { CombatState } from '../../js/game/combat/combat-state.js';
 import { formatLaunchPoint, describeEnergy } from '../../js/ui/hud.js';
 import { CONFIG } from '../../js/config.js';
 import { duel, def as DEF_0001, fakeSprites, DT } from '../helpers/fighter-harness.mjs';
 import { getMap } from '../../js/data/maps.js';
 import { setLanguage, localizeTree } from '../../js/localization/i18n.js';
+import { EN } from '../../js/localization/strings/en.js';
 import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from '../fighters/fixtures/test-fighters.mjs';
 import { stylesheet } from '../helpers/stylesheet.mjs';
 
@@ -146,7 +151,12 @@ function setup() {
     },
     settings: new Settings(null),
     device: { blockedPortrait: false, reducedMotion: false },
-    screens: { current: null, back() {}, go() {} },
+    screens: {
+      current: null, stack: [], went: [],
+      back() { this.went.push(['back']); },
+      go(id, params, opts) { this.went.push(['go', id, opts ?? {}]); },
+      backTo(id) { this.went.push(['backTo', id]); },
+    },
     loading: { hide() {} },
     audio: { play() {} },
   };
@@ -157,20 +167,35 @@ function setup() {
   return { app, screen };
 }
 
+// A side's match statistics, every counter at `n`.
+const statsOf = (n) => Object.fromEntries(STAT_KEYS.map((k) => [k, n]));
+
 // A stand-in for Battle that uses the real draw/winner rule. `p1` / `p2`
-// are the fighters' Launch Point, `score` their points.
+// are the fighters' Launch Point, `score` their points. finish() ends its
+// match as the Battle does (the celebration phase, the frozen result with
+// statistics), the world still framing on.
 function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
-  const fighter = (launchPoint) => {
+  const fighter = (launchPoint, label) => {
     const combat = new CombatState();
     combat.launchPoint = launchPoint;
-    return { def: { displayName: '#0001', actions: DEF_0001.actions }, combat };
+    return { def: { displayName: '#0001', actions: DEF_0001.actions }, combat, label };
   };
   const battle = {
-    p1: fighter(p1), p2: fighter(p2), phase: 'fight', phaseTime: 1, timeLeft: 0.2, round: 1, restarts: 0,
-    score: { ...score }, pointsToWin: CONFIG.battle.pointsToWin,
+    p1: fighter(p1, 'P1'), p2: fighter(p2, 'CPU'), phase: 'fight', phaseTime: 1, timeLeft: 0.2, round: 1, restarts: 0, frames: 0,
+    score: { ...score }, pointsToWin: CONFIG.battle.pointsToWin, final: null,
+    get matchOver() { return !!this.final; },
     resize: () => false,
     render() {},
-    frame() {},
+    frame() { this.frames++; },
+    finish({ stats = { p1: statsOf(7), p2: statsOf(4) }, seconds = 125 } = {}) {
+      const { outcome, reason } = this.liveResult;
+      this.phase = 'celebration';
+      this.phaseTime = 0;
+      this.final = Object.freeze({
+        outcome, reason, winner: outcome === 'draw' ? null : outcome, score: { ...this.score },
+        launchPoints: { p1: this.p1.combat.launchPoint, p2: this.p2.combat.launchPoint }, overtime: false, seconds, stats,
+      });
+    },
     restart() {
       this.restarts++;
       for (const f of [this.p1, this.p2]) {
@@ -182,9 +207,12 @@ function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
       this.timeLeft = 99;
       this.phase = 'intro';
       this.phaseTime = 0;
+      this.final = null;
     },
   };
-  Object.defineProperty(battle, 'result', Object.getOwnPropertyDescriptor(Battle.prototype, 'result'));
+  for (const key of ['result', 'liveResult']) {
+    Object.defineProperty(battle, key, Object.getOwnPropertyDescriptor(Battle.prototype, key));
+  }
   return battle;
 }
 
@@ -197,8 +225,18 @@ function startBattle(screen, opts) {
   return battle;
 }
 
-const pauseItems = (screen) => screen.pauseMenuView.querySelectorAll('[data-nav]');
+const pauseItems = (screen) => screen.pauseMenuView.querySelector('.pause-menu').querySelectorAll('[data-nav]');
+const resultsItems = (screen) => screen.resultsOverlay.querySelector('.results-actions').querySelectorAll('[data-nav]');
 const byText = (items, text) => items.find(b => b.textContent === text);
+
+// Ends `battle`'s match on the next frame and plays that frame.
+function finishOnNextFrame(screen, battle, opts) {
+  battle.frame = function () { this.frames++; if (!this.final) this.finish(opts); };
+  screen.update(1 / 60);
+}
+
+const toastShown = (screen) => !screen.toast.hidden;
+
 
 test('the pause menu is exactly Resume, Restart Battle and Return to Home, in that order', () => {
   const { app, screen } = setup();
@@ -209,7 +247,8 @@ test('the pause menu is exactly Resume, Restart Battle and Return to Home, in th
   const [resume, restart, home] = items;
   assert.ok(items.every(b => !b.disabled && !b.hidden), 'all three are live');
   assert.equal(document.activeElement, resume);
-  assert.deepEqual(app.nav.candidates(screen.pauseOverlay), [resume, restart, home]);
+  const { settings, close } = screen.pauseControls;
+  assert.deepEqual(app.nav.candidates(screen.pauseOverlay), [settings, close, resume, restart, home], 'Settings and the X first, at the top');
 
   items.forEach((b, i) => { b.rect = { left: 0, top: i * 50, width: 300, height: 44 }; });
   app.nav.move('down', screen.pauseOverlay);
@@ -563,12 +602,13 @@ test('HUD: a rematch shows 0 Launch Point and empty dots again; on time and leve
   const { screen } = setup();
   const battle = startBattle(screen, { p1: 12, p2: 40, score: { p1: 1, p2: 1 } });
   screen.hud.update(battle);
-  battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
-  screen.update(1 / 60);
+  battle.timeLeft = 0;
+  finishOnNextFrame(screen, battle);
   assert.deepEqual(battle.result, { outcome: 'p1', reason: 'time' }, 'lower Launch Point is better');
-  assert.equal(screen.resultTitle.textContent, 'Player 1 wins');
+  assert.equal(screen.toastText.textContent, 'Team I wins!');
 
-  byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+  screen.openResults();
+  byText(resultsItems(screen), 'Rematch').click();
   for (const side of [screen.hud.left, screen.hud.right]) {
     assert.equal(side.launchPointValue.textContent, '0');
     assert.ok(side.dots.every((d) => !d.classList.contains('is-filled')));
@@ -593,107 +633,217 @@ test('Quick Battle result: points first (3 wins at once, or more on time), then 
   assert.doesNotMatch(source, /health|\.energy\b/i, 'results never read Health or Energy');
 });
 
-test('a draw is a tie on the result menu: no winner named, nothing restarts until Rematch', () => {
+// ---- The match's end -------------------------------------------------------------
+
+test('the match\'s end stops nothing: VICTORY!, one toast, no dialog, the world and the player\'s controls go on', () => {
   const { app, screen } = setup();
-  const battle = startBattle(screen);
-  battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
-  screen.update(1 / 60);
+  const battle = startBattle(screen, { p2: 40 });
+  let fills = 0;
+  const fill = screen.fillResults;
+  screen.fillResults = function (...args) { fills++; return fill.apply(this, args); };
+  finishOnNextFrame(screen, battle);
 
-  assert.equal(battle.result.outcome, 'draw');
-  assert.equal(battle.restarts, 0, 'no fresh battle');
-  assert.equal(battle.phase, 'result');
-  assert.equal(screen.resultOverlay.hidden, false);
-  // With overtime off (this stand-in has no period), time over decided it.
-  assert.equal(screen.resultKicker.textContent, 'Time over');
-  assert.equal(screen.resultTitle.textContent, 'Tie');
-  assert.equal(screen.resultSub.textContent, 'Time ran out with the points and Launch Point equal.');
-  assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|CPU/);
-  assert.deepEqual(app.nav.scopes, [screen.resultScope]);
+  assert.equal(battle.phase, 'celebration');
+  assert.equal(screen.bannerState, 'victory');
+  assert.equal(screen.bannerMain.textContent, 'VICTORY!');
+  assert.equal(screen.bannerSub.textContent, '');
+  assert.ok(screen.banner.classList.contains('is-final'));
+  assert.equal(toastShown(screen), true, 'the toast is up at once');
+  assert.equal(screen.toastText.textContent, 'Team I wins!');
+  assert.equal(screen.toastButton.textContent, 'View match results');
+  assert.ok(screen.toastButton.classList.contains('btn--primary'), 'the green action');
+  assert.equal(screen.toast.getAttribute('role'), 'status', 'a message, never a dialog');
+  assert.equal(screen.resultsOverlay.hidden, true, 'no dialog opens by itself');
+  assert.deepEqual(app.nav.scopes, []);
+  assert.equal(screen.isRunning, true, 'the world runs on');
+  assert.equal(app.input.gameplayActive, true, 'the player keeps their controls');
+  assert.equal(screen.touch.enabled, true);
+
+  const frames = battle.frames;
+  for (let i = 0; i < 300; i++) {
+    battle.phaseTime += 1 / 60;
+    screen.update(1 / 60);
+  }
+  assert.equal(battle.frames, frames + 300, 'every frame still plays');
+  assert.equal(fills, 1, 'the end is shown exactly once');
+  assert.equal(screen.toast.parentNode.children.filter((c) => c === screen.toast).length, 1, 'one toast');
+  assert.equal(toastShown(screen), true, 'and it stays');
+  assert.ok(battle.phaseTime > FINAL_BANNER_SECONDS);
+  assert.equal(screen.bannerState, null, 'the announcement has had its beat');
+  assert.equal(battle.restarts, 0, 'nothing restarts by itself');
+});
+
+test('the announcements: DEFEAT. for the player\'s loss, GAME. for a draw, VICTORY! for Watch Mode\'s winning team; never K.O.', () => {
+  const cases = [
+    [{ p1: 40 }, 'quick-battle', 'defeat', 'DEFEAT.', '', 'Team II wins!'],
+    [{}, 'quick-battle', 'game', 'GAME.', '', 'No winner, game ended with a draw.'],
+    [{ p1: 40 }, 'watch', 'victory.p2', 'VICTORY!', 'TEAM II', 'Team II wins!'],
+    [{ p2: 40 }, 'watch', 'victory.p1', 'VICTORY!', 'TEAM I', 'Team I wins!'],
+    [{}, 'watch', 'game', 'GAME.', '', 'No winner, game ended with a draw.'],
+  ];
+  for (const [opts, mode, state, main, sub, toast] of cases) {
+    const { screen } = setup();
+    screen.mode = mode;
+    const battle = startBattle(screen, opts);
+    finishOnNextFrame(screen, battle);
+    assert.equal(screen.bannerState, state, `${mode} ${state}`);
+    assert.equal(screen.bannerMain.textContent, main);
+    assert.equal(screen.bannerSub.textContent, sub);
+    assert.equal(screen.toastText.textContent, toast);
+  }
+  for (const key of Object.keys(EN)) assert.doesNotMatch(key, /^banner\.(ko|void|time|timeOver)$/, `${key}: no K.O. or TIME end beat`);
+  assert.ok(!Object.values(EN).some((v) => /K\.O\./.test(v)), 'K.O. is never announced');
+  assert.ok(!Object.values(EN).some((v) => /fell into the Void for the final point/.test(v)), 'nor the final fall');
+  const source = readFileSync(new URL('../../js/screens/battle-screen.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /banner\.ko|result\.void|kickerKo/);
+});
+
+test('View match results opens the Match Results over the running world: both teams, the outcome, the statistics, four actions and an X', () => {
+  const { app, screen } = setup();
+  const battle = startBattle(screen, { p2: 40, score: { p1: 2, p2: 1 } });
+  finishOnNextFrame(screen, battle);
+  screen.toastButton.click();
+
+  assert.equal(screen.resultsOverlay.hidden, false);
+  assert.equal(screen.resultsOverlay.getAttribute('role'), 'dialog');
+  assert.deepEqual(app.nav.scopes, [screen.resultsScope]);
   assert.equal(document.activeElement.textContent, 'Rematch');
-  assert.equal(screen.isRunning, false);
-  assert.equal(app.input.gameplayActive, false);
-  assert.equal(screen.touch.enabled, false);
+  assert.equal(toastShown(screen), false, 'the toast makes way');
+  assert.equal(screen.paused, false, 'no pause');
+  assert.equal(screen.isRunning, true);
+  assert.equal(app.input.gameplayActive, false, 'no key meant for the dialog moves the fighter');
+  const frames = battle.frames;
+  for (let i = 0; i < 30; i++) screen.update(1 / 60);
+  assert.equal(battle.frames, frames + 30, 'the battle plays on behind it');
 
-  screen.update(1 / 60);
-  assert.equal(battle.restarts, 0, 'the result menu waits for the player');
-  byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
-  assert.equal(battle.restarts, 1);
-  assert.equal(screen.resultOverlay.hidden, true);
+  const text = (sel) => screen.resultsOverlay.querySelector(sel).textContent;
+  assert.equal(text('.results-title'), 'MATCH RESULTS');
+  assert.deepEqual(screen.resultsLine.children.map((c) => c.textContent), ['TEAM I — WINNER', 'TEAM II — DEFEATED']);
+  const cards = screen.resultsOverlay.querySelectorAll('.results-team');
+  assert.deepEqual(cards.map((c) => c.querySelector('.results-team-name').textContent), ['Team I', 'Team II']);
+  assert.deepEqual(cards.map((c) => c.querySelector('.results-team-status').textContent), ['Winner', 'Defeated']);
+  assert.deepEqual(cards.map((c) => c.querySelector('.results-team-fighter').textContent), ['#0001', '#0001']);
+  assert.deepEqual(cards.map((c) => c.querySelector('.results-team-tag').textContent), ['P1', 'CPU']);
+  assert.deepEqual(cards.map((c) => c.classList.contains('is-winner')), [true, false]);
+  assert.ok(cards.every((c) => c.querySelector('.results-portrait')), 'a portrait each');
+  // The statistics: a row each, Team I's column then Team II's, the
+  // winner's brought forward.
+  const rows = screen.statsTable.querySelectorAll('tr');
+  const heads = rows[0].children.map((c) => c.textContent);
+  assert.deepEqual(heads, ['Statistic', 'Team I', 'Team II']);
+  const body = Object.fromEntries(rows.slice(1).map((r) => [r.children[0].textContent, r.children.slice(1).map((c) => c.textContent)]));
+  assert.deepEqual(Object.keys(body), [
+    'Points', 'Total damage dealt', 'Total damage received', 'Total Launch Point recovered', 'Successful blocks', 'Perfect Shields',
+    'Successful Deflects', 'Total Energy consumed', 'Void falls', 'Successful attacks', 'Highest single hit', 'Final Launch Point',
+  ]);
+  assert.deepEqual(body['Total damage dealt'], ['7', '4']);
+  assert.deepEqual(body['Successful Deflects'], ['7', '4']);
+  assert.deepEqual(body['Final Launch Point'], ['0', '40']);
+  assert.ok(rows[1].children[1].classList.contains('is-winner') && !rows[1].children[2].classList.contains('is-winner'));
+  assert.deepEqual(screen.resultsMeta.children.map((c) => c.textContent), ['Time expired: more points', 'Match length 2:05']);
+  assert.deepEqual(resultsItems(screen).map((b) => b.textContent), ['Rematch', 'Change fighters', 'Change stage', 'Return to home screen']);
+  assert.ok(resultsItems(screen)[0].classList.contains('is-primary'));
+
+  // The X, top right: Close match results. It closes back to the
+  // celebration, the toast up again, the player's controls back and no
+  // control focused.
+  const [close] = screen.resultsControls.root.children;
+  assert.equal(close, screen.resultsControls.close);
+  assert.equal(screen.resultsControls.settings, null, 'no Settings on a dialog that does not pause');
+  assert.equal(close.getAttribute('aria-label'), 'Close match results');
+  assert.ok(close.hasAttribute('data-nav'), 'the controller reaches it');
+  close.click();
+  assert.equal(screen.resultsOverlay.hidden, true);
+  assert.equal(toastShown(screen), true, 'the toast is back');
   assert.deepEqual(app.nav.scopes, []);
   assert.equal(app.input.gameplayActive, true);
-});
+  assert.equal(document.activeElement, document.body);
+  assert.equal(battle.restarts, 0);
 
-test('a winner still gets the result menu', () => {
-  for (const [opts, title] of [[{ p2: 40 }, 'Player 1 wins'], [{ p1: 30 }, 'CPU wins']]) {
-    const { app, screen } = setup();
-    const battle = startBattle(screen, opts);
-    battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
-    screen.update(1 / 60);
-
-    assert.equal(battle.restarts, 0);
-    assert.equal(screen.resultOverlay.hidden, false);
-    assert.equal(screen.resultTitle.textContent, title);
-    assert.equal(screen.resultSub.textContent, 'Time ran out with the points level. Lower Launch Point wins.');
-    assert.deepEqual(app.nav.scopes, [screen.resultScope]);
-    assert.equal(document.activeElement.textContent, 'Rematch');
-    assert.equal(app.input.gameplayActive, false);
-    assert.equal(screen.touch.enabled, false);
-
-    screen.update(1 / 60);
-    assert.equal(battle.restarts, 0, 'the result menu waits for the player');
+  // Esc / gamepad Back and Start close it too; Start never rematches.
+  for (const how of ['onBack', 'onStart']) {
     screen.hud.timeButton.click();
-    assert.equal(screen.paused, false, 'no pause over the result menu');
-
-    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
-    assert.equal(battle.restarts, 1);
-    assert.equal(screen.resultOverlay.hidden, true);
-    assert.deepEqual(app.nav.scopes, []);
-    assert.equal(app.input.gameplayActive, true);
+    assert.equal(screen.resultsOverlay.hidden, false, 'the pause control opens the results once the match is over');
+    assert.equal(screen.paused, false);
+    screen.resultsScope[how]();
+    assert.equal(screen.resultsOverlay.hidden, true, how);
+    assert.equal(battle.restarts, 0, `${how} starts nothing`);
   }
+  // The pause keys toggle it.
+  const key = (code) => screen.onKey({ code, repeat: false, preventDefault() {} });
+  key('Escape');
+  assert.equal(screen.resultsOverlay.hidden, false);
+  key('KeyP');
+  assert.equal(screen.resultsOverlay.hidden, true);
+  assert.equal(screen.onCommand('start'), true);
+  assert.equal(screen.resultsOverlay.hidden, false);
+  // The statistics never move while it is open.
+  const shown = screen.statsTable.textContent;
+  battle.p1.combat.launchPoint = 999;
+  battle.score.p2 = 3;
+  for (let i = 0; i < 30; i++) screen.update(1 / 60);
+  assert.equal(screen.statsTable.textContent, shown);
 });
 
-test('the third point plays the K.O. banner with the dots filled, then the result menu names who fell', () => {
-  const cases = [['p1', 'CPU wins', 'Player 1 fell into the Void for the final point.'], ['p2', 'Player 1 wins', 'The CPU fell into the Void for the final point.']];
-  for (const [lost, title, sub] of cases) {
-    const { app, screen } = setup();
-    const battle = startBattle(screen);
-    const won = lost === 'p1' ? 'p2' : 'p1';
-    // The Battle scored the winner's third point and took the loser out:
-    // its Launch Point (lower here) does not matter.
-    battle.score[won] = 3;
-    battle.score[lost] = 2;
-    battle[lost].lostToVoid = true;
-    battle[won].combat.launchPoint = 120;
-    battle.phase = 'ko';
-    battle.phaseTime = 0.2;
-    screen.update(1 / 60);
-    assert.equal(screen.bannerState, 'ko');
-    assert.equal(screen.bannerMain.textContent, 'K.O.');
-    assert.equal(screen.bannerSub.textContent, 'VOID');
-    assert.equal(screen.resultOverlay.hidden, true, 'the KO beat plays first');
-    const side = won === 'p1' ? screen.hud.left : screen.hud.right;
-    assert.ok(side.dots.every((d) => d.classList.contains('is-filled')), 'with all three dots already filled');
+test('a draw\'s Match Results: DRAW — NO WINNER, both teams alike, nobody defeated', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen, { p1: 33, p2: 33, score: { p1: 1, p2: 1 } });
+  finishOnNextFrame(screen, battle);
+  assert.equal(screen.toastText.textContent, 'No winner, game ended with a draw.');
+  screen.openResults();
+  assert.deepEqual(screen.resultsLine.children.map((c) => c.textContent), ['DRAW — NO WINNER']);
+  const cards = screen.resultsOverlay.querySelectorAll('.results-team');
+  assert.deepEqual(cards.map((c) => c.querySelector('.results-team-status').textContent), ['Draw', 'Draw']);
+  assert.ok(cards.every((c) => !c.classList.contains('is-winner')));
+  assert.doesNotMatch(screen.resultsOverlay.textContent, /Defeated|DEFEATED|Winner|— WINNER/);
+  assert.ok(screen.statsTable.querySelectorAll('.is-winner').length === 0, 'no column brought forward');
+  assert.deepEqual(screen.resultsMeta.children.map((c) => c.textContent), ['Time expired with everything level', 'Match length 2:05']);
+});
 
-    battle.frame = () => { battle.phase = 'result'; };
-    screen.update(1 / 60);
-    assert.deepEqual(battle.result, { outcome: won, reason: 'void' });
-    assert.equal(screen.resultOverlay.hidden, false);
-    assert.equal(screen.resultKicker.textContent, 'K.O.');
-    assert.equal(screen.resultTitle.textContent, title);
-    assert.equal(screen.resultSub.textContent, sub);
-    assert.deepEqual(app.nav.scopes, [screen.resultScope]);
+test('Rematch: a clean match on the same settings, its intro first, everything of the last end gone', () => {
+  const { app, screen } = setup();
+  const battle = startBattle(screen, { p2: 40 });
+  finishOnNextFrame(screen, battle);
+  screen.openResults();
+  byText(resultsItems(screen), 'Rematch').click();
+  assert.equal(battle.restarts, 1);
+  assert.equal(battle.phase, 'intro');
+  assert.equal(screen.resultsOverlay.hidden, true);
+  assert.equal(toastShown(screen), false);
+  assert.equal(screen.bannerState, null);
+  assert.deepEqual(app.nav.scopes, []);
+  assert.equal(app.input.gameplayActive, true);
+  assert.equal(screen.paused, false);
+  // The next match's end is its own: shown again, once.
+  battle.phase = 'fight';
+  battle.p1.combat.launchPoint = 50;
+  finishOnNextFrame(screen, battle);
+  assert.equal(screen.toastText.textContent, 'Team II wins!');
+  assert.equal(screen.bannerMain.textContent, 'DEFEAT.');
+  // Restart battle from the pause menu clears it as well.
+  screen.pause();
+  byText(pauseItems(screen), 'Restart battle').click();
+  assert.equal(toastShown(screen), false);
+  assert.equal(screen.resultsOverlay.hidden, true);
+});
 
-    // The rematch starts from 0 points and runs to time over: ahead on
-    // points, the result reads as time over by points.
-    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
-    assert.deepEqual(battle.score, { p1: 0, p2: 0 });
-    battle[lost].lostToVoid = false;
-    battle.score.p1 = 1;
-    battle.frame = () => { battle.phase = 'result'; };
-    screen.update(1 / 60);
-    assert.equal(screen.resultKicker.textContent, 'Time over');
-    assert.equal(screen.resultTitle.textContent, 'Player 1 wins');
-    assert.equal(screen.resultSub.textContent, 'Time ran out. More points wins the match.');
+test('Change fighters, Change stage and Return to home screen lead to their screens, every overlay closed first', () => {
+  for (const [mode, fighters, stage] of [['quick-battle', 'character', 'map'], ['watch', 'watch-cpu1', 'watch-map']]) {
+    const choose = (label) => {
+      const { app, screen } = setup();
+      screen.mode = mode;
+      const battle = startBattle(screen, { p2: 40 });
+      finishOnNextFrame(screen, battle);
+      screen.openResults();
+      byText(resultsItems(screen), label).click();
+      assert.equal(screen.resultsOverlay.hidden, true, `${mode} ${label}: the dialog closed`);
+      assert.equal(toastShown(screen), false, 'the toast gone');
+      assert.deepEqual(app.nav.scopes, []);
+      return app.screens.went;
+    };
+    assert.deepEqual(choose('Change fighters'), [['backTo', fighters]], `${mode}: its first fighter selection`);
+    assert.deepEqual(choose('Change stage'), [['go', stage, { replace: true }]], `${mode}: its own Select Stage`);
+    assert.deepEqual(choose('Return to home screen'), [['go', 'home', { reset: true }]]);
   }
 });
 
@@ -786,7 +936,7 @@ test('Quick Battle\'s HUD starts at 5:00; at a level 0:00 it turns to OVERTIME a
   }
 });
 
-test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime result, naming CPU 1 and CPU 2', () => {
+test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime\'s result, naming Team I and Team II', () => {
   const { app, screen } = setup();
   const sprites = fakeSprites();
   const battle = new Battle({
@@ -802,6 +952,7 @@ test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime re
   screen.hud.update(battle);
   assert.equal(screen.hud.timer.textContent, '5:00');
   assert.deepEqual([screen.hud.left.tag.textContent, screen.hud.right.tag.textContent], ['CPU 1', 'CPU 2']);
+  assert.deepEqual([screen.hud.left.wrap.getAttribute('aria-label'), screen.hud.right.wrap.getAttribute('aria-label')], ['Team I', 'Team II']);
   battle.setPhase('fight');
   battle.phaseTime = 5;
   battle.timeLeft = 0.01;
@@ -815,18 +966,25 @@ test('Watch Mode shows the same 5:00, OVERTIME banner and label, and overtime re
   battle.p1.combat.launchPoint = 70;
   battle.p2.combat.launchPoint = 15;
   battle.timeLeft = 0.01;
-  playUntil(screen, () => !screen.resultOverlay.hidden, 200);
-  assert.equal(screen.resultKicker.textContent, 'End of overtime');
-  assert.equal(screen.resultTitle.textContent, 'CPU 2 wins');
-  assert.equal(screen.resultSub.textContent, 'Overtime ran out with the points still level. The lower Launch Point decides it.');
+  playUntil(screen, () => toastShown(screen), 200);
+  assert.equal(battle.phase, 'celebration');
+  assert.equal(screen.bannerMain.textContent, 'VICTORY!');
+  assert.equal(screen.bannerSub.textContent, 'TEAM II');
+  assert.equal(screen.toastText.textContent, 'Team II wins!');
+  screen.openResults();
+  assert.deepEqual(screen.resultsLine.children.map((c) => c.textContent), ['TEAM II — WINNER', 'TEAM I — DEFEATED']);
+  assert.deepEqual(screen.resultsOverlay.querySelectorAll('.results-team-tag').map((c) => c.textContent), ['CPU 1', 'CPU 2']);
+  assert.deepEqual(screen.resultsMeta.children.map((c) => c.textContent).slice(0, 1), ['Overtime: lower Launch Point']);
+  assert.ok(screen.resultsMeta.children.some((c) => c.textContent === 'Overtime played'));
+  assert.equal(app.input.gameplayActive, false, 'nobody plays Watch Mode');
 });
 
-test('overtime results say overtime decided it: more points, or level on points the lower Launch Point', () => {
+test('overtime\'s results stand as overtime decided them: more points, or level the lower Launch Point at that moment', () => {
   const cases = [
-    [{ p1: 2, p2: 1 }, [50, 0], 'Player 1 wins', 'Overtime ran out. More points wins the match.'],
-    [{ p1: 1, p2: 1 }, [80, 20], 'CPU wins', 'Overtime ran out with the points still level. The lower Launch Point decides it.'],
+    [{ p1: 2, p2: 1 }, [50, 0], 'Team I wins!', 'Overtime: more points'],
+    [{ p1: 1, p2: 1 }, [80, 20], 'Team II wins!', 'Overtime: lower Launch Point'],
   ];
-  for (const [score, [a, b], title, sub] of cases) {
+  for (const [score, [a, b], toast, reason] of cases) {
     const { app, screen } = setup();
     const battle = startRealBattle(screen, app);
     battle.setPhase('fight');
@@ -838,24 +996,27 @@ test('overtime results say overtime decided it: more points, or level on points 
     battle.p2.combat.launchPoint = b;
     battle.timeLeft = 0.01;
     screen.update(DT + 1e-9);
-    assert.equal(battle.phase, 'timeup');
-    assert.equal(screen.bannerState, 'time');
-    playUntil(screen, () => !screen.resultOverlay.hidden, 200);
-    assert.equal(screen.resultOverlay.hidden, false);
-    assert.equal(screen.resultKicker.textContent, 'End of overtime');
-    assert.equal(screen.resultTitle.textContent, title);
-    assert.equal(screen.resultSub.textContent, sub);
+    assert.equal(battle.phase, 'celebration');
+    assert.equal(screen.toastText.textContent, toast);
+    const decided = battle.result;
+    // Recovery afterwards (both Launch Points fall to 0) changes nothing.
+    playUntil(screen, () => battle.p1.combat.launchPoint === 0 && battle.p2.combat.launchPoint === 0, 60 * 120);
+    assert.deepEqual(battle.result, decided);
+    screen.openResults();
+    assert.equal(screen.resultsMeta.children[0].textContent, reason);
+    assert.deepEqual(screen.statCells.finalLaunchPoint.p1.textContent, String(a), 'the Launch Point it ended on');
     // A rematch: no overtime left, the full 5:00 and the map's own Void.
-    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+    byText(resultsItems(screen), 'Rematch').click();
     assert.equal(battle.overtime, false);
     assert.equal(battle.timeLeft, 300);
     assert.equal(battle.stage.void, battle.stage.baseVoid);
     assert.equal(screen.hud.roundLabel.textContent, 'Round 1', 'an ordinary label, not a banner');
     assert.equal(screen.hud.timer.textContent, '5:00');
+    assert.equal(battle.final, null);
   }
 });
 
-test('level on points and Launch Point at the end of overtime: a tie on the result menu; Rematch starts a clean match', () => {
+test('level on points and Launch Point at the end of overtime: a draw, GAME.; it stays over until the player acts; in French too', () => {
   // Equal, and equal within the Battle's 1e-6 tolerance.
   for (const [a, b] of [[33, 33], [33, 33 + 5e-7]]) {
     const { app, screen } = setup();
@@ -870,36 +1031,31 @@ test('level on points and Launch Point at the end of overtime: a tie on the resu
     battle.p2.combat.launchPoint = b;
     battle.timeLeft = 0.01;
     screen.update(DT + 1e-9);
-    assert.equal(battle.phase, 'timeup');
-    assert.equal(screen.bannerState, 'time');
-    playUntil(screen, () => !screen.resultOverlay.hidden, 200);
-    assert.equal(battle.phase, 'result', 'over: no fresh battle');
+    assert.equal(battle.phase, 'celebration', 'over: no fresh battle');
     assert.deepEqual(battle.result, { outcome: 'draw', reason: 'overtimeLaunchPoint' });
-    assert.equal(screen.resultKicker.textContent, 'End of overtime');
-    assert.equal(screen.resultTitle.textContent, 'Tie');
-    assert.equal(screen.resultSub.textContent, 'Overtime ended with the points and Launch Point equal.');
-    assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|CPU/, 'no side is the winner');
-    assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change stage', 'Return to home']);
+    assert.equal(screen.bannerMain.textContent, 'GAME.');
+    assert.equal(screen.toastText.textContent, 'No winner, game ended with a draw.');
     assert.deepEqual(battle.score, { p1: 1, p2: 1 }, 'the match stands as it ended');
-    assert.equal(battle.overtime, true);
-    // It stays over until the player acts.
     for (let i = 0; i < 120; i++) screen.update(DT + 1e-9);
-    assert.equal(battle.phase, 'result');
-    assert.equal(screen.resultOverlay.hidden, false);
-    // In French, the repository's Launch Point.
+    assert.equal(battle.phase, 'celebration');
+    assert.equal(toastShown(screen), true);
+    screen.openResults();
+    assert.deepEqual(screen.resultsMeta.children.map((c) => c.textContent).filter((x) => /level/.test(x)), ['Overtime ended with everything level']);
+    // In French.
     setLanguage('fr');
     try {
-      localizeTree(screen.resultOverlay);
-      assert.equal(screen.resultKicker.textContent, 'Fin de la prolongation');
-      assert.equal(screen.resultTitle.textContent, 'Égalité');
-      assert.equal(screen.resultSub.textContent, 'La prolongation est terminée avec les points et le Point d’éjection à égalité.');
+      localizeTree(screen.el);
+      assert.equal(screen.toastText.textContent, 'Aucun vainqueur, la partie se termine sur une égalité.');
+      assert.equal(screen.toastButton.textContent, 'Voir les résultats du match');
+      assert.equal(screen.resultsOverlay.querySelector('.results-title').textContent, 'RÉSULTATS DU MATCH');
+      assert.deepEqual(screen.resultsLine.children.map((c) => c.textContent), ['ÉGALITÉ — AUCUN VAINQUEUR']);
+      assert.deepEqual(resultsItems(screen).map((x) => x.textContent), ['Revanche', 'Changer de combattants', 'Changer d’arène', 'Retour à l’écran d’accueil']);
     } finally {
       setLanguage('en');
-      localizeTree(screen.resultOverlay);
+      localizeTree(screen.el);
     }
-    // Rematch: 0-0, the full 5:00, no overtime and the map's own Void.
-    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
-    assert.equal(screen.resultOverlay.hidden, true);
+    byText(resultsItems(screen), 'Rematch').click();
+    assert.equal(screen.resultsOverlay.hidden, true);
     assert.equal(battle.phase, 'intro');
     assert.equal(battle.overtime, false);
     assert.deepEqual(battle.score, { p1: 0, p2: 0 });
@@ -907,10 +1063,39 @@ test('level on points and Launch Point at the end of overtime: a tie on the resu
     assert.equal(battle.timeLeft, 300);
     assert.deepEqual({ ...battle.stage.void }, { ...battle.map.voidBounds });
     assert.equal(battle.voidWaveSpeed, 1);
-    screen.hud.update(battle);
-    assert.equal(screen.hud.timer.textContent, '5:00');
-    assert.equal(screen.hud.roundLabel.textContent, 'Round 1', 'an ordinary label, not a banner');
   }
+});
+
+test('the statistics a real match shows are its own, frozen at its end while the celebration plays on', () => {
+  const { app, screen } = setup();
+  const battle = startRealBattle(screen, app);
+  battle.setPhase('fight');
+  // A real hit by Player 1 on the CPU, counted.
+  battle.combat.applyHit(battle.p1, battle.p2, { ...battle.p1.attacks[Object.keys(battle.p1.attacks)[0]], damage: 5 });
+  battle.stats.record(battle);
+  battle.score.p1 = 2;
+  battle.p2.body.y = battle.stage.void.bottom + 100;
+  battle.p2.body.grounded = false;
+  playUntil(screen, () => battle.matchOver, 10);
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'void' });
+  screen.openResults();
+  assert.equal(screen.statCells.points.p1.textContent, '3');
+  assert.equal(screen.statCells.damageDealt.p1.textContent, '5');
+  assert.equal(screen.statCells.damageReceived.p2.textContent, '5');
+  assert.equal(screen.statCells.voidFalls.p2.textContent, '1');
+  const frozen = battle.final;
+  assert.ok(Object.isFrozen(frozen) && Object.isFrozen(frozen.stats) && Object.isFrozen(frozen.stats.p1));
+  // Player 1 plays on, and even falls: nothing counts any more.
+  battle.combat.applyHit(battle.p2, battle.p1, { ...battle.p1.attacks[Object.keys(battle.p1.attacks)[0]], damage: 10 });
+  battle.p1.body.y = battle.stage.void.bottom + 100;
+  battle.p1.body.grounded = false;
+  for (let i = 0; i < 300; i++) screen.update(DT + 1e-9);
+  assert.equal(battle.p1.lostToVoid, true);
+  assert.equal(battle.p1.respawnTimer, null, 'no respawn after the match');
+  assert.deepEqual(battle.score, { p1: 3, p2: 0 });
+  assert.equal(battle.final, frozen);
+  assert.equal(screen.statCells.voidFalls.p1.textContent, '0');
+  assert.equal(screen.statCells.damageReceived.p1.textContent, '0');
 });
 
 test('cancelling Return to Home keeps the pause menu and its focus', async () => {
@@ -942,7 +1127,7 @@ test('only Restart Battle and Return to Home drop their fill in the pause menu',
   assert.equal(outlineOnly(home), true);
   assert.equal(outlineOnly(resume), false);
   assert.equal(resume.classList.contains('is-primary'), true);
-  for (const b of screen.resultOverlay.querySelectorAll('[data-nav]')) {
+  for (const b of resultsItems(screen)) {
     assert.equal(outlineOnly(b), false, `${b.textContent} keeps its fill states`);
   }
 });
@@ -1290,3 +1475,71 @@ test('Quick Battle gives Player 1 the saved Automatic turn-around, read on every
   assert.ok(battle.p1.controller instanceof CombatAIController && battle.p2.controller instanceof CombatAIController);
   screen.exit?.();
 }));
+
+// ---- Settings and the X on the dialogs that pause play ------------------------------------
+
+test('the pause menu has Settings then the X at its top right: the X resumes; Settings opens over it, the battle staying paused', async () => {
+  const { app, screen } = setup();
+  const { SettingsDialog } = await import('../../js/ui/settings-dialog.js');
+  app.settingsDialog = new SettingsDialog(new Element('div'), app);
+  const battle = startBattle(screen);
+  screen.pause();
+  const { root, settings, close } = screen.pauseControls;
+  assert.deepEqual(root.children, [settings, close], 'Settings, then the X');
+  assert.equal(settings.getAttribute('aria-label'), 'Open settings');
+  assert.equal(close.getAttribute('aria-label'), 'Close and resume');
+  assert.ok(settings.hasAttribute('data-nav') && close.hasAttribute('data-nav'), 'the controller cursor reaches both');
+  assert.ok(settings.html.includes('<svg') && close.html.includes('<svg'), 'the game\'s own icons');
+
+  settings.click();
+  assert.equal(app.settingsDialog.isOpen, true);
+  assert.deepEqual(app.nav.scopes, [screen.pauseScope, app.settingsDialog.scope], 'Settings over the pause menu');
+  assert.equal(screen.pauseOverlay.inert, true, 'the pause menu waits beneath');
+  assert.equal(screen.paused, true);
+  // Nothing beneath resumes play while Settings is open: not P, not the X's
+  // path, not the frames.
+  const frames = battle.frames;
+  screen.onKey({ code: 'KeyP', repeat: false, preventDefault() {} });
+  screen.resume();
+  for (let i = 0; i < 10; i++) screen.update(1 / 60);
+  assert.equal(screen.paused, true);
+  assert.equal(battle.frames, frames, 'the world stays frozen');
+  assert.equal(app.input.gameplayActive, false);
+  // Closing Settings comes back to the paused menu, focus on the gear.
+  app.settingsDialog.close();
+  await Promise.resolve();
+  assert.equal(app.settingsDialog.isOpen, false);
+  assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
+  assert.equal(document.activeElement, settings);
+  assert.equal(screen.paused, true, 'it never resumes by itself');
+  close.click();
+  assert.equal(screen.paused, false, 'the X resumes');
+  assert.deepEqual(app.nav.scopes, []);
+  assert.equal(app.input.gameplayActive, true);
+});
+
+test('Return to home? over the pause menu has Settings and the X too: the X keeps playing, the pause menu waiting', async () => {
+  const { app, screen } = setup();
+  let opened = 0;
+  app.settingsDialog = { isOpen: false, open() { opened++; } };
+  startBattle(screen);
+  screen.pause();
+  const home = byText(pauseItems(screen), 'Return to home');
+  home.focus();
+  const pending = screen.confirmHome();
+  assert.equal(app.dialog.controls.hidden, false);
+  assert.deepEqual(app.dialog.controls.children, [app.dialog.settingsBtn, app.dialog.closeBtn]);
+  app.dialog.settingsBtn.click();
+  assert.equal(opened, 1);
+  app.dialog.closeBtn.click();
+  await pending;
+  assert.equal(app.dialog.root.hidden, true);
+  assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
+  assert.equal(screen.paused, true);
+  assert.deepEqual(app.screens.went, [], 'nowhere');
+  // Another confirmation, not over a paused game, has neither.
+  const other = app.dialog.open({ title: 'Other', message: 'Another confirmation' });
+  assert.equal(app.dialog.controls.hidden, true);
+  app.dialog.cancelBtn.click();
+  await other;
+});

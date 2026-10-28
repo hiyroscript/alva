@@ -432,23 +432,29 @@ test('Quick Battle: the CPU in the Void scores Player 1 a point; whatever aimed 
   assert.equal(p2.combat.paralysis, 0);
 });
 
-test('Quick Battle: after time runs out, a fall scores nothing and nobody respawns; points, then Launch Point, decide', () => {
+test('Quick Battle: after time runs out, a fall scores nothing and nobody respawns; points, then Launch Point, decide, as the clock ran out', () => {
   const { battle } = realBattle('city');
-  battle.setPhase('timeup');
+  battle.setPhase('fight');
   battle.p1.combat.launchPoint = 30;
+  // Level on points with overtime off: the lower Launch Point wins, then.
+  battle.overtimeSeconds = 0;
+  battle.timeLeft = DT / 2;
+  battle.update(DT);
+  assert.equal(battle.phase, 'celebration');
+  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
   Object.assign(battle.p2.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(battle.p2.lostToVoid, true);
-  assert.equal(battle.phase, 'timeup', 'no KO beat once time is up');
+  assert.equal(battle.phase, 'celebration', 'no new announcement or beat');
   assert.deepEqual(battle.score, { p1: 0, p2: 0 }, 'no point after time');
   assert.equal(battle.p2.respawnTimer, null, 'and no respawn');
-  // Level on points: the lower Launch Point wins, the fall itself decides nothing.
-  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
   Object.assign(battle.p1.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
   for (let i = 0; i < 60 * 3; i++) battle.update(DT);
   assert.deepEqual(battle.inPlay, [], 'both stay out');
+  // The fall itself decides nothing, nor anything after the end.
   battle.p1.combat.launchPoint = 0;
-  assert.deepEqual(battle.result, { outcome: 'draw', reason: 'time' });
+  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
+  assert.deepEqual(battle.liveResult, { outcome: 'draw', reason: 'time' }, 'the rule itself is unchanged');
 });
 
 test('the training CPU never walks off a ledge on its own', async () => {

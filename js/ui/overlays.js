@@ -99,13 +99,24 @@ export class ConfirmDialog {
     this.message = el('p', { class: 'dialog-message', id: 'dialog-message' });
     this.cancelBtn = el('button', { class: 'btn', type: 'button', 'data-nav': true, 'data-nav-default': true });
     this.okBtn = el('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true });
+    // Settings and the X, for a confirmation over a paused game (see open):
+    // the X cancels, the gear opens the app's Settings over it.
+    this.settingsBtn = el('button', {
+      class: 'dialog-settings', type: 'button', 'data-nav': true, 'aria-haspopup': 'dialog',
+      ...tattr('aria-label', 'dialog.settings'), html: ICONS.settings,
+    });
+    this.closeBtn = el('button', {
+      class: 'dialog-close', type: 'button', 'data-nav': true, ...tattr('aria-label', 'common.close'), html: ICONS.close,
+    });
+    this.controls = el('div', { class: 'dialog-controls', hidden: true }, [this.settingsBtn, this.closeBtn]);
+    this.onSettings = null;
     root.setAttribute('role', 'alertdialog');
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-labelledby', 'dialog-title');
     root.setAttribute('aria-describedby', 'dialog-message');
     root.replaceChildren(
       el('div', { class: 'dialog-panel glass glass--panel' }, [
-        this.title,
+        el('div', { class: 'dialog-head' }, [this.title, this.controls]),
         this.message,
         el('div', { class: 'dialog-actions' }, [this.cancelBtn, this.okBtn]),
       ]),
@@ -113,13 +124,23 @@ export class ConfirmDialog {
     this.resolve = null;
     this.cancelBtn.addEventListener('click', () => this.close(false));
     this.okBtn.addEventListener('click', () => this.close(true));
+    this.closeBtn.addEventListener('click', () => this.close(false));
+    this.settingsBtn.addEventListener('click', () => this.onSettings?.(this.settingsBtn));
   }
 
   // `title`, `message` and the labels arrive translated. cancelOutlineOnly
   // keeps the cancel button's background transparent through hover/press.
-  // Set per call, so no later dialog inherits it.
-  open({ title, message, confirmLabel = t('common.confirm'), cancelLabel = t('common.cancel'), cancelOutlineOnly = false }) {
+  // `onSettings`, for a confirmation over a paused game, shows Settings and
+  // the X at the top right: the gear calls it with itself (to open Settings
+  // over this dialog and come back to it), the X cancels. Set per call, so
+  // no later dialog inherits either.
+  open({
+    title, message, confirmLabel = t('common.confirm'), cancelLabel = t('common.cancel'), cancelOutlineOnly = false,
+    onSettings = null,
+  }) {
     if (this.resolve) this.close(false);
+    this.onSettings = onSettings;
+    this.controls.hidden = !onSettings;
     this.title.textContent = title;
     this.message.textContent = message;
     this.okBtn.textContent = confirmLabel;

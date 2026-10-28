@@ -178,6 +178,13 @@ export class CombatState {
     // Launch.
     this.launchPoint = 0;
     this.resetLaunchRecovery();
+    // Running totals for the match statistics (js/game/match-stats.js),
+    // from 0 for every fresh state (a new fighter, a respawn): the Launch
+    // Point recovery and heals have actually taken off, and the Energy
+    // actually paid (all that was left, when that was less than the cost).
+    // Nothing here reads them.
+    this.launchPointRecovered = 0;
+    this.energySpent = 0;
     // Energy for the Dash, the Deflect and the Shield (see resolveEnergy):
     // full at the start, never below 0 or above maxEnergy (MAX_ENERGY for
     // every fighter). Emptying it (however it happens) exhausts the
@@ -396,7 +403,9 @@ export class CombatState {
       this.launchRecoveryRemaining -= dt;
       if (this.launchRecoveryRemaining <= PHASE_EPSILON) {
         const ticks = 1 + Math.floor((PHASE_EPSILON - this.launchRecoveryRemaining) / LAUNCH_RECOVERY_INTERVAL);
-        this.launchPoint = Math.max(0, this.launchPoint - ticks * LAUNCH_RECOVERY_AMOUNT);
+        const before = this.launchPoint;
+        this.launchPoint = Math.max(0, before - ticks * LAUNCH_RECOVERY_AMOUNT);
+        this.launchPointRecovered += before - this.launchPoint;
         this.launchRecoveryRemaining += ticks * LAUNCH_RECOVERY_INTERVAL;
       }
     }
@@ -413,6 +422,7 @@ export class CombatState {
   heal(amount) {
     const before = this.launchPoint;
     this.launchPoint = Math.max(0, before - Math.max(0, amount));
+    this.launchPointRecovered += before - this.launchPoint;
     return before - this.launchPoint;
   }
 
@@ -435,7 +445,9 @@ export class CombatState {
   // fighter exhausted until it refills completely.
   spendEnergy(cost) {
     if (!this.canUseEnergy()) return false;
-    this.setEnergy(this.energy - cost);
+    const before = this.energy;
+    this.setEnergy(before - cost);
+    this.energySpent += Math.max(0, before - this.energy);
     return true;
   }
 

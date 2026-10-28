@@ -630,8 +630,9 @@ test('Regular Play\'s Restart Battle and Rematch keep the drawn CPU and stage; a
     byText(screen.pauseMenuView, 'Restart battle').click();
     keep('restart');
     battle.score.p2 = 3;
-    screen.finishBattle();
-    byText(screen.resultOverlay, 'Rematch').click();
+    battle.finishMatch();
+    screen.openResults();
+    byText(screen.resultsOverlay, 'Rematch').click();
     keep('rematch');
   });
   screen.exit();
@@ -796,8 +797,9 @@ test('Change Stage after Regular Play opens Select Stage with both fighters and 
   const { app, screens } = booted;
   const battle = await startRegular(booted, { difficulty: 'brutal', fighter: TEST_A, cpu: DEF_9999, mapId: 'city' });
   battle.score.p1 = 3;
-  screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change stage').click();
+  battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change stage').click();
   assert.equal(current(app), 'map', 'a stage selector, never Select Fighter');
   assert.equal(screens.battle.battle, null);
   assert.deepEqual(app.screens.stack, ['home', 'mode', 'difficulty', 'character']);
@@ -822,8 +824,9 @@ test('Change Stage after Custom Play and Watch Mode still goes back to their own
   const { app, screens } = booted;
   const battle = await startCustom(booted, { fighter: TEST_SAMPLE, cpu: TEST_A, mapId: 'city' });
   battle.score.p2 = 3;
-  screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change stage').click();
+  battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change stage').click();
   assert.equal(current(app), 'map');
   assert.deepEqual(app.screens.stack, ['home', 'mode', 'difficulty', 'character', 'quick-cpu']);
   assert.deepEqual([stepNames(screens.map), currentStep(screens.map)], [['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], 4]);
@@ -841,10 +844,88 @@ test('Change Stage after Custom Play and Watch Mode still goes back to their own
   screens.watchMap.start();
   await settle();
   screens.battle.battle.score.p1 = 3;
-  screens.battle.finishBattle();
-  byText(screens.battle.resultOverlay, 'Change stage').click();
+  screens.battle.battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change stage').click();
   assert.equal(current(app), 'watch-map');
   assert.deepEqual(app.screens.stack, ['home', 'watch-difficulty', 'watch-cpu1', 'watch-cpu2']);
+});
+
+// ---- Change fighters -------------------------------------------------------------------
+
+test('Change fighters goes back to each mode\'s first fighter selection, its setup going on as it does, the level kept', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  // Regular Play: Select Fighter, whose confirm draws the CPU and stage anew.
+  let battle = await startRegular(booted, { difficulty: 'brutal', fighter: TEST_A, cpu: DEF_9999, mapId: 'city' });
+  battle.score.p1 = 3;
+  battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change fighters').click();
+  assert.equal(current(app), 'character', 'Quick Battle\'s Select Fighter');
+  assert.equal(screens.battle.battle, null, 'the battle is gone');
+  assert.equal(screens.battle.resultsOverlay.hidden, true);
+  assert.equal(screens.battle.toast.hidden, true);
+  assert.deepEqual(app.nav.scopes, []);
+  assert.deepEqual(app.screens.stack, ['home', 'mode', 'difficulty']);
+  app.loads.length = 0;
+  withRandom([toPick(playableCharacters(), TEST_A), toPick(MAPS, MAPS.find((m) => m.id === 'desert'))], () => screens.character.confirm(TEST_SAMPLE));
+  await settle();
+  assert.equal(current(app), 'battle', 'Regular Play draws and starts at once');
+  battle = screens.battle.battle;
+  assert.deepEqual([battle.p1.def.id, battle.p2.def.id, battle.map.id, battle.difficulty], ['test-sample', 'test-a', 'desert', 'brutal']);
+  screens.battle.exit();
+
+  // Custom Play: Select Fighter, then Select CPU and Select Stage as usual.
+  app.screens.go('home', {}, { reset: true });
+  battle = await startCustom(booted, { fighter: TEST_SAMPLE, cpu: TEST_A, mapId: 'city' });
+  battle.score.p2 = 3;
+  battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change fighters').click();
+  assert.equal(current(app), 'character');
+  screens.character.confirm(TEST_A);
+  assert.equal(current(app), 'quick-cpu', 'Custom Play goes on to Select CPU');
+  screens.battle.exit();
+
+  // Watch Mode: Select CPU 1, then CPU 2 and the stage; never Quick Battle's.
+  app.screens.go('home', {}, { reset: true });
+  screens.home.actions.watch.click();
+  cardOf(screens.watchDifficulty, 'hard').click();
+  screens.watchCpu1.confirm(DEF_9999);
+  screens.watchCpu2.confirm(TEST_A);
+  mapCard(screens.watchMap, 'city').click();
+  screens.watchMap.start();
+  await settle();
+  screens.battle.battle.score.p1 = 3;
+  screens.battle.battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Change fighters').click();
+  assert.equal(current(app), 'watch-cpu1');
+  assert.deepEqual(app.screens.stack, ['home', 'watch-difficulty']);
+  assert.equal(app.selection.watch.difficulty, 'hard', 'the level kept');
+  screens.watchCpu1.confirm(TEST_A);
+  assert.equal(current(app), 'watch-cpu2');
+});
+
+test('Return to home screen after a match: Home, the battle destroyed and nothing of it left running', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  const battle = await startRegular(booted, { fighter: TEST_A, cpu: DEF_9999, mapId: 'city' });
+  let destroyed = 0;
+  const destroy = battle.destroy.bind(battle);
+  battle.destroy = () => { destroyed++; destroy(); };
+  battle.score.p1 = 3;
+  battle.finishMatch();
+  screens.battle.openResults();
+  byText(screens.battle.resultsOverlay, 'Return to home screen').click();
+  assert.equal(current(app), 'home');
+  assert.deepEqual(app.screens.stack, []);
+  assert.equal(destroyed, 1);
+  assert.equal(screens.battle.battle, null);
+  assert.equal(screens.battle.resultsOverlay.hidden, true);
+  assert.equal(screens.battle.toast.hidden, true);
+  assert.deepEqual(app.nav.scopes, []);
 });
 
 test('Quick Battle choices never touch Watch Mode\'s', async () => {
