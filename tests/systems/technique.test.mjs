@@ -5,14 +5,17 @@
 // round itself (with art of its own as it goes out), or both. Its timing is
 // its clips', its facing is snapshotted as it starts, it needs the ground
 // throughout, a hit breaks
-// it, and its cooldown (a 3 s or 5 s one) runs from its release, never its start. Checked on a test-only caster
+// it, its cooldown (a 3 s or 5 s one) runs from its release, never its
+// start, and it may open only in danger. Checked on a test-only caster
 // (#0001's body and clips, re-timed, with a technique of its own) through
 // the real Fighter, projectiles and CombatSystem (see
 // tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createTechniqueDefinition, techniqueProblem, TECHNIQUE_CLIPS } from '../../js/game/combat/technique.js';
+import { createTechniqueDefinition, inDanger, techniqueProblem, TECHNIQUE_CLIPS } from '../../js/game/combat/technique.js';
+import { abilityGroups, abilityStatus, moveRestriction } from '../../js/game/combat/move-status.js';
+import { analyzeCapabilities, moveReady } from '../../js/game/ai/cpu-intelligence/capabilities.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { def, DT, duel, fakeSpritesOf, makeFighter, stageMap, steps } from '../helpers/fighter-harness.mjs';
@@ -301,6 +304,62 @@ test('a hit before it lets go breaks it and heals nothing', () => {
   assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), false, 'never released: no cooldown');
 });
 
+// ---- In danger only -------------------------------------------------------------------
+
+// The caster whose technique opens only in danger: its own Launch Point
+// at 30 or more (`minLaunchPoint`; #0009's Air Sphere is the roster's).
+const DESPERATE = {
+  ...CASTER,
+  id: 'test-desperate',
+  techniques: { attack4: { ...CASTER.techniques.attack4, minLaunchPoint: 30 } },
+};
+const DESPERATE_SPRITES = fakeSpritesOf(DESPERATE);
+
+test('a technique may open only in danger: a whole number of Launch Points, 0 (none) by default', () => {
+  assert.equal(createTechniqueDefinition({ id: 'attack4', ...CASTER.techniques.attack4 }).minLaunchPoint, 0);
+  const t = createTechniqueDefinition({ id: 'attack4', ...DESPERATE.techniques.attack4 });
+  assert.equal(t.minLaunchPoint, 30);
+  for (const bad of [-1, 2.5, '30', null, Infinity]) {
+    assert.throws(() => createTechniqueDefinition({ id: 'attack4', ...CASTER.techniques.attack4, minLaunchPoint: bad }), /minLaunchPoint must be a whole number/);
+  }
+  // It changes nothing else about the move: its cooldown, Energy and
+  // classification are the same technique's.
+  const plain = createTechniqueDefinition({ id: 'attack4', ...CASTER.techniques.attack4 });
+  assert.deepEqual([t.cooldown, t.energyCost, t.offense.attack], [plain.cooldown, plain.energyCost, plain.offense.attack]);
+  const { fighter } = makeFighter({ character: DESPERATE, sprites: DESPERATE_SPRITES });
+  assert.equal(inDanger(fighter, t), false);
+  fighter.combat.launchPoint = 29;
+  assert.equal(inDanger(fighter, t), false);
+  fighter.combat.launchPoint = 30;
+  assert.equal(inDanger(fighter, t), true);
+  fighter.combat.launchPoint = 0;
+  assert.equal(inDanger(fighter, plain), true, 'one that needs none is always open');
+});
+
+test('out of danger a press does nothing at all, the ability HUD shows it held back and the CPU never plans it; in danger it casts as ever', () => {
+  const { fighter, step } = makeFighter({ character: DESPERATE, sprites: DESPERATE_SPRITES });
+  const entry = abilityGroups(DESPERATE).ground.find((e) => e.move === 'attack4');
+  step({});
+  fighter.combat.launchPoint = 29;
+  step(P('attack4'));
+  assert.equal(fighter.technique, null, 'nothing starts');
+  assert.equal(fighter.combat.energy, fighter.combat.maxEnergy, 'nothing paid');
+  assert.equal(moveRestriction(fighter, entry, 'ground'), 'danger');
+  assert.equal(abilityStatus(fighter, entry, 'ground').ready, false);
+  const m = analyzeCapabilities(fighter).moves.find((x) => x.kind === 'technique' && x.id === 'attack4');
+  assert.equal(moveReady(fighter, m), false, 'the CPU waits for the same danger');
+  step({});
+  assert.equal(fighter.technique, null, 'and the press was never kept for later');
+  fighter.combat.launchPoint = 30;
+  assert.equal(moveRestriction(fighter, entry, 'ground'), null);
+  assert.equal(moveReady(fighter, m), true);
+  step(P('attack4'));
+  assert.equal(fighter.technique?.phase, 'cast', 'in danger, it casts');
+  // Started, it plays out whatever happens to its fighter's Launch Point.
+  fighter.combat.launchPoint = 0;
+  while (fighter.technique?.phase === 'cast') step({});
+  assert.equal(fighter.technique?.released, true, 'released all the same');
+});
 // ---- The burst's art --------------------------------------------------------------------
 
 // The singer: the caster whose burst plays art as it goes out, an

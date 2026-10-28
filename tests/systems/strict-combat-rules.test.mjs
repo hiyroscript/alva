@@ -266,6 +266,9 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // Every move its own body, nothing created: the Feast (a heal, 3 s) and
     // the Gum-Gum Giant Pistol (5 s) pay nothing.
     '0008': { 'tech:attack4': 0, 'tech:attack5': 0 },
+    // The Air Blast, the Air Gust and the Earth Pillar, ordinary shots; the
+    // Freezing Splash (3 s) and the Air Sphere (5 s) pay nothing.
+    '0009': { attack3: 15, midair_attack3: 15, extra_attack: 15, 'tech:attack4': 0, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

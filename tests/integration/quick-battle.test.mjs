@@ -192,7 +192,7 @@ const { pickRandom, drawRegularPlay, quickBattleParams } = await import('../../j
 const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
 const { PlayerController } = await import('../../js/game/fighters/fighter-controller.js');
 
-// Beside #0001 and #0002: Test A (slot 09), #9999 (#0001's art under another
+// Beside #0001 and #0002: Test A (slot 31), #9999 (#0001's art under another
 // id, slot 06), the sample fighter's different moves (slot 05) and a
 // disabled fighter (slot 11) no route may pick.
 const DEF_9999 = testFighter('9999', '#9999', 5);

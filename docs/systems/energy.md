@@ -68,6 +68,7 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0006 | Heat Vision (attack3), the Sonic Scream (attack5) | Ice Breath (3 s) |
 | #0007 | the Pistol (extra_attack), the Molotov Cocktail (attack3), the Sawn-Offs (attack4, a burst) | the Rocket Launcher (5 s) |
 | #0008 | — (every move its own body: nothing created) | the Gum-Gum Giant Pistol (5 s; the Feast is a heal, 3 s) |
+| #0009 | the Air Blast (attack3), the Air Gust (midair_attack3), the Earth Pillar (extra_attack) | the Freezing Splash (3 s), the Air Sphere (5 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):
@@ -86,7 +87,7 @@ A fighter's `energy` entry sets one thing, its refill rate:
 
 #0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
 `regen` 14, #0005 `regen` 14, #0006 `regen` 14, #0007 `regen` 14; #0008
-leaves it out (12). Nothing
+and #0009 leave it out (12). Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost`, `deflectCost` and `constructCost` may be left out (and
 are, by every fighter), and declaring any of them with another value than

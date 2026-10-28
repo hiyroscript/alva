@@ -202,7 +202,7 @@ const { PracticeGroundScreen, practiceDefaultFighter } = await import('../../js/
 
 // The test-only playable fighters beside #0001 (slot 01, the first playable
 // one and so the practice default), registered before any roster is built
-// and taken out after the last test: Test A (slot 09) and #9999 (slot 06),
+// and taken out after the last test: Test A (slot 31) and #9999 (slot 06),
 // #0001's art under other ids, for swaps between fighters of the same art;
 // and two that differ from them: one with no moves at all (slot 04, every
 // combat button left out) and the sample fighter's different moves and
@@ -1067,8 +1067,8 @@ test('the dialog shows the full configured roster; locked slots stay non-interac
   assert.equal(grid.children.length, CONFIG.roster.totalSlots);
   const available = slots.filter((s) => s._def?.available);
   const locked = slots.filter((s) => !s._def?.available);
-  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '0003', 'test-moveless', 'test-sample', '9999', '0007', '0008', 'test-a']);
-  assert.equal(locked.length, CONFIG.roster.totalSlots - 9);
+  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '0003', 'test-moveless', 'test-sample', '9999', '0007', '0008', '0009', 'test-a']);
+  assert.equal(locked.length, CONFIG.roster.totalSlots - 10);
   assert.equal(slots[0]._def.id, '0001', 'slot 01 holds #0001');
   assert.ok(available.includes(slots[0]), 'open, like any playable fighter\'s');
   for (const s of locked) {
@@ -2342,7 +2342,7 @@ test('Select Fighter still builds the full roster from the shared component and 
   assert.equal(select.roster.previewPanel.getAttribute('aria-labelledby'), 'preview-name');
   assert.ok(select.roster.selectedId === 'test-a');
   select.focusDefault();
-  assert.equal(document.activeElement, slots[8], 'Quick Battle\'s own fighter, Test A in slot 09, not Practice\'s #0001');
+  assert.equal(document.activeElement, slots[TEST_A.rosterSlot], 'Quick Battle\'s own fighter, Test A in slot 31, not Practice\'s #0001');
   slots.find((s) => s._def?.id === '9999').click(0);
   assert.equal(app.selection.characterId, '9999');
   assert.deepEqual(app.screens.calls, [['quick-cpu']]);

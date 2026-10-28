@@ -18,9 +18,10 @@ export function testFighter(id, displayName, rosterSlot, overrides = {}) {
   return { ...BASE, id, displayName, rosterSlot, available: true, ...overrides };
 }
 
-// The two the screen tests pick from: slots 09 and 10 (slot 03 is #0003's).
-export const TEST_A = testFighter('test-a', 'Test A', 8);
-export const TEST_B = testFighter('test-b', 'Test B', 9);
+// The two the screen tests pick from: slots 31 and 32, side by side and
+// well past the roster's own fighters (slot 03 is #0003's).
+export const TEST_A = testFighter('test-a', 'Test A', 30);
+export const TEST_B = testFighter('test-b', 'Test B', 31);
 
 // A fighter with no moves at all (slot 04): every combat button left out of
 // its `actions`, so no touch button, attack, summon, technique, projectile,

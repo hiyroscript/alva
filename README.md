@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Eight playable fighters** on a 48-slot roster:
+- **Nine playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -69,21 +69,28 @@ blocks every attack.
   uppercut, a flying kick and a hammer fist, all up close; a pistol, a
   molotov cocktail whose fire burns where it lands, a sawn-off in each
   hand fired to both sides at once and a rocket launcher, all fired
-  standing on the ground), and [#0008](docs/characters/0008.md), the
+  standing on the ground), [#0008](docs/characters/0008.md), the
   rubber pirate, who fights with nothing but its own body, stretched (a
   long-armed pistol of a punch, a barrage of stretched fists, both legs
   stretched down to stamp from high above, a slingshot dive at its
   opponent, a body blown up into a balloon that bounces projectiles back,
   a meal that heals it and a fist blown up to a giant's; its stretched
   limbs are still its body, and can be hit, and launched into a wall it
-  rebounds like rubber). All eight Shield on the ground and Deflect in
-  the air (a strike that knocks projectiles back at their thrower), and
-  all eight Dash on the ground and air dash. Each fighter
+  rebounds like rubber), and [#0009](docs/characters/0009.md), the young
+  monk of the four elements, who would rather move an opponent than hurt
+  one (a cone of wind that drags its target away before flinging it and
+  blows shots back, a gust it floats on in the air, a pillar of rock that
+  rises out of the ground to throw up whoever stands there and wall off
+  shots, a splash of water that freezes, a fire kick, a staff and a leap
+  on the air, and a trance that opens only in danger, when its Launch
+  Point is high: a sphere of air bursting out round it). All nine Shield
+  on the ground and Deflect in the air (a strike that knocks projectiles
+  back at their thrower), and all nine Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
   #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
-  Giant Pistol): an orange exclamation
+  Giant Pistol, #0009's Freezing Splash and Air Sphere): an orange exclamation
   mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
@@ -305,6 +312,10 @@ own credits: Cosbydaf (NGC sprites), Kenshin Himura (rip), Misse-the-cat
 **#0008 sprite source.** Sprite sheet by degue-1297 on
 [DeviantArt](https://www.deviantart.com/degue-1297/art/443591282); the
 sheet's own credit: ripped by Alejo & Grim.
+
+**#0009 sprite source.** Sprite sheet by gameinvader247 on
+[DeviantArt](https://www.deviantart.com/gameinvader247/art/636302762); the
+sheet's own credit: GameInvader.
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

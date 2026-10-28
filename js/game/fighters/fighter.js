@@ -44,7 +44,7 @@ import { FLOAT_RISE_SPEED } from '../combat/hit-effects.js';
 import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
-import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
+import { Technique, createTechniqueDefinition, inDanger, techniqueProblem } from '../combat/technique.js';
 import { MashCombo, resolveMashPair } from '../combat/mash-combo.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
@@ -1556,11 +1556,12 @@ export class Fighter {
   // paying its Energy now (its `energyCost`: 15 for an ordinary technique
   // that releases a projectile or a burst). Its cooldown starts only as it
   // releases (see update). False, with nothing paid, if there is no such
-  // technique, its art or data is missing (logged) or it costs Energy the
-  // exhausted fighter cannot pay.
+  // technique, the fighter is not in the danger it needs (its Launch Point
+  // under its `minLaunchPoint`: see inDanger), its art or data is missing
+  // (logged) or it costs Energy the exhausted fighter cannot pay.
   tryTechnique(action, id, dir = 0) {
     const def = this.techniqueDefs[id];
-    if (!def) return false;
+    if (!def || !inDanger(this, def)) return false;
     const problem = techniqueProblem(this, def);
     if (problem) {
       console.warn(`[Alva] Technique "${id}" is unavailable: ${problem}; ignoring.`);

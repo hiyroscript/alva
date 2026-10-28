@@ -253,8 +253,11 @@ interface, and nothing about them changes.
   `abilityStatus` from the combat state ([combat](combat.md#cooldowns)):
   `cooling` (a 3 s or 5 s cooldown, from its release: sweep and seconds),
   `restricted` (spent for this airtime, free fall, no Energy while
-  exhausted for a move that costs it, or missing art: muted, no countdown;
-  `data-restriction` says which) or `ready`. There is no repeat-delay
+  exhausted for a move that costs it, a technique held back until its
+  fighter is in the danger it needs (`danger`: its Launch Point under the
+  technique's `minLaunchPoint`, [combat](combat.md#techniques); #0009's
+  Air Sphere), or missing art: muted, no countdown; `data-restriction`
+  says which) or `ready`. There is no repeat-delay
   state: an ordinary move has no cooldown at all. Only changed values
   reach the DOM.
   The touch controls show the same states on their own buttons
@@ -462,7 +465,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0005](../characters/0005.md#controller-layout),
 [#0006](../characters/0006.md#controller-layout),
 [#0007](../characters/0007.md#controller-layout),
-[#0008](../characters/0008.md#controller-layout).
+[#0008](../characters/0008.md#controller-layout),
+[#0009](../characters/0009.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -482,6 +486,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0007 air | Flying Kick | Hammer Fist | | | | |
 | #0008 ground | Jab and Straight | Gum-Gum Gatling | Gum-Gum Balloon | Gum-Gum Pistol | Feast | forward: Gum-Gum Giant Pistol |
 | #0008 air | Gum-Gum Stamp | Gum-Gum Rocket | Floating Balloon | | | |
+| #0009 ground | Swift Strikes | Fire Kick | | Air Blast | Air Sphere | forward: Freezing Splash; up: Earth Pillar |
+| #0009 air | Staff Swing | | | Air Gust | | up: Rising Air Kick |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -513,8 +519,8 @@ itself classifies as Special (its `specialAbilities`,
 [combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
 Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
-Launcher and #0008's Feast and Gum-Gum Giant Pistol, each tagged Ground or
-Air. Every other move, a
+Launcher, #0008's Feast and Gum-Gum Giant Pistol and #0009's Freezing
+Splash and Air Sphere, each tagged Ground or Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

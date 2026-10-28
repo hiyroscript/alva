@@ -26,7 +26,7 @@ import { analyzeCapabilities } from '../../js/game/ai/cpu-intelligence/capabilit
 import { Track, moveContact } from '../../js/game/ai/cpu-intelligence/prediction.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { CONFIG } from '../../js/config.js';
-import { DT, MOVEMENT as MV, harnessFor, stageMap, steps } from '../helpers/fighter-harness.mjs';
+import { DT, MOVEMENT as MV, endanger, harnessFor, stageMap, steps } from '../helpers/fighter-harness.mjs';
 
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const RIGHT = { runRight: true };
@@ -110,6 +110,7 @@ const VERDICTS = {
   '0006': { attack1: 'universal', attack2: 'exempt', extra_attack: 'exempt' },
   '0007': { attack1: 'universal', attack2: 'universal', extra_attack: 'exempt' },
   '0008': { attack1: 'universal', attack2: 'universal', attack3: 'declined', extra_attack: 'declined' },
+  '0009': { attack1: 'universal', attack2: 'universal', attack3: 'exempt', extra_attack: 'exempt' },
 };
 
 test('every fighter\'s verdicts, as its moves really work', () => {
@@ -209,6 +210,7 @@ for (const c of playableCharacters()) {
       for (const facing of [1, -1]) {
         const h = makeFighter({ x: 1000, facing });
         aim(h.fighter);
+        endanger(h.fighter);
         h.step({});
         const x0 = h.fighter.body.x;
         h.step(P(move.action));

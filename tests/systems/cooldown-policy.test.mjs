@@ -9,7 +9,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DT, duel, makeFighter } from '../helpers/fighter-harness.mjs';
+import { DT, duel, endanger, makeFighter } from '../helpers/fighter-harness.mjs';
 import {
   COOLDOWN_CLASSES, EXCEPTIONAL_COOLDOWN, EXCEPTIONAL_EFFECTS, ROUTINE_EFFECTS, SPECIAL_COOLDOWNS, TEN_DAMAGE_COOLDOWN,
   cooldownClass, moveImpact, policyCooldown, resolveCooldown,
@@ -181,6 +181,11 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0, mash_attack: 0,
       attack4: 3, attack5: 5, deflect: 0,
     },
+    // The Freezing Splash: a freeze. The Air Sphere: its burst deals 10.
+    '0009': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0,
+      attack4: 3, attack5: 5, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
@@ -258,6 +263,11 @@ test('14: the CPU and the player read the same cooldowns and the CPU never press
       assert.equal(planned, m.def.cooldown, `#${c.id} ${m.id}`);
     }
     for (const m of analyzeCapabilities(cpu).moves.filter((x) => x.kind === 'technique')) {
+      // One that needs danger (#0009's Air Sphere) waits for it, as the
+      // player's press does.
+      cpu.combat.launchPoint = 0;
+      assert.equal(moveReady(cpu, m), !(m.def.minLaunchPoint > 0), `#${c.id} ${m.id}: out of danger`);
+      endanger(cpu);
       assert.equal(moveReady(cpu, m), true, `#${c.id} ${m.id}: ready`);
       cpu.combat.abilityCooldowns.start(m.id, m.def.cooldown);
       // An ordinary technique has no cooldown to wait for: still ready.
