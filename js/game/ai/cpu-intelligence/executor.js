@@ -11,8 +11,11 @@
 //     is let go for a step first (so a Deflect is always a real press of
 //     Shield in the air, never a Shield carried up off the ground);
 //   - the Shield is only ever held on the ground;
-//   - every jump is a tap (the normal jump) unless the plan asks for the
-//     higher jump, which holds Jump past the higher-jump window;
+//   - every jump is a fresh press of Jump, held a moment as a hand does
+//     (how long never changes the jump); the Super Jump is Down and Jump
+//     pressed together on the ground, the very chord a player makes, and
+//     Down is held on the ground on that one step only (so it never
+//     drops through a platform or stands about holding it);
 //   - never both directions at once;
 //   - never walking or Dashing off the main floor's edge into open air
 //     unless the plan means to (an edge-guard, a route down), and a hop over
@@ -22,7 +25,7 @@
 // Important constraints: it never writes to the fighter; what the inputs do
 // is the Fighter's business, exactly as for a player.
 
-import { HELD_CONTROLS, blankInput, jumpTapHold } from '../../fighters/fighter-controller.js';
+import { HELD_CONTROLS, blankInput, jumpTapHold, wallAhead, jumpFor } from '../../fighters/fighter-controller.js';
 
 const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 const LEDGE_MARGIN = 10;
@@ -42,6 +45,7 @@ export class Executor {
     }
     this.mouvement = 0;
     this.jumpHoldUntil = -Infinity;
+    this.superJump = false;
     this.allowEdge = false;
     this.pressed = null;
     this.clock = 0;
@@ -53,6 +57,7 @@ export class Executor {
     this.clock = clock;
     for (const k of HELD_CONTROLS) this.held[k] = false;
     this.mouvement = 0;
+    this.superJump = false;
     this.allowEdge = false;
     this.pressed = null;
     this.wantDir = 0;
@@ -65,6 +70,7 @@ export class Executor {
   redo() {
     for (const k of HELD_CONTROLS) this.held[k] = false;
     this.mouvement = 0;
+    this.superJump = false;
     this.pressed = null;
     this.wantDir = 0;
   }
@@ -88,16 +94,19 @@ export class Executor {
     if (grounded) this.held.shield = true;
   }
 
-  // Press Jump: a tap (`high` false) or the higher jump. False if Jump is
-  // still held from an earlier press (let go first).
-  jump(self, high = false) {
+  // Press Jump for the jump `kind` names: 'normal' (the ground's normal
+  // jump, or the air jump in the air), 'air', or 'super' (Down pressed with
+  // it: the Super Jump on the ground; in the air the Fighter makes it the
+  // air jump, as for anyone). False if Jump is still held from an earlier
+  // press (let go first).
+  jump(self, kind = 'normal') {
     if (this.prev.jump) {
       this.releaseJump();
       return false;
     }
     this.held.jump = true;
-    const tap = jumpTapHold(self);
-    this.jumpHoldUntil = this.clock + (high ? self.movement.highJumpWindow + 3 / 60 : tap);
+    this.superJump = kind === 'super';
+    this.jumpHoldUntil = this.clock + jumpTapHold(self);
     return true;
   }
 
@@ -155,17 +164,20 @@ export class Executor {
         this.blocked++;
       }
     }
-    // A solid block in the way on the ground: hop it.
+    // A solid block in the way on the ground: hop it (the Super Jump for
+    // one the normal jump would not clear).
     if (d && b.grounded && b.wall === d && self.canAct() && !this.prev.jump) {
       held.jump = true;
+      this.superJump = jumpFor(self, wallAhead(b, stage, d) + 8) === 'super';
       this.jumpHoldUntil = this.clock + jumpTapHold(self);
     }
     held.runLeft = d < 0;
     held.runRight = d > 0;
-    // A fresh Down press on a platform drops through it; the CPU plans no
-    // drop (it walks off a platform instead), so it never holds Down on the
-    // ground, where Down does nothing else.
-    if (b.grounded) held.down = false;
+    // On the ground Down is the Super Jump's half of the chord and nothing
+    // else for the CPU: held on the step Jump is freshly pressed for one,
+    // never otherwise (a tap of Down on a platform drops through it, and
+    // the CPU plans no drop: it walks off a platform instead).
+    if (b.grounded) held.down = this.superJump && held.jump && !this.prev.jump;
     const out = this.out;
     for (const k of HELD_CONTROLS) {
       out[k] = held[k];

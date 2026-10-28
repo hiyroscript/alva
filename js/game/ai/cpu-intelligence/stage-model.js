@@ -32,7 +32,7 @@
 //
 // Inputs: a StageCollision. Outputs: StageModel (one per stage, cached).
 // Important constraints: read-only; nothing here plans a platform drop (a
-// player's fresh Down press on a platform, which the CPU never makes: see
+// player's tap of Down on a platform, which the CPU never makes: see
 // Executor.finish): the CPU's way down from a platform is to walk off its
 // edge.
 

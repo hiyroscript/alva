@@ -80,9 +80,10 @@ export const CATEGORIES = Object.freeze(['movement', 'defense', 'ground', 'air',
 // which activations they allow, whether a direction may be added to a
 // button (`directional`) and whether a stick direction may be the input
 // itself (`stickInput`). `jump`, `shield` and `fastFall` keep their held
-// behaviour whatever their input (a higher jump, a Shield held up, a fall
-// sped up while held), so they are always 'continuous'; Pause is always a
-// press of a button.
+// behaviour whatever their input (Jump held steering a launch up, a Shield
+// held up, Down held: a fall sped up, or on the ground the Super Jump's
+// half of its chord with Jump), so they are always 'continuous'; Pause is
+// always a press of a button.
 const UNIVERSAL = Object.freeze([
   Object.freeze({ id: 'move', kind: 'move', category: 'movement', place: 'both' }),
   Object.freeze({ id: 'jump', kind: 'jump', category: 'movement', place: 'both', activations: ['continuous'], directional: true, stickInput: true }),
@@ -105,7 +106,9 @@ const flick = (stick, direction, { modifier = null, activation = 'press' } = {})
 // together so no finger is ever asked for two things at once:
 //
 //   the left stick moves, and pushed down in the air fast-falls;
-//   Cross / A jumps (held a little longer, higher);
+//   Cross / A jumps; with the left stick held down on the ground, it is
+//     the Super Jump (the two universal inputs together, never a
+//     fighter's own combination);
 //   R1 / RB Dashes and air-dashes, the way the left stick points (or the
 //     fighter faces): the right index finger, so the left thumb aims, the
 //     right thumb stays on the jump and attack buttons and a Dash flows

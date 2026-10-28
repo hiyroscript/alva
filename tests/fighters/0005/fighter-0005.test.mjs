@@ -50,7 +50,8 @@ const versus = (opts = {}, target = DEF_0001) => duel({
 });
 // Into the air, `rise` steps after a jump.
 const airborne = (tick, rise = 14) => {
-  tick(P('jump'));
+  // A Super Jump: the airtime the aerials below play out in.
+  tick({ ...P('jump'), down: true, downPressed: true });
   for (let i = 0; i < rise; i++) tick({});
 };
 // Lifts `f` `height` off the floor and holds it there.

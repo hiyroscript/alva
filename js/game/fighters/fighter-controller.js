@@ -8,7 +8,8 @@
 // Fighter.playerControlled); no CPU's ever is.
 
 import { range } from '../../core/utils.js';
-import { ACTIONS } from '../../config.js';
+import { ACTIONS, CONFIG } from '../../config.js';
+import { jumpRise } from './movement.js';
 
 // How far past its own collider the training CPU looks for a ledge ahead
 // (world units): about two steps at its top speed.
@@ -26,7 +27,7 @@ export const HELD_CONTROLS = Object.freeze(ACTIONS.filter((action) => action !==
 // press buffered for one never comes out in the other; neither, from a
 // keyboard, touch or a CPU, makes no such claim) and the training CPU's
 // platform drop (`dropPressed`: a player asks for the same drop with a
-// fresh Down press, see Fighter.update).
+// tap of Down, see Fighter.update).
 export function blankInput() {
   const input = {};
   for (const control of HELD_CONTROLS) input[control] = false;
@@ -39,11 +40,35 @@ export function blankInput() {
   return input;
 }
 
-// Seconds a CPU holds Jump after pressing it: a step and a half short of the
-// higher-jump window (movement.highJumpWindow, the universal one; see
-// Fighter.update), so its jump is always the normal one.
-export function jumpTapHold(self) {
-  return Math.max(0, self.movement.highJumpWindow - 1.5 / 60);
+// Seconds a CPU keeps Jump held after pressing it, as a hand does. How
+// high a jump goes never depends on it (a jump is decided as Jump is
+// pressed: see Fighter.update); it only means every jump is a fresh press
+// after a let-go.
+const CPU_JUMP_HOLD = 4 / 60;
+export function jumpTapHold() {
+  return CPU_JUMP_HOLD;
+}
+
+// How far above `body`'s feet the top of the solid it stands against going
+// `dir` (-1 or 1) is, world units (0 when nothing stands in the way).
+export function wallAhead(body, stage, dir) {
+  if (!stage || !dir) return 0;
+  const side = body.x + dir * body.halfW;
+  let top = 0;
+  for (const s of stage.solids ?? []) {
+    if (s.active === false) continue;
+    const face = dir > 0 ? s.x : s.x + s.w;
+    if (Math.abs(face - side) > 2 || s.y >= body.y || s.y + s.h <= body.y - body.height) continue;
+    top = Math.max(top, body.y - s.y);
+  }
+  return top;
+}
+
+// The ground jump that clears `rise` world units above the feet: the
+// normal jump while it clears it comfortably, otherwise the Super Jump (the
+// same choice for every fighter: movement is universal).
+export function jumpFor(self, rise, gravity = CONFIG.sim.gravity) {
+  return rise > jumpRise(self.movement.jumpVelocity, gravity) * 0.88 ? 'super' : 'normal';
 }
 
 // The human player's controller (kind 'player'): its presses go through
@@ -71,10 +96,12 @@ export class PlayerController {
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
 // combat buttons (extra_attack and attack1 to attack5 included, so it never
-// throws a projectile, summons or casts), Down or Shield (so it never
-// shields), so the player can practise on it.
+// throws a projectile, summons or casts) or Shield (so it never shields),
+// so the player can practise on it. It holds Down only on the step it
+// presses Jump for a Super Jump, as a player would (Down and Jump together),
+// to reach a surface or clear a solid the normal jump would not.
 // It drops through one-way platforms with `dropPressed`, its own intent (a
-// player drops with a fresh Down press instead, which this controller never
+// player drops with a tap of Down instead, which this controller never
 // makes). It never walks off the main floor's edges into open air
 // on its own (see atLedge): it only leaves the stage when knocked off.
 export class TrainingAIController {
@@ -84,12 +111,12 @@ export class TrainingAIController {
     this.out = blankInput();
     this.moveIntent = 0;
     this.thinkTimer = 0.6;
+    // The jump it wants next: false, 'normal' or 'super'.
     this.wantJump = false;
     this.wantDrop = false;
     this.hopCooldown = 2;
     this.idleUntilSettled = 0;
-    // Seconds Jump stays held after a press: let go in time for the normal
-    // jump, never the higher one (see jumpTapHold).
+    // Seconds Jump stays held after a press (see jumpTapHold).
     this.jumpHold = 0;
   }
 
@@ -97,6 +124,8 @@ export class TrainingAIController {
     const out = this.out;
     out.jumpPressed = false;
     out.dropPressed = false;
+    out.down = false;
+    out.downPressed = false;
 
     // Nobody to follow (none, or one lost to the Void and waiting to
     // respawn): stand still until there is.
@@ -112,9 +141,10 @@ export class TrainingAIController {
     this.hopCooldown -= dt;
     if (this.thinkTimer <= 0) this.think(self, foe, ctx);
 
-    // Blocked by a solid while moving -> hop over it.
+    // Blocked by a solid while moving -> hop over it (the Super Jump for
+    // one the normal jump would not clear).
     if (this.moveIntent !== 0 && self.body.grounded && self.body.wall === this.moveIntent) {
-      this.wantJump = true;
+      this.wantJump = jumpFor(self, wallAhead(self.body, ctx.stage, this.moveIntent) + 8, ctx.gravity);
     }
     // About to walk off a ledge into open air -> stop at the edge.
     if (this.moveIntent !== 0 && self.body.grounded && this.atLedge(self, ctx.stage)) {
@@ -122,8 +152,10 @@ export class TrainingAIController {
       this.wantJump = false;
     }
 
-    if (this.wantJump && self.body.grounded) {
+    if (this.wantJump && self.body.grounded && this.jumpHold <= 0) {
       out.jumpPressed = true;
+      // The Super Jump: Down pressed with Jump on this one step.
+      out.down = out.downPressed = this.wantJump === 'super';
       this.wantJump = false;
       this.jumpHold = jumpTapHold(self);
     }
@@ -148,15 +180,17 @@ export class TrainingAIController {
     return !stage.surfaceBelow(x - b.halfW, x + b.halfW, b.y).ref;
   }
 
-  // Closest reachable surface between our height and the foe's.
-  findStep(self, foe, stage) {
+  // Closest surface between our height and the foe's that a ground jump
+  // (the Super Jump at most) reaches.
+  findStep(self, foe, stage, gravity) {
     const y = self.body.y;
+    const reach = jumpRise(self.movement.superJumpVelocity, gravity) * 0.92;
     let best = null;
     let bestD = Infinity;
     for (const p of [...stage.platforms, ...stage.solids]) {
       // Never a platform that is not there now (a hazard that vanished).
       if (p.active === false) continue;
-      if (p.y >= y - 40 || p.y < y - 155 || p.y <= foe.lastGroundY + 20) continue;
+      if (p.y >= y - 40 || p.y < y - reach || p.y <= foe.lastGroundY + 20) continue;
       const cx = p.x + p.w / 2;
       if (Math.abs(cx - foe.body.x) > 460) continue;
       const d = Math.abs(cx - self.body.x);
@@ -178,22 +212,24 @@ export class TrainingAIController {
     const foeGroundY = foe.lastGroundY;
     const selfY = self.body.y;
 
-    // Vertical following: foe settled on a higher surface nearby -> jump up,
+    // Vertical following: foe settled on a higher surface nearby -> jump up
+    // (the normal jump where it reaches, the Super Jump where it does not),
     // using an intermediate platform as a stepping stone when it's too high.
     if (self.body.grounded && foe.body.grounded && foeGroundY < selfY - 40) {
-      if (selfY - foeGroundY > 150) {
-        const step = this.findStep(self, foe, ctx.stage);
+      const reach = jumpRise(self.movement.superJumpVelocity, ctx.gravity) * 0.92;
+      if (selfY - foeGroundY > reach) {
+        const step = this.findStep(self, foe, ctx.stage, ctx.gravity);
         if (step) {
           const cx = step.x + step.w / 2;
           const gap = Math.max(step.x - self.body.x, self.body.x - (step.x + step.w), 0);
           this.moveIntent = Math.sign(cx - self.body.x) || toward;
-          if (gap < 90) this.wantJump = true;
+          if (gap < 90) this.wantJump = jumpFor(self, selfY - step.y + 12, ctx.gravity);
           return;
         }
       }
       if (dist < 230) {
         this.moveIntent = toward;
-        if (dist < 170) this.wantJump = true;
+        if (dist < 170) this.wantJump = jumpFor(self, selfY - foeGroundY + 12, ctx.gravity);
         return;
       }
     }
@@ -224,7 +260,7 @@ export class TrainingAIController {
       else this.moveIntent = -toward;
       this.thinkTimer = range(rng, 0.35, 0.9);
       if (this.hopCooldown <= 0 && rng() < 0.12) {
-        this.wantJump = true;
+        this.wantJump = 'normal';
         this.hopCooldown = range(rng, 2.5, 5);
       }
     }

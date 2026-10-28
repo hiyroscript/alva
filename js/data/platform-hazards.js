@@ -31,8 +31,8 @@ export const ORDINARY_STATES = Object.freeze([
 ]);
 
 // The drifting cloud: Asperitas's two hazards. Tuned against the universal
-// movement (js/data/movement.js: 420 units / s run, a 169-unit jump, 237
-// for the higher jump, about 103 per air jump): it drifts at a fraction of
+// movement (js/data/movement.js: 420 units / s run, a 112-unit jump, 242
+// for the Super Jump, about 103 per air jump): it drifts at a fraction of
 // a walk (at most about 110 units / s at the middle of its longest, fastest
 // move), so a fighter keeps its feet and can always outrun it; and it
 // fades for over half a second before it goes, long enough to see and jump.

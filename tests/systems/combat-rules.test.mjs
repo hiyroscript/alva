@@ -597,9 +597,9 @@ test('every fighter runs, jumps, falls and Dashes on the one baseline, and no de
   }
   const [first] = fighters;
   for (const field of [
-    'maxSpeed', 'acceleration', 'deceleration', 'turnBoost', 'airAcceleration', 'airDeceleration', 'jumpVelocity', 'highJumpWindow',
-    'highJumpHeight', 'airJumps', 'airJumpRatio', 'gravityScale', 'maxFallSpeed', 'fastFallSpeed', 'fastFallAcceleration', 'dashSpeed',
-    'dashDuration', 'airDashSpeed', 'airDashDuration', 'airDashUses', 'coyoteTime', 'jumpBuffer', 'attackBuffer',
+    'maxSpeed', 'acceleration', 'deceleration', 'turnBoost', 'airAcceleration', 'airDeceleration', 'jumpVelocity', 'superJumpVelocity',
+    'airJumps', 'airJumpVelocity', 'gravityScale', 'maxFallSpeed', 'fastFallSpeed', 'fastFallAcceleration', 'dashSpeed',
+    'dashDuration', 'airDashSpeed', 'airDashDuration', 'airDashUses', 'coyoteTime', 'jumpBuffer', 'attackBuffer', 'dropTapTime',
   ]) {
     assert.ok(MOVEMENT_FIELDS.includes(field), field);
     for (const f of fighters) assert.equal(f.movement[field], first.movement[field], `#${f.def.id} ${field}`);

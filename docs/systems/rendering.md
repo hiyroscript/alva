@@ -11,7 +11,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows, and when a clip restarts (a new key, a new move activation). |
 | [`js/game/rendering/ensemble.js`](../../js/game/rendering/ensemble.js) | A fighter drawn as several members ([ensembles](#ensembles)): `EnsembleSprites` (its members' sprite sets as one), `EnsembleAnimator` (every member playing the fighter's state, its formation, glide and idle float), `fighterParts` (what is drawn of any fighter), `buildFighterSprites` and `createAnimator` (the factories every mode builds fighters' art with), `idlePose` (a menu's idle). |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
-| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
+| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the Super Jump's dust, the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark, fear mark and Mash Combo counter drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
@@ -118,7 +118,8 @@ terrain, behind the fighters, and their impacts' bursts part of its
 foreground; on Jökull the glacier's cracks, contacts and falling pieces
 are its terrain, and its snow and blizzard its foreground, over the
 fighters),
-shadows, clones, each fighter in play (the CPU, then Player 1 on top: its
+shadows, the Super Jump's dust (on the ground, behind everything that
+fights), clones, each fighter in play (the CPU, then Player 1 on top: its
 speed trail, the Shield's interior, the fighter, the Shield's rim), the
 technique objects, projectiles, hit sparks, the stage's foreground, the
 Void (with the ripples where it has just taken a fighter), the elimination
@@ -326,7 +327,7 @@ impact spark, and on a fighter whose hit feeds on its opponent's fear, from
 the hit's `fed`, beside that hit's own effects), and a
 short slow-motion zoom on a launch predicted to reach the Void. Reduced
 motion drops the shake and the zoom. Tuning: `HIT_FX` (`shake`, `flash`,
-`sparks`, `trail`, `mash`, `lethal`, `bounce`, `elimination`).
+`sparks`, `trail`, `mash`, `lethal`, `bounce`, `elimination`, `dust`).
 
 **A Mash Combo** ([combat](combat.md#mash-combo)): while a series runs,
 fading afterimages of the fighter's strikes trail it (`trail.mashAlpha`,
@@ -338,6 +339,27 @@ strike of a turn that lands adds a short white slash along the strike
 amber (`sparks.finisher`) and a harder shake (`mash.finisherShake`, none
 with reduced motion). Afterimages and slashes are paint only: no box, no
 hit, no damage event; a trail is dropped once the series is over.
+
+**The Super Jump's dust.** Every Super Jump that takes off (a player's or
+a CPU's) records where its feet left the ground, what it stood on and
+where on it (`Fighter.superJumpTakeoff`, set on its takeoff step only);
+`Arena.update` hands it to `HitEffects.addSuperJumpDust`, so there is
+exactly one burst per Super Jump and none for a normal jump, an air jump,
+Down alone, a refused press or a CPU's plan that never took off. `drawDust`
+draws it on the ground, after the shadows and before every fighter: a
+small cloud at the feet, two puffs rolling out along the surface either
+side (each a few overlapping circles, easing out), a faint flat ring
+spreading over the surface and six motes rising, warm pale grey over a
+warm dark edge so it reads on night, sand, snow and cloud alike, all
+fading out together in `dust.life` (0.3 s). It never follows the fighter:
+it stays where it was raised, and on a moving platform (`ground.dynamic`)
+it is drawn where that platform is drawn, at the same offset, as faint as
+the platform is. At most `dust.max` (8) live at once, the oldest going
+first; it ages on the effects' real-time clock like every spark, and a
+restart clears it. No shake. With reduced motion it spreads only
+`dust.reducedTravel` as far and raises no motes. Paint only: no box, no
+collision, and the fight steps the same with or without it. Tuning:
+`HIT_FX.dust`.
 
 **The elimination burst.** Whenever the Void takes a fighter (in any mode,
 two at once included), `Arena.checkVoid` hands it to
@@ -361,6 +383,10 @@ far; the colour flash and fade stay.
 - [`tests/systems/projectile-spin.test.mjs`](../../tests/systems/projectile-spin.test.mjs):
   the spin (its angle from age, never its box, kept through a turn back)
   and the rotated draw on a recording canvas.
+- [`tests/systems/super-jump-dust.test.mjs`](../../tests/systems/super-jump-dust.test.mjs):
+  one burst per Super Jump (a player's or a CPU's) at ground level, none
+  for anything else, its life, bound and restart, a moving cloud, the draw
+  order, reduced motion, and the fight stepping the same without it.
 - [`tests/systems/hit-fx.test.mjs`](../../tests/systems/hit-fx.test.mjs),
   [`fighter-status.test.mjs`](../../tests/systems/fighter-status.test.mjs),
   [`platform-stage.test.mjs`](../../tests/systems/platform-stage.test.mjs).

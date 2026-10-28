@@ -229,7 +229,7 @@ for (const c of playableCharacters()) {
       const plain = { ...c, attacks: { ...c.attacks, [air.id]: { ...c.attacks[air.id], motion: undefined } } };
       const low = harnessFor(plain).makeFighter();
       low.step(JUMP);
-      while (low.fighter.body.vy < 0 || low.fighter.body.y < 790) low.step({});
+      while (low.fighter.body.vy < 0 || low.fighter.body.y < 785) low.step({});
       const press = Object.keys(c.actions).find((a) => c.actions[a]?.air === air.id);
       low.step(P(press));
       const atk = low.fighter.combat.attack;

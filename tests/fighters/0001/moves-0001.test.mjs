@@ -503,7 +503,8 @@ test('Infinity is the ground\'s: in the air the Shield button is the Deflect\'s 
   const { fighter, step } = solo();
   const plain = solo();
   for (const r of [step, plain.step]) {
-    r(P('jump'));
+    // A Super Jump: the whole Deflect plays out before landing.
+    r({ ...P('jump'), down: true, downPressed: true });
     while ((r === step ? fighter : plain.fighter).body.vy < 0) r({});
   }
   step(SHIELD);

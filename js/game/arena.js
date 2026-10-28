@@ -235,6 +235,9 @@ export class Arena {
     // A launch that rebounded off the stage this step shows its impact,
     // and a fighter that healed itself its glow.
     for (const f of fighters) if (f.bounce) this.fx.takeBounce(f.bounce);
+    // A Super Jump that took off this step raises its dust where it left
+    // the ground.
+    for (const f of fighters) if (f.superJumpTakeoff) this.fx.addSuperJumpDust(f.superJumpTakeoff);
     for (const f of fighters) for (const heal of f.heals) this.fx.addHeal(f, heal);
     for (const f of fighters) for (const effect of f.effects) this.addCastEffect(f, effect);
     // Pushboxes keep every pair of fighters apart (a lone fighter has none;
@@ -436,6 +439,9 @@ export class Arena {
     const fighters = this.inPlay;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const f of fighters) this.drawShadow(f);
+    // A Super Jump's dust on the ground it rose from, behind everything
+    // that fights.
+    this.fx.drawDust(ctx, (x, y) => this.toScreen(x, y), view.scale);
     ctx.imageSmoothingEnabled = false;
     // A burst's art behind everything that fights: it goes out round its
     // fighter, who stays in front of it.

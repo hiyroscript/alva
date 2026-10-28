@@ -111,14 +111,19 @@ test('the left stick runs left and right (past the run threshold only); the D-pa
   assert.equal(p.sample({ grounded: true, facing: 1, character: ONE }).runRight, false, 'the right stick is free');
 });
 
-test('Cross / A jumps; held a little longer it is the higher jump, as the keyboard\'s is', async () => {
-  const apex = async (holdFrames) => {
+test('Cross / A jumps, the same however long it is held; with the left stick held down it is the Super Jump, as the keyboard\'s is', async () => {
+  const apex = async (holdFrames, { stickDown = false, downFirst = 0 } = {}) => {
     const p = await padFighter(ONE);
     const y0 = p.fighter.body.y;
     let top = y0;
+    if (stickDown) {
+      p.stick(0, 0.9);
+      for (let i = 0; i < downFirst; i++) p.frame();
+    }
     p.down('south');
     for (let i = 0; i < 90; i++) {
       if (i === holdFrames) p.up('south');
+      if (stickDown && i === 2) p.stick(0, 0);
       top = Math.min(top, p.frame().body.y);
     }
     return y0 - top;
@@ -126,7 +131,11 @@ test('Cross / A jumps; held a little longer it is the higher jump, as the keyboa
   const tap = await apex(1);
   const held = await apex(20);
   assert.ok(tap > 50, 'a jump');
-  assert.ok(held > tap * 1.1, `the higher jump: ${held.toFixed(0)} over ${tap.toFixed(0)}`);
+  assert.ok(Math.abs(held - tap) < 1e-9, `held or tapped, the same jump: ${held.toFixed(0)} and ${tap.toFixed(0)}`);
+  const sup = await apex(1, { stickDown: true });
+  const ready = await apex(1, { stickDown: true, downFirst: 12 });
+  assert.ok(sup > tap * 2, `the Super Jump: ${sup.toFixed(0)} over ${tap.toFixed(0)}`);
+  assert.ok(Math.abs(ready - sup) < 1e-9, 'the stick held down first, any time: the same Super Jump');
 });
 
 test('R1 / RB Dashes the way the stick points, else the way the fighter faces; in the air it is the air dash; held, it never repeats; L1 never Dashes', async () => {

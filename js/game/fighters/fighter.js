@@ -53,7 +53,7 @@ import { blankInput } from './fighter-controller.js';
 import { closestEnemy, facingToward } from './turn-around.js';
 import { approach, clamp } from '../../core/utils.js';
 import {
-  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
+  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, groundJump, airJump,
 } from './movement.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
@@ -260,13 +260,24 @@ export class Fighter {
     // otherwise. And this step's rebound off stage geometry, if any.
     this.launch = null;
     this.bounce = null;
-    // A ground jump that may still become the higher jump, or already is
-    // one ({ time, fromY, lift }): Jump still held movement.highJumpWindow
-    // after takeoff makes it rise on to highJumpHeight x the normal jump's
-    // height, under `lift` x gravity until its apex (see highJumpLift).
-    // `lift` is null while undecided. Null for a normal jump (Jump let go
-    // in time) and once the higher one's rise is over.
-    this.highJump = null;
+    // The kind of ground jump the press in the jump buffer asked for:
+    // 'super' (Down held, or pressed on the same step, as Jump was pressed,
+    // standing on the ground: the Super Jump) or 'normal'. Decided as the
+    // press is made, never later from whatever is held then, and a Super
+    // Jump only ever takes off from the ground itself (see the jump in
+    // update).
+    this.jumpKind = 'normal';
+    // The Super Jump that took off this step ({ x, y, ground, dx, dy }:
+    // where its feet left the ground, what it stood on and where on it),
+    // for whoever shows its dust (see Arena.update); null on any other
+    // step. Presentation reads it; nothing in play does.
+    this.superJumpTakeoff = null;
+    // The platform drop's tap in progress ({ ground, age }): Down pressed
+    // standing on a one-way platform that lets fighters drop, not let go
+    // yet. Let go within movement.dropTapTime, with no Jump pressed
+    // meanwhile, it drops the fighter through that platform (see the
+    // platform drop in update). Null when there is none.
+    this.dropTap = null;
     // Steps this fighter has lived (frozen ones included), to keep buffered
     // presses in the order they were made (the jump's press step, and each
     // buffered attack's and Dash's) and to tell a request made after the
@@ -379,6 +390,7 @@ export class Fighter {
     this.steps++;
     this.fastFalling = false;
     this.airJumped = false;
+    this.superJumpTakeoff = null;
     this.bounce = null;
     this.heals.length = 0;
     this.effects.length = 0;
@@ -428,10 +440,18 @@ export class Fighter {
       combat.release = null;
     }
     // Jump presses count from the step they are made, the freeze included,
-    // and so do Shield presses on the ground.
+    // and so do Shield presses on the ground. Each press says there and
+    // then which ground jump it asks for: the Super Jump with Down held (or
+    // pressed on this same step) standing on the ground, the normal jump
+    // otherwise, so a Down pressed after Jump never upgrades it and a press
+    // made in the air never becomes a Super Jump by landing. A Jump press
+    // also ends any platform drop's tap: Down and Jump together are the
+    // Super Jump, never a drop.
     if (input.jumpPressed) {
       this.jumpBuffer = mv.jumpBuffer;
       this.jumpPressedAt = this.steps;
+      this.jumpKind = input.down && body.grounded ? 'super' : 'normal';
+      this.dropTap = null;
     }
     if (combat.hitstop > 0) {
       // Impact freeze: nothing moves or advances, but a fresh hit still
@@ -670,18 +690,36 @@ export class Fighter {
     else this.shieldDownTime += dt;
 
     // ---- Platform drop --------------------------------------------------
-    // A fresh Down press (S / ↓, the left stick down, the touch Down button)
+    // A tap of Down (S / ↓, the left stick down, the touch Down button)
     // while standing on a one-way platform that lets fighters drop
-    // (`dropThrough`, see dropThrough in js/game/physics.js), free to act and
-    // with no Shield up, drops the fighter through it: never the main floor
-    // or a solid, never a platform that forbids it, never out of an attack,
-    // a stun, a paralysis, a technique or a Dash, and never a Down held since
-    // before (a fast fall carried into a landing stands on the platform). A
-    // jump pressed on the same step still jumps from where it stood. The
-    // training CPU asks for the same drop with `dropPressed`.
-    if ((input.downPressed || input.dropPressed) && canAct && body.grounded && !combat.shielding) {
+    // (`dropThrough`, see dropThrough in js/game/physics.js) drops the
+    // fighter through it as Down is let go: a fresh press on that platform
+    // arms it, and letting go within movement.dropTapTime, still standing
+    // on it, free to act and with no Shield up, drops. Down held on (a
+    // fighter getting ready to Super Jump) stands: past dropTapTime the tap
+    // is over, and no later release drops. A Jump pressed while Down is
+    // down ends it (that is the Super Jump; see the jump press above), and
+    // so does anything that takes the fighter off that platform or out of
+    // its control (leaving it, an attack, a stun, a paralysis, a
+    // technique, a Dash, the Shield): never a delayed drop. Never the main
+    // floor or a solid, never a platform that forbids it, and never a Down
+    // held since before (a fast fall carried into a landing stands on the
+    // platform). The training CPU asks for the drop at once with
+    // `dropPressed`.
+    const ground = body.grounded ? body.ground : null;
+    const droppable = !!ground?.oneWay && !!ground.dropThrough;
+    const dropFree = canAct && !combat.shielding;
+    if (input.downPressed && !input.jumpPressed && droppable && dropFree) this.dropTap = { ground, age: 0 };
+    const tap = this.dropTap;
+    if (tap && (ground !== tap.ground || !dropFree || tap.age > mv.dropTapTime + TIME_EPSILON)) {
+      this.dropTap = null;
+    } else if (tap && !input.down) {
+      this.dropTap = null;
       dropThrough(body, mv.dropThroughTime);
+    } else if (tap) {
+      tap.age += dt;
     }
+    if (input.dropPressed && dropFree && body.grounded) dropThrough(body, mv.dropThroughTime);
 
     // ---- Horizontal movement ---------------------------------------------
     // See moveHorizontal, and moveAttack while an attack plays (moveMotion
@@ -753,9 +791,17 @@ export class Fighter {
     // Dash or an air dash past its cancel time (see dashCancellable); it
     // only cuts once it really jumps. It only sets the upward speed: whatever horizontal
     // speed the fighter has (a Dash's whole burst included) carries
-    // straight into the air, under full gravity from this step. A tap is
-    // the normal jump; Jump held a little longer makes it the higher jump
-    // (see below).
+    // straight into the air, under full gravity from this step.
+    //
+    // The press decided which jump (jumpKind, see above): the normal jump,
+    // or the Super Jump at movement.superJumpVelocity, all of its lift
+    // given at takeoff (groundJump). The Super Jump needs the ground under
+    // the fighter as it takes off: a press that asked for it, kept in the
+    // buffer while the fighter could not act and run out of ground since
+    // (coyote time), is the normal jump. Nothing held after takeoff changes
+    // either: Jump or Down let go or held on, the arc is the same, and so is
+    // every air jump after it (two, as ever). A Super Jump leaves a burst
+    // of dust where it took off (superJumpTakeoff, for whoever shows it).
     const free = !this.mash.active &&
       (canAct || combat.cancellable || this.dashCancellable || this.moveYields(this.jumpPressedAt)) &&
       !(combat.shielding && combat.shieldStun > 0);
@@ -765,8 +811,14 @@ export class Fighter {
       if (this.dash) this.endDash();
       combat.shielding = false;
       gravityShare = 1;
-      this.highJump = { time: 0, fromY: body.y, lift: null };
-      body.vy = -this.jumpVelocity;
+      const superJump = this.jumpKind === 'super' && body.grounded;
+      if (superJump) {
+        const g = body.ground;
+        this.superJumpTakeoff = { x: body.x, y: body.y, ground: g ?? null, dx: g ? body.x - g.x : 0, dy: g ? body.y - g.y : 0 };
+      }
+      groundJump(body, mv, superJump);
+      this.jumpKind = 'normal';
+      this.dropTap = null;
       body.grounded = false;
       body.ground = null;
       this.coyote = 0;
@@ -776,38 +828,19 @@ export class Fighter {
       // ---- Air jump -------------------------------------------------------
       // Jump pressed in the air (past coyote time), with one left (two per
       // airtime: the triple jump): a fresh jump from wherever the fighter
-      // is, at airJumpRatio x the normal jump's speed, the jump clip from its
-      // first frame. Vertical only: the sideways speed carries straight
-      // through it, and steering the other way bends it round as the air
-      // allows. Always the same height, held or tapped: never a higher jump.
+      // is, at movement.airJumpVelocity, the jump clip from its first frame.
+      // Vertical only: the sideways speed carries straight through it, and
+      // steering the other way bends it round as the air allows. Always the
+      // same height, held or tapped, Down held or not: never a Super Jump.
       this.cutAttack();
       if (this.dash) this.endDash();
       gravityShare = 1;
       airJump(body, mv);
       this.airJumps--;
       this.jumpBuffer = 0;
-      this.highJump = null;
+      this.jumpKind = 'normal';
       this.airJumped = true;
       jumped = true;
-    }
-
-    // ---- Higher jump -------------------------------------------------------
-    // A ground jump whose Jump is still held highJumpWindow after takeoff (a
-    // press a little longer than a tap, held from the takeoff step on) is
-    // the higher jump: from then until its apex it rises under lighter
-    // gravity, just enough to top out at highJumpHeight x the normal jump's
-    // height (see highJumpLift), so its arc stretches rather than kicking.
-    // Let go sooner, it is the normal jump, exactly as ever. Decided once,
-    // and kept whether Jump stays held or not; the apex, a stun, the air
-    // jump or the ground ends it.
-    const rise = this.highJump;
-    if (rise) {
-      if (!jumped) rise.time += dt;
-      if (body.vy >= 0 || combat.stun > 0) this.highJump = null;
-      else if (!rise.lift) {
-        if (!input.jump) this.highJump = null;
-        else if (rise.time >= (mv.highJumpWindow ?? Infinity) - TIME_EPSILON) rise.lift = this.highJumpLift(ctx.gravity);
-      }
     }
 
     // ---- Fast fall ---------------------------------------------------------
@@ -825,16 +858,16 @@ export class Fighter {
     }
 
     // ---- Integrate -------------------------------------------------------
-    // A higher jump's rise falls under its lighter share of gravity, and an
-    // attack's motion under its own (none while it holds the fighter up, nor
-    // through an air dash).
+    // Every jump rises under full gravity; an attack's motion falls under
+    // its own share (none while it holds the fighter up, nor through an air
+    // dash).
     // Standing on a moving platform (a stage hazard), the fighter is first
     // carried by its movement this step (carryBody: nothing on static
     // ground, nothing in the air, so a jump leaves it behind), then takes
     // its own step from there. It is drawn moving from where it was before
     // the carry, as its platform is.
     carryBody(body);
-    stepBody(body, dt, ctx.stage, ctx.gravity * (this.highJump?.lift ?? 1) * gravityShare, body.maxFall);
+    stepBody(body, dt, ctx.stage, ctx.gravity * gravityShare, body.maxFall);
     body.prevX -= body.carryX;
     body.prevY -= body.carryY;
     // What meeting the ground or a wall does to an attack's motion.
@@ -868,7 +901,6 @@ export class Fighter {
         this.airAttacks.clear();
         this.freeFall = false;
       }
-      this.highJump = null;
       this.tumbling = false;
       // Landing cancel: an attack started in the air whose recovery runs
       // on the ground is over (released already, its cooldown, if any,
@@ -950,6 +982,8 @@ export class Fighter {
     this.bufferedAttack = null;
     this.bufferedDash = null;
     this.jumpBuffer = 0;
+    this.jumpKind = 'normal';
+    this.dropTap = null;
   }
 
   // ---- Mash Combo (js/game/combat/mash-combo.js, js/data/mash-combo.js) ----
@@ -1186,24 +1220,19 @@ export class Fighter {
       this.bufferedAttack = null;
       this.bufferedDash = null;
       this.jumpBuffer = 0;
+      this.jumpKind = 'normal';
     }
+    // Nor does a platform drop's tap: a hit never leads to a delayed drop.
+    this.dropTap = null;
     this.airJumps = this.movement.airJumps;
     this.airDashes = this.airDashUses;
     this.burst = false;
     this.airAttacks.clear();
     this.freeFall = false;
-    this.highJump = null;
     if (event.launchSpeed > 0) {
       this.tumbling = event.launchSpeed >= this.launchReaction.tumbleSpeed;
       this.launch = startLaunch(event.finalLaunch, this.launch);
     }
-  }
-
-  // The share of gravity (0-1) under which the higher jump rises from here
-  // to top out at movement.highJumpHeight x the normal jump's height above
-  // its takeoff (see highJumpLift in js/game/fighters/movement.js).
-  highJumpLift(gravity) {
-    return highJumpLift(this.body, this.movement, this.highJump.fromY, gravity);
   }
 
   // Cuts the move in progress short for a replacement starting now (another
@@ -1402,7 +1431,6 @@ export class Fighter {
     const burst = this.dashSpeedToward(direction, speed);
     this.dash = { direction, time: 0, duration: this.airDashDuration, speed: burst, air: true, animation: 'midair_mouvment' };
     this.facing = direction;
-    this.highJump = null;
     this.burst = true;
     this.body.vx = direction * burst;
     this.body.vy = 0;

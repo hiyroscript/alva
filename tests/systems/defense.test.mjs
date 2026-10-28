@@ -927,7 +927,7 @@ test('M: the frame rate never changes it: at 30, 60 and 144 fps the Shield stops
 for (const id of ['0001', '0002']) {
   for (const [when, setup] of [
     ['rising', (step) => { step(JUMP); step(); }],
-    ['falling', (step) => { step(JUMP); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700); }],
+    ['falling', (step) => { step({ ...JUMP, down: true, downPressed: true }); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700); }],
   ]) {
     test(`#${id}: Shield held while ${when} never goes up; the arc is exactly the plain one (no slow fall)`, () => {
       const character = getCharacter(id);

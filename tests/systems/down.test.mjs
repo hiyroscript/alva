@@ -1,12 +1,14 @@
 // Run with node --test tests/systems/down.test.mjs (no dependencies).
 // Down: a plain directional gameplay input (`down`), on S / ↓, the left
-// stick held down and the touch Down button. It does exactly three things:
-// in the air the fast fall, as a hit lands steering a launch downward, and
-// a fresh press while standing on a one-way platform drops the fighter
-// through it (tests/systems/drop-through.test.mjs). Otherwise, on the
-// ground, it is nothing: no state, no pose, no lock on movement or the
-// Dash, no faster Energy or cooldowns, and no change to what any button
-// does; held, never a drop. Menus keep their own Down. Uses the
+// stick held down and the touch Down button. It does exactly four things:
+// in the air the fast fall, as a hit lands steering a launch downward, held
+// (or pressed) on the ground as Jump is pressed the Super Jump
+// (tests/systems/movement.test.mjs), and a tap of it while standing on a
+// one-way platform drops the fighter through it
+// (tests/systems/drop-through.test.mjs). Otherwise, on the ground, it is
+// nothing: no state, no pose, no lock on movement or the Dash, no faster
+// Energy or cooldowns, and no change to what any other button does; held,
+// never a drop. Menus keep their own Down. Uses the
 // real Fighter, CombatSystem, physics and InputManager (see
 // tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
@@ -161,14 +163,17 @@ test('holding Down never stops or slows normal movement: running, turning and wa
   const landed = (log) => log.findIndex(([, y]) => y === 800);
   assert.ok(landed(off(DOWN)) < landed(off({})), 'then falling faster, to the floor sooner');
   // And standing on it with Down held from before (no fresh press), nothing
-  // drops through; only a fresh press does.
+  // drops through, let go or not; only a fresh tap does, as it is let go.
   const { fighter, step } = makeFighter({ x: 1000, y: 600 });
   for (let i = 0; i < steps(1); i++) step(DOWN);
+  step({});
   assert.equal(fighter.body.ground.id, 'ledge');
   assert.equal(fighter.body.y, 600);
   assert.equal(fighter.state, 'idle');
   step({ down: true, downPressed: true });
-  assert.equal(fighter.grounded, false, 'a fresh press: through the platform');
+  assert.equal(fighter.body.ground.id, 'ledge', 'pressed: standing');
+  step({});
+  assert.equal(fighter.grounded, false, 'a fresh tap, let go: through the platform');
 });
 
 test('holding Down never prevents a Dash: an explicit request with it held dashes exactly as without', () => {
@@ -325,7 +330,7 @@ test('Down held as a hit lands in the air bends the launch downward; on the grou
 
 // ---- Controllers ----------------------------------------------------------------------
 
-test('the training CPU never holds Down or presses a combat button, and still drops through platforms to follow', async () => {
+test('the training CPU holds Down only with a Super Jump\'s press and never presses a combat button, and still drops through platforms to follow', async () => {
   const { TrainingAIController } = await import('../../js/game/fighters/fighter-controller.js');
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const player = makeFighter({ x: 700 });
@@ -335,8 +340,7 @@ test('the training CPU never holds Down or presses a combat button, and still dr
   for (let i = 0; i < 1200; i++) {
     player.step(i % 300 < 150 ? { runRight: true } : { runLeft: true, ...(i % 97 === 0 ? DOWN : {}) });
     const out = cpu.getInput(bot.fighter, DT, SIM_CTX);
-    assert.equal(out.down, false);
-    assert.equal(out.downPressed, false);
+    if (out.down) assert.ok(out.jumpPressed && out.downPressed && bot.fighter.grounded, 'Down only as the Super Jump\'s chord');
     for (const button of COMBAT_BUTTONS) assert.equal(out[`${button}Pressed`], false, button);
     bot.step(out);
     assert.equal(bot.fighter.combat.attack, null);

@@ -35,7 +35,7 @@
 
 import { readMoveset } from '../moveset.js';
 import { attackReach } from '../../combat/attacks.js';
-import { stepInTravel } from '../../fighters/movement.js';
+import { stepInTravel, jumpRise } from '../../fighters/movement.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../../data/movement.js';
 import { CONFIG } from '../../../config.js';
 import { attackOffense, summonOffense, techniqueOffense } from '../../combat/offense.js';
@@ -310,10 +310,12 @@ export function analyzeCapabilities(f) {
     m.roles = rolesOf(m, height, Number.isFinite(fastest) ? fastest : 0.1);
     Object.freeze(m);
   }
+  // The jumps as the universal movement makes them, under ordinary gravity
+  // all the way: the normal jump, the Super Jump (its lift all at takeoff)
+  // and the air jump, each one's rise and its airtime back to the height it
+  // left.
   const mv = f.movement;
-  const g = 2500 * mv.gravityScale;
-  const jumpHeight = (mv.jumpVelocity * mv.jumpVelocity) / (2 * g);
-  const airJumpV = mv.jumpVelocity * mv.airJumpRatio;
+  const g = CONFIG.sim.gravity * mv.gravityScale;
   const shield = ms.groundShield && f.defense
     ? Object.freeze({
       perfectWindow: f.defense.perfectWindow, perfectRearm: f.defense.perfectRearm, stall: f.defense.stall,
@@ -331,9 +333,12 @@ export function analyzeCapabilities(f) {
     },
     movement: Object.freeze({
       maxSpeed: mv.maxSpeed, acceleration: mv.acceleration, airAcceleration: mv.airAcceleration,
-      jumpVelocity: mv.jumpVelocity, airJumpVelocity: airJumpV, airJumps: mv.airJumps, gravityScale: mv.gravityScale,
-      jumpHeight, highJumpHeight: jumpHeight * mv.highJumpHeight, airJumpHeight: (airJumpV * airJumpV) / (2 * g),
-      airtime: (2 * mv.jumpVelocity) / g, highJumpWindow: mv.highJumpWindow, fastFallSpeed: mv.fastFallSpeed,
+      jumpVelocity: mv.jumpVelocity, superJumpVelocity: mv.superJumpVelocity, airJumpVelocity: mv.airJumpVelocity,
+      airJumps: mv.airJumps, gravityScale: mv.gravityScale,
+      jumpHeight: jumpRise(mv.jumpVelocity, g), superJumpHeight: jumpRise(mv.superJumpVelocity, g),
+      airJumpHeight: jumpRise(mv.airJumpVelocity, g),
+      normalJumpAirtime: (2 * mv.jumpVelocity) / g, superJumpAirtime: (2 * mv.superJumpVelocity) / g,
+      fastFallSpeed: mv.fastFallSpeed,
       dash: ms.dash, airDash: ms.airDash, dashCancelTime: mv.dashCancelTime, attackBuffer: mv.attackBuffer,
     }),
     energy: f.energyDef,

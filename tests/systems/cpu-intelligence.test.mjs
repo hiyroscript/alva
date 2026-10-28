@@ -701,8 +701,10 @@ test('deterministic: the same seed plays the same match, decision for decision',
 });
 
 test('the debug trace explains each decision from its own data, and costs nothing when off', () => {
+  // Long enough for a dozen decisions however many Mash Combos (twelve
+  // strikes each) it plays.
   const r = arena({ difficulty: 'hard', seed: 3, debug: true, cpuX: 900, foeX: 1150 });
-  r.run(seconds(4));
+  r.run(seconds(12));
   const trace = r.ai.telemetry.trace;
   assert.ok(trace.length > 10);
   for (const e of trace) {
@@ -713,7 +715,7 @@ test('the debug trace explains each decision from its own data, and costs nothin
   // `[objective · mode] plan move: reason`.
   assert.match(r.ai.telemetry.explain(), /^\[\w+ · \w+\] \w+/);
   const quiet = arena({ difficulty: 'hard', seed: 3, cpuX: 900, foeX: 1150 });
-  quiet.run(seconds(4));
+  quiet.run(seconds(12));
   assert.equal(quiet.ai.telemetry.trace.length, 0);
   assert.ok(quiet.ai.telemetry.counters.decisions > 10, 'the counters still run');
   assert.ok(new CpuIntelligence({ difficulty: 'easy' }) instanceof CpuIntelligence);

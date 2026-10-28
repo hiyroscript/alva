@@ -121,7 +121,9 @@ blocks every attack.
   reserved slots for the stages to come), a live preview with each
   stage's details, and **Random Stage**.
 - **Shared mechanics**: universal, momentum-driven movement (a fast run,
-  a higher jump, the triple jump, the fast fall, a Dash and an air dash
+  a quick, low jump and the Super Jump (Down and Jump on the ground: a
+  powerful leap with a burst of dust), the triple jump, the fast fall, a
+  tap of Down to drop through a platform, a Dash and an air dash
   that flow straight into attacks and jumps), a held Shield with a perfect
   Shield, Energy, hit-cancels and an input buffer, launch steering and
   tumbling, launches that rebound off walls, and hit effects.
@@ -188,8 +190,9 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 | --- | --- | --- |
 | Move | A D or ← → | Left stick |
 | Dash (in the air: air dash) | Q / E (left / right) | R1 / RB (the way the left stick points, else the way you face) |
-| Jump (hold a little longer: higher; again in the air: air jump) | W, Space or ↑ | Cross / A |
-| Down (fast fall; steer a launch down) | S or ↓ | Left stick down |
+| Jump (a quick, low jump; again in the air: air jump) | W, Space or ↑ | Cross / A |
+| Super Jump (on the ground: hold Down, press Jump) | S or ↓, then W, Space or ↑ | Left stick down, then Cross / A |
+| Down (fast fall; steer a launch down; tap on a platform: drop through it) | S or ↓ | Left stick down |
 | Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | each fighter's own layout (below) |
 | Extra attack | J | each fighter's own layout |
 | Shield (hold, on the ground) / Deflect (press, in the air) | L | L1 / LB |
@@ -212,7 +215,8 @@ held with a button, or the stick itself as the input), modifiers, and
 press, hold or held activation. In menus the D-pad moves focus, the left
 stick moves a circular cursor, Cross / A confirms and Circle / B goes
 back. On touch: a joystick (or Left / Right buttons) at the lower left
-and the action buttons at the lower right. Details, the controller layouts
+and the action buttons at the lower right; hold the Down button with one
+finger and press Jump with another for the Super Jump. Details, the controller layouts
 and the touch layouts in [input](docs/systems/input.md).
 
 ## How the repository is organized

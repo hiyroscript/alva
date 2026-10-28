@@ -180,9 +180,8 @@ test('the hazard regions are disjoint by construction: from each other, and from
 
 test('no jump reaches the upper Void, even from the highest a cloud can rise', () => {
   const g = CONFIG.sim.gravity * MOVEMENT.gravityScale;
-  const v = MOVEMENT.jumpVelocity;
-  // The higher jump, then both air jumps at their apexes.
-  const rise = ((v ** 2) * MOVEMENT.highJumpHeight + (v * MOVEMENT.airJumpRatio) ** 2 * MOVEMENT.airJumps) / (2 * g);
+  // The Super Jump, then both air jumps at their apexes.
+  const rise = (MOVEMENT.superJumpVelocity ** 2 + MOVEMENT.airJumpVelocity ** 2 * MOVEMENT.airJumps) / (2 * g);
   const highest = Math.min(...ASPERITAS.platforms.map((p) => p.dynamic.region.top));
   const tallest = Math.max(...CHARACTERS.map((c) => c.collider.height));
   const apex = highest - rise - tallest / 2;
@@ -628,10 +627,11 @@ test('a fighter lands on each cloud from above, and jumps up through it from bel
     }
     assert.equal(fighter.body.ground, p, `${id}: landed on it`);
     assert.equal(fighter.body.y, p.y);
-    // From under it, a jump passes up through it (one-way) and lands on top.
+    // From under it, a Super Jump and an air jump pass up through it
+    // (one-way) and land on top.
     const under = makeFighter({ stage, x: p.x + p.w / 2 });
     assert.equal(under.fighter.body.ground, stage.floor);
-    under.step({ jump: true, jumpPressed: true });
+    under.step({ jump: true, jumpPressed: true, down: true, downPressed: true });
     let landed = false;
     for (let i = 0; i < 120 && !landed; i++) {
       hazards.update(DT, [under.fighter]);

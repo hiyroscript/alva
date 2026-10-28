@@ -4179,3 +4179,85 @@ danger, for the player, the HUD and the CPU); the roster-wide tables
 (its credits), each fighter's roster list, `cpu-intelligence` (the
 opportunity for a technique that needs danger) and the test fighters'
 slots.
+
+## Super Jump
+
+Not a named update (it can become one if the owner names it). Asked for
+(the `max` brief, "ALVA — Complete Super Jump Movement Overhaul") as: retire
+holding Jump to jump higher; make the normal jump noticeably lower; make
+the old higher jump a separate, deliberate **Super Jump** (hold Down, press
+Jump, on the ground) at about the same height, an explosive leap rather
+than a floatier jump, with a burst of dust at takeoff; keep the air jumps'
+strength; resolve Down's clash with the platform drop; and teach every CPU
+to use it.
+
+- **The jumps** (`js/data/movement.js`, `js/game/fighters/movement.js`,
+  `Fighter.update`). The normal jump is 750 units/s (was 920): about 106
+  units high on the fixed step (was 161.6), the same however long Jump is
+  held. The Super Jump is `superJumpVelocity`, 1100, all of it at takeoff
+  (`groundJump`) under ordinary gravity: 232.9 units high on the fixed step,
+  against the retired higher jump's measured 232.5, reached in 25 steps
+  instead of 36. `highJumpWindow`, `highJumpHeight`, `highJumpLift`,
+  `Fighter.highJump` and its lighter gravity are gone. The kind is decided
+  as Jump is pressed (`Fighter.jumpKind`): Down held (or pressed on the
+  same step) on the ground is the Super Jump; Down after Jump, a press in
+  the air and coyote time never are; a press kept in the jump buffer keeps
+  its kind but takes off as the Super Jump only from the ground.
+- **The air jumps** keep their strength: `airJumpVelocity`, 718 (the old
+  920 × 0.78), replaces `airJumpRatio`, so the lower normal jump does not
+  weaken them (85.9 units each on the fixed step, was 85.8). Two per
+  airtime after either ground jump.
+- **The platform drop** is now a tap of Down (`dropTapTime`, 0.25 s:
+  pressed on the platform and let go, no Jump meanwhile), dropping as Down
+  is let go (`Fighter.dropTap`), so Down held on a one-way platform stands
+  ready for the Super Jump. Down and Jump together is the Super Jump, never
+  a drop; a hit, an attack, the Shield, a jump or leaving the platform ends
+  the tap, so no drop ever comes late. The training CPU's `dropPressed` is
+  unchanged.
+- **The dust** (`HitEffects.addSuperJumpDust`, `drawDust`, `HIT_FX.dust`):
+  one burst per Super Jump that takes off (`Fighter.superJumpTakeoff`),
+  on the ground where it left it, riding a moving cloud, drawn behind the
+  fighters, 0.3 s, quieter with reduced motion. Paint only.
+- **The CPU**: the executor's `jump(self, kind)` makes the player's chord
+  (Down pressed with Jump, on the ground, on that step only); its arcs
+  (`arcTrack` `'super'`) and capabilities (`superJumpHeight`,
+  `superJumpAirtime`, ...) follow the real jumps. Navigation uses the
+  normal jump where it reaches and the Super Jump where only it does;
+  jumping over a threat tries the normal jump first; jump-ins weigh the
+  Super Jump with a small commitment cost; a cornered CPU Super Jumps past
+  its opponent. Every level may use it. The training CPU follows onto
+  high ground and hops tall solids with it, and celebrating CPUs Super
+  Jump now and then.
+- **Words**: Discover gains a Super Jump entry (*Super saut* in French),
+  and the Jump, Triple jump and Fast fall entries, the controller's Jump
+  activation and the Jump and Fast fall descriptions say how it works now.
+
+**Where to tune it:** `jumpVelocity`, `superJumpVelocity`,
+`airJumpVelocity` and `dropTapTime` in `BASE_FIGHTER_MOVEMENT`
+([`js/data/movement.js`](./js/data/movement.js)); `HIT_FX.dust` in
+`js/game/rendering/hit-fx.js`; the CPU's `SUPER_JUMP_COMMITMENT` in
+`js/game/ai/cpu-intelligence/evaluator.js`, the jump-over landing risk in
+`defense.js` and `jumpFor` in `js/game/fighters/fighter-controller.js`.
+
+**Code:** `js/data/movement.js`, `js/game/fighters/movement.js`,
+`js/game/fighters/fighter.js`, `js/game/fighters/fighter-controller.js`,
+`js/game/arena.js`, `js/game/rendering/hit-fx.js`,
+`js/game/ai/cpu-intelligence/` (`executor`, `prediction`, `capabilities`,
+`plans`, `brain`, `defense`, `evaluator`, `telemetry`),
+`js/game/ai/celebration.js`, `js/data/controller-profiles.js` (comments),
+the English and French strings; the specification and guides
+(`ALVA_SPEC.md`, `README.md`, movement, input, the AI, rendering, stages,
+testing, module responsibilities).
+
+**Tests:** new `tests/systems/super-jump-dust.test.mjs` and
+`tests/systems/cpu-super-jump.test.mjs`; `movement` (the normal jump, the
+Super Jump and its rules, the CPUs' jumps), `movement-rules`,
+`universal-movement`, `drop-through` and `down` (the tap), `controller-input`
+(the left stick down with Cross / A), `hit-fx`, `combat-rules`,
+`platform-stage` and `platform-hazards` (the Void's reach, the clouds
+reached with a Super Jump), and tests that needed a jump's old airtime
+(a Super Jump now, or a later press: `defense`, `jokull`, `momentum`,
+`step-in`, #0001's, #0002's and #0005's). Two statistical CPU tests
+moved with the new movement: `cpu-behaviour`'s Brutal "takes less when
+ahead" allows 0.05 LP/s of noise, and `jokull`'s full matches play a sixth
+seed. `cpu-intelligence`'s debug trace runs 12 s instead of 4.

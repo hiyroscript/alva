@@ -32,12 +32,25 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | --- | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | A D or ← → | Left stick | Joystick, or Classic ◀ ▶ |
 | Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Both layouts: one tap of **Left movement** / **Right movement** |
-| Down (fast fall in the air; steer a launch down; a fresh press on a one-way platform drops through it) | `down` | S or ↓ | Left stick down | both layouts: the small **Down** button at the far left of the lower-left cluster |
-| Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
+| Down (fast fall in the air; steer a launch down; held on the ground as Jump is pressed: the Super Jump; tapped on a one-way platform: a drop through it) | `down` | S or ↓ | Left stick down | both layouts: the small **Down** button at the far left of the lower-left cluster |
+| Jump (a press: the normal jump, the same however long it is held; with Down held on the ground: the Super Jump; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
 | Shield (on the ground, held: it holds the fighter still, a direction held with it only turns it, Jump jumps out of it) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | the fighter's own layout (see below) | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Options / Menu | the timer / pause or More button |
+
+**The Super Jump is Down and Jump together**, never a button of its own: Down
+held (or pressed on the same sample) as Jump is freshly pressed, on the
+ground. The Fighter reads it from the one snapshot every device fills
+(`down`, `jumpPressed`), so S / ↓ with W / Space / ↑, the left stick down
+with Cross / A (or wherever the player has bound Jump and the fast fall),
+and the touch Down button held by one finger with Jump pressed by another
+(both layouts; each pointer is its own control) all make the same Super
+Jump. Down and Jump pressed in the same sample count; Down pressed after
+Jump never upgrades it. Because Down held on the ground is half of that
+chord, the platform drop is a *tap* of Down (pressed and let go within
+`dropTapTime`, no Jump meanwhile), so holding Down on a one-way platform,
+ready to Super Jump, never drops the fighter ([movement](./movement.md)).
 
 A held control's codename is its one internal name: its key in
 `CONFIG.bindings` and `ACTIONS`, its field in every input snapshot (with a
@@ -405,7 +418,7 @@ decides what they do, exactly as for the keyboard. The rules:
 - **Activation.** `press` acts as the input goes down; `hold` once it has
   been held `HOLD_THRESHOLD` (a tap does nothing); `continuous` holds its
   control while held. Nothing repeats while held. The Shield is always held
-  (never a toggle), Jump keeps its higher jump when held, Pause is a press.
+  (never a toggle), Jump stays held (it steers a launch up), Pause is a press.
 - **Context.** A ground action is never chosen in the air, nor an air
   action on the ground. A controller's combat presses say where they were
   made for (`pressedOnGround` / `pressedInAir` in the snapshot), and the
@@ -430,9 +443,9 @@ defend:
 | Action | PlayStation | Xbox | Why |
 | --- | --- | --- | --- |
 | Movement | Left stick | Left stick | The left thumb steers, all the time. |
-| Jump (and air jumps; held a little longer, higher) | Cross | A | The button every platformer jumps on, under the right thumb. |
+| Jump (and air jumps; with the left stick held down on the ground, the Super Jump) | Cross | A | The button every platformer jumps on, under the right thumb. The Super Jump is the two universal inputs together (the left thumb down, the right thumb on Jump), never a fighter's own combination. |
 | Dash / air dash | R1 | RB | The right index finger: the left thumb aims it (the stick's way, else facing), the right thumb stays on Jump and the attacks, so a Dash flows into a jump or a strike with no hand moved. A bumper's short travel suits a quick, frequent press. |
-| Fast fall | Left stick down (in the air) | Left stick down | Push down to fall faster; it also steers a launch down. |
+| Fast fall | Left stick down (in the air) | Left stick down | Push down to fall faster; it also steers a launch down. On the ground it is the Down that makes a Jump press the Super Jump, and a quick flick of it drops through a one-way platform. |
 | Shield (held, on the ground) / Deflect (pressed, in the air) | L1 | LB | One guard button on a finger of its own: guarding never takes the right thumb off the attacks (let go and strike at once), the left thumb keeps steering, turning and walking behind it while it is held, the right thumb's Jump jumps straight out of it, and a bumper makes the Deflect's timing crisp. |
 | Pause | Options | Menu | The pause button of every game. |
 

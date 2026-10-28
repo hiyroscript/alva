@@ -615,7 +615,7 @@ test('after the Blue Tornado it is in free fall: no attack and no air jump until
   assert.equal(fighter.freeFall, true);
   assert.equal(fighter.airJumps, MOVEMENT.airJumps, 'its air jumps are still counted...');
   step(P('jump'));
-  assert.ok(fighter.body.vy > -fighter.jumpVelocity * MOVEMENT.airJumpRatio + 1, '...but no air jump comes out');
+  assert.ok(fighter.body.vy > -MOVEMENT.airJumpVelocity + 1, '...but no air jump comes out');
   for (const button of ['attack1', 'attack2', 'attack3']) {
     step(P(button));
     assert.equal(fighter.combat.attack, null, `${button}: nothing`);

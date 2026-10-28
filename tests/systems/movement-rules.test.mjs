@@ -3,15 +3,14 @@
 // values they are given, not against the universal ones: ground and air
 // steering, turning, braking, overspeed (held, let go, reversed; a burst in
 // the air), attack momentum and the Step-in (never steered), the hitstun
-// drift, the fast fall, the air
-// jump and the higher jump's lift, each checked
-// with made-up values. Whatever the numbers, the same rules turn them into
+// drift, the fast fall, the ground jumps (the normal jump and the Super
+// Jump) and the air jump, each checked with made-up values. Whatever the numbers, the same rules turn them into
 // motion; the numbers every fighter actually runs on are checked in
 // tests/systems/universal-movement.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift,
+  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, groundJump, airJump, jumpRise,
 } from '../../js/game/fighters/movement.js';
 import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import { CONFIG } from '../../js/config.js';
@@ -25,7 +24,7 @@ const VALUES = Object.freeze({
   maxSpeed: 400,
   acceleration: 3000, deceleration: 2000, turnBoost: 3, overspeedDeceleration: 5000, overspeedHoldDeceleration: 1500,
   airAcceleration: 1500, airDeceleration: 300, airTurnBoost: 1.5, airOverspeedDeceleration: 2500,
-  jumpVelocity: 1000, fastFallAcceleration: 9000, fastFallSpeed: 1200, airJumpRatio: 0.8, highJumpHeight: 1.5,
+  jumpVelocity: 1000, superJumpVelocity: 1500, fastFallAcceleration: 9000, fastFallSpeed: 1200, airJumpVelocity: 800,
   hitstunFriction: 700, hitstunAirDrag: 90,
 });
 const body = (fields = {}) => ({ x: 0, y: 0, vx: 0, vy: 0, grounded: true, gravityScale: 1, ...fields });
@@ -190,34 +189,35 @@ test('an attack\'s drift: its Step-in once, on the ground, the way it faces; no 
 
 // ---- The rest ------------------------------------------------------------------------
 
-test('hitstun drift, fast fall, air jump and the higher jump read the values they are given', () => {
+test('hitstun drift, fast fall, the ground jumps and the air jump read the values they are given', () => {
   assert.equal(hitstunDrag(VALUES, true), VALUES.hitstunFriction);
   assert.equal(hitstunDrag(VALUES, false), VALUES.hitstunAirDrag);
   // The fast fall: toward fastFallSpeed, never a jump in speed, never slower.
   near(fastFallVelocity(100, VALUES, DT), 100 + VALUES.fastFallAcceleration * DT, 1e-9, 'speeding up');
   assert.equal(fastFallVelocity(1190, VALUES, DT), VALUES.fastFallSpeed, 'capped');
   assert.equal(fastFallVelocity(1500, VALUES, DT), 1500, 'never slower');
-  // The air jump: airJumpRatio x the jump speed, upward, and nothing else:
-  // whatever sideways speed the body has carries straight through it.
+  // The ground jumps: jumpVelocity, or superJumpVelocity for the Super
+  // Jump, upward, all at once, and nothing else: the sideways speed carries
+  // straight into the air.
+  for (const vx of [-650, 0, 120, 1250]) {
+    const b = body({ vx });
+    groundJump(b, VALUES);
+    assert.deepEqual([b.vy, b.vx], [-1000, vx], `${vx}: the normal jump, the run untouched`);
+    groundJump(b, VALUES, true);
+    assert.deepEqual([b.vy, b.vx], [-1500, vx], `${vx}: the Super Jump, the run untouched`);
+  }
+  // The air jump: airJumpVelocity upward, whatever jump came before, and
+  // nothing else: whatever sideways speed the body has carries straight
+  // through it.
   for (const vx of [-650, 0, 120, 1250]) {
     const b = body({ grounded: false, vx, vy: 300 });
     airJump(b, VALUES);
     assert.deepEqual([b.vy, b.vx], [-800, vx], `${vx}: a fresh rise, the drift untouched`);
   }
-  // The higher jump's lift: the share of gravity under which the rise left
-  // tops out at exactly highJumpHeight x the normal jump's height.
+  // A jump's rise, for planning: v² / 2g.
   const g = CONFIG.sim.gravity;
-  const v = 900;
-  const normal = (v * v) / (2 * g);
-  for (const highJumpHeight of [1.2, 1.5, 2]) {
-    const rise = body({ grounded: false, y: -40, vy: -700 });
-    const lift = highJumpLift(rise, { ...VALUES, jumpVelocity: v, highJumpHeight }, 0, g);
-    assert.ok(lift > 0 && lift < 1, `${highJumpHeight}: lighter gravity`);
-    near(40 + (rise.vy * rise.vy) / (2 * g * lift), normal * highJumpHeight, 1e-6, `${highJumpHeight}: its apex`);
-  }
-  // Already rising faster than the target needs: full gravity, never more.
-  assert.equal(highJumpLift(body({ y: -40, vy: -900 }), { ...VALUES, jumpVelocity: v, highJumpHeight: 1 }, 0, g), 1, 'never more than gravity');
-  assert.equal(highJumpLift(body({ vy: -700 }), VALUES, 0, 0), 1, 'no gravity, no lift');
+  near(jumpRise(1000, g), (1000 * 1000) / (2 * g), 1e-9, 'the rise');
+  assert.equal(jumpRise(1000, 0), Infinity, 'no gravity, no top');
 });
 
 test('movement rules contain no tap detector or tap window', async () => {
