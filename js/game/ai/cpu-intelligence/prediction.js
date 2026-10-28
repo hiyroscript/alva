@@ -483,6 +483,9 @@ export function projectileContact(stage, p, x0, y0, dir, delay, foe, hurt, out =
       break;
     }
     const fk = foe.i(k);
+    // A quake reaches the opponent only standing on the ground: one in the
+    // air is passed by, the shot still live for it (hitReaches).
+    if (p.quake && !foe.g[fk]) continue;
     let fx = foe.x[fk] + dragX;
     let fy = foe.y[fk] + dragY;
     if (pull) {

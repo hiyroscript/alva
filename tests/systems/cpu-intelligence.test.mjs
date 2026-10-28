@@ -521,6 +521,9 @@ function tryOpportunity(D, move, difficulty, { dx, lift }, seed = 5) {
   const r = arena({ cpuDef: D, foeDef: D, difficulty, seed, cpuX: 1000, foeX: 1000 + dx, foeY: lift ? 800 - lift : undefined, hover: lift > 0 });
   // The same move in this CPU's own reading of its fighter.
   const m = analyzeCapabilities(r.cpu).moves.find((x) => x.key === move.key);
+  // A technique that opens only in danger (#0009's Air Sphere) is given it,
+  // with room to spare for the Launch Point that recovers while it looks.
+  if (m.kind === 'technique' && m.def.minLaunchPoint > 0) r.cpu.combat.launchPoint = m.def.minLaunchPoint + 10;
   r.ai.neutral = false;
   r.run(seconds(getDifficultyProfile(difficulty).react[1] + 0.15));
   if (m.air) r.ai.command({ jump: 'ground', dir: 0 });

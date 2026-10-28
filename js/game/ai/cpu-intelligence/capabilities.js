@@ -39,6 +39,7 @@ import { stepInTravel } from '../../fighters/movement.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../../data/movement.js';
 import { CONFIG } from '../../../config.js';
 import { attackOffense, summonOffense, techniqueOffense } from '../../combat/offense.js';
+import { inDanger } from '../../combat/technique.js';
 import { MASH_COMBO, mashSequence } from '../../../data/mash-combo.js';
 
 // Every role a move can be given (a move may have several at once).
@@ -109,7 +110,7 @@ function projectileModel(proj, spawnAt, offset) {
     def: proj, id: proj.id, speed: proj.speed, lifetime: proj.lifetime, range: proj.speed * proj.lifetime,
     spawnAt, offset: { x: offset?.x ?? 0, y: offset?.y ?? 0 }, hitbox: proj.hitbox,
     pierce: proj.pierce, pull: proj.pull, repel: !!proj.repel, erase: !!proj.erase,
-    carry: proj.carry, strikes, damage: strikes.reduce((n, s) => n + s.damage, 0),
+    carry: proj.carry, quake: !!proj.quake, strikes, damage: strikes.reduce((n, s) => n + s.damage, 0),
   });
 }
 
@@ -361,6 +362,8 @@ export function moveReady(self, m) {
   const combat = self.combat;
   if (m.energyCost > 0 && combat.energyExhausted) return false;
   if (m.kind === 'technique' || m.kind === 'summon') {
+    // A technique it is not in the danger for (inDanger) is no option yet.
+    if (m.kind === 'technique' && !inDanger(self, m.def)) return false;
     const gone = !!self.opponent?.lostToVoid;
     const pureHeal = m.kind === 'technique' && m.heal > 0 && !m.projectile && !m.burst;
     if (self.technique?.def.id === m.id || self.pendingSummon?.id === m.id) return false;

@@ -89,8 +89,9 @@ For example, #0001 has five (attack4 and attack5 techniques), #0002
 three ordinary ones, #0003 four (attack3 and attack4 techniques),
 #0004 five (attack4 and attack5 techniques), #0005 five (attack4 a
 technique, attack5 a summon), #0006 five (attack3 to attack5
-techniques), #0007 five (attack3 to attack5 techniques) and #0008 five
-(attack4 and attack5 techniques) ([character docs](../characters/README.md)).
+techniques), #0007 five (attack3 to attack5 techniques), #0008 five
+(attack4 and attack5 techniques) and #0009 five (attack4 and attack5
+techniques) ([character docs](../characters/README.md)).
 
 ## Attacks
 
@@ -176,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0008 use them between them
+is built, and usable by any fighter (#0001 to #0009 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -362,6 +363,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0006 | `['attack4']` | Ice Breath (a gale that freezes whoever it reaches) | Heat Vision, the Sonic Scream, the Triple Strike |
 | #0007 | `['attack5']` | the Rocket Launcher (a 10-damage rocket after a long heave) | the Molotov Cocktail, the Sawn-Offs, the Pistol |
 | #0008 | `['attack4', 'attack5']` | the Feast (heals its own Launch Point), the Gum-Gum Giant Pistol (a 10-damage giant fist after a long wind-up) | the Gum-Gum Balloon, the Gum-Gum Rocket, the Gum-Gum Gatling |
+| #0009 | `['attack4', 'attack5']` | the Freezing Splash (a freeze that holds its target for a follow-up), the Air Sphere (its trance, a 10-damage burst open only in danger) | the Air Blast, the Air Gust, the Earth Pillar |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -556,7 +558,8 @@ fighter's Launch Point drops by that much, never below 0
 delays Launch Point recovery, records no hit event (the fighter's `heals`
 list, read by the hit effects for the glow, records it), and a cast
 broken before its release heals nothing. Fields: `castAnimation`,
-`releaseAnimation`, `cooldown`, `energyCost`, `projectile`, `burst`, `heal`; the
+`releaseAnimation`, `cooldown`, `energyCost`, `projectile`, `burst`, `heal`,
+`minLaunchPoint`; the
 burst's hit is validated like an attack's (damage, launch, stuns and hit
 effects). E.g. #0001's Unlimited Void (a burst that paralyzes) and Hollow
 Purple (a projectile that erases), each blocked by a raised Shield ([its
@@ -568,10 +571,26 @@ Ievan Polkka (a projectile that never moves) and World is Mine (a burst
 that charms, its ring of sound its `effect`; [its
 specification](../characters/0004.md#each-move-in-detail)), and #0005's
 Deadlights (a burst that floats whoever faces it, a `gaze`; [its
-specification](../characters/0005.md#each-move-in-detail)). Nothing in the
+specification](../characters/0005.md#each-move-in-detail)), and #0009's
+Freezing Splash (a burst that paralyzes, a freeze) and Air Sphere (a burst
+round it, its sphere its `effect`, open only in danger; [its
+specification](../characters/0009.md#each-move-in-detail)). Nothing in the
 runtime reads a fighter or a button; a technique of a different shape
 would be a new form in the runtime with its own fields, not a
 reinterpretation of these.
+
+**Only in danger** (`minLaunchPoint`, a whole number of Launch Points; 0,
+the default, is none): a technique may open only once its own fighter's
+Launch Point has reached it, a move that comes over a fighter in mortal
+danger (#0009's Air Sphere, its trance, at 30). Below it a press does
+nothing at all, nothing paid and nothing kept for later; the CPU never
+plans it (`moveReady`), and the ability HUD shows it held back
+(`moveRestriction` gives `danger`, [input](input.md#the-ability-hud)). All
+three ask one `inDanger(fighter, def)` in
+[`technique.js`](../../js/game/combat/technique.js), so they never
+disagree. Only the start reads it: once cast, the technique plays out
+whatever its fighter's Launch Point does, and its cooldown, Energy and
+classification are its own as ever.
 
 Any clip missing, the projectile's or the burst effect's art missing, nothing to release (no
 projectile, burst or heal), invalid data, or Energy it cannot pay, and
@@ -687,17 +706,22 @@ The roster, reclassified from its mechanics: #0001's Unlimited Void 3 s
 and World is Mine 3 s (charm); #0005's Deadlights 3 s (float) and Red
 Balloon 3 s (its phantom's fear); #0006's Ice Breath 3 s (a freeze, its
 paralysis); #0007's Rocket Launcher 5 s (a 10-damage rocket); #0008's
-Feast 3 s (a heal) and Gum-Gum Giant Pistol 5 s (a 10-damage fist). Everything else, Red, Blue and Maximum Blue (a pull earns
+Feast 3 s (a heal) and Gum-Gum Giant Pistol 5 s (a 10-damage fist); #0009's
+Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10).
+Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
 Spin (a pull and a carry), Heat Vision and Sonic Scream (a carry, a repel,
 a block push), #0007's Molotov Cocktail (a fire that strikes four times,
 6 in all) and Sawn-Offs, #0008's Gatling (8 at the most), Balloon (a
 turn-back and a block push) and Rocket (a homing dash) included, has no
-cooldown, and every Deflect none.
+cooldown, and so has every move of #0009's but its two Specials (the Air
+Blast's drag, a carry, and the Earth Pillar's quake earn nothing), and
+every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
-the Molotov Cocktail, the Sawn-Offs) cost 15 Energy instead ([energy](energy.md#construct-moves)).
+the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
+Earth Pillar) cost 15 Energy instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and
 `CombatState.abilityCooldowns` are the only stores. The player's presses,
@@ -1040,8 +1064,8 @@ or changes a hitbox, a range or a stun. The rules are
   [`hit-effects.test.mjs`](../../tests/systems/hit-effects.test.mjs),
   [`pull.test.mjs`](../../tests/systems/pull.test.mjs),
   [`projectile-clash.test.mjs`](../../tests/systems/projectile-clash.test.mjs),
-  [`technique.test.mjs`](../../tests/systems/technique.test.mjs) (the heal
-  and a burst's art included), [`quake.test.mjs`](../../tests/systems/quake.test.mjs),
+  [`technique.test.mjs`](../../tests/systems/technique.test.mjs) (the heal,
+  a burst's art and a technique open only in danger included), [`quake.test.mjs`](../../tests/systems/quake.test.mjs),
   [`slam.test.mjs`](../../tests/systems/slam.test.mjs),
   [`charm.test.mjs`](../../tests/systems/charm.test.mjs),
   [`float.test.mjs`](../../tests/systems/float.test.mjs),

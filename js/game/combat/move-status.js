@@ -23,7 +23,7 @@ import { moveFor } from '../../data/controller-profiles.js';
 import { specialAction } from '../../data/loadout.js';
 import { isSpecialAbility } from '../../data/special-abilities.js';
 import { summonProblem } from './summon.js';
-import { techniqueProblem } from './technique.js';
+import { inDanger, techniqueProblem } from './technique.js';
 
 // The combat buttons in control order: the numbered attacks, then the extra
 // attack, as the keyboard lays them out.
@@ -97,11 +97,13 @@ export function moveCooldown(fighter, id, kind = null) {
 // place for a reason other than its cooldown, or null. Shown apart from a
 // cooldown, never as one: 'art' (its frames are missing: refused, never
 // faked), 'energy' (it costs Energy, its `energyCost`, and the fighter is
-// exhausted until its bar is full again, in either place), 'airUses' (its
-// starts for this airtime are used up) and 'freeFall' (an earlier move
-// spent the airtime). Only the place the fighter is in now can be spent
-// for the airtime; the other place's moves are a preview of what comes
-// after landing or leaving the ground.
+// exhausted until its bar is full again, in either place), 'danger' (a
+// technique its fighter's Launch Point is still under the `minLaunchPoint`
+// of: see inDanger in js/game/combat/technique.js), 'airUses' (its starts
+// for this airtime are used up) and 'freeFall' (an earlier move spent the
+// airtime). Only the place the fighter is in now can be spent for the
+// airtime; the other place's moves are a preview of what comes after
+// landing or leaving the ground.
 export function moveRestriction(fighter, entry, place) {
   if (entry.special) {
     const defs = entry.special === 'technique' ? fighter.techniqueDefs : fighter.summonDefs;
@@ -109,6 +111,7 @@ export function moveRestriction(fighter, entry, place) {
     if (!def) return 'art';
     const problem = entry.special === 'technique' ? techniqueProblem(fighter, def) : summonProblem(fighter, def);
     if (problem) return 'art';
+    if (entry.special === 'technique' && !inDanger(fighter, def)) return 'danger';
     return def.energyCost > 0 && fighter.combat?.energyExhausted ? 'energy' : null;
   }
   const atk = fighter.attacks?.[entry.move];

@@ -77,6 +77,11 @@ decision quality, never a rule):
   live, so it can never disagree with the Fighter. A cooldown is no
   animation lock: a move without one can still be unavailable because the
   fighter is busy.
+- **Danger.** A technique that opens only in danger (its `minLaunchPoint`,
+  [combat](combat.md#techniques): #0009's Air Sphere) is no option while
+  the CPU's own Launch Point is under it: `moveReady` asks the same
+  `inDanger` the Fighter's press does, so the CPU never plans it early and
+  reaches for it once it is in danger.
 - **Energy.** Each move's `energyCost` is the Fighter's own (15 for the
   Deflect and for an ordinary move that creates a construct: a throw, a
   burst, a clone; 0 for a melee strike and a 3 s / 5 s move), the Dash's
@@ -414,9 +419,12 @@ are attacks to the CPU too, the Deflect a defense as well), its role
 `heal`; none gets past a Shield), its reach swept along its motion (a
 slam's to where it would land, with its impact), its projectile's range
 and pull, its technique's burst and heal, its summon's clone, whether a
-hit is a quake or a gaze, its cooldowns and air uses. The forward
-simulation follows the same rules as combat: a quake strike, burst or
-impact meets only a fighter its path has standing on the ground (so the CPU
+hit is a quake or a gaze, its cooldowns and air uses. A ranged move's
+shot may fly or, with no speed, stand where it appears for its lifetime
+(#0009's Earth Pillar): `readMoveset` reads both, and the shot's path is
+then where it stands. The forward
+simulation follows the same rules as combat: a quake strike, burst,
+impact or shot meets only a fighter its path has standing on the ground (so the CPU
 counts on none against an airborne opponent, and fears none while its own
 path keeps it in the air), a gaze burst only an opponent facing the CPU,
 and a slam stands through its landing where it lands. A move's Step-in is
@@ -615,7 +623,13 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   [`tests/fighters/0008/fighter-0008.test.mjs`](../../tests/fighters/0008/fighter-0008.test.mjs):
   the CPU playing #0008's whole kit, its fists, its stretched punches and
   stamps, its slingshot, its balloon (against a shot, timed to bounce it
-  back), its meal and its giant fist.
+  back), its meal and its giant fist;
+  [`tests/fighters/0009/fighter-0009.test.mjs`](../../tests/fighters/0009/fighter-0009.test.mjs):
+  the CPU playing #0009's whole kit, its strikes, its staff, its wind, its
+  rock (a shot that stands where it rises) and its water, and its trance
+  once it is in danger;
+  [`technique.test.mjs`](../../tests/systems/technique.test.mjs): the CPU
+  waiting, as a press does, for the danger a technique needs.
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and
   [`reference-opponents.mjs`](../../tests/helpers/reference-opponents.mjs):
   full matches on a real `Battle` (with how each side played: presses,

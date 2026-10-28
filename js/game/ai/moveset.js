@@ -50,10 +50,12 @@ const MOVESETS = new WeakMap();
 // Read once per fighter (and again if its definition or art changes): every
 // attack a button starts, on the ground and in the air, split into melee and
 // ranged (only the buttons in its `actions`, attack3 to attack5 included
-// where it has them), each melee one with where its strikes can reach over
-// its own motion and pull (`reach`, see attackReach in
-// js/game/combat/attacks.js) and that motion's kind (`motion`: a roll, a
-// homing dash, a plunge, a lift, a hover, or null); its summons and
+// where it has them; a ranged one's shot may fly or, with no speed, stand
+// where it appears for its lifetime, as #0009's Earth Pillar does), each
+// melee one with where its strikes can reach over its own motion and pull
+// (`reach`, see attackReach in js/game/combat/attacks.js) and that motion's
+// kind (`motion`: a roll, a homing dash, a plunge, a lift, a hover, or
+// null); its summons and
 // techniques (`specials`, e.g. #0001's attack4 and attack5), each with its
 // own button (`action`), what it takes to come out (`lead`) and, for a
 // technique, where it lands (`box`) and with what (`hit`); whether it has a
@@ -79,7 +81,7 @@ export function readMoveset(f) {
       if (!atk || (air && atk.groundOnly) || !atk.animation || !sprites.has(atk.animation)) continue;
       if (isRangedAttack(atk)) {
         const proj = f.projectileDefs[atk.projectile.id];
-        if (!proj?.animation || !sprites.projectile(proj.animation) || !(proj.speed > 0)) continue;
+        if (!proj?.animation || !sprites.projectile(proj.animation) || !(proj.speed >= 0)) continue;
         ranged.push({ action, air, id, atk, proj });
       } else if (isMeleeAttack(atk)) {
         melee.push({ action, air, id, atk, reach: attackReach(atk), motion: atk.motion?.type ?? null });

@@ -153,6 +153,21 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0008.playStyle',
     reviewedSourceHash: 'c2956192dff56a1a0db543de3b69f7574d427a8274684277c130d1b2781fe381',
   }),
+  // An elusive elementalist that moves its opponents more than it hurts
+  // them: a gale that carries its target off before flinging it, a gust
+  // that floats it in the air, both blowing shots back, a freezing splash,
+  // a pillar of rock that throws up whoever stands on it and walls off
+  // shots, fire and a staff up close, and a trance that opens only in
+  // danger. Demanding: three of its tools cost Energy, so it must choose
+  // between wind and rock; the freeze has to be converted before it thaws;
+  // it is light and steered far by the wind; and its strongest move asks it
+  // to survive into danger first, then find room for a long, breakable
+  // meditation.
+  '0009': Object.freeze({
+    difficulty: 4,
+    descriptionKey: 'discover.fighter.0009.playStyle',
+    reviewedSourceHash: 'c4c3550ab1dc68763809a52a44b526fe0b85775a2b0d9b5b72199e5e7e3f9839',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

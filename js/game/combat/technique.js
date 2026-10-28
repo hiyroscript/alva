@@ -99,6 +99,21 @@
 // in its release pose (the heal and the cooldown kept). A technique that
 // harms never does: it owns its fighter until it is over.
 // A horizontal launch travels along the technique's facing.
+//
+// A technique may also be one its fighter can only reach in danger:
+// `minLaunchPoint` (a whole number of Launch Points; 0, the default, is
+// none) is the least Launch Point its own fighter must have for it to
+// start. Below that, a press of it does nothing at all (nothing paid,
+// nothing kept for later), the CPU never plans it and the ability HUD shows
+// it held back ('danger', see moveRestriction in
+// js/game/combat/move-status.js); once started, it plays out whatever
+// happens to its fighter's Launch Point. Only the start reads it
+// (inDanger): never its cooldown, Energy, classification or release. E.g.
+// #0009's Air Sphere, its glowing trance, which comes over it only in
+// mortal danger:
+//
+//   attack5: { castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release',
+//     minLaunchPoint: 30, burst: { ... } },
 
 import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveMoveEnergy } from '../../data/energy.js';
@@ -119,6 +134,9 @@ const TECHNIQUE_DEFAULTS = {
   // Launch Point it takes off its own fighter as it releases (a whole
   // number; 0 is none): see `heal` above.
   heal: 0,
+  // The least Launch Point its own fighter must have for it to start (a
+  // whole number; 0 is none): see `minLaunchPoint` above.
+  minLaunchPoint: 0,
 };
 
 // Clocks are sums of fixed steps; compare against boundaries with a little
@@ -146,6 +164,9 @@ export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
     });
   }
   if (!(Number.isInteger(def.heal) && def.heal >= 0)) throw new Error(`[Alva] ${owner}'s heal must be a whole number of Launch Points from 0`);
+  if (!(Number.isInteger(def.minLaunchPoint) && def.minLaunchPoint >= 0)) {
+    throw new Error(`[Alva] ${owner}'s minLaunchPoint must be a whole number of Launch Points from 0`);
+  }
   def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'technique', def, cls);
   def.offense = resolveOffense(spec, techniqueOffense(def), owner);
   def.freeCancel = yieldsToRequests(def.offense);
@@ -160,6 +181,15 @@ function resolveBurstEffect(spec, owner) {
   if (typeof spec.animation !== 'string' || !spec.animation) throw new Error(`[Alva] ${owner}'s burst effect needs an animation`);
   const o = spec.offset ?? {};
   return Object.freeze({ animation: spec.animation, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
+}
+
+// Whether `owner` is in the danger technique `def` needs to start (see
+// `minLaunchPoint` above): always, for a technique that needs none. Read by
+// every start (Fighter.tryTechnique), the CPU (moveReady in
+// js/game/ai/cpu-intelligence/capabilities.js) and the ability HUD
+// (moveRestriction), so the three never disagree.
+export function inDanger(owner, def) {
+  return !(def?.minLaunchPoint > 0) || (owner?.combat?.launchPoint ?? 0) >= def.minLaunchPoint;
 }
 
 // The fields naming a technique's fighter clips (fighter animations).

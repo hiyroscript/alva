@@ -50,7 +50,7 @@ reads, what a fighter may leave out, and its tests.
 ## Characters
 
 - [The roster](characters/README.md)
-- [#0001](characters/0001.md), [#0002](characters/0002.md), [#0003](characters/0003.md), [#0004](characters/0004.md), [#0005](characters/0005.md), [#0006](characters/0006.md), [#0007](characters/0007.md), [#0008](characters/0008.md)
+- [#0001](characters/0001.md), [#0002](characters/0002.md), [#0003](characters/0003.md), [#0004](characters/0004.md), [#0005](characters/0005.md), [#0006](characters/0006.md), [#0007](characters/0007.md), [#0008](characters/0008.md), [#0009](characters/0009.md)
 - [Adding a fighter](characters/adding-characters.md)
 
 ## Gameplay

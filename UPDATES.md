@@ -4051,3 +4051,131 @@ screen), `tests/integration/watch-mode.test.mjs`,
 `tests/interface/ui-consistency.test.mjs`,
 `tests/systems/platform-hazards.test.mjs` and the CPU match helpers
 updated.
+
+## #0009, the young monk of the four elements
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0009 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks
+for abilities with real mechanics from the character's canon (not only
+animations and damage), no move the character cannot perform in canon,
+the sheet's DeviantArt page credited, the character named nowhere and
+#0008's source named nowhere either. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0009 in roster slot 09, playable: 111 frames cut from
+  the sheet into `assets/characters/0009/` (1× crops of whole pieces of
+  its art, each tight, the flat green background (0, 150, 0) made
+  transparent, nothing redrawn or recoloured, every file
+  `0009_<codename>_<frame>.png`): 84 of the fighter, 21 of its wind and
+  its rock (projectiles) and 6 of its sphere (an effect). The sheet draws
+  the aerial staff spin's body and whirl apart, the whirl to go over the
+  raised hands: each Deflect frame is one body with one whirl laid behind
+  it, nothing redrawn. A drawing the sheet repeats is one file played
+  again (the air palm in two rows, the wind's puffs). Drawn at the
+  roster's art-pixel size (a 49-pixel fighting stance, about 83 units
+  tall); its staff, water, fire and whirl reach far from its body, so every
+  clip authors its own `anchorX` on its trousers. Movement is the
+  universal one; its Energy refills at the shared 12 a second.
+- **Its four elements and its staff**, from its canon (a boy monk of the
+  air nomads, the one person who bends all four elements, who would
+  rather move an opponent than hurt one), each with a mechanic: **Swift
+  Strikes** (1 that holds, then 3) and the **Fire Kick** (fire swept round
+  its feet, either side, that holds, then a flaming kick, 3 at Base Launch
+  2), its Mash Combo pair; the **Staff Swing** (a great arc out to 96
+  units) and the **Rising Air Kick** (a lift on the air, once per
+  airtime) in the air; the **Air Blast** (a cone of wind that drags its
+  target along with it, 1 and 1, before flinging it, 3 at Base Launch 2,
+  and blows other fighters' shots back) and, in the air, the **Air Gust**
+  (a quick push and a turned-back shot, floating as it blows); the
+  **Earth Pillar** (a column of rock that stands where it rises, throwing
+  up only a fighter standing on the ground there, 5 at Base Launch 2, and
+  erasing every shot that meets it); the **Freezing Splash** (a technique
+  and a Special: water thrown into an icy splash that freezes for a
+  second; 3 s); the **Air Sphere** (a technique and a Special: its
+  glowing trance, open only in danger, a burst round it, 10 at Base Launch
+  3 straight up; 5 s). Its guard is its arms raised across its body; its
+  Deflect its staff twirled overhead; its Dash a low lunge, its air dash a
+  flat leap. It heals nobody, summons nobody and carries nothing but its
+  staff.
+- **Light on the wind**: its `launchReaction` steers a launch up to 30°,
+  the roster's most (everyone else 15° to 20°).
+- **One shared capability, for any technique: only in danger.** A
+  technique's `minLaunchPoint` (a whole number of Launch Points, 0 by
+  default) is the least its own fighter must have for it to start: below
+  it a press does nothing at all (nothing paid, nothing kept), the CPU
+  never plans it (`moveReady`) and the ability HUD shows it held back
+  (`danger`, "Only in danger: more Launch Point needed"); one `inDanger`
+  in `js/game/combat/technique.js` answers all three. Only the start reads
+  it: once cast, it plays out, and its cooldown, Energy and classification
+  are its own as ever. #0009's Air Sphere opens at 30: its trance comes
+  over it only in mortal danger.
+- **Two CPU readings, for any fighter.** An ordinary attack whose shot
+  stands where it appears (no speed: the Earth Pillar) is a ranged move
+  the CPU reads and uses (`readMoveset` skipped it until now: only
+  techniques had stationary shots), and a shot that is a `quake` meets
+  only an opponent its predicted path has standing on the ground
+  (`projectileContact`, as a quake strike, burst or impact already did).
+- **Test-only fighters moved.** Test A and Test B, which the screen tests
+  register in roster slots 09 and 10, now sit in slots 31 and 32, out of
+  the way of the roster's own fighters.
+- **Its controller layout** by the comfort rules (Square Swift Strikes /
+  Staff Swing, Triangle the Fire Kick, R2 the Air Blast / Air Gust, L2 the
+  Air Sphere, the right stick forward the Freezing Splash, the right stick
+  up the Earth Pillar on the ground and the Rising Air Kick in the air),
+  touch buttons, names and descriptions in English and French, a Discover
+  profile (4/5) and its credits (the sheet by gameinvader247 on
+  DeviantArt, linked by the deviation's number alone, and the sheet's own
+  credit: GameInvader).
+
+Found on the way: "Palm Strike" is the move of a fighter slot 03 once
+had, and a guard keeps it out of the strings; #0009's first strike is
+named Swift Strikes. The step-in, cooldown-policy and CPU tests that press
+every move now put a fighter in the danger its techniques need first
+(`endanger` in the fighter harness).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 192 matches a level): #0009 wins 0.57 at
+Medium, 0.45 at Hard and 0.48 at Brutal, inside the roster's usual range;
+strongest against #0003 and #0004, weakest against #0006 and #0007. As
+first written it won 0.83, 0.79 and 0.70; the steps from there are in
+[#0009's specification](docs/characters/0009.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0009.js`: the
+moves' phases are whole frames of their clips at `FPS_0009` (the orders
+`SWIFT_STRIKES_0009`, `FIRE_KICK_0009`, `AIR_BLAST_0009` and the rest);
+reaches are the attacks' `hitbox`es and the techniques' `burst`es; the
+wind, the gust and the rock are its `projectiles`; the trance's danger is
+`techniques.attack5.minLaunchPoint`; its steering is
+`launchReaction.steerAngle`.
+
+**Code:** `js/data/characters/0009.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/technique.js` (`minLaunchPoint`, `inDanger`),
+`js/game/fighters/fighter.js`, `js/game/combat/move-status.js`,
+`js/game/ai/cpu-intelligence/capabilities.js`, `js/game/ai/moveset.js`,
+`js/game/ai/cpu-intelligence/prediction.js`; the specification and guides
+(`ALVA_SPEC.md`, `README.md`, `docs/characters/0009.md` (new), the roster,
+adding a fighter, the character system, module responsibilities, combat,
+defense, Energy, input, launch, rendering, the AI, testing).
+
+**Tests:** new `tests/fighters/0009/fighter-0009.test.mjs` (registration
+and kit; Energy for what it creates and nothing else; its Mash Combo; its
+names, touch buttons and controller layout; the 111 files, clean and
+tight, none a copy, at one scale, anchored on its body, its objects
+centred; every move's mechanic: the holds, the fire sweep either side, the
+staff's reach, the lift once per airtime, the wind dragging its target and
+blowing a pistol shot back, the gust's hover, the rock throwing up a
+standing target, passing one in the air, standing still and stopping a
+shot, the freeze and its broken cast, the trance held back out of danger
+and bursting either side in it; its Deflect turning a shot back; its
+steering; the CPU playing its whole kit and its trance in danger; its
+source named nowhere); `technique.test.mjs` (a technique open only in
+danger, for the player, the HUD and the CPU); the roster-wide tables
+(`cooldown-policy`, `special-abilities`: twelve Specials,
+`strict-combat-rules`, `step-in`, `mash-combo`), `empty-roster`,
+`discover`, `practice-ground`, `watch-mode`, `quick-battle`, `settings`
+(its credits), each fighter's roster list, `cpu-intelligence` (the
+opportunity for a technique that needs danger) and the test fighters'
+slots.

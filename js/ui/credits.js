@@ -4,10 +4,10 @@
 // Proper names (Finhj, ZetrasBlack, R0B4N, thespriteanimations, DeviantArt,
 // Dazz & Fret, The Spriters Resource, xmaygrrr, imhomiejaydev,
 // regularDor8go, NotEverything123, Cosbydaf, Kenshin Himura,
-// Misse-the-cat, xxalexsmashxx, degue-1297, Alejo & Grim) stay as they are
-// in every language. A line may also link to its source:
-// { label: key or [key, params], href }, the label still translated and
-// the address never.
+// Misse-the-cat, xxalexsmashxx, degue-1297, Alejo & Grim, gameinvader247,
+// GameInvader) stay as they are in every language. A line may also link to
+// its source: { label: key or [key, params], href }, the label still
+// translated and the address never.
 
 import { CONFIG } from '../config.js';
 import { t } from '../localization/i18n.js';
@@ -44,6 +44,10 @@ const SPRITES_0007 = 'https://www.deviantart.com/xxalexsmashxx/art/955490753';
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0008 is never named).
 const SPRITES_0008 = 'https://www.deviantart.com/degue-1297/art/443591282';
+// Where #0009's sprite sheet was published: its DeviantArt page, found by
+// the deviation's number alone (the page's title is left out of the
+// address: the character behind #0009 is never named).
+const SPRITES_0009 = 'https://www.deviantart.com/gameinvader247/art/636302762';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -96,6 +100,12 @@ export const CREDITS = [
   {
     title: 'credits.sprites0008.title',
     lines: [{ label: 'credits.sprites0008.sheet', href: SPRITES_0008 }, 'credits.sprites0008.sheetCredits'],
+  },
+  // #0009's sheet, linked to where it was published, and the credit the
+  // sheet itself asks for.
+  {
+    title: 'credits.sprites0009.title',
+    lines: [{ label: 'credits.sprites0009.sheet', href: SPRITES_0009 }, 'credits.sprites0009.sheetCredits'],
   },
   {
     title: 'credits.rights.title',

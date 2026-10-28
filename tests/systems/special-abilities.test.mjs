@@ -51,11 +51,12 @@ const SPECIALS = Object.freeze({
   '0006': ['attack4'],
   '0007': ['attack5'],
   '0008': ['attack4', 'attack5'],
+  '0009': ['attack4', 'attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly ten Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast and the Gum-Gum Giant Pistol', () => {
+test('exactly twelve Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash and the Air Sphere', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -65,7 +66,7 @@ test('exactly ten Specials across the roster: Unlimited Void and Hollow Purple, 
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 10);
+  assert.equal(total, 12);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
@@ -78,6 +79,13 @@ test('exactly ten Specials across the roster: Unlimited Void and Hollow Purple, 
   // homes in, and both are ordinary.
   for (const move of ['attack3', 'midair_attack3', 'midair_attack2']) {
     assert.equal(isSpecialAbility(getCharacter('0008'), move), false, `${name('0008', move)} is not Special`);
+  }
+  assert.deepEqual(specialAbilities(getCharacter('0009')).map((m) => name('0009', m)), ['Freezing Splash', 'Air Sphere']);
+  // The Air Blast and the Air Gust turn projectiles back, and the Earth
+  // Pillar walls them off and throws up whoever stands on it: all
+  // ordinary.
+  for (const move of ['attack3', 'midair_attack3', 'extra_attack']) {
+    assert.equal(isSpecialAbility(getCharacter('0009'), move), false, `${name('0009', move)} is not Special`);
   }
   // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
   for (const move of ['attack3', 'attack4']) {
@@ -162,6 +170,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       abilities: ['ground:attack5'],
     },
     '0008': {
+      ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3'],
+      abilities: ['ground:attack4', 'ground:attack5'],
+    },
+    '0009': {
       ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
       air: ['attack1', 'attack2', 'attack3'],
       abilities: ['ground:attack4', 'ground:attack5'],

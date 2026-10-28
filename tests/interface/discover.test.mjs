@@ -526,10 +526,10 @@ test('the Fighters page is the roster in roster order, in the Select Fighter ros
   assert.deepEqual(shape(browser), shape(roster));
   const order = browser.slots.filter((s) => s.tagName === 'BUTTON').map((s) => s._def.id);
   assert.deepEqual(order, [...playableCharacters()].sort((a, b) => a.rosterSlot - b.rosterSlot).map((d) => d.id));
-  assert.deepEqual(order, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', 'test-a'], '#0001 to #0008 first, as on Select Fighter');
+  assert.deepEqual(order, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', 'test-a'], '#0001 to #0009 first, as on Select Fighter');
   assert.equal(browser.slots[0].querySelector('.slot-name').textContent, '#0001');
   assert.equal(browser.slots[1].querySelector('.slot-name').textContent, '#0002');
-  assert.deepEqual(loads.sort(), ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', 'test-a'], 'only playable fighters load, for their portraits');
+  assert.deepEqual(loads.sort(), ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', 'test-a'], 'only playable fighters load, for their portraits');
 
   // A disabled fighter is a locked slot: no button, no focus, no preview
   // on a press, never selected.
@@ -1350,8 +1350,8 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assertFocus(slotOf(discover, '0002'));
   assert.equal(browser.name.textContent, '#0002');
   app.input.key('ArrowDown');
-  assertFocus(slotOf(discover, TEST_A.id));
-  assert.equal(browser.describeBtn.hidden, true, 'nothing to describe for an unrated fighter');
+  assertFocus(slotOf(discover, '0009'));
+  assert.equal(browser.name.textContent, '#0009');
   app.input.key('ArrowUp');
   app.input.key('ArrowRight');
   assertFocus(slotOf(discover, '0002'));
@@ -1398,6 +1398,8 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assertFocus(fighters.tab);
   assert.deepEqual(selected(discover), ['fighters']);
   slotOf(discover, TEST_A.id).focus();
+  assert.equal(browser.describeBtn.hidden, true, 'nothing to describe for an unrated fighter');
+  slotOf(discover, '0009').focus();
   app.input.key('ArrowLeft');
   assertFocus(fighters.tab);
   assert.deepEqual(selected(discover), ['fighters']);
