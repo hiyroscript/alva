@@ -866,7 +866,7 @@ test('choosing after navigation does not restore focus to an inactive Home', asy
 test('Home has four menu actions and a top-right Help, Controller, Settings group', () => {
   const { home, done } = boot();
   try {
-    assert.deepEqual(Object.keys(home.actions), ['play', 'watch', 'practice', 'discover']);
+    assert.deepEqual(Object.keys(home.actions), ['play', 'local', 'watch', 'practice', 'discover']);
     assert.deepEqual(home.el.querySelectorAll('.home-action'), Object.values(home.actions));
     assert.ok(!home.el.querySelectorAll('.home-action').some((b) => /Settings/.test(b.html)), 'no Settings action any more');
     const gear = home.settingsButton;

@@ -33,6 +33,12 @@ export const WATCH_SETUP = Object.freeze({
   name: 'setup.watch',
   steps: Object.freeze(['step.difficulty', ['step.cpu', { n: 1 }], ['step.cpu', { n: 2 }], 'step.stage']),
 });
+// Local Play's Quick Battle, after Select local mode: Player 1's fighter,
+// Player 2's, then the stage. No CPU, no difficulty, no play type.
+export const LOCAL_SETUP = Object.freeze({
+  name: 'setup.localQuickBattle',
+  steps: Object.freeze([['step.playerFighter', { n: 1 }], ['step.playerFighter', { n: 2 }], 'step.stage']),
+});
 
 // Quick Battle's play types; anything else (a fresh or stale value) is
 // Regular Play, the default.
@@ -57,8 +63,9 @@ export const currentSetup = (setup) => read(setup);
 // `title` and `kicker` are translation keys, or [key, params]. `setup` and
 // `step` are a setup and an index in it, or functions returning them, read
 // again by refreshSteps() (on a screen's enter()) so the steps follow the
-// path the player is on.
-export function screenHeader({ title, kicker, step = null, setup = QUICK_BATTLE_CUSTOM_SETUP, onBack }) {
+// path the player is on (a step of -1: none reached yet). `badge`: an
+// element shown before the title (a Local Play step's player).
+export function screenHeader({ title, kicker, step = null, setup = QUICK_BATTLE_CUSTOM_SETUP, onBack, badge = null }) {
   const back = el('button', {
     class: 'btn-back',
     type: 'button',
@@ -75,11 +82,12 @@ export function screenHeader({ title, kicker, step = null, setup = QUICK_BATTLE_
     steps._refresh();
   }
 
+  const heading = el('h1', { class: 'screen-title', ...tx(...label(title)) });
   return el('header', { class: 'screen-header' }, [
     back,
     el('div', { class: 'screen-heading' }, [
       kicker ? el('span', { class: 'kicker', ...tx(...label(kicker)) }) : null,
-      el('h1', { class: 'screen-title', ...tx(...label(title)) }),
+      badge ? el('div', { class: 'screen-title-row' }, [badge, heading]) : heading,
     ]),
     steps,
   ]);

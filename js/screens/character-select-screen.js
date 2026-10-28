@@ -12,6 +12,9 @@
 // continues) and the roster's preview id, so the rosters never share an
 // element id. Left out, they are Quick Battle's Select Fighter, whose steps
 // follow the play type. The title is a translation key, or [key, params].
+// Local Play's Player 1 and Player 2 screens (js/screens/local-play-screens.js)
+// add a `badge` before the title and a `note` above Confirm, and decide
+// whose input may choose (accepts, onHold).
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
@@ -24,6 +27,7 @@ export class CharacterSelectScreen extends Screen {
   constructor(app, {
     id = 'character', title = 'character.title', setup = () => quickBattleSetup(app.selection), step = 2,
     selection = () => app.selection, key = 'characterId', next = () => continueAfterFighter(app), previewId = 'preview-name',
+    badge = null, note = null,
   } = {}) {
     super(app, id);
     this.selection = selection;
@@ -32,11 +36,14 @@ export class CharacterSelectScreen extends Screen {
     this.roster = new FighterRoster(app, {
       host: this.el,
       previewId,
+      note,
       onConfirm: (def) => this.confirm(def),
+      accepts: () => this.accepts(),
+      onHold: () => this.onHold(),
     });
 
     this.el.replaceChildren(
-      screenHeader({ title, kicker: currentSetup(setup).name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title, kicker: currentSetup(setup).name, setup, step, badge, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body char-layout' }, [this.roster.rosterPanel, this.roster.previewPanel]),
     );
   }
@@ -62,6 +69,17 @@ export class CharacterSelectScreen extends Screen {
   enter() {
     refreshSteps(this.el);
     this.roster.show(this.chosenId);
+  }
+
+  // Whether the input being handled may choose here (any, but on a Local
+  // Play step: see js/screens/local-play-screens.js).
+  accepts() {
+    return true;
+  }
+
+  // Whether choosing waits (never, but on a Local Play step).
+  onHold() {
+    return false;
   }
 
   confirm(def) {

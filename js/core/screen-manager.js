@@ -11,6 +11,9 @@ export class Screen {
     this.navigable = true;
     // How long the screen stays mounted under the next one when leaving.
     this.leaveMs = null;
+    // Whose controller drives its menus (js/core/input-manager.js
+    // MENU_OWNERS): Player 1's, but on a screen Player 2 owns in Local Play.
+    this.menuOwner = 'p1';
   }
 
   // Lifecycle hooks (override as needed)
@@ -116,6 +119,7 @@ export class ScreenManager {
       el.classList.add('is-entering');
     }
     document.documentElement.dataset.screen = next.id;
+    this.app.input?.setMenuOwner?.(next.menuOwner);
     next.enter(params);
     if (next.navigable) next.focusDefault();
     // A dialog still open over the change (a loading error) keeps the new

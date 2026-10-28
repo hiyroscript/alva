@@ -324,7 +324,7 @@ test('Controller Connections lists each supported controller with its status and
     assert.ok(reads(items[0], 'Status Connected'));
     assert.ok(reads(items[0], 'Assignment Player 1'));
     assert.ok(reads(items[1], 'Controller 2 — Xbox Wireless Controller'));
-    assert.ok(reads(items[1], 'Assignment Available'));
+    assert.ok(reads(items[1], 'Assignment Player 2 (local play)'), 'the controller Local Play would give Player 2');
     assert.equal(items[0].querySelector('.controller-use'), null, 'Player 1 needs no button');
     const use = items[1].querySelector('.controller-use');
     assert.equal(use.getAttribute('aria-label'), 'Use controller 2 for Player 1');
@@ -332,7 +332,7 @@ test('Controller Connections lists each supported controller with its status and
     assert.equal(env.controllers.player1.family, 'xbox');
     const after = root.querySelectorAll('.controller-device');
     assert.ok(reads(after[1], 'Assignment Player 1'));
-    assert.ok(reads(after[0], 'Assignment Available'));
+    assert.ok(reads(after[0], 'Assignment Player 2 (local play)'));
     assert.equal(text(root.querySelector('.controller-announcer')), 'Controller 2 now controls Player 1.');
     assert.ok(root.contains(document.activeElement), 'focus stays in the dialog');
     // Only Player 1's controller navigates: the other one's buttons do nothing.
@@ -477,7 +477,12 @@ test('the cursor hides for the keyboard, the mouse and play, and follows the D-p
     assert.equal(cursor.visible, true);
     env.pads[0].axes = [0, 0, 0, 0];
     // The D-pad moves focus, and the cursor glides after it.
-    Object.values(env.home.actions).forEach((b, i) => { b.rect = { left: 80, top: 300 + i * 60, width: 320, height: 44 }; });
+    // As the page lays them out: Play and Local play side by side, the
+    // rest one a row.
+    const { play, local, watch, practice, discover } = env.home.actions;
+    play.rect = { left: 80, top: 300, width: 156, height: 44 };
+    local.rect = { left: 244, top: 300, width: 156, height: 44 };
+    [watch, practice, discover].forEach((b, i) => { b.rect = { left: 80, top: 360 + i * 60, width: 320, height: 44 }; });
     env.home.actions.play.focus();
     setButton(env.pads[0], 'dpadDown', true);
     env.poll();

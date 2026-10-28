@@ -180,3 +180,40 @@ html.is-touch .hint-bar { display: none; }
   border-radius: var(--radius-menu);
 }
 
+/* ---------------------------------------------------------------------
+   Local Play's players (js/ui/local-play.js): Player 1 red, Player 2 blue
+   --------------------------------------------------------------------- */
+
+/* Each player's tone, wash and edge, on anything marked with the player
+   (data-player, or a --p1 / --p2 modifier): read by the rules below. */
+[data-player="p1"], .player-chip--p1 { --player: var(--player-1); --player-wash: var(--player-1-wash); --player-edge: var(--player-1-edge); }
+[data-player="p2"], .player-chip--p2 { --player: var(--player-2); --player-wash: var(--player-2-wash); --player-edge: var(--player-2-edge); }
+/* A player's badge: its tag in the player's tone on a tinted pill (the tag
+   names the player, so the colour is never alone), its name beside it. */
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 2px 9px 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--player-edge);
+  background: var(--player-wash);
+  white-space: nowrap;
+}
+.player-chip-tag { font-family: var(--font-mono); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; color: var(--player); }
+.player-chip-tag::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--player);
+  vertical-align: 1px;
+}
+.player-chip-name { font-size: 12px; font-weight: 600; color: var(--text); }
+/* A title led by its player's badge (a Local Play setup step). */
+.screen-title-row { display: flex; align-items: center; gap: clamp(8px, 1vw, 12px); min-width: 0; }
+.screen-title-row .player-chip { padding: 4px 11px 4px 10px; }
+.screen-title-row .player-chip-tag { font-size: clamp(12px, 2vh, 14px); }

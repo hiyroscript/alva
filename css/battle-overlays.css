@@ -264,3 +264,30 @@
   .results-table th, .results-table td { padding: 4px 8px; }
 }
 
+/* Local Play's announcement: the winner in their own tone (PLAYER 1 WINS!
+   red, PLAYER 2 WINS! blue), a draw neutral; the toast and the Match
+   Results keep Player 1 red and Player 2 blue. */
+.battle-banner[data-state="wins.p1"] .banner-main { color: var(--player-1); }
+.battle-banner[data-state="wins.p2"] .banner-main { color: var(--player-2); }
+.screen--battle.is-local .match-toast[data-outcome="p1"] .match-toast-panel { border-color: var(--player-1-edge); }
+.screen--battle.is-local .match-toast[data-outcome="p2"] .match-toast-panel { border-color: var(--player-2-edge); }
+.screen--battle.is-local .results-team--p1 { --player: var(--player-1); --player-wash: var(--player-1-wash); --player-edge: var(--player-1-edge); }
+.screen--battle.is-local .results-team--p2 { --player: var(--player-2); --player-wash: var(--player-2-wash); --player-edge: var(--player-2-edge); }
+.screen--battle.is-local .results-team { border-color: var(--player-edge); }
+.screen--battle.is-local .results-team.is-winner { background: var(--player-wash); border-color: var(--player); }
+.screen--battle.is-local .results-team-name, .screen--battle.is-local .results-team-tag { color: var(--player); }
+.screen--battle.is-local .results-col--p1.is-winner { background: var(--player-1-wash); }
+.screen--battle.is-local .results-col--p2.is-winner { background: var(--player-2-wash); }
+.screen--battle.is-local thead .results-col--p1 { color: var(--player-1); }
+.screen--battle.is-local thead .results-col--p2 { color: var(--player-2); }
+
+/* Local Play's lost controller, in the pause panel's place: whose went (in
+   amber), how to bring it back, any other controller that could take its
+   place, then Resume (open once both are back), Reconnect and Return to
+   home. */
+.connection-view[hidden], .pause-view[hidden] { display: none; }
+.connection-message { margin: 0; font-weight: 700; font-size: clamp(14px, 2.4vh, 17px); color: var(--text-strong); }
+.connection-view.is-lost .connection-message { color: #ffb15c; }
+.connection-hint { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+.connection-hint[hidden], .connection-spares[hidden] { display: none; }
+.connection-spares { display: grid; gap: 6px; }

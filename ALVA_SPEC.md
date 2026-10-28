@@ -322,9 +322,11 @@ Splash → Home → Select Mode → Quick Battle → Regular Play → Select Dif
 Splash → Home → Select Mode → Quick Battle → Custom Play → Select Difficulty → Select Fighter → Select CPU → Select Stage → Battle
 Select Mode → Quick Battle → play-type dialog → Esc / Back / close → Select Mode (nothing chosen)
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
+Home → Local play (two controllers) → Select local mode → Quick Battle → Player 1's fighter → Player 2's fighter → Select Stage → two-player Battle (6.5b)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
 Home → Discover (Fighters / Movement / Launch reference, opening on Fighters; Back returns Home)
-Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
+Home (no playable fighter) → Play, Local play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
+Home (fewer than two supported controllers) → Local play disabled, "Connect two controllers to play locally."
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed); Settings (gear) and X (resume) at its top right
@@ -343,7 +345,10 @@ Match Results → Change Stage → Select Stage (Custom Play's own; after Regula
 A Watch Mode battle follows the same Battle lines (pause, points, 5:00,
 overtime and its closing Void, the announcement, the celebration, the
 toast, the Match Results, a draw); its Change Fighters returns to Watch
-Mode's Select CPU 1 and its Change Stage to Watch Mode's Select Stage.
+Mode's Select CPU 1 and its Change Stage to Watch Mode's Select Stage. So
+does a Local Play battle, its announcement naming the winner (PLAYER 1
+WINS!, PLAYER 2 WINS!, DRAW), its Change Fighters returning to Player 1's
+fighter and its Change Stage to Local Play's Select Stage (6.5b).
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
@@ -389,8 +394,14 @@ no header, build label, eyebrow or keyboard hint bar.
   supporting line "Fan project. Big heart." ("Un projet de fan, fait avec
   cœur." in French). The wordmark's first visible stroke lines up with the
   start of that line.
-- **Actions:** exactly four, in this order — **Play** (green, white text,
-  arrow) opens Select Mode and is focused by default; **Watch Mode**
+- **Actions:** five on four rows, in this order — **Play** (green, white
+  text, arrow) opens Select Mode and is focused by default; **Local play**
+  (outlined, chevron) beside it on the same first row, the two in equal
+  columns that together span exactly the full-width actions under them
+  (the gap between them the gap between rows), opens Select local mode
+  (6.5b), and opens only while two supported controllers are active (see
+  6.5b: disabled otherwise, "Connect two controllers to play locally.",
+  and the Download button's green edge and glow once open); **Watch Mode**
   (outlined, chevron) beneath it opens Watch Mode's Select Difficulty (6.5a)
   directly, never Select Mode; **Practice Ground** (outlined, chevron)
   beneath that opens Practice Ground (6.8) straight away, with no mode,
@@ -398,7 +409,7 @@ no header, build label, eyebrow or keyboard hint bar.
   Practice Ground) last opens the Discover reference (6.9). All four are in
   keyboard / gamepad menu navigation, in that order, which the DOM order
   matches whatever the layout. Home buttons have a small 3 px radius.
-- **No playable fighter:** Play, Watch Mode and Practice Ground each start a
+- **No playable fighter:** Play, Local play, Watch Mode and Practice Ground each start a
   match, so they are open only while some fighter is playable (7.2; #0001
   is, today). With none, they are disabled (quieter outline, muted label, no hover
   or press response), out of Tab and menu navigation, and a press goes
@@ -790,6 +801,92 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   (CPU 1) and **Team II** (CPU 2) wherever the result names them ("Team II
   wins!"); the pause dialog's kicker is "Watch Mode"; the canvas is
   labelled "Watch mode battle: CPU 1, #0001, against CPU 2, #0001".
+
+### 6.5b Local Play
+
+Two people on one device, each on their own game controller
+(`js/screens/local-play-screens.js`): Home → Local play → Select local mode
+→ Quick Battle → Player 1's fighter → Player 2's fighter → Select Stage →
+Battle. A real two-player battle: no CPU anywhere.
+
+- **Home's Local play.** Always shown, beside a half-width Play (6.2). It
+  opens only while the Gamepad API works, a fighter is playable and two
+  distinct supported controllers are active (an unsupported device never
+  counts; two of the same model are two; more may be connected, and the
+  four-controller limit and its warning stay). Open, it keeps the outlined
+  look (no green fill) with a green edge that always shows and the Download
+  button's soft green glow pulsing round it on the same cadence (still with
+  reduced motion); closed, the disabled look, described as "Connect two
+  controllers to play locally." ("Connectez deux manettes pour jouer en
+  local.") for assistive technology and as its tooltip. It follows every
+  controller connected or lost at once, and a press checks again.
+- **The session.** Pressing it starts Local Play: Player 1 keeps their
+  controller (the one chosen in Controller Connections, if any), Player 2
+  gets the first other active one, and each keeps theirs until Home. A
+  controller connected meanwhile never takes either seat; a lost one leaves
+  its player's seat empty until it comes back (the same controller), or
+  until the players explicitly give the seat to another one. Controller
+  Connections names the controller Player 2 would play with ("Player 2
+  (local play)").
+- **Select local mode** (`local-mode`). Select Mode's own design (6.3):
+  kicker "Local play", title "Select local mode", the mode card in its rail
+  and Mode details beside it, Quick Battle the one mode (more may join the
+  rail), no play type and no difficulty. Mode details describes Local
+  Quick Battle ("Face another player in a local battle using two
+  controllers…") and its rules, and names each player's controller. The
+  header shows the three Local Play steps, none reached yet. Back goes
+  Home; choosing the mode checks both controllers again.
+- **The setup.** Three steps (Player 1 fighter · Player 2 fighter · Stage,
+  "Local quick battle setup"), each Quick Battle's own screen for Local
+  Play: **Player 1 — select fighter** (`local-character-p1`) and **Player 2
+  — select fighter** (`local-character-p2`), each its own instance of the
+  shared roster (6.4: the 48 slots, the animated preview, locked slots), and
+  the stage (`local-map`, 6.5: the 24 slots, Random Stage only when chosen,
+  "Confirm and start battle"). Choices live in `app.selection.local`
+  (`p1CharacterId`, `p2CharacterId`, `mapId`), apart from Quick Battle's
+  and Watch Mode's; both players may pick the same fighter. Each step
+  belongs to one player's controller: Player 1's for its fighter and the
+  stage, Player 2's for theirs. Only that controller moves, chooses,
+  confirms and goes Back there; the keyboard, the pointer and the other
+  controller never choose (Back stays open to them). A line above Confirm
+  says whose turn it is ("Player 2: use your controller to choose."). While
+  either controller is lost the step waits (nothing chosen or started, the
+  choices kept, the line saying which to reconnect) and goes on once it is
+  back. Back retraces the steps to Select local mode, each choice kept.
+- **Player identity.** Player 1 is **red** (`--player-1`, #ff4d5e) and
+  Player 2 **blue** (`--player-2`, #3d9bff), never by colour alone (each
+  indicator carries P1 / P2 — J1 / J2 in French — or the player's name):
+  each step's badge, current step and selected slot, the preview's badge
+  and edge, the HUD cards (their tags, outer edge and score dots), the
+  ground rings, name tags and off-screen pointers over the fighters (by
+  player, wherever they stand), the move HUDs, the announcement, the toast
+  and the Match Results.
+- **The battle** (`mode: 'local'`). The real `Battle` (7.2) with a
+  `PlayerController` on each side, each fed by that player's controller
+  alone, through their own fighter's controller layout (7.4a), with the
+  Automatic turn-around setting for both: every rule, clock, overtime,
+  statistic and celebration unchanged. Controllers only: the keyboard and
+  the touch controls play neither fighter (none show). Both players' move
+  HUDs show (7.3), Player 1's bottom left and Player 2's bottom right, each
+  tagged, following its own fighter and showing its own controller's
+  buttons (PlayStation and Xbox at once), on a touch screen too; both hide
+  under the pause menu and the Match Results. Either controller's Options /
+  Menu pauses (once, however many press it), and either drives the pause
+  menu ("Local quick battle") and the Match Results.
+- **A lost controller.** Mid-match it pauses the whole match at once (the
+  clock and both fighters stop): the pause panel says whose went ("Player 2
+  controller disconnected."), with Reconnect, Return to home, any other
+  connected controller to use in its place, and Resume, which opens (and
+  takes focus) once both are back. Nobody becomes a CPU, and a button held
+  as a controller comes back is no press.
+- **The end.** Neutral between two players: PLAYER 1 WINS! in red, PLAYER
+  2 WINS! in blue, or DRAW; the toast "Player 2 wins!"; the Match Results
+  name Player 1 and Player 2 ("PLAYER 2 — WINNER") with both fighters,
+  scores, Launch Points, statistics, the match's length and overtime.
+  Rematch keeps both fighters, the stage and both controllers; Change
+  fighters returns to Player 1's fighter, then Player 2's and the stage;
+  Change stage to Local Play's Select Stage; Return to home ends Local
+  Play.
 
 ### 6.6 Credits
 

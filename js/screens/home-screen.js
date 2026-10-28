@@ -6,9 +6,19 @@
 // a check (one to four), red with a cross (none), orange with an
 // exclamation mark (more than four), kept up to date as they change.
 //
-// Play, Watch Mode and Practice Ground each start a match, so they are
-// open only while a fighter is playable: with none, they are disabled and
-// described by a "No fighters available" note under the menu. Discover,
+// Play and Local play share the menu's first row, half its width each:
+// Play (green) opens Select Mode, Local play Select local mode
+// (js/screens/local-play-screens.js) for two players on two controllers.
+// Local play always shows; it opens only while two supported controllers
+// are active (js/core/controller-manager.js localReady) and a fighter is
+// playable, and then wears the Download button's green edge and glow.
+// Otherwise it is disabled, with a localized reason (its description, and
+// its tooltip), and follows every controller connected or lost at once.
+// Coming back Home ends a Local Play session (App.endLocalPlay).
+//
+// Play, Local play, Watch Mode and Practice Ground each start a match, so
+// they are open only while a fighter is playable: with none, they are
+// disabled and described by a "No fighters available" note under the menu. Discover,
 // Settings, Why Alva?, Download and the credits stay open whatever the
 // roster holds. Download (the footer's bottom-right button) opens the
 // install dialog over Home (js/ui/install-dialog.js): how to add Alva to
@@ -28,13 +38,19 @@ import { CREDITS, creditLabel, creditLink } from '../ui/credits.js';
 import { playableCharacters } from '../data/characters.js';
 
 // The Home actions that start a match, and so need a playable fighter, and
-// the id of the note that says why they are closed.
+// the id of the note that says why they are closed. Local play needs two
+// controllers as well (see localPlayOpen).
 export const MATCH_ACTIONS = Object.freeze(['play', 'watch', 'practice']);
 const NO_FIGHTERS_NOTE = 'home-no-fighters';
+const LOCAL_NOTE = 'home-local-note';
 
 // Whether any fighter can be played: the one check behind every match
 // action.
 export const hasPlayableFighters = () => playableCharacters().length > 0;
+
+// Whether Local play can start now: a playable fighter and two active
+// supported controllers on a working Gamepad API.
+export const localPlayOpen = (controllers) => hasPlayableFighters() && !!controllers?.localReady;
 
 const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
@@ -73,6 +89,11 @@ export class HomeScreen extends Screen {
       class: 'home-action home-action--primary', type: 'button', 'data-nav': true, 'data-nav-default': true,
       'data-home-action': 'play', ...iconLabel('home.play', ICONS.arrow),
     });
+    // Local play: a secondary action beside Play, the same size.
+    const local = el('button', {
+      class: 'home-action home-action--local', type: 'button', 'data-nav': true,
+      'data-home-action': 'local', ...iconLabel('home.local', ICONS.right),
+    });
     // The secondary actions, outlined with a chevron. Watch Mode (CPU vs
     // CPU) opens its own setup, never Select Mode; Practice Ground goes
     // straight into the training room (no mode, fighter or stage select);
@@ -90,15 +111,28 @@ export class HomeScreen extends Screen {
       if (hasPlayableFighters()) app.screens.go(id);
     };
     play.addEventListener('click', startMatch('mode'));
+    // Checked again as it is pressed: a controller may have gone since the
+    // button was last drawn.
+    local.addEventListener('click', () => {
+      app.controllers?.refresh?.();
+      if (localPlayOpen(app.controllers) && app.startLocalPlay?.()) app.screens.go('local-mode');
+      else this.syncLocalAction();
+    });
     watch.addEventListener('click', startMatch('watch-difficulty'));
     practice.addEventListener('click', startMatch('practice'));
     discover.addEventListener('click', () => app.screens.go('discover'));
     // By name, in menu order.
-    this.actions = { play, watch, practice, discover };
+    this.actions = { play, local, watch, practice, discover };
     // Shown, and describing the match actions, only while none can start.
     this.noFightersNote = el('p', {
       class: 'home-note', id: NO_FIGHTERS_NOTE, role: 'status', hidden: true, ...tx('common.noFighters'),
     });
+    // Why Local play is closed while fighters are not the reason: read out
+    // with the button, and its tooltip (on its cell, which a disabled
+    // button lets the pointer reach).
+    this.localNote = el('span', { class: 'home-sr', id: LOCAL_NOTE, ...tx('home.localNeedsControllers') });
+    this.localCell = el('span', { class: 'home-action-cell' }, [local, this.localNote]);
+    this.firstRow = el('div', { class: 'home-actions-row' }, [play, this.localCell]);
 
     // Settings: Home chrome, not a menu action. The gear in the top right
     // corner opens the Settings dialog over Home (js/ui/settings-dialog.js)
@@ -123,7 +157,10 @@ export class HomeScreen extends Screen {
       this.controllerStatus,
     ]);
     this.controllerButton.addEventListener('click', () => app.controllerDialog?.open({ opener: this.controllerButton }));
-    app.controllers?.onChange(() => this.syncControllerStatus());
+    app.controllers?.onChange(() => {
+      this.syncControllerStatus();
+      this.syncLocalAction();
+    });
     // Help shares the information dialog's reading region and navigation,
     // returning focus here even when a touch does not focus the button.
     this.helpButton = el('button', {
@@ -237,7 +274,7 @@ export class HomeScreen extends Screen {
         el('div', { class: 'home-intro' }, [
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
           el('p', { class: 'home-lede', ...tx('home.lede') }),
-          el('nav', { class: 'home-actions', ...tattr('aria-label', 'home.menu') }, Object.values(this.actions)),
+          el('nav', { class: 'home-actions', ...tattr('aria-label', 'home.menu') }, [this.firstRow, watch, practice, discover]),
           this.noFightersNote,
         ]),
       ]),
@@ -286,6 +323,26 @@ export class HomeScreen extends Screen {
     }
     this.noFightersNote.hidden = open;
     this.el.querySelector('.home-intro')?.classList.toggle('has-note', !open);
+    this.syncLocalAction();
+  }
+
+  // Local play: open (and glowing green) while it can start, else
+  // disabled, described by why: no fighter (the note under the menu), or
+  // not two controllers (its own description and tooltip).
+  syncLocalAction() {
+    const button = this.actions.local;
+    const open = localPlayOpen(this.app.controllers);
+    button.disabled = !open;
+    button.classList.toggle('is-ready', open);
+    this.localCell.classList.toggle('is-disabled', !open);
+    if (open) {
+      button.removeAttribute('aria-describedby');
+      this.localCell.removeAttribute('title');
+      this.localCell.removeAttribute('data-i18n-title');
+    } else {
+      button.setAttribute('aria-describedby', hasPlayableFighters() ? LOCAL_NOTE : NO_FIGHTERS_NOTE);
+      setAttr(this.localCell, 'title', hasPlayableFighters() ? 'home.localNeedsControllers' : 'common.noFighters');
+    }
   }
 
   // The first action that is open (Play whenever a fighter is playable),
@@ -305,6 +362,8 @@ export class HomeScreen extends Screen {
 
   enter() {
     this.lastInteraction = -Infinity;
+    // Home ends Local Play: each controller is free again.
+    this.app.endLocalPlay?.();
     this.syncMatchActions();
     this.syncControllerStatus();
     this.syncInstallState();

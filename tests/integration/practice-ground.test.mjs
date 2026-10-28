@@ -345,18 +345,18 @@ function practiceSession({ cpu = true, def = DEF_0001 } = {}) {
 
 // ---- Home ---------------------------------------------------------------------
 
-test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground and Discover open directly; Settings is the gear, not an action', () => {
+test('Home: Play and Local play, Watch Mode, Practice Ground, then Discover; Practice Ground and Discover open directly; Settings is the gear, not an action', () => {
   const { app } = fakeApp();
   const opened = [];
   app.settingsDialog = { open: (opts) => opened.push(opts) };
   const home = new HomeScreen(app);
-  const { play, watch, practice, discover } = home.actions;
-  assert.deepEqual(Object.keys(home.actions), ['play', 'watch', 'practice', 'discover'], 'exactly four menu actions');
+  const { play, local, watch, practice, discover } = home.actions;
+  assert.deepEqual(Object.keys(home.actions), ['play', 'local', 'watch', 'practice', 'discover'], 'five menu actions on four rows');
   assert.ok(play.html.includes('<span>Play</span>'));
   assert.ok(watch.html.includes('<span>Watch mode</span>'));
   assert.ok(practice.html.includes('<span>Practice ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Watch Mode under Play, Discover last');
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, local, watch, practice, discover], 'Local play beside Play, Watch Mode under them, Discover last');
   // Discover matches Practice Ground: the same outlined action and chevron.
   for (const action of [practice, discover]) {
     assert.ok(action.html.includes(ICONS.right), 'keeps the Home chevron');
@@ -365,8 +365,10 @@ test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground an
     assert.equal(action.hasAttribute('data-nav'), true);
   }
   assert.ok(!home.el.querySelectorAll('.home-action').some((b) => /Help|Settings/.test(b.html)), 'no Help or Settings action');
+  // No controller here: Local play is closed, out of the navigation.
+  assert.equal(local.disabled, true);
   assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.helpButton, home.controllerButton, home.settingsButton, home.el.querySelector('.home-why-alva'), home.downloadButton],
-    'keyboard / gamepad reach the actions in order, then Help, Controller, Settings, Why Alva? and Download');
+    'keyboard / gamepad reach the open actions in order, then Help, Controller, Settings, Why Alva? and Download');
   const actions = home.el.querySelector('.home-actions').children;
   assert.equal(actions.indexOf(discover), actions.indexOf(practice) + 1, 'Discover sits directly under Practice Ground');
   assert.equal(actions.includes(home.settingsButton), false, 'the gear is not in the menu');

@@ -10,7 +10,9 @@
      whatever the number of moves (--ah-count, the longer row's). */
   --ah-count: 5;
   --ah-gap: clamp(4px, 0.42vw, 7px);
-  --ah-tile: min(clamp(48px, 4.1vw, 62px), calc(44vw / var(--ah-count) - var(--ah-gap)));
+  /* The widest the HUD may grow (Local Play's two each take less). */
+  --ah-span: 44vw;
+  --ah-tile: min(clamp(48px, 4.1vw, 62px), calc(var(--ah-span) / var(--ah-count) - var(--ah-gap)));
   --ah-art-h: calc(var(--ah-tile) * 0.8);
   --ah-input-h: clamp(19px, calc(var(--ah-tile) * 0.4), 23px);
   --ah-h: calc(var(--ah-art-h) + 1px + var(--ah-input-h) + 2px);
@@ -221,8 +223,27 @@ html.is-touch .ability-hud { display: none; }
   from { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.28); }
 }
 
+/* Local Play: both players' HUDs at once, Player 1's in the bottom-left
+   corner and Player 2's in the bottom-right, each a little narrower (never
+   meeting in the middle, whatever either fighter's move count) and tagged
+   with its player. On a touch screen too: Local Play has no touch controls,
+   so the HUDs are its players' guide there as well. */
+.screen--battle.is-local .ability-hud { --ah-span: 36vw; }
+.screen--battle.is-local .ability-hud--p1 {
+  left: max(var(--safe-l), clamp(10px, 1.4vw, 20px));
+  right: auto;
+}
+.screen--battle.is-local .ability-hud--p1 .ah-wheel { perspective-origin: 0% 40%; }
+.screen--battle.is-local .ability-hud--p1 .ah-row { left: 0; right: auto; transform-origin: 0 0; }
+html.is-touch .screen--battle.is-local .ability-hud:not([hidden]) { display: block; }
+/* The player's tag, over its HUD's outer corner. */
+.ah-player { position: absolute; bottom: calc(100% + 6px); right: 0; background: rgba(10, 11, 12, 0.72); }
+.ability-hud--p1 .ah-player { left: 0; right: auto; }
+.ability-hud[data-player] .ah-row.is-current .ah-tile { border-color: var(--player-edge); }
+
 @media (max-height: 420px) {
-  .ability-hud { --ah-tile: min(clamp(40px, 3.4vw, 50px), calc(40vw / var(--ah-count) - var(--ah-gap))); --ah-gap-y: 4px; }
+  .ability-hud { --ah-span: 40vw; --ah-tile: min(clamp(40px, 3.4vw, 50px), calc(var(--ah-span) / var(--ah-count) - var(--ah-gap))); --ah-gap-y: 4px; }
+  .screen--battle.is-local .ability-hud { --ah-span: 33vw; }
 }
 
 /* Reduced motion: the rows swap at once, and nothing flashes. */

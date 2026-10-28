@@ -359,9 +359,11 @@ function trace(battle, steps) {
 test('Home: Watch Mode sits between Play and Practice Ground, styled like the secondary actions; Play stays the default', () => {
   const { app, screens } = boot();
   const home = screens.home;
-  const { play, watch, practice, discover } = home.actions;
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Play → Watch Mode → Practice Ground → Discover');
-  assert.deepEqual(home.el.querySelector('.home-actions').children, [play, watch, practice, discover], 'in the DOM in that order');
+  const { play, local, watch, practice, discover } = home.actions;
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, local, watch, practice, discover], 'Play and Local play → Watch Mode → Practice Ground → Discover');
+  const [firstRow, ...rows] = home.el.querySelector('.home-actions').children;
+  assert.deepEqual(rows, [watch, practice, discover], 'in the DOM in that order, under the first row');
+  assert.ok(firstRow.contains(play) && firstRow.contains(local), 'Play and Local play share the first row');
   assert.ok(watch.html.includes('<span>Watch mode</span>'));
   assert.ok(watch.html.includes(ICONS.right), 'the secondary actions\' chevron');
   assert.equal(watch.className, practice.className, 'the same outlined Home action as Practice Ground and Discover');
@@ -717,7 +719,7 @@ test('stale Watch values fall back as Quick Battle\'s do: Medium, the first avai
 // ---- The Battle -------------------------------------------------------------------
 
 test('a Watch Mode Battle: the combat AI on both sides at the chosen level, each with its own fighter and label', () => {
-  assert.deepEqual(Object.keys(BATTLE_MODES), ['quick-battle', 'watch']);
+  assert.deepEqual(Object.keys(BATTLE_MODES), ['quick-battle', 'watch', 'local']);
   for (const id of DIFFICULTY_IDS) {
     const battle = makeBattle({ difficulty: id, p1Def: DEF_9999, p2Def: DEF_0001 });
     assert.equal(battle.mode, 'watch');

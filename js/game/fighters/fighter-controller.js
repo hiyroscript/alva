@@ -80,6 +80,9 @@ export function jumpFor(self, rise, gravity = CONFIG.sim.gravity) {
 // Each sample is taken for the fighter as it is at that step (on the ground
 // or not, its facing, which fighter it is), so a game controller resolves
 // through that fighter's own controller profile (js/core/input-manager.js).
+// `input` is the InputManager (Player 1: keyboard, touch and its
+// controller), or in Local Play one player's own controller channel
+// (InputManager.player(slot)): the same contract, sample() and flush().
 export class PlayerController {
   constructor(input, { automaticTurnAround = true } = {}) {
     this.input = input;
@@ -90,6 +93,11 @@ export class PlayerController {
   getInput(self) {
     if (!self) return this.input.sample();
     return this.input.sample({ grounded: !!self.body?.grounded, facing: self.facing, character: self.def ?? null });
+  }
+
+  // Drops this player's buffered presses (its fighter respawning).
+  flush() {
+    this.input.flush?.();
   }
 }
 

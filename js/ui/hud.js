@@ -14,7 +14,9 @@
 // centre whichever way its art was drawn, one thin divider, then its slot
 // tag and name over its Launch Point (a plain number: no bar, maximum or
 // % sign; named for screen readers). The tag is the fighter's own label:
-// P1 and CPU in Quick Battle, CPU 1 and CPU 2 in Watch Mode. Under it, in a
+// P1 and CPU in Quick Battle, CPU 1 and CPU 2 in Watch Mode, P1 and P2 in
+// Local Play (where each card carries its player's colour: the battle
+// screen's is-local, css/battle.css). Under it, in a
 // Battle only, one dot per point the match is played to
 // (CONFIG.battle.pointsToWin), filled for each point the fighter has scored.
 // The right-hand card mirrors the left-hand one. In a Battle each card and
@@ -32,10 +34,12 @@ import { el } from '../core/utils.js';
 import { t, tattr, plural, slotLabel, setAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { paintPortrait, portraitSourceFacing } from './sprite-art.js';
+import { PLAYER_NAMES } from './local-play.js';
 
-// Spoken names of the slot tags, for the score dots' labels: Player 1 in
-// full, the others as shown.
-const spokenSlot = (tag) => (tag === 'P1' ? t('hud.player1') : slotLabel(tag));
+// Spoken names of the slot tags, for the score dots' labels: Player 1 and
+// Player 2 in full, the others as shown.
+const SPOKEN = Object.freeze({ P1: 'hud.player1', P2: 'hud.player2' });
+const spokenSlot = (tag) => (SPOKEN[tag] ? t(SPOKEN[tag]) : slotLabel(tag));
 
 // The Launch Point on show: whole numbers, with no % sign.
 export function formatLaunchPoint(value) {
@@ -154,6 +158,14 @@ export class HUD {
     this.shownTime = null;
     this.shownRound = null;
     this.shownOvertime = null;
+  }
+
+  // Local Play names each side for its player (Player 1, Player 2) rather
+  // than its team, for screen readers too.
+  setLocal(on) {
+    for (const [panel, slot] of [[this.left, 'p1'], [this.right, 'p2']]) {
+      setAttr(panel.wrap, 'aria-label', on ? PLAYER_NAMES[slot] : `team.${slot}`);
+    }
   }
 
   // Each card is tagged with its fighter's label (Quick Battle's P1 and CPU

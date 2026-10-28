@@ -22,6 +22,17 @@
 // last one sample; Run never requests a Dash. Nothing a menu did reaches
 // play: every button (and the stick) held as play starts is stale until let
 // go, and a lost controller lets go of everything at once.
+//
+// Local Play (setLocalPlay) adds Player 2: each player's controller has its
+// own channel (ControllerChannel: its own binding resolver, press edges,
+// held buttons, sticks, menu repeat and snapshot), never merged with the
+// other's. In a Local Play battle each fighter samples its own channel
+// (player(slot)), from its controller alone: the keyboard and the touch
+// controls play no fighter there. Menus listen to the controller that owns
+// them (setMenuOwner: Player 1's, Player 2's, or either one's while a
+// shared dialog such as the pause menu is open); their commands say which
+// player sent them. In play, either player's Pause binding asks for the
+// pause menu, once a frame however many press it together.
 
 import { COMBAT_BUTTONS } from '../config.js';
 import { HELD_CONTROLS, blankInput } from '../game/fighters/fighter-controller.js';
@@ -44,6 +55,106 @@ const MENU_BUTTONS = Object.freeze([['south', 'confirm'], ['east', 'back'], ['st
 // actions only.
 const NO_FIGHTER = Object.freeze({ grounded: true, facing: 1, character: null });
 const NO_CHARACTER = Symbol('no character');
+
+// Who may drive the menus with a controller: Player 1, Player 2, or either
+// one (a dialog both players share).
+export const MENU_OWNERS = Object.freeze(['p1', 'p2', 'any']);
+
+// The stick nearer the edge, of two menu cursor sticks.
+const stronger = (a, b) => (!a || Math.hypot(b.x, b.y) > Math.hypot(a.x, a.y) ? b : a);
+
+// One player's controller pipeline: the controller assigned to `slot`
+// ('p1' or 'p2'), its binding resolver, its menu repeat and its own
+// snapshot. Nothing in it is shared with the other player's.
+export class ControllerChannel {
+  constructor(input, slot) {
+    this.input = input;
+    this.slot = slot;
+    this.resolver = new ControllerResolver();
+    // The device it reads, as last assigned; whether one was read on the
+    // last poll; and whether its held buttons go stale on the next one.
+    this.key = input.controllers.playerDevice?.(slot)?.key ?? null;
+    this.active = false;
+    this.reset = false;
+    this.menu = { dir: null, nextRepeat: 0 };
+    const { dropPressed, ...frame } = blankInput();
+    this.frame = frame;
+  }
+
+  // The player's device record, or null.
+  get device() {
+    return this.input.controllers.playerDevice?.(this.slot) ?? null;
+  }
+
+  // The controller is gone (or another took its place): everything let go.
+  release() {
+    this.resolver.release();
+    this.menu.dir = null;
+  }
+
+  // The controller's part of a sample for `context` (see InputManager.
+  // sample), or null outside play.
+  controllerFrame(context) {
+    const input = this.input;
+    if (!input.gameplayActive) return null;
+    const ctx = context ?? NO_FIGHTER;
+    this.resolver.setProfile(input.compiledFor(ctx.character ?? null));
+    return this.resolver.resolve(ctx);
+  }
+
+  // This player's snapshot from its controller alone, for a Local Play
+  // fighter: no keyboard, no touch (see InputManager.sample for the
+  // fields).
+  sample(context = NO_FIGHTER) {
+    const f = this.frame;
+    const pad = this.controllerFrame(context);
+    for (const control of HELD_CONTROLS) {
+      f[control] = !!pad?.held[control];
+      f[`${control}Pressed`] = !!pad?.pressed[control];
+    }
+    f.mouvementLeftPressed = pad?.dash === -1;
+    f.mouvementRightPressed = pad?.dash === 1;
+    const place = pad?.place ?? null;
+    f.pressedOnGround = place === 'ground';
+    f.pressedInAir = place === 'air';
+    return f;
+  }
+
+  // Drops this player's presses not resolved yet (see
+  // ControllerResolver.flush).
+  flush() {
+    this.resolver.flush();
+  }
+
+  // The menu commands this poll's `state` gives, in order: the D-pad's
+  // direction (once, then repeating while held), then Cross / A, Circle /
+  // B and Options / Menu as pressed.
+  menuCommands(state, now) {
+    const commands = [];
+    let dir = null;
+    for (const [button, name] of MENU_DIRECTIONS) {
+      if (state.held.has(button)) {
+        dir = name;
+        break;
+      }
+    }
+    const ms = this.menu;
+    if (dir !== ms.dir) {
+      ms.dir = dir;
+      if (dir) {
+        ms.nextRepeat = now + MENU_REPEAT_DELAY;
+        commands.push(dir);
+      }
+    } else if (dir && now >= ms.nextRepeat) {
+      ms.nextRepeat = now + MENU_REPEAT;
+      commands.push(dir);
+    }
+    for (const [button, command] of MENU_BUTTONS) {
+      if (state.pressed.includes(button)) commands.push(command);
+    }
+    return commands;
+  }
+}
 
 export class InputManager {
   // `controllers`: the connection manager (one of its own by default).
@@ -73,26 +184,29 @@ export class InputManager {
     this.padMenuListener = null;
     this.padCursorListener = null;
     this.captureListener = null;
-    this.padMenuState = { dir: null, nextRepeat: 0 };
+    // Whether the menu cursor was last given a stick (see pollGamepads).
+    this.cursorLive = false;
 
-    // Player 1's controller and its resolver.
+    // Each player's controller channel (Player 2's read only in Local
+    // Play), and Player 1's resolver under its old name.
     this.controllers = controllers ?? new ControllerManager();
-    this.resolver = new ControllerResolver();
     this.profileFor = profileFor ?? ((def) => resolveProfile(def));
     this.profiles = new Map();
-    this.padActive = false;
-    this.padReset = false;
+    this.channels = { p1: new ControllerChannel(this, 'p1'), p2: new ControllerChannel(this, 'p2') };
+    this.resolver = this.channels.p1.resolver;
+    this.localPlay = false;
+    this.menuOwner = 'p1';
     this.lastPoll = null;
-    this.player1Key = this.controllers.player1?.key ?? null;
     this.controllers.onChange(() => {
-      const key = this.controllers.player1?.key ?? null;
-      if (key === this.player1Key) return;
-      // Player 1's controller changed (or was lost): let go of everything
-      // the old one held; the new one's held buttons are stale.
-      this.player1Key = key;
-      this.resolver.release();
-      this.padMenuState.dir = null;
-      this.padReset = true;
+      for (const channel of Object.values(this.channels)) {
+        const key = channel.device?.key ?? null;
+        if (key === channel.key) continue;
+        // A player's controller changed (or was lost): let go of everything
+        // the old one held; the new one's held buttons are stale.
+        channel.key = key;
+        channel.release();
+        channel.reset = true;
+      }
     });
 
     // Reused per-step snapshot to avoid allocations in the sim loop: every
@@ -122,9 +236,10 @@ export class InputManager {
     return () => this.keyListeners.delete(listener);
   }
 
-  // The controller's menu commands: 'up' / 'down' / 'left' / 'right'
-  // (D-pad), 'confirm', 'back' and 'start'; in play, 'start' from the
-  // Pause binding.
+  // The controller's menu commands: listener(command, slot), the command
+  // 'up' / 'down' / 'left' / 'right' (D-pad), 'confirm', 'back' or 'start'
+  // (in play, 'start' from the Pause binding), `slot` the player whose
+  // controller sent it ('p1' or 'p2').
   onPadMenu(listener) {
     this.padMenuListener = listener;
   }
@@ -149,7 +264,45 @@ export class InputManager {
     this.gameplayActive = active;
     this.clear();
     // Play has no cursor.
-    if (active) this.padCursorListener?.(null, 0);
+    if (active) {
+      this.padCursorListener?.(null, 0);
+      this.cursorLive = false;
+    }
+  }
+
+  // Local Play on or off: Player 2's controller read as well (its channel
+  // starting from nothing held), or no longer.
+  setLocalPlay(on) {
+    const next = !!on;
+    if (next === this.localPlay) return;
+    this.localPlay = next;
+    const p2 = this.channels.p2;
+    p2.release();
+    p2.reset = true;
+    p2.active = false;
+    if (!next) this.setMenuOwner('p1');
+  }
+
+  // Whose controller drives the menus (MENU_OWNERS; anything else is
+  // Player 1's): the other's commands and cursor stick are ignored, its
+  // held buttons still followed.
+  setMenuOwner(owner) {
+    const next = MENU_OWNERS.includes(owner) ? owner : 'p1';
+    if (next === this.menuOwner) return;
+    this.menuOwner = next;
+    for (const channel of Object.values(this.channels)) channel.menu.dir = null;
+  }
+
+  // `slot`'s controller channel ('p1' or 'p2'): what a Local Play fighter
+  // samples (ControllerChannel.sample).
+  player(slot) {
+    return this.channels[slot] ?? null;
+  }
+
+  // The players whose controllers are read now: Player 1's, and in Local
+  // Play Player 2's.
+  get padSlots() {
+    return this.localPlay ? ['p1', 'p2'] : ['p1'];
   }
 
   // The player's controller profiles changed: re-read them on the next
@@ -231,15 +384,16 @@ export class InputManager {
   }
 
   // Drop buffered presses (e.g. after closing a menu with the same key):
-  // the keyboard's and touch's, and the controller's unresolved ones.
+  // the keyboard's and touch's, and every controller's unresolved ones.
   flush() {
     for (const st of Object.values(this.state)) st.presses = 0;
     this.touchMouvement = 0;
-    this.resolver.flush();
+    for (const channel of Object.values(this.channels)) channel.flush();
   }
 
   // Lets go of every key and touch control, and makes every controller
-  // button held now stale (see ControllerResolver.reset).
+  // button held now stale, on every player's controller (see
+  // ControllerResolver.reset).
   clear() {
     this.keys.clear();
     this.touch.clear();
@@ -248,21 +402,20 @@ export class InputManager {
       st.presses = 0;
     }
     this.touchMouvement = 0;
-    this.resolver.reset();
+    for (const channel of Object.values(this.channels)) channel.resolver.reset();
   }
 
-  // Focus lost or page hidden: everything let go, the controller included,
-  // until the page has it back.
+  // Focus lost or page hidden: everything let go, every controller
+  // included, until the page has it back.
   suspend() {
     this.clear();
     this.controllers.suspend();
-    this.resolver.release();
-    this.padMenuState.dir = null;
+    for (const channel of Object.values(this.channels)) channel.release();
   }
 
   resumeDevices() {
     this.controllers.resume();
-    this.padReset = true;
+    for (const channel of Object.values(this.channels)) channel.reset = true;
   }
 
   // The compiled controller profile for fighter `def` (null: universal
@@ -307,83 +460,95 @@ export class InputManager {
     return f;
   }
 
-  // The controller's part of a sample, or null when it has none (not in
-  // play, or no controller).
+  // Player 1's controller's part of a sample, or null when it has none
+  // (not in play, or no controller).
   controllerFrame(context) {
-    if (!this.gameplayActive) return null;
-    const ctx = context ?? NO_FIGHTER;
-    this.resolver.setProfile(this.compiledFor(ctx.character ?? null));
-    return this.resolver.resolve(ctx);
+    return this.channels.p1.controllerFrame(context);
   }
 
   // Called once per animation frame (`now` in milliseconds): reads Player
-  // 1's controller and hands it to play, the menus or a binding capture.
+  // 1's controller (and in Local Play Player 2's) and hands it to play,
+  // the menus or a binding capture (Player 1's alone).
   pollGamepads(now) {
     const dt = this.lastPoll === null ? 0 : Math.max(0, Math.min(0.1, (now - this.lastPoll) / 1000));
     this.lastPoll = now;
-    const state = this.controllers.poll();
-    if (!state) {
-      if (this.padActive) {
-        this.padActive = false;
-        this.resolver.release();
-        this.padMenuState.dir = null;
-        this.padCursorListener?.(null, dt);
+    const slots = this.padSlots;
+    const states = this.controllers.pollPlayers ? this.controllers.pollPlayers({ p2: this.localPlay }) : { p1: this.controllers.poll() };
+    const live = [];
+    for (const slot of slots) {
+      const channel = this.channels[slot];
+      const state = states[slot] ?? null;
+      if (!state) {
+        if (channel.active) {
+          channel.active = false;
+          channel.release();
+        }
+        continue;
       }
-      return;
+      channel.active = true;
+      live.push([channel, state]);
+      if (state.pressed.length || state.axes.some((a) => Math.abs(a) > 0.5)) this.lastDevice = 'gamepad';
     }
-    this.padActive = true;
-    if (state.pressed.length || state.axes.some((a) => Math.abs(a) > 0.5)) this.lastDevice = 'gamepad';
     const seconds = now / 1000;
     if (this.captureListener) {
-      this.resolver.record({ held: state.held, pressed: [], axes: state.axes }, seconds, { gameplay: false });
-      this.padMenuState.dir = null;
-      this.captureListener(state);
+      for (const [channel, state] of live) {
+        channel.resolver.record({ held: state.held, pressed: [], axes: state.axes }, seconds, { gameplay: false });
+        channel.menu.dir = null;
+      }
+      const p1 = live.find(([channel]) => channel.slot === 'p1');
+      if (p1) this.captureListener(p1[1]);
+      else this.loseCursor(dt);
       return;
     }
     if (this.gameplayActive) {
-      const { pause } = this.resolver.record(state, seconds, { gameplay: true });
-      if (this.padReset) {
-        this.padReset = false;
-        this.resolver.reset();
+      // Either player's Pause: one 'start' a frame, so two pressed together
+      // never open and close the pause menu at once.
+      let pausedBy = null;
+      for (const [channel, state] of live) {
+        const { pause } = channel.resolver.record(state, seconds, { gameplay: true });
+        if (channel.reset) {
+          channel.reset = false;
+          channel.resolver.reset();
+        }
+        channel.menu.dir = null;
+        if (pause && !pausedBy) pausedBy = channel.slot;
       }
-      this.padMenuState.dir = null;
-      if (pause) this.padMenuListener?.('start');
+      if (pausedBy) this.padMenuListener?.('start', pausedBy);
       return;
     }
     // Menus: the held buttons are kept up to date (so play, when it
-    // starts, finds them stale), never resolved.
-    this.resolver.record({ held: state.held, pressed: [], axes: state.axes }, seconds, { gameplay: false });
-    if (this.padReset) {
-      this.padReset = false;
-      this.resolver.reset();
+    // starts, finds them stale), never resolved. Only the menu's owner (or
+    // owners) send commands and move the cursor; a command two owners send
+    // on the same frame goes once.
+    const owners = this.menuOwner === 'any' ? slots : [this.menuOwner];
+    const commands = new Map();
+    let stick = null;
+    for (const [channel, state] of live) {
+      channel.resolver.record({ held: state.held, pressed: [], axes: state.axes }, seconds, { gameplay: false });
+      if (channel.reset) {
+        channel.reset = false;
+        channel.resolver.reset();
+      }
+      if (!owners.includes(channel.slot)) {
+        channel.menu.dir = null;
+        continue;
+      }
+      for (const command of channel.menuCommands(state, now)) if (!commands.has(command)) commands.set(command, channel.slot);
+      stick = stronger(stick, { x: state.axes[0], y: state.axes[1], scroll: state.axes[3] });
     }
-    this._padMenu(state, now, dt);
+    for (const [command, slot] of commands) this.padMenuListener?.(command, slot);
+    if (stick) {
+      this.padCursorListener?.(stick, dt);
+      this.cursorLive = true;
+    } else {
+      this.loseCursor(dt);
+    }
   }
 
-  _padMenu(state, now, dt) {
-    const { held, pressed, axes } = state;
-    const listener = this.padMenuListener;
-    let dir = null;
-    for (const [button, name] of MENU_DIRECTIONS) {
-      if (held.has(button)) {
-        dir = name;
-        break;
-      }
-    }
-    const ms = this.padMenuState;
-    if (dir !== ms.dir) {
-      ms.dir = dir;
-      if (dir) {
-        ms.nextRepeat = now + MENU_REPEAT_DELAY;
-        listener?.(dir);
-      }
-    } else if (dir && now >= ms.nextRepeat) {
-      ms.nextRepeat = now + MENU_REPEAT;
-      listener?.(dir);
-    }
-    for (const [button, command] of MENU_BUTTONS) {
-      if (pressed.includes(button)) listener?.(command);
-    }
-    this.padCursorListener?.({ x: axes[0], y: axes[1], scroll: axes[3] }, dt);
+  // No owner's controller to give the menu cursor: it is told once.
+  loseCursor(dt) {
+    if (!this.cursorLive) return;
+    this.cursorLive = false;
+    this.padCursorListener?.(null, dt);
   }
 }

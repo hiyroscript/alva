@@ -137,9 +137,10 @@ export function bilingual(key) {
   return LANGUAGES.map((language) => t(key, undefined, language)).join(' · ');
 }
 
-// The spoken or shown name of a fighter's slot tag ('P1', 'CPU', 'CPU 1',
-// 'CPU 2'); any other tag is shown as it is.
-const SLOT_KEYS = Object.freeze({ P1: 'slot.p1', CPU: 'slot.cpu', 'CPU 1': 'slot.cpu1', 'CPU 2': 'slot.cpu2' });
+// The spoken or shown name of a fighter's slot tag ('P1', 'P2' (Local
+// Play's Player 2), 'CPU', 'CPU 1', 'CPU 2'); any other tag is shown as it
+// is.
+const SLOT_KEYS = Object.freeze({ P1: 'slot.p1', P2: 'slot.p2', CPU: 'slot.cpu', 'CPU 1': 'slot.cpu1', 'CPU 2': 'slot.cpu2' });
 export function slotLabel(tag) {
   return SLOT_KEYS[tag] ? t(SLOT_KEYS[tag]) : tag;
 }

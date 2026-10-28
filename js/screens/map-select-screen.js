@@ -22,6 +22,9 @@
 // kept and its start button's label (a translation key); it also says what
 // starting hands the Battle screen (battleParams). Left out, they are Quick
 // Battle's. Each keeps its own `mapId`, so neither changes the other's.
+// Local Play's Select Stage (js/screens/local-play-screens.js) adds a
+// `badge` before the title and a `note` above its start button, and decides
+// whose input may choose (accepts, onHold).
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
@@ -40,6 +43,7 @@ export class MapSelectScreen extends Screen {
     selection = () => app.selection, startLabel = 'map.start',
     // Random Stage's randomness (returns [0, 1), as Math.random does).
     random = Math.random,
+    badge = null, note = null,
   } = {}) {
     super(app, id);
     // The object holding this setup's `mapId`, read on every use.
@@ -84,7 +88,7 @@ export class MapSelectScreen extends Screen {
     this.countEl = el('span', { class: 'panel-meta map-count' });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'map.title', kicker: currentSetup(setup).name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title: 'map.title', kicker: currentSetup(setup).name, setup, step, badge, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body map-layout' }, [
         this.heroEl,
         el('section', { class: 'map-roster', ...tattr('aria-label', 'map.stages') }, [
@@ -95,6 +99,7 @@ export class MapSelectScreen extends Screen {
           ]),
           this.scroller,
           this.info,
+          note,
           this.startBtn,
         ]),
       ]),
@@ -220,8 +225,23 @@ export class MapSelectScreen extends Screen {
     }));
   }
 
+  // Whether the input being handled may choose here (any, but on a Local
+  // Play step).
+  accepts() {
+    return true;
+  }
+
+  // Whether choosing waits (never, but on a Local Play step).
+  onHold() {
+    return false;
+  }
+
+  get choosing() {
+    return !this.onHold() && this.accepts();
+  }
+
   activate(tile, e) {
-    if (!tile._map) return;
+    if (!tile._map || !this.choosing) return;
     const wasSelected = this.selection().mapId === tile._map.id;
     this.select(tile._map);
     this.showHero(tile._map);
@@ -233,6 +253,7 @@ export class MapSelectScreen extends Screen {
   // previewed. It never starts the battle: the player confirms, or rolls
   // again (focus stays on Random Stage).
   pickRandom() {
+    if (!this.choosing) return null;
     const map = randomStage(this.random);
     if (!map) return null;
     this.select(map);
@@ -242,7 +263,7 @@ export class MapSelectScreen extends Screen {
   }
 
   start() {
-    if (!getMap(this.selection().mapId)) return;
+    if (!getMap(this.selection().mapId) || !this.choosing) return;
     this.app.screens.go('battle', this.battleParams());
   }
 
