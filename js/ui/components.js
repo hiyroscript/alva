@@ -132,6 +132,28 @@ export function menuButton(key, opts = {}) {
   });
 }
 
+// The controls at the top right of a dialog that pauses play, in this
+// order: Settings (the gear, opening the app's one Settings dialog through
+// `onSettings`), then the X (`onClose`, named by `closeLabel`): what closing
+// means is the dialog's own (resume from the pause menu, back to it from a
+// dialog opened over it). Without `onSettings` there is the X alone (a
+// dialog that does not pause, such as the Match Results). Both are
+// ordinary navigable buttons: mouse, touch, keyboard and the controller
+// cursor reach them.
+export function dialogControls({ onSettings = null, onClose, closeLabel = 'common.close' }) {
+  const settings = onSettings ? el('button', {
+    class: 'dialog-settings', type: 'button', 'data-nav': true, 'aria-haspopup': 'dialog',
+    ...tattr('aria-label', 'dialog.settings'), html: ICONS.settings,
+  }) : null;
+  const close = el('button', {
+    class: 'dialog-close', type: 'button', 'data-nav': true, ...tattr('aria-label', closeLabel), html: ICONS.close,
+  });
+  settings?.addEventListener('click', onSettings);
+  close.addEventListener('click', onClose);
+  const root = el('div', { class: 'dialog-controls' }, [settings, close]);
+  return { root, settings, close };
+}
+
 export const MENU_HINTS = [
   [['↑', '↓', '←', '→'], 'hint.navigate'],
   [['key.enter'], 'hint.select'],

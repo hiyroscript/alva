@@ -153,8 +153,11 @@ export function runMatch({ a, b, defA, defB, map = 'desert', seed = 1, maxSecond
       return out;
     };
   }
+  // Each side's match controller, kept: the celebration after the match
+  // takes a CPU's place (see Battle.startCelebration).
+  const controllers = { p1: battle.p1.controller, p2: battle.p2.controller };
   const limit = Math.round(maxSeconds / DT);
-  while (battle.phase !== 'result' && steps < limit) {
+  while (!battle.matchOver && steps < limit) {
     const live = battle.phase === 'fight';
     battle.update(DT);
     steps++;
@@ -200,9 +203,9 @@ export function runMatch({ a, b, defA, defB, map = 'desert', seed = 1, maxSecond
   }
   stats.p1.points = battle.score.p1;
   stats.p2.points = battle.score.p2;
-  const done = battle.phase === 'result';
+  const done = battle.matchOver;
   const result = done ? battle.result : { outcome: battle.score.p1 > battle.score.p2 ? 'p1' : battle.score.p2 > battle.score.p1 ? 'p2' : 'draw', reason: 'cut' };
-  const telemetry = (f) => (f.controller.telemetry ? f.controller.telemetry.report() : null);
+  const telemetry = (f) => (controllers[f.slot]?.telemetry ? controllers[f.slot].telemetry.report() : null);
   stats.p1.behaviour = summarize(habits.p1);
   stats.p2.behaviour = summarize(habits.p2);
   return {

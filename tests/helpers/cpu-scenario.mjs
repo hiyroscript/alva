@@ -65,7 +65,7 @@ export function scenario({
     }
   };
   const run = (seconds, each = null) => {
-    for (let i = 0; i < Math.round(seconds / DT) && battle.phase !== 'result'; i++) {
+    for (let i = 0; i < Math.round(seconds / DT) && !battle.matchOver; i++) {
       step();
       if (each && each(i) === false) break;
     }

@@ -933,6 +933,9 @@ test('Quick Battle: the CPU follows the player up onto the moving clouds and nev
     const { battle } = battleOn(2, { difficulty: 'medium' });
     battle.setPhase('fight');
     const { p1, p2 } = battle;
+    // Its combat AI, kept: a celebration takes its place once the match is
+    // over.
+    const ai = p2.controller;
     let cloudSteps = 0;
     let hits = 0;
     for (let i = 0; i < 60 * 60 && battle.phase === 'fight'; i++) {
@@ -950,7 +953,7 @@ test('Quick Battle: the CPU follows the player up onto the moving clouds and nev
     }
     assert.ok(cloudSteps > 20, `the CPU stood on the clouds for ${cloudSteps} steps`);
     assert.ok(hits > 10, `and fought there (${hits} hits)`);
-    assert.equal(p2.controller.telemetry.report().stuckNavigation ?? 0, 0, 'never stuck');
+    assert.equal(ai.telemetry.report().stuckNavigation ?? 0, 0, 'never stuck');
   });
   assert.ok(seen.picked > 20, `${seen.picked} stepping stones picked`);
   assert.equal(seen.stale, 0, 'none of them stale, fading or gone');

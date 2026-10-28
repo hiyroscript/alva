@@ -63,6 +63,8 @@
   color-scheme: dark;
   border-radius: var(--radius-menu);
 }
+.dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dialog-head .dialog-title { align-self: center; min-width: 0; }
 .dialog-title { font-weight: 700; font-size: clamp(18px, 3.6vh, 24px); letter-spacing: -0.01em; color: var(--text-strong); }
 .dialog-message { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
@@ -157,13 +159,14 @@
 /* Secondary actions in glass panels: transparent at rest, with the usual
    hover (mouse or controller cursor) and pressed fills. */
 .pause-overlay .pause-btn-item:not(.is-primary):enabled,
+.results-overlay .pause-btn-item:not(.is-primary):enabled,
 .practice-menu-overlay .pause-btn-item:not(.is-primary):enabled,
 .dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled,
 .dialog-overlay .choice-btn:not(.btn--primary):enabled {
   color: var(--text);
 }
 .pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
-.result-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
+.results-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
 .practice-menu-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
 .dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(.is-cursor-target):not(:active),
 .dialog-overlay .choice-btn:not(.btn--primary):enabled:not(:hover):not(.is-cursor-target):not(:active) {

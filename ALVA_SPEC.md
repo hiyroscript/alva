@@ -282,9 +282,12 @@ Nothing in the interface turns blue.
   "Return to home", "Player 1 wins"), in the underlying strings, never by a
   CSS case transform; small metadata labels are tracked monospace in the
   same case. French follows its own conventions ("Mode spectateur").
-- Exceptions: the ALVA wordmark and title, CPU (CPU 1, CPU 2), P1 (J1), and
-  the round announcements (READY, ROUND 1, FIGHT, TIME OVER, K.O.,
-  OVERTIME); the HUD's own round line is an ordinary label (Round 1).
+- Exceptions: the ALVA wordmark and title, CPU (CPU 1, CPU 2), P1 (J1), the
+  round announcements (READY, ROUND 1, FIGHT, OVERTIME), the final
+  announcements (VICTORY!, DEFEAT., GAME.) and the Match Results' heading
+  and outcome lines (MATCH RESULTS, TEAM I — WINNER, DRAW — NO WINNER); the
+  HUD's own round line is an ordinary label (Round 1). The teams' Roman
+  numerals are part of their names (Team I, Team II).
   Proper names keep their capitals: fighters' ability names, stages, game
   terms such as Launch Point, Base Launch, the Void, the Shield, the Dash
   and Energy, and devices and products.
@@ -324,20 +327,23 @@ Home → Discover (Fighters / Movement / Launch reference, opening on Fighters; 
 Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
-Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
+Battle → Pause → Resume / Restart Battle / Return to Home (confirmed); Settings (gear) and X (resume) at its top right
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
-Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change Stage / Return to Home
-Battle (5:00 over, one fighter ahead on points) → Result → Rematch / Change Stage / Return to Home
+Battle (a fighter scores its 3rd point) → VICTORY! / DEFEAT. → Celebration (the world plays on) + result toast
+Battle (5:00 over, one fighter ahead on points) → VICTORY! / DEFEAT. → Celebration + result toast
 Battle (5:00 over, level on points) → OVERTIME: the same fight 60 s more, the Void closing in from the sides and bottom
-Battle (overtime: a fighter scores its 3rd point) → K.O. → Result
-Battle (overtime over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
-Battle (overtime over, level on points and Launch Point: a tie) → Result (Tie) → Rematch / Change Stage / Return to Home
-Result → Change Stage → Select Stage (Custom Play's own; after Regular Play, the stage selector in the Battle's place, Back to Select Fighter)
+Battle (overtime: a fighter scores its 3rd point) → VICTORY! / DEFEAT. → Celebration + result toast
+Battle (overtime over, one fighter ahead on points, or level with the lower Launch Point) → VICTORY! / DEFEAT. → Celebration + result toast
+Battle (overtime over, level on points and Launch Point: a draw) → GAME. → Celebration + result toast
+Celebration → View match results (toast; or Esc / P / Start / the HUD's timer) → Match Results → Rematch / Change Fighters / Change Stage / Return to Home Screen; X, Esc / Back or Start → Celebration
+Match Results → Change Fighters → Select Fighter (Quick Battle; then Regular Play's draw or Custom Play's Select CPU and Select Stage)
+Match Results → Change Stage → Select Stage (Custom Play's own; after Regular Play, the stage selector in the Battle's place, Back to Select Fighter)
 ```
 
-A Watch Mode battle follows the same Battle lines (pause, points, K.O.,
-5:00, overtime and its closing Void, result, tie); its Change Stage
-returns to Watch Mode's Select Stage.
+A Watch Mode battle follows the same Battle lines (pause, points, 5:00,
+overtime and its closing Void, the announcement, the celebration, the
+toast, the Match Results, a draw); its Change Fighters returns to Watch
+Mode's Select CPU 1 and its Change Stage to Watch Mode's Select Stage.
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
@@ -773,12 +779,17 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   hidden, whichever Mobile Controls layout is chosen (no joystick, Dash
   buttons or Down either). Pause (`Esc`, `P`, a controller's Options / Menu, the HUD's
   timer or pause button), Resume, Restart Battle and Return to Home work as
-  in Quick Battle, and so do Rematch and Change Stage (which returns to
-  Watch Mode's Select Stage).
-- **Names.** The HUD tags, the markers over the fighters and the results
-  say **CPU 1** and **CPU 2** ("CPU 1 Wins", "CPU 2 fell into the Void for
-  the final point."); the pause dialog's kicker is "Watch Mode"; the canvas
-  is labelled "Watch mode battle: CPU 1, #0001, against CPU 2, #0001".
+  in Quick Battle, and so do the celebration after the match, the result
+  toast and the Match Results with Rematch, Change Fighters (which returns
+  to Watch Mode's Select CPU 1) and Change Stage (which returns to Watch
+  Mode's Select Stage). The announcement is VICTORY! over the winning
+  team's name (TEAM I, TEAM II), or GAME. for a draw: there is no player to
+  be defeated.
+- **Names.** The HUD tags and the markers over the fighters say **CPU 1**
+  and **CPU 2** (the setup's names for them); the sides are **Team I**
+  (CPU 1) and **Team II** (CPU 2) wherever the result names them ("Team II
+  wins!"); the pause dialog's kicker is "Watch Mode"; the canvas is
+  labelled "Watch mode battle: CPU 1, #0001, against CPU 2, #0001".
 
 ### 6.6 Credits
 
@@ -942,8 +953,8 @@ A training room, entered straight from Home.
   menu in the dialogs' translucent glass (5.2) centred under the More
   button over the shared dim, the still stage visible beneath. It holds exactly **Change Fighter** (green, focused),
   **Change CPU** (**Enable CPU** once the CPU is disabled) and **Return**
-  (outlined).
-  More again, Esc / Back, P, Start or a press on the dim resumes. **Return**
+  (outlined), with the Settings gear and the X at its top right (7.3).
+  More again, Esc / Back, P, Start, the X or a press on the dim resumes. **Return**
   goes Home and tears everything down.
 - **Change Fighter:** opens the fighter roster (the same component, rules and
   look as Select Fighter, 6.4) as one large translucent glass dialog
@@ -3830,9 +3841,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   while a fighter waits to respawn: the timer runs on and the survivor
   plays on (a summon then has nobody to appear behind and its press does
   nothing at all; nothing can hit, hold or aim at the absent fighter). The point that
-  reaches 3 ends the match: no respawn for the loser, the `ko` phase (the
-  K.O. beat) and then the result. Once time is up or the match is won, a
-  fall scores nothing and nobody respawns. The result: 3 points wins
+  reaches 3 ends the match at once, with no respawn for the loser (7.2.10).
+  Once the match is over, a fall scores nothing and nobody respawns. The result: 3 points wins
   (`reason: 'void'`, in overtime too); when the normal clock runs out, more
   points wins (`'points'`); level on points, overtime (below). (With
   overtime turned off, `CONFIG.battle.overtimeSeconds` 0, the lower Launch
@@ -3850,14 +3860,76 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   becomes overtime's, counting down from 60 on the simulation clock like
   the normal one (so pause freezes it), and the Void starts closing in
   (7.1). Falls score, respawns run and the third point ends the match at
-  once (the K.O. beat, then the result) as ever. When overtime runs out:
+  once as ever. When overtime runs out:
   more points wins (`'overtimePoints'`); level on points, the lower Launch
   Point (`'overtimeLaunchPoint'`, compared within 1e-6); equal on both is a
-  tie (outcome `'draw'`): the match is over, and the result menu says so
-  with no winner (7.3). Ahead on points when the normal clock
+  draw (outcome `'draw'`): the match is over with no winner (7.3). The
+  decision is the one at that very step: Launch Point recovered afterwards
+  never changes it. Ahead on points when the normal clock
   runs out, there is no overtime: more points wins (`'points'`). Restart
   and rematch clear overtime: the normal period, 0–0, `5:00`, the stage's
   own Void and normal waves.
+
+#### 7.2.10 The match's end and the celebration
+
+- **Four things kept apart.** Whether the competitive match is live
+  (`Battle.matchLive`: the `fight` phase before a result), whether the
+  world runs (always, unless the player paused it), whether the player
+  paused it (the screen's pause menu, and anything opened over it), and
+  whether the Match Results are on show (the screen's; they pause nothing).
+  The phases are `intro` (inputs locked), `fight` and `celebration`.
+- **The end, exactly once** (`Battle.finishMatch`): the moment the result
+  is known (the third point, as the Void takes the loser; the normal clock
+  or overtime running out), the Battle freezes it (`Battle.final`: the
+  outcome and its reason, the winner or none, the score, both Launch
+  Points, whether overtime was played, the match's length, and the match
+  statistics as that step left them) and every part of it is immutable.
+  The clock stops, every respawn wait is called off, and the phase becomes
+  `celebration`. `Battle.result` keeps answering with the frozen outcome
+  and reason; nothing that happens afterwards changes them, the
+  statistics or the score.
+- **The celebration.** The world goes on: the same fixed steps, rendering,
+  camera (following whoever is still in play), stage, effects and
+  animations; no new match, round, overtime or scoring starts, no stage
+  hazard strikes, and nothing restarts by itself. Inputs stay unlocked:
+  the player keeps their fighter (run, jump, Dash, attack, specials, even
+  off the stage). A fall into the Void plays the usual elimination and
+  takes the fighter out for good: no point, no statistic, no respawn, for
+  the player and a CPU alike, the final point's loser and a fighter
+  already waiting included; with both out, the stage plays on and the
+  toast and Match Results stay available.
+- **A CPU's celebration** (`js/game/ai/celebration.js`): each CPU's combat
+  AI makes way for a celebration controller of its own, on a stream of the
+  battle's seed of its own (never the combat AI's randomness, so ordinary
+  matches, difficulty and seeded results are untouched); a restart or
+  rematch gives the combat AI back, reset. The winning CPU picks at random
+  among five behaviours, each for a random while: **ability spam** (presses
+  of the buttons in its own moveset, sometimes after a jump for an aerial,
+  facing the stage's middle; the Fighter refuses a press as ever, for a
+  cooldown, Energy or a move still playing), **the Void run** (it runs to
+  the nearer side of the Void in force, overtime's closing one included,
+  hopping whatever stops it, and the stage and Void check take it; once
+  chosen it never ends), **idle**, **the dash dance** (quick turns left and
+  right round where it began, never past a ledge) and **jump spam** (a
+  fresh Jump press each time, let go in between, air jumps included).
+  Never the same one twice running, never all five by force; the Void run
+  comes up less often than the others. A losing CPU stays calm (idle);
+  after a draw both CPUs only idle, dash dance or jump. Every behaviour is
+  plain input through the universal rules: nothing is forced, teleported
+  or special-cased for a fighter.
+- **Match statistics** (`js/game/match-stats.js`, `Battle.stats`), per side
+  (Team I and Team II), across every life, from 0 for each match, counted
+  only while the match is live and frozen into the result: points; damage
+  dealt and received (a blocked hit deals none; a projectile's, clone's,
+  technique's or Deflected projectile's damage is its owner's; a hazard's
+  is received from nobody); Launch Point recovered (passive recovery and
+  heals, never a respawn's reset); successful blocks and, of those, perfect
+  Shields; successful Deflects (projectiles turned back); Energy consumed
+  (what was actually paid, a partial payment as paid, never regeneration
+  or a refill); Void falls; successful attacks (hits landed); the highest
+  single hit. They observe the CombatSystem's events and deflections and
+  each CombatState's running totals (`energySpent`,
+  `launchPointRecovered`); they never repeat a rule.
 
 #### 7.2.9 Character specifications
 
@@ -3948,7 +4020,7 @@ Adding one is described in
   faint top sheen, a light translucent hairline and a soft shadow; darker than
   the Home strip so type stays readable over bright and dark stage art. HUD
   pieces float over a canvas that repaints every frame, so they skip backdrop
-  blur. Every dialog panel (`.glass--panel`: pause, result, Practice menu and
+  blur. Every dialog panel (`.glass--panel`: pause, Match Results, Practice menu and
   rosters, confirmation, Settings, the controller dialogs and every other,
   5.2) adds a light blur where supported, with a denser fill as the fallback.
   The stage stays dimly visible behind every panel.
@@ -3973,8 +4045,8 @@ Adding one is described in
 - Score dots (battles only, Quick Battle and Watch Mode): under each card, centred, one small CSS
   circle per point the match is played to (`pointsToWin`, 3), an outlined
   empty ring (○) filled solid white (●) for each point that fighter has
-  scored, in order, the moment it is scored (the third fills as the K.O.
-  beat starts). They survive respawns and reset only on a new match, a
+  scored, in order, the moment it is scored (the third fills as the match
+  ends). They survive respawns and reset only on a new match, a
   restart or a rematch. Practice Ground shows none.
 - Fighter status (Canvas, `js/game/rendering/fighter-status.js`, drawn by the Arena
   over everything, the Void included, for each fighter in play whose body
@@ -4204,37 +4276,85 @@ Adding one is described in
   - Reduced motion drops the shake and the zoom (and the burst's shake, its
     shards travelling only about a third as far); the flash, sparks,
     trails, slow motion and the burst's colour flash and fade stay.
-- Round banners ("ROUND 1", "FIGHT", "TIME", and "K.O." under "VOID" when a
-  fighter's fall gives the opponent its third point) in white on a dark
-  band. As overtime starts, "OVERTIME" under "POINTS LEVEL" ("PROLONGATION"
-  under "ÉGALITÉ" in French), a size smaller, for about 1.4 s while the
-  fight goes on, then gone.
+- Round banners ("ROUND 1", "FIGHT") in white on a dark band. As overtime
+  starts, "OVERTIME" under "POINTS LEVEL" ("PROLONGATION" under "ÉGALITÉ"
+  in French), a size smaller, for about 1.4 s while the fight goes on,
+  then gone.
+- The final announcement, the moment the match ends, in the same banner,
+  landing with a little more weight, for about 2.4 s
+  (`FINAL_BANNER_SECONDS`) and then gone while the world plays on:
+  **VICTORY!** when Player 1 wins, **DEFEAT.** when the CPU does, **GAME.**
+  for a draw; in Watch Mode **VICTORY!** over the winning team ("TEAM I",
+  "TEAM II"), or **GAME.** French: VICTOIRE !, DÉFAITE., MATCH NUL. There is
+  no K.O. or TIME beat any more.
 - Pause menu: glass panel over a dimmed battle with "Quick Battle" ("Watch
   Mode" in Watch Mode; no stage name), "Paused", green **Resume** (default), **Restart Battle** and
-  **Return to Home**, nothing else. `Esc` / Back resumes.
-- Time over: the fighter with more points wins ("Time ran out. More points
-  wins the match."); level on points, the match goes to overtime. Overtime over, under
-  the kicker "End of overtime": more points wins ("Overtime ran out. More
-  points wins the match."); level on points, the lower Launch Point
-  ("Overtime ran out with the points still level. The lower Launch Point
-  decides it."). A glass result menu offers green **Rematch**, **Change Stage**
-  and **Return to Home**. Level on both as overtime runs out is a tie: once
-  the TIME banner has played, the same result menu opens with the kicker
-  "End of overtime", the title "Tie" and the line "Overtime ended with the
-  points and Launch Point equal.", naming no winner, in Quick Battle and
-  Watch Mode alike. Nothing restarts by itself: Rematch starts a clean match
-  (0–0, 5:00, no overtime, the stage's own Void).
+  **Return to Home**, nothing else in the menu; at its top right the
+  Settings gear then the X (below). `Esc` / Back resumes.
+- The result toast: as the match ends, a small glass strip at the bottom
+  centre (clear of the safe areas, entering with a short rise, still with
+  reduced motion) says **Team I wins!**, **Team II wins!** or **No winner,
+  game ended with a draw.**, with a green **View match results** beside it
+  (stacked on narrow screens). It is a status message, never a dialog: it
+  pauses nothing, takes no focus and only its own panel takes a press. It
+  stays for the whole celebration, steps aside while the Match Results are
+  open and comes back when they close; there is only ever one.
+- The Match Results (after **View match results**; once the match is over
+  `Esc`, `P`, gamepad Start and the HUD's timer open them too): a larger
+  glass dialog over the battle, which plays on undimmed behind it (it is
+  no pause). "MATCH RESULTS" with the X at its top right; the outcome
+  ("TEAM I — WINNER" beside "TEAM II — DEFEATED", or "DRAW — NO WINNER");
+  both teams side by side, each with its fighter's portrait, its tag (P1,
+  CPU, CPU 1, CPU 2), its fighter and Winner / Defeated / Draw, the
+  winner's card in green; how it ended ("Decided by the winning point",
+  "Time expired: more points", "Overtime: lower Launch Point", "Time
+  expired with everything level"...), the match's length and "Overtime
+  played"; then the statistics (7.2.10) as a table, Team I's column
+  beside Team II's, the winner's brought forward, with each side's final
+  Launch Point; then **Rematch** (green, default), **Change Fighters**,
+  **Change Stage** and **Return to Home Screen**. Only its body scrolls.
+  While it is open the player's controls are off (no key meant for it
+  moves the fighter), the ability HUD steps aside, the simulation runs on.
+  The X, `Esc` / Back and Start close it back to the celebration and the
+  toast, focus off every control; Start never rematches.
+- **Rematch**: a clean match on the same settings (mode, fighters, stage,
+  level): 0–0, 5:00, no overtime, the stage's own Void, fresh fighters,
+  every projectile and summon gone, the statistics and the celebration
+  over, the toast, dialog and banners gone, its intro first.
+- **Change Fighters**: Quick Battle's Select Fighter (Regular Play then
+  draws the CPU and the stage as usual; Custom Play goes on to Select CPU
+  and Select Stage), Watch Mode's Select CPU 1; the mode and the level
+  kept. **Return to Home Screen**: Home, the battle destroyed with its
+  screen.
+- Time over: the fighter with more points wins; level on points, the
+  match goes to overtime. Overtime over: more points wins; level on
+  points, the lower Launch Point; level on both, a draw naming no winner,
+  in Quick Battle and Watch Mode alike. Nothing restarts by itself.
 - **Change Stage** opens the mode's own Select Stage with every other choice
   kept: Custom Play's and Watch Mode's, the screen the Battle was started
   from; after Regular Play, which starts from Select Fighter, the stage
   selector takes the Battle's place (its steps Mode · Difficulty · Fighter ·
   Stage) and Back from it returns to Select Fighter. It never lands on
   Select Fighter itself.
-- Match K.O.: once the K.O. banner has played, the same result menu opens
-  with the kicker "K.O." and the line "The CPU fell into the Void for the
-  final point." (or "Player 1 fell ...").
-- Result titles: "Player 1 Wins" or "CPU Wins" in Quick Battle, "CPU 1 Wins"
-  or "CPU 2 Wins" in Watch Mode, whose K.O. line names CPU 1 or CPU 2.
+- **Dialogs that pause play** (the Battle's pause menu, Practice Ground's
+  menu and its two roster dialogs, and Return to Home? over a paused
+  battle) each have, at their top right, the Settings gear and then the X,
+  the game's own icons in the dialog close button's style, each with a
+  spoken name ("Open settings", "Close and resume", "Close and go back to
+  the menu", "Close") and reached by mouse, touch, keyboard and the
+  controller cursor. The X is the dialog's own way out: the pause menu's
+  resumes, a roster dialog's goes back to the Practice menu (never
+  resuming beneath it), the confirmation's cancels. The gear opens the
+  app's one Settings dialog over it (every choice saved as ever); the game
+  stays frozen beneath, no pause key resumes it while Settings is open, and
+  closing Settings comes back to the dialog it was opened from, focus on
+  the gear. The Settings dialog keeps its own X; the Match Results, which
+  pause nothing, have the X alone.
+- Team names: Player 1's side is **Team I** and the CPU's **Team II** in
+  Quick Battle; CPU 1's **Team I** and CPU 2's **Team II** in Watch Mode
+  (French: Équipe I, Équipe II). Never "Team 1" or "Team 2". Internally the
+  slots stay `p1` and `p2`; the HUD's cards are named for their teams for
+  screen readers. Nothing names who fell for the final point.
 
 ### 7.4 Input
 
@@ -4495,8 +4615,11 @@ Adding one is described in
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
 - Gameplay pauses when the pause menu (Practice Ground: the Practice menu,
-  the Change Fighter dialog or the CPU dialog) is open, the tab is hidden, or
-  the device is blocked in portrait.
+  the Change Fighter dialog or the CPU dialog), or Settings or a
+  confirmation opened over it, is open, the tab is hidden, or the device is
+  blocked in portrait. The Match Results and the result toast never pause
+  it; the player's own controls are off only while the Match Results are
+  open.
 
 ### 7.4a Game controllers
 

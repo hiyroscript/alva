@@ -34,6 +34,7 @@ non-attacking `TrainingAIController` stays in
 | [`cpu-intelligence/executor.js`](../../js/game/ai/cpu-intelligence/executor.js) | 9. execution | `Executor`: the plan's wishes turned into one legal `FighterInput` snapshot (press edges, jump holds, the Mouvement request, no Shield in the air but the Deflect), with the ledge guard. |
 | [`cpu-intelligence/telemetry.js`](../../js/game/ai/cpu-intelligence/telemetry.js) | 11. telemetry | `Telemetry`: counters, move usage, waits with their reasons and ends, time per objective, inactivity by cause, the debug trace and its events, `STILL_LIMIT`, `WAIT_LIMIT`. |
 | [`js/data/difficulty.js`](../../js/data/difficulty.js) | 10. humanization | The four profiles and `CAPABILITY` (which way each trait improves). |
+| [`celebration.js`](../../js/game/ai/celebration.js) | after the match | `CelebrationController`: what a CPU does once its match is over (see below); never part of CPU Intelligence. |
 
 `js/game/ai/moveset.js` (`readMoveset`, `hurtExtent`) is the raw reading
 of a definition the capability analyzer builds on.
@@ -489,6 +490,35 @@ for a lower one); what changes is how well each part of it works:
   judgement, deep jump and Dash searches, precise punishes and recoveries,
   quick adaptation, and disciplined match play.
 
+## After the match: the celebration
+
+CPU Intelligence plays the match and nothing after it. Once a Battle's
+result is final (`Battle.finishMatch`), each CPU's `CombatAIController`
+makes way for a `CelebrationController`
+([`js/game/ai/celebration.js`](../../js/game/ai/celebration.js)), built
+fresh on a stream of the battle's seed of its own (`CELEBRATION_STREAMS`,
+never the combat AI's), so nothing here moves how a CPU fights, its
+difficulty or a seeded match's result; a restart or rematch gives the
+combat AI back, reset. It is a controller like any other: one
+`FighterInput` snapshot a step, through the Fighter's universal rules.
+
+The winner picks one behaviour at a time, at random (never the same twice
+running; the Void run less often than the others), each for a random
+while:
+
+| Behaviour | What it presses |
+| --- | --- |
+| `abilities` | A button from its own moveset (`readMoveset`: every move it has for the ground or the air, its summons and techniques on the ground, its Deflect in the air), one press at a random moment, sometimes after a jump for an aerial; its moves face the stage's middle (`attackFacing`). The Fighter refuses whatever it would refuse a player (a cooldown, Energy, a move still playing). |
+| `void` | Run toward the nearer side of the Void in force (overtime's closing one included), hopping whatever stalls it (a wall, the other fighter). The stage and the Void check take it; the usual elimination plays; nobody respawns after a match. It never ends. |
+| `idle` | Nothing. |
+| `dashDance` | Run left and right in quick turns (about every 0.1–0.2 s) within 90 world units of where it began, turning back from a ledge or the Void. |
+| `jump` | Jump, held for a normal jump (`jumpTapHold`), let go, pressed again: its air jumps come out in the air. |
+
+A CPU that did not win (Watch Mode's loser, Quick Battle's CPU beaten by
+the player) only idles (`LOSER_CELEBRATIONS`); after a draw both CPUs idle,
+dash dance or jump (`DRAW_CELEBRATIONS`). The ordinary CPU's ledge guard
+and survival logic are untouched: the Void run exists only here.
+
 ## Debugging
 
 `new CombatAIController({ difficulty, rng, debug: true })` keeps a ring of
@@ -523,6 +553,11 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
 `{ move, seconds }`, `{ shield }`).
 
 ## Tests and benchmark
+
+- [`tests/systems/celebration.test.mjs`](../../tests/systems/celebration.test.mjs):
+  the celebration (who celebrates how, every behaviour on real Battles for
+  every fighter, the Void run on every kind of stage and under overtime's
+  Void, determinism) and the combat AI given back on a restart.
 
 - [`tests/systems/cpu-intelligence.test.mjs`](../../tests/systems/cpu-intelligence.test.mjs):
   inputs and intent-aware liveness at every level, approach, stage

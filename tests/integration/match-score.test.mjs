@@ -2,8 +2,8 @@
 // Quick Battle's match: first to three points, a point for each time the
 // opponent falls into the Void, the fallen fighter out of play for two
 // seconds and then back at its spawn in a clean neutral state; the
-// simultaneous-fall rule, the final point's K.O., time-up during a respawn
-// wait, and rematches. Runs the real Battle, Fighter, CombatSystem and
+// simultaneous-fall rule, the final point ending the match at once,
+// time-up during a respawn wait, and rematches. Runs the real Battle, Fighter, CombatSystem and
 // physics on a stub canvas (see tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,12 +74,13 @@ test('both start at 0; each fall scores the opponent exactly one point, never th
   intoVoid(battle, p2);
   run();
   assert.deepEqual(battle.score, { p1: 3, p2: 1 });
-  assert.equal(battle.phase, 'ko');
+  assert.equal(battle.phase, 'celebration', 'the match is over at once, the world going on');
+  assert.equal(battle.matchOver, true);
   assert.deepEqual(battle.result, { outcome: 'p1', reason: 'void' });
   assert.equal(p2.respawnTimer, null, 'the final loser does not respawn');
   run(RESPAWN_STEPS * 2);
   assert.equal(p2.lostToVoid, true, 'and stays out');
-  assert.equal(battle.phase, 'result', 'the result follows the K.O. beat');
+  assert.equal(battle.phase, 'celebration', 'nothing restarts by itself');
   assert.deepEqual(battle.score, { p1: 3, p2: 1 });
 });
 
@@ -222,18 +223,18 @@ test('the timer keeps running through a respawn wait; time up during one keeps t
   run(10);
   assert.ok(battle.timeLeft < left, 'no pause for the respawn');
   run(30);
-  assert.equal(battle.phase, 'timeup');
+  assert.equal(battle.phase, 'celebration', 'time up ends the match at once');
   // No more respawns once time is up: whoever is out stays out, keeping the
   // Launch Point it fell with, and no point comes from the timer.
   run(RESPAWN_STEPS * 2);
   assert.equal(p1.lostToVoid, true);
   assert.equal(p1.combat.launchPoint, 80);
   assert.deepEqual(battle.score, { p1: 0, p2: 1 });
-  assert.equal(battle.phase, 'result');
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'points' });
   // Level on points, the Launch Point it fell with still counts.
   battle.score.p2 = 0;
-  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
+  assert.deepEqual(battle.liveResult, { outcome: 'p2', reason: 'time' });
+  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'points' }, 'the result it ended on stands');
 });
 
 test('while its opponent is out the Quick Battle CPU repositions with a purpose, never attacks nobody, then plays on', () => {
@@ -273,7 +274,7 @@ test('a rematch (or a restart) resets the points to 0 and brings everyone back',
   battle.score.p1 = 2;
   intoVoid(battle, p2);
   run();
-  assert.equal(battle.phase, 'ko');
+  assert.equal(battle.phase, 'celebration');
   battle.restart();
   assert.deepEqual(battle.score, { p1: 0, p2: 0 });
   assert.deepEqual([p1.lostToVoid, p2.lostToVoid], [false, false]);

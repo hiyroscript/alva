@@ -142,23 +142,26 @@ test('the normal clock counts down on simulation steps: 5:00 to 0:00 in 300 s of
   // Ahead on points: the next step ends it.
   battle.score.p1 = 1;
   run();
-  assert.equal(battle.phase, 'timeup');
+  assert.equal(battle.phase, 'celebration', 'the match ends on that step');
+  assert.equal(battle.matchOver, true);
 });
 
 // ---- The end of the normal clock -------------------------------------------------
 
-test('time-up with the points apart: no overtime; the normal time-up and result, more points wins, whatever the Launch Point', () => {
+test('time-up with the points apart: no overtime; the match ends at once on its result, more points wins, whatever the Launch Point', () => {
   for (const [score, winner] of [[{ p1: 2, p2: 0 }, 'p1'], [{ p1: 1, p2: 2 }, 'p2']]) {
     const { battle, run, toTimeUp } = match();
     Object.assign(battle.score, score);
     battle[winner].combat.launchPoint = 250;
     toTimeUp();
-    assert.equal(battle.phase, 'timeup');
+    assert.equal(battle.phase, 'celebration');
     assert.equal(battle.overtime, false, 'no overtime');
     assert.equal(battle.timeLeft, 0);
     assert.deepEqual(battle.stage.void, battle.stage.baseVoid, 'the Void never moved');
-    run(Math.ceil(CONFIG.battle.timeUpSeconds / DT) + 1);
-    assert.equal(battle.phase, 'result');
+    assert.deepEqual(battle.result, { outcome: winner, reason: 'points' });
+    run(120);
+    assert.equal(battle.phase, 'celebration', 'nothing starts again');
+    assert.equal(battle.timeLeft, 0, 'the clock stays stopped');
     assert.deepEqual(battle.result, { outcome: winner, reason: 'points' });
   }
 });
@@ -240,14 +243,13 @@ test('Watch Mode plays the same overtime: level at 5:00 it goes on 60 s under th
   assert.ok(battle.voidWaveSpeed > 1);
   battle.timeLeft = DT / 2;
   run();
-  assert.equal(battle.phase, 'timeup');
-  run(Math.ceil(CONFIG.battle.timeUpSeconds / DT) + 1);
+  assert.equal(battle.phase, 'celebration');
   assert.deepEqual(battle.result, { outcome: 'p1', reason: 'overtimeLaunchPoint' });
   // Ahead on points at 5:00: no overtime, as in Quick Battle.
   const ahead = match({ mode: 'watch' });
   ahead.battle.score.p2 = 1;
   ahead.toTimeUp();
-  assert.equal(ahead.battle.phase, 'timeup');
+  assert.equal(ahead.battle.phase, 'celebration');
   assert.equal(ahead.battle.overtime, false);
   // A rematch clears it.
   battle.restart();
@@ -280,12 +282,12 @@ test('overtime is playable: Player 1 moves, falls score, respawns run, and the c
   // Run the rest of overtime out.
   let steps = 0;
   while (battle.phase === 'fight' && steps++ < Math.ceil(OT / DT) + 5) run();
-  assert.equal(battle.phase, 'timeup');
+  assert.equal(battle.phase, 'celebration');
   assert.equal(battle.timeLeft, 0);
   assert.ok(steps < Math.ceil(OT / DT), `overtime ran its remaining clock (${steps} steps)`);
 });
 
-test('a third point in overtime ends the match at once: the K.O. beat, then the result', () => {
+test('a third point in overtime ends the match at once, on its result', () => {
   const { battle, run, toTimeUp } = match();
   battle.score.p1 = 2;
   battle.score.p2 = 2;
@@ -294,13 +296,16 @@ test('a third point in overtime ends the match at once: the K.O. beat, then the 
   run(120);
   intoVoid(battle, battle.p1);
   run();
-  assert.equal(battle.phase, 'ko', 'no waiting for the clock');
+  assert.equal(battle.phase, 'celebration', 'no waiting for the clock');
   assert.ok(battle.timeLeft > OT - 3);
+  const left = battle.timeLeft;
   assert.deepEqual(battle.score, { p1: 2, p2: 3 });
   assert.equal(battle.p1.respawnTimer, null, 'the loser stays out');
-  run(Math.ceil(CONFIG.battle.koSeconds / DT) + 1);
-  assert.equal(battle.phase, 'result');
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'void' });
+  const closed = battle.stage.void;
+  run(120);
+  assert.equal(battle.timeLeft, left, 'the clock stopped');
+  assert.equal(battle.stage.void, closed, 'the Void stays where overtime left it');
 });
 
 test('overtime\'s end: more points wins; level on points, the lower Launch Point; equal on both (within 1e-6) a draw', () => {
@@ -313,11 +318,13 @@ test('overtime\'s end: more points wins; level on points, the lower Launch Point
     battle.p2.combat.launchPoint = b;
     battle.timeLeft = DT / 2;
     run();
-    assert.equal(battle.phase, 'timeup', 'overtime never repeats');
+    assert.equal(battle.phase, 'celebration', 'overtime never repeats');
     assert.equal(battle.overtime, true);
-    run(Math.ceil(CONFIG.battle.timeUpSeconds / DT) + 1);
-    assert.equal(battle.phase, 'result');
-    return battle.result;
+    const decided = battle.result;
+    // Launch Point recovered afterwards changes nothing.
+    run(Math.ceil(5 / DT));
+    assert.deepEqual(battle.result, decided);
+    return decided;
   };
   assert.deepEqual(end({ p1: 1, p2: 0 }, 300, 0), { outcome: 'p1', reason: 'overtimePoints' }, 'points first');
   assert.deepEqual(end({ p1: 0, p2: 2 }, 0, 300), { outcome: 'p2', reason: 'overtimePoints' });

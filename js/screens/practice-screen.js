@@ -24,7 +24,7 @@ import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { t, tx, tattr, iconLabel, setText } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
-import { menuButton } from '../ui/components.js';
+import { menuButton, dialogControls } from '../ui/components.js';
 import { FighterRoster } from '../ui/fighter-roster.js';
 import { isPlayable, playableCharacters } from '../data/characters.js';
 import { PRACTICE_MAP } from '../data/practice-map.js';
@@ -89,8 +89,10 @@ export class PracticeGroundScreen extends Screen {
   // ---- DOM builders ---------------------------------------------------------
 
   // The light Practice menu: exactly Change Fighter, Change CPU (Enable CPU
-  // while there is none) and Return. Esc / Back, Start, the More button or a
-  // press on the dim around it close it again.
+  // while there is none) and Return, under its heading with Settings and the
+  // X at the top right (the X resumes, the gear opens the app's Settings over
+  // the frozen stage). Esc / Back, Start, the X, the More button or a press
+  // on the dim around it close it again.
   buildMenu() {
     this.changeBtn = menuButton('practice.changeFighter', { primary: true });
     this.cpuBtn = menuButton('practice.changeCpu');
@@ -98,12 +100,20 @@ export class PracticeGroundScreen extends Screen {
     this.changeBtn.addEventListener('click', () => this.openRoster());
     this.cpuBtn.addEventListener('click', () => this.openCpuRoster());
     this.returnBtn.addEventListener('click', () => this.leave());
+    this.menuControls = dialogControls({
+      onSettings: () => this.openSettings(this.menuControls.settings),
+      onClose: () => this.resume(),
+      closeLabel: 'dialog.closeResume',
+    });
 
     this.menuOverlay = el('div', {
       class: 'overlay practice-menu-overlay', hidden: true,
       role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'practice-menu-title',
     }, [el('div', { class: 'pause-panel practice-menu-panel glass glass--panel' }, [
-      el('h2', { class: 'kicker practice-menu-title', id: 'practice-menu-title', ...tx('practice.title') }),
+      el('header', { class: 'pause-header' }, [
+        el('h2', { class: 'kicker practice-menu-title', id: 'practice-menu-title', ...tx('practice.title') }),
+        this.menuControls.root,
+      ]),
       el('div', { class: 'pause-menu' }, [this.changeBtn, this.cpuBtn, this.returnBtn]),
     ])]);
     this.menuOverlay.addEventListener('click', (e) => {
@@ -119,9 +129,10 @@ export class PracticeGroundScreen extends Screen {
 
   // A roster dialog: its own instance of the shared fighter roster as one
   // large glass panel over the paused stage, under a header with Back (plus
-  // any `actions` right beside it) and a Practice Ground heading (`title` is
-  // its translation key). Ids come from `titleId` and `previewId`, so both
-  // dialogs share the page.
+  // any `actions` right beside it), a Practice Ground heading (`title` is
+  // its translation key), and Settings and the X at the top right (the X
+  // goes back to the Practice menu, like Back; the stage stays frozen). Ids
+  // come from `titleId` and `previewId`, so both dialogs share the page.
   buildRosterDialog({ titleId, title, previewId, onConfirm, onBack, actions = [] }) {
     const back = el('button', {
       class: 'btn-back', type: 'button', 'data-nav': true,
@@ -132,6 +143,11 @@ export class PracticeGroundScreen extends Screen {
     const dialog = el('div', { class: 'practice-roster-dialog glass glass--panel' });
     const roster = new FighterRoster(this.app, { host: dialog, previewId, onConfirm });
     const heading = el('h2', { class: 'screen-title', id: titleId, ...tx(title) });
+    const controls = dialogControls({
+      onSettings: () => this.openSettings(controls.settings),
+      onClose: onBack,
+      closeLabel: 'dialog.closeBack',
+    });
     dialog.replaceChildren(
       el('header', { class: 'screen-header practice-roster-head' }, [
         el('div', { class: 'practice-roster-actions' }, [back, ...actions]),
@@ -139,6 +155,7 @@ export class PracticeGroundScreen extends Screen {
           el('span', { class: 'kicker', ...tx('practice.title') }),
           heading,
         ]),
+        controls.root,
       ]),
       el('div', { class: 'screen-body char-layout practice-roster-body' }, [roster.rosterPanel, roster.previewPanel]),
     );
@@ -147,7 +164,7 @@ export class PracticeGroundScreen extends Screen {
       class: 'overlay practice-roster-overlay', hidden: true,
       role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId,
     }, [dialog]);
-    return { overlay, dialog, roster, back, heading, scope: { el: overlay, onBack } };
+    return { overlay, dialog, roster, back, heading, controls, scope: { el: overlay, onBack } };
   }
 
   // Change Fighter: the shared fighter roster in a large glass dialog. Back
@@ -332,7 +349,7 @@ export class PracticeGroundScreen extends Screen {
   }
 
   onKey(e) {
-    if (e.menuHandled || !this.session || this.app.dialog.resolve) return;
+    if (e.menuHandled || !this.session || this.app.dialog.resolve || this.app.settingsDialog?.isOpen) return;
     if (e.code === CONFIG.debug.overlayKey && !e.repeat) {
       this.session.debug = !this.session.debug;
       if (!this.isRunning) this.session.render();
@@ -390,9 +407,17 @@ export class PracticeGroundScreen extends Screen {
     this.changeBtn.focus({ preventScroll: true });
   }
 
-  // Back to practising, from the menu (never past a roster dialog).
+  // The app's one Settings dialog over the frozen stage, which stays frozen
+  // beneath it: closing it comes back to the dialog it was opened from,
+  // focus on `opener`.
+  openSettings(opener) {
+    this.app.settingsDialog?.open({ returnFocus: opener });
+  }
+
+  // Back to practising, from the menu (never past a roster dialog or
+  // Settings).
   resume() {
-    if (!this.menuOpen || this.dialogOpen || this.loadingFighter) return;
+    if (!this.menuOpen || this.dialogOpen || this.loadingFighter || this.app.settingsDialog?.isOpen) return;
     if (this.app.device.blockedPortrait) return; // stay frozen until landscape
     this.hideMenu();
     // Keys pressed in the menu (J confirms, K goes back) are not attacks.

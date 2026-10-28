@@ -488,7 +488,7 @@ test('a fighter swap replaces the whole moveset and its timers; clearing leaves 
 
 // ---- Where it shows ----------------------------------------------------------------
 
-test('the screens show it for the player only: Quick Battle and Practice Ground, never Watch Mode or a result', () => {
+test('the screens show it for the player only: Quick Battle (its celebration too) and Practice Ground, never Watch Mode or the Match Results', () => {
   const p1 = makeFighter({ character: DEF_0002, sprites: fakeSpritesOf(DEF_0002) }).fighter;
   const hud = new AbilityHUD(new Element('div'), { input: fakeInput() });
   const screen = { abilityHud: hud, app: { device: { touchUI: false } } };
@@ -498,10 +498,14 @@ test('the screens show it for the player only: Quick Battle and Practice Ground,
   sync.call(screen);
   assert.equal(hud.root.hidden, false);
   assert.equal(screen.battle.hudCooldownsFor, p1, 'the rings over Player 1 step aside for it');
-  screen.battle.phase = 'result';
+  screen.battle.phase = 'celebration';
   sync.call(screen);
-  assert.equal(hud.root.hidden, true, 'no HUD over the result menu');
+  assert.equal(hud.root.hidden, false, 'the player plays on after the match');
+  screen.resultsOpen = true;
+  sync.call(screen);
+  assert.equal(hud.root.hidden, true, 'no HUD over the Match Results');
   assert.equal(screen.battle.hudCooldownsFor, null, 'and the rings are back');
+  screen.resultsOpen = false;
   hud.clear();
   screen.mode = 'watch';
   screen.battle = { p1, phase: 'fight', hudCooldownsFor: null };

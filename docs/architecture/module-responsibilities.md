@@ -28,7 +28,7 @@ There are no import cycles (checked over every module).
 | Module | Owns | Used by |
 | --- | --- | --- |
 | `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's and Watch Mode's), preloading and loading fighters, the language and settings wiring. | `main.js` |
-| `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`). | `app.js`, every screen |
+| `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`), Back and `backTo` (back to a screen in the stack, e.g. Change fighters). | `app.js`, every screen |
 | `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns), and the dialog stack (each dialog above the one that opened it, the layers beneath inert, focus restored). | `app.js`, `screens/discover-screen.js`, every dialog |
 | `input-modality.js` | The input modality on `<html>` (mouse, touch, keyboard, gamepad), so hover and the focus ring only show for their own input. | `menu-navigator.js` |
 | `input-manager.js` | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step with press edges, resolved for the fighter being played; the controller's menu commands and cursor stick; binding capture. | `app.js` |
@@ -72,7 +72,8 @@ There are no import cycles (checked over every module).
 | Module | Owns | Used by |
 | --- | --- | --- |
 | `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), the camera and all canvas drawing. | `battle.js`, `practice.js` |
-| `battle.js` | `Battle` (Quick Battle and Watch Mode): phases, timer, score, K.O., each side's controller (the player's Automatic turn-around setting to the player's alone). | `screens/battle-screen.js` |
+| `battle.js` | `Battle` (Quick Battle and Watch Mode): phases (intro, fight, celebration), timer, score, the match's end exactly once (`finishMatch`, the frozen `final` result), each side's controller (the player's Automatic turn-around setting to the player's alone) and each CPU's celebration after the match. | `screens/battle-screen.js` |
+| `match-stats.js` | `MatchStats`: each side's match statistics from the combat events and each CombatState's running totals, kept across lives, frozen with the result. | `battle.js` |
 | `practice.js` | `PracticeSession`: Player 1 (with the player's Automatic turn-around setting, every fighter swapped in included) and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
 | `physics.js` | Bodies, integration, stage collision (`StageCollision`, with its runtime platforms, static and dynamic (`active`, `prevX` / `prevY`, `interpolate`), and the queries `surfaceBelow`, `supportsAt`, `solidAcross`, `floorSection` and `inVoid`; the ground's kind, finite or continuous, and a finite one's sections (`resolveGround`, `GROUND_TYPES`, `floors`, `breakableFloors`: a solid switched off, `active` false, is gone from every query); the visible `dangerZones`; `stepBody` (of two surfaces at one height, the one under a body's centre), `carryBody` (riding a moving platform), `releaseGround` (letting go of a vanished platform or a broken section, or standing on the neighbour still under it), `separate`, `dropThrough`). | `arena.js`, `platform-hazards.js`, `fighters/fighter.js`, `rendering/hit-fx.js`, `ui/stage-preview.js` |
 | `stage-hazards.js` | `StageHazards`, `VolcanoController`, `IceSectionController` and `BlizzardController`: each stage hazard's own state machine and random stream (the volcano's dormant and erupting periods drawn at random, its eruption phases and volleys; an ice section's contacts, one per new footing, its fracture network, its break (critical, separating with its floor section switched off, collapsing, destroyed) and its falling pieces; the weather's checks, 0.25 each, and its calm, warning, blizzard and clearing), the rocks in flight, where each lands, its warning (`rockWarning`, the stage's live `dangerZones`, an unstable ice section's too), its impact, and its hit through `CombatSystem.hazardHit` (no owner, never a projectile); each step's `events`; a preview's `demo`. | `arena.js`, `ui/stage-preview.js`, `stages/adamaris-theme.js`, `stages/jokull-theme.js` |
@@ -95,6 +96,7 @@ There are no import cycles (checked over every module).
 | `combat/technique.js` | The technique runtime. | `fighters/fighter.js`, `ai/moveset.js`, `data/loadout.js` |
 | `combat/launch-bounce.js` | Launch rebounds and their settings. | `fighters/fighter.js`, `rendering/hit-fx.js` |
 | `ai/combat-ai.js` | `CombatAIController`: CPU Intelligence as the modes build it. | `battle.js` |
+| `ai/celebration.js` | `CelebrationController`: a CPU's behaviour once its match is over (ability spam, the Void run, idle, dash dance, jump spam), on a seeded stream of its own. | `battle.js` |
 | `ai/moveset.js` | `readMoveset`, `hurtExtent`: a definition read raw. | `ai/cpu-intelligence/capabilities.js` |
 | `ai/cpu-intelligence/brain.js` | `CpuIntelligence`: the layers run every step in their order, the choice to commit (the value of waiting, pressure resets, hit-confirm), plans (breaking off to a safer spot, deliberate waits), recovery, the intent-aware liveness, the attack orientation, test directives (see [CPU Intelligence](../systems/ai.md)). | `ai/combat-ai.js` |
 | `ai/cpu-intelligence/capabilities.js` | `analyzeCapabilities` (each move's timing, reach, strikes and roles), `moveReady`, `MOVE_ROLES`. | the other CPU Intelligence modules |
@@ -146,7 +148,7 @@ registries through English/French translation keys and scroll independently.
 
 | `js/ui/` module | Owns | Used by |
 | --- | --- | --- |
-| `components.js` | Shared menu pieces (headers with their setup steps, each setup's steps and Quick Battle's play types, buttons, hint bars). | the setup screens, battle, practice, discover |
+| `components.js` | Shared menu pieces (headers with their setup steps, each setup's steps and Quick Battle's play types, buttons, the Settings gear and X of a dialog that pauses play (`dialogControls`), hint bars). | the setup screens, battle, practice, discover |
 | `hud.js` | The battle and practice HUD (DOM). | `screens/battle-screen.js`, `screens/practice-screen.js` |
 | `ability-hud.js` | The ability HUD (DOM): Player 1's moves, art and keyboard or controller inputs on a ground / air wheel, with their cooldowns, for keyboard and controller play. | `screens/battle-screen.js`, `screens/practice-screen.js` |
 | `touch-controls.js` | `TouchControls`: both touch layouts, one press per touch, and Player 1's live move state on the combat buttons (`showStatus`, read through `game/combat/move-status.js`). | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |
@@ -156,7 +158,7 @@ registries through English/French translation keys and scroll independently.
 | `fighter-browser.js` | `FighterBrowser`: the roster read-only for Discover's Fighters page (no Confirm; a press only selects), each fighter's difficulty stars in the Available badge's place and the Play style description button, using the shared `InfoDialog`. | `screens/discover-screen.js` |
 | `sprite-art.js` | Portrait and preview painting. | `fighter-roster.js`, `hud.js`, `stage-preview.js` |
 | `stage-preview.js` | Select Stage's live preview (and still thumbnails); an animated preview of a stage with hazards runs them in its own `StageCollision`, `PlatformHazards` and `StageHazards` (a demonstration: Jökull's wings break, and form again, on a timer of their own). | `screens/map-select-screen.js` |
-| `overlays.js` | The loading overlay, the confirm dialog (`alertdialog`), and the `role="dialog"` modals built on one shared base (its own navigation scope, the screen beneath inert, focus returned): the choice dialog (Quick Battle's play type) and the information dialog (`InfoDialog`, Discover's play-style description). | `core/app.js`, `ui/install-dialog.js` |
+| `overlays.js` | The loading overlay, the confirm dialog (`alertdialog`; over a paused game, with Settings and the X), and the `role="dialog"` modals built on one shared base (its own navigation scope, the screen beneath inert, focus returned): the choice dialog (Quick Battle's play type) and the information dialog (`InfoDialog`, Discover's play-style description). | `core/app.js`, `ui/install-dialog.js` |
 | `install-dialog.js` | `InstallDialog`, what Home's Download button opens: the explanation, the browser's own installation where offered, the manual steps per platform (`INSTALL_INSTRUCTIONS`), the installed state; on the shared modal base. | `core/app.js` |
 | `settings-dialog.js`, `language-dialog.js` | Settings; the first-launch language chooser. | `core/app.js` |
 | `controller-dialog.js` | Controller Connections (Home's controller button), and the status marks the Home indicator shares. | `core/app.js`, `screens/home-screen.js` |

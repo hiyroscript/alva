@@ -41,9 +41,12 @@
   color: var(--text-strong);
 }
 /* The settings dialog's close button, shared by the choice dialog's
-   (css/overlays.css). */
+   (css/overlays.css) and by the Settings gear and X at the top right of
+   every dialog over a paused game and of the Match Results
+   (.dialog-controls, css/battle-overlays.css). */
 .settings-close,
-.dialog-close {
+.dialog-close,
+.dialog-settings {
   flex: none;
   display: grid;
   place-items: center;
@@ -55,10 +58,16 @@
   color: var(--text);
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
-.settings-close .icon, .dialog-close .icon { font-size: 20px; }
-:where(html:not(.is-touch-input)) .settings-close:hover, :where(html:not(.is-touch-input)) .dialog-close:hover, .settings-close.is-cursor-target, .dialog-close.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
-:where(html:not(.is-pointer-input)) .settings-close:focus, :where(html:not(.is-pointer-input)) .dialog-close:focus { box-shadow: var(--focus-ring); }
-.settings-close:active, .dialog-close:active { transform: scale(0.96); }
+.settings-close .icon, .dialog-close .icon, .dialog-settings .icon { font-size: 20px; }
+:where(html:not(.is-touch-input)) .settings-close:hover, :where(html:not(.is-touch-input)) .dialog-close:hover, :where(html:not(.is-touch-input)) .dialog-settings:hover, .settings-close.is-cursor-target, .dialog-close.is-cursor-target, .dialog-settings.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .settings-close:focus, :where(html:not(.is-pointer-input)) .dialog-close:focus, :where(html:not(.is-pointer-input)) .dialog-settings:focus { box-shadow: var(--focus-ring); }
+.settings-close:active, .dialog-close:active, .dialog-settings:active { transform: scale(0.96); }
+/* The gear turns a little as it is pointed at or focused, as Home's does. */
+.dialog-settings .icon { transition: transform var(--dur) var(--ease); }
+:where(html:not(.is-touch-input)) .dialog-settings:hover .icon, .dialog-settings.is-cursor-target .icon, :where(html:not(.is-pointer-input)) .dialog-settings:focus .icon { transform: rotate(30deg); }
+/* Settings then the X, side by side at a dialog's top right. */
+.dialog-controls { flex: none; display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.dialog-controls[hidden] { display: none; }
 /* Header and tabs stay fixed; only the active panel can scroll. The rail
    scrolls horizontally when more categories (or longer labels) need room. */
 .settings-tabs {

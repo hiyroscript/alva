@@ -143,10 +143,13 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 // ---- 1. Capitalization -----------------------------------------------------------
 
 // Labels the interface shows as they are written: the brand, the CPU and
-// Player 1's tag, and the round banners (READY, ROUND 1, FIGHT, K.O....).
+// Player 1's tag, the round banners and the final announcement (READY,
+// ROUND 1, FIGHT, VICTORY!...), and the Match Results' heading and outcome
+// lines (MATCH RESULTS, TEAM I — WINNER...), announced like the banners.
 const UPPERCASE_ALLOWED = (key, value) =>
-  key.startsWith('banner.') || ['brand.title', 'slot.p1', 'slot.cpu', 'slot.cpu1', 'slot.cpu2', 'step.opponent'].includes(key)
-  || /^(ALVA|CPU( \d| \{n\})?|P1|J1|K\.-?O\.)$/.test(value);
+  key.startsWith('banner.') || key === 'results.title' || key.startsWith('results.line.')
+  || ['brand.title', 'slot.p1', 'slot.cpu', 'slot.cpu1', 'slot.cpu2', 'step.opponent'].includes(key)
+  || /^(ALVA|CPU( \d| \{n\})?|P1|J1)$/.test(value);
 
 test('no ordinary interface string is written in capitals, in English or French: only ALVA, CPU, P1 and the round banners', () => {
   for (const [name, strings] of [['en', EN], ['fr', FR]]) {
@@ -157,7 +160,8 @@ test('no ordinary interface string is written in capitals, in English or French:
       assert.notEqual(letters, letters.toUpperCase(), `${name} ${key}: "${value}"`);
     }
   }
-  for (const key of ['banner.ready', 'banner.round', 'banner.fight', 'banner.timeOver', 'banner.ko', 'banner.overtime']) {
+  for (const key of ['banner.ready', 'banner.round', 'banner.fight', 'banner.overtime', 'banner.victory', 'banner.defeat', 'banner.game',
+    'results.title', 'results.line.p1.winner', 'results.line.draw']) {
     const caps = (value) => value.replace(/\{[^}]*\}/g, '');
     assert.equal(caps(EN[key]), caps(EN[key]).toUpperCase(), `${key} keeps its announcement capitals`);
     assert.equal(caps(FR[key]), caps(FR[key]).toUpperCase(), `${key} keeps its announcement capitals in French`);
@@ -179,7 +183,8 @@ test('menu labels, titles and buttons are in sentence case', () => {
     'pause.home': 'Return to home', 'confirmHome.title': 'Return to home?', 'confirmHome.cancel': 'Keep playing',
     'map.random': 'Random stage', 'setup.quickBattle': 'Quick battle', 'setup.watch': 'Watch mode',
     'practice.title': 'Practice ground', 'home.watch': 'Watch mode', 'home.practice': 'Practice ground',
-    'side.quickBattle.p1.wins': 'Player 1 wins', 'side.quickBattle.p2.wins': 'CPU wins', 'side.watch.p1.wins': 'CPU 1 wins',
+    'team.p1': 'Team I', 'team.p2': 'Team II', 'toast.view': 'View match results', 'results.changeFighters': 'Change fighters',
+    'results.home': 'Return to home screen', 'stats.damageDealt': 'Total damage dealt',
     'mode.title': 'Select mode', 'difficulty.title': 'Select difficulty', 'map.title': 'Select stage',
     'quickPlay.custom.name': 'Custom play', 'quickPlay.regular.name': 'Regular play', 'howToPlay.title': 'How to play',
     'install.add': 'Add to home screen', 'install.notNow': 'Not now', 'install.gotIt': 'Got it', 'control.extra_attack': 'Extra attack',
@@ -193,9 +198,12 @@ test('menu labels, titles and buttons are in sentence case', () => {
     'Firefox', 'Enter', 'Esc', 'A', 'D-pad', 'Run', 'Discover', 'Settings', 'Quick', 'Watch', 'Practice', 'Custom',
     'Regular', 'Combat', 'Mobile', 'Controls', 'Movement', 'Launch', 'Fighters', 'Up', 'Down', 'Page',
     // The Mash Combo, a game term like the Shield or the Dash.
-    'Mash', 'Combo']);
+    'Mash', 'Combo',
+    // The teams' Roman numerals (Team I, Team II), and game terms counted in
+    // the Match Results (Perfect Shields, Successful Deflects).
+    'I', 'II', 'Shields', 'Deflects']);
   for (const [key, value] of Object.entries(EN)) {
-    if (typeof value !== 'string' || key.startsWith('banner.') || key.startsWith('ability.') || key.startsWith('credits.')) continue;
+    if (typeof value !== 'string' || UPPERCASE_ALLOWED(key, value) || key.startsWith('ability.') || key.startsWith('credits.')) continue;
     if (/[.!?…:]/.test(value) || value.split(' ').length > 5) continue; // sentences and prose
     const later = value.replace(/\{[^}]*\}/g, '').split(/\s+/).slice(1).filter((w) => /^\p{Lu}/u.test(w));
     for (const word of later) {
@@ -310,7 +318,7 @@ test('focus moved by script never looks like a hover or a keyboard focus', () =>
 // ---- 3. Glass ----------------------------------------------------------------------------
 
 // Every dialog panel class, and the dialogs' sources.
-const PANELS = ['dialog-panel', 'pause-panel', 'settings-panel', 'language-panel', 'controller-editor-panel', 'practice-roster-dialog'];
+const PANELS = ['dialog-panel', 'pause-panel', 'results-panel', 'settings-panel', 'language-panel', 'controller-editor-panel', 'practice-roster-dialog'];
 const DIALOG_SOURCES = ['js/ui/overlays.js', 'js/ui/controller-dialog.js', 'js/ui/settings-dialog.js', 'js/ui/language-dialog.js',
   'js/ui/install-dialog.js', 'js/ui/controller-editor.js', 'js/screens/battle-screen.js', 'js/screens/practice-screen.js'];
 
@@ -361,9 +369,12 @@ test('one dim for every dialog: the shared scrim, perceptible, never black', () 
     assert.match(overlays, new RegExp(`\\.${overlay}\\b`), overlay);
   }
   assert.match(body, /background: var\(--scrim\);/);
-  for (const overlay of ['pause-overlay, \\.result-overlay', 'practice-menu-overlay', 'practice-roster-overlay']) {
+  for (const overlay of ['pause-overlay', 'practice-menu-overlay', 'practice-roster-overlay']) {
     assert.match(css, new RegExp(`\\n\\.${overlay} \\{[^}]*background: var\\(--scrim\\);`), overlay);
   }
+  // The Match Results pause nothing: the battle plays on behind them,
+  // undimmed.
+  assert.match(css, /\n\.results-overlay \{[^}]*background: transparent;/);
   assert.doesNotMatch(css, /\.language-overlay \{[^}]*background: #000/, 'the first-launch chooser no longer blacks Home out');
 });
 
@@ -375,11 +386,11 @@ test('every rectangular menu control has the Home Play button\'s 3 px corners; c
   const radius = (selector) => css.match(new RegExp(`\\n${selector.replace(/\./g, '\\.')} \\{[^}]*border-radius: ([^;]+);`))?.[1];
   for (const control of ['.home-action', '.btn', '.btn-back', '.pause-btn-item', '.mode-card', '.mode-cta', '.difficulty-card',
     '.slot', '.stage-tile', '.settings-language, .settings-choice', '.settings-option', '.language-option', '.cycler',
-    '.controller-row', '.touch-editor-step', '.dialog-panel', '.pause-panel', '.practice-roster-dialog', '.settings-panel',
+    '.controller-row', '.touch-editor-step', '.dialog-panel', '.pause-panel', '.results-panel', '.practice-roster-dialog', '.settings-panel',
     '.language-panel', '.controller-editor-panel', '.text-action']) {
     assert.equal(radius(control), 'var(--radius-menu)', control);
   }
-  assert.match(css, /\n\.settings-close,\n\.dialog-close \{[^}]*border-radius: var\(--radius-menu\);/);
+  assert.match(css, /\n\.settings-close,\n\.dialog-close,\n\.dialog-settings \{[^}]*border-radius: var\(--radius-menu\);/);
   // Tabs keep their open edge, with the same corners.
   assert.equal(radius('.settings-tab'), 'var(--radius-menu) var(--radius-menu) 0 0');
   // No menu control is left on the larger radii.
