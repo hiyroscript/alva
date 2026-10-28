@@ -188,9 +188,10 @@ export class ControllerDialog extends ModalDialog {
   }
 
   // One supported controller: "Controller n — name", its family, status
-  // and assignment, and Use for Player 1 when it is available.
+  // and assignment (Player 1's, the one Player 2 plays Local Play with,
+  // available or inactive), and Use for Player 1 when it is not Player 1's.
   deviceItem(d, n) {
-    const assignment = d.player1 ? 'player1' : d.active ? 'available' : 'inactive';
+    const assignment = d.player1 ? 'player1' : d.player2 ? 'player2' : d.active ? 'available' : 'inactive';
     const item = el('li', { class: `controller-device is-${assignment}` }, [
       el('div', { class: 'controller-device-head' }, [
         el('p', { class: 'controller-device-name' }, [
@@ -205,7 +206,7 @@ export class ControllerDialog extends ModalDialog {
         el('div', {}, [el('dt', tx('controller.assignLabel')), el('dd', { class: 'controller-assignment', ...tx(`controller.assignment.${assignment}`) })]),
       ]),
     ]);
-    if (assignment === 'available') {
+    if (assignment === 'available' || assignment === 'player2') {
       const use = el('button', {
         class: 'btn controller-use', type: 'button', 'data-nav': true, 'data-device': d.key,
         ...tx('controller.useForP1'), ...tattr('aria-label', 'controller.useForP1Label', { n }),

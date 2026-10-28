@@ -102,6 +102,10 @@ blocks every attack.
   below, then the lower Launch Point, and a tie if that is level too.
 - **Watch Mode**: CPU against CPU, any two fighters, mirror matches
   included, under the same clock and overtime.
+- **Local Play**: two players on one device, each on their own
+  PlayStation or Xbox controller: each picks a fighter (the same one too),
+  then a stage, and they fight under the same rules, each with their own
+  move HUD; Player 1 red, Player 2 blue.
 - **Practice Ground**: a training room with a stand-still dummy, damage
   numbers and fighter swaps.
 - **Five stages**, Yerma, Sol-Noir, Asperitas, Adamaris and Jökull, plus the

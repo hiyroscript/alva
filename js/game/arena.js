@@ -30,8 +30,10 @@ import { HIT_FX, HitEffects, whiteFrame } from './rendering/hit-fx.js';
 import { createTheme } from '../stages/index.js';
 import { slotLabel, t } from '../localization/i18n.js';
 
-// Ground ring + name tag tones: the player is white, the CPU a mid gray.
-const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
+// Ground ring + name tag tones: the player is white, the CPU a mid gray. A
+// mode may give its own (Local Play: each player's colour, see
+// markerColors), always by slot, never by where a fighter stands.
+export const MARKER = Object.freeze({ p1: '#ffffff', p2: '#a3a3a3' });
 // Debug overlay: techniques get their own dashed colour, apart from
 // melee / clone (orange) and projectile (magenta) boxes.
 const TECHNIQUE_DEBUG = '#29f0ff';
@@ -97,11 +99,15 @@ export class Arena {
     // where it went out, then dropped. Art only.
     this.castEffects = [];
     // The fighter whose move cooldowns a screen's ability HUD shows
-    // (js/ui/ability-hud.js), or null: its world-space cooldown rings step
-    // aside for it, so the same timer is never shown twice as prominently.
-    // Every other fighter (the CPU, any fighter in a mode without that HUD)
-    // keeps its rings.
+    // (js/ui/ability-hud.js), or a list of them (Local Play's two players,
+    // each with their own HUD), or null: their world-space cooldown rings
+    // step aside for it, so the same timer is never shown twice as
+    // prominently. Every other fighter (the CPU, any fighter in a mode
+    // without that HUD) keeps its rings.
     this.hudCooldownsFor = null;
+    // Each slot's marker tone (the ground ring, the name tag and the
+    // off-screen pointer).
+    this.markerColors = MARKER;
     // A technique (js/game/combat/technique.js) lives on the
     // fighter performing it (`fighter.technique`), not here: that fighter
     // updates and ends it, and a reset ends it. What it releases is a
@@ -359,14 +365,17 @@ export class Arena {
   // One step of every respawn wait. A fighter whose wait is over is back at
   // its own spawn (Fighter.respawn: 0 Launch Point, full Energy, every
   // cooldown ready, nothing transient) and in play at once. Buffered presses
-  // made while Player 1 was out are dropped, so it comes back neutral.
+  // made while a player was out are dropped, so it comes back neutral: that
+  // player's own (in Local Play the other player's are untouched).
   updateRespawns(dt) {
     for (const f of this.fighters) {
       if (f.respawnTimer === null) continue;
       f.respawnTimer -= dt;
       if (f.respawnTimer > 1e-6) continue;
       f.respawn(this.stage);
-      if (f.controller?.kind === 'player') this.input.flush();
+      if (f.controller?.kind !== 'player') continue;
+      if (f.controller.flush) f.controller.flush();
+      else this.input.flush();
     }
   }
 
@@ -526,7 +535,7 @@ export class Arena {
     // Player ring marker on the ground.
     ctx.save();
     ctx.globalAlpha = 0.85 * fade;
-    ctx.strokeStyle = MARKER[f.slot];
+    ctx.strokeStyle = this.markerColor(f);
     ctx.lineWidth = Math.max(1.5, view.scale * 1.2);
     ctx.beginPath();
     ctx.ellipse(sx, sy, rx * 1.1, ry * 1.35, 0, 0, Math.PI * 2);
@@ -713,7 +722,7 @@ export class Arena {
       const [x, , footY] = this.markerAnchor(f);
       if (!statusOnScreen(x, footY, view)) continue;
       drawEnergyBar(ctx, f, this.energyBarRect(f), view.dpr);
-      if (f !== this.hudCooldownsFor) drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
+      if (!this.cooldownsInHud(f)) drawCooldownIndicators(ctx, f, x, footY, view.scale, view.dpr);
       const mark = this.specialMarkRect(f);
       if (mark) drawSpecialMark(ctx, mark, view.dpr, this.fxTime, this.reducedMotion);
       const charm = this.charmMarkRect(f);
@@ -728,6 +737,18 @@ export class Arena {
     }
   }
 
+  // Whether a screen's ability HUD carries `f`'s cooldowns (see
+  // hudCooldownsFor).
+  cooldownsInHud(f) {
+    const shown = this.hudCooldownsFor;
+    return Array.isArray(shown) ? shown.includes(f) : f === shown;
+  }
+
+  // `f`'s marker tone: its slot's.
+  markerColor(f) {
+    return this.markerColors?.[f.slot] ?? MARKER[f.slot] ?? MARKER.p2;
+  }
+
   drawMarkers(fighters = this.inPlay) {
     const { ctx, view } = this;
     const s = view.scale;
@@ -736,7 +757,7 @@ export class Arena {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     for (const f of fighters) {
-      const color = MARKER[f.slot];
+      const color = this.markerColor(f);
       // The tag as the HUD shows it, in the interface language (P1 or J1).
       const tag = slotLabel(f.label);
       const [x, top, footY] = this.markerAnchor(f);

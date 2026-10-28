@@ -271,7 +271,9 @@ test('Help is gone from the pause overlay: no button, view, scroll area, state o
   };
   walk(screen.pauseOverlay);
   assert.doesNotMatch(everything.join(' '), /help/i, 'no Help text, label, id or class');
-  assert.equal(screen.pauseOverlay.querySelector('.pause-panel').children.length, 1, 'one view: the menu');
+  // The menu, and Local Play's lost-controller view (hidden outside it).
+  assert.deepEqual(screen.pauseOverlay.querySelector('.pause-panel').children, [screen.pauseMenuView, screen.connectionView], 'the menu, and no Help view');
+  assert.equal(screen.connectionView.hidden, true);
   for (const key of ['helpBtn', 'helpOpen', 'helpScroll', 'pauseHelpView', 'openHelp', 'closeHelp']) {
     assert.equal(screen[key], undefined, key);
   }

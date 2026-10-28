@@ -38,12 +38,15 @@ import { CharacterSelectScreen } from '../screens/character-select-screen.js';
 import { QuickCpuScreen } from '../screens/quick-cpu-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../screens/watch-screens.js';
+import { LocalModeSelectScreen, LocalFighterScreen, LocalMapScreen } from '../screens/local-play-screens.js';
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
 import { DiscoverScreen } from '../screens/discover-screen.js';
 
-// Quick Battle's choices, and Watch Mode's apart from them (one difficulty
-// for both CPUs, a fighter each), as they start. Quick Battle's play type
+// Quick Battle's choices, Watch Mode's apart from them (one difficulty for
+// both CPUs, a fighter each) and Local Play's apart from both (each
+// player's fighter and the stage: js/screens/local-play-screens.js), as
+// they start. Quick Battle's play type
 // (Regular Play until Custom Play is chosen in Select Mode), Player 1's
 // fighter, the CPU's fighter and the stage are the one state its Battle is
 // started from (js/screens/quick-battle-setup.js): Regular Play draws the
@@ -66,6 +69,12 @@ export function initialSelection() {
       cpu2CharacterId: firstFighter,
       mapId: MAPS[0].id,
     },
+    local: {
+      mode: 'quick-battle',
+      p1CharacterId: firstFighter,
+      p2CharacterId: firstFighter,
+      mapId: MAPS[0].id,
+    },
   };
 }
 
@@ -79,9 +88,10 @@ export class App {
     // follows the language.
     this.settings = new Settings();
     // Game controllers: up to four connected PlayStation / Xbox pads, one
-    // of them Player 1's. Its gameplay buttons follow the fighter played,
-    // through that fighter's saved controller layout (Settings › Controls ›
-    // Controller controls) or its recommended one.
+    // of them Player 1's (and in Local Play another Player 2's). Their
+    // gameplay buttons follow the fighter played, through that fighter's
+    // saved controller layout (Settings › Controls › Controller controls)
+    // or its recommended one.
     this.controllers = new ControllerManager();
     this.input = new InputManager(CONFIG.bindings, {
       controllers: this.controllers,
@@ -141,6 +151,11 @@ export class App {
     s.register(new WatchFighterScreen(this, 1));
     s.register(new WatchFighterScreen(this, 2));
     s.register(new WatchMapScreen(this));
+    // Local Play's: Local mode → Player 1's fighter → Player 2's → Stage.
+    s.register(new LocalModeSelectScreen(this));
+    s.register(new LocalFighterScreen(this, 1));
+    s.register(new LocalFighterScreen(this, 2));
+    s.register(new LocalMapScreen(this));
     s.register(new BattleScreen(this));
     s.register(new PracticeGroundScreen(this));
     s.register(new DiscoverScreen(this));
@@ -163,6 +178,23 @@ export class App {
     if (!isCurrent()) return;
     this.screens.go('home', {}, { reset: true });
     return this.languageDialog.ensureChosen();
+  }
+
+  // Starts a Local Play session (js/core/controller-manager.js startLocal):
+  // Player 1 and Player 2 each keep their own controller, and Player 2's is
+  // read, until endLocalPlay. False, and nothing starts, without two
+  // controllers.
+  startLocalPlay() {
+    if (!this.controllers.startLocal()) return false;
+    this.input.setLocalPlay(true);
+    return true;
+  }
+
+  // Ends the session (Home): Player 2's controller is no longer read, and
+  // the menus are Player 1's again.
+  endLocalPlay() {
+    this.input.setLocalPlay(false);
+    this.controllers.endLocal();
   }
 
   // Re-reads every string on the page in the new language: each marked one

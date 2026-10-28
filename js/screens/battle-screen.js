@@ -2,12 +2,30 @@
 // the match's final announcement, its result toast and its Match Results
 // dialog, and drives the Battle simulation from the app loop.
 //
-// It runs both kinds of Battle: Quick Battle (Player 1 against the CPU, a
-// fighter each: characterId and cpuCharacterId, which may be the same one)
-// and Watch Mode (params.mode 'watch': CPU 1 against CPU 2, a fighter each,
-// one difficulty for both). Watch Mode is for watching only: no gameplay
-// input and no touch controls, while pause, restart, rematch and Return to
-// Home work as in Quick Battle.
+// It runs every kind of Battle: Quick Battle (Player 1 against the CPU, a
+// fighter each: characterId and cpuCharacterId, which may be the same one),
+// Watch Mode (params.mode 'watch': CPU 1 against CPU 2, a fighter each,
+// one difficulty for both) and Local Play (params.mode 'local': Player 1
+// against Player 2, each on their own controller: p1CharacterId and
+// p2CharacterId, which may be the same one). A mode it does not know is
+// refused, never played as another. Watch Mode is for watching only: no
+// gameplay input and no touch controls, while pause, restart, rematch and
+// Return to Home work as in Quick Battle.
+//
+// Local Play is controllers only: neither fighter takes the keyboard or the
+// touch controls (none show), and each player's own controller plays their
+// own fighter. Both players' move HUDs show at once, Player 1's in the
+// bottom-left corner and Player 2's in the bottom-right, each with its own
+// controller's buttons. Either controller's Options / Menu pauses (once,
+// however many press it), and either one drives the pause menu and the
+// Match Results. A player's controller lost mid-match pauses the whole
+// match at once (the clock and both fighters stop): the pause panel says
+// whose controller went, and offers Reconnect, Return to home, an explicit
+// switch to another connected controller, and Resume once both are back.
+// Player 1 is red and Player 2 blue throughout: the HUD cards, the markers,
+// the move HUDs, the announcement (PLAYER 1 WINS!), the toast and the Match
+// Results; nobody is the protagonist, so a result never says VICTORY or
+// DEFEAT there.
 //
 // The end of a match stops nothing (see the lifecycle in js/game/battle.js).
 // As the Battle decides it, the screen announces it once (VICTORY! or
@@ -32,20 +50,23 @@
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { t, tx, tattr, setText, joinList, slotLabel } from '../localization/i18n.js';
+import { t, tx, tattr, setText, setAttr, joinList, slotLabel } from '../localization/i18n.js';
 import { menuButton, dialogControls } from '../ui/components.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
-import { Battle } from '../game/battle.js';
+import { Battle, BATTLE_MODES } from '../game/battle.js';
 import { STAT_KEYS } from '../game/match-stats.js';
 import { HUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
 import { TouchControls } from '../ui/touch-controls.js';
 import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
+import { deviceName } from '../ui/controller-dialog.js';
+import { PLAYER_NAMES, playerNumber } from '../ui/local-play.js';
 
 // Banner lines by state, as translation keys (with params). The final ones
-// announce the result: the player's VICTORY! or DEFEAT., a draw's GAME., and
-// Watch Mode's VICTORY! over the winning team's name.
+// announce the result: the player's VICTORY! or DEFEAT., a draw's GAME.,
+// Watch Mode's VICTORY! over the winning team's name, and in Local Play the
+// winner by name (PLAYER 1 WINS!) or DRAW.
 const BANNERS = {
   round: { sub: ['banner.ready'], main: ['banner.round', { n: 1 }] },
   fight: { sub: null, main: ['banner.fight'] },
@@ -55,6 +76,9 @@ const BANNERS = {
   game: { sub: null, main: ['banner.game'], final: true },
   'victory.p1': { sub: ['banner.team.p1'], main: ['banner.victory'], final: true },
   'victory.p2': { sub: ['banner.team.p2'], main: ['banner.victory'], final: true },
+  'wins.p1': { sub: null, main: ['banner.playerWins', { n: 1 }], final: true },
+  'wins.p2': { sub: null, main: ['banner.playerWins', { n: 2 }], final: true },
+  draw: { sub: null, main: ['banner.draw'], final: true },
 };
 
 // How long the OVERTIME banner shows once overtime starts (seconds of
@@ -65,8 +89,9 @@ const OVERTIME_BANNER_SECONDS = 1.4;
 // of the celebration's clock).
 export const FINAL_BANNER_SECONDS = 2.4;
 
-// The toast's line for each outcome.
+// The toast's line for each outcome (Local Play's names the player).
 const TOAST_TEXT = { p1: 'toast.p1Wins', p2: 'toast.p2Wins', draw: 'toast.draw' };
+const LOCAL_TOAST_TEXT = { p1: 'toast.player1Wins', p2: 'toast.player2Wins', draw: 'toast.draw' };
 
 // The Match Results' line under its outcome for each way a match ends
 // (Battle.result's reason), a draw's by when it ended.
@@ -85,14 +110,27 @@ const STAT_ROWS = Object.freeze([...STAT_KEYS, 'finalLaunchPoint']);
 
 // Each mode's own Select Stage, where Change Stage goes, and its first
 // fighter selection, where Change fighters goes.
-const STAGE_SCREEN = { 'quick-battle': 'map', watch: 'watch-map' };
-const FIGHTER_SCREEN = { 'quick-battle': 'character', watch: 'watch-cpu1' };
+const STAGE_SCREEN = { 'quick-battle': 'map', watch: 'watch-map', local: 'local-map' };
+const FIGHTER_SCREEN = { 'quick-battle': 'character', watch: 'watch-cpu1', local: 'local-character-p1' };
 
 // The pause dialog's kicker, by mode.
 const MODE_TEXT = {
   'quick-battle': { kicker: 'setup.quickBattle' },
   watch: { kicker: 'setup.watch' },
+  local: { kicker: 'setup.localQuickBattle' },
 };
+
+// Where each mode's choices live (app.selection, or its own part of it)
+// and which of them is each side's fighter.
+const MODE_SELECTION = {
+  'quick-battle': { selection: (app) => app.selection, p1: 'characterId', p2: 'cpuCharacterId' },
+  watch: { selection: (app) => app.selection.watch, p1: 'cpu1CharacterId', p2: 'cpu2CharacterId' },
+  local: { selection: (app) => app.selection.local, p1: 'p1CharacterId', p2: 'p2CharacterId' },
+};
+
+// Each side's name in the Match Results: its team, or in Local Play its
+// player.
+const sideName = (mode, slot) => (mode === 'local' ? PLAYER_NAMES[slot] : `team.${slot}`);
 
 const SLOTS = ['p1', 'p2'];
 
@@ -119,9 +157,12 @@ export class BattleScreen extends Screen {
     this.touchRoot = el('div', { class: 'touch-controls' });
     this.touch = new TouchControls(this.touchRoot, app.input);
     // Player 1's moves in the corner, for keyboard and controller play
-    // (never Watch Mode's: nobody plays there).
-    this.abilityRoot = el('div');
+    // (never Watch Mode's: nobody plays there); in Local Play each player's,
+    // Player 1's bottom left and Player 2's bottom right.
+    this.abilityRoot = el('div', { class: 'ability-hud--p1' });
     this.abilityHud = new AbilityHUD(this.abilityRoot, { input: app.input, settings: app.settings });
+    this.abilityRoot2 = el('div', { class: 'ability-hud--p2' });
+    this.abilityHud2 = new AbilityHUD(this.abilityRoot2, { input: app.input, settings: app.settings, player: 'p2' });
 
     this.bannerSub = el('span', { class: 'banner-sub' });
     this.bannerMain = el('span', { class: 'banner-main' });
@@ -133,14 +174,18 @@ export class BattleScreen extends Screen {
     this.buildResults();
 
     this.el.replaceChildren(
-      this.canvas, this.hudRoot, this.abilityRoot, this.touchRoot, this.banner, this.toast,
+      this.canvas, this.hudRoot, this.abilityRoot, this.abilityRoot2, this.touchRoot, this.banner, this.toast,
       this.pauseOverlay, this.resultsOverlay,
     );
 
     this.battle = null;
-    // 'quick-battle' or 'watch', set as each battle is entered.
+    // 'quick-battle', 'watch' or 'local', set as each battle is entered.
     this.mode = 'quick-battle';
     this.paused = false;
+    // Local Play: whether the pause panel shows a lost controller (see
+    // syncControllers), and the unsubscribe from the controllers.
+    this.connectionShown = false;
+    this.unsubControllers = null;
     // The match's end as this screen has shown it: the result it filled the
     // toast and the Match Results with (once per match), and whether the
     // Match Results are open.
@@ -183,15 +228,47 @@ export class BattleScreen extends Screen {
       el('div', { class: 'pause-menu' }, [resume, restart, home]),
     ]);
 
+    this.buildConnection();
     this.pauseOverlay = el('div', {
       class: 'overlay pause-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title',
-    }, [el('div', { class: 'pause-panel glass glass--panel' }, [this.pauseMenuView])]);
+    }, [el('div', { class: 'pause-panel glass glass--panel' }, [this.pauseMenuView, this.connectionView])]);
 
+    // While a lost controller shows, Back and Start resume only once it is
+    // back.
     this.pauseScope = {
       el: this.pauseOverlay,
       onBack: () => this.resume(),
       onStart: () => this.resume(),
     };
+  }
+
+  // Local Play's lost-controller panel, in the pause panel's place: whose
+  // controller went (or is back), the other connected controllers that
+  // could explicitly take its place, then Resume (only once both players
+  // have one), Reconnect and Return to home.
+  buildConnection() {
+    this.connectionTitle = el('h2', { class: 'pause-title', id: 'connection-title' });
+    this.connectionMessage = el('p', { class: 'connection-message', id: 'connection-message', role: 'alert' });
+    this.connectionHint = el('p', { class: 'connection-hint', ...tx('local.reconnectHint') });
+    this.connectionSpares = el('div', { class: 'connection-spares' });
+    this.connectionResume = menuButton('pause.resume', { primary: true });
+    const reconnect = menuButton('controller.reconnect', { outlineOnly: true });
+    const home = menuButton('pause.home', { outlineOnly: true });
+    this.connectionResume.addEventListener('click', () => this.resume());
+    reconnect.addEventListener('click', () => {
+      this.app.controllers?.refresh?.({ force: true });
+      this.syncControllers();
+    });
+    home.addEventListener('click', () => this.confirmHome());
+    this.connectionView = el('div', { class: 'pause-view connection-view', hidden: true, 'aria-describedby': 'connection-message' }, [
+      el('header', { class: 'pause-header' }, [
+        el('div', { class: 'pause-heading' }, [el('span', { class: 'kicker', ...tx('setup.localQuickBattle') }), this.connectionTitle]),
+      ]),
+      this.connectionMessage,
+      this.connectionHint,
+      this.connectionSpares,
+      el('div', { class: 'pause-menu' }, [this.connectionResume, reconnect, home]),
+    ]);
   }
 
   // The result toast: the outcome on the left, View match results (green)
@@ -271,19 +348,32 @@ export class BattleScreen extends Screen {
 
   async enter(params) {
     const app = this.app;
-    // Watch Mode reads its own selection (app.selection.watch), Quick Battle
-    // the main one; params from the stage screen come first.
-    const mode = params?.mode === 'watch' ? 'watch' : 'quick-battle';
+    // Each mode reads its own selection (app.selection.watch, .local, or
+    // Quick Battle's, the main one); params from the stage screen come
+    // first. No mode is Quick Battle; a mode nobody knows starts nothing.
+    const mode = params?.mode ?? 'quick-battle';
+    if (!Object.hasOwn(BATTLE_MODES, mode) || !Object.hasOwn(MODE_SELECTION, mode)) {
+      this.refuse('battle.unknownMode', 'battle.unavailable');
+      return;
+    }
     const watch = mode === 'watch';
-    const selection = watch ? app.selection.watch : app.selection;
+    const local = mode === 'local';
+    const sides = MODE_SELECTION[mode];
+    const selection = sides.selection(app);
     const pick = (key) => params?.[key] || selection[key];
     // Only a playable fighter can take a side: a missing, unknown, deleted
     // or disabled id (from a stale selection or a direct route) is null.
     // Each side is checked on its own: neither ever stands in for the other.
-    const p1Def = getPlayableCharacter(pick(watch ? 'cpu1CharacterId' : 'characterId'));
-    const p2Def = getPlayableCharacter(pick(watch ? 'cpu2CharacterId' : 'cpuCharacterId'));
+    const p1Def = getPlayableCharacter(pick(sides.p1));
+    const p2Def = getPlayableCharacter(pick(sides.p2));
     if (!p1Def || !p2Def) {
       this.refuse();
+      return;
+    }
+    // Local Play needs its session: each player with their own controller
+    // (one lost since is waited for below, never replaced).
+    if (local && !app.controllers?.inLocal && !app.startLocalPlay?.()) {
+      this.refuse('local.needsControllers', 'local.needsControllersTitle');
       return;
     }
     const map = getMap(pick('mapId'));
@@ -296,22 +386,31 @@ export class BattleScreen extends Screen {
     this.map = map;
     this.difficulty = difficulty;
     setText(this.pauseKicker, MODE_TEXT[mode].kicker);
-    this.canvas.setAttribute('aria-label', watch
-      ? t('battle.watchCanvas', { p1: p1Def.displayName, p2: p2Def.displayName })
-      : t('battle.canvas'));
-    this.canvas.setAttribute('data-i18n-aria-label', '');
+    if (watch) setAttr(this.canvas, 'aria-label', 'battle.watchCanvas', { p1: p1Def.displayName, p2: p2Def.displayName });
+    else if (local) setAttr(this.canvas, 'aria-label', 'battle.localCanvas', { p1: p1Def.displayName, p2: p2Def.displayName });
+    else setAttr(this.canvas, 'aria-label', 'battle.canvas');
     // The touch layout the player chose (Home › Settings › Controls), its
     // custom placement and sizes, and Player 1's fighter for the buttons'
     // art and names, never the CPU's. A spectator has no touch controls at
-    // all.
+    // all, and nor does Local Play: both players play on controllers.
     this.touch.setScheme(app.settings.mobileControls);
     this.touch.setLayout(app.settings.touchLayout(this.touch.scheme));
-    this.touch.setCharacter(watch ? null : p1Def);
-    this.touchRoot.hidden = watch;
+    this.touch.setCharacter(watch || local ? null : p1Def);
+    this.touchRoot.hidden = watch || local;
     this.el.classList.toggle('is-watch', watch);
+    this.el.classList.toggle('is-local', local);
     this.el.dataset.map = map.id;
+    this.hud.setLocal(local);
+    // Player 1's move HUD is that player's own in Local Play (their
+    // controller's buttons, their tag), else whatever Player 1 last used.
+    this.abilityHud.setPlayer(local ? 'p1' : null);
+    // Either player drives the pause menu and the Match Results in Local
+    // Play; elsewhere Player 1 does.
+    app.input.setMenuOwner?.(local ? 'any' : 'p1');
     // Nothing of an earlier battle shows while this one loads.
     this.abilityHud.clear();
+    this.abilityHud2.clear();
+    this.hideConnection();
     this.hideFinal();
     this.token = {};
     const token = this.token;
@@ -353,6 +452,7 @@ export class BattleScreen extends Screen {
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.abilityHud.bind(watch ? null : this.battle.p1);
+    this.abilityHud2.bind(local ? this.battle.p2 : null);
     this.needsResize = true;
     this.paused = false;
     this.hidePause();
@@ -361,22 +461,26 @@ export class BattleScreen extends Screen {
 
     this.unsubKey = app.input.onKey((e) => this.onKey(e));
     document.addEventListener('visibilitychange', this.onVisibility);
+    if (local) this.unsubControllers = app.controllers?.onChange?.(() => this.syncControllers()) ?? null;
     document.activeElement?.blur?.();
     this.setPlayActive(true);
     this.syncAbilityHud();
     this.el.classList.add('is-live');
 
     if (app.device.blockedPortrait) this.pause();
+    // A controller already lost: the match waits for it from the start.
+    if (local) this.syncControllers();
   }
 
-  // A battle whose fighters are not all playable never starts: nothing is
-  // loaded or built, and the loading overlay says so with a way Home.
-  refuse() {
+  // A battle that cannot be played never starts: nothing is loaded or
+  // built, and the loading overlay says why (a side's fighter unavailable,
+  // by default) with a way Home.
+  refuse(message = 'common.fighterUnavailableMessage', title = 'common.fighterUnavailable') {
     const app = this.app;
     this.token = null;
-    app.loading.showError(t('common.fighterUnavailableMessage'), {
+    app.loading.showError(t(message), {
       nav: app.nav,
-      title: 'common.fighterUnavailable',
+      title,
       onBack: () => app.screens.go('home', {}, { reset: true }),
     });
   }
@@ -405,40 +509,59 @@ export class BattleScreen extends Screen {
   // Gameplay input and the touch controls follow play (on while it runs,
   // the celebration after the match included; off while paused, while the
   // Match Results are open, or gone), and only while someone plays: in
-  // Watch Mode nobody controls a fighter, so they stay off throughout.
-  // Pause keys, gamepad Start and the menus never depend on them.
+  // Watch Mode nobody controls a fighter, so they stay off throughout. The
+  // touch controls play nobody in Local Play either. Pause keys, gamepad
+  // Start and the menus never depend on them.
   setPlayActive(on) {
     const playing = on && this.mode !== 'watch';
     this.app.input.setGameplayActive(playing);
-    this.touch.setEnabled(playing);
+    this.touch.setEnabled(playing && this.mode !== 'local');
   }
 
   exit() {
     this.token = null;
     this.unsubKey?.();
     this.unsubKey = null;
+    this.unsubControllers?.();
+    this.unsubControllers = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.setPlayActive(false);
     this.hidePause();
     this.hideFinal();
     this.app.loading.hide();
     this.abilityHud.clear();
+    this.abilityHud2.clear();
     this.battle?.destroy();
     this.battle = null;
-    this.el.classList.remove('is-live');
+    this.el.classList.remove('is-live', 'is-local');
   }
 
   // The ability HUD follows Player 1 while a player plays (the celebration
   // after the match included; never in Watch Mode, never under the Match
   // Results); while it is on show (not on a touch screen, whose touch
   // controls are the interface) it, not the rings over the fighter, carries
-  // Player 1's cooldowns.
+  // Player 1's cooldowns. In Local Play both players' HUDs follow their own
+  // fighters, on a touch screen too (it has no touch controls there), and
+  // carry both players' cooldowns.
   syncAbilityHud() {
     const battle = this.battle;
     const playing = !!battle && this.mode !== 'watch' && !this.resultsOpen;
+    const local = this.mode === 'local';
     if (playing) this.abilityHud.show(battle.p1);
     else this.abilityHud.setVisible(false);
-    if (battle) battle.hudCooldownsFor = this.abilityHud.showing && !this.app.device.touchUI ? battle.p1 : null;
+    if (playing && local) this.abilityHud2.show(battle.p2);
+    else this.abilityHud2.setVisible(false);
+    if (!battle) return;
+    if (!local) {
+      battle.hudCooldownsFor = this.abilityHud.showing && !this.app.device.touchUI ? battle.p1 : null;
+      return;
+    }
+    // One list, kept: this runs every frame.
+    const shown = (this.hudFighters ??= []);
+    shown.length = 0;
+    if (this.abilityHud.showing) shown.push(battle.p1);
+    if (this.abilityHud2.showing) shown.push(battle.p2);
+    battle.hudCooldownsFor = shown;
   }
 
   // The world runs unless the player paused it: through the match and
@@ -461,6 +584,9 @@ export class BattleScreen extends Screen {
     this.touch.setAirborne(!!battle.primary && !battle.primary.grounded);
     this.touch.showStatus(battle.primary);
     this.hud.update(battle);
+    // The move HUDs follow their fighters frame by frame: place, cooldowns,
+    // restrictions.
+    this.syncAbilityHud();
     // Handled after the frame rather than from inside the simulation step:
     // the match's end is shown once, on a settled step.
     if (battle.matchOver && this.shownFinal !== battle.final) this.showFinal();
@@ -534,8 +660,10 @@ export class BattleScreen extends Screen {
 
   // The final announcement for `final`: a draw is GAME.; in Quick Battle
   // the player's own VICTORY! or DEFEAT.; in Watch Mode, with no player,
-  // VICTORY! for the winning team.
+  // VICTORY! for the winning team; in Local Play, between two players, the
+  // winner by name (PLAYER 1 WINS!, PLAYER 2 WINS!) or DRAW.
   finalBanner(final) {
+    if (this.mode === 'local') return final?.winner ? `wins.${final.winner}` : 'draw';
     if (!final?.winner) return 'game';
     if (this.mode === 'watch') return `victory.${final.winner}`;
     return final.winner === 'p1' ? 'victory' : 'defeat';
@@ -564,12 +692,37 @@ export class BattleScreen extends Screen {
     this.el.classList.add('is-paused');
     this.pauseOverlay.hidden = false;
     this.app.nav.pushScope(this.pauseScope);
-    this.pauseMenuView.querySelector('[data-nav-default]').focus({ preventScroll: true });
+    this.showPauseView();
+  }
+
+  // The pause panel shows the lost-controller panel while one is shown
+  // (Local Play), else the pause menu; focus on its first open action.
+  showPauseView() {
+    const connection = this.connectionShown;
+    this.pauseMenuView.hidden = connection;
+    this.connectionView.hidden = !connection;
+    this.pauseOverlay.setAttribute('aria-labelledby', connection ? 'connection-title' : 'pause-title');
+    if (!connection) {
+      this.pauseMenuView.querySelector('[data-nav-default]').focus({ preventScroll: true });
+      return;
+    }
+    const active = document.activeElement;
+    if (active && this.connectionView.contains(active) && !active.disabled) return;
+    [...this.connectionView.querySelectorAll('[data-nav]')].find((b) => !b.disabled)?.focus({ preventScroll: true });
+  }
+
+  // Whether both players' controllers are connected (always, outside
+  // Local Play).
+  get controllersReady() {
+    return this.mode !== 'local' || !(this.app.controllers?.missingPlayers?.().length);
   }
 
   resume() {
     if (!this.paused || this.coveredByDialog) return;
     if (this.app.device.blockedPortrait) return; // stay paused until landscape
+    // Local Play waits for both players' controllers.
+    if (!this.controllersReady) return;
+    this.hideConnection();
     this.hidePause();
     this.paused = false;
     // The Match Results, when they were open beneath the pause menu, keep
@@ -582,6 +735,58 @@ export class BattleScreen extends Screen {
     this.pauseOverlay.hidden = true;
     this.el.classList.remove('is-paused');
     this.app.nav.popScope(this.pauseScope);
+  }
+
+  // ---- Local Play's controllers --------------------------------------------------
+
+  // After any change of controller in a Local Play battle: a player's
+  // controller lost pauses the whole match at once and shows whose went;
+  // once both are back the panel says so and Resume opens (the players
+  // resume when they are ready, through the usual Resume).
+  syncControllers() {
+    if (this.mode !== 'local' || !this.battle) return;
+    const missing = this.app.controllers?.missingPlayers?.() ?? [];
+    if (!missing.length && !this.connectionShown) return;
+    this.connectionShown = true;
+    this.renderConnection(missing);
+    if (!this.paused) this.pause();
+    else if (!this.pauseOverlay.hidden) this.showPauseView();
+    // Both back: focus on Resume, one press away.
+    if (!missing.length && !this.pauseOverlay.hidden) this.connectionResume.focus({ preventScroll: true });
+  }
+
+  // The lost-controller panel for the players in `missing` (none: both
+  // are back).
+  renderConnection(missing) {
+    const lost = missing.length > 0;
+    setText(this.connectionTitle, lost ? 'local.disconnectedTitle' : 'local.reconnectedTitle');
+    if (missing.length > 1) setText(this.connectionMessage, 'local.disconnectedBoth');
+    else if (lost) setText(this.connectionMessage, 'local.disconnected', { n: playerNumber(missing[0]) });
+    else setText(this.connectionMessage, 'local.reconnected');
+    this.connectionView.classList.toggle('is-lost', lost);
+    this.connectionHint.hidden = !lost;
+    this.connectionResume.disabled = lost;
+    // Another connected controller takes a lost player's place only when
+    // the players say so: one button per controller and player.
+    const spares = lost ? this.app.controllers?.spareControllers ?? [] : [];
+    this.connectionSpares.replaceChildren(...missing.flatMap((slot) => spares.map((device) => {
+      const button = el('button', {
+        class: 'pause-btn-item is-outline-only connection-use', type: 'button', 'data-nav': true,
+        ...tx('local.useController', { device: deviceName(device), n: playerNumber(slot) }),
+      });
+      button.addEventListener('click', () => {
+        if (this.app.controllers?.assignLocal?.(slot, device.key)) this.syncControllers();
+      });
+      return button;
+    })));
+    this.connectionSpares.hidden = !this.connectionSpares.children.length;
+  }
+
+  hideConnection() {
+    this.connectionShown = false;
+    this.connectionView.hidden = true;
+    this.pauseMenuView.hidden = false;
+    this.pauseOverlay.setAttribute('aria-labelledby', 'pause-title');
   }
 
   // The app's one Settings dialog over the paused battle, which stays
@@ -633,7 +838,9 @@ export class BattleScreen extends Screen {
     const final = this.battle.final;
     this.shownFinal = final;
     this.fillResults(final);
-    setText(this.toastText, TOAST_TEXT[final.winner ?? 'draw']);
+    const toasts = this.mode === 'local' ? LOCAL_TOAST_TEXT : TOAST_TEXT;
+    setText(this.toastText, toasts[final.winner ?? 'draw']);
+    this.toast.dataset.outcome = final.winner ?? 'draw';
     this.toast.hidden = this.resultsOpen;
   }
 
@@ -683,11 +890,14 @@ export class BattleScreen extends Screen {
   // Team II — Defeated, or Draw — No winner), each team's card, how the
   // match ended, and the statistics, each side's column, the winner's
   // brought forward.
+  // In Local Play each side is its player (Player 1 — Winner), never a
+  // team.
   fillResults(final) {
     const battle = this.battle;
     const winner = final.winner;
+    const side = (slot) => (this.mode === 'local' ? `player${playerNumber(slot)}` : slot);
     const lines = winner
-      ? [[`results.line.${winner}.winner`, 'is-winner'], [`results.line.${other(winner)}.defeated`, 'is-defeated']]
+      ? [[`results.line.${side(winner)}.winner`, 'is-winner'], [`results.line.${side(other(winner))}.defeated`, 'is-defeated']]
       : [['results.line.draw', 'is-draw']];
     this.resultsLine.replaceChildren(...lines.map(([key, cls]) => el('span', { class: `results-line-part ${cls}`, ...tx(key) })));
     this.resultsOverlay.dataset.outcome = winner ?? 'draw';
@@ -697,6 +907,8 @@ export class BattleScreen extends Screen {
       const status = !winner ? 'draw' : winner === slot ? 'winner' : 'defeated';
       card.root.dataset.status = status;
       card.root.classList.toggle('is-winner', winner === slot);
+      setText(card.name, sideName(this.mode, slot));
+      setText(this.statHeads[slot], sideName(this.mode, slot));
       card.fighter.textContent = fighter.def.displayName;
       card.tag.textContent = slotLabel(fighter.label);
       setText(card.status, `results.${status}`);
@@ -763,20 +975,22 @@ export class BattleScreen extends Screen {
 const other = (slot) => (slot === 'p1' ? 'p2' : 'p1');
 
 // A team's card in the Match Results: its fighter's portrait (facing the
-// middle), the team's name, the side's tag (P1, CPU, CPU 1, CPU 2) and its
-// fighter's name, and its status (Winner, Defeated, Draw).
+// middle), the team's name (in Local Play its player's), the side's tag
+// (P1, P2, CPU, CPU 1, CPU 2) and its fighter's name, and its status
+// (Winner, Defeated, Draw).
 function teamCard(slot) {
   const portrait = el('canvas', { class: 'results-portrait', width: 1, height: 1, 'aria-hidden': 'true' });
   const tag = el('span', { class: 'results-team-tag' });
   const fighter = el('span', { class: 'results-team-fighter' });
   const status = el('span', { class: 'results-team-status' });
+  const name = el('span', { class: 'results-team-name', ...tx(`team.${slot}`) });
   const root = el('div', { class: `results-team results-team--${slot}`, 'data-team': slot }, [
     portrait,
     el('div', { class: 'results-team-text' }, [
-      el('span', { class: 'results-team-name', ...tx(`team.${slot}`) }),
+      name,
       el('span', { class: 'results-team-who' }, [tag, fighter]),
       status,
     ]),
   ]);
-  return { root, portrait, tag, fighter, status };
+  return { root, portrait, name, tag, fighter, status };
 }

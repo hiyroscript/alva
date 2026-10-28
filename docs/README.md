@@ -57,6 +57,7 @@ reads, what a fighter may leave out, and its tests.
 
 - [Quick Battle](gameplay/battle.md) (and difficulty)
 - [Watch Mode](gameplay/watch-mode.md)
+- [Local Play](gameplay/local-play.md) (two players, two controllers)
 - [Practice Ground](gameplay/practice.md)
 - [Stages](gameplay/stages.md) (Select Stage's 24-slot roster and Random
   Stage, Asperitas and its platform hazards, Adamaris and its volcano, Jökull's breaking ice and blizzard, and adding a stage)

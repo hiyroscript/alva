@@ -491,7 +491,8 @@ test('a fighter swap replaces the whole moveset and its timers; clearing leaves 
 test('the screens show it for the player only: Quick Battle (its celebration too) and Practice Ground, never Watch Mode or the Match Results', () => {
   const p1 = makeFighter({ character: DEF_0002, sprites: fakeSpritesOf(DEF_0002) }).fighter;
   const hud = new AbilityHUD(new Element('div'), { input: fakeInput() });
-  const screen = { abilityHud: hud, app: { device: { touchUI: false } } };
+  const hud2 = new AbilityHUD(new Element('div'), { input: fakeInput(), player: 'p2' });
+  const screen = { abilityHud: hud, abilityHud2: hud2, app: { device: { touchUI: false } } };
   const sync = BattleScreen.prototype.syncAbilityHud;
   screen.mode = 'quick-battle';
   screen.battle = { p1, phase: 'fight', hudCooldownsFor: null };
@@ -536,7 +537,8 @@ test('the stylesheet: bottom-right in the safe area, hidden on touch screens and
   assert.match(css, /\.ability-hud \{[^}]*right: max\(var\(--safe-r\)[^}]*bottom: max\(var\(--safe-b\)[^}]*pointer-events: none;/s);
   assert.match(css, /html\.is-touch \.ability-hud \{ display: none; \}/);
   assert.match(css, /\.is-paused \.ability-hud,\s*\.is-menu-open \.ability-hud,\s*\.is-roster-open \.ability-hud,\s*\.is-cpu-roster-open \.ability-hud \{\s*opacity: 0;\s*visibility: hidden;/);
-  assert.match(css, /--ah-tile: min\(clamp\([^)]*\), calc\(44vw \/ var\(--ah-count\)/, 'never wider than the screen allows, however many moves');
+  assert.match(css, /--ah-span: 44vw;/);
+  assert.match(css, /--ah-tile: min\(clamp\([^)]*\), calc\(var\(--ah-span\) \/ var\(--ah-count\)/, 'never wider than the screen allows, however many moves');
   assert.match(css, /grid-template-rows: var\(--ah-art-h\) 1px var\(--ah-input-h\);/, 'art, a 1px divider, the input');
   assert.match(css, /image-rendering: pixelated;/);
   // Nothing in it takes focus.

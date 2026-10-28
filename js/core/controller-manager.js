@@ -2,9 +2,10 @@
 //
 // Purpose: find the game controllers the browser exposes, tell which are
 // supported (js/core/gamepad-devices.js), keep at most MAX_CONTROLLERS of
-// them active, assign one to Player 1, and read that one controller's
-// buttons and sticks every frame. It never decides what a button does:
-// the binding resolver (js/core/controller-resolver.js) and the menus do.
+// them active, assign one to Player 1 (and, for Local Play, another to
+// Player 2), and read each player's controller's buttons and sticks every
+// frame. It never decides what a button does: the binding resolver
+// (js/core/controller-resolver.js) and the menus do.
 //
 // Status (the Home controller button's indicator):
 //   'connected'     one to MAX_CONTROLLERS supported controllers
@@ -22,7 +23,18 @@
 //   - else the first active device in order, so a single controller
 //     simply works and, if Player 1's controller is lost, the next one
 //     connected takes over (the player may pick another at any time).
-// Four detected controllers are a connection limit, not multiplayer: only
+// Player 2 is the first other active device in order: the controller Local
+// Play would give the second player (Home's Local play opens only while
+// there is one, see localReady). Two controllers of the same model are two
+// devices: each is told apart by its Gamepad API index as well as its id.
+//
+// A Local Play session (startLocal ... endLocal) freezes both assignments:
+// Player 1 and Player 2 keep their own controller for the whole session,
+// and a controller connected meanwhile (a third, a fourth) never takes
+// either seat. A player whose controller is lost has none (missingPlayers)
+// until that same controller comes back: the same device (index and id),
+// or a device with its id that was not connected when it was lost. Nothing
+// else takes the seat but an explicit assignLocal. Outside a session only
 // Player 1's controller is ever read for play.
 //
 // The browser exposes a gamepad only after a button press on it, may stop
@@ -37,6 +49,9 @@ import { PAD_BUTTONS, TRIGGERS, identifyController, cleanDeviceName, MODELS } fr
 
 export const MAX_CONTROLLERS = 4;
 export const CONTROLLER_STATUSES = Object.freeze(['connected', 'disconnected', 'tooMany']);
+
+// The players a controller can be assigned to.
+export const PLAYER_SLOTS = Object.freeze(['p1', 'p2']);
 
 // A trigger counts as pressed from TRIGGER_PRESS of its travel and as let go
 // below TRIGGER_RELEASE, so a trigger resting half way never flickers.
@@ -58,6 +73,12 @@ function browserGamepads() {
 // A finite axis value in [-1, 1].
 const axis = (value) => (Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0);
 
+// One player's controller as last read: held buttons, the four axes and the
+// triggers past their threshold. `fresh`: the next read reports no presses
+// (whatever is held on a controller just assigned, or as the page comes
+// back, was pressed before).
+const blankReading = () => ({ held: new Set(), axes: [0, 0, 0, 0], triggerDown: new Set(), fresh: true });
+
 export class ControllerManager {
   // `source` returns { api, pads } (the browser's by default); `target`
   // receives the connection events (the window by default).
@@ -70,18 +91,20 @@ export class ControllerManager {
     this.order = new Map(); // device key -> first-seen sequence number
     this.signature = null;
     this.player1Key = null;
-    // The id string of the controller the player chose for Player 1.
+    this.player2Key = null;
+    // The id string (and key) of the controller the player chose for
+    // Player 1.
     this.preferredId = null;
-    // Player 1's controller as last read: held buttons and the four axes.
-    this.held = new Set();
-    this.axes = [0, 0, 0, 0];
-    this.triggerDown = new Set();
+    this.preferredKey = null;
+    // The Local Play session, or null: each player's seat, { key, id,
+    // lost }, `lost` the device keys connected when its controller went
+    // (null while it is connected).
+    this.local = null;
+    // Each player's controller as last read (see blankReading).
+    this.readings = { p1: blankReading(), p2: blankReading() };
     // Whether the page can read controllers right now (false while it is
     // hidden or has lost focus: every button then reads as released).
     this.suspended = false;
-    // The next poll reports no presses: whatever is held on a controller
-    // just assigned, or as the page comes back, was pressed before.
-    this.fresh = true;
     this.refresh();
     target?.addEventListener?.('gamepadconnected', () => this.refresh());
     target?.addEventListener?.('gamepaddisconnected', () => this.refresh());
@@ -132,7 +155,7 @@ export class ControllerManager {
         key, index: pad.index, id: String(pad.id ?? ''),
         name: (info.model && MODELS[info.model].name) || cleanDeviceName(pad.id) || null,
         ...info,
-        active: false, excess: false, player1: false,
+        active: false, excess: false, player1: false, player2: false,
       };
     });
     for (const key of [...this.order.keys()]) if (!keys.has(key)) this.order.delete(key);
@@ -149,27 +172,77 @@ export class ControllerManager {
     this.assign();
   }
 
-  // Player 1: kept, recovered or the first active device (see the top).
+  // Player 1 and Player 2: kept, recovered or the first active devices
+  // (see the top); in a Local Play session, each player's own.
   assign() {
     const active = this.devices.filter((d) => d.active);
-    let p1 = this.preferredId !== null ? active.find((d) => d.id === this.preferredId) ?? null : null;
-    if (!p1) p1 = active.find((d) => d.key === this.player1Key) ?? null;
-    if (!p1) p1 = active[0] ?? null;
-    const key = p1?.key ?? null;
-    for (const d of this.devices) d.player1 = d.key === key;
-    if (key !== this.player1Key) {
-      this.player1Key = key;
-      // A new Player 1 controller starts from nothing held, and what is
-      // held on it already is no press.
-      this.held = new Set();
-      this.triggerDown = new Set();
-      this.axes = [0, 0, 0, 0];
-      this.fresh = true;
+    let p1;
+    let p2;
+    if (this.local) {
+      // Each player's own controller first, then a lost one recovered.
+      const own = (slot) => active.find((d) => d.key === this.local[slot].key) ?? null;
+      p1 = own('p1');
+      p2 = own('p2');
+      if (p2 === p1) p2 = null;
+      p1 ??= this.recover('p1', active, p2);
+      p2 ??= this.recover('p2', active, p1);
+      this.takeSeat('p1', p1);
+      this.takeSeat('p2', p2);
+    } else {
+      // The chosen device itself first: another controller of the same
+      // model shares its id.
+      const chosen = (d) => d.id === this.preferredId;
+      p1 = this.preferredId !== null
+        ? active.find((d) => chosen(d) && d.key === this.preferredKey) ?? active.find(chosen) ?? null
+        : null;
+      if (!p1) p1 = active.find((d) => d.key === this.player1Key) ?? null;
+      if (!p1) p1 = active[0] ?? null;
+      p2 = active.find((d) => d !== p1) ?? null;
+    }
+    this.setPlayers(p1?.key ?? null, p2?.key ?? null);
+  }
+
+  // In a session, `slot`'s lost controller come back: a device with its id
+  // that was not connected when it was lost (never `other`, the other
+  // player's), or null.
+  recover(slot, active, other) {
+    const seat = this.local[slot];
+    if (!seat.lost) return null;
+    return active.find((d) => d !== other && d.id === seat.id && !seat.lost.has(d.key)) ?? null;
+  }
+
+  // `slot`'s seat on `device`, or, without one, lost: the devices
+  // connected as it went are remembered (see recover).
+  takeSeat(slot, device) {
+    const seat = this.local[slot];
+    if (device) {
+      seat.key = device.key;
+      seat.lost = null;
+    } else if (!seat.lost) {
+      seat.lost = new Set(this.devices.map((d) => d.key));
+    }
+  }
+
+  // Marks Player 1's and Player 2's devices. A player whose controller
+  // changed starts from nothing held, and what is held on the new one
+  // already is no press.
+  setPlayers(p1Key, p2Key) {
+    for (const d of this.devices) {
+      d.player1 = d.key === p1Key;
+      d.player2 = d.key === p2Key;
+    }
+    if (p1Key !== this.player1Key) {
+      this.player1Key = p1Key;
+      this.readings.p1 = blankReading();
+    }
+    if (p2Key !== this.player2Key) {
+      this.player2Key = p2Key;
+      this.readings.p2 = blankReading();
     }
   }
 
   // The device records, in order: { key, index, id, name, supported,
-  // family, model, reason, active, excess, player1, slot }.
+  // family, model, reason, active, excess, player1, player2, slot }.
   get list() {
     return this.devices;
   }
@@ -197,25 +270,97 @@ export class ControllerManager {
     return this.devices.find((d) => d.player1) ?? null;
   }
 
+  // Player 2's device record (see the top), or null.
+  get player2() {
+    return this.devices.find((d) => d.player2) ?? null;
+  }
+
+  // `slot`'s ('p1' / 'p2') device record, or null.
+  playerDevice(slot) {
+    return slot === 'p2' ? this.player2 : slot === 'p1' ? this.player1 : null;
+  }
+
   // The family Player 1's controller is ('playstation' / 'xbox'), or null.
   get family() {
     return this.player1?.family ?? null;
   }
 
+  // Whether Local Play can be played: the Gamepad API answering, and two
+  // distinct active supported controllers, one for each player (more may
+  // be connected). In a session: both players' own controllers connected.
+  get localReady() {
+    return this.api === 'available' && !!this.player1 && !!this.player2;
+  }
+
+  // ---- Local Play ---------------------------------------------------------------
+
+  // Starts a Local Play session on the two controllers assigned now (see
+  // the top), keeping Player 1's own. False, and nothing changes, without
+  // two. A session already running is kept as it is.
+  startLocal() {
+    if (this.local) return true;
+    if (!this.localReady) return false;
+    const seat = (d) => ({ key: d.key, id: d.id, lost: null });
+    this.local = { p1: seat(this.player1), p2: seat(this.player2) };
+    this.emit();
+    return true;
+  }
+
+  // Ends the session: the usual assignment rules again (Player 1's chosen
+  // controller first).
+  endLocal() {
+    if (!this.local) return;
+    this.local = null;
+    this.assign();
+    this.emit();
+  }
+
+  get inLocal() {
+    return !!this.local;
+  }
+
+  // The session's players whose controller is lost, in order ([] outside
+  // a session).
+  missingPlayers() {
+    if (!this.local) return [];
+    return PLAYER_SLOTS.filter((slot) => !this.playerDevice(slot));
+  }
+
+  // The active controllers a lost seat may be explicitly given (every
+  // active one that is neither player's), in order.
+  get spareControllers() {
+    return this.devices.filter((d) => d.active && !d.player1 && !d.player2);
+  }
+
+  // Explicitly seats `slot` on active device `key` for the rest of the
+  // session (a lost controller replaced by another the players chose).
+  // False outside a session, or for a device that is not active, or is
+  // the other player's.
+  assignLocal(slot, key) {
+    if (!this.local || !PLAYER_SLOTS.includes(slot)) return false;
+    const device = this.devices.find((d) => d.key === key);
+    const other = this.playerDevice(slot === 'p1' ? 'p2' : 'p1');
+    if (!device?.active || device === other) return false;
+    this.local[slot] = { key: device.key, id: device.id, lost: null };
+    this.assign();
+    this.emit();
+    return true;
+  }
+
   // Makes active device `key` Player 1's controller (remembered by its id,
   // so it gets Player 1 back when it reconnects). False for a device that
   // is not connected, supported and active.
+  // In a Local Play session Player 2's controller is refused: one device
+  // never plays both.
   assignPlayer1(key) {
     const device = this.devices.find((d) => d.key === key);
     if (!device?.active) return false;
+    if (this.local && device.player2) return false;
     this.preferredId = device.id;
+    this.preferredKey = device.key;
     if (this.player1Key === key) return true;
-    this.player1Key = key;
-    for (const d of this.devices) d.player1 = d.key === key;
-    this.held = new Set();
-    this.triggerDown = new Set();
-    this.axes = [0, 0, 0, 0];
-    this.fresh = true;
+    if (this.local) this.local.p1 = { key: device.key, id: device.id, lost: null };
+    this.assign();
     this.emit();
     return true;
   }
@@ -224,15 +369,18 @@ export class ControllerManager {
   // controllers again (focus lost, page hidden).
   suspend() {
     this.suspended = true;
-    this.held = new Set();
-    this.triggerDown = new Set();
-    this.axes = [0, 0, 0, 0];
+    for (const slot of PLAYER_SLOTS) {
+      const r = this.readings[slot];
+      r.held = new Set();
+      r.triggerDown = new Set();
+      r.axes = [0, 0, 0, 0];
+    }
   }
 
   resume() {
     if (!this.suspended) return;
     this.suspended = false;
-    this.fresh = true;
+    for (const slot of PLAYER_SLOTS) this.readings[slot].fresh = true;
   }
 
   // Reads every controller (a cheap check for connections, every frame:
@@ -241,30 +389,43 @@ export class ControllerManager {
   // axes }, `pressed` the buttons that went down since the last poll; or
   // null with no Player 1 controller (or while suspended).
   poll() {
+    return this.read('p1', this.refresh());
+  }
+
+  // Like poll(), for both players at once on one look at the browser:
+  // { p1, p2 }, each a state or null. Player 2's controller is read only
+  // with `p2` (Local Play): otherwise it is null.
+  pollPlayers({ p2 = false } = {}) {
     const pads = this.refresh();
-    const device = this.player1;
+    return { p1: this.read('p1', pads), p2: p2 ? this.read('p2', pads) : null };
+  }
+
+  // `slot`'s controller among `pads`: its state, or null.
+  read(slot, pads) {
+    const device = this.playerDevice(slot);
     if (!device || this.suspended) return null;
     const pad = pads.find((p) => `${p.index}:${p.id}` === device.key);
     if (!pad) return null;
+    const r = this.readings[slot];
     const held = new Set();
     PAD_BUTTONS.forEach((button, i) => {
       const b = pad.buttons?.[i];
       if (!b) return;
       const value = Number.isFinite(b.value) ? b.value : (b.pressed ? 1 : 0);
       if (TRIGGERS.includes(button)) {
-        const was = this.triggerDown.has(button);
+        const was = r.triggerDown.has(button);
         const down = was ? value >= TRIGGER_RELEASE || (b.pressed && value === 0) : value >= TRIGGER_PRESS || (b.pressed && value === 0);
-        if (down) this.triggerDown.add(button);
-        else this.triggerDown.delete(button);
+        if (down) r.triggerDown.add(button);
+        else r.triggerDown.delete(button);
         if (down) held.add(button);
       } else if (b.pressed || value > 0.5) {
         held.add(button);
       }
     });
-    const pressed = this.fresh ? [] : [...held].filter((b) => !this.held.has(b));
-    this.fresh = false;
-    this.held = held;
-    this.axes = [axis(pad.axes?.[0]), axis(pad.axes?.[1]), axis(pad.axes?.[2]), axis(pad.axes?.[3])];
-    return { device, held, pressed, axes: this.axes };
+    const pressed = r.fresh ? [] : [...held].filter((b) => !r.held.has(b));
+    r.fresh = false;
+    r.held = held;
+    r.axes = [axis(pad.axes?.[0]), axis(pad.axes?.[1]), axis(pad.axes?.[2]), axis(pad.axes?.[3])];
+    return { device, held, pressed, axes: r.axes };
   }
 }

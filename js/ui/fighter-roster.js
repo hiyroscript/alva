@@ -11,6 +11,11 @@
 // confirming a fighter means (`onConfirm(def)`). Preview element ids come
 // from `previewId`, so several rosters can share the page.
 //
+// A Local Play setup step (js/screens/local-play-screens.js) adds two
+// hooks: `accepts()`, whether the input being handled may choose (its own
+// player's controller alone), and `onHold()`, whether choosing waits (a
+// controller lost: Confirm disabled), and a `note` shown above Confirm.
+//
 // Discover's Fighters page browses the same roster read-only
 // (js/ui/fighter-browser.js, a subclass): it overrides the hooks marked
 // below (confirmation and what activating a slot does) and has no Confirm.
@@ -31,10 +36,12 @@ const STAR_EMPTY = '☆';
 
 export class FighterRoster {
   // `host` carries the is-locked-preview state while a locked slot is shown.
-  constructor(app, { host, previewId = 'preview-name', onConfirm }) {
+  constructor(app, { host, previewId = 'preview-name', onConfirm, accepts = null, onHold = null, note = null }) {
     this.app = app;
     this.host = host;
     this.onConfirm = onConfirm;
+    this.accepts = accepts ?? (() => true);
+    this.onHold = onHold ?? (() => false);
     this.slots = [];
     this.focusedSlot = null;
     this.previewTime = 0;
@@ -92,7 +99,7 @@ export class FighterRoster {
 
     this.previewPanel = el('aside', { class: 'char-preview', 'aria-labelledby': previewId, 'aria-live': 'polite' }, [
       el('div', { class: 'preview-stage' }, [this.previewCanvas]),
-      el('div', { class: `preview-info${this.confirmBtn ? '' : ' preview-info--no-confirm'}` }, [this.buildPreviewHead(previewId), this.describeBtn, this.confirmBtn]),
+      el('div', { class: `preview-info${this.confirmBtn ? '' : ' preview-info--no-confirm'}` }, [this.buildPreviewHead(previewId), this.describeBtn, note, this.confirmBtn]),
     ]);
   }
 
@@ -232,9 +239,14 @@ export class FighterRoster {
     this.updateConfirm();
   }
 
+  // Whether the input being handled may choose a fighter now.
+  get choosing() {
+    return !this.onHold() && this.accepts();
+  }
+
   // Hook: a slot pressed, clicked or confirmed.
   activate(slot, e) {
-    if (!isPlayable(slot._def)) return;
+    if (!isPlayable(slot._def) || !this.choosing) return;
     // Keyboard/gamepad activation confirms immediately; pointer selects first
     // and confirms on a second press.
     const wasSelected = this.selectedId === slot._def.id;
@@ -267,17 +279,17 @@ export class FighterRoster {
     if (!this.previewSprites) this.clearPreview();
   }
 
-  // Confirm is enabled only for a playable selection; with no playable
-  // fighter at all it says so.
+  // Confirm is enabled only for a playable selection (and never while
+  // choosing is on hold); with no playable fighter at all it says so.
   updateConfirm() {
     const def = getPlayableCharacter(this.selectedId);
-    this.confirmBtn.disabled = !def;
+    this.confirmBtn.disabled = !def || this.onHold();
     setText(this.confirmBtn, def ? 'roster.confirm' : this.slotFor(null) ? 'roster.none' : 'common.noFighters');
   }
 
   confirm() {
     const def = getPlayableCharacter(this.selectedId);
-    if (!def) return;
+    if (!def || !this.choosing) return;
     this.onConfirm(def);
   }
 

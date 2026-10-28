@@ -86,6 +86,15 @@ export const CONFIG = Object.freeze({
     totalSlots: 48,
   },
 
+  // Local Play's two players (js/screens/local-play-screens.js): Player 1
+  // red, Player 2 blue, wherever either is identified (the setup steps, the
+  // HUD, the markers over the fighters, the move HUDs, the Match Results).
+  // The stylesheet's --player-1 / --player-2 (css/base.css) are the same two
+  // tones; the canvas reads them here.
+  localPlay: {
+    colors: { p1: '#ff4d5e', p2: '#3d9bff' },
+  },
+
   // Select Stage's roster: this many stage slots, laid out for all of them
   // from the start (six by four on a large display). The playable stages
   // (js/data/maps.js MAPS, in order) fill the first slots and every other

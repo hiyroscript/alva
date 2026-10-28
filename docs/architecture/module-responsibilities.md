@@ -27,13 +27,13 @@ There are no import cycles (checked over every module).
 
 | Module | Owns | Used by |
 | --- | --- | --- |
-| `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's and Watch Mode's), preloading and loading fighters, the language and settings wiring. | `main.js` |
+| `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's, Watch Mode's and Local Play's), the Local Play session (`startLocalPlay`, `endLocalPlay`), preloading and loading fighters, the language and settings wiring. | `main.js` |
 | `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`), Back and `backTo` (back to a screen in the stack, e.g. Change fighters). | `app.js`, every screen |
 | `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns), and the dialog stack (each dialog above the one that opened it, the layers beneath inert, focus restored). | `app.js`, `screens/discover-screen.js`, every dialog |
 | `input-modality.js` | The input modality on `<html>` (mouse, touch, keyboard, gamepad), so hover and the focus ring only show for their own input. | `menu-navigator.js` |
-| `input-manager.js` | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step with press edges, resolved for the fighter being played; the controller's menu commands and cursor stick; binding capture. | `app.js` |
+| `input-manager.js` | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step with press edges, resolved for the fighter being played; one `ControllerChannel` per player (Local Play's fighters each sample their own, controller only); the controllers' menu commands (with the player who sent each) and cursor stick, from the menu's owner; binding capture. | `app.js` |
 | `gamepad-devices.js` | Controller identification (PlayStation / Xbox, conservatively), the normalized button names and each family's names for them. | `controller-manager.js`, `data/controller-profiles.js`, `ui/controller-glyphs.js` |
-| `controller-manager.js` | `ControllerManager`: connected controllers, the four-controller limit, the status, Player 1's controller, refresh, and Player 1's buttons and sticks each frame. | `app.js`, `input-manager.js`, `ui/controller-dialog.js`, `screens/home-screen.js`, `ui/controller-editor.js` |
+| `controller-manager.js` | `ControllerManager`: connected controllers, the four-controller limit, the status, Player 1's and Player 2's controllers, the Local Play session (each player's own controller, lost and recovered), refresh, and each player's buttons and sticks each frame. | `app.js`, `input-manager.js`, `ui/controller-dialog.js`, `screens/home-screen.js`, `ui/controller-editor.js` |
 | `controller-resolver.js` | `ControllerResolver`, `compileProfile`: a controller's presses resolved into control codenames for a fighter and where it is (one owner per press, modifier first, directions read on their own stick, forward and back by facing, each stick's pushes as presses of their own with a deadzone and a release, activations); the stick thresholds. | `input-manager.js`, `ui/controller-editor.js` |
 | `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Automatic turn-around, each fighter's controller layout. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js`, `ui/controller-editor.js` |
 | `touch-layout.js` | Touch control ids, layout geometry and sanitizing. | `settings.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
@@ -72,7 +72,7 @@ There are no import cycles (checked over every module).
 | Module | Owns | Used by |
 | --- | --- | --- |
 | `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), the camera and all canvas drawing. | `battle.js`, `practice.js` |
-| `battle.js` | `Battle` (Quick Battle and Watch Mode): phases (intro, fight, celebration), timer, score, the match's end exactly once (`finishMatch`, the frozen `final` result), each side's controller (the player's Automatic turn-around setting to the player's alone) and each CPU's celebration after the match. | `screens/battle-screen.js` |
+| `battle.js` | `Battle` (Quick Battle, Watch Mode and Local Play): phases (intro, fight, celebration), timer, score, the match's end exactly once (`finishMatch`, the frozen `final` result), each side's controller (the player's Automatic turn-around setting to the player's alone) and each CPU's celebration after the match. | `screens/battle-screen.js` |
 | `match-stats.js` | `MatchStats`: each side's match statistics from the combat events and each CombatState's running totals, kept across lives, frozen with the result. | `battle.js` |
 | `practice.js` | `PracticeSession`: Player 1 (with the player's Automatic turn-around setting, every fighter swapped in included) and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
 | `physics.js` | Bodies, integration, stage collision (`StageCollision`, with its runtime platforms, static and dynamic (`active`, `prevX` / `prevY`, `interpolate`), and the queries `surfaceBelow`, `supportsAt`, `solidAcross`, `floorSection` and `inVoid`; the ground's kind, finite or continuous, and a finite one's sections (`resolveGround`, `GROUND_TYPES`, `floors`, `breakableFloors`: a solid switched off, `active` false, is gone from every query); the visible `dangerZones`; `stepBody` (of two surfaces at one height, the one under a body's centre), `carryBody` (riding a moving platform), `releaseGround` (letting go of a vanished platform or a broken section, or standing on the neighbour still under it), `separate`, `dropThrough`). | `arena.js`, `platform-hazards.js`, `fighters/fighter.js`, `rendering/hit-fx.js`, `ui/stage-preview.js` |
@@ -132,7 +132,9 @@ There are no import cycles (checked over every module).
 Each screen (`splash`, `home`, `mode-select`, `difficulty-select`,
 `character-select`, `quick-cpu-screen` (Custom Play's Select CPU, built
 from Select Fighter), `map-select`, `watch-screens` (Watch Mode's setup,
-built from the setup screens), `battle`, `practice`, `discover`) is
+built from the setup screens), `local-play-screens` (Local Play's Select
+local mode and setup, built from the same screens), `battle`, `practice`,
+`discover`) is
 registered by `core/app.js` and owns its own section of `index.html`.
 `quick-battle-setup.js` is no screen: it is Quick Battle's setup logic
 (Regular Play's random draw and `randomStage`, which Select Stage's Random
@@ -150,7 +152,8 @@ registries through English/French translation keys and scroll independently.
 | --- | --- | --- |
 | `components.js` | Shared menu pieces (headers with their setup steps, each setup's steps and Quick Battle's play types, buttons, the Settings gear and X of a dialog that pauses play (`dialogControls`), hint bars). | the setup screens, battle, practice, discover |
 | `hud.js` | The battle and practice HUD (DOM). | `screens/battle-screen.js`, `screens/practice-screen.js` |
-| `ability-hud.js` | The ability HUD (DOM): Player 1's moves, art and keyboard or controller inputs on a ground / air wheel, with their cooldowns, for keyboard and controller play. | `screens/battle-screen.js`, `screens/practice-screen.js` |
+| `local-play.js` | Local Play's player identity: each player's tone (red, blue), badge and the setup's turn note. | `screens/local-play-screens.js`, `screens/battle-screen.js`, `ability-hud.js`, `hud.js` |
+| `ability-hud.js` | The ability HUD (DOM): Player 1's moves, art and keyboard or controller inputs on a ground / air wheel, with their cooldowns, for keyboard and controller play; in Local Play one for each player, on that player's own controller (`setPlayer`). | `screens/battle-screen.js`, `screens/practice-screen.js` |
 | `touch-controls.js` | `TouchControls`: both touch layouts, one press per touch, and Player 1's live move state on the combat buttons (`showStatus`, read through `game/combat/move-status.js`). | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |
 | `mobile-abilities.js` | Which touch buttons a fighter has, their names and art. | `touch-controls.js`, `controller-editor.js` |
 | `touch-layout-editor.js` | The layout editor. | `core/app.js` |

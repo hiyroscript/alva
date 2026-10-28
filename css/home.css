@@ -82,6 +82,21 @@
   width: min(100%, 320px);
   margin-top: clamp(18px, 5vh, 48px);
 }
+/* The first row: Play and Local play side by side, two equal columns that
+   together span exactly the full-width actions under them (the same gap
+   between them as between rows). Still one row of the menu's height. */
+.home-actions-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: inherit;
+  min-width: 0;
+}
+.home-action-cell { display: grid; min-width: 0; }
+.home-action-cell > .home-action { min-width: 0; }
+/* A half-width action keeps its label on one line, cut short rather than
+   wrapped if a language's word is too long for a narrow screen. */
+.home-actions-row .home-action > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-actions-row .home-action { gap: 8px; padding: 0 14px; }
 .home-action {
   display: flex;
   align-items: center;
@@ -111,6 +126,43 @@
    after the interactive states so it overrides them. */
 .home-action:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
 .home-action:disabled .icon { color: var(--text-faint); transform: none; }
+/* Local play while it cannot start: the disabled look, and its cell takes
+   the pointer instead (a disabled button keeps it from the tooltip). */
+.home-action-cell.is-disabled { cursor: not-allowed; }
+.home-action-cell.is-disabled > .home-action { pointer-events: none; }
+/* Local play once two controllers are connected: the outlined secondary
+   look (no green fill) with a green edge that always shows, and the
+   Download button's soft green glow pulsing round it on the same cadence
+   (its own layer: only opacity moves, no layout shift; hover and focus keep
+   their look). Paused while a dialog covers Home, still with reduced
+   motion. */
+.home-action--local { position: relative; }
+.home-action--local.is-ready { border-color: rgba(47, 191, 99, 0.6); }
+:where(html:not(.is-touch-input)) .home-action--local.is-ready:hover, .home-action--local.is-ready.is-cursor-target { border-color: rgba(47, 191, 99, 0.85); }
+.home-action--local.is-ready::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid rgba(47, 191, 99, 0.6);
+  box-shadow: 0 0 10px 1px rgba(47, 191, 99, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  animation: home-download-glow 3.2s ease-in-out infinite;
+}
+.screen--home[inert] .home-action--local::after { animation-play-state: paused; }
+/* Read out with Local play, never shown. */
+.home-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 /* Why the match actions are disabled; only shown while they are. */
 .home-note {
   margin-top: var(--home-note-gap);
@@ -390,6 +442,8 @@
 @media (prefers-reduced-motion: reduce) {
   .screen--home.is-entering .home-intro > * { animation: none; }
   .home-download::after, .home-download .icon-download-arrow { animation: none; }
+  /* Local play's glow holds still at a faint, steady level. */
+  .home-action--local.is-ready::after { animation: none; opacity: 0.5; }
   .home-credits-track { will-change: auto; }
   .home-credits-seq { padding-bottom: 24vh; }
   .home-credits-seq[aria-hidden] { display: none; }

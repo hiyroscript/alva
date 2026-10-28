@@ -196,3 +196,13 @@
 .hud-timer.is-urgent { color: var(--white); }
 .is-paused .hud { visibility: hidden; }
 
+/* Local Play: each card in its player's tone (Player 1 red on the left,
+   Player 2 blue on the right): its tag filled, a thin edge along its outer
+   side and its score dots, never the whole card. */
+.screen--battle.is-local .hud-fighter--p1 { --player: var(--player-1); --player-edge: var(--player-1-edge); }
+.screen--battle.is-local .hud-fighter--p2 { --player: var(--player-2); --player-edge: var(--player-2-edge); }
+.screen--battle.is-local .hud-slot { background: var(--player); border-color: var(--player); color: var(--black); }
+.screen--battle.is-local .hud-side { border-color: var(--player-edge); }
+.screen--battle.is-local .hud-p1 { box-shadow: var(--glass-shadow), inset 3px 0 0 var(--player); }
+.screen--battle.is-local .hud-p2 { box-shadow: var(--glass-shadow), inset -3px 0 0 var(--player); }
+.screen--battle.is-local .hud-dot.is-filled { background: var(--player); border-color: var(--player); }

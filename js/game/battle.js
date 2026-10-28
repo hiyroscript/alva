@@ -2,9 +2,10 @@
 // intro / fight / celebration phases and the match clock. In Quick Battle
 // it is Player 1 against the combat AI (js/game/ai/combat-ai.js) at the
 // chosen difficulty; in Watch Mode both fighters are the combat AI, each
-// with its own controller, at the one chosen difficulty (see BATTLE_MODES).
-// Every rule below is the same in both, the 5-minute clock and overtime
-// included. The Arena owns the fixed-timestep world and its Canvas 2D
+// with its own controller, at the one chosen difficulty; in Local Play both
+// are players, each on their own controller and nothing else (see
+// BATTLE_MODES). Every rule below is the same in all three, the 5-minute
+// clock and overtime included. The Arena owns the fixed-timestep world and its Canvas 2D
 // rendering; DOM concerns (HUD, pause, the result toast and dialog) live in
 // the battle screen.
 //
@@ -50,8 +51,12 @@ import { mulberry32, deriveSeed } from '../core/utils.js';
 // deriveSeed): each CPU has its own, so two CPUs never share one sequence,
 // not even in a mirror match, and Quick Battle's CPU keeps the seed itself.
 // `celebration` is the stream of the side's celebration after the match
-// (CELEBRATION_STREAMS), never one its combat AI draws from. Whatever the
-// mode, p1 is Team I and p2 Team II wherever the sides are named.
+// (CELEBRATION_STREAMS), never one its combat AI draws from. `player`: a
+// Local Play side's player, whose own controller alone it samples
+// (InputManager.player); a player side without one is Player 1 on every
+// device (the keyboard, touch and its controller). Whatever the mode, p1 is
+// Team I and p2 Team II wherever the sides are named; in Local Play they
+// are Player 1 and Player 2.
 export const BATTLE_MODES = Object.freeze({
   'quick-battle': Object.freeze({
     p1: Object.freeze({ cpu: false, label: 'P1' }),
@@ -60,6 +65,10 @@ export const BATTLE_MODES = Object.freeze({
   watch: Object.freeze({
     p1: Object.freeze({ cpu: true, label: 'CPU 1', stream: 1 }),
     p2: Object.freeze({ cpu: true, label: 'CPU 2', stream: 0 }),
+  }),
+  local: Object.freeze({
+    p1: Object.freeze({ cpu: false, label: 'P1', player: 'p1' }),
+    p2: Object.freeze({ cpu: false, label: 'P2', player: 'p2' }),
   }),
 });
 
@@ -77,15 +86,16 @@ export const PHASES = Object.freeze({ intro: 'intro', fight: 'fight', celebratio
 export const CELEBRATION_STREAMS = Object.freeze({ p1: 0x63656c31, p2: 0x63656c32 });
 
 export class Battle extends Arena {
-  // `mode` is 'quick-battle' (the default, also for anything unknown) or
-  // 'watch' (see BATTLE_MODES). `difficulty` is the level of every CPU
-  // (js/data/difficulty.js); anything missing or unknown is Medium. It shapes
-  // only the CPUs' controllers: both fighters are built from their
-  // definitions alone. `seed` fixes the CPUs' randomness (tests); by default
-  // every battle differs. `automaticTurnAround` is the human player's
-  // Automatic turn-around setting (on unless given false, as the settings'
-  // default): it goes to the player's controller only, so a CPU (Quick
-  // Battle's, or either of Watch Mode's) never has it.
+  // `mode` is 'quick-battle' (the default, also for anything unknown),
+  // 'watch' or 'local' (see BATTLE_MODES). `difficulty` is the level of
+  // every CPU (js/data/difficulty.js); anything missing or unknown is
+  // Medium. It shapes only the CPUs' controllers: both fighters are built
+  // from their definitions alone. `seed` fixes the CPUs' randomness
+  // (tests); by default every battle differs. `automaticTurnAround` is the
+  // human players' Automatic turn-around setting (on unless given false, as
+  // the settings' default): it goes to the players' controllers only (both
+  // of Local Play's alike), so a CPU (Quick Battle's, or either of Watch
+  // Mode's) never has it.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
     automaticTurnAround = true,
@@ -103,7 +113,7 @@ export class Battle extends Arena {
     const sides = BATTLE_MODES[this.mode];
     const controllerFor = (side) => (side.cpu
       ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
-      : new PlayerController(input, { automaticTurnAround }));
+      : new PlayerController(side.player ? input.player?.(side.player) ?? input : input, { automaticTurnAround }));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
       def: p1Def, sprites: p1Sprites, spawn: s1, stage: this.stage,
@@ -116,6 +126,9 @@ export class Battle extends Arena {
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;
     this.fighters = [this.p1, this.p2];
+    // Local Play marks each player in their own colour: Player 1 red,
+    // Player 2 blue, wherever they stand.
+    if (this.mode === 'local') this.markerColors = CONFIG.localPlay.colors;
     // What each side does over the match (js/game/match-stats.js), started
     // over with every match.
     this.stats = new MatchStats(this.fighters);

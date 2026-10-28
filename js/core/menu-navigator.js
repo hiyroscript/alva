@@ -9,6 +9,12 @@
 // hovers and focuses items of the same scope, and confirm activates what it
 // is on. Keyboard, mouse and touch hide it and keep working as ever.
 //
+// In Local Play each controller is a player's: a command says whose
+// controller sent it, and while it runs `commandSource` names that player
+// ('p1' or 'p2'; null for the keyboard, the mouse and touch), so a Local
+// Play setup screen can take a choice from its own player's controller
+// alone (js/screens/local-play-screens.js).
+//
 // The navigator also keeps the input modality (js/core/input-modality.js),
 // so focus rings show only for keyboard and controller navigation, and owns
 // the dialog stack: its scopes are the open dialogs, oldest first. Each
@@ -80,15 +86,18 @@ export class MenuNavigator {
     this.inerted = new Set();
     this.inertedScreens = new Set();
     this.cursor = new ControllerCursor(this);
+    // The player whose controller sent the command being carried out, or
+    // null (see the top).
+    this.commandSource = null;
     setInputModality(initialModality());
     app.input.onKey((e) => {
       if (isNavigationKey(e)) setInputModality('keyboard');
       this.cursor.hide();
       this.onKey(e);
     });
-    app.input.onPadMenu((cmd) => {
+    app.input.onPadMenu((cmd, source) => {
       setInputModality('gamepad');
-      this.padCommand(cmd);
+      this.padCommand(cmd, source);
     });
     app.input.onPadCursor?.((stick, dt) => {
       this.cursor.move(stick, dt);
@@ -117,14 +126,21 @@ export class MenuNavigator {
     }, { passive: true });
   }
 
-  // A controller's menu command: confirm activates what the cursor is on
-  // when it shows one, else the focused item; directions move focus and
-  // the cursor follows.
-  padCommand(cmd) {
-    if (cmd === 'confirm' && this.scopeEl && this.cursor.confirm()) return true;
-    const handled = this.command(cmd, null);
-    if (DIRS.includes(cmd)) this.cursor.followFocus();
-    return handled;
+  // A controller's menu command (from `source`'s controller, Player 1's
+  // unless said): confirm activates what the cursor is on when it shows
+  // one, else the focused item; directions move focus and the cursor
+  // follows.
+  padCommand(cmd, source = 'p1') {
+    const outer = this.commandSource;
+    this.commandSource = source ?? 'p1';
+    try {
+      if (cmd === 'confirm' && this.scopeEl && this.cursor.confirm()) return true;
+      const handled = this.command(cmd, null);
+      if (DIRS.includes(cmd)) this.cursor.followFocus();
+      return handled;
+    } finally {
+      this.commandSource = outer;
+    }
   }
 
   // Pointer (mouse or touch) modality on or off: kept for callers that only

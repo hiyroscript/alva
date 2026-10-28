@@ -3,7 +3,11 @@
 // for keyboard and controller play. Quick Battle and Practice Ground show it
 // for Player 1; Watch Mode, menus, loading and results never do, and the
 // touch controls keep their own buttons (it is hidden on a touch screen:
-// html.is-touch, see css/ability-hud.css).
+// html.is-touch, see css/ability-hud.css). A Local Play battle shows two,
+// one for each player (setPlayer): Player 1's in the bottom-left corner and
+// Player 2's in the bottom-right, each with its player's tag, each following
+// its own fighter and showing its own controller's buttons, on a touch
+// screen too (the touch controls play no fighter there).
 //
 //   ┌────────┐┌────────┐┌────────┐     the current place's moves, full size
 //   │  art   ││  art   ││  art   │
@@ -31,7 +35,9 @@
 //     fighter's resolved profile (InputManager.profileFor: the player's
 //     saved layout, else the fighter's recommended one) in the family of
 //     Player 1's pad, whichever the player last used (InputManager.
-//     lastDevice: a pad that is only connected never counts);
+//     lastDevice: a pad that is only connected never counts); for a Local
+//     Play player, always their own controller's family and model (never
+//     the last device used: both players play at once);
 //   - the cooldowns and other restrictions: the fighter's combat state,
 //     read through abilityStatus (js/game/combat/move-status.js). The HUD
 //     keeps no timer: a cooldown (only the policy's special lengths, 3 s or
@@ -46,7 +52,8 @@
 // translated (js/localization/i18n.js).
 
 import { el } from '../core/utils.js';
-import { t, onLanguageChange } from '../localization/i18n.js';
+import { t, onLanguageChange, setAttr } from '../localization/i18n.js';
+import { playerChip, playerNumber } from './local-play.js';
 import { DEFAULT_FAMILY, buttonGlyph } from '../core/gamepad-devices.js';
 import { activationText, bindingText, displayFamily, stickGlyph } from './controller-glyphs.js';
 import { mobileAbility } from './mobile-abilities.js';
@@ -112,15 +119,18 @@ export class AbilityHUD {
   // `root` is the HUD's element (the screen places it); `input` the
   // InputManager (lastDevice, bindings, profileFor, controllers);
   // `settings` the player's settings (a saved controller layout changing
-  // redraws the inputs).
-  constructor(root, { input = null, settings = null } = {}) {
+  // redraws the inputs); `player` a Local Play player ('p1' or 'p2', see
+  // setPlayer), or null.
+  constructor(root, { input = null, settings = null, player = null } = {}) {
     this.root = root;
     this.input = input;
     root.classList.add('ability-hud');
     root.setAttribute('role', 'group');
-    root.setAttribute('aria-label', t('abilityHud.label'));
     root.hidden = true;
     this.wheel = el('div', { class: 'ah-wheel', 'data-place': 'ground' });
+    this.player = null;
+    this.tag = null;
+    this.labelled = false;
     this.rows = {};
     for (const place of PLACES) {
       const row = el('div', { class: `ah-row ah-row--${place}`, role: 'list', 'data-place': place });
@@ -128,6 +138,7 @@ export class AbilityHUD {
       this.wheel.append(row);
     }
     root.replaceChildren(this.wheel);
+    this.setPlayer(player);
     this.fighter = null;
     this.def = null;
     this.place = 'ground';
@@ -144,6 +155,28 @@ export class AbilityHUD {
         if (name === 'controllerProfiles') this.invalidate();
       }),
     ].filter(Boolean);
+  }
+
+  // The Local Play player this HUD is for ('p1' / 'p2': their tag on it,
+  // their own controller's buttons in its tiles, whatever device was last
+  // used), or null (Player 1 on any device: the last one used).
+  setPlayer(player) {
+    const next = player === 'p1' || player === 'p2' ? player : null;
+    if (next === this.player && this.labelled) return;
+    this.labelled = true;
+    this.player = next;
+    this.inputKey = null;
+    this.tag = next ? playerChip(next) : null;
+    if (this.tag) {
+      this.tag.classList.add('ah-player');
+      this.root.replaceChildren(this.tag, this.wheel);
+    } else {
+      this.root.replaceChildren(this.wheel);
+    }
+    if (next) this.root.dataset.player = next;
+    else delete this.root.dataset.player;
+    if (next) setAttr(this.root, 'aria-label', 'abilityHud.playerLabel', { n: playerNumber(next) });
+    else setAttr(this.root, 'aria-label', 'abilityHud.label');
   }
 
   // Shows (or hides) the HUD: a screen shows it only while a player
@@ -256,9 +289,13 @@ export class AbilityHUD {
 
   // The device whose inputs the tiles show, with what it needs: the
   // keyboard, or Player 1's pad (its family and model) and the fighter's
-  // profile.
+  // profile. A Local Play player's HUD: that player's own pad, always.
   inputContext() {
     const input = this.input;
+    if (this.player) {
+      const pad = input?.controllers?.playerDevice?.(this.player) ?? null;
+      return { device: 'gamepad', family: displayFamily(pad?.family ?? null), model: pad?.model ?? null };
+    }
     const device = input?.lastDevice === 'gamepad' ? 'gamepad' : 'keyboard';
     const pad = input?.controllers?.player1 ?? null;
     const family = displayFamily(pad?.family ?? null);
