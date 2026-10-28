@@ -1,56 +1,74 @@
-ALVA — Implement the Super Jump Movement Overhaul
+ALVA — Complete Super Jump Movement Overhaul
 
-Objective
+Primary Objective
 
-Implement a complete overhaul of jumping in the Alva game repository (hiyroscript/alva).
+Implement a complete, polished, production-ready overhaul of Alva’s universal jumping mechanics.
 
-Replace the existing hold Jump to jump higher mechanic with a new universal movement mechanic called Super Jump.
+Replace the existing “hold Jump to jump higher” mechanic with a new movement action called “Super Jump.”
 
-The new control scheme must be:
+The new mechanics must work identically for human-controlled and CPU-controlled fighters, respecting Alva’s shared movement architecture.
 
-* Normal Jump: Press Jump while grounded, without holding Down.
-* Super Jump: While grounded, hold Down (the existing Fast Fall input), then press Jump.
-* Air Jump: Press Jump while airborne, following the existing triple-jump rules.
-* Fast Fall: Hold Down while descending in the air, as before.
+Required new controls
 
-Super Jump must feel like a genuinely powerful leap off the ground, not merely a normal jump with an increased height multiplier.
+Action	Input	Result
+Normal Jump	Press Jump while grounded	A noticeably lower, compact jump
+Super Jump	Hold Down, then press Jump while grounded	A dramatically stronger upward leap
+Air Jump	Press Jump while airborne	Uses one of the two existing air jumps
+Fast Fall	Hold Down while descending	Accelerates descent as before
 
-Normal Jump must become noticeably shorter than it currently is. Super Jump must become substantially higher than both the new Normal Jump and the game’s previous higher-jump mechanic.
+The fundamental requirement is that Super Jump must feel like a powerful leap, not merely a normal jump that floats higher.
 
-Every successfully executed Super Jump must produce a visible dust burst at the fighter’s feet, originating from the ground at takeoff.
+Super Jump must also produce a distinctive ground-level dust burst at takeoff.
 
-All changes must work equally for human players and CPU-controlled fighters. CPUs must understand, execute, predict, and strategically use Super Jump rather than merely being given an artificial vertical movement advantage.
+Critical height requirement
 
-Implement this as a complete, production-ready change, including gameplay physics, input handling, CPU intelligence, visual effects, documentation, localization, and automated tests.
+Alva’s previous higher jump must become Super Jump, with approximately the same maximum height it had before this update.
+
+Do not substantially increase or decrease that height.
+
+Normal jumps, however, must become noticeably shorter than before, establishing a much clearer distinction between the two movement options.
+
+Do not confuse this requirement with any previous proposal in the repository’s max file that suggests increasing Super Jump height to approximately 328 units. That is not the requested balance.
 
 ⸻
 
-1. Understand and preserve Alva’s architecture
+1. Understand Alva Before Implementing
 
-Alva is a browser-based 2D platform fighter built with JavaScript and Canvas 2D, running a fixed-step simulation.
+Alva is a browser-based 2D platform fighter implemented using vanilla JavaScript, HTML, CSS, and Canvas 2D.
 
-The game currently has eight playable fighters, five battle stages, Quick Battle, Watch Mode, and Practice Ground.
+The current repository includes:
 
-Importantly, all fighters share universal baseline locomotion. No fighter should have unique run, jump, or dash statistics.
+* Nine playable fighters.
+* Five battle stages and Practice Ground.
+* Quick Battle against CPU opponents.
+* Watch Mode with CPU-versus-CPU battles.
+* Multiple CPU difficulty levels.
+* Keyboard, PlayStation, Xbox, and multitouch controls.
+* Universal movement physics shared by every fighter.
+* A fixed 60 Hz gameplay simulation.
+* Automated tests using Node’s built-in test runner.
 
-Review these existing files before making changes:
+All fighters must retain identical baseline locomotion.
 
-Core movement
+Do not create different jumping systems or movement parameters for individual fighters.
 
-* js/data/movement.js — universal movement constants and Discover’s movement descriptions.
-* js/game/fighters/movement.js — shared movement physics and helpers.
-* js/game/fighters/fighter.js — fighter movement state, jump buffering, coyote time, jumping, fast falling, and update ordering.
-* js/game/fighters/fighter-controller.js — human and CPU input snapshots and jump helpers.
-* js/game/physics.js — collision, gravity, one-way platforms, and grounded state.
+Examine these files carefully
 
-Input systems
+Core movement and physics
+
+* js/data/movement.js
+* js/game/fighters/movement.js
+* js/game/fighters/fighter.js
+* js/game/fighters/fighter-controller.js
+* js/game/physics.js
+
+Input handling
 
 * js/core/input-manager.js
 * js/core/controller-resolver.js
 * js/data/controller-profiles.js
-* js/ui/touch-controls.js
-* js/ui/controller-glyphs.js
 * js/config.js
+* js/ui/touch-controls.js
 
 CPU intelligence
 
@@ -61,680 +79,1379 @@ CPU intelligence
 * js/game/ai/cpu-intelligence/capabilities.js
 * js/game/ai/cpu-intelligence/prediction.js
 * js/game/ai/cpu-intelligence/evaluator.js
+* js/game/ai/cpu-intelligence/defense.js
 * js/game/ai/cpu-intelligence/telemetry.js
+* js/game/fighters/fighter-controller.js, including TrainingAIController
+* js/game/ai/celebration.js
 
-Visual effects
+Rendering
 
 * js/game/arena.js
 * js/game/rendering/hit-fx.js
+* js/game/rendering/ensemble.js
+* Existing sprite animation and visual-effects systems.
 
-Read CLAUDE.md, ALVA_SPEC.md, codename_rule, and the relevant movement, AI, input, and rendering documentation.
+Documentation
 
-Respect the existing architecture. Do not introduce character-specific movement overrides, change protected character_rule, or create a second independent jumping system for CPUs.
+* README.md
+* ALVA_SPEC.md
+* CLAUDE.md
+* UPDATES.md
+* docs/systems/movement.md
+* docs/systems/input.md
+* docs/systems/ai.md
+* docs/systems/rendering.md
+* docs/development/testing.md
 
-⸻
+Respect the repository’s architecture and naming conventions.
 
-2. Completely replace the old higher-jump mechanic
+Do not edit the protected character_rule file.
 
-Currently, Alva uses:
-
-* jumpVelocity: 920
-* highJumpWindow: 0.15
-* highJumpHeight: 1.4
-
-Holding Jump past a timing window activates a higher jump by modifying gravity during ascent.
-
-Remove this behavior entirely.
-
-Holding Jump must no longer increase jump height under any circumstances.
-
-A Jump held for one frame and a Jump held for an entire second must produce the same Normal Jump trajectory, assuming identical starting conditions.
-
-Do not leave behind an invisible or partial version of the old hold-to-jump-higher feature.
-
-Retire or appropriately replace the obsolete highJumpWindow, highJumpHeight, highJumpLift, and Fighter.highJump implementation.
-
-Remove or update references to the old mechanic throughout the CPU system, documentation, UI, and tests.
-
-The new Super Jump must be a distinct movement action determined by the input combination at the time the jump is requested.
+Avoid introducing additional gameplay dependencies or a build process.
 
 ⸻
 
-3. Implement the new Super Jump input
+2. Completely Remove Hold-to-Jump-Higher
 
-Grounded controls
+Existing behavior
 
-When the fighter is standing on a valid surface:
+The current universal movement configuration includes approximately:
 
-Normal Jump
+jumpVelocity: 920,
+highJumpWindow: 0.15,
+highJumpHeight: 1.4
 
-Pressing Jump without Down held must immediately execute a Normal Jump.
+Currently:
+
+1. Pressing Jump initiates a normal jump.
+2. Continuing to hold Jump beyond highJumpWindow activates the higher jump.
+3. The fighter receives reduced gravity during ascent.
+4. The modified gravity extends the jump’s height.
+
+This existing mechanic must be retired.
+
+Required replacement behavior
+
+Jump duration must no longer influence ground-jump height.
+
+A fighter pressing Jump for one frame and a fighter holding Jump for the entire jump must follow the same normal-jump trajectory when all other conditions are identical.
+
+Do not retain variable jump height, hold-to-jump-higher behavior, delayed additional lift, or gravity reductions activated by holding Jump.
+
+Remove obsolete implementation
+
+Review and appropriately remove or replace:
+
+* highJumpWindow
+* highJumpHeight
+* highJumpLift()
+* Fighter.highJump
+* Fighter.highJumpLift()
+* Gravity multiplication based on highJump?.lift
+* CPU jump-hold timing intended to distinguish normal and higher jumps.
+* Outdated jump-height calculations.
+* Obsolete references throughout documentation, interfaces, and tests.
+
+Do not simply rename these variables while preserving their old behavior.
+
+The new Super Jump must be a genuine, separate takeoff action.
+
+⸻
+
+3. Implement the New Super Jump Command
+
+Core input behavior
+
+When a fighter is genuinely grounded:
+
+Jump without Down = Normal Jump.
+
+Down held + fresh Jump press = Super Jump.
+
+Use Alva’s existing logical inputs:
+
+input.down
+input.jump
+input.jumpPressed
+
+Do not add a dedicated mandatory Super Jump button.
+
+The system should recognize the input combination independently of the input device.
+
+Input order
+
+The intended sequence is:
+
+1. The fighter is grounded.
+2. The player holds Down.
+3. The player presses Jump.
+4. The fighter immediately performs Super Jump.
+
+The player must not have to charge Super Jump.
+
+No minimum Down-hold duration is required.
+
+If Down and Jump activate in the same simulation input sample, count that as a valid Super Jump as well.
+
+This ensures responsive behavior with simultaneous keyboard presses, controller polling, and multitouch input.
+
+Supported input devices
+
+Keyboard
+
+Existing jump bindings include W, Space, and Up Arrow, while Down uses S or Down Arrow.
+
+Examples:
+
+* S + Space
+* S + W
+* S + Up Arrow
+* Down Arrow + Space
+
+All equivalent configured bindings should work.
+
+PlayStation and Xbox
+
+Holding the controller’s existing Down input while pressing its configured Jump control must activate Super Jump.
+
+Examples include:
+
+* Left Stick Down + Cross
+* Left Stick Down + A
+
+Preserve remappable controller layouts and existing universal controller controls.
+
+Do not add character-specific controller combinations.
+
+Mobile and tablet
+
+Players must be able to:
+
+1. Hold the existing Down button with one finger.
+2. Press Jump with another finger.
+3. Perform Super Jump.
+
+Both mobile control schemes must support this.
+
+Maintain pointer ownership, simultaneous-touch support, and custom control layouts.
+
+Do not require a new on-screen button.
+
+⸻
+
+4. Important Jump Input Rules
+
+Implement these rules consistently for players and CPUs.
+
+Ground eligibility
+
+Super Jump is a grounded action.
+
+It must only activate when the fighter actually begins a legal grounded takeoff.
+
+An airborne fighter must not Super Jump just because Down and Jump are held together.
+
+Fresh presses
+
+A new Jump press is required for every jump.
+
+Holding Jump continuously must not generate repeated jumps, including after landing.
+
+Preserve the existing one-press-per-action rules.
+
+Releasing buttons
+
+Once Super Jump begins:
+
+* Releasing Down must not reduce its height.
+* Releasing Jump must not reduce its height.
+* Continuing to hold Down must not increase its height.
+* Continuing to hold Jump must not increase its height.
+* The upward launch should already have been determined.
+
+No post-takeoff button-hold behavior should affect its initial jump strength.
+
+Jump buffering
+
+Preserve Alva’s existing jumpBuffer behavior.
+
+A grounded Down + Jump request should remember that it was intended as Super Jump if the fighter temporarily cannot act.
+
+For example, if the fighter presses Down + Jump during a valid grounded recovery window, the buffer should preserve the requested type until it can legally execute.
+
+However:
+
+* The buffered request must expire normally.
+* A buffered airborne Down + Jump must not become a Super Jump merely because the fighter subsequently lands.
+* An originally grounded Super Jump request may only execute as Super Jump if legal ground contact still exists when it executes.
+* Interruptions, resets, respawns, or invalidated requests must clear the stored intent.
+
+Store the intended jump type explicitly when the press is registered rather than inferring it later from whichever buttons remain held.
+
+Coyote time
+
+Preserve the current coyote-time functionality.
+
+A fighter jumping shortly after walking off an edge should still be able to perform a normal ground-style jump.
+
+However, Super Jump must not be obtainable from an ordinary airborne coyote jump.
+
+The Super Jump requirement is genuine grounded takeoff, not merely a remaining coyote timer.
+
+Combat interactions
+
+Preserve:
+
+* Hitstun and blockstun restrictions.
+* Shield-to-jump behavior.
+* Attack cancellation rules.
+* Hit-confirmed follow-up windows.
+* Dash cancellation timing.
+* Input priority.
+* Momentum conservation.
+* Jump buffering during hitstop.
+* Restrictions imposed by special techniques, Free Fall, and other committed actions.
+
+Super Jump must not become a way to bypass a fighter’s existing action restrictions.
+
+⸻
+
+5. Resolve the Existing Down / Platform Drop Conflict
+
+This is a critical implementation detail.
+
+Alva currently allows a fighter to drop through a one-way platform by making a fresh Down press while grounded.
+
+That conflicts directly with the new command:
+
+Hold Down, then press Jump.
+
+If Down immediately drops the fighter from a one-way platform, the fighter cannot reliably remain grounded long enough to perform Super Jump.
+
+Do not ignore this problem.
+
+Required outcome
+
+Players must be able to perform Super Jump from:
+
+* Main floors.
+* Ordinary solid surfaces.
+* One-way platforms.
+* Moving platforms.
+* Supported stage-hazard platforms.
+* Practice Ground surfaces.
+
+A fighter standing on a one-way platform must not fall through simply because the player is holding Down in preparation for Super Jump.
+
+Recommended conflict resolution
+
+Change the player-facing platform-drop gesture to distinguish a deliberate Down tap from a held Down input.
+
+For example:
+
+* Press and release Down without Jump on a droppable platform: drop through.
+* Hold Down and then press Jump: Super Jump.
+* Press Down and Jump simultaneously: Super Jump.
+* Continue holding Down without pressing Jump: remain grounded, ready for Super Jump.
+* A successful Super Jump consumes/cancels any pending drop gesture.
+
+This makes the new movement command reliably available regardless of how long the player holds Down.
+
+Preserve intentional platform dropping, but do not allow it to interfere with Super Jump.
+
+The existing explicit training-CPU dropPressed functionality should remain valid.
+
+Handle input release, changing platforms, hitstun, and interruptions without accidentally producing a delayed platform drop.
+
+Update the relevant platform-drop documentation and tests to reflect the final gesture.
+
+Super Jump must take priority over platform drop whenever the intended Down + Jump chord is valid.
+
+⸻
+
+6. Noticeably Lower Normal Jump Height
+
+The current normal jump launches at approximately 920 world units per second.
+
+With Alva’s gravity of 2500 world units per second squared, its idealized jump height is roughly 169 world units.
+
+This is too high for the new distinction between Normal Jump and Super Jump.
+
+Desired Normal Jump behavior
+
+Normal Jump should feel:
+
+* Quick.
+* Compact.
+* Responsive.
+* Useful for small obstacles.
+* Useful for positioning and close-range combat.
+* Clearly shorter than Super Jump.
+* Naturally affected by normal gravity.
+
+The fighter should no longer jump nearly as high from an ordinary Jump press.
+
+Initial tuning recommendation
+
+Start by reducing:
+
+jumpVelocity: 920
+
+to approximately:
+
+jumpVelocity: 740
+
+This produces an idealized apex of roughly 110 world units before discrete simulation effects.
+
+This is approximately a 35% reduction in maximum height.
+
+Treat this as the starting tuning value, not an inflexible final number.
+
+A reasonable target is roughly 100–115 world units, subject to gameplay validation.
+
+The distinction should be obvious when performing Normal Jump and Super Jump consecutively.
+
+Do not compensate by artificially slowing the normal jump, adding an unnatural landing delay, or changing global gravity.
+
+Normal Jump should remain responsive and mechanically useful.
+
+⸻
+
+7. Preserve the Previous Higher Jump’s Height as Super Jump
+
+This is equally important.
+
+The current higher jump has an idealized maximum height near:
+
+169 × 1.4 ≈ 237 world units
+
+Super Jump should reach approximately this same height.
+
+Do not make it significantly taller.
+
+Record the original baseline first
+
+Before removing the old mechanic:
+
+1. Use the existing movement test harness.
+2. Measure the actual old higher-jump apex.
+3. Record its displacement from takeoff.
+4. Use that measured value as the regression target for Super Jump.
+
+The actual simulated height matters more than the simplified physics formula because Alva integrates movement at fixed simulation steps.
+
+New universal configuration
+
+Introduce a dedicated shared parameter:
+
+superJumpVelocity
+
+A reasonable initial value is approximately:
+
+jumpVelocity: 740,
+superJumpVelocity: 1100
+
+Adjust superJumpVelocity against the measured baseline until Super Jump’s apex closely matches the former higher jump.
+
+Target approximately ±5–8 world units of the old higher jump, preferably tighter if achievable.
+
+The final movement configuration should be centralized in:
+
+js/data/movement.js
+
+No character definition should override these parameters.
+
+Desired height relationship
+
+The final distinction should resemble:
+
+Jump type	Approximate apex
+Previous Normal Jump	169 units
+New Normal Jump	100–115 units
+Previous Higher Jump	237 units
+New Super Jump	Approximately 237 units
+
+This establishes a noticeably stronger contrast without increasing the game’s overall intended vertical reach.
+
+⸻
+
+8. Super Jump Must Feel Like an Explosive Leap
+
+Super Jump should not resemble a floatier version of Normal Jump.
+
+It must communicate physical strength from the instant the fighter leaves the ground.
+
+Immediate launch impulse
+
+When Super Jump activates, apply its complete dedicated upward impulse immediately.
+
+Conceptually:
+
+body.vy = -movement.superJumpVelocity;
+
+Apply it through the same legal movement pipeline used for ordinary jumps.
+
+Do not add another burst later during ascent.
+
+Do not implement the old reduced-gravity jump in disguise.
+
+Arc behavior
+
+Super Jump should have:
+
+1. A powerful initial upward velocity.
+2. Fast, immediately noticeable vertical movement.
+3. A smooth reduction in upward speed under ordinary gravity.
+4. A natural apex.
+5. A normal fall back toward the stage.
+
+Keep the standard gravity relationship throughout the ordinary movement arc.
+
+Compared with the old higher jump, Super Jump may reach its apex sooner because its height comes from launch velocity rather than reduced gravity.
+
+That is desirable.
+
+The fighter should feel like it forcefully propelled itself off the surface.
+
+Normal Jump versus Super Jump
+
+Normal Jump should feel like a small athletic hop.
+
+Super Jump should feel like a strong vertical launch requiring deliberate input.
+
+The contrast must be evident even without effects.
+
+Momentum
+
+Preserve Alva’s momentum-based movement.
+
+A Super Jump out of a run or a legally cancellable Dash should inherit horizontal velocity according to the same rules as Normal Jump.
+
+Super Jump must not unexpectedly:
+
+* Set horizontal velocity to zero.
+* Clamp velocity to the running speed.
+* Override air steering.
+* Provide unlimited directional control.
+* Create a free air dash.
+* Give invulnerability.
+* Create attack damage or a hitbox.
+
+It is a movement action, not an attack or special ability.
+
+Animation feel
+
+Use existing universal character jump animations where possible.
+
+Avoid creating character-specific animation requirements.
+
+If helpful, implement subtle shared visual presentation such as:
+
+* A small takeoff compression.
+* A brief vertical stretch after launch.
+* A restrained burst of rising motion lines.
+* A slight difference in how Super Jump’s initial animation plays.
+
+These are optional enhancements, not replacements for correct physics.
+
+Any takeoff animation enhancement must not delay the actual physics impulse.
+
+Avoid camera shakes or dramatic full-screen effects that become irritating when jumping repeatedly.
+
+⸻
+
+9. Super Jump Must Create a Ground Dust Effect
+
+Every successfully executed Super Jump must generate a visible dust effect at takeoff.
+
+This effect is mandatory.
+
+Visual intention
+
+When a fighter launches with Super Jump, the ground should appear to respond to the force of the leap.
+
+The dust should make the action feel powerful without obscuring the fighter.
+
+Suggested dust behavior
+
+At the moment of takeoff:
+
+1. A compact burst appears at the fighter’s feet.
+2. Small dust clouds spread outward along the ground.
+3. A few lighter particles rise slightly.
+4. The dust expands and becomes transparent.
+5. The effect disappears quickly.
+
+The overall effect should last approximately 0.2–0.35 seconds.
+
+Use natural easing instead of linear movement where appropriate.
+
+Appearance
+
+A recommended effect includes:
+
+* Two outward-moving dust puffs, one on each side.
+* A small central impact cloud.
+* A faint spreading ground ring.
+* A handful of small particles.
+* Rapid fading near the end of its lifetime.
+
+Keep the result visually consistent with Alva’s existing Canvas 2D style.
+
+Do not introduce unnecessary image assets or new dependencies.
+
+Procedural Canvas rendering is acceptable and preferable if it fits the existing effects architecture.
+
+Ground attachment
+
+Dust must originate from the actual surface where the fighter took off.
+
+Use the fighter’s takeoff position and surface contact point.
+
+Do not spawn the effect at the fighter’s airborne position.
+
+Do not attach the dust to the ascending fighter.
+
+The dust should stay at ground level while the fighter rises away.
+
+Handle moving platforms and dynamic stages without leaving the effect visibly floating in the wrong location.
+
+Render ordering
+
+The dust should appear:
+
+* Above the ground surface.
+* Below or behind the fighter.
+* Without obstructing combat effects or the fighter’s silhouette.
+
+Integrate with the shared Arena rendering lifecycle.
+
+Triggering
+
+Only successful Super Jump activation should produce the dust burst.
+
+Do not trigger it from:
+
+* Normal Jump.
+* Air Jump.
+* Fast Fall.
+* A rejected jump request.
+* A failed input buffer.
+* Merely pressing Down.
+* A jump animation played for another reason.
+* CPU planning that never results in a real takeoff.
+
+Generate the event from the accepted Super Jump action rather than from a purely visual animation state.
+
+Exactly one dust burst should be created for each successful Super Jump.
+
+Performance and accessibility
+
+The effect should:
+
+* Work for both players and CPUs.
+* Have a bounded particle count.
+* Use time-based lifetimes.
+* Be removed after completion.
+* Behave correctly during pause and simulation freeze.
+* Reset cleanly on restarts.
+* Respect reduced-motion settings.
+* Not influence gameplay collision or physics.
+* Avoid uncontrolled allocations during long CPU matches.
+
+Ensure the effect is visible on the game’s different stage backgrounds, including dark, bright, sandy, snowy, and cloudy environments.
+
+⸻
+
+10. Preserve Triple Jump and Air Recovery
+
+Alva currently allows:
+
+1. One ground jump.
+2. Two additional air jumps.
+
+This must remain unchanged.
+
+Super Jump replaces the ground jump’s type; it does not add a fourth jump.
+
+A fighter performing Super Jump must still receive exactly the usual two air jumps.
+
+Critical air-jump balancing issue
+
+The current air-jump strength is derived from:
+
+jumpVelocity * airJumpRatio
+
+The old values are approximately:
+
+920 * 0.78 = 717.6
+
+If Normal Jump velocity becomes 740 without changing this relationship, the resulting air-jump velocity would be approximately 577.
+
+That would unintentionally weaken air jumps considerably.
+
+Do not allow this incidental regression.
+
+Recommended approach
+
+Decouple air-jump strength from Normal Jump velocity.
+
+Introduce a universal explicit value such as:
+
+airJumpVelocity: 718
+
+Then update the shared airJump() helper and the CPU’s capability model accordingly.
+
+Alternatively, appropriately retune the existing ratio, provided the real air-jump outcome remains consistent.
+
+The preferred outcome is that air jumps maintain approximately their existing height and utility.
+
+Preserve existing behavior
+
+* Two air jumps per airtime.
+* Air jumps restored on legitimate landing or applicable hit events.
+* Fresh Jump presses required.
+* Air-jump animation restarts appropriately.
+* No Super Jump variant of an air jump.
+* No additional air jumps granted by Super Jump.
+* Existing Free Fall restrictions.
+* Existing air-dash availability.
+* Existing recovery-move interactions.
+
+Verify vertical reach and safety against the existing stages and Void boundaries.
+
+⸻
+
+11. CPU Fighters Must Fully Understand Super Jump
+
+CPU compatibility is a core requirement, not an optional follow-up.
+
+Every CPU must use the new movement system as a legitimate action.
+
+Do not simply increase CPU vertical movement artificially.
+
+Do not allow CPU fighters to use the old hold-to-jump-higher behavior.
+
+Do not create CPU-only jump heights.
+
+CPUs must perform the same actions through the same legal Fighter input snapshots as human players.
+
+11.1. Update CPU input execution
+
+Review:
+
+js/game/ai/cpu-intelligence/executor.js
+
+The current Executor.jump(self, high = false) function distinguishes normal and higher jumps by controlling how long Jump remains held.
+
+Remove that behavior.
+
+Replace it with an explicit movement type such as:
+
+* normal
+* super
+* air
+
+The CPU should be able to request Super Jump deliberately.
+
+For Super Jump, generate legal inputs equivalent to a human holding Down and pressing Jump while grounded.
+
+The executor must not merely set a special internal CPU velocity.
+
+Existing CPU restriction
+
+The executor currently clears Down when grounded.
+
+That restriction must be revised to allow a legal grounded Down + Jump Super Jump command.
+
+Do not remove the restriction indiscriminately.
+
+A CPU should only hold Down on the ground when deliberately performing Super Jump or another valid action that requires it.
+
+It should not accidentally drop through platforms or continuously crouch without reason.
+
+Fresh input edges
+
+Ensure the CPU correctly handles:
+
+* Down becoming held.
+* Jump becoming freshly pressed.
+* Jump release.
+* Down release.
+* Repeated Super Jumps after separate landings.
+* Preventing repeated jumps from held controls.
+* Controller reset and plan cancellation.
+
+CPU input must obey the exact same chord-detection rules as player input.
+
+⸻
+
+12. Update CPU Intelligence and Decision-Making
+
+Merely enabling the CPU to execute Super Jump is insufficient.
+
+The CPU must understand when and why to use it.
+
+12.1. Navigation
+
+Review:
+
+js/game/ai/cpu-intelligence/plans.js
+
+Its navigation logic currently considers the normal and higher jumps.
+
+Replace old higher-jump decisions with Super Jump decisions.
+
+The CPU should understand:
+
+* Normal Jump reaches lower surfaces.
+* Super Jump reaches significantly higher surfaces.
+* Air jumps provide additional reach after takeoff.
+* Different jumps have different travel times.
+* Different arcs create different landing positions.
+
+Example decisions
+
+If a platform is reachable with Normal Jump, the CPU should normally use Normal Jump.
+
+If a platform is too high for Normal Jump but reachable with Super Jump, the CPU should select Super Jump.
+
+If the target requires Super Jump followed by an air jump, the CPU should plan that combination when appropriate.
+
+If no legal route exists, the CPU must not repeatedly perform impossible jumps.
+
+Keep the CPU’s ledge safety checks and live platform evaluation intact.
+
+12.2. Combat
+
+Super Jump should be a genuine tactical option.
+
+Potential uses include:
+
+* Approaching an opponent on higher ground.
+* Initiating a high aerial attack.
+* Avoiding an approaching grounded threat.
+* Jumping over an opponent.
+* Repositioning during neutral combat.
+* Escaping poor stage positioning.
+* Pursuing an airborne opponent.
+* Reaching a safer platform.
+
+Normal Jump should remain preferable for shorter, faster aerial positioning when appropriate.
+
+Do not make every CPU jump a Super Jump.
+
+The CPU must distinguish between the tactical advantages and risks of both actions.
+
+12.3. Defensive decisions
+
+Review:
+
+js/game/ai/cpu-intelligence/defense.js
+
+The defensive planner currently evaluates ground and higher-jump escape possibilities.
+
+Update it to consider:
+
+* Normal Jump.
+* Super Jump.
+* Current threat height.
+* Threat timing.
+* Grounded eligibility.
+* The time required to rise above danger.
+* The fighter’s likely position after the jump.
+
+Because Super Jump uses a stronger initial impulse, it may clear some threats faster than the previous lighter-gravity higher jump.
+
+The CPU should base this decision on the actual new trajectory.
+
+Do not grant extra defensive priority or invulnerability merely because Super Jump was requested.
+
+12.4. Aerial offense
+
+Review:
+
+js/game/ai/cpu-intelligence/evaluator.js
+
+Its jumpStrikes() logic currently evaluates jump trajectories for aerial attacks.
+
+Update those evaluations to consider Super Jump using its actual trajectory.
+
+Ensure the CPU can plan:
+
+* Normal Jump into an aerial attack.
+* Super Jump into an aerial attack.
+* Air Jump into an aerial attack.
+
+The CPU must calculate the correct attack contact timing and reach.
+
+The higher initial speed of Super Jump should influence the prediction naturally.
+
+It should not keep predicting the old slow, floating higher-jump arc.
+
+⸻
+
+13. Update CPU Movement Prediction
+
+Review:
+
+js/game/ai/cpu-intelligence/prediction.js
+
+The existing arcTrack() function supports:
+
+* ground
+* high
+* air
+* No jump.
+
+The old high branch simulates a reduced-gravity higher jump.
+
+This must be replaced.
+
+Required jump prediction types
+
+Use clear, consistent identifiers such as:
+
+* ground or normal
+* super
+* air
+* null
+
+For Super Jump:
+
+1. Start from a valid grounded state.
+2. Apply the universal superJumpVelocity.
+3. Simulate ordinary gravity.
+4. Use the same collision and movement behavior as the real fighter.
+5. Include horizontal steering and platform collisions.
+6. Stop or transition appropriately on landing.
+
+Do not approximate the old higher jump with a new name.
+
+Prediction accuracy
+
+The CPU’s predicted Normal Jump and Super Jump trajectories must closely match real Fighter simulations.
+
+Test both:
+
+* Jumping vertically without horizontal movement.
+* Jumping while running or carrying momentum.
+
+The CPU should not believe it can reach a platform when real physics makes that impossible.
+
+Its ability to plan aerial attacks, jump escapes, platform routes, and recovery must remain reliable.
+
+⸻
+
+14. Update CPU Capability Analysis
+
+Review:
+
+js/game/ai/cpu-intelligence/capabilities.js
+
+Currently, movement capabilities include values such as:
+
+jumpHeight
+highJumpHeight
+highJumpWindow
+airJumpHeight
+airtime
+
+Replace obsolete higher-jump properties with appropriate Super Jump properties.
+
+For example:
+
+jumpHeight
+superJumpHeight
+airJumpHeight
+normalJumpAirtime
+superJumpAirtime
+
+These values must derive from actual universal physics and movement settings.
+
+Update dependent code to use them.
+
+Do not leave any calculation assuming the old higher jump is produced by reduced gravity.
+
+Account for changes in:
+
+* Vertical displacement.
+* Time to apex.
+* Total airtime.
+* Reachable platforms.
+* Air attack windows.
+* Landing predictions.
+* Movement choice.
+
+Update CPU planning, defense, navigation, and evaluation to consume these values consistently.
+
+⸻
+
+15. Update All CPU Variants
+
+Alva has more than one CPU-controlled behavior system.
+
+The main competitive intelligence is not the only relevant controller.
+
+Review and adapt:
+
+CombatAIController
+
+This is the primary CPU for Quick Battle and Watch Mode.
+
+It must fully understand and strategically use Super Jump.
+
+TrainingAIController
+
+The Practice Ground training opponent must follow the new movement rules.
+
+Where its existing logic navigates or hops over obstacles, it should use Normal Jump or Super Jump as appropriate.
+
+It must not depend on old hold-Jump timing.
+
+Preserve its intended non-attacking behavior.
+
+CelebrationController
+
+Post-match CPU celebrations must continue to function.
+
+The CPU must no longer hold Jump specifically to activate an obsolete higher jump.
+
+Normal celebratory hops should continue to work.
+
+Super Jump may be used in celebrations when appropriate, but should not cause accidental falls or alter match results.
+
+All difficulties
+
+Easy, Medium, Hard, and Brutal must all be physically capable of performing Super Jump.
+
+Difficulty should continue to change decision quality, anticipation, and tactics rather than movement permissions or jump physics.
+
+Higher difficulties may use Super Jump more intelligently, but lower difficulties must not be excluded from using the mechanic.
+
+Watch Mode
+
+Both CPU fighters must independently support Super Jump.
+
+Verify CPU-versus-CPU matches, mirror matches, and repeated battles.
+
+Neither CPU should receive hidden movement benefits.
+
+⸻
+
+16. Preserve and Improve Input Responsiveness
+
+Super Jump must feel immediate and consistent.
+
+There should be no artificial delay between a valid Jump press and the upward takeoff.
+
+No charging bar.
+
+No required crouching animation.
+
+No minimum Down-hold duration.
+
+No staged process where the fighter first performs Normal Jump and then transforms into Super Jump.
+
+The movement type must be determined before the takeoff impulse.
+
+Input state reliability
+
+Test combinations involving:
+
+* Down pressed before Jump.
+* Down and Jump pressed in the same frame.
+* Jump pressed before Down.
+* Down released immediately after Jump.
+* Jump released immediately after takeoff.
+* Both buttons held throughout ascent.
+* Jump pressed repeatedly without releasing.
+* Down held across landings.
+* Buffered Jump during temporary recovery.
+* Rapid Normal Jump followed by Air Jump.
+* Rapid Super Jump followed by Air Jump.
+* Input device disconnection or reset.
+
+Jump pressed first without Down must remain Normal Jump, even if Down is pressed shortly afterward.
+
+Late Down input must not retroactively upgrade the jump.
+
+⸻
+
+17. Update Game Text, Discover, and Controls
+
+The existing player-facing description says a longer Jump press produces the higher jump.
+
+That description must be updated everywhere.
+
+The new mechanic should consistently be called:
 
 Super Jump
 
-Holding Down and then pressing Jump must immediately execute a Super Jump.
+Normal Jump should continue to be called Jump or Normal Jump, depending on context.
 
-Use the existing logical down and jump controls rather than introducing a new physical button requirement.
+Air Jump and Fast Fall retain their existing meanings.
 
-The mechanic must work with:
+Discover
 
-* Keyboard: S + W, S + Space, S + Up, or corresponding remapped inputs.
-* PlayStation controllers: Left Stick Down + Cross, or the player’s configured bindings.
-* Xbox controllers: Left Stick Down + A, or the player’s configured bindings.
-* Touchscreen controls: Holding the existing Down button with one finger and tapping Jump with another.
+Update MOVEMENT_GUIDE and relevant Discover content in:
 
-Do not require players to charge Super Jump for a fixed duration. The intended command is hold Down, then press Jump, not hold Down for several seconds.
+js/data/movement.js
 
-If Down and Jump become active within the same simulation input sample, recognize the chord as a Super Jump when the fighter is grounded. This avoids unnecessary missed inputs caused by keyboard, controller, or touch sampling.
+Clearly explain the difference between Normal Jump and Super Jump.
 
-Important input rules
+Suggested wording:
 
-1. Super Jump activates only from genuine grounded takeoff.
-2. A fresh Jump press is required. Continuously holding Jump must not trigger repeated jumps.
-3. Holding Down after takeoff must not increase Super Jump height.
-4. Releasing Down immediately after takeoff must not weaken or cancel the Super Jump.
-5. Holding Jump after takeoff must not modify the movement trajectory.
-6. Down + Jump while airborne must not produce an additional Super Jump; ordinary air-jump and fast-fall rules still apply.
-7. Coyote-time jumps after leaving a ledge should remain available, but should be Normal Jumps rather than grounded Super Jumps.
-8. Preserve jump buffering and existing attack, stun, shield, and dash cancellation rules.
-9. If a valid grounded Super Jump request is buffered while the fighter is temporarily unable to act, preserve its intended type until the buffer is consumed or expires. Only execute the Super Jump if the fighter is legally grounded when it begins.
-10. Clear pending jump state correctly on interruption, respawn, reset, and input deactivation.
+Jump: “Press Jump for a quick, low jump.”
 
-Determine the jump type from the actual logical inputs, not from the current input device or whether the fighter is controlled by a human or CPU.
+Super Jump: “Hold Down and press Jump while grounded to launch yourself much higher.”
 
-⸻
+Air Jump: “Press Jump again in the air for an additional jump. You have two air jumps.”
 
-4. Reduce Normal Jump height and significantly buff Super Jump
+Fast Fall: “Hold Down while falling to descend faster.”
 
-The current Normal Jump reaches approximately 169 world units under the standard gravity of 2500 units/s². The existing higher jump reaches approximately 237 world units.
+Include the revised one-way platform-drop instruction wherever controls are explained.
 
-Change this balance substantially.
+Settings and controller information
 
-Recommended starting values
+Review and update:
 
-Use the following as initial tuning targets, then validate them against the game’s stages and physics:
-
-Property	Current	Proposed
-Normal Jump launch velocity	920	780
-Normal Jump approximate apex	169 units	122 units
-Previous higher-jump apex	237 units	Retired
-Super Jump launch velocity	N/A	1280
-Super Jump approximate apex	N/A	328 units
-
-These are proposed starting values, not permission to ignore gameplay testing.
-
-Desired outcome:
-
-* Normal Jump feels quick, compact, and suitable for smaller obstacles, positioning, and combat.
-* Super Jump is dramatically more powerful and reaches significantly higher platforms.
-* A Super Jump reaches at least approximately twice the height of a Normal Jump, ideally around 2.5–2.7 times with the initial values.
-* Super Jump is meaningfully higher than the retired higher-jump mechanic.
-* Gravity, stage geometry, and collision remain physically consistent.
-
-Keep the tuning centralized in BASE_FIGHTER_MOVEMENT.
-
-Introduce a clearly named universal value such as superJumpVelocity.
-
-Preserve the triple jump
-
-Alva currently allows two additional air jumps after leaving the ground.
-
-This must remain intact.
-
-Be careful that the existing air-jump velocity depends on jumpVelocity * airJumpRatio. Lowering Normal Jump should not unintentionally destroy the usefulness of aerial recovery.
-
-Review and, if necessary, independently tune air-jump strength so that:
-
-* Air jumps remain useful.
-* Triple-jump recovery is reliable.
-* Fighters can still traverse the intended stage geometry.
-* Super Jump does not give extra air jumps.
-* Super Jump followed by two air jumps does not bypass upper Void boundaries or create unintended stage exploits.
-
-Do not introduce an extra jump, new Energy cost, cooldown, attack hitbox, or invulnerability.
-
-⸻
-
-5. Make Super Jump genuinely feel like a powerful leap
-
-This is a major design requirement.
-
-Do not implement Super Jump simply by copying Normal Jump and multiplying its height, or by continuing the old reduced-gravity mechanic.
-
-Super Jump should communicate a powerful launch from the moment the fighter leaves the ground.
-
-Takeoff
-
-Give Super Jump its distinct, stronger upward impulse immediately at takeoff.
-
-The fighter should visibly leave the ground with considerably greater initial upward speed than a Normal Jump.
-
-There must not be an invisible delay where it performs a regular jump first and receives additional lift halfway through the ascent.
-
-Movement arc
-
-Use a physically coherent arc:
-
-* Strong initial upward velocity.
-* A powerful, clearly readable rising phase.
-* Gradual deceleration from normal gravity.
-* A natural apex.
-* A normal descending phase.
-
-Avoid the existing higher jump’s floaty effect caused by applying lighter gravity after a hold window.
-
-The result should feel like a fighter explosively springing upward, not floating.
-
-Animation and presentation
-
-Use existing character jump sprites wherever possible.
-
-Consider lightweight universal presentation enhancements, such as:
-
-* A very brief takeoff squash/compression.
-* A subtle upward stretch during the first moments of ascent.
-* A short directional acceleration accent or speed streak.
-* A slightly more forceful-looking lift-off.
-
-These should be cosmetic and must not delay gameplay responsiveness, alter collision dimensions, require unique new character sprites, or cause animation flickering.
-
-For ensemble fighters, maintain correct rendering of all members using their shared body and movement state.
-
-Horizontal momentum
-
-Preserve Alva’s existing momentum-driven movement.
-
-Running into a Super Jump should carry the fighter’s horizontal velocity naturally.
-
-Dashing into a Super Jump should preserve the earned momentum subject to existing dash-cancellation rules.
-
-If a modest directional launch assist improves the leap’s feeling, make it universal and carefully tuned. Do not force forward motion when the fighter is standing still or unexpectedly replace existing dash speed.
-
-Air steering should remain responsive and consistent with universal air-control rules.
-
-The leap must be visually and mechanically distinguishable from Normal Jump without turning into an uncontrolled dash or teleport.
-
-⸻
-
-6. Add a ground dust burst when Super Jump begins
-
-Every successfully executed Super Jump must create a distinct dust effect at the exact takeoff location.
-
-Desired visual
-
-On takeoff:
-
-* A small, forceful burst erupts from beneath the fighter’s feet.
-* Dust expands outward to both sides of the takeoff point.
-* Some particles lift slightly upward before dispersing.
-* The effect rapidly spreads, fades, and disappears.
-* The fighter visibly rises away from the effect, leaving the dust on the ground.
-
-The result should evoke the force of the fighter pushing off the surface.
-
-Visual specifications
-
-Suggested initial effect tuning:
-
-* Duration: approximately 0.3–0.45 seconds.
-* Particles: several small puffs or a combination of puffs and short outward streaks.
-* Expansion: mostly horizontal with a smaller vertical component.
-* Opacity: strong immediately after takeoff, then smoothly fades.
-* Scale: relative to world units and the rendered fighter size.
-* Rendering: behind the fighter, above the appropriate stage surface.
-
-Avoid enormous smoke clouds, flashes that obscure attacks, or excessive camera shake.
-
-Prefer using Alva’s existing Canvas 2D procedural effects infrastructure in js/game/rendering/hit-fx.js and event integration in js/game/arena.js.
-
-A suitable approach is to have the Fighter report a successful Super Jump takeoff event, including its world-space ground position, and let the Arena’s visual effect system render the dust.
-
-Do not infer takeoff events from arbitrary vertical velocity values. That could incorrectly generate dust for launches, rebounds, air jumps, or character abilities.
-
-Effect correctness
-
-* Spawn the dust exactly once for every successfully executed Super Jump.
-* Never spawn it for a Normal Jump.
-* Never spawn it for an Air Jump.
-* Never spawn it for a failed or buffered-but-never-executed request.
-* Never create dust merely because the fighter is airborne.
-* Keep the dust at its original world-space location after the fighter has jumped away.
-* Support moving platforms and changing stage geometry.
-* Support all fighters and both human and CPU control.
-* Do not create damaging hitboxes, collision objects, or gameplay forces.
-* Keep particle lifetime and allocations lightweight enough for mobile.
-* Respect Alva’s reduced-motion setting by simplifying particle movement and avoiding shake without eliminating the visual indication entirely.
-
-Where appropriate, consider stage-aware color variation, such as dust on ordinary terrain, sand on Adamaris, or a pale powder-like appearance on Jökull, while retaining a universal fallback.
-
-The dust should be a shared movement visual effect, not a fighter-specific special ability.
-
-⸻
-
-7. Resolve the Down input conflict with one-way platforms
-
-This is critical.
-
-Alva currently uses a fresh Down press to drop through eligible one-way platforms.
-
-But Super Jump requires holding Down while standing on a platform.
-
-Without changing the input behavior, the fighter may drop through the platform before Jump can be pressed.
-
-Super Jump must always take priority over dropping through a platform.
-
-Implement deliberate input disambiguation.
-
-Recommended control behavior
-
-Use a quick Down tap-and-release as the explicit platform drop command:
-
-* Quick Down tap and release, without Jump: drop through an eligible one-way platform.
-* Hold Down, then press Jump: execute Super Jump from the platform.
-* Hold Down without pressing Jump: remain grounded; do not automatically drop.
-* Down + Jump in the same input sample: execute Super Jump rather than drop.
-* Holding Down in the air while descending: continue Fast Fall.
-* Explicit dropPressed requests from a training or scripted controller should retain their separate intended behavior where appropriate.
-
-Use a short, clearly defined tap threshold if necessary to distinguish a tap from a hold. A long hold followed by release should not unexpectedly produce a delayed platform drop.
-
-Preserve restrictions on dropping through:
-
-* The main floor cannot be dropped through.
-* Solid platforms cannot be dropped through.
-* Platforms with dropThrough: false cannot be dropped through.
-* Existing move, Shield, stun, and other action restrictions remain valid.
-
-In particular, test Sol-Noir’s non-droppable water-tower deck and Asperitas’s moving clouds.
-
-Do not resolve this conflict by simply disabling platform drops permanently.
-
-Update instructions so players understand the new tap-versus-hold distinction.
-
-⸻
-
-8. Fully update CPU behavior and intelligence
-
-CPU implementation is just as important as player controls.
-
-Alva already has a sophisticated CPU intelligence system capable of planning jumps, predicting movement trajectories, navigating stages, choosing aerial attacks, and recovering from dangerous positions.
-
-Update the entire system to understand the new movement rules.
-
-A. CPU execution
-
-Modify js/game/ai/cpu-intelligence/executor.js.
-
-Its existing jump(self, high) behavior simulates a higher jump by holding Jump for longer.
-
-Replace this with Normal Jump and Super Jump requests.
-
-For Super Jump, the CPU must emit the actual legal input combination:
-
-1. Hold Down while grounded.
-2. Make a fresh Jump press while Down is active.
-3. Release the relevant controls naturally after takeoff.
-
-The executor currently clears down while grounded. This must be changed for legitimate Super Jump execution without accidentally permitting platform drops.
-
-The CPU must use the same FighterInput contract and the same movement code as human players.
-
-Never implement CPU Super Jump by directly manipulating fighter.body.vy, teleporting a fighter, giving a hidden height multiplier, or ignoring jump restrictions.
-
-B. CPU movement capabilities
-
-Update capabilities.js so the CPU accurately knows:
-
-* Normal Jump launch velocity and apex height.
-* Super Jump launch velocity and apex height.
-* Normal and Super Jump airtime.
-* Air-jump capability and recovery height.
-* Reachable platform elevations.
-* Movement constraints and resources.
-
-Retire the old highJumpHeight and highJumpWindow calculations.
-
-Use the same universal movement values and gravity as the actual simulation.
-
-C. CPU trajectory prediction
-
-Update prediction.js, especially arcTrack.
-
-Replace the old 'high' trajectory based on reduced gravity with a genuine 'super' trajectory based on Super Jump’s immediate upward impulse.
-
-Prediction and actual gameplay must agree closely on takeoff speed, gravity, apex, airtime, and lateral movement.
-
-The CPU must not plan aerial attacks or navigation routes around the removed higher-jump trajectory.
-
-D. CPU navigation
-
-Update plans.js and brain.js.
-
-CPUs should make intelligent choices:
-
-Choose Normal Jump when:
-
-* Clearing small obstacles.
-* Performing low, fast repositioning jumps.
-* Initiating quick aerial attacks.
-* Evading threats where a shorter arc is advantageous.
-* Navigating a height reachable without Super Jump.
-
-Choose Super Jump when:
-
-* Reaching platforms too high for Normal Jump.
-* Pursuing an airborne opponent above Normal Jump range.
-* Escaping a corner by leaping over an opponent.
-* Setting up a higher aerial approach.
-* Traversing vertically separated stage regions.
-* A planned combat route benefits from the larger arc.
-
-Do not make CPUs spam Super Jump for every jump.
-
-The higher leap has strategic trade-offs, including increased airtime, commitment, exposure to attacks, and risk near the upper Void.
-
-The CPU should factor these into its decisions.
-
-E. CPU combat evaluation
-
-Update evaluator.js.
-
-When evaluating aerial attacks, consider Normal Jump and Super Jump as separate trajectories.
-
-A Super Jump should be selected when its trajectory can produce a worthwhile attack, positioning advantage, or escape that a Normal Jump cannot.
-
-Higher-difficulty CPUs may evaluate more sophisticated Super Jump opportunities, consistent with the existing difficulty architecture.
-
-Lower-difficulty CPUs must still be capable of executing the mechanic correctly when they choose it.
-
-Do not add new cheats or character-specific AI exceptions.
-
-F. CPU recovery and safety
-
-Preserve the existing air-jump and air-dash recovery intelligence.
-
-CPUs cannot Super Jump when genuinely airborne, even if doing so would save them from the Void.
-
-They should not assume that holding Down after takeoff continues adding lift.
-
-Reassess CPU ledge safety, upper Void avoidance, stage navigation, aerial tracking, and safety around disappearing platforms with the new jump arcs.
-
-G. Modes and debugging
-
-Ensure that Super Jump works in:
-
-* Quick Battle — Easy, Medium, Hard, Brutal.
-* Custom and Regular Play.
-* Watch Mode — CPU vs CPU, including mirror matches.
-* Any other active CPU controller that performs jumps.
-
-Practice Ground’s existing stationary, controller-less training dummy should remain stationary unless a separately configured moving CPU is used. Do not accidentally make the Practice dummy actively fight or jump.
-
-Consider adding separate superJumps telemetry alongside regular jump counts so CPU behavior can be verified.
-
-⸻
-
-9. Update controls, UI, terminology, and localization
-
-The retired higher-jump mechanic must no longer be advertised anywhere as a control.
-
-The new official movement name is Super Jump.
-
-Use “Normal Jump” and “Super Jump” consistently in English.
-
-Update relevant strings and explanations in:
-
-* js/data/movement.js
 * js/localization/strings/en.js
 * js/localization/strings/fr.js
-* js/ui/controller-glyphs.js
-* js/ui/touch-controls.js, where relevant
-* Controller settings and binding help
-* Discover → Movement
-* Any How to Play or input reference screens
+* Controller action descriptions.
+* Jump button help text.
+* Controller binding descriptions.
+* Touch control instructions.
+* Any instructions referring to holding Jump to jump higher.
 
-For French, use a clear consistent localized name such as “Super saut.”
+For example, replace:
 
-Discover → Movement
+“Press (hold to jump higher)”
 
-Give Super Jump its own entry or clearly separated explanation.
+with an accurate description that explains the new combination.
 
-Suggested player-facing text:
+Do not rename the actual Jump button to Super Jump; the Jump control still performs multiple jump actions depending on context.
 
-Jump
+French localization
 
-“Press Jump to perform a quick, normal jump. Holding Jump does not increase its height.”
+Provide accurate French translations, using a consistent term such as “Super saut.”
 
-Super Jump
+Avoid leaving newly introduced instructions untranslated.
 
-“While standing on the ground, hold Down and press Jump to launch into a powerful Super Jump. Reach much greater heights with an explosive leap.”
+Documentation
 
-Fast Fall
-
-“Hold Down while descending in the air to fall faster. On the ground, Down also prepares a Super Jump.”
-
-Platform Drop
-
-“Quickly tap and release Down while standing on a drop-through platform to fall through it.”
-
-Describe the triple jump accurately and clarify that Super Jump cannot be performed in midair.
-
-Controller bindings
-
-Preserve the existing universal default inputs.
-
-Do not require any new hardware button, break custom controller profiles, or violate the controller comfort rules for fighter attacks.
-
-The controller UI must no longer describe Jump as a button that can be held to achieve a higher jump.
-
-Touch controls
-
-Ensure the dedicated Down and Jump buttons continue supporting simultaneous independent touch pointers.
-
-Do not replace them with an unnecessary new Super Jump button.
-
-A player must be able to hold Down with one finger and press Jump with another in either touch layout.
-
-⸻
-
-10. Maintain combat and movement compatibility
-
-Preserve all existing systems unless a direct change is necessary to support the new mechanic:
-
-* Normal running and air steering.
-* Horizontal momentum preservation.
-* Dash and air-dash cancellation timing.
-* Jump input buffering and coyote time.
-* Existing attacks and their move-specific movement.
-* Hit-confirmed jump cancels.
-* Shield-to-jump transitions.
-* Hitstun and paralysis restrictions.
-* Fast Fall.
-* Drop-through platforms.
-* Two air jumps and aerial recovery.
-* The Mash Combo and its commitment restrictions.
-* Moving platforms and stage hazards.
-* Respawn and reset behavior.
-* Universal movement for all characters.
-
-Special attention should be given to the ordering of movement requests in Fighter.update.
-
-A successful Super Jump must not inadvertently activate a platform drop, attack, air jump, or second jump.
-
-A failed Super Jump request must not generate a dust burst.
-
-⸻
-
-11. Add comprehensive automated tests
-
-Update old tests that assume hold-to-jump-higher still exists, and add coverage for the new mechanic.
-
-At minimum, validate the following.
-
-Player input and physics
-
-1. Jump alone produces Normal Jump.
-2. Holding Jump for a long duration produces exactly the same Normal Jump apex as tapping it.
-3. Down held before a fresh grounded Jump press produces Super Jump.
-4. A same-sample Down + Jump chord produces Super Jump.
-5. Super Jump reaches substantially higher than Normal Jump.
-6. Super Jump exceeds the previous higher-jump height.
-7. Super Jump receives its stronger upward velocity immediately.
-8. Super Jump uses normal gravity during ascent and descent.
-9. Releasing Down or Jump after takeoff does not alter the already-selected jump trajectory.
-10. Down + Jump while airborne cannot create another Super Jump.
-11. Air jumps remain limited to two per airtime.
-12. The jump buffer and coyote-time behavior remain correct.
-13. No additional Energy is consumed.
-14. Running and Dash momentum carry through takeoff.
-15. The jump does not bypass stun, attack commitment, or other movement restrictions.
-
-Platform behavior
-
-1. A grounded Super Jump works from a one-way platform without dropping through it.
-2. A brief Down tap and release still drops through an eligible platform.
-3. Holding Down alone does not cause an unintended drop.
-4. The main floor never drops.
-5. Solid and non-droppable platforms remain unaffected.
-6. Moving cloud platforms correctly support Super Jump.
-7. A previously held Down input carried into a landing does not trigger an unintended drop.
-8. Buffered and same-frame input combinations resolve correctly.
-
-Visual effects
-
-1. Every successful Super Jump creates exactly one dust burst.
-2. Normal and Air Jumps never create Super Jump dust.
-3. Rejected requests create no dust.
-4. Dust originates from the correct ground contact point.
-5. Dust remains behind as the fighter rises.
-6. Particles expire and do not accumulate indefinitely.
-7. CPU Super Jumps generate exactly the same effect.
-8. Reduced-motion settings remain supported.
-9. Reset and rematch do not leave orphaned particles.
-
-CPU behavior
-
-1. CPU-generated Super Jump input contains a valid grounded Down + fresh Jump combination.
-2. CPU-generated Normal Jump remains a normal jump, regardless of how long Jump is held.
-3. CPU trajectory prediction matches real Super Jump physics within reasonable fixed-step tolerance.
-4. CPUs choose Super Jump for representative elevated-platform navigation.
-5. CPUs prefer Normal Jump for representative low-height navigation.
-6. CPUs can use Super Jump to pursue airborne targets and set up aerial attacks.
-7. CPUs do not continuously spam Super Jump.
-8. All four difficulties can perform Super Jump.
-9. CPU vs CPU Watch Mode functions correctly.
-10. No CPU can Super Jump during airborne recovery or otherwise bypass movement legality.
-11. The Practice Ground dummy remains passive.
-
-Cross-system regressions
-
-Update and run relevant suites, particularly:
-
-* tests/systems/movement.test.mjs
-* tests/systems/movement-rules.test.mjs
-* tests/systems/universal-movement.test.mjs
-* tests/systems/combat-rules.test.mjs
-* tests/systems/drop-through.test.mjs
-* tests/systems/down.test.mjs
-* tests/systems/controller-input.test.mjs
-* tests/systems/cpu-intelligence.test.mjs
-* tests/systems/combat-ai.test.mjs
-* tests/systems/cpu-behaviour.test.mjs
-* tests/systems/platform-hazards.test.mjs
-* Relevant rendering, touch-control, localization, Discover, and integration tests.
-
-Review any old tests using highJumpWindow, highJumpHeight, highJumpLift, or the old 'high' CPU jump type.
-
-Do not simply delete failing tests. Replace their outdated assertions with correct tests for the new design.
-
-Run the full repository test suite using:
-
-node --test
-
-Also use the existing feel metrics and CPU benchmarks where appropriate to compare movement and AI behavior before and after the change.
-
-⸻
-
-12. Validate movement across the stages
-
-The updated heights must work with actual Alva stage geometry.
-
-Check the playable stages, particularly:
-
-* Yerma
-* Sol-Noir
-* Asperitas
-* Adamaris
-* Jökull
-
-Verify that:
-
-* Normal Jump is useful for smaller elevation changes.
-* Super Jump can reach meaningful higher platforms.
-* Existing stage routes remain traversable.
-* Triple-jump recovery remains viable.
-* Moving and disappearing platforms behave correctly.
-* Super Jump does not unintentionally send fighters into the upper Void from the highest footing.
-* CPU navigation recognizes which platforms require Normal Jump, Super Jump, or an air jump.
-* The new movement remains balanced within combat and overtime.
-
-Tune universal movement values if needed, but do not make stage-specific or character-specific exceptions as a shortcut.
-
-⸻
-
-13. Update the game specification and documentation
-
-Update all affected source-of-truth documentation so no outdated jumping rules remain.
-
-In particular:
+Update the relevant sections of:
 
 * README.md
 * ALVA_SPEC.md
 * docs/systems/movement.md
 * docs/systems/input.md
 * docs/systems/ai.md
-* Relevant rendering and testing documentation
-* Any other descriptions that still mention holding Jump for a higher jump
+* docs/systems/rendering.md
+* Related architecture and test documentation.
+* UPDATES.md, if recording this overhaul as a named movement update.
 
-The documentation should clearly explain the new Normal Jump, Super Jump, Air Jump, Fast Fall, and platform drop controls.
-
-Do not rewrite unrelated game documentation.
-
-Follow Alva’s existing repository conventions and protected-file rules.
+Remove obsolete descriptions of holding Jump for greater height.
 
 ⸻
 
-14. Definition of done
+18. Automated Testing Requirements
 
-This implementation is complete only when all of the following are true:
+Create or update comprehensive tests using the existing Node test infrastructure.
 
-* Holding Jump no longer increases height.
-* Normal Jump is noticeably shorter than before.
-* Holding Down and pressing Jump on the ground immediately executes a powerful Super Jump.
-* Super Jump has a visibly different, more explosive takeoff and movement arc.
-* Super Jump reaches much greater height than Normal Jump.
-* Every successful Super Jump leaves a brief, clear dust burst at the takeoff point.
-* The dust is visible for both human and CPU fighters.
-* Players can reliably perform Super Jump on the ground and on one-way platforms.
-* Existing Fast Fall, platform drop, triple jump, and air-dash controls remain functional.
-* Keyboard, controller, and both touch layouts support the mechanic.
-* CPUs use real input combinations, understand the updated physics, and make meaningful Super Jump decisions.
-* All fighters share the same new movement behavior.
-* English and French UI text, controller guides, Discover, and repository documentation reflect the new mechanics.
-* All relevant tests pass, including the full node --test suite.
-* No unrelated gameplay features regress.
+Use:
 
-Final implementation report
+node --test
 
-After implementing the change, provide:
+Pay particular attention to:
 
-1. A summary of the new Normal Jump and Super Jump behavior.
-2. The final movement values and measured or simulated apex heights.
-3. An explanation of how Super Jump input and platform dropping were reconciled.
-4. A description of the dust effect and where it is rendered.
-5. A summary of the CPU intelligence changes, including how CPUs choose between the two jump types.
-6. The files changed.
-7. The tests and benchmarks executed, with their results.
-8. Any remaining concerns discovered during stage or combat balancing.
+* tests/systems/movement.test.mjs
+* tests/systems/movement-rules.test.mjs
+* tests/systems/universal-movement.test.mjs
+* tests/systems/drop-through.test.mjs
+* tests/systems/down.test.mjs
+* tests/systems/momentum.test.mjs
+* tests/systems/combat-rules.test.mjs
+* tests/systems/cpu-intelligence.test.mjs
+* tests/systems/cpu-behaviour.test.mjs
+* tests/systems/combat-ai.test.mjs
+* tests/systems/controller-input.test.mjs
+* tests/systems/request-devices.test.mjs
+* tests/systems/platform-hazards.test.mjs
+* tests/systems/hit-fx.test.mjs
+* Relevant UI and integration tests.
 
-The final result must make Super Jump feel like a deliberate, powerful, visually satisfying leap that changes how both players and CPUs approach movement, navigation, and aerial combat. It must be a genuine mechanical overhaul, not a renamed version of the old higher jump.
+Required physics tests
+
+Verify that:
+
+1. Normal Jump is noticeably lower than its previous height.
+2. Super Jump reaches approximately the old higher-jump apex.
+3. Normal Jump height does not change when Jump is held.
+4. Super Jump height does not change when Jump is released early.
+5. Super Jump applies its stronger impulse immediately.
+6. Super Jump uses ordinary gravity throughout its movement arc.
+7. A late Down press cannot upgrade an existing Normal Jump.
+8. Down + Jump in the air does not generate a Super Jump.
+9. Coyote jumps remain normal rather than becoming grounded Super Jumps.
+10. Air Jump retains approximately its previous strength.
+11. Super Jump does not replenish or create air jumps.
+12. Existing momentum and dash-cancel rules remain intact.
+
+Required input tests
+
+Test keyboard, controller, and touch input snapshots.
+
+Verify:
+
+* Correct held states.
+* Correct pressed edges.
+* Same-frame chords.
+* Multiple simultaneous touches.
+* Remapped controls.
+* Long-held buttons.
+* Released buttons.
+* No accidental repeated jumps.
+* No accidental platform drops.
+* Input buffers retaining the correct requested jump type.
+
+Required CPU tests
+
+Verify:
+
+* CPU Normal Jump.
+* CPU Super Jump.
+* CPU Air Jump.
+* CPU Super Jump from a platform.
+* CPU Super Jump into an aerial attack.
+* CPU selecting Super Jump for a higher platform.
+* CPU selecting Normal Jump for a low obstacle.
+* CPU evaluating Super Jump as a defensive option.
+* CPU navigating after the normal-jump reduction.
+* All CPU difficulty levels using legal movement.
+* Watch Mode CPU versus CPU.
+* Training CPU compatibility.
+* Correct movement prediction.
+* No infinite failed-jump loops.
+* No CPU-only velocity modifications.
+
+Required dust-effect tests
+
+Verify that:
+
+* Every accepted Super Jump creates exactly one dust event.
+* The effect originates at takeoff ground level.
+* Normal Jump creates no Super Jump dust.
+* Air Jump creates no Super Jump dust.
+* Failed or rejected Super Jump requests create no dust.
+* The effect expires.
+* Reset and respawn clear stale effects.
+* Reduced-motion settings are respected.
+* CPU Super Jumps produce the same effect as player Super Jumps.
+
+Determinism
+
+Run the relevant fixed-step tests at multiple rendering frame rates.
+
+The existing game tests include comparisons at 30, 60, and 144 FPS.
+
+The movement and CPU behavior must remain simulation-consistent.
+
+Visual effects must not alter deterministic gameplay.
+
+⸻
+
+19. Gameplay and Stage Validation
+
+After implementing and passing automated tests, validate the changes in actual gameplay.
+
+Test all nine playable fighters.
+
+Test all five battle stages and Practice Ground.
+
+Pay attention to:
+
+Normal Jump
+
+* Can fighters still navigate small obstacles?
+* Does combat positioning feel responsive?
+* Are low aerial attacks still practical?
+* Does the reduced jump height create any unavoidable navigation traps?
+
+Super Jump
+
+* Does it visibly launch the fighter upward?
+* Is its maximum height approximately unchanged from the old higher jump?
+* Does it feel dramatically stronger than Normal Jump?
+* Can it be activated reliably during movement?
+* Can it be used safely from one-way platforms?
+* Does it preserve momentum?
+* Does the dust appear at the correct position?
+
+Stages and hazards
+
+Check behavior on:
+
+* Static platforms.
+* Moving cloud platforms.
+* Vanishing platforms.
+* Breakable terrain.
+* One-way platforms.
+* Solid walls.
+* High platforms.
+* Platforms near the Void boundary.
+
+Ensure the reduced Normal Jump does not inadvertently make important routes impossible.
+
+If necessary, modify CPU navigation decisions or use the appropriate jump type rather than making arbitrary exceptions to the shared movement rules.
+
+CPU matches
+
+Watch CPUs fight on different stages and difficulties.
+
+Confirm that CPUs:
+
+* Actually perform Super Jump.
+* Use it for real tactical purposes.
+* Can reach elevated enemies.
+* Can perform aerial attacks from Super Jump.
+* Avoid unnecessary Super Jump spam.
+* Continue to recover from dangerous situations.
+* Do not repeatedly fail at reachable platforms.
+* Remain competitive and active throughout matches.
+
+CPU intelligence should recognize Super Jump as an intentional and useful movement option.
+
+⸻
+
+20. Implementation Quality Requirements
+
+All changes should respect the existing architecture.
+
+Movement
+
+Keep every movement tuning value in the universal movement configuration.
+
+Do not create fighter-specific jump modifiers.
+
+Physics
+
+Use the existing Fighter and physics pipeline.
+
+Do not create separate CPU jump physics.
+
+Do not add a fake upward teleport or midair boost to Super Jump.
+
+Input
+
+Reuse logical Down and Jump controls.
+
+Do not introduce an unnecessarily complicated input parser.
+
+Make sure input consumption, timing, and action priority are unambiguous.
+
+CPU
+
+Use the established CPU intelligence architecture.
+
+Do not bypass action restrictions.
+
+Remove obsolete higher-jump assumptions throughout the model.
+
+Rendering
+
+Reuse existing Canvas 2D rendering infrastructure.
+
+Dust should remain visual only.
+
+Avoid excessive particle complexity.
+
+Stability
+
+Do not break:
+
+* Existing attacks.
+* Dash and air dash.
+* Hitstun.
+* Shielding and Deflect.
+* Launch and knockback.
+* Stage collisions.
+* Fast Fall.
+* Air jumps.
+* Combos.
+* Momentum.
+* Practice Ground.
+* Watch Mode.
+* Controller mapping.
+* Mobile touch layouts.
+* Existing accessibility behavior.
+
+Prefer clean, maintainable changes over isolated special cases.
+
+⸻
+
+21. Final Acceptance Criteria
+
+The implementation is complete only when all the following are true.
+
+* [ ]	Pressing Jump normally produces a clearly shorter jump than before.
+* [ ]	Holding Jump no longer increases jump height.
+* [ ]	Holding Down and pressing Jump while grounded immediately activates Super Jump.
+* [ ]	Super Jump reaches approximately the same height as the previous higher jump.
+* [ ]	Super Jump feels like a genuine explosive leap, with a powerful initial takeoff and natural gravity.
+* [ ]	Super Jump does not require charging.
+* [ ]	Releasing Down or Jump after takeoff does not weaken Super Jump.
+* [ ]	Super Jump produces a visible dust burst originating at the ground.
+* [ ]	Every successful Super Jump produces exactly one burst.
+* [ ]	The effect works with every fighter and every CPU.
+* [ ]	Super Jump works from one-way and moving platforms without accidental dropping.
+* [ ]	Fast Fall continues to function correctly.
+* [ ]	Existing intentional platform-drop functionality remains available.
+* [ ]	Air jumps retain their previous usefulness and number of uses.
+* [ ]	Keyboard, PlayStation, Xbox, and touch controls work correctly.
+* [ ]	CPUs can execute Super Jump using the same inputs and physics as humans.
+* [ ]	CPUs understand Super Jump in navigation, combat, defense, and prediction.
+* [ ]	CPUs intelligently choose between Normal Jump and Super Jump.
+* [ ]	All CPU difficulties support the mechanic.
+* [ ]	Quick Battle, Watch Mode, and Practice Ground remain functional.
+* [ ]	The old higher-jump implementation and obsolete descriptions are removed.
+* [ ]	Discover, controller help, documentation, and localization accurately describe the new system.
+* [ ]	Automated tests pass.
+* [ ]	Real gameplay validation confirms the new movement feels responsive and balanced.
+
+⸻
+
+22. Required Final Report
+
+After implementing the overhaul, provide a clear completion report explaining:
+
+1. Which files were changed and why.
+2. How the new Normal Jump and Super Jump inputs are detected.
+3. The final Normal Jump and Super Jump velocities.
+4. The measured apex heights of both jump types, including comparison with the original higher jump.
+5. How the stronger launch impulse produces Super Jump’s leap-like feel.
+6. How the dust effect works and where it is rendered.
+7. How the one-way platform-drop conflict was resolved.
+8. How air-jump strength was preserved.
+9. Which CPU systems were changed and how CPU fighters decide when to Super Jump.
+10. Which tests were added or updated.
+11. Which test suites passed, with any failures or untested cases disclosed.
+12. Any gameplay tuning concerns discovered during validation.
+
+Do not report completion without verifying the changed behavior.
+
+Final Design Direction
+
+The finished system should create three clearly different jumping experiences:
+
+Normal Jump: A quick, low, responsive hop used for ordinary movement and combat positioning.
+
+Super Jump: A deliberate Down + Jump command that propels the fighter powerfully upward, reaches the original higher jump’s height, and creates a satisfying dust explosion at the feet.
+
+Air Jump: The familiar additional midair jump, preserving Alva’s existing triple-jump and recovery gameplay.
+
+Most importantly, Super Jump should feel powerful because of the initial leap, its immediate vertical acceleration, and its takeoff presentation—not because the fighter floats under reduced gravity.
+
+Players and CPUs must obey the same rules, use the same movement system, and have access to the same mechanic.
+
+Implement the complete change across gameplay, presentation, CPU intelligence, UI, documentation, and tests rather than stopping after the basic jump-physics modification.
