@@ -1,1499 +1,1002 @@
-Implement Local Play in Alva — Complete Two-Controller Multiplayer System
+ALVA — Safe File Consolidation and itch.io Publishing Preparation
 
-Objective
+Your role
 
-Introduce a fully functional Local Play feature to Alva, allowing two people to fight each other on the same device using two separate physical controllers.
+Act as a senior JavaScript game engineer, web performance specialist, and software architect working on Alva, a browser-based 2D platform fighting game.
 
-This must be a proper extension of Alva’s existing systems, not a separate fighting engine or an imitation of multiplayer.
+Repository: https://github.com/hiyroscript/alva
 
-Local Play must use the same battle mechanics, animations, stages, fighters, physics, scoring, and overall visual identity as the existing game.
+Your assignment is to carefully consolidate files, reduce the number of files required to distribute the game, and prepare Alva for publication on HTML5 platforms such as itch.io.
 
-The feature must integrate naturally with everything already implemented.
+The absolute priority is preserving the existing game.
 
-The main requirements are:
+This is a packaging, consolidation, and deployment task. It is not a gameplay update, balance update, redesign, engine rewrite, or opportunity to introduce unrelated improvements.
 
-1. Introduce a Local play button on the Home Screen, positioned directly beside a half-width Play button.
-2. Keep Local play visible at all times, but enable it only when at least two compatible controllers are connected.
-3. Give the enabled button the same animated green border glow as the Home Screen’s Download button.
-4. Introduce a new Select local mode page, visually identical to the existing Select mode page.
-5. Offer only Quick Battle in Local Play for now.
-6. Make Local Quick Battle follow this exact sequence:
-    * Player 1 fighter selection
-    * Player 2 fighter selection
-    * Stage selection
-7. Create a genuine two-human-player battle, with each player controlling their own fighter independently.
-8. Display both fighters’ move HUDs simultaneously, with Player 1 on the bottom-left and Player 2 on the bottom-right.
-9. Use prominent, consistent player identification throughout Local Play: Player 1 is RED and Player 2 is BLUE.
-10. Preserve all current gameplay features and prevent regressions to Play, Watch Mode, and Practice Ground.
+The finished game must play, look, feel, and behave exactly like the original.
 
-This must be an actual working implementation, including controller handling, navigation, rendering, match lifecycle, edge cases, localization, and tests.
+Do not simply describe how to accomplish this. Investigate the repository, implement the safest solution, run tests, produce a playable distribution, and document the results.
 
 ⸻
 
-1. First understand the existing codebase
+1. Understand Alva before changing anything
 
-Before implementing anything, inspect the current systems and understand how they interact.
+Read and understand the repository before making changes.
 
-Alva is a browser-based Canvas 2D fighting game written using vanilla JavaScript ES modules, HTML, and CSS. There is no framework or build process.
+Start with these authoritative documents:
 
-Important files include:
+* README.md
+* CLAUDE.md
+* ALVA_SPEC.md
+* docs/README.md
+* docs/architecture/overview.md
+* docs/architecture/module-responsibilities.md
+* docs/architecture/character-system.md
+* docs/development/setup.md
+* docs/development/testing.md
+* docs/development/conventions.md
+* codename_rule
+* Relevant sections of UPDATES.md
 
-Application and navigation
+Read the relevant gameplay and character documentation whenever making decisions involving their systems.
 
-* js/core/app.js — Initializes the application, managers, selection state, and screens.
-* js/core/screen-manager.js — Screen registration, navigation, transitions, and history.
-* js/core/menu-navigator.js — Keyboard and controller menu navigation.
-* index.html — Screen sections, overlays, and CSS imports.
+ALVA_SPEC.md is the authoritative product specification. Treat it as a contract.
 
-Existing menu flow
+Do not edit, rename, reformat, or move character_rule. Preserve the codename contract, including the intentional spelling of mouvment.
 
-* js/screens/home-screen.js
-* js/screens/mode-select-screen.js
-* js/screens/character-select-screen.js
-* js/screens/map-select-screen.js
-* js/screens/quick-battle-setup.js
-* js/screens/watch-screens.js
-* js/ui/components.js
-* js/ui/fighter-roster.js
+Technical architecture
 
-Controllers and input
+Alva is built using:
 
-* js/core/controller-manager.js
-* js/core/input-manager.js
-* js/core/controller-resolver.js
-* js/core/gamepad-devices.js
-* js/game/fighters/fighter-controller.js
-* js/data/controller-profiles.js
-* js/ui/controller-dialog.js
+* Vanilla JavaScript ES modules.
+* HTML5 and CSS.
+* Canvas 2D rendering.
+* A deterministic, fixed-step game simulation.
+* Dynamically loaded PNG character animation frames.
+* Native keyboard, touch, and controller inputs.
+* Browser localStorage for persistent settings.
 
-Battle and interface
+There is currently no required build process, JavaScript framework, WebGL dependency, or runtime package dependency.
 
-* js/game/battle.js
-* js/game/arena.js
-* js/screens/battle-screen.js
-* js/ui/hud.js
-* js/ui/ability-hud.js
-* js/game/rendering/fighter-status.js
+The main entry point is index.html, which loads js/main.js.
 
-Styling and localization
+js/core/app.js initializes the application, managers, screens, settings, localization, and game loop.
 
-* css/home.css
-* css/setup.css
-* css/battle.css
-* css/battle-overlays.css
-* css/ability-hud.css
-* css/responsive.css
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
+The simulation is implemented across js/game/, with data-driven character definitions in js/data/characters/.
 
-Examine the relevant automated tests before changing their underlying interfaces.
+Understand these relationships before touching anything.
 
-Important architectural observation: Alva’s ControllerManager already detects up to four active supported controllers, but gameplay polling and binding resolution currently operate on Player 1’s controller. This must be extended to support two independent human input streams.
+Game modes to preserve
 
-Also, Battle already maintains two fighters, p1 and p2, with independent slots, scores, opponents, and controllers. Reuse that architecture rather than introducing another battle simulation.
-
-2. Home Screen — split Play and introduce Local play
-
-Current behavior
-
-The Home Screen has a full-width green Play button, followed by Watch mode, Practice ground, and Discover.
-
-The actions are created inside js/screens/home-screen.js, and their appearance is controlled primarily by css/home.css.
-
-The menu currently uses a grid approximately 320px wide, with consistently sized action buttons.
-
-Required new layout
-
-The first row must contain two buttons displayed horizontally:
-
-┌────────────────────┬────────────────────┐
-│ Play               │ Local play         │
-└────────────────────┴────────────────────┘
-┌─────────────────────────────────────────┐
-│ Watch mode                              │
-├─────────────────────────────────────────┤
-│ Practice ground                         │
-├─────────────────────────────────────────┤
-│ Discover                                │
-└─────────────────────────────────────────┘
-
-The diagram is conceptual; use the game’s existing actual design.
-
-Exact layout rules
-
-* The original Play button should occupy approximately half its previous width.
-* The new Local play button must have exactly the same width and height as Play.
-* Both buttons together, including their spacing, must occupy exactly the original full-width Play row.
-* Both buttons must align perfectly with the left and right edges of the full-width buttons beneath them.
-* Use the same vertical height as the current Home Screen action buttons.
-* Preserve the existing button border radius, typography, spacing, icons, interaction animations, and focus treatment.
-* The existing Play button must remain green.
-* Local play must use the same dark/transparent secondary button style as Watch mode, Practice ground, and Discover.
-* Local play must not have a green-filled background.
-* Keep both buttons readable in English and French.
-* Preserve proper sizing on short displays and smaller landscape screens.
-* Do not cause the Alva logo or any Home Screen elements to shift off-screen.
-
-Prefer a dedicated two-column row inside .home-actions, using equal-width grid columns, rather than hard-coded button widths.
-
-Update any Home Screen height calculations only if required. The first row must still count as one row, not two.
-
-Controller availability
-
-The Local play button must always exist and remain visible.
-
-However, it must only be actionable when:
-
-* At least two distinct supported controllers are connected.
-* At least two of those controllers are active according to Alva’s existing controller limit.
-* The browser’s Gamepad API is available and functioning.
-* At least one playable fighter is available.
-
-Do not count an unsupported controller as an eligible controller.
-
-Two controllers of the exact same model must count as two separate controllers when they are separate devices.
-
-More than two supported controllers may be connected; Local Play should use two distinct active controllers rather than requiring exactly two total.
-
-Preserve Alva’s existing four-active-controller limit and excessive-controller warnings.
-
-Disabled appearance
-
-When fewer than two eligible controllers are present:
-
-* Show Local play in the correct position.
-* Use the existing disabled button appearance.
-* Do not show the animated green border.
-* Do not allow the button to initiate a Local Play session.
-* Keep the label readable.
-* Provide a localized explanation such as “Connect two controllers to play locally.”
-* Use appropriate accessible descriptions so users understand why the button is unavailable.
-
-The existing Controller Connections dialog should remain accessible and useful for connecting or identifying controllers.
-
-Enabled appearance — green border
-
-This is particularly important.
-
-When two controllers become available, Local play must receive an animated light-green border treatment matching the existing Download button on the Home Screen.
-
-The Download button already implements this in css/home.css, with a pseudo-element, green border, subtle box shadow, and home-download-glow animation.
-
-Reuse those existing design principles and, where possible, existing animation definitions.
-
-The effect should have:
-
-* A green border matching Alva’s established green accent.
-* A soft surrounding green glow.
-* The same elegant pulse cadence as the Download button.
-* No bright green fill.
-* No flashing or jarring transitions.
-* No layout movement during animation.
-* Proper reduced-motion behavior.
-
-Use the Download button’s existing green border and shadow values as the design reference, rather than inventing an unrelated green.
-
-For readability, keep an identifiable green outline in the enabled state even between glow pulses. The animation should enhance the enabled state.
-
-When the second controller disconnects, remove the enabled glow immediately and revert to the disabled appearance.
-
-When it reconnects, automatically update the button again.
-
-Functionality
-
-The existing Play button must continue opening the normal Select mode page.
-
-The Local play button must open the new Select local mode page.
-
-Do not redirect Local play through the existing single-player setup or its Custom Play / Regular Play choice dialog.
-
-3. Introduce the Select local mode page
-
-Create a dedicated Local Play mode selection screen.
-
-Recommended file:
-
-js/screens/local-mode-select-screen.js
-
-It should use the existing Select mode page as its direct visual reference.
-
-Title
-
-The main page title must be:
-
-Select local mode
-
-Its kicker should be:
-
-Local play
-
-Appearance
-
-Match js/screens/mode-select-screen.js as closely as possible:
-
-* Same background and design system.
-* Same screen header.
-* Same Back button.
-* Same card styling.
-* Same card size and placement.
-* Same Mode details panel.
-* Same typography.
-* Same hover, focus, and selection effects.
-* Same entrance animations.
-* Same controller navigation behavior.
-* Same responsive treatment.
-
-Avoid inventing a completely different multiplayer menu.
-
-Available modes
-
-Only one mode should be selectable:
+Study and verify all existing game modes:
 
 Quick Battle
 
-Use the existing Quick Battle card format, including the mode index, title, description, and selection indicator.
+* Regular Play and Custom Play.
+* Human versus CPU.
+* All four CPU difficulties: Easy, Medium, Hard, and Brutal.
+* Fighter selection and stage selection.
+* Match results, rematches, and navigation.
 
-The details panel must describe Local Quick Battle appropriately.
+Watch Mode
 
-For example:
+* CPU versus CPU.
+* Independent AI controllers.
+* Mirror matches.
+* Seeded randomness and reproducible behavior.
+* Match results and celebrations.
 
-“Face another player in a local battle using two controllers. Choose your fighters and stage, then compete to knock each other into the Void.”
+Local Play
 
-The rules description should accurately describe Alva’s existing match format.
+* Two players on separate controllers.
+* Independent controller inputs and configurations.
+* Player-specific interfaces.
+* Controller disconnection and reconnection.
+* Match results and rematches.
 
-Do not describe the opponent as a CPU.
+Practice Ground
 
-Do not show Regular Play or Custom Play choices.
+* Training dummy.
+* Fighter swapping.
+* CPU swapping and disabling.
+* Damage numbers.
+* Training-specific respawn behavior.
+* Infinite practice without normal scoring.
 
-Do not show a difficulty selector.
+Preserve the Discover interface, splash screen, settings, dialogs, language selection, PWA installation features, and every menu.
 
-Other local modes may eventually be added, so use a structure that allows future extensions without redesigning this screen.
+Fighters and stages
 
-Navigation
+Alva currently has nine playable fighters, registered as 0001 through 0009.
 
-Home → Local play → Select local mode
+Their definitions, attacks, abilities, frame data, animation timing, controller layouts, and visual characteristics must remain unchanged.
 
-Selecting Quick Battle begins the fighter-selection sequence.
+The game also contains five regular stages:
 
-Back returns to Home.
+* Yerma
+* Sol-Noir
+* Asperitas
+* Adamaris
+* Jökull
 
-Controller availability must be checked again before advancing.
+Additionally, preserve the Practice Ground stage.
 
-4. Local Quick Battle setup sequence
+All stage backgrounds, procedural artwork, hazards, collision surfaces, physics, and camera behavior must remain identical.
 
-The exact sequence must be:
+⸻
 
-Player 1 fighter selection → Player 2 fighter selection → Stage selection → Battle
+2. Investigate the file-count problem
 
-Do not insert additional setup screens.
+The repository currently has approximately:
 
-The Select local mode page occurs before this three-step sequence.
+Type	Files
+Assets	894
+JavaScript	145
+CSS	15
+Tests	118
+Documentation	33
+Other root files	13
+Total	1,218
 
-Setup progress indicator
+The production candidate set, excluding the known development-only materials, is approximately 1,060 files.
 
-Use the existing step-progress system in js/ui/components.js.
+These numbers reflect the inspected repository and must be recalculated against the actual working branch before implementation.
 
-Create a dedicated Local Quick Battle setup definition, with these three steps:
+The itch.io HTML5 deployment requirements include:
 
-1. Player 1 fighter
-2. Player 2 fighter
-3. Stage
+* A playable index.html at the root of the uploaded ZIP.
+* No more than 1,000 files after extraction.
+* No more than 500 MB total extracted content.
+* No individual extracted file over 200 MB.
+* No file path longer than 240 characters.
+* Correct, case-sensitive file names.
+* Relative paths for resources.
 
-The existing progress display, completed-step checkmarks, and active-step styling must work properly.
+Verify the platform’s current official requirements before final packaging.
 
-The setup name should be Local Quick Battle or Quick Battle under the Local play context.
+Our target is fewer than 950 distribution files, preferably around 900, without reducing gameplay content.
 
-Do not reuse the CPU, difficulty, or Regular/Custom steps.
+File-count reduction must not come at the cost of broken animations, missing assets, changed physics, or altered game functionality.
 
-Separate selection state
+⸻
 
-Local Play must have its own state, isolated from regular Quick Battle and Watch Mode.
+3. Choose the safest consolidation strategy
 
-For example:
+Do not merge files indiscriminately.
 
-selection.local = {
-  p1CharacterId: firstPlayableFighter,
-  p2CharacterId: firstPlayableFighter,
-  mapId: firstPlayableStage,
-};
+The preferred solution is to preserve the development source while introducing an optional production export process.
 
-This is a suggested shape, not a requirement to disregard existing conventions.
+The development repository should remain readable, modular, testable, and easy to extend.
 
-The critical point is that Local Play choices must never overwrite:
+For example, preserve the existing structure:
 
-* selection.characterId
-* selection.cpuCharacterId
-* selection.difficulty
-* selection.playType
-* selection.watch
+index.html
+css/
+js/
+  core/
+  data/
+  game/
+  localization/
+  screens/
+  stages/
+  ui/
+assets/
+tests/
+docs/
 
-Normal Play must retain its own selections.
+Create a production-only export that resembles:
 
-Returning to Local Play may restore its previously selected fighters and stage, provided they remain valid and playable.
+dist/
+  itch/
+    index.html
+    game.js
+    game.css
+    manifest.webmanifest
+    alvafav.PNG
+    controller.PNG
+    hs.jpg
+    assets/
 
-Step 1 — Player 1 fighter selection
+This is an illustrative layout, not a mandatory naming contract.
 
-Create a dedicated local Player 1 fighter-selection screen.
+The resulting production directory must contain every resource the game genuinely needs.
 
-Suggested ID:
+Preserve all required assets and their relative references.
 
-local-character-p1
+Important distinction
 
-The page must use the existing CharacterSelectScreen and FighterRoster architecture.
+There are two possible forms of consolidation:
 
-Do not rebuild the roster.
+A. Production bundling
 
-Keep:
+Combining multiple source files into fewer distributable files without destroying or reorganizing the originals.
 
-* The existing 48-slot roster.
-* The same fighter portraits.
-* The same animated preview.
-* Fighter descriptions and details.
-* Disabled and unavailable slots.
-* Existing selection and confirmation behavior.
-* All existing loadout and sprite behavior.
+B. Source consolidation
 
-The page should prominently identify:
+Actually combining modules or stylesheets inside the development repository.
 
-PLAYER 1
+Prioritize A.
 
-Use RED for the Player 1 indicator.
+Only perform B when there is a clear architectural benefit, the merge is low risk, and all affected tests and references can be maintained without changing behavior.
 
-The title can be:
+Do not merge important gameplay modules merely to reduce the repository’s file count.
 
-Player 1 — Select fighter
+A production build is preferable to turning the original source into giant, difficult-to-maintain files.
 
-A correctly localized equivalent is required in French.
+⸻
 
-Only Controller 1, meaning the gamepad assigned to Player 1, should control this fighter-selection step.
+4. Consolidate CSS safely
 
-Once Player 1 confirms a playable fighter:
+The HTML currently references 15 stylesheets.
 
-* Save the choice to the Local Play selection state.
-* Advance to Player 2 fighter selection.
-* Do not start the battle.
-* Do not select a CPU.
-* Do not randomize the stage.
+Investigate whether the production version can use a single generated CSS file.
 
-Step 2 — Player 2 fighter selection
+The current order is:
 
-Create a separate Player 2 fighter-selection screen.
+css/base.css
+css/components.css
+css/splash.css
+css/home.css
+css/setup.css
+css/discover.css
+css/settings.css
+css/battle.css
+css/touch-controls.css
+css/battle-overlays.css
+css/practice.css
+css/ability-hud.css
+css/controller.css
+css/overlays.css
+css/responsive.css
 
-Suggested ID:
+Preserve this exact cascade order.
 
-local-character-p2
+This is essential because later stylesheets intentionally override earlier declarations.
 
-It must look and function like the Player 1 selection screen, using the same shared roster component.
+The final production stylesheet must retain:
 
-The title should be:
+* Every selector and declaration.
+* Every responsive breakpoint.
+* Every CSS variable.
+* Every animation and transition.
+* Every hover and focus state.
+* Every z-index and overlay relationship.
+* Every touch-control layout.
+* Every HUD layout.
+* Every accessibility-related styling rule.
+* Every reduced-motion behavior.
 
-Player 2 — Select fighter
+Do not alphabetically reorder CSS rules.
 
-Use BLUE for the Player 2 indicator.
+Do not remove rules based only on static unused-CSS analysis. Some selectors are created dynamically by JavaScript.
 
-Player 2’s physical controller must control Player 2’s fighter selection.
+Avoid introducing CSS minification or rewriting unless its compatibility has been demonstrated.
 
-This is important: do not simply let Player 1’s controller make every selection while calling the second screen Player 2.
+Alva’s existing stylesheet tests expect modular source files. Do not invalidate those tests simply to create one production stylesheet.
 
-Player 2 must be able to browse the roster and confirm their fighter using their own controller.
+The development page may continue loading the original files, while the production page loads the generated bundle.
 
-Do not allow inputs from Player 1’s controller to accidentally confirm Player 2’s fighter.
+Test both versions.
 
-Both players must be able to select the same fighter.
+⸻
 
-Mirror matches are allowed and must work correctly.
+5. Consolidate JavaScript safely
 
-When Player 2 confirms:
+The repository contains approximately 145 JavaScript source files.
 
-* Save the choice separately.
-* Advance to Stage selection.
+Investigate whether they can be bundled into one or a small number of production JavaScript files.
 
-Step 3 — Stage selection
+A lightweight development-only bundler, such as esbuild, is acceptable if it can preserve the game’s behavior.
 
-Create a dedicated local stage-selection screen.
+If introducing a build dependency, make it reproducible, minimal, and strictly development-only. Do not add runtime dependencies or require a server framework.
 
-Suggested ID:
-
-local-map
-
-Reuse MapSelectScreen.
+Mandatory compatibility requirements
 
 Preserve:
 
-* The existing 24-slot stage roster.
-* All playable stages.
-* Locked stage slots.
-* Stage thumbnails.
-* Animated stage preview.
-* Stage descriptions.
-* Random Stage.
-* Existing selection and confirmation behavior.
-
-Local Play must not silently select a random stage unless the players explicitly choose Random Stage.
-
-For this initial implementation, Player 1’s controller should own stage selection and confirmation.
-
-The final button must start a Local Quick Battle using both previously selected fighters and the selected stage.
-
-No CPU should be spawned.
-
-Back navigation
-
-Back must behave correctly at every point:
-
-* Stage selection → Player 2 fighter selection
-* Player 2 fighter selection → Player 1 fighter selection
-* Player 1 fighter selection → Select local mode
-* Select local mode → Home
-
-Previously selected fighters and stage should remain selected when moving backward.
-
-During Player 2 selection, Player 2 should be able to use their own Back command.
-
-Do not break the existing global navigation or dialog stack.
-
-5. Extend controller handling for two independent players
-
-This is the most important technical requirement.
-
-Alva already supports connecting multiple controllers, but the gameplay input system currently reads only Player 1’s controller.
-
-Supporting multiple connected controllers is not the same as supporting multiple human players.
-
-You must implement true independent input processing.
-
-Controller assignments
-
-Local Play requires:
-
-* Player 1 → Controller A
-* Player 2 → Controller B
-
-The controllers must be physically distinct devices.
-
-Use the existing ControllerManager’s device identity and ordering system.
-
-Preserve the existing manually selected Player 1 controller when possible.
-
-Assign Player 2 to the next eligible active controller that is not Player 1’s controller.
-
-Keep assignments stable throughout a Local Play session.
-
-If a third or fourth controller is connected, it must not automatically interfere with either player’s inputs.
-
-If controller assignments are exposed in Controller Connections, clearly label which device belongs to Player 1 and which belongs to Player 2.
-
-Prevent assigning the same device to both players.
-
-Separate input state
-
-Each player needs their own:
-
-* Held buttons.
-* Newly pressed buttons.
-* Released buttons.
-* Analog stick axes.
-* Trigger states.
-* Controller binding resolver.
-* Press-edge handling.
-* Gameplay snapshot.
+* ES module initialization and evaluation behavior.
+* Import and export semantics.
+* Module-level side effects.
+* Application startup order.
+* The complete character registry.
+* Shared mutable registry identities.
+* Constructor behavior.
+* Event listener registration.
+* Animation loop scheduling.
+* Promise and asset-loading behavior.
+* Controller polling.
 * Input buffering.
-* Reset and flush behavior.
+* Seeded random-number generators.
+* Every combat and physics calculation.
 
-Never merge both controllers into the same gameplay snapshot.
+Avoid changes to execution order, floating-point operations, timers, or state transitions.
 
-For example, Controller 1 pressing Jump must not cause Player 2 to jump.
+Do not use aggressive tree shaking, property mangling, code restructuring, or minification by default.
 
-Controller 2 pressing Attack must not cause Player 1 to attack.
+Do not assume code is unused just because it has few direct imports. It may be used dynamically or through an existing registry.
 
-Both players must be able to press the same action at the same time and have both actions execute.
+Test bundler options such as disabling tree shaking and minification where appropriate.
 
-The code should support two independent input pipelines without unnecessarily duplicating the entire InputManager implementation.
+Ensure the production bundle exposes the same functional behavior as the unbundled source.
 
-A per-player resolver and input-state abstraction is preferable.
+The existing window.alva debugging interface should remain available.
 
-Maintain backwards compatibility with the existing single-player input APIs wherever possible.
+High-risk modules
 
-Fighter-specific controller profiles
+Treat these as particularly sensitive:
 
-Alva already gives each fighter a recommended controller layout and supports customized per-fighter bindings.
+js/game/arena.js
+js/game/battle.js
+js/game/physics.js
+js/game/fighters/fighter.js
+js/game/combat/
+js/game/ai/
+js/data/characters/
+js/data/movement.js
+js/data/launch.js
+js/core/input-manager.js
+js/core/controller-manager.js
+js/core/controller-resolver.js
+js/core/settings.js
 
-Both players must use the appropriate controls for their own selected fighters.
+Do not refactor their algorithms as part of file consolidation.
 
-For example:
+Bundling these modules without rewriting their internal logic is acceptable if verified.
 
-* Player 1 chooses Fighter #0001.
-* Player 2 chooses Fighter #0002.
-* Controller 1 uses Fighter #0001’s resolved bindings.
-* Controller 2 uses Fighter #0002’s resolved bindings.
+Changing their calculations, state machines, or public contracts is not.
 
-They must not share a single fighter profile accidentally.
+Preserve the rule that shared character mechanics cannot special-case particular fighter IDs.
 
-If both players select the same fighter, they may share the same profile definition but must still use independent input state and binding resolution.
+⸻
 
-Saved custom controller layouts must remain compatible.
+6. Protect the character assets
 
-All existing universal controls must work independently for both players, including:
+The sprite system is one of the most sensitive parts of Alva.
 
-* Movement
-* Jump and air jumps
-* Super Jump
-* Dash and air dash
-* Fast fall and platform drop
-* Attacks and extra attacks
-* Shield and Deflect
-* Character-specific special moves
-* Directional stick inputs
-* Button modifiers
-* Hold-based bindings
+The repository contains approximately 894 asset files, mostly PNG animation frames.
 
-Do not simplify or remove any fighter’s unique mechanics to make multiplayer work.
+These files are lightweight individually, but numerous.
 
-Controller-only gameplay
+Do not assume they should be combined.
 
-Local Play must never use keyboard or touch controls for either fighter.
+The existing file-count target can likely be reached by bundling JavaScript and CSS alone.
 
-Do not fall back to:
+Preserve exact sprite behavior
 
-* Keyboard for Player 1
-* Keyboard for Player 2
-* One controller plus keyboard
-* One controller plus touch
-* Two players sharing one controller
+Maintain:
 
-The Home Screen may still be clicked normally to enter Local Play when the controller requirements are satisfied, but local fighter selection, stage confirmation, and combat should use their assigned controllers.
+* Frame ordering.
+* Animation FPS.
+* Loop behavior.
+* Sprite dimensions.
+* Pixel transparency.
+* Pixel colors.
+* Collision-independent visual anchors.
+* Fighter visual scale.
+* Per-frame offsets.
+* Animation restart behavior.
+* Projectile animations.
+* Effect animations.
+* Summon and ensemble animation behavior.
 
-The existing keyboard, touch, and controller behavior in other game modes must remain unchanged.
+Alva’s sprite normalizer reads image pixels and derives information from them.
 
-Controller menu navigation
+Changing image dimensions, transparency, or pixel values may alter how sprites are processed and displayed.
 
-The current menu navigator is built around Player 1.
+Do not introduce sprite atlases, image repacking, or format conversion unless they are genuinely necessary and can be proven visually equivalent.
 
-Extend it carefully so the active local setup screen can determine which controller owns menu navigation.
+The default solution should retain the existing PNG files unchanged.
 
-Required ownership:
+Duplicate assets
 
-* Select local mode: Player 1
-* Player 1 fighter selection: Player 1
-* Player 2 fighter selection: Player 2
-* Local stage selection: Player 1
+The repository contains some byte-identical sprite files.
 
-Preserve D-pad navigation, analog cursor behavior, confirmation, and Back commands.
+Investigate these, but do not automatically remove them.
 
-Only the appropriate assigned controller should change or confirm a local selection.
+Two identical images may serve different animation names and have meaningful separate references.
 
-Do not permanently change the application’s Player 1 assignment merely to let Player 2 navigate a menu.
+If deduplication is considered, preserve every logical animation frame and its original ordering.
 
-Outside Local Play, preserve the existing Player 1 menu navigation behavior.
+A repeated image may be intentionally repeated to create an animation hold.
 
-Pause behavior
+Never eliminate that timing behavior.
 
-During Local Battle, either player’s controller must be able to pause.
+Do not remove any animation merely because it appears redundant.
 
-Use Alva’s existing Options / Menu input mapping.
+⸻
 
-The first pause request opens the shared pause interface.
+7. Preserve every gameplay mechanic exactly
 
-Both fighters must stop receiving gameplay input while the match is paused.
+Treat gameplay behavior as immutable.
 
-A simultaneous pause press must not open multiple dialogs or immediately close the menu.
+No movement, collision, animation-timing, attack, or AI changes are authorized.
 
-Closing the pause menu must flush stale inputs for both players.
+Movement and physics
 
-When resuming, no held menu button should accidentally trigger an attack.
+Preserve:
 
-6. Extend the existing Battle engine with Local Play mode
+* Universal run and jump values.
+* Normal jumps and Super Jumps.
+* Triple jumps.
+* Dash and air dash.
+* Momentum conservation.
+* Air control.
+* Fast falls.
+* Platform drop-through.
+* Gravity.
+* Collision handling.
+* Wall rebounds.
+* Landing behavior.
+* Knockback and launch steering.
+* Camera movement.
+* Fixed simulation timestep.
 
-Use js/game/battle.js and js/screens/battle-screen.js.
+Alva uses a fixed-step simulation of 1/60 second, with accumulated frame time and a maximum number of simulation steps per rendered frame.
 
-The game already supports two sides:
+Do not introduce behavior that depends on monitor refresh rate or wall-clock timing.
 
-* p1
-* p2
+Combat
 
-Existing Quick Battle uses one player and one CPU.
+Preserve:
 
-Watch Mode uses two CPUs.
+* Exact attack damage.
+* Hitboxes and hurtboxes.
+* Launch Point calculations.
+* Base and directional launch.
+* Shield behavior.
+* Perfect Shields.
+* Deflects.
+* Energy use and recovery.
+* Attack cooldowns.
+* Hitstun and impact freeze.
+* Combo timing.
+* Mash Combo requirements.
+* Attack cancellation rules.
+* Projectiles and summons.
+* Techniques and special abilities.
+* Status effects.
+* Healing and recovery.
+* Every fighter-specific moveset.
 
-Extend the battle configuration with a new mode:
+Even a small timing or numeric difference is unacceptable if it affects gameplay.
 
-local
+AI
 
-In this mode:
+Preserve all CPU difficulty levels, decision-making behavior, opponent modeling, reaction rules, tactical planning, and seeded determinism.
 
-* p1 is a human-controlled fighter.
-* p2 is a human-controlled fighter.
-* Neither fighter receives a CombatAIController.
-* Both fighters use their own assigned controller input source.
-* Both fighters receive their own fighter definition and sprite set.
-* Both remain part of the existing shared Arena.
+Do not simplify the AI to reduce bundle size.
 
-Prefer extending BATTLE_MODES rather than hard-coding local-specific behavior throughout the engine.
+Keep AI gameplay calculations functionally equivalent to the original.
 
-Fighter labels
-
-Use:
-
-* Player 1: P1
-* Player 2: P2
-
-Provide localized readable forms:
-
-* Player 1 / Joueur 1
-* Player 2 / Joueur 2
-
-Do not show CPU labels anywhere in Local Play.
-
-Gameplay rules
-
-Local Quick Battle must follow the existing Quick Battle rules.
+Match rules
 
 Preserve:
 
 * First to three points.
-* Five-minute regulation match.
-* A point when an opponent falls into the Void.
-* Existing respawn timing and behavior.
-* Existing Launch Point rules.
-* Energy, cooldowns, and Shield mechanics.
-* Existing hit detection.
-* Stage collisions and environmental hazards.
-* Normal movement and attacks.
-* Match clock and overtime.
-* The closing Void during overtime.
-* Existing tiebreakers and draw rules.
+* Void scoring and respawns.
+* Five-minute match timer.
+* Overtime rules.
+* Closing Void behavior.
+* Match-end decisions.
+* Launch Point tiebreakers.
+* Draw conditions.
 * Match statistics.
-* Intro and celebration phases.
-* Camera behavior and interpolation.
-* Existing restart and rematch behavior.
+* Celebrations.
+* Pause, resume, rematch, and restart behavior.
 
-Do not introduce health bars, rounds with separate health pools, or different damage calculations.
+All match modes must continue to share their existing rules.
 
-Do not change the AI or difficulty systems to support Local Play.
+⸻
 
-Automatic turn-around
+8. Preserve inputs, menus, and settings
 
-Alva has an existing Automatic turn-around setting that currently applies to the human player.
+The published version must support the same controls and interface behavior.
 
-Both local human fighters should follow the existing setting consistently.
+Keyboard
 
-If enabled, both players receive the normal human-player Automatic turn-around behavior.
+Preserve all bindings, press-edge behavior, input buffering, and navigation.
 
-If disabled, neither receives it.
+Controllers
 
-Do not apply CPU-specific logic to either player.
+Preserve:
 
-Combat independence
+* PlayStation controller compatibility.
+* Xbox controller compatibility.
+* Player 1 device assignment.
+* Two-controller Local Play.
+* Individual fighter mappings.
+* Recommended controller layouts.
+* Custom bindings.
+* Gamepad navigation and cursor support.
+* Controller connection indicators.
+* Disconnect and reconnect handling.
 
-Make sure every system can correctly identify each fighter’s owner.
+Touch controls
 
-This includes:
+Preserve both existing layouts:
 
-* Direct melee hits.
-* Projectiles.
-* Summons.
-* Techniques.
-* Deflects.
-* Shields.
-* Status effects.
-* Launches.
-* Stage hazards.
-* Scoring.
-* Eliminations.
-* Match statistics.
+* Joystick.
+* Classic buttons.
 
-A projectile from Player 2 must belong to Player 2, not Player 1.
+Preserve player-customizable positions, sizes, and touch interactions.
 
-An attack landed by Player 1 must be credited to Player 1.
+Settings
 
-Mirror matches must remain completely independent.
+Preserve the existing localStorage key and schema, including historical migration behavior.
 
-Camera
+Do not reset players’ settings or invalidate their saved controller and touch configurations.
 
-Continue using Alva’s shared camera.
+Interface and localization
 
-Both fighters must remain appropriately framed wherever possible.
+Preserve:
 
-Do not introduce split-screen gameplay; the two players fight in the same arena and see the same screen.
+* English and French translations.
+* Screen navigation.
+* Button positions and sizing.
+* HUD information.
+* Menus and dialogs.
+* Fighter and stage previews.
+* Responsive layouts.
+* Landscape handling.
+* Accessibility behavior.
+* PWA installation controls.
 
-7. Player identification — RED for P1, BLUE for P2
+Do not change labels, animations, or visual designs as part of this task.
 
-Player identity must be unmistakable throughout Local Play.
+⸻
 
-Use a consistent visual language:
+9. Create an itch.io-compatible production build
 
-PLAYER 1 — RED
+Create a clean, deployable HTML5 distribution.
 
-PLAYER 2 — BLUE
+Prefer an output structure such as:
 
-These colors are a central requirement, not an optional styling flourish.
+dist/itch/index.html
+dist/itch/game.js
+dist/itch/game.css
+dist/itch/assets/...
+dist/itch/manifest.webmanifest
 
-Color system
+Include additional root assets and icons required by the existing game.
 
-Create reusable local-player color tokens or constants rather than scattering unrelated color values across stylesheets and rendering code.
+The production export must be self-contained.
 
-Choose legible red and blue tones that fit Alva’s existing dark visual identity.
+Do not depend on fetching source files from GitHub, GitHub Pages, a development server, or another external host.
 
-Use sufficient contrast against both dark UI surfaces and bright stage backgrounds.
+Do not require Node.js, npm, or any development tooling in the player’s browser.
 
-Do not rely on color alone: every indicator should also contain a readable player label or equivalent distinguishing shape.
+All build tooling must run before distribution.
 
-Where player colors must appear
+Path handling
 
-Apply consistent indicators to:
+All resource paths must work when the game is hosted:
 
-1. Player 1 and Player 2 fighter-selection screens.
-2. The setup step currently being controlled.
-3. Each player’s fighter preview.
-4. The battle HUD’s two fighter panels.
-5. The score indicator for each player.
-6. The markers above or around fighters in the arena.
-7. The move HUD identification for each player.
-8. Off-screen fighter indicators.
-9. The Match Results screen.
-10. Winner announcements and associated result indicators.
+* At a domain root.
+* Under a nested subdirectory.
+* Within an itch.io HTML5 embed.
 
-Use RED on Player 1’s side and BLUE on Player 2’s side.
+Preserve correct case-sensitive paths.
 
-In-arena identification
+Avoid hard-coded absolute paths.
 
-The Arena currently uses side marker colors defined through MARKER in js/game/arena.js.
+Make sure the asset loader can still retrieve every required frame.
 
-In Local Play, update these markers to represent the two local players:
+Validate that generated JavaScript and CSS paths point to real files.
 
-* Player 1’s ground ring and name indicator must be red.
-* Player 2’s ground ring and name indicator must be blue.
+Embedding
 
-The identifiers must follow each fighter when they move, jump, switch sides, or go off-screen.
+itch.io normally displays HTML5 games inside an iframe.
 
-Do not color a fighter according to which side of the stage they occupy at that moment.
+Test:
 
-Their identity must remain associated with their player slot.
+* Fullscreen launch.
+* Embedded viewport sizing.
+* Keyboard focus.
+* Gamepad access where supported.
+* Pointer and touch controls.
+* Resizing.
+* Landscape orientation.
+* Pausing and resuming after focus changes.
 
-Preserve the existing marker colors for normal Quick Battle, Watch Mode, and Practice Ground.
+Do not modify Alva’s gameplay rules to work around platform-specific restrictions.
 
-HUD identification
+If a browser or embedding limitation cannot be solved without changing the experience, document it separately.
 
-The upper battle HUD already positions p1 on the left and p2 on the right.
+PWA behavior
 
-Preserve this orientation.
+Alva already has a web app manifest and installation interface, implemented through js/core/web-app-install.js.
 
-In Local Play:
+Keep the existing standalone installation behavior intact.
 
-* Left HUD card: red Player 1 indicator.
-* Right HUD card: blue Player 2 indicator.
+Test it separately from the itch.io embedded experience.
 
-Include clearly visible P1/P2 labels.
+Do not introduce an offline service worker, storage changes, or a different installation system as part of this task.
 
-Use subtle red/blue accents for panel outlines, labels, or score indicators, but do not recolor every UI element.
+⸻
 
-The style should remain sophisticated, cohesive, and consistent with Alva.
+10. Add a repeatable export process
 
-8. Display BOTH fighters’ move HUDs
-
-This requirement is essential.
-
-Alva already has an AbilityHUD component in js/ui/ability-hud.js.
-
-It displays a fighter’s available moves, associated input glyphs, ground/air move groups, cooldowns, and restrictions.
-
-Currently, the Battle Screen is designed around showing this HUD for one human fighter.
-
-Local Play needs two independent move HUDs visible at the same time.
-
-Required placement
-
-Player 1 move HUD: bottom-left corner
-
-Player 2 move HUD: bottom-right corner
-
-Conceptually:
-
-┌──────────────────────────────────────────┐
-│ P1 HUD       MATCH CLOCK        P2 HUD   │
-│                                          │
-│                                          │
-│             SHARED BATTLE                │
-│                                          │
-│                                          │
-│ [P1 MOVES]                    [P2 MOVES] │
-└──────────────────────────────────────────┘
-
-Player 1 move HUD
-
-Display Player 1’s selected fighter’s actual move set.
-
-Place it in the bottom-left corner.
-
-Give it a visible, compact RED player identifier.
-
-The move HUD must be the existing AbilityHUD visual component or a faithful reuse of its implementation.
-
-Do not replace it with a simplified text-only move list.
-
-Player 2 move HUD
-
-Display Player 2’s selected fighter’s actual move set.
-
-Place it in the bottom-right corner.
-
-Give it a visible, compact BLUE player identifier.
-
-The structure and capabilities must be equivalent to Player 1’s move HUD.
-
-Independent behavior
-
-Each HUD must:
-
-* Follow its own fighter.
-* Display that fighter’s actual move names and art.
-* Display the correct physical controller button glyphs.
-* Respect PlayStation and Xbox controller families independently.
-* Respect each fighter’s custom controller profile.
-* Switch between ground and air move rows independently.
-* Display its own cooldowns.
-* Display its own restrictions.
-* Update in real time.
-* Reset correctly after respawns and rematches.
-* Respond correctly to localization changes.
-
-Example:
-
-If Player 1 is airborne and Player 2 is grounded:
-
-* Player 1’s HUD should display the aerial move row as current.
-* Player 2’s HUD should display the grounded move row as current.
-
-One player’s change of state must not change the other player’s HUD.
-
-If Player 1 uses a PlayStation controller and Player 2 uses an Xbox controller, the two HUDs must show the respective PlayStation symbols and Xbox labels simultaneously.
-
-Do not use the global last-input-device value to determine both players’ HUD glyphs in Local Play.
-
-Each HUD must receive the appropriate controller context explicitly.
-
-Reuse existing AbilityHUD
-
-Prefer creating two independently configured instances of the existing AbilityHUD component.
-
-Refactor its input-context handling to support a specific player or gamepad.
-
-Avoid copying the entire component into a new Player2AbilityHUD.
-
-Each instance should have its own fighter binding, input context, profile cache, cooldown display, and update lifecycle.
-
-Prevent duplicated cooldown indicators
-
-The Arena currently has a hudCooldownsFor mechanism indicating which fighter’s cooldowns are represented in the ability HUD.
-
-Review and extend this appropriately so both local players can be represented.
-
-Do not accidentally suppress one player’s cooldowns while leaving duplicate indicators for the other.
-
-Preserve the previous single-player behavior.
-
-Responsive layout
-
-Both move HUDs must remain readable and must not overlap.
-
-Requirements:
-
-* Player 1 aligned left.
-* Player 2 aligned right.
-* Neither extends beyond the viewport.
-* Neither obscures the other.
-* Both respect safe-area insets.
-* Both work on shorter landscape displays.
-* Both remain usable when fighters have different numbers of moves.
-* Both retain current ground/air row transitions.
-* Both follow reduced-motion preferences.
-
-Adapt the existing .ability-hud layout rather than using fixed arbitrary offsets.
-
-The existing tile sizing already depends on viewport dimensions and move count; preserve that adaptability.
-
-On touch-capable devices with two connected controllers, Local Play must still display both controller move HUDs. The global touch-device CSS rule must not accidentally hide them.
-
-Touch gameplay controls themselves must remain disabled in Local Play.
-
-Visibility rules
-
-During active Local Battle, both move HUDs must be visible.
-
-Hide or appropriately dim them when:
-
-* The game is paused.
-* The results interface is open.
-* A blocking connection dialog is open.
-* The Battle Screen is no longer active.
-
-Show both again when combat resumes.
-
-Neither HUD should remain mounted visibly over Home or a selection screen.
-
-9. Local Play pause, victory, and Match Results
-
-The existing BattleScreen already provides a pause interface, final announcement, result toast, and Match Results screen.
-
-Extend those systems for Local Play.
-
-Pause interface
-
-Use the existing visual design and controls.
-
-The pause menu should identify the current mode as Local Quick Battle.
-
-Both players must be able to pause using their controller.
-
-Keep the existing functionality:
-
-* Resume
-* Restart battle
-* Settings
-* Return home
-
-The world must stop for both players during a pause.
-
-Do not maintain separate pause states for the two fighters.
-
-Winner announcements
-
-Local Play is a competition between two humans.
-
-Do not treat Player 1 as the only protagonist.
-
-The ending must be neutral and symmetrical.
-
-Instead of showing Player 1 a generic VICTORY and Player 2 a generic DEFEAT, identify the actual winner.
+Create a straightforward way to generate a production build.
 
 For example:
 
-* PLAYER 1 WINS! — red
-* PLAYER 2 WINS! — blue
-* DRAW — neutral
+npm run build:itch
 
-Preserve the game’s existing visual treatment for the ending banner.
+And, if appropriate:
 
-Keep Team I and Team II compatibility internally if needed, but visibly associate them with Player 1 and Player 2 during Local Play.
+npm run package:itch
 
-Match Results
+These are illustrative commands. Choose the simplest reliable approach that fits the repository.
 
-Show:
+The build should:
 
-* Player 1’s fighter.
-* Player 2’s fighter.
-* Both scores.
-* Both final Launch Points.
-* Both sets of match statistics.
-* The winner or draw.
-* The match duration.
-* Overtime information where applicable.
+1. Start from a clean distribution directory.
+2. Bundle the required JavaScript.
+3. Combine CSS in the exact original order.
+4. Copy every required asset.
+5. Copy and adapt the HTML entry point.
+6. Preserve required metadata and icons.
+7. Check all referenced resources.
+8. Validate file counts and sizes.
+9. Generate a ZIP suitable for itch.io.
+10. Print a clear build report.
 
-Player 1 must remain visually associated with red and Player 2 with blue.
+Ensure the ZIP contains index.html at its root, not hidden inside an additional project folder.
 
-Support the existing actions:
+Keep development-only files out of the release ZIP:
 
-* Rematch
-* Change fighters
-* Change stage
-* Return to home
+* Tests.
+* Test fixtures.
+* Benchmarks.
+* Product specifications and development documentation.
+* Git metadata.
+* Build scripts and dependencies.
+* Temporary logs.
+* Unnecessary source maps.
+* Development-only artifacts.
 
-Rematch
+Exclude these from the distribution, not from the repository itself.
 
-Rematch must start a fresh Local Battle with:
+Do not delete original source files to clean the release.
 
-* The same Player 1 fighter.
-* The same Player 2 fighter.
-* The same stage.
-* The same two assigned controllers.
+Generated output should be ignored by Git unless there is a deliberate reason to track it.
 
-Reset all match state normally.
+The build must be deterministic and repeatable.
 
-Do not switch either player to CPU control.
+⸻
 
-Do not randomly change fighters or stages.
+11. Establish a baseline before implementation
 
-Change fighters
+Before modifying anything:
 
-Return to Local Play’s Player 1 fighter-selection screen.
+1. Record the current Git commit and branch.
+2. Create a dedicated working branch.
+3. Run the complete test suite.
+4. Record the total test count, failures, and execution environment.
+5. Verify that the original application boots.
+6. Record the original production-relevant file count.
+7. Identify existing missing assets and console errors.
+8. Capture representative gameplay and interface results where possible.
 
-Keep the Local Play mode and proper controller assignments.
-
-Proceed through Player 2 selection and Stage selection again.
-
-Do not redirect to normal Quick Battle’s fighter-selection screen.
-
-Change stage
-
-Return to the dedicated Local Play Stage selection screen.
-
-Preserve both chosen fighters and the local controller assignments.
-
-Return home
-
-Close the match and cleanly release Local Play-specific resources.
-
-Restore the normal Home Screen and its controller availability state.
-
-Do not leave either player’s move HUD visible.
-
-Do not leave residual controller inputs active.
-
-10. Controller disconnection and reconnection
-
-Handle this carefully and reliably.
-
-Before entering Local Play
-
-If fewer than two eligible controllers are connected, Local play must remain disabled.
-
-If availability changes between pressing the button and navigating to the next screen, revalidate the controller requirement.
-
-Do not rely solely on a button’s disabled property.
-
-During fighter or stage selection
-
-If either assigned controller disconnects:
-
-* Do not advance the setup automatically.
-* Preserve the current selections.
-* Disable confirmation that requires the missing controller.
-* Display a clear localized controller-disconnected message.
-* Allow recovery when the assigned controller reconnects.
-* Never silently substitute keyboard or touch input.
-
-During an active battle
-
-If either player’s controller disconnects:
-
-Automatically pause the entire match.
-
-Both fighters must stop moving.
-
-The match clock must stop.
-
-Do not let the disconnected player become a CPU.
-
-Do not let the remaining player continue attacking an uncontrolled fighter.
-
-Show a clear connection warning identifying the missing controller:
-
-“Player 2 controller disconnected.”
-
-Provide appropriate options for:
-
-* Reconnecting the controller.
-* Returning to Home.
-* Resuming once both required controllers are available.
-
-Preserve the assigned players where possible.
-
-Do not silently swap their identities if another controller becomes available.
-
-If reassignment is needed, it must be explicit and unambiguous.
-
-Reconnection
-
-When the controller reconnects:
-
-* Reidentify the intended player.
-* Restore that player’s input source.
-* Clear stale held buttons and press edges.
-* Preserve match state.
-* Resume through the normal pause/resume mechanism.
-
-Never interpret a button already being held during reconnection as a fresh attack.
-
-Browser behavior
-
-Respect Alva’s existing Gamepad API handling.
-
-Account for:
-
-* Controllers needing a button press before discovery.
-* gamepadconnected and gamepaddisconnected.
-* Controller index changes.
-* Two controllers with identical model IDs.
-* Browser focus loss.
-* Page visibility changes.
-* Unsupported devices.
-* Restricted or unavailable Gamepad API.
-* Controllers connected during gameplay.
-* Third and fourth controllers that should not disturb active players.
-
-The existing ControllerManager should remain the source of truth for available devices.
-
-11. Localization
-
-Alva supports English and French throughout its UI.
-
-Every new visible Local Play string must be localized.
-
-Update:
-
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-
-Include keys for:
-
-* Local play
-* Select local mode
-* Local Quick Battle
-* Local mode descriptions
-* Player 1 fighter selection
-* Player 2 fighter selection
-* Player 1
-* Player 2
-* Local setup steps
-* Controller connection requirements
-* Missing-controller warnings
-* Reconnection prompts
-* Local victory announcements
-* Local result messages
-* Accessibility descriptions
-
-Avoid hard-coded English text inside screen components.
-
-Extend slotLabel support to properly represent P2, as the current localization mapping explicitly handles P1 and CPU labels.
-
-Use Alva’s current translation helpers and markup conventions.
-
-Check localization behavior after switching languages while screens or dialogs are open.
-
-All added keys must exist in both languages.
-
-12. Maintain existing modes without regressions
-
-This implementation must be additive.
-
-Regular Play
-
-Must still allow:
-
-* Normal Select mode.
-* Regular Play / Custom Play choices.
-* Difficulty selection.
-* Player 1 fighter selection.
-* CPU selection where applicable.
-* Random opponent and stage in Regular Play.
-* Existing keyboard, touch, and controller support.
-
-Watch Mode
-
-Must remain CPU versus CPU.
-
-Its controller inputs must continue controlling menus rather than fighters.
-
-Practice Ground
-
-Must retain its original input behavior, practice HUD, dummy, and training interface.
-
-Controller Settings
-
-Must continue to support:
-
-* Controller Connections.
-* Selecting a Player 1 controller.
-* Custom fighter-specific controller controls.
-* Recommended controller layouts.
-* PlayStation and Xbox controller glyphs.
-* Controller binding capture.
-
-The Local Play implementation must not break any of those features.
-
-Existing battle behavior
-
-Do not modify core combat rules merely to make Local Play easier to implement.
-
-Both players must use the exact same shared Fighter, Combat, Arena, and Stage systems already used by the rest of the game.
-
-13. Recommended implementation architecture
-
-Follow the repository’s established structure.
-
-New screens
-
-Introduce dedicated Local Play screens or configurable subclasses:
-
-* local-mode
-* local-character-p1
-* local-character-p2
-* local-map
-
-Register them through App.start() and add the corresponding sections to index.html.
-
-Reuse existing screen classes and visual components wherever practical.
-
-Selection state
-
-Keep local choices under a separate namespace, such as app.selection.local.
-
-Do not conflate local Player 2 with cpuCharacterId.
-
-Battle mode
-
-Extend the existing battle mode model with local.
-
-Ensure the Battle Screen correctly routes Local Play to the two-human Battle configuration.
-
-Update all mode-specific routing tables, including those for:
-
-* Change stage.
-* Change fighters.
-* Pause-screen mode labels.
-* Results.
-* Victory announcements.
-
-Do not allow an unknown mode string to silently turn a requested Local Play match into normal Quick Battle.
-
-Input architecture
-
-Introduce separate controller input contexts and binding resolvers for the two players.
-
-Keep the existing InputManager behavior compatible for ordinary Play.
-
-Avoid duplicating shared code or attaching unnecessary extra global event listeners.
-
-A clear per-player interface is preferable to many scattered conditions checking for Local Play.
-
-Ability HUD
-
-Allow AbilityHUD to receive an explicit player/controller context.
-
-Instantiate and bind two HUDs in Local Battle.
-
-Keep one HUD in normal Play and none in Watch Mode.
-
-Styling
-
-Use existing CSS files and introduce narrowly scoped local-mode selectors.
-
-Use a shared color system for the red and blue identities.
-
-Prevent local-specific colors or dual-HUD positioning from leaking into normal battle modes.
-
-Cleanup
-
-When navigating away, ensure:
-
-* Local input resources are released.
-* Both HUDs are hidden and unbound.
-* Event listeners are removed where appropriate.
-* Paused state is cleared.
-* The connection-warning UI is closed.
-* The usual controller navigation system is restored.
-
-14. Testing requirements
-
-Add automated coverage consistent with the repository’s existing tests.
-
-Relevant existing suites include:
-
-* tests/systems/controller-devices.test.mjs
-* tests/systems/controller-input.test.mjs
-* tests/interface/controller-ui.test.mjs
-* tests/interface/ability-hud.test.mjs
-* tests/interface/battle-screen.test.mjs
-* tests/interface/stage-select.test.mjs
-* tests/interface/i18n.test.mjs
-* tests/integration/quick-battle.test.mjs
-* tests/integration/watch-mode.test.mjs
-* tests/integration/match-score.test.mjs
-
-Reuse the fake gamepad facilities in tests/helpers/fake-gamepad.mjs.
-
-Add new Local Play tests where appropriate.
-
-Home Screen tests
-
-Verify that:
-
-* Play and Local play share one row.
-* The buttons are equal-sized.
-* Local play remains visible with zero controllers.
-* Local play remains disabled with one controller.
-* Local play enables with two eligible controllers.
-* Unsupported controllers do not count.
-* The green glow appears only when enabled.
-* The glow and enabled state update on connection changes.
-* Ordinary Play still works normally.
-
-Selection tests
-
-Verify the exact flow:
-
-Home → Select local mode → Player 1 fighter → Player 2 fighter → Stage → Battle.
-
-Test Back navigation at every step.
-
-Test identical fighter selections.
-
-Test unavailable fighter entries.
-
-Test the Random Stage option.
-
-Ensure no CPU or difficulty selection appears.
-
-Ensure Player 2’s controller actually owns Player 2 fighter selection.
-
-Input tests
-
-Verify:
-
-* Player 1 controls only Player 1.
-* Player 2 controls only Player 2.
-* Both players can move simultaneously.
-* Both players can attack simultaneously.
-* Their button presses are not merged.
-* Their directional inputs do not interfere.
-* Their binding profiles are independent.
-* PlayStation and Xbox controllers work together.
-* Two identical controller models still work separately.
-* Keyboard inputs do not move either local fighter.
-* Touch inputs do not move either local fighter.
-* Both controllers can pause.
-* Focus loss and resume clear stale inputs.
-
-Battle tests
-
-Verify:
-
-* Both fighters have human-controlled PlayerControllers.
-* Neither uses CombatAIController.
-* Damage, collisions, score, and statistics work for both sides.
-* Mirror matches work.
-* Respawning works.
-* Overtime works.
-* Rematches work.
-* Change fighters returns to local fighter selection.
-* Change stage returns to local stage selection.
-* Return home cleans up correctly.
-
-Move HUD tests
-
-Verify:
-
-* Both HUDs are displayed in Local Play.
-* Player 1’s HUD is on the left.
-* Player 2’s HUD is on the right.
-* Both show correct fighter abilities.
-* Both use the correct controller button glyphs.
-* Both show independent cooldowns.
-* Both switch ground/air rows independently.
-* Both hide correctly under overlays.
-* Normal Play retains only one ability HUD.
-* Watch Mode still has no player ability HUD.
-
-Controller disconnection tests
-
-Verify:
-
-* Disconnecting either controller pauses the match.
-* The match clock stops.
-* No uncontrolled fighter becomes a CPU.
-* No other controller silently steals the disconnected player’s slot.
-* Reconnecting permits the correct player to resume.
-* Stale button states do not trigger attacks.
-
-Localization and styling tests
-
-Verify:
-
-* English and French strings are complete.
-* P1/P2 identity labels are correct.
-* RED and BLUE accents are applied only where intended.
-* The two move HUDs do not overlap.
-* Reduced motion is respected.
-* Existing interface accessibility conventions remain intact.
-
-Run the complete test suite:
+Run:
 
 node --test
 
-Also perform real-browser visual and controller testing where the execution environment allows it. The Node test suite does not substitute for verifying actual CSS layout and two physical controllers.
+Do not treat an already failing test as a regression without investigating it.
 
-Test at desktop and short-landscape viewport sizes, and check both mixed and matching controller models.
+Also inspect tests that depend directly on source file names or file organization.
 
-Do not claim physical controller behavior was tested unless it actually was.
+For example, tests/interface/stylesheets.test.mjs requires the development stylesheets to remain separately linked in their original order.
 
-15. Required acceptance criteria
+Some character and system tests inspect source code and module boundaries directly.
 
-The implementation is complete only when every statement below is true.
+A production-only bundle should not require those tests to be rewritten.
 
-* [ ]	The Home Screen’s Play button is half-width and remains green.
-* [ ]	Local play sits directly beside it, at the exact same width and height.
-* [ ]	Both buttons occupy the original full-width Play row together.
-* [ ]	Local play is always visible.
-* [ ]	Local play is disabled with fewer than two eligible controllers.
-* [ ]	Local play becomes available when two eligible controllers are connected.
-* [ ]	Its enabled border glows green using the Download button’s established visual style.
-* [ ]	Clicking Local play opens Select local mode.
-* [ ]	Select local mode matches the existing Select mode page.
-* [ ]	Quick Battle is the only available local mode.
-* [ ]	Quick Battle goes through Player 1 fighter, Player 2 fighter, and Stage selection, in that exact order.
-* [ ]	Each player’s fighter choice is stored separately.
-* [ ]	Player 1 makes their selection with Controller 1.
-* [ ]	Player 2 makes their selection with Controller 2.
-* [ ]	Stage selection is performed with Controller 1.
-* [ ]	Both players can select the same fighter.
-* [ ]	Both fighters are controlled by humans, with no CPU.
-* [ ]	Both controllers work independently and simultaneously.
-* [ ]	Keyboard and touch do not control local fighters.
-* [ ]	All fighter-specific controller bindings continue working.
-* [ ]	Player 1 has a red identity indicator.
-* [ ]	Player 2 has a blue identity indicator.
-* [ ]	Red/blue identification remains consistent throughout the setup, battle, HUDs, results, and in-arena markers.
-* [ ]	Player 1’s move HUD is displayed on the bottom-left.
-* [ ]	Player 2’s move HUD is displayed on the bottom-right.
-* [ ]	Both move HUDs update independently and display the correct controller inputs.
-* [ ]	Both controllers can pause the battle.
-* [ ]	Disconnecting a required controller safely pauses the match.
-* [ ]	Rematch preserves fighters, stage, and controller assignments.
-* [ ]	Change fighters and Change stage return to the correct Local Play screens.
-* [ ]	The original match rules remain intact.
-* [ ]	Regular Play, Custom Play, Watch Mode, and Practice Ground still work.
-* [ ]	English and French are fully supported.
-* [ ]	Existing tests pass and relevant new tests are included.
+Do not weaken, disable, or delete tests simply to make the refactor pass.
 
-16. Final implementation principles
+⸻
 
-Do not create a separate miniature multiplayer game. Build Local Play into Alva itself.
+12. Test the finished production build
 
-Reuse the game’s existing systems wherever possible.
+Passing the existing unit tests is necessary but not sufficient.
 
-Prioritize correct two-player gameplay over superficial multiplayer UI.
+The production build must also be tested in a real browser.
 
-In particular, avoid these mistakes:
+Functional regression testing
 
-* Merely relabeling the CPU as Player 2.
-* Reading both physical controllers through the same input resolver.
-* Showing identical input glyphs for both players when their controller types differ.
-* Giving both players the same ability HUD state.
-* Accidentally routing Local Play through the existing CPU setup.
-* Allowing a disconnected controller to silently turn into AI control.
-* Breaking single-player input or menu navigation.
-* Making red/blue identification visible only in the top HUD but not on the actual fighters.
-* Showing two HUDs without checking their responsiveness.
-* Adding English-only strings.
-* Creating an entirely different visual design for Local Play.
+Verify every major workflow:
 
-Maintain the existing code conventions, avoid unnecessary dependencies, and preserve the game’s established identity.
+* Launch and splash sequence.
+* First-time language selection.
+* Returning-player startup.
+* Home screen.
+* Quick Battle Regular Play.
+* Quick Battle Custom Play.
+* All CPU difficulties.
+* Every playable fighter.
+* Every playable stage.
+* Watch Mode.
+* Mirror matches.
+* Local Play.
+* Practice Ground.
+* Discover.
+* Settings.
+* Controller configuration.
+* Touch-layout customization.
+* Pause and resume.
+* Match results.
+* Rematch and restart.
+* Returning to Home.
 
-17. Expected deliverables
+Combat testing
 
-Implement the feature completely in the repository.
+Verify representative attacks and mechanics for all nine fighters.
 
-After implementation, provide:
+Check:
 
-1. A summary of the actual changes.
-2. A list of the important modified and newly created files.
-3. An explanation of the two-controller input architecture.
-4. Confirmation of how Player 1 and Player 2 are assigned.
-5. Confirmation of the new Local Play screen flow.
-6. Confirmation that both move HUDs work independently.
-7. Automated test results.
-8. Any limitations that genuinely remain.
+* Frame-perfect animation sequencing where relevant.
+* Sprite loading and normalization.
+* Hitbox and hurtbox alignment.
+* Launch distances.
+* Shield and Deflect.
+* Mash Combos.
+* Cooldowns.
+* Special effects.
+* Summons and projectiles.
+* Stage hazards.
+* Respawns.
 
-Do not stop after creating the Home button or selection screens. The task is finished only when two real players can select their fighters, choose a stage, enter battle, fight simultaneously using two controllers, see their own move HUDs, finish the match, and rematch successfully.
+Deterministic simulation testing
 
-The finished experience should feel like Local Play was always intended to be part of Alva.
+Where the test harness permits it, run identical scripted input sequences with identical seeds against the original and consolidated builds.
+
+Compare:
+
+* Fighter positions.
+* Velocities.
+* Facing directions.
+* Combat states.
+* Energy.
+* Launch Points.
+* Cooldowns.
+* Hit events.
+* Projectile and summon states.
+* Scores.
+* Match outcomes.
+* AI decisions.
+
+Use a consistent simulation-step count and supported frame rates.
+
+Differences must be investigated and resolved, not dismissed as acceptable.
+
+Visual testing
+
+Capture screenshots of the original and production versions under matching conditions.
+
+Compare:
+
+* Splash screen.
+* Home screen.
+* Character selection.
+* Stage selection.
+* Each stage.
+* In-game HUD.
+* Dialogs.
+* Mobile layout.
+* Touch controls.
+* Match results.
+
+Check actual sprite and CSS rendering, not only source code.
+
+Where automated visual comparison is practical, use it; otherwise document manual comparisons.
+
+Browser testing
+
+Test current versions of major supported browsers, including Chromium and Firefox, and Safari where the testing environment permits.
+
+Test desktop and landscape mobile layouts.
+
+Include an iframe-based smoke test approximating the itch.io environment.
+
+Report any browser or hardware combinations that could not be tested.
+
+⸻
+
+13. Implement automatic release validation
+
+Add a validation step that checks the distribution before it can be considered complete.
+
+It should verify:
+
+* index.html exists at the ZIP root.
+* Extracted file count is below 1,000.
+* Extracted total size is within platform limits.
+* Each file is within the individual size limit.
+* Paths meet length restrictions.
+* Paths use correct filename casing.
+* Every expected game asset is present.
+* Required script and CSS files exist.
+* No references point back to missing source files.
+* No unapproved external runtime dependencies exist.
+* No source maps or test files were accidentally packaged.
+* No development-only directories were copied into the archive.
+
+Prefer a comfortable margin below the platform limit instead of targeting exactly 1,000 files.
+
+If the resulting production build exceeds the limit, first investigate redundant packaging and consolidation opportunities.
+
+Do not remove animation frames or gameplay systems as a shortcut.
+
+⸻
+
+14. Preserve maintainability
+
+The game’s development architecture should remain convenient for future updates.
+
+It must still be easy to:
+
+* Add a new fighter.
+* Add new sprite animations.
+* Introduce a stage.
+* Update AI behavior.
+* Modify translations.
+* Extend controller support.
+* Update the interface.
+* Run focused unit tests.
+
+Keep modular source files as the primary development representation.
+
+The generated production bundle should not become the source of truth.
+
+Future game updates should flow naturally into the production build without manually editing bundled files.
+
+Do not introduce new frameworks or rearchitect the engine for this task.
+
+Keep the implementation small and explain why each new tool or script is necessary.
+
+⸻
+
+15. Strictly prohibited changes
+
+Do not:
+
+* Change combat balance.
+* Adjust movement values.
+* Alter physics.
+* Rewrite AI behavior.
+* Change attack timing.
+* Modify hitboxes or hurtboxes.
+* Change animation timing.
+* Change sprite appearance or quality.
+* Remove fighters.
+* Remove stages.
+* Remove abilities.
+* Remove game modes.
+* Simplify controller support.
+* Remove localization.
+* Change saved-settings compatibility.
+* Alter menu layouts or design.
+* Introduce gameplay features.
+* Reorganize character definitions without necessity.
+* Delete documentation or tests from the development repository.
+* Edit the protected character_rule.
+* Rename contracted codenames.
+* Introduce unrelated optimizations.
+* Hide failing tests.
+* Claim the game is unchanged without verification.
+
+If preserving behavior conflicts with reducing the file count, preserving behavior wins.
+
+⸻
+
+16. Required deliverables
+
+When complete, provide the following.
+
+A. Repository audit
+
+Report:
+
+* Original file count.
+* Original production candidate count.
+* File counts by category.
+* Main entry points and important dependencies.
+* Any potential build hazards.
+* Any genuinely redundant files found.
+
+B. Consolidation report
+
+Explain:
+
+* Which files were bundled.
+* Which files, if any, were actually merged in source.
+* Which files were intentionally kept separate.
+* Why the approach was selected.
+* How compatibility was preserved.
+
+C. Final distribution structure
+
+Show the generated production directory tree.
+
+Report the number and total size of files in the output.
+
+D. ZIP artifact
+
+Generate a ready-to-upload archive, preferably:
+
+alva-itch.zip
+
+Ensure that the archive is valid and contains a runnable index.html at its root.
+
+Do not upload or publish the game to itch.io without explicit authorization.
+
+E. Test results
+
+Provide:
+
+* Baseline test outcome.
+* Final test outcome.
+* Regression test results.
+* Browser smoke-test results.
+* Deterministic comparisons performed.
+* Visual comparisons performed.
+* Unverified areas or remaining limitations.
+
+Be explicit about what was tested and what could not be tested.
+
+F. Deployment instructions
+
+Document how to:
+
+1. Generate the production build.
+2. Validate the generated output.
+3. Test it locally over HTTP.
+4. Upload the ZIP to itch.io as an HTML Game.
+5. Select appropriate launch and fullscreen settings.
+6. Verify the published game.
+7. Rebuild and republish future updates.
+
+G. Change summary
+
+Give a concise summary of every modified or added source file, build script, and configuration file.
+
+Make the final diff easy to review.
+
+⸻
+
+17. Definition of success
+
+This task is complete only when:
+
+* The original development source remains maintainable.
+* Every existing game mode is preserved.
+* Every fighter and stage remains available.
+* All combat rules, timing, and physics remain unchanged.
+* All animations and art display correctly.
+* All supported inputs continue working.
+* Both languages continue working.
+* Saved settings remain compatible.
+* The original test suite passes.
+* The new production build has been independently tested.
+* The distribution is within itch.io HTML5 limits.
+* A valid release ZIP is generated.
+* No unauthorized gameplay or design changes have been introduced.
+
+The ideal outcome is to reduce the deployment from roughly 1,060 files to around 900 by bundling the JavaScript and CSS, without needing to merge the original PNG animation frames or rewrite gameplay code.
+
+This is a target, not a requirement to force a specific file count.
+
+Prefer correctness and simplicity over aggressive reduction.
+
+Final instruction
+
+Proceed carefully and implement the solution.
+
+Start with a repository audit and baseline tests. Then create the smallest safe production consolidation, validate it, test the original and production versions, and generate the final distribution.
+
+Do not stop after providing recommendations.
+
+If a consolidation creates a gameplay difference, revert or correct it before continuing.
+
+Do not consider fewer files to be evidence of success by itself.
+
+The objective is the same Alva, with the same gameplay, same visuals, same controls, and same content — simply packaged more efficiently and ready to publish as a browser game.
