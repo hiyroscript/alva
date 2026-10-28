@@ -366,7 +366,8 @@ export class Defense {
       for (let d = 0.1; d <= latest && delays.length < 8; d += 0.08) delays.push(d);
       let found = null;
       for (const delay of delays) {
-        for (const jump of ['ground', 'high']) {
+        // The normal jump first: the Super Jump only where it alone clears.
+        for (const jump of ['ground', 'super']) {
           for (const dir of [0, -threat.from]) {
             if (this.clearsByJump(s, threat, jump, dir, delay)) {
               found = { jump, dir, delay };
@@ -378,7 +379,9 @@ export class Defense {
         if (found) break;
       }
       if (found) {
-        const landRisk = threat.kind === 'melee' ? 1.2 : 0.4;
+        // A Super Jump clears more, but stays up longer: more time in the
+        // air for the opponent to meet it, and a later landing.
+        const landRisk = (threat.kind === 'melee' ? 1.2 : 0.4) * (found.jump === 'super' ? 1.4 : 1);
         options.push({
           score: -0.6 - landRisk + (threat.kind !== 'melee' ? 0.8 : 0),
           plan: { kind: 'jump', jump: found.jump, dir: found.dir, startAt: brain.clock + found.delay, why: 'jump over' }, why: 'jump over',

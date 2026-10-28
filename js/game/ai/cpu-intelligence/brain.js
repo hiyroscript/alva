@@ -257,7 +257,7 @@ export class CpuIntelligence {
 
   // Hands the brain one plan to carry out next step (tests, debugging),
   // through the same legal inputs: { press: action } (that button's move
-  // where the fighter is), { jump: 'ground' | 'high' | 'air', dir },
+  // where the fighter is), { jump: 'ground' | 'super' | 'air', dir },
   // { dash: dir }, { move: dir, seconds }, { shield: seconds }.
   command(spec) {
     this.directive = spec;
@@ -807,13 +807,13 @@ export class CpuIntelligence {
     }
     // Cornered with the opponent in front: get past it, over its head.
     if (s.myEdge < 90 && s.dist < 160 && p.stageSense > 0.5 && this.rng() < p.stageSense * 0.5) {
-      return makePlan('jump', { jump: 'high', dir: s.dir, hold: 0.5, reason: 'cornered: jumping past the opponent toward the centre' }, this);
+      return makePlan('jump', { jump: 'super', dir: s.dir, hold: 0.5, reason: 'cornered: Super Jumping past the opponent toward the centre' }, this);
     }
     // Hunting the finish from the wrong side (a horizontal launch from here
     // would send the opponent the long way, toward the centre): over it, to
     // launch it toward the nearer ledge.
     if (obj.kind === 'finish' && this.crossover(s)) {
-      return makePlan('jump', { jump: 'high', dir: s.dir, hold: 0.5, reason: 'finish: crossing over to launch it toward the near ledge' }, this);
+      return makePlan('jump', { jump: 'super', dir: s.dir, hold: 0.5, reason: 'finish: crossing over to launch it toward the near ledge' }, this);
     }
     if (defensive) {
       const plan = this.defensivePlan(s);

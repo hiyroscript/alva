@@ -14,7 +14,9 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.8 and §6.3a.
 
 Practice Ground keeps its training dummy (no controller); the older
 non-attacking `TrainingAIController` stays in
-`js/game/fighters/fighter-controller.js`, unused by every mode.
+`js/game/fighters/fighter-controller.js`, unused by every mode (it follows
+onto a footing with the normal jump or, where only that reaches, the Super
+Jump, made with the same chord).
 
 ## Modules
 
@@ -52,6 +54,49 @@ exhausted or spawn anything. It never writes to a fighter, never reads the
 player's raw input or the DOM, never uses the wall clock, and never has
 the player's Automatic turn-around (its attacks are aimed by its own
 `attackFacing`). Every random draw comes from its injected seeded RNG.
+
+### The jumps
+
+The CPU has the player's three jumps and makes them the player's way
+(`Executor.jump(self, kind)`): `'normal'` is a fresh press of Jump, held a
+moment as a hand does (`jumpTapHold`, a few steps: how long never changes
+the jump); `'super'` is the same press with Down pressed on that very step
+on the ground, the Super Jump's chord; `'air'` a fresh press in the air.
+On the ground the executor holds Down only on a Super Jump's press step,
+so the CPU never stands about holding it and never taps it into a
+platform drop. A solid in the way is hopped with the normal jump, or the
+Super Jump if the normal one would not clear it (`wallAhead`, `jumpFor` in
+`js/game/fighters/fighter-controller.js`, shared with the training CPU).
+
+Its capabilities (`analyzeCapabilities(...).movement`) read the universal
+jumps: `jumpHeight`, `superJumpHeight`, `airJumpHeight`,
+`normalJumpAirtime`, `superJumpAirtime` and the three velocities. Every jump
+arc it weighs (`arcTrack` in `prediction.js`: `'ground'`, `'super'`,
+`'air'` or none) is flown by the Fighter's own rules (`groundJump`,
+`airJump`, `steer`, `stepBody`) under ordinary gravity, so a planned arc is
+the real one, standing or running. It uses the Super Jump where it earns
+its longer airtime:
+
+- **Navigation** reaches a higher footing with the normal jump wherever
+  that reaches it, with the Super Jump only where it does not (and an air
+  jump on top when even that is short), and never retries an impossible
+  jump for ever (a stuck plan fails).
+- **Jumping over a threat** tries the normal jump first; the Super Jump
+  only where it alone clears, scored with a higher landing risk for its
+  longer airtime.
+- **Jump-ins and interceptions** weigh the normal jump and, from Medium
+  up (and at every level against an opponent above the normal jump's
+  reach), the Super Jump, which costs a little more than the same strike
+  off the quicker hop (`SUPER_JUMP_COMMITMENT`), so it is chosen where its
+  height or timing is what connects.
+- **Cornered** with the opponent in front, or crossing over to launch it
+  toward the near ledge, it Super Jumps past it.
+- An opponent's escape from a strike is judged by its strongest rise, the
+  Super Jump's.
+
+Every level may Super Jump: the level changes when and how well it
+chooses, never what the jump does. Its telemetry counts `superJumps`
+beside `jumps`.
 
 ### The same combat rules as a player
 
@@ -520,7 +565,7 @@ while:
 | `void` | Run toward the nearer side of the Void in force (overtime's closing one included), hopping whatever stalls it (a wall, the other fighter). The stage and the Void check take it; the usual elimination plays; nobody respawns after a match. It never ends. |
 | `idle` | Nothing. |
 | `dashDance` | Run left and right in quick turns (about every 0.1–0.2 s) within 90 world units of where it began, turning back from a ledge or the Void. |
-| `jump` | Jump, held for a normal jump (`jumpTapHold`), let go, pressed again: its air jumps come out in the air. |
+| `jump` | Jump, held a moment (`jumpTapHold`), let go, pressed again; now and then from the ground a Super Jump (Down pressed with Jump on that step); its air jumps come out in the air. |
 
 A CPU that did not win (Watch Mode's loser, Quick Battle's CPU beaten by
 the player) only idles (`LOSER_CELEBRATIONS`); after a draw both CPUs idle,

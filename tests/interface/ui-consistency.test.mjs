@@ -197,8 +197,9 @@ test('menu labels, titles and buttons are in sentence case', () => {
     'Deflect', 'Dash', 'Energy', 'Attack', 'PlayStation', 'Xbox', 'Nintendo', 'Bluetooth', 'Safari', 'Chrome', 'Edge',
     'Firefox', 'Enter', 'Esc', 'A', 'D-pad', 'Run', 'Discover', 'Settings', 'Quick', 'Watch', 'Practice', 'Custom',
     'Regular', 'Combat', 'Mobile', 'Controls', 'Movement', 'Launch', 'Fighters', 'Up', 'Down', 'Page',
-    // The Mash Combo, a game term like the Shield or the Dash.
-    'Mash', 'Combo',
+    // The Mash Combo and the Super Jump, game terms like the Shield or the
+    // Dash.
+    'Mash', 'Combo', 'Jump',
     // The teams' Roman numerals (Team I, Team II), and game terms counted in
     // the Match Results (Perfect Shields, Successful Deflects).
     'I', 'II', 'Shields', 'Deflects']);

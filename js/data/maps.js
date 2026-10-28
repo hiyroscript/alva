@@ -34,7 +34,7 @@
 //               `bottom` shallow: a slab, never a hidden foundation.
 // platforms:    one-way surfaces (pass through from below, land from above).
 //               `dropThrough` controls whether a fighter may drop through
-//               them (a player's fresh Down press, the training CPU's
+//               them (a player's tap of Down, the training CPU's
 //               drop); true unless a platform says otherwise.
 //               `h` is visual slab thickness only; `kind` picks the art.
 //               `hazard: true` marks a stage hazard; `dynamic` makes it

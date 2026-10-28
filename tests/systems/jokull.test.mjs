@@ -272,14 +272,14 @@ test('walking from the centre onto a wing is one entry, as its centre crosses th
   assert.equal(w.east.contacts, 0);
 });
 
-test('every kind of new footing counts: a jump, a higher jump, an air jump, an air dash, a fall from above, a launch, a blizzard landing', () => {
+test('every kind of new footing counts: a jump, a Super Jump, an air jump, an air dash, a fall from above, a launch, a blizzard landing', () => {
   const landings = {
     jump: (tick, f) => {
       tick({ jump: true, jumpPressed: true });
       until(tick, () => f.body.grounded, {});
     },
-    'higher jump': (tick, f) => {
-      tick({ jump: true, jumpPressed: true });
+    'Super Jump': (tick, f) => {
+      tick({ jump: true, jumpPressed: true, down: true, downPressed: true });
       let top = f.body.y;
       until(tick, () => {
         top = Math.min(top, f.body.y);
@@ -295,7 +295,7 @@ test('every kind of new footing counts: a jump, a higher jump, an air jump, an a
     },
     'air dash': (tick, f) => {
       f.body.x = WEST.left + 20;
-      tick({ jump: true, jumpPressed: true });
+      tick({ jump: true, jumpPressed: true, down: true, downPressed: true });
       for (let i = 0; i < 14; i++) tick();
       tick({ mouvementRightPressed: true });
       assert.ok(f.dash, 'air-dashing');
@@ -840,11 +840,12 @@ test('overtime closes the Void round the glacier with both wings or neither: the
 test('Quick Battle and Watch Mode play full matches on Jökull: the CPUs fight on the wings while they last, the ice breaks, nobody stands on missing ice', () => {
   let contacts = 0;
   let broken = 0;
-  // Five seeded matches: where a fight goes is chaotic (any change to how
-  // fighters move sends it elsewhere), and a match or two may never stay on
+  // Six seeded matches: where a fight goes is chaotic (any change to how
+  // fighters move sends it elsewhere), and most matches may never stay on
   // a wing long enough to break it.
   const matches = [
     ['watch', 6, 'hard'], ['watch', 9, 'brutal'], ['quick-battle', 21, 'hard'], ['watch', 2, 'medium'], ['watch', 7, 'brutal'],
+    ['watch', 10, 'medium'],
   ];
   for (const [mode, seed, difficulty] of matches) {
     const battle = battleOn({ mode, seed, difficulty });

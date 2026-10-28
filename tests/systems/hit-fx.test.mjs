@@ -1,5 +1,6 @@
 // Hit effects (js/game/rendering/hit-fx.js): screen shake, the white hit flash,
-// sparks, speed trails and a lethal launch's slow-motion zoom. Presentation
+// sparks, speed trails and a lethal launch's slow-motion zoom (a Super
+// Jump's dust: tests/systems/super-jump-dust.test.mjs). Presentation
 // only: these check what each hit asks for, and that none of it ever changes
 // a simulation step.
 import test from 'node:test';
@@ -176,7 +177,8 @@ test('effects never change a step: the same fight, stepped with and without them
     let i = 0;
     let battle = null;
     // Running at the opponent wherever it is (the same in both runs, unless
-    // the effects changed something), then a Jab, a jump and Red.
+    // the effects changed something), then a Jab, a Super Jump (its dust)
+    // and Red.
     const input = {
       flush() {},
       sample() {
@@ -185,13 +187,14 @@ test('effects never change a step: the same fight, stepped with and without them
         return {
           runRight: k < 20 && dx > 40, runLeft: k < 20 && dx < -40,
           attack1: k === 22, attack1Pressed: k === 22, attack2: k === 40, attack2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30,
+          down: k === 30, downPressed: k === 30,
         };
       },
     };
     battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
     battle.p2.controller = null;
     battle.p2.combat.launchPoint = 40;
-    if (!withFx) battle.fx = { take() {}, takeBounce() {}, reset() {}, timeScale: 1 };
+    if (!withFx) battle.fx = { take() {}, takeBounce() {}, addSuperJumpDust() {}, addHeal() {}, reset() {}, timeScale: 1 };
     battle.setPhase('fight');
     battle.p2.body.x = battle.p1.body.x + 44;
     const out = [];

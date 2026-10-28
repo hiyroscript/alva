@@ -54,27 +54,31 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   airOverspeedDeceleration: 2600,
 
   // ---- Jumps and falling ------------------------------------------------------
-  // The normal jump's upward speed: about 170 units high.
-  jumpVelocity: 920,
+  // The normal jump's upward speed (Jump pressed): a quick, low hop, about
+  // 105 units high.
+  jumpVelocity: 750,
+  // The Super Jump's (Down held, or pressed with it, and a fresh Jump press,
+  // standing on the ground): its whole lift given at takeoff, under the same
+  // gravity as any jump, about 233 units high. Never built up, never added to
+  // later: nothing held after takeoff changes it.
+  superJumpVelocity: 1100,
   gravityScale: 1,
   maxFallSpeed: 1500,
   // Down held while falling speeds the fall toward fastFallSpeed.
   fastFallAcceleration: 14000,
   fastFallSpeed: 1500,
-  // How long after leaving the ground a ground jump is still allowed, and
-  // how long a jump press waits for the first step it can be used.
+  // How long after leaving the ground a ground jump (the normal one: a
+  // Super Jump needs the ground itself) is still allowed, and how long a
+  // jump press waits for the first step it can be used.
   coyoteTime: 0.1,
   jumpBuffer: 0.12,
-  // Jump still held this long after takeoff makes the higher jump, up to
-  // highJumpHeight x the normal jump's height.
-  highJumpWindow: 0.15,
-  highJumpHeight: 1.4,
-  // The triple jump: the ground jump, then two more in the air, each at
-  // airJumpRatio x the jump's speed (about 105 units each). Landing or a hit
-  // gives both back. Kept to that height so no stage's highest footing can
-  // jump a fighter into the Void above it.
+  // The triple jump: the ground jump (normal or Super), then two more in the
+  // air, each at airJumpVelocity (about 86 units each), whichever ground
+  // jump it followed. Landing or a hit gives both back. Kept to that height
+  // so no stage's highest footing can jump a fighter into the Void above
+  // it.
   airJumps: 2,
-  airJumpRatio: 0.78,
+  airJumpVelocity: 718,
 
   // ---- The Dash and the air dash ---------------------------------------------
   // An explicit mouvement request Dashes on the ground and air dashes in the air. Each is a burst
@@ -103,9 +107,13 @@ export const BASE_FIGHTER_MOVEMENT = Object.freeze({
   hitstunFriction: 1600,
   hitstunAirDrag: 210,
 
-  // How long a platform drop (a fresh Down press on a one-way platform, or
-  // the training CPU's own) ignores the platform.
+  // How long a platform drop (a tap of Down on a one-way platform, or the
+  // training CPU's own) ignores the platform.
   dropThroughTime: 0.28,
+  // The platform drop's tap: Down pressed on a one-way platform and let go
+  // within this, no Jump pressed meanwhile, drops through it as it is let
+  // go. Held longer (ready for a Super Jump), it stands.
+  dropTapTime: 0.25,
 });
 
 // Every universal movement field.
@@ -146,13 +154,22 @@ export const MOVEMENT_GUIDE = Object.freeze([
     name: 'Run',
     description: 'Quick to full speed and quick to turn. Speed you build carries on through jumps, attacks and landings.',
   }),
-  Object.freeze({ id: 'jump', name: 'Jump', description: 'A tap is the normal jump; held a little longer, the higher jump.' }),
+  Object.freeze({ id: 'jump', name: 'Jump', description: 'Press Jump for a quick, low jump. Holding it longer changes nothing.' }),
+  Object.freeze({
+    id: 'superJump',
+    name: 'Super Jump',
+    description: 'Hold Down and press Jump while on the ground to spring much higher, with a burst of dust.',
+  }),
   Object.freeze({
     id: 'airJumps',
     name: 'Triple jump',
-    description: 'Two more jumps in mid-air. Landing or being hit gives them back.',
+    description: 'Press Jump again in the air for an additional jump. You have two air jumps; landing or being hit gives them back.',
   }),
-  Object.freeze({ id: 'fastFall', name: 'Fast fall', description: 'Hold Down while falling to drop faster.' }),
+  Object.freeze({
+    id: 'fastFall',
+    name: 'Fast fall',
+    description: 'Hold Down while falling to descend faster. On a platform you can pass through, tap Down to drop through it.',
+  }),
   Object.freeze({
     id: 'dash',
     name: 'Dash',

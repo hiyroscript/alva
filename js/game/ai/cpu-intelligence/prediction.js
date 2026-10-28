@@ -3,7 +3,7 @@
 // Purpose: where things will be, by the game's own rules. Every prediction
 // here steps a scratch body through the shared physics (stepBody in
 // js/game/physics.js) and the shared movement rules (steer, attackDrift,
-// activationStep, attackStartSpeed and airJump in
+// activationStep, attackStartSpeed, groundJump and airJump in
 // js/game/fighters/movement.js) with the universal movement values, so the
 // CPU never runs a second physics with rules of its own. It predicts:
 //
@@ -28,7 +28,7 @@
 
 import { CONFIG } from '../../../config.js';
 import { stepBody } from '../../physics.js';
-import { steer, attackDrift, activationStep, attackStartSpeed, airJump } from '../../fighters/movement.js';
+import { steer, attackDrift, activationStep, attackStartSpeed, groundJump, airJump } from '../../fighters/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
@@ -294,24 +294,20 @@ export function driftDir(x, vx, toX) {
   return Math.sign(dx);
 }
 
-// A jump's arc from `st` (grounded or not), into `track`: `jump` 'ground',
-// 'high', 'air' or null (no jump: the drift from here), steering toward
-// `dir` (or toward `toX` when given, braking near it), with the fast fall
-// from `fastFallAt` seconds when given. `steps` long, stopping early once
-// it lands (kept as its last point).
+// A jump's arc from `st` (grounded or not), into `track`: `jump` 'ground'
+// (the normal jump), 'super' (the Super Jump: from the ground only, its
+// whole lift at takeoff), 'air' or null (no jump: the drift from here),
+// steering toward `dir` (or toward `toX` when given, braking near it), with
+// the fast fall from `fastFallAt` seconds when given. Every jump rises and
+// falls under the same gravity, exactly as the Fighter's does. `steps`
+// long, stopping early once it lands (kept as its last point).
 export function arcTrack(track, stage, gravity, st, { jump = 'ground', dir = 0, toX = null, steps = 70, fastFallAt = null } = {}) {
   track.clear();
   const b = bodyFrom(st, scratch);
-  let lift = 1;
-  if (jump === 'ground' || jump === 'high') {
-    b.vy = -MV.jumpVelocity;
+  if (jump === 'ground' || jump === 'super') {
+    groundJump(b, MV, jump === 'super');
     b.grounded = false;
     b.ground = null;
-    if (jump === 'high') {
-      const g = gravity * b.gravityScale;
-      const normal = (MV.jumpVelocity * MV.jumpVelocity) / (2 * g);
-      lift = (MV.jumpVelocity * MV.jumpVelocity) / (2 * g * normal * MV.highJumpHeight);
-    }
   } else if (jump === 'air') {
     airJump(b, MV);
     b.grounded = false;
@@ -321,8 +317,7 @@ export function arcTrack(track, stage, gravity, st, { jump = 'ground', dir = 0, 
     const d = toX != null ? driftDir(b.x, b.vx, toX) : dir;
     steer(b, MV, d, STEP, false);
     if (fastFallAt != null && k * STEP >= fastFallAt && b.vy > 0) b.vy = Math.min(MV.fastFallSpeed, b.vy + MV.fastFallAcceleration * STEP);
-    const share = b.vy < 0 && lift < 1 ? lift : 1;
-    stepBody(b, STEP, stage, gravity * share, b.maxFall);
+    stepBody(b, STEP, stage, gravity, b.maxFall);
     track.push(b);
     if (b.grounded && k > 0) break;
   }

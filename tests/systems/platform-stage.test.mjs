@@ -109,16 +109,23 @@ test('the Void is much closer than before on every stage: at least 30% nearer on
 
 test('ordinary jumps never reach the upper Void, even from each stage\'s highest footing', () => {
   const g = CONFIG.sim.gravity * MOVEMENT.gravityScale;
-  // The universal jump, then both air jumps of the triple jump, each taken
-  // at the apex of the one before (the highest each can start).
-  const v = MOVEMENT.jumpVelocity;
-  const rise = (v ** 2 + (v * MOVEMENT.airJumpRatio) ** 2 * MOVEMENT.airJumps) / (2 * g);
+  // The highest ground jump (the Super Jump), then both air jumps of the
+  // triple jump, each taken at the apex of the one before (the highest
+  // each can start).
+  const airs = MOVEMENT.airJumpVelocity ** 2 * MOVEMENT.airJumps;
+  const rise = (MOVEMENT.jumpVelocity ** 2 + airs) / (2 * g);
+  const superRise = (MOVEMENT.superJumpVelocity ** 2 + airs) / (2 * g);
   assert.equal(MOVEMENT.airJumps, 2, 'the triple jump');
   for (const m of ALL_MAPS) {
     const footing = Math.min(m.mainStage.top, ...m.platforms.map((p) => p.y), ...m.solids.map((s) => s.y));
-    // The body's centre at the top of the jump (see StageCollision.inVoid).
+    // The body's centre at the top of the jump (see StageCollision.inVoid):
+    // well inside with the normal jump; inside still with the Super Jump
+    // (the reach the retired higher jump had), even on this continuous arc,
+    // a little higher than the fixed steps really go.
     const apex = footing - rise - def.collider.height / 2;
     assert.ok(apex - m.voidBounds.top > 100, `${m.id}: apex ${apex.toFixed(0)} vs Void ${m.voidBounds.top}`);
+    const superApex = footing - superRise - def.collider.height / 2;
+    assert.ok(superApex - m.voidBounds.top > 20, `${m.id}: the Super Jump's apex ${superApex.toFixed(0)} vs Void ${m.voidBounds.top}`);
   }
   // And a real jump from the main stage stays well inside it.
   for (const m of ALL_MAPS) {

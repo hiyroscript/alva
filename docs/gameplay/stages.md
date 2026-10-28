@@ -89,7 +89,7 @@ The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.1.
 ([`js/data/maps.js`](../../js/data/maps.js),
 [`js/data/practice-map.js`](../../js/data/practice-map.js)): the main
 stage, platforms (one-way: fighters jump up through them from below, and
-a fresh Down press drops a fighter through one unless its `dropThrough` is
+a tap of Down drops a fighter through one unless its `dropThrough` is
 false, see [Platform drop](../systems/movement.md#platform-drop)),
 solids, spawn points and the Void's and camera's margins. Each stage's art
 is a procedural Canvas theme ([`js/stages/`](../../js/stages/)): flat
@@ -276,7 +276,7 @@ sections*, Hazards *Collapsing ice and blizzards*, Obstacles *None*, Light
   the other or across the centre.
 - **What counts as a contact.** One for every new footing a fighter takes
   on a wing, never one per step: the step its ground becomes that wing (a
-  jump's, a higher jump's, an air jump's or an air dash's landing, a fall
+  jump's, a Super Jump's, an air jump's or an air dash's landing, a fall
   onto it from above, a landing after a launch, in a blizzard or not), or
   its centre crossing the seam from the centre section. The footing lasts
   while it stays on the ground overlapping the wing, so standing,

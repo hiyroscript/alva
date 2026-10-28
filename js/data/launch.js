@@ -136,7 +136,7 @@ export function resolveLaunchStrength(baseLaunch, launchPoint) {
 // World units per second of launch speed for each point of launch
 // strength: the one conversion from launch strength to physics, the same for
 // every direction and every hit. Without it a launch would be measured on the
-// same scale as damage, far below the world's (gravity 2500, a jump 920), and
+// same scale as damage, far below the world's (gravity 2500, a jump 750), and
 // no hit would visibly move anyone until very high Launch Points.
 export const LAUNCH_UNIT_SPEED = 10;
 

@@ -264,7 +264,7 @@ for (const c of playableCharacters()) {
       const h = makeFighter({ x: 400 });
       aim(h.fighter);
       h.step(P('jump'));
-      while (h.fighter.body.vy < 0 || h.fighter.body.y < 790) h.step({});
+      while (h.fighter.body.vy < 0 || h.fighter.body.y < 785) h.step({});
       h.step(P(move.action));
       const record = h.fighter.combat.attack;
       if (!record) continue;

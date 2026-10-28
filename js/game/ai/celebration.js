@@ -23,9 +23,11 @@
 //   idle       holds nothing at all.
 //   dashDance  runs left and right in quick turns round where it began,
 //              never past a ledge.
-//   jump       jumps again whenever it can: Jump pressed, held for a
-//              normal jump (jumpTapHold), let go, pressed again; its air
-//              jumps come out in the air as a player's would.
+//   jump       jumps again whenever it can: Jump pressed, held a moment
+//              (jumpTapHold), let go, pressed again; now and then from the
+//              ground a Super Jump (Down pressed with Jump on that step, as
+//              a player's hand does it); its air jumps come out in the air
+//              as a player's would.
 //
 // Every behaviour is plain input (a FighterInput snapshot, blankInput):
 // the Fighter moves, jumps and attacks by its own universal rules. A
@@ -69,6 +71,8 @@ const LEDGE_LOOKAHEAD = 60;
 // (seconds), and how often a press of the ability spam starts with a jump.
 const ABILITY_GAP = [0.12, 0.55];
 const JUMP_GAP = [0.06, 0.32];
+// How often a jump from the ground is a Super Jump.
+const SUPER_CHANCE = 0.3;
 const AIR_CHANCE = 0.25;
 
 // The Void run: how long its run may stall (barely moving, held up by a wall
@@ -284,6 +288,7 @@ export class CelebrationController {
     // Let go for a step at least, so every press is a new one.
     if (this.prev.jump || this.gap > 0) return;
     this.held.jump = true;
+    if (self.body.grounded && this.rng() < SUPER_CHANCE) this.held.down = true;
     this.jumpHold = jumpTapHold(self);
     this.gap = this.jumpHold + range(this.rng, JUMP_GAP[0], JUMP_GAP[1]);
   }

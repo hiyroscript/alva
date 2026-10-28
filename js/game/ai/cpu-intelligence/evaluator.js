@@ -49,6 +49,9 @@ const FOE_REACT = 0.2;
 // How often an opponent that could get out of the way does: nobody escapes
 // everything (scaled by how mobile this one has been seen to be).
 const ALERT = 0.8;
+// What a jump-in by the Super Jump costs over the same strike off the
+// normal jump: its longer airtime and later landing.
+const SUPER_JUMP_COMMITMENT = 0.6;
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const scratchBox = {};
@@ -407,8 +410,10 @@ export class Evaluator {
   }
 
   // Jumping (or air jumping) into an aerial: each arc the level weighs
-  // (toward the opponent, onto it, straight up; the normal and the higher
-  // jump), each aerial at the first step of the arc where it would connect.
+  // (toward the opponent, onto it, straight up; the normal jump and the
+  // Super Jump, every level weighing the Super Jump against an opponent
+  // above the normal jump's reach), each aerial at the first step of the
+  // arc where it would connect.
   // Also the aerials still to come in the jump the CPU is already in.
   jumpStrikes(s, out, combo, k0 = 0) {
     const self = s.self;
@@ -418,7 +423,7 @@ export class Evaluator {
     const free = me.canAct || self.canFollowUp() || (combo && self.combat.attack?.confirmed);
     if (me.grounded && free && !me.shielding) {
       kinds.push('ground');
-      if (p.planDepth >= 2) kinds.push('high');
+      if (p.planDepth >= 2 || me.y - s.op.y > s.caps.movement.jumpHeight * 0.6) kinds.push('super');
     } else if (!me.grounded) {
       kinds.push(null);
       if (me.airJumps > 0 && !me.freeFall && free) kinds.push('air');
@@ -432,7 +437,7 @@ export class Evaluator {
     for (const m of aerials) if (m.reach) longest = Math.max(longest, Math.abs(m.reach.x), Math.abs(m.reach.x + m.reach.w));
     const fk = s.foeTrack.i(18);
     const fx = s.foeTrack.x[fk];
-    if (Math.abs(fx - me.x) > s.caps.movement.airtime * MV.maxSpeed * 1.2 + longest + 80) return;
+    if (Math.abs(fx - me.x) > s.caps.movement.superJumpAirtime * MV.maxSpeed * 1.2 + longest + 80) return;
     const targets = [fx - s.dir * 40, fx];
     if (p.planDepth >= 2) targets.push(me.x);
     if (p.planDepth >= 4) targets.push(fx - s.dir * 90);
@@ -528,7 +533,8 @@ export class Evaluator {
       const fit = c.margin >= run ? 1 : clamp((c.margin + 4) / (run + 4), 0, 1) ** 0.8;
       let jumpOut = 1;
       if (fpos.grounded && !c.burst) {
-        const rise = MV.jumpVelocity * esc - 0.5 * s.gravity * esc * esc;
+        // How far it could rise by then: its strongest jump, the Super Jump.
+        const rise = MV.superJumpVelocity * esc - 0.5 * s.gravity * esc * esc;
         if (c.marginUp < rise) jumpOut = 0.75;
       }
       pg = 0.96 * (1 - ALERT * (0.55 + 0.45 * model.mobile) * (1 - fit * jumpOut));
@@ -647,6 +653,9 @@ export class Evaluator {
     }
     if (m.abilityCooldown > 1) cost += Math.min(2.5, m.abilityCooldown * 0.25);
     else if (m.cooldown > 1) cost += Math.min(1.5, m.cooldown * 0.15);
+    // A Super Jump commits the CPU to a long airtime and a late landing:
+    // where the normal jump's quicker hop does the job, it is the one.
+    if (c.kind === 'jumpStrike' && c.jump === 'super') cost += SUPER_JUMP_COMMITMENT;
     // Getting back: a move that ends over open air must leave a way home.
     const elim = this.eliminationRisk(s, m, c);
     const risk = params.risk * (0.4 + p.riskSense * 0.6);

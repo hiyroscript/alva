@@ -1109,13 +1109,16 @@ comes from its definition and its profile.
   cannot drift from gameplay: "Movement is the same for everyone: one run,
   one set of jumps, one Dash. What sets each apart is their moves." A second
   paragraph follows immediately, joining the six localized explanations
-  with subtly bold inline names. It uses a comfortable reading width,
+  with subtly bold inline names (seven of them). It uses a comfortable reading width,
   without cards, borders or decorative markers:
   Run "Quick to full speed and quick to turn. Speed you build carries on
-  through jumps, attacks and landings.", Jump "A tap is the normal jump;
-  held a little longer, the higher jump.", Triple jump "Two more jumps in
-  mid-air. Landing or being hit gives them back.", Fast fall "Hold Down
-  while falling to drop faster.", Dash "Press Q/E, the Dash button on a controller (the left shoulder button by default), or a movement button for a burst
+  through jumps, attacks and landings.", Jump "Press Jump for a quick, low
+  jump. Holding it longer changes nothing.", Super Jump "Hold Down and
+  press Jump while on the ground to spring much higher, with a burst of
+  dust.", Triple jump "Press Jump again in the air for an additional jump.
+  You have two air jumps; landing or being hit gives them back.", Fast fall
+  "Hold Down while falling to descend faster. On a platform you can pass
+  through, tap Down to drop through it.", Dash "Press Q/E, the Dash button on a controller (the left shoulder button by default), or a movement button for a burst
   of speed. An attack or a jump can cut in after a moment.", Air dash "The
   Dash in mid-air, flat across, once per airtime." No tiers and no
   numbers: there is nothing to compare.
@@ -1398,7 +1401,7 @@ English and French.
   names, a direction always naming its stick ("R2", "Right stick
   forward", "Left stick down + X", "L2 + Right stick up") and its activation
   (Press, Push for a stick, Modifier + press, Modifier + push, Hold to
-  activate, Hold, Press (hold to jump higher)).
+  activate, Hold, Press (with Down held on the ground: Super Jump)).
   Every move row (each ground and aerial attack, the Extra Attack, a
   projectile, a technique or a summon) also shows the move's own artwork
   beside its name ("[art] Jab — Square", "[art] Red — R2"): the
@@ -1570,7 +1573,7 @@ French, concise game terms).
   a girder, the water-tower deck, a scaffold) that fighters jump up through
   from below, each a slab with depth, plus a stair bulkhead. No boundary
   buildings. The player drops through any of them but the water-tower deck
-  with a fresh Down press (7.2.2), or walks off an edge to come down;
+  with a tap of Down (7.2.2), or walks off an edge to come down;
   Quick Battle's combat AI walks off an edge; the training CPU can drop
   through all of them except the water-tower deck. Neither CPU ever walks
   off the roof's edges on its own.
@@ -1649,7 +1652,7 @@ French, concise game terms).
   `IceSectionController` in `js/game/stage-hazards.js`, `ICE_SECTION` in
   `js/data/stage-hazards.js`, each with its own counter, cracks, timing and
   stream). One **contact** per new footing a fighter takes on a wing (any
-  landing: jump, higher jump, air jump, air dash, a fall, after a launch,
+  landing: jump, Super Jump, air jump, air dash, a fall, after a launch,
   in a blizzard; or its centre crossing the seam from the centre), never
   per step: standing, walking, fighting or jittering on it add nothing; a
   wall, the underside or a rebound never counts; both fighters count, on
@@ -2045,17 +2048,24 @@ each fighter's own values are in its character specification (7.2.9).
   frame.
 - `down` (S / ↓, the left stick down, the touch Down button) is a
   direction only, never a stance, state or modifier: it has no animation,
-  locks no movement, refills nothing and changes no attack. It does three
+  locks no movement, refills nothing and changes no attack. It does four
   things: held while falling it is the fast fall, held as a hit lands it
   steers the launch downward (see the fast fall, 7.2.3, and launch
-  steering, 7.2.7), and a **fresh press while standing on a one-way
-  platform drops the fighter through it** (any platform that allows it:
-  every one but Sol-Noir's water-tower deck; never the main floor or a
-  solid), the platform ignored for `dropThroughTime` (0.28 s), only while
-  free to act (never out of an attack, a stun, a paralysis, a technique, a
-  summon's startup or a Dash) and with no Shield up. Down held from before
-  never drops (a fast fall carried into a landing stands on the platform),
-  and a jump pressed on the same step jumps from where the fighter stood.
+  steering, 7.2.7), held (or pressed) on the ground as Jump is freshly
+  pressed it makes that jump the Super Jump (7.2.3), and a **tap of it
+  while standing on a one-way platform drops the fighter through it** (any
+  platform that allows it: every one but Sol-Noir's water-tower deck;
+  never the main floor or a solid): a fresh press on the platform, let go
+  within `dropTapTime` (0.25 s) with no Jump pressed meanwhile, drops it as
+  it is let go, the platform ignored for `dropThroughTime` (0.28 s), only
+  while free to act (never out of an attack, a stun, a paralysis, a
+  technique, a summon's startup or a Dash) and with no Shield up, at the
+  press and at the release. Down held on stands ready for the Super Jump:
+  held past `dropTapTime` it never drops, however it is let go. Down held
+  from before never drops (a fast fall carried into a landing stands on
+  the platform). Jump pressed while the tap is down is the Super Jump from
+  the platform, never a drop; and a hit, an attack, the Shield, a jump or
+  leaving that platform ends the tap, so no drop ever comes late.
   Otherwise, on the ground, it does nothing at all: the fighter idles, runs,
   attacks, jumps and shields exactly as with nothing held, and every
   numbered button does the same thing whether or not Down is held. Quick
@@ -2083,7 +2093,7 @@ each fighter's own values are in its character specification (7.2.9).
   Character identity changes the moveset, not run/jump/Dash
   fundamentals.** Every playable fighter has exactly the same top speed,
   ground acceleration and deceleration, turn braking, overspeed handling,
-  air acceleration, drag and turning, jump speed and higher jump, air jumps
+  air acceleration, drag and turning, jump speed and Super Jump, air jumps
   (count and strength), gravity, fall speed, fast fall, coyote time, jump
   and combat input buffers, Dash speed, length, input window and repeat
   delay, and air dash speed, length and uses: one
@@ -2136,26 +2146,45 @@ each fighter's own values are in its character specification (7.2.9).
     technique's or summon's rooted cast, a paralysis), the Void; and the
     one stop a player chooses, the ground Shield going up, which ends the
     fighter's own sideways speed on that step (7.2.5).
-  - *Jump.* Its strength is the universal `jumpVelocity` (920 units/s,
-    about 170 units high); it is buffered (`jumpBuffer`) and has coyote time
+  - *Jump.* A press of Jump on the ground is the normal jump, a quick, low
+    hop: the universal `jumpVelocity` (750 units/s, about 106 units high on
+    the fixed step). It is buffered (`jumpBuffer`) and has coyote time
     (`coyoteTime`). Takeoff is on the press step, and the jump only sets
     the upward speed: the run carries straight into the air (no horizontal
-    reset), so run → jump → drift is one continuous motion.
-  - *Higher jump.* A tap is the normal jump. Jump still held
-    `highJumpWindow` after takeoff (held from the takeoff step on: a press
-    a little longer than a tap) makes it the higher jump: from that step to
-    its apex it rises under a lighter share of gravity, set once so it tops
-    out at `highJumpHeight` × the normal height (`Fighter.highJump`,
-    `highJumpLift`). No kick in speed: the arc stretches. Decided once and
-    kept whether Jump stays held or not; the apex, a hit, an air jump or
-    the ground ends it. Ground jumps only (coyote time included); an air
-    jump is never a higher one. Both CPUs let go of Jump inside the window
-    (`jumpTapHold`): their jumps are normal ones.
+    reset), so run → jump → drift is one continuous motion. How long Jump
+    is held changes nothing: a one-step tap and Jump held all the way give
+    the same arc. There is no hold-for-higher jump.
+  - *Super Jump.* Down held (or pressed on the same step) as Jump is
+    freshly pressed, standing on the ground, is the Super Jump: all of its
+    lift at takeoff, `superJumpVelocity` (1100 units/s), then ordinary
+    gravity all the way, so it springs up hard and tops out at about 233
+    units on the fixed step: the height the retired hold-for-higher jump
+    reached (232.5), quicker to its apex. No minimum hold of Down, no
+    build-up, no delay, no second kick; nothing held or let go after
+    takeoff changes it. Every input device makes it the same way (S / ↓
+    with W / Space / ↑, the left stick down with Cross / A, the touch Down
+    and Jump buttons with two fingers): Down and Jump are the universal
+    inputs, never a fighter's own combination. The press decides it
+    (`Fighter.jumpKind`): Down pressed after Jump never upgrades a jump,
+    and a press made in the air (the air jump, or one buffered into a
+    landing) is never a Super Jump. A press kept in the jump buffer while
+    the fighter cannot act keeps its kind, and comes out as the Super Jump
+    only if the fighter still stands on the ground as it takes off; from
+    coyote time it is the normal jump. Every restriction on a jump holds
+    (hitstun, blockstun, an attack that may not be cut, free fall, a Mash
+    Combo), and so does every way a jump may cut in (an attack that hit,
+    a yielding move, a Dash past its cancel time, the Shield). It keeps
+    the sideways speed, gives no invulnerability and strikes nothing, and
+    both air jumps follow it as after any ground jump. Its takeoff raises
+    a burst of dust on the ground it left (`Fighter.superJumpTakeoff`, the
+    Super Jump's dust, 7.3): exactly one per Super Jump, none for anything
+    else.
   - *Triple jump.* Two air jumps (`airJumps: 2`, counting the jumps after
     the ground jump): ground jump, air jump, air jump; a fourth press does
     nothing until the airtime resources come back. Each is past coyote
-    time, at `airJumpRatio` (0.78) × the jump's speed, always the same
-    height, the jump clip from its first frame. Vertical only: the sideways
+    time, at `airJumpVelocity` (718 units/s, about 86 units on the fixed
+    step), whichever ground jump came first, always the same height, Down
+    held or not, the jump clip from its first frame. Vertical only: the sideways
     speed carries straight through it, and steering the other way bends it
     round as air control allows, never in one step. Landing gives both
     back, and so does a hit (and a homing dash's spring off what it hit).
@@ -2165,7 +2194,9 @@ each fighter's own values are in its character specification (7.2.9).
     jump, a Deflect (cancellable, 7.2.4) and an air dash past its cancel
     time. Quick
     Battle's CPU uses them to get back to the stage. A jump and both air
-    jumps from a stage's highest footing stay well clear of the upper Void.
+    jumps from a stage's highest footing stay well clear of the upper Void,
+    and a Super Jump and both air jumps (the reach the retired higher jump
+    had) stay inside it.
   - *Fast fall.* Down (the `down` input: S / ↓, the left stick down, the
     touch Down button) held in the air while already descending
     speeds the fall up toward `fastFallSpeed` at `fastFallAcceleration` on
@@ -3513,7 +3544,7 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   no base velocity is added, and horizontal and vertical launches use the
   same number. The one conversion factor is the same for every hit and
   direction, so it only puts the strength in the world's units (gravity
-  2500, a jump 920) and never changes its proportions. At 120 Launch Point,
+  2500, a jump 750) and never changes its proportions. At 120 Launch Point,
   Base Launch 0, 1, 2 and 3 give strengths of 0, 120, 240 and 360 (speeds
   0, 1200, 2400 and 3600); at 37, 0, 37, 74 and 111. A hit a Shield
   blocks is the one exception: it adds no Launch Point and launches
@@ -3716,11 +3747,26 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
     projectiles, the Shield, summons and techniques (their own buttons,
     pressed directly), the fast fall (`down`), jumps and the Dash (an
     explicit Mouvement request) all go through the fighter exactly as a
-    player's do. It never writes to a fighter, never spawns or moves
-    anything, never reads the player's raw input, never uses the wall clock
-    or unseeded randomness, and never drops through a platform (neither
-    the training CPU's drop nor a Down press on the ground): it walks off
-    platform edges instead. It never has the player's Automatic
+    player's do; its Super Jump is the player's chord, Down pressed on the
+    step it freshly presses Jump on the ground, and Down is held on the
+    ground on that step only. It never writes to a fighter, never spawns or
+    moves anything, never reads the player's raw input, never uses the wall
+    clock or unseeded randomness, and never drops through a platform
+    (neither the training CPU's drop nor a tap of Down on the ground): it
+    walks off platform edges instead.
+  - **The Super Jump.** Every level may use it, through the same input and
+    physics as a player, and its predictions fly the real arcs (the normal
+    jump, the Super Jump with all its lift at takeoff, the air jump, under
+    ordinary gravity). It navigates with the normal jump wherever that
+    reaches a footing and with the Super Jump (and an air jump on top)
+    only where it does not; jumps over a threat with the normal jump where
+    that clears it, the Super Jump weighed with its longer airtime; jumps
+    into an aerial off either, a Super Jump jump-in costing it a little
+    more than the same strike off the quicker hop (every level weighs it
+    against an opponent above the normal jump's reach, the higher levels
+    always); and Super Jumps past a cornering opponent toward the centre.
+    The training CPU follows onto high ground and hops a tall solid with
+    it, and celebrating CPUs sometimes Super Jump in their jump spam. It never has the player's Automatic
     turn-around (7.2.4a): its attacks are aimed by its own perception.
   - **Perception.** It sees its opponent as it was a reaction time ago
     (the level's window, resampled now and then; never zero), carried
@@ -3938,7 +3984,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   hopping whatever stops it, and the stage and Void check take it; once
   chosen it never ends), **idle**, **the dash dance** (quick turns left and
   right round where it began, never past a ledge) and **jump spam** (a
-  fresh Jump press each time, let go in between, air jumps included).
+  fresh Jump press each time, let go in between, now and then a Super
+  Jump from the ground, air jumps included).
   Never the same one twice running, never all five by force; the Void run
   comes up less often than the others. A losing CPU stays calm (idle);
   after a draw both CPUs only idle, dash dance or jump. Every behaviour is
@@ -4313,8 +4360,22 @@ Adding one is described in
     go, on the simulation clock, at its fighter's art-pixel scale, behind
     the clones and fighters, then is dropped (`Arena.castEffects`). Paint
     only: the burst's hit has already landed.
+  - *The Super Jump's dust:* every Super Jump that takes off (a player's
+    or a CPU's, `Fighter.superJumpTakeoff`, handed over by the Arena on its
+    takeoff step) raises one burst of dust on the ground it left, where its
+    feet left it: a small cloud at the feet, two puffs rolling out along
+    the surface either side, a faint flat ring spreading over it and six
+    motes rising, warm pale grey over a warm dark edge so it reads on
+    night, sand, snow and cloud alike, easing out and fading together in
+    0.3 s (`HIT_FX.dust`). It stays on the ground while the fighter rises
+    away, riding a moving cloud it took off from (drawn where the cloud is
+    drawn), and is drawn over the shadows and behind every fighter. At most
+    eight at once (the oldest goes); a restart clears them. Never for a
+    normal jump, an air jump, Down alone or a refused press; no shake.
+    Paint only.
   - Reduced motion drops the shake and the zoom (and the burst's shake, its
-    shards travelling only about a third as far); the flash, sparks,
+    shards travelling only about a third as far, and the Super Jump's dust
+    spreading only about a third as far, with no motes); the flash, sparks,
     trails, slow motion and the burst's colour flash and fade stay.
 - Round banners ("ROUND 1", "FIGHT") in white on a dark band. As overtime
   starts, "OVERTIME" under "POINTS LEVEL" ("PROLONGATION" under "ÉGALITÉ"
@@ -4399,7 +4460,7 @@ Adding one is described in
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, as a hit lands, steering the launch downward, and pressed on a one-way platform, a drop through it), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
+  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, as a hit lands, steering the launch downward, held on the ground with a Jump press, the Super Jump, and tapped on a one-way platform, a drop through it), W/Space/↑ jump (`jump`; pressed, the normal jump, the same however long it is held; with Down held on the ground, the Super Jump; again in the air, an air jump, twice: the triple jump), J the
   extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground, it holds the fighter still, a direction held with it only turning it, and Jump jumps out of it; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
@@ -4812,11 +4873,11 @@ codename is sent, never what an action does.
   controlled. Every CPU's controller is untouched.
 - **Universal recommended controls**, every fighter, chosen together so no
   finger is asked for two things at once: Movement, the left stick; Jump,
-  Cross / A (held a little longer, the higher jump; the air and triple
-  jumps as ever); Dash / air dash, R1 / RB (toward the movement stick's
+  Cross / A (with the left stick held down on the ground, the Super Jump;
+  the air and triple jumps as ever); Dash / air dash, R1 / RB (toward the movement stick's
   side past 0.3 of its travel, else the way the fighter faces; one per
   press): the left thumb aims, the right thumb stays on Jump and the
-  attacks; Fast fall and downward launch steering, the left stick down;
+  attacks; Fast fall and downward launch steering (and, on the ground, the Super Jump's half of its chord and the platform drop's tap), the left stick down;
   Shield, L1 / LB held (never a toggle), and Deflect, L1 / LB pressed in
   the air: one guard button on a finger of its own, so guarding never takes
   the right thumb off the attacks; Pause, Options / Menu. The other three

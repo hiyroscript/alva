@@ -583,7 +583,7 @@ test('#0001\'s editor: its portrait, name and family, every action by category w
     assert.equal(text(row(editor, 'shield').querySelector('.controller-row-activation')), 'Hold');
     assert.equal(text(row(editor, 'deflect').querySelector('.controller-chip')), 'L1');
     assert.equal(text(row(editor, 'dash').querySelector('.controller-chip')), 'R1');
-    assert.equal(text(row(editor, 'jump').querySelector('.controller-row-activation')), 'Press (hold to jump higher)');
+    assert.equal(text(row(editor, 'jump').querySelector('.controller-row-activation')), 'Press (with Down held on the ground: Super Jump)');
     assert.equal(text(row(editor, 'fastFall').querySelector('.controller-chip')), 'Left stick down');
     assert.equal(text(row(editor, 'air:attack3').querySelector('.controller-chip')), 'Circle');
     const purple = row(editor, 'ground:attack5');
@@ -766,14 +766,14 @@ test('a binding changed in text (no controller needed), saved for that fighter a
     env.key('ArrowRight');
     env.key('ArrowRight');
     env.key('ArrowRight');
-    assert.equal(text(binding.detected), 'Binding: Triangle · Press (hold to jump higher)');
+    assert.equal(text(binding.detected), 'Binding: Triangle · Press (with Down held on the ground: Super Jump)');
     // Triangle on the ground is the Rapid Kicks: an error, Confirm off.
     assert.match(text(binding.conflicts), /Jump and Rapid Kicks use the same input \(Triangle\)\./);
     assert.equal(binding.confirmButton.disabled, true);
     env.key('ArrowRight'); // L1: the guard's
     env.key('ArrowRight'); // R1: the Dash's
     env.key('ArrowRight'); // L2: free
-    assert.equal(text(binding.detected), 'Binding: L2 · Press (hold to jump higher)');
+    assert.equal(text(binding.detected), 'Binding: L2 · Press (with Down held on the ground: Super Jump)');
     assert.equal(binding.confirmButton.disabled, false);
     binding.confirmButton.click();
     assert.equal(binding.isOpen, false);

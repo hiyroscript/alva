@@ -13,7 +13,7 @@
 //               rest made while it plays; done once the fighter's own
 //               detector has started the series, failed if it never does
 //   dashStrike  Dash in, then strike out of the Dash past its cancel time
-//   jumpStrike  jump (the normal or the higher jump, or an air jump),
+//   jumpStrike  jump (the normal jump or the Super Jump, or an air jump),
 //               steer the arc that was planned, press the aerial on the
 //               planned step
 //   shield      raise the Shield at the planned moment (just in time for a
@@ -47,8 +47,10 @@
 //               jumps, air dash home when far out, a lift as a last resort,
 //               steer a launch while stunned
 //   navigate    reach an opponent on another level: walk under a surface
-//               and jump to it (the higher jump and an air jump if needed),
-//               or walk off a platform's edge (there is no platform drop)
+//               and jump to it (the normal jump where it reaches, the Super
+//               Jump where only it does, and an air jump on top if needed),
+//               or walk off a platform's edge (the CPU plans no platform
+//               drop)
 //   edgeguard   hold the ledge the opponent must come back to, ready
 //   reposition  make for a better spot (a safe distance from where an
 //               opponent will respawn), then wait there
@@ -251,10 +253,10 @@ const STEPS = {
       if (c.jump !== 'air' && !me.grounded) return 'fail';
       const free = me.canAct || self.combat.cancellable || self.dashCancellable || self.moveYields();
       if (!free) return brain.clock - plan.start > 0.3 ? 'fail' : 'run';
-      if (ex.jump(self, c.jump === 'high')) {
+      if (ex.jump(self, jumpKind(c.jump))) {
         plan.jumped = true;
         plan.jumpAt = brain.clock;
-        brain.telemetry.count('jumps');
+        countJump(brain, c.jump);
       }
       ex.dir(sign(c.toX - me.x));
       return 'run';
@@ -300,7 +302,7 @@ const STEPS = {
         ex.dir(0);
         return 'run';
       } else {
-        if (ex.jump(self, false)) {
+        if (ex.jump(self)) {
           plan.jumped = true;
           brain.telemetry.count('jumps');
         }
@@ -344,10 +346,10 @@ const STEPS = {
     const self = s.self;
     if (!plan.jumped) {
       if (!s.me.grounded && plan.jump !== 'air') return 'fail';
-      if (ex.jump(self, plan.jump === 'high')) {
+      if (ex.jump(self, jumpKind(plan.jump))) {
         plan.jumped = true;
         plan.jumpAt = brain.clock;
-        brain.telemetry.count('jumps');
+        countJump(brain, plan.jump);
       }
       ex.dir(plan.dir ?? 0);
       return brain.clock - plan.start > 0.25 ? 'fail' : 'run';
@@ -521,7 +523,7 @@ const STEPS = {
       return 'run';
     }
     if (me.airJumps > 0 && !me.freeFall && me.vy > 0 && below > -plan.jumpBelow && free) {
-      if (ex.jump(self, false)) brain.telemetry.count('jumps');
+      if (ex.jump(self, 'air')) brain.telemetry.count('jumps');
       return 'run';
     }
     const rise = riseOf(caps);
@@ -543,7 +545,13 @@ const STEPS = {
     let tx = s.op.x;
     let jump = false;
     if (up > 30) {
-      const maxRise = (plan.high ? caps(s).highJumpHeight : caps(s).jumpHeight) + (me.airJumps > 0 ? caps(s).airJumpHeight * 0.8 : 0);
+      // On the ground every jump is open to it, so it looks as far as the
+      // Super Jump (and an air jump) reaches; in the air, as far as the jump
+      // it took and its air jumps do. The normal jump wherever it reaches
+      // the step on its own, the Super Jump only where it does not.
+      const c = caps(s);
+      const air = me.airJumps > 0 ? c.airJumpHeight * 0.8 : 0;
+      const maxRise = (me.grounded || plan.super ? c.superJumpHeight : c.jumpHeight) + air;
       const step = s.model.stepToward(me.grounded ? me.y : me.lastGroundY, foeY, s.op.x, me.x, maxRise * 0.92, me.ground);
       if (step) {
         tx = Math.min(step.x1 - 18, Math.max(step.x0 + 18, s.op.x));
@@ -552,13 +560,13 @@ const STEPS = {
           const under = !step.oneWay && gap === 0;
           if (under) tx = me.x < (step.x0 + step.x1) / 2 ? step.x0 - 34 : step.x1 + 34;
           else if (gap < 90) jump = true;
-          plan.high = me.y - step.y > caps(s).jumpHeight * 0.85;
+          plan.super = me.y - step.y > c.jumpHeight * 0.85;
         } else if (me.vy > -80 && me.airJumps > 0 && me.y > step.y + 6 && ex.jumpFree()) {
-          ex.jump(self, false);
+          ex.jump(self, 'air');
         }
       } else if (Math.abs(s.op.x - me.x) < 160 && me.grounded) {
         jump = true;
-        plan.high = true;
+        plan.super = true;
       }
     } else if (up < -30 && me.grounded && me.ground && !s.model.isMain(me.ground)) {
       // Down: walk off the nearer edge of this surface toward the opponent,
@@ -577,7 +585,7 @@ const STEPS = {
     const d = Math.abs(dx) > 6 ? sign(dx) : 0;
     ex.dir(me.grounded ? d : driftDir(me.x, me.vx, tx));
     if (jump && self.canAct() && ex.jumpFree()) {
-      if (ex.jump(self, !!plan.high)) brain.telemetry.count('jumps');
+      if (ex.jump(self, plan.super ? 'super' : 'normal')) countJump(brain, plan.super ? 'super' : 'ground');
     }
     // Stuck: moving toward a target without getting any closer.
     if (Math.abs(me.x - plan.lastX) > 12 || Math.abs(me.y - plan.lastY) > 12) {
@@ -614,6 +622,17 @@ const STEPS = {
 };
 
 const caps = (s) => s.caps.movement;
+
+// The executor's press for a planned jump (`jump`: 'ground', 'super' or
+// 'air', see arcTrack): the normal jump's, the Super Jump's chord or the
+// air jump's.
+const jumpKind = (jump) => (jump === 'super' ? 'super' : jump === 'air' ? 'air' : 'normal');
+
+// Counts a jump the CPU pressed for, and a Super Jump on its own as well.
+function countJump(brain, jump) {
+  brain.telemetry.count('jumps');
+  if (jump === 'super') brain.telemetry.count('superJumps');
+}
 
 // A plan of kind `kind` with its spec, started now.
 export function makePlan(kind, spec, brain) {

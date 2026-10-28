@@ -20,9 +20,9 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/data/movement.js`](../../js/data/movement.js) | The numbers: `BASE_FIGHTER_MOVEMENT`, one frozen object every Fighter reads (`MOVEMENT_FIELDS` lists them). `movementProblems` / `assertUniversalMovement`, which the registry uses to refuse a definition that declares movement of its own. And the Discover copy (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`). |
-| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ordinary locomotion: ground and air acceleration, braking, turning, overspeed), `attackDrift` (an attack's horizontal movement: its Step-in, then on the ground its speed running down whatever is held, in the air the universal air control), `activationStep` (the Step-in an activation makes: its move's on the ground, none in the air), `attackStartSpeed` (the momentum an attack keeps), `stepInTravel` (how far a Step-in carries a fighter, for planners), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`. Each reads the values it is given on every call and writes only the body it is handed. |
+| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ordinary locomotion: ground and air acceleration, braking, turning, overspeed), `attackDrift` (an attack's horizontal movement: its Step-in, then on the ground its speed running down whatever is held, in the air the universal air control), `activationStep` (the Step-in an activation makes: its move's on the ground, none in the air), `attackStartSpeed` (the momentum an attack keeps), `stepInTravel` (how far a Step-in carries a fighter, for planners), `hitstunDrag`, `fastFallVelocity`, `groundJump` (the normal jump or the Super Jump: all of its upward speed at once), `airJump`, `jumpRise` (a jump's height, for planners). Each reads the values it is given on every call and writes only the body it is handed. |
 | [`js/data/attack-movement.js`](../../js/data/attack-movement.js) | How an attack moves its fighter, the same rules for everyone: the shared Step-in (`STEP_IN`) and its verdict per move (`resolveStepIn`, `stepInEligible`), what an attack keeps of its speed (`resolveAttackCarry`), and the retired steering fields it refuses (`STEERING_FIELDS`). See [attack movement](#5-attack-movement). |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer and the kind of jump it holds (`jumpKind`), coyote time, the platform drop's tap (`dropTap`), the Super Jump's takeoff for its dust (`superJumpTakeoff`), air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms, moving ones included (`carryBody` carries a fighter standing on one by exactly its movement before its own step; `releaseGround` lets go of one that has vanished; see [stages](../gameplay/stages.md#platform-hazards)). It never knows why a body moves. |
 
 No fighter definition has a `movement` profile or `powers` any more: the
@@ -50,8 +50,8 @@ or the air dash's speed (an air dash also holds the fall off), the
 Shield's stand (no steering at all), an attack's
 own motion, an attack's drift (its Step-in; never steered on the ground,
 the universal air control in the air), or normal steering.
-Then the jump (buffered, with coyote time), the air jump, the higher
-jump's lift and the fast fall; then the body is integrated and collided;
+Then the jump (buffered, with coyote time: the normal jump or the Super
+Jump, as its press asked), the air jump and the fast fall; then the body is integrated and collided;
 then launch rebounds, landing resets (air jumps, air dashes, per-airtime
 attacks, free fall) and the landing cancel, the end of a Dash that lost
 its ground or an air dash that found it, of a technique or a summon's
@@ -80,21 +80,22 @@ plays every pairing at 30, 60 and 144 fps and compares every step).
 | `airDeceleration` | 360 | Air: the gentle drag with nothing held. |
 | `airTurnBoost` | 2.0 | Air: as `turnBoost`. |
 | `airOverspeedDeceleration` | 2600 | Air, above top speed, for a burst of the fighter's own (a Dash's or an air dash's): it bleeds off at this rate. A launch's speed never does. |
-| `jumpVelocity` | 920 | The normal jump's upward speed: about 170 units high. |
+| `jumpVelocity` | 750 | The normal jump's upward speed (Jump pressed): a quick, low hop, about 106 units high on the fixed step. |
+| `superJumpVelocity` | 1100 | The Super Jump's (Down held, or pressed with it, as Jump is freshly pressed on the ground): all of its lift at takeoff, under ordinary gravity, about 233 units high on the fixed step, the height the retired hold-for-higher jump reached. |
 | `gravityScale` | 1 | The share of world gravity on the body. |
 | `maxFallSpeed` | 1500 | The fall cap. |
 | `fastFallAcceleration` / `fastFallSpeed` | 14000 / 1500 | Down held while falling speeds the fall up at this rate, to this speed. |
 | `coyoteTime` | 0.1 | How long after leaving the ground a ground jump is still allowed. |
 | `jumpBuffer` | 0.12 | How long a jump press waits for the first step it can be used. |
-| `highJumpWindow` / `highJumpHeight` | 0.15 / 1.4 | Jump still held this long after takeoff makes the higher jump, up to this × the normal jump's height. |
-| `airJumps` / `airJumpRatio` | 2 / 0.78 | The triple jump: two jumps in the air, each at this × the jump's speed (about 105 units each). Landing or a hit gives both back. |
+| `airJumps` / `airJumpVelocity` | 2 / 718 | The triple jump: two jumps in the air, each at this speed (about 86 units each on the fixed step), whichever ground jump came first. Landing or a hit gives both back. |
 | `dashSpeed` / `dashDuration` | 1250 / 1/6 | The Dash: a burst at this speed for this long (about 208 units). |
 | `dashCancelTime` | 0.05 | From this far into a Dash or air dash, an attack, a Deflect or a jump may cut it short. |
 | `airDashSpeed` / `airDashDuration` / `airDashUses` | 1250 / 1/6 / 1 | The air dash, once per airtime; landing or a hit gives it back. |
 | `dashRepeat` | 0.4 | A Dash (or, on its own timer, an air dash) may start again this long after the last one started. |
 | `attackBuffer` | 0.15 | How long an attack press (and a Dash request) the fighter cannot act on yet is kept. |
 | `hitstunFriction` / `hitstunAirDrag` | 1600 / 210 | How a launch or push runs down while stunned, whatever is held: the rates Launch Point is tuned against. |
-| `dropThroughTime` | 0.28 | How long a platform drop (a fresh Down press on a one-way platform, or the training CPU's own drop) ignores that platform. |
+| `dropThroughTime` | 0.28 | How long a platform drop (a tap of Down on a one-way platform, or the training CPU's own drop) ignores that platform. |
+| `dropTapTime` | 0.25 | The platform drop's tap: Down pressed on a one-way platform and let go within this, no Jump pressed meanwhile, drops through it as it is let go. Held longer, it stands (ready for the Super Jump). |
 
 The values are tuned against the stages (main floors about 1400 units
 wide), the camera and combat ranges: a Dash covers about a seventh of a
@@ -109,7 +110,7 @@ away:
 
 - **Jumps.** A jump only sets the upward speed: the run's (or the Dash's)
   whole sideways speed carries into the air. An air jump is vertical
-  only, a fresh rise at `airJumpRatio` × the jump's speed: the sideways
+  only, a fresh rise at `airJumpVelocity`: the sideways
   speed carries straight through it, and steering the other way bends it
   round as the air allows (`airTurnBoost`), never in one step.
 - **Attacks.** An attack keeps its `momentum` share of the speed it starts
@@ -149,19 +150,54 @@ never a burst, so momentum rules never weaken a launch.
 
 ## 4. Jumps
 
-A tap of Jump is the normal jump; held past `highJumpWindow` after
-takeoff it becomes the higher jump, rising under lighter gravity to
-`highJumpHeight` × the normal jump's height. A jump is buffered
+A press of Jump on the ground is the **normal jump**: a quick, low hop at
+`jumpVelocity`. How long Jump is held never changes it: a one-step tap
+and Jump held all the way give the same arc. A jump is buffered
 (`jumpBuffer`) and allowed for `coyoteTime` after leaving the ground.
+
+**The Super Jump.** Down held (or pressed on the same step) as Jump is
+freshly pressed, standing on the ground, is the Super Jump: all of its
+lift at takeoff, `superJumpVelocity`, then ordinary gravity all the way,
+so it springs up hard and tops out at about the height the retired
+hold-for-higher jump reached (233 units against its 232.5 on the fixed
+step), sooner. No minimum hold of Down, no build-up, no delay, no second
+kick; nothing held or let go after takeoff changes it.
+
+- *Decided as Jump is pressed.* `Fighter.jumpKind` records the kind with
+  the press (`'super'` with Down held and the fighter on the ground,
+  `'normal'` otherwise), never later from whatever is held then: Down
+  pressed after Jump never upgrades it, and a press made in the air (the
+  air jump, or one buffered into a landing) is never a Super Jump.
+- *From the ground itself.* A Super Jump press kept in the jump buffer
+  while the fighter cannot act (an attack's recovery, a stun's last
+  steps, a freeze) keeps its kind, and comes out as the Super Jump only if
+  the fighter still stands on the ground as it takes off; from coyote time
+  it is the normal jump. The buffer's expiry, a hit (a player's requests
+  are dropped by one), a Mash Combo or a reset clears it.
+- *Every rule of a jump.* Every restriction holds (hitstun, blockstun, an
+  attack that may not be cut, free fall, a Mash Combo) and so does every
+  way a jump may cut in (an attack that hit, a yielding move, a Dash past
+  its cancel time, the Shield). It keeps the sideways speed, gives no
+  invulnerability and strikes nothing, and both air jumps follow it as
+  after any ground jump.
+- *Its dust.* The step it takes off it records `superJumpTakeoff` (where
+  its feet left the ground and what it stood on); the Arena hands that to
+  the hit effects, which raise one burst of dust there
+  ([rendering](./rendering.md)). Nothing in play reads it.
+
+Every device makes it the same way, since Down and Jump are universal
+inputs: S / ↓ with W / Space / ↑, the left stick down with Cross / A, the
+touch Down and Jump buttons with two fingers. A CPU makes the same chord
+([AI](./ai.md)).
 
 **The triple jump.** In the air, past coyote time, a jump press is an air
 jump while one is left: two per airtime (`airJumps: 2` counts jumps after
 the ground jump). Ground jump, air jump, air jump; a fourth press does
 nothing until the airtime resources are restored: by landing, by a hit
 (`Fighter.takeHit`), and by a homing dash that hits (its spring off the
-target). Each air jump is the same height, held or tapped (never a
-higher jump), and starts the jump clip over. Walking off an edge keeps
-both. Free fall (after a move that spends the airtime) rules them out.
+target). Each air jump is the same height, at `airJumpVelocity`, held
+or tapped, Down held or not, whichever ground jump came first, and starts
+the jump clip over. Walking off an edge keeps both. Free fall (after a move that spends the airtime) rules them out.
 
 ## 5. Attack movement
 
@@ -327,21 +363,30 @@ every playable fighter has the same capabilities
 
 ## Platform drop
 
-A fresh Down press (S / ↓, the left stick pushed down, the touch Down
-button) while standing on a one-way platform that allows it drops the
-fighter through it (`dropThrough` in
-[`js/game/physics.js`](../../js/game/physics.js)): the platform is ignored
-for `dropThroughTime` and the fighter falls on from where it stood, its
-speed kept. Every one-way platform allows it unless its map says
-`dropThrough: false` (Sol-Noir's water-tower deck); the main floor and the
-solids never do. It needs the fighter free to act (no attack, stun,
-paralysis, technique, summon's startup or Dash) and no Shield up. Down
-held from before never drops, so a fast fall carried into a landing stands
-on the platform; and a jump pressed on the same step jumps from where the
-fighter stood. A moving cloud drops a fighter the same way. The training
-CPU asks for the same drop with its own `dropPressed`; Quick Battle's
-combat AI never presses Down on the ground (it plans no drop and walks off
-an edge instead).
+A **tap** of Down (S / ↓, the left stick pushed down, the touch Down
+button: pressed and let go within `dropTapTime`, no Jump pressed
+meanwhile) while standing on a one-way platform that allows it drops the
+fighter through it as Down is let go (`Fighter.dropTap`, then
+`dropThrough` in [`js/game/physics.js`](../../js/game/physics.js)): the
+platform is ignored for `dropThroughTime` and the fighter falls on from
+where it stood, its speed kept. Every one-way platform allows it unless
+its map says `dropThrough: false` (Sol-Noir's water-tower deck); the main
+floor and the solids never do. It needs the fighter free to act (no
+attack, stun, paralysis, technique, summon's startup or Dash) and no
+Shield up, at the press and at the release.
+
+The drop is a tap, not a press, because Down held on the ground is half of
+the Super Jump: a fighter on a platform holding Down, ready to Super
+Jump, must stand there however long it holds it. So Down held past
+`dropTapTime` never drops, however it is let go; Jump pressed while Down
+is down is the Super Jump, never a drop; and anything that takes the
+fighter off that platform or out of its control (a hit, an attack, the
+Shield, a jump, walking off) ends the tap, so no drop ever comes late.
+Down held from before (a fast fall carried into a landing) never drops
+either. A moving cloud drops a fighter the same way. The training CPU asks
+for the drop at once with its own `dropPressed`; Quick Battle's combat AI
+holds Down on the ground only on the step it presses Jump for a Super
+Jump (it plans no drop and walks off an edge instead).
 
 ## The Shield holds still
 

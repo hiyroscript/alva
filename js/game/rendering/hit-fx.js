@@ -44,10 +44,18 @@
 //   one a hit of its own fed, its target frightened of it (an event's
 //   `fed`, see `fear` in js/game/combat/hit-effects.js). Nothing but
 //   paint.
+// - A Super Jump's takeoff (see Fighter.superJumpTakeoff): a burst of dust
+//   on the ground where it left it, a small cloud at its feet, two puffs
+//   rolling out along the surface either side, a faint ring spreading over
+//   it and a few motes rising, pale over a warm dark edge, all fading out within a third of a second.
+//   It stays on the ground (riding a moving platform it took off from)
+//   while the fighter rises away, and is drawn behind the fighters. Nothing
+//   but paint.
 //
 // With reduced motion there is no shake and no zoom, an elimination's
-// shards barely travel and the Void's ripple is a still, fading pulse with
-// no wave running along its edge; the rest stays.
+// shards barely travel, a Super Jump's dust barely spreads and raises no
+// motes, and the Void's ripple is a still, fading pulse with no wave
+// running along its edge; the rest stays.
 
 import { stepBody } from '../physics.js';
 import { bounceLaunch } from '../combat/launch-bounce.js';
@@ -119,6 +127,19 @@ export const HIT_FX = Object.freeze({
     pulse: 70, // the bright pulse's radius at its widest (units)
     reducedRing: 60, // with reduced motion: one still ring this wide
   },
+  // A Super Jump's dust (world units and real seconds, so it reads the same
+  // at every zoom).
+  dust: {
+    life: 0.3, // seconds
+    spread: 62, // how far each puff rolls out along the ground
+    puff: 13, // a puff's radius as it starts
+    cloud: 15, // the cloud at the feet
+    ring: 74, // the ground ring's widest half-width
+    motes: 6,
+    rise: 34, // how high the motes rise
+    max: 8, // live at once: the oldest goes first
+    reducedTravel: 0.3, // with reduced motion, this much of the spread
+  },
   lethal: {
     scale: 0.25, // the clock's speed at its slowest
     hold: 0.45, // real seconds held at its slowest
@@ -130,6 +151,10 @@ export const HIT_FX = Object.freeze({
 });
 
 const AMBER = '#ffd27a';
+// Dust: a warm pale grey over a warm dark edge, so it reads on dark
+// ground, sand, snow and cloud alike.
+const DUST = '#e4d9c4';
+const DUST_EDGE = 'rgba(70, 52, 34, 0.5)';
 const RED = '#d21f2b';
 const HEAL = '#7dffa8';
 
@@ -200,6 +225,7 @@ export class HitEffects {
     this.slow = null; // { time, focus: fighter } while the lethal slow motion runs
     this.eliminations = []; // { slot, x, y, size, palette, age, life, seed }
     this.ripples = []; // { side, x, y, slot, age, life }
+    this.dusts = []; // { x, y, ground, dx, dy, age, life, seed }
   }
 
   // ---- From the simulation -------------------------------------------------------
@@ -293,6 +319,18 @@ export class HitEffects {
     });
   }
 
+  // A Super Jump took off this step (`takeoff`, see
+  // Fighter.superJumpTakeoff): its dust where its feet left the ground. One
+  // burst a takeoff; past HIT_FX.dust.max at once, the oldest goes.
+  addSuperJumpDust(takeoff) {
+    const d = HIT_FX.dust;
+    this.dusts.push({
+      x: takeoff.x, y: takeoff.y, ground: takeoff.ground ?? null, dx: takeoff.dx ?? 0, dy: takeoff.dy ?? 0,
+      age: 0, life: d.life, seed: takeoff.x * 0.27 + takeoff.y * 0.13,
+    });
+    if (this.dusts.length > d.max) this.dusts.shift();
+  }
+
   addShake(amp) {
     if (this.reducedMotion || !(amp > 0)) return;
     if (amp < this.shake.amp * (1 - this.shake.time / (this.shake.life || 1))) return;
@@ -332,6 +370,10 @@ export class HitEffects {
     this.eliminations = this.eliminations.filter((e) => e.age < e.life);
     for (const r of this.ripples) r.age += dt;
     this.ripples = this.ripples.filter((r) => r.age < r.life);
+    if (this.dusts.length) {
+      for (const d of this.dusts) d.age += dt;
+      this.dusts = this.dusts.filter((d) => d.age < d.life);
+    }
     if (this.slow) {
       this.slow.time += dt;
       const { hold, ease } = HIT_FX.lethal;
@@ -545,6 +587,79 @@ export class HitEffects {
           ctx.arc(x, y, r + px * 3, 0, Math.PI * 2);
           ctx.stroke();
         }
+      }
+      ctx.restore();
+    }
+  }
+
+  // Where dust `d` is now (world units): where its fighter took off, carried
+  // with a moving platform it took off from (drawn where that platform is
+  // drawn), and how visible that ground is ({ x, y, alpha }).
+  dustAt(d) {
+    const g = d.ground;
+    if (g?.dynamic) return { x: g.renderX + d.dx, y: g.renderY + d.dy, alpha: g.opacity ?? 1 };
+    return { x: d.x, y: d.y, alpha: 1 };
+  }
+
+  // Draws every live Super Jump dust burst on the ground it rose from: the
+  // ring spreading over the surface, the cloud at the feet, the two puffs
+  // rolling out either side and the motes rising, each over a faint dark
+  // edge, all easing out and fading together. `toScreen(x, y)` maps world
+  // to device pixels and `scale` is device pixels per world unit. With
+  // reduced motion it barely spreads and raises no motes.
+  drawDust(ctx, toScreen, scale) {
+    const cfg = HIT_FX.dust;
+    const travel = this.reducedMotion ? cfg.reducedTravel : 1;
+    for (const d of this.dusts) {
+      const at = this.dustAt(d);
+      const k = Math.min(1, d.age / d.life);
+      const out = 1 - (1 - k) ** 3;
+      const fade = (1 - k) * (1 - k * 0.4) * at.alpha;
+      if (!(fade > 0)) continue;
+      const [x, y] = toScreen(at.x, at.y);
+      const u = scale;
+      const blobs = [];
+      // The cloud at the feet, swelling a little as it thins.
+      blobs.push([x, y - u * cfg.cloud * 0.55, u * cfg.cloud * (0.8 + 0.5 * out)]);
+      // Two puffs rolling out along the ground, each a few overlapping
+      // circles, lifting a touch as they go.
+      for (const side of [-1, 1]) {
+        const cx = x + side * u * cfg.spread * out * travel;
+        const r = u * cfg.puff * (0.75 + 0.6 * out);
+        blobs.push([cx, y - r * 0.6, r]);
+        blobs.push([cx - side * r * 0.8, y - r * 0.45, r * 0.75]);
+        blobs.push([cx + side * r * 0.55, y - r * 0.35, r * 0.6]);
+      }
+      // The motes, rising and drifting outward.
+      const motes = [];
+      if (!this.reducedMotion) {
+        const rnd = seeded(d.seed);
+        for (let i = 0; i < cfg.motes; i++) {
+          const side = i % 2 ? 1 : -1;
+          const mx = x + side * u * (6 + rnd() * cfg.spread * 0.7) * out;
+          const my = y - u * (4 + cfg.rise * (0.5 + rnd() * 0.5)) * out;
+          motes.push([mx, my, u * (1.6 + rnd() * 1.4) * (1 - 0.5 * k)]);
+        }
+      }
+      ctx.save();
+      // The ring spreading over the surface: a flat ellipse.
+      const rx = u * cfg.ring * (0.25 + 0.75 * out * travel);
+      ctx.globalAlpha = fade * 0.6;
+      ctx.lineWidth = Math.max(1, u * 2.4 * (1 - k));
+      ctx.strokeStyle = DUST_EDGE;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, Math.max(1, rx * 0.16), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Edge first, then the dust over it.
+      for (const [color, grow, alpha] of [[DUST_EDGE, u * 1.6, 1], [DUST, 0, 0.92]]) {
+        ctx.globalAlpha = fade * alpha;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (const [bx, by, r] of [...blobs, ...motes]) {
+          ctx.moveTo(bx + r + grow, by);
+          ctx.arc(bx, by, r + grow, 0, Math.PI * 2);
+        }
+        ctx.fill();
       }
       ctx.restore();
     }

@@ -168,6 +168,18 @@ function measure(c) {
     out.jumps = heights;
     out.airJumpsLeft = fighter.airJumps;
   }
+  {
+    // The Super Jump: Down and Jump together on the ground, its rise, and
+    // both air jumps still after it.
+    const { fighter, step } = makeFighter();
+    const y0 = fighter.body.y;
+    step({ ...JUMP, down: true, downPressed: true });
+    out.superJumpVy = fighter.body.vy;
+    let top = fighter.body.y;
+    while (fighter.body.vy < 0) top = Math.min(top, step({}).body.y);
+    out.superJump = +(y0 - top).toFixed(6);
+    out.airJumpsAfterSuper = fighter.airJumps;
+  }
   if (hasClip(c, 'mouvment') && hasClip(c, 'midair_mouvment')) {
     // The Dash and the air dash: speed, length, distance.
     const { fighter, step } = makeFighter();
@@ -213,8 +225,12 @@ test('every fighter runs, turns, stops, steers, falls, jumps and Dashes identica
   assert.ok(r.fastFall.every((v, i) => i === 0 || v - r.fastFall[i - 1] <= (mv.fastFallAcceleration + G) * DT + 1e-9));
   assert.ok(close(r.jumpVy, -mv.jumpVelocity + G * DT), 'the jump\'s own speed');
   const jump = (mv.jumpVelocity ** 2) / (2 * G);
-  const airJump = ((mv.jumpVelocity * mv.airJumpRatio) ** 2) / (2 * G);
+  const airJump = (mv.airJumpVelocity ** 2) / (2 * G);
   assert.ok(Math.abs(r.jumps[0] - jump) < 10, `the jump: ${r.jumps[0]} vs ${jump.toFixed(1)}`);
+  assert.ok(close(r.superJumpVy, -mv.superJumpVelocity + G * DT), 'the Super Jump\'s own speed');
+  const superJump = (mv.superJumpVelocity ** 2) / (2 * G);
+  assert.ok(Math.abs(r.superJump - superJump) < 12, `the Super Jump: ${r.superJump} vs ${superJump.toFixed(1)}`);
+  assert.equal(r.airJumpsAfterSuper, mv.airJumps, 'both air jumps after a Super Jump');
   assert.ok(Math.abs(r.jumps[1] - airJump) < 8 && Math.abs(r.jumps[2] - airJump) < 8, `both air jumps the same height: ${r.jumps}`);
   assert.ok(r.jumps[3] <= 0, 'a fourth jump does nothing: it only falls on');
   assert.equal(r.airJumpsLeft, 0);
@@ -268,7 +284,7 @@ test('coyote time, the jump buffer and the combat input buffer are the same leng
 // ---- Identical traces ------------------------------------------------------------------
 
 // A movement-only script (no attack, Shield or Deflect): running both
-// ways, turns, a tap jump, a higher jump, both air jumps, steering in the
+// ways, turns, a tap jump, a Super Jump, both air jumps, steering in the
 // air, a fast fall, Dashes (held on, let go, reversed), a Dash cut short by
 // a jump, an air dash and its run-on, on a wide floor where no edge or wall
 // is ever reached (a body's width is the fighter's own, its locomotion is
@@ -282,7 +298,8 @@ function script(i) {
     runLeftPressed: k === 45 || k === 205,
     jump: k === 20 || (k >= 60 && k < 75) || k === 85 || k === 88 || k === 100 || k === 150,
     jumpPressed: k === 20 || k === 60 || k === 85 || k === 88 || k === 100 || k === 150,
-    down: k > 140 && k < 150,
+    downPressed: k === 60 || k === 141,
+    down: k === 60 || (k > 140 && k < 150),
     mouvementLeftPressed: k === 155,
     mouvementRightPressed: k === 210,
   };

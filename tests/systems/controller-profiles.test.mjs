@@ -51,7 +51,7 @@ test('the vocabulary: universal actions, editor categories, activations, directi
 
 test('the universal defaults are chosen together, and the same for every fighter', () => {
   assert.deepEqual(UNIVERSAL_DEFAULTS.move, { source: 'leftStick' });
-  assert.deepEqual(UNIVERSAL_DEFAULTS.jump, b('south', { activation: 'continuous' }), 'Cross / A, held for the higher jump');
+  assert.deepEqual(UNIVERSAL_DEFAULTS.jump, b('south', { activation: 'continuous' }), 'Cross / A, held (with the left stick down on the ground: the Super Jump)');
   assert.deepEqual(UNIVERSAL_DEFAULTS.dash, b('r1'), 'R1 / RB: the right index finger, the left thumb aiming, the right thumb free');
   assert.deepEqual(UNIVERSAL_DEFAULTS.fastFall, flick('down', { stick: 'leftStick', activation: 'continuous' }), 'the left stick down');
   assert.deepEqual(UNIVERSAL_DEFAULTS.shield, b('l1', { activation: 'continuous' }), 'L1 / LB held');
@@ -334,7 +334,7 @@ test('a binding is checked against its action: buttons, modifiers, sticks, direc
   ]) {
     assert.equal(normalizeBinding(red, bad), null, JSON.stringify(bad));
   }
-  // The Shield stays held, Jump keeps its held higher jump, Pause stays a press of a button.
+  // The Shield stays held, Jump stays held (a launch steered up), Pause stays a press of a button.
   assert.equal(normalizeBinding(actions.get('shield'), b('east')), null);
   assert.ok(normalizeBinding(actions.get('shield'), b('l2', { activation: 'continuous' })));
   assert.ok(normalizeBinding(actions.get('shield'), flick('down', { activation: 'continuous' })), 'or a stick held');
