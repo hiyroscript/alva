@@ -1,1457 +1,1499 @@
-ALVA — Complete Super Jump Movement Overhaul
+Implement Local Play in Alva — Complete Two-Controller Multiplayer System
 
-Primary Objective
+Objective
 
-Implement a complete, polished, production-ready overhaul of Alva’s universal jumping mechanics.
+Introduce a fully functional Local Play feature to Alva, allowing two people to fight each other on the same device using two separate physical controllers.
 
-Replace the existing “hold Jump to jump higher” mechanic with a new movement action called “Super Jump.”
+This must be a proper extension of Alva’s existing systems, not a separate fighting engine or an imitation of multiplayer.
 
-The new mechanics must work identically for human-controlled and CPU-controlled fighters, respecting Alva’s shared movement architecture.
+Local Play must use the same battle mechanics, animations, stages, fighters, physics, scoring, and overall visual identity as the existing game.
 
-Required new controls
+The feature must integrate naturally with everything already implemented.
 
-Action	Input	Result
-Normal Jump	Press Jump while grounded	A noticeably lower, compact jump
-Super Jump	Hold Down, then press Jump while grounded	A dramatically stronger upward leap
-Air Jump	Press Jump while airborne	Uses one of the two existing air jumps
-Fast Fall	Hold Down while descending	Accelerates descent as before
+The main requirements are:
 
-The fundamental requirement is that Super Jump must feel like a powerful leap, not merely a normal jump that floats higher.
+1. Introduce a Local play button on the Home Screen, positioned directly beside a half-width Play button.
+2. Keep Local play visible at all times, but enable it only when at least two compatible controllers are connected.
+3. Give the enabled button the same animated green border glow as the Home Screen’s Download button.
+4. Introduce a new Select local mode page, visually identical to the existing Select mode page.
+5. Offer only Quick Battle in Local Play for now.
+6. Make Local Quick Battle follow this exact sequence:
+    * Player 1 fighter selection
+    * Player 2 fighter selection
+    * Stage selection
+7. Create a genuine two-human-player battle, with each player controlling their own fighter independently.
+8. Display both fighters’ move HUDs simultaneously, with Player 1 on the bottom-left and Player 2 on the bottom-right.
+9. Use prominent, consistent player identification throughout Local Play: Player 1 is RED and Player 2 is BLUE.
+10. Preserve all current gameplay features and prevent regressions to Play, Watch Mode, and Practice Ground.
 
-Super Jump must also produce a distinctive ground-level dust burst at takeoff.
-
-Critical height requirement
-
-Alva’s previous higher jump must become Super Jump, with approximately the same maximum height it had before this update.
-
-Do not substantially increase or decrease that height.
-
-Normal jumps, however, must become noticeably shorter than before, establishing a much clearer distinction between the two movement options.
-
-Do not confuse this requirement with any previous proposal in the repository’s max file that suggests increasing Super Jump height to approximately 328 units. That is not the requested balance.
+This must be an actual working implementation, including controller handling, navigation, rendering, match lifecycle, edge cases, localization, and tests.
 
 ⸻
 
-1. Understand Alva Before Implementing
+1. First understand the existing codebase
 
-Alva is a browser-based 2D platform fighter implemented using vanilla JavaScript, HTML, CSS, and Canvas 2D.
+Before implementing anything, inspect the current systems and understand how they interact.
 
-The current repository includes:
+Alva is a browser-based Canvas 2D fighting game written using vanilla JavaScript ES modules, HTML, and CSS. There is no framework or build process.
 
-* Nine playable fighters.
-* Five battle stages and Practice Ground.
-* Quick Battle against CPU opponents.
-* Watch Mode with CPU-versus-CPU battles.
-* Multiple CPU difficulty levels.
-* Keyboard, PlayStation, Xbox, and multitouch controls.
-* Universal movement physics shared by every fighter.
-* A fixed 60 Hz gameplay simulation.
-* Automated tests using Node’s built-in test runner.
+Important files include:
 
-All fighters must retain identical baseline locomotion.
+Application and navigation
 
-Do not create different jumping systems or movement parameters for individual fighters.
+* js/core/app.js — Initializes the application, managers, selection state, and screens.
+* js/core/screen-manager.js — Screen registration, navigation, transitions, and history.
+* js/core/menu-navigator.js — Keyboard and controller menu navigation.
+* index.html — Screen sections, overlays, and CSS imports.
 
-Examine these files carefully
+Existing menu flow
 
-Core movement and physics
+* js/screens/home-screen.js
+* js/screens/mode-select-screen.js
+* js/screens/character-select-screen.js
+* js/screens/map-select-screen.js
+* js/screens/quick-battle-setup.js
+* js/screens/watch-screens.js
+* js/ui/components.js
+* js/ui/fighter-roster.js
 
-* js/data/movement.js
-* js/game/fighters/movement.js
-* js/game/fighters/fighter.js
-* js/game/fighters/fighter-controller.js
-* js/game/physics.js
+Controllers and input
 
-Input handling
-
+* js/core/controller-manager.js
 * js/core/input-manager.js
 * js/core/controller-resolver.js
+* js/core/gamepad-devices.js
+* js/game/fighters/fighter-controller.js
 * js/data/controller-profiles.js
-* js/config.js
-* js/ui/touch-controls.js
+* js/ui/controller-dialog.js
 
-CPU intelligence
+Battle and interface
 
-* js/game/ai/combat-ai.js
-* js/game/ai/cpu-intelligence/brain.js
-* js/game/ai/cpu-intelligence/executor.js
-* js/game/ai/cpu-intelligence/plans.js
-* js/game/ai/cpu-intelligence/capabilities.js
-* js/game/ai/cpu-intelligence/prediction.js
-* js/game/ai/cpu-intelligence/evaluator.js
-* js/game/ai/cpu-intelligence/defense.js
-* js/game/ai/cpu-intelligence/telemetry.js
-* js/game/fighters/fighter-controller.js, including TrainingAIController
-* js/game/ai/celebration.js
-
-Rendering
-
+* js/game/battle.js
 * js/game/arena.js
-* js/game/rendering/hit-fx.js
-* js/game/rendering/ensemble.js
-* Existing sprite animation and visual-effects systems.
+* js/screens/battle-screen.js
+* js/ui/hud.js
+* js/ui/ability-hud.js
+* js/game/rendering/fighter-status.js
 
-Documentation
+Styling and localization
 
-* README.md
-* ALVA_SPEC.md
-* CLAUDE.md
-* UPDATES.md
-* docs/systems/movement.md
-* docs/systems/input.md
-* docs/systems/ai.md
-* docs/systems/rendering.md
-* docs/development/testing.md
+* css/home.css
+* css/setup.css
+* css/battle.css
+* css/battle-overlays.css
+* css/ability-hud.css
+* css/responsive.css
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
 
-Respect the repository’s architecture and naming conventions.
+Examine the relevant automated tests before changing their underlying interfaces.
 
-Do not edit the protected character_rule file.
+Important architectural observation: Alva’s ControllerManager already detects up to four active supported controllers, but gameplay polling and binding resolution currently operate on Player 1’s controller. This must be extended to support two independent human input streams.
 
-Avoid introducing additional gameplay dependencies or a build process.
+Also, Battle already maintains two fighters, p1 and p2, with independent slots, scores, opponents, and controllers. Reuse that architecture rather than introducing another battle simulation.
 
-⸻
+2. Home Screen — split Play and introduce Local play
 
-2. Completely Remove Hold-to-Jump-Higher
+Current behavior
 
-Existing behavior
+The Home Screen has a full-width green Play button, followed by Watch mode, Practice ground, and Discover.
 
-The current universal movement configuration includes approximately:
+The actions are created inside js/screens/home-screen.js, and their appearance is controlled primarily by css/home.css.
 
-jumpVelocity: 920,
-highJumpWindow: 0.15,
-highJumpHeight: 1.4
+The menu currently uses a grid approximately 320px wide, with consistently sized action buttons.
 
-Currently:
+Required new layout
 
-1. Pressing Jump initiates a normal jump.
-2. Continuing to hold Jump beyond highJumpWindow activates the higher jump.
-3. The fighter receives reduced gravity during ascent.
-4. The modified gravity extends the jump’s height.
+The first row must contain two buttons displayed horizontally:
 
-This existing mechanic must be retired.
+┌────────────────────┬────────────────────┐
+│ Play               │ Local play         │
+└────────────────────┴────────────────────┘
+┌─────────────────────────────────────────┐
+│ Watch mode                              │
+├─────────────────────────────────────────┤
+│ Practice ground                         │
+├─────────────────────────────────────────┤
+│ Discover                                │
+└─────────────────────────────────────────┘
 
-Required replacement behavior
+The diagram is conceptual; use the game’s existing actual design.
 
-Jump duration must no longer influence ground-jump height.
+Exact layout rules
 
-A fighter pressing Jump for one frame and a fighter holding Jump for the entire jump must follow the same normal-jump trajectory when all other conditions are identical.
+* The original Play button should occupy approximately half its previous width.
+* The new Local play button must have exactly the same width and height as Play.
+* Both buttons together, including their spacing, must occupy exactly the original full-width Play row.
+* Both buttons must align perfectly with the left and right edges of the full-width buttons beneath them.
+* Use the same vertical height as the current Home Screen action buttons.
+* Preserve the existing button border radius, typography, spacing, icons, interaction animations, and focus treatment.
+* The existing Play button must remain green.
+* Local play must use the same dark/transparent secondary button style as Watch mode, Practice ground, and Discover.
+* Local play must not have a green-filled background.
+* Keep both buttons readable in English and French.
+* Preserve proper sizing on short displays and smaller landscape screens.
+* Do not cause the Alva logo or any Home Screen elements to shift off-screen.
 
-Do not retain variable jump height, hold-to-jump-higher behavior, delayed additional lift, or gravity reductions activated by holding Jump.
+Prefer a dedicated two-column row inside .home-actions, using equal-width grid columns, rather than hard-coded button widths.
 
-Remove obsolete implementation
+Update any Home Screen height calculations only if required. The first row must still count as one row, not two.
 
-Review and appropriately remove or replace:
+Controller availability
 
-* highJumpWindow
-* highJumpHeight
-* highJumpLift()
-* Fighter.highJump
-* Fighter.highJumpLift()
-* Gravity multiplication based on highJump?.lift
-* CPU jump-hold timing intended to distinguish normal and higher jumps.
-* Outdated jump-height calculations.
-* Obsolete references throughout documentation, interfaces, and tests.
+The Local play button must always exist and remain visible.
 
-Do not simply rename these variables while preserving their old behavior.
+However, it must only be actionable when:
 
-The new Super Jump must be a genuine, separate takeoff action.
+* At least two distinct supported controllers are connected.
+* At least two of those controllers are active according to Alva’s existing controller limit.
+* The browser’s Gamepad API is available and functioning.
+* At least one playable fighter is available.
 
-⸻
+Do not count an unsupported controller as an eligible controller.
 
-3. Implement the New Super Jump Command
+Two controllers of the exact same model must count as two separate controllers when they are separate devices.
 
-Core input behavior
+More than two supported controllers may be connected; Local Play should use two distinct active controllers rather than requiring exactly two total.
 
-When a fighter is genuinely grounded:
+Preserve Alva’s existing four-active-controller limit and excessive-controller warnings.
 
-Jump without Down = Normal Jump.
+Disabled appearance
 
-Down held + fresh Jump press = Super Jump.
+When fewer than two eligible controllers are present:
 
-Use Alva’s existing logical inputs:
+* Show Local play in the correct position.
+* Use the existing disabled button appearance.
+* Do not show the animated green border.
+* Do not allow the button to initiate a Local Play session.
+* Keep the label readable.
+* Provide a localized explanation such as “Connect two controllers to play locally.”
+* Use appropriate accessible descriptions so users understand why the button is unavailable.
 
-input.down
-input.jump
-input.jumpPressed
+The existing Controller Connections dialog should remain accessible and useful for connecting or identifying controllers.
 
-Do not add a dedicated mandatory Super Jump button.
+Enabled appearance — green border
 
-The system should recognize the input combination independently of the input device.
+This is particularly important.
 
-Input order
+When two controllers become available, Local play must receive an animated light-green border treatment matching the existing Download button on the Home Screen.
 
-The intended sequence is:
+The Download button already implements this in css/home.css, with a pseudo-element, green border, subtle box shadow, and home-download-glow animation.
 
-1. The fighter is grounded.
-2. The player holds Down.
-3. The player presses Jump.
-4. The fighter immediately performs Super Jump.
+Reuse those existing design principles and, where possible, existing animation definitions.
 
-The player must not have to charge Super Jump.
+The effect should have:
 
-No minimum Down-hold duration is required.
+* A green border matching Alva’s established green accent.
+* A soft surrounding green glow.
+* The same elegant pulse cadence as the Download button.
+* No bright green fill.
+* No flashing or jarring transitions.
+* No layout movement during animation.
+* Proper reduced-motion behavior.
 
-If Down and Jump activate in the same simulation input sample, count that as a valid Super Jump as well.
+Use the Download button’s existing green border and shadow values as the design reference, rather than inventing an unrelated green.
 
-This ensures responsive behavior with simultaneous keyboard presses, controller polling, and multitouch input.
+For readability, keep an identifiable green outline in the enabled state even between glow pulses. The animation should enhance the enabled state.
 
-Supported input devices
+When the second controller disconnects, remove the enabled glow immediately and revert to the disabled appearance.
 
-Keyboard
+When it reconnects, automatically update the button again.
 
-Existing jump bindings include W, Space, and Up Arrow, while Down uses S or Down Arrow.
+Functionality
 
-Examples:
+The existing Play button must continue opening the normal Select mode page.
 
-* S + Space
-* S + W
-* S + Up Arrow
-* Down Arrow + Space
+The Local play button must open the new Select local mode page.
 
-All equivalent configured bindings should work.
+Do not redirect Local play through the existing single-player setup or its Custom Play / Regular Play choice dialog.
 
-PlayStation and Xbox
+3. Introduce the Select local mode page
 
-Holding the controller’s existing Down input while pressing its configured Jump control must activate Super Jump.
+Create a dedicated Local Play mode selection screen.
 
-Examples include:
+Recommended file:
 
-* Left Stick Down + Cross
-* Left Stick Down + A
+js/screens/local-mode-select-screen.js
 
-Preserve remappable controller layouts and existing universal controller controls.
+It should use the existing Select mode page as its direct visual reference.
 
-Do not add character-specific controller combinations.
+Title
 
-Mobile and tablet
+The main page title must be:
 
-Players must be able to:
+Select local mode
 
-1. Hold the existing Down button with one finger.
-2. Press Jump with another finger.
-3. Perform Super Jump.
+Its kicker should be:
 
-Both mobile control schemes must support this.
-
-Maintain pointer ownership, simultaneous-touch support, and custom control layouts.
-
-Do not require a new on-screen button.
-
-⸻
-
-4. Important Jump Input Rules
-
-Implement these rules consistently for players and CPUs.
-
-Ground eligibility
-
-Super Jump is a grounded action.
-
-It must only activate when the fighter actually begins a legal grounded takeoff.
-
-An airborne fighter must not Super Jump just because Down and Jump are held together.
-
-Fresh presses
-
-A new Jump press is required for every jump.
-
-Holding Jump continuously must not generate repeated jumps, including after landing.
-
-Preserve the existing one-press-per-action rules.
-
-Releasing buttons
-
-Once Super Jump begins:
-
-* Releasing Down must not reduce its height.
-* Releasing Jump must not reduce its height.
-* Continuing to hold Down must not increase its height.
-* Continuing to hold Jump must not increase its height.
-* The upward launch should already have been determined.
-
-No post-takeoff button-hold behavior should affect its initial jump strength.
-
-Jump buffering
-
-Preserve Alva’s existing jumpBuffer behavior.
-
-A grounded Down + Jump request should remember that it was intended as Super Jump if the fighter temporarily cannot act.
-
-For example, if the fighter presses Down + Jump during a valid grounded recovery window, the buffer should preserve the requested type until it can legally execute.
-
-However:
-
-* The buffered request must expire normally.
-* A buffered airborne Down + Jump must not become a Super Jump merely because the fighter subsequently lands.
-* An originally grounded Super Jump request may only execute as Super Jump if legal ground contact still exists when it executes.
-* Interruptions, resets, respawns, or invalidated requests must clear the stored intent.
-
-Store the intended jump type explicitly when the press is registered rather than inferring it later from whichever buttons remain held.
-
-Coyote time
-
-Preserve the current coyote-time functionality.
-
-A fighter jumping shortly after walking off an edge should still be able to perform a normal ground-style jump.
-
-However, Super Jump must not be obtainable from an ordinary airborne coyote jump.
-
-The Super Jump requirement is genuine grounded takeoff, not merely a remaining coyote timer.
-
-Combat interactions
-
-Preserve:
-
-* Hitstun and blockstun restrictions.
-* Shield-to-jump behavior.
-* Attack cancellation rules.
-* Hit-confirmed follow-up windows.
-* Dash cancellation timing.
-* Input priority.
-* Momentum conservation.
-* Jump buffering during hitstop.
-* Restrictions imposed by special techniques, Free Fall, and other committed actions.
-
-Super Jump must not become a way to bypass a fighter’s existing action restrictions.
-
-⸻
-
-5. Resolve the Existing Down / Platform Drop Conflict
-
-This is a critical implementation detail.
-
-Alva currently allows a fighter to drop through a one-way platform by making a fresh Down press while grounded.
-
-That conflicts directly with the new command:
-
-Hold Down, then press Jump.
-
-If Down immediately drops the fighter from a one-way platform, the fighter cannot reliably remain grounded long enough to perform Super Jump.
-
-Do not ignore this problem.
-
-Required outcome
-
-Players must be able to perform Super Jump from:
-
-* Main floors.
-* Ordinary solid surfaces.
-* One-way platforms.
-* Moving platforms.
-* Supported stage-hazard platforms.
-* Practice Ground surfaces.
-
-A fighter standing on a one-way platform must not fall through simply because the player is holding Down in preparation for Super Jump.
-
-Recommended conflict resolution
-
-Change the player-facing platform-drop gesture to distinguish a deliberate Down tap from a held Down input.
-
-For example:
-
-* Press and release Down without Jump on a droppable platform: drop through.
-* Hold Down and then press Jump: Super Jump.
-* Press Down and Jump simultaneously: Super Jump.
-* Continue holding Down without pressing Jump: remain grounded, ready for Super Jump.
-* A successful Super Jump consumes/cancels any pending drop gesture.
-
-This makes the new movement command reliably available regardless of how long the player holds Down.
-
-Preserve intentional platform dropping, but do not allow it to interfere with Super Jump.
-
-The existing explicit training-CPU dropPressed functionality should remain valid.
-
-Handle input release, changing platforms, hitstun, and interruptions without accidentally producing a delayed platform drop.
-
-Update the relevant platform-drop documentation and tests to reflect the final gesture.
-
-Super Jump must take priority over platform drop whenever the intended Down + Jump chord is valid.
-
-⸻
-
-6. Noticeably Lower Normal Jump Height
-
-The current normal jump launches at approximately 920 world units per second.
-
-With Alva’s gravity of 2500 world units per second squared, its idealized jump height is roughly 169 world units.
-
-This is too high for the new distinction between Normal Jump and Super Jump.
-
-Desired Normal Jump behavior
-
-Normal Jump should feel:
-
-* Quick.
-* Compact.
-* Responsive.
-* Useful for small obstacles.
-* Useful for positioning and close-range combat.
-* Clearly shorter than Super Jump.
-* Naturally affected by normal gravity.
-
-The fighter should no longer jump nearly as high from an ordinary Jump press.
-
-Initial tuning recommendation
-
-Start by reducing:
-
-jumpVelocity: 920
-
-to approximately:
-
-jumpVelocity: 740
-
-This produces an idealized apex of roughly 110 world units before discrete simulation effects.
-
-This is approximately a 35% reduction in maximum height.
-
-Treat this as the starting tuning value, not an inflexible final number.
-
-A reasonable target is roughly 100–115 world units, subject to gameplay validation.
-
-The distinction should be obvious when performing Normal Jump and Super Jump consecutively.
-
-Do not compensate by artificially slowing the normal jump, adding an unnatural landing delay, or changing global gravity.
-
-Normal Jump should remain responsive and mechanically useful.
-
-⸻
-
-7. Preserve the Previous Higher Jump’s Height as Super Jump
-
-This is equally important.
-
-The current higher jump has an idealized maximum height near:
-
-169 × 1.4 ≈ 237 world units
-
-Super Jump should reach approximately this same height.
-
-Do not make it significantly taller.
-
-Record the original baseline first
-
-Before removing the old mechanic:
-
-1. Use the existing movement test harness.
-2. Measure the actual old higher-jump apex.
-3. Record its displacement from takeoff.
-4. Use that measured value as the regression target for Super Jump.
-
-The actual simulated height matters more than the simplified physics formula because Alva integrates movement at fixed simulation steps.
-
-New universal configuration
-
-Introduce a dedicated shared parameter:
-
-superJumpVelocity
-
-A reasonable initial value is approximately:
-
-jumpVelocity: 740,
-superJumpVelocity: 1100
-
-Adjust superJumpVelocity against the measured baseline until Super Jump’s apex closely matches the former higher jump.
-
-Target approximately ±5–8 world units of the old higher jump, preferably tighter if achievable.
-
-The final movement configuration should be centralized in:
-
-js/data/movement.js
-
-No character definition should override these parameters.
-
-Desired height relationship
-
-The final distinction should resemble:
-
-Jump type	Approximate apex
-Previous Normal Jump	169 units
-New Normal Jump	100–115 units
-Previous Higher Jump	237 units
-New Super Jump	Approximately 237 units
-
-This establishes a noticeably stronger contrast without increasing the game’s overall intended vertical reach.
-
-⸻
-
-8. Super Jump Must Feel Like an Explosive Leap
-
-Super Jump should not resemble a floatier version of Normal Jump.
-
-It must communicate physical strength from the instant the fighter leaves the ground.
-
-Immediate launch impulse
-
-When Super Jump activates, apply its complete dedicated upward impulse immediately.
-
-Conceptually:
-
-body.vy = -movement.superJumpVelocity;
-
-Apply it through the same legal movement pipeline used for ordinary jumps.
-
-Do not add another burst later during ascent.
-
-Do not implement the old reduced-gravity jump in disguise.
-
-Arc behavior
-
-Super Jump should have:
-
-1. A powerful initial upward velocity.
-2. Fast, immediately noticeable vertical movement.
-3. A smooth reduction in upward speed under ordinary gravity.
-4. A natural apex.
-5. A normal fall back toward the stage.
-
-Keep the standard gravity relationship throughout the ordinary movement arc.
-
-Compared with the old higher jump, Super Jump may reach its apex sooner because its height comes from launch velocity rather than reduced gravity.
-
-That is desirable.
-
-The fighter should feel like it forcefully propelled itself off the surface.
-
-Normal Jump versus Super Jump
-
-Normal Jump should feel like a small athletic hop.
-
-Super Jump should feel like a strong vertical launch requiring deliberate input.
-
-The contrast must be evident even without effects.
-
-Momentum
-
-Preserve Alva’s momentum-based movement.
-
-A Super Jump out of a run or a legally cancellable Dash should inherit horizontal velocity according to the same rules as Normal Jump.
-
-Super Jump must not unexpectedly:
-
-* Set horizontal velocity to zero.
-* Clamp velocity to the running speed.
-* Override air steering.
-* Provide unlimited directional control.
-* Create a free air dash.
-* Give invulnerability.
-* Create attack damage or a hitbox.
-
-It is a movement action, not an attack or special ability.
-
-Animation feel
-
-Use existing universal character jump animations where possible.
-
-Avoid creating character-specific animation requirements.
-
-If helpful, implement subtle shared visual presentation such as:
-
-* A small takeoff compression.
-* A brief vertical stretch after launch.
-* A restrained burst of rising motion lines.
-* A slight difference in how Super Jump’s initial animation plays.
-
-These are optional enhancements, not replacements for correct physics.
-
-Any takeoff animation enhancement must not delay the actual physics impulse.
-
-Avoid camera shakes or dramatic full-screen effects that become irritating when jumping repeatedly.
-
-⸻
-
-9. Super Jump Must Create a Ground Dust Effect
-
-Every successfully executed Super Jump must generate a visible dust effect at takeoff.
-
-This effect is mandatory.
-
-Visual intention
-
-When a fighter launches with Super Jump, the ground should appear to respond to the force of the leap.
-
-The dust should make the action feel powerful without obscuring the fighter.
-
-Suggested dust behavior
-
-At the moment of takeoff:
-
-1. A compact burst appears at the fighter’s feet.
-2. Small dust clouds spread outward along the ground.
-3. A few lighter particles rise slightly.
-4. The dust expands and becomes transparent.
-5. The effect disappears quickly.
-
-The overall effect should last approximately 0.2–0.35 seconds.
-
-Use natural easing instead of linear movement where appropriate.
+Local play
 
 Appearance
 
-A recommended effect includes:
+Match js/screens/mode-select-screen.js as closely as possible:
 
-* Two outward-moving dust puffs, one on each side.
-* A small central impact cloud.
-* A faint spreading ground ring.
-* A handful of small particles.
-* Rapid fading near the end of its lifetime.
+* Same background and design system.
+* Same screen header.
+* Same Back button.
+* Same card styling.
+* Same card size and placement.
+* Same Mode details panel.
+* Same typography.
+* Same hover, focus, and selection effects.
+* Same entrance animations.
+* Same controller navigation behavior.
+* Same responsive treatment.
 
-Keep the result visually consistent with Alva’s existing Canvas 2D style.
+Avoid inventing a completely different multiplayer menu.
 
-Do not introduce unnecessary image assets or new dependencies.
+Available modes
 
-Procedural Canvas rendering is acceptable and preferable if it fits the existing effects architecture.
+Only one mode should be selectable:
 
-Ground attachment
+Quick Battle
 
-Dust must originate from the actual surface where the fighter took off.
+Use the existing Quick Battle card format, including the mode index, title, description, and selection indicator.
 
-Use the fighter’s takeoff position and surface contact point.
-
-Do not spawn the effect at the fighter’s airborne position.
-
-Do not attach the dust to the ascending fighter.
-
-The dust should stay at ground level while the fighter rises away.
-
-Handle moving platforms and dynamic stages without leaving the effect visibly floating in the wrong location.
-
-Render ordering
-
-The dust should appear:
-
-* Above the ground surface.
-* Below or behind the fighter.
-* Without obstructing combat effects or the fighter’s silhouette.
-
-Integrate with the shared Arena rendering lifecycle.
-
-Triggering
-
-Only successful Super Jump activation should produce the dust burst.
-
-Do not trigger it from:
-
-* Normal Jump.
-* Air Jump.
-* Fast Fall.
-* A rejected jump request.
-* A failed input buffer.
-* Merely pressing Down.
-* A jump animation played for another reason.
-* CPU planning that never results in a real takeoff.
-
-Generate the event from the accepted Super Jump action rather than from a purely visual animation state.
-
-Exactly one dust burst should be created for each successful Super Jump.
-
-Performance and accessibility
-
-The effect should:
-
-* Work for both players and CPUs.
-* Have a bounded particle count.
-* Use time-based lifetimes.
-* Be removed after completion.
-* Behave correctly during pause and simulation freeze.
-* Reset cleanly on restarts.
-* Respect reduced-motion settings.
-* Not influence gameplay collision or physics.
-* Avoid uncontrolled allocations during long CPU matches.
-
-Ensure the effect is visible on the game’s different stage backgrounds, including dark, bright, sandy, snowy, and cloudy environments.
-
-⸻
-
-10. Preserve Triple Jump and Air Recovery
-
-Alva currently allows:
-
-1. One ground jump.
-2. Two additional air jumps.
-
-This must remain unchanged.
-
-Super Jump replaces the ground jump’s type; it does not add a fourth jump.
-
-A fighter performing Super Jump must still receive exactly the usual two air jumps.
-
-Critical air-jump balancing issue
-
-The current air-jump strength is derived from:
-
-jumpVelocity * airJumpRatio
-
-The old values are approximately:
-
-920 * 0.78 = 717.6
-
-If Normal Jump velocity becomes 740 without changing this relationship, the resulting air-jump velocity would be approximately 577.
-
-That would unintentionally weaken air jumps considerably.
-
-Do not allow this incidental regression.
-
-Recommended approach
-
-Decouple air-jump strength from Normal Jump velocity.
-
-Introduce a universal explicit value such as:
-
-airJumpVelocity: 718
-
-Then update the shared airJump() helper and the CPU’s capability model accordingly.
-
-Alternatively, appropriately retune the existing ratio, provided the real air-jump outcome remains consistent.
-
-The preferred outcome is that air jumps maintain approximately their existing height and utility.
-
-Preserve existing behavior
-
-* Two air jumps per airtime.
-* Air jumps restored on legitimate landing or applicable hit events.
-* Fresh Jump presses required.
-* Air-jump animation restarts appropriately.
-* No Super Jump variant of an air jump.
-* No additional air jumps granted by Super Jump.
-* Existing Free Fall restrictions.
-* Existing air-dash availability.
-* Existing recovery-move interactions.
-
-Verify vertical reach and safety against the existing stages and Void boundaries.
-
-⸻
-
-11. CPU Fighters Must Fully Understand Super Jump
-
-CPU compatibility is a core requirement, not an optional follow-up.
-
-Every CPU must use the new movement system as a legitimate action.
-
-Do not simply increase CPU vertical movement artificially.
-
-Do not allow CPU fighters to use the old hold-to-jump-higher behavior.
-
-Do not create CPU-only jump heights.
-
-CPUs must perform the same actions through the same legal Fighter input snapshots as human players.
-
-11.1. Update CPU input execution
-
-Review:
-
-js/game/ai/cpu-intelligence/executor.js
-
-The current Executor.jump(self, high = false) function distinguishes normal and higher jumps by controlling how long Jump remains held.
-
-Remove that behavior.
-
-Replace it with an explicit movement type such as:
-
-* normal
-* super
-* air
-
-The CPU should be able to request Super Jump deliberately.
-
-For Super Jump, generate legal inputs equivalent to a human holding Down and pressing Jump while grounded.
-
-The executor must not merely set a special internal CPU velocity.
-
-Existing CPU restriction
-
-The executor currently clears Down when grounded.
-
-That restriction must be revised to allow a legal grounded Down + Jump Super Jump command.
-
-Do not remove the restriction indiscriminately.
-
-A CPU should only hold Down on the ground when deliberately performing Super Jump or another valid action that requires it.
-
-It should not accidentally drop through platforms or continuously crouch without reason.
-
-Fresh input edges
-
-Ensure the CPU correctly handles:
-
-* Down becoming held.
-* Jump becoming freshly pressed.
-* Jump release.
-* Down release.
-* Repeated Super Jumps after separate landings.
-* Preventing repeated jumps from held controls.
-* Controller reset and plan cancellation.
-
-CPU input must obey the exact same chord-detection rules as player input.
-
-⸻
-
-12. Update CPU Intelligence and Decision-Making
-
-Merely enabling the CPU to execute Super Jump is insufficient.
-
-The CPU must understand when and why to use it.
-
-12.1. Navigation
-
-Review:
-
-js/game/ai/cpu-intelligence/plans.js
-
-Its navigation logic currently considers the normal and higher jumps.
-
-Replace old higher-jump decisions with Super Jump decisions.
-
-The CPU should understand:
-
-* Normal Jump reaches lower surfaces.
-* Super Jump reaches significantly higher surfaces.
-* Air jumps provide additional reach after takeoff.
-* Different jumps have different travel times.
-* Different arcs create different landing positions.
-
-Example decisions
-
-If a platform is reachable with Normal Jump, the CPU should normally use Normal Jump.
-
-If a platform is too high for Normal Jump but reachable with Super Jump, the CPU should select Super Jump.
-
-If the target requires Super Jump followed by an air jump, the CPU should plan that combination when appropriate.
-
-If no legal route exists, the CPU must not repeatedly perform impossible jumps.
-
-Keep the CPU’s ledge safety checks and live platform evaluation intact.
-
-12.2. Combat
-
-Super Jump should be a genuine tactical option.
-
-Potential uses include:
-
-* Approaching an opponent on higher ground.
-* Initiating a high aerial attack.
-* Avoiding an approaching grounded threat.
-* Jumping over an opponent.
-* Repositioning during neutral combat.
-* Escaping poor stage positioning.
-* Pursuing an airborne opponent.
-* Reaching a safer platform.
-
-Normal Jump should remain preferable for shorter, faster aerial positioning when appropriate.
-
-Do not make every CPU jump a Super Jump.
-
-The CPU must distinguish between the tactical advantages and risks of both actions.
-
-12.3. Defensive decisions
-
-Review:
-
-js/game/ai/cpu-intelligence/defense.js
-
-The defensive planner currently evaluates ground and higher-jump escape possibilities.
-
-Update it to consider:
-
-* Normal Jump.
-* Super Jump.
-* Current threat height.
-* Threat timing.
-* Grounded eligibility.
-* The time required to rise above danger.
-* The fighter’s likely position after the jump.
-
-Because Super Jump uses a stronger initial impulse, it may clear some threats faster than the previous lighter-gravity higher jump.
-
-The CPU should base this decision on the actual new trajectory.
-
-Do not grant extra defensive priority or invulnerability merely because Super Jump was requested.
-
-12.4. Aerial offense
-
-Review:
-
-js/game/ai/cpu-intelligence/evaluator.js
-
-Its jumpStrikes() logic currently evaluates jump trajectories for aerial attacks.
-
-Update those evaluations to consider Super Jump using its actual trajectory.
-
-Ensure the CPU can plan:
-
-* Normal Jump into an aerial attack.
-* Super Jump into an aerial attack.
-* Air Jump into an aerial attack.
-
-The CPU must calculate the correct attack contact timing and reach.
-
-The higher initial speed of Super Jump should influence the prediction naturally.
-
-It should not keep predicting the old slow, floating higher-jump arc.
-
-⸻
-
-13. Update CPU Movement Prediction
-
-Review:
-
-js/game/ai/cpu-intelligence/prediction.js
-
-The existing arcTrack() function supports:
-
-* ground
-* high
-* air
-* No jump.
-
-The old high branch simulates a reduced-gravity higher jump.
-
-This must be replaced.
-
-Required jump prediction types
-
-Use clear, consistent identifiers such as:
-
-* ground or normal
-* super
-* air
-* null
-
-For Super Jump:
-
-1. Start from a valid grounded state.
-2. Apply the universal superJumpVelocity.
-3. Simulate ordinary gravity.
-4. Use the same collision and movement behavior as the real fighter.
-5. Include horizontal steering and platform collisions.
-6. Stop or transition appropriately on landing.
-
-Do not approximate the old higher jump with a new name.
-
-Prediction accuracy
-
-The CPU’s predicted Normal Jump and Super Jump trajectories must closely match real Fighter simulations.
-
-Test both:
-
-* Jumping vertically without horizontal movement.
-* Jumping while running or carrying momentum.
-
-The CPU should not believe it can reach a platform when real physics makes that impossible.
-
-Its ability to plan aerial attacks, jump escapes, platform routes, and recovery must remain reliable.
-
-⸻
-
-14. Update CPU Capability Analysis
-
-Review:
-
-js/game/ai/cpu-intelligence/capabilities.js
-
-Currently, movement capabilities include values such as:
-
-jumpHeight
-highJumpHeight
-highJumpWindow
-airJumpHeight
-airtime
-
-Replace obsolete higher-jump properties with appropriate Super Jump properties.
+The details panel must describe Local Quick Battle appropriately.
 
 For example:
 
-jumpHeight
-superJumpHeight
-airJumpHeight
-normalJumpAirtime
-superJumpAirtime
+“Face another player in a local battle using two controllers. Choose your fighters and stage, then compete to knock each other into the Void.”
 
-These values must derive from actual universal physics and movement settings.
+The rules description should accurately describe Alva’s existing match format.
 
-Update dependent code to use them.
+Do not describe the opponent as a CPU.
 
-Do not leave any calculation assuming the old higher jump is produced by reduced gravity.
+Do not show Regular Play or Custom Play choices.
 
-Account for changes in:
+Do not show a difficulty selector.
 
-* Vertical displacement.
-* Time to apex.
-* Total airtime.
-* Reachable platforms.
-* Air attack windows.
-* Landing predictions.
-* Movement choice.
+Other local modes may eventually be added, so use a structure that allows future extensions without redesigning this screen.
 
-Update CPU planning, defense, navigation, and evaluation to consume these values consistently.
+Navigation
 
-⸻
+Home → Local play → Select local mode
 
-15. Update All CPU Variants
+Selecting Quick Battle begins the fighter-selection sequence.
 
-Alva has more than one CPU-controlled behavior system.
+Back returns to Home.
 
-The main competitive intelligence is not the only relevant controller.
+Controller availability must be checked again before advancing.
 
-Review and adapt:
+4. Local Quick Battle setup sequence
 
-CombatAIController
+The exact sequence must be:
 
-This is the primary CPU for Quick Battle and Watch Mode.
+Player 1 fighter selection → Player 2 fighter selection → Stage selection → Battle
 
-It must fully understand and strategically use Super Jump.
+Do not insert additional setup screens.
 
-TrainingAIController
+The Select local mode page occurs before this three-step sequence.
 
-The Practice Ground training opponent must follow the new movement rules.
+Setup progress indicator
 
-Where its existing logic navigates or hops over obstacles, it should use Normal Jump or Super Jump as appropriate.
+Use the existing step-progress system in js/ui/components.js.
 
-It must not depend on old hold-Jump timing.
+Create a dedicated Local Quick Battle setup definition, with these three steps:
 
-Preserve its intended non-attacking behavior.
+1. Player 1 fighter
+2. Player 2 fighter
+3. Stage
 
-CelebrationController
+The existing progress display, completed-step checkmarks, and active-step styling must work properly.
 
-Post-match CPU celebrations must continue to function.
+The setup name should be Local Quick Battle or Quick Battle under the Local play context.
 
-The CPU must no longer hold Jump specifically to activate an obsolete higher jump.
+Do not reuse the CPU, difficulty, or Regular/Custom steps.
 
-Normal celebratory hops should continue to work.
+Separate selection state
 
-Super Jump may be used in celebrations when appropriate, but should not cause accidental falls or alter match results.
+Local Play must have its own state, isolated from regular Quick Battle and Watch Mode.
 
-All difficulties
+For example:
 
-Easy, Medium, Hard, and Brutal must all be physically capable of performing Super Jump.
+selection.local = {
+  p1CharacterId: firstPlayableFighter,
+  p2CharacterId: firstPlayableFighter,
+  mapId: firstPlayableStage,
+};
 
-Difficulty should continue to change decision quality, anticipation, and tactics rather than movement permissions or jump physics.
+This is a suggested shape, not a requirement to disregard existing conventions.
 
-Higher difficulties may use Super Jump more intelligently, but lower difficulties must not be excluded from using the mechanic.
+The critical point is that Local Play choices must never overwrite:
 
-Watch Mode
+* selection.characterId
+* selection.cpuCharacterId
+* selection.difficulty
+* selection.playType
+* selection.watch
 
-Both CPU fighters must independently support Super Jump.
+Normal Play must retain its own selections.
 
-Verify CPU-versus-CPU matches, mirror matches, and repeated battles.
+Returning to Local Play may restore its previously selected fighters and stage, provided they remain valid and playable.
 
-Neither CPU should receive hidden movement benefits.
+Step 1 — Player 1 fighter selection
 
-⸻
+Create a dedicated local Player 1 fighter-selection screen.
 
-16. Preserve and Improve Input Responsiveness
+Suggested ID:
 
-Super Jump must feel immediate and consistent.
+local-character-p1
 
-There should be no artificial delay between a valid Jump press and the upward takeoff.
+The page must use the existing CharacterSelectScreen and FighterRoster architecture.
 
-No charging bar.
+Do not rebuild the roster.
 
-No required crouching animation.
+Keep:
 
-No minimum Down-hold duration.
+* The existing 48-slot roster.
+* The same fighter portraits.
+* The same animated preview.
+* Fighter descriptions and details.
+* Disabled and unavailable slots.
+* Existing selection and confirmation behavior.
+* All existing loadout and sprite behavior.
 
-No staged process where the fighter first performs Normal Jump and then transforms into Super Jump.
+The page should prominently identify:
 
-The movement type must be determined before the takeoff impulse.
+PLAYER 1
 
-Input state reliability
+Use RED for the Player 1 indicator.
 
-Test combinations involving:
+The title can be:
 
-* Down pressed before Jump.
-* Down and Jump pressed in the same frame.
-* Jump pressed before Down.
-* Down released immediately after Jump.
-* Jump released immediately after takeoff.
-* Both buttons held throughout ascent.
-* Jump pressed repeatedly without releasing.
-* Down held across landings.
-* Buffered Jump during temporary recovery.
-* Rapid Normal Jump followed by Air Jump.
-* Rapid Super Jump followed by Air Jump.
-* Input device disconnection or reset.
+Player 1 — Select fighter
 
-Jump pressed first without Down must remain Normal Jump, even if Down is pressed shortly afterward.
+A correctly localized equivalent is required in French.
 
-Late Down input must not retroactively upgrade the jump.
+Only Controller 1, meaning the gamepad assigned to Player 1, should control this fighter-selection step.
 
-⸻
+Once Player 1 confirms a playable fighter:
 
-17. Update Game Text, Discover, and Controls
+* Save the choice to the Local Play selection state.
+* Advance to Player 2 fighter selection.
+* Do not start the battle.
+* Do not select a CPU.
+* Do not randomize the stage.
 
-The existing player-facing description says a longer Jump press produces the higher jump.
+Step 2 — Player 2 fighter selection
 
-That description must be updated everywhere.
+Create a separate Player 2 fighter-selection screen.
 
-The new mechanic should consistently be called:
+Suggested ID:
 
-Super Jump
+local-character-p2
 
-Normal Jump should continue to be called Jump or Normal Jump, depending on context.
+It must look and function like the Player 1 selection screen, using the same shared roster component.
 
-Air Jump and Fast Fall retain their existing meanings.
+The title should be:
 
-Discover
+Player 2 — Select fighter
 
-Update MOVEMENT_GUIDE and relevant Discover content in:
+Use BLUE for the Player 2 indicator.
 
-js/data/movement.js
+Player 2’s physical controller must control Player 2’s fighter selection.
 
-Clearly explain the difference between Normal Jump and Super Jump.
+This is important: do not simply let Player 1’s controller make every selection while calling the second screen Player 2.
 
-Suggested wording:
+Player 2 must be able to browse the roster and confirm their fighter using their own controller.
 
-Jump: “Press Jump for a quick, low jump.”
+Do not allow inputs from Player 1’s controller to accidentally confirm Player 2’s fighter.
 
-Super Jump: “Hold Down and press Jump while grounded to launch yourself much higher.”
+Both players must be able to select the same fighter.
 
-Air Jump: “Press Jump again in the air for an additional jump. You have two air jumps.”
+Mirror matches are allowed and must work correctly.
 
-Fast Fall: “Hold Down while falling to descend faster.”
+When Player 2 confirms:
 
-Include the revised one-way platform-drop instruction wherever controls are explained.
+* Save the choice separately.
+* Advance to Stage selection.
 
-Settings and controller information
+Step 3 — Stage selection
 
-Review and update:
+Create a dedicated local stage-selection screen.
 
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* Controller action descriptions.
-* Jump button help text.
-* Controller binding descriptions.
-* Touch control instructions.
-* Any instructions referring to holding Jump to jump higher.
+Suggested ID:
 
-For example, replace:
+local-map
 
-“Press (hold to jump higher)”
+Reuse MapSelectScreen.
 
-with an accurate description that explains the new combination.
+Preserve:
 
-Do not rename the actual Jump button to Super Jump; the Jump control still performs multiple jump actions depending on context.
+* The existing 24-slot stage roster.
+* All playable stages.
+* Locked stage slots.
+* Stage thumbnails.
+* Animated stage preview.
+* Stage descriptions.
+* Random Stage.
+* Existing selection and confirmation behavior.
 
-French localization
+Local Play must not silently select a random stage unless the players explicitly choose Random Stage.
 
-Provide accurate French translations, using a consistent term such as “Super saut.”
+For this initial implementation, Player 1’s controller should own stage selection and confirmation.
 
-Avoid leaving newly introduced instructions untranslated.
+The final button must start a Local Quick Battle using both previously selected fighters and the selected stage.
 
-Documentation
+No CPU should be spawned.
 
-Update the relevant sections of:
+Back navigation
 
-* README.md
-* ALVA_SPEC.md
-* docs/systems/movement.md
-* docs/systems/input.md
-* docs/systems/ai.md
-* docs/systems/rendering.md
-* Related architecture and test documentation.
-* UPDATES.md, if recording this overhaul as a named movement update.
+Back must behave correctly at every point:
 
-Remove obsolete descriptions of holding Jump for greater height.
+* Stage selection → Player 2 fighter selection
+* Player 2 fighter selection → Player 1 fighter selection
+* Player 1 fighter selection → Select local mode
+* Select local mode → Home
 
-⸻
+Previously selected fighters and stage should remain selected when moving backward.
 
-18. Automated Testing Requirements
+During Player 2 selection, Player 2 should be able to use their own Back command.
 
-Create or update comprehensive tests using the existing Node test infrastructure.
+Do not break the existing global navigation or dialog stack.
+
+5. Extend controller handling for two independent players
+
+This is the most important technical requirement.
+
+Alva already supports connecting multiple controllers, but the gameplay input system currently reads only Player 1’s controller.
+
+Supporting multiple connected controllers is not the same as supporting multiple human players.
+
+You must implement true independent input processing.
+
+Controller assignments
+
+Local Play requires:
+
+* Player 1 → Controller A
+* Player 2 → Controller B
+
+The controllers must be physically distinct devices.
+
+Use the existing ControllerManager’s device identity and ordering system.
+
+Preserve the existing manually selected Player 1 controller when possible.
+
+Assign Player 2 to the next eligible active controller that is not Player 1’s controller.
+
+Keep assignments stable throughout a Local Play session.
+
+If a third or fourth controller is connected, it must not automatically interfere with either player’s inputs.
+
+If controller assignments are exposed in Controller Connections, clearly label which device belongs to Player 1 and which belongs to Player 2.
+
+Prevent assigning the same device to both players.
+
+Separate input state
+
+Each player needs their own:
+
+* Held buttons.
+* Newly pressed buttons.
+* Released buttons.
+* Analog stick axes.
+* Trigger states.
+* Controller binding resolver.
+* Press-edge handling.
+* Gameplay snapshot.
+* Input buffering.
+* Reset and flush behavior.
+
+Never merge both controllers into the same gameplay snapshot.
+
+For example, Controller 1 pressing Jump must not cause Player 2 to jump.
+
+Controller 2 pressing Attack must not cause Player 1 to attack.
+
+Both players must be able to press the same action at the same time and have both actions execute.
+
+The code should support two independent input pipelines without unnecessarily duplicating the entire InputManager implementation.
+
+A per-player resolver and input-state abstraction is preferable.
+
+Maintain backwards compatibility with the existing single-player input APIs wherever possible.
+
+Fighter-specific controller profiles
+
+Alva already gives each fighter a recommended controller layout and supports customized per-fighter bindings.
+
+Both players must use the appropriate controls for their own selected fighters.
+
+For example:
+
+* Player 1 chooses Fighter #0001.
+* Player 2 chooses Fighter #0002.
+* Controller 1 uses Fighter #0001’s resolved bindings.
+* Controller 2 uses Fighter #0002’s resolved bindings.
+
+They must not share a single fighter profile accidentally.
+
+If both players select the same fighter, they may share the same profile definition but must still use independent input state and binding resolution.
+
+Saved custom controller layouts must remain compatible.
+
+All existing universal controls must work independently for both players, including:
+
+* Movement
+* Jump and air jumps
+* Super Jump
+* Dash and air dash
+* Fast fall and platform drop
+* Attacks and extra attacks
+* Shield and Deflect
+* Character-specific special moves
+* Directional stick inputs
+* Button modifiers
+* Hold-based bindings
+
+Do not simplify or remove any fighter’s unique mechanics to make multiplayer work.
+
+Controller-only gameplay
+
+Local Play must never use keyboard or touch controls for either fighter.
+
+Do not fall back to:
+
+* Keyboard for Player 1
+* Keyboard for Player 2
+* One controller plus keyboard
+* One controller plus touch
+* Two players sharing one controller
+
+The Home Screen may still be clicked normally to enter Local Play when the controller requirements are satisfied, but local fighter selection, stage confirmation, and combat should use their assigned controllers.
+
+The existing keyboard, touch, and controller behavior in other game modes must remain unchanged.
+
+Controller menu navigation
+
+The current menu navigator is built around Player 1.
+
+Extend it carefully so the active local setup screen can determine which controller owns menu navigation.
+
+Required ownership:
+
+* Select local mode: Player 1
+* Player 1 fighter selection: Player 1
+* Player 2 fighter selection: Player 2
+* Local stage selection: Player 1
+
+Preserve D-pad navigation, analog cursor behavior, confirmation, and Back commands.
+
+Only the appropriate assigned controller should change or confirm a local selection.
+
+Do not permanently change the application’s Player 1 assignment merely to let Player 2 navigate a menu.
+
+Outside Local Play, preserve the existing Player 1 menu navigation behavior.
+
+Pause behavior
+
+During Local Battle, either player’s controller must be able to pause.
+
+Use Alva’s existing Options / Menu input mapping.
+
+The first pause request opens the shared pause interface.
+
+Both fighters must stop receiving gameplay input while the match is paused.
+
+A simultaneous pause press must not open multiple dialogs or immediately close the menu.
+
+Closing the pause menu must flush stale inputs for both players.
+
+When resuming, no held menu button should accidentally trigger an attack.
+
+6. Extend the existing Battle engine with Local Play mode
+
+Use js/game/battle.js and js/screens/battle-screen.js.
+
+The game already supports two sides:
+
+* p1
+* p2
+
+Existing Quick Battle uses one player and one CPU.
+
+Watch Mode uses two CPUs.
+
+Extend the battle configuration with a new mode:
+
+local
+
+In this mode:
+
+* p1 is a human-controlled fighter.
+* p2 is a human-controlled fighter.
+* Neither fighter receives a CombatAIController.
+* Both fighters use their own assigned controller input source.
+* Both fighters receive their own fighter definition and sprite set.
+* Both remain part of the existing shared Arena.
+
+Prefer extending BATTLE_MODES rather than hard-coding local-specific behavior throughout the engine.
+
+Fighter labels
 
 Use:
 
+* Player 1: P1
+* Player 2: P2
+
+Provide localized readable forms:
+
+* Player 1 / Joueur 1
+* Player 2 / Joueur 2
+
+Do not show CPU labels anywhere in Local Play.
+
+Gameplay rules
+
+Local Quick Battle must follow the existing Quick Battle rules.
+
+Preserve:
+
+* First to three points.
+* Five-minute regulation match.
+* A point when an opponent falls into the Void.
+* Existing respawn timing and behavior.
+* Existing Launch Point rules.
+* Energy, cooldowns, and Shield mechanics.
+* Existing hit detection.
+* Stage collisions and environmental hazards.
+* Normal movement and attacks.
+* Match clock and overtime.
+* The closing Void during overtime.
+* Existing tiebreakers and draw rules.
+* Match statistics.
+* Intro and celebration phases.
+* Camera behavior and interpolation.
+* Existing restart and rematch behavior.
+
+Do not introduce health bars, rounds with separate health pools, or different damage calculations.
+
+Do not change the AI or difficulty systems to support Local Play.
+
+Automatic turn-around
+
+Alva has an existing Automatic turn-around setting that currently applies to the human player.
+
+Both local human fighters should follow the existing setting consistently.
+
+If enabled, both players receive the normal human-player Automatic turn-around behavior.
+
+If disabled, neither receives it.
+
+Do not apply CPU-specific logic to either player.
+
+Combat independence
+
+Make sure every system can correctly identify each fighter’s owner.
+
+This includes:
+
+* Direct melee hits.
+* Projectiles.
+* Summons.
+* Techniques.
+* Deflects.
+* Shields.
+* Status effects.
+* Launches.
+* Stage hazards.
+* Scoring.
+* Eliminations.
+* Match statistics.
+
+A projectile from Player 2 must belong to Player 2, not Player 1.
+
+An attack landed by Player 1 must be credited to Player 1.
+
+Mirror matches must remain completely independent.
+
+Camera
+
+Continue using Alva’s shared camera.
+
+Both fighters must remain appropriately framed wherever possible.
+
+Do not introduce split-screen gameplay; the two players fight in the same arena and see the same screen.
+
+7. Player identification — RED for P1, BLUE for P2
+
+Player identity must be unmistakable throughout Local Play.
+
+Use a consistent visual language:
+
+PLAYER 1 — RED
+
+PLAYER 2 — BLUE
+
+These colors are a central requirement, not an optional styling flourish.
+
+Color system
+
+Create reusable local-player color tokens or constants rather than scattering unrelated color values across stylesheets and rendering code.
+
+Choose legible red and blue tones that fit Alva’s existing dark visual identity.
+
+Use sufficient contrast against both dark UI surfaces and bright stage backgrounds.
+
+Do not rely on color alone: every indicator should also contain a readable player label or equivalent distinguishing shape.
+
+Where player colors must appear
+
+Apply consistent indicators to:
+
+1. Player 1 and Player 2 fighter-selection screens.
+2. The setup step currently being controlled.
+3. Each player’s fighter preview.
+4. The battle HUD’s two fighter panels.
+5. The score indicator for each player.
+6. The markers above or around fighters in the arena.
+7. The move HUD identification for each player.
+8. Off-screen fighter indicators.
+9. The Match Results screen.
+10. Winner announcements and associated result indicators.
+
+Use RED on Player 1’s side and BLUE on Player 2’s side.
+
+In-arena identification
+
+The Arena currently uses side marker colors defined through MARKER in js/game/arena.js.
+
+In Local Play, update these markers to represent the two local players:
+
+* Player 1’s ground ring and name indicator must be red.
+* Player 2’s ground ring and name indicator must be blue.
+
+The identifiers must follow each fighter when they move, jump, switch sides, or go off-screen.
+
+Do not color a fighter according to which side of the stage they occupy at that moment.
+
+Their identity must remain associated with their player slot.
+
+Preserve the existing marker colors for normal Quick Battle, Watch Mode, and Practice Ground.
+
+HUD identification
+
+The upper battle HUD already positions p1 on the left and p2 on the right.
+
+Preserve this orientation.
+
+In Local Play:
+
+* Left HUD card: red Player 1 indicator.
+* Right HUD card: blue Player 2 indicator.
+
+Include clearly visible P1/P2 labels.
+
+Use subtle red/blue accents for panel outlines, labels, or score indicators, but do not recolor every UI element.
+
+The style should remain sophisticated, cohesive, and consistent with Alva.
+
+8. Display BOTH fighters’ move HUDs
+
+This requirement is essential.
+
+Alva already has an AbilityHUD component in js/ui/ability-hud.js.
+
+It displays a fighter’s available moves, associated input glyphs, ground/air move groups, cooldowns, and restrictions.
+
+Currently, the Battle Screen is designed around showing this HUD for one human fighter.
+
+Local Play needs two independent move HUDs visible at the same time.
+
+Required placement
+
+Player 1 move HUD: bottom-left corner
+
+Player 2 move HUD: bottom-right corner
+
+Conceptually:
+
+┌──────────────────────────────────────────┐
+│ P1 HUD       MATCH CLOCK        P2 HUD   │
+│                                          │
+│                                          │
+│             SHARED BATTLE                │
+│                                          │
+│                                          │
+│ [P1 MOVES]                    [P2 MOVES] │
+└──────────────────────────────────────────┘
+
+Player 1 move HUD
+
+Display Player 1’s selected fighter’s actual move set.
+
+Place it in the bottom-left corner.
+
+Give it a visible, compact RED player identifier.
+
+The move HUD must be the existing AbilityHUD visual component or a faithful reuse of its implementation.
+
+Do not replace it with a simplified text-only move list.
+
+Player 2 move HUD
+
+Display Player 2’s selected fighter’s actual move set.
+
+Place it in the bottom-right corner.
+
+Give it a visible, compact BLUE player identifier.
+
+The structure and capabilities must be equivalent to Player 1’s move HUD.
+
+Independent behavior
+
+Each HUD must:
+
+* Follow its own fighter.
+* Display that fighter’s actual move names and art.
+* Display the correct physical controller button glyphs.
+* Respect PlayStation and Xbox controller families independently.
+* Respect each fighter’s custom controller profile.
+* Switch between ground and air move rows independently.
+* Display its own cooldowns.
+* Display its own restrictions.
+* Update in real time.
+* Reset correctly after respawns and rematches.
+* Respond correctly to localization changes.
+
+Example:
+
+If Player 1 is airborne and Player 2 is grounded:
+
+* Player 1’s HUD should display the aerial move row as current.
+* Player 2’s HUD should display the grounded move row as current.
+
+One player’s change of state must not change the other player’s HUD.
+
+If Player 1 uses a PlayStation controller and Player 2 uses an Xbox controller, the two HUDs must show the respective PlayStation symbols and Xbox labels simultaneously.
+
+Do not use the global last-input-device value to determine both players’ HUD glyphs in Local Play.
+
+Each HUD must receive the appropriate controller context explicitly.
+
+Reuse existing AbilityHUD
+
+Prefer creating two independently configured instances of the existing AbilityHUD component.
+
+Refactor its input-context handling to support a specific player or gamepad.
+
+Avoid copying the entire component into a new Player2AbilityHUD.
+
+Each instance should have its own fighter binding, input context, profile cache, cooldown display, and update lifecycle.
+
+Prevent duplicated cooldown indicators
+
+The Arena currently has a hudCooldownsFor mechanism indicating which fighter’s cooldowns are represented in the ability HUD.
+
+Review and extend this appropriately so both local players can be represented.
+
+Do not accidentally suppress one player’s cooldowns while leaving duplicate indicators for the other.
+
+Preserve the previous single-player behavior.
+
+Responsive layout
+
+Both move HUDs must remain readable and must not overlap.
+
+Requirements:
+
+* Player 1 aligned left.
+* Player 2 aligned right.
+* Neither extends beyond the viewport.
+* Neither obscures the other.
+* Both respect safe-area insets.
+* Both work on shorter landscape displays.
+* Both remain usable when fighters have different numbers of moves.
+* Both retain current ground/air row transitions.
+* Both follow reduced-motion preferences.
+
+Adapt the existing .ability-hud layout rather than using fixed arbitrary offsets.
+
+The existing tile sizing already depends on viewport dimensions and move count; preserve that adaptability.
+
+On touch-capable devices with two connected controllers, Local Play must still display both controller move HUDs. The global touch-device CSS rule must not accidentally hide them.
+
+Touch gameplay controls themselves must remain disabled in Local Play.
+
+Visibility rules
+
+During active Local Battle, both move HUDs must be visible.
+
+Hide or appropriately dim them when:
+
+* The game is paused.
+* The results interface is open.
+* A blocking connection dialog is open.
+* The Battle Screen is no longer active.
+
+Show both again when combat resumes.
+
+Neither HUD should remain mounted visibly over Home or a selection screen.
+
+9. Local Play pause, victory, and Match Results
+
+The existing BattleScreen already provides a pause interface, final announcement, result toast, and Match Results screen.
+
+Extend those systems for Local Play.
+
+Pause interface
+
+Use the existing visual design and controls.
+
+The pause menu should identify the current mode as Local Quick Battle.
+
+Both players must be able to pause using their controller.
+
+Keep the existing functionality:
+
+* Resume
+* Restart battle
+* Settings
+* Return home
+
+The world must stop for both players during a pause.
+
+Do not maintain separate pause states for the two fighters.
+
+Winner announcements
+
+Local Play is a competition between two humans.
+
+Do not treat Player 1 as the only protagonist.
+
+The ending must be neutral and symmetrical.
+
+Instead of showing Player 1 a generic VICTORY and Player 2 a generic DEFEAT, identify the actual winner.
+
+For example:
+
+* PLAYER 1 WINS! — red
+* PLAYER 2 WINS! — blue
+* DRAW — neutral
+
+Preserve the game’s existing visual treatment for the ending banner.
+
+Keep Team I and Team II compatibility internally if needed, but visibly associate them with Player 1 and Player 2 during Local Play.
+
+Match Results
+
+Show:
+
+* Player 1’s fighter.
+* Player 2’s fighter.
+* Both scores.
+* Both final Launch Points.
+* Both sets of match statistics.
+* The winner or draw.
+* The match duration.
+* Overtime information where applicable.
+
+Player 1 must remain visually associated with red and Player 2 with blue.
+
+Support the existing actions:
+
+* Rematch
+* Change fighters
+* Change stage
+* Return to home
+
+Rematch
+
+Rematch must start a fresh Local Battle with:
+
+* The same Player 1 fighter.
+* The same Player 2 fighter.
+* The same stage.
+* The same two assigned controllers.
+
+Reset all match state normally.
+
+Do not switch either player to CPU control.
+
+Do not randomly change fighters or stages.
+
+Change fighters
+
+Return to Local Play’s Player 1 fighter-selection screen.
+
+Keep the Local Play mode and proper controller assignments.
+
+Proceed through Player 2 selection and Stage selection again.
+
+Do not redirect to normal Quick Battle’s fighter-selection screen.
+
+Change stage
+
+Return to the dedicated Local Play Stage selection screen.
+
+Preserve both chosen fighters and the local controller assignments.
+
+Return home
+
+Close the match and cleanly release Local Play-specific resources.
+
+Restore the normal Home Screen and its controller availability state.
+
+Do not leave either player’s move HUD visible.
+
+Do not leave residual controller inputs active.
+
+10. Controller disconnection and reconnection
+
+Handle this carefully and reliably.
+
+Before entering Local Play
+
+If fewer than two eligible controllers are connected, Local play must remain disabled.
+
+If availability changes between pressing the button and navigating to the next screen, revalidate the controller requirement.
+
+Do not rely solely on a button’s disabled property.
+
+During fighter or stage selection
+
+If either assigned controller disconnects:
+
+* Do not advance the setup automatically.
+* Preserve the current selections.
+* Disable confirmation that requires the missing controller.
+* Display a clear localized controller-disconnected message.
+* Allow recovery when the assigned controller reconnects.
+* Never silently substitute keyboard or touch input.
+
+During an active battle
+
+If either player’s controller disconnects:
+
+Automatically pause the entire match.
+
+Both fighters must stop moving.
+
+The match clock must stop.
+
+Do not let the disconnected player become a CPU.
+
+Do not let the remaining player continue attacking an uncontrolled fighter.
+
+Show a clear connection warning identifying the missing controller:
+
+“Player 2 controller disconnected.”
+
+Provide appropriate options for:
+
+* Reconnecting the controller.
+* Returning to Home.
+* Resuming once both required controllers are available.
+
+Preserve the assigned players where possible.
+
+Do not silently swap their identities if another controller becomes available.
+
+If reassignment is needed, it must be explicit and unambiguous.
+
+Reconnection
+
+When the controller reconnects:
+
+* Reidentify the intended player.
+* Restore that player’s input source.
+* Clear stale held buttons and press edges.
+* Preserve match state.
+* Resume through the normal pause/resume mechanism.
+
+Never interpret a button already being held during reconnection as a fresh attack.
+
+Browser behavior
+
+Respect Alva’s existing Gamepad API handling.
+
+Account for:
+
+* Controllers needing a button press before discovery.
+* gamepadconnected and gamepaddisconnected.
+* Controller index changes.
+* Two controllers with identical model IDs.
+* Browser focus loss.
+* Page visibility changes.
+* Unsupported devices.
+* Restricted or unavailable Gamepad API.
+* Controllers connected during gameplay.
+* Third and fourth controllers that should not disturb active players.
+
+The existing ControllerManager should remain the source of truth for available devices.
+
+11. Localization
+
+Alva supports English and French throughout its UI.
+
+Every new visible Local Play string must be localized.
+
+Update:
+
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+
+Include keys for:
+
+* Local play
+* Select local mode
+* Local Quick Battle
+* Local mode descriptions
+* Player 1 fighter selection
+* Player 2 fighter selection
+* Player 1
+* Player 2
+* Local setup steps
+* Controller connection requirements
+* Missing-controller warnings
+* Reconnection prompts
+* Local victory announcements
+* Local result messages
+* Accessibility descriptions
+
+Avoid hard-coded English text inside screen components.
+
+Extend slotLabel support to properly represent P2, as the current localization mapping explicitly handles P1 and CPU labels.
+
+Use Alva’s current translation helpers and markup conventions.
+
+Check localization behavior after switching languages while screens or dialogs are open.
+
+All added keys must exist in both languages.
+
+12. Maintain existing modes without regressions
+
+This implementation must be additive.
+
+Regular Play
+
+Must still allow:
+
+* Normal Select mode.
+* Regular Play / Custom Play choices.
+* Difficulty selection.
+* Player 1 fighter selection.
+* CPU selection where applicable.
+* Random opponent and stage in Regular Play.
+* Existing keyboard, touch, and controller support.
+
+Watch Mode
+
+Must remain CPU versus CPU.
+
+Its controller inputs must continue controlling menus rather than fighters.
+
+Practice Ground
+
+Must retain its original input behavior, practice HUD, dummy, and training interface.
+
+Controller Settings
+
+Must continue to support:
+
+* Controller Connections.
+* Selecting a Player 1 controller.
+* Custom fighter-specific controller controls.
+* Recommended controller layouts.
+* PlayStation and Xbox controller glyphs.
+* Controller binding capture.
+
+The Local Play implementation must not break any of those features.
+
+Existing battle behavior
+
+Do not modify core combat rules merely to make Local Play easier to implement.
+
+Both players must use the exact same shared Fighter, Combat, Arena, and Stage systems already used by the rest of the game.
+
+13. Recommended implementation architecture
+
+Follow the repository’s established structure.
+
+New screens
+
+Introduce dedicated Local Play screens or configurable subclasses:
+
+* local-mode
+* local-character-p1
+* local-character-p2
+* local-map
+
+Register them through App.start() and add the corresponding sections to index.html.
+
+Reuse existing screen classes and visual components wherever practical.
+
+Selection state
+
+Keep local choices under a separate namespace, such as app.selection.local.
+
+Do not conflate local Player 2 with cpuCharacterId.
+
+Battle mode
+
+Extend the existing battle mode model with local.
+
+Ensure the Battle Screen correctly routes Local Play to the two-human Battle configuration.
+
+Update all mode-specific routing tables, including those for:
+
+* Change stage.
+* Change fighters.
+* Pause-screen mode labels.
+* Results.
+* Victory announcements.
+
+Do not allow an unknown mode string to silently turn a requested Local Play match into normal Quick Battle.
+
+Input architecture
+
+Introduce separate controller input contexts and binding resolvers for the two players.
+
+Keep the existing InputManager behavior compatible for ordinary Play.
+
+Avoid duplicating shared code or attaching unnecessary extra global event listeners.
+
+A clear per-player interface is preferable to many scattered conditions checking for Local Play.
+
+Ability HUD
+
+Allow AbilityHUD to receive an explicit player/controller context.
+
+Instantiate and bind two HUDs in Local Battle.
+
+Keep one HUD in normal Play and none in Watch Mode.
+
+Styling
+
+Use existing CSS files and introduce narrowly scoped local-mode selectors.
+
+Use a shared color system for the red and blue identities.
+
+Prevent local-specific colors or dual-HUD positioning from leaking into normal battle modes.
+
+Cleanup
+
+When navigating away, ensure:
+
+* Local input resources are released.
+* Both HUDs are hidden and unbound.
+* Event listeners are removed where appropriate.
+* Paused state is cleared.
+* The connection-warning UI is closed.
+* The usual controller navigation system is restored.
+
+14. Testing requirements
+
+Add automated coverage consistent with the repository’s existing tests.
+
+Relevant existing suites include:
+
+* tests/systems/controller-devices.test.mjs
+* tests/systems/controller-input.test.mjs
+* tests/interface/controller-ui.test.mjs
+* tests/interface/ability-hud.test.mjs
+* tests/interface/battle-screen.test.mjs
+* tests/interface/stage-select.test.mjs
+* tests/interface/i18n.test.mjs
+* tests/integration/quick-battle.test.mjs
+* tests/integration/watch-mode.test.mjs
+* tests/integration/match-score.test.mjs
+
+Reuse the fake gamepad facilities in tests/helpers/fake-gamepad.mjs.
+
+Add new Local Play tests where appropriate.
+
+Home Screen tests
+
+Verify that:
+
+* Play and Local play share one row.
+* The buttons are equal-sized.
+* Local play remains visible with zero controllers.
+* Local play remains disabled with one controller.
+* Local play enables with two eligible controllers.
+* Unsupported controllers do not count.
+* The green glow appears only when enabled.
+* The glow and enabled state update on connection changes.
+* Ordinary Play still works normally.
+
+Selection tests
+
+Verify the exact flow:
+
+Home → Select local mode → Player 1 fighter → Player 2 fighter → Stage → Battle.
+
+Test Back navigation at every step.
+
+Test identical fighter selections.
+
+Test unavailable fighter entries.
+
+Test the Random Stage option.
+
+Ensure no CPU or difficulty selection appears.
+
+Ensure Player 2’s controller actually owns Player 2 fighter selection.
+
+Input tests
+
+Verify:
+
+* Player 1 controls only Player 1.
+* Player 2 controls only Player 2.
+* Both players can move simultaneously.
+* Both players can attack simultaneously.
+* Their button presses are not merged.
+* Their directional inputs do not interfere.
+* Their binding profiles are independent.
+* PlayStation and Xbox controllers work together.
+* Two identical controller models still work separately.
+* Keyboard inputs do not move either local fighter.
+* Touch inputs do not move either local fighter.
+* Both controllers can pause.
+* Focus loss and resume clear stale inputs.
+
+Battle tests
+
+Verify:
+
+* Both fighters have human-controlled PlayerControllers.
+* Neither uses CombatAIController.
+* Damage, collisions, score, and statistics work for both sides.
+* Mirror matches work.
+* Respawning works.
+* Overtime works.
+* Rematches work.
+* Change fighters returns to local fighter selection.
+* Change stage returns to local stage selection.
+* Return home cleans up correctly.
+
+Move HUD tests
+
+Verify:
+
+* Both HUDs are displayed in Local Play.
+* Player 1’s HUD is on the left.
+* Player 2’s HUD is on the right.
+* Both show correct fighter abilities.
+* Both use the correct controller button glyphs.
+* Both show independent cooldowns.
+* Both switch ground/air rows independently.
+* Both hide correctly under overlays.
+* Normal Play retains only one ability HUD.
+* Watch Mode still has no player ability HUD.
+
+Controller disconnection tests
+
+Verify:
+
+* Disconnecting either controller pauses the match.
+* The match clock stops.
+* No uncontrolled fighter becomes a CPU.
+* No other controller silently steals the disconnected player’s slot.
+* Reconnecting permits the correct player to resume.
+* Stale button states do not trigger attacks.
+
+Localization and styling tests
+
+Verify:
+
+* English and French strings are complete.
+* P1/P2 identity labels are correct.
+* RED and BLUE accents are applied only where intended.
+* The two move HUDs do not overlap.
+* Reduced motion is respected.
+* Existing interface accessibility conventions remain intact.
+
+Run the complete test suite:
+
 node --test
 
-Pay particular attention to:
-
-* tests/systems/movement.test.mjs
-* tests/systems/movement-rules.test.mjs
-* tests/systems/universal-movement.test.mjs
-* tests/systems/drop-through.test.mjs
-* tests/systems/down.test.mjs
-* tests/systems/momentum.test.mjs
-* tests/systems/combat-rules.test.mjs
-* tests/systems/cpu-intelligence.test.mjs
-* tests/systems/cpu-behaviour.test.mjs
-* tests/systems/combat-ai.test.mjs
-* tests/systems/controller-input.test.mjs
-* tests/systems/request-devices.test.mjs
-* tests/systems/platform-hazards.test.mjs
-* tests/systems/hit-fx.test.mjs
-* Relevant UI and integration tests.
-
-Required physics tests
-
-Verify that:
-
-1. Normal Jump is noticeably lower than its previous height.
-2. Super Jump reaches approximately the old higher-jump apex.
-3. Normal Jump height does not change when Jump is held.
-4. Super Jump height does not change when Jump is released early.
-5. Super Jump applies its stronger impulse immediately.
-6. Super Jump uses ordinary gravity throughout its movement arc.
-7. A late Down press cannot upgrade an existing Normal Jump.
-8. Down + Jump in the air does not generate a Super Jump.
-9. Coyote jumps remain normal rather than becoming grounded Super Jumps.
-10. Air Jump retains approximately its previous strength.
-11. Super Jump does not replenish or create air jumps.
-12. Existing momentum and dash-cancel rules remain intact.
-
-Required input tests
-
-Test keyboard, controller, and touch input snapshots.
-
-Verify:
-
-* Correct held states.
-* Correct pressed edges.
-* Same-frame chords.
-* Multiple simultaneous touches.
-* Remapped controls.
-* Long-held buttons.
-* Released buttons.
-* No accidental repeated jumps.
-* No accidental platform drops.
-* Input buffers retaining the correct requested jump type.
-
-Required CPU tests
-
-Verify:
-
-* CPU Normal Jump.
-* CPU Super Jump.
-* CPU Air Jump.
-* CPU Super Jump from a platform.
-* CPU Super Jump into an aerial attack.
-* CPU selecting Super Jump for a higher platform.
-* CPU selecting Normal Jump for a low obstacle.
-* CPU evaluating Super Jump as a defensive option.
-* CPU navigating after the normal-jump reduction.
-* All CPU difficulty levels using legal movement.
-* Watch Mode CPU versus CPU.
-* Training CPU compatibility.
-* Correct movement prediction.
-* No infinite failed-jump loops.
-* No CPU-only velocity modifications.
-
-Required dust-effect tests
-
-Verify that:
-
-* Every accepted Super Jump creates exactly one dust event.
-* The effect originates at takeoff ground level.
-* Normal Jump creates no Super Jump dust.
-* Air Jump creates no Super Jump dust.
-* Failed or rejected Super Jump requests create no dust.
-* The effect expires.
-* Reset and respawn clear stale effects.
-* Reduced-motion settings are respected.
-* CPU Super Jumps produce the same effect as player Super Jumps.
-
-Determinism
-
-Run the relevant fixed-step tests at multiple rendering frame rates.
-
-The existing game tests include comparisons at 30, 60, and 144 FPS.
-
-The movement and CPU behavior must remain simulation-consistent.
-
-Visual effects must not alter deterministic gameplay.
-
-⸻
-
-19. Gameplay and Stage Validation
-
-After implementing and passing automated tests, validate the changes in actual gameplay.
-
-Test all nine playable fighters.
-
-Test all five battle stages and Practice Ground.
-
-Pay attention to:
-
-Normal Jump
-
-* Can fighters still navigate small obstacles?
-* Does combat positioning feel responsive?
-* Are low aerial attacks still practical?
-* Does the reduced jump height create any unavoidable navigation traps?
-
-Super Jump
-
-* Does it visibly launch the fighter upward?
-* Is its maximum height approximately unchanged from the old higher jump?
-* Does it feel dramatically stronger than Normal Jump?
-* Can it be activated reliably during movement?
-* Can it be used safely from one-way platforms?
-* Does it preserve momentum?
-* Does the dust appear at the correct position?
-
-Stages and hazards
-
-Check behavior on:
-
-* Static platforms.
-* Moving cloud platforms.
-* Vanishing platforms.
-* Breakable terrain.
-* One-way platforms.
-* Solid walls.
-* High platforms.
-* Platforms near the Void boundary.
-
-Ensure the reduced Normal Jump does not inadvertently make important routes impossible.
-
-If necessary, modify CPU navigation decisions or use the appropriate jump type rather than making arbitrary exceptions to the shared movement rules.
-
-CPU matches
-
-Watch CPUs fight on different stages and difficulties.
-
-Confirm that CPUs:
-
-* Actually perform Super Jump.
-* Use it for real tactical purposes.
-* Can reach elevated enemies.
-* Can perform aerial attacks from Super Jump.
-* Avoid unnecessary Super Jump spam.
-* Continue to recover from dangerous situations.
-* Do not repeatedly fail at reachable platforms.
-* Remain competitive and active throughout matches.
-
-CPU intelligence should recognize Super Jump as an intentional and useful movement option.
-
-⸻
-
-20. Implementation Quality Requirements
-
-All changes should respect the existing architecture.
-
-Movement
-
-Keep every movement tuning value in the universal movement configuration.
-
-Do not create fighter-specific jump modifiers.
-
-Physics
-
-Use the existing Fighter and physics pipeline.
-
-Do not create separate CPU jump physics.
-
-Do not add a fake upward teleport or midair boost to Super Jump.
-
-Input
-
-Reuse logical Down and Jump controls.
-
-Do not introduce an unnecessarily complicated input parser.
-
-Make sure input consumption, timing, and action priority are unambiguous.
-
-CPU
-
-Use the established CPU intelligence architecture.
-
-Do not bypass action restrictions.
-
-Remove obsolete higher-jump assumptions throughout the model.
-
-Rendering
-
-Reuse existing Canvas 2D rendering infrastructure.
-
-Dust should remain visual only.
-
-Avoid excessive particle complexity.
-
-Stability
-
-Do not break:
-
-* Existing attacks.
-* Dash and air dash.
-* Hitstun.
-* Shielding and Deflect.
-* Launch and knockback.
-* Stage collisions.
-* Fast Fall.
-* Air jumps.
-* Combos.
-* Momentum.
-* Practice Ground.
-* Watch Mode.
-* Controller mapping.
-* Mobile touch layouts.
-* Existing accessibility behavior.
-
-Prefer clean, maintainable changes over isolated special cases.
-
-⸻
-
-21. Final Acceptance Criteria
-
-The implementation is complete only when all the following are true.
-
-* [ ]	Pressing Jump normally produces a clearly shorter jump than before.
-* [ ]	Holding Jump no longer increases jump height.
-* [ ]	Holding Down and pressing Jump while grounded immediately activates Super Jump.
-* [ ]	Super Jump reaches approximately the same height as the previous higher jump.
-* [ ]	Super Jump feels like a genuine explosive leap, with a powerful initial takeoff and natural gravity.
-* [ ]	Super Jump does not require charging.
-* [ ]	Releasing Down or Jump after takeoff does not weaken Super Jump.
-* [ ]	Super Jump produces a visible dust burst originating at the ground.
-* [ ]	Every successful Super Jump produces exactly one burst.
-* [ ]	The effect works with every fighter and every CPU.
-* [ ]	Super Jump works from one-way and moving platforms without accidental dropping.
-* [ ]	Fast Fall continues to function correctly.
-* [ ]	Existing intentional platform-drop functionality remains available.
-* [ ]	Air jumps retain their previous usefulness and number of uses.
-* [ ]	Keyboard, PlayStation, Xbox, and touch controls work correctly.
-* [ ]	CPUs can execute Super Jump using the same inputs and physics as humans.
-* [ ]	CPUs understand Super Jump in navigation, combat, defense, and prediction.
-* [ ]	CPUs intelligently choose between Normal Jump and Super Jump.
-* [ ]	All CPU difficulties support the mechanic.
-* [ ]	Quick Battle, Watch Mode, and Practice Ground remain functional.
-* [ ]	The old higher-jump implementation and obsolete descriptions are removed.
-* [ ]	Discover, controller help, documentation, and localization accurately describe the new system.
-* [ ]	Automated tests pass.
-* [ ]	Real gameplay validation confirms the new movement feels responsive and balanced.
-
-⸻
-
-22. Required Final Report
-
-After implementing the overhaul, provide a clear completion report explaining:
-
-1. Which files were changed and why.
-2. How the new Normal Jump and Super Jump inputs are detected.
-3. The final Normal Jump and Super Jump velocities.
-4. The measured apex heights of both jump types, including comparison with the original higher jump.
-5. How the stronger launch impulse produces Super Jump’s leap-like feel.
-6. How the dust effect works and where it is rendered.
-7. How the one-way platform-drop conflict was resolved.
-8. How air-jump strength was preserved.
-9. Which CPU systems were changed and how CPU fighters decide when to Super Jump.
-10. Which tests were added or updated.
-11. Which test suites passed, with any failures or untested cases disclosed.
-12. Any gameplay tuning concerns discovered during validation.
-
-Do not report completion without verifying the changed behavior.
-
-Final Design Direction
-
-The finished system should create three clearly different jumping experiences:
-
-Normal Jump: A quick, low, responsive hop used for ordinary movement and combat positioning.
-
-Super Jump: A deliberate Down + Jump command that propels the fighter powerfully upward, reaches the original higher jump’s height, and creates a satisfying dust explosion at the feet.
-
-Air Jump: The familiar additional midair jump, preserving Alva’s existing triple-jump and recovery gameplay.
-
-Most importantly, Super Jump should feel powerful because of the initial leap, its immediate vertical acceleration, and its takeoff presentation—not because the fighter floats under reduced gravity.
-
-Players and CPUs must obey the same rules, use the same movement system, and have access to the same mechanic.
-
-Implement the complete change across gameplay, presentation, CPU intelligence, UI, documentation, and tests rather than stopping after the basic jump-physics modification.
+Also perform real-browser visual and controller testing where the execution environment allows it. The Node test suite does not substitute for verifying actual CSS layout and two physical controllers.
+
+Test at desktop and short-landscape viewport sizes, and check both mixed and matching controller models.
+
+Do not claim physical controller behavior was tested unless it actually was.
+
+15. Required acceptance criteria
+
+The implementation is complete only when every statement below is true.
+
+* [ ]	The Home Screen’s Play button is half-width and remains green.
+* [ ]	Local play sits directly beside it, at the exact same width and height.
+* [ ]	Both buttons occupy the original full-width Play row together.
+* [ ]	Local play is always visible.
+* [ ]	Local play is disabled with fewer than two eligible controllers.
+* [ ]	Local play becomes available when two eligible controllers are connected.
+* [ ]	Its enabled border glows green using the Download button’s established visual style.
+* [ ]	Clicking Local play opens Select local mode.
+* [ ]	Select local mode matches the existing Select mode page.
+* [ ]	Quick Battle is the only available local mode.
+* [ ]	Quick Battle goes through Player 1 fighter, Player 2 fighter, and Stage selection, in that exact order.
+* [ ]	Each player’s fighter choice is stored separately.
+* [ ]	Player 1 makes their selection with Controller 1.
+* [ ]	Player 2 makes their selection with Controller 2.
+* [ ]	Stage selection is performed with Controller 1.
+* [ ]	Both players can select the same fighter.
+* [ ]	Both fighters are controlled by humans, with no CPU.
+* [ ]	Both controllers work independently and simultaneously.
+* [ ]	Keyboard and touch do not control local fighters.
+* [ ]	All fighter-specific controller bindings continue working.
+* [ ]	Player 1 has a red identity indicator.
+* [ ]	Player 2 has a blue identity indicator.
+* [ ]	Red/blue identification remains consistent throughout the setup, battle, HUDs, results, and in-arena markers.
+* [ ]	Player 1’s move HUD is displayed on the bottom-left.
+* [ ]	Player 2’s move HUD is displayed on the bottom-right.
+* [ ]	Both move HUDs update independently and display the correct controller inputs.
+* [ ]	Both controllers can pause the battle.
+* [ ]	Disconnecting a required controller safely pauses the match.
+* [ ]	Rematch preserves fighters, stage, and controller assignments.
+* [ ]	Change fighters and Change stage return to the correct Local Play screens.
+* [ ]	The original match rules remain intact.
+* [ ]	Regular Play, Custom Play, Watch Mode, and Practice Ground still work.
+* [ ]	English and French are fully supported.
+* [ ]	Existing tests pass and relevant new tests are included.
+
+16. Final implementation principles
+
+Do not create a separate miniature multiplayer game. Build Local Play into Alva itself.
+
+Reuse the game’s existing systems wherever possible.
+
+Prioritize correct two-player gameplay over superficial multiplayer UI.
+
+In particular, avoid these mistakes:
+
+* Merely relabeling the CPU as Player 2.
+* Reading both physical controllers through the same input resolver.
+* Showing identical input glyphs for both players when their controller types differ.
+* Giving both players the same ability HUD state.
+* Accidentally routing Local Play through the existing CPU setup.
+* Allowing a disconnected controller to silently turn into AI control.
+* Breaking single-player input or menu navigation.
+* Making red/blue identification visible only in the top HUD but not on the actual fighters.
+* Showing two HUDs without checking their responsiveness.
+* Adding English-only strings.
+* Creating an entirely different visual design for Local Play.
+
+Maintain the existing code conventions, avoid unnecessary dependencies, and preserve the game’s established identity.
+
+17. Expected deliverables
+
+Implement the feature completely in the repository.
+
+After implementation, provide:
+
+1. A summary of the actual changes.
+2. A list of the important modified and newly created files.
+3. An explanation of the two-controller input architecture.
+4. Confirmation of how Player 1 and Player 2 are assigned.
+5. Confirmation of the new Local Play screen flow.
+6. Confirmation that both move HUDs work independently.
+7. Automated test results.
+8. Any limitations that genuinely remain.
+
+Do not stop after creating the Home button or selection screens. The task is finished only when two real players can select their fighters, choose a stage, enter battle, fight simultaneously using two controllers, see their own move HUDs, finish the match, and rematch successfully.
+
+The finished experience should feel like Local Play was always intended to be part of Alva.
