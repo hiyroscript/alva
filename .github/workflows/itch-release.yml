@@ -1,0 +1,49 @@
+# The itch.io release, built and checked on every merge to main
+# (docs/development/itch-release.md): the tests, the release built and
+# validated, the bundle played against the source, then the ZIP kept on the
+# run's page, ready for the owner to upload to itch.io by hand. It never
+# uploads anything. "Run workflow" (Actions tab) runs it on any branch.
+
+name: itch.io release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the export's tools (esbuild)
+        run: npm ci
+
+      - name: Run the tests
+        run: node --test
+
+      - name: Build and validate the release
+        run: npm run build:itch
+
+      - name: Play the bundle against the source
+        run: npm run verify:itch
+
+      # Downloadable from the run's page for 90 days. GitHub hands it over
+      # wrapped in a ZIP of its own: unzip that once to get alva-itch.zip.
+      - name: Keep the ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: alva-itch-${{ github.sha }}
+          path: dist/alva-itch.zip
+          if-no-files-found: error
+          compression-level: 0

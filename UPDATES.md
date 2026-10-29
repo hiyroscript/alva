@@ -4309,3 +4309,10 @@ development source kept modular, the same game in every respect, tested.
 `zip.mjs`, `equivalence.mjs`, `sim-probe.mjs`), `package.json` and
 `package-lock.json` (esbuild 0.28.2, a development dependency only),
 `.gitignore` (`dist/`, `node_modules/`).
+
+### Later: built on every merge
+
+`.github/workflows/itch-release.yml` runs on every push to `main` (and by
+hand, on any branch): the tests, the build, the equivalence check, then the
+ZIP kept on the run for 90 days. It never uploads: the owner publishes on
+itch.io by hand, from that ZIP or a local build.

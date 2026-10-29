@@ -162,12 +162,31 @@ itch.io's own rules for HTML5 games are at
 <https://itch.io/docs/creators/html5>; check them before uploading, since
 they can change.
 
-1. Build and validate: `npm run build:itch` must end with `OK`.
-2. On itch.io, **Create new project** (or **Edit game** for an existing
+Publishing is the owner's, by hand: nothing in the repository uploads to
+itch.io.
+
+### Getting the ZIP
+
+Either:
+
+- **From GitHub, nothing to install.** Every merge to `main` runs
+  [`.github/workflows/itch-release.yml`](../../.github/workflows/itch-release.yml):
+  the tests (`node --test`), `npm run build:itch` and `npm run verify:itch`,
+  and keeps the ZIP on the run's page for 90 days (the **Actions** tab, the
+  run, **Artifacts**). A failure anywhere means no ZIP from that run.
+  **Run workflow** there makes one from any branch. GitHub hands an artifact
+  over wrapped in a ZIP of its own: unzip that once, and upload the
+  `alva-itch.zip` inside.
+- **On your computer:** `npm install` once, then `npm run build:itch`; it
+  must end with `OK`, and the ZIP is `dist/alva-itch.zip`.
+
+### The first upload
+
+1. On itch.io, **Create new project** (or **Edit game** for an existing
    one). **Kind of project: HTML**.
-3. **Uploads**: upload `dist/alva-itch.zip` and tick **This file will be
-   played in the browser**.
-4. **Embed options**:
+2. **Uploads**: upload `alva-itch.zip` and tick **This file will be played
+   in the browser**.
+3. **Embed options**:
    - **Viewport dimensions**: a 16:9 size such as 1280 × 720 (or 960 ×
      540); the game fits any size.
    - **Mobile friendly**: on, **Orientation**: landscape (the game shows
@@ -178,20 +197,20 @@ they can change.
      keyboard focus at once.
    - **Enable scrollbars**: off. **SharedArrayBuffer support**: off (not
      needed).
-5. Save, then open the page while it is still a draft or restricted.
-6. Verify it: the splash plays, Home appears, a battle starts and plays,
+4. Save, then open the page while it is still a draft or restricted, and
+   verify it: the splash plays, Home appears, a battle starts and plays,
    the keyboard works after a click into the game, a controller works,
    fullscreen works, the browser console shows no errors, and on a phone in
    landscape the touch controls appear.
-7. Publish when it is right. Uploading or publishing is the owner's call:
-   nothing in the repository does it.
+5. Publish when it is right.
 
 ### Updating it
 
-Change the repository as usual (the tests, `node --test`, must pass), then
-`npm run build:itch` (and `npm run verify:itch` after a change to the
-simulation), and on itch.io upload the new `dist/alva-itch.zip`, mark it as
-played in the browser and delete the old upload.
+After a merge to `main`, take the new ZIP (from the run, or
+`npm run build:itch`), and on itch.io upload it, tick **This file will be
+played in the browser** and delete the older upload. `npm run verify:itch`
+locally runs the workflow's own check before a change to the simulation is
+merged. After a large change, play the itch.io page on real devices again.
 
 ### What is different inside itch.io's page
 

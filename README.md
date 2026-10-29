@@ -193,8 +193,10 @@ itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,059):
 the same game in 901 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every asset unchanged),
 validated, with `index.html` at its root; `npm run verify:itch` plays the
-bundle against the source step for step. Upload the ZIP as an HTML game.
-More in [the itch.io release](docs/development/itch-release.md).
+bundle against the source step for step. Every merge to `main` also builds
+and checks it on GitHub and keeps the ZIP on the run
+(`.github/workflows/itch-release.yml`). Upload the ZIP to itch.io by hand as
+an HTML game. More in [the itch.io release](docs/development/itch-release.md).
 
 ## Controls
 
