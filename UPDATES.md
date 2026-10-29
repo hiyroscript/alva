@@ -4261,3 +4261,51 @@ reached with a Super Jump), and tests that needed a jump's old airtime
 moved with the new movement: `cpu-behaviour`'s Brutal "takes less when
 ahead" allows 0.05 LP/s of noise, and `jokull`'s full matches play a sixth
 seed. `cpu-intelligence`'s debug trace runs 12 s instead of 4.
+
+## itch.io release export
+
+Not a named update (it can become one if the owner names it), and it
+changes no behaviour, tuning, art, layout or saved setting: the repository
+still runs as it is. Asked for (the `max` brief, "ALVA — Safe File
+Consolidation and itch.io Publishing Preparation") as: fewer files to
+publish the game on itch.io (at most 1,000 in an HTML5 game's ZIP), the
+development source kept modular, the same game in every respect, tested.
+
+- **Before:** 1,218 files in the repository; the page served 1,059 of them
+  (`index.html`, 15 stylesheet parts, 145 modules, the manifest, three
+  root images and 894 assets), over itch.io's limit.
+- **The export** (`npm run build:itch`, `tools/itch/build.mjs`): the 145
+  modules bundled into `game.js` by esbuild (one ES module, `esnext`, no
+  minification, tree shaking or source map, in ES evaluation order), the
+  15 parts joined in cascade order into `game.css`, `index.html` loading
+  those two, and the manifest, root images and `assets/` copied byte for
+  byte: **901 files**, 4.6 MB, `dist/alva-itch.zip` 3.4 MB with
+  `index.html` at its root. Nothing merged in the source; no art packed,
+  converted or deduplicated (the 58 byte-identical frames are frames of
+  their own clips). Reproducible: two builds make the same bytes.
+- **The validation** (`tools/itch/validate.mjs`, run by every build): the
+  limits, nothing development-only packaged, the release current with the
+  repository, every module in ES evaluation order, every frame of every
+  fighter and every image and icon the game names present under its exact
+  name, no other host, the archive identical to the folder.
+- **The equivalence check** (`npm run verify:itch`,
+  `tools/itch/equivalence.mjs`, `tools/itch/sim-probe.mjs`): the bundle
+  against the source in 33 seeded scenarios (Watch Mode for every fighter,
+  stage and CPU level, mirrors, overtime, Quick Battles and Local Play with
+  scripted players, Practice Ground with swaps): 160,107 fixed steps and
+  2,697 whole-world checkpoints, every one the same.
+- **Specification and guides:** `ALVA_SPEC.md` §2 (the release, an
+  optional generated copy), the architecture decision, the overview,
+  conventions, setup, testing, the README, and the new guide
+  [`docs/development/itch-release.md`](./docs/development/itch-release.md)
+  (building, what is checked, publishing on itch.io and updating it).
+- **Tests:** the suite is unchanged in what it checks; the seven walks over
+  the whole repository (`codenames` and the fighter files of #0003,
+  #0004, #0005, #0007, #0008 and #0009) skip `dist/` as they skip
+  `node_modules/`: generated copies of files they read, and an archive
+  whose compressed bytes matched a name pattern by chance.
+
+**Code:** `tools/itch/` (`release.mjs`, `build.mjs`, `validate.mjs`,
+`zip.mjs`, `equivalence.mjs`, `sim-probe.mjs`), `package.json` and
+`package-lock.json` (esbuild 0.28.2, a development dependency only),
+`.gitignore` (`dist/`, `node_modules/`).

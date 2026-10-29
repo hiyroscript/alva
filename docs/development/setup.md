@@ -1,6 +1,6 @@
 # Running and deploying
 
-Alva is static files: there is nothing to install or build.
+Alva is static files: there is nothing to install or build to run it.
 
 ## Run locally
 
@@ -13,7 +13,8 @@ python3 -m http.server 8000
 ```
 
 Any static server works (`npx serve`, `npx http-server`, …). No
-`npm install`: the repository has no dependencies.
+`npm install`: the game has no dependencies. (`package.json` holds only the
+optional itch.io export's development dependency, below.)
 
 Useful while developing:
 
@@ -44,3 +45,18 @@ asset, module and stylesheet path is relative (`./assets/...`, `./js/...`,
 `./css/...`), so the game works under any sub-path, including `/alva/`.
 `.nojekyll` stops Jekyll from processing the site. Nothing in the code
 depends on the repository's name.
+
+## Publish on itch.io
+
+itch.io takes at most 1,000 files in an HTML5 game, and the repository
+serves 1,059. The release export makes the same game in 901 files:
+
+```sh
+npm install           # once: esbuild, a development dependency of the export only
+npm run build:itch    # dist/itch/ and dist/alva-itch.zip, validated
+npm run verify:itch   # the bundle against the source, step for step
+```
+
+Upload `dist/alva-itch.zip` as an HTML game. How it is made, what it
+checks, the embed settings and updating it: [the itch.io
+release](itch-release.md).

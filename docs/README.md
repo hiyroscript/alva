@@ -65,6 +65,8 @@ reads, what a fighter may leave out, and its tests.
 ## Development
 
 - [Running and deploying](development/setup.md)
+- [The itch.io release](development/itch-release.md): the optional export
+  in fewer files, its validation and equivalence check, publishing it.
 - [Testing](development/testing.md): the layout, the harness, universal
   and fighter-specific tests.
 - [Conventions](development/conventions.md): codenames, code,

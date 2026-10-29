@@ -188,6 +188,14 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,059):
+`npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
+the same game in 901 files (the modules bundled into one script, the
+stylesheet parts joined into one stylesheet, every asset unchanged),
+validated, with `index.html` at its root; `npm run verify:itch` plays the
+bundle against the source step for step. Upload the ZIP as an HTML game.
+More in [the itch.io release](docs/development/itch-release.md).
+
 ## Controls
 
 | Action | Keyboard | Controller (PlayStation / Xbox) |
@@ -250,6 +258,8 @@ js/
 assets/characters/<id>/ each fighter's art
 tests/                  systems/, fighters/<id>/, interface/, integration/, helpers/
 docs/                   architecture, systems, characters, gameplay, development
+tools/itch/             the optional itch.io release export, its validation and
+                        its equivalence check (package.json: esbuild, dev only)
 ALVA_SPEC.md            the product specification
 UPDATES.md              history: the named updates and other large changes
 codename_rule           the naming contract for controls, moves and art

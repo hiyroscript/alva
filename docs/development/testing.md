@@ -67,6 +67,19 @@ stays slight, that nothing steers a ground attack and that every aerial
 keeps the air control, never whether the game is fun; the tests assert
 the rules.
 
+## The itch.io release's equivalence check
+
+```sh
+npm run verify:itch            # every scenario, about 40 s
+npm run verify:itch -- --quick # a short smoke run
+```
+
+Not part of `node --test` (it needs `npm install` for esbuild). It plays
+seeded matches of every mode on the modules as they are and bundled with
+the release's own options, and requires the two to agree step for step
+([the itch.io release](itch-release.md#the-equivalence-check)). Run it
+after a change to the simulation before publishing a release.
+
 ## The CPU benchmark
 
 ```sh
@@ -147,7 +160,10 @@ graphics operation, `ctx.setTransform` or a CSS `transform`); every frame
 path existing. They scan
 folders recursively, so new modules are covered without editing the
 tests. [`UPDATES.md`](../../UPDATES.md) is the history record and is not
-scanned for retired names.
+scanned for retired names. The walks over the whole repository skip
+`.git/`, `node_modules/` and `dist/` (the generated itch.io release,
+ignored by Git: copies of files they read in the repository, and an
+archive whose compressed bytes would match a pattern by chance).
 
 ## What the tests cannot check
 

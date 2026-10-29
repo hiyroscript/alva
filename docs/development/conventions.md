@@ -36,7 +36,9 @@ contract; it applies to every fighter.
 ## Code
 
 - Vanilla JavaScript ES modules, no build step and no dependencies. Every
-  import and URL is relative.
+  import and URL is relative. (The itch.io export in `tools/itch/` is
+  development tooling with one dev dependency, esbuild; the game never
+  imports it: [the itch.io release](itch-release.md).)
 - Shared code reads per-fighter values from the fighter's definition and
   never checks a fighter's id. A comment may give a fighter's value as an
   example; say whose ("e.g. #0001's").
