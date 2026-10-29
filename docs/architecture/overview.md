@@ -95,6 +95,8 @@ How the fighter data and the shared systems divide the work is in
 
 - **No build step.** The repository is the site. `index.html` stays at the
   root; every URL is relative (`./js/...`, `./css/...`, `./assets/...`).
+  The itch.io release is an optional, generated copy in fewer files, never
+  a step the game needs ([the itch.io release](../development/itch-release.md)).
 - **Fixed-step simulation.** Gameplay never reads wall-clock time;
   presentation (hit effects, camera, stage animation) never feeds back.
 - **One rule set for every fighter.** Shared systems read every per-fighter

@@ -11,6 +11,22 @@ install, and nothing can drift between source and build. It rules out
 bundlers, TypeScript compilation, CSS preprocessors and package
 dependencies, and requires every path to be relative.
 
+## The itch.io release: bundled, never rewritten
+
+itch.io accepts at most 1,000 files in an HTML5 game, and the repository
+serves 1,059. Rather than merge modules or stylesheets in the source (which
+would make the code harder to read, test and extend), an optional export
+generates a copy for release: the modules bundled into `game.js`, the
+stylesheet parts joined into `game.css`, everything else copied as it is
+([the itch.io release](itch-release.md)). It is the one place a bundler
+(esbuild) is allowed, as a development dependency of the export only: the
+game still runs from the repository with nothing installed, the release is
+never edited and never the source of truth, and nothing drifts because the
+export validates the release against the repository on every build and an
+equivalence check plays the bundle against the source step for step. It
+rules out minification, tree shaking, syntax lowering, sprite atlases and
+any change to the art.
+
 ## A fixed-step, deterministic simulation
 
 The world advances in fixed 1/60 s steps from an accumulator; rendering

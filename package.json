@@ -1,0 +1,13 @@
+{
+  "name": "alva",
+  "private": true,
+  "description": "Alva, a 2D sprite fighting game for the browser. The game itself needs nothing installed; esbuild is only for the optional itch.io release export.",
+  "type": "module",
+  "scripts": {
+    "build:itch": "node tools/itch/build.mjs",
+    "verify:itch": "node tools/itch/equivalence.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

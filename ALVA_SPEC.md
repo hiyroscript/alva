@@ -41,7 +41,17 @@ behave, and how it must look.
   sprite previews; HTML/CSS for menus (better layout and accessibility).
 - No framework, no build step, no npm dependencies, no CSS framework
   (Tailwind, Bootstrap), no WebGL/Three.js/Babylon.js, no 3D assets or fake 3D.
-- A working `index.html` at the repository root for GitHub Pages.
+- A working `index.html` at the repository root for GitHub Pages: the
+  repository is the game, run as it is.
+- **The itch.io release** is an optional, generated copy of the same game for
+  hosts that cap the number of files (itch.io: 1,000 in an HTML5 game's ZIP):
+  the modules bundled into one script and the stylesheet parts joined into one
+  stylesheet, in their own order, everything else copied unchanged. It is made
+  by a development-only export (one dev dependency, esbuild; nothing the
+  player's browser runs), is never edited by hand, and must play, look and
+  behave exactly as the repository does: its build validates it and its
+  equivalence check compares its simulation with the source's step for step
+  ([`docs/development/itch-release.md`](docs/development/itch-release.md)).
 - **Every URL is relative** (`./assets/...`, `./js/...`). Never use root-relative
   paths: the project page may live under `/alva/` (or the current repository
   name) and must work under any sub-path.

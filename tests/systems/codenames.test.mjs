@@ -391,7 +391,9 @@ const BINARY = /\.(png|jpe?g|gif|webp|ico)$/i;
 // Every file and folder of the repository but its git store, as paths.
 function repositoryPaths(dir = '') {
   return readdirSync(new URL(dir || './', ROOT), { withFileTypes: true }).flatMap((e) => {
-    if (e.name === '.git' || e.name === 'node_modules') return [];
+    // Not the repository's own: Git's store, npm's packages, and the generated
+    // itch.io release (dist/, ignored by Git: copies of files read here).
+    if (e.name === '.git' || e.name === 'node_modules' || e.name === 'dist') return [];
     const path = `${dir}${e.name}`;
     return e.isDirectory() ? [`${path}/`, ...repositoryPaths(`${path}/`)] : [path];
   });
