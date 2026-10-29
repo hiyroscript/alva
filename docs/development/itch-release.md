@@ -162,12 +162,28 @@ itch.io's own rules for HTML5 games are at
 <https://itch.io/docs/creators/html5>; check them before uploading, since
 they can change.
 
-1. Build and validate: `npm run build:itch` must end with `OK`.
-2. On itch.io, **Create new project** (or **Edit game** for an existing
-   one). **Kind of project: HTML**.
-3. **Uploads**: upload `dist/alva-itch.zip` and tick **This file will be
-   played in the browser**.
-4. **Embed options**:
+Every merge to `main` publishes the release by itself
+([`.github/workflows/itch-release.yml`](../../.github/workflows/itch-release.yml)):
+the tests (`node --test`), `npm run build:itch`, `npm run verify:itch`, then
+butler, itch.io's own upload tool, pushes `dist/itch/` to the project's
+`html5` channel, labelled with the commit. A failure anywhere stops it before
+the upload, and the game on itch.io stays as it was. Every run keeps the ZIP
+on its page (the **Actions** tab, 90 days), published or not, and **Run
+workflow** there runs it by hand.
+
+### Setting it up, once
+
+1. On itch.io, **Create new project**, **Kind of project: HTML**, and save
+   it as a draft (no upload yet).
+2. On itch.io, **Settings › API keys**: generate a key. On GitHub, the
+   repository's **Settings › Secrets and variables › Actions**: add the key
+   as the secret `BUTLER_API_KEY`, and add the variable `ITCH_GAME`, the
+   project as in its address, `<user>/<project>` (`hiyroscript/alva` for
+   `hiyroscript.itch.io/alva`). The key never goes in a file.
+3. On GitHub, **Actions › itch.io release › Run workflow** on `main` (or
+   merge anything): the first upload arrives in the `html5` channel.
+4. On itch.io, **Edit game › Uploads**: tick **This file will be played in
+   the browser** on that upload. **Embed options**:
    - **Viewport dimensions**: a 16:9 size such as 1280 × 720 (or 960 ×
      540); the game fits any size.
    - **Mobile friendly**: on, **Orientation**: landscape (the game shows
@@ -178,20 +194,29 @@ they can change.
      keyboard focus at once.
    - **Enable scrollbars**: off. **SharedArrayBuffer support**: off (not
      needed).
-5. Save, then open the page while it is still a draft or restricted.
-6. Verify it: the splash plays, Home appears, a battle starts and plays,
+5. Save, then open the page while it is still a draft or restricted, and
+   verify it: the splash plays, Home appears, a battle starts and plays,
    the keyboard works after a click into the game, a controller works,
    fullscreen works, the browser console shows no errors, and on a phone in
    landscape the touch controls appear.
-7. Publish when it is right. Uploading or publishing is the owner's call:
-   nothing in the repository does it.
+6. Publish the page when it is right. Its visibility stays the owner's: the
+   workflow only replaces the files, keeping the upload's settings.
+
+Until the secret and the variable are set, the workflow runs every check
+and uploads nothing.
 
 ### Updating it
 
-Change the repository as usual (the tests, `node --test`, must pass), then
-`npm run build:itch` (and `npm run verify:itch` after a change to the
-simulation), and on itch.io upload the new `dist/alva-itch.zip`, mark it as
-played in the browser and delete the old upload.
+Merge to `main`; the release follows. `npm run verify:itch` locally runs the
+workflow's own check before a change to the simulation is merged. After a
+large change, play the itch.io page on real devices again.
+
+### By hand
+
+Without the workflow: `npm run build:itch`, then on itch.io upload
+`dist/alva-itch.zip`, tick **This file will be played in the browser** and
+delete the older upload. A ZIP uploaded by hand is an upload of its own
+beside the workflow's `html5` channel: keep only one playable.
 
 ### What is different inside itch.io's page
 

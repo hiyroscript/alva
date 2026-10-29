@@ -57,6 +57,7 @@ npm run build:itch    # dist/itch/ and dist/alva-itch.zip, validated
 npm run verify:itch   # the bundle against the source, step for step
 ```
 
-Upload `dist/alva-itch.zip` as an HTML game. How it is made, what it
-checks, the embed settings and updating it: [the itch.io
-release](itch-release.md).
+Upload `dist/alva-itch.zip` as an HTML game, or let every merge to `main`
+publish it (`.github/workflows/itch-release.yml`, set up once). How it is
+made, what it checks, the embed settings and the automatic publishing:
+[the itch.io release](itch-release.md).

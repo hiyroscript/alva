@@ -1,0 +1,77 @@
+# The itch.io release, on every merge to main (docs/development/itch-release.md):
+# the tests, the release built and validated, the bundle played against the
+# source, then the release published to itch.io with butler, itch.io's own
+# upload tool. Any failure stops it before the upload, and the game on itch.io
+# stays as it was. "Run workflow" (Actions tab) runs it by hand; from another
+# branch it builds and checks but never publishes.
+#
+# Publishing needs, once: the repository secret BUTLER_API_KEY (an itch.io API
+# key) and the repository variable ITCH_GAME (the project, e.g.
+# hiyroscript/alva). Without them every check still runs and nothing is
+# uploaded.
+
+name: itch.io release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One release at a time, never cut off halfway; a newer merge waits its turn.
+concurrency:
+  group: itch-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the export's tools (esbuild)
+        run: npm ci
+
+      - name: Run the tests
+        run: node --test
+
+      - name: Build and validate the release
+        run: npm run build:itch
+
+      - name: Play the bundle against the source
+        run: npm run verify:itch
+
+      # Downloadable from the run's page for 90 days, published or not.
+      - name: Keep the ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: alva-itch-${{ github.sha }}
+          path: dist/alva-itch.zip
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish to itch.io
+        if: github.ref == 'refs/heads/main'
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_GAME: ${{ vars.ITCH_GAME }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then
+            echo "::notice title=Not published::Set the BUTLER_API_KEY secret and the ITCH_GAME variable to publish (docs/development/itch-release.md)."
+            exit 0
+          fi
+          for host in broth.itch.ovh broth.itch.zone; do
+            curl -sSfL -o butler.zip "https://$host/butler/linux-amd64/LATEST/archive/default" && break
+          done
+          unzip -oq butler.zip -d butler
+          chmod +x butler/butler
+          butler/butler -V
+          butler/butler push dist/itch "$ITCH_GAME:html5" --userversion "$(git rev-parse --short HEAD)"
