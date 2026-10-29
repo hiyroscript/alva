@@ -4310,12 +4310,9 @@ development source kept modular, the same game in every respect, tested.
 `package-lock.json` (esbuild 0.28.2, a development dependency only),
 `.gitignore` (`dist/`, `node_modules/`).
 
-### Later: published on every merge
+### Later: built on every merge
 
 `.github/workflows/itch-release.yml` runs on every push to `main` (and by
-hand): the tests, the build, the equivalence check, the ZIP kept on the run,
-then butler pushes `dist/itch/` to the itch.io project `ITCH_GAME`
-(a repository variable) on its `html5` channel with the `BUTLER_API_KEY`
-secret, labelled with the commit. A failure stops it before the upload;
-without the secret and the variable it uploads nothing. The guide's
-publishing section became its one-time setup.
+hand, on any branch): the tests, the build, the equivalence check, then the
+ZIP kept on the run for 90 days. It never uploads: the owner publishes on
+itch.io by hand, from that ZIP or a local build.
