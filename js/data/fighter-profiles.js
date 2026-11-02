@@ -168,6 +168,11 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0009.playStyle',
     reviewedSourceHash: 'c4c3550ab1dc68763809a52a44b526fe0b85775a2b0d9b5b72199e5e7e3f9839',
   }),
+  '0010': Object.freeze({
+    difficulty: 4,
+    descriptionKey: 'discover.fighter.0010.playStyle',
+    reviewedSourceHash: '3a4c8ff36358c2f68e18b0344284d583e80b9ecfa3910ec8ce72b02d5855d014',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

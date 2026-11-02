@@ -269,6 +269,10 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // The Air Blast, the Air Gust and the Earth Pillar, ordinary shots; the
     // Freezing Splash (3 s) and the Air Sphere (5 s) pay nothing.
     '0009': { attack3: 15, midair_attack3: 15, extra_attack: 15, 'tech:attack4': 0, 'tech:attack5': 0 },
+    // It creates nothing of its own but the Emergency Meeting's call, and
+    // that has its 3 s: the Kill (5 s) and the Meeting pay nothing, and the
+    // Vent, the Tongue Lash and every strike are melee.
+    '0010': { 'tech:attack4': 0, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

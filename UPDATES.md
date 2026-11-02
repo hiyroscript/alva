@@ -4316,3 +4316,133 @@ development source kept modular, the same game in every respect, tested.
 hand, on any branch): the tests, the build, the equivalence check, then the
 ZIP kept on the run for 90 days. It never uploads: the owner publishes on
 itch.io by hand, from that ZIP or a local build.
+
+## #0010, the traitor in the red spacesuit
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0010 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks
+for abilities with real mechanics from the character's canon (not only
+animations and damage), no move the character cannot perform in canon
+(homing now named among them), the sheet's DeviantArt page credited and
+the character named nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0010 in roster slot 10, playable: 85 frames cut from
+  the sheet into `assets/characters/0010/` (1× crops of whole pieces of
+  its art, each tight, the flat red-orange background (228, 66, 48) made
+  transparent, nothing redrawn or recoloured, every file
+  `0010_<codename>_<frame>.png`): 83 of the fighter and 2 of the
+  meeting's call (a projectile). Where the sheet draws parts apart, a frame
+  lays them together, nothing redrawn: the flying fists beside the body,
+  the muzzle's sparks against the pistol, the tentacles' bits, the
+  emergency button set down before it, the vent under it diving in and
+  climbing out (the sheet's dive played backwards). A drawing the sheet
+  repeats is one file played again; its final move, drawn at a larger
+  scale, is no clip. Drawn at the roster's art-pixel size (a 27-pixel
+  standing pose, about 46 units tall: the roster's smallest by far); every
+  clip authors its own `anchorX` on its suit. Movement is the universal
+  one; its Energy refills at the shared 12 a second.
+- **Its kills and its tricks**, from its canon (one of a ship's crew to
+  look at, secretly hunting them: it kills unseen and must wait between
+  kills, travels through the vents, calls the emergency meeting, and under
+  the suit has a mouth with a long tongue and tentacles), each with a
+  mechanic: **Punches** (1 that holds, then 3) and the **Pistol Whip**
+  (1 that holds, then a point-blank shot, 3 at Base Launch 2), its Mash
+  Combo pair; the **Air Kick** and the **Tentacle Sweep** (all round it,
+  launching straight up) in the air; the **Tongue Lash** (its tongue out to
+  70 units, 3 that holds, reeling whoever it strikes in to its feet, on the
+  ground and in the air); the **Kill** (a technique and a Special: a knife
+  out of nowhere, 5 at Base Launch 2, and on a back turned to it the kill,
+  10 at Base Launch 3; then its kill cooldown, the policy's 5 s); the
+  **Emergency Meeting** (a technique and a Special: the button slammed,
+  everyone within 260 units called to it either side and whoever reaches
+  it held there 1.2 s; 3 s); the **Vent** (a Special: into a vent at its
+  feet and out of another up to 240 units further along the floor,
+  bursting out at whoever stands there, 3 that holds; meanwhile only the
+  vent's hatch can be hit). Its guard is its fists raised; its Deflect its
+  body rolled over sideways; its Dash a headlong lunge, its air dash its
+  body flung out flat. It heals nobody, summons nobody, throws nothing of
+  its own, never homes in, and no move of it costs Energy but its Deflect.
+- **Two shared capabilities, for any fighter.**
+  - **`backstab`**, a hit effect on any hit (`{ damage, baseLaunch,
+    directionalLaunch, hitstun, hitstop }`): a real hit that finds its
+    target's back turned to where it comes from (`backTurned` in
+    `js/game/combat/hit-effects.js`) deals those instead of its own, its
+    event marked `backstab`. A Shield blocks it like any hit, either way
+    round. The cooldown policy weighs a move by the harder of the two (a
+    backstab of 10 earns 5 s), and the CPU values one where its target's
+    back is turned (`values.js`).
+  - **`tunnel`**, an attack motion for a ground-only attack (`{ distance,
+    hide, at, show, hurtboxes }`): from `hide` the fighter is inside the
+    floor (through other fighters, no pull moves it, only the motion's own
+    `hurtboxes`, never none, open to a hit: Alva still has no
+    invulnerability); at `at` it moves at once up to `distance` along the
+    ground it stands on (`tunnelExit` in `js/game/fighters/movement.js`:
+    never past that ground's end, never into the Void or a solid, under a
+    wall standing on it); at `show` it is out. The CPU predicts it with
+    the same `tunnelExit`, reads its reach swept along the floor and
+    counts it an approach and a mobility move.
+- **Small.** At its true height, what is aimed high passes over it
+  standing: #0001's Jab, #0001's Red and #0007's Pistol and Rocket
+  Launcher shots; every other Jab meets it. The Shield-Energy tests that
+  struck every fighter with #0001's Jab now use, for a target it passes
+  over, the first roster Jab that meets it (#0002's).
+- **Its controller layout** by the comfort rules (Square Punches / Air
+  Kick, Triangle the Pistol Whip / Tentacle Sweep, R2 the Tongue Lash both
+  ways, L2 the Kill, Circle the Emergency Meeting, the right stick down the
+  Vent), touch buttons, names and descriptions in English and French, a
+  Discover profile (4/5) and its credits (the sheet by xxalexsmashxx on
+  DeviantArt, linked by the deviation's number alone; the sheet's own
+  description could not be read from here, so no sheet credit was added
+  beyond the author).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 216 matches a level): #0010 wins 0.54 at
+Medium, 0.42 at Hard and 0.45 at Brutal; one-sided against #0001 (21 of
+24 at Medium and Hard, 17 at Brutal), whose Jab and Red pass over it, and
+weakest against #0002. Details in
+[#0010's specification](docs/characters/0010.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0010.js`: the
+moves' phases are whole frames of their clips at `FPS_0010` (the orders
+`PUNCHES_0010`, `PISTOL_0010`, `TONGUE_0010`, `VENT_0010` and the rest);
+reaches are the attacks' `hitbox`es and the Kill's `burst`; the kill's
+worth is its burst hit's `backstab`; the Vent's way is
+`attacks.extra_attack.motion` (`distance`, `hide`, `at`, `show`, its
+hatch's `hurtboxes`); the meeting's call is `projectiles.attack5_object`
+(its `pull` and `paralyze`).
+
+**Code:** `js/data/characters/0010.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/hit-effects.js` (`backstab`, `backTurned`),
+`js/game/combat/combat.js` (`applyHit` reads it, every hit passes where it
+comes from), `js/game/combat/attacks.js` (the `tunnel` motion, a strike's
+and a pending attack's `backstab`), `js/game/combat/projectile.js` (a
+finisher's), `js/data/cooldowns.js`, `js/game/fighters/movement.js`
+(`tunnelExit`), `js/game/fighters/fighter.js` (the tunnel, `inFloor`, its
+hurtboxes and pass-through), `js/game/combat/pull.js`,
+`js/game/ai/cpu-intelligence/prediction.js`, `capabilities.js` and
+`values.js`; the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0010.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy,
+input, launch, movement, rendering, the AI, testing).
+
+**Tests:** new `tests/fighters/0010/fighter-0010.test.mjs` (registration
+and kit; nothing costing Energy but the Deflect; its Mash Combo; its
+names, touch buttons and controller layout; the 85 files, clean and
+tight, none a copy, at one scale, anchored on its body, its call centred;
+every move's mechanic: the holds, the tentacles either side, the tongue's
+reel on its front only, the kill's 5 and 10, its kill cooldown, its block
+and its broken cast, the vent's move along the floor all at once, its
+hatch, its ledge and its reach for the CPU, the meeting's call either
+side, its hold and a Shield holding its ground; its Deflect turning a shot
+back; the high Jab passing over it; the CPU playing its whole kit; its
+source named nowhere); new `backstab.test.mjs` and `tunnel.test.mjs`; the
+roster-wide tables (`cooldown-policy`, `special-abilities`: fifteen
+Specials, `strict-combat-rules`, `mash-combo`), `hit-effects` and `launch`
+(the new field and event key), `combat-rules` (the Jab that meets each
+target), `move-cancel` (a strike made where it stands, never a tunnel),
+`empty-roster`, `discover`, `practice-ground`, `watch-mode`, `settings`
+(its credits) and each fighter's roster list.

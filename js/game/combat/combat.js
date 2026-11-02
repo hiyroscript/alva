@@ -63,7 +63,7 @@
 
 import { resolveLaunchStrength, resolveDirectionalLaunch } from '../../data/launch.js';
 import { attackPhase, strikeLive } from './attacks.js';
-import { hitReaches } from './hit-effects.js';
+import { backTurned, hitReaches } from './hit-effects.js';
 
 // How a fighter responds to being launched (the character's
 // `launchReaction`, every field optional; the defaults change nothing):
@@ -271,7 +271,7 @@ export class CombatSystem {
         // block) opens its hitCancel.
         atk.hasHit = true;
         const event = this.applyHit(attacker, target, atk.def, {
-          point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null,
+          point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null, fromX: attacker.body.x,
         });
         atk.confirmed = event.type === 'hit';
         atk.confirmedAt = atk.time;
@@ -295,7 +295,7 @@ export class CombatSystem {
         const def = p.nextHit;
         if (!hitReaches(def, target, p.x)) continue;
         const event = this.applyHit(p.owner, target, def, {
-          facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 },
+          facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 }, fromX: p.x,
         });
         p.struck(event.type === 'block', target);
         break;
@@ -312,7 +312,7 @@ export class CombatSystem {
         c.hasHit = true;
         // The clone's own facing, never the owner's: a horizontal launch
         // travels from the clone.
-        this.applyHit(c.owner, target, c.attackDef, { facing: c.facing, summon: c, point });
+        this.applyHit(c.owner, target, c.attackDef, { facing: c.facing, summon: c, point, fromX: c.x });
         c.hitstop = c.attackDef.hitstop;
         break;
       }
@@ -326,7 +326,7 @@ export class CombatSystem {
       for (const target of fighters) {
         if (target === owner || !hitReaches(t.def.burst.hit, target, owner.body.x)) continue;
         const point = strikePoint(box, target);
-        if (point) this.applyHit(owner, target, t.def.burst.hit, { facing: t.facing, technique: t, point });
+        if (point) this.applyHit(owner, target, t.def.burst.hit, { facing: t.facing, technique: t, point, fromX: owner.body.x });
       }
     }
     return this.events;
@@ -374,7 +374,7 @@ export class CombatSystem {
       const point = strikePoint(box, target);
       if (!point) continue;
       atk.hasHit = true;
-      const event = this.applyHit(attacker, target, impact.hit, { point });
+      const event = this.applyHit(attacker, target, impact.hit, { point, fromX: attacker.body.x });
       if (event.type === 'hit' && !atk.confirmed) {
         atk.confirmed = true;
         atk.confirmedAt = atk.time;
@@ -399,7 +399,7 @@ export class CombatSystem {
         atk.struck.add(h.index);
         atk.hasHit = true;
         const event = this.applyHit(attacker, target, h, {
-          point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null,
+          point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null, fromX: attacker.body.x,
         });
         if (event.type === 'block') atk.blocked = true;
         else if (event.type === 'hit' && !atk.confirmed) {
@@ -425,7 +425,7 @@ export class CombatSystem {
     const point = strikePoint(box, target);
     if (!point) return null;
     const facing = Math.sign(target.body.x - (box.x + box.w / 2)) || 1;
-    return this.applyHit(null, target, def, { facing, hazard, point });
+    return this.applyHit(null, target, def, { facing, hazard, point, fromX: box.x + box.w / 2 });
   }
 
   // Shared by melee, projectiles, clones, techniques and stage hazards:
@@ -493,10 +493,16 @@ export class CombatSystem {
   // (`authoredBaseLaunch`), and `mash` the turn ({ turn, turns, final }) or
   // null. The final turn launches with its own Base Launch, from the
   // Launch Point the series has built.
+  //
+  // A hit with a `backstab` (js/game/combat/hit-effects.js) that the target
+  // does not block, landing with its back turned to `fromX` (the world x the
+  // hit comes from: its attacker's, its projectile's, its clone's; see
+  // backTurned), deals the backstab's damage, launch and stuns instead of
+  // its own; its event says so (`backstab`). Nothing else about it changes.
   applyHit(attacker, target, def, {
     facing = attacker?.facing ?? 1, projectile = null, summon = null, technique = null, hazard = null,
     detached = !!(projectile || summon || technique || hazard), point = bodyPoint(target), velocity = null,
-    suppressLaunch = false, mash = null,
+    suppressLaunch = false, mash = null, fromX = null,
   } = {}) {
     const tc = target.combat;
     // The universal Shield rule: up at contact, it blocks. Nothing about the
@@ -515,14 +521,19 @@ export class CombatSystem {
     if (!blocked && attacker?.combat?.charmedTo?.(target)) return this.charmed(attacker, target, def, { projectile, summon, technique, point });
     // Frightened of its attacker before this hit: the hit feeds it (below).
     const feeds = !blocked && !!attacker && tc.frightenedOf?.(attacker);
-    const damage = blocked ? 0 : def.damage;
+    // Its back turned to the hit: a backstab's own damage, launch and stuns.
+    const stab = !blocked && def.backstab && backTurned(target, fromX, facing) ? def.backstab : null;
+    const damage = blocked ? 0 : stab ? stab.damage : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
     // Every real hit restarts recovery, including non-launching strikes.
     // A block leaves the existing schedule untouched.
     if (!blocked) tc.resetLaunchRecovery();
     const launchPointAfter = tc.launchPoint;
-    const baseLaunch = suppressLaunch ? 0 : def.baseLaunch;
+    const baseLaunch = suppressLaunch ? 0 : stab ? stab.baseLaunch : def.baseLaunch;
+    const directionalLaunch = stab ? stab.directionalLaunch : def.directionalLaunch;
+    const hitstunOwn = stab?.hitstun ?? def.hitstun;
+    const hitstop = stab?.hitstop ?? def.hitstop;
     const launchStrength = blocked ? 0 : resolveLaunchStrength(baseLaunch, launchPointAfter);
     // The target may bend its launch a little with the direction it holds
     // as the hit lands (launch steering: never the strength, only the angle;
@@ -531,10 +542,10 @@ export class CombatSystem {
     const reaction = target.launchReaction;
     const held = target.steerHeld && target.body.grounded && target.steerHeld.y > 0 ? { x: target.steerHeld.x, y: 0 } : target.steerHeld;
     const finalLaunch = steerLaunch(
-      resolveDirectionalLaunch(def.directionalLaunch, launchStrength, facing), held, reaction?.steerAngle,
+      resolveDirectionalLaunch(directionalLaunch, launchStrength, facing), held, reaction?.steerAngle,
     );
     const launchSpeed = Math.hypot(finalLaunch.x, finalLaunch.y);
-    const hitstun = def.hitstun > 0 ? def.hitstun + resolveLaunchStun(launchSpeed, reaction) : 0;
+    const hitstun = hitstunOwn > 0 ? hitstunOwn + resolveLaunchStun(launchSpeed, reaction) : 0;
     // A hit with no stun or freeze of its own leaves any already running
     // as it is. A block's stun holds the Shield
     // only while it is still up.
@@ -543,8 +554,8 @@ export class CombatSystem {
     } else if (hitstun > 0) {
       tc.stun = hitstun;
     }
-    if (def.hitstop > 0) tc.hitstop = def.hitstop;
-    if (!detached) attacker.combat.hitstop = def.hitstop;
+    if (hitstop > 0) tc.hitstop = hitstop;
+    if (!detached) attacker.combat.hitstop = hitstop;
     const stall = blocked && !detached ? target.defense?.stall ?? 0 : 0;
     if (stall > 0 && stall > attacker.combat.hitstop) attacker.combat.hitstop = stall;
     // ...and a technique: no armour. A real hit ends it at once (whatever it
@@ -586,8 +597,8 @@ export class CombatSystem {
     const event = {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
       damage, energyCost, launchPointBefore, launchPointAfter,
-      baseLaunch, authoredBaseLaunch: def.baseLaunch, mash,
-      directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
+      baseLaunch, authoredBaseLaunch: stab ? stab.baseLaunch : def.baseLaunch, mash,
+      directionalLaunch, launchStrength, finalLaunch, backstab: !!stab,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || launched ? 0 : Math.max(def.paralyze ?? 0, def.float ?? 0),
       float: blocked || launched ? 0 : def.float ?? 0, charm: blocked ? 0 : def.charm ?? 0,

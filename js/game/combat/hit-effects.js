@@ -4,7 +4,7 @@
 // applied by CombatSystem.applyHit (js/game/combat/combat.js).
 //
 // Inputs: one hit's entry from a character definition.
-// Outputs: resolveHitEffects, HIT_EFFECT_FIELDS, hitReaches, createHit
+// Outputs: resolveHitEffects, HIT_EFFECT_FIELDS, hitReaches, backTurned, createHit
 // (a hit of its own: a technique's burst, a slam's impact) and
 // FLOAT_RISE_SPEED.
 // Important constraints: every field is optional and its default changes
@@ -71,6 +71,19 @@
 //                       passes it by and nothing is used up, as a quake
 //                       passes a fighter off the ground. A Shield raised
 //                       toward it still blocks it like any hit.
+//   backstab: { damage: 10, baseLaunch: 3, directionalLaunch: 'horizontal' }
+//                       the hit lands harder on a fighter with its back
+//                       turned to where it comes from (see backTurned): a
+//                       real hit that finds its target so deals these
+//                       instead of its own, its own damage tier (required),
+//                       its own Base Launch and Directional Launch (each
+//                       authored, none when left out, as for any hit) and,
+//                       optionally, its own `hitstun` and `hitstop` (the
+//                       hit's own when left out). Everything else is the
+//                       hit's own: its stuns on a block, its other effects.
+//                       A Shield, raised toward it or not, still blocks it
+//                       like any hit. The cooldown policy weighs a move by
+//                       the harder of the two (js/data/cooldowns.js).
 //
 // For example:
 //
@@ -80,12 +93,17 @@
 //   burst: { hitbox: { x: -160, y: -110, w: 320, h: 130 }, hit: { damage: 1, charm: 2.5 } },
 //   burst: { hitbox: { x: 0, y: -120, w: 170, h: 120 }, hit: { damage: 1, float: 1.6, gaze: true } },
 //   attack5: { ..., damage: 3, fear: 2.5 },
+//   burst: { hitbox: { ... }, hit: { damage: 5, baseLaunch: 2, directionalLaunch: 'horizontal',
+//     backstab: { damage: 10, baseLaunch: 3, directionalLaunch: 'horizontal' } } },
 
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { assertNoShieldBypass } from './offense.js';
 
 // The fields a hit may declare here, with the value that changes nothing.
-const DEFAULTS = Object.freeze({ paralyze: 0, blockPush: 0, quake: false, charm: 0, float: 0, fear: 0, gaze: false });
+const DEFAULTS = Object.freeze({ paralyze: 0, blockPush: 0, quake: false, charm: 0, float: 0, fear: 0, gaze: false, backstab: null });
+
+// What a hit's `backstab` may declare (see above): the rest stays the hit's.
+const BACKSTAB_FIELDS = Object.freeze(['damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'hitstop']);
 
 // World units per second a floating fighter rises (see `float` above): the
 // same for every fighter and every hit, a slow drift up, never a launch.
@@ -113,7 +131,37 @@ export function resolveHitEffects(spec, owner = 'A hit') {
   if (!seconds(float)) throw new Error(`[Alva] ${owner}'s float must be seconds from 0`);
   if (!seconds(fear)) throw new Error(`[Alva] ${owner}'s fear must be seconds from 0`);
   if (typeof gaze !== 'boolean') throw new Error(`[Alva] ${owner}'s gaze must be true or false`);
-  return { paralyze, blockPush, quake, charm, float, fear, gaze };
+  const backstab = resolveBackstab(spec?.backstab ?? DEFAULTS.backstab, owner);
+  return { paralyze, blockPush, quake, charm, float, fear, gaze, backstab };
+}
+
+// A hit's frozen `backstab` (see above) from its entry, or null: its own
+// damage tier and launch, validated as any hit's, and its stuns if it has
+// its own (null: the hit's). Anything else in it is refused, and so is any
+// way past a Shield.
+function resolveBackstab(spec, owner) {
+  if (spec === null) return null;
+  const who = `${owner}'s backstab`;
+  if (typeof spec !== 'object' || Array.isArray(spec)) throw new Error(`[Alva] ${who} must be a hit's damage and launch`);
+  assertNoShieldBypass(spec, who);
+  const extra = Object.keys(spec).filter((field) => !BACKSTAB_FIELDS.includes(field));
+  if (extra.length) throw new Error(`[Alva] ${who} declares ${extra.join(', ')}: it may declare only ${BACKSTAB_FIELDS.join(', ')}`);
+  const seconds = (value) => value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  if (!seconds(spec.hitstun) || !seconds(spec.hitstop)) throw new Error(`[Alva] ${who}'s hitstun and hitstop must be seconds from 0`);
+  return Object.freeze({
+    damage: resolveHitDamage(spec.damage, who), ...resolveHitLaunch(spec, who),
+    hitstun: spec.hitstun ?? null, hitstop: spec.hitstop ?? null,
+  });
+}
+
+// Whether `target` has its back turned to a hit coming from world x `fromX`
+// and travelling toward `facing` (1 right, -1 left): the hit comes from
+// the side it faces away from; level with it, the hit travels the way it
+// faces. Read by a hit's `backstab` (CombatSystem.applyHit) and by the CPU
+// that weighs one (js/game/ai/cpu-intelligence/values.js).
+export function backTurned(target, fromX, facing) {
+  const side = fromX === null || fromX === undefined || !target?.body ? 0 : Math.sign(fromX - target.body.x);
+  return side ? side === -target.facing : target?.facing === facing;
 }
 
 // Whether hit `def` can reach `target` at all where it is now: always,

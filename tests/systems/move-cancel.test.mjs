@@ -231,7 +231,12 @@ test('an attack that hit and reached its hitCancel is still cut short by another
 test('never in a freeze, a stun or a paralysis: a press during the hit\'s freeze waits; a paralysis or a stun takes the attack away', () => {
   for (const c of playableCharacters()) {
     const f = far(c).player;
-    const [first, second] = pairs(f).find(([a]) => f.attacks[f.attackFor(a)].hitbox && !f.attacks[f.attackFor(a)].projectile);
+    // A strike made where it stands: no projectile, and no tunnel that
+    // comes out somewhere else to strike.
+    const [first, second] = pairs(f).find(([a]) => {
+      const atk = f.attacks[f.attackFor(a)];
+      return atk.hitbox && !atk.projectile && atk.motion?.type !== 'tunnel';
+    });
     const r = playerRig({ character: c, gap: 40, automaticTurnAround: false });
     r.tick(press(first));
     r.until(() => r.player.combat.hitstop > 0);

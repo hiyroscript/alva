@@ -472,7 +472,13 @@ simulation follows the same rules as combat: a quake strike, burst,
 impact or shot meets only a fighter its path has standing on the ground (so the CPU
 counts on none against an airborne opponent, and fears none while its own
 path keeps it in the air), a gaze burst only an opponent facing the CPU,
-and a slam stands through its landing where it lands. A move's Step-in is
+a slam stands through its landing where it lands, and a tunnel (#0010's
+Vent) moves along the floor all at once where `tunnelExit` says, the
+Fighter's own function, so its strike is predicted where it comes out (its
+reach swept along the floor; a `tunnel` is an `approach` and a
+`mobility` move). A hit with a `backstab` is valued as its backstab where
+its target's back is turned to where it comes from (`backTurned`, the
+same as combat), on the CPU's hits and on the hits it fears alike. A move's Step-in is
 counted as the distance it really travels (`lunge`, from `stepInTravel`):
 the shared Step-in, a lean of about 11 units, never makes a strike an
 `approach` or a `mobility` move; only a lunge of about a fighter's width
@@ -673,6 +679,12 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   the CPU playing #0009's whole kit, its strikes, its staff, its wind, its
   rock (a shot that stands where it rises) and its water, and its trance
   once it is in danger;
+  [`tests/fighters/0010/fighter-0010.test.mjs`](../../tests/fighters/0010/fighter-0010.test.mjs):
+  the CPU playing #0010's whole kit, its strikes, its tongue, its kill,
+  its meeting and its vent (a `tunnel` it predicts with the Fighter's own
+  `tunnelExit`, its reach the strike swept along the floor); a backstab
+  weighed where its target's back is turned (`values.js`) in
+  [`backstab.test.mjs`](../../tests/systems/backstab.test.mjs);
   [`technique.test.mjs`](../../tests/systems/technique.test.mjs): the CPU
   waiting, as a press does, for the danger a technique needs.
 - [`tests/helpers/cpu-match.mjs`](../../tests/helpers/cpu-match.mjs) and

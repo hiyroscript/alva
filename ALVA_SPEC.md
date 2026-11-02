@@ -101,8 +101,8 @@ behave, and how it must look.
   `assets/characters/0002/`, `assets/characters/0003/`,
   `assets/characters/0004/`, `assets/characters/0005/`,
   `assets/characters/0006/` (its three members' frames),
-  `assets/characters/0007/`, `assets/characters/0008/` and
-  `assets/characters/0009/` are the only fighter art in the repository today, and any future fighter's frames go
+  `assets/characters/0007/`, `assets/characters/0008/`,
+  `assets/characters/0009/` and `assets/characters/0010/` are the only fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
   character specification (7.2.9).
@@ -139,8 +139,8 @@ behave, and how it must look.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
   never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's,
-  #0006's, #0007's, #0008's and #0009's art faces right; #0001's three orbs, #0004's note,
-  #0005's balloons and #0007's molotov fire are direction-neutral.)
+  #0006's, #0007's, #0008's, #0009's and #0010's art faces right; #0001's three orbs, #0004's note,
+  #0005's balloons, #0007's molotov fire and #0010's meeting call are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -151,7 +151,7 @@ behave, and how it must look.
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
   artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's,
-  #0007's, #0008's, #0009's or any later fighter's). Do not download
+  #0007's, #0008's, #0009's, #0010's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -656,11 +656,11 @@ no header, build label, eyebrow or keyboard hint bar.
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
   (silhouette + lock). No invented names or power ratings.
-- **Today nine slots are selectable:** `#0001` in slot 01 (selected and
+- **Today ten slots are selectable:** `#0001` in slot 01 (selected and
   focused by default, as the first playable fighter), `#0002` in slot 02,
   `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
-  slot 06, `#0007` in slot 07, `#0008` in slot 08 and `#0009` in slot 09;
-  the other 39 are locked. A fighter that is not
+  slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09 and
+  `#0010` in slot 10; the other 38 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -944,6 +944,9 @@ Battle. A real two-player battle: no CPU anywhere.
     DeviantArt, the line linked to the sheet's page (by the deviation's
     number alone, so the address names nothing), and the credit the sheet
     itself asks for: GameInvader.
+  - **#0010 sprite source** — sprite sheet by xxalexsmashxx on DeviantArt,
+    the line linked to the sheet's page (by the deviation's number alone,
+    so the address names nothing).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -955,9 +958,9 @@ Battle. A real two-player battle: no CPU anywhere.
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
 - The UI does not name the character behind #0001, #0002, #0003, #0004,
-  #0005, #0006, #0007, #0008 or #0009 (or any fighter): each stays `#0001` /
-  `#0002` / `#0003` / `#0004` / `#0005` / `#0006` / `#0007` / `#0008` /
-  `#0009` in game, and
+  #0005, #0006, #0007, #0008, #0009 or #0010 (or any fighter): each stays
+  `#0001` / `#0002` / `#0003` / `#0004` / `#0005` / `#0006` / `#0007` /
+  `#0008` / `#0009` / `#0010` in game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
@@ -1498,7 +1501,8 @@ English and French.
   Hollow Purple, #0003's Mystical Palm Technique, #0004's World is Mine,
   #0005's Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
   Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
-  Splash and Air Sphere, marked Ground or Air;
+  Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent, marked
+  Ground or Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -1909,13 +1913,14 @@ each fighter's own values are in its character specification (7.2.9).
 #### 7.2.1 Roster and the character system
 
 - **Roster and availability.** `CHARACTERS` (the registry,
-  `js/data/characters.js`) holds nine definitions today, each in a module
+  `js/data/characters.js`) holds ten definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
-  `0004.js`, `0005.js`, `0006.js`, `0007.js`, `0008.js`, `0009.js`):
-  `#0001` in roster slot 01, `#0002` in slot 02, `#0003` in slot 03,
-  `#0004` in slot 04, `#0005` in slot 05, `#0006` in slot 06, `#0007` in
-  slot 07, `#0008` in slot 08 and `#0009` in slot 09, each fully
-  implemented (7.2.9) and playable: `available: true`. All nine are
+  `0004.js`, `0005.js`, `0006.js`, `0007.js`, `0008.js`, `0009.js`,
+  `0010.js`): `#0001` in roster slot 01, `#0002` in slot 02, `#0003` in
+  slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in slot 06,
+  `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09 and `#0010`
+  in slot 10, each fully implemented (7.2.9) and playable: `available:
+  true`. All ten are
   preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -2061,6 +2066,11 @@ each fighter's own values are in its character specification (7.2.9).
   and `attack3` (the Air Blast; `midair_attack3`, the Air Gust) are
   ordinary attacks, `attack4` (the Freezing Splash) and `attack5` (the Air
   Sphere) techniques, and `extra_attack` is its Earth Pillar.
+  #0010 has five: `attack1` (Punches; `midair_attack1`, the Air Kick),
+  `attack2` (the Pistol Whip; `midair_attack2`, the Tentacle Sweep) and
+  `attack3` (the Tongue Lash; `midair_attack3`, the Tongue Lash) are
+  ordinary attacks, `attack4` (the Kill) and `attack5` (the Emergency
+  Meeting) techniques, and `extra_attack` is its Vent.
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -2073,11 +2083,12 @@ each fighter's own values are in its character specification (7.2.9).
   #0003: the Mystical Palm Technique; #0004: World is Mine; #0005: the
   Deadlights and the Red Balloon; #0006: Ice Breath; #0007: the Rocket
   Launcher; #0008: the Feast and the Gum-Gum Giant Pistol; #0009: the
-  Freezing Splash and the Air Sphere: twelve across the roster. Red,
-  Maximum Blue, the Whirlwind, Cherry Blossom Impact, Ievan Polkka, Dark
-  Tendrils, Heat Vision, the Sonic Scream, the Triple Strike, the Molotov
-  Cocktail, the Sawn-Offs, the Pistol, the Gum-Gum Balloon, the Gum-Gum
-  Rocket, the Air Blast, the Air Gust and the Earth Pillar are ordinary. The
+  Freezing Splash and the Air Sphere; #0010: the Kill, the Vent and the
+  Emergency Meeting: fifteen across the roster. Red, Maximum Blue, the
+  Whirlwind, Cherry Blossom Impact, Ievan Polkka, Dark Tendrils, Heat
+  Vision, the Sonic Scream, the Triple Strike, the Molotov Cocktail, the
+  Sawn-Offs, the Pistol, the Gum-Gum Balloon, the Gum-Gum Rocket, the Air
+  Blast, the Air Gust, the Earth Pillar and the Tongue Lash are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -2541,12 +2552,14 @@ each fighter's own values are in its character specification (7.2.9).
     Launcher 5 s (its 10-damage rocket), #0008 the Feast 3 s (its heal) and
     the Gum-Gum Giant Pistol 5 s (its 10-damage giant fist), #0009 the
     Freezing Splash 3 s (its freeze) and the Air Sphere 5 s (its 10-damage
-    burst); every other move of the nine, Red, Blue, Maximum Blue, Cherry
-    Blossom Impact, the Heavenly Foot of Pain, the Stage Dive, Dark
-    Tendrils, the Tornado Spin, Heat Vision, the Sonic Scream, the Molotov
-    Cocktail, the Sawn-Offs, #0008's Gatling (8 at the most), Balloon and
-    Rocket and #0009's Air Blast (a carry), Air Gust and Earth Pillar (a
-    quake) included, none at all (the ordinary ones
+    burst), #0010 the Kill 5 s (its backstab's 10, its kill cooldown) and
+    the Emergency Meeting 3 s (its hold); every other move of the ten, Red,
+    Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly Foot of Pain,
+    the Stage Dive, Dark Tendrils, the Tornado Spin, Heat Vision, the Sonic
+    Scream, the Molotov Cocktail, the Sawn-Offs, #0008's Gatling (8 at the
+    most), Balloon and Rocket, #0009's Air Blast (a carry), Air Gust and
+    Earth Pillar (a quake) and #0010's Tongue Lash (a pull) and Vent (a
+    tunnel) included, none at all (the ordinary ones
     that create a construct cost 15 Energy instead, 7.2.5). The player, the
     CPU and the ability HUD all read the same built definitions and combat
     state (`js/game/combat/move-status.js` for presentation).
@@ -2794,7 +2807,7 @@ each fighter's own values are in its character specification (7.2.9).
   - **Carry** (`carry: { lift }`, on an attack, a strike or a projectile): a
     real hit that launches nothing gives its target the velocity of what
     struck it (the attacker's body, or the projectile), less `lift` upward.
-  - **Motion** (`motion`, one of six kinds; a motion attack never changes physical facing for a visual turn
+  - **Motion** (`motion`, one of seven kinds; a motion attack never changes physical facing for a visual turn
     while it plays): `hover` stands on the air for the whole attack (no
     fall, its drift, its `airMomentum` share, under the universal air
     control);
@@ -2823,7 +2836,21 @@ each fighter's own values are in its character specification (7.2.9).
     on), then rolls the way it faces at `speed` plus `keep` × the running
     speed it had, up to `maxSpeed`, losing `friction` per second on the
     ground (none in the air); a wall stops it, and a Shield that blocks it
-    stops it dead and sends it back at `recoil`. No motion attack starts
+    stops it dead and sends it back at `recoil`. `tunnel` is a way under
+    the floor, for a ground-only attack (`groundOnly`, or it is refused):
+    from `hide` seconds in the fighter is inside the floor, passing
+    through other fighters, moved by no pull, and all of it there is to
+    hit is the motion's own `hurtboxes` (the hatch it went into: never
+    none, or it is refused; there is no invulnerability, and a hit on the
+    hatch ends the attack as any hit does); at `at` it moves at once,
+    drawn nowhere in between, up to `distance` the way it faces along the
+    ground it stands on (`tunnelExit`: its middle over ground at the
+    height its feet stand at all the way, so never past a ledge, a gap or a
+    step, never into the Void, never inside a solid, though under a wall
+    standing on that ground); at `show` (within the attack) it is out, its
+    own hurtboxes back. Nothing else moves it; its strikes are where it is
+    when they are live. The CPU predicts it with the same `tunnelExit`
+    (#0010's Vent). No motion attack starts
     while its fighter is still flying from a launch (`Fighter.launch`): a
     hang, hover, dash, plunge or lift would cancel the launch, so it must
     recover first (an air jump, a fast fall or landing).
@@ -2899,7 +2926,18 @@ each fighter's own values are in its character specification (7.2.9).
     fighter facing where it comes from, `hitReaches`; one with its back
     turned is not met at all, so nothing is used up, as a quake passes a
     fighter in the air. A Shield raised toward it blocks it like any hit;
-    #0005's Deadlights). Each defaults to changing nothing, and a value of the wrong kind is
+    #0005's Deadlights); `backstab` (`{ damage, baseLaunch,
+    directionalLaunch, hitstun, hitstop }`: the hit lands harder on a
+    fighter with its back turned to where it comes from, `backTurned`, the
+    side of it it faces away from, or, level with it, the hit travelling
+    the way it faces: a real hit that finds its target so deals the
+    backstab's own damage tier (required), Base Launch and Directional
+    Launch (each authored, none when left out) and stuns (the hit's own
+    when left out) instead of its own, its event marked `backstab`; nothing
+    else of the hit changes. A Shield blocks it like any hit, either way
+    round, and a blocked hit is no backstab. The cooldown policy weighs a
+    move by the harder of the two, so a backstab of 10 earns 5 s; the CPU
+    values one where its target's back is turned; #0010's Kill). Each defaults to changing nothing, and a value of the wrong kind is
     refused. No hit effect gets past a Shield (above).
   - **Per airtime** (`airUses`): how many times the attack may start before
     the fighter lands or is hit. **Free fall** (`freeFall: true`): started
@@ -3388,7 +3426,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Impact, #0004 the Melody, #0006 Heat Vision and the Sonic Scream, #0007
   the Pistol, the Molotov Cocktail and the Sawn-Offs, #0009 the Air Blast,
   the Air Gust and the Earth Pillar (#0008 has none: it creates nothing,
-  every move its own body). One
+  every move its own body; nor has #0010: its one construct, the
+  Emergency Meeting's call, has its 3 s). One
   activation pays once: never per projectile update, per hit (a piercing
   orb's several strikes), per frame a construct lives, per clone strike,
   per projectile turned back or per phase; a refused press pays nothing
@@ -3397,7 +3436,7 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14, #0006 14, #0007 14, #0008 12, #0009 12). The maximum and every
+  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12). The maximum and every
   cost are universal (a move's own `energyCost` too: one it declares must
   agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
@@ -3463,7 +3502,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Cocktail and the Sawn-Offs none (15 Energy each), #0008 the Feast 3 s
   (its heal) and the Gum-Gum Giant Pistol 5 s (its 10-damage giant fist),
   #0009 the Freezing Splash 3 s (its freeze) and the Air Sphere 5 s (its
-  10-damage burst), with cast/release timing,
+  10-damage burst), #0010 the Kill 5 s (its backstab's 10) and the
+  Emergency Meeting 3 s (its call's hold), with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from attacks' cooldowns in
@@ -3592,7 +3632,9 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   burst that floats whoever faces it, a gaze, docs/characters/0005.md),
   and #0009's Freezing Splash (a burst that freezes) and Air Sphere (a
   burst round it, open only in danger, its sphere as its art,
-  docs/characters/0009.md); a
+  docs/characters/0009.md), and #0010's Kill (a burst with a backstab) and
+  Emergency Meeting (a projectile that never moves, pulls either side and
+  holds, docs/characters/0010.md); a
   technique of another shape would be a new
   form in the runtime, not a new reading of these fields. The CPU reads a
   technique's lead (its cast), where it lands (its burst's box, its
@@ -4183,6 +4225,16 @@ there, and nothing in one is a rule for another fighter.
   Splash and the Air Sphere, its trance, open only in danger, its Specials,
   as techniques; launches it steers further than anyone, its arms raised
   for its guard and its staff twirled overhead for its Deflect).
+- **#0010**: [docs/characters/0010.md](docs/characters/0010.md) (the
+  traitor in the red spacesuit, the roster's smallest, who catches its
+  opponents off guard: Punches and the Pistol Whip up close, its Mash
+  Combo; the Air Kick and the Tentacle Sweep in the air; the Tongue Lash,
+  reeling its target in, on the ground and in the air; the Kill, twice as
+  strong on a back turned to it, and the Emergency Meeting, calling
+  everyone near to the button and holding them there, as techniques; the
+  Vent, under the floor and out further along it, only its hatch open to a
+  hit meanwhile; its Specials the Kill, the Vent and the Meeting; its fists
+  raised for its guard and its body rolled over for its Deflect).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -4198,7 +4250,8 @@ reviewed. Recheck its difficulty and play-style description, then update
 reviewedSourceHash"), and whenever a playable fighter has no valid profile
 or description in both languages, so every change to a fighter brings its
 profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
-#0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5.
+#0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5,
+#0010 4/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -4256,7 +4309,8 @@ Adding one is described in
   5 s, #0003 Mystical Palm Technique 3 s, #0004 Ievan Polkka 5 s and World
   is Mine 3 s, #0005 Deadlights 3 s and Red Balloon 3 s, #0006 Ice Breath
   3 s, #0007 Rocket Launcher 5 s, #0008 Feast 3 s and Gum-Gum Giant Pistol
-  5 s, #0009 Freezing Splash 3 s and Air Sphere 5 s). The fighter the
+  5 s, #0009 Freezing Splash 3 s and Air Sphere 5 s, #0010 Kill 5 s and
+  Emergency Meeting 3 s). The fighter the
   ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
@@ -4354,7 +4408,9 @@ Adding one is described in
     Gum-Gum Stamp, Rocket and Floating Balloon; #0009: ground Swift
     Strikes, the Fire Kick, the Air Blast, the Freezing Splash, the Air
     Sphere and the Earth Pillar, air the Staff Swing, the Rising Air Kick
-    and the Air Gust.
+    and the Air Gust; #0010: ground Punches, the Pistol Whip, the Tongue
+    Lash, the Kill, the Emergency Meeting and the Vent, air the Air Kick,
+    the Tentacle Sweep and the Tongue Lash.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -4607,7 +4663,8 @@ Adding one is described in
   Rocket Launcher; for #0008, O is the Gum-Gum Balloon (the Floating
   Balloon in the air), M the Feast and `,` the Gum-Gum Giant Pistol; for
   #0009, O is the Air Blast (the Air Gust in the air), M the Freezing
-  Splash and `,` the Air Sphere. The
+  Splash and `,` the Air Sphere; for #0010, O is the Tongue Lash (in the
+  air too), M the Kill and `,` the Emergency Meeting. The
   input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
@@ -4729,7 +4786,8 @@ Adding one is described in
   slot 3, the Sawn-Offs in slot 4 and the Rocket Launcher in slot 5;
   #0008: the Gum-Gum Balloon in slot 3, the Feast in slot 4 and the
   Gum-Gum Giant Pistol in slot 5; #0009: the Air Blast in slot 3, the
-  Freezing Splash in slot 4 and the Air Sphere in slot 5). A summon or technique button is
+  Freezing Splash in slot 4 and the Air Sphere in slot 5; #0010: the Tongue
+  Lash in slot 3, the Kill in slot 4 and the Emergency Meeting in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -5044,7 +5102,10 @@ codename is sent, never what an action does.
   Gum-Gum Rocket Triangle, Floating Balloon Circle. #0009: Swift Strikes
   Square, Fire Kick Triangle, Air Blast R2, Air Sphere L2, Freezing Splash
   the right stick forward, Earth Pillar the right stick up; in the air
-  Staff Swing Square, Air Gust R2, Rising Air Kick the right stick up. A
+  Staff Swing Square, Air Gust R2, Rising Air Kick the right stick up.
+  #0010: Punches Square, Pistol Whip Triangle, Tongue Lash R2, Kill L2,
+  Emergency Meeting Circle, Vent the right stick down; in the air Air Kick
+  Square, Tentacle Sweep Triangle, Tongue Lash R2. A
   fighter without a
   layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter

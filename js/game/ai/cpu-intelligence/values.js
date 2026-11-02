@@ -16,6 +16,7 @@
 
 import { launchOutcome } from './prediction.js';
 import { LAUNCH_UNIT_SPEED } from '../../../data/launch.js';
+import { backTurned } from '../../combat/hit-effects.js';
 
 export const KO_VALUE = 70;
 // A launch that leaves its target off the stage (not a fall yet): an
@@ -77,8 +78,11 @@ export class LaunchJudge {
     let ko = 0;
     let offstage = false;
     const stakes = target === 'foe' ? s.match.koFor : s.match.koAgainst;
+    // Where the hits come from: the other fighter, for a backstab (a target
+    // with its back turned to it takes the backstab's hit instead).
+    const fromX = target === 'foe' ? s.me.x : s.op.x;
     for (let i = 0; i < Math.min(n, strikes.length); i++) {
-      const st = strikes[i];
+      const st = stabbed(strikes[i], who, pos, fromX, face);
       lp += st.damage;
       value += st.damage * (1 + lp / 160);
       if (st.dir && st.baseLaunch > 0) {
@@ -99,6 +103,15 @@ export class LaunchJudge {
 }
 
 const NONE = Object.freeze({ ko: 0, offstage: false, speed: 0 });
+
+// Strike `st` as it would land on `who` standing at `pos`, coming from
+// `fromX` toward `face`: its backstab's damage, launch and stun when it has
+// one and `who` has its back turned to it (backTurned), else itself.
+function stabbed(st, who, pos, fromX, face) {
+  const b = st.backstab;
+  if (!b || !backTurned({ body: { x: pos.x }, facing: who.facing }, fromX, face)) return st;
+  return { ...st, damage: b.damage, baseLaunch: b.baseLaunch, dir: b.directionalLaunch, hitstun: b.hitstun ?? st.hitstun };
+}
 
 // The lifting move a fighter may use to get back (a rising air attack), as
 // the recovery simulation takes it: { speed, time, hang, airMomentum } (its

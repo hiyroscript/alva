@@ -7,7 +7,8 @@
 //   1. A move that deals 10 damage waits TEN_DAMAGE_COOLDOWN (5 s): any one
 //      hit of it dealing 10 (a strike, a multi-hit's finisher, its
 //      projectile or that projectile's finisher, a slam's impact, a
-//      technique's burst, a summoned clone's attack), or everything one use
+//      technique's burst, a summoned clone's attack, a hit's `backstab`:
+//      what it deals a target with its back turned), or everything one use
 //      can deal one target adding up to 10 or more.
 //   2. Otherwise a move with an exceptional effect waits
 //      EXCEPTIONAL_COOLDOWN (3 s): one listed in EXCEPTIONAL_EFFECTS (a heal
@@ -79,14 +80,16 @@ export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm', '
 // cooldown tests check it), so a new one has to be classified on purpose.
 export const ROUTINE_EFFECTS = Object.freeze([
   'damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'blockstun', 'hitstop',
-  'blockPush', 'quake', 'gaze', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
+  'blockPush', 'quake', 'gaze', 'backstab', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
   'motion', 'step', 'momentum', 'hits', 'projectile', 'burst', 'deflectProjectiles', 'passThrough', 'hurtboxes',
   'airUses', 'freeFall', 'groundOnly', 'hitCancel',
 ]);
 
 const sum = (hits) => hits.reduce((total, h) => total + h.damage, 0);
+// One hit as the policy weighs it: a hit with a `backstab` (a target with
+// its back turned takes that instead) by the harder of the two.
 const hit = (spec, inherited = {}) => ({
-  damage: spec?.damage ?? 0,
+  damage: Math.max(spec?.damage ?? 0, (spec?.backstab ?? inherited.backstab)?.damage ?? 0),
   paralyze: spec?.paralyze ?? inherited.paralyze ?? 0,
   charm: spec?.charm ?? inherited.charm ?? 0,
   float: spec?.float ?? inherited.float ?? 0,

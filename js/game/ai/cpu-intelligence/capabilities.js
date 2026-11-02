@@ -70,7 +70,7 @@ function strikeOf(h, at, end) {
     // as one.
     paralyze: Math.max(h.paralyze ?? 0, h.float ?? 0), float: h.float ?? 0,
     blockPush: h.blockPush ?? 0, carry: h.carry ?? null, quake: !!h.quake, gaze: !!h.gaze,
-    charm: h.charm ?? 0, fear: h.fear ?? 0,
+    charm: h.charm ?? 0, fear: h.fear ?? 0, backstab: h.backstab ?? null,
   });
 }
 
@@ -153,7 +153,7 @@ function rolesOf(m, height, fastest) {
   // A lunge counts only when it really travels (MAJOR_LUNGE): the shared
   // Step-in, a lean into the blow, never makes a jab an approach.
   const lunges = m.lunge >= MAJOR_LUNGE;
-  if (motion === 'homing' || motion === 'roll' || lunges) r.add('approach');
+  if (motion === 'homing' || motion === 'roll' || motion === 'tunnel' || lunges) r.add('approach');
   const plunge = motion === 'bounce' || motion === 'slam';
   if (m.maxBaseLaunch >= 2 || (fin.dir === 'vertical' && fin.baseLaunch >= 1)) r.add('launcher');
   if (m.hitCancel != null || m.paralyze > 0 || m.pull || m.strikes.some((s) => s.baseLaunch === 0 && s.damage > 0)) r.add('comboStarter');
@@ -166,7 +166,7 @@ function rolesOf(m, height, fastest) {
   if (shot && shot.range >= 250) r.add('zoning');
   if ((shot && ((shot.speed <= 420 && shot.lifetime >= 1) || shot.pull || shot.pierce)) || m.paralyze > 0 || m.kind === 'summon') r.add('trap');
   if (m.deflectProjectiles || shot?.repel || shot?.erase) r.add('counterProjectile');
-  if (motion === 'homing' || motion === 'roll' || motion === 'rise' || plunge || lunges ||
+  if (motion === 'homing' || motion === 'roll' || motion === 'rise' || motion === 'tunnel' || plunge || lunges ||
       (motion === 'hover' && m.air && m.total >= 0.3)) r.add('mobility');
   if (m.air && (motion === 'rise' || motion === 'homing' || (motion === 'hover' && m.total >= 0.3))) r.add('recovery');
   if (m.blockPush > 0 || m.strikes.length > 1 || shot?.pierce) r.add('shieldPressure');

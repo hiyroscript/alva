@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0009 use them between them
+is built, and usable by any fighter (#0001 to #0010 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -213,7 +213,24 @@ today):
   validated like an attack's. A plunge that runs out in the air lands
   nothing and falls on under gravity (#0003's Heavenly Foot of Pain).
   `attackReach` takes in the plunge and the impact where it would land at
-  the furthest. A motion attack keeps its physical facing,
+  the furthest. `tunnel` (`distance` and `show` required; `hide`, `at`,
+  `hurtboxes`): a way under the floor, for a ground-only attack (one that
+  is not `groundOnly` is refused). From `hide` (seconds in) the fighter is
+  inside the floor: it passes through other fighters (no pushbox), no pull
+  moves it, and all of it there is to hit is the motion's own `hurtboxes`
+  (the hatch it went into; never none, or the attack is refused: there is
+  no invulnerability anywhere, and a blow that meets the hatch flushes it
+  out as any hit ends an attack). At `at` it moves at once, drawn nowhere in
+  between, up to `distance` world units the way it faces along the ground
+  it stands on (`tunnelExit` in
+  [`movement.js`](../../js/game/fighters/movement.js): its middle stays
+  over ground at the height its feet stand at, so never past a ledge, a gap
+  or a step, never into the Void and never inside a solid, though under a
+  wall standing on that ground); at `show` it is out, its own hurtboxes
+  back. Nothing else moves it, its strikes are where it is when they are
+  live, and `show` must fall within the attack. The CPU predicts the move
+  with the same `tunnelExit`, and `attackReach` sweeps the strike along the
+  floor to its furthest (#0010's Vent). A motion attack keeps its physical facing,
   and never starts while its fighter is still flying from a launch.
 - **Pull** (`pull: { radius, speed, offset, front }`): while the attack is
   active it draws every opponent whose middle is within `radius` of its
@@ -271,7 +288,16 @@ today):
   so it reaches only a fighter facing where it comes from; one with its
   back turned is passed by with nothing used up, as a quake passes a
   fighter in the air; a Shield raised toward it blocks it like any hit;
-  `hitReaches`; #0005's Deadlights). A strike inherits its
+  `hitReaches`; #0005's Deadlights), `backstab` (`{ damage, baseLaunch,
+  directionalLaunch, hitstun, hitstop }`: a hit that lands harder on a
+  fighter with its back turned to where it comes from, `backTurned`: a
+  real hit that finds its target so deals the backstab's damage tier
+  (required), its launch (each authored, none when left out) and its stuns
+  (the hit's own when left out) instead of its own, its event marked
+  `backstab`; everything else, a block's stuns and the other effects, stays
+  the hit's; a Shield blocks it like any hit, either way round; the
+  cooldown policy weighs a move by the harder of the two, so a backstab of
+  10 earns 5 s; #0010's Kill). A strike inherits its
   attack's and a finisher its projectile's. Each defaults to changing
   nothing; a value of the wrong kind is refused. There is no hit effect
   that gets past a Shield: `unblockable` (gone) and every other field of
@@ -364,6 +390,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0007 | `['attack5']` | the Rocket Launcher (a 10-damage rocket after a long heave) | the Molotov Cocktail, the Sawn-Offs, the Pistol |
 | #0008 | `['attack4', 'attack5']` | the Feast (heals its own Launch Point), the Gum-Gum Giant Pistol (a 10-damage giant fist after a long wind-up) | the Gum-Gum Balloon, the Gum-Gum Rocket, the Gum-Gum Gatling |
 | #0009 | `['attack4', 'attack5']` | the Freezing Splash (a freeze that holds its target for a follow-up), the Air Sphere (its trance, a 10-damage burst open only in danger) | the Air Blast, the Air Gust, the Earth Pillar |
+| #0010 | `['attack4', 'extra_attack', 'attack5']` | the Kill (twice as strong on a back turned to it, then its kill cooldown), the Vent (a way under the floor, only its hatch open to a hit), the Emergency Meeting (everyone near called to the button and held there) | the Tongue Lash |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -1070,7 +1097,9 @@ or changes a hitbox, a range or a stun. The rules are
   [`charm.test.mjs`](../../tests/systems/charm.test.mjs),
   [`float.test.mjs`](../../tests/systems/float.test.mjs),
   [`fear.test.mjs`](../../tests/systems/fear.test.mjs),
-  [`gaze.test.mjs`](../../tests/systems/gaze.test.mjs).
+  [`gaze.test.mjs`](../../tests/systems/gaze.test.mjs),
+  [`backstab.test.mjs`](../../tests/systems/backstab.test.mjs),
+  [`tunnel.test.mjs`](../../tests/systems/tunnel.test.mjs).
 - Each fighter's moves: [`tests/fighters/0001/`](../../tests/fighters/0001/)
   (every move's mechanic, its combos, the CPU playing it),
   [`tests/fighters/0002/`](../../tests/fighters/0002/),

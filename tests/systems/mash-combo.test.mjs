@@ -116,6 +116,7 @@ test('every playable fighter has exactly one valid pair: two distinct genuine gr
     '0007': ['attack1', 'attack2'],
     '0008': ['attack1', MASH_PARTNER],
     '0009': ['attack1', 'attack2'],
+    '0010': ['attack1', 'attack2'],
   });
   for (const c of FIGHTERS) {
     assert.deepEqual(mashComboProblems(c), [], `#${c.id}`);

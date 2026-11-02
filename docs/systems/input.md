@@ -479,7 +479,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0006](../characters/0006.md#controller-layout),
 [#0007](../characters/0007.md#controller-layout),
 [#0008](../characters/0008.md#controller-layout),
-[#0009](../characters/0009.md#controller-layout).
+[#0009](../characters/0009.md#controller-layout),
+[#0010](../characters/0010.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -501,6 +502,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0008 air | Gum-Gum Stamp | Gum-Gum Rocket | Floating Balloon | | | |
 | #0009 ground | Swift Strikes | Fire Kick | | Air Blast | Air Sphere | forward: Freezing Splash; up: Earth Pillar |
 | #0009 air | Staff Swing | | | Air Gust | | up: Rising Air Kick |
+| #0010 ground | Punches | Pistol Whip | Emergency Meeting | Tongue Lash | Kill | down: Vent |
+| #0010 air | Air Kick | Tentacle Sweep | | Tongue Lash | | |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -532,8 +535,9 @@ itself classifies as Special (its `specialAbilities`,
 [combat](combat.md#special-abilities)): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
 Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
-Launcher, #0008's Feast and Gum-Gum Giant Pistol and #0009's Freezing
-Splash and Air Sphere, each tagged Ground or Air. Every other move, a
+Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
+Splash and Air Sphere and #0010's Kill, Emergency Meeting and Vent, each
+tagged Ground or Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

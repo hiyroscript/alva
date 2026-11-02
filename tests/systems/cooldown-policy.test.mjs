@@ -186,6 +186,12 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0,
       attack4: 3, attack5: 5, deflect: 0,
     },
+    // The Kill: its backstab deals 10 (its kill cooldown). The Emergency
+    // Meeting: its call holds whoever it reaches (a paralysis).
+    '0010': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0,
+      attack4: 5, attack5: 3, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

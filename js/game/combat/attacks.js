@@ -160,7 +160,7 @@
 //   carry: { lift: 0 },
 //
 // `motion` is movement the attack makes itself, owning the fighter's
-// velocity while it lasts (gravity included, where it says so). Six kinds:
+// velocity while it lasts (gravity included, where it says so). Seven kinds:
 //
 //   homing  the lock-on dash. Through the startup the fighter hangs in the
 //           air (no gravity, its drift braking). As the active phase opens
@@ -201,6 +201,22 @@
 //           a ledge it flies on), for the rest of the attack; a wall stops
 //           it. Nothing steers the roll itself. A Shield that blocks it
 //           stops it dead, sending it back at `recoil`.
+//   tunnel  the way under the floor (ground only: the attack must be
+//           `groundOnly`). From `hide` seconds into the attack the
+//           fighter is inside the floor: it passes through other fighters,
+//           no pull moves it, and all of it there is to hit is its
+//           `hurtboxes` (the hatch it went into, facing right from its
+//           origin: never none, it is never out of reach). At `at` it moves
+//           at once up to `distance` world units the way it faces, along
+//           the ground it stands on (see tunnelExit in
+//           js/game/fighters/movement.js: never past that ground's end,
+//           never into a solid, never into the Void), drawn nowhere in
+//           between; at `show` it is out again, its own hurtboxes back.
+//           Nothing else moves it: it stands where it went in, then where
+//           it came out. Its strikes (an ordinary hitbox or `hits`) are
+//           where it is when they are live: after `show`, round where it
+//           came out. Its clip draws what is seen of it meanwhile (the
+//           hatch alone).
 //
 // A motion attack never turns while it plays (a homing dash faces the way
 // it flies), and never starts while its fighter is still flying from a
@@ -216,6 +232,8 @@
 //   midair_attack3: { ..., motion: { type: 'rise', speed: 460 } },
 //   attack3: { ..., motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, friction: 420, recoil: 260 } },
 //   midair_attack1: { ..., motion: { type: 'hover' } },
+//   extra_attack: { ..., groundOnly: true, motion: { type: 'tunnel', distance: 240, hide: 0.15, at: 0.35, show: 0.45,
+//     hurtboxes: [{ x: -22, y: -30, w: 44, h: 30 }] } },
 //
 // `pull` draws opponents in while the attack's active phase is open: every
 // step, an opponent whose middle is within `radius` of the point `offset`
@@ -328,6 +346,7 @@ const ATTACK_DEFAULTS = {
   float: 0,
   fear: 0,
   gaze: false,
+  backstab: null,
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -339,9 +358,11 @@ const MOTION_DEFAULTS = Object.freeze({
   roll: Object.freeze({ speed: 0, keep: 0, maxSpeed: Infinity, friction: 0, recoil: 0 }),
   hover: Object.freeze({}),
   slam: Object.freeze({ fallSpeed: 0, impact: null }),
+  tunnel: Object.freeze({ distance: 0, hide: 0, at: 0, show: 0, hurtboxes: null }),
 });
 const MOTION_REQUIRED = Object.freeze({
   homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'], hover: [], slam: ['fallSpeed'],
+  tunnel: ['distance', 'show'],
 });
 
 export const MOTION_TYPES = Object.freeze(Object.keys(MOTION_DEFAULTS));
@@ -359,7 +380,23 @@ function resolveMotion(spec, owner, id) {
   }
   if (spec.impact !== undefined && spec.type !== 'slam') throw new Error(`[Alva] ${owner}'s ${spec.type} motion has an impact: only a slam lands with one`);
   if (spec.type === 'slam') motion.impact = resolveImpact(spec.impact, owner, id);
+  if (spec.type === 'tunnel') resolveTunnel(motion, owner);
   return Object.freeze(motion);
+}
+
+// A tunnel's times and the hurtboxes it has inside the floor (see `tunnel`
+// above), checked: in, through and out in that order, and always something
+// to hit while it is in (never out of reach).
+function resolveTunnel(motion, owner) {
+  const { hide, at, show } = motion;
+  if (!(hide >= 0 && hide <= at && at <= show && hide < show)) {
+    throw new Error(`[Alva] ${owner}'s tunnel needs 0 <= hide <= at <= show, and hide before show`);
+  }
+  const boxes = motion.hurtboxes;
+  if (!Array.isArray(boxes) || !boxes.length || !boxes.every((b) => b?.w > 0 && b?.h > 0)) {
+    throw new Error(`[Alva] ${owner}'s tunnel needs its hurtboxes inside the floor: never nothing to hit`);
+  }
+  motion.hurtboxes = Object.freeze(boxes.map((b) => Object.freeze({ x: b.x ?? 0, y: b.y ?? 0, w: b.w, h: b.h })));
 }
 
 // A slam's frozen impact (see `slam` above) from its `impact` entry, or
@@ -395,7 +432,7 @@ export function resolvePull(spec, owner) {
 // The fields a strike of a multi-hit attack takes from the attack when it
 // does not declare its own, and the ones only the strikes may declare.
 const STRIKE_INHERITS = Object.freeze([
-  'hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze',
+  'hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab',
 ]);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
@@ -474,6 +511,8 @@ export function attackReach(def) {
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
   if (m.type === 'rise') return { x: hb.x, y: hb.y - m.speed * t, w: hb.w, h: hb.h + m.speed * t };
+  // Wherever it comes out, from where it is to the furthest.
+  if (m.type === 'tunnel') return { x: hb.x, y: hb.y, w: hb.w + m.distance, h: hb.h };
   const cy = hb.y + hb.h / 2;
   return { x: hb.x, y: cy - m.range - hb.h / 2, w: m.range + hb.w, h: 2 * m.range + hb.h };
 }
@@ -544,7 +583,7 @@ export function attackReleaseAt(def) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'energyCost', 'step',
+  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab', 'energyCost', 'step',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -590,10 +629,14 @@ export function createAttackDefinition(spec, { clipDuration = 0, projectiles = n
   def.cooldown = resolveCooldown(spec.cooldown, owner, { cls: def.cooldownClass });
   def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'attack', def, def.cooldownClass);
   def.motion = resolveMotion(spec.motion, owner, spec.id);
+  if (def.motion?.type === 'tunnel' && !def.groundOnly) throw new Error(`[Alva] ${owner} tunnels through the floor: it must be groundOnly`);
   def.pull = resolvePull(spec.pull, owner);
   def.deflectProjectiles = !!def.deflectProjectiles;
   if (def.deflectProjectiles && !def.hitbox) throw new Error(`[Alva] ${owner} deflects projectiles but has no hitbox to do it with`);
   def.total = def.startup + def.active + def.recovery;
+  if (def.motion?.type === 'tunnel' && def.motion.show > def.total + PHASE_EPSILON) {
+    throw new Error(`[Alva] ${owner}'s tunnel comes out after the attack is over`);
+  }
   def.releaseAt = attackReleaseAt(def);
   Object.assign(def, resolveStepIn(spec, def, owner));
   def.offense = resolveOffense(spec, attackOffense(def), owner);

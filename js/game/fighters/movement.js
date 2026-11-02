@@ -174,3 +174,33 @@ export function jumpRise(velocity, gravity) {
 export function airJump(body, mv) {
   body.vy = -mv.airJumpVelocity;
 }
+
+// How far a tunnel's way under the floor is searched at a time (world
+// units): see tunnelExit.
+export const TUNNEL_STEP = 4;
+
+// Where a tunnel (the attack motion `tunnel`, see js/game/combat/attacks.js)
+// comes back out of the floor: up to `distance` world units from `body`
+// the way `dir` points (1 right, -1 left), along the ground it stands on as
+// `stage` (a StageCollision) has it now. Its middle stays over ground at
+// the height its feet stand at all the way, so it never comes out past
+// where that ground ends (a ledge, a gap, a section switched off, a step up
+// or down) nor in the Void; it may pass under a solid standing on that
+// ground (a wall), but never comes out inside one. The furthest such place,
+// searched TUNNEL_STEP at a time; where it is when there is none (or it is
+// not on the ground). Shared by the Fighter and the CPU that predicts it,
+// so the two never disagree.
+export function tunnelExit(stage, body, dir, distance) {
+  let best = body.x;
+  if (!body.grounded || !(distance > 0) || !dir) return best;
+  const y = body.y;
+  const probe = { x: 0, y, height: body.height };
+  for (let d = TUNNEL_STEP; ; d += TUNNEL_STEP) {
+    const x = body.x + dir * Math.min(d, distance);
+    probe.x = x;
+    if (!stage.supportsAt(x - 1, x + 1, y) || stage.inVoid(probe)) break;
+    if (!stage.solidAcross(x - body.halfW, x + body.halfW, y, body.height)) best = x;
+    if (d >= distance) break;
+  }
+  return best;
+}

@@ -526,10 +526,10 @@ test('the Fighters page is the roster in roster order, in the Select Fighter ros
   assert.deepEqual(shape(browser), shape(roster));
   const order = browser.slots.filter((s) => s.tagName === 'BUTTON').map((s) => s._def.id);
   assert.deepEqual(order, [...playableCharacters()].sort((a, b) => a.rosterSlot - b.rosterSlot).map((d) => d.id));
-  assert.deepEqual(order, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', 'test-a'], '#0001 to #0009 first, as on Select Fighter');
+  assert.deepEqual(order, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', 'test-a'], '#0001 to #0010 first, as on Select Fighter');
   assert.equal(browser.slots[0].querySelector('.slot-name').textContent, '#0001');
   assert.equal(browser.slots[1].querySelector('.slot-name').textContent, '#0002');
-  assert.deepEqual(loads.sort(), ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', 'test-a'], 'only playable fighters load, for their portraits');
+  assert.deepEqual(loads.sort(), ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', 'test-a'], 'only playable fighters load, for their portraits');
 
   // A disabled fighter is a locked slot: no button, no focus, no preview
   // on a press, never selected.
@@ -1350,10 +1350,9 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assertFocus(slotOf(discover, '0002'));
   assert.equal(browser.name.textContent, '#0002');
   app.input.key('ArrowDown');
-  assertFocus(slotOf(discover, '0009'));
-  assert.equal(browser.name.textContent, '#0009');
+  assertFocus(slotOf(discover, '0010'));
+  assert.equal(browser.name.textContent, '#0010');
   app.input.key('ArrowUp');
-  app.input.key('ArrowRight');
   assertFocus(slotOf(discover, '0002'));
   app.input.key('ArrowRight');
   assertFocus(slotOf(discover, '0003'));

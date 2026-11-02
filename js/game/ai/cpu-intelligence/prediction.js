@@ -28,7 +28,7 @@
 
 import { CONFIG } from '../../../config.js';
 import { stepBody } from '../../physics.js';
-import { steer, attackDrift, activationStep, attackStartSpeed, groundJump, airJump } from '../../fighters/movement.js';
+import { steer, attackDrift, activationStep, attackStartSpeed, groundJump, airJump, tunnelExit } from '../../fighters/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 
@@ -132,6 +132,11 @@ function attackStep(body, rec, face, target, burst) {
       body.vy = 0;
       return 0;
     }
+    if (spec.type === 'tunnel') {
+      // It stands where it is; its move along the floor is tunnelAt's.
+      attackDrift(body, MV, face, rec, 0, STEP, burst);
+      return 1;
+    }
     if (phase === 'recovery') {
       m.done = true;
       if (spec.type === 'homing') {
@@ -180,6 +185,17 @@ function attackStep(body, rec, face, target, burst) {
   return 1;
 }
 
+// A tunnel's move along the floor (see `tunnel` in
+// js/game/combat/attacks.js), as Fighter.tunnelThrough makes it: once,
+// the step its attack's time `time` reaches its `at`, to where tunnelExit
+// says it comes out, the way it faces.
+function tunnelAt(body, rec, face, time, stage) {
+  const spec = rec.def.motion;
+  if (spec?.type !== 'tunnel' || !rec.motion || rec.motion.through || time < spec.at - EPS) return;
+  rec.motion.through = true;
+  body.x = tunnelExit(stage, body, face, spec.distance);
+}
+
 // A fresh scratch attack record for `def` starting now at running speed
 // `running` facing `face`, on the ground (`grounded`) or in the air, its
 // Step-in and its motion set going as Fighter.startAttack and startMotion do.
@@ -198,6 +214,7 @@ function attackRecord(def, face, running, grounded, out = {}) {
     m.dirX = face;
     m.dirY = 0;
     m.rolling = false;
+    m.through = false;
     m.speed = spec.type === 'roll' ? Math.min(spec.maxSpeed, spec.speed + spec.keep * Math.max(0, running * face)) : 0;
   } else {
     out.motion = null;
@@ -269,7 +286,10 @@ export function predictTrack(track, stage, gravity, st, { steps = 90, horizon = 
     } else if (rec) {
       rec.time += STEP * (rec.rate ?? 1);
       if (rec.time >= rec.def.total - EPS) rec = null;
-      else share = attackStep(b, rec, face, target, false);
+      else {
+        tunnelAt(b, rec, face, rec.time, stage);
+        share = attackStep(b, rec, face, target, false);
+      }
     } else {
       free += STEP;
       if (free > horizon) steer(b, MV, 0, STEP, false);
@@ -375,6 +395,7 @@ export function moveContact(stage, gravity, m, st, face, foe, hurt, self, out = 
     aim.x = foe.x[fk];
     aim.y = foe.y[fk] - (hurt.bottom - hurt.top) / 2;
     if (turns) face = Math.sign(aim.x - b.x) || face;
+    tunnelAt(b, rec, face, rec.time, stage);
     const share = attackStep(b, rec, face, aim, false);
     stepBody(b, STEP, stage, gravity * share, b.maxFall);
     // A homing dash or a plunge that meets the ground stops there.
