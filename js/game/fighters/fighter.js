@@ -53,7 +53,7 @@ import { blankInput } from './fighter-controller.js';
 import { closestEnemy, facingToward } from './turn-around.js';
 import { approach, clamp } from '../../core/utils.js';
 import {
-  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, groundJump, airJump,
+  steer, attackDrift, activationStep, attackStartSpeed, hitstunDrag, fastFallVelocity, groundJump, airJump, tunnelExit,
 } from './movement.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
@@ -1783,6 +1783,16 @@ export class Fighter {
       body.vy = 0;
       return 0;
     }
+    if (spec.type === 'tunnel') {
+      // Under the floor, it moves along it once, all at once, at `at`;
+      // otherwise it stands where it is, as any grounded attack does.
+      if (!m.through && atk.time >= spec.at - TIME_EPSILON) {
+        m.through = true;
+        this.tunnelThrough(spec);
+      }
+      this.moveAttack(atk, dir, dt);
+      return 1;
+    }
     if (phase === 'recovery') {
       // Over without contact: a dash keeps `exit` of its velocity, anything
       // else just carries on under gravity.
@@ -1840,6 +1850,29 @@ export class Fighter {
     if (dist < 1) return;
     m.dirX = dx / dist;
     m.dirY = dy / dist;
+  }
+
+  // A tunnel moving the fighter along the floor it is inside (see `tunnel`
+  // in js/game/combat/attacks.js): straight to where it comes out
+  // (tunnelExit), drawn nowhere in between, on the ground there. Off the
+  // ground (a floor lost under it), it goes nowhere.
+  tunnelThrough(spec) {
+    const b = this.body;
+    if (!b.grounded) return;
+    const x = tunnelExit(this.stage, b, this.facing, spec.distance);
+    if (x === b.x) return;
+    b.x = x;
+    b.prevX = x;
+    b.ground = this.stage.surfaceBelow(x - 1, x + 1, b.y).ref ?? b.ground;
+  }
+
+  // Whether the fighter is inside the floor, in a tunnel between its `hide`
+  // and its `show` (see `tunnel` in js/game/combat/attacks.js): only its
+  // hatch can be hit, it passes through other fighters and no pull moves it.
+  get inFloor() {
+    const a = this.combat.attack;
+    const m = a?.def.motion;
+    return m?.type === 'tunnel' && a.time >= m.hide - TIME_EPSILON && a.time < m.show - TIME_EPSILON;
   }
 
   // From this fighter's middle to `other`'s ([dx, dy], world units).
@@ -1915,16 +1948,18 @@ export class Fighter {
     this.body.ground = null;
   }
 
-  // The hurtboxes that count right now: its attack's own while one says so
-  // (a roll's ball), else its own.
+  // The hurtboxes that count right now: a tunnel's hatch while it is inside
+  // the floor (see inFloor), its attack's own while one says so (a roll's
+  // ball), else its own.
   get hurtboxes() {
+    if (this.inFloor) return this.combat.attack.def.motion.hurtboxes;
     return this.combat.attack?.def.hurtboxes ?? this.def.hurtboxes;
   }
 
   // Passing through other fighters: in an attack that does (see
-  // separateFighters).
+  // separateFighters), or inside the floor (see inFloor).
   get passingThrough() {
-    return !!this.combat.attack?.def.passThrough;
+    return !!this.combat.attack?.def.passThrough || this.inFloor;
   }
 
   // Whether a press of `action` that could not start now may still start

@@ -22,7 +22,8 @@
 // is dragged along the ground and only lifted when the point is above its
 // head; an airborne one is drawn along both axes. Not pulled: the owner,
 // a fighter out of play, one whose Shield is up (it holds its ground), one
-// held in place (paralyzed) and, for a pull that reaches only its `front`,
+// held in place (paralyzed), one inside the floor (a tunnel's, see
+// Fighter.inFloor) and, for a pull that reaches only its `front`,
 // one whose middle is behind it (behind the attack's fighter, the way it
 // faces, or behind the projectile, the way it flies).
 //
@@ -77,7 +78,7 @@ function inFront(pull, target, x, facing) {
 // may be drawn and its middle is within the pull's radius. True when it
 // was.
 export function pullToward(f, x, y, pull, dt) {
-  if (f.lostToVoid || f.combat.shielding || f.combat.immobilized) return false;
+  if (f.lostToVoid || f.combat.shielding || f.combat.immobilized || f.inFloor) return false;
   const b = f.body;
   const dx = x - b.x;
   const dy = y - (b.y - b.height / 2);

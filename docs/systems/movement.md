@@ -500,6 +500,11 @@ direct strike the shared Step-in.
   whose landing is its recovery, never cancelled.
 - [`tests/fighters/0004/fighter-0004.test.mjs`](../../tests/fighters/0004/fighter-0004.test.mjs):
   #0004's `rise` (the Leekspin, carrying its target) and its `slam`.
+- [`tests/systems/tunnel.test.mjs`](../../tests/systems/tunnel.test.mjs) and
+  [`tests/fighters/0010/fighter-0010.test.mjs`](../../tests/fighters/0010/fighter-0010.test.mjs):
+  the `tunnel` motion (#0010's Vent): under the floor and out further along
+  it, all at once, never past where the ground ends, only its hatch open to
+  a hit meanwhile.
 - [`tests/fighters/0005/fighter-0005.test.mjs`](../../tests/fighters/0005/fighter-0005.test.mjs):
   #0005's `hover` (Floating Hands, once per airtime);
   [`tests/fighters/0006/fighter-0006.test.mjs`](../../tests/fighters/0006/fighter-0006.test.mjs):

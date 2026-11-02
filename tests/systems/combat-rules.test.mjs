@@ -156,25 +156,42 @@ test('every fighter pays exactly 15 for a ground Dash, an air dash and a Dash ca
 
 // ---- Energy: the Shield -------------------------------------------------------------------
 
+// The Jab that tests `target`'s Shield: #0001's, unless it passes over the
+// target's head (#0010 stands lower than #0001's fist), then the first
+// fighter's on the roster that meets it standing. { attacker, lands }: the
+// attacker's definition and the step its Jab lands on, its press the first.
+function jabFor(target) {
+  for (const a of CHARACTERS) {
+    const d = duel({ attackerCharacter: a, targetCharacter: target });
+    d.tick(P('attack1'));
+    let n = 1;
+    for (; n < 40 && !d.events.length; n++) d.tick();
+    if (d.events.length) return { attacker: a, lands: n };
+  }
+  throw new Error(`no Jab meets #${target.id}`);
+}
+
 test('every fighter\'s Shield pays exactly 15 per block, a perfect block\'s included: no discount, nothing back', () => {
   assert.equal(BLOCK_ENERGY_COST, 15);
   for (const c of CHARACTERS) {
     const who = `#${c.id}`;
     const still = { ...c, energy: { regen: 0 } };
+    const { attacker, lands } = jabFor(still);
     // Ordinary: up long before the Jab.
-    const d = duel({ targetCharacter: still });
+    const d = duel({ attackerCharacter: attacker, targetCharacter: still });
     d.tick({}, SHIELD);
     for (let i = 0; i < 20; i++) d.tick({}, HOLD);
     d.tick(P('attack1'), HOLD);
     for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
     assert.deepEqual([d.events[0].type, d.events[0].perfect, d.events[0].energyCost, d.events[0].damage], ['block', false, 15, 0], who);
     assert.equal(d.target.combat.energy, 85, `${who}: 15 off`);
-    // Perfect: raised just before it lands (the Jab lands 8 steps after
-    // its press).
-    const p = duel({ targetCharacter: still });
-    p.tick(P('attack1'));
-    p.tick();
-    p.tick({}, SHIELD);
+    // Perfect: raised just before it lands (#0001's Jab lands on the
+    // seventh step from its press, the Shield going up on the third).
+    const p = duel({ attackerCharacter: attacker, targetCharacter: still });
+    const raise = Math.max(1, lands - 4);
+    p.tick(P('attack1'), raise === 1 ? SHIELD : {});
+    for (let step = 2; step < raise; step++) p.tick();
+    if (raise > 1) p.tick({}, SHIELD);
     for (let i = 0; i < 30 && !p.events.length; i++) p.tick({}, HOLD);
     assert.deepEqual([p.events[0].type, p.events[0].perfect, p.events[0].energyCost], ['block', true, 15], `${who}: perfect, the same 15`);
     assert.equal(p.target.combat.energy, 85, `${who}: and nothing given back after`);
@@ -282,7 +299,7 @@ test('no defense ever improves Energy: an event never carries a negative cost, a
   // A real exchange of blocks, perfect blocks and Deflects: the bar never
   // rises faster than the refill.
   for (const c of CHARACTERS) {
-    const d = duel({ targetCharacter: c, gap: 40 });
+    const d = duel({ attackerCharacter: jabFor(c).attacker, targetCharacter: c, gap: 40 });
     const regen = resolveEnergy(c.energy).regen * DT;
     let last = d.target.combat.energy;
     for (let i = 0; i < 240; i++) {

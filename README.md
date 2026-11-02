@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Nine playable fighters** on a 48-slot roster:
+- **Ten playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -76,21 +76,29 @@ blocks every attack.
   opponent, a body blown up into a balloon that bounces projectiles back,
   a meal that heals it and a fist blown up to a giant's; its stretched
   limbs are still its body, and can be hit, and launched into a wall it
-  rebounds like rubber), and [#0009](docs/characters/0009.md), the young
+  rebounds like rubber), [#0009](docs/characters/0009.md), the young
   monk of the four elements, who would rather move an opponent than hurt
   one (a cone of wind that drags its target away before flinging it and
   blows shots back, a gust it floats on in the air, a pillar of rock that
   rises out of the ground to throw up whoever stands there and wall off
   shots, a splash of water that freezes, a fire kick, a staff and a leap
   on the air, and a trance that opens only in danger, when its Launch
-  Point is high: a sphere of air bursting out round it). All nine Shield
+  Point is high: a sphere of air bursting out round it), and
+  [#0010](docs/characters/0010.md), the traitor in the red spacesuit, the
+  roster's smallest, who catches its opponents off guard (a knife that
+  kills twice as hard on a back turned to it and must then wait, a vent it
+  dives into and climbs out of further along the floor, only the vent's
+  hatch open to a hit meanwhile, an emergency button that calls everyone
+  near to it and holds them there, a tongue that reels its target in, a
+  pistol, its fists and tentacles). All ten Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all nine Dash on the ground and air dash. Each fighter
+  back at their thrower), and all ten Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
   #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
-  Giant Pistol, #0009's Freezing Splash and Air Sphere): an orange exclamation
+  Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent
+  and Emergency Meeting): an orange exclamation
   mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
@@ -336,6 +344,9 @@ sheet's own credit: ripped by Alejo & Grim.
 **#0009 sprite source.** Sprite sheet by gameinvader247 on
 [DeviantArt](https://www.deviantart.com/gameinvader247/art/636302762); the
 sheet's own credit: GameInvader.
+
+**#0010 sprite source.** Sprite sheet by xxalexsmashxx on
+[DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/1262852046).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

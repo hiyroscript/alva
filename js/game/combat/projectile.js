@@ -129,7 +129,7 @@ const PROJECTILE_DEFAULTS = {
 };
 
 // What a finisher takes from its projectile when it does not say.
-const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze']);
+const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab']);
 
 // Age is a sum of fixed steps; compare against boundaries with a little slack
 // (see PHASE_EPSILON in attacks.js).
