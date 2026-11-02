@@ -192,6 +192,13 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0,
       attack4: 5, attack5: 3, deflect: 0,
     },
+    // The Web Shot: its ball of webbing holds whoever it strikes (a
+    // paralysis). Camouflage: it cloaks its own fighter. The Venom Punch:
+    // its sting holds whoever it reaches (a paralysis).
+    '0011': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 3, midair_attack3: 0, extra_attack: 0,
+      attack4: 3, attack5: 3, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
@@ -213,7 +220,7 @@ test('every effect a hit or a move can carry is classified, exceptional or routi
     assert.ok(EXCEPTIONAL_EFFECTS.includes(field) || ROUTINE_EFFECTS.includes(field), `${field} is classified`);
   }
   for (const field of EXCEPTIONAL_EFFECTS) assert.equal(ROUTINE_EFFECTS.includes(field), false, field);
-  assert.deepEqual([...EXCEPTIONAL_EFFECTS], ['heal', 'paralyze', 'charm', 'float', 'fear']);
+  assert.deepEqual([...EXCEPTIONAL_EFFECTS], ['heal', 'cloak', 'paralyze', 'charm', 'float', 'fear']);
   for (const routine of ['pull', 'quake', 'gaze', 'blockPush', 'carry', 'repel', 'erase', 'motion', 'hitstun']) assert.ok(ROUTINE_EFFECTS.includes(routine), routine);
   // Classification reads data only: a move called anything is judged the same.
   assert.equal(cooldownClass('attack', { hitbox: BOX, damage: 3, animation: 'hollow_purple' }), 'ordinary');

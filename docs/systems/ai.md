@@ -25,7 +25,7 @@ Jump, made with the same chord).
 | [`combat-ai.js`](../../js/game/ai/combat-ai.js) | — | `CombatAIController`, the controller the modes build: CPU Intelligence itself. |
 | [`cpu-intelligence/brain.js`](../../js/game/ai/cpu-intelligence/brain.js) | the hierarchy | `CpuIntelligence`: runs the layers every fixed step, the decision order and its cadence, choosing whether to commit or wait, combo follow-ups and their hit-confirm, breaking off to a safer spot and deliberate waits, recovery and edge-guard plans, the point of no return, launch steering, the intent-aware liveness monitor, the attack orientation, directives for tests. |
 | [`cpu-intelligence/capabilities.js`](../../js/game/ai/cpu-intelligence/capabilities.js) | 1. capabilities | `analyzeCapabilities` (cached per fighter): every move with its timing, reach, strikes, projectile, motion, cooldowns, air uses, Energy and **roles**; the Shield, the Deflect, movement and launch reaction. `moveReady`. |
-| [`cpu-intelligence/perception.js`](../../js/game/ai/cpu-intelligence/perception.js) | 2. perception | `Perception`: the opponent as it was `latency` ago (a ring of snapshots), recognized or lapsed events, the projectiles and clones the CPU has seen. |
+| [`cpu-intelligence/perception.js`](../../js/game/ai/cpu-intelligence/perception.js) | 2. perception | `Perception`: the opponent as it was `latency` ago (a ring of snapshots), recognized or lapsed events, the projectiles and clones the CPU has seen; a cloaked opponent as it was last seen (`lastSeen`). |
 | [`cpu-intelligence/situation.js`](../../js/game/ai/cpu-intelligence/situation.js), [`stage-model.js`](../../js/game/ai/cpu-intelligence/stage-model.js), [`prediction.js`](../../js/game/ai/cpu-intelligence/prediction.js) | 3. world model | `Situation` (rebuilt each step), `StageModel` (ledges, surfaces, the Void in force, read live; a stage's moving or vanishing platforms read live too: where each is now, and none while it is hidden or forming, nor as a stepping stone while it fades; on a continuous ground, the combat area's edges in place of ledges; a sectioned floor's breakable sections read live too: each a surface only while it is there, with the damage it shows, and the main floor's edges moved in to the permanent section's own once one starts breaking, so no plan aims at missing ice; and a stage hazard's visible warnings, `dangerZones`, never a landing before its warning shows, an ice section critically unstable or breaking among them, which a CPU steps off by its level, never off a ledge into the air), and the forward simulation on the game's own rules: paths, jump arcs, move contact, projectile contact, launches and recoveries. |
 | [`cpu-intelligence/opponent-model.js`](../../js/game/ai/cpu-intelligence/opponent-model.js) | 4. opponent model | `OpponentModel`: decaying rates of what the opponent was seen doing (jumps, Shields under threat and held, projectiles, Dashes, whiffs, attacks within reach, backing off when hurt, moving about, preferred range, repeated moves) and of how the CPU's own attacks fared against it (blocked, whiffed, punished); the habits read from them (`turtling`, `walls`, `punishing`, `mobile`, `recovering`, …), trusted as fast as the level adapts. |
 | [`cpu-intelligence/objective.js`](../../js/game/ai/cpu-intelligence/objective.js) | 5a. match objective | `MatchObjective`: what the CPU is after in the match (build, finish, stabilize, protect, survive, force, regroup) from the score, the clock, overtime's tiebreak and its closing Void, both fighters' exposure and how long nothing has happened; persistence, progress checks, impatience, a seeded temperament. |
@@ -246,7 +246,13 @@ Every fixed step, in this order:
 1. **Observe.** Perception records the opponent and recognizes what it
    did (an attack's startup, a whiff, a jump, a landing, a Dash, a Shield,
    exhaustion, a projectile, a clone, a cast) once it has been on screen
-   for the level's latency, or lets it lapse. The situation is rebuilt:
+   for the level's latency, or lets it lapse. An opponent cloaked by a
+   technique of its own (`cloak`, [combat](combat.md#techniques)) cannot
+   be seen at all: while the picture it would see shows it cloaked, it sees
+   the last picture it saw of it uncloaked, standing where it vanished,
+   still and doing nothing (no speed, attack, Dash, technique or summon),
+   and swings at that; it sees it again a latency after it shows itself.
+   The situation is rebuilt:
    the CPU's own fighter exactly, its opponent as perceived and carried
    forward by its visible motion (or, off the stage and free, along its
    likely recovery) and shifted by the level's misjudgement of range (a
@@ -488,7 +494,11 @@ aerial keeps. A
 heal is no attack: the CPU casts it when it has taken enough for the
 whole heal to count and the opponent, busy as long as it is and then
 closing in with a Dash and a run, could not reach it before the cast lets
-go (`healPlan`). Charmed by its opponent (a hit's `charm`: its hits on
+go (`healPlan`). A cloak of its own is no attack either: in neutral, not
+already cloaked, with the same room to finish the cast and its opponent
+out of reach, it casts it now and then (`cloakPlan`, a quarter of the
+times it could), then goes in unseen; a capability's `cloak` gives the
+move the `cloak` role. Charmed by its opponent (a hit's `charm`: its hits on
 that opponent would heal it), it strikes nothing at it while the charm
 runs: no new plan to attack, no combo follow-up, no strike or projectile
 in answer to a threat; it keeps its distance (out of the opponent's

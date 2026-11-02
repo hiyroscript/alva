@@ -7,7 +7,7 @@
 // where it may start (ground or air), its timing and commitment, its
 // strikes (damage, Base Launch, Directional Launch, stuns, hit effects), its
 // reach over its own motion and pull, its projectile, burst or impact, the
-// heal it gives its own fighter, its costs
+// heal or cloak it gives its own fighter, its costs
 // and limits, its classification (`offense`: whether it is an attack, a
 // defense or both, read from the shared js/game/combat/offense.js, so a
 // technique, a summon, a throw and the Deflect are attacks here exactly as
@@ -46,7 +46,7 @@ import { MASH_COMBO, mashSequence } from '../../../data/mash-combo.js';
 export const MOVE_ROLES = Object.freeze([
   'poke', 'approach', 'launcher', 'comboStarter', 'comboExtender', 'finisher', 'antiAir', 'airToGround', 'edgeGuard',
   'zoning', 'trap', 'punish', 'counterProjectile', 'mobility', 'recovery', 'shieldPressure', 'areaDenial',
-  'defensiveDisengage', 'spike', 'heal',
+  'defensiveDisengage', 'spike', 'heal', 'cloak',
 ]);
 
 const CACHE = new WeakMap();
@@ -176,6 +176,10 @@ function rolesOf(m, height, fastest) {
   // A heal of its own (Launch Point back): a move for a safe moment, never
   // a strike (see CpuIntelligence.healPlan).
   if (m.heal > 0) r.add('heal');
+  // A cloak of its own (out of sight, see `cloak` in
+  // js/game/combat/technique.js): a move for a safe moment too, before it
+  // goes in unseen (see CpuIntelligence.cloakPlan).
+  if (m.cloak > 0) r.add('cloak');
   return r;
 }
 
@@ -189,7 +193,7 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
   return {
     key: `${action}:${air ? 'air' : 'ground'}`, kind, action, id, air, def: atk, offense: attackOffense(atk),
     startup: atk.startup, active: atk.active, recovery: atk.recovery, total: atk.total,
-    lead, commitment: atk.total, strikes, projectile, burst: null, summon: null, impact, heal: 0, ...sum,
+    lead, commitment: atk.total, strikes, projectile, burst: null, summon: null, impact, heal: 0, cloak: 0, ...sum,
     blockstun: Math.max(0, ...(projectile ? projectile.strikes : strikes).map((s) => s.blockstun)),
     hitstop: Math.max(0, ...(projectile ? projectile.strikes : strikes).map((s) => s.hitstop)),
     reach: projectile ? null : attackReach(atk), hitbox: atk.hitbox,
@@ -203,8 +207,9 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
 }
 
 // A technique: a cast that releases a projectile, a burst round the
-// fighter, a heal of its own (`heal`, Launch Points), or any of them
-// together, its fighter committed throughout.
+// fighter, a heal of its own (`heal`, Launch Points), a cloak of its own
+// (`cloak`, seconds), or any of them together, its fighter committed
+// throughout.
 function techniqueMove(f, special, sprites) {
   const t = f.techniqueDefs[special.id];
   const cast = sprites.duration(t.castAnimation);
@@ -219,7 +224,7 @@ function techniqueMove(f, special, sprites) {
     offense: techniqueOffense(t),
     startup: cast, active: 1 / 60, recovery: release, total: cast + release, lead: cast, commitment: cast + release,
     strikes, projectile, burst: t.burst ? { box: t.burst.hitbox, hit: burstHit } : null, summon: null,
-    impact: null, heal: t.heal ?? 0, ...sum,
+    impact: null, heal: t.heal ?? 0, cloak: t.cloak ?? 0, ...sum,
     blockstun: burstHit?.blockstun ?? 0, hitstop: burstHit?.hitstop ?? 0, reach: t.burst ? { ...t.burst.hitbox } : null,
     hitbox: t.burst?.hitbox ?? null, motion: null, motionSpec: null, pull: projectile?.pull ?? null,
     cooldown: 0, abilityCooldown: t.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
@@ -240,7 +245,7 @@ function summonMove(f, special, entry) {
     key: `${special.action}:ground`, kind: 'summon', action: special.action, id: special.id, air: false, def: s,
     offense: summonOffense(s, f.attacks),
     startup, active: 0, recovery: 0, total: startup, lead: entry.lead, commitment: startup, strikes, projectile: null,
-    burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, impact: null, heal: 0, ...sum,
+    burst: null, summon: { def: s, attack: atk, behind: s.behindDistance, noGround: s.noGround }, impact: null, heal: 0, cloak: 0, ...sum,
     blockstun: atk.blockstun, hitstop: atk.hitstop, reach: null, hitbox: atk.hitbox, motion: null, motionSpec: null,
     pull: null, cooldown: 0, abilityCooldown: s.cooldown, airUses: 0, freeFall: false, groundOnly: true, hitCancel: null,
     energyCost: s.energyCost, momentum: 0, airMomentum: 0, friction: 1, step: null, stepIn: 'exempt', lunge: 0,
@@ -360,7 +365,7 @@ export function analyzeCapabilities(f) {
 // needs the ground, a free fighter (or one in a move that yields) and its
 // own cooldown over; a summon its opponent in play (it appears behind it),
 // and so does any technique that strikes (the CPU attacks nobody), but not
-// a heal of its own. The checks mirror the ones the Fighter makes when the
+// a heal or a cloak of its own. The checks mirror the ones the Fighter makes when the
 // button is pressed, so the CPU never presses what cannot start.
 export function moveReady(self, m) {
   const grounded = self.body.grounded;
@@ -370,7 +375,7 @@ export function moveReady(self, m) {
     // A technique it is not in the danger for (inDanger) is no option yet.
     if (m.kind === 'technique' && !inDanger(self, m.def)) return false;
     const gone = !!self.opponent?.lostToVoid;
-    const pureHeal = m.kind === 'technique' && m.heal > 0 && !m.projectile && !m.burst;
+    const pureHeal = m.kind === 'technique' && (m.heal > 0 || m.cloak > 0) && !m.projectile && !m.burst;
     if (self.technique?.def.id === m.id || self.pendingSummon?.id === m.id) return false;
     return grounded && (self.canAct() || self.moveYields()) && !combat.abilityCooldowns.active(m.id) && (!gone || pureHeal);
   }

@@ -52,6 +52,10 @@ const SPRITES_0009 = 'https://www.deviantart.com/gameinvader247/art/636302762';
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0010 is never named).
 const SPRITES_0010 = 'https://www.deviantart.com/xxalexsmashxx/art/1262852046';
+// Where #0011's sprite sheet was published: its DeviantArt page, found by
+// the deviation's number alone (the page's title is left out of the
+// address: the character behind #0011 is never named).
+const SPRITES_0011 = 'https://www.deviantart.com/xxalexsmashxx/art/955488395';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -115,6 +119,11 @@ export const CREDITS = [
   {
     title: 'credits.sprites0010.title',
     lines: [{ label: 'credits.sprites0010.sheet', href: SPRITES_0010 }],
+  },
+  // #0011's sheet, linked to where it was published.
+  {
+    title: 'credits.sprites0011.title',
+    lines: [{ label: 'credits.sprites0011.sheet', href: SPRITES_0011 }],
   },
   {
     title: 'credits.rights.title',

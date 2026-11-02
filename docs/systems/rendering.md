@@ -131,6 +131,14 @@ lie on the solid surface under it (a moving platform where it is drawn,
 as faint as the platform is while it fades); a vanished platform takes
 none.
 
+A cloaked fighter (a technique's `cloak`, [combat](combat.md#techniques))
+is drawn as a faint shimmer: its frames, its speed trail, its shadow and
+its ground ring at a fifth of their strength (`CLOAK_ALPHA` 0.2),
+wavering a little on the effects clock (`CLOAK_WAVER`, steady under
+reduced motion; `Arena.cloakAlpha`). Its name tag, Energy bar and marks
+stay as they are, so its player never loses it. Art only: nothing in the
+simulation reads it.
+
 ## The Void
 
 `StageTheme.drawVoid(ctx, view, bounds, ripples)` draws the black and its red rim
@@ -188,7 +196,7 @@ centered row shows only active cooldowns with a duration **above 0.5 seconds**
 (the cooldown policy's 3 s and 5 s, [combat](combat.md#cooldowns)):
 #0001 Unlimited Void (3 s), Hollow Purple (5 s), #0002 Whirlwind (5 s),
 #0003 Mystical Palm Technique (3 s), #0004 Ievan Polkka (5 s) and World is
-Mine (3 s), #0005 Deadlights (3 s) and Red Balloon (3 s), #0006 Ice Breath (3 s), #0007 Rocket Launcher (5 s), #0008 Feast (3 s) and Gum-Gum Giant Pistol (5 s), #0009 Freezing Splash (3 s) and Air Sphere (5 s), #0010 Kill (5 s) and Emergency Meeting (3 s), long ordinary attacks as well as summons
+Mine (3 s), #0005 Deadlights (3 s) and Red Balloon (3 s), #0006 Ice Breath (3 s), #0007 Rocket Launcher (5 s), #0008 Feast (3 s) and Gum-Gum Giant Pistol (5 s), #0009 Freezing Splash (3 s) and Air Sphere (5 s), #0010 Kill (5 s) and Emergency Meeting (3 s), #0011 Web Shot (3 s), Camouflage (3 s) and Venom Punch (3 s), long ordinary attacks as well as summons
 and techniques. The fighter the ability HUD shows
 ([input](input.md#the-ability-hud)) has no rings while that HUD is on show
 (`Arena.hudCooldownsFor`, set by the screen each frame): the HUD carries its
@@ -217,7 +225,7 @@ ready timers draw nothing and leave no gap in the centered row.
 While a fighter performs one of its **Special abilities**
 ([combat](combat.md#special-abilities): #0001's Unlimited Void and Hollow
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
-Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent and Emergency Meeting), a bright orange (`#ff9f1c`)
+Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent and Emergency Meeting, #0011's Camouflage and Venom Punch), a bright orange (`#ff9f1c`)
 exclamation mark with a dark outline floats over it, centered above the
 top of its status column (its Energy bar while that shows, else its name
 tag: `Arena.specialMarkRect`, `specialMarkRect` in

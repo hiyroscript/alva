@@ -724,6 +724,8 @@ export class CpuIntelligence {
     const heal = this.healPlan(s);
     if (heal) return heal;
     if (me.charmed > 0) return this.movePlan(s);
+    const cloak = this.cloakPlan(s);
+    if (cloak) return cloak;
     const list = this.evaluator.candidates(s, this.candidateList, {});
     const p = this.profile;
     const o = this.objective;
@@ -1049,6 +1051,25 @@ export class CpuIntelligence {
         if (this.opponentArrives(s) < m.lead + 0.15) continue;
       }
       return makePlan('press', { move: m, reason: `heal: ${Math.round(me.lp)} Launch Point, the opponent out of reach` }, this);
+    }
+    return null;
+  }
+
+  // A cloak of its own (a technique that hides its fighter, see `cloak` in
+  // js/game/combat/technique.js): worth its cast in neutral, not already
+  // cloaked, with room to finish it as a heal needs (no threat on its way,
+  // the opponent unable to come within reach first) and the opponent
+  // outside its reach, so it then goes in unseen. Not every time it could:
+  // now and then, as a player picks its moment.
+  cloakPlan(s) {
+    const me = s.me;
+    if (!s.present || !me.grounded || !me.canAct || me.offstage || s.self.combat.cloaked) return null;
+    for (const m of s.caps.moves) {
+      if (!(m.cloak > 0) || !moveReady(s.self, m)) continue;
+      if (this.threatened || (this.incoming && this.incoming.contact < m.commitment + 0.15)) continue;
+      if (this.opponentArrives(s) < m.lead + 0.15) continue;
+      if (this.rng() > 0.25) continue;
+      return makePlan('press', { move: m, reason: 'cloak: out of sight before it goes in' }, this);
     }
     return null;
   }

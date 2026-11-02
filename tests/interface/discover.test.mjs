@@ -526,17 +526,17 @@ test('the Fighters page is the roster in roster order, in the Select Fighter ros
   assert.deepEqual(shape(browser), shape(roster));
   const order = browser.slots.filter((s) => s.tagName === 'BUTTON').map((s) => s._def.id);
   assert.deepEqual(order, [...playableCharacters()].sort((a, b) => a.rosterSlot - b.rosterSlot).map((d) => d.id));
-  assert.deepEqual(order, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', 'test-a'], '#0001 to #0010 first, as on Select Fighter');
+  assert.deepEqual(order, ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', 'test-a'], '#0001 to #0011 first, as on Select Fighter');
   assert.equal(browser.slots[0].querySelector('.slot-name').textContent, '#0001');
   assert.equal(browser.slots[1].querySelector('.slot-name').textContent, '#0002');
-  assert.deepEqual(loads.sort(), ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', 'test-a'], 'only playable fighters load, for their portraits');
+  assert.deepEqual(loads.sort(), ['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', 'test-a'], 'only playable fighters load, for their portraits');
 
   // A disabled fighter is a locked slot: no button, no focus, no preview
   // on a press, never selected.
   const locked = browser.slots[TEST_DISABLED.rosterSlot];
   assert.equal(locked.tagName, 'DIV');
   assert.equal(locked.hasAttribute('data-nav'), false);
-  assert.equal(locked.getAttribute('aria-label'), 'Slot 11, locked');
+  assert.equal(locked.getAttribute('aria-label'), 'Slot 26, locked');
   locked.click();
   assert.equal(browser.selectedId, '0001');
   assert.ok(!loads.includes(TEST_DISABLED.id));

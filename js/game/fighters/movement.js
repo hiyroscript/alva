@@ -92,7 +92,11 @@ export function steer(body, mv, dir, dt, burst = false, friction = 1) {
 // so nothing held moves a fighter through a grounded attack. In the air it
 // is the universal air control, exactly as outside any attack (steer with
 // `dir`): every move, whatever it is, lets its fighter move in the air.
-// The Step-in raises the forward speed to at least its own, once, on the
+// One exception, never a steer: a grounded attack whose own motion lifts it
+// off the ground (a rise started standing, its record not `airborne`) is
+// still a grounded attack until it ends, its drift running down in the air
+// as if nothing were held (#0011's Venom Jump from the floor; the same move
+// started in the air keeps the air control). The Step-in raises the forward speed to at least its own, once, on the
 // ground only: a fighter off the ground as its time comes never makes it
 // (never later either). `burst` as for steer.
 export function attackDrift(body, mv, facing, atk, dir, dt, burst = false) {
@@ -102,7 +106,7 @@ export function attackDrift(body, mv, facing, atk, dir, dt, burst = false) {
     if (body.grounded && body.vx * facing < step.speed) body.vx = facing * step.speed;
   }
   if (body.grounded) steer(body, mv, 0, dt, burst, atk.def.friction);
-  else steer(body, mv, dir, dt, burst);
+  else steer(body, mv, atk.airborne === false && atk.def.motion ? 0 : dir, dt, burst);
 }
 
 // The Step-in an activation of attack definition `def` makes, started on

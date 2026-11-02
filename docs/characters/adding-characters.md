@@ -16,7 +16,7 @@ The steps below use `0027` as the new fighter's id.
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
   of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4, 5, 6, 7,
-  8 and 9 are taken.
+  8, 9 and 10 are taken.
 
 ## 2. Add the art
 
@@ -320,11 +320,13 @@ as the cast ends: a `projectile` (an entry of `projectiles`,
 `attackN_object`), a `burst` round the fighter (a `hitbox` and its `hit`,
 and optionally its art as it goes out, `effect: { animation, offset }`, an
 `effectAnimations` clip named `attackN_object...`), a `heal` (Launch Point
-taken off its own fighter), or any of them together
+taken off its own fighter), a `cloak` (seconds its own fighter is out of
+sight: drawn as a shimmer, invisible to a CPU, until it strikes or is
+struck; never an invulnerability), or any of them together
 ([techniques](../systems/combat.md#techniques); #0001's Unlimited Void and
 Hollow Purple, #0003's Cherry Blossom Impact and Mystical Palm Technique,
-#0004's Ievan Polkka and World is Mine).
-A technique that only heals is no attack. A technique of a different
+#0004's Ievan Polkka and World is Mine, #0011's Camouflage).
+A technique that only heals or cloaks is no attack. A technique of a different
 shape needs a new form in the runtime first.
 
 **Attack or not is never yours to declare.** However a move is executed
@@ -537,8 +539,8 @@ Then:
    its place, input and why, as [#0001](0001.md#controller-layout),
    [#0002](0002.md#controller-layout), [#0003](0003.md#controller-layout),
    [#0004](0004.md#controller-layout), [#0005](0005.md#controller-layout),
-   [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout) and
-   [#0010](0010.md#controller-layout) do.
+   [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout),
+   [#0010](0010.md#controller-layout) and [#0011](0011.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (the comfortable inputs in order, one input a
@@ -583,7 +585,7 @@ valid, current one fails
    | --- | --- | --- |
    | 1 | Very easy to learn and comparatively simple to master. | |
    | 2 | An easy core game plan with little extra to master. | |
-   | 3 | Approachable fundamentals, with meaningful decision-making and execution depth at higher levels. | #0002: readable rushdown; mastery in momentum, air uses, free fall, approach angles, not overcommitting. #0003: plain, heavy ground game; mastery in timing its long commitments, reading jumps against its quakes, finding room to heal. #0007: plain fists and feet up close, ground-bound weapons from afar; mastery in spending its Energy between shots, placing the fire ahead of an approach and finding room for the rocket's long, breakable aim. #0008: plain fists up close and its own stretched limbs from afar; mastery in limbs that stay open to a hit while they are out, reading shots for its balloon, finding room to eat and landing the giant fist's long, breakable wind-up |
+   | 3 | Approachable fundamentals, with meaningful decision-making and execution depth at higher levels. | #0002: readable rushdown; mastery in momentum, air uses, free fall, approach angles, not overcommitting. #0003: plain, heavy ground game; mastery in timing its long commitments, reading jumps against its quakes, finding room to heal. #0007: plain fists and feet up close, ground-bound weapons from afar; mastery in spending its Energy between shots, placing the fire ahead of an approach and finding room for the rocket's long, breakable aim. #0008: plain fists up close and its own stretched limbs from afar; mastery in limbs that stay open to a hit while they are out, reading shots for its balloon, finding room to eat and landing the giant fist's long, breakable wind-up. #0011: an agile all-rounder; light strikes up close, webbing that holds an approach for a moment, a rising launcher that is also its recovery; mastery in converting its holds, picking safe moments for its breakable casts and spending its camouflage well |
    | 4 | Demanding to use well, with substantial mastery requirements. | #0004: a rhythm controller; placement of its stationary double, timing its long, breakable song onto an opponent who cannot get away and cashing in the charm, light and exposed when rushed before its setups are in place. #0005: a reach-and-setup predator; spacing its long, slow bite, landing the Deadlights only on a facing opponent, timing its phantom and cashing in the fear while it lasts, tall and exposed when rushed. #0009: an elusive elementalist; spending its Energy between wind and rock, converting the freeze before it thaws, steering its own launches, and surviving into danger to find room for its trance's long, breakable meditation. #0010: a small ambusher; getting behind an opponent for the kill and spending its cooldown well, reading when to vent past or away and keeping its hatch out of reach, calling the meeting from far enough and converting the hold, and coming close enough with short, modest blows |
    | 5 | Difficult both to pilot effectively and to master: highly layered mechanics, situational decisions, setup or resource requirements, punishing commitments. | #0001: a large, contextual space-control and setup toolkit, Energy and cooldown management, punishable long casts |
 

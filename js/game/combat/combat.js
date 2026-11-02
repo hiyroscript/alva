@@ -505,6 +505,9 @@ export class CombatSystem {
     suppressLaunch = false, mash = null, fromX = null,
   } = {}) {
     const tc = target.combat;
+    // A hit that reaches a cloaked fighter shows it, blocked or not (see
+    // CombatState.cloakFor): it is struck where it really is.
+    tc.reveal();
     // The universal Shield rule: up at contact, it blocks. Nothing about the
     // hit is consulted.
     const blocked = tc.shielding;

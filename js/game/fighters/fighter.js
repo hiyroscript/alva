@@ -644,6 +644,10 @@ export class Fighter {
       if (this.technique?.takeCooldown()) combat.abilityCooldowns.start(this.technique.def.id, this.technique.def.cooldown);
       const effect = this.technique?.takeEffect();
       if (effect) this.effects.push(effect);
+      // A cloak it lets go of hides this fighter from now (see
+      // CombatState.cloakFor), until it runs out or the fighter shows itself.
+      const cloak = this.technique?.takeCloak();
+      if (cloak > 0) combat.cloakFor(cloak);
       if (ended) this.endTechnique(ended);
     }
 
@@ -1543,6 +1547,7 @@ export class Fighter {
     // now.
     if (!this.payEnergy(summon.energyCost)) return false;
     this.cutAttack();
+    this.combat.reveal();
     this.moveStartedAt = this.steps;
     const target = this.opponent;
     this.faceAttackTarget();
@@ -1599,6 +1604,8 @@ export class Fighter {
     // yields, see trySpecial) ends now.
     if (!this.payEnergy(def.energyCost)) return false;
     this.cutAttack();
+    // A move started shows a cloaked fighter (see CombatState.reveal).
+    this.combat.reveal();
     this.moveStartedAt = this.steps;
     this.faceAttackTarget(dir);
     this.body.vx = 0;
@@ -1697,6 +1704,9 @@ export class Fighter {
   startAttack(atk, dir = 0, { button = null, mash = null } = {}) {
     const combat = this.combat;
     this.cutAttack();
+    // Any attack (the Deflect and a Mash Combo turn included) shows a
+    // cloaked fighter (see CombatState.reveal).
+    combat.reveal();
     if (this.dash) this.endDash();
     this.faceAttackTarget(dir);
     const runningSpeed = this.body.vx;
