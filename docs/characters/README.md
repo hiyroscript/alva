@@ -20,8 +20,9 @@ pages are part of the product specification
 | #0008 | 08 | yes | 5: Jab and Straight / Gum-Gum Stamp, Gum-Gum Gatling / Gum-Gum Rocket, Gum-Gum Balloon / Floating Balloon, Feast (technique), Gum-Gum Giant Pistol (technique); extra attack: the Gum-Gum Pistol; its Mash Combo partner the Crescent Kick (no button); every move its own body, its stretched limbs still its body | [0008.md](0008.md) |
 | #0009 | 09 | yes | 5: Swift Strikes / Staff Swing, Fire Kick / Rising Air Kick, Air Blast / Air Gust, Freezing Splash (technique), Air Sphere (technique, only in danger); extra attack: the Earth Pillar; the four elements, each its own mechanic: wind that carries and blows shots back, water that freezes, rock that rises and walls off shots, fire up close | [0009.md](0009.md) |
 | #0010 | 10 | yes | 5: Punches / Air Kick, Pistol Whip / Tentacle Sweep, Tongue Lash / Tongue Lash (it reels its target in), Kill (technique: twice as strong on a back turned to it), Emergency Meeting (technique: everyone near called to the button and held there); extra attack: the Vent, under the floor and out further along it, only the vent's hatch open to a hit meanwhile; the roster's smallest | [0010.md](0010.md) |
+| #0011 | 11 | yes | 5: Punches / Air Kick, Spin Kick / Somersault Kick, Web Shot (its webbing sticks its target where it stands) / Web Lines (they reel it in), Camouflage (technique: out of sight, a CPU losing track of it, until it strikes or is struck), Venom Punch (technique: its lightning stuns whoever it reaches stiff); extra attack: the Venom Jump, an uppercut that rises off the ground carrying its target, on the ground and in the air | [0011.md](0011.md) |
 
-The other 38 of the 48 roster slots are locked placeholders. #0001 is the
+The other 37 of the 48 roster slots are locked placeholders. #0001 is the
 first playable fighter, so it is what
 startup preloads first, Quick Battle's initial pick, both Watch Mode CPUs
 and the Practice Ground default; that is an ordering, not a special role:
@@ -34,7 +35,7 @@ Where things are:
 | | |
 | --- | --- |
 | Definitions | [`js/data/characters/<id>.js`](../../js/data/characters/), registered in [`js/data/characters.js`](../../js/data/characters.js) |
-| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5, #0010 4/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
+| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5, #0010 4/5, #0011 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
 | Art | [`assets/characters/<id>/`](../../assets/characters/) |
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | A fighter drawn as several members (#0006) | its `ensemble` ([the character system](../architecture/character-system.md#ensembles-one-fighter-several-members), [adding a fighter](adding-characters.md#a-fighter-of-several-members)) |

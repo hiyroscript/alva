@@ -232,7 +232,12 @@ air control**: exactly the air steering a fighter has outside an attack
 `airMomentum` share of the drift it started with. No move has air control
 of its own, better or worse; only a motion that sets the horizontal speed
 itself (a homing dash's dash, a roll flying off a ledge) overrides it
-while it does.
+while it does. A grounded attack whose own motion lifts it off the floor
+(a rise started standing, #0011's Venom Jump) is still a grounded attack
+until it ends: its drift runs down in the air as if nothing were held
+(`attackDrift` reads the attack record's `airborne`, false for a move
+started on the ground), and the same move started in the air keeps the
+air control.
 
 Normal locomotion comes back the step the attack is over (or cut short).
 The retired Attack Mobility system (its tiers `quick`, `medium`, `heavy`,

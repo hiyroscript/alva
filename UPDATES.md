@@ -4446,3 +4446,125 @@ Specials, `strict-combat-rules`, `mash-combo`), `hit-effects` and `launch`
 target), `move-cancel` (a strike made where it stands, never a tunnel),
 `empty-roster`, `discover`, `practice-ground`, `watch-mode`, `settings`
 (its credits) and each fighter's roster list.
+
+## #0011, the young spider in the black and red suit
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0011 from a
+supplied sprite sheet, then open a pull request (the owner knows the
+itch.io release will pass its 1,000-file limit with it, to be fixed in a
+later update). `character_rule` asks for abilities with real mechanics
+from the character's canon, no move the character cannot perform in
+canon, the sheet's DeviantArt page credited and the character named
+nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0011 in roster slot 11, playable: 77 frames cut from
+  the sheet into `assets/characters/0011/`. The sheet is an exact 2×
+  enlargement of its pixel art, so it was read at 1× and each frame
+  cropped tight to its art, the flat blue background (67, 94, 255) made
+  transparent, nothing redrawn or recoloured, every file
+  `0011_<codename>_<frame>.png`: 68 of the fighter, 4 of the Web Shot's
+  webbing (a projectile) and 5 of the Venom Punch's lightning (an effect).
+  A drawing the sheet repeats is one file played again; its guard-raising
+  and guard-lowering poses are its landing's drawings, so its Shield has no
+  raise or lower clip rather than a copy. Drawn at the roster's art-pixel
+  size (a 49-pixel standing pose, about 83 units); every clip authors its
+  own `anchorX` on its suit. Movement is the universal one; its Energy
+  refills at the shared 12 a second.
+- **Its webs, its venom and its camouflage**, from its canon (a spider's
+  strength and agility, web-shooters, a bioelectric venom that stuns, and
+  a camouflage that turns it all but invisible), each with a mechanic:
+  **Punches** (1 that holds, then 3) and the **Spin Kick** (3 at Base
+  Launch 2), its Mash Combo pair; the **Air Kick** and the **Somersault
+  Kick** (all round it, launching straight up) in the air; the **Web
+  Shot** (a ball of webbing, about 420 units, that sticks its target where
+  it stands: 1, held 0.35 s; 3 s) and in the air **Web Lines** (3, reeling
+  whoever they catch in, its front only); the **Venom Jump** (its extra
+  attack: an uppercut that rises off the ground, carrying its target up,
+  then 3 at Base Launch 2 straight up; once per airtime in the air, its
+  way back to the stage); **Camouflage** (a technique and a Special: out
+  of sight for 2.5 s; 3 s) and the **Venom Punch** (a technique and a
+  Special: 3, stunned stiff 1.2 s by a ring of lightning; 3 s). Its guard
+  is its forearm raised; its Deflect a flip whose legs sweep a great arc;
+  its Dash a low, spider-like lunge, its air dash a web line zipping it
+  along. It heals nobody, summons nobody, throws nothing but its webbing,
+  never homes in, and no move of it costs Energy but its Deflect.
+- **One shared capability, for any fighter: `cloak`**, a technique release
+  (seconds). Released, its fighter is cloaked (`CombatState.cloakFor`, the
+  longer cloak winning, run down in real time, ended by a respawn): drawn
+  as a faint shimmer of its own art, its trail, shadow and ring
+  (`Arena.cloakAlpha`, `CLOAK_ALPHA` 0.2, steady under reduced motion),
+  and invisible to a CPU, whose perception keeps the last picture it saw of
+  it uncloaked, standing where it vanished and doing nothing, until a
+  reaction time after it shows itself (`lastSeen` in `perception.js`). No
+  invulnerability: it is struck, pushed and pulled as ever. Any move it
+  starts (an attack, the Deflect, a Mash Combo turn, a technique, a
+  summon) and any hit or block that reaches it (`CombatSystem.applyHit`)
+  show it at once (`CombatState.reveal`). The cooldown policy counts a
+  cloak an exceptional effect (3 s, `EXCEPTIONAL_EFFECTS`); it costs no
+  Energy; a cast that only cloaks harms nobody, so it is no attack and
+  gives way to any move. The CPU gives such a move the `cloak` role and
+  casts it now and then in a safe moment (`cloakPlan`, beside the heal's).
+- **A ground-started rise is a grounded attack.** The Venom Jump is the
+  roster's first `rise` that can start standing: once its own motion has
+  lifted it off the floor, nothing held steers it until it ends
+  (`attackDrift` reads the record's `airborne`; the CPU's prediction
+  already walked it so). Started in the air it keeps the air control.
+- **Its controller layout** by the comfort rules (Square Punches / Air
+  Kick, Triangle the Spin Kick / Somersault Kick, R2 the Web Shot / Web
+  Lines, L2 Camouflage, Circle the Venom Punch, the right stick up the
+  Venom Jump both ways), touch buttons, names and descriptions in English
+  and French, a Discover profile (3/5) and its credits (the sheet by
+  xxalexsmashxx on DeviantArt, linked by the deviation's number alone).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 240 matches a level): #0011 wins 0.55 at
+Medium, 0.52 at Hard and 0.53 at Brutal; weakest against #0007 (4 to 6 of
+24). Its first tuning won 0.70 to 0.88: the Web Shot's hold was cut from
+0.6 s to 0.35 s and the Venom Jump's throw from Base Launch 3 to 2.
+Details in [#0011's specification](docs/characters/0011.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0011.js`: the
+moves' phases are whole frames of their clips at `FPS_0011` (the orders
+`PUNCHES_0011`, `SPIN_0011`, `WEB_SHOT_0011`, `VENOM_JUMP_0011` and the
+rest); reaches are the attacks' `hitbox`es and the Venom Punch's `burst`;
+the webbing is `projectiles.attack3_object` (its `paralyze`, `speed` and
+`lifetime`); the reel is `attacks.midair_attack3.pull`; the lift is
+`attacks.extra_attack.motion`; the cloak's length is
+`techniques.attack4.cloak`. The shimmer is `CLOAK_ALPHA` / `CLOAK_WAVER`
+in `js/game/arena.js`; how often the CPU cloaks is in `cloakPlan`.
+
+**Code:** `js/data/characters/0011.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/technique.js` (`cloak`, `takeCloak`),
+`js/game/combat/combat-state.js` (`cloakFor`, `cloaked`, `reveal`),
+`js/game/combat/combat.js` (a hit or block shows it),
+`js/game/fighters/fighter.js` (takes the cloak; a move shows it),
+`js/game/fighters/movement.js` (the grounded rise), `js/data/cooldowns.js`,
+`js/data/loadout.js`, `js/game/arena.js` (the shimmer),
+`js/game/ai/cpu-intelligence/perception.js`, `capabilities.js` and
+`brain.js`; the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0011.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy,
+input, launch, movement, rendering, the AI, testing).
+
+**Tests:** new `tests/fighters/0011/fighter-0011.test.mjs` (registration
+and kit; its costs and cooldowns; its Specials; its Mash Combo; its names,
+touch buttons and controller layout; the 77 files, clean and tight, none
+a copy, at one scale, anchored on its body, its webbing and lightning
+centred; every move's mechanic; Camouflage's cloak, what shows it and what
+never does, a CPU's perception losing it; its Deflect turning a shot back;
+the CPU playing its whole kit; its source named nowhere); new
+`cloak.test.mjs` (the shared capability on a test-only fighter); the
+roster-wide tables (`cooldown-policy`: the cloak among the exceptional
+effects, `special-abilities`: seventeen Specials, `strict-combat-rules`,
+`mash-combo`), `attack-classification` (a technique that harms nobody
+heals or cloaks), `cpu-intelligence` (a cloak's opportunity), `i18n`
+(Camouflage, the same word in French), `empty-roster`, `discover`,
+`practice-ground`, `watch-mode`, `quick-battle`, `settings` (its credits)
+and each fighter's roster list; the disabled test fighter moved from slot
+11 to slot 26. The itch.io release now counts 1,063 files, over its 1,000
+limit: `npm run build:itch` refuses it until a later update brings it
+back under.

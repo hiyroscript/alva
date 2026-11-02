@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0010 use them between them
+is built, and usable by any fighter (#0001 to #0011 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -336,8 +336,8 @@ launches (`strike`), a
 multi-hit string (`strikes`), a projectile it releases or is (`projectile`,
 a piercing one's `finisher` too), a technique's burst (`burst`), a slam's
 impact where it lands (`impact`), a summon's clone that strikes (`clone`),
-or projectiles it turns back (`redirect`). A technique that only heals its
-own fighter harms nobody, so it is no attack.
+or projectiles it turns back (`redirect`). A technique that only heals or
+cloaks its own fighter harms nobody, so it is no attack.
 So:
 
 | Move | Executed as | Classified |
@@ -346,6 +346,7 @@ So:
 | A throw and its projectile, a piercing projectile and its finisher | attack, projectile | attack |
 | A cast's burst or projectile (Unlimited Void, Hollow Purple, Cherry Blossom Impact) | technique | attack |
 | A cast that only heals its own fighter (the Mystical Palm Technique) | technique | neither |
+| A cast that only cloaks its own fighter (Camouflage) | technique | neither |
 | A plunge that lands with an impact (the Heavenly Foot of Pain) | attack (in the air) | attack |
 | A summon, its clone and the clone's strike | summon | attack |
 | The Deflect | attack (in the air) | attack **and** defense |
@@ -391,6 +392,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0008 | `['attack4', 'attack5']` | the Feast (heals its own Launch Point), the Gum-Gum Giant Pistol (a 10-damage giant fist after a long wind-up) | the Gum-Gum Balloon, the Gum-Gum Rocket, the Gum-Gum Gatling |
 | #0009 | `['attack4', 'attack5']` | the Freezing Splash (a freeze that holds its target for a follow-up), the Air Sphere (its trance, a 10-damage burst open only in danger) | the Air Blast, the Air Gust, the Earth Pillar |
 | #0010 | `['attack4', 'extra_attack', 'attack5']` | the Kill (twice as strong on a back turned to it, then its kill cooldown), the Vent (a way under the floor, only its hatch open to a hit), the Emergency Meeting (everyone near called to the button and held there) | the Tongue Lash |
+| #0011 | `['attack4', 'attack5']` | Camouflage (out of sight, a CPU losing track of it, until it strikes or is struck), the Venom Punch (its lightning stuns whoever it reaches stiff) | the Web Shot, Web Lines, the Venom Jump |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -584,9 +586,21 @@ fighter's Launch Point drops by that much, never below 0
 (`CombatState.heal`); a heal is no hit, so it neither restarts nor
 delays Launch Point recovery, records no hit event (the fighter's `heals`
 list, read by the hit effects for the glow, records it), and a cast
-broken before its release heals nothing. Fields: `castAnimation`,
-`releaseAnimation`, `cooldown`, `energyCost`, `projectile`, `burst`, `heal`,
-`minLaunchPoint`; the
+broken before its release heals nothing. Or a `cloak` (seconds, from 0):
+on the release step its own fighter is cloaked for that long
+(`CombatState.cloakFor`, the longer cloak winning; it runs down in real
+time and a respawn ends it). Cloaked, it is drawn as a faint shimmer of its
+own art, its shadow and its trail (`Arena.cloakAlpha`,
+[rendering](rendering.md)), and a CPU cannot see it: it sees it where it
+vanished, doing nothing, until a reaction time after it shows itself
+([AI](ai.md)). It is no invulnerability: it is struck, pushed and pulled
+exactly as ever. Any move it starts (an attack, the Deflect and a Mash
+Combo turn included, a technique, a summon) and any hit or block that
+reaches it (`CombatSystem.applyHit`) shows it at once
+(`CombatState.reveal`); running, jumping and Dashing never do. A cast
+broken before its release cloaks nothing (#0011's Camouflage). Fields:
+`castAnimation`, `releaseAnimation`, `cooldown`, `energyCost`,
+`projectile`, `burst`, `heal`, `cloak`, `minLaunchPoint`; the
 burst's hit is validated like an attack's (damage, launch, stuns and hit
 effects). E.g. #0001's Unlimited Void (a burst that paralyzes) and Hollow
 Purple (a projectile that erases), each blocked by a raised Shield ([its
@@ -660,7 +674,7 @@ lengths exist; an ordinary move has **no cooldown at all** (the universal
 | Class (`cooldownClass`) | When | Cooldown |
 | --- | --- | --- |
 | `tenDamage` | Any one hit of the move deals 10 (a strike, a multi-hit's finisher, its projectile or that projectile's finisher, a slam's `impact`, a technique's `burst`, a summoned clone's attack), or everything one use can deal one target adds up to 10 or more | `TEN_DAMAGE_COOLDOWN`, 5 s |
-| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal`, or any hit's `paralyze`, `charm`, `float` or `fear` | `EXCEPTIONAL_COOLDOWN`, 3 s |
+| `exceptional` | Otherwise, an effect in `EXCEPTIONAL_EFFECTS`: a technique's `heal` or `cloak`, or any hit's `paralyze`, `charm`, `float` or `fear` | `EXCEPTIONAL_COOLDOWN`, 3 s |
 | `ordinary` | Everything else, the Deflect included | 0 |
 
 The first row that applies decides: a move never gets 3 s and 5 s added
@@ -670,7 +684,7 @@ The first row that applies decides: a move never gets 3 s and 5 s added
 nothing however strong it looks; every shared hit effect
 (`HIT_EFFECT_FIELDS`) is in one list or the other, checked by the tests,
 so a new effect is classified on purpose. `moveImpact(kind, spec,
-context)` reads what one use can do to one target (`{ hits, heal }`, a
+context)` reads what one use can do to one target (`{ hits, heal, cloak }`, a
 piercing projectile's every strike included) and `cooldownClass` its
 class; the builders call them with the fighter's own `projectiles` (for a
 throw or a cast) and `attacks` (for a summon's clone):
@@ -701,7 +715,7 @@ move is **released**, the event that emits what it authors
 | Multi-hit attack | its last strike goes live (the whole authored string emitted; an early strike is not enough) |
 | Projectile attack | its projectile spawns (time past `spawnAt`, the thrower not stunned) |
 | Slam with an `impact` | the impact strikes as it lands (`Fighter.landSlam`); a plunge that runs out in the air never releases |
-| Technique (projectile, burst, heal) | its cast is over and it lets go (`Technique.release`, taken by `takeCooldown`) |
+| Technique (projectile, burst, heal, cloak) | its cast is over and it lets go (`Technique.release`, taken by `takeCooldown`) |
 | Summon | its clone actually appears (`spawnClones`) |
 
 Pressing the button, the startup, the cast or the summoning pose start
@@ -734,7 +748,10 @@ and World is Mine 3 s (charm); #0005's Deadlights 3 s (float) and Red
 Balloon 3 s (its phantom's fear); #0006's Ice Breath 3 s (a freeze, its
 paralysis); #0007's Rocket Launcher 5 s (a 10-damage rocket); #0008's
 Feast 3 s (a heal) and Gum-Gum Giant Pistol 5 s (a 10-damage fist); #0009's
-Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10).
+Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
+#0010's Kill 5 s (its backstab's 10) and Emergency Meeting 3 s (its hold);
+#0011's Web Shot 3 s (its webbing's hold), Camouflage 3 s (a cloak) and
+Venom Punch 3 s (its hold).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -806,7 +823,7 @@ or not) is gone.
      freeze, stun or paralysis), which another attack, a jump, a Dash or
      an air dash (and the Deflect) may use. A summon or technique never
      cuts an attack short, not even one that hit.
-   - **A move that harms nobody** (a technique that only heals, a pending
+   - **A move that harms nobody** (a technique that only heals or cloaks, a pending
      attack) **and the Deflect** (by explicit rule: it is a defense; see
      `yieldsToRequests` in `js/game/combat/offense.js`), **and any other
      move that turns projectiles back** (a defense too, by the same rule:

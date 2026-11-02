@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Ten playable fighters** on a 48-slot roster:
+- **Eleven playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -83,22 +83,29 @@ blocks every attack.
   rises out of the ground to throw up whoever stands there and wall off
   shots, a splash of water that freezes, a fire kick, a staff and a leap
   on the air, and a trance that opens only in danger, when its Launch
-  Point is high: a sphere of air bursting out round it), and
+  Point is high: a sphere of air bursting out round it),
   [#0010](docs/characters/0010.md), the traitor in the red spacesuit, the
   roster's smallest, who catches its opponents off guard (a knife that
   kills twice as hard on a back turned to it and must then wait, a vent it
   dives into and climbs out of further along the floor, only the vent's
   hatch open to a hit meanwhile, an emergency button that calls everyone
   near to it and holds them there, a tongue that reels its target in, a
-  pistol, its fists and tentacles). All ten Shield
+  pistol, its fists and tentacles), and [#0011](docs/characters/0011.md),
+  the young spider in the black and red suit (a ball of webbing that
+  sticks its target where it stands, web lines that reel it in, a venom
+  punch that stuns it stiff, an uppercut crackling with venom that carries
+  it up off the ground, and a camouflage that turns it all but invisible,
+  a CPU losing track of it altogether, until it strikes or is struck).
+  All eleven Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all ten Dash on the ground and air dash. Each fighter
+  back at their thrower), and all eleven Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
   #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
   Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent
-  and Emergency Meeting): an orange exclamation
+  and Emergency Meeting, #0011's Camouflage and Venom Punch): an orange
+  exclamation
   mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
@@ -347,6 +354,9 @@ sheet's own credit: GameInvader.
 
 **#0010 sprite source.** Sprite sheet by xxalexsmashxx on
 [DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/1262852046).
+
+**#0011 sprite source.** Sprite sheet by xxalexsmashxx on
+[DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/955488395).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related
