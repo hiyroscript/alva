@@ -40,9 +40,10 @@ export const TEST_MOVELESS = testFighter('test-moveless', 'Moveless', 3, {
 // playable, in slot 05.
 export const TEST_SAMPLE = { ...SAMPLE_FIGHTER, id: 'test-sample', displayName: 'Sample', rosterSlot: 4, available: true };
 
-// A fighter that exists but is disabled (`available: false`, slot 11): the
-// definition no route may start, and the roster shows locked.
-export const TEST_DISABLED = testFighter('test-disabled', 'Disabled', 10, { available: false });
+// A fighter that exists but is disabled (`available: false`, slot 26, well
+// past the roster's own fighters): the definition no route may start, and
+// the roster shows locked.
+export const TEST_DISABLED = testFighter('test-disabled', 'Disabled', 25, { available: false });
 
 // The ids of the fighters removed from the roster and not given to another
 // since: none today. Only ever checked for absence: no definition, art,

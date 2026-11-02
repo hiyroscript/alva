@@ -17,11 +17,12 @@
 //
 // The runtime implements one form of technique: the cast. The fighter
 // stands still, committed to a casting pose, then lets go of what it casts
-// all at once: a projectile, a burst round itself, a heal of its own, or
-// any of them together. Nothing in it reads a fighter or a button: any
-// fighter may give a cast its own clips, timing, projectile, burst and
-// heal. E.g. #0001's Hollow Purple (attack5) and Unlimited Void (attack4),
-// and #0003's Mystical Palm Technique (attack4, a heal):
+// all at once: a projectile, a burst round itself, a heal of its own, a
+// cloak of its own, or any of them together. Nothing in it reads a fighter
+// or a button: any fighter may give a cast its own clips, timing,
+// projectile, burst, heal and cloak. E.g. #0001's Hollow Purple (attack5)
+// and Unlimited Void (attack4), #0003's Mystical Palm Technique (attack4, a
+// heal) and #0011's Camouflage (attack4, a cloak):
 //
 //   techniques: {
 //     attack5: {
@@ -33,6 +34,7 @@
 //       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, paralyze: 1.8 } },
 //     },
 //     attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', heal: 10 },
+//     attack4: { castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cloak: 2.5 },
 //   },
 //
 // Phases, always explicit:
@@ -52,10 +54,15 @@
 //            offset }`, is the art the burst plays as it goes out, an
 //            `effectAnimations` clip named <attack>_object played once,
 //            centred at `offset` from the fighter, art only: see
-//            takeEffect) and its `heal` (that many Launch Points
+//            takeEffect), its `heal` (that many Launch Points
 //            taken off its own fighter's, never below 0: see
-//            CombatState.heal). releaseAnimation then plays once, the
-//            fighter still committed.
+//            CombatState.heal) and its `cloak` (seconds its own fighter is
+//            cloaked from then: drawn near invisible and out of a CPU's
+//            sight, until they run out or it shows itself by starting a
+//            move or being reached by a hit; it can be hit exactly as ever,
+//            no invulnerability: see CombatState.cloakFor).
+//            releaseAnimation then plays once, the fighter still
+//            committed.
 //   done     the fighter is free again.
 //
 // The fighter must stay grounded from the first cast frame until the
@@ -80,7 +87,7 @@
 // A technique's cooldown is the cooldown policy's (js/data/cooldowns.js),
 // derived from what the cast releases: 5 s when its burst or its
 // projectile (judged from the fighter's `projectiles`) deals 10 damage,
-// else 3 s when it heals, paralyzes, charms, floats or frightens, else none
+// else 3 s when it heals, cloaks, paralyzes, charms, floats or frightens, else none
 // at all. An entry may leave it out; one it declares must agree. It starts
 // as the technique is released (its cast over: see release and
 // takeCooldown), exactly once: a cast broken before that starts none, and
@@ -90,9 +97,10 @@
 // Its Energy (`energyCost`, the Energy policy's, js/data/energy.js) is 15
 // for an ordinary technique that releases a projectile or a burst (a
 // construct), paid once as it starts; 0 for one with a special cooldown or
-// one that only heals.
+// one that only heals or cloaks.
 //
-// A technique that is no attack (one that only heals its own fighter) gives
+// A technique that is no attack (one that only heals or cloaks its own
+// fighter) gives
 // way to any valid request while it plays (`freeCancel`, see
 // yieldsToRequests in js/game/combat/offense.js): another move, a jump or a
 // Dash ends it at once, before its release (nothing healed, no cooldown) or
@@ -134,6 +142,9 @@ const TECHNIQUE_DEFAULTS = {
   // Launch Point it takes off its own fighter as it releases (a whole
   // number; 0 is none): see `heal` above.
   heal: 0,
+  // Seconds it cloaks its own fighter as it releases (0 is none): see
+  // `cloak` above.
+  cloak: 0,
   // The least Launch Point its own fighter must have for it to start (a
   // whole number; 0 is none): see `minLaunchPoint` above.
   minLaunchPoint: 0,
@@ -164,6 +175,9 @@ export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
     });
   }
   if (!(Number.isInteger(def.heal) && def.heal >= 0)) throw new Error(`[Alva] ${owner}'s heal must be a whole number of Launch Points from 0`);
+  if (!(typeof def.cloak === 'number' && Number.isFinite(def.cloak) && def.cloak >= 0)) {
+    throw new Error(`[Alva] ${owner}'s cloak must be a number of seconds from 0`);
+  }
   if (!(Number.isInteger(def.minLaunchPoint) && def.minLaunchPoint >= 0)) {
     throw new Error(`[Alva] ${owner}'s minLaunchPoint must be a whole number of Launch Points from 0`);
   }
@@ -202,7 +216,9 @@ export function techniqueProblem(owner, def) {
   for (const key of TECHNIQUE_CLIPS.map((field) => def[field])) {
     if (!key || !owner.sprites.has(key)) return `its fighter clip "${key}" has no animation frames`;
   }
-  if (!def.projectile && !def.burst && !(def.heal > 0)) return 'it releases nothing (no projectile, no burst and no heal)';
+  if (!def.projectile && !def.burst && !(def.heal > 0) && !(def.cloak > 0)) {
+    return 'it releases nothing (no projectile, no burst, no heal and no cloak)';
+  }
   if (def.projectile) {
     const proj = owner.projectileDefs?.[def.projectile.id];
     if (!proj) return `its projectile "${def.projectile.id}" is not defined`;
@@ -232,6 +248,7 @@ export class Technique {
     this.burstDue = false; // the burst, waiting for the CombatSystem
     this.effectDue = false; // the burst's art, waiting for its fighter (see takeEffect)
     this.healDue = 0; // the heal, waiting for its fighter (see takeHeal)
+    this.cloakDue = 0; // the cloak, waiting for its fighter (see takeCloak)
     this.cooldownDue = false; // its cooldown, waiting for its fighter (see takeCooldown)
     this.endReason = null;
     this.castDuration = owner.sprites.duration(def.castAnimation);
@@ -267,6 +284,7 @@ export class Technique {
     if (this.def.burst) this.burstDue = true;
     if (this.def.burst?.effect) this.effectDue = true;
     if (this.def.heal > 0) this.healDue = this.def.heal;
+    if (this.def.cloak > 0) this.cloakDue = this.def.cloak;
     this.cooldownDue = true;
   }
 
@@ -297,6 +315,14 @@ export class Technique {
     const heal = this.healDue;
     this.healDue = 0;
     return heal;
+  }
+
+  // The cloak due this step, taken (its fighter takes it on, see
+  // Fighter.update): seconds, or 0 when none is due.
+  takeCloak() {
+    const cloak = this.cloakDue;
+    this.cloakDue = 0;
+    return cloak;
   }
 
   // The burst due this step, taken: its world-space box (`out`), centred on
@@ -349,6 +375,7 @@ export class Technique {
     this.burstDue = false;
     this.effectDue = false;
     this.healDue = 0;
+    this.cloakDue = 0;
     this.cooldownDue = false;
     this.owner = null;
   }

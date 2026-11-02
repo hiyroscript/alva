@@ -224,6 +224,8 @@ export const EN = {
   'credits.sprites0009.sheetCredits': 'Sheet credits: GameInvader',
   'credits.sprites0010.title': '#0010 sprite source',
   'credits.sprites0010.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
+  'credits.sprites0011.title': '#0011 sprite source',
+  'credits.sprites0011.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -473,6 +475,7 @@ export const EN = {
   'discover.fighter.0008.playStyle': 'A rubber brawler that strikes from afar with its own stretched fists and feet, bounces shots back by blowing itself up and heals by eating, a threat at every range without ever throwing a thing. Its stretched limbs are still its body and can be hit, and its biggest blows are easy to see coming.',
   'discover.fighter.0009.playStyle': 'An elusive elementalist that would rather move an opponent than hurt one: winds that carry and fling, water that freezes, rising rock that throws foes and stops shots, fire and a staff up close. It is light and easily knocked about, and its greatest power wakes only once it is in real danger.',
   'discover.fighter.0010.playStyle': 'A small, sly ambusher that wins by catching opponents off guard: it slips under the floor to appear elsewhere, reels them in from afar and strikes hardest when their back is turned. Its plain blows are modest and its deadliest strike comes rarely, so a watchful opponent leaves it little to work with.',
+  'discover.fighter.0011.playStyle': 'An agile all-rounder that pins opponents from afar with webbing, stuns them up close with crackling blows and can slip out of sight to choose when it strikes. Its plain strikes are light and its strongest tools need a moment to gather, so a fast, aggressive opponent can catch it mid-preparation.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

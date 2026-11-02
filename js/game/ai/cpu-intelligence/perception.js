@@ -11,6 +11,11 @@
 // starts, on any level. Projectiles and clones are perceived the same way
 // (a shot is seen `latency` after it appears; a shot turned back keeps its
 // old heading and owner in the CPU's eyes until the turn has been seen).
+// An opponent cloaked by a technique of its own (`cloak`, see
+// CombatState.cloakFor) cannot be seen at all: for as long as the picture
+// the CPU would see shows it cloaked, the CPU sees it as it last saw it,
+// standing where it vanished and doing nothing, and only sees it again
+// `latency` after it shows itself.
 //
 // Changes between two perceived pictures are events (an attack starting, a
 // whiff, a jump, a landing, a Dash, the Shield going up or down, a
@@ -40,7 +45,7 @@ function blankSnap() {
     energy: 100, exhausted: false, lp: 0, dash: null, dashDir: 0, dashSpeed: 0, dashLeft: 0, dashAir: false,
     technique: null, techniqueDef: null, techniquePhase: null, techniqueReleaseIn: 0, techniqueEndIn: 0, techniqueFacing: 1,
     summon: null, summonLeft: 0, airJumps: 0, airDashes: 0, freeFall: false, launched: false, tumbling: false,
-    canAct: true, lastGroundY: 0, lost: false,
+    canAct: true, lastGroundY: 0, lost: false, hidden: false,
   };
 }
 
@@ -110,7 +115,37 @@ function snap(s, f, t) {
   s.canAct = f.canAct();
   s.lastGroundY = f.lastGroundY;
   s.lost = !!f.lostToVoid;
+  s.hidden = !!f.combat.cloaked;
   return s;
+}
+
+// What the CPU keeps seeing of an opponent that has vanished (`ghost`) from
+// the last picture it saw of it (`seen`): there, still, doing nothing.
+function lastSeen(ghost, seen) {
+  Object.assign(ghost, seen);
+  ghost.vx = 0;
+  ghost.vy = 0;
+  ghost.attack = null;
+  ghost.attackDef = null;
+  ghost.attackTime = 0;
+  ghost.attackPhase = null;
+  ghost.attackHit = false;
+  ghost.attackConfirmed = false;
+  ghost.attackMotion = null;
+  ghost.attackMash = null;
+  ghost.dash = null;
+  ghost.dashDir = 0;
+  ghost.dashSpeed = 0;
+  ghost.dashLeft = 0;
+  ghost.technique = null;
+  ghost.techniqueDef = null;
+  ghost.techniquePhase = null;
+  ghost.techniqueReleaseIn = 0;
+  ghost.techniqueEndIn = 0;
+  ghost.summon = null;
+  ghost.summonLeft = 0;
+  ghost.hidden = true;
+  return ghost;
 }
 
 export class Perception {
@@ -120,6 +155,10 @@ export class Perception {
     this.ring = Array.from({ length: HISTORY }, blankSnap);
     this.view = blankSnap();
     this.prevView = blankSnap();
+    // The last picture of the opponent the CPU saw uncloaked, and what it
+    // sees of it while it is cloaked (see lastSeen).
+    this.seen = blankSnap();
+    this.ghost = blankSnap();
     this.reset();
   }
 
@@ -132,6 +171,7 @@ export class Perception {
     this.shots = new Map();
     this.clones = new Map();
     this.hasView = false;
+    this.hasSeen = false;
     this.seenAttack = null;
     this.seenTechnique = null;
     this.seenSummon = null;
@@ -157,6 +197,13 @@ export class Perception {
       const s = this.ring[(this.head - i + HISTORY) % HISTORY];
       pick = s;
       if (s.t <= then + 1e-9) break;
+    }
+    // Cloaked in that picture: the CPU sees it as it last saw it (see
+    // lastSeen); otherwise that picture is the last it saw.
+    if (pick.hidden && this.hasSeen) pick = lastSeen(this.ghost, this.seen);
+    else if (!pick.hidden) {
+      Object.assign(this.seen, pick);
+      this.hasSeen = true;
     }
     const prev = this.prevView;
     Object.assign(prev, this.view);

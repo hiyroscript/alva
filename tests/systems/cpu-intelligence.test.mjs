@@ -574,6 +574,20 @@ function tryHeal(D, move, difficulty, seed = 5) {
   return out;
 }
 
+// A cloak's opportunity at `difficulty` (see CpuIntelligence.cloakPlan):
+// its opponent stands still far across the ring, out of reach for longer
+// than the cast. Its job is done once its fighter is cloaked.
+function tryCloak(D, move, difficulty, seed = 5) {
+  const r = arena({ cpuDef: D, foeDef: D, difficulty, seed, cpuX: 400, foeX: 1600 });
+  const out = { started: false, cloaked: false };
+  for (let i = 0; i < seconds(4) && !out.cloaked; i++) {
+    r.step();
+    if (r.cpu.technique?.def.id === move.id) out.started = true;
+    if (r.cpu.combat.cloaked) out.cloaked = true;
+  }
+  return out;
+}
+
 test('every move of every fighter, in an opportunity made for it, is recognized, pressed and does its job, at every level', () => {
   for (const D of FIGHTERS) {
     const f = new Fighter({ def: D, sprites: fakeSpritesOf(D), stage: FLAT, spawn: { x: 1000 } });
@@ -583,6 +597,14 @@ test('every move of every fighter, in an opportunity made for it, is recognized,
         for (const difficulty of DIFFICULTY_IDS) {
           const o = tryHeal(D, m, difficulty);
           assert.ok(o.started && o.healed === m.heal, `#${D.id} ${m.key} at ${difficulty}: heals ${JSON.stringify(o)}`);
+        }
+        continue;
+      }
+      // A cloak's is its own fighter out of sight.
+      if (m.cloak > 0) {
+        for (const difficulty of DIFFICULTY_IDS) {
+          const o = tryCloak(D, m, difficulty);
+          assert.ok(o.started && o.cloaked, `#${D.id} ${m.key} at ${difficulty}: cloaks ${JSON.stringify(o)}`);
         }
         continue;
       }

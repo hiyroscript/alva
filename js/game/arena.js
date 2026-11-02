@@ -37,6 +37,11 @@ export const MARKER = Object.freeze({ p1: '#ffffff', p2: '#a3a3a3' });
 // Debug overlay: techniques get their own dashed colour, apart from
 // melee / clone (orange) and projectile (magenta) boxes.
 const TECHNIQUE_DEBUG = '#29f0ff';
+// How much of a cloaked fighter shows (see CombatState.cloakFor): a faint
+// shimmer of its own art, its shadow and its trail, wavering a little on
+// the effects clock (steady under reduced motion). Art only.
+const CLOAK_ALPHA = 0.2;
+const CLOAK_WAVER = 0.06;
 
 export class Arena {
   // `seed` fixes the stage hazards' randomness (each its own stream of it,
@@ -511,7 +516,7 @@ export class Arena {
     const surface = this.stage.surfaceBelow(b.x - b.halfW, b.x + b.halfW, f.renderY);
     const surfaceY = surface.ref?.dynamic ? surface.ref.renderY : surface.y;
     const height = Math.max(0, surfaceY - f.renderY);
-    const fade = Math.max(0, 1 - height / 220) * (surface.ref?.opacity ?? 1);
+    const fade = Math.max(0, 1 - height / 220) * (surface.ref?.opacity ?? 1) * this.cloakAlpha(f);
     if (fade <= 0) return;
     const sh = this.theme.shadow;
     const [sx, sy] = this.toScreen(f.renderX, surfaceY);
@@ -550,10 +555,23 @@ export class Arena {
   drawFighter(f) {
     const flashing = this.fx.flashing(f);
     const pxPerArt = this.pxPerArtOf(f.sprites);
+    const alpha = this.cloakAlpha(f);
+    if (alpha < 1) {
+      this.ctx.save();
+      this.ctx.globalAlpha = alpha;
+    }
     for (const part of fighterParts(f)) {
       const [sx, sy] = this.toScreen(part.x, part.y);
       drawFrame(this.ctx, flashing ? whiteFrame(part.frame) : part.frame, sx, sy, pxPerArt, part.flip);
     }
+    if (alpha < 1) this.ctx.restore();
+  }
+
+  // How much of fighter `f` shows: all of it, or a faint shimmer while it is
+  // cloaked (see CLOAK_ALPHA).
+  cloakAlpha(f) {
+    if (!f.combat?.cloaked) return 1;
+    return this.reducedMotion ? CLOAK_ALPHA : CLOAK_ALPHA + CLOAK_WAVER * Math.sin(this.fxTime * 9);
   }
 
   // Device pixels per art pixel for art from `sprites`: each fighter's art
@@ -571,8 +589,9 @@ export class Arena {
     if (!ghosts.length) return;
     const { ctx } = this;
     ctx.save();
+    const cloak = this.cloakAlpha(f);
     for (const g of ghosts) {
-      ctx.globalAlpha = g.alpha;
+      ctx.globalAlpha = g.alpha * cloak;
       for (const part of g.parts) {
         const [sx, sy] = this.toScreen(part.x, part.y);
         drawFrame(ctx, part.frame, sx, sy, this.pxPerArtOf(f.sprites), part.flip);

@@ -181,7 +181,9 @@ export function loadoutProblems(def) {
       if (!hasClip(def, key, technique.members)) say(`technique ${id}'s ${field} "${key}" is not in ${clipHome}`);
       else if (!key.startsWith(`${id}_`)) say(`technique ${id}'s ${field} "${key}" is not named ${id}_...`);
     }
-    if (!technique.projectile && !technique.burst && !(technique.heal > 0)) say(`technique ${id} releases nothing (no projectile, no burst and no heal)`);
+    if (!technique.projectile && !technique.burst && !(technique.heal > 0) && !(technique.cloak > 0)) {
+      say(`technique ${id} releases nothing (no projectile, no burst, no heal and no cloak)`);
+    }
     const shot = technique.projectile;
     if (shot) {
       if (shot.id !== objectOf(id)) say(`technique ${id} releases "${shot.id}": its projectile is ${objectOf(id)}`);

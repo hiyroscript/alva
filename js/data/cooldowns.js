@@ -2,7 +2,7 @@
 // used again, the same rules for every fighter. A fighter never chooses a
 // move's cooldown; the policy derives it from what the move does, read from
 // its structured combat data (its hits, its projectile, its burst, its
-// impact, its heal), never from its name or its fighter.
+// impact, its heal, its cloak), never from its name or its fighter.
 //
 //   1. A move that deals 10 damage waits TEN_DAMAGE_COOLDOWN (5 s): any one
 //      hit of it dealing 10 (a strike, a multi-hit's finisher, its
@@ -12,7 +12,7 @@
 //      can deal one target adding up to 10 or more.
 //   2. Otherwise a move with an exceptional effect waits
 //      EXCEPTIONAL_COOLDOWN (3 s): one listed in EXCEPTIONAL_EFFECTS (a heal
-//      of Launch Point, a paralysis that holds its target in place, a charm
+//      of Launch Point, a cloak that hides its own fighter, a paralysis that holds its target in place, a charm
 //      that turns its target's hits into heals, a float that lifts its
 //      target helpless into the air, a fear that makes its own hits on its
 //      target heal it).
@@ -64,14 +64,15 @@ export const COOLDOWN_CLASSES = Object.freeze({
 
 // The effects that make a move exceptional (rule 2), by the field that
 // carries them: a move's own `heal` (Launch Point it restores to its
-// fighter, see js/game/combat/technique.js), a hit's `paralyze` (seconds
+// fighter, see js/game/combat/technique.js), a move's own `cloak` (seconds
+// it hides its own fighter from sight, see the same), a hit's `paralyze` (seconds
 // it holds its target in place, unable to act), a hit's `charm` (seconds
 // its target's hits on the charmer heal it instead), a hit's `float`
 // (seconds it holds its target helpless, rising in the air) and a hit's
 // `fear` (seconds its fighter's own hits on its target feed it; all four in
-// js/game/combat/hit-effects.js). A new effect that stops a fighter acting
-// or restores it belongs here.
-export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'paralyze', 'charm', 'float', 'fear']);
+// js/game/combat/hit-effects.js). A new effect that stops a fighter acting,
+// restores it or hides it belongs here.
+export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'cloak', 'paralyze', 'charm', 'float', 'fear']);
 
 // Every other combat capability a hit or a move may declare, classified as
 // routine: none of them earns a cooldown, however strong it looks. Every
@@ -108,18 +109,18 @@ export function projectileHits(spec) {
 
 // What one use of a move can do to one target, from its raw entry (a
 // character's `attacks`, `techniques` or `summons` entry, or its
-// `deflect`): { hits, heal }. `kind` is 'attack', 'technique' or 'summon';
+// `deflect`): { hits, heal, cloak }. `kind` is 'attack', 'technique' or 'summon';
 // `context` the fighter's own `projectiles` (for a throw or a cast) and
 // `attacks` (for a summon's clone). Without a context, only the move's own
 // hits count.
 export function moveImpact(kind, spec, { projectiles = null, attacks = null } = {}) {
-  if (!spec) return { hits: [], heal: 0 };
+  if (!spec) return { hits: [], heal: 0, cloak: 0 };
   if (kind === 'summon') {
     // A clone performs one attack, or its no-ground one: the more severe.
     const uses = [spec.attack, spec.noGround?.attack]
       .filter(Boolean)
       .map((id) => moveImpact('attack', attacks?.[id], { projectiles }));
-    return uses.sort((a, b) => rank(b) - rank(a) || sum(b.hits) - sum(a.hits))[0] ?? { hits: [], heal: 0 };
+    return uses.sort((a, b) => rank(b) - rank(a) || sum(b.hits) - sum(a.hits))[0] ?? { hits: [], heal: 0, cloak: 0 };
   }
   const hits = [];
   if (kind === 'technique') {
@@ -130,7 +131,7 @@ export function moveImpact(kind, spec, { projectiles = null, attacks = null } = 
     if (spec.motion?.impact?.hit) hits.push(hit(spec.motion.impact.hit));
   }
   if (spec.projectile?.id) hits.push(...projectileHits(projectiles?.[spec.projectile.id]));
-  return { hits, heal: kind === 'technique' ? spec.heal ?? 0 : 0 };
+  return { hits, heal: kind === 'technique' ? spec.heal ?? 0 : 0, cloak: kind === 'technique' ? spec.cloak ?? 0 : 0 };
 }
 
 const CLASS_RANK = Object.freeze({ ordinary: 0, exceptional: 1, tenDamage: 2 });
@@ -138,9 +139,9 @@ const rank = (impact) => CLASS_RANK[impactClass(impact)];
 
 // The class of what a move does (see moveImpact): 'tenDamage',
 // 'exceptional' or 'ordinary', by the first rule that applies.
-export function impactClass({ hits = [], heal = 0 } = {}) {
+export function impactClass({ hits = [], heal = 0, cloak = 0 } = {}) {
   if (hits.some((h) => h.damage >= TEN_DAMAGE) || sum(hits) >= TEN_DAMAGE) return 'tenDamage';
-  if (heal > 0 || hits.some((h) => h.paralyze > 0 || h.charm > 0 || h.float > 0 || h.fear > 0)) return 'exceptional';
+  if (heal > 0 || cloak > 0 || hits.some((h) => h.paralyze > 0 || h.charm > 0 || h.float > 0 || h.fear > 0)) return 'exceptional';
   return 'ordinary';
 }
 

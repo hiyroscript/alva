@@ -53,11 +53,12 @@ const SPECIALS = Object.freeze({
   '0008': ['attack4', 'attack5'],
   '0009': ['attack4', 'attack5'],
   '0010': ['attack4', 'extra_attack', 'attack5'],
+  '0011': ['attack4', 'attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly fifteen Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash, the Air Sphere, the Kill, the Vent and the Emergency Meeting', () => {
+test('exactly seventeen Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash, the Air Sphere, the Kill, the Vent, the Emergency Meeting, Camouflage and the Venom Punch', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -67,7 +68,7 @@ test('exactly fifteen Specials across the roster: Unlimited Void and Hollow Purp
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 15);
+  assert.equal(total, 17);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
@@ -92,6 +93,12 @@ test('exactly fifteen Specials across the roster: Unlimited Void and Hollow Purp
   // The Tongue Lash reels its target in, a pull like others': ordinary.
   for (const move of ['attack3', 'midair_attack3']) {
     assert.equal(isSpecialAbility(getCharacter('0010'), move), false, `${name('0010', move)} is not Special`);
+  }
+  assert.deepEqual(specialAbilities(getCharacter('0011')).map((m) => name('0011', m)), ['Camouflage', 'Venom Punch']);
+  // The Web Shot holds too, briefly, but is its everyday shot; the Venom
+  // Jump is its riser: ordinary.
+  for (const move of ['attack3', 'midair_attack3', 'extra_attack']) {
+    assert.equal(isSpecialAbility(getCharacter('0011'), move), false, `${name('0011', move)} is not Special`);
   }
   // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
   for (const move of ['attack3', 'attack4']) {
@@ -189,6 +196,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'attack3'],
       air: ['attack1', 'attack2', 'attack3'],
       abilities: ['ground:attack4', 'ground:attack5', 'ground:extra_attack'],
+    },
+    '0011': {
+      ground: ['attack1', 'attack2', 'attack3', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3', 'extra_attack'],
+      abilities: ['ground:attack4', 'ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

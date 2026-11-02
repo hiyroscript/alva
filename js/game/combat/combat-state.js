@@ -238,6 +238,10 @@ export class CombatState {
     // is not.
     this.fear = 0;
     this.frightenedBy = null;
+    // Seconds this fighter is still cloaked by a technique of its own
+    // (`cloak`, see js/game/combat/technique.js and cloakFor below): near
+    // invisible on screen, and out of a CPU's sight. 0 when it is not.
+    this.cloak = 0;
   }
 
   get attacking() {
@@ -380,6 +384,29 @@ export class CombatState {
     this.charmedBy = null;
   }
 
+  // A technique of its own cloaked this fighter for `seconds` (see `cloak`
+  // in js/game/combat/technique.js): until it runs out or the fighter shows
+  // itself (reveal), it is drawn near invisible and a CPU cannot see it
+  // (see js/game/ai/cpu-intelligence/perception.js). The longer of what is
+  // left and the new cloak. It changes nothing else: it can still be hit,
+  // pushed and pulled exactly as ever (no invulnerability), and it runs
+  // down every step, frozen or not (see update).
+  cloakFor(seconds) {
+    if (seconds > this.cloak) this.cloak = seconds;
+  }
+
+  // Whether this fighter is cloaked right now (see cloakFor).
+  get cloaked() {
+    return this.cloak > 0;
+  }
+
+  // The cloak ends at once: the fighter shows itself (it starts a move, or
+  // a hit reaches it: see Fighter.startAttack, Fighter.tryTechnique,
+  // Fighter.trySummon and CombatSystem.applyHit).
+  reveal() {
+    this.cloak = 0;
+  }
+
   // Free of any attack, stun (a Shield's blockstun included) or paralysis.
   // Launch Point never matters here, however high it is, and neither does
   // Energy. (An attack that hit may still be cut short by another attack or
@@ -506,6 +533,8 @@ export class CombatState {
       this.fear = this.fear - dt <= PHASE_EPSILON ? 0 : this.fear - dt;
       if (!this.fear) this.frightenedBy = null;
     }
+    // ...and so does a cloak.
+    if (this.cloak > 0) this.cloak = this.cloak - dt <= PHASE_EPSILON ? 0 : this.cloak - dt;
     if (this.hitstop > 0) {
       // Frozen: the attack reaches no new time this step (see sweepAttack).
       if (this.attack) this.attack.samples = null;

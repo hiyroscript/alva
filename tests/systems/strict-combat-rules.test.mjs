@@ -273,6 +273,10 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // that has its 3 s: the Kill (5 s) and the Meeting pay nothing, and the
     // Vent, the Tongue Lash and every strike are melee.
     '0010': { 'tech:attack4': 0, 'tech:attack5': 0 },
+    // Its one projectile, the Web Shot's webbing, holds (3 s): nothing to
+    // pay. Camouflage (a cloak, 3 s) and the Venom Punch (a hold, 3 s) pay
+    // nothing either, and every other move is melee.
+    '0011': { 'tech:attack4': 0, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
