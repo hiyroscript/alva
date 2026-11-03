@@ -1,1002 +1,246 @@
-ALVA — Safe File Consolidation and itch.io Publishing Preparation
+# Add Online Play to Alva (rooms, no accounts)
+
+You are working on **hiyroscript/alva**, a 2D platform fighter for the browser (plain HTML/CSS/ES modules, Canvas 2D, no build step). Players play the **itch.io release** (`npm run build:itch`), not GitHub Pages. Your task is to add **Online Play**: two players on two devices fight a Quick Battle by creating or joining a **room**. There's no matchmaking and no accounts.
+
+You do this in **two pull requests**, with a hand-off to the owner in between:
+
+1. **PR 1 (setup):** the whole client feature, the room server code, its deploy workflow and the tests. Everything works locally against a local server, but the game isn't connected to a deployed server yet, because the owner has no Cloudflare account yet.
+2. **Hand-off:** after opening PR 1, tell the owner **exactly** what to do, step by step, in plain language (template below). Then stop and wait.
+3. **PR 2 (go live):** once the owner gives you the server URL, connect the game to it, tighten security to the real origins, smoke-test it and finish the docs. This concludes the work.
+
+---
+
+## 0. Before writing code: read the project
+
+Read these first and follow them. They are the project's rules, and the owner enforces them:
+
+- `CLAUDE.md`: house rules (never edit `character_rule`, never special-case a fighter id in shared code, controller comfort rules, `node --test`).
+- `ALVA_SPEC.md`: the product spec. Especially §2 (platform constraints: **no npm dependencies in the game**, every URL relative, the itch release must behave exactly like the source), §5 (brand, palette, component rules, motion), §6.2 (Home), §6.3–6.5 (Quick Battle flow), §6.5b (Local Play, the closest existing model for this feature), §6.7 (loading and dialogs), §7.3–7.4 (battle chrome, input), §8 (accessibility). Note the line in §6.3: **"No fake modes or online matchmaking."** Update it: online rooms are now a real mode, and there's still no matchmaking.
+- `docs/README.md` and `docs/architecture/*`: module responsibilities. Match the existing structure and comment style (each module opens with a block comment explaining what it owns).
+- `docs/gameplay/local-play.md`: how Local Play was built across Home, screens, `ControllerManager`, `InputManager` and `BATTLE_MODES`. Online Play should feel like its sibling.
+- `docs/development/itch-release.md` and `tools/itch/*`: the release build, `validate.mjs` (it **fails on any external `http(s)://` URL that isn't a credits link**, see `EXTERNAL_URL`) and the equivalence check.
+- `docs/development/testing.md`: the test layout (`tests/systems`, `tests/interface`, `tests/integration`, a fake DOM, no browser).
+- `UPDATES.md`: named updates. Ask the owner in the hand-off whether this should be named (for example "the online update"). Don't invent a name.
+
+Key files you'll touch (verify; the code may have moved):
+
+| Area | File(s) |
+| --- | --- |
+| Home screen | `js/screens/home-screen.js`, `css/home.css` (`.home-actions-row`, `.home-action--local.is-ready`, `@keyframes home-download-glow`, `.home-utility-buttons > button`, `.home-settings`) |
+| Icons | `js/ui/icons.js` (original inline SVGs, stroked in `currentColor`; add the globe here) |
+| Strings | `js/localization/strings/en.js` and `fr.js` (every new string in **both**, sentence case) |
+| Dialogs | `js/ui/overlays.js` (`ModalDialog`, `ConfirmDialog`, `ChoiceDialog`, `InfoDialog`); reuse them, don't invent a new dialog style |
+| Settings / storage | `js/core/settings.js` (one versioned object under one `localStorage` key, safe when storage is missing) |
+| App wiring | `js/core/app.js` (screen registration, `startLocalPlay` / `endLocalPlay`) |
+| Config | `js/config.js` (add an `online` section) |
+| Quick Battle | `js/screens/quick-battle-setup.js` (`randomStage`, `pickRandom`), `js/screens/character-select-screen.js`, `js/screens/local-play-screens.js` |
+| Battle | `js/game/battle.js` (`BATTLE_MODES`, seeded `mulberry32` / `deriveSeed`), `js/game/arena.js` (fixed 60 Hz step, `acc`, `maxStepsPerFrame`, `fx.timeScale` slow motion), `js/game/fighters/fighter-controller.js` (`PlayerController.getInput` → `input.sample(context)`), `js/core/input-manager.js` |
+| Battle UI | `js/screens/battle-screen.js` (pause menu, result toast, Match Results, Rematch / Change fighters) |
+| Release | `tools/itch/validate.mjs`, `tools/itch/release.mjs`, `.github/workflows/itch-release.yml` |
 
-Your role
+---
 
-Act as a senior JavaScript game engineer, web performance specialist, and software architect working on Alva, a browser-based 2D platform fighting game.
+## 1. What the player experiences
 
-Repository: https://github.com/hiyroscript/alva
+### 1.1 Home: the Online Play button
+
+- Add an **Online Play** button in the Home menu's first row, **right after Local play**: `[ Play ][ Local play ][ 🌐 ]`.
+- It is a **compact square icon button with the same size as the Settings button** (`.home-utility-buttons > button`: same width, height, radius, border and icon size), not a full-width menu action. Play and Local play shrink to share the rest of the row. Check it at phone landscape widths and in portrait (§2 viewport rules; no overflow, no page scroll).
+- **Icon:** a new original **globe** SVG in `js/ui/icons.js` (`ICONS.globe`): a circle with a meridian ellipse and two or three latitude lines, stroked in `currentColor` at the same stroke weight as the gear. Don't use an emoji glyph or a copied icon set.
+- **Name:** its accessible name and tooltip are "Online play" / "Jeu en ligne" (`aria-label` and `title` through `tattr`, like Settings).
+- **States:**
+  - **Online** (`navigator.onLine === true`): enabled, with a **green edge and glow**. Reuse exactly the Local play `is-ready` treatment (`rgba(47, 191, 99, …)` and the `home-download-glow` animation).
+  - **Offline** (`navigator.onLine === false`): **disabled** with the same glow in **red** (add a red variant using the palette's error/red token from §5.1, or the controller badge's red if there's no token). Tooltip and `aria-describedby`: "You're offline. Connect to the internet to play online." Follow Local play's pattern: a wrapping `.home-action-cell` so the tooltip still works on a disabled button.
+  - Update it live on `window` `online` / `offline` events. Also re-check on press, since `navigator.onLine` can be wrong.
+  - **No playable fighter:** disable it like the other match actions (`MATCH_ACTIONS`, the "No fighters available" note). This is the existing rule for every mode that starts a match.
+- Reduced motion: no animated glow, a static edge (as `.home-action--local.is-ready::after` does in the reduced-motion block).
+- Keyboard, gamepad and spatial navigation (`data-nav`) reach it like any menu item. Hover vs. focus ring follows the input modality rules (`ui-consistency` tests).
+- Pressing it opens the online flow below. If `CONFIG.online.serverUrl` is empty (PR 1), it opens an info dialog instead: "Online play is coming soon." This lets PR 1 merge safely.
 
-Your assignment is to carefully consolidate files, reduce the number of files required to distribute the game, and prepare Alva for publication on HTML5 platforms such as itch.io.
+### 1.2 Username (required before any room)
 
-The absolute priority is preserving the existing game.
+- The first time a player opens Online Play, ask for a **username** in a dialog: "Choose a name other players will see". Also show it when they choose **Change name** in the online lobby.
+- Rules: 2–16 characters after trimming. Letters (any script), digits, spaces, `_`, `-` and `.`. Collapse inner whitespace. No leading or trailing spaces. Reject anything else with an inline message. Enforce it **on the server too**, and escape it everywhere it's displayed (set `textContent`, never `innerHTML`).
+- Save it in `Settings` (a new `onlineName` field with a validator in `resolveSetting`, defaulting to empty), so it persists on that device. No account and nothing else stored.
 
-This is a packaging, consolidation, and deployment task. It is not a gameplay update, balance update, redesign, engine rewrite, or opportunity to introduce unrelated improvements.
+### 1.3 The online lobby (new screen `online-lobby`)
 
-The finished game must play, look, feel, and behave exactly like the original.
+Header: "Online play" with the player's name and a **Change name** link. Back returns Home. It has three areas:
 
-Do not simply describe how to accomplish this. Investigate the repository, implement the safest solution, run tests, produce a playable distribution, and document the results.
+1. **Create room**: opens a dialog with:
+   - **Room name**, prefilled with the localized default: EN `"{name}'s room"` (use `"{name}' room"` when the name ends in "s"), FR `"Salon de {name}"`. Editable, 2–24 characters, same character rules as names. Validated on the server.
+   - **Visibility**: Public (listed for everyone) or Private (join by code only). Default Public.
+   - **Mode**: Quick Battle, shown as the only choice, already selected. Build the room data with a `mode` field (`'quick-battle'`) so more modes can be added later without a protocol change.
+   - **Create**. The host then waits in the room (1.4).
+2. **Join with code**: a 6-character code field (uppercase, from an unambiguous alphabet with no 0/O/1/I/L), auto-uppercased, with a Join button. It works for both public and private rooms.
+3. **Public rooms**: a live list of open public rooms, each showing the room name, the host's name and "1/2". Joining is one press. Full or in-progress rooms aren't listed. Empty state: "No public rooms right now. Create one!" The list updates by **server push** over the lobby's WebSocket, never by polling (see the budget in §3.4).
 
-⸻
+Errors, each a localized dialog through the existing dialog classes:
+- **Servers are full** (room cap or daily budget reached, §3.4): title "Servers are full", body "Too many rooms are open right now. Try again in a few minutes." Show it on Create, and on opening the lobby if the server says it's at capacity.
+- Room not found / wrong code; room full; room closed by host.
+- Can't reach the server ("Couldn't connect to online play. Check your connection and try again.").
+- Connection failed between players (WebRTC couldn't connect; this is the case a TURN relay fixes later): "Couldn't connect to the other player. Their network may be blocking it."
+- Name rejected.
 
-1. Understand Alva before changing anything
+### 1.4 In a room (new screen `online-room`)
 
-Read and understand the repository before making changes.
+- Shows the room name, the code (with a Copy button), the visibility and both player slots (host, guest or "Waiting for a player…").
+- The host can **rename the room** and toggle Public/Private while waiting. Both are pushed to the server.
+- When both are present, each player **picks their fighter** with the existing fighter roster UI (reuse `CharacterSelectScreen` / `LocalFighterScreen` patterns; the same fighter twice is allowed, as in Local Play). Each player sees the other's pick and a **Ready** state.
+- **The stage is random.** When both are ready, the host draws it with `randomStage()` from a seeded RNG, along with the battle seed, and sends both. Show the drawn stage in a brief "Stage: X" note before the battle loads.
+- Leave room: back to the lobby. If the host leaves before the battle, the room closes and the guest sees "The host closed the room."
 
-Start with these authoritative documents:
+### 1.5 The online battle
 
-* README.md
-* CLAUDE.md
-* ALVA_SPEC.md
-* docs/README.md
-* docs/architecture/overview.md
-* docs/architecture/module-responsibilities.md
-* docs/architecture/character-system.md
-* docs/development/setup.md
-* docs/development/testing.md
-* docs/development/conventions.md
-* codename_rule
-* Relevant sections of UPDATES.md
+- A new `BATTLE_MODES.online` entry: both sides are players. The local side samples Player 1's usual devices (keyboard, touch, the controller); the remote side gets its input from the network. HUD labels are the two usernames. Marker colours: reuse `CONFIG.localPlay.colors`, with the host as red / P1 and the guest as blue / P2.
+- All match rules are unchanged (first to 3, 5-minute clock, overtime, celebration).
+- **Pause:** the world can't pause online. The pause button opens a small menu (Settings, Leave match) while the match keeps running, and the other player isn't paused. Leaving counts as a forfeit for that player.
+- **Match end:** the Match Results show as usual. **Rematch** needs both players to press it (show "Waiting for {name}…"); a rematch draws a new random stage and seed. **Change fighters** returns both to the room's fighter step. **Leave** returns to the lobby, and the other player sees "{name} left."
+- **Disconnects:** if no input arrives from the peer for 3 s, show "Waiting for {name}…" over the frozen game. After 10 s, end the match: "{name} disconnected." Then return to the room or lobby. A hidden tab stops `requestAnimationFrame`, so treat `visibilitychange` → hidden as a likely disconnect for the other side and keep sending a heartbeat while it's possible.
+- Touch controls, the ability HUD and controllers work as in Quick Battle.
 
-Read the relevant gameplay and character documentation whenever making decisions involving their systems.
+---
 
-ALVA_SPEC.md is the authoritative product specification. Treat it as a contract.
+## 2. Netcode (client)
 
-Do not edit, rename, reformat, or move character_rule. Preserve the codename contract, including the intentional spelling of mouvment.
+### 2.1 Transport
 
-Technical architecture
+- **No npm dependencies in the game.** Write the WebRTC code by hand (`RTCPeerConnection` plus one `RTCDataChannel`). No PeerJS or socket libraries.
+- Signaling goes over a **WebSocket** to the room server (§3). The server relays only SDP offers/answers and ICE candidates between the two players in a room. After the data channel opens, **game traffic is peer-to-peer** and the server is out of the loop (keep the room socket open only for room events and presence, with a low heartbeat).
+- Use an **unordered, unreliable** data channel (`ordered: false, maxRetransmits: 0`) for input frames, sending redundant recent inputs in each packet (see 2.2). Control messages (ready, rematch, leave, desync report) go on a second **reliable ordered** channel.
+- ICE servers come from `CONFIG.online.iceServers`: by default a public STUN server (`stun:stun.cloudflare.com:3478`, plus `stun:stun.l.google.com:19302` as a fallback). Leave a documented slot for TURN credentials, but **don't set up TURN**; that's a later, optional step.
+- Put the networking in new modules, for example:
+  - `js/online/server-connection.js`: the WebSocket to the room server, its protocol, reconnects and heartbeat.
+  - `js/online/peer-link.js`: the RTCPeerConnection and data channels, from the WebSocket signaling.
+  - `js/online/lockstep.js`: the input exchange and frame gating (2.2).
+  - `js/online/online-session.js`: session state (name, room, role, peer) that the screens read, like `app.selection`.
+  - `js/online/protocol.js`: message types and validators, **shared with the server** (plain ES module, no Node or browser globals), so both sides use one definition.
 
-Alva is built using:
+### 2.2 Delay-based lockstep (version 1)
 
-* Vanilla JavaScript ES modules.
-* HTML5 and CSS.
-* Canvas 2D rendering.
-* A deterministic, fixed-step game simulation.
-* Dynamically loaded PNG character animation frames.
-* Native keyboard, touch, and controller inputs.
-* Browser localStorage for persistent settings.
+The simulation already suits this: a fixed 60 Hz step (`CONFIG.sim.step`), every random source seeded from the battle seed (`mulberry32(deriveSeed(seed, stream))`), and `PlayerController` reading one input snapshot per step via `input.sample(context)`.
 
-There is currently no required build process, JavaScript framework, WebGL dependency, or runtime package dependency.
+- Both peers run the **same** `Battle` with the **same seed, map and fighters**, from the host's start message.
+- Each step `n`, the local player's sample is scheduled for step `n + D` (input delay `D`), sent to the peer and applied locally at `n + D`. The remote fighter's controller returns the peer's sample for that step.
+- **A step runs only when both inputs for it are known.** If the remote input for the next step hasn't arrived, **stall**: don't advance the simulation that frame (keep rendering, and don't let `acc` pile up into a burst of catch-up steps; clamp it). This replaces `Arena`'s accumulator loop for online mode only. Other modes keep the exact current behaviour, and the itch equivalence check must still pass.
+- **Input delay `D`:** measure the RTT during the room phase (ping/pong on the data channel). Set `D = clamp(ceil(RTT / 2 / 16.67ms) + 1, 2, 8)`, agreed by both peers (the host decides and sends it). Keep it fixed for the match.
+- Serialize the resolved sample compactly: a bitfield for buttons plus any analog values the sample needs, quantized identically on both sides. **Important:** the local machine must also apply the quantized value, not the raw one, or the two simulations will drift. Check which `sample()` fields affect the simulation and send exactly those.
+- Each packet carries the inputs for the last ~8 steps (redundancy against packet loss), plus the sender's latest acknowledged step.
+- Things that must stay deterministic: anything in the simulation that reads wall-clock time, `Math.random`, `performance.now`, frame `dt` or local settings. Grep for them and route them through the seed or the fixed step. Local-only settings that change gameplay must be **sent with the start message** so both sides use the same values. `automaticTurnAround`, for example, is passed per player into `PlayerController`: each player's own setting applies to their own fighter, and the opponent's value must be known to the peer. Purely visual settings (reduced motion, effects) may differ, but they must not change the simulation (verify that `reducedMotion` and `fx.timeScale` don't change step results; slow motion only changes how fast steps are fed).
+- **Desync detection:** every 60 steps, each peer hashes the simulation state (fighter positions, velocities, Launch Points, score, clock, active projectiles, RNG states; round floats to a fixed precision before hashing) and sends `{step, hash}` on the reliable channel. On a mismatch, log both states to the console in debug mode, end the match gracefully ("The match got out of sync and was ended."), and report it to the server as a counter (no personal data). This is how we'll learn whether cross-browser float differences matter.
 
-The main entry point is index.html, which loads js/main.js.
+### 2.3 Later (don't build now, but don't block it)
 
-js/core/app.js initializes the application, managers, screens, settings, localization, and game loop.
+Rollback netcode is the planned version 2. Keep the lockstep layer separate so a later rollback layer can replace it. Note in the docs which parts of the state a snapshot/restore would need. Don't refactor `Battle` for snapshots now.
 
-The simulation is implemented across js/game/, with data-driven character definitions in js/data/characters/.
+---
 
-Understand these relationships before touching anything.
+## 3. The room server (Cloudflare Workers + Durable Objects)
 
-Game modes to preserve
+### 3.1 Layout and tooling
 
-Study and verify all existing game modes:
+- New top-level folder **`server/`**, its own small project: `server/package.json` (dev dependency `wrangler` only), `server/wrangler.toml`, `server/src/index.js` and `server/README.md`. The game's "no npm dependencies" rule applies to the game. The server is a separate deployable, like `tools/`. Say this in `ALVA_SPEC.md` §2 and §10.
+- **Exclude `server/` from the itch release.** Add it to the excluded paths in `tools/itch/validate.mjs` / `release.mjs` (next to `tools`, `docs`, `tests`) and make sure the build's file count doesn't change.
+- Plain JavaScript (ES modules), matching the repo's style. Import the shared `js/online/protocol.js` validators (bundled by wrangler).
+- Use **one Durable Object class, `Lobby`, with a single instance** (`idFromName('global')`). It holds the room directory, enforces the caps and relays signaling for every room. At this scale one instance is plenty, and it's the simplest way to enforce a global cap. Use the **SQLite-backed** Durable Object class (`new_sqlite_classes` in the `migrations` of `wrangler.toml`), which is what the Workers Free plan supports.
+- Use the **WebSocket Hibernation API** (`state.acceptWebSocket`, `webSocketMessage`, `webSocketClose`, socket attachments via `serializeAttachment`) so idle sockets don't bill duration. Keep room state in the DO's storage or attachments so it survives hibernation.
 
-Quick Battle
+### 3.2 Protocol (JSON over one WebSocket per client)
 
-* Regular Play and Custom Play.
-* Human versus CPU.
-* All four CPU difficulties: Easy, Medium, Hard, and Brutal.
-* Fighter selection and stage selection.
-* Match results, rematches, and navigation.
+Client → server: `hello {name, protocolVersion}`, `listRooms` (subscribes to public list pushes), `createRoom {roomName, visibility, mode}`, `joinRoom {code}`, `updateRoom {roomName?, visibility?}` (host only), `leaveRoom`, `signal {to, data}` (SDP/ICE relay, only to the other member of your own room), `startMatch` / `matchEnded` (room status), `ping`.
 
-Watch Mode
+Server → client: `welcome {clientId}`, `rooms [{code, roomName, hostName, players, mode}]` (public, open rooms only), `roomJoined {room, role}`, `roomUpdated {room}`, `peerJoined {name}`, `peerLeft {reason}`, `signal {from, data}`, `error {code}` with codes `SERVERS_FULL`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `BAD_NAME`, `BAD_ROOM_NAME`, `RATE_LIMITED`, `VERSION_MISMATCH`, `pong`.
 
-* CPU versus CPU.
-* Independent AI controllers.
-* Mirror matches.
-* Seeded randomness and reproducible behavior.
-* Match results and celebrations.
+- Validate every message's shape and size (reject > 16 KB, drop unknown types). Validate names with the same rules as the client.
+- Room codes: 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, unique among open rooms, generated with `crypto.getRandomValues`.
+- A room holds max 2 players. It closes when its host leaves, when it's empty, or after **30 minutes** without a match starting (DO alarm).
+- **Origin check** on the WebSocket upgrade, against an allowlist from a `wrangler.toml` var: `ALLOWED_ORIGINS`. In PR 1 include `http://localhost:*` and `http://127.0.0.1:*` for development, `https://html-classic.itch.zone` (where itch runs HTML5 games, in an iframe) and `https://hiyroscript.github.io`. Confirm the itch origin in PR 2 by testing; itch also serves some games from `https://*.ssl.hwcdn.net`, so check.
+- `GET /health` returns `{ok, rooms, capacity}` for the smoke test.
+- Per-connection rate limit (for example 20 messages per 10 s outside `signal`, 200 for `signal` during setup), then `RATE_LIMITED` and close.
+- Log no personal data. Names live only in memory and the room's lifetime.
 
-Local Play
+### 3.3 Deployment
 
-* Two players on separate controllers.
-* Independent controller inputs and configurations.
-* Player-specific interfaces.
-* Controller disconnection and reconnection.
-* Match results and rematches.
+- Add **`.github/workflows/deploy-room-server.yml`**, `workflow_dispatch` only (a manual "Run workflow" button). It installs `server/` and runs `wrangler deploy` with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from repository secrets, then prints the deployed `*.workers.dev` URL in the job summary. This way the owner never needs a terminal. Also document the local path (`cd server && npx wrangler login && npx wrangler deploy`) as an alternative.
+- `npm run dev` in `server/` runs `wrangler dev` locally for development.
 
-Practice Ground
+### 3.4 Staying inside the free plan ("Servers are full")
 
-* Training dummy.
-* Fighter swapping.
-* CPU swapping and disabling.
-* Damage numbers.
-* Training-specific respawn behavior.
-* Infinite practice without normal scoring.
+Cloudflare's Workers Free plan allows Durable Objects **100,000 requests per day** (a WebSocket connection counts as a request; incoming WebSocket messages count at 20:1; outgoing messages are free) and 13,000 GB-s of duration per day. Going over makes further requests fail until 00:00 UTC rather than billing. Check the current numbers on https://developers.cloudflare.com/durable-objects/platform/pricing before you finalize. We never want to hit those limits, so:
 
-Preserve the Discover interface, splash screen, settings, dialogs, language selection, PWA installation features, and every menu.
+- **Concurrent room cap:** `MAX_ROOMS` (default **40**) and `MAX_CONNECTIONS` (default **120**) as `wrangler.toml` vars. `createRoom` past the cap → `SERVERS_FULL`. A new connection past the connection cap → `SERVERS_FULL` and close.
+- **Daily budget guard:** the DO counts billable units per UTC day in storage (connections + incoming messages ÷ 20 + HTTP requests). Past **`DAILY_BUDGET`** (default **70,000**, a 30% safety margin) it refuses new rooms and connections with `SERVERS_FULL` until the UTC day rolls over. Existing matches continue.
+- Keep traffic low by design: list updates are pushed (never polled), lobby sockets that sit idle for **5 minutes** are closed by the server (the client reconnects when the player acts), and the in-room heartbeat is ≤ 1 message per 20 s. Game input never touches the server.
+- In `server/README.md`, write a short budget estimate per match (connections plus messages) and how many matches per day the defaults allow.
 
-Fighters and stages
+---
 
-Alva currently has nine playable fighters, registered as 0001 through 0009.
+## 4. Tests (all must pass with `node --test`; no new test dependencies)
 
-Their definitions, attacks, abilities, frame data, animation timing, controller layouts, and visual characteristics must remain unchanged.
+- **Protocol:** validators accept and reject names, room names, codes and message shapes; EN and FR default room names, including the "s" rule.
+- **Server logic:** keep the room/lobby logic in a pure module (no Cloudflare globals) that the DO wraps, and test it directly: create/join/leave, private rooms hidden from the list, host-only updates, room full, codes unique, 30-minute expiry, `MAX_ROOMS` / `MAX_CONNECTIONS` / `DAILY_BUDGET` → `SERVERS_FULL`, the day rollover, rate limits, signal relayed only within a room.
+- **Lockstep:** two `Battle` instances with the same seed, map and fighters, fed through the lockstep layer with simulated latency, jitter and packet loss (an in-memory fake channel), stay **step-for-step identical** (state hashes equal) over a whole match, for several fighter pairings and every stage. A missing remote input stalls the step. Redundant packets fill gaps. Quantization is applied on both sides. A desync (state changed on one side on purpose) is detected.
+- **Home:** the Online Play button exists after Local play with the globe icon and the Settings button's size class; green `is-ready` when online; disabled and red when offline; follows `online`/`offline` events; disabled with no fighter; "coming soon" when `serverUrl` is empty; keyboard/gamepad reachable; EN and FR.
+- **Screens:** the username dialog (required, validated, saved in Settings), the lobby (create dialog defaults, visibility, Quick Battle as the only mode, join by code, public list rendering, empty state, every error dialog including **Servers are full**), the room (rename, visibility toggle, ready, the random stage note, leave), the online battle (pause doesn't stop the world, rematch needs both, disconnect messages). Use a fake server connection and a fake peer link.
+- **Untouched modes:** existing Quick Battle, Local Play, Watch Mode and Practice tests still pass unchanged. `npm run build:itch` and `npm run verify:itch` still pass.
+- Add the new files to the tables in `docs/development/testing.md`.
 
-The game also contains five regular stages:
+---
 
-* Yerma
-* Sol-Noir
-* Asperitas
-* Adamaris
-* Jökull
+## 5. Docs and spec
 
-Additionally, preserve the Practice Ground stage.
+- `ALVA_SPEC.md`: a new **§6.5c Online Play** (Home button and states, username, lobby, rooms, public/private, codes, random stage, Quick Battle only for now, errors including Servers are full, battle rules online, pause, rematch, disconnects). Update §2 (WebRTC/WebSocket, the server as a separate deployable, the itch validator's allowed online origin), §6.2 (Home's first row), the §6.3 "no online matchmaking" line, and §10 (repository: `server/`).
+- New `docs/gameplay/online-play.md` (module table like `local-play.md`), `docs/systems/netcode.md` (lockstep, delay, quantization, desync hashing, what rollback would need later) and `server/README.md` (protocol, caps, budget, deploy, local dev). Link them from `docs/README.md`.
+- Every new player-facing string in `en.js` **and** `fr.js`.
 
-All stage backgrounds, procedural artwork, hazards, collision surfaces, physics, and camera behavior must remain identical.
+---
 
-⸻
+## 6. PR 1: setup (do this now)
 
-2. Investigate the file-count problem
+1. Create a branch from `main` (`claude/online-play-setup`).
+2. Build everything above, with `CONFIG.online.serverUrl = ''`. The Home button shows "Online play is coming soon" while it's empty, so PR 1 is safe to merge and release.
+3. Verify end-to-end **locally**: run `wrangler dev` in `server/`, serve the game locally with `serverUrl` temporarily pointed at it, and drive **two headless Chromium pages** with the pre-installed Playwright: create a room on page A, see it listed on page B, join by list and by code, pick fighters, play a few hundred steps with scripted inputs, compare state hashes, rematch, leave. Also force the room cap to 1 to see **Servers are full**. Take screenshots of the Home button (online and offline, desktop and phone landscape), the lobby, the create dialog and the room, and attach them to the PR.
+4. Run `node --test`, `npm run build:itch` and `npm run verify:itch`. All green.
+5. Open the PR with a clear description: what it adds, screenshots, what's not live yet, and the budget defaults.
+6. Then **send the owner the hand-off message** (§7) and stop.
 
-The repository currently has approximately:
+## 7. The hand-off message (send after PR 1, adapted to what you actually built)
 
-Type	Files
-Assets	894
-JavaScript	145
-CSS	15
-Tests	118
-Documentation	33
-Other root files	13
-Total	1,218
+Write it for someone who isn't a sysadmin: short numbered steps, exact button names, nothing skipped. The shape:
 
-The production candidate set, excluding the known development-only materials, is approximately 1,060 files.
+> PR 1 is open: [link]. Online play is built but not connected to a server yet, so the Home button says "coming soon" for now. It's safe to merge whenever you like.
+>
+> Here's what I need you to do. It's about 15 minutes and free, and you don't need a credit card:
+>
+> 1. **Merge PR 1** on GitHub (or tell me to wait).
+> 2. **Create a free Cloudflare account** at dash.cloudflare.com/sign-up and verify your email.
+> 3. **Pick your workers.dev subdomain:** in the dashboard, open *Workers & Pages* and accept or choose the subdomain it offers (for example `hiyroscript`). Your server will live at `alva-rooms.<subdomain>.workers.dev`.
+> 4. **Copy your Account ID:** on the *Workers & Pages* overview page it's shown on the right. Copy it.
+> 5. **Create an API token:** profile icon → *My Profile* → *API Tokens* → *Create Token* → template **"Edit Cloudflare Workers"** → *Continue to summary* → *Create Token*. Copy the token (it's shown only once).
+> 6. **Add both to GitHub:** in the alva repo → *Settings* → *Secrets and variables* → *Actions* → *New repository secret*. Add `CLOUDFLARE_API_TOKEN` (the token) and `CLOUDFLARE_ACCOUNT_ID` (the ID). Never paste the token in chat.
+> 7. **Deploy:** repo → *Actions* → **Deploy room server** → *Run workflow*. When it turns green, open the run and copy the URL from the summary (it ends in `.workers.dev`).
+> 8. **Send me that URL** here. That's the only thing I need back, and it isn't secret.
+>
+> Then I'll open PR 2, which connects the game to it. After you merge it, upload the new itch build as usual and test with a friend on two devices.
+>
+> One question: do you want this named in UPDATES.md (for example "the online update")?
 
-These numbers reflect the inspected repository and must be recalculated against the actual working branch before implementation.
+## 8. PR 2: go live (after the owner sends the URL)
 
-The itch.io HTML5 deployment requirements include:
+1. Branch from the updated `main` (`claude/online-play-live`).
+2. Set `CONFIG.online.serverUrl` to `wss://<the URL>` (and the `https://` form for `/health`).
+3. Update `tools/itch/validate.mjs` to allow **exactly** that one online origin (from `CONFIG.online`) in addition to the credits links, with a test. No other external host.
+4. Tighten `ALLOWED_ORIGINS` in `wrangler.toml`: remove the localhost entries from the production config (keep them in a `[env.dev]` block) and confirm the real itch origin by checking the `Origin` header itch sends. Tell the owner to re-run **Deploy room server** if the server config changed, or say that it didn't.
+5. Smoke-test the live server if this environment can reach it (`GET /health`, then a WebSocket create/list/join/leave with two clients). If the sandbox's network blocks `workers.dev`, say so plainly and give the owner a 2-minute manual check instead.
+6. Update the docs from "not live" to live, add the UPDATES.md entry if the owner named one, and run all tests plus the itch build and verify.
+7. Open PR 2, then send a final short message: what changed, **how to release** (merge → the itch workflow builds the ZIP → download it from the run → upload to itch as usual), **how to test** (two devices: create a public room, join from the list; a private room by code; check the offline red state with Wi-Fi off), and what to do if a friend can't connect at all (that's when we'd add a TURN relay, a separate optional step with its own free tier).
 
-* A playable index.html at the root of the uploaded ZIP.
-* No more than 1,000 files after extraction.
-* No more than 500 MB total extracted content.
-* No individual extracted file over 200 MB.
-* No file path longer than 240 characters.
-* Correct, case-sensitive file names.
-* Relative paths for resources.
+---
 
-Verify the platform’s current official requirements before final packaging.
+## Ground rules throughout
 
-Our target is fewer than 950 distribution files, preferably around 900, without reducing gameplay content.
-
-File-count reduction must not come at the cost of broken animations, missing assets, changed physics, or altered game functionality.
-
-⸻
-
-3. Choose the safest consolidation strategy
-
-Do not merge files indiscriminately.
-
-The preferred solution is to preserve the development source while introducing an optional production export process.
-
-The development repository should remain readable, modular, testable, and easy to extend.
-
-For example, preserve the existing structure:
-
-index.html
-css/
-js/
-  core/
-  data/
-  game/
-  localization/
-  screens/
-  stages/
-  ui/
-assets/
-tests/
-docs/
-
-Create a production-only export that resembles:
-
-dist/
-  itch/
-    index.html
-    game.js
-    game.css
-    manifest.webmanifest
-    alvafav.PNG
-    controller.PNG
-    hs.jpg
-    assets/
-
-This is an illustrative layout, not a mandatory naming contract.
-
-The resulting production directory must contain every resource the game genuinely needs.
-
-Preserve all required assets and their relative references.
-
-Important distinction
-
-There are two possible forms of consolidation:
-
-A. Production bundling
-
-Combining multiple source files into fewer distributable files without destroying or reorganizing the originals.
-
-B. Source consolidation
-
-Actually combining modules or stylesheets inside the development repository.
-
-Prioritize A.
-
-Only perform B when there is a clear architectural benefit, the merge is low risk, and all affected tests and references can be maintained without changing behavior.
-
-Do not merge important gameplay modules merely to reduce the repository’s file count.
-
-A production build is preferable to turning the original source into giant, difficult-to-maintain files.
-
-⸻
-
-4. Consolidate CSS safely
-
-The HTML currently references 15 stylesheets.
-
-Investigate whether the production version can use a single generated CSS file.
-
-The current order is:
-
-css/base.css
-css/components.css
-css/splash.css
-css/home.css
-css/setup.css
-css/discover.css
-css/settings.css
-css/battle.css
-css/touch-controls.css
-css/battle-overlays.css
-css/practice.css
-css/ability-hud.css
-css/controller.css
-css/overlays.css
-css/responsive.css
-
-Preserve this exact cascade order.
-
-This is essential because later stylesheets intentionally override earlier declarations.
-
-The final production stylesheet must retain:
-
-* Every selector and declaration.
-* Every responsive breakpoint.
-* Every CSS variable.
-* Every animation and transition.
-* Every hover and focus state.
-* Every z-index and overlay relationship.
-* Every touch-control layout.
-* Every HUD layout.
-* Every accessibility-related styling rule.
-* Every reduced-motion behavior.
-
-Do not alphabetically reorder CSS rules.
-
-Do not remove rules based only on static unused-CSS analysis. Some selectors are created dynamically by JavaScript.
-
-Avoid introducing CSS minification or rewriting unless its compatibility has been demonstrated.
-
-Alva’s existing stylesheet tests expect modular source files. Do not invalidate those tests simply to create one production stylesheet.
-
-The development page may continue loading the original files, while the production page loads the generated bundle.
-
-Test both versions.
-
-⸻
-
-5. Consolidate JavaScript safely
-
-The repository contains approximately 145 JavaScript source files.
-
-Investigate whether they can be bundled into one or a small number of production JavaScript files.
-
-A lightweight development-only bundler, such as esbuild, is acceptable if it can preserve the game’s behavior.
-
-If introducing a build dependency, make it reproducible, minimal, and strictly development-only. Do not add runtime dependencies or require a server framework.
-
-Mandatory compatibility requirements
-
-Preserve:
-
-* ES module initialization and evaluation behavior.
-* Import and export semantics.
-* Module-level side effects.
-* Application startup order.
-* The complete character registry.
-* Shared mutable registry identities.
-* Constructor behavior.
-* Event listener registration.
-* Animation loop scheduling.
-* Promise and asset-loading behavior.
-* Controller polling.
-* Input buffering.
-* Seeded random-number generators.
-* Every combat and physics calculation.
-
-Avoid changes to execution order, floating-point operations, timers, or state transitions.
-
-Do not use aggressive tree shaking, property mangling, code restructuring, or minification by default.
-
-Do not assume code is unused just because it has few direct imports. It may be used dynamically or through an existing registry.
-
-Test bundler options such as disabling tree shaking and minification where appropriate.
-
-Ensure the production bundle exposes the same functional behavior as the unbundled source.
-
-The existing window.alva debugging interface should remain available.
-
-High-risk modules
-
-Treat these as particularly sensitive:
-
-js/game/arena.js
-js/game/battle.js
-js/game/physics.js
-js/game/fighters/fighter.js
-js/game/combat/
-js/game/ai/
-js/data/characters/
-js/data/movement.js
-js/data/launch.js
-js/core/input-manager.js
-js/core/controller-manager.js
-js/core/controller-resolver.js
-js/core/settings.js
-
-Do not refactor their algorithms as part of file consolidation.
-
-Bundling these modules without rewriting their internal logic is acceptable if verified.
-
-Changing their calculations, state machines, or public contracts is not.
-
-Preserve the rule that shared character mechanics cannot special-case particular fighter IDs.
-
-⸻
-
-6. Protect the character assets
-
-The sprite system is one of the most sensitive parts of Alva.
-
-The repository contains approximately 894 asset files, mostly PNG animation frames.
-
-These files are lightweight individually, but numerous.
-
-Do not assume they should be combined.
-
-The existing file-count target can likely be reached by bundling JavaScript and CSS alone.
-
-Preserve exact sprite behavior
-
-Maintain:
-
-* Frame ordering.
-* Animation FPS.
-* Loop behavior.
-* Sprite dimensions.
-* Pixel transparency.
-* Pixel colors.
-* Collision-independent visual anchors.
-* Fighter visual scale.
-* Per-frame offsets.
-* Animation restart behavior.
-* Projectile animations.
-* Effect animations.
-* Summon and ensemble animation behavior.
-
-Alva’s sprite normalizer reads image pixels and derives information from them.
-
-Changing image dimensions, transparency, or pixel values may alter how sprites are processed and displayed.
-
-Do not introduce sprite atlases, image repacking, or format conversion unless they are genuinely necessary and can be proven visually equivalent.
-
-The default solution should retain the existing PNG files unchanged.
-
-Duplicate assets
-
-The repository contains some byte-identical sprite files.
-
-Investigate these, but do not automatically remove them.
-
-Two identical images may serve different animation names and have meaningful separate references.
-
-If deduplication is considered, preserve every logical animation frame and its original ordering.
-
-A repeated image may be intentionally repeated to create an animation hold.
-
-Never eliminate that timing behavior.
-
-Do not remove any animation merely because it appears redundant.
-
-⸻
-
-7. Preserve every gameplay mechanic exactly
-
-Treat gameplay behavior as immutable.
-
-No movement, collision, animation-timing, attack, or AI changes are authorized.
-
-Movement and physics
-
-Preserve:
-
-* Universal run and jump values.
-* Normal jumps and Super Jumps.
-* Triple jumps.
-* Dash and air dash.
-* Momentum conservation.
-* Air control.
-* Fast falls.
-* Platform drop-through.
-* Gravity.
-* Collision handling.
-* Wall rebounds.
-* Landing behavior.
-* Knockback and launch steering.
-* Camera movement.
-* Fixed simulation timestep.
-
-Alva uses a fixed-step simulation of 1/60 second, with accumulated frame time and a maximum number of simulation steps per rendered frame.
-
-Do not introduce behavior that depends on monitor refresh rate or wall-clock timing.
-
-Combat
-
-Preserve:
-
-* Exact attack damage.
-* Hitboxes and hurtboxes.
-* Launch Point calculations.
-* Base and directional launch.
-* Shield behavior.
-* Perfect Shields.
-* Deflects.
-* Energy use and recovery.
-* Attack cooldowns.
-* Hitstun and impact freeze.
-* Combo timing.
-* Mash Combo requirements.
-* Attack cancellation rules.
-* Projectiles and summons.
-* Techniques and special abilities.
-* Status effects.
-* Healing and recovery.
-* Every fighter-specific moveset.
-
-Even a small timing or numeric difference is unacceptable if it affects gameplay.
-
-AI
-
-Preserve all CPU difficulty levels, decision-making behavior, opponent modeling, reaction rules, tactical planning, and seeded determinism.
-
-Do not simplify the AI to reduce bundle size.
-
-Keep AI gameplay calculations functionally equivalent to the original.
-
-Match rules
-
-Preserve:
-
-* First to three points.
-* Void scoring and respawns.
-* Five-minute match timer.
-* Overtime rules.
-* Closing Void behavior.
-* Match-end decisions.
-* Launch Point tiebreakers.
-* Draw conditions.
-* Match statistics.
-* Celebrations.
-* Pause, resume, rematch, and restart behavior.
-
-All match modes must continue to share their existing rules.
-
-⸻
-
-8. Preserve inputs, menus, and settings
-
-The published version must support the same controls and interface behavior.
-
-Keyboard
-
-Preserve all bindings, press-edge behavior, input buffering, and navigation.
-
-Controllers
-
-Preserve:
-
-* PlayStation controller compatibility.
-* Xbox controller compatibility.
-* Player 1 device assignment.
-* Two-controller Local Play.
-* Individual fighter mappings.
-* Recommended controller layouts.
-* Custom bindings.
-* Gamepad navigation and cursor support.
-* Controller connection indicators.
-* Disconnect and reconnect handling.
-
-Touch controls
-
-Preserve both existing layouts:
-
-* Joystick.
-* Classic buttons.
-
-Preserve player-customizable positions, sizes, and touch interactions.
-
-Settings
-
-Preserve the existing localStorage key and schema, including historical migration behavior.
-
-Do not reset players’ settings or invalidate their saved controller and touch configurations.
-
-Interface and localization
-
-Preserve:
-
-* English and French translations.
-* Screen navigation.
-* Button positions and sizing.
-* HUD information.
-* Menus and dialogs.
-* Fighter and stage previews.
-* Responsive layouts.
-* Landscape handling.
-* Accessibility behavior.
-* PWA installation controls.
-
-Do not change labels, animations, or visual designs as part of this task.
-
-⸻
-
-9. Create an itch.io-compatible production build
-
-Create a clean, deployable HTML5 distribution.
-
-Prefer an output structure such as:
-
-dist/itch/index.html
-dist/itch/game.js
-dist/itch/game.css
-dist/itch/assets/...
-dist/itch/manifest.webmanifest
-
-Include additional root assets and icons required by the existing game.
-
-The production export must be self-contained.
-
-Do not depend on fetching source files from GitHub, GitHub Pages, a development server, or another external host.
-
-Do not require Node.js, npm, or any development tooling in the player’s browser.
-
-All build tooling must run before distribution.
-
-Path handling
-
-All resource paths must work when the game is hosted:
-
-* At a domain root.
-* Under a nested subdirectory.
-* Within an itch.io HTML5 embed.
-
-Preserve correct case-sensitive paths.
-
-Avoid hard-coded absolute paths.
-
-Make sure the asset loader can still retrieve every required frame.
-
-Validate that generated JavaScript and CSS paths point to real files.
-
-Embedding
-
-itch.io normally displays HTML5 games inside an iframe.
-
-Test:
-
-* Fullscreen launch.
-* Embedded viewport sizing.
-* Keyboard focus.
-* Gamepad access where supported.
-* Pointer and touch controls.
-* Resizing.
-* Landscape orientation.
-* Pausing and resuming after focus changes.
-
-Do not modify Alva’s gameplay rules to work around platform-specific restrictions.
-
-If a browser or embedding limitation cannot be solved without changing the experience, document it separately.
-
-PWA behavior
-
-Alva already has a web app manifest and installation interface, implemented through js/core/web-app-install.js.
-
-Keep the existing standalone installation behavior intact.
-
-Test it separately from the itch.io embedded experience.
-
-Do not introduce an offline service worker, storage changes, or a different installation system as part of this task.
-
-⸻
-
-10. Add a repeatable export process
-
-Create a straightforward way to generate a production build.
-
-For example:
-
-npm run build:itch
-
-And, if appropriate:
-
-npm run package:itch
-
-These are illustrative commands. Choose the simplest reliable approach that fits the repository.
-
-The build should:
-
-1. Start from a clean distribution directory.
-2. Bundle the required JavaScript.
-3. Combine CSS in the exact original order.
-4. Copy every required asset.
-5. Copy and adapt the HTML entry point.
-6. Preserve required metadata and icons.
-7. Check all referenced resources.
-8. Validate file counts and sizes.
-9. Generate a ZIP suitable for itch.io.
-10. Print a clear build report.
-
-Ensure the ZIP contains index.html at its root, not hidden inside an additional project folder.
-
-Keep development-only files out of the release ZIP:
-
-* Tests.
-* Test fixtures.
-* Benchmarks.
-* Product specifications and development documentation.
-* Git metadata.
-* Build scripts and dependencies.
-* Temporary logs.
-* Unnecessary source maps.
-* Development-only artifacts.
-
-Exclude these from the distribution, not from the repository itself.
-
-Do not delete original source files to clean the release.
-
-Generated output should be ignored by Git unless there is a deliberate reason to track it.
-
-The build must be deterministic and repeatable.
-
-⸻
-
-11. Establish a baseline before implementation
-
-Before modifying anything:
-
-1. Record the current Git commit and branch.
-2. Create a dedicated working branch.
-3. Run the complete test suite.
-4. Record the total test count, failures, and execution environment.
-5. Verify that the original application boots.
-6. Record the original production-relevant file count.
-7. Identify existing missing assets and console errors.
-8. Capture representative gameplay and interface results where possible.
-
-Run:
-
-node --test
-
-Do not treat an already failing test as a regression without investigating it.
-
-Also inspect tests that depend directly on source file names or file organization.
-
-For example, tests/interface/stylesheets.test.mjs requires the development stylesheets to remain separately linked in their original order.
-
-Some character and system tests inspect source code and module boundaries directly.
-
-A production-only bundle should not require those tests to be rewritten.
-
-Do not weaken, disable, or delete tests simply to make the refactor pass.
-
-⸻
-
-12. Test the finished production build
-
-Passing the existing unit tests is necessary but not sufficient.
-
-The production build must also be tested in a real browser.
-
-Functional regression testing
-
-Verify every major workflow:
-
-* Launch and splash sequence.
-* First-time language selection.
-* Returning-player startup.
-* Home screen.
-* Quick Battle Regular Play.
-* Quick Battle Custom Play.
-* All CPU difficulties.
-* Every playable fighter.
-* Every playable stage.
-* Watch Mode.
-* Mirror matches.
-* Local Play.
-* Practice Ground.
-* Discover.
-* Settings.
-* Controller configuration.
-* Touch-layout customization.
-* Pause and resume.
-* Match results.
-* Rematch and restart.
-* Returning to Home.
-
-Combat testing
-
-Verify representative attacks and mechanics for all nine fighters.
-
-Check:
-
-* Frame-perfect animation sequencing where relevant.
-* Sprite loading and normalization.
-* Hitbox and hurtbox alignment.
-* Launch distances.
-* Shield and Deflect.
-* Mash Combos.
-* Cooldowns.
-* Special effects.
-* Summons and projectiles.
-* Stage hazards.
-* Respawns.
-
-Deterministic simulation testing
-
-Where the test harness permits it, run identical scripted input sequences with identical seeds against the original and consolidated builds.
-
-Compare:
-
-* Fighter positions.
-* Velocities.
-* Facing directions.
-* Combat states.
-* Energy.
-* Launch Points.
-* Cooldowns.
-* Hit events.
-* Projectile and summon states.
-* Scores.
-* Match outcomes.
-* AI decisions.
-
-Use a consistent simulation-step count and supported frame rates.
-
-Differences must be investigated and resolved, not dismissed as acceptable.
-
-Visual testing
-
-Capture screenshots of the original and production versions under matching conditions.
-
-Compare:
-
-* Splash screen.
-* Home screen.
-* Character selection.
-* Stage selection.
-* Each stage.
-* In-game HUD.
-* Dialogs.
-* Mobile layout.
-* Touch controls.
-* Match results.
-
-Check actual sprite and CSS rendering, not only source code.
-
-Where automated visual comparison is practical, use it; otherwise document manual comparisons.
-
-Browser testing
-
-Test current versions of major supported browsers, including Chromium and Firefox, and Safari where the testing environment permits.
-
-Test desktop and landscape mobile layouts.
-
-Include an iframe-based smoke test approximating the itch.io environment.
-
-Report any browser or hardware combinations that could not be tested.
-
-⸻
-
-13. Implement automatic release validation
-
-Add a validation step that checks the distribution before it can be considered complete.
-
-It should verify:
-
-* index.html exists at the ZIP root.
-* Extracted file count is below 1,000.
-* Extracted total size is within platform limits.
-* Each file is within the individual size limit.
-* Paths meet length restrictions.
-* Paths use correct filename casing.
-* Every expected game asset is present.
-* Required script and CSS files exist.
-* No references point back to missing source files.
-* No unapproved external runtime dependencies exist.
-* No source maps or test files were accidentally packaged.
-* No development-only directories were copied into the archive.
-
-Prefer a comfortable margin below the platform limit instead of targeting exactly 1,000 files.
-
-If the resulting production build exceeds the limit, first investigate redundant packaging and consolidation opportunities.
-
-Do not remove animation frames or gameplay systems as a shortcut.
-
-⸻
-
-14. Preserve maintainability
-
-The game’s development architecture should remain convenient for future updates.
-
-It must still be easy to:
-
-* Add a new fighter.
-* Add new sprite animations.
-* Introduce a stage.
-* Update AI behavior.
-* Modify translations.
-* Extend controller support.
-* Update the interface.
-* Run focused unit tests.
-
-Keep modular source files as the primary development representation.
-
-The generated production bundle should not become the source of truth.
-
-Future game updates should flow naturally into the production build without manually editing bundled files.
-
-Do not introduce new frameworks or rearchitect the engine for this task.
-
-Keep the implementation small and explain why each new tool or script is necessary.
-
-⸻
-
-15. Strictly prohibited changes
-
-Do not:
-
-* Change combat balance.
-* Adjust movement values.
-* Alter physics.
-* Rewrite AI behavior.
-* Change attack timing.
-* Modify hitboxes or hurtboxes.
-* Change animation timing.
-* Change sprite appearance or quality.
-* Remove fighters.
-* Remove stages.
-* Remove abilities.
-* Remove game modes.
-* Simplify controller support.
-* Remove localization.
-* Change saved-settings compatibility.
-* Alter menu layouts or design.
-* Introduce gameplay features.
-* Reorganize character definitions without necessity.
-* Delete documentation or tests from the development repository.
-* Edit the protected character_rule.
-* Rename contracted codenames.
-* Introduce unrelated optimizations.
-* Hide failing tests.
-* Claim the game is unchanged without verification.
-
-If preserving behavior conflicts with reducing the file count, preserving behavior wins.
-
-⸻
-
-16. Required deliverables
-
-When complete, provide the following.
-
-A. Repository audit
-
-Report:
-
-* Original file count.
-* Original production candidate count.
-* File counts by category.
-* Main entry points and important dependencies.
-* Any potential build hazards.
-* Any genuinely redundant files found.
-
-B. Consolidation report
-
-Explain:
-
-* Which files were bundled.
-* Which files, if any, were actually merged in source.
-* Which files were intentionally kept separate.
-* Why the approach was selected.
-* How compatibility was preserved.
-
-C. Final distribution structure
-
-Show the generated production directory tree.
-
-Report the number and total size of files in the output.
-
-D. ZIP artifact
-
-Generate a ready-to-upload archive, preferably:
-
-alva-itch.zip
-
-Ensure that the archive is valid and contains a runnable index.html at its root.
-
-Do not upload or publish the game to itch.io without explicit authorization.
-
-E. Test results
-
-Provide:
-
-* Baseline test outcome.
-* Final test outcome.
-* Regression test results.
-* Browser smoke-test results.
-* Deterministic comparisons performed.
-* Visual comparisons performed.
-* Unverified areas or remaining limitations.
-
-Be explicit about what was tested and what could not be tested.
-
-F. Deployment instructions
-
-Document how to:
-
-1. Generate the production build.
-2. Validate the generated output.
-3. Test it locally over HTTP.
-4. Upload the ZIP to itch.io as an HTML Game.
-5. Select appropriate launch and fullscreen settings.
-6. Verify the published game.
-7. Rebuild and republish future updates.
-
-G. Change summary
-
-Give a concise summary of every modified or added source file, build script, and configuration file.
-
-Make the final diff easy to review.
-
-⸻
-
-17. Definition of success
-
-This task is complete only when:
-
-* The original development source remains maintainable.
-* Every existing game mode is preserved.
-* Every fighter and stage remains available.
-* All combat rules, timing, and physics remain unchanged.
-* All animations and art display correctly.
-* All supported inputs continue working.
-* Both languages continue working.
-* Saved settings remain compatible.
-* The original test suite passes.
-* The new production build has been independently tested.
-* The distribution is within itch.io HTML5 limits.
-* A valid release ZIP is generated.
-* No unauthorized gameplay or design changes have been introduced.
-
-The ideal outcome is to reduce the deployment from roughly 1,060 files to around 900 by bundling the JavaScript and CSS, without needing to merge the original PNG animation frames or rewrite gameplay code.
-
-This is a target, not a requirement to force a specific file count.
-
-Prefer correctness and simplicity over aggressive reduction.
-
-Final instruction
-
-Proceed carefully and implement the solution.
-
-Start with a repository audit and baseline tests. Then create the smallest safe production consolidation, validate it, test the original and production versions, and generate the final distribution.
-
-Do not stop after providing recommendations.
-
-If a consolidation creates a gameplay difference, revert or correct it before continuing.
-
-Do not consider fewer files to be evidence of success by itself.
-
-The objective is the same Alva, with the same gameplay, same visuals, same controls, and same content — simply packaged more efficiently and ready to publish as a browser game.
+- Follow every rule in `CLAUDE.md` and `ALVA_SPEC.md`. If the spec and this prompt conflict, follow this prompt for online play only and update the spec to match, saying so in the PR.
+- Don't change gameplay, balance or any existing mode's behaviour.
+- Match the existing code and comment style. Keep modules focused, as in `docs/architecture/module-responsibilities.md`.
+- Never put secrets in the repository or ask the owner to paste a token in chat.
+- If something is genuinely ambiguous and expensive to get wrong, ask the owner before building it. Otherwise make the sensible call and list it under "Decisions" in the PR description.
