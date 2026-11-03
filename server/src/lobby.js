@@ -143,6 +143,8 @@ export class Lobby {
     const route = `${request.method} ${url.pathname}`;
     try {
       switch (route) {
+        case 'GET /health':
+          return json({ ok: true });
         case 'GET /rooms':
           return this.list(ip);
         case 'POST /rooms':

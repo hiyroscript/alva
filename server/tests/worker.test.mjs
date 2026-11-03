@@ -12,14 +12,22 @@ import { makeEnv, gameRequest, createBody } from './fakes.mjs';
 
 const wranglerOrigins = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8').match(/^ALLOWED_ORIGINS = "([^"]+)"/m)[1];
 
-test('/health says ok to anyone, with no origin (a browser\'s address bar) or any', async () => {
+test('/health: readable by any page, the Lobby asked too, and the asking origin and whether it is allowed', async () => {
   const { env } = makeEnv();
   const res = await handle(gameRequest('/health', { origin: null }), env);
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true, service: 'alva-rooms' });
-  assert.equal(res.headers.get('access-control-allow-origin'), null);
+  assert.deepEqual(await res.json(), { ok: true, service: 'alva-rooms', lobby: true, origin: null, originAllowed: false },
+    'a browser\'s address bar: no origin');
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
   const fromItch = await handle(gameRequest('/health'), env);
-  assert.equal(fromItch.headers.get('access-control-allow-origin'), 'https://html-classic.itch.zone');
+  assert.deepEqual(await fromItch.json(), { ok: true, service: 'alva-rooms', lobby: true, origin: 'https://html-classic.itch.zone', originAllowed: true });
+  assert.equal(fromItch.headers.get('access-control-allow-origin'), '*');
+  const elsewhere = await handle(gameRequest('/health', { origin: 'https://hiyroscript.github.io' }), env);
+  assert.deepEqual(await elsewhere.json(), { ok: true, service: 'alva-rooms', lobby: true, origin: 'https://hiyroscript.github.io', originAllowed: false });
+  // A Lobby that does not answer: not ok (503), and said.
+  const broken = await handle(gameRequest('/health'), { ...env, LOBBY: { idFromName: () => 'x', get: () => ({ fetch: () => Promise.reject(new Error('down')) }) } });
+  assert.equal(broken.status, 503);
+  assert.deepEqual(await broken.json(), { ok: false, service: 'alva-rooms', lobby: false, origin: 'https://html-classic.itch.zone', originAllowed: true });
 });
 
 test('the allowed origins: itch.io\'s game hosts and a local copy, nothing else', () => {
@@ -42,6 +50,8 @@ test('every API route refuses another origin, or none; the game\'s gets CORS hea
       const res = await handle(gameRequest(path, { method, origin, body: method === 'POST' ? createBody() : undefined }), env);
       assert.equal(res.status, 403, `${method} ${path} from ${origin}`);
       assert.deepEqual(await res.json(), { error: 'origin' });
+      // The refusal itself is readable, so the game can say why.
+      assert.equal(res.headers.get('access-control-allow-origin'), '*');
     }
   }
   const list = await handle(gameRequest('/rooms', { origin: 'http://localhost:8000' }), env);
@@ -71,6 +81,25 @@ test('unknown routes are 404, and nothing breaks the Worker', async () => {
   const { env } = makeEnv();
   assert.equal((await handle(gameRequest('/admin'), env)).status, 404);
   assert.equal((await handle(gameRequest('/rooms', { method: 'DELETE' }), env)).status, 404);
-  const broken = await worker.fetch(gameRequest('/rooms'), { ...env, LOBBY: null });
-  assert.equal(broken.status, 400);
+  // An unexpected failure: answered as server_error, with the game's CORS
+  // headers so it can read it, and logged.
+  const logged = [];
+  const error = console.error;
+  console.error = (...args) => logged.push(args.join(' '));
+  try {
+    const broken = await worker.fetch(gameRequest('/rooms'), { ...env, LOBBY: null });
+    assert.equal(broken.status, 500);
+    assert.deepEqual(await broken.json(), { error: 'server_error' });
+    assert.equal(broken.headers.get('access-control-allow-origin'), 'https://html-classic.itch.zone');
+    const elsewhere = await worker.fetch(gameRequest('/rooms', { origin: 'https://evil.example' }), { ...env, LOBBY: null, ALLOWED_ORIGINS: null });
+    assert.equal(elsewhere.status, 403, 'an origin refused before anything can fail');
+  } finally {
+    console.error = error;
+  }
+  assert.ok(logged.some((line) => line.includes('GET /rooms failed')), 'logged for the dashboard');
+});
+
+test('wrangler.toml turns the logs on (Workers Logs), for the dashboard', () => {
+  const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+  assert.match(toml, /^\[observability\]\nenabled = true$/m);
 });

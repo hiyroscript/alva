@@ -20,6 +20,7 @@ export const ERRORS = Object.freeze({
   version_mismatch: 409,
   too_large: 413,
   rate_limited: 429,
+  server_error: 500,
   full: 503,
 });
 

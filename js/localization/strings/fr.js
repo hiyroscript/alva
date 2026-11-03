@@ -1024,4 +1024,9 @@ export const FR = {
   'online.peerFailed.message': 'Impossible de se connecter à votre adversaire. L’un de vos réseaux le bloque peut-être.',
   'online.fighterUnavailable.message': 'Ce match demande un combattant que ce jeu ne peut pas jouer. Rechargez la page, puis réessayez.',
   'online.error.message': 'Une erreur est survenue. Veuillez réessayer.',
+  'online.detail.notConfigured': 'Aucun serveur de salles n’est configuré dans cette copie du jeu.',
+  'online.detail.unreachable': 'Le serveur de salles est injoignable d’ici : il est peut-être arrêté, ou bloqué sur ce réseau.',
+  'online.detail.origin': 'Le serveur de salles n’accepte pas l’adresse de cette page ({origin}).',
+  'online.detail.server': 'Le serveur de salles répond, mais ses salles ne fonctionnent pas pour le moment.',
+  'online.detail.reachable': 'Le serveur de salles répond maintenant : réessayez dans un instant.',
 };

@@ -12,7 +12,7 @@
 import { fakeSprites, DT } from './fighter-harness.mjs';
 import { padSource } from './fake-gamepad.mjs';
 import { makeEnv, FakeSocket, ITCH } from '../../server/tests/fakes.mjs';
-import { handle } from '../../server/src/index.js';
+import worker from '../../server/src/index.js';
 
 const noop = () => {};
 
@@ -200,13 +200,15 @@ export async function settleAll(n = 6) {
   for (let i = 0; i < n; i++) await settle();
 }
 
-// The room server, in process: its fetch and its WebSocket.
-export function backend(vars = {}) {
+// The room server, in process: its fetch (through the Worker's own entry,
+// so its error handling too) and its WebSocket. Every request comes from
+// `origin`, the page's (itch.io's game host by default).
+export function backend(vars = {}, { origin = ITCH } = {}) {
   const made = makeEnv(vars, { start: Date.now() });
   const { env } = made;
   const fetchImpl = async (url, init = {}) => {
-    const req = new Request(url, { ...init, headers: { ...(init.headers ?? {}), origin: ITCH } });
-    return handle(req, env);
+    const req = new Request(url, { ...init, headers: { ...(init.headers ?? {}), origin } });
+    return worker.fetch(req, env);
   };
   // A WebSocket into a Room: what the client sends is the Room's message;
   // what the Room sends the client's, a tick later as on a real network.
