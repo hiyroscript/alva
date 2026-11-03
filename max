@@ -1,1 +1,213 @@
+# Prompt: add Online Play to Alva
 
+You are working on **hiyroscript/alva**, a 2D platform fighter for the browser (pure HTML/CSS/JS, Canvas 2D, no frameworks, no build step except the optional itch.io export). Players play it on **itch.io**, not GitHub Pages. Your task is to add **Online Play**: rooms that players create and join, with no accounts and no matchmaking.
+
+The owner has **no server or Cloudflare account yet**. Work in two pull requests:
+
+- **PR 1, Setup:** all the game-side work plus the room server's code, fully tested locally, and safe to merge before any server exists.
+- **Owner's part:** after PR 1, tell the owner exactly what to do, in very simple numbered steps.
+- **PR 2, Finalize:** once the owner says their part is done and sends you the server URL, connect everything and finish the update.
+
+Read `CLAUDE.md` first and follow it throughout. Also read `ALVA_SPEC.md`, `docs/README.md`, `docs/gameplay/local-play.md`, `docs/systems/input.md`, `docs/development/itch-release.md`, `docs/development/testing.md` and `docs/development/conventions.md` before writing code. Match the codebase's existing style: long explanatory comments at the top of modules, `el()` from `js/core/utils.js` for DOM, `tx` / `tattr` / `iconLabel` for localized text, frozen config objects, and every string in **both** `js/localization/strings/en.js` and `fr.js`. Run `node --test` before each commit, and also `npm run build:itch` and `npm run verify:itch`, since the itch release must still build and validate.
+
+---
+
+## 1. What the player sees
+
+### 1.1 Home screen button
+
+- Add an **Online Play** button in the Home menu's first row (`.home-actions-row` in `js/screens/home-screen.js`), **right after the Local play button**, so the row is: Play | Local play | 🌐.
+- It is a **square icon button the same size as the Settings button** (`.home-settings`, styled with `.home-utility-buttons > button` in `css/home.css`). Make its width and height match exactly at every breakpoint in `css/responsive.css`. Play and Local play shrink to share the rest of the row. The row must still fit on phones in landscape. Check the existing `ui-consistency` and `stylesheets` tests.
+- Its icon is a **globe**: add `globe` to `js/ui/icons.js` in the same stroke style as the other icons (a circle, an equator, two meridian curves). Don't use the emoji itself.
+- Accessible name and tooltip: "Online play" (FR: "Jeu en ligne"), via `tattr('aria-label', …)` and `tattr('title', …)`.
+- Give it `data-nav`, `data-home-action="online"`, and add it to `this.actions` so keyboard and gamepad menu navigation reach it.
+
+**Enabled and disabled states:**
+
+- It is **enabled whenever the device is online** and a fighter is playable. Use `navigator.onLine` with the `online` / `offline` window events, and update the button live, the same way `syncLocalAction` follows controllers. Put the check in a small module (e.g. `js/core/connectivity.js`) with an `onChange` listener so tests can fake it.
+- It is **disabled when offline**, with the reason "You're offline. Connect to the internet to play online." in its `aria-describedby` and on its cell's tooltip, like Local play's `localNote` / `localCell` pattern. With no playable fighter it is disabled like the other match actions (`MATCH_ACTIONS` / the no-fighters note).
+- **Enabled: it glows green** exactly like Local play's `.is-ready` (the same border colour, `::after` glow and `home-download-glow` animation). **Disabled because offline: it glows red** with the same animation and shape in a red tone. Add a red token rather than hard-coding the colour twice. Respect reduced motion as Local play does, and pause the animation while `.screen--home[inert]`.
+- If the device goes offline while the player is anywhere in Online Play, show a dialog saying the connection was lost and return to Home.
+
+### 1.2 Username (first step, every time)
+
+- Pressing Online Play opens an **Online name** screen (or dialog) before anything else: "Choose a name other players will see."
+- Rules: 2 to 16 characters after trimming; letters (any language), digits, spaces, `_` `-` `.` and `'`. No control characters, emoji or HTML. Collapse repeated spaces. The server **re-validates** everything, so never trust the client.
+- Remember the last name in the existing settings store (`js/core/settings.js`; bump its version and migrate cleanly) and prefill it next time. The player can always change it.
+- Keyboard, touch (on-screen keyboard), and gamepad users must all be able to complete this screen. A gamepad player should be able to confirm a remembered name without typing.
+
+### 1.3 Online lobby
+
+After the name, show the lobby with:
+
+- **Create room** opens a small form with:
+  - a **Room name**, prefilled as "{name}'s room" (FR: "Salle de {name}"; use the localization formatter, and handle names ending in "s" sensibly in English, e.g. "Chris's room" is fine). The player can edit it, using the same validation as names, up to 24 characters.
+  - **Visibility**: **Public** (listed in the lobby) or **Private** (only joinable with its code).
+  - **Mode**: Quick Battle only for now. Show it as a fixed, single option so more modes can be added later without redesigning the screen. Put the list of online modes in config (e.g. `CONFIG.online.modes = ['quick-battle']`).
+- **Join with code**: a field for a room code. Codes are 5 characters from an unambiguous alphabet (no 0/O/1/I/L), shown in uppercase and entered case-insensitively.
+- **Public rooms list**: room name, host name, mode, players (1/2), and a Join button. It refreshes every ~5 seconds while open (poll, don't keep a socket open just for the list) and has an empty state ("No public rooms right now. Create one!"). Full or in-match rooms are hidden or shown as unjoinable.
+- **Back** returns to Home. Every screen uses the existing screen manager and menu navigation, with the same look as the Local Play / Quick Battle setup screens.
+
+### 1.4 Room
+
+- Show the room's name and code. Include a **Copy code** button; itch runs the game in an iframe, so URLs aren't shareable and the code is the way to invite. Handle the Clipboard API being blocked in the iframe by selecting the code text instead.
+- Show both player slots with their names; the host is marked. Rooms hold **2 players** (Quick Battle is 1v1).
+- Each player picks their fighter with the existing fighter picker and comfort/loadout rules, reusing `CharacterSelectScreen` / `LocalFighterScreen` patterns. **The stage is chosen at random** (reuse `randomStage` from `js/screens/quick-battle-setup.js`), using a seed that the host sends, so both players get the same stage. Show which stage was drawn before the match starts.
+- Both players press **Ready**; the host's client starts the match when both are ready.
+- After the match: **Rematch** (both must accept; draw a new random stage) or **Leave room**. If the host leaves, close the room and tell the other player ("The host closed the room.").
+
+### 1.5 Online battle rules
+
+- It is the normal Quick Battle match: same clock, overtime, points, Void, HUD and results.
+- **There is no pause online.** Options / Menu (and the HUD's pause button) opens a menu with only **Leave match** that does **not** freeze the world. Leaving counts as a forfeit, and the opponent sees "Your opponent left."
+- **Opponent disconnects mid-match:** show "Waiting for opponent…" for up to 10 seconds, then end the match ("Connection lost") and return both players to the room or lobby.
+- HUD labels show the players' online names instead of P1/P2. The local player is always shown on their own side. Marker colours come from a new `CONFIG.online.colors`, or reuse the Local Play colours.
+- The local player uses their usual input: keyboard, touch controls or any controller. The single-player input path works unchanged.
+
+### 1.6 "Servers are full"
+
+- The server enforces a **global cap** so the free Cloudflare plan is never exceeded (see §3.4). When the cap is reached, creating a room is refused with code `full`. The game shows a dialog: "Servers are full right now. Please try again in a few minutes." (FR equivalent) and stays in the lobby.
+- If the server can't be reached at all (down, not deployed yet, or blocked), show: "Online play is unavailable right now." This is a different message from "full".
+
+---
+
+## 2. Netcode (version 1: delay-based lockstep)
+
+Alva is well placed for lockstep. Rely on these facts and verify them in the code:
+
+- The simulation runs on a fixed step, `CONFIG.sim.step = 1/60`, in `Arena.frame` / `Arena.update` (`js/game/arena.js`), and `Battle.update` (`js/game/battle.js`) layers the match rules on top.
+- Battle randomness is already seeded: `Battle` takes `seed` and uses `mulberry32` / `deriveSeed` from `js/core/utils.js`. Online, the **host generates the seed** and sends it, together with both fighters, both loadouts and the stage id, in a `start` message.
+- Each fighter is driven by a controller. `PlayerController` reads an input channel (`input.player(slot)` gives Local Play a `ControllerChannel` per player). For online play, add a mode to `BATTLE_MODES` (e.g. `online`, both sides `cpu: false`) and give each fighter a channel fed by the lockstep layer instead of a device.
+
+**Build it like this:**
+
+1. **Input frames.** Each step, sample the local player's input into a compact, serializable frame (bit flags for buttons plus quantized stick axes). Read `js/core/input-manager.js` and `PlayerController` to see exactly what a controller reads per step, including the edge-triggered "pressed this step" inputs, and make the frame carry all of it.
+2. **Input delay.** Schedule local input for step `n + D` (start at D = 3 steps, about 50 ms; make it configurable in `CONFIG.online`). Send each frame to the peer immediately, and resend the last few unacknowledged frames in every packet so loss doesn't stall.
+3. **Lockstep stepping.** In online mode, step the battle **only when both players' inputs for that step are known**. Drive steps from a step counter fed by the arrival of inputs, not from wall-clock time alone. Handle the `maxStepsPerFrame` catch-up and the lethal-launch slow motion (`fx.timeScale`) so they never make the two simulations diverge. Slow motion may change how fast steps are fed, but never what a step does.
+4. **Remote input channel.** Feed the remote player's fighter through a channel with the same interface `PlayerController` already uses, so no fighter code changes. Never special-case a fighter id (see `CLAUDE.md`).
+5. **Determinism audit.** Search for anything in the simulation path that isn't a pure function of state + inputs + seed: `Math.random` without the injected rng, `Date.now()` / `performance.now()` inside the step, iteration over `Set`/`Map` with order that depends on insertion timing, settings that change gameplay (e.g. **Automatic turn-around**, which is per player: send each player's value in `start`), reduced motion affecting simulation, and frame-dependent work in `Arena.frame` outside `update`. Fix what you find without changing how offline modes play. Prove this with the existing tests plus `npm run verify:itch`.
+6. **Desync detection.** Every 60 steps, each side hashes the key state (fighter positions, velocities, Launch Points, Energy, score, clock, projectile count) and sends the hash. On a mismatch, log both states in debug and end the match with "Connection problem (desync)". Write a test that runs two `Battle` instances side by side with the same seed and scripted inputs for several thousand steps across every fighter and stage and asserts their hashes always match. This is the most important test in the PR.
+7. **Transport.** Players connect **peer-to-peer over a WebRTC DataChannel** after the room server introduces them (it relays the offer/answer/ICE messages over its WebSocket). Use STUN `stun:stun.cloudflare.com:3478`. Leave a config slot for TURN servers (`CONFIG.online.iceServers`) but don't require one. **Never relay gameplay through the Cloudflare server**: at 60 messages a second it would use up the free plan in a few dozen matches. If WebRTC can't connect within ~10 seconds, show "Couldn't connect to your opponent. One of your networks may be blocking it." and return to the room.
+8. Put the transport behind a small interface (`send`, `onMessage`, `close`, `onClose`) so tests can use an in-memory pair, and so rollback netcode can be added later without redoing the lobby.
+
+Rollback netcode is **out of scope**. Leave a short note in the docs on what it would need (state snapshot/restore on `Battle`).
+
+---
+
+## 3. The room server (Cloudflare Workers + Durable Objects)
+
+### 3.1 Where it lives
+
+- Create `server/` at the repo root with its own `package.json` (devDependency `wrangler`), `wrangler.toml`, `src/index.js`, and tests.
+- Add `server/` to the itch release's development-only exclusions (`DEVELOPMENT_ONLY` in `tools/itch/validate.mjs`, and the build), so none of it ships in the itch ZIP.
+- Plain JavaScript (ES modules), no TypeScript and no frameworks, to match the repo.
+
+### 3.2 Design
+
+- A Worker handles HTTP and WebSocket upgrades. It routes to:
+  - one **`Lobby` Durable Object** (a single named instance) that knows every open room: id, code, name, host name, public/private, mode, player count, status, created/last-active times. It hands out codes, serves the public list, and enforces the caps.
+  - one **`Room` Durable Object per room**, holding the two players' WebSockets. It relays only lobby and room messages (join, leave, ready, fighter picked, start, rematch, WebRTC signalling) and reports changes back to the Lobby.
+- Use the **WebSocket Hibernation API** (`state.acceptWebSocket`) so idle rooms don't use Durable Object duration.
+- Endpoints, all JSON:
+  - `GET /health`
+  - `GET /rooms` (public, joinable rooms)
+  - `POST /rooms` (create: name, playerName, visibility, mode → id, code, or `{ error: 'full' }` with HTTP 503)
+  - `POST /rooms/join` (by code, or by id for public rooms)
+  - `GET /rooms/:id/ws` (the WebSocket into a room)
+- Validate every field on the server (lengths, characters, mode is in the allowed list). Reject anything else with clear error codes the client translates (`invalid_name`, `room_not_found`, `room_full`, `full`, `rate_limited`).
+- **CORS:** allow only itch's game origins (`https://html-classic.itch.zone`, `https://html.itch.zone`, and any other `*.itch.zone` origin itch uses; check itch's docs) plus `http://localhost:*` for development. Put the allowed origins in `wrangler.toml` vars so the owner can change them without code. Check the `Origin` header on WebSocket upgrades too.
+- Clean up rooms with no activity for 10 minutes, and rooms whose host left, using a Durable Object alarm.
+- Rate-limit per IP (e.g. 10 room creations per minute) in the Lobby, keeping counters in memory or storage. Don't log IPs persistently.
+
+### 3.3 No accounts, no personal data
+
+- No login, cookies or stored identity. Each client generates a random session id per visit to recognise reconnects. Names live only while the room exists.
+
+### 3.4 Staying under the free plan
+
+Cloudflare's free plan allows **100,000 Durable Object requests per day** (WebSocket connections count as requests; incoming WebSocket messages count at 20:1) and **13,000 GB-s of duration per day**; the daily reset is at 00:00 UTC. Check the current numbers in the Cloudflare docs before you write the caps, since they may have changed.
+
+- `MAX_ROOMS` (start at 50) open at once. Over it, `POST /rooms` returns `full`.
+- A **daily request budget** counted in the Lobby (count requests/messages handled, reset at 00:00 UTC). Above ~80% of the daily limit, refuse new rooms with `full` while letting existing rooms finish.
+- Both caps go in `wrangler.toml` vars, with the reasoning written as a comment next to them.
+- itch.io itself imposes no player limit on HTML5 games; the caps protect the Cloudflare free plan.
+
+### 3.5 Testing the server without an account
+
+- Write unit tests for the Lobby and Room logic as plain classes with fake storage/WebSockets, runnable with `node --test`. Keep the main repo's test command working: either include them in it or document the separate command and add it to the GitHub workflow.
+- Document how to run it locally with `npx wrangler dev`, which needs no Cloudflare account, and point the game at `http://localhost:8787` via config for a two-tab local test.
+
+---
+
+## 4. Config, itch validator, docs
+
+- Add `CONFIG.online` in `js/config.js`: `serverUrl` (empty string in PR 1), `inputDelay`, `iceServers`, `modes`, `connectTimeoutMs`, `disconnectGraceMs`, `colors`. When `serverUrl` is empty, the button still follows the online/offline rule, and pressing it ends at the "Online play is unavailable right now" dialog after the name screen. Nothing should crash.
+- The itch validator (`tools/itch/validate.mjs`) **rejects any `http(s)://` URL that isn't a credits link** (`EXTERNAL_URL`). Don't weaken that check in general. Add a narrow, documented allowance: the single host in `CONFIG.online.serverUrl`, plus its `wss://` form if you use one. Add a test proving that other hosts are still rejected.
+- Update the docs as `CLAUDE.md` and `docs/README.md` expect:
+  - a new `docs/gameplay/online-play.md` in the style of `local-play.md`, with a module/ownership table
+  - `docs/systems/input.md` (the remote channel)
+  - `docs/development/itch-release.md`
+  - a new `docs/development/online-server.md` (deploy, caps, local dev)
+  - the architecture docs
+- **`ALVA_SPEC.md`:** replace the rule "No fake modes or online matchmaking" with the Online Play rules from §1 (rooms, no matchmaking, no accounts). Add the Home → Online play flows to the flow list next to the Local play ones, including the offline (disabled, red) and "servers are full" cases.
+- Add an entry to `UPDATES.md` for the **online update** (the owner's name for this work; confirm the name with the owner if unsure), following the format of the existing entries.
+
+---
+
+## 5. Tests to add (PR 1)
+
+- Home: the Online Play button exists after Local play, matches the Settings button's size, follows online/offline live, has the green `is-ready` vs red offline classes, carries the right descriptions and tooltips, and is reachable by menu navigation.
+- Username validation (client) and room-name default/editing, in EN and FR.
+- Lobby/room screens with a fake server client: create (public/private), join by code, the public list, full/unavailable/not-found errors, the host leaving, rematch.
+- Lockstep with an in-memory transport: delayed inputs, packet loss/resend, waiting when inputs are late, forfeit on leave, timeout on disconnect.
+- **Two-simulation determinism test** across fighters and stages (see §2.6).
+- The itch build still validates, `server/` is excluded, and the validator rejects other external hosts.
+- Server: Lobby caps (`MAX_ROOMS`, daily budget), validation, CORS/origin checks, cleanup alarms, code uniqueness, rate limiting.
+
+---
+
+## 6. Workflow
+
+### PR 1: "Online Play, part 1: game and server code"
+
+- Branch from `main` and open the PR when everything above is done and all checks pass. `CONFIG.online.serverUrl` stays empty.
+- The PR description includes: what was built, how to try it locally (two browser tabs + `npx wrangler dev`), known limits (no rollback; strict networks may need a TURN server later), and the owner's steps below.
+
+### Then tell the owner, in very simple steps
+
+Write this in the chat **and** in `docs/development/online-server.md`. Assume they've never used a terminal for this. Keep each step one action, say exactly what to click or type, and say what they should see when it worked:
+
+1. Merge PR 1 (or keep it open, and say which).
+2. Create a free Cloudflare account at cloudflare.com (no credit card needed for the free Workers plan).
+3. Install Node.js if they don't have it (give the link and the version).
+4. Download/clone the repo, open a terminal in the `server` folder (explain how on Windows and on Mac).
+5. Run `npm install`, then `npx wrangler login` (a browser window opens; click Allow).
+6. Run `npx wrangler deploy`. Copy the URL it prints (ends in `.workers.dev`).
+7. Open `https://<that-url>/health` in a browser and check that it says ok.
+8. Send that URL back to Claude.
+
+Also say what to do if a step fails (paste the error back to you). Don't ask them to set up TURN now.
+
+### PR 2: "Online Play, part 2: go live"
+
+When the owner sends the URL:
+
+- Set `CONFIG.online.serverUrl` and add it to the validator allowance. Check its `/health` from your environment if your network allows it; if not, tell the owner it's not reachable from your side.
+- Confirm the CORS origins match the itch embed origins. If any server change is needed, tell the owner to run `npx wrangler deploy` again.
+- Final docs pass, `UPDATES.md` entry with both PR numbers, all checks green.
+- Then give the owner a short final checklist:
+  1. Merge PR 2.
+  2. Download the itch ZIP from the GitHub Actions run, unzip it once, and upload it to itch.io as usual.
+  3. Test with a friend on two devices: one creates a room and shares the code, the other joins.
+  4. If a friend can't connect at all, tell Claude. A TURN server (free tier) is the fix and is a small follow-up.
+
+---
+
+## 7. Don'ts
+
+- Don't add accounts, matchmaking, chat, or online modes other than Quick Battle.
+- Don't send gameplay traffic through Cloudflare.
+- Don't special-case a fighter id in shared code, and don't change movement numbers or controller comfort rules.
+- Don't edit `character_rule`.
+- Don't change how offline modes (Quick Battle vs CPU, Watch, Local, Practice) play. The existing tests and `verify:itch` must pass unchanged.
+- Don't commit secrets. The server needs none for this version.
