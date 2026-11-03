@@ -8,7 +8,7 @@ Which document answers what, and which one decides.
 | [`ALVA_SPEC.md`](../ALVA_SPEC.md) | **The product specification.** What the game must do and look like, and every shared rule. Authoritative: where a guide below disagrees with it, the guide is wrong. |
 | [`docs/characters/`](characters/README.md) | Each fighter's own specification (part of `ALVA_SPEC.md`), and how to add one. |
 | [`docs/architecture/`](architecture/overview.md), [`docs/systems/`](systems/), [`docs/gameplay/`](gameplay/), [`docs/development/`](development/) | How the code carries the specification out: modules, data fields, extension points, tests. |
-| [`UPDATES.md`](../UPDATES.md) | History: the named updates (movement, effect, bounce) and other large changes, with their pull requests, commits, tuning and tests. |
+| [`UPDATES.md`](../UPDATES.md) | History: the named updates (movement, effect, bounce, Mash Combo, online) and other large changes, with their pull requests, commits, tuning and tests. |
 | [`codename_rule`](../codename_rule) | The naming contract for controls, moves, animations and files. |
 | [`character_rule`](../character_rule) | The owner's direction for fighters' abilities. Protected: never edited. |
 
@@ -58,6 +58,8 @@ reads, what a fighter may leave out, and its tests.
 - [Quick Battle](gameplay/battle.md) (and difficulty)
 - [Watch Mode](gameplay/watch-mode.md)
 - [Local Play](gameplay/local-play.md) (two players, two controllers)
+- [Online Play](gameplay/online-play.md) (rooms, two browsers, delay-based
+  lockstep netcode)
 - [Practice Ground](gameplay/practice.md)
 - [Stages](gameplay/stages.md) (Select Stage's 24-slot roster and Random
   Stage, Asperitas and its platform hazards, Adamaris and its volcano, Jökull's breaking ice and blizzard, and adding a stage)
@@ -67,6 +69,9 @@ reads, what a fighter may leave out, and its tests.
 - [Running and deploying](development/setup.md)
 - [The itch.io release](development/itch-release.md): the optional export
   in fewer files, its validation and equivalence check, publishing it.
+- [The room server](development/online-server.md): Online Play's Cloudflare
+  Worker, its caps on the free plan, testing it locally, putting it online
+  step by step.
 - [Testing](development/testing.md): the layout, the harness, universal
   and fighter-specific tests.
 - [Conventions](development/conventions.md): codenames, code,

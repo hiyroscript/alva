@@ -1,0 +1,226 @@
+/* Online Play: its menu screens (the online name, the lobby, the room), the
+   Create room dialog, and what an online battle adds (its players' colours,
+   "Waiting for opponent…", the drawn stage). One part of the stylesheet
+   index.html loads in order (css/base.css first; see
+   docs/development/conventions.md). The screens use the shared menu frame,
+   panels and buttons; only their own layout is here. */
+
+/* ---------------------------------------------------------------------
+   The online screens
+   --------------------------------------------------------------------- */
+
+.online-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: start;
+  overflow-y: auto;
+}
+.online-layout--single { grid-template-columns: minmax(0, 520px); justify-content: center; }
+.online-panel {
+  display: grid;
+  gap: clamp(10px, 2vh, 16px);
+  min-width: 0;
+  padding: clamp(14px, 2.6vh, 22px) clamp(14px, 2vw, 22px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+}
+.online-lede { color: var(--text); font-size: clamp(14px, 2.2vh, 16px); line-height: 1.45; }
+.online-field { display: grid; gap: 6px; min-width: 0; }
+.online-label { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
+.online-input {
+  width: 100%;
+  min-width: 0;
+  height: clamp(40px, 7vh, 48px);
+  padding: 0 12px;
+  border-radius: var(--radius-menu);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-sunken);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 16px;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+:where(html:not(.is-touch-input)) .online-input:hover, .online-input.is-cursor-target { border-color: var(--border-hover); }
+.online-input:focus { outline: none; border-color: var(--accent); }
+:where(html:not(.is-pointer-input)) .online-input:focus { box-shadow: var(--focus-ring); }
+.online-input[aria-invalid="true"] { border-color: var(--danger-edge); }
+/* A room code reads in capitals as the game writes it, in monospace. */
+.online-input--code, .online-code { font-family: var(--font-mono); letter-spacing: 0.18em; }
+.online-hint { color: var(--text-muted); font-size: 12.5px; line-height: 1.45; }
+.online-error { min-height: 1.4em; color: var(--danger-edge-strong); font-size: 13px; line-height: 1.4; }
+.online-error:empty { min-height: 0; }
+.online-status { color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+.online-status:empty { display: none; }
+.online-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.online-actions .btn { flex: 1 1 140px; }
+
+/* The lobby: who the player is, Create room, Join with code; the public
+   rooms beside them. */
+.online-identity { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.online-playing-as { min-width: 0; color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.online-change-name { flex: none; min-height: 34px; padding: 0 12px; font-size: 13px; }
+.online-join { display: grid; gap: 8px; padding-top: clamp(10px, 2vh, 16px); border-top: 1px solid var(--border); }
+.online-join-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.online-list-status { color: var(--text-muted); font-size: 13px; line-height: 1.45; }
+.online-list-status[hidden] { display: none; }
+.online-room-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.online-room {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+  background: var(--surface-subtle);
+}
+.online-room.is-unjoinable { opacity: 0.7; }
+.online-room-text { display: grid; gap: 3px; min-width: 0; }
+.online-room-name { color: var(--text-strong); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.online-room-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--text-muted); font-size: 12.5px; }
+.btn.online-room-join { flex: none; min-height: 36px; padding: 0 14px; }
+
+/* The room: its code and details; both seats, then what to do. */
+.online-code-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.online-code {
+  min-width: 0;
+  height: clamp(44px, 8vh, 56px);
+  padding: 0 14px;
+  border-radius: var(--radius-menu);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-sunken);
+  color: var(--text-strong);
+  font-size: clamp(22px, 4.4vh, 30px);
+  font-weight: 700;
+}
+.online-code:focus { outline: none; border-color: var(--accent); }
+:where(html:not(.is-pointer-input)) .online-code:focus { box-shadow: var(--focus-ring); }
+.online-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.online-chip {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.online-stage { color: var(--text); font-size: 13.5px; line-height: 1.45; }
+.online-seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.online-seat {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--player-edge, var(--border));
+  border-radius: var(--radius-menu);
+  background: var(--player-wash, var(--surface-subtle));
+  box-shadow: inset 3px 0 0 var(--player, transparent);
+}
+.online-seat[data-player="p1"] { --player: var(--player-1); --player-wash: var(--player-1-wash); --player-edge: var(--player-1-edge); }
+.online-seat[data-player="p2"] { --player: var(--player-2); --player-wash: var(--player-2-wash); --player-edge: var(--player-2-edge); }
+.online-seat.is-empty { border-style: dashed; background: transparent; box-shadow: none; }
+.online-seat.is-away { opacity: 0.6; }
+.online-seat-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.online-seat-name { min-width: 0; color: var(--text-strong); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.online-seat.is-empty .online-seat-name { color: var(--text-muted); font-weight: 600; white-space: normal; }
+.online-mark {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--player, var(--surface-muted));
+  color: var(--black);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.online-mark--you { background: var(--surface-muted); color: var(--text); }
+.online-mark[hidden] { display: none; }
+.online-seat-body { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; color: var(--text-secondary); font-size: 13px; }
+.online-seat.is-ready .online-seat-state { color: var(--accent); font-weight: 700; }
+.btn.online-ready.is-on { background: transparent; border-color: var(--accent); color: var(--text); }
+.btn[hidden] { display: none; }
+
+/* ---------------------------------------------------------------------
+   Create room: a dialog over the lobby
+   --------------------------------------------------------------------- */
+
+.dialog-panel.online-dialog { width: min(560px, 100%); max-height: 100%; overflow-y: auto; gap: clamp(10px, 2vh, 16px); }
+.online-choices { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.online-choice-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.online-choice {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-menu);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+:where(html:not(.is-touch-input)) .online-choice:enabled:hover, .online-choice.is-cursor-target:enabled { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .online-choice:focus { box-shadow: var(--focus-ring); }
+.online-choice[aria-checked="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.online-choice-name { font-weight: 700; }
+.online-choice-desc { color: var(--text-secondary); font-size: 12.5px; line-height: 1.4; }
+
+/* ---------------------------------------------------------------------
+   The online battle
+   --------------------------------------------------------------------- */
+
+/* Each player in their own colour, as in Local Play: the host red, the
+   guest blue. Their names may be longer than a tag. */
+.screen--battle.is-online .hud-fighter--p1 { --player: var(--player-1); --player-edge: var(--player-1-edge); }
+.screen--battle.is-online .hud-fighter--p2 { --player: var(--player-2); --player-edge: var(--player-2-edge); }
+.screen--battle.is-online .hud-slot {
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--player);
+  border-color: var(--player);
+  color: var(--black);
+}
+.screen--battle.is-online .hud-side { border-color: var(--player-edge); }
+.screen--battle.is-online .hud-p1 { box-shadow: var(--glass-shadow), inset 3px 0 0 var(--player); }
+.screen--battle.is-online .hud-p2 { box-shadow: var(--glass-shadow), inset -3px 0 0 var(--player); }
+.screen--battle.is-online .hud-dot.is-filled { background: var(--player); border-color: var(--player); }
+.online-menu-note { color: var(--text-secondary); font-size: 13.5px; line-height: 1.45; }
+.online-waiting,
+.online-reveal {
+  position: absolute;
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  border-radius: var(--radius-menu);
+  pointer-events: none;
+}
+.online-waiting {
+  top: calc(max(var(--safe-t), 10px) + clamp(64px, 13vh, 96px));
+  padding: 8px 16px;
+  color: var(--text-strong);
+  font-weight: 700;
+  font-size: clamp(13px, 2.2vh, 16px);
+}
+.online-reveal {
+  bottom: calc(max(var(--safe-b), 10px) + clamp(70px, 16vh, 120px));
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 18px 10px;
+}
+.online-reveal-name { color: var(--text-strong); font-weight: 700; font-size: clamp(16px, 3vh, 22px); }
+.online-waiting[hidden], .online-reveal[hidden] { display: none; }
+.online-rematch-status { color: var(--text-secondary); font-size: 13px; text-align: center; }
+.online-rematch-status:empty { display: none; }
+
+/* Phones held sideways: one column, a little tighter. */
+@media (max-height: 560px), (max-width: 720px) {
+  .online-layout { grid-template-columns: minmax(0, 1fr); }
+  .online-seats { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 560px) and (min-width: 640px) {
+  .online-layout:not(.online-layout--single) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+  .online-seats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

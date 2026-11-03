@@ -48,6 +48,13 @@
   --player-1-edge: rgba(255, 77, 94, 0.62);
   --player-2-edge: rgba(61, 155, 255, 0.62);
 
+  /* Something that cannot work right now (Home's Online play while the
+     device is offline): a red edge and glow, the counterpart of the green
+     ones Local play and Download wear when they are ready. */
+  --danger-edge: rgba(255, 90, 79, 0.6);
+  --danger-edge-strong: rgba(255, 90, 79, 0.85);
+  --danger-glow: rgba(255, 90, 79, 0.32);
+
   /* Battle chrome (dark, over stage art) */
   --scrim-text-muted: #ababab;
   /* Battle glass: translucent charcoal with a faint top sheen and a light

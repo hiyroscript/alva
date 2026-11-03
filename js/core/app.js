@@ -13,6 +13,7 @@ import { ControllerManager } from './controller-manager.js';
 import { resolveProfile } from '../data/controller-profiles.js';
 import { AudioManager } from './audio-manager.js';
 import { Device } from './device.js';
+import { Connectivity } from './connectivity.js';
 import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
 import { Settings } from './settings.js';
@@ -29,6 +30,7 @@ import { getCharacter, getPlayableCharacter, playableCharacters, characterFrameP
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
 import { buildFighterSprites } from '../game/rendering/ensemble.js';
+import { OnlineSession } from '../online/online-session.js';
 
 import { SplashScreen } from '../screens/splash-screen.js';
 import { HomeScreen } from '../screens/home-screen.js';
@@ -42,11 +44,16 @@ import { LocalModeSelectScreen, LocalFighterScreen, LocalMapScreen } from '../sc
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
 import { DiscoverScreen } from '../screens/discover-screen.js';
+import {
+  OnlineNameScreen, OnlineLobbyScreen, OnlineRoomScreen, OnlineFighterScreen, CreateRoomDialog, routeOnlineEvents, showNotice,
+} from '../screens/online-screens.js';
+import { OnlineBattleScreen } from '../screens/online-battle-screen.js';
 
 // Quick Battle's choices, Watch Mode's apart from them (one difficulty for
-// both CPUs, a fighter each) and Local Play's apart from both (each
-// player's fighter and the stage: js/screens/local-play-screens.js), as
-// they start. Quick Battle's play type
+// both CPUs, a fighter each), Local Play's apart from both (each player's
+// fighter and the stage: js/screens/local-play-screens.js) and Online
+// Play's (this player's fighter for a room: js/screens/online-screens.js),
+// as they start. Quick Battle's play type
 // (Regular Play until Custom Play is chosen in Select Mode), Player 1's
 // fighter, the CPU's fighter and the stage are the one state its Battle is
 // started from (js/screens/quick-battle-setup.js): Regular Play draws the
@@ -74,6 +81,9 @@ export function initialSelection() {
       p1CharacterId: firstFighter,
       p2CharacterId: firstFighter,
       mapId: MAPS[0].id,
+    },
+    online: {
+      characterId: firstFighter,
     },
   };
 }
@@ -104,6 +114,11 @@ export class App {
     followSettings(this.settings);
     onLanguageChange(() => this.localize());
     this.audio = new AudioManager();
+    // Online Play (js/online/online-session.js): whether the device is
+    // online (Home's Online play follows it), and the player's time in
+    // Online Play, from their name to the room they are in.
+    this.connectivity = new Connectivity(window, globalThis.navigator);
+    this.online = new OnlineSession({ settings: this.settings });
     // Whether Alva can be installed as a web app here, and how (Home's
     // Download button and its dialog): listening for the browser's offer
     // from the start.
@@ -120,6 +135,7 @@ export class App {
     this.settingsDialog = new SettingsDialog(document.getElementById('settings-dialog'), this);
     this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
     this.controllerDialog = new ControllerDialog(document.getElementById('controller-dialog'), this);
+    this.createRoomDialog = new CreateRoomDialog(document.getElementById('online-room-dialog'), this);
     this.controllerControls = new ControllerControls(this, {
       roster: document.getElementById('controller-roster'),
       editor: document.getElementById('controller-editor'),
@@ -159,6 +175,17 @@ export class App {
     s.register(new BattleScreen(this));
     s.register(new PracticeGroundScreen(this));
     s.register(new DiscoverScreen(this));
+    // Online Play's: Online name → Online lobby → Room (its fighter) →
+    // Online battle.
+    s.register(new OnlineNameScreen(this));
+    s.register(new OnlineLobbyScreen(this));
+    s.register(new OnlineRoomScreen(this));
+    s.register(new OnlineFighterScreen(this));
+    s.register(new OnlineBattleScreen(this));
+    routeOnlineEvents(this);
+    this.connectivity.onChange((online) => {
+      if (!online) this.wentOffline();
+    });
     // The page's own static labels (index.html) in the language in use.
     localizeTree(document.body);
 
@@ -195,6 +222,15 @@ export class App {
   endLocalPlay() {
     this.input.setLocalPlay(false);
     this.controllers.endLocal();
+  }
+
+  // The device went offline: anywhere in Online Play, it ends (the room is
+  // left), back to Home, and the player is told the connection was lost.
+  wentOffline() {
+    if (!this.screens.current?.id?.startsWith('online-')) return;
+    this.online.leaveRoom();
+    this.screens.go('home', {}, { reset: true });
+    showNotice(this, 'offline');
   }
 
   // Re-reads every string on the page in the new language: each marked one

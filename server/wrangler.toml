@@ -1,0 +1,64 @@
+# Alva's room server (server/src/index.js): a Cloudflare Worker with two
+# Durable Object classes. Deploy with `npx wrangler deploy` from this folder;
+# run it on your own computer with `npx wrangler dev` (no account needed).
+# Step by step: docs/development/online-server.md.
+
+name = "alva-rooms"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+# The free plan's address: https://alva-rooms.<your account>.workers.dev
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+# The free plan only offers SQLite-backed Durable Objects, so both classes
+# are created as such.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Lobby", "Room"]
+
+[vars]
+# Who may call the server: the itch.io pages that run the game (itch.io serves
+# HTML5 games from html-classic.itch.zone and html.itch.zone, and may use
+# other *.itch.zone hosts) and a copy on your own computer for testing.
+# Comma-separated; * stands for any host labels before the domain, or any
+# port. Change it here and run `npx wrangler deploy` again; no code changes.
+ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*"
+
+# Staying inside Cloudflare's free Workers plan (checked on 2026-11-03:
+# https://developers.cloudflare.com/durable-objects/platform/pricing/). Its
+# daily allowance resets at 00:00 UTC:
+#   - 100,000 Durable Object requests a day. HTTP requests, WebSocket
+#     connections and alarms count one each; incoming WebSocket messages
+#     count at 20 : 1. Past it, requests fail until the next day.
+#   - 13,000 GB-s of Durable Object duration a day. Rooms hibernate their
+#     sockets and the Lobby only works while answering a request, so an
+#     idle server spends almost none of it.
+# A room costs the server about 15 requests from creation to its last
+# match (create, join, two connections, the signalling, the reports), and a
+# player waiting in the lobby about 12 a minute (the list refreshes every
+# 5 s). The match itself costs nothing here: it is peer to peer.
+#
+# MAX_ROOMS: rooms open at once. Past it, creating a room answers `full`
+# ("Servers are full right now"). 50 rooms with two players each and the
+# lobby polling stay far inside the daily requests.
+MAX_ROOMS = "50"
+# The plan's daily request allowance, and the share of it that may be spent
+# before new rooms are refused as `full`. 0.8 leaves a fifth of the day's
+# requests for the rooms already open to finish their matches. The Lobby
+# counts its own requests and those each Room reports.
+DAILY_REQUEST_LIMIT = "100000"
+BUDGET_SHARE = "0.8"
+# A room with no activity this long closes itself.
+ROOM_IDLE_MINUTES = "10"
+# Per address, a minute: rooms created, joins tried, list reads (the game
+# reads the list 12 times a minute; several players can share an address).
+CREATE_PER_MINUTE = "10"
+JOIN_PER_MINUTE = "30"
+LIST_PER_MINUTE = "120"

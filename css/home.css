@@ -13,6 +13,10 @@
   --glass-l: 0.64;
   --glass-w: 0.44;
   --credits-pad: clamp(18px, 2.6vw, 40px);
+  /* The compact squares' side: the Help, Controller and Settings buttons
+     and Online play in the menu's first row, one value for all of them at
+     every size, so they always match. */
+  --home-utility-size: clamp(40px, 7vh, 48px);
   isolation: isolate;
 }
 .screen--home.is-entering { animation: fade-in 0.7s ease both; }
@@ -46,7 +50,8 @@
      much as a short screen needs, so the menu is never pushed off it. */
   --below-logo: calc(max(var(--safe-t), 24px) + 24px + var(--home-footer-height) + var(--safe-b)
     + clamp(14px, 3vh, 28px) + var(--lede-size) * 1.45
-    + clamp(18px, 5vh, 48px) + 4 * clamp(42px, 7.4vh, 58px) + 3 * 8px + 8px
+    + clamp(18px, 5vh, 48px) + 3 * clamp(42px, 7.4vh, 58px) + max(clamp(42px, 7.4vh, 58px), var(--home-utility-size))
+    + 3 * 8px + 8px
     + var(--home-note-room));
   display: flex;
   flex-direction: column;
@@ -76,18 +81,24 @@
   line-height: 1.45;
   color: var(--text-secondary);
 }
+/* Wide enough that Play and Local play, beside the Online play square,
+   keep their whole labels on a computer's screen (a narrow screen cuts a
+   label short rather than wrap it). */
 .home-actions {
   display: grid;
   gap: 8px;
-  width: min(100%, 320px);
+  width: min(100%, 344px);
   margin-top: clamp(18px, 5vh, 48px);
 }
-/* The first row: Play and Local play side by side, two equal columns that
-   together span exactly the full-width actions under them (the same gap
-   between them as between rows). Still one row of the menu's height. */
+/* The first row: Play, Local play and Online play, together spanning
+   exactly the full-width actions under them (the same gap between them as
+   between rows). Online play is a square the size of the Settings button;
+   Play and Local play share the rest in two equal columns. One row of the
+   menu, as tall as its tallest (the square, on a short screen). */
 .home-actions-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) var(--home-utility-size);
+  align-items: center;
   gap: inherit;
   min-width: 0;
 }
@@ -152,6 +163,39 @@
 }
 .screen--home[inert] .home-action--local::after { animation-play-state: paused; }
 /* Read out with Local play, never shown. */
+/* Online play: the square, its globe centred. Its own green edge and glow
+   while it can open (Local play's), a red one while the device is offline. */
+/* Two classes, so the menu's own heights on short screens (later in this
+   part) never change the square. */
+.home-action.home-action--online {
+  position: relative;
+  justify-content: center;
+  width: var(--home-utility-size);
+  height: var(--home-utility-size);
+  padding: 0;
+}
+.home-action--online .icon { font-size: clamp(20px, 3.4vh, 24px); }
+:where(html:not(.is-touch-input)) .home-action--online:enabled:hover .icon, .home-action--online.is-cursor-target .icon, :where(html:not(.is-pointer-input)) .home-action--online:focus .icon { transform: none; }
+.home-action--online.is-ready { border-color: rgba(47, 191, 99, 0.6); }
+:where(html:not(.is-touch-input)) .home-action--online.is-ready:hover, .home-action--online.is-ready.is-cursor-target { border-color: rgba(47, 191, 99, 0.85); }
+.home-action--online.is-ready::after,
+.home-action--online.is-offline::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid rgba(47, 191, 99, 0.6);
+  box-shadow: 0 0 10px 1px rgba(47, 191, 99, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  animation: home-download-glow 3.2s ease-in-out infinite;
+}
+/* Offline: disabled, with the same edge, glow and cadence in red. Kept
+   after the disabled look, so its edge shows. */
+.home-action--online.is-offline:disabled { border-color: var(--danger-edge); }
+.home-action--online.is-offline::after { border-color: var(--danger-edge); box-shadow: 0 0 10px 1px var(--danger-glow); }
+.home-action--online.is-offline:disabled .icon { color: var(--danger-edge-strong); }
+.screen--home[inert] .home-action--online::after { animation-play-state: paused; }
 .home-sr {
   position: absolute;
   width: 1px;
@@ -186,8 +230,8 @@
 .home-utility-buttons > button, .home-download {
   display: grid;
   place-items: center;
-  width: clamp(40px, 7vh, 48px);
-  height: clamp(40px, 7vh, 48px);
+  width: var(--home-utility-size);
+  height: var(--home-utility-size);
   border-radius: var(--radius-menu);
   border: 1px solid var(--border-strong);
   background: rgba(10, 11, 12, 0.72);
@@ -403,7 +447,7 @@
   .home-intro {
     --lede-size: 13px;
     --below-logo: calc(max(var(--safe-t), 12px) + 12px + var(--home-footer-height) + var(--safe-b)
-      + 10px + var(--lede-size) * 1.45 + 12px + 4 * 36px + 3 * 5px + 6px
+      + 10px + var(--lede-size) * 1.45 + 12px + 3 * 36px + max(36px, var(--home-utility-size)) + 3 * 5px + 6px
       + var(--home-note-room));
     --home-note-gap: 6px;
     --home-note-size: 12px;
@@ -413,7 +457,8 @@
     width: min(100%, 69vh, max(96px, (100dvh - var(--below-logo)) * 3));
   }
   .home-lede { margin-top: 10px; }
-  /* The four actions fit a 360 px landscape phone above its home bar. */
+  /* The four rows fit a 360 px landscape phone above its home bar (the
+     first as tall as the Online play square). */
   .home-actions { margin-top: 12px; gap: 5px; }
   .home-action { height: 36px; }
   .home-credit + .home-credit { margin-top: 20px; }
@@ -424,7 +469,8 @@
 @media (max-height: 360px) {
   .home-intro {
     --below-logo: calc(max(var(--safe-t), 12px) + 12px + var(--home-footer-height) + var(--safe-b)
-      + 8px + var(--lede-size) * 1.45 + 8px + 4 * clamp(30px, 10vh, 36px) + 3 * 4px + 6px
+      + 8px + var(--lede-size) * 1.45 + 8px + 3 * clamp(30px, 10vh, 36px) + max(clamp(30px, 10vh, 36px), var(--home-utility-size))
+      + 3 * 4px + 6px
       + var(--home-note-room));
     --home-note-gap: 4px;
     --home-note-size: 11px;
@@ -442,8 +488,10 @@
 @media (prefers-reduced-motion: reduce) {
   .screen--home.is-entering .home-intro > * { animation: none; }
   .home-download::after, .home-download .icon-download-arrow { animation: none; }
-  /* Local play's glow holds still at a faint, steady level. */
+  /* Local play's glow, and Online play's green or red one, hold still at a
+     faint, steady level. */
   .home-action--local.is-ready::after { animation: none; opacity: 0.5; }
+  .home-action--online.is-ready::after, .home-action--online.is-offline::after { animation: none; opacity: 0.5; }
   .home-credits-track { will-change: auto; }
   .home-credits-seq { padding-bottom: 24vh; }
   .home-credits-seq[aria-hidden] { display: none; }

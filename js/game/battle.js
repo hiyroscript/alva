@@ -3,8 +3,10 @@
 // it is Player 1 against the combat AI (js/game/ai/combat-ai.js) at the
 // chosen difficulty; in Watch Mode both fighters are the combat AI, each
 // with its own controller, at the one chosen difficulty; in Local Play both
-// are players, each on their own controller and nothing else (see
-// BATTLE_MODES). Every rule below is the same in all three, the 5-minute
+// are players, each on their own controller and nothing else; in Online
+// Play both are players in two browsers, each side fed by the lockstep
+// (js/online/lockstep.js), which also decides when a step runs (see
+// BATTLE_MODES and Arena.advance). Every rule below is the same in all four, the 5-minute
 // clock and overtime included. The Arena owns the fixed-timestep world and its Canvas 2D
 // rendering; DOM concerns (HUD, pause, the result toast and dialog) live in
 // the battle screen.
@@ -70,7 +72,19 @@ export const BATTLE_MODES = Object.freeze({
     p1: Object.freeze({ cpu: false, label: 'P1', player: 'p1' }),
     p2: Object.freeze({ cpu: false, label: 'P2', player: 'p2' }),
   }),
+  // Online Play (js/online/lockstep.js): two players in two browsers, each
+  // side's PlayerController on the channel the lockstep fills for that
+  // player (the room's host is p1, its guest p2). Labelled by the players'
+  // online names (`labels`).
+  online: Object.freeze({
+    p1: Object.freeze({ cpu: false, label: 'P1', player: 'p1' }),
+    p2: Object.freeze({ cpu: false, label: 'P2', player: 'p2' }),
+  }),
 });
+
+// Each mode whose sides are marked in their players' own colours, and
+// where its colours are (the ground rings, name tags and pointers).
+const PLAYER_COLORS = Object.freeze({ local: CONFIG.localPlay.colors, online: CONFIG.online.colors });
 
 // The match's periods: the normal clock, then (points level) overtime.
 export const PERIODS = Object.freeze({ regulation: 'regulation', overtime: 'overtime' });
@@ -95,10 +109,13 @@ export class Battle extends Arena {
   // human players' Automatic turn-around setting (on unless given false, as
   // the settings' default): it goes to the players' controllers only (both
   // of Local Play's alike), so a CPU (Quick Battle's, or either of Watch
-  // Mode's) never has it.
+  // Mode's) never has it. Online, each player brings their own: it may be
+  // { p1, p2 }, each side's on unless given false. `labels` ({ p1, p2 },
+  // either optional) names the sides in place of their mode's tags (Online
+  // Play's player names).
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
-    automaticTurnAround = true,
+    automaticTurnAround = true, labels = null,
   }) {
     // One seed for the battle's randomness: each CPU's and each stage
     // hazard's its own stream of it.
@@ -111,24 +128,28 @@ export class Battle extends Arena {
     this.seed = battleSeed;
 
     const sides = BATTLE_MODES[this.mode];
-    const controllerFor = (side) => (side.cpu
+    const turnAround = (slot) => (automaticTurnAround && typeof automaticTurnAround === 'object'
+      ? automaticTurnAround[slot] !== false
+      : automaticTurnAround);
+    const controllerFor = (side, slot) => (side.cpu
       ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
-      : new PlayerController(side.player ? input.player?.(side.player) ?? input : input, { automaticTurnAround }));
+      : new PlayerController(side.player ? input.player?.(side.player) ?? input : input, { automaticTurnAround: turnAround(slot) }));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
       def: p1Def, sprites: p1Sprites, spawn: s1, stage: this.stage,
-      slot: 'p1', label: sides.p1.label, controller: controllerFor(sides.p1),
+      slot: 'p1', label: labels?.p1 ?? sides.p1.label, controller: controllerFor(sides.p1, 'p1'),
     });
     this.p2 = new Fighter({
       def: p2Def, sprites: p2Sprites, spawn: s2, stage: this.stage,
-      slot: 'p2', label: sides.p2.label, controller: controllerFor(sides.p2),
+      slot: 'p2', label: labels?.p2 ?? sides.p2.label, controller: controllerFor(sides.p2, 'p2'),
     });
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;
     this.fighters = [this.p1, this.p2];
-    // Local Play marks each player in their own colour: Player 1 red,
-    // Player 2 blue, wherever they stand.
-    if (this.mode === 'local') this.markerColors = CONFIG.localPlay.colors;
+    // Local Play and Online Play mark each player in their own colour:
+    // Player 1 (the host) red, Player 2 (the guest) blue, wherever they
+    // stand.
+    if (Object.hasOwn(PLAYER_COLORS, this.mode)) this.markerColors = PLAYER_COLORS[this.mode];
     // What each side does over the match (js/game/match-stats.js), started
     // over with every match.
     this.stats = new MatchStats(this.fighters);
@@ -320,9 +341,9 @@ export class Battle extends Arena {
   // (`final`; its statistics are sealed once this step's are counted, see
   // sealFinal). The clock stops where it is, every respawn wait is called
   // off, and the celebration starts. A later call changes nothing.
-  finishMatch() {
+  finishMatch(result = this.liveResult) {
     if (this.final) return this.final;
-    const { outcome, reason } = this.liveResult;
+    const { outcome, reason } = result;
     this.final = {
       outcome, reason,
       winner: outcome === 'draw' ? null : outcome,
@@ -338,6 +359,14 @@ export class Battle extends Arena {
     // Ended from outside a step: nothing of this step is left to count.
     if (!this.stepping) this.sealFinal();
     return this.final;
+  }
+
+  // Side `slot` gives the match up (an online player who left it): it ends
+  // at once, as finishMatch does, won by the other side ('forfeit'),
+  // whatever the score. Once the match is over, nothing changes.
+  forfeit(slot) {
+    if (this.final) return this.final;
+    return this.finishMatch({ outcome: slot === 'p1' ? 'p2' : 'p1', reason: 'forfeit' });
   }
 
   // The match statistics as they stood at the end, frozen into the result,

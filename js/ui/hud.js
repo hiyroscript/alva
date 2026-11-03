@@ -31,7 +31,7 @@
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { t, tattr, plural, slotLabel, setAttr } from '../localization/i18n.js';
+import { t, tattr, plural, slotLabel, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { paintPortrait, portraitSourceFacing } from './sprite-art.js';
 import { PLAYER_NAMES } from './local-play.js';
@@ -165,6 +165,14 @@ export class HUD {
   setLocal(on) {
     for (const [panel, slot] of [[this.left, 'p1'], [this.right, 'p2']]) {
       setAttr(panel.wrap, 'aria-label', on ? PLAYER_NAMES[slot] : `team.${slot}`);
+    }
+  }
+
+  // Online Play names each side for its player's online name (text no
+  // translation owns), for screen readers too.
+  setNames(names) {
+    for (const [panel, slot] of [[this.left, 'p1'], [this.right, 'p2']]) {
+      setPlainAttr(panel.wrap, 'aria-label', String(names?.[slot] ?? ''));
     }
   }
 

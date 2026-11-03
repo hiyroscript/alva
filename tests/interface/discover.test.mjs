@@ -233,8 +233,14 @@ function layOutNarrow(discover) {
   layOutFighters(discover, { x: 16, y: 190, cols: 6, size: 68, button: [300, 900, 180, 32] });
 }
 
+// Home's menu as it is laid out: Play, Local play and the Online play
+// square side by side in the first row, the other actions under it.
 function layOutHome(home) {
-  home.el.querySelectorAll('.home-action').forEach((b, i) => place(b, 80, 370 + i * 60, 320, 52));
+  const { play, local, online, watch, practice, discover } = home.actions;
+  place(play, 80, 370, 132, 52);
+  place(local, 220, 370, 132, 52);
+  place(online, 360, 372, 48, 48);
+  [watch, practice, discover].forEach((b, i) => place(b, 80, 430 + i * 60, 328, 52));
 }
 
 const text = (el) => el.textContent.replace(/\s+/g, ' ').trim();

@@ -359,11 +359,11 @@ function trace(battle, steps) {
 test('Home: Watch Mode sits between Play and Practice Ground, styled like the secondary actions; Play stays the default', () => {
   const { app, screens } = boot();
   const home = screens.home;
-  const { play, local, watch, practice, discover } = home.actions;
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, local, watch, practice, discover], 'Play and Local play → Watch Mode → Practice Ground → Discover');
+  const { play, local, online, watch, practice, discover } = home.actions;
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, local, online, watch, practice, discover], 'Play, Local play and Online play → Watch Mode → Practice Ground → Discover');
   const [firstRow, ...rows] = home.el.querySelector('.home-actions').children;
   assert.deepEqual(rows, [watch, practice, discover], 'in the DOM in that order, under the first row');
-  assert.ok(firstRow.contains(play) && firstRow.contains(local), 'Play and Local play share the first row');
+  assert.ok(firstRow.contains(play) && firstRow.contains(local) && firstRow.contains(online), 'Play, Local play and Online play share the first row');
   assert.ok(watch.html.includes('<span>Watch mode</span>'));
   assert.ok(watch.html.includes(ICONS.right), 'the secondary actions\' chevron');
   assert.equal(watch.className, practice.className, 'the same outlined Home action as Practice Ground and Discover');
@@ -374,8 +374,8 @@ test('Home: Watch Mode sits between Play and Practice Ground, styled like the se
   assert.equal(watch.hasAttribute('data-nav-default'), false);
   assert.equal(watch.disabled, false);
   assert.equal(document.activeElement, play, 'Play is still focused by default');
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.helpButton, home.controllerButton, home.settingsButton, home.el.querySelector('.home-why-alva'), home.downloadButton],
-    'keyboard / gamepad reach all four in order, then Help, Controller, Settings, Why Alva? and Download');
+  assert.deepEqual(app.nav.candidates(home.el), [play, online, watch, practice, discover, home.helpButton, home.controllerButton, home.settingsButton, home.el.querySelector('.home-why-alva'), home.downloadButton],
+    'keyboard / gamepad reach the open actions in order, then Help, Controller, Settings, Why Alva? and Download');
   // Practice Ground and Discover still open their screens (their stand-ins).
   assert.ok(practice.html.includes('<span>Practice ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
@@ -397,9 +397,15 @@ test('Watch Mode opens its own setup straight from Home, never Select Mode', () 
 });
 
 test('keyboard and gamepad reach Watch Mode on Home and open it', () => {
-  const layOut = (home) => home.el.querySelectorAll('.home-action').forEach((b, i) => {
-    b.rect = { left: 80, top: 370 + i * 60, width: 320, height: 52 };
-  });
+  // The first row side by side (Play, Local play, the Online play
+  // square), the other actions under it.
+  const layOut = (home) => {
+    const { play, local, online, watch, practice, discover } = home.actions;
+    play.rect = { left: 80, top: 370, width: 132, height: 52 };
+    local.rect = { left: 220, top: 370, width: 132, height: 52 };
+    online.rect = { left: 360, top: 372, width: 48, height: 48 };
+    [watch, practice, discover].forEach((b, i) => { b.rect = { left: 80, top: 430 + i * 60, width: 328, height: 52 }; });
+  };
   // Keyboard: ↓ from Play, then J.
   let { app, screens } = boot();
   layOut(screens.home);
@@ -719,7 +725,7 @@ test('stale Watch values fall back as Quick Battle\'s do: Medium, the first avai
 // ---- The Battle -------------------------------------------------------------------
 
 test('a Watch Mode Battle: the combat AI on both sides at the chosen level, each with its own fighter and label', () => {
-  assert.deepEqual(Object.keys(BATTLE_MODES), ['quick-battle', 'watch', 'local']);
+  assert.deepEqual(Object.keys(BATTLE_MODES), ['quick-battle', 'watch', 'local', 'online']);
   for (const id of DIFFICULTY_IDS) {
     const battle = makeBattle({ difficulty: id, p1Def: DEF_9999, p2Def: DEF_0001 });
     assert.equal(battle.mode, 'watch');

@@ -95,6 +95,50 @@ export const CONFIG = Object.freeze({
     colors: { p1: '#ff4d5e', p2: '#3d9bff' },
   },
 
+  // Online Play (js/online/, js/screens/online-screens.js): rooms players
+  // create and join through the room server (server/, a Cloudflare Worker),
+  // then a peer-to-peer match between the two browsers
+  // (docs/gameplay/online-play.md). Frozen: the game never changes it.
+  online: Object.freeze({
+    // The room server's address, scheme and host with no trailing slash
+    // (for example the workers.dev address `npx wrangler deploy` prints, or
+    // the local `npx wrangler dev` one for a two-tab test). Empty: Online
+    // Play has no server yet, and ends at "Online play is unavailable right
+    // now." The itch.io validator allows this one host and no other
+    // (tools/itch/hosts.mjs).
+    serverUrl: '',
+    // Steps between sampling the local player's input and playing it (3 is
+    // 50 ms): the time a frame has to reach the other browser before it is
+    // needed, so the match never waits on a normal connection.
+    inputDelay: 3,
+    // How the two browsers find a way to each other. STUN only for now; a
+    // TURN server (a relay for strict networks) can be added here later as
+    // { urls, username, credential } without touching the game.
+    iceServers: Object.freeze([Object.freeze({ urls: 'stun:stun.cloudflare.com:3478' })]),
+    // The modes a room can be created for, in order: Quick Battle alone for
+    // now (the server allows the same list: server/src/rules.js).
+    modes: Object.freeze(['quick-battle']),
+    // How long the peer-to-peer connection may take before "Couldn't
+    // connect to your opponent", and how long a match waits for an
+    // opponent who stopped answering before "Connection lost".
+    connectTimeoutMs: 10000,
+    disconnectGraceMs: 10000,
+    // How long a match waits for the other browser's first input while
+    // both load their fighters (slow connections load slowly).
+    loadTimeoutMs: 30000,
+    // The public rooms list refreshes this often while it is on screen.
+    listRefreshMs: 5000,
+    // Every this many steps both browsers compare a hash of the match
+    // (js/online/state-hash.js): a difference ends it as a desync.
+    hashInterval: 60,
+    // How many unacknowledged input frames each packet carries again, so a
+    // lost packet never stalls the match.
+    resendWindow: 30,
+    // The two players' tones online, the same as Local Play's (the host is
+    // red, the guest blue): the HUD cards, markers and name tags.
+    colors: Object.freeze({ p1: '#ff4d5e', p2: '#3d9bff' }),
+  }),
+
   // Select Stage's roster: this many stage slots, laid out for all of them
   // from the start (six by four on a large display). The playable stages
   // (js/data/maps.js MAPS, in order) fill the first slots and every other
@@ -147,6 +191,9 @@ export const CONFIG = Object.freeze({
   debug: {
     // Toggle collider / hurtbox / active-hitbox overlay in battle with this key.
     overlayKey: 'Backquote',
+    // Online Play: on a desync, log both browsers' states to the console
+    // (js/online/lockstep.js).
+    online: false,
   },
 });
 

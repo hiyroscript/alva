@@ -32,6 +32,7 @@
   <link rel="stylesheet" href="./css/practice.css">
   <link rel="stylesheet" href="./css/ability-hud.css">
   <link rel="stylesheet" href="./css/controller.css">
+  <link rel="stylesheet" href="./css/online.css">
   <link rel="stylesheet" href="./css/overlays.css">
   <link rel="stylesheet" href="./css/responsive.css">
   <script type="module" src="./js/main.js"></script>
@@ -53,7 +54,12 @@
     <section data-i18n-aria-label="screen.localFighter1" class="screen screen--menu screen--character screen--local" data-screen="local-character-p1" aria-label="Local play: Player 1, select fighter" hidden></section>
     <section data-i18n-aria-label="screen.localFighter2" class="screen screen--menu screen--character screen--local" data-screen="local-character-p2" aria-label="Local play: Player 2, select fighter" hidden></section>
     <section data-i18n-aria-label="screen.localMap" class="screen screen--menu screen--map screen--local" data-screen="local-map" aria-label="Local play: select stage" hidden></section>
+    <section data-i18n-aria-label="screen.onlineName" class="screen screen--menu screen--online" data-screen="online-name" aria-label="Online play: choose your name" hidden></section>
+    <section data-i18n-aria-label="screen.onlineLobby" class="screen screen--menu screen--online" data-screen="online-lobby" aria-label="Online lobby" hidden></section>
+    <section data-i18n-aria-label="screen.onlineRoom" class="screen screen--menu screen--online" data-screen="online-room" aria-label="Online room" hidden></section>
+    <section data-i18n-aria-label="screen.onlineFighter" class="screen screen--menu screen--character screen--online" data-screen="online-character" aria-label="Online play: select fighter" hidden></section>
     <section data-i18n-aria-label="screen.battle" class="screen screen--battle" data-screen="battle" aria-label="Battle" hidden></section>
+    <section data-i18n-aria-label="screen.onlineBattle" class="screen screen--battle" data-screen="online-battle" aria-label="Online battle" hidden></section>
     <section data-i18n-aria-label="screen.practice" class="screen screen--practice" data-screen="practice" aria-label="Practice ground" hidden></section>
     <section data-i18n-aria-label="screen.discover" class="screen screen--menu screen--discover" data-screen="discover" aria-label="Discover" hidden></section>
   </main>
@@ -70,6 +76,7 @@
   <div id="controller-roster" class="overlay controller-roster-overlay" hidden></div>
   <div id="controller-editor" class="overlay controller-editor-overlay" hidden></div>
   <div id="binding-dialog" class="overlay binding-overlay" hidden></div>
+  <div id="online-room-dialog" class="overlay dialog-overlay online-room-dialog" hidden></div>
 
   <div id="rotate-overlay" class="rotate-overlay" role="alert">
     <div class="rotate-inner">

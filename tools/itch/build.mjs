@@ -24,7 +24,7 @@ import { dirname } from 'node:path';
 import { build } from 'esbuild';
 import {
   ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, COPIED_FILES, COPIED_DIRS, PACKED_DIRS, LIMITS, BUNDLE_OPTIONS,
-  read, pageParts, joinStylesheets, releasePage, isPacked, writePack,
+  read, pageParts, joinStylesheets, releasePage, isPacked, writePack, isDevelopmentOnly,
 } from './release.mjs';
 import { listFiles, validateRelease } from './validate.mjs';
 import { writeZip } from './zip.mjs';
@@ -45,6 +45,12 @@ async function main() {
   const started = Date.now();
   const html = read('index.html');
   const { stylesheets, entry } = pageParts(html);
+
+  // Nothing development-only is ever copied (the room server in server/
+  // included): the release is only what the page loads.
+  for (const f of [...COPIED_FILES, ...COPIED_DIRS]) {
+    if (isDevelopmentOnly(f)) throw new Error(`${f} is development-only and is never copied into the release`);
+  }
 
   rmSync(`${ROOT}${OUT_DIR}`, { recursive: true, force: true });
   rmSync(`${ROOT}${ZIP_PATH}`, { force: true });

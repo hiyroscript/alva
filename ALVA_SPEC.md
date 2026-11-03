@@ -60,6 +60,16 @@ behave, and how it must look.
   paths: the project page may live under `/alva/` (or the current repository
   name) and must work under any sub-path.
 - Must be served over HTTP(S); sprite normalization reads pixel data.
+- **One server, for Online Play only** (6.5c): a small room server
+  (`server/`, a Cloudflare Worker with Durable Objects, plain JavaScript,
+  deployed on its own by the owner within Cloudflare's free plan) that
+  introduces two players and nothing more. The game reaches it at
+  `CONFIG.online.serverUrl` (empty until it is deployed: Online play is then
+  unavailable, never broken), never imports it, and the itch.io release
+  never includes it; that one host (and its WebSocket form) is the only one
+  the release may name besides the credits' links. Every other mode needs
+  no network at all. Matches go peer to peer (WebRTC), never through the
+  server.
 - Viewport: `width=device-width, initial-scale=1, maximum-scale=1,
   user-scalable=no, viewport-fit=cover`: a web game, so rapid taps and
   pinches never zoom the page. Together with `touch-action: none` on the
@@ -200,6 +210,16 @@ behave, and how it must look.
   registration and a roster slot — never editing engine code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
   frame delta, so behaviour is identical at 30, 60 and 120 Hz.
+- The simulation is deterministic: a step is a pure function of the state,
+  both sides' inputs and the battle's seed (no wall-clock time, no
+  unseeded randomness, presentation never feeding back). Online Play
+  (6.5c) runs on it: both browsers run the same `Battle` in delay-based
+  lockstep (`js/online/lockstep.js`: each step only once both players'
+  inputs for it are known, every input played 3 steps after it is
+  sampled, lost packets made up by the next ones) and compare a hash of
+  the match every 60 steps; a difference ends the match as a desync.
+  Rollback netcode is not part of it (it would need a Battle that saves
+  and restores its whole state).
 
 ## 5. Brand identity
 
@@ -339,8 +359,19 @@ Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → 
 Home → Local play (two controllers) → Select local mode → Quick Battle → Player 1's fighter → Player 2's fighter → Select Stage → two-player Battle (6.5b)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
 Home → Discover (Fighters / Movement / Launch reference, opening on Fighters; Back returns Home)
-Home (no playable fighter) → Play, Local play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
+Home (no playable fighter) → Play, Local play, Online play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home (fewer than two supported controllers) → Local play disabled, "Connect two controllers to play locally."
+Home → Online play (the device online) → Online name → Online lobby → Create room (name, Public / Private, Quick Battle) → Room → the guest joins → each picks a fighter → both Ready → the drawn stage → online Battle (6.5c)
+Home → Online play → Online name → Online lobby → Join with code (or a public room's Join) → Room → each picks a fighter → both Ready → the drawn stage → online Battle
+Home (the device offline) → Online play disabled and glowing red, "You're offline. Connect to the internet to play online."
+Online name → Continue (no room server reachable) → "Online play is unavailable right now." → Home
+Online lobby → Create room (the server at its cap) → "Servers are full right now. Please try again in a few minutes." → Online lobby
+Online lobby → Join with code (no such room / a full room) → its message → Online lobby
+Room (the host leaves) → "The host closed the room." → Online lobby
+Online Battle → Options / Menu (no pause: the world runs on) → Leave match (a forfeit) → Room; the opponent: "Your opponent left." → Room
+Online Battle (the opponent stops answering) → "Waiting for opponent…" → after 10 s "Connection lost" → Room
+Online Battle → match over → Match Results → Rematch (both accept: a new random stage) / Leave room → Online lobby
+Anywhere in Online Play (the device goes offline) → "Connection lost" → Home
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed); Settings (gear) and X (resume) at its top right
@@ -408,22 +439,38 @@ no header, build label, eyebrow or keyboard hint bar.
   supporting line "Fan project. Big heart." ("Un projet de fan, fait avec
   cœur." in French). The wordmark's first visible stroke lines up with the
   start of that line.
-- **Actions:** five on four rows, in this order — **Play** (green, white
+- **Actions:** six on four rows, in this order — **Play** (green, white
   text, arrow) opens Select Mode and is focused by default; **Local play**
-  (outlined, chevron) beside it on the same first row, the two in equal
-  columns that together span exactly the full-width actions under them
-  (the gap between them the gap between rows), opens Select local mode
-  (6.5b), and opens only while two supported controllers are active (see
-  6.5b: disabled otherwise, "Connect two controllers to play locally.",
-  and the Download button's green edge and glow once open); **Watch Mode**
+  (outlined, chevron) beside it on the same first row opens Select local
+  mode (6.5b), and opens only while two supported controllers are active
+  (see 6.5b: disabled otherwise, "Connect two controllers to play
+  locally.", and the Download button's green edge and glow once open);
+  **Online play** right after it, the row's third: a square button the
+  size of the Settings button at every screen size (one shared value), its
+  original globe icon (`ICONS.globe`: a circle, an equator, two meridian
+  curves; never the emoji), named "Online play" / "Jeu en ligne" (its
+  accessible name and tooltip), opens the online name (6.5c). Play and
+  Local play share the rest of the row in two equal columns; the three
+  together span exactly the full-width actions under them (the gaps
+  between them the gap between rows), and the row still fits a phone held
+  sideways. Online play opens while the device is online (the browser's
+  `navigator.onLine`, followed live through its `online` / `offline`
+  events) and a fighter is playable, and then wears Local play's green
+  edge and glow; offline it is disabled, described by "You're offline.
+  Connect to the internet to play online." ("Vous êtes hors ligne.
+  Connectez-vous à Internet pour jouer en ligne.") for assistive technology
+  and as its tooltip, with the same edge, glow and cadence in red; with no
+  playable fighter, disabled like every match action. Both glows hold
+  still with reduced motion and pause while a dialog covers Home;
+  **Watch Mode**
   (outlined, chevron) beneath it opens Watch Mode's Select Difficulty (6.5a)
   directly, never Select Mode; **Practice Ground** (outlined, chevron)
   beneath that opens Practice Ground (6.8) straight away, with no mode,
   fighter or stage select; and **Discover** (outlined, chevron, like
-  Practice Ground) last opens the Discover reference (6.9). All four are in
+  Practice Ground) last opens the Discover reference (6.9). All six are in
   keyboard / gamepad menu navigation, in that order, which the DOM order
   matches whatever the layout. Home buttons have a small 3 px radius.
-- **No playable fighter:** Play, Local play, Watch Mode and Practice Ground each start a
+- **No playable fighter:** Play, Local play, Online play, Watch Mode and Practice Ground each start a
   match, so they are open only while some fighter is playable (7.2; #0001
   is, today). With none, they are disabled (quieter outline, muted label, no hover
   or press response), out of Tab and menu navigation, and a press goes
@@ -608,7 +655,9 @@ no header, build label, eyebrow or keyboard hint bar.
   choosing: Select Mode stays, focus back on the Quick Battle card. Coming
   Back to Select Mode and selecting Quick Battle again asks again, so the
   player can switch play type.
-- No fake modes or online matchmaking.
+- No fake modes. Online Play (6.5c) is rooms that players create and join
+  by name or code: no matchmaking, no accounts, no chat, and Quick Battle
+  its one mode for now.
 
 ### 6.3a Select Difficulty
 
@@ -901,6 +950,91 @@ Battle. A real two-player battle: no CPU anywhere.
   fighters returns to Player 1's fighter, then Player 2's and the stage;
   Change stage to Local Play's Select Stage; Return to home ends Local
   Play.
+
+### 6.5c Online Play
+
+Two people in two browsers (`js/screens/online-screens.js`,
+`js/screens/online-battle-screen.js`, `js/online/`): Home → Online play →
+Online name → Online lobby → a room → Battle. Rooms that players create and
+join, through a small room server (`server/`, a Cloudflare Worker); no
+accounts, no matchmaking, no chat. The match itself goes straight between
+the two browsers.
+
+- **Home's Online play** (6.2): the first row's third, a square globe the
+  size of Settings, green while it can open, disabled and red while the
+  device is offline, live. Going offline anywhere in Online Play ends it:
+  "Connection lost" ("You're offline, so the connection was lost."), Home.
+- **Online name** (`online-name`). First, every time: "Choose a name other
+  players will see." 2 to 16 characters after trimming: letters of any
+  language, digits, spaces and `_` `-` `.` `'`; no control characters,
+  emoji or markup; repeated spaces collapsed. The server checks again and
+  never trusts the game. The last name is remembered (Settings, schema 9)
+  and offered again, Continue focused so a controller confirms it without
+  typing; Suggest a name fills one in ("Player 1234"). Keyboard, touch (the
+  system's on-screen keyboard) and controllers all complete it; while a
+  field has focus its typing keys are its own (7.4). With no room server
+  reachable (none set up yet, down, or blocked), Continue says "Online play
+  is unavailable right now." and goes Home.
+- **Online lobby** (`online-lobby`). The menu screens' look (the shared
+  header, panels and buttons). **Create room** opens a dialog: the room's
+  name ("{name}'s room" / "Salle de {name}" to start with, the same rules
+  as names, up to 24 characters), **Public** (listed in the lobby) or
+  **Private** (joinable only with its code), and the mode, Quick Battle
+  alone for now, shown as a choice of one (`CONFIG.online.modes`). **Join
+  with code**: 5 characters from an alphabet without 0 / O / 1 / I / L,
+  shown in capitals, typed in any case. **Public rooms**: each room's name,
+  host, mode and players (1/2) with Join; full rooms, rooms in a match and
+  rooms of another game version show without Join; "No public rooms right
+  now. Create one!" when there are none; read again every 5 s while the
+  lobby shows. Refusals are dialogs and the lobby stays: "Servers are full
+  right now. Please try again in a few minutes." when the server is at its
+  cap, a different message, "Online play is unavailable right now.", when
+  it cannot be reached, and a code nobody has, a full room, too many tries
+  or another version each their own. Back goes Home.
+- **Room** (`online-room`). Its name and code, with **Copy code** (itch.io
+  runs the game in a frame, so links cannot be shared: the code is the
+  invitation; where the clipboard is blocked the code is selected for the
+  player to copy). Its visibility and mode. Two seats (Quick Battle is one
+  against one): each player's name, the host marked, "You" on the
+  player's own, their fighter (**Choose fighter**: the shared roster, its
+  comfort and loadout rules as everywhere) and whether they are ready. The
+  stage is drawn at random when the match starts. While both players are
+  there their browsers connect to each other; **Ready** opens once they
+  are connected and a fighter is chosen. When both are ready the host's
+  browser starts the match with a seed it draws, from which both browsers
+  draw the same stage; the drawn stage shows a moment ("Stage: …"), then
+  the Battle. A connection that cannot be made in 10 s says "Couldn't
+  connect to your opponent. One of your networks may be blocking it." and
+  offers Try again. Leaving asks first; the host leaving closes the room
+  for both: "The host closed the room."
+- **The battle** (`online-battle`, `mode: 'online'`). The normal Quick
+  Battle match: the same clock, overtime, points, Void, HUD, announcement,
+  toast and Match Results. Each player plays with their usual devices
+  (keyboard, touch controls or any controller) with their own Automatic
+  turn-around. The host is Player 1's side (left, red), the guest Player
+  2's (right, blue); each player is shown on their own side, by their
+  online name (the HUD cards, the name tags), in Local Play's two colours.
+  The drawn stage shows over the intro.
+- **No pause online.** Options / Menu, Esc, P and the HUD's pause open a
+  menu with only **Leave match** (and its X), and the world does not stop:
+  the player's own fighter plays nothing while it is open. Leaving is a
+  forfeit; the other player sees "Your opponent left. The match counts as a
+  win for you." Both go back to the room.
+- **A lost opponent.** One who stops answering: "Waiting for opponent…" for
+  up to 10 s, then the match ends ("Connection lost") and both go back to
+  the room (the lobby if the room is gone). If the two games ever stop
+  matching: "Connection problem (desync)", the same way.
+- **The end** is announced from each player's own side (VICTORY!, DEFEAT.,
+  GAME.); the toast says "You win!" or "{name} wins!"; the Match Results
+  name both players and offer **Rematch** (both must accept; a new random
+  stage) and **Leave room**.
+- **The room server** caps itself to stay within Cloudflare's free plan:
+  at most 50 rooms open at once and a daily request budget (refusing new
+  rooms as "full" past 80% of the plan's day, while open rooms play on),
+  per-address limits, rooms cleaned up after 10 minutes without activity.
+  It allows only itch.io's game hosts (and a local copy for testing). No
+  login, cookie or stored identity; names last as long as their room
+  (docs/development/online-server.md).
 
 ### 6.6 Credits
 
@@ -4671,6 +4805,20 @@ Adding one is described in
 
 ### 7.4 Input
 
+- **Text fields** (Online Play's name, room name and code, 6.5c): while
+  one has focus the keys that type are its own (letters, W A S D, J and K
+  included, digits, Space, Backspace, ← →): none is a menu command. ↑ ↓
+  still move between the controls, Esc still goes back, Enter submits the
+  field. A controller navigates as ever, and confirms a remembered name
+  without typing.
+- **Online Play's input** (6.5c): the local player's snapshot, from
+  whichever device they play with, exactly as offline, is sampled once a
+  step and played 3 steps later on both browsers (an input frame of 26
+  bits: every held control, its press edge, the Dash requests and where a
+  controller's presses were made for). Both fighters on both browsers read
+  the same frames; a menu over play makes the local player's frames
+  neutral; a flush (a respawn, the fight starting) drops the presses of
+  the frames already sampled, on both browsers at the same step.
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, as a hit lands, steering the launch downward, held on the ground with a Jump press, the Super Jump, and tapped on a one-way platform, a drop through it), W/Space/↑ jump (`jump`; pressed, the normal jump, the same however long it is held; with Down held on the ground, the Super Jump; again in the air, an air jump, twice: the triple jump), J the
   extra attack (`extra_attack`, e.g. #0001's High Kick), L Shield (`shield`; held on the ground, it holds the fighter still, a direction held with it only turning it, and Jump jumps out of it; a fresh press in the air is the Deflect), U

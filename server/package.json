@@ -1,0 +1,14 @@
+{
+  "name": "alva-rooms",
+  "private": true,
+  "description": "Alva's room server for Online Play: a Cloudflare Worker with Durable Objects. See docs/development/online-server.md.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.2"
+  }
+}

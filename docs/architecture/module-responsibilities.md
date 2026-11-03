@@ -9,6 +9,7 @@ a module's exports reaches exactly those. The folders' roles:
 | `js/core/` | Application shell: the app controller, screens, input devices, settings, assets, device and utilities. | config, data, localization, game, screens, ui (only `app.js` wires everything together) |
 | `js/data/` | Registries and pure data: fighters, Discover's fighter profiles, universal movement, loadout rules, Launch, difficulty, maps, ability names. No DOM, no simulation state. | config, other data (and `loadout.js` reads the technique clip-field names from `game/combat/technique.js`) |
 | `js/game/` | The simulation (fighters, combat, AI, physics, modes) and its canvas rendering. No DOM except the canvas it is given. | config, core/utils, data, stages, localization (the arena's canvas label only) |
+| `js/online/` | Online Play's own: names and codes, the room server's client, the peer link, the lockstep and its input frames, the match hash, the session. No DOM. | config, core/utils, data, game (the input snapshot's fields), transport, screens (`quick-battle-setup.js`'s `randomStage`) |
 | `js/stages/` | Stage themes: procedural Canvas art, perspective, the Void's look. | core |
 | `js/localization/` | The interface languages. | config, core/settings, data (for registry-owned English copy) |
 | `js/screens/` | One module per screen: navigation and the screen's lifecycle. | everything below them |
@@ -27,15 +28,16 @@ There are no import cycles (checked over every module).
 
 | Module | Owns | Used by |
 | --- | --- | --- |
-| `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's, Watch Mode's and Local Play's), the Local Play session (`startLocalPlay`, `endLocalPlay`), preloading and loading fighters, the language and settings wiring. | `main.js` |
+| `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's, Watch Mode's, Local Play's and Online Play's), the Local Play session (`startLocalPlay`, `endLocalPlay`), the connectivity and the online session (`connectivity`, `online`, `wentOffline`), preloading and loading fighters, the language and settings wiring. | `main.js` |
+| `connectivity.js` | `Connectivity`: whether the device is online (`navigator.onLine`, the `online` / `offline` events), with `onChange`. | `app.js` (read by `screens/home-screen.js`) |
 | `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`), Back and `backTo` (back to a screen in the stack, e.g. Change fighters). | `app.js`, every screen |
-| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns), and the dialog stack (each dialog above the one that opened it, the layers beneath inert, focus restored). | `app.js`, `screens/discover-screen.js`, every dialog |
+| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and the controller (its commands, and the controller cursor it owns), the keys a focused text field keeps (`isTextEntry`), and the dialog stack (each dialog above the one that opened it, the layers beneath inert, focus restored). | `app.js`, `screens/discover-screen.js`, every dialog |
 | `input-modality.js` | The input modality on `<html>` (mouse, touch, keyboard, gamepad), so hover and the focus ring only show for their own input. | `menu-navigator.js` |
 | `input-manager.js` | `InputManager`: keyboard, touch and Player 1's controller merged into one snapshot per step with press edges, resolved for the fighter being played; one `ControllerChannel` per player (Local Play's fighters each sample their own, controller only); the controllers' menu commands (with the player who sent each) and cursor stick, from the menu's owner; binding capture. | `app.js` |
 | `gamepad-devices.js` | Controller identification (PlayStation / Xbox, conservatively), the normalized button names and each family's names for them. | `controller-manager.js`, `data/controller-profiles.js`, `ui/controller-glyphs.js` |
 | `controller-manager.js` | `ControllerManager`: connected controllers, the four-controller limit, the status, Player 1's and Player 2's controllers, the Local Play session (each player's own controller, lost and recovered), refresh, and each player's buttons and sticks each frame. | `app.js`, `input-manager.js`, `ui/controller-dialog.js`, `screens/home-screen.js`, `ui/controller-editor.js` |
 | `controller-resolver.js` | `ControllerResolver`, `compileProfile`: a controller's presses resolved into control codenames for a fighter and where it is (one owner per press, modifier first, directions read on their own stick, forward and back by facing, each stick's pushes as presses of their own with a deadzone and a release, activations); the stick thresholds. | `input-manager.js`, `ui/controller-editor.js` |
-| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Automatic turn-around, each fighter's controller layout. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js`, `ui/controller-editor.js` |
+| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Automatic turn-around, each fighter's controller layout, the last online name. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js`, `ui/controller-editor.js` |
 | `touch-layout.js` | Touch control ids, layout geometry and sanitizing. | `settings.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
 | `asset-loader.js` | Image loading and decoding; `assetSource`, what the browser reads for an asset's path (the path itself, or in a release that packs files the `data:` URL of its exact packed bytes). | `app.js`, `ui/ability-hud.js`, `ui/controller-editor.js`, `ui/touch-controls.js` |
 | `device.js` | Touch-first detection, orientation, reduced motion. | `app.js` |
@@ -71,8 +73,8 @@ There are no import cycles (checked over every module).
 
 | Module | Owns | Used by |
 | --- | --- | --- |
-| `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), the camera and all canvas drawing. | `battle.js`, `practice.js` |
-| `battle.js` | `Battle` (Quick Battle, Watch Mode and Local Play): phases (intro, fight, celebration), timer, score, the match's end exactly once (`finishMatch`, the frozen `final` result), each side's controller (the player's Automatic turn-around setting to the player's alone) and each CPU's celebration after the match. | `screens/battle-screen.js` |
+| `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), how a frame's time becomes steps (`advance`, or its `stepper`: an online match's lockstep), the camera and all canvas drawing. | `battle.js`, `practice.js` |
+| `battle.js` | `Battle` (Quick Battle, Watch Mode, Local Play and Online Play): phases (intro, fight, celebration), timer, score, the match's end exactly once (`finishMatch`, the frozen `final` result; `forfeit`), each side's controller (each player's Automatic turn-around setting to that player's alone), the sides' names (`labels`) and each CPU's celebration after the match. | `screens/battle-screen.js`, `screens/online-battle-screen.js` |
 | `match-stats.js` | `MatchStats`: each side's match statistics from the combat events and each CombatState's running totals, kept across lives, frozen with the result. | `battle.js` |
 | `practice.js` | `PracticeSession`: Player 1 (with the player's Automatic turn-around setting, every fighter swapped in included) and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
 | `physics.js` | Bodies, integration, stage collision (`StageCollision`, with its runtime platforms, static and dynamic (`active`, `prevX` / `prevY`, `interpolate`), and the queries `surfaceBelow`, `supportsAt`, `solidAcross`, `floorSection` and `inVoid`; the ground's kind, finite or continuous, and a finite one's sections (`resolveGround`, `GROUND_TYPES`, `floors`, `breakableFloors`: a solid switched off, `active` false, is gone from every query); the visible `dangerZones`; `stepBody` (of two surfaces at one height, the one under a body's centre), `carryBody` (riding a moving platform), `releaseGround` (letting go of a vanished platform or a broken section, or standing on the neighbour still under it), `separate`, `dropThrough`). | `arena.js`, `platform-hazards.js`, `fighters/fighter.js`, `rendering/hit-fx.js`, `ui/stage-preview.js` |
@@ -119,6 +121,20 @@ There are no import cycles (checked over every module).
 | `rendering/shield-fx.js` | The Shield's look. | `arena.js` (only) |
 | `rendering/fighter-status.js` | The Energy bar, cooldown rings, the Special ability mark (`specialMarkRect`, `drawSpecialMark`), the charm's heart (`charmMarkRect`, `drawCharmMark`) and the fear's drop of cold sweat (`fearMarkRect`, `drawFearMark`). | `arena.js` |
 
+## `js/online/`
+
+| Module | Owns | Used by |
+| --- | --- | --- |
+| `rules.js` | What a player types: names, room names, room codes (`checkName`, `checkRoomName`, `fitName`, `normalizeCode`, `isValidCode`), the session id. | `core/settings.js`, `online-session.js`, `screens/online-screens.js` |
+| `server-client.js` | `RoomServerClient` (the room server's HTTP calls), `RoomLink` (a room's WebSocket), `OnlineError`. | `online-session.js` |
+| `online-session.js` | `OnlineSession` (`App.online`): name, session id, the room and both seats, the peer link, the host's start, rematches. | `core/app.js` |
+| `peer.js` | `PeerLink`: the WebRTC DataChannel, signalled through the room. | `online-session.js` |
+| `transport.js` | The transport interface, `MessageTransport`, `memoryTransportPair`, `listeners`. | `peer.js`, `lockstep.js`, `online-session.js`, `server-client.js` |
+| `lockstep.js` | `LockstepSession`, `LockstepChannel`, `OnlineInput`: delay-based lockstep, resends, waits, the desync check. | `screens/online-battle-screen.js` |
+| `input-frame.js` | One step's input as a frame (`encodeFrame`, `decodeFrame`, `FRAME_FIELDS`, `HELD_MASK`). | `lockstep.js` |
+| `state-hash.js` | `battleState`, `hashState`, `battleHash`. | `lockstep.js` |
+| `match-setup.js` | `stageForSeed`, `readStart`: the match a start message describes. | `screens/online-screens.js`, `screens/online-battle-screen.js` |
+
 ## `js/localization/`
 
 | Module | Owns | Used by |
@@ -133,8 +149,10 @@ Each screen (`splash`, `home`, `mode-select`, `difficulty-select`,
 `character-select`, `quick-cpu-screen` (Custom Play's Select CPU, built
 from Select Fighter), `map-select`, `watch-screens` (Watch Mode's setup,
 built from the setup screens), `local-play-screens` (Local Play's Select
-local mode and setup, built from the same screens), `battle`, `practice`,
-`discover`) is
+local mode and setup, built from the same screens), `online-screens`
+(Online Play's name, lobby with its Create room dialog, room and fighter),
+`battle`, `online-battle-screen` (the Battle screen with Online Play's
+rules), `practice`, `discover`) is
 registered by `core/app.js` and owns its own section of `index.html`.
 `quick-battle-setup.js` is no screen: it is Quick Battle's setup logic
 (Regular Play's random draw and `randomStage`, which Select Stage's Random

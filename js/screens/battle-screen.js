@@ -101,6 +101,8 @@ const REASON_TEXT = {
   time: 'results.reason.time',
   overtimePoints: 'results.reason.overtimePoints',
   overtimeLaunchPoint: 'results.reason.overtimeLaunchPoint',
+  // Online Play: a player left the match (Battle.forfeit).
+  forfeit: 'results.reason.forfeit',
 };
 const DRAW_REASON_TEXT = { time: 'results.reason.drawTime', overtimeLaunchPoint: 'results.reason.drawOvertime' };
 
@@ -147,9 +149,13 @@ export function formatDuration(seconds) {
 }
 
 export class BattleScreen extends Screen {
-  constructor(app) {
-    super(app, 'battle');
+  // `id` is the screen's (another battle screen built on this one, Online
+  // Play's, has its own); its element ids are prefixed with it, so two
+  // battle screens on one page never share one. This one's are unprefixed.
+  constructor(app, id = 'battle') {
+    super(app, id);
     this.navigable = false;
+    this.idPrefix = id === 'battle' ? '' : `${id}-`;
 
     this.canvas = el('canvas', { class: 'battle-canvas', ...tattr('aria-label', 'battle.canvas'), role: 'img' });
     this.hudRoot = el('div', { class: 'hud' });
@@ -200,6 +206,23 @@ export class BattleScreen extends Screen {
     };
   }
 
+  // This screen's element id for `name` (see the constructor).
+  domId(name) {
+    return `${this.idPrefix ?? ''}${name}`;
+  }
+
+  // The fighter the touch controls show and follow: Player 1's, where this
+  // device plays (Online Play: whichever side this player is).
+  get playerFighter() {
+    return this.battle?.primary ?? null;
+  }
+
+  // Whether a phone held upright holds the world still (it does offline: the
+  // rotate prompt covers a paused match).
+  get holdsForPortrait() {
+    return this.app.device.blockedPortrait;
+  }
+
   // ---- DOM builders ---------------------------------------------------------
 
   buildPause() {
@@ -221,7 +244,7 @@ export class BattleScreen extends Screen {
       el('header', { class: 'pause-header' }, [
         el('div', { class: 'pause-heading' }, [
           this.pauseKicker,
-          el('h2', { class: 'pause-title', id: 'pause-title', ...tx('pause.title') }),
+          el('h2', { class: 'pause-title', id: this.domId('pause-title'), ...tx('pause.title') }),
         ]),
         this.pauseControls.root,
       ]),
@@ -230,7 +253,7 @@ export class BattleScreen extends Screen {
 
     this.buildConnection();
     this.pauseOverlay = el('div', {
-      class: 'overlay pause-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title',
+      class: 'overlay pause-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': this.domId('pause-title'),
     }, [el('div', { class: 'pause-panel glass glass--panel' }, [this.pauseMenuView, this.connectionView])]);
 
     // While a lost controller shows, Back and Start resume only once it is
@@ -247,8 +270,8 @@ export class BattleScreen extends Screen {
   // could explicitly take its place, then Resume (only once both players
   // have one), Reconnect and Return to home.
   buildConnection() {
-    this.connectionTitle = el('h2', { class: 'pause-title', id: 'connection-title' });
-    this.connectionMessage = el('p', { class: 'connection-message', id: 'connection-message', role: 'alert' });
+    this.connectionTitle = el('h2', { class: 'pause-title', id: this.domId('connection-title') });
+    this.connectionMessage = el('p', { class: 'connection-message', id: this.domId('connection-message'), role: 'alert' });
     this.connectionHint = el('p', { class: 'connection-hint', ...tx('local.reconnectHint') });
     this.connectionSpares = el('div', { class: 'connection-spares' });
     this.connectionResume = menuButton('pause.resume', { primary: true });
@@ -260,7 +283,7 @@ export class BattleScreen extends Screen {
       this.syncControllers();
     });
     home.addEventListener('click', () => this.confirmHome());
-    this.connectionView = el('div', { class: 'pause-view connection-view', hidden: true, 'aria-describedby': 'connection-message' }, [
+    this.connectionView = el('div', { class: 'pause-view connection-view', hidden: true, 'aria-describedby': this.domId('connection-message') }, [
       el('header', { class: 'pause-header' }, [
         el('div', { class: 'pause-heading' }, [el('span', { class: 'kicker', ...tx('setup.localQuickBattle') }), this.connectionTitle]),
       ]),
@@ -275,7 +298,7 @@ export class BattleScreen extends Screen {
   // on the right. A status message, never a dialog: only its own panel
   // takes a press, and it never takes focus by itself.
   buildToast() {
-    this.toastText = el('p', { class: 'match-toast-text', id: 'match-toast-text' });
+    this.toastText = el('p', { class: 'match-toast-text', id: this.domId('match-toast-text') });
     this.toastButton = el('button', {
       class: 'btn btn--primary match-toast-action', type: 'button', 'aria-haspopup': 'dialog', ...tx('toast.view'),
     });
@@ -292,7 +315,7 @@ export class BattleScreen extends Screen {
   // Change stage and Return to home screen.
   buildResults() {
     this.resultsControls = dialogControls({ onClose: () => this.closeResults(), closeLabel: 'results.close' });
-    this.resultsLine = el('p', { class: 'results-line', id: 'results-line' });
+    this.resultsLine = el('p', { class: 'results-line', id: this.domId('results-line') });
     this.resultsMeta = el('ul', { class: 'results-meta' });
     this.resultsTeams = Object.fromEntries(SLOTS.map((slot) => [slot, teamCard(slot)]));
 
@@ -322,10 +345,10 @@ export class BattleScreen extends Screen {
 
     this.resultsOverlay = el('div', {
       class: 'overlay results-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true',
-      'aria-labelledby': 'results-title', 'aria-describedby': 'results-line',
+      'aria-labelledby': this.domId('results-title'), 'aria-describedby': this.domId('results-line'),
     }, [el('div', { class: 'results-panel glass glass--panel' }, [
       el('header', { class: 'results-header' }, [
-        el('h2', { class: 'results-title', id: 'results-title', ...tx('results.title') }),
+        el('h2', { class: 'results-title', id: this.domId('results-title'), ...tx('results.title') }),
         this.resultsControls.root,
       ]),
       el('div', { class: 'results-body' }, [
@@ -579,10 +602,11 @@ export class BattleScreen extends Screen {
       this.touch.applyLayout();
       if (battle.resize() && !this.isRunning) battle.render();
     }
-    if (!this.isRunning || this.app.device.blockedPortrait) return;
+    if (!this.isRunning || this.holdsForPortrait) return;
     battle.frame(dt);
-    this.touch.setAirborne(!!battle.primary && !battle.primary.grounded);
-    this.touch.showStatus(battle.primary);
+    const own = this.playerFighter;
+    this.touch.setAirborne(!!own && !own.grounded);
+    this.touch.showStatus(own);
     this.hud.update(battle);
     // The move HUDs follow their fighters frame by frame: place, cooldowns,
     // restrictions.
@@ -701,7 +725,7 @@ export class BattleScreen extends Screen {
     const connection = this.connectionShown;
     this.pauseMenuView.hidden = connection;
     this.connectionView.hidden = !connection;
-    this.pauseOverlay.setAttribute('aria-labelledby', connection ? 'connection-title' : 'pause-title');
+    this.pauseOverlay.setAttribute('aria-labelledby', this.domId(connection ? 'connection-title' : 'pause-title'));
     if (!connection) {
       this.pauseMenuView.querySelector('[data-nav-default]').focus({ preventScroll: true });
       return;
@@ -786,7 +810,7 @@ export class BattleScreen extends Screen {
     this.connectionShown = false;
     this.connectionView.hidden = true;
     this.pauseMenuView.hidden = false;
-    this.pauseOverlay.setAttribute('aria-labelledby', 'pause-title');
+    this.pauseOverlay.setAttribute('aria-labelledby', this.domId('pause-title'));
   }
 
   // The app's one Settings dialog over the paused battle, which stays
@@ -799,8 +823,8 @@ export class BattleScreen extends Screen {
   restart() {
     if (!this.battle) return;
     this.battle.restart();
-    this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
-    this.touch.showStatus(this.battle.primary);
+    this.touch.setAirborne(!!this.playerFighter && !this.playerFighter.grounded);
+    this.touch.showStatus(this.playerFighter);
     this.hud.update(this.battle);
     this.setBanner(null);
     this.hideFinal();
@@ -961,8 +985,8 @@ export class BattleScreen extends Screen {
     if (!this.battle) return;
     this.hideFinal();
     this.battle.restart();
-    this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
-    this.touch.showStatus(this.battle.primary);
+    this.touch.setAirborne(!!this.playerFighter && !this.playerFighter.grounded);
+    this.touch.showStatus(this.playerFighter);
     this.hud.update(this.battle);
     this.setBanner(null);
     this.syncAbilityHud();
