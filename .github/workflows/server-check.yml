@@ -14,7 +14,7 @@ jobs:
         run: |
           SUB=christopherjustemsh117.workers.dev
           for NAME in "alva-rooms.$SUB" "$SUB" "anything.$SUB" workers.dev; do
-            for DNS in 1.1.1.1 8.8.8.8; do
+            for DNS in clyde.ns.cloudflare.com 1.1.1.1; do
               echo "== $NAME via $DNS =="
               dig "$NAME" A @"$DNS" +noall +comments +answer +authority | grep -E 'status:|IN' || true
             done
