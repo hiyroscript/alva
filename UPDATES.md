@@ -4720,7 +4720,7 @@ reach it answers `server_error` with `ok: false`, which the game reads as
 Cloudflare's local runtime (the Worker and the gateway connected, two
 browser pages playing a match through it). The owner sets it up once from
 GitHub ([the steps](./docs/development/online-server.md#if-the-workersdev-address-never-works-the-pagesdev-address));
-`serverUrl` then names its address.
+`serverUrl` then names its address: `https://alva-online.pages.dev`.
 
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
