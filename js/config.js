@@ -102,12 +102,14 @@ export const CONFIG = Object.freeze({
   online: Object.freeze({
     // The room server's address, scheme and host with no trailing slash:
     // the owner's deployed Worker (server/, deployed by Cloudflare from this
-    // repository: docs/development/online-server.md). For a test against a
+    // repository: docs/development/online-server.md), reached through its
+    // pages.dev gateway (server/gateway/), as the account's workers.dev
+    // address never came to exist in DNS. For a test against a
     // local `npx wrangler dev`, its address goes here for that test only.
     // Empty, or a server that does not answer, and Online Play ends at
     // "Online play is unavailable right now." The itch.io validator allows
     // this one host and no other (tools/itch/hosts.mjs).
-    serverUrl: 'https://alva-rooms.christopherjustemsh117.workers.dev',
+    serverUrl: 'https://alva-online.pages.dev',
     // Steps between sampling the local player's input and playing it (3 is
     // 50 ms): the time a frame has to reach the other browser before it is
     // needed, so the match never waits on a normal connection.
