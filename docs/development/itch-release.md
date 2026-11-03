@@ -151,8 +151,9 @@ build and on its own:
   sprite sources (opened by the player, never loaded) and, for Online Play,
   the room server: the single host in `CONFIG.online.serverUrl` and its
   WebSocket form (wss for https). No script, style or image from
-  elsewhere, and no other path to another host; with `serverUrl` empty, as
-  until the server is deployed, nothing more is allowed.
+  elsewhere, and no other path to another host (not even the server's
+  own host over plain http or ws); with `serverUrl` empty, nothing more is
+  allowed.
 - The archive: every entry intact (CRC-32), exactly the folder's files and
   bytes, `index.html` at its root, no unsafe paths.
 

@@ -342,7 +342,7 @@ export function otherSide(player, start, { script = () => null } = {}) {
 }
 
 // The app: Home, the online screens and the online battle, over `server`
-// (or none: `serverUrl` empty), its connectivity `online` (a fake that the
+// (`serverUrl` empty: none configured), its connectivity `online` (a fake that the
 // test switches: connectivity.set(false)), the peer `hub`.
 export function boot({ server = backend(), hub = peerHub(), serverUrl = SERVER_URL, settings = new Settings(null), isOnline = true } = {}) {
   // An earlier boot's input stops listening.

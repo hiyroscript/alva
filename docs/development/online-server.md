@@ -44,8 +44,11 @@ the top of [`server/src/room.js`](../../server/src/room.js).
 `ALLOWED_ORIGINS` in `wrangler.toml`: itch.io's HTML5 game hosts
 (`https://html-classic.itch.zone`, `https://html.itch.zone`, and any other
 `https://*.itch.zone`, the domain itch.io serves games from) and
-`http://localhost:*` / `http://127.0.0.1:*` for testing. Change the list
-there and deploy again; no code changes. The Origin of a WebSocket upgrade
+`http://localhost:*` / `http://127.0.0.1:*` for testing. The game's own
+site on GitHub Pages is not on it, so Online Play is for the itch.io page
+(adding `https://hiyroscript.github.io` to the list would open it there
+too). Change the list there and deploy again (merging into `main` does);
+no code changes. The Origin of a WebSocket upgrade
 is held to the same list.
 
 **No accounts, no personal data.** No login, cookie or stored identity: the
@@ -98,7 +101,15 @@ node --test                        # every test of the repository, the server's 
 cd server && npm test              # the server's alone (no install needed)
 ```
 
-Two tabs against a local server:
+**Two tabs against the deployed server.** It allows `http://localhost:*`,
+so the game served from your computer (`python3 -m http.server 8000` from
+the repository's root, then `http://localhost:8000` in two tabs or two
+browsers) plays online through it with nothing to change. In one tab,
+Online play → a name → Create room; in the other, Online play → another
+name → Join with code (or the public list).
+
+**Two tabs against a local server** (to try a change to the server's code
+before it is merged):
 
 ```sh
 cd server
@@ -107,17 +118,18 @@ npx wrangler dev                   # the server on http://localhost:8787, its Du
 ```
 
 Then, for the game, set `serverUrl: 'http://localhost:8787'` in
-`CONFIG.online` (`js/config.js`; never commit it), serve the repository
-(`python3 -m http.server 8000` from its root) and open
-`http://localhost:8000` in two tabs (or two browsers). In one, Online play →
-a name → Create room; in the other, Online play → another name → Join with
-code (or the public list). Open `http://localhost:8787/health` to see the
-server is up.
+`CONFIG.online` (`js/config.js`; never commit it: the committed address is
+the deployed server's), serve the repository and open it in two tabs as
+above. Open `http://localhost:8787/health` to see the server is up.
 
 ## Putting it online, step by step
 
-This is the owner's part, done once, and it needs **no computer of a
-particular kind and no terminal**: everything happens in a web browser, on
+Done once, on 2026-11-03: the server is deployed, and its address is
+`CONFIG.online.serverUrl`. The steps stay here for a new deployment (another
+Cloudflare account, or starting over).
+
+This is the owner's part, and it needs **no computer of a particular kind
+and no terminal**: everything happens in a web browser, on
 a phone, a tablet, a Chromebook or any computer. Cloudflare builds and
 deploys the server itself, from this repository on GitHub (its "Workers
 Builds": it runs `npx wrangler deploy` in the `server` folder on its own

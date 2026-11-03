@@ -16,8 +16,7 @@ const ROOT = new URL('../../', import.meta.url);
 const credits = new Set(readFileSync(new URL('js/ui/credits.js', ROOT), 'utf8').match(EXTERNAL_URL) ?? []);
 const SERVER = 'https://alva-rooms.someone.workers.dev';
 
-test('with no server configured (as now), only the credits\' links pass: every other host fails', () => {
-  assert.equal(CONFIG.online.serverUrl, '', 'Online Play has no server yet');
+test('with no server configured, only the credits\' links pass: every other host fails', () => {
   assert.ok(credits.size > 0);
   const link = [...credits][0];
   assert.deepEqual(hostProblems(`a credit: "${link}"`, 'game.js', { approved: credits }), []);
@@ -42,6 +41,18 @@ test('with a server configured, its one host and its WebSocket form pass, and no
   }
   // A malformed or non-web server address allows nothing.
   for (const bad of ['not a url', 'ftp://files.example', 'javascript:alert(1)', '  ']) assert.deepEqual(serverOrigins(bad), [], bad);
+});
+
+test('the configured server: its host and its wss form pass; another host, the same host over http or ws, or a look-alike never do', () => {
+  const configured = CONFIG.online.serverUrl;
+  const { host } = new URL(configured);
+  const options = { approved: credits, serverUrl: configured };
+  for (const fine of [configured, `${configured}/rooms`, `wss://${host}/rooms/abc/ws?token=1`]) {
+    assert.deepEqual(hostProblems(`"${fine}"`, 'game.js', options), [], fine);
+  }
+  for (const other of [`http://${host}/rooms`, `ws://${host}/rooms`, `https://${host}.evil.example/`, 'https://evil.workers.dev/rooms', 'https://example.com/']) {
+    assert.equal(hostProblems(`"${other}"`, 'game.js', options).length, 1, other);
+  }
 });
 
 test('the game\'s own code names no other host, and builds its WebSocket address from the server\'s', () => {

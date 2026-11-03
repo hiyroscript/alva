@@ -4683,6 +4683,16 @@ before.
   `server/` is on the shared development-only list. Menu navigation keeps
   a focused text field's typing keys its own (`isTextEntry`).
 
+**Part 2, going live:** the owner deployed the server from a web browser,
+with no terminal (Cloudflare's Workers Builds deploys `server/` from this
+repository and again on every merge into `main`;
+[the steps](./docs/development/online-server.md#putting-it-online-step-by-step)),
+and `CONFIG.online.serverUrl` now names it, so the itch.io validator allows
+that one host (and its `wss` form) and no other. The server's allowed
+origins already matched itch.io's game hosts; it needed no change. The
+tests that pinned an empty address now test the empty case explicitly, and
+a new one holds the configured host to the rule.
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
 `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
