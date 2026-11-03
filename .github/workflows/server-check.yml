@@ -1,26 +1,23 @@
-# Temporary: checks from GitHub's machines whether the room server answers
-# on the public internet (to tell a network block on the owner's side from
-# a server problem). Removed again right after it runs.
 name: Room server reachability check (temporary)
-
 on:
   push:
     branches: [claude/amazing-mayer-0piftj]
     paths: ['.github/workflows/server-check.yml']
-
 permissions:
   contents: read
-
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Resolve and reach the room server
+      - name: Look up the room server's name in public DNS
         run: |
-          HOST=alva-rooms.christopherjustemsh117.workers.dev
-          echo "== DNS (system) =="; getent hosts "$HOST" || echo "no answer"
-          echo "== DNS (1.1.1.1) =="; dig +short "$HOST" @1.1.1.1 || true
-          echo "== DNS (8.8.8.8) =="; dig +short "$HOST" @8.8.8.8 || true
-          echo "== GET /health =="; curl -sS -m 20 -i "https://$HOST/health" || echo "curl failed: $?"
-          echo; echo "== GET /rooms from itch.io's origin =="; curl -sS -m 20 -i -H "Origin: https://html-classic.itch.zone" "https://$HOST/rooms" || echo "curl failed: $?"
+          SUB=christopherjustemsh117.workers.dev
+          for NAME in "alva-rooms.$SUB" "$SUB" "anything.$SUB" workers.dev; do
+            for DNS in 1.1.1.1 8.8.8.8; do
+              echo "== $NAME via $DNS =="
+              dig "$NAME" A @"$DNS" +noall +comments +answer +authority | grep -E 'status:|IN' || true
+            done
+          done
+          echo "== GET /health =="
+          curl -sS -m 20 -i "https://alva-rooms.$SUB/health" || echo "curl failed: $?"
