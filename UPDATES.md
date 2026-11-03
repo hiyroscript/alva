@@ -18,7 +18,7 @@ for where they moved). The game as it is now is specified in
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
-| **Online update** | part 1 (game and server code), branch `claude/amazing-mayer-0piftj`; part 2 (go live) to follow | part 1: see [its section](#online-update) | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
+| **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code); part 2 (go live) to follow | part 1: `cb3c38b` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -4628,8 +4628,9 @@ naming the frame's file).
 
 ## Online update
 
-Asked for (the `max` brief, "add Online Play to Alva") in two parts. Part 1,
-here: all the game's side and the room server's code, tested without any
+Asked for (the `max` brief, "add Online Play to Alva") in two parts. Part 1
+([#160](https://github.com/hiyroscript/alva/pull/160), `cb3c38b`), here: all
+the game's side and the room server's code, tested without any
 server deployed, `CONFIG.online.serverUrl` left empty (Online play then says
 "Online play is unavailable right now."). Part 2 points the game at the
 owner's deployed server. Nothing of the offline modes changes: Quick Battle
