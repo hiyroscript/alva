@@ -1,6 +1,7 @@
 // What an online match is, read from the room's start message
-// ({ match, seed, p1, p2 }, server/src/room.js): the same answer in both
-// browsers, so both build the very same Battle.
+// ({ match, seed, delay, p1, p2 }, server/src/room.js): the same answer in
+// both browsers, so both build the very same Battle and step it with the
+// same input delay.
 //
 // The stage is drawn at random, as Regular Play's is (randomStage), from
 // the host's seed on a stream of its own, so both players get the same one
@@ -9,9 +10,11 @@
 // cannot play either; each side keeps its player's own Automatic
 // turn-around and is named by its player's online name.
 
+import { CONFIG } from '../config.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 import { randomStage } from '../screens/quick-battle-setup.js';
+import { validDelay } from './delay.js';
 
 // The stage draw's stream of the seed ('stag').
 export const STAGE_STREAM = 0x73746167;
@@ -35,5 +38,8 @@ export function readStart(start) {
     p2Def,
     labels: { p1: String(start.p1.name ?? ''), p2: String(start.p2.name ?? '') },
     automaticTurnAround: { p1: start.p1.turn !== false, p2: start.p2.turn !== false },
+    // The input delay the host's browser chose for this match, the same on
+    // both (js/online/delay.js), or the game's own default.
+    delay: validDelay(start.delay) ?? CONFIG.online.inputDelay,
   };
 }

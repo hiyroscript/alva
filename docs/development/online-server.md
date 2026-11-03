@@ -114,15 +114,17 @@ SQLite-backed Durable Objects, which `wrangler.toml` creates.
   waiting in the lobby about 12 a minute (the list refreshes every 5 s).
 - **The match** goes through its room ([privacy](#privacy)), and it is
   what the plan is spent on: each player sends a packet at most every
-  `CONFIG.online.sendIntervalMs` (50 ms, 20 a second), 40 a second for a
-  match, which Cloudflare counts as 2 requests a second. With the room's
+  `CONFIG.online.sendIntervalMs` (33 ms, 30 a second), 60 a second for a
+  match, which Cloudflare counts as 3 requests a second. With the room's
   reports (one every 50 requests' worth, so the budget stays current during
-  a long match) that is about 7,350 requests an hour of play: the budget
-  below allows **about 10 hours of matches a day**, across every player. A
+  a long match) and the pings that measure the trip, that is about 11,000
+  requests an hour of play: the budget below allows **about 7 hours of
+  matches a day**, across every player. A
   packet is never saved (the room's last activity is, at most once a
   minute).
-- Each seat may send `MATCH_RATE` (30) packets a second on average,
-  `MATCH_BURST` (60) at once: the game's 20 and a hash a second pass, a
+- Each seat may send `MATCH_RATE` (45) packets a second on average,
+  `MATCH_BURST` (90) at once: the game's 30, a hash a second and its pings
+  pass, a
   flood is dropped, and a seat that keeps flooding by a whole burst has its
   socket closed (4008, `too_fast`), so nobody can spend the day's budget
   alone.

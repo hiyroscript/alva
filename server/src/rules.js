@@ -67,6 +67,11 @@ export const validFighterId = (raw) => (typeof raw === 'string' && /^[\w-]{1,32}
 // The game's version string, or null.
 export const validVersion = (raw) => (typeof raw === 'string' && /^[\w.+-]{1,32}$/.test(raw) ? raw : null);
 
+// A match's input delay, in steps, as the host's browser chose it
+// (js/online/delay.js; the game's CONFIG.online.inputDelayRange, again).
+export const DELAY_RANGE = Object.freeze({ min: 3, max: 12 });
+export const validDelay = (raw) => (Number.isInteger(raw) && raw >= DELAY_RANGE.min && raw <= DELAY_RANGE.max ? raw : null);
+
 // `n` random bytes as hex, from `random` (crypto by default).
 export function randomHex(n, random = globalThis.crypto) {
   const bytes = new Uint8Array(n);

@@ -67,10 +67,11 @@ ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https:/
 # match (create, join, two connections, the reports), and a player waiting
 # in the lobby about 12 a minute (the list refreshes every 5 s). The match
 # itself goes through its room, so no player ever learns the other's
-# address (server/src/room.js): each player sends 20 packets a second,
-# 40 a match, which Cloudflare counts as 2 requests a second, about 7,350
-# an hour with the room's reports. So the day's allowance (the budget
-# share below) is about 10 hours of matches in all, across every player;
+# address (server/src/room.js): each player sends 30 packets a second,
+# 60 a match, which Cloudflare counts as 3 requests a second, about 11,000
+# an hour with the room's reports and the pings that measure the trip. So
+# the day's allowance (the budget share below) is about 7 hours of matches
+# in all, across every player;
 # past it, new rooms are refused as `full` while the open ones play on.
 #
 # MAX_ROOMS: rooms open at once. Past it, creating a room answers `full`

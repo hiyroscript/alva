@@ -330,6 +330,7 @@ export function otherSide(player, start, { script = () => null, clock, sendInter
   let n = 0;
   const lockstep = new LockstepSession({
     transport: player.session.peer.transport, localSlot: player.session.localSlot, match: setup.match,
+    delay: setup.delay,
     sampleLocal: () => script(n++),
     ...(clock ? { clock } : {}),
     ...(sendIntervalMs !== undefined ? { sendIntervalMs } : {}),

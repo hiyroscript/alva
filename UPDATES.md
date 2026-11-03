@@ -4777,8 +4777,35 @@ in step) and the Room's own tests. The first version of this (a TURN relay
 with a key) is in the pull request's history, should a relay ever be
 wanted.
 
+**Later: a shorter delay.** Through the room, a fixed delay of 7 steps
+(about 117 ms) felt slow to the owner. Two changes bring it down while the
+match stays private and free:
+
+- **A delay for each match** (`js/online/delay.js`). While both players are
+  in the room, the host's browser pings the other through it
+  (`DelayProbe`, `{ t: 'ping' }` answered by `{ t: 'pong' }`: every 200 ms
+  until a dozen round trips are in, then every 5 s, so a match started a
+  second after the guest arrives is measured already; the lockstep ignores
+  them), and the match's delay is the fewest steps that cover the send
+  interval, half the round trip (its 80th percentile) and a 15 ms margin,
+  within 3 to 12 steps (`chooseDelay`). Nearby players get about 4 to 5
+  steps (67 to 83 ms). The host's start carries it (`{ type: 'start', seed,
+  delay }`); the Room passes a valid one to both (`validDelay`, 3 to 12) and
+  `readStart` reads it, so both browsers step with the same one; with too
+  little measured it is `inputDelay` (7).
+- **30 packets a second** (`sendIntervalMs` 50 → 33), so a frame waits less
+  to be sent. The free plan then allows about 7 hours of matches a day
+  instead of 10. The Room's allowance per seat rose to match (`MATCH_RATE`
+  45, `MATCH_BURST` 90).
+
+Tests: `tests/online/delay.test.mjs` (the delay for each round trip and its
+range, the start carrying it, the probe), the Room's start test, and the
+match through the real Room in `tests/online/room-relay.test.mjs` (the trip
+measured, the shortest delay chosen and used on both sides).
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
-(`serverUrl`, `inputDelay`, `sendIntervalMs`, `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
+(`serverUrl`, `inputDelay`, `inputDelayRange`, `delayMarginMs`,
+`pingIntervalMs`, `pingRefreshMs`, `sendIntervalMs`, `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
 `hashInterval`, `resendWindow`, `colors`; `CONFIG.debug.online` logs a
 desync's states); the server's caps and allowed origins in
 [`server/wrangler.toml`](./server/wrangler.toml); `STAGE_REVEAL_MS` in

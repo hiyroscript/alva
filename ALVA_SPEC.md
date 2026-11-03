@@ -219,8 +219,9 @@ behave, and how it must look.
   unseeded randomness, presentation never feeding back). Online Play
   (6.5c) runs on it: both browsers run the same `Battle` in delay-based
   lockstep (`js/online/lockstep.js`: each step only once both players'
-  inputs for it are known, every input played 7 steps after it is
-  sampled, lost packets made up by the next ones) and compare a hash of
+  inputs for it are known, every input played a few steps after it is
+  sampled (a delay chosen for each match from the trip between the two
+  players, 3 to 12 steps), lost packets made up by the next ones) and compare a hash of
   the match every 60 steps; a difference ends the match as a desync.
   Rollback netcode is not part of it (it would need a Battle that saves
   and restores its whole state).
@@ -1036,7 +1037,7 @@ other's address.
 - **The room server** caps itself to stay within Cloudflare's free plan:
   at most 50 rooms open at once and a daily request budget (refusing new
   rooms as "full" past 80% of the plan's day, while open rooms play on:
-  about 10 hours of matches a day in all, the match's packets being most
+  about 7 hours of matches a day in all, the match's packets being most
   of what it spends), per-address limits, a limit on each seat's packets
   (a flood is dropped, a seat that keeps flooding is closed), rooms cleaned
   up after 10 minutes without activity. It allows only itch.io's game hosts
@@ -1050,8 +1051,11 @@ other's address.
   address (its per-minute limits count a salted hash, in memory only;
   Cloudflare's per-request logs are off). A copy of the game plays online
   as its version marked `+relay`, so it never shares a room with an older
-  copy that connected directly. The cost is delay: inputs play 7 steps
-  (about 117 ms) after they are sampled, and packets go 20 a second
+  copy that connected directly. The cost is delay: each match measures the
+  trip between the two players through the room (the host's pings) and
+  plays inputs the fewest steps after they are sampled that cover it, 3 to
+  12 (50 to 200 ms; about 67 to 83 ms for nearby players; 7 when nothing
+  could be measured), the same on both; and packets go 30 a second
   (docs/gameplay/online-play.md, Transport and Privacy).
 
 ### 6.6 Credits
@@ -4831,7 +4835,9 @@ Adding one is described in
   without typing.
 - **Online Play's input** (6.5c): the local player's snapshot, from
   whichever device they play with, exactly as offline, is sampled once a
-  step and played 7 steps later on both browsers (an input frame of 26
+  step and played the match's delay later on both browsers (chosen for
+  each match from the trip between the players, 3 to 12 steps; an input
+  frame of 26
   bits: every held control, its press edge, the Dash requests and where a
   controller's presses were made for). Both fighters on both browsers read
   the same frames; a menu over play makes the local player's frames

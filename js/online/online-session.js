@@ -15,10 +15,14 @@
 //     straight to the other browser, so neither player ever learns the
 //     other's network address: each match packet is a { type: 'm' }
 //     message on the room's socket, passed on by the room;
+//   - measuring the trip to the other player while the link is open
+//     (`delayProbe`, js/online/delay.js: pings through the room), for the match's
+//     input delay;
 //   - starting a match: the host's browser sends the start, with a seed it
-//     draws, once both players are ready with their fighters and the peer
-//     link is open (and again after a rematch both accepted). The room fills
-//     in who plays what and sends the same start to both (`start`).
+//     draws and the input delay it chose from the trip it measured, once
+//     both players are ready with their fighters and the peer link is open
+//     (and again after a rematch both accepted). The room fills in who plays
+//     what and sends the same start to both (`start`).
 //
 // Events (on(fn) → fn(type, detail)): 'room' (the room changed), 'peer'
 // (the peer link's status changed), 'start' (a match starts: the start
@@ -28,6 +32,7 @@
 import { CONFIG } from '../config.js';
 import { RoomServerClient } from './server-client.js';
 import { roomRelay } from './room-relay.js';
+import { DelayProbe } from './delay.js';
 import { sessionId } from './rules.js';
 import { listeners } from './transport.js';
 
@@ -68,6 +73,8 @@ export class OnlineSession {
     this.players = { host: null, guest: null };
     this.link = null;
     this.peer = { status: 'idle', link: null, transport: null, reason: null };
+    this.delayProbe?.stop();
+    this.delayProbe = null;
     this.start = null;
     this.starting = false;
     this.rematchPending = false;
@@ -300,6 +307,10 @@ export class OnlineSession {
         return;
       }
       this.peer = { status: 'open', link, transport, reason: null };
+      // The trip to the other player, measured for the match's delay (the
+      // host measures; both answer).
+      this.delayProbe?.stop();
+      this.delayProbe = new DelayProbe({ transport, measuring: this.isHost, setTimer: this.setTimer, clearTimer: this.clearTimer });
       transport.onClose(() => {
         if (this.peer.link !== link) return;
         this.peer = { status: 'idle', link: null, transport: null, reason: 'closed' };
@@ -318,6 +329,8 @@ export class OnlineSession {
   closePeer({ quiet = false } = {}) {
     const { link, transport } = this.peer;
     this.peer = { status: 'idle', link: null, transport: null, reason: null };
+    this.delayProbe?.stop();
+    this.delayProbe = null;
     if (transport) transport.close();
     else link?.cancel?.();
     if (!quiet && (link || transport)) this.emit('peer', this.peer);
@@ -339,7 +352,13 @@ export class OnlineSession {
     const fresh = host.ready && guest.ready && this.room?.status !== 'playing';
     if (!fresh && !this.rematchPending) return;
     this.starting = true;
-    this.send({ type: 'start', seed: this.drawSeed() });
+    this.send({ type: 'start', seed: this.drawSeed(), delay: this.matchDelay() });
+  }
+
+  // The input delay for the next match, from the trip measured to the other
+  // player (js/online/delay.js); the game's default when too little was.
+  matchDelay() {
+    return this.delayProbe?.delay() ?? CONFIG.online.inputDelay;
   }
 
   drawSeed() {

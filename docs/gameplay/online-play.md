@@ -13,6 +13,7 @@ guide: [the room server](../development/online-server.md).
 | [`js/screens/online-battle-screen.js`](../../js/screens/online-battle-screen.js) | `OnlineBattleScreen` (`online-battle`): the Battle screen with Online Play's rules (no pause, Leave match, waiting, the result from this player's side, Rematch, Leave room). |
 | [`js/online/online-session.js`](../../js/online/online-session.js) | `OnlineSession` (`App.online`): the player's name and session id, the room's socket and state, the link to the other player, the host's start; `ONLINE_VERSION`. |
 | [`js/online/server-client.js`](../../js/online/server-client.js) | `RoomServerClient`: the server's HTTP calls and a room's WebSocket (`RoomLink`); `OnlineError` and its codes. |
+| [`js/online/delay.js`](../../js/online/delay.js) | Each match's input delay: `DelayProbe` (pings through the room, the round trips) and `chooseDelay` (the fewest steps covering them), `validDelay`. |
 | [`js/online/room-relay.js`](../../js/online/room-relay.js) | The link to the other player, through the room (`roomRelay`, `RelayTransport`): each match packet a `{ type: 'm' }` message on the room's socket, never a direct connection. |
 | [`js/online/transport.js`](../../js/online/transport.js) | The transport interface (`send`, `onMessage`, `close`, `onClose`), `MessageTransport`, and `memoryTransportPair` for tests. |
 | [`js/online/lockstep.js`](../../js/online/lockstep.js) | `LockstepSession`: delay-based lockstep, resends, waiting and timeouts, the desync check; `LockstepChannel` and `OnlineInput`, each fighter's input. |
@@ -26,7 +27,8 @@ guide: [the room server](../development/online-server.md).
 
 `CONFIG.online` ([`js/config.js`](../../js/config.js)) holds its settings:
 `serverUrl` (the deployed room server; empty, Online Play ends at "Online
-play is unavailable right now."), `inputDelay`, `sendIntervalMs`,
+play is unavailable right now."), `inputDelay`, `inputDelayRange`,
+`delayMarginMs`, `pingIntervalMs`, `pingRefreshMs`, `sendIntervalMs`,
 `modes`, `connectTimeoutMs`, `disconnectGraceMs`,
 `loadTimeoutMs`, `listRefreshMs`, `hashInterval`, `resendWindow` and
 `colors`.
@@ -110,10 +112,11 @@ slow motion):
    control and its press edge, the Dash requests and where the presses
    were made for. The snapshot holds no analog value (the sticks are
    resolved into codenames first), so the frame carries all of it.
-2. **Delay.** It is sampled for step n + D (D = `inputDelay`, 7 steps,
-   about 117 ms: enough for a packet's trip through the room server, see
-   [Transport](#transport)); steps 0 to D − 1 are neutral on both sides.
-3. **Resends.** At most every `sendIntervalMs` (50 ms, 20 a second) one
+2. **Delay.** It is sampled for step n + D, D chosen for this match by the
+   host's browser from the trip it measured to the other player (3 to 12
+   steps, 50 to 200 ms; see [Transport](#transport)) and carried to both
+   in the start; steps 0 to D − 1 are neutral on both sides.
+3. **Resends.** At most every `sendIntervalMs` (33 ms, 30 a second) one
    packet carries every local frame the other side has not acknowledged
    (up to `resendWindow`) and the last step this side holds the other's
    frames through. A lost packet costs nothing.
@@ -186,12 +189,21 @@ things, both set in `CONFIG.online`:
 
 - **Delay.** A packet travels player → Cloudflare → the room → Cloudflare
   → player, longer than a direct link, and waits up to `sendIntervalMs`
-  to be sent. `inputDelay` 7 (117 ms) leaves about 65 ms for that trip at
-  worst, enough for players on the same continent; farther apart, the
-  match pauses for a moment when a packet is late.
+  to be sent. So each match chooses its own delay (`js/online/delay.js`):
+  while both players are in the room, the host's browser pings the other
+  through the room (`DelayProbe`: every `pingIntervalMs`, 200 ms, until a
+  dozen round trips are in, then every `pingRefreshMs`, 5 s; the other
+  side answers at once), and the match's delay is the fewest steps that
+  cover the send interval, half the round trip (the 80th percentile of the
+  last dozen, so one stray trip is ignored) and `delayMarginMs` (15 ms),
+  within `inputDelayRange` (3 to 12). Nearby players get about 4 to 5
+  steps (67 to 83 ms), far ones more, with no pauses. With fewer than four
+  round trips measured, it is `inputDelay` (7, about 117 ms). Both browsers
+  must use the same delay, so the host's choice goes in its start and the
+  room hands the same one to both (`readStart`'s `delay`).
 - **The free plan.** The room server's plan counts every packet it
   receives (at 20 : 1), so packets go at most every `sendIntervalMs`
-  (20 a second): about 10 hours of matches a day in all, across every
+  (30 a second): about 7 hours of matches a day in all, across every
   player ([the numbers](../development/online-server.md#staying-on-the-free-plan)).
 
 A relay closer to each player (a TURN server) would bring the delay down;
@@ -246,7 +258,9 @@ server code in process), [`tests/online/room-relay.test.mjs`](../../tests/online
 (the transport; two players connecting through their room with no WebRTC
 connection and no signalling; a match through the real Room code at the
 game's own rate, in step, nothing received naming an address),
-[`tests/online/rules.test.mjs`](../../tests/online/rules.test.mjs)
+[`tests/online/delay.test.mjs`](../../tests/online/delay.test.mjs)
+(the delay for each round trip, its range, the start carrying it, the
+probe), [`tests/online/rules.test.mjs`](../../tests/online/rules.test.mjs)
 and [`tests/online/itch-hosts.test.mjs`](../../tests/online/itch-hosts.test.mjs).
 The server's own: [`server/tests/`](../../server/tests/). Real browsers on
 real networks and the itch.io frame need a real test:
