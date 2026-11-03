@@ -21,6 +21,7 @@ steps are [below](#putting-it-online-step-by-step)).
 | [`server/src/rules.js`](../../server/src/rules.js) | What the server accepts: names, room names, codes, modes, visibility (the game's own rules, again). |
 | [`server/src/http.js`](../../server/src/http.js) | JSON replies, error codes, body limits, origin patterns. |
 | [`server/wrangler.toml`](../../server/wrangler.toml) | The Worker's configuration: its Durable Objects (SQLite-backed, as the free plan requires), the allowed origins and the caps, each with its reasoning. |
+| [`server/gateway/`](../../server/gateway/) | The server's `pages.dev` address: a Cloudflare Pages project that passes every request, WebSockets included, unchanged to the Worker over a service binding ([why and how](#if-the-workersdev-address-never-works-the-pagesdev-address)). |
 | [`server/tests/`](../../server/tests/) | Its tests, on fake Durable Objects: no account, no network. |
 
 ## What it answers
@@ -125,6 +126,16 @@ Then, for the game, set `serverUrl: 'http://localhost:8787'` in
 the deployed server's), serve the repository and open it in two tabs as
 above. Open `http://localhost:8787/health` to see the server is up.
 
+**The pages.dev gateway, locally** (`server/gateway/`), in front of that
+local server: with `npx wrangler dev` running in `server`, start it from
+a second terminal (`cd server/gateway`, then
+`../node_modules/.bin/wrangler pages dev --port 8788`). Its `ROOMS` binding
+shows `[connected]`, and `http://localhost:8788` answers as the server does
+(set `serverUrl: 'http://localhost:8788'` to play through it). Start the
+Worker first: started the other way round, the Worker can fail with
+"Address already in use". The gateway has its own `package.json` so that
+wrangler takes its folder, not `server/`, as the Pages project.
+
 ## Putting it online, step by step
 
 Done once, on 2026-11-03: the server is deployed, and its address is
@@ -210,6 +221,69 @@ repository: `npm install`, then `npx wrangler login` (a browser page asks to
 **Allow**), then `npx wrangler deploy`, which prints the `.workers.dev`
 address. Deploying that way does not set up the automatic deploys above.
 
+### If the workers.dev address never works: the pages.dev address
+
+A Worker's own `workers.dev` address can fail to exist at all. It happened
+to this account: the dashboard showed `alva-rooms.<name>.workers.dev`
+switched on and public, the build was green, and opening it said the page
+or server can't be found. Cloudflare's own nameserver answered that the
+whole `<name>.workers.dev` subdomain does not exist (NXDOMAIN, checked on
+2026-11-03), and switching the address off and on again did not help.
+Others have reported the same on Cloudflare's forum.
+
+The way around it is a second address, `https://alva-online.pages.dev`,
+from a free Cloudflare Pages project (`server/gateway/`). It passes every
+request, WebSockets included, unchanged to the same `alva-rooms` Worker
+over a service binding, so nothing about the server changes: the same
+rooms, allowed origins and limits. A `pages.dev` address is made separately
+from the account's `workers.dev` subdomain. The Pages project is set up once,
+from GitHub, on a phone:
+
+1. **Merge the pull request that adds `server/gateway/`.** Cloudflare
+   builds the Pages project from `main`, so the folder has to be there first.
+2. **Start a Pages project.** In Cloudflare, open **Workers & Pages**, then
+   **Create** (or **Create application**). Choose **Pages** (it may be a
+   tab, or a line such as **Looking to deploy Pages? Get started**), then
+   **Import an existing Git repository**. Pick **alva** (GitHub is
+   already connected from the Worker) and tap **Begin setup**.
+3. **Fill in the settings** on the **Set up builds and deployments** screen:
+   - **Project name:** `alva-online`. It must be exactly this: it is the
+     name in `server/gateway/wrangler.toml`.
+   - **Production branch:** `main`.
+   - **Framework preset:** **None**.
+   - **Build command:** leave it empty.
+   - **Build output directory:** `public`.
+   - Open **Root directory (advanced)**: set **Path** to
+     **`server/gateway`**.
+   - **Environment variables:** none.
+
+   Then tap **Save and Deploy**, and wait for the deploy (under a minute).
+4. **Check it.** Open the project's address with `/health` at the end, for
+   example <https://alva-online.pages.dev/health>. It should start with
+   `{"ok":true,"service":"alva-rooms","lobby":true`: the Worker itself
+   answering through the new address. (If Cloudflare added letters to the
+   name, for example `alva-online-4xk.pages.dev`, because the name was
+   taken, use that address.)
+5. **Send that address to Claude** (the one without `/health`). Claude
+   points the game at it (`CONFIG.online.serverUrl`) in a pull request; after
+   merging it, upload the new ZIP to itch.io.
+6. **Optional:** in the project's **Settings** › **Builds** (or **Builds &
+   deployments**) › **Branch control**, set preview branches to **None**:
+   only `main` needs a build.
+
+If step 4 shows `{"ok":false,"service":"alva-online","error":"server_error"}`,
+the gateway works but cannot reach the Worker: in the project's
+**Settings** › **Bindings**, a **Service binding** named `ROOMS` must point to
+`alva-rooms` (the deploy normally adds it from `server/gateway/wrangler.toml`).
+Add it if it is missing, then deploy again (**Deployments** › the latest ›
+**Retry deployment**).
+
+On the free plan, each request through `pages.dev` runs the gateway's small
+script and then the Worker, both counted against the day's Workers requests
+(100,000 a day). That is far more than the lobby's polling and the rooms
+need: the Durable Objects' own allowance, which the server's caps watch, is
+unchanged.
+
 ### If Online play says it is unavailable
 
 The message then says why, in a second sentence, from the server's own
@@ -219,6 +293,7 @@ answer (`/health`):
 | --- | --- | --- |
 | "This copy of the game has no room server set up." | `CONFIG.online.serverUrl` is empty in this build. | Upload a build made after the server's address was added (the ZIP of a later run of the workflow). |
 | "The room server can't be reached from here…" | No answer at all: the Worker is not deployed, is down, or the network blocks `workers.dev`. | Open the server's `/health` in a browser; if it does not answer, look at the last build under **Workers & Pages** › **alva-rooms** › **Deployments** / **Builds**. Try another network. |
+| (opening `/health` says the page or server can't be found, on any network) | The address does not exist in DNS: for a `workers.dev` address with the build green and the address switched on, Cloudflare never created the account's subdomain. | Set up [the pages.dev address](#if-the-workersdev-address-never-works-the-pagesdev-address) and send it to Claude. |
 | "The room server doesn't accept this page's address (…)" | The page runs from an origin missing from `ALLOWED_ORIGINS`. | Add that address to `ALLOWED_ORIGINS` in `server/wrangler.toml` and merge (Claude can). |
 | "The room server answers, but its rooms are not working right now." | The Worker answers but its Lobby (its Durable Objects) does not. | Open `/health` (`"lobby": false`) and the Worker's **Logs** in the dashboard, and send them to Claude. |
 | "The room server answers now: try again in a moment." | It failed once, then answered. | Try again. |

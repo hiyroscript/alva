@@ -1,0 +1,6 @@
+{
+  "name": "alva-online",
+  "private": true,
+  "description": "The room server's pages.dev address: passes every request to the alva-rooms Worker (see wrangler.toml and docs/development/online-server.md). Its own package.json makes this folder its own project, apart from the Worker's in ../.",
+  "type": "module"
+}
