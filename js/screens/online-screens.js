@@ -76,7 +76,6 @@ const NOTICES = Object.freeze({
   timeout: ['online.lost.title', 'online.timeout.message'],
   desync: ['online.desync.title', 'online.desync.message'],
   peer: ['online.peerFailed.title', 'online.peerFailed.message'],
-  relay: ['online.peerFailed.title', 'online.relayFailed.message'],
   fighter: ['common.fighterUnavailable', 'online.fighterUnavailable.message'],
   error: ['online.unavailable.title', 'online.error.message'],
 });
@@ -93,9 +92,8 @@ export function showNotice(app, code, { detail = null } = {}) {
 }
 
 // The codes that all mean the room server cannot be used (its own refusal
-// of this page's origin, its unexpected failures, and its having no relay
-// for private connections included).
-export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error', 'relay_unavailable']);
+// of this page's origin and its unexpected failures included).
+export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error']);
 
 // What "Online play is unavailable" adds to say why, by the server's
 // answer to /health (RoomServerClient.diagnose).
@@ -104,7 +102,6 @@ const WHY_UNAVAILABLE = Object.freeze({
   unreachable: 'online.detail.unreachable',
   origin: 'online.detail.origin',
   server_error: 'online.detail.server',
-  relay: 'online.detail.relay',
   reachable: 'online.detail.reachable',
 });
 
@@ -652,9 +649,7 @@ export class OnlineRoomScreen extends Screen {
     if (type === 'room' || type === 'peer') this.render();
     if (type === 'peer' && detail?.status === 'failed' && this.peerNoticeShown !== detail) {
       this.peerNoticeShown = detail;
-      // No relay for a private connection is said as such (no direct link is
-      // ever tried instead).
-      if (this.app.screens.current === this) showNotice(this.app, detail.reason === 'relay' ? 'relay' : 'peer');
+      if (this.app.screens.current === this) showNotice(this.app, 'peer');
     }
   }
 

@@ -128,7 +128,7 @@ There are no import cycles (checked over every module).
 | `rules.js` | What a player types: names, room names, room codes (`checkName`, `checkRoomName`, `fitName`, `normalizeCode`, `isValidCode`), the session id. | `core/settings.js`, `online-session.js`, `screens/online-screens.js` |
 | `server-client.js` | `RoomServerClient` (the room server's HTTP calls), `RoomLink` (a room's WebSocket), `OnlineError`. | `online-session.js` |
 | `online-session.js` | `OnlineSession` (`App.online`): name, session id, the room and both seats, the peer link, the host's start, rematches. | `core/app.js` |
-| `peer.js` | `PeerLink`: the WebRTC DataChannel, signalled through the room. | `online-session.js` |
+| `room-relay.js` | `roomRelay`, `RelayTransport`: the link to the other player through the room (`{ type: 'm' }` packets on the room's socket), never a direct connection. | `online-session.js` |
 | `transport.js` | The transport interface, `MessageTransport`, `memoryTransportPair`, `listeners`. | `peer.js`, `lockstep.js`, `online-session.js`, `server-client.js` |
 | `lockstep.js` | `LockstepSession`, `LockstepChannel`, `OnlineInput`: delay-based lockstep, resends, waits, the desync check. | `screens/online-battle-screen.js` |
 | `input-frame.js` | One step's input as a frame (`encodeFrame`, `decodeFrame`, `FRAME_FIELDS`, `HELD_MASK`). | `lockstep.js` |

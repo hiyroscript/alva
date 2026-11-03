@@ -16,18 +16,18 @@ test('/health: readable by any page, the Lobby asked too, and the asking origin 
   const { env } = makeEnv();
   const res = await handle(gameRequest('/health', { origin: null }), env);
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true, service: 'alva-rooms', lobby: true, relay: true, origin: null, originAllowed: false },
+  assert.deepEqual(await res.json(), { ok: true, service: 'alva-rooms', lobby: true, origin: null, originAllowed: false },
     'a browser\'s address bar: no origin');
   assert.equal(res.headers.get('access-control-allow-origin'), '*');
   const fromItch = await handle(gameRequest('/health'), env);
-  assert.deepEqual(await fromItch.json(), { ok: true, service: 'alva-rooms', lobby: true, relay: true, origin: 'https://html-classic.itch.zone', originAllowed: true });
+  assert.deepEqual(await fromItch.json(), { ok: true, service: 'alva-rooms', lobby: true, origin: 'https://html-classic.itch.zone', originAllowed: true });
   assert.equal(fromItch.headers.get('access-control-allow-origin'), '*');
   const elsewhere = await handle(gameRequest('/health', { origin: 'https://hiyroscript.github.io' }), env);
-  assert.deepEqual(await elsewhere.json(), { ok: true, service: 'alva-rooms', lobby: true, relay: true, origin: 'https://hiyroscript.github.io', originAllowed: false });
+  assert.deepEqual(await elsewhere.json(), { ok: true, service: 'alva-rooms', lobby: true, origin: 'https://hiyroscript.github.io', originAllowed: false });
   // A Lobby that does not answer: not ok (503), and said.
   const broken = await handle(gameRequest('/health'), { ...env, LOBBY: { idFromName: () => 'x', get: () => ({ fetch: () => Promise.reject(new Error('down')) }) } });
   assert.equal(broken.status, 503);
-  assert.deepEqual(await broken.json(), { ok: false, service: 'alva-rooms', lobby: false, relay: true, origin: 'https://html-classic.itch.zone', originAllowed: true });
+  assert.deepEqual(await broken.json(), { ok: false, service: 'alva-rooms', lobby: false, origin: 'https://html-classic.itch.zone', originAllowed: true });
 });
 
 test('the allowed origins: itch.io\'s game hosts and a local copy, nothing else', () => {

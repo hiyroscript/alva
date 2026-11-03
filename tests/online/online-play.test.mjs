@@ -641,7 +641,7 @@ test('a peer link that cannot be made: "Couldn\'t connect to your opponent…", 
   hub.fail = true;
   const booted = boot({ hub });
   const { app, screens } = booted;
-  await roomWithGuest(booted);
+  const guest = await roomWithGuest(booted);
   await settleAll();
   assert.equal(app.online.peer.status, 'failed');
   assert.equal(dialogText(app), "Couldn't connect — Couldn't connect to your opponent. One of your networks may be blocking it.");
@@ -651,6 +651,8 @@ test('a peer link that cannot be made: "Couldn\'t connect to your opponent…", 
   assert.equal(screens.room.readyButton.disabled, true);
   hub.fail = false;
   screens.room.retryButton.click();
+  // Each player tries again from their own side (both were told).
+  guest.session.retryPeer();
   await settleAll(10);
   assert.equal(app.online.peer.status, 'open', 'connected on the second try');
 });
@@ -688,73 +690,4 @@ test('Copy code: the clipboard where allowed, else the code selected for the pla
     if (saved) Object.defineProperty(globalThis, 'navigator', saved);
     else delete globalThis.navigator;
   }
-});
-
-// ---- Privacy: every link relayed, no address passed on ----------------------------
-
-test('each player\'s link is relayed, with their own credentials from the room, and connects', async () => {
-  const booted = boot();
-  const { app, server, hub } = booted;
-  await roomWithGuest(booted);
-  assert.equal(app.online.peer.status, 'open');
-  assert.equal(server.turn.requests.length, 2, 'the host and the guest each asked once');
-  assert.deepEqual(hub.made.map((m) => [m.initiator, m.iceServers.map((s) => s.username)]), [[true, ['user-1']], [false, ['user-2']]], 'each their own');
-  for (const { iceServers } of hub.made) {
-    assert.ok(iceServers.every((s) => s.urls.every((u) => /^turns?:/.test(u))), 'TURN servers only');
-  }
-});
-
-test('no relay to be had: no link at all, "Couldn\'t set up a private connection…", and Try again asks again', async () => {
-  const booted = boot();
-  const { app, screens, server, hub } = booted;
-  server.turn.fail = true;
-  await roomWithGuest(booted);
-  await settleAll();
-  assert.equal(app.online.peer.status, 'failed');
-  assert.equal(app.online.peer.reason, 'relay');
-  assert.equal(hub.links, 0, 'no direct link was tried instead');
-  assert.equal(dialogText(app), "Couldn't connect — Couldn't set up a private connection to your opponent. Please try again in a moment.");
-  await acknowledge(app);
-  assert.equal(screens.room.retryButton.hidden, false);
-  server.turn.fail = false;
-  screens.room.retryButton.click();
-  await settleAll(10);
-  assert.equal(app.online.peer.status, 'open', 'with the relay back, the second try connects');
-});
-
-test('a server with no relay set up makes no room: "…can\'t make private connections right now."', async () => {
-  const server = backend({ TURN_KEY_ID: '', TURN_KEY_API_TOKEN: '' });
-  const booted = boot({ server });
-  const { app, screens } = booted;
-  await toLobby(booted);
-  screens.lobby.createButton.click();
-  await settle();
-  app.createRoomDialog.createButton.click();
-  await settleAll(10);
-  assert.equal(current(app), 'online-lobby');
-  assert.equal(dialogText(app), "Online play unavailable — Online play is unavailable right now. The room server can't make private connections right now.");
-  setLanguage('fr');
-  try {
-    await acknowledge(app);
-    screens.lobby.createButton.click();
-    await settle();
-    app.createRoomDialog.createButton.click();
-    await settleAll(10);
-    assert.equal(app.dialog.message.textContent, 'Le jeu en ligne est indisponible pour le moment. Le serveur de salles ne peut pas établir de connexions privées pour le moment.');
-  } finally {
-    setLanguage('en');
-  }
-});
-
-test('an older copy that connected directly never shares a room with this one ("Other version")', async () => {
-  const booted = boot();
-  const { screens, server, hub } = booted;
-  const old = otherPlayer(server, hub, { name: 'Old' });
-  old.session.version = CONFIG.version;
-  await old.session.createRoom({ name: 'Old room', visibility: 'public', mode: 'quick-battle' });
-  await toLobby(booted, 'Chris');
-  await settleAll();
-  const [row] = screens.lobby.list.children;
-  assert.equal(row.querySelector('.online-room-join').disabled, true);
-  assert.match(text(row.querySelector('.online-room-join')), /version/i);
 });

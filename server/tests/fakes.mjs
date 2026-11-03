@@ -129,37 +129,9 @@ export class FakeNamespace {
   }
 }
 
-// Cloudflare's TURN service as a test sees it: every request it was sent
-// (`turn.requests`), answered with credentials in the service's own shape,
-// or failing while `turn.fail` is set.
-export function fakeTurn() {
-  const turn = { requests: [], fail: false, issued: 0 };
-  turn.fetch = async (url, init = {}) => {
-    turn.requests.push({ url: String(url), method: init.method, headers: { ...init.headers }, body: init.body ? JSON.parse(init.body) : null });
-    if (turn.fail) return new Response('{"error":"down"}', { status: 503 });
-    turn.issued += 1;
-    return new Response(JSON.stringify({
-      iceServers: [
-        { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] },
-        {
-          urls: [
-            'turn:turn.cloudflare.com:3478?transport=udp', 'turn:turn.cloudflare.com:53?transport=udp',
-            'turn:turn.cloudflare.com:3478?transport=tcp', 'turn:turn.cloudflare.com:80?transport=tcp',
-            'turns:turn.cloudflare.com:5349?transport=tcp', 'turns:turn.cloudflare.com:443?transport=tcp',
-          ],
-          username: `user-${turn.issued}`,
-          credential: `secret-${turn.issued}`,
-        },
-      ],
-    }), { status: 201, headers: { 'content-type': 'application/json' } });
-  };
-  return turn;
-}
-
 // The server's environment: its variables (wrangler.toml's, overridden by
-// `vars`; a TURN key is set unless `vars` empties it), a Lobby namespace and
-// a Room namespace wired together, one clock (`clock.now`, milliseconds), a
-// seeded source of random bytes and a fake TURN service (`turn`).
+// `vars`), a Lobby namespace and a Room namespace wired together, one clock
+// (`clock.now`, milliseconds) and a seeded source of random bytes.
 export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
   const clock = { now: start };
   const now = () => clock.now;
@@ -177,13 +149,11 @@ export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
     ALLOWED_ORIGINS: 'https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*',
     MAX_ROOMS: '50', DAILY_REQUEST_LIMIT: '100000', BUDGET_SHARE: '0.8', ROOM_IDLE_MINUTES: '10',
     CREATE_PER_MINUTE: '10', JOIN_PER_MINUTE: '30', LIST_PER_MINUTE: '120',
-    TURN_KEY_ID: 'test-turn-key', TURN_KEY_API_TOKEN: 'test-turn-token',
     ...vars,
   };
-  const turn = fakeTurn();
   env.LOBBY = new FakeNamespace((state) => new Lobby(state, env, { now, random }));
-  env.ROOM = new FakeNamespace((state) => new Room(state, env, { now, fetch: turn.fetch }));
-  return { env, clock, turn, lobby: () => env.LOBBY.object('lobby'), room: (id) => env.ROOM.object(id) };
+  env.ROOM = new FakeNamespace((state) => new Room(state, env, { now }));
+  return { env, clock, lobby: () => env.LOBBY.object('lobby'), room: (id) => env.ROOM.object(id) };
 }
 
 export const ITCH = 'https://html-classic.itch.zone';

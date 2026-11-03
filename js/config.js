@@ -110,16 +110,19 @@ export const CONFIG = Object.freeze({
     // "Online play is unavailable right now." The itch.io validator allows
     // this one host and no other (tools/itch/hosts.mjs).
     serverUrl: 'https://alva-online.pages.dev',
-    // Steps between sampling the local player's input and playing it (3 is
-    // 50 ms): the time a frame has to reach the other browser before it is
-    // needed, so the match never waits on a normal connection.
-    inputDelay: 3,
-    // How the two browsers reach each other: only through a TURN relay,
-    // never directly, so neither learns the other's IP address
-    // (js/online/privacy.js). Each player's relay credentials come from the
-    // room server for each link (its TURN key is the owner's, in the
-    // Worker's secrets: docs/development/online-server.md); nothing about
-    // them is set here.
+    // Steps between sampling the local player's input and playing it (7 is
+    // about 117 ms): the time a frame has to reach the other browser before
+    // it is needed. The match goes through the room server, never straight
+    // to the other browser (js/online/room-relay.js: so neither player
+    // learns the other's address), which takes longer than a direct link,
+    // and a frame may wait up to sendIntervalMs to be sent: 7 leaves about
+    // 65 ms for the trip, so the match never waits on a normal connection.
+    inputDelay: 7,
+    // The match's packets go at most this far apart (20 a second): the room
+    // server's free plan counts every one it receives, and 20 a second keeps
+    // about 10 hours of matches a day inside it
+    // (docs/development/online-server.md, "Staying on the free plan").
+    sendIntervalMs: 50,
     // The modes a room can be created for, in order: Quick Battle alone for
     // now (the server allows the same list: server/src/rules.js).
     modes: Object.freeze(['quick-battle']),

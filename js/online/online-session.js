@@ -9,15 +9,12 @@
 //   - the room they are in: its WebSocket (js/online/server-client.js
 //     RoomLink), the room and both seats as the server last described them,
 //     their seat (host or guest) and so their side (the host plays p1);
-//   - the peer link to the other player (js/online/peer.js), made as soon
-//     as both seats are filled and connected (the host offers, the guest
-//     answers, through the room), made again if it drops while both are
-//     still there, and given up after CONFIG.online.connectTimeoutMs
-//     ('failed': the player may try again). Each link is relayed: before
-//     making it, this browser asks the room for its own relay credentials
-//     ('relay'), and with none it makes no link at all ('failed', reason
-//     'relay'), so no player's address ever reaches the other
-//     (js/online/privacy.js);
+//   - the link to the other player (`peer`: js/online/room-relay.js), made
+//     as soon as both seats are filled and connected, made again if it
+//     drops while both are still there. It goes through the room, never
+//     straight to the other browser, so neither player ever learns the
+//     other's network address: each match packet is a { type: 'm' }
+//     message on the room's socket, passed on by the room;
 //   - starting a match: the host's browser sends the start, with a seed it
 //     draws, once both players are ready with their fighters and the peer
 //     link is open (and again after a rematch both accepted). The room fills
@@ -30,7 +27,7 @@
 
 import { CONFIG } from '../config.js';
 import { RoomServerClient } from './server-client.js';
-import { webRtcPeer } from './peer.js';
+import { roomRelay } from './room-relay.js';
 import { sessionId } from './rules.js';
 import { listeners } from './transport.js';
 
@@ -41,13 +38,14 @@ const RECONNECT_DELAYS_MS = Object.freeze([1000, 2500, 5000]);
 const otherSeat = (seat) => (seat === 'host' ? 'guest' : 'host');
 
 // The version a copy of the game plays online as: the game's, marked as one
-// that connects only through the relay, so it never shares a room with an
-// older copy that connected directly ("Other version").
+// whose matches go through the room, so it never shares a room with an
+// older copy that connected straight to the other browser ("Other
+// version").
 export const ONLINE_VERSION = `${CONFIG.version}+relay`;
 
 export class OnlineSession {
   constructor({
-    client = new RoomServerClient(), peerFactory = webRtcPeer, settings = null, version = ONLINE_VERSION,
+    client = new RoomServerClient(), peerFactory = roomRelay, settings = null, version = ONLINE_VERSION,
     random = globalThis.crypto, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id),
   } = {}) {
     this.client = client;
@@ -70,7 +68,6 @@ export class OnlineSession {
     this.players = { host: null, guest: null };
     this.link = null;
     this.peer = { status: 'idle', link: null, transport: null, reason: null };
-    this.endRelayWait();
     this.start = null;
     this.starting = false;
     this.rematchPending = false;
@@ -195,11 +192,9 @@ export class OnlineSession {
         this.syncPeer();
         this.maybeStart();
         return;
-      case 'signal':
-        this.signal(message.data);
-        return;
-      case 'relay':
-        this.relayAnswer(message);
+      case 'm':
+        // The other player's match packet, for the link.
+        this.peer.link?.deliver?.(message.d);
         return;
       case 'start':
         this.starting = false;
@@ -290,35 +285,16 @@ export class OnlineSession {
     if (this.peer.status === 'idle') this.startPeer();
   }
 
-  // A new link: this player's relay credentials first (the other player's
-  // signalling meanwhile waits in `attempt`), then the link itself.
   startPeer() {
     this.closePeer({ quiet: true });
-    const attempt = { signals: [] };
-    this.peer = { status: 'connecting', link: null, transport: null, reason: null, attempt };
-    this.emit('peer', this.peer);
-    this.requestRelay().then((iceServers) => {
-      if (this.peer.attempt === attempt) this.openLink(attempt, iceServers);
-    }, (err) => {
-      if (this.peer.attempt !== attempt) return;
-      this.peer = { status: 'failed', link: null, transport: null, reason: err?.message === 'relay_unavailable' ? 'relay' : 'timeout' };
-      this.emit('peer', this.peer);
-    });
-  }
-
-  openLink(attempt, iceServers) {
     const link = this.peerFactory({
       initiator: this.isHost,
-      sendSignal: (data) => this.send({ type: 'signal', data }),
-      iceServers,
+      send: (d) => this.send({ type: 'm', d }),
       timeoutMs: CONFIG.online.connectTimeoutMs,
     });
-    this.peer = { ...this.peer, link };
-    const started = link.start();
-    // The other player's signalling that came while the relay was asked
-    // for, now that the link can take it.
-    for (const data of attempt.signals.splice(0)) link.handleSignal?.(data);
-    started.then((transport) => {
+    this.peer = { status: 'connecting', link, transport: null, reason: null };
+    this.emit('peer', this.peer);
+    link.start().then((transport) => {
       if (this.peer.link !== link) {
         transport.close();
         return;
@@ -342,74 +318,15 @@ export class OnlineSession {
   closePeer({ quiet = false } = {}) {
     const { link, transport } = this.peer;
     this.peer = { status: 'idle', link: null, transport: null, reason: null };
-    this.endRelayWait();
     if (transport) transport.close();
     else link?.cancel?.();
     if (!quiet && (link || transport)) this.emit('peer', this.peer);
   }
 
-  // Tries the peer link again after it failed: the host offers again, the
-  // guest asks the host to.
+  // Tries the link again after it failed.
   retryPeer() {
     if (!this.opponent?.connected) return;
-    if (this.isHost) this.startPeer();
-    else {
-      this.startPeer();
-      this.send({ type: 'signal', data: { kind: 'retry' } });
-    }
-  }
-
-  // The other player's signalling.
-  signal(data) {
-    if (!data || typeof data !== 'object') return;
-    if (data.kind === 'retry') {
-      if (this.isHost) this.startPeer();
-      return;
-    }
-    // A new offer while this side is not making a link (the host starting
-    // over): this side starts over too.
-    if (data.kind === 'offer' && !this.isHost && this.peer.status !== 'connecting') this.startPeer();
-    if (this.peer.link) this.peer.link.handleSignal?.(data);
-    // Still waiting for this side's relay: kept for the link.
-    else if (this.peer.attempt) this.peer.attempt.signals.push(data);
-  }
-
-  // ---- The relay -------------------------------------------------------------------
-
-  // This player's relay (TURN) servers for one link, asked of the room:
-  // resolves with them, or rejects ('relay_unavailable', or 'timeout'
-  // after CONFIG.online.connectTimeoutMs). A new request replaces one still
-  // waiting.
-  requestRelay() {
-    this.endRelayWait();
-    return new Promise((resolve, reject) => {
-      const timer = this.setTimer(() => {
-        if (this.relayWait?.resolve !== resolve) return;
-        this.relayWait = null;
-        reject(new Error('timeout'));
-      }, CONFIG.online.connectTimeoutMs);
-      timer?.unref?.();
-      this.relayWait = { resolve, reject, timer };
-      if (!this.send({ type: 'relay' })) {
-        this.endRelayWait();
-        reject(new Error('timeout'));
-      }
-    });
-  }
-
-  relayAnswer(message) {
-    const wait = this.relayWait;
-    if (!wait) return;
-    this.relayWait = null;
-    this.clearTimer(wait.timer);
-    if (Array.isArray(message.iceServers) && message.iceServers.length) wait.resolve(message.iceServers);
-    else wait.reject(new Error(message.error === 'relay_unavailable' ? 'relay_unavailable' : 'timeout'));
-  }
-
-  endRelayWait() {
-    const wait = this.relayWait;
-    this.relayWait = null;
-    if (wait) this.clearTimer(wait.timer);
+    this.startPeer();
   }
 
   // ---- Starting a match ---------------------------------------------------------------

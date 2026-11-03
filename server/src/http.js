@@ -22,7 +22,6 @@ export const ERRORS = Object.freeze({
   rate_limited: 429,
   server_error: 500,
   full: 503,
-  relay_unavailable: 503,
 });
 
 export function json(data, status = 200, headers = {}) {

@@ -80,9 +80,7 @@ export class RoomServerClient {
   // to say: 'not_configured' (no address), 'unreachable' (no answer at all:
   // down, blocked, or not deployed), 'origin' (it answers, but this page's
   // origin is not one it accepts), 'server_error' (it answers, its Lobby
-  // does not), 'relay' (it answers, but has no relay for private
-  // connections, so it makes no room) or 'reachable' (it answers and would
-  // accept this page).
+  // does not) or 'reachable' (it answers and would accept this page).
   // `origin` is this page's, as the server saw it when it says. Never
   // throws.
   async diagnose() {
@@ -97,7 +95,6 @@ export class RoomServerClient {
       const origin = typeof data.origin === 'string' ? data.origin : page;
       if (data.originAllowed === false) return { code: 'origin', origin };
       if (data.ok === false || data.lobby === false) return { code: 'server_error', origin };
-      if (data.relay === false) return { code: 'relay', origin };
       return { code: 'reachable', origin };
     } catch {
       return { code: 'unreachable', origin: page };
