@@ -93,9 +93,9 @@ test('CONFIG.online: the deployed server (one https origin, nothing more), the d
   const url = new URL(o.serverUrl);
   assert.equal(url.protocol, 'https:', 'a secure address: itch.io serves the game over https');
   assert.equal(url.origin, o.serverUrl, 'scheme and host only: no path, query or trailing slash');
-  // The Worker's own address, or its pages.dev gateway (server/gateway/),
-  // which passes everything to the same Worker.
-  assert.match(url.hostname, /\.(workers|pages)\.dev$/, 'one of Cloudflare\'s free addresses for the room server');
+  // The pages.dev gateway (server/gateway/), which passes everything to the
+  // Worker: the Worker has no public address of its own.
+  assert.match(url.hostname, /\.pages\.dev$/, 'the room server\'s pages.dev address');
   assert.equal(o.inputDelay, 3);
   assert.deepEqual(o.iceServers.map((s) => ({ ...s })), [{ urls: 'stun:stun.cloudflare.com:3478' }]);
   assert.equal(o.connectTimeoutMs, 10000);

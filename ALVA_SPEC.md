@@ -64,9 +64,9 @@ behave, and how it must look.
   (`server/`, a Cloudflare Worker with Durable Objects, plain JavaScript,
   deployed on its own by the owner within Cloudflare's free plan) that
   introduces two players and nothing more. The game reaches it at
-  `CONFIG.online.serverUrl` (the owner's deployed Worker, at its
-  `workers.dev` address or through the `pages.dev` gateway in
-  `server/gateway/`, which passes everything to it unchanged; a server that
+  `CONFIG.online.serverUrl` (the owner's deployed Worker, through the
+  `pages.dev` gateway in `server/gateway/`, which passes everything to it
+  unchanged: the Worker has no public address of its own; a server that
   cannot be reached, or no address, makes Online play unavailable, never
   broken), never imports it, and the itch.io release
   never includes it; that one host (and its WebSocket form) is the only one

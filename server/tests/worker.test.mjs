@@ -103,3 +103,10 @@ test('wrangler.toml turns the logs on (Workers Logs), for the dashboard', () => 
   const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
   assert.match(toml, /^\[observability\]\nenabled = true$/m);
 });
+
+test('wrangler.toml gives the Worker no public address: the gateway (a service binding) is its address', () => {
+  const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+  assert.match(toml, /^workers_dev = false$/m);
+  assert.match(toml, /^preview_urls = false$/m);
+  assert.doesNotMatch(toml, /^routes? = /m);
+});
