@@ -8,7 +8,8 @@
 // stylesheet and assets exactly what the repository's would make now, its
 // bundle every module in ES evaluation order), that everything the game
 // loads is in it under its exact, case-sensitive name (every fighter's
-// frames, the icons, the images the code names), that nothing loads from
+// frames, in the pack byte for byte, the icons, the images the code
+// names), that nothing loads from
 // another host, and that the archive extracts to exactly the folder, with
 // index.html at its root.
 
@@ -16,8 +17,8 @@ import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { transform } from 'esbuild';
 import {
-  ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, COPIED_FILES, COPIED_DIRS, LIMITS,
-  read, pageParts, joinStylesheets, releasePage, moduleOrder,
+  ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, COPIED_FILES, COPIED_DIRS, PACKED_DIRS, LIMITS,
+  read, pageParts, joinStylesheets, releasePage, moduleOrder, isPacked, readPack,
 } from './release.mjs';
 import { readZip } from './zip.mjs';
 
@@ -29,7 +30,7 @@ export function listFiles(dir, prefix = '') {
   }).sort();
 }
 
-const RELEASE_ROOT = new Set(['index.html', BUNDLE_JS, BUNDLE_CSS, ...COPIED_FILES, ...COPIED_DIRS]);
+const RELEASE_ROOT = new Set(['index.html', BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, ...COPIED_FILES, ...COPIED_DIRS]);
 const DEVELOPMENT_ONLY = [
   /(^|\/)(tests?|docs|tools|node_modules|dist|\.git|\.github|\.claude)(\/|$)/,
   /\.(map|mjs|md|log|zip)$/i,
@@ -73,7 +74,20 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
   const files = listFiles(base);
   const fileSet = new Set(files);
   const bytes = new Map(files.map((f) => [f, readFileSync(`${base}/${f}`)]));
-  const has = (path) => fileSet.has(path.replace(/^\.\//, ''));
+  // The packed files (the fighters' frames), path -> bytes, read back from
+  // the pack exactly as the game reads them.
+  let pack = new Map();
+  try {
+    pack = readPack(bytes.get(ASSET_PACK)?.toString('utf8') ?? '');
+  } catch (err) {
+    fail(`${ASSET_PACK}: ${err.message}`);
+  }
+  // A path the game loads is in the release as a file or, for a packed
+  // folder, in the pack.
+  const has = (path) => {
+    const p = path.replace(/^\.\//, '');
+    return isPacked(p) ? pack.has(p) : fileSet.has(p);
+  };
 
   // The platform's limits, with a margin below the file count.
   const totalBytes = [...bytes.values()].reduce((n, b) => n + b.length, 0);
@@ -103,7 +117,7 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
     else if (url.startsWith('/')) fail(`index.html: ${url} is root-relative (every URL must be relative)`);
     else if (!has(url)) fail(`index.html references ${url}, which is not in the release`);
   }
-  for (const needed of [BUNDLE_JS, BUNDLE_CSS]) {
+  for (const needed of [ASSET_PACK, BUNDLE_JS, BUNDLE_CSS]) {
     if (!html.includes(`"./${needed}"`)) fail(`index.html does not load ./${needed}`);
   }
   if (/["'](?:\.\/)?(?:js|css)\//.test(html)) fail('index.html still references a source module or stylesheet part');
@@ -160,21 +174,31 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
     }
   }
 
-  // Copies, byte for byte: the root files and every asset, nothing more.
+  // Copies, byte for byte: the root files and every asset, nothing more;
+  // a packed asset in the pack (and never also a file of its own), the
+  // pack holding exactly the repository's packed folders.
   for (const f of COPIED_FILES) {
     if (!fileSet.has(f)) fail(`${f} is missing`);
     else if (!sameBytes(bytes.get(f), readFileSync(`${ROOT}${f}`))) fail(`${f} differs from the repository's`);
   }
+  const packedSource = new Set();
   for (const d of COPIED_DIRS) {
     const source = listFiles(`${ROOT}${d}`).map((f) => `${d}/${f}`);
     const copied = files.filter((f) => f.startsWith(`${d}/`));
     for (const f of source) {
-      if (!fileSet.has(f)) fail(`${f} is missing`);
-      else if (!sameBytes(bytes.get(f), readFileSync(`${ROOT}${f}`))) fail(`${f} differs from the repository's`);
+      const where = isPacked(f) ? ASSET_PACK : dir;
+      const got = isPacked(f) ? pack.get(f) : bytes.get(f);
+      if (isPacked(f)) packedSource.add(f);
+      if (!got) fail(`${f} is missing from ${where}`);
+      else if (!sameBytes(got, readFileSync(`${ROOT}${f}`))) fail(`${f} in ${where} differs from the repository's`);
     }
     const sourceSet = new Set(source);
-    for (const f of copied) if (!sourceSet.has(f)) fail(`${f} is not in the repository's ${d}/`);
+    for (const f of copied) {
+      if (!sourceSet.has(f)) fail(`${f} is not in the repository's ${d}/`);
+      else if (isPacked(f)) fail(`${f}: packed, so it is never also a file of its own`);
+    }
   }
+  for (const f of pack.keys()) if (!packedSource.has(f)) fail(`${ASSET_PACK} holds ${f}, which is not in the repository's ${PACKED_DIRS.join(', ')}`);
 
   // The archive: exactly the folder, index.html at its root.
   let zipBytes = 0;
@@ -209,6 +233,7 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
     modules: bundled.length,
     stylesheets: stylesheets.length,
     frames,
+    packed: pack.size,
     byFolder: files.reduce((m, f) => {
       const folder = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '.';
       m[folder] = (m[folder] ?? 0) + 1;

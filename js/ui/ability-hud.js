@@ -52,6 +52,7 @@
 // translated (js/localization/i18n.js).
 
 import { el } from '../core/utils.js';
+import { assetSource } from '../core/asset-loader.js';
 import { t, onLanguageChange, setAttr } from '../localization/i18n.js';
 import { playerChip, playerNumber } from './local-play.js';
 import { DEFAULT_FAMILY, buttonGlyph } from '../core/gamepad-devices.js';
@@ -272,7 +273,7 @@ export class AbilityHUD {
       if (img.isConnected) this.showArt(tile, null);
     }, { once: true });
     img.classList.toggle('is-mirrored', !!sprite.mirrored);
-    img.setAttribute('src', sprite.url);
+    img.setAttribute('src', assetSource(sprite.url));
     tile.art.replaceChildren(img);
     tile.el.classList.add('has-sprite');
   }

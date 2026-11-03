@@ -49,7 +49,9 @@ depends on the repository's name.
 ## Publish on itch.io
 
 itch.io takes at most 1,000 files in an HTML5 game, and the repository
-serves 1,059. The release export makes the same game in 901 files:
+serves 1,223. The release export makes the same game in 14 files (the
+modules bundled, the stylesheets joined, the fighters' frames packed byte
+for byte):
 
 ```sh
 npm install           # once: esbuild, a development dependency of the export only

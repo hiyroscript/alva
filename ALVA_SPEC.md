@@ -46,7 +46,11 @@ behave, and how it must look.
 - **The itch.io release** is an optional, generated copy of the same game for
   hosts that cap the number of files (itch.io: 1,000 in an HTML5 game's ZIP):
   the modules bundled into one script and the stylesheet parts joined into one
-  stylesheet, in their own order, everything else copied unchanged. It is made
+  stylesheet, in their own order, every fighter's frames packed into one
+  script byte for byte (each under its own path, read by the game through
+  `assetSource` in `js/core/asset-loader.js` as a `data:` URL of its exact
+  bytes; on the site nothing is packed and `assetSource` returns the path
+  itself), everything else copied unchanged. It is made
   by a development-only export (one dev dependency, esbuild; nothing the
   player's browser runs), is never edited by hand, and must play, look and
   behave exactly as the repository does: its build validates it and its

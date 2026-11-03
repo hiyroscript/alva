@@ -61,6 +61,7 @@
 // and it writes only what changed.
 
 import { el } from '../core/utils.js';
+import { assetSource } from '../core/asset-loader.js';
 import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { NUMBERED_ATTACKS } from '../config.js';
@@ -742,7 +743,11 @@ export class TouchControls {
       img.addEventListener('error', () => this.spriteFailed(b, img));
       b._sprite = img;
     }
-    if (img.getAttribute('src') !== sprite.url) img.setAttribute('src', sprite.url);
+    // Its source is the frame's file, or its packed bytes in a release that
+    // packs them (assetSource); the frame is still known by its path.
+    const src = assetSource(sprite.url);
+    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+    img._asset = sprite.url;
     img.classList.toggle('is-mirrored', sprite.mirrored);
     b._fallback = icon;
     if (!b.classList.contains('has-sprite')) {
@@ -756,7 +761,7 @@ export class TouchControls {
   // not tried again. Reported once per file. An error from a source already
   // replaced (the new one still loading) is not this one's.
   spriteFailed(b, img) {
-    const url = img.getAttribute('src');
+    const url = img._asset ?? img.getAttribute('src');
     if (b._sprite !== img || !b.classList.contains('has-sprite') || !url || img.complete === false) return;
     if (!this.failedArt.has(url)) {
       this.failedArt.add(url);

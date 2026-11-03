@@ -4568,3 +4568,59 @@ and each fighter's roster list; the disabled test fighter moved from slot
 11 to slot 26. The itch.io release now counts 1,063 files, over its 1,000
 limit: `npm run build:itch` refuses it until a later update brings it
 back under.
+
+## The itch.io release's frames, packed
+
+Not a named update (it can become one if the owner names it). Asked for
+as: the itch.io run failed (with #0011 the release had 1,063 files, over
+itch.io's 1,000); fix it by merging files or otherwise, the game running
+exactly the same, then open a pull request.
+
+**What it changed**
+
+- **The fighters' frames packed into one script.** The release's build
+  (`tools/itch/build.mjs`) no longer copies the 1,050 files of
+  `assets/characters/` one by one: it packs them into `game-assets.js`
+  (`writePack` in `tools/itch/release.mjs`), each file's exact bytes in
+  base64 under its own path, one line a file in path order, so the same
+  files always make the same pack. The release page loads it as a deferred
+  script just before the bundle (deferred scripts and modules run in
+  document order), and it sets `globalThis.ALVA_PACKED_ASSETS`, frozen. The
+  release went from 1,063 files to 14, and stays at 14 however many
+  fighters join.
+- **`assetSource`, the one place the game asks where an asset's bytes
+  are** (`js/core/asset-loader.js`): on the site, where nothing is packed,
+  the path itself, so the repository runs exactly as before; in the
+  release, a `data:` URL of the packed file's exact bytes, which decodes to
+  the very same image. The four places that hand a frame to the browser ask
+  it: the asset loader, the touch buttons, the ability HUD and the
+  controller editor. Everything else still names each frame by its path
+  (the definitions, the sprite sets, the loader's keys, a failure's report).
+- **The validation** (`tools/itch/validate.mjs`) reads the pack back
+  (`readPack`) and checks it holds exactly the files of
+  `assets/characters/`, each byte for byte the repository's, none missing,
+  none extra and none also copied as a file of its own; every frame of
+  every registered fighter must be in it.
+
+**Checked.** `npm run build:itch`: 14 files, valid. `npm run verify:itch`:
+the bundle plays every scenario exactly as the source does (39 scenarios,
+187,909 fixed steps). In headless Chromium, the site and the release side
+by side: all 1,050 frames load in both and decode to the same pixels
+(width, height and every RGBA byte), the release requests no frame file at
+all, the touch buttons and the ability HUD show their frames from the pack,
+and a battle plays with no console error.
+
+**Code:** `js/core/asset-loader.js` (`assetSource`), `js/ui/touch-controls.js`,
+`js/ui/ability-hud.js`, `js/ui/controller-editor.js`,
+`tools/itch/release.mjs` (`ASSET_PACK`, `PACKED_DIRS`, `isPacked`,
+`writePack`, `readPack`, the page's pack script), `tools/itch/build.mjs`,
+`tools/itch/validate.mjs`; the documentation (the itch.io release, running
+and deploying, architecture decisions, module responsibilities, testing,
+`ALVA_SPEC.md`, `README.md`).
+
+**Tests:** new `tests/interface/packed-assets.test.mjs` (`assetSource` on
+the site and in a release, the loader keying a packed frame by its path,
+the pack holding every fighter frame byte for byte, run as the page runs
+it, and the release page running it before the game); a packed case each
+in `ability-hud` and `controls-ui` (the touch buttons, a failure still
+naming the frame's file).

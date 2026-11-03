@@ -21,15 +21,52 @@ export const OUT_DIR = `${DIST}/itch`;
 export const ZIP_PATH = `${DIST}/alva-itch.zip`;
 
 // The release's own files: the page, the bundled modules, the joined
-// stylesheet. Everything else is copied unchanged from the repository.
+// stylesheet and the packed fighter frames. Everything else is copied
+// unchanged from the repository.
 export const BUNDLE_JS = 'game.js';
 export const BUNDLE_CSS = 'game.css';
+export const ASSET_PACK = 'game-assets.js';
 
 // What the game loads besides its modules and stylesheet, copied as they
 // are: the manifest, the favicon and splash images, Home's controller
-// picture, and every asset (fighter frames and icons), byte for byte.
+// picture, and every asset but the packed ones (the icons), byte for byte.
 export const COPIED_FILES = ['manifest.webmanifest', 'alvafav.PNG', 'controller.PNG', 'hs.jpg'];
 export const COPIED_DIRS = ['assets'];
+
+// The folders whose files are packed into ASSET_PACK instead of copied one
+// by one: every fighter's frames (over a thousand PNGs, more than itch.io
+// accepts in a whole game). Each keeps its exact bytes, under its own path:
+// the game loads it from a data: URL of those bytes (assetSource in
+// js/core/asset-loader.js), so it decodes to the very same image.
+export const PACKED_DIRS = ['assets/characters'];
+export const isPacked = (path) => PACKED_DIRS.some((d) => path.replace(/^\.\//, '').startsWith(`${d}/`));
+
+// The global the pack sets, read by assetSource.
+export const PACK_GLOBAL = 'ALVA_PACKED_ASSETS';
+const PACK_HEAD = '// Alva\'s fighter frames, packed for release by tools/itch/build.mjs: every file of\n' +
+  `// ${PACKED_DIRS.map((d) => `${d}/`).join(', ')}, byte for byte (base64), under its own path, for\n` +
+  '// assetSource (js/core/asset-loader.js). Generated: never edit it; change the files and rebuild.\n' +
+  `globalThis.${PACK_GLOBAL} = Object.freeze({\n`;
+const PACK_TAIL = '});\n';
+
+// The pack's script for `files` ([{ path, data }], path relative to the
+// repository root, data a Buffer): one line per file, in path order, so the
+// same files always make the same pack.
+export function writePack(files) {
+  const lines = [...files]
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .map(({ path, data }) => `  ${JSON.stringify(path)}: ${JSON.stringify(Buffer.from(data).toString('base64'))},\n`);
+  return `${PACK_HEAD}${lines.join('')}${PACK_TAIL}`;
+}
+
+// The files a pack's script holds, path -> Buffer of their bytes; throws
+// on anything but a pack writePack made.
+export function readPack(text) {
+  if (!text.startsWith(PACK_HEAD) || !text.endsWith(PACK_TAIL)) throw new Error('not a pack made by writePack');
+  const body = text.slice(PACK_HEAD.length, text.length - PACK_TAIL.length).replace(/,\n$/, '');
+  const entries = JSON.parse(`{${body}}`);
+  return new Map(Object.entries(entries).map(([path, b64]) => [path, Buffer.from(b64, 'base64')]));
+}
 
 // itch.io's limits for an HTML5 game's ZIP (as extracted), and the margin
 // the release keeps below the file limit.
@@ -88,7 +125,10 @@ export function joinStylesheets(parts) {
 }
 
 // index.html for the release: the parts' links become one link to the
-// joined stylesheet, the module entry the bundle. Nothing else changes.
+// joined stylesheet, the module entry the bundle, preceded by the pack's
+// deferred script (deferred scripts and module scripts run in document
+// order, so the pack is set before the first module runs, and both are
+// fetched in parallel without holding up the page). Nothing else changes.
 export function releasePage(html = read('index.html')) {
   const { stylesheets } = pageParts(html);
   let first = true;
@@ -100,7 +140,10 @@ export function releasePage(html = read('index.html')) {
       first = false;
       return line.replace(/href="[^"]+"/, `href="./${BUNDLE_CSS}"`);
     })
-    .replace(MODULE_SCRIPT, (line) => line.replace(/src="[^"]+"/, `src="./${BUNDLE_JS}"`));
+    .replace(MODULE_SCRIPT, (line) => {
+      const indent = line.match(/^[ \t]*/)[0];
+      return `${indent}<script defer src="./${ASSET_PACK}"></script>\n${line.replace(/src="[^"]+"/, `src="./${BUNDLE_JS}"`)}`;
+    });
   if (stylesheets.length && !page.includes(`href="./${BUNDLE_CSS}"`)) throw new Error('the release page lost its stylesheet');
   return page;
 }

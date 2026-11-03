@@ -4,8 +4,12 @@
 // 2. Bundles the page's module entry (js/main.js) and everything it imports
 //    into game.js (release.mjs: BUNDLE_OPTIONS, nothing rewritten).
 // 3. Joins the page's stylesheet parts, in their cascade order, into game.css.
-// 4. Copies index.html with those two in place of the parts and modules.
-// 5. Copies the manifest, the root images and assets/ unchanged.
+// 4. Copies index.html with those two in place of the parts and modules,
+//    and the pack's script before the bundle.
+// 5. Packs every fighter's frames (assets/characters/) into game-assets.js,
+//    each file's exact bytes under its own path (release.mjs: writePack),
+//    and copies the manifest, the root images and the rest of assets/
+//    unchanged.
 // 6. Validates the folder (validate.mjs) and, if it is valid, writes
 //    dist/alva-itch.zip with index.html at its root, then validates the
 //    archive against the folder.
@@ -19,8 +23,8 @@ import { mkdirSync, rmSync, writeFileSync, copyFileSync, readFileSync, existsSyn
 import { dirname } from 'node:path';
 import { build } from 'esbuild';
 import {
-  ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, COPIED_FILES, COPIED_DIRS, LIMITS, BUNDLE_OPTIONS,
-  read, pageParts, joinStylesheets, releasePage,
+  ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, COPIED_FILES, COPIED_DIRS, PACKED_DIRS, LIMITS, BUNDLE_OPTIONS,
+  read, pageParts, joinStylesheets, releasePage, isPacked, writePack,
 } from './release.mjs';
 import { listFiles, validateRelease } from './validate.mjs';
 import { writeZip } from './zip.mjs';
@@ -58,12 +62,19 @@ async function main() {
   write(BUNDLE_CSS, joinStylesheets(stylesheets));
   write('index.html', releasePage(html));
   for (const f of COPIED_FILES) write(f, readFileSync(`${ROOT}${f}`));
+  const packed = [];
   for (const d of COPIED_DIRS) {
     for (const f of listFiles(`${ROOT}${d}`)) {
-      mkdirSync(dirname(out(`${d}/${f}`)), { recursive: true });
-      copyFileSync(`${ROOT}${d}/${f}`, out(`${d}/${f}`));
+      const path = `${d}/${f}`;
+      if (isPacked(path)) {
+        packed.push({ path, data: readFileSync(`${ROOT}${path}`) });
+        continue;
+      }
+      mkdirSync(dirname(out(path)), { recursive: true });
+      copyFileSync(`${ROOT}${path}`, out(path));
     }
   }
+  write(ASSET_PACK, writePack(packed));
 
   // The folder first: an invalid release makes no archive.
   let report = await validateRelease({ checkZip: false });
@@ -81,7 +92,8 @@ async function main() {
   console.log(`page            ${OUT_DIR}/index.html (from index.html)`);
   console.log(`modules         ${stats?.modules} → ${OUT_DIR}/${BUNDLE_JS} (${kb(readFileSync(out(BUNDLE_JS)).length)})`);
   console.log(`stylesheets     ${stylesheets.length} → ${OUT_DIR}/${BUNDLE_CSS} (${kb(readFileSync(out(BUNDLE_CSS)).length)})`);
-  console.log(`copied          ${COPIED_FILES.join(', ')}, ${COPIED_DIRS.map((d) => `${d}/`).join(', ')} (unchanged)`);
+  console.log(`copied          ${COPIED_FILES.join(', ')}, ${COPIED_DIRS.map((d) => `${d}/`).join(', ')} but what is packed (unchanged)`);
+  console.log(`packed          ${packed.length} files of ${PACKED_DIRS.map((d) => `${d}/`).join(', ')} → ${OUT_DIR}/${ASSET_PACK} (${kb(readFileSync(out(ASSET_PACK)).length)}), byte for byte`);
   console.log(`fighter frames  ${stats?.frames} referenced, every one present`);
   if (stats) {
     console.log('\nfiles by folder');

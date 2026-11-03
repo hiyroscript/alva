@@ -38,6 +38,7 @@
 //                listens: no menu behind it and no gameplay moves.
 
 import { el } from '../core/utils.js';
+import { assetSource } from '../core/asset-loader.js';
 import { t, tx, tattr, iconLabel, setText } from '../localization/i18n.js';
 import { CHARACTERS, isPlayable, getPlayableCharacter } from '../data/characters.js';
 import {
@@ -723,7 +724,7 @@ class EditorLayer {
       return frame;
     }
     const img = el('img', {
-      class: `controller-row-sprite${sprite.mirrored ? ' is-mirrored' : ''}`, src: sprite.url, alt: '',
+      class: `controller-row-sprite${sprite.mirrored ? ' is-mirrored' : ''}`, src: assetSource(sprite.url), alt: '',
       draggable: 'false', decoding: 'async',
     });
     img.addEventListener('error', () => {
