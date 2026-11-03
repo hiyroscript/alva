@@ -1,7 +1,10 @@
 # Alva's room server (server/src/index.js): a Cloudflare Worker with two
-# Durable Object classes. Deploy with `npx wrangler deploy` from this folder;
-# run it on your own computer with `npx wrangler dev` (no account needed).
-# Step by step: docs/development/online-server.md.
+# Durable Object classes. Deployed by Cloudflare from the GitHub repository
+# (Workers Builds: root directory `server`, deploy command
+# `npx wrangler deploy`, the Worker's name exactly `name` below), or with
+# `npx wrangler deploy` from this folder; run it on your own computer with
+# `npx wrangler dev` (no account needed). Step by step:
+# docs/development/online-server.md.
 
 name = "alva-rooms"
 main = "src/index.js"
@@ -28,7 +31,8 @@ new_sqlite_classes = ["Lobby", "Room"]
 # HTML5 games from html-classic.itch.zone and html.itch.zone, and may use
 # other *.itch.zone hosts) and a copy on your own computer for testing.
 # Comma-separated; * stands for any host labels before the domain, or any
-# port. Change it here and run `npx wrangler deploy` again; no code changes.
+# port. Change it here and deploy again (merging into main does it when
+# Cloudflare deploys from GitHub); no code changes.
 ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*"
 
 # Staying inside Cloudflare's free Workers plan (checked on 2026-11-03:
