@@ -44,8 +44,11 @@ the top of [`server/src/room.js`](../../server/src/room.js).
 `ALLOWED_ORIGINS` in `wrangler.toml`: itch.io's HTML5 game hosts
 (`https://html-classic.itch.zone`, `https://html.itch.zone`, and any other
 `https://*.itch.zone`, the domain itch.io serves games from) and
-`http://localhost:*` / `http://127.0.0.1:*` for testing. Change the list
-there and deploy again; no code changes. The Origin of a WebSocket upgrade
+`http://localhost:*` / `http://127.0.0.1:*` for testing. The game's own
+site on GitHub Pages is not on it, so Online Play is for the itch.io page
+(adding `https://hiyroscript.github.io` to the list would open it there
+too). Change the list there and deploy again (merging into `main` does);
+no code changes. The Origin of a WebSocket upgrade
 is held to the same list.
 
 **No accounts, no personal data.** No login, cookie or stored identity: the
@@ -98,7 +101,15 @@ node --test                        # every test of the repository, the server's 
 cd server && npm test              # the server's alone (no install needed)
 ```
 
-Two tabs against a local server:
+**Two tabs against the deployed server.** It allows `http://localhost:*`,
+so the game served from your computer (`python3 -m http.server 8000` from
+the repository's root, then `http://localhost:8000` in two tabs or two
+browsers) plays online through it with nothing to change. In one tab,
+Online play → a name → Create room; in the other, Online play → another
+name → Join with code (or the public list).
+
+**Two tabs against a local server** (to try a change to the server's code
+before it is merged):
 
 ```sh
 cd server
@@ -107,53 +118,72 @@ npx wrangler dev                   # the server on http://localhost:8787, its Du
 ```
 
 Then, for the game, set `serverUrl: 'http://localhost:8787'` in
-`CONFIG.online` (`js/config.js`; never commit it), serve the repository
-(`python3 -m http.server 8000` from its root) and open
-`http://localhost:8000` in two tabs (or two browsers). In one, Online play →
-a name → Create room; in the other, Online play → another name → Join with
-code (or the public list). Open `http://localhost:8787/health` to see the
-server is up.
+`CONFIG.online` (`js/config.js`; never commit it: the committed address is
+the deployed server's), serve the repository and open it in two tabs as
+above. Open `http://localhost:8787/health` to see the server is up.
 
 ## Putting it online, step by step
 
-This is the owner's part, done once. Nothing here costs money: the free
-Cloudflare plan needs no credit card. Each step is one thing to do; if a
-step does not show what it says, copy everything the terminal printed and
-paste it to Claude.
+Done once, on 2026-11-03: the server is deployed, and its address is
+`CONFIG.online.serverUrl`. The steps stay here for a new deployment (another
+Cloudflare account, or starting over).
+
+This is the owner's part, and it needs **no computer of a particular kind
+and no terminal**: everything happens in a web browser, on
+a phone, a tablet, a Chromebook or any computer. Cloudflare builds and
+deploys the server itself, from this repository on GitHub (its "Workers
+Builds": it runs `npx wrangler deploy` in the `server` folder on its own
+machines). Nothing here costs money: the free plan needs no credit card,
+and its building allowance (3,000 build minutes a month) is far more than
+the server needs. Each step is one thing to do; if a step does not show
+what it says, take a screenshot (or copy the error text) and send it to
+Claude.
 
 1. **Merge the first pull request** ("Online Play, part 1: game and server
-   code") on GitHub. It is safe: until the second pull request, Online play
-   says "Online play is unavailable right now." Don't upload a new itch.io
-   build until the second pull request is merged.
+   code") on GitHub. Cloudflare deploys from the `main` branch, so the
+   `server` folder has to be there first. It is safe: until the second pull
+   request, Online play says "Online play is unavailable right now." Don't
+   upload a new itch.io build until the second pull request is merged.
 2. **Create a free Cloudflare account** at <https://dash.cloudflare.com/sign-up>.
    Enter your email and a password, then open the email Cloudflare sends and
-   click its link to confirm the address. You should see the Cloudflare
-   dashboard. No credit card is needed.
-3. **Install Node.js**, if `node --version` in a terminal does not already
-   print v22 or higher: go to <https://nodejs.org>, download the **LTS**
-   version (22 or newer) for your computer, open the file and click through
-   the installer with its default choices.
-4. **Get the repository and open a terminal in its `server` folder.**
-   - On GitHub, on the repository's page, click the green **Code** button,
-     then **Download ZIP**, and unzip the file (double-click it). Inside is a
-     folder `alva-main`, and inside that a folder `server`.
-   - **Windows:** open the `server` folder in File Explorer, click the
-     address bar at the top, type `cmd` and press Enter. A black terminal
-     window opens, already in that folder.
-   - **Mac:** in Finder, right-click (or Control-click) the `server` folder
-     and choose **New Terminal at Folder** (if it is not there: open
-     Terminal from Applications › Utilities, type `cd ` with a space, drag
-     the `server` folder onto the window and press Return).
-5. **Install the tool and log in.** In the terminal type `npm install` and
-   press Enter; after a little while it says "added … packages". Then type
-   `npx wrangler login` and press Enter: your browser opens a Cloudflare
-   page; log in if asked, then click **Allow**. The terminal then says it
-   is logged in.
-6. **Deploy.** Type `npx wrangler deploy` and press Enter. The first time it
-   may ask you to register a **workers.dev subdomain**: answer yes and type
-   a short name (letters and digits, for example your name). When it is
-   done it prints an address ending in **`.workers.dev`**, like
-   `https://alva-rooms.yourname.workers.dev`. Copy it.
+   tap its link to confirm the address. You should see the Cloudflare
+   dashboard. No credit card is needed. (If it asks what you want to do
+   first, skip it.)
+3. **Start a new Worker from GitHub.** In the dashboard's menu, open
+   **Workers & Pages** (on a phone, the menu is behind the ☰ button at the
+   top), then **Create** (or **Create application**), and choose to
+   **import a repository** from Git (the option that connects GitHub).
+4. **Let Cloudflare see the repository.** Choose **GitHub** and connect your
+   GitHub account: a GitHub page opens asking to install Cloudflare's app.
+   Choose your account (`hiyroscript`), then **Only select repositories**,
+   pick **alva**, and tap **Install** (or **Install & Authorize**). You come
+   back to Cloudflare; pick **alva** in its list of repositories.
+5. **Fill in the settings** on the **Set up your application** screen:
+   - **Project name:** `alva-rooms`. It must be exactly this: it is the name
+     in `server/wrangler.toml`, and the build fails if the two differ.
+   - **Build command:** leave it empty.
+   - **Deploy command:** `npx wrangler deploy`
+   - **Preview command:** leave it as it is.
+   - **Enable Preview builds:** turn it **off** (only `main` is deployed;
+     other branches need no builds).
+   - **Protect with Cloudflare Access:** leave it **off** (with it on, the
+     game cannot reach the server).
+   - Open **Advanced settings**: **Path** (the root directory) is `/`;
+     change it to **`/server`**.
+   - **API token:** leave **Create new token** (Cloudflare makes one for its
+     own build; if it asks for a name, type `alva-rooms-build`).
+   - **Variable name** and **Variable value:** leave them empty (the
+     server's settings are in `server/wrangler.toml`).
+
+   Then tap **Deploy**.
+6. **Wait for the build** (a minute or two). The page shows the build's
+   log; it ends successfully with a line naming the deployed address, which
+   ends in **`.workers.dev`**, like `https://alva-rooms.yourname.workers.dev`.
+   You can also find it later on the Worker's page (open **Workers & Pages**,
+   then **alva-rooms**; the address is near the top, or under its
+   **Settings**, **Domains & Routes**). Copy it. (The first time, Cloudflare
+   may ask you to choose a **workers.dev subdomain**: any short name, for
+   example your name.)
 7. **Check it.** Open that address with `/health` at the end in your
    browser, for example `https://alva-rooms.yourname.workers.dev/health`.
    It should show `{"ok":true,"service":"alva-rooms"}`.
@@ -161,17 +191,34 @@ paste it to Claude.
    makes the second pull request ("Online Play, part 2: go live"), which
    points the game at your server.
 
+From then on, every merge into `main` builds and deploys the server again by
+itself (a change to the server's code or to `server/wrangler.toml` reaches it
+that way, with nothing to run). If the dashboard offers builds for other
+branches than `main`, they can be turned off: only `main` matters.
+
 A TURN server (for players behind very strict networks) is not needed now;
 if a friend can never connect, tell Claude: it is a small follow-up.
 
+### With a terminal instead
+
+On a computer with a terminal (Linux, macOS or Windows) and Node.js 22 or
+newer, the same server deploys from the `server` folder of a copy of the
+repository: `npm install`, then `npx wrangler login` (a browser page asks to
+**Allow**), then `npx wrangler deploy`, which prints the `.workers.dev`
+address. Deploying that way does not set up the automatic deploys above.
+
 ### Later
 
-- **Changing a cap or the allowed origins:** edit `server/wrangler.toml`,
-  then `npx wrangler deploy` again from the `server` folder.
+- **Changing a cap or the allowed origins:** edit `server/wrangler.toml`
+  in a pull request; merging it deploys the server again (with a terminal
+  instead: `npx wrangler deploy` from the `server` folder).
 - **Seeing it work:** the Cloudflare dashboard, **Workers & Pages** ›
-  **alva-rooms** shows its requests and errors; **Durable Objects** shows
-  the day's usage against the free plan.
-- **Changing the server's code:** the same `npx wrangler deploy`.
+  **alva-rooms** shows its builds, requests and errors; **Durable Objects**
+  shows the day's usage against the free plan.
+- **Changing the server's code:** the same: merged into `main`, it is
+  deployed. A deploy restarts the rooms' connections: the game reconnects
+  to its room by itself within a few seconds, and a match under way is not
+  affected (it never goes through the server).
 - **A new release of the game:** a room only takes a guest whose game has
   the host's `CONFIG.version` (`js/config.js`), so two players never mix
   versions in a match. Raise it with any release that changes how a match

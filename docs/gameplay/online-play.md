@@ -25,7 +25,8 @@ guide: [the room server](../development/online-server.md).
 | [`js/game/arena.js`](../../js/game/arena.js) | `Arena.advance`: the fixed steps, which an online match hands to its `stepper` (the lockstep). |
 
 `CONFIG.online` ([`js/config.js`](../../js/config.js)) holds its settings:
-`serverUrl` (empty until the server is deployed), `inputDelay`,
+`serverUrl` (the deployed room server; empty, Online Play ends at "Online
+play is unavailable right now."), `inputDelay`,
 `iceServers`, `modes`, `connectTimeoutMs`, `disconnectGraceMs`,
 `loadTimeoutMs`, `listRefreshMs`, `hashInterval`, `resendWindow` and
 `colors`.

@@ -64,8 +64,9 @@ behave, and how it must look.
   (`server/`, a Cloudflare Worker with Durable Objects, plain JavaScript,
   deployed on its own by the owner within Cloudflare's free plan) that
   introduces two players and nothing more. The game reaches it at
-  `CONFIG.online.serverUrl` (empty until it is deployed: Online play is then
-  unavailable, never broken), never imports it, and the itch.io release
+  `CONFIG.online.serverUrl` (the owner's deployed Worker; a server that
+  cannot be reached, or no address, makes Online play unavailable, never
+  broken), never imports it, and the itch.io release
   never includes it; that one host (and its WebSocket form) is the only one
   the release may name besides the credits' links. Every other mode needs
   no network at all. Matches go peer to peer (WebRTC), never through the

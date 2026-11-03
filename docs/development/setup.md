@@ -40,9 +40,10 @@ Cloudflare account either.
 Online Play needs one small server, a Cloudflare Worker in `server/`
 (deployed on its own, never part of the game's files). Run it locally with
 `npx wrangler dev` from `server/` (no account needed) and point
-`CONFIG.online.serverUrl` at it for a two-tab test; put it online with
-`npx wrangler deploy`. Everything, step by step, in
-[the room server](online-server.md).
+`CONFIG.online.serverUrl` at it for a two-tab test. Putting it online
+needs only a web browser: Cloudflare deploys it from this repository on
+GitHub (or `npx wrangler deploy` from a terminal). Everything, step by step,
+in [the room server](online-server.md).
 
 ## Deploy to GitHub Pages
 

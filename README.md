@@ -200,10 +200,10 @@ python3 -m http.server 8000
 Any static server works; there is nothing to install. Run the tests with
 `node --test`.
 
-Online Play needs its room server (`server/`, a Cloudflare Worker on the
-free plan): `npx wrangler dev` runs it locally with no account, and
-[the room server](docs/development/online-server.md) explains putting it
-online. Until it is, Online play says it is unavailable.
+Online Play uses its room server (`server/`, a Cloudflare Worker on the
+free plan, deployed by Cloudflare from this repository: its address is
+`CONFIG.online.serverUrl`); `npx wrangler dev` runs it locally with no
+account. More in [the room server](docs/development/online-server.md).
 
 ## Deploy it
 

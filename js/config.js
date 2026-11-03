@@ -100,13 +100,14 @@ export const CONFIG = Object.freeze({
   // then a peer-to-peer match between the two browsers
   // (docs/gameplay/online-play.md). Frozen: the game never changes it.
   online: Object.freeze({
-    // The room server's address, scheme and host with no trailing slash
-    // (for example the workers.dev address `npx wrangler deploy` prints, or
-    // the local `npx wrangler dev` one for a two-tab test). Empty: Online
-    // Play has no server yet, and ends at "Online play is unavailable right
-    // now." The itch.io validator allows this one host and no other
-    // (tools/itch/hosts.mjs).
-    serverUrl: '',
+    // The room server's address, scheme and host with no trailing slash:
+    // the owner's deployed Worker (server/, deployed by Cloudflare from this
+    // repository: docs/development/online-server.md). For a test against a
+    // local `npx wrangler dev`, its address goes here for that test only.
+    // Empty, or a server that does not answer, and Online Play ends at
+    // "Online play is unavailable right now." The itch.io validator allows
+    // this one host and no other (tools/itch/hosts.mjs).
+    serverUrl: 'https://alva-rooms.christopherjustemsh117.workers.dev',
     // Steps between sampling the local player's input and playing it (3 is
     // 50 ms): the time a frame has to reach the other browser before it is
     // needed, so the match never waits on a normal connection.

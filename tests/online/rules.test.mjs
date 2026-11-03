@@ -88,9 +88,12 @@ test('the online modes and a visit\'s session id', () => {
   assert.notEqual(sessionId(), a);
 });
 
-test('CONFIG.online: no server yet, the delay, STUN only, the waits and the colours; frozen', () => {
+test('CONFIG.online: the deployed server (one https origin, nothing more), the delay, STUN only, the waits and the colours; frozen', () => {
   const o = CONFIG.online;
-  assert.equal(o.serverUrl, '');
+  const url = new URL(o.serverUrl);
+  assert.equal(url.protocol, 'https:', 'a secure address: itch.io serves the game over https');
+  assert.equal(url.origin, o.serverUrl, 'scheme and host only: no path, query or trailing slash');
+  assert.match(url.hostname, /\.workers\.dev$/);
   assert.equal(o.inputDelay, 3);
   assert.deepEqual(o.iceServers.map((s) => ({ ...s })), [{ urls: 'stun:stun.cloudflare.com:3478' }]);
   assert.equal(o.connectTimeoutMs, 10000);

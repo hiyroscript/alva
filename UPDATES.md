@@ -18,7 +18,7 @@ for where they moved). The game as it is now is specified in
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
-| **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code); part 2 (go live) to follow | part 1: `cb3c38b` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
+| **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -4682,6 +4682,16 @@ before.
   WebSocket addresses too ([`tools/itch/hosts.mjs`](./tools/itch/hosts.mjs));
   `server/` is on the shared development-only list. Menu navigation keeps
   a focused text field's typing keys its own (`isTextEntry`).
+
+**Part 2, going live** ([#161](https://github.com/hiyroscript/alva/pull/161), `887b256`): the owner deployed the server from a web browser,
+with no terminal (Cloudflare's Workers Builds deploys `server/` from this
+repository and again on every merge into `main`;
+[the steps](./docs/development/online-server.md#putting-it-online-step-by-step)),
+and `CONFIG.online.serverUrl` now names it, so the itch.io validator allows
+that one host (and its `wss` form) and no other. The server's allowed
+origins already matched itch.io's game hosts; it needed no change. The
+tests that pinned an empty address now test the empty case explicitly, and
+a new one holds the configured host to the rule.
 
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,

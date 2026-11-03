@@ -245,9 +245,8 @@ test('typing in a field: letters, Space and Backspace are the field\'s, never a 
   assert.equal(current(app), 'home', 'Esc goes back');
 });
 
-test('no room server (CONFIG.online.serverUrl empty, as now): after the name, "Online play is unavailable right now", then Home', async () => {
-  assert.equal(CONFIG.online.serverUrl, '');
-  const booted = boot({ serverUrl: CONFIG.online.serverUrl });
+test('no room server configured (CONFIG.online.serverUrl empty): after the name, "Online play is unavailable right now", then Home', async () => {
+  const booted = boot({ serverUrl: '' });
   const { app, screens } = booted;
   screens.home.actions.online.click();
   screens.name.field.input.type_('Chris');
