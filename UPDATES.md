@@ -4719,8 +4719,13 @@ reach it answers `server_error` with `ok: false`, which the game reads as
 "rooms not working". Tested in `server/tests/gateway.test.mjs`, and on
 Cloudflare's local runtime (the Worker and the gateway connected, two
 browser pages playing a match through it). The owner sets it up once from
-GitHub ([the steps](./docs/development/online-server.md#if-the-workersdev-address-never-works-the-pagesdev-address));
+GitHub ([the steps](./docs/development/online-server.md#putting-it-online-step-by-step));
 `serverUrl` then names its address: `https://alva-online.pages.dev`.
+Since nothing uses the Worker's own `workers.dev` address any more,
+`server/wrangler.toml` then switched it off (`workers_dev = false`,
+`preview_urls = false`), and the setup steps became the Worker first, then
+its Pages project. The old address is gone from the files; it stays in the
+history of the commits and pull requests that used it.
 
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,

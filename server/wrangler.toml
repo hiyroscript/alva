@@ -5,12 +5,19 @@
 # `npx wrangler deploy` from this folder; run it on your own computer with
 # `npx wrangler dev` (no account needed). Step by step:
 # docs/development/online-server.md.
+#
+# The game reaches it at https://alva-online.pages.dev, through the Pages
+# project in gateway/, which calls this Worker by its name (a service
+# binding), not by any address.
 
 name = "alva-rooms"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
-# The free plan's address: https://alva-rooms.<your account>.workers.dev
-workers_dev = true
+# No public address of its own: the workers.dev one never came to exist in
+# DNS on this account, and nothing uses it now that the gateway (gateway/)
+# is the server's address. Its preview addresses are off too.
+workers_dev = false
+preview_urls = false
 
 [[durable_objects.bindings]]
 name = "LOBBY"
