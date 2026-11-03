@@ -82,10 +82,39 @@ const NOTICES = Object.freeze({
 export const noticeKeys = (code) => NOTICES[code] ?? NOTICES.error;
 
 // Tells the player about `code` in the app's dialog, one button to
-// acknowledge; resolves once they have.
-export function showNotice(app, code) {
+// acknowledge; resolves once they have. `detail` ([key, params]) adds a
+// line saying why, after the message.
+export function showNotice(app, code, { detail = null } = {}) {
   const [title, message] = noticeKeys(code);
-  return app.dialog.open({ title: t(title), message: t(message), confirmLabel: t('online.notice.ok'), notice: true });
+  const text = detail ? `${t(message)} ${t(...detail)}` : t(message);
+  return app.dialog.open({ title: t(title), message: text, confirmLabel: t('online.notice.ok'), notice: true });
+}
+
+// The codes that all mean the room server cannot be used (its own refusal
+// of this page's origin and its unexpected failures included).
+export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error']);
+
+// What "Online play is unavailable" adds to say why, by the server's
+// answer to /health (RoomServerClient.diagnose).
+const WHY_UNAVAILABLE = Object.freeze({
+  not_configured: 'online.detail.notConfigured',
+  unreachable: 'online.detail.unreachable',
+  origin: 'online.detail.origin',
+  server_error: 'online.detail.server',
+  reachable: 'online.detail.reachable',
+});
+
+// Tells the player about the failure `err` (an OnlineError): a refusal by
+// its own message, and "Online play is unavailable" with the reason the
+// server gives for it (asked again: /health is readable from any page).
+export async function showFailure(app, err) {
+  const code = err?.code ?? 'unavailable';
+  if (!UNAVAILABLE.includes(code)) return showNotice(app, code);
+  const why = (await app.online?.diagnose?.().catch?.(() => null)) ?? null;
+  const reason = code === 'origin' ? 'origin' : code === 'server_error' && why?.code === 'reachable' ? 'server_error' : why?.code;
+  const key = WHY_UNAVAILABLE[reason];
+  const origin = why?.origin || globalThis.location?.origin || '?';
+  return showNotice(app, 'unavailable', { detail: key ? [key, { origin }] : null });
 }
 
 // The room name a new room starts with: "{name}'s room" in the language in
@@ -212,9 +241,9 @@ export class OnlineNameScreen extends Screen {
     } catch (err) {
       if (this.app.screens.current !== this) return;
       const code = err?.code ?? 'unavailable';
-      await showNotice(this.app, code);
-      // No server at all: Online Play ends here, back Home.
-      if (code === 'unavailable' && this.app.screens.current === this) this.app.screens.go('home', {}, { reset: true });
+      await showFailure(this.app, err);
+      // No server to use: Online Play ends here, back Home.
+      if (UNAVAILABLE.includes(code) && this.app.screens.current === this) this.app.screens.go('home', {}, { reset: true });
     } finally {
       this.busy = false;
       this.continueButton.disabled = false;
@@ -520,7 +549,7 @@ export class OnlineLobbyScreen extends Screen {
       if (this.app.screens.current === this) this.app.screens.go('online-room');
     } catch (err) {
       if (this.app.screens.current !== this) return;
-      await showNotice(this.app, err?.code ?? 'unavailable');
+      await showFailure(this.app, err);
       if (this.app.screens.current === this) this.refresh();
     } finally {
       this.busy = false;

@@ -253,7 +253,7 @@ test('no room server configured (CONFIG.online.serverUrl empty): after the name,
   screens.name.continueButton.click();
   await settleAll();
   assert.equal(dialogOpen(app), true);
-  assert.equal(dialogText(app), 'Online play unavailable — Online play is unavailable right now.');
+  assert.equal(dialogText(app), 'Online play unavailable — Online play is unavailable right now. This copy of the game has no room server set up.');
   assert.equal(app.dialog.cancelBtn.hidden, true, 'one button to acknowledge');
   await acknowledge(app);
   assert.equal(current(app), 'home');
@@ -267,7 +267,46 @@ test('a server that cannot be reached is "unavailable" too, never "full"', async
   screens.name.field.input.type_('Chris');
   screens.name.continueButton.click();
   await settleAll();
-  assert.equal(dialogText(app), 'Online play unavailable — Online play is unavailable right now.');
+  assert.equal(dialogText(app), "Online play unavailable — Online play is unavailable right now. The room server can't be reached from here: it may be down, or blocked on this network.");
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+});
+
+test('a server that refuses this page\'s address says so, naming the address it saw', async () => {
+  const server = backend({ ALLOWED_ORIGINS: 'https://html.itch.zone' }, { origin: 'https://html-classic.itch.zone' });
+  const { app, screens } = boot({ server });
+  screens.home.actions.online.click();
+  screens.name.field.input.type_('Chris');
+  screens.name.continueButton.click();
+  await settleAll(10);
+  assert.equal(dialogText(app), "Online play unavailable — Online play is unavailable right now. The room server doesn't accept this page's address (https://html-classic.itch.zone).");
+  setLanguage('fr');
+  try {
+    await acknowledge(app);
+    screens.home.actions.online.click();
+    screens.name.continueButton.click();
+    await settleAll(10);
+    assert.equal(app.dialog.message.textContent, "Le jeu en ligne est indisponible pour le moment. Le serveur de salles n’accepte pas l’adresse de cette page (https://html-classic.itch.zone).");
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('a server whose rooms fail says the server answers but its rooms do not, and logs it', async () => {
+  const server = backend();
+  server.env.LOBBY = { idFromName: () => 'lobby', get: () => ({ fetch: () => Promise.reject(new Error('storage down')) }) };
+  const { app, screens } = boot({ server });
+  const error = console.error;
+  console.error = () => {};
+  try {
+    screens.home.actions.online.click();
+    screens.name.field.input.type_('Chris');
+    screens.name.continueButton.click();
+    await settleAll(10);
+  } finally {
+    console.error = error;
+  }
+  assert.equal(dialogText(app), 'Online play unavailable — Online play is unavailable right now. The room server answers, but its rooms are not working right now.');
 });
 
 // ---- The lobby ----------------------------------------------------------------------

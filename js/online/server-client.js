@@ -76,6 +76,33 @@ export class RoomServerClient {
     return this.request('/health');
   }
 
+  // Why the server could not be used, for "Online play is unavailable"
+  // to say: 'not_configured' (no address), 'unreachable' (no answer at all:
+  // down, blocked, or not deployed), 'origin' (it answers, but this page's
+  // origin is not one it accepts), 'server_error' (it answers, its Lobby
+  // does not) or 'reachable' (it answers and would accept this page).
+  // `origin` is this page's, as the server saw it when it says. Never
+  // throws.
+  async diagnose() {
+    const page = globalThis.location?.origin ?? null;
+    if (!this.configured) return { code: 'not_configured', origin: page };
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => controller?.abort(), this.timeoutMs);
+    try {
+      const res = await this.fetch(`${this.baseUrl}/health`, { signal: controller?.signal });
+      const data = await res.json().catch(() => null);
+      if (!data || typeof data !== 'object') return { code: 'unreachable', origin: page };
+      const origin = typeof data.origin === 'string' ? data.origin : page;
+      if (data.originAllowed === false) return { code: 'origin', origin };
+      if (data.ok === false || data.lobby === false) return { code: 'server_error', origin };
+      return { code: 'reachable', origin };
+    } catch {
+      return { code: 'unreachable', origin: page };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async listRooms() {
     const data = await this.request('/rooms');
     return Array.isArray(data.rooms) ? data.rooms : [];

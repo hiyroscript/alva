@@ -6,7 +6,8 @@
 // to put it online: docs/development/online-server.md.
 //
 // Endpoints (JSON):
-//   GET  /health            { ok: true }: the server is up
+//   GET  /health            { ok, service, lobby, origin, originAllowed }: the server
+//                           is up and its Lobby answers (readable from any page)
 //   GET  /rooms             the public rooms
 //   POST /rooms             create a room → { room, seat, token }, or { error: 'full' } (503)
 //   POST /rooms/join        join by code (or a public room by id) → { room, seat, token }
@@ -16,11 +17,22 @@
 // of the ALLOWED_ORIGINS (wrangler.toml), which the replies' CORS headers
 // name, and a WebSocket upgrade is held to the same list. The caller's
 // address is passed to the Lobby for its per-minute limits only.
+//
+// So that "Online play is unavailable" can say why, two answers are
+// readable from any page (`access-control-allow-origin: *`), as they hold
+// nothing private: /health, which also says whether the Lobby answers and
+// whether the asking page's origin is allowed, and the refusal of an origin
+// that is not ({ error: 'origin' }). An unexpected failure is answered as
+// `server_error` (with the game's CORS headers, so it can read it) and
+// logged, for the Cloudflare dashboard's logs.
 
 import { Lobby } from './lobby.js';
 import { Room } from './room.js';
 import { json, error, parseOrigins, originAllowed, corsHeaders, withCors } from './http.js';
 import { validRoomId } from './rules.js';
+
+// What any page may read.
+const PUBLIC = Object.freeze({ 'access-control-allow-origin': '*' });
 
 export { Lobby, Room };
 
@@ -34,10 +46,11 @@ export async function handle(request, env) {
   const allowed = parseOrigins(env.ALLOWED_ORIGINS);
   const fromGame = originAllowed(origin, allowed);
 
-  if (url.pathname === '/health' && request.method === 'GET') {
-    return withCors(json({ ok: true, service: 'alva-rooms' }), fromGame ? origin : null);
+  if (url.pathname === '/health' && request.method === 'GET') return health(env, origin, fromGame);
+  if (!fromGame) {
+    console.warn(`[alva-rooms] refused a request from origin ${origin ?? '(none)'} (not in ALLOWED_ORIGINS)`);
+    return error('origin', PUBLIC);
   }
-  if (!fromGame) return error('origin');
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) });
 
   const lobby = () => env.LOBBY.get(env.LOBBY.idFromName('lobby'));
@@ -71,8 +84,29 @@ export async function handle(request, env) {
   return withCors(error('not_found'), origin);
 }
 
+// Whether the server is up: the Worker answers, and the Lobby (a Durable
+// Object, so the storage and the migration behind every room) answers too.
+// It also tells the asking page its origin and whether it is allowed.
+async function health(env, origin, fromGame) {
+  let lobby = false;
+  try {
+    const res = await env.LOBBY.get(env.LOBBY.idFromName('lobby')).fetch('https://lobby/health');
+    lobby = res.ok;
+  } catch (err) {
+    console.error('[alva-rooms] the Lobby did not answer /health', err?.stack ?? err);
+  }
+  const body = { ok: lobby, service: 'alva-rooms', lobby, origin: origin ?? null, originAllowed: fromGame };
+  return json(body, lobby ? 200 : 503, PUBLIC);
+}
+
 export default {
-  fetch(request, env) {
-    return handle(request, env).catch(() => error('bad_request'));
+  async fetch(request, env) {
+    try {
+      return await handle(request, env);
+    } catch (err) {
+      console.error(`[alva-rooms] ${request.method} ${new URL(request.url).pathname} failed`, err?.stack ?? err);
+      const origin = request.headers.get('origin');
+      return withCors(error('server_error'), originAllowed(origin, parseOrigins(env?.ALLOWED_ORIGINS)) ? origin : null);
+    }
   },
 };

@@ -105,6 +105,11 @@ export class OnlineSession {
     return this.client.listRooms();
   }
 
+  // Why the server cannot be used now (RoomServerClient.diagnose).
+  diagnose() {
+    return this.client.diagnose();
+  }
+
   listRooms() {
     return this.client.listRooms();
   }

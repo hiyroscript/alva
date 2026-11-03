@@ -803,4 +803,9 @@ export const EN = {
   'online.peerFailed.message': "Couldn't connect to your opponent. One of your networks may be blocking it.",
   'online.fighterUnavailable.message': 'This match needs a fighter this game cannot play. Reload the page, then try again.',
   'online.error.message': 'Something went wrong. Please try again.',
+  'online.detail.notConfigured': 'This copy of the game has no room server set up.',
+  'online.detail.unreachable': "The room server can't be reached from here: it may be down, or blocked on this network.",
+  'online.detail.origin': "The room server doesn't accept this page's address ({origin}).",
+  'online.detail.server': 'The room server answers, but its rooms are not working right now.',
+  'online.detail.reachable': 'The room server answers now: try again in a moment.',
 };

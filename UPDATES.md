@@ -4693,6 +4693,18 @@ origins already matched itch.io's game hosts; it needed no change. The
 tests that pinned an empty address now test the empty case explicitly, and
 a new one holds the configured host to the rule.
 
+**Later: saying why Online play is unavailable.** On itch.io the owner's
+first try ended at "Online play is unavailable right now.", the one message
+for every way of not reaching the server, so nothing said which. The
+server's `/health` now also asks its Lobby and says which origin asked and
+whether it is allowed, readable from any page, as is its refusal of an
+origin; an unexpected failure is answered as `server_error` (with the
+game's CORS headers) and logged (Workers Logs, on in `wrangler.toml`).
+When the server cannot be used, the game asks `/health` and adds the reason
+to the message (`RoomServerClient.diagnose`, `showFailure`): no server set
+up, no answer, this page's address refused (naming it), or the rooms
+failing ([what each means and what to do](./docs/development/online-server.md#if-online-play-says-it-is-unavailable)).
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
 `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,

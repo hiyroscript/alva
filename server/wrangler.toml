@@ -20,6 +20,11 @@ class_name = "Lobby"
 name = "ROOM"
 class_name = "Room"
 
+# Logs (Workers Logs, included in the free plan): the dashboard's
+# alva-rooms › Logs shows refused origins and any unexpected error.
+[observability]
+enabled = true
+
 # The free plan only offers SQLite-backed Durable Objects, so both classes
 # are created as such.
 [[migrations]]

@@ -27,7 +27,7 @@ steps are [below](#putting-it-online-step-by-step)).
 
 | Request | Answer |
 | --- | --- |
-| `GET /health` | `{ "ok": true, "service": "alva-rooms" }`: the server is up (open it in a browser). |
+| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "origin": …, "originAllowed": … }`: the server is up and its Lobby answers (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
 | `GET /rooms` | The public rooms: `{ rooms: [{ id, name, host, mode, players, status, version, joinable }] }`. |
 | `POST /rooms` | Create: `{ name, playerName, visibility, mode, session, version }` → `{ room, seat: 'host', token }`, or `{ error: 'full' }` (503). |
 | `POST /rooms/join` | Join by `{ code }` (any room) or `{ id }` (a public room), with `{ playerName, session, version }` → `{ room, seat: 'guest', token }`. |
@@ -37,7 +37,10 @@ Every field is checked on the server; a refusal is a code the game
 translates: `invalid_name`, `invalid_room_name`, `invalid_mode`,
 `invalid_visibility`, `invalid_code`, `room_not_found`, `room_full`,
 `version_mismatch` (two versions of the game never share a match), `full`,
-`rate_limited`, `origin`, `bad_request`. The room's messages are listed at
+`rate_limited`, `origin`, `bad_request`, `server_error` (something failed:
+logged, see below). The refusal of an origin is readable from any page, as
+`/health` is, so the game can say which address was refused. The room's
+messages are listed at
 the top of [`server/src/room.js`](../../server/src/room.js).
 
 **Who may call it.** Every request but `/health` must come from one of
@@ -186,7 +189,7 @@ Claude.
    example your name.)
 7. **Check it.** Open that address with `/health` at the end in your
    browser, for example `https://alva-rooms.yourname.workers.dev/health`.
-   It should show `{"ok":true,"service":"alva-rooms"}`.
+   It should start with `{"ok":true,"service":"alva-rooms","lobby":true`.
 8. **Send that address to Claude** (the one without `/health`). Claude then
    makes the second pull request ("Online Play, part 2: go live"), which
    points the game at your server.
@@ -206,6 +209,23 @@ newer, the same server deploys from the `server` folder of a copy of the
 repository: `npm install`, then `npx wrangler login` (a browser page asks to
 **Allow**), then `npx wrangler deploy`, which prints the `.workers.dev`
 address. Deploying that way does not set up the automatic deploys above.
+
+### If Online play says it is unavailable
+
+The message then says why, in a second sentence, from the server's own
+answer (`/health`):
+
+| It says | What it means | What to do |
+| --- | --- | --- |
+| "This copy of the game has no room server set up." | `CONFIG.online.serverUrl` is empty in this build. | Upload a build made after the server's address was added (the ZIP of a later run of the workflow). |
+| "The room server can't be reached from here…" | No answer at all: the Worker is not deployed, is down, or the network blocks `workers.dev`. | Open the server's `/health` in a browser; if it does not answer, look at the last build under **Workers & Pages** › **alva-rooms** › **Deployments** / **Builds**. Try another network. |
+| "The room server doesn't accept this page's address (…)" | The page runs from an origin missing from `ALLOWED_ORIGINS`. | Add that address to `ALLOWED_ORIGINS` in `server/wrangler.toml` and merge (Claude can). |
+| "The room server answers, but its rooms are not working right now." | The Worker answers but its Lobby (its Durable Objects) does not. | Open `/health` (`"lobby": false`) and the Worker's **Logs** in the dashboard, and send them to Claude. |
+| "The room server answers now: try again in a moment." | It failed once, then answered. | Try again. |
+
+**Logs.** `wrangler.toml` turns on Workers Logs (part of the free plan): the
+dashboard's **Workers & Pages** › **alva-rooms** › **Logs** lists every
+refused origin and every unexpected error, with what failed.
 
 ### Later
 
