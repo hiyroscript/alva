@@ -4705,6 +4705,23 @@ to the message (`RoomServerClient.diagnose`, `showFailure`): no server set
 up, no answer, this page's address refused (naming it), or the rooms
 failing ([what each means and what to do](./docs/development/online-server.md#if-online-play-says-it-is-unavailable)).
 
+**Later: a pages.dev address.** The game then said the server could not
+be reached, and the owner's phone could not open its `/health` either,
+while Cloudflare showed the Worker deployed with its `workers.dev` address
+on and public, and 0 requests. Checked from GitHub's machines: the
+account's whole `workers.dev` subdomain did not exist in DNS (NXDOMAIN
+from Cloudflare's own nameserver), and switching the address off and on
+did not help. So the server gained a second address: `server/gateway/`, a
+Cloudflare Pages project whose `_worker.js` passes every request,
+WebSockets included, unchanged to the `alva-rooms` Worker over a service
+binding (`ROOMS`). The Worker itself is unchanged. A gateway that cannot
+reach it answers `server_error` with `ok: false`, which the game reads as
+"rooms not working". Tested in `server/tests/gateway.test.mjs`, and on
+Cloudflare's local runtime (the Worker and the gateway connected, two
+browser pages playing a match through it). The owner sets it up once from
+GitHub ([the steps](./docs/development/online-server.md#if-the-workersdev-address-never-works-the-pagesdev-address));
+`serverUrl` then names its address.
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
 `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,

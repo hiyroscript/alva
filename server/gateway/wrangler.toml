@@ -1,0 +1,23 @@
+# The room server's pages.dev address: a Cloudflare Pages project that
+# passes every request, WebSockets included, unchanged to the alva-rooms
+# Worker (../wrangler.toml) over a service binding. The Worker still does
+# all the work; this only gives it a second address.
+#
+# Why: a Worker's own workers.dev address can fail to appear in DNS. It did
+# for this account (checked on 2026-11-03: Cloudflare's own nameserver
+# answered NXDOMAIN while the dashboard showed the address switched on),
+# and a pages.dev address is made separately from it.
+#
+# Deployed by Cloudflare Pages from the GitHub repository (root directory
+# `server/gateway`, no build command, the project's name exactly `name`
+# below), so every merge into main deploys it again. Step by step:
+# docs/development/online-server.md.
+
+name = "alva-online"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-10-01"
+
+# The Worker everything goes to: its `name` in ../wrangler.toml.
+[[services]]
+binding = "ROOMS"
+service = "alva-rooms"
