@@ -14,18 +14,24 @@ dependencies, and requires every path to be relative.
 ## The itch.io release: bundled, never rewritten
 
 itch.io accepts at most 1,000 files in an HTML5 game, and the repository
-serves 1,059. Rather than merge modules or stylesheets in the source (which
-would make the code harder to read, test and extend), an optional export
-generates a copy for release: the modules bundled into `game.js`, the
-stylesheet parts joined into `game.css`, everything else copied as it is
-([the itch.io release](itch-release.md)). It is the one place a bundler
+serves 1,223. Rather than merge modules, stylesheets or frames in the source
+(which would make the code harder to read, test and extend), an optional
+export generates a copy for release: the modules bundled into `game.js`,
+the stylesheet parts joined into `game.css`, every fighter's frames packed
+into `game-assets.js` (each file's exact bytes under its own path, read by
+the game through `assetSource` as a `data:` URL of those bytes), everything
+else copied as it is ([the itch.io release](itch-release.md)). It is the one place a bundler
 (esbuild) is allowed, as a development dependency of the export only: the
 game still runs from the repository with nothing installed, the release is
 never edited and never the source of truth, and nothing drifts because the
 export validates the release against the repository on every build and an
 equivalence check plays the bundle against the source step for step. It
 rules out minification, tree shaking, syntax lowering, sprite atlases and
-any change to the art.
+any change to the art: packing keeps every frame a file of its own bytes,
+only shipped inside one script, so it decodes to the same pixels. The
+frames were packed once the roster's art alone passed the file limit
+(#0011 took the release to 1,063 files); packing them keeps the release at
+14 files however many fighters join.
 
 ## A fixed-step, deterministic simulation
 

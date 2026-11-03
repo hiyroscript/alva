@@ -436,6 +436,28 @@ test('a sprite whose file fails to load falls back to its glyph, keeping its nam
   assert.equal(look(b), ART_0002.attack3, 'still loading its new source: kept');
 });
 
+test('in a release that packs its frames, a button reads its frame from the packed bytes, and a failure still names the frame\'s file', () => {
+  const url = DEF_0001.projectileAnimations.attack3_object.frames[0];
+  const path = url.replace(/^\.\//, '');
+  const b64 = readFileSync(new URL(path, ROOT)).toString('base64');
+  globalThis.ALVA_PACKED_ASSETS = { [path]: b64 };
+  try {
+    const { tc } = touchControls(DEF_0001);
+    const b = tc.buttons.get('attack3');
+    const img = spriteOf(b);
+    assert.equal(img.getAttribute('src'), `data:image/png;base64,${b64}`, 'its exact bytes');
+    assert.match(spriteOf(tc.buttons.get('attack1')).getAttribute('src'), /^\.\/assets\/.*0001_.*\.png$/, 'a frame not packed: its own file');
+    tc.setCharacter(DEF_0001);
+    assert.equal(spriteOf(b), img, 'the same frame again: the same image, its source unchanged');
+    assert.equal(img.getAttribute('src'), `data:image/png;base64,${b64}`);
+    const warnings = captureWarnings(() => img.dispatch('error', {}));
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /"\.\/assets\/characters\/0001\/0001_attack3_object_1\.png" failed to load/, 'named by its path');
+  } finally {
+    delete globalThis.ALVA_PACKED_ASSETS;
+  }
+});
+
 // ---- Touch buttons: a fighter that is not #0001 ----------------------------------
 
 test('another fighter presents its own buttons: its own art and names, a button it presents nothing for is neutral', () => {

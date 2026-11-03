@@ -222,6 +222,20 @@ test('every tile shows its own move\'s art: the preview frame, the air artwork f
   assert.match(src('air', 'midair_attack3'), /0001_midair_attack3_2\.png$/, 'Blue: its own frame');
 });
 
+test('in a release that packs its frames, each tile reads its frame from the packed bytes (assetSource), still the same frame', () => {
+  const want = previewFrame(DEF_0001, 'attack1', false);
+  const path = want.url.replace(/^\.\//, '');
+  const b64 = readFileSync(new URL(path, ROOT)).toString('base64');
+  globalThis.ALVA_PACKED_ASSETS = { [path]: b64 };
+  try {
+    const { hud } = hudFor(DEF_0001);
+    assert.equal(tileOf(hud, 'ground', 'attack1').art.children[0].getAttribute('src'), `data:image/png;base64,${b64}`);
+    assert.match(tileOf(hud, 'ground', 'attack2').art.children[0].getAttribute('src'), /^\.\/assets\/.*\.png$/, 'a frame not packed: its own file');
+  } finally {
+    delete globalThis.ALVA_PACKED_ASSETS;
+  }
+});
+
 test('missing art: a neutral glyph, never a broken image; a frame that fails to load falls back once', () => {
   const noArt = {
     ...DEF_0002, id: 'test-no-art',

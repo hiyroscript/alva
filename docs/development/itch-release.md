@@ -3,12 +3,15 @@
 The repository is the site: `index.html`, its stylesheet parts in `css/`
 and its modules in `js/` run as they are, with no build, on GitHub Pages or
 any static server ([running and deploying](setup.md)). Served that way the
-game is 1,059 files, and itch.io accepts at most 1,000 in an HTML5 game's
-ZIP. The **release** is an optional, generated copy of the same game in
-901 files: the 145 modules bundled into one `game.js`, the 15 stylesheet
-parts joined into one `game.css`, and everything else copied unchanged. It
-is never edited by hand and never the source of truth: change the
-repository, then rebuild.
+game is 1,223 files (over a thousand of them fighter frames), and itch.io
+accepts at most 1,000 in an HTML5 game's ZIP. The **release** is an
+optional, generated copy of the same game in 14 files: the 147 modules
+bundled into one `game.js`, the 15 stylesheet parts joined into one
+`game.css`, every fighter's frames packed byte for byte into one
+`game-assets.js`, and everything else copied unchanged. However many
+fighters join the roster, the release stays at 14 files. It is never
+edited by hand and never the source of truth: change the repository, then
+rebuild.
 
 ```sh
 npm install              # once: esbuild, the export's one development dependency
@@ -35,10 +38,11 @@ with the checks in [`tools/itch/release.mjs`](../../tools/itch/release.mjs):
 4. Joins the stylesheet parts in the page's cascade order into `game.css`,
    each part as written under a comment naming it.
 5. Writes `index.html` with one `<link>` to `./game.css` in place of the
-   parts and `./game.js` in place of `./js/main.js`; nothing else on the
-   page changes.
-6. Copies `manifest.webmanifest`, `alvafav.PNG`, `controller.PNG`, `hs.jpg`
-   and `assets/` byte for byte.
+   parts and `./game.js` in place of `./js/main.js`, the pack's deferred
+   `<script>` just before it; nothing else on the page changes.
+6. Packs every file of `assets/characters/` into `game-assets.js` (below),
+   and copies `manifest.webmanifest`, `alvafav.PNG`, `controller.PNG`,
+   `hs.jpg` and the rest of `assets/` byte for byte.
 7. Validates the folder; only a valid release gets its archive,
    `dist/alva-itch.zip` (index.html at its root, no enclosing folder), which
    is validated against the folder in turn. Any problem fails the build
@@ -54,8 +58,9 @@ the same archive (fixed entry order and timestamps,
 dist/
   alva-itch.zip            the upload: everything below, index.html at its root
   itch/
-    index.html             the page, loading the two files below
-    game.js                the 145 modules of js/, bundled (about 1.6 MB)
+    index.html             the page, loading the three files below
+    game-assets.js         every fighter's frames, packed byte for byte (about 1.7 MB)
+    game.js                the 147 modules of js/, bundled (about 1.7 MB)
     game.css               the 15 parts of css/, joined (about 170 KB)
     manifest.webmanifest   unchanged
     alvafav.PNG            unchanged (favicon, splash)
@@ -64,7 +69,6 @@ dist/
     assets/
       favicon.svg
       icons/               5 install icons
-      characters/<id>/     every fighter's frames, 888 PNGs
 ```
 
 ## What is bundled, and how it stays the same game
@@ -87,13 +91,30 @@ dist/
   cascade is the page's order, and the parts have no `@import`, `@charset`
   or `url()` whose meaning depends on their own file (the validation
   checks, and that each part's braces balance).
-- **Kept as they are.** The PNG frames: the sprite normalizer reads their
-  pixels, so no atlas, repacking or conversion, and the release is under
-  the limit without one. The 58 byte-identical frames stay too: each is a
-  frame of its own clip, some repeated on purpose as holds, and each is
-  loaded once by URL anyway. `assets/favicon.svg` is referenced by nothing
-  (the favicon is `alvafav.PNG`) but stays a copy of `assets/` like the
-  rest.
+- **The fighters' frames, packed, never changed.** Over a thousand PNGs
+  are more files than itch.io accepts for the whole game, so the release
+  ships them in one script, `game-assets.js` (`writePack` in
+  `release.mjs`): each file's exact bytes, in base64, under its own path
+  (`assets/characters/0001/0001_idle_1.png`), one line a file in path
+  order. Run before the first module (a deferred script, and deferred
+  scripts and modules run in document order), it sets
+  `globalThis.ALVA_PACKED_ASSETS`, frozen. The game asks
+  `assetSource(url)` ([`js/core/asset-loader.js`](../../js/core/asset-loader.js))
+  for what the browser should read for a path: the path itself on the site,
+  where nothing is packed, and in the release a `data:` URL of that file's
+  exact bytes, so it decodes to the very same image, pixel for pixel. Every
+  other part of the game keeps naming each frame by its path (the
+  definitions, the sprite sets, the loader's keys, a failure's report), and
+  only the four places that hand a frame to the browser ask for its source:
+  the asset loader, the touch buttons, the ability HUD and the controller
+  editor. No atlas, no repacking, no conversion: the sprite normalizer
+  reads the same pixels from the same bytes. The 58 byte-identical frames
+  stay too: each is a frame of its own clip, some repeated on purpose as
+  holds, and each is loaded once by path anyway.
+- **Kept as they are.** Everything else the game loads: the manifest, the
+  root images and the rest of `assets/` (`assets/favicon.svg` is referenced
+  by nothing, the favicon being `alvafav.PNG`, but stays a copy of `assets/`
+  like the rest).
 - **Left out.** Everything development-only: `tests/`, `docs/`, `tools/`,
   the specification and Markdown, `codename_rule`, `character_rule`, `max`,
   `package.json`, `node_modules/`, `.nojekyll` (GitHub Pages only) and Git.
@@ -112,10 +133,14 @@ build and on its own:
 - Current: `index.html` is the page the repository makes now, `game.css`
   the parts joined in order, `game.js` every module of the page's graph,
   once each, in ES evaluation order (read from the source's own imports),
-  every copied file identical to the repository's and nothing extra.
+  every copied file identical to the repository's and nothing extra, and
+  `game-assets.js` exactly the files of `assets/characters/`, each read
+  back (`readPack`) byte for byte identical to the repository's, none
+  missing, none extra and none also copied as a file of its own.
 - Complete, under exact names: every local URL of the page, every image the
   code names (`./hs.jpg`, `./alvafav.PNG`, `controller.PNG`), every frame of
-  every registered fighter (from the registry itself), every manifest icon.
+  every registered fighter (from the registry itself, in the pack), every
+  manifest icon.
 - No other host: the only addresses are the credits' links to the sprite
   sources (opened by the player, never loaded); no script, style or image
   from elsewhere.
