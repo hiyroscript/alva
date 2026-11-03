@@ -146,18 +146,24 @@ Claude.
    Choose your account (`hiyroscript`), then **Only select repositories**,
    pick **alva**, and tap **Install** (or **Install & Authorize**). You come
    back to Cloudflare; pick **alva** in its list of repositories.
-5. **Fill in the four settings** on the next screen. The labels may differ a
-   little; these four values are what matter (the root directory may be
-   under **Advanced settings**):
-   - **Project name** (or Worker name): `alva-rooms`. It must be exactly
-     this: it is the name in `server/wrangler.toml`, and the build fails if
-     the two differ.
-   - **Root directory** (or Path): `server`
-   - **Build command**: leave it empty.
-   - **Deploy command**: `npx wrangler deploy`
+5. **Fill in the settings** on the **Set up your application** screen:
+   - **Project name:** `alva-rooms`. It must be exactly this: it is the name
+     in `server/wrangler.toml`, and the build fails if the two differ.
+   - **Build command:** leave it empty.
+   - **Deploy command:** `npx wrangler deploy`
+   - **Preview command:** leave it as it is.
+   - **Enable Preview builds:** turn it **off** (only `main` is deployed;
+     other branches need no builds).
+   - **Protect with Cloudflare Access:** leave it **off** (with it on, the
+     game cannot reach the server).
+   - Open **Advanced settings**: **Path** (the root directory) is `/`;
+     change it to **`/server`**.
+   - **API token:** leave **Create new token** (Cloudflare makes one for its
+     own build; if it asks for a name, type `alva-rooms-build`).
+   - **Variable name** and **Variable value:** leave them empty (the
+     server's settings are in `server/wrangler.toml`).
 
-   If it shows a production branch, keep it `main`. Then tap **Deploy** (or
-   **Save and Deploy**).
+   Then tap **Deploy**.
 6. **Wait for the build** (a minute or two). The page shows the build's
    log; it ends successfully with a line naming the deployed address, which
    ends in **`.workers.dev`**, like `https://alva-rooms.yourname.workers.dev`.
