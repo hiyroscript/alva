@@ -26,6 +26,7 @@
 //     other player's match would wait on it (the rotate prompt still
 //     covers the screen).
 
+import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { t, tx, setText, setAttr } from '../localization/i18n.js';
 import { menuButton, dialogControls } from '../ui/components.js';
@@ -269,6 +270,8 @@ export class OnlineBattleScreen extends BattleScreen {
       match: setup.match,
       sampleLocal: (context) => app.input.sample(context),
       flushLocal: () => app.input.flush(),
+      // Through the room server: packets spaced to stay in its free plan.
+      sendIntervalMs: CONFIG.online.sendIntervalMs,
       debug: !!app.config?.debug?.online,
       ...(this.lockstepClock ? { clock: this.lockstepClock } : {}),
     });

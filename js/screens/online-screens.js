@@ -48,6 +48,7 @@ import { CharacterSelectScreen } from './character-select-screen.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { checkName, checkRoomName, fitName, normalizeCode, isValidCode, NAME_LIMITS, ROOM_NAME_LIMITS } from '../online/rules.js';
 import { readStart } from '../online/match-setup.js';
+import { ONLINE_VERSION } from '../online/online-session.js';
 
 // Online Play's setup, as the shared header names it (it has no steps:
 // rooms are not a sequence of choices).
@@ -491,7 +492,7 @@ export class OnlineLobbyScreen extends Screen {
   // One public room: its name, host, mode and players, and Join (or why
   // not).
   row(room) {
-    const sameVersion = !room.version || room.version === CONFIG.version;
+    const sameVersion = !room.version || room.version === ONLINE_VERSION;
     const joinable = !!room.joinable && sameVersion;
     const why = !sameVersion ? 'online.rooms.otherVersion' : room.status === 'playing' ? 'online.rooms.playing' : 'online.rooms.full';
     const name = el('span', { class: 'online-room-name' });

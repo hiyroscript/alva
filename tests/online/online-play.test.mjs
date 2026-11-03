@@ -641,7 +641,7 @@ test('a peer link that cannot be made: "Couldn\'t connect to your opponent…", 
   hub.fail = true;
   const booted = boot({ hub });
   const { app, screens } = booted;
-  await roomWithGuest(booted);
+  const guest = await roomWithGuest(booted);
   await settleAll();
   assert.equal(app.online.peer.status, 'failed');
   assert.equal(dialogText(app), "Couldn't connect — Couldn't connect to your opponent. One of your networks may be blocking it.");
@@ -651,6 +651,8 @@ test('a peer link that cannot be made: "Couldn\'t connect to your opponent…", 
   assert.equal(screens.room.readyButton.disabled, true);
   hub.fail = false;
   screens.room.retryButton.click();
+  // Each player tries again from their own side (both were told).
+  guest.session.retryPeer();
   await settleAll(10);
   assert.equal(app.online.peer.status, 'open', 'connected on the second try');
 });

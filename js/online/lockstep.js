@@ -20,7 +20,9 @@
 //      the match waits (nothing runs, nothing is banked) and says so after a
 //      moment ("Waiting for opponent…"), ending it after
 //      CONFIG.online.disconnectGraceMs ("Connection lost").
-//   3. One packet goes to the other browser: every local frame it has not
+//   3. One packet goes to the other browser (at most every
+//      `sendIntervalMs`: CONFIG.online.sendIntervalMs online, as the match
+//      goes through the room server): every local frame it has not
 //      acknowledged yet (up to CONFIG.online.resendWindow, oldest first)
 //      and the latest step this browser holds the other's frames through.
 //      A lost packet costs nothing: the next one carries the same frames.
@@ -116,10 +118,13 @@ export class LockstepSession {
   // another match is never read. `sampleLocal(context)`: the local
   // player's input snapshot for their fighter as it is (InputManager.
   // sample); `flushLocal()`: drops the local devices' buffered presses.
-  // `clock()`: milliseconds, for the waits only (never for a step).
+  // `clock()`: milliseconds, for the waits and the send interval only
+  // (never for a step). `sendIntervalMs`: the least time between two
+  // input packets (0: one every frame).
   constructor({
     transport, localSlot = 'p1', match = 1, sampleLocal = () => null, flushLocal = () => {}, clock = wallClock,
     delay = CONFIG.online.inputDelay, hashInterval = CONFIG.online.hashInterval, resendWindow = CONFIG.online.resendWindow,
+    sendIntervalMs = 0,
     graceMs = CONFIG.online.disconnectGraceMs, loadTimeoutMs = CONFIG.online.loadTimeoutMs,
     maxStepsPerFrame = CONFIG.sim.maxStepsPerFrame, step = CONFIG.sim.step, debug = false,
   }) {
@@ -133,6 +138,7 @@ export class LockstepSession {
     this.delay = Math.max(0, Math.round(delay));
     this.hashInterval = Math.max(1, Math.round(hashInterval));
     this.resendWindow = Math.max(1, Math.round(resendWindow));
+    this.sendIntervalMs = Math.max(0, Number(sendIntervalMs) || 0);
     this.graceMs = graceMs;
     this.loadTimeoutMs = loadTimeoutMs;
     this.maxStepsPerFrame = maxStepsPerFrame;
@@ -307,13 +313,15 @@ export class LockstepSession {
 
   // ---- The link ---------------------------------------------------------------------
 
-  // The packet for this frame (see the top), unless there is nothing new
-  // and a heartbeat went recently.
+  // The packet for this frame (see the top), unless the last one went less
+  // than `sendIntervalMs` ago, or there is nothing new and a heartbeat went
+  // recently.
   sendInputs() {
     if (!this.transport?.open) return;
+    const t = this.clock();
+    if (this.sendIntervalMs && t - this.lastSent < this.sendIntervalMs) return;
     const first = this.peerHas + 1;
     const last = Math.min(this.localNext - 1, first + this.resendWindow - 1);
-    const t = this.clock();
     if (last < first && this.ackSent === this.remoteHave && t - this.lastSent < HEARTBEAT_MS) return;
     const f = [];
     for (let s = first; s <= last; s++) f.push(this.frames[this.localSlot].get(s) ?? 0);

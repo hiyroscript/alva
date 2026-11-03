@@ -71,8 +71,9 @@ behave, and how it must look.
   broken), never imports it, and the itch.io release
   never includes it; that one host (and its WebSocket form) is the only one
   the release may name besides the credits' links. Every other mode needs
-  no network at all. Matches go peer to peer (WebRTC), never through the
-  server.
+  no network at all. Matches go through their room on that server, never
+  straight from one browser to the other, so no player learns another's IP
+  address (6.5c, Privacy).
 - Viewport: `width=device-width, initial-scale=1, maximum-scale=1,
   user-scalable=no, viewport-fit=cover`: a web game, so rapid taps and
   pinches never zoom the page. Together with `touch-action: none` on the
@@ -218,7 +219,7 @@ behave, and how it must look.
   unseeded randomness, presentation never feeding back). Online Play
   (6.5c) runs on it: both browsers run the same `Battle` in delay-based
   lockstep (`js/online/lockstep.js`: each step only once both players'
-  inputs for it are known, every input played 3 steps after it is
+  inputs for it are known, every input played 7 steps after it is
   sampled, lost packets made up by the next ones) and compare a hash of
   the match every 60 steps; a difference ends the match as a desync.
   Rollback netcode is not part of it (it would need a Battle that saves
@@ -960,8 +961,9 @@ Two people in two browsers (`js/screens/online-screens.js`,
 `js/screens/online-battle-screen.js`, `js/online/`): Home → Online play →
 Online name → Online lobby → a room → Battle. Rooms that players create and
 join, through a small room server (`server/`, a Cloudflare Worker); no
-accounts, no matchmaking, no chat. The match itself goes straight between
-the two browsers.
+accounts, no matchmaking, no chat. The match itself goes through the room
+too, never straight between the two browsers, so neither player learns the
+other's address.
 
 - **Home's Online play** (6.2): the first row's third, a square globe the
   size of Settings, green while it can open, disabled and red while the
@@ -1033,11 +1035,24 @@ the two browsers.
   stage) and **Leave room**.
 - **The room server** caps itself to stay within Cloudflare's free plan:
   at most 50 rooms open at once and a daily request budget (refusing new
-  rooms as "full" past 80% of the plan's day, while open rooms play on),
-  per-address limits, rooms cleaned up after 10 minutes without activity.
-  It allows only itch.io's game hosts (and a local copy for testing). No
-  login, cookie or stored identity; names last as long as their room
-  (docs/development/online-server.md).
+  rooms as "full" past 80% of the plan's day, while open rooms play on:
+  about 10 hours of matches a day in all, the match's packets being most
+  of what it spends), per-address limits, a limit on each seat's packets
+  (a flood is dropped, a seat that keeps flooding is closed), rooms cleaned
+  up after 10 minutes without activity. It allows only itch.io's game hosts
+  (and a local copy for testing). No login, cookie or stored identity;
+  names last as long as their room (docs/development/online-server.md).
+- **Privacy.** No player ever learns another's network address: the two
+  browsers never connect to each other (no WebRTC); each match packet goes
+  to the room and the room passes it to the other player. The room never
+  passes on WebRTC signalling. A player sees of the other only their name,
+  fighter, Ready, Rematch and connection. The server stores and logs no
+  address (its per-minute limits count a salted hash, in memory only;
+  Cloudflare's per-request logs are off). A copy of the game plays online
+  as its version marked `+relay`, so it never shares a room with an older
+  copy that connected directly. The cost is delay: inputs play 7 steps
+  (about 117 ms) after they are sampled, and packets go 20 a second
+  (docs/gameplay/online-play.md, Transport and Privacy).
 
 ### 6.6 Credits
 
@@ -4816,7 +4831,7 @@ Adding one is described in
   without typing.
 - **Online Play's input** (6.5c): the local player's snapshot, from
   whichever device they play with, exactly as offline, is sampled once a
-  step and played 3 steps later on both browsers (an input frame of 26
+  step and played 7 steps later on both browsers (an input frame of 26
   bits: every held control, its press edge, the Dash requests and where a
   controller's presses were made for). Both fighters on both browsers read
   the same frames; a menu over play makes the local player's frames

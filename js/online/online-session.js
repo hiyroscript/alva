@@ -9,11 +9,12 @@
 //   - the room they are in: its WebSocket (js/online/server-client.js
 //     RoomLink), the room and both seats as the server last described them,
 //     their seat (host or guest) and so their side (the host plays p1);
-//   - the peer link to the other player (js/online/peer.js), made as soon
-//     as both seats are filled and connected (the host offers, the guest
-//     answers, through the room), made again if it drops while both are
-//     still there, and given up after CONFIG.online.connectTimeoutMs
-//     ('failed': the player may try again);
+//   - the link to the other player (`peer`: js/online/room-relay.js), made
+//     as soon as both seats are filled and connected, made again if it
+//     drops while both are still there. It goes through the room, never
+//     straight to the other browser, so neither player ever learns the
+//     other's network address: each match packet is a { type: 'm' }
+//     message on the room's socket, passed on by the room;
 //   - starting a match: the host's browser sends the start, with a seed it
 //     draws, once both players are ready with their fighters and the peer
 //     link is open (and again after a rematch both accepted). The room fills
@@ -26,7 +27,7 @@
 
 import { CONFIG } from '../config.js';
 import { RoomServerClient } from './server-client.js';
-import { webRtcPeer } from './peer.js';
+import { roomRelay } from './room-relay.js';
 import { sessionId } from './rules.js';
 import { listeners } from './transport.js';
 
@@ -36,9 +37,15 @@ const RECONNECT_DELAYS_MS = Object.freeze([1000, 2500, 5000]);
 
 const otherSeat = (seat) => (seat === 'host' ? 'guest' : 'host');
 
+// The version a copy of the game plays online as: the game's, marked as one
+// whose matches go through the room, so it never shares a room with an
+// older copy that connected straight to the other browser ("Other
+// version").
+export const ONLINE_VERSION = `${CONFIG.version}+relay`;
+
 export class OnlineSession {
   constructor({
-    client = new RoomServerClient(), peerFactory = webRtcPeer, settings = null, version = CONFIG.version,
+    client = new RoomServerClient(), peerFactory = roomRelay, settings = null, version = ONLINE_VERSION,
     random = globalThis.crypto, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id),
   } = {}) {
     this.client = client;
@@ -185,8 +192,9 @@ export class OnlineSession {
         this.syncPeer();
         this.maybeStart();
         return;
-      case 'signal':
-        this.signal(message.data);
+      case 'm':
+        // The other player's match packet, for the link.
+        this.peer.link?.deliver?.(message.d);
         return;
       case 'start':
         this.starting = false;
@@ -281,8 +289,7 @@ export class OnlineSession {
     this.closePeer({ quiet: true });
     const link = this.peerFactory({
       initiator: this.isHost,
-      sendSignal: (data) => this.send({ type: 'signal', data }),
-      iceServers: CONFIG.online.iceServers,
+      send: (d) => this.send({ type: 'm', d }),
       timeoutMs: CONFIG.online.connectTimeoutMs,
     });
     this.peer = { status: 'connecting', link, transport: null, reason: null };
@@ -316,28 +323,10 @@ export class OnlineSession {
     if (!quiet && (link || transport)) this.emit('peer', this.peer);
   }
 
-  // Tries the peer link again after it failed: the host offers again, the
-  // guest asks the host to.
+  // Tries the link again after it failed.
   retryPeer() {
     if (!this.opponent?.connected) return;
-    if (this.isHost) this.startPeer();
-    else {
-      this.startPeer();
-      this.send({ type: 'signal', data: { kind: 'retry' } });
-    }
-  }
-
-  // The other player's signalling.
-  signal(data) {
-    if (!data || typeof data !== 'object') return;
-    if (data.kind === 'retry') {
-      if (this.isHost) this.startPeer();
-      return;
-    }
-    // A new offer while this side's link is not waiting for one (the host
-    // starting over): this side starts over too.
-    if (data.kind === 'offer' && !this.isHost && (this.peer.status !== 'connecting' || !this.peer.link)) this.startPeer();
-    this.peer.link?.handleSignal?.(data);
+    this.startPeer();
   }
 
   // ---- Starting a match ---------------------------------------------------------------

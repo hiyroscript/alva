@@ -4,9 +4,10 @@ Online Play ([online play](../gameplay/online-play.md)) needs one small
 server: it lets players create rooms, lists the public ones, and
 introduces the two players of a room to each other. It is
 [`server/`](../../server/): a Cloudflare Worker with two Durable Object
-classes, plain JavaScript, no framework. It never carries a match: once the
-two browsers are introduced, the match's inputs go straight from one to the
-other (WebRTC), so a match costs the server a handful of messages.
+classes, plain JavaScript, no framework. It also carries each match, the
+two players' input packets passed between them by their room, so the two
+browsers never connect to each other and neither ever learns the other's
+address ([privacy](#privacy)).
 
 `server/` is development-only for the game: the itch.io release never
 includes it ([the itch.io release](itch-release.md)), and the game never
@@ -17,7 +18,8 @@ steps are [below](#putting-it-online-step-by-step)).
 | --- | --- |
 | [`server/src/index.js`](../../server/src/index.js) | The Worker: the routes, the allowed origins (CORS, and a WebSocket upgrade's Origin), the caller's address passed to the Lobby. |
 | [`server/src/lobby.js`](../../server/src/lobby.js) | `Lobby`, one Durable Object for every room: ids and codes, the public list, joining, the caps (`MAX_ROOMS`, the daily request budget), the per-address limits, the sweep of silent rooms. |
-| [`server/src/room.js`](../../server/src/room.js) | `Room`, one Durable Object per room: both players' WebSockets (hibernated), seats by token, fighters, Ready, the host's start, rematches, signalling relayed, leaving, closing, its alarms, its reports to the Lobby. |
+| [`server/src/room.js`](../../server/src/room.js) | `Room`, one Durable Object per room: both players' WebSockets (hibernated), seats by token, fighters, Ready, the host's start, rematches, the match's packets passed between the players (with each seat's allowance, `MATCH_RATE`, `MATCH_BURST`), leaving, closing, its alarms, its reports to the Lobby. |
+| [`server/src/privacy.js`](../../server/src/privacy.js) | The salted hash the Lobby counts callers by (`callerKey`), and what keeps every player's address to themselves. |
 | [`server/src/rules.js`](../../server/src/rules.js) | What the server accepts: names, room names, codes, modes, visibility (the game's own rules, again). |
 | [`server/src/http.js`](../../server/src/http.js) | JSON replies, error codes, body limits, origin patterns. |
 | [`server/wrangler.toml`](../../server/wrangler.toml) | The Worker's configuration: its Durable Objects (SQLite-backed, as the free plan requires), the allowed origins and the caps, each with its reasoning. |
@@ -57,9 +59,36 @@ is held to the same list.
 
 **No accounts, no personal data.** No login, cookie or stored identity: the
 game makes a random session id for each visit (memory only) so the server
-can tell a reconnect. A room's names live as long as the room. Addresses are
-held in memory for a minute, for the rate limits, and never stored or
-logged.
+can tell a reconnect. A room's names live as long as the room.
+
+### Privacy
+
+No player ever learns another's network address (IP address), and the
+server keeps none:
+
+- **No direct connection.** A direct link between the two browsers (WebRTC)
+  would hand each one the other's address while it was set up. So there is
+  none: each match packet goes up the player's room WebSocket as
+  `{ type: 'm', d }`, and the Room passes it to the other player, nothing
+  added. The game makes no WebRTC connection at all.
+- **No signalling passed on.** The Room drops every `signal` message (an
+  older copy's WebRTC signalling, which would carry its address), so no
+  direct link can be made through it either; the game's online version
+  (`+relay`) keeps older copies out of its rooms.
+- **What a player sees of the other:** the name they typed, their fighter,
+  Ready, Rematch and whether they are connected, and their match packets
+  (input frames, acknowledgements, hashes). Never a token, a session or an
+  address. The public list shows a room's name, its host's name, its mode,
+  its players and its version.
+- **No address kept.** The Lobby's per-minute limits count a salted hash of
+  the caller's address (`callerKey`; the salt is random, in memory only),
+  never the address, for a minute. Nothing stored holds an address.
+  Cloudflare's per-request logs, which would hold callers' addresses, are
+  off (`invocation_logs = false` in `wrangler.toml`); the Worker's own log
+  lines name none.
+- **Who sees what, unavoidably:** Cloudflare runs the server (and the
+  `pages.dev` address), so it sees each player's address, as any host does.
+  The other player never does.
 
 **Cleaning up.** A room with no activity for `ROOM_IDLE_MINUTES` (10)
 closes itself (an alarm); a host gone for 15 s (a reload has that long to
@@ -78,16 +107,31 @@ check again before changing the caps.) The free plan only offers
 SQLite-backed Durable Objects, which `wrangler.toml` creates.
 
 - Rooms hibernate their WebSockets and the Lobby only works while answering
-  a request, so an idle server spends almost no duration.
-- A room costs about 15 requests from creation to its last match; a player
-  waiting in the lobby about 12 a minute (the list refreshes every 5 s). The
-  match itself costs nothing here.
+  a request, so an idle server spends almost no duration. A room playing a
+  match stays awake: about 460 GB-s an hour, so the duration allows some
+  28 hours of matches a day, more than the requests do.
+- A room costs about 15 requests from creation to its first match; a player
+  waiting in the lobby about 12 a minute (the list refreshes every 5 s).
+- **The match** goes through its room ([privacy](#privacy)), and it is
+  what the plan is spent on: each player sends a packet at most every
+  `CONFIG.online.sendIntervalMs` (50 ms, 20 a second), 40 a second for a
+  match, which Cloudflare counts as 2 requests a second. With the room's
+  reports (one every 50 requests' worth, so the budget stays current during
+  a long match) that is about 7,350 requests an hour of play: the budget
+  below allows **about 10 hours of matches a day**, across every player. A
+  packet is never saved (the room's last activity is, at most once a
+  minute).
+- Each seat may send `MATCH_RATE` (30) packets a second on average,
+  `MATCH_BURST` (60) at once: the game's 20 and a hash a second pass, a
+  flood is dropped, and a seat that keeps flooding by a whole burst has its
+  socket closed (4008, `too_fast`), so nobody can spend the day's budget
+  alone.
 - `MAX_ROOMS` (50) rooms at once: one more answers `full` ("Servers are full
   right now. Please try again in a few minutes.").
 - The daily budget: the Lobby counts every request it handles and those each
   Room reports, and past `BUDGET_SHARE` (0.8) of `DAILY_REQUEST_LIMIT`
   (100,000) refuses new rooms as `full`, while the rooms already open play
-  on.
+  on (the last fifth is about 2.7 hours of their matches).
 - Per address, a minute: `CREATE_PER_MINUTE` (10) rooms,
   `JOIN_PER_MINUTE` (30) joins, `LIST_PER_MINUTE` (120) list reads.
 
@@ -240,8 +284,9 @@ themselves (a change to the server's code or to a `wrangler.toml` reaches
 them that way, with nothing to run). If the dashboard offers builds for
 other branches than `main`, they can be turned off: only `main` matters.
 
-A TURN server (for players behind very strict networks) is not needed now;
-if a friend can never connect, tell Claude: it is a small follow-up.
+The match goes through the room server, so no network blocks it that lets
+the game reach the server at all; there is no direct link to fail and no
+relay to set up.
 
 ### With a terminal instead
 

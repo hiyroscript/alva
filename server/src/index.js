@@ -16,7 +16,10 @@
 // Only the game may call it: every request but /health must come from one
 // of the ALLOWED_ORIGINS (wrangler.toml), which the replies' CORS headers
 // name, and a WebSocket upgrade is held to the same list. The caller's
-// address is passed to the Lobby for its per-minute limits only.
+// address is passed to the Lobby for its per-minute limits only (which
+// count a salted hash of it, never the address: server/src/privacy.js).
+// The two players of a match never connect to each other: the match goes
+// through its Room, so no player learns another's address.
 //
 // So that "Online play is unavailable" can say why, two answers are
 // readable from any page (`access-control-allow-origin: *`), as they hold

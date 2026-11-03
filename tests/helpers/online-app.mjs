@@ -187,7 +187,7 @@ const { InputManager } = await import('../../js/core/input-manager.js');
 const { HomeScreen } = await import('../../js/screens/home-screen.js');
 const online = await import('../../js/screens/online-screens.js');
 const { OnlineBattleScreen } = await import('../../js/screens/online-battle-screen.js');
-const { OnlineSession } = await import('../../js/online/online-session.js');
+const { OnlineSession, ONLINE_VERSION } = await import('../../js/online/online-session.js');
 const { RoomServerClient } = await import('../../js/online/server-client.js');
 const { memoryTransportPair } = await import('../../js/online/transport.js');
 const { LockstepSession } = await import('../../js/online/lockstep.js');
@@ -261,16 +261,18 @@ export function backend(vars = {}, { origin = ITCH } = {}) {
   return { ...made, fetchImpl, WebSocket: FakeWebSocket };
 }
 
-// Peer links for both players of a room, joined in memory as WebRTC joins
-// them: the host's link offers through the room, and the guest's opens
-// when that offer reaches it (handleSignal); both then resolve with the two
-// ends of a pair (`hub.pair`, delivered by the test). With `hub.fail`,
-// every link fails ("Couldn't connect").
+// Links for both players of a room, joined in memory in place of the
+// room's relay (js/online/room-relay.js) so a test steps the match frame
+// by frame: once both players' links have started, they resolve with the
+// two ends of a pair (`hub.pair`, delivered by the test: the host's end is
+// `a`). With `hub.fail`, every link fails ("Couldn't connect"). Tests of
+// the relay itself use none (boot({ hub: null })).
 export function peerHub() {
-  const hub = { offering: null, pair: null, pairs: [], fail: false, links: 0 };
-  hub.factory = ({ initiator, sendSignal }) => {
+  const hub = { waiting: null, pair: null, pairs: [], fail: false, links: 0 };
+  hub.factory = ({ initiator }) => {
     hub.links += 1;
     const link = {
+      initiator,
       start() {
         return new Promise((resolve, reject) => {
           link.resolve = resolve;
@@ -279,26 +281,24 @@ export function peerHub() {
             queueMicrotask(() => reject(new Error('timeout')));
             return;
           }
-          if (initiator) {
-            hub.offering = link;
-            queueMicrotask(() => sendSignal({ kind: 'offer', sdp: { type: 'offer', sdp: 'v=0' } }));
+          const other = hub.waiting;
+          if (!other || other.initiator === initiator) {
+            hub.waiting = link;
+            return;
           }
-        });
-      },
-      handleSignal(data) {
-        if (initiator || data?.kind !== 'offer' || !hub.offering || !link.resolve) return;
-        const host = hub.offering;
-        hub.offering = null;
-        const pair = memoryTransportPair();
-        hub.pair = pair;
-        hub.pairs.push(pair);
-        queueMicrotask(() => {
-          host.resolve(pair.a);
-          link.resolve(pair.b);
+          hub.waiting = null;
+          const pair = memoryTransportPair();
+          hub.pair = pair;
+          hub.pairs.push(pair);
+          const [host, guest] = initiator ? [link, other] : [other, link];
+          queueMicrotask(() => {
+            host.resolve(pair.a);
+            guest.resolve(pair.b);
+          });
         });
       },
       cancel() {
-        if (hub.offering === link) hub.offering = null;
+        if (hub.waiting === link) hub.waiting = null;
         link.reject?.(new Error('cancelled'));
       },
     };
@@ -312,8 +312,8 @@ export function peerHub() {
 export function otherPlayer(server, hub, { name = 'Sam' } = {}) {
   const session = new OnlineSession({
     client: new RoomServerClient({ baseUrl: SERVER_URL, fetchImpl: server.fetchImpl, WebSocketImpl: server.WebSocket }),
-    peerFactory: hub.factory,
-    version: CONFIG.version,
+    ...(hub ? { peerFactory: hub.factory } : {}),
+    version: ONLINE_VERSION,
   });
   session.name = name;
   const events = [];
@@ -322,13 +322,17 @@ export function otherPlayer(server, hub, { name = 'Sam' } = {}) {
 }
 
 // The other player's side of a match: its own lockstep and Battle on its
-// peer link, from the start the room sent, with `script(n)` its inputs.
-export function otherSide(player, start, { script = () => null } = {}) {
+// peer link, from the start the room sent, with `script(n)` its inputs
+// (and, for a match through the room as the game plays it, its `clock` and
+// `sendIntervalMs`).
+export function otherSide(player, start, { script = () => null, clock, sendIntervalMs } = {}) {
   const setup = readStart(start);
   let n = 0;
   const lockstep = new LockstepSession({
     transport: player.session.peer.transport, localSlot: player.session.localSlot, match: setup.match,
     sampleLocal: () => script(n++),
+    ...(clock ? { clock } : {}),
+    ...(sendIntervalMs !== undefined ? { sendIntervalMs } : {}),
   });
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: setup.map, mode: 'online', p1Def: setup.p1Def, p2Def: setup.p2Def,
@@ -385,7 +389,7 @@ export function boot({ server = backend(), hub = peerHub(), serverUrl = SERVER_U
   };
   app.online = new OnlineSession({
     client: new RoomServerClient({ baseUrl: serverUrl, fetchImpl: server.fetchImpl, WebSocketImpl: server.WebSocket }),
-    peerFactory: hub.factory,
+    ...(hub ? { peerFactory: hub.factory } : {}),
     settings,
   });
   app.screens = new ScreenManager(app);
@@ -411,14 +415,20 @@ export function boot({ server = backend(), hub = peerHub(), serverUrl = SERVER_U
     online.showNotice(app, 'offline');
   });
   app.screens.go('home');
+  // The online battle's clock (its waits and its send interval): simulated
+  // time, moved on by each frame, so a test runs a match as fast as it
+  // likes. A test may set its own (screens.battle.lockstepClock).
+  let simulated = 0;
+  screens.battle.lockstepClock = () => simulated;
   // One animation frame of the online battle (and the other side's, and the
   // network between them).
   const frame = (other = null, dt = DT) => {
+    simulated += dt * 1000;
     input.pollGamepads(performance.now());
     const screen = screens.battle;
     if (app.screens.current === screen) screen.update(dt);
     other?.lockstep.advance(dt);
-    for (const pair of hub.pairs) pair.deliver();
+    for (const pair of hub?.pairs ?? []) pair.deliver();
   };
   const key = (code) => {
     const e = { code, key: code, repeat: false, altKey: false, ctrlKey: false, metaKey: false, preventDefault: noop };

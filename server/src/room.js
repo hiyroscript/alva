@@ -1,11 +1,27 @@
 // A Room: one Durable Object per room, holding its two players' WebSockets
-// (the host's and, once someone joins, the guest's). It relays only what a
-// room needs between them: who is there, each player's fighter and Ready,
-// the host's start (with the seed it drew), rematches, leaving, and the
-// WebRTC signalling (offer, answer, ICE candidates) that lets the two
-// browsers connect to each other. The match itself never comes through
-// here: its inputs go peer to peer (js/online/lockstep.js), so a match costs
-// the server a handful of messages, not sixty a second.
+// (the host's and, once someone joins, the guest's). It carries what a room
+// needs between them: who is there, each player's fighter and Ready, the
+// host's start (with the seed it drew), rematches, leaving, and the match
+// itself: each player's packets ({ type: 'm' }, the lockstep's input
+// frames and hashes, js/online/lockstep.js) passed to the other player as
+// they come.
+//
+// Privacy: the two browsers never connect to each other, so neither ever
+// learns the other's network address (a direct WebRTC link would hand each
+// one the other's IP address while it was set up). Everything goes through
+// this room, and what a player receives names nobody's address: the room
+// as it stands (names, fighters, Ready, connection), the start, and the
+// other player's packets. WebRTC signalling is not passed on at all, so
+// even an older copy of the game that tried a direct link cannot make one
+// through it.
+//
+// The match's packets are what this room spends most of the free plan's
+// requests on (incoming messages at Cloudflare's 20 : 1): the game sends
+// at most CONFIG.online.sendIntervalMs apart (20 a second), and the room
+// takes at most MATCH_RATE a second from a seat (MATCH_BURST at once),
+// drops the rest, and closes a seat's socket that keeps sending far past
+// it. A packet is never saved: the room's state is written as it changes,
+// and its last activity at most once a minute while a match runs.
 //
 // Its sockets use the WebSocket Hibernation API (ctx.acceptWebSocket), so a
 // room where nobody is sending anything costs no Durable Object duration;
@@ -30,13 +46,13 @@
 //   { type: 'start', seed }                   the host starts (both ready, fighters chosen)
 //   { type: 'end' }                           the match is over: back to the room
 //   { type: 'rematch' }                       this player wants a rematch
-//   { type: 'signal', data }                  WebRTC signalling for the other player
+//   { type: 'm', d }                          a match packet for the other player
 //   { type: 'leave' }                         leaving the room
 // Room → client:
 //   { type: 'room', room, you, players }      the room as it is now (after every change)
 //   { type: 'start', match, seed, p1, p2 }    a match starts (p1 the host, p2 the guest)
 //   { type: 'rematch' }                       both want a rematch: the host starts it
-//   { type: 'signal', data }                  the other player's signalling
+//   { type: 'm', d }                          the other player's match packet
 //   { type: 'closed', reason }                the room is gone ('host_left', 'expired')
 //   { type: 'error', code }
 
@@ -47,9 +63,19 @@ const MINUTE = 60_000;
 // How long a seat waits for its player to (re)connect.
 export const SEAT_GRACE_MS = 15_000;
 const MESSAGE_LIMIT = 16 * 1024;
+// A match packet's largest size (the lockstep's are under 400 bytes).
+const PACKET_LIMIT = 2048;
 // Cloudflare bills incoming WebSocket messages at 20 : 1.
 const MESSAGE_RATE = 1 / 20;
 const SEATS = ['host', 'guest'];
+// Match packets a seat may send: this many a second on average (the game
+// sends about 20, and a hash a second), this many at once. A seat that
+// keeps sending past it by a whole burst is closed ('too_fast').
+export const MATCH_RATE = 30;
+export const MATCH_BURST = 60;
+// The requests handled since the last report to the Lobby that make it
+// report again (a long match keeps the daily budget up to date).
+const REPORT_EVERY = 50;
 
 export class Room {
   constructor(ctx, env, { now = () => Date.now() } = {}) {
@@ -61,6 +87,10 @@ export class Room {
     this.loaded = null;
     // Requests handled since the last report to the Lobby.
     this.unreported = 0;
+    // Each seat's allowance of match packets (memory only), and when the
+    // room's last activity was last saved.
+    this.buckets = {};
+    this.activeSavedAt = 0;
     if (globalThis.WebSocketRequestResponsePair && ctx.setWebSocketAutoResponse) {
       ctx.setWebSocketAutoResponse(new globalThis.WebSocketRequestResponsePair('ping', 'pong'));
     }
@@ -188,6 +218,7 @@ export class Room {
     s.lastActive = this.now();
     const me = s.seats[name];
     const otherName = name === 'host' ? 'guest' : 'host';
+    if (message.type === 'm') return this.relayPacket(ws, name, otherName, message.d, raw.length);
     switch (message.type) {
       case 'fighter': {
         const id = validFighterId(message.fighterId);
@@ -224,9 +255,9 @@ export class Room {
         }
         break;
       }
+      // WebRTC signalling (an older copy of the game's) is never passed on:
+      // no player's address reaches the other.
       case 'signal':
-        if (!message.data || typeof message.data !== 'object') return;
-        this.sendSeat(otherName, { type: 'signal', data: message.data });
         return;
       case 'leave':
         return name === 'host' ? this.close('host_left') : this.removeGuest();
@@ -259,6 +290,35 @@ export class Room {
     for (const n of SEATS) this.sendSeat(n, { type: 'start', match: s.match, seed, p1: side(host), p2: side(guest) });
     this.broadcast();
     await this.report();
+  }
+
+  // One match packet, to the other player only, never saved; past the
+  // seat's allowance it is dropped, and a seat far past it is closed.
+  async relayPacket(ws, name, otherName, d, size) {
+    const left = this.allowance(name);
+    if (left < -MATCH_BURST) {
+      for (const own of this.ctx.getWebSockets(name)) this.closeSocket(own, 4008, 'too_fast');
+      return;
+    }
+    if (left < 0 || size > PACKET_LIMIT || !d || typeof d !== 'object' || Array.isArray(d)) return;
+    this.sendSeat(otherName, { type: 'm', d });
+    const t = this.now();
+    if (t - this.activeSavedAt >= MINUTE) {
+      this.activeSavedAt = t;
+      await this.save();
+    }
+    if (this.unreported >= REPORT_EVERY) await this.report();
+  }
+
+  // Seat `name`'s allowance of match packets after taking one: below zero
+  // the packet is over it.
+  allowance(name) {
+    const t = this.now();
+    const b = (this.buckets[name] ??= { tokens: MATCH_BURST, at: t });
+    b.tokens = Math.min(MATCH_BURST, b.tokens + ((t - b.at) / 1000) * MATCH_RATE);
+    b.at = t;
+    b.tokens -= 1;
+    return b.tokens;
   }
 
   async webSocketClose(ws) {

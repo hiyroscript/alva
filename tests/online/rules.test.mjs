@@ -88,7 +88,7 @@ test('the online modes and a visit\'s session id', () => {
   assert.notEqual(sessionId(), a);
 });
 
-test('CONFIG.online: the deployed server (one https origin, nothing more), the delay, STUN only, the waits and the colours; frozen', () => {
+test('CONFIG.online: the deployed server (one https origin, nothing more), the delay and send interval for a match through it, no server for a direct link, the waits and the colours; frozen', () => {
   const o = CONFIG.online;
   const url = new URL(o.serverUrl);
   assert.equal(url.protocol, 'https:', 'a secure address: itch.io serves the game over https');
@@ -96,12 +96,17 @@ test('CONFIG.online: the deployed server (one https origin, nothing more), the d
   // The pages.dev gateway (server/gateway/), which passes everything to the
   // Worker: the Worker has no public address of its own.
   assert.match(url.hostname, /\.pages\.dev$/, 'the room server\'s pages.dev address');
-  assert.equal(o.inputDelay, 3);
-  assert.deepEqual(o.iceServers.map((s) => ({ ...s })), [{ urls: 'stun:stun.cloudflare.com:3478' }]);
+  // The match goes through the room server: 20 packets a second, and
+  // enough delay for a packet's trip through it (about 117 ms).
+  assert.equal(o.inputDelay, 7);
+  assert.equal(o.sendIntervalMs, 50);
+  assert.ok(o.inputDelay * CONFIG.sim.step * 1000 - o.sendIntervalMs >= 60, 'at least 60 ms left for the trip');
+  // No STUN or other server for a direct link between the two browsers.
+  assert.equal(o.iceServers, undefined);
   assert.equal(o.connectTimeoutMs, 10000);
   assert.equal(o.disconnectGraceMs, 10000);
   assert.deepEqual({ ...o.colors }, { ...CONFIG.localPlay.colors });
-  assert.ok(Object.isFrozen(o) && Object.isFrozen(o.modes) && Object.isFrozen(o.iceServers));
+  assert.ok(Object.isFrozen(o) && Object.isFrozen(o.modes));
 });
 
 test('the settings remember the online name (schema 9): checked, cleaned, saved, and an older schema migrates with none', async () => {

@@ -28,9 +28,15 @@ name = "ROOM"
 class_name = "Room"
 
 # Logs (Workers Logs, included in the free plan): the dashboard's
-# alva-rooms › Logs shows refused origins and any unexpected error.
+# alva-rooms › Logs shows refused origins and any unexpected error, the
+# server's own messages, none of which names an address. Cloudflare's
+# per-request records (invocation logs, which hold each caller's IP
+# address) are off: no address is kept, not even in the logs.
 [observability]
 enabled = true
+
+[observability.logs]
+invocation_logs = false
 
 # The free plan only offers SQLite-backed Durable Objects, so both classes
 # are created as such.
@@ -55,15 +61,21 @@ ALLOWED_ORIGINS = "https://html-classic.itch.zone,https://html.itch.zone,https:/
 #     count at 20 : 1. Past it, requests fail until the next day.
 #   - 13,000 GB-s of Durable Object duration a day. Rooms hibernate their
 #     sockets and the Lobby only works while answering a request, so an
-#     idle server spends almost none of it.
-# A room costs the server about 15 requests from creation to its last
-# match (create, join, two connections, the signalling, the reports), and a
-# player waiting in the lobby about 12 a minute (the list refreshes every
-# 5 s). The match itself costs nothing here: it is peer to peer.
+#     idle server spends almost none of it; a room awake for its match
+#     spends about 460 GB-s an hour (28 room-hours a day).
+# A room costs the server about 15 requests from creation to its first
+# match (create, join, two connections, the reports), and a player waiting
+# in the lobby about 12 a minute (the list refreshes every 5 s). The match
+# itself goes through its room, so no player ever learns the other's
+# address (server/src/room.js): each player sends 20 packets a second,
+# 40 a match, which Cloudflare counts as 2 requests a second, about 7,350
+# an hour with the room's reports. So the day's allowance (the budget
+# share below) is about 10 hours of matches in all, across every player;
+# past it, new rooms are refused as `full` while the open ones play on.
 #
 # MAX_ROOMS: rooms open at once. Past it, creating a room answers `full`
-# ("Servers are full right now"). 50 rooms with two players each and the
-# lobby polling stay far inside the daily requests.
+# ("Servers are full right now"). The daily budget, not this cap, is what
+# limits how much can be played in a day.
 MAX_ROOMS = "50"
 # The plan's daily request allowance, and the share of it that may be spent
 # before new rooms are refused as `full`. 0.8 leaves a fifth of the day's

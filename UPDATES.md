@@ -4734,14 +4734,57 @@ message ended with the site's link, "…doesn't accept this page's address
 shows the address, in English and French: "The room server doesn't accept
 this page's address." (`online.detail.origin`, `showFailure`).
 
+**Later: matches through the room, no address exposed.** The owner asked
+that Online Play expose nobody's information, no IP address. A direct
+peer-to-peer link cannot promise that: setting one up hands each browser
+the other's public address. A TURN relay would hide it, but Cloudflare's
+asks for a payment method, so the owner chose the free way: every match
+now goes through its room.
+
+- **Through the room.** `js/online/room-relay.js` replaces the WebRTC link
+  (`js/online/peer.js` is gone): each match packet is a `{ type: 'm', d }`
+  message on the player's room WebSocket, and the Room passes it to the
+  other player as it came (`relayPacket`), never saving it (its last
+  activity at most once a minute) and reporting to the Lobby every 50
+  requests' worth so the daily budget stays current. `CONFIG.online.
+  iceServers` (STUN) is gone; the game makes no WebRTC connection at all.
+- **No signalling passed on.** The Room drops every `signal` message, so an
+  older copy cannot make a direct link through it; the game plays online
+  as `ONLINE_VERSION` (its version marked `+relay`), so older copies show
+  as "Other version".
+- **What it costs.** The free plan counts every packet the room receives,
+  so a packet goes at most every `sendIntervalMs` (50 ms, 20 a second: the
+  lockstep's new `sendIntervalMs` option, set by the online battle), about
+  10 hours of matches a day in all. A seat may send `MATCH_RATE` (30) a
+  second, `MATCH_BURST` (60) at once; a flood is dropped, and a seat that
+  keeps flooding is closed (`too_fast`). The longer trip and the send
+  interval need a longer delay: `inputDelay` 3 → 7 (about 117 ms).
+- **No address kept.** The Lobby counts callers by a salted hash in memory
+  (`server/src/privacy.js` `callerKey`); Cloudflare's per-request logs are
+  off (`invocation_logs = false`).
+
+Tried on Cloudflare's local runtime with two Chromium pages: no WebRTC
+connection attempted, a match at 60 steps a second on both with no wait,
+about 19 packets a second each way, no address in anything either page
+received. Not tried yet on the live server, where the trip through
+Cloudflare adds its own delay. Tests: `server/tests/privacy.test.mjs`
+(the packets passed to the other player only, signalling never, nothing
+answered, stored, listed or sent naming an address, the salted hash, no
+packet saved, each seat's allowance, the budget kept current, the logs
+off), `tests/online/room-relay.test.mjs` (two players through their room
+with no WebRTC connection and no signalling, a match at the game's own rate
+in step) and the Room's own tests. The first version of this (a TURN relay
+with a key) is in the pull request's history, should a relay ever be
+wanted.
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
-(`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
-`connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
+(`serverUrl`, `inputDelay`, `sendIntervalMs`, `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
 `hashInterval`, `resendWindow`, `colors`; `CONFIG.debug.online` logs a
 desync's states); the server's caps and allowed origins in
 [`server/wrangler.toml`](./server/wrangler.toml); `STAGE_REVEAL_MS` in
 `js/screens/online-screens.js`; `WAITING_NOTICE_MS` in
-`js/online/lockstep.js`; `SEAT_GRACE_MS` in `server/src/room.js`.
+`js/online/lockstep.js`; `SEAT_GRACE_MS`, `MATCH_RATE` and `MATCH_BURST`
+in `server/src/room.js`.
 
 **Code:** new `js/online/` (`rules.js`, `input-frame.js`, `transport.js`,
 `peer.js`, `lockstep.js`, `state-hash.js`, `match-setup.js`,
