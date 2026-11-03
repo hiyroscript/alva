@@ -268,6 +268,8 @@ export class OnlineBattleScreen extends BattleScreen {
       transport,
       localSlot: this.localSlot,
       match: setup.match,
+      // The delay the host's browser chose for this match, the same on both.
+      delay: setup.delay,
       sampleLocal: (context) => app.input.sample(context),
       flushLocal: () => app.input.flush(),
       // Through the room server: packets spaced to stay in its free plan.

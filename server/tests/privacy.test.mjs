@@ -128,34 +128,35 @@ test('a packet is never saved: the room writes its last activity at most once a 
   assert.equal((await r.ctx.storage.get('room')).lastActive, clock.now, 'saved again after a minute');
 });
 
-test('a seat\'s allowance: the game\'s 20 a second pass, a flood is cut, and a seat flooding on is closed', async () => {
+test('a seat\'s allowance: the game\'s 30 a second (and its hashes and pings) pass, a flood is cut, and a seat flooding on is closed', async () => {
   const { host, guest, say, clock } = await room();
-  // The game's rate, with a hash a second, for 10 s: every packet passes.
-  for (let i = 0; i < 210; i++) {
-    clock.now += 1000 / 21;
+  // The game's rate, with a hash and two pings a second, for 10 s: every
+  // packet passes.
+  for (let i = 0; i < 330; i++) {
+    clock.now += 1000 / 33;
     await say(host, { type: 'm', d: packet(i) });
   }
-  assert.equal(guest.of('m').length, 210);
+  assert.equal(guest.of('m').length, 330);
   // A flood in one moment: about a burst's worth passes (the allowance
   // was nearly full), the rest is dropped.
   const passed = guest.of('m').length;
-  for (let i = 0; i < MATCH_BURST + 30; i++) await say(host, { type: 'm', d: packet(i) });
+  for (let i = 0; i < MATCH_BURST * 1.5; i++) await say(host, { type: 'm', d: packet(i) });
   const flood = guest.of('m').length - passed;
   assert.ok(flood >= MATCH_BURST - 2 && flood <= MATCH_BURST, `${flood} of the flood passed`);
   assert.equal(host.closed, null, 'not closed yet');
-  for (let i = 0; i < 40; i++) await say(host, { type: 'm', d: packet(i) });
+  for (let i = 0; i < MATCH_BURST; i++) await say(host, { type: 'm', d: packet(i) });
   assert.deepEqual(host.closed, { code: 4008, reason: 'too_fast' }, 'a whole burst past it: its socket is closed');
   assert.equal(guest.of('m').length - passed, flood, 'nothing more passed');
   assert.equal(guest.closed, null, 'the other player keeps theirs');
-  assert.ok(MATCH_RATE >= 21, 'the game\'s own rate fits');
+  assert.ok(MATCH_RATE >= 33, 'the game\'s own rate fits');
 });
 
 test('a long match keeps the Lobby\'s daily budget up to date: a report every 50 requests\' worth of packets', async () => {
   const { host, guest, say, lobby, clock } = await room();
   const before = lobby().budget.used;
-  // 50 s of a match: 20 packets a second from each player, 2,000 in all.
+  // 33 s of a match: 30 packets a second from each player, 2,000 in all.
   for (let i = 0; i < 1000; i++) {
-    clock.now += 50;
+    clock.now += 33;
     await say(host, { type: 'm', d: packet(i) });
     await say(guest, { type: 'm', d: packet(i) });
     // Reported during the match, not only at its end.

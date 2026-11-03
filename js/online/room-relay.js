@@ -10,9 +10,10 @@
 //
 // What it costs: the room server's free plan counts every packet it
 // receives, so the match sends at most every CONFIG.online.sendIntervalMs
-// (20 a second), and the input delay (CONFIG.online.inputDelay) is long
-// enough for a packet to reach the other player through the server before
-// its step is due. Both are in js/config.js; the numbers behind them in
+// (30 a second), and each match's input delay is long enough for a packet
+// to reach the other player through the server before its step is due
+// (js/online/delay.js measures the trip and chooses it). Their settings
+// are in js/config.js; the numbers behind them in
 // docs/development/online-server.md ("Staying on the free plan").
 
 import { listeners } from './transport.js';

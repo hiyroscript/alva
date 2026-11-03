@@ -17,7 +17,7 @@
 //
 // The match's packets are what this room spends most of the free plan's
 // requests on (incoming messages at Cloudflare's 20 : 1): the game sends
-// at most CONFIG.online.sendIntervalMs apart (20 a second), and the room
+// at most CONFIG.online.sendIntervalMs apart (30 a second), and the room
 // takes at most MATCH_RATE a second from a seat (MATCH_BURST at once),
 // drops the rest, and closes a seat's socket that keeps sending far past
 // it. A packet is never saved: the room's state is written as it changes,
@@ -43,20 +43,20 @@
 // Client → room messages (JSON):
 //   { type: 'fighter', fighterId }            the player's fighter
 //   { type: 'ready', ready, turn }            Ready on or off, with the player's Automatic turn-around
-//   { type: 'start', seed }                   the host starts (both ready, fighters chosen)
+//   { type: 'start', seed, delay }            the host starts (both ready, fighters chosen), with the input delay its browser chose
 //   { type: 'end' }                           the match is over: back to the room
 //   { type: 'rematch' }                       this player wants a rematch
 //   { type: 'm', d }                          a match packet for the other player
 //   { type: 'leave' }                         leaving the room
 // Room → client:
 //   { type: 'room', room, you, players }      the room as it is now (after every change)
-//   { type: 'start', match, seed, p1, p2 }    a match starts (p1 the host, p2 the guest)
+//   { type: 'start', match, seed, delay, p1, p2 }   a match starts (p1 the host, p2 the guest; the same delay for both)
 //   { type: 'rematch' }                       both want a rematch: the host starts it
 //   { type: 'm', d }                          the other player's match packet
 //   { type: 'closed', reason }                the room is gone ('host_left', 'expired')
 //   { type: 'error', code }
 
-import { validFighterId } from './rules.js';
+import { validFighterId, validDelay } from './rules.js';
 import { json, error, readJson, numberVar } from './http.js';
 
 const MINUTE = 60_000;
@@ -69,10 +69,11 @@ const PACKET_LIMIT = 2048;
 const MESSAGE_RATE = 1 / 20;
 const SEATS = ['host', 'guest'];
 // Match packets a seat may send: this many a second on average (the game
-// sends about 20, and a hash a second), this many at once. A seat that
-// keeps sending past it by a whole burst is closed ('too_fast').
-export const MATCH_RATE = 30;
-export const MATCH_BURST = 60;
+// sends at most 30, a hash a second, and a ping or two while measuring the
+// trip), this many at once. A seat that keeps sending past it by a whole
+// burst is closed ('too_fast').
+export const MATCH_RATE = 45;
+export const MATCH_BURST = 90;
 // The requests handled since the last report to the Lobby that make it
 // report again (a long match keeps the daily budget up to date).
 const REPORT_EVERY = 50;
@@ -287,7 +288,12 @@ export class Room {
     }
     await this.save();
     const side = (p) => ({ name: p.name, fighterId: p.fighterId, turn: p.turn !== false });
-    for (const n of SEATS) this.sendSeat(n, { type: 'start', match: s.match, seed, p1: side(host), p2: side(guest) });
+    // The host's chosen delay, for both (one out of range is left out: both
+    // then play the game's own default).
+    const delay = validDelay(message.delay);
+    for (const n of SEATS) {
+      this.sendSeat(n, { type: 'start', match: s.match, seed, ...(delay !== null ? { delay } : {}), p1: side(host), p2: side(guest) });
+    }
     this.broadcast();
     await this.report();
   }

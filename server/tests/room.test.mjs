@@ -123,6 +123,25 @@ test('the start: only the host, only with both ready; the room fills in the play
   assert.equal(lobby().rooms[created.room.id].status, 'full');
 });
 
+test('the start carries the input delay the host chose, the same for both; one out of range is left out', async () => {
+  const { host, guest, say } = await roomWithPlayers();
+  await say(host, { type: 'fighter', fighterId: '0001' });
+  await say(guest, { type: 'fighter', fighterId: '0003' });
+  const startWith = async (delay) => {
+    await say(host, { type: 'ready', ready: true });
+    await say(guest, { type: 'ready', ready: true });
+    await say(host, { type: 'start', seed: 5, delay });
+    const [hs, gs] = [host.of('start').at(-1), guest.of('start').at(-1)];
+    assert.deepEqual(hs, gs);
+    await say(host, { type: 'end' });
+    return hs.delay;
+  };
+  assert.equal(await startWith(5), 5);
+  assert.equal(await startWith(3), 3);
+  assert.equal(await startWith(12), 12);
+  for (const bad of [2, 13, 4.5, '6', -1, null, undefined]) assert.equal(await startWith(bad), undefined, String(bad));
+});
+
 test('a rematch: both must accept; then the host starts the next match without Ready', async () => {
   const { host, guest, say } = await roomWithPlayers();
   await say(host, { type: 'fighter', fighterId: '0001' });

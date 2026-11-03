@@ -96,11 +96,16 @@ test('CONFIG.online: the deployed server (one https origin, nothing more), the d
   // The pages.dev gateway (server/gateway/), which passes everything to the
   // Worker: the Worker has no public address of its own.
   assert.match(url.hostname, /\.pages\.dev$/, 'the room server\'s pages.dev address');
-  // The match goes through the room server: 20 packets a second, and
-  // enough delay for a packet's trip through it (about 117 ms).
+  // The match goes through the room server: 30 packets a second, and a
+  // delay chosen for each match from the trip (3 to 12 steps), 7 (about
+  // 117 ms) when it could not be measured.
+  assert.equal(o.sendIntervalMs, 33);
   assert.equal(o.inputDelay, 7);
-  assert.equal(o.sendIntervalMs, 50);
-  assert.ok(o.inputDelay * CONFIG.sim.step * 1000 - o.sendIntervalMs >= 60, 'at least 60 ms left for the trip');
+  assert.deepEqual({ ...o.inputDelayRange }, { min: 3, max: 12 });
+  assert.ok(o.inputDelay * CONFIG.sim.step * 1000 - o.sendIntervalMs - o.delayMarginMs >= 60, 'the default leaves 60 ms for the trip');
+  assert.equal(o.delayMarginMs, 15);
+  assert.equal(o.pingIntervalMs, 200);
+  assert.equal(o.pingRefreshMs, 5000);
   // No STUN or other server for a direct link between the two browsers.
   assert.equal(o.iceServers, undefined);
   assert.equal(o.connectTimeoutMs, 10000);

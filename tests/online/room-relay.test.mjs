@@ -104,10 +104,21 @@ test('a match through the room: both sides step together, the same world on both
   host.session.pickFighter(TEST_A.id);
   guest.session.pickFighter(TEST_B.id);
   await settleAll();
+  // In the room, the host's browser measures the trip to the other player
+  // through the room (its pings, answered at once).
+  for (let i = 0; i < 6; i++) {
+    host.session.delayProbe.ping();
+    await settleAll();
+  }
+  assert.ok(host.session.delayProbe.samples.length >= 4, 'round trips measured through the room');
   host.session.setReady(true);
   guest.session.setReady(true);
   await settleAll(10);
   assert.ok(host.session.start && guest.session.start, 'the match started for both');
+  // Next door (the test's room answers in a millisecond): the shortest
+  // delay, the same in both starts.
+  assert.equal(host.session.start.delay, CONFIG.online.inputDelayRange.min);
+  assert.equal(guest.session.start.delay, host.session.start.delay);
   // Both as the game plays: a packet at most every CONFIG.online.
   // sendIntervalMs, on a clock that goes on with the frames.
   let now = 0;
@@ -127,12 +138,14 @@ test('a match through the room: both sides step together, the same world on both
     await settle();
   }
   assert.ok(a.lockstep.next > 300 && b.lockstep.next > 300, `both ran (${a.lockstep.next}, ${b.lockstep.next})`);
+  assert.equal(a.lockstep.delay, host.session.start.delay, 'both step with the chosen delay');
+  assert.equal(b.lockstep.delay, host.session.start.delay);
   assert.equal(a.ends.length + b.ends.length, 0, 'no desync, no timeout');
   // Compare at the same step.
-  // The game's rate: about 20 packets a second from each, well inside the
+  // The game's rate: about 30 packets a second from each, well inside the
   // room's allowance (none dropped, no socket closed).
   const packets = received.guest.filter((m) => m.type === 'm').length - packetsBefore;
-  assert.ok(packets > 120 && packets < 150, `${packets} packets from the host in 400 frames (about 6.7 s)`);
+  assert.ok(packets > 185 && packets < 215, `${packets} packets from the host in 400 frames (about 6.7 s)`);
   while (a.lockstep.next !== b.lockstep.next) {
     now += 1000 / 60;
     server.clock.now += 1000 / 60;
