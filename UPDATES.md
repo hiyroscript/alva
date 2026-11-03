@@ -4702,7 +4702,7 @@ origin; an unexpected failure is answered as `server_error` (with the
 game's CORS headers) and logged (Workers Logs, on in `wrangler.toml`).
 When the server cannot be used, the game asks `/health` and adds the reason
 to the message (`RoomServerClient.diagnose`, `showFailure`): no server set
-up, no answer, this page's address refused (naming it), or the rooms
+up, no answer, this page's address refused, or the rooms
 failing ([what each means and what to do](./docs/development/online-server.md#if-online-play-says-it-is-unavailable)).
 
 **Later: a pages.dev address.** The game then said the server could not
@@ -4726,6 +4726,13 @@ Since nothing uses the Worker's own `workers.dev` address any more,
 `preview_urls = false`), and the setup steps became the Worker first, then
 its Pages project. The old address is gone from the files; it stays in the
 history of the commits and pull requests that used it.
+
+**Later: the refused address unsaid.** On the game's GitHub Pages site
+(not one of `ALLOWED_ORIGINS`: Online Play is for the itch.io page), the
+message ended with the site's link, "…doesn't accept this page's address
+(https://hiyroscript.github.io)". At the owner's request it no longer
+shows the address, in English and French: "The room server doesn't accept
+this page's address." (`online.detail.origin`, `showFailure`).
 
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,

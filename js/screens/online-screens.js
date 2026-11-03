@@ -113,8 +113,9 @@ export async function showFailure(app, err) {
   const why = (await app.online?.diagnose?.().catch?.(() => null)) ?? null;
   const reason = code === 'origin' ? 'origin' : code === 'server_error' && why?.code === 'reachable' ? 'server_error' : why?.code;
   const key = WHY_UNAVAILABLE[reason];
-  const origin = why?.origin || globalThis.location?.origin || '?';
-  return showNotice(app, 'unavailable', { detail: key ? [key, { origin }] : null });
+  // The page's address is not shown (on the game's GitHub Pages site, the
+  // message would carry its link): saying it is refused is enough.
+  return showNotice(app, 'unavailable', { detail: key ? [key] : null });
 }
 
 // The room name a new room starts with: "{name}'s room" in the language in
