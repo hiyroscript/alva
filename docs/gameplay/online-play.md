@@ -13,7 +13,8 @@ guide: [the room server](../development/online-server.md).
 | [`js/screens/online-battle-screen.js`](../../js/screens/online-battle-screen.js) | `OnlineBattleScreen` (`online-battle`): the Battle screen with Online Play's rules (no pause, Leave match, waiting, the result from this player's side, Rematch, Leave room). |
 | [`js/online/online-session.js`](../../js/online/online-session.js) | `OnlineSession` (`App.online`): the player's name and session id, the room's socket and state, the peer link, the host's start. |
 | [`js/online/server-client.js`](../../js/online/server-client.js) | `RoomServerClient`: the server's HTTP calls and a room's WebSocket (`RoomLink`); `OnlineError` and its codes. |
-| [`js/online/peer.js`](../../js/online/peer.js) | `PeerLink`: the WebRTC DataChannel between the two browsers, signalled through the room. |
+| [`js/online/peer.js`](../../js/online/peer.js) | `PeerLink`: the WebRTC DataChannel between the two browsers, relay-only, signalled through the room. |
+| [`js/online/privacy.js`](../../js/online/privacy.js) | What keeps each player's address to themselves: `scrubSignal` (the signalling sent and taken, with no address but the relay's) and `relayOnly` (the TURN servers a link may use); the server checks again with its own copy. |
 | [`js/online/transport.js`](../../js/online/transport.js) | The transport interface (`send`, `onMessage`, `close`, `onClose`), `MessageTransport`, and `memoryTransportPair` for tests. |
 | [`js/online/lockstep.js`](../../js/online/lockstep.js) | `LockstepSession`: delay-based lockstep, resends, waiting and timeouts, the desync check; `LockstepChannel` and `OnlineInput`, each fighter's input. |
 | [`js/online/input-frame.js`](../../js/online/input-frame.js) | One player's input for one step as a whole number (`encodeFrame`, `decodeFrame`, `FRAME_FIELDS`). |
@@ -26,8 +27,8 @@ guide: [the room server](../development/online-server.md).
 
 `CONFIG.online` ([`js/config.js`](../../js/config.js)) holds its settings:
 `serverUrl` (the deployed room server; empty, Online Play ends at "Online
-play is unavailable right now."), `inputDelay`,
-`iceServers`, `modes`, `connectTimeoutMs`, `disconnectGraceMs`,
+play is unavailable right now."), `inputDelay`, `modes`,
+`connectTimeoutMs`, `disconnectGraceMs`,
 `loadTimeoutMs`, `listRefreshMs`, `hashInterval`, `resendWindow` and
 `colors`.
 
@@ -171,10 +172,42 @@ as a desync.
 
 `PeerLink` makes the DataChannel: the host offers, the guest answers, the
 offer, answer and ICE candidates going through the room's WebSocket as
-`signal` messages. The channel is unordered with no retransmissions;
-STUN is `stun:stun.cloudflare.com:3478`, and `CONFIG.online.iceServers`
-takes a TURN relay later if strict networks need one. A link not open
-within `connectTimeoutMs` fails. Gameplay never goes through the server.
+`signal` messages. The channel is unordered with no retransmissions. A link
+not open within `connectTimeoutMs` fails. Gameplay never goes through the
+room server: it goes between the two browsers, through a TURN relay.
+
+## Privacy
+
+No player ever learns another's network address (IP address), and nothing
+else about them but what they chose to show: the name they typed, their
+fighter, Ready and whether they are connected.
+
+- **Relay only.** A direct WebRTC link would hand each browser the other's
+  public address during setup. So the two browsers never connect directly:
+  before each link, each one asks its room for its own short-lived relay
+  credentials (`{ type: 'relay' }`, answered with TURN servers from
+  Cloudflare's TURN service), and `PeerLink` connects with
+  `iceTransportPolicy: 'relay'` and those servers alone. Each browser then
+  only ever sees the relay's address, never the other player's. With no
+  relay to be had, no link is made: "Couldn't set up a private connection
+  to your opponent." (`relay`), never a direct link instead. A server with
+  no relay set up makes no room at all ("The room server can't make
+  private connections right now.").
+- **Scrubbed signalling.** What a browser sends is scrubbed first
+  (`scrubSignal`, `js/online/privacy.js`): only relay candidates, their
+  related address (`raddr`, the player's own) blanked; host,
+  server-reflexive and peer-reflexive candidates dropped; the SDP's
+  connection and origin lines blanked. The room scrubs everything it
+  passes on again, by its own copy of the rules, so even a copy of the game
+  that tried a direct link could not pass an address through it. What a
+  browser takes is scrubbed too.
+- **Older copies.** A copy plays online as `ONLINE_VERSION`
+  (`js/online/online-session.js`: the game's version marked `+relay`), so
+  it never shares a room with an older copy that connected directly
+  ("Other version").
+- **The server.** It never stores, logs or passes on an address: its
+  per-minute limits count a salted hash of it, in memory only, and
+  Cloudflare's per-request logs are off ([the room server](../development/online-server.md#privacy)).
 
 ## Rollback, later
 
@@ -197,8 +230,11 @@ difference caught),
 (the frame, the delay, loss and resends, waiting, timeouts, forfeits,
 flushes, muting, slow motion, catching up),
 [`tests/online/online-play.test.mjs`](../../tests/online/online-play.test.mjs)
-(Home, the name, the lobby, the room, the battle and its rules, on the real
-server code in process), [`tests/online/rules.test.mjs`](../../tests/online/rules.test.mjs)
+(Home, the name, the lobby, the room, the battle and its rules, the relay
+for each link and what happens without one, on the real server code in
+process), [`tests/online/peer-privacy.test.mjs`](../../tests/online/peer-privacy.test.mjs)
+(the link relay-only with TURN servers alone, never without one, and only
+scrubbed relay candidates sent or taken), [`tests/online/rules.test.mjs`](../../tests/online/rules.test.mjs)
 and [`tests/online/itch-hosts.test.mjs`](../../tests/online/itch-hosts.test.mjs).
 The server's own: [`server/tests/`](../../server/tests/). Real browsers on
 real networks, WebRTC through NATs, and the itch.io frame need a real test:

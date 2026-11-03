@@ -71,8 +71,9 @@ behave, and how it must look.
   broken), never imports it, and the itch.io release
   never includes it; that one host (and its WebSocket form) is the only one
   the release may name besides the credits' links. Every other mode needs
-  no network at all. Matches go peer to peer (WebRTC), never through the
-  server.
+  no network at all. Matches go between the two browsers (WebRTC), never
+  through the room server, and only through a TURN relay, so no player
+  learns another's IP address (6.5c, Privacy).
 - Viewport: `width=device-width, initial-scale=1, maximum-scale=1,
   user-scalable=no, viewport-fit=cover`: a web game, so rapid taps and
   pinches never zoom the page. Together with `touch-action: none` on the
@@ -1038,6 +1039,19 @@ the two browsers.
   It allows only itch.io's game hosts (and a local copy for testing). No
   login, cookie or stored identity; names last as long as their room
   (docs/development/online-server.md).
+- **Privacy.** No player ever learns another's network address: the two
+  browsers connect only through a TURN relay (Cloudflare's, with
+  credentials the room hands each player for each link; relay-only, never
+  a direct link), and every signalling message is scrubbed of addresses by
+  the game and again by the server. A player sees of the other only their
+  name, fighter, Ready, Rematch and connection. With no relay to be had, no
+  link is made ("Couldn't set up a private connection to your opponent.");
+  a server with no relay key makes no room ("The room server can't make
+  private connections right now."). The server stores and logs no address
+  (its per-minute limits count a salted hash, in memory only). A copy of
+  the game plays online as its version marked `+relay`, so it never shares
+  a room with an older copy that connected directly
+  (docs/gameplay/online-play.md, Privacy).
 
 ### 6.6 Credits
 

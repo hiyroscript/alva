@@ -801,11 +801,13 @@ export const EN = {
   'online.desync.message': 'The two games stopped matching, so the match was stopped.',
   'online.peerFailed.title': "Couldn't connect",
   'online.peerFailed.message': "Couldn't connect to your opponent. One of your networks may be blocking it.",
+  'online.relayFailed.message': "Couldn't set up a private connection to your opponent. Please try again in a moment.",
   'online.fighterUnavailable.message': 'This match needs a fighter this game cannot play. Reload the page, then try again.',
   'online.error.message': 'Something went wrong. Please try again.',
   'online.detail.notConfigured': 'This copy of the game has no room server set up.',
   'online.detail.unreachable': "The room server can't be reached from here: it may be down, or blocked on this network.",
   'online.detail.origin': "The room server doesn't accept this page's address.",
   'online.detail.server': 'The room server answers, but its rooms are not working right now.',
+  'online.detail.relay': "The room server can't make private connections right now.",
   'online.detail.reachable': 'The room server answers now: try again in a moment.',
 };

@@ -4734,14 +4734,53 @@ message ended with the site's link, "…doesn't accept this page's address
 shows the address, in English and French: "The room server doesn't accept
 this page's address." (`online.detail.origin`, `showFailure`).
 
+**Later: private connections.** The owner asked that Online Play expose
+nobody's information, no IP address. A direct peer-to-peer link cannot
+promise that: setting one up hands each browser the other's public
+address. So every link is now relayed through Cloudflare's TURN service,
+which the brief had named as the follow-up for strict networks:
+
+- **Relay only.** Before each link, each browser asks its room for its own
+  credentials (`{ type: 'relay' }`); the Room gets them with the Worker's
+  TURN key (two secrets, `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`), keeps the
+  TURN addresses only, and limits them to 10 per player per 10 minutes.
+  `PeerLink` connects with `iceTransportPolicy: 'relay'` and those servers
+  alone, never without them. `CONFIG.online.iceServers` (STUN) is gone.
+  Without a relay, no link is made ("Couldn't set up a private connection
+  to your opponent."), and a server without the key makes no room
+  (`relay_unavailable`: "The room server can't make private connections
+  right now."; `/health` says `relay`).
+- **Scrubbed signalling,** by the game before sending and by the Room
+  before passing on (`js/online/privacy.js`, `server/src/privacy.js`, the
+  same rules): relay candidates only, their related address blanked, the
+  SDP's addresses blanked.
+- **No address kept.** The Lobby counts callers by a salted hash in memory;
+  Cloudflare's per-request logs are off (`invocation_logs = false`).
+- **Older copies apart.** The game plays online as `ONLINE_VERSION` (its
+  version marked `+relay`), so it never shares a room with a copy that
+  connected directly.
+
+The relay is not "gameplay through the Cloudflare server" that the brief
+ruled out: that was the room server and its Workers allowance, which the
+relay's traffic does not touch (the TURN service has its own, 1,000 GB a
+month free; a match is about 0.1 GB an hour). Tried on Cloudflare's local
+runtime with a local TURN server: two browser pages connected relay to
+relay, every candidate on both sides a relay one, the signalling each
+received with no address but the relay's, and a match played in sync.
+The owner adds the TURN key once ([the steps](./docs/development/online-server.md#putting-it-online-step-by-step),
+12 to 14). Tests: `server/tests/privacy.test.mjs`,
+`tests/online/peer-privacy.test.mjs`, and the relay's flow in
+`tests/online/online-play.test.mjs`.
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
-(`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
-`connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
+(`serverUrl`, `inputDelay`, `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
 `hashInterval`, `resendWindow`, `colors`; `CONFIG.debug.online` logs a
 desync's states); the server's caps and allowed origins in
 [`server/wrangler.toml`](./server/wrangler.toml); `STAGE_REVEAL_MS` in
 `js/screens/online-screens.js`; `WAITING_NOTICE_MS` in
-`js/online/lockstep.js`; `SEAT_GRACE_MS` in `server/src/room.js`.
+`js/online/lockstep.js`; `SEAT_GRACE_MS`, `RELAY_PER_WINDOW` and
+`RELAY_WINDOW_MS` in `server/src/room.js`; `RELAY_TTL_SECONDS` in
+`server/src/privacy.js`.
 
 **Code:** new `js/online/` (`rules.js`, `input-frame.js`, `transport.js`,
 `peer.js`, `lockstep.js`, `state-hash.js`, `match-setup.js`,

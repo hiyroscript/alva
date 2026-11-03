@@ -1022,11 +1022,13 @@ export const FR = {
   'online.desync.message': 'Les deux parties ne correspondaient plus : le match a été arrêté.',
   'online.peerFailed.title': 'Connexion impossible',
   'online.peerFailed.message': 'Impossible de se connecter à votre adversaire. L’un de vos réseaux le bloque peut-être.',
+  'online.relayFailed.message': 'Impossible d’établir une connexion privée avec votre adversaire. Réessayez dans un instant.',
   'online.fighterUnavailable.message': 'Ce match demande un combattant que ce jeu ne peut pas jouer. Rechargez la page, puis réessayez.',
   'online.error.message': 'Une erreur est survenue. Veuillez réessayer.',
   'online.detail.notConfigured': 'Aucun serveur de salles n’est configuré dans cette copie du jeu.',
   'online.detail.unreachable': 'Le serveur de salles est injoignable d’ici : il est peut-être arrêté, ou bloqué sur ce réseau.',
   'online.detail.origin': 'Le serveur de salles n’accepte pas l’adresse de cette page.',
   'online.detail.server': 'Le serveur de salles répond, mais ses salles ne fonctionnent pas pour le moment.',
+  'online.detail.relay': 'Le serveur de salles ne peut pas établir de connexions privées pour le moment.',
   'online.detail.reachable': 'Le serveur de salles répond maintenant : réessayez dans un instant.',
 };

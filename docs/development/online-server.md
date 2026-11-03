@@ -19,6 +19,7 @@ steps are [below](#putting-it-online-step-by-step)).
 | [`server/src/lobby.js`](../../server/src/lobby.js) | `Lobby`, one Durable Object for every room: ids and codes, the public list, joining, the caps (`MAX_ROOMS`, the daily request budget), the per-address limits, the sweep of silent rooms. |
 | [`server/src/room.js`](../../server/src/room.js) | `Room`, one Durable Object per room: both players' WebSockets (hibernated), seats by token, fighters, Ready, the host's start, rematches, signalling relayed, leaving, closing, its alarms, its reports to the Lobby. |
 | [`server/src/rules.js`](../../server/src/rules.js) | What the server accepts: names, room names, codes, modes, visibility (the game's own rules, again). |
+| [`server/src/privacy.js`](../../server/src/privacy.js) | What keeps every player's address to themselves: the signalling a Room passes on scrubbed of addresses (`scrubSignal`), each player's relay credentials from Cloudflare's TURN service (`relayServers`), the salted hash the Lobby counts callers by (`callerKey`). |
 | [`server/src/http.js`](../../server/src/http.js) | JSON replies, error codes, body limits, origin patterns. |
 | [`server/wrangler.toml`](../../server/wrangler.toml) | The Worker's configuration: its Durable Objects (SQLite-backed, as the free plan requires), the allowed origins and the caps, each with its reasoning. |
 | [`server/gateway/`](../../server/gateway/) | The server's `pages.dev` address: a Cloudflare Pages project that passes every request, WebSockets included, unchanged to the Worker over a service binding ([why](#why-the-pagesdev-address); setting it up: [the steps](#putting-it-online-step-by-step)). |
@@ -28,9 +29,9 @@ steps are [below](#putting-it-online-step-by-step)).
 
 | Request | Answer |
 | --- | --- |
-| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "origin": …, "originAllowed": … }`: the server is up and its Lobby answers (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
+| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "relay": true, "origin": …, "originAllowed": … }`: the server is up, its Lobby answers, and it can make private (relayed) connections (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
 | `GET /rooms` | The public rooms: `{ rooms: [{ id, name, host, mode, players, status, version, joinable }] }`. |
-| `POST /rooms` | Create: `{ name, playerName, visibility, mode, session, version }` → `{ room, seat: 'host', token }`, or `{ error: 'full' }` (503). |
+| `POST /rooms` | Create: `{ name, playerName, visibility, mode, session, version }` → `{ room, seat: 'host', token }`, or `{ error: 'full' }` (503), or `{ error: 'relay_unavailable' }` (503) with no TURN key set. |
 | `POST /rooms/join` | Join by `{ code }` (any room) or `{ id }` (a public room), with `{ playerName, session, version }` → `{ room, seat: 'guest', token }`. |
 | `GET /rooms/:id/ws?token=…` | The room's WebSocket, for the seat whose token it brings. |
 
@@ -38,7 +39,8 @@ Every field is checked on the server; a refusal is a code the game
 translates: `invalid_name`, `invalid_room_name`, `invalid_mode`,
 `invalid_visibility`, `invalid_code`, `room_not_found`, `room_full`,
 `version_mismatch` (two versions of the game never share a match), `full`,
-`rate_limited`, `origin`, `bad_request`, `server_error` (something failed:
+`rate_limited`, `origin`, `bad_request`, `relay_unavailable` (no relay for
+private connections: no room is made), `server_error` (something failed:
 logged, see below). The refusal of an origin is readable from any page, as
 `/health` is, so the game can say which address was refused. The room's
 messages are listed at
@@ -57,9 +59,48 @@ is held to the same list.
 
 **No accounts, no personal data.** No login, cookie or stored identity: the
 game makes a random session id for each visit (memory only) so the server
-can tell a reconnect. A room's names live as long as the room. Addresses are
-held in memory for a minute, for the rate limits, and never stored or
-logged.
+can tell a reconnect. A room's names live as long as the room.
+
+### Privacy
+
+No player ever learns another's network address (IP address), and the
+server keeps none:
+
+- **Matches are relayed.** The two browsers of a match never connect
+  directly, which would show each the other's public address. Each asks its
+  room for its own relay credentials before every link (`{ type: 'relay' }`
+  over the room's WebSocket): the Room gets them from Cloudflare's TURN
+  service with the Worker's TURN key (`relayServers`: a 6-hour lifetime,
+  TURN addresses only, at most 10 per player per 10 minutes, only with the
+  other seat taken), and the game connects relay-only with them
+  (`iceTransportPolicy: 'relay'`, [online play](../gameplay/online-play.md#privacy)).
+  Without the key, no room is made (`relay_unavailable`); Online Play never
+  falls back to a direct link.
+- **Signalling is scrubbed.** Every `signal` a Room passes on goes through
+  `scrubSignal` first: only relay candidates, their related address
+  (`raddr`, the player's own) blanked; host, server-reflexive and
+  peer-reflexive candidates dropped; the SDP's `c=`, `a=rtcp` and `o=`
+  addresses blanked; unknown kinds dropped. The game scrubs what it sends
+  the same way (`js/online/privacy.js`); a test holds the two copies to the
+  same answers.
+- **What a player sees of the other:** the name they typed, their fighter,
+  Ready, Rematch and whether they are connected. Never a token, a session
+  or an address. The public list shows a room's name, its host's name, its
+  mode, its players and its version.
+- **No address kept.** The Lobby's per-minute limits count a salted hash of
+  the caller's address (`callerKey`; the salt is random, in memory only),
+  never the address, for a minute. Nothing is stored with an address in
+  it. Cloudflare's per-request logs, which would hold callers' addresses,
+  are off (`invocation_logs = false`); the Worker's own log lines name none.
+- **Who sees what, unavoidably:** Cloudflare (it runs the server, the
+  `pages.dev` address and the relay) sees each player's address, as any
+  host does; the other player never does.
+
+The TURN service is free up to 1,000 GB a month. A match sends about
+200-byte packets 60 times a second each way, roughly 0.1 GB an hour, so the
+allowance is about 10,000 hours of play a month. It is not the room server:
+its traffic counts nothing against the Workers or Durable Objects
+allowances below.
 
 **Cleaning up.** A room with no activity for `ROOM_IDLE_MINUTES` (10)
 closes itself (an alarm); a host gone for 15 s (a reload has that long to
@@ -125,6 +166,16 @@ Then, for the game, set `serverUrl: 'http://localhost:8787'` in
 `CONFIG.online` (`js/config.js`; never commit it: the committed address is
 the deployed server's), serve the repository and open it in two tabs as
 above. Open `http://localhost:8787/health` to see the server is up.
+
+A local server makes rooms only with a relay (`"relay":true` in its
+`/health`): give it the TURN key as variables for that run
+(`npx wrangler dev --var TURN_KEY_ID:… --var TURN_KEY_API_TOKEN:…`, never
+committed). To try it with no Cloudflare account, `TURN_API_URL` points the
+server at a stand-in for Cloudflare's credentials service instead, for
+example a small local TURN server (such as the `node-turn` package) and a
+page answering `{ "iceServers": [{ "urls": ["turn:127.0.0.1:3478?transport=udp"], "username": …, "credential": … }] }`;
+that is how the relay was tried on 2026-11-03 (two browser pages, a match
+played, every candidate a relay one).
 
 **The pages.dev gateway, locally** (`server/gateway/`), in front of that
 local server: with `npx wrangler dev` running in `server`, start it from
@@ -235,13 +286,33 @@ send it to Claude.
     **Builds & deployments**) › **Branch control**, set preview branches to
     **None**: only `main` needs a build.
 
+**Its relay key (private connections)**
+
+The relay that keeps players' addresses private ([privacy](#privacy)) is
+Cloudflare's TURN service, free up to 1,000 GB a month. The server needs
+its key, two values kept as secrets: never in the repository, never sent
+to Claude.
+
+12. **Make a TURN key.** In the Cloudflare dashboard's menu, open
+    **Realtime** (it may be listed as **Calls**), then **TURN Server**, and
+    **Create** a key. If it asks for a name, type `alva-relay`. Cloudflare
+    then shows two values: the key's **ID** (Turn Token ID) and its **API
+    token**. Keep the page open: the API token is shown only once. (If
+    Cloudflare asks for a payment method here, stop and tell Claude.)
+13. **Give them to the server.** Open **Workers & Pages** › **alva-rooms** ›
+    **Settings** › **Variables and Secrets**, and tap **Add**. Choose the
+    type **Secret**, name it `TURN_KEY_ID`, paste the key's ID as its
+    value. **Add** another: type **Secret**, name `TURN_KEY_API_TOKEN`,
+    the API token as its value. Then **Deploy** (or **Save**). Secrets stay
+    through every later deploy from GitHub.
+14. **Check it.** Open <https://alva-online.pages.dev/health>: it should now
+    say `"relay":true`. (With `"relay":false`, the two names in step 13
+    are not exactly right, or not saved yet.)
+
 From then on, every merge into `main` builds and deploys both again by
 themselves (a change to the server's code or to a `wrangler.toml` reaches
 them that way, with nothing to run). If the dashboard offers builds for
 other branches than `main`, they can be turned off: only `main` matters.
-
-A TURN server (for players behind very strict networks) is not needed now;
-if a friend can never connect, tell Claude: it is a small follow-up.
 
 ### With a terminal instead
 
@@ -292,6 +363,8 @@ answer (`/health`):
 | (opening `/health` says the page or server can't be found, on any network) | The address does not exist in DNS (what happened to the Worker's own `workers.dev` address: [why the pages.dev address](#why-the-pagesdev-address)). | Check the address in **Workers & Pages** › **alva-online**, and send it to Claude. |
 | "The room server doesn't accept this page's address." | The page runs from an origin missing from `ALLOWED_ORIGINS` (the game's GitHub Pages site, for one: Online Play is for the itch.io page). The message does not show the address. | Add that address to `ALLOWED_ORIGINS` in `server/wrangler.toml` and merge (Claude can). |
 | "The room server answers, but its rooms are not working right now." | The Worker answers but its Lobby (its Durable Objects) does not, or (`/health` says `"service":"alva-online"`) the Pages project cannot reach the Worker. | Open `/health` (`"lobby": false`, or the binding: step 9 [above](#putting-it-online-step-by-step)) and the Worker's **Logs** in the dashboard, and send them to Claude. |
+| "The room server can't make private connections right now." | The server has no relay key (`/health` says `"relay":false`), so it makes no room. | Add the two secrets: steps 12 to 14 [above](#putting-it-online-step-by-step). |
+| "Couldn't set up a private connection to your opponent." (in a room) | The TURN service gave no relay credentials just then (or the key is wrong): the server's **Logs** say "the TURN service gave no relay credentials". | Try again; if it keeps happening, check the key (steps 12 to 14) and send the log line to Claude. |
 | "The room server answers now: try again in a moment." | It failed once, then answered. | Try again. |
 
 **Logs.** `wrangler.toml` turns on Workers Logs (part of the free plan): the

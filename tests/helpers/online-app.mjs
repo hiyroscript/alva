@@ -187,7 +187,7 @@ const { InputManager } = await import('../../js/core/input-manager.js');
 const { HomeScreen } = await import('../../js/screens/home-screen.js');
 const online = await import('../../js/screens/online-screens.js');
 const { OnlineBattleScreen } = await import('../../js/screens/online-battle-screen.js');
-const { OnlineSession } = await import('../../js/online/online-session.js');
+const { OnlineSession, ONLINE_VERSION } = await import('../../js/online/online-session.js');
 const { RoomServerClient } = await import('../../js/online/server-client.js');
 const { memoryTransportPair } = await import('../../js/online/transport.js');
 const { LockstepSession } = await import('../../js/online/lockstep.js');
@@ -265,11 +265,13 @@ export function backend(vars = {}, { origin = ITCH } = {}) {
 // them: the host's link offers through the room, and the guest's opens
 // when that offer reaches it (handleSignal); both then resolve with the two
 // ends of a pair (`hub.pair`, delivered by the test). With `hub.fail`,
-// every link fails ("Couldn't connect").
+// every link fails ("Couldn't connect"). `hub.made` keeps what each link was
+// made with (its side, and the relay servers it was given).
 export function peerHub() {
-  const hub = { offering: null, pair: null, pairs: [], fail: false, links: 0 };
-  hub.factory = ({ initiator, sendSignal }) => {
+  const hub = { offering: null, pair: null, pairs: [], fail: false, links: 0, made: [] };
+  hub.factory = ({ initiator, sendSignal, iceServers }) => {
     hub.links += 1;
+    hub.made.push({ initiator, iceServers });
     const link = {
       start() {
         return new Promise((resolve, reject) => {
@@ -313,7 +315,7 @@ export function otherPlayer(server, hub, { name = 'Sam' } = {}) {
   const session = new OnlineSession({
     client: new RoomServerClient({ baseUrl: SERVER_URL, fetchImpl: server.fetchImpl, WebSocketImpl: server.WebSocket }),
     peerFactory: hub.factory,
-    version: CONFIG.version,
+    version: ONLINE_VERSION,
   });
   session.name = name;
   const events = [];

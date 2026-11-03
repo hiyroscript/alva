@@ -4,8 +4,16 @@
 // the host's start (with the seed it drew), rematches, leaving, and the
 // WebRTC signalling (offer, answer, ICE candidates) that lets the two
 // browsers connect to each other. The match itself never comes through
-// here: its inputs go peer to peer (js/online/lockstep.js), so a match costs
-// the server a handful of messages, not sixty a second.
+// here: its inputs go between the two browsers (js/online/lockstep.js),
+// through a TURN relay, so a match costs the server a handful of
+// messages, not sixty a second.
+//
+// Privacy (server/src/privacy.js): no player ever learns another's
+// network address. Each player's browser connects only through the relay,
+// with credentials this room hands it ('relay'), and every signalling
+// message is scrubbed of addresses before it is passed on. What a player
+// sees of the other is their name, fighter, Ready and connection, never a
+// token, a session or an address.
 //
 // Its sockets use the WebSocket Hibernation API (ctx.acceptWebSocket), so a
 // room where nobody is sending anything costs no Durable Object duration;
@@ -30,18 +38,21 @@
 //   { type: 'start', seed }                   the host starts (both ready, fighters chosen)
 //   { type: 'end' }                           the match is over: back to the room
 //   { type: 'rematch' }                       this player wants a rematch
-//   { type: 'signal', data }                  WebRTC signalling for the other player
+//   { type: 'signal', data }                  WebRTC signalling for the other player (scrubbed)
+//   { type: 'relay' }                         relay credentials for this player's next peer link
 //   { type: 'leave' }                         leaving the room
 // Room → client:
 //   { type: 'room', room, you, players }      the room as it is now (after every change)
 //   { type: 'start', match, seed, p1, p2 }    a match starts (p1 the host, p2 the guest)
 //   { type: 'rematch' }                       both want a rematch: the host starts it
-//   { type: 'signal', data }                  the other player's signalling
+//   { type: 'signal', data }                  the other player's signalling, with no address but the relay's
+//   { type: 'relay', iceServers }             this player's relay (TURN) servers, or { type: 'relay', error }
 //   { type: 'closed', reason }                the room is gone ('host_left', 'expired')
 //   { type: 'error', code }
 
 import { validFighterId } from './rules.js';
 import { json, error, readJson, numberVar } from './http.js';
+import { scrubSignal, hasRelay, relayServers } from './privacy.js';
 
 const MINUTE = 60_000;
 // How long a seat waits for its player to (re)connect.
@@ -50,12 +61,18 @@ const MESSAGE_LIMIT = 16 * 1024;
 // Cloudflare bills incoming WebSocket messages at 20 : 1.
 const MESSAGE_RATE = 1 / 20;
 const SEATS = ['host', 'guest'];
+// Relay credentials a seat may ask for: this many in this long (a new
+// peer link, a retry, a reconnect each ask once).
+const RELAY_PER_WINDOW = 10;
+const RELAY_WINDOW_MS = 10 * MINUTE;
 
 export class Room {
-  constructor(ctx, env, { now = () => Date.now() } = {}) {
+  // `now` and `fetch` (the TURN service's) are for tests.
+  constructor(ctx, env, { now = () => Date.now(), fetch = globalThis.fetch?.bind(globalThis) } = {}) {
     this.ctx = ctx;
     this.env = env;
     this.now = now;
+    this.fetchImpl = fetch;
     this.idleMs = numberVar(env.ROOM_IDLE_MINUTES, 10) * MINUTE;
     this.state = null;
     this.loaded = null;
@@ -224,10 +241,15 @@ export class Room {
         }
         break;
       }
-      case 'signal':
-        if (!message.data || typeof message.data !== 'object') return;
-        this.sendSeat(otherName, { type: 'signal', data: message.data });
+      case 'signal': {
+        // Nothing that could name an address is passed on.
+        const data = scrubSignal(message.data);
+        if (!data) return;
+        this.sendSeat(otherName, { type: 'signal', data });
         return;
+      }
+      case 'relay':
+        return this.relay(ws, name);
       case 'leave':
         return name === 'host' ? this.close('host_left') : this.removeGuest();
       default:
@@ -259,6 +281,28 @@ export class Room {
     for (const n of SEATS) this.sendSeat(n, { type: 'start', match: s.match, seed, p1: side(host), p2: side(guest) });
     this.broadcast();
     await this.report();
+  }
+
+  // Relay credentials for this player's next peer link: only with the other
+  // seat taken, at most RELAY_PER_WINDOW per RELAY_WINDOW_MS, and only to
+  // this player. Without a TURN key (or with the service failing) the
+  // player is told 'relay_unavailable', and no link is made at all.
+  async relay(ws, name) {
+    const s = this.state;
+    const me = s.seats[name];
+    if (!s.seats[name === 'host' ? 'guest' : 'host']) return this.send(ws, { type: 'relay', error: 'bad_request' });
+    const t = this.now();
+    me.relayAt = (me.relayAt ?? []).filter((at) => t - at < RELAY_WINDOW_MS);
+    if (me.relayAt.length >= RELAY_PER_WINDOW) return this.send(ws, { type: 'relay', error: 'rate_limited' });
+    me.relayAt.push(t);
+    await this.save();
+    if (!hasRelay(this.env)) return this.send(ws, { type: 'relay', error: 'relay_unavailable' });
+    try {
+      this.send(ws, { type: 'relay', iceServers: await relayServers(this.env, this.fetchImpl) });
+    } catch (err) {
+      console.error('[alva-rooms] the TURN service gave no relay credentials:', err?.message ?? err);
+      this.send(ws, { type: 'relay', error: 'relay_unavailable' });
+    }
   }
 
   async webSocketClose(ws) {

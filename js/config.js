@@ -114,10 +114,12 @@ export const CONFIG = Object.freeze({
     // 50 ms): the time a frame has to reach the other browser before it is
     // needed, so the match never waits on a normal connection.
     inputDelay: 3,
-    // How the two browsers find a way to each other. STUN only for now; a
-    // TURN server (a relay for strict networks) can be added here later as
-    // { urls, username, credential } without touching the game.
-    iceServers: Object.freeze([Object.freeze({ urls: 'stun:stun.cloudflare.com:3478' })]),
+    // How the two browsers reach each other: only through a TURN relay,
+    // never directly, so neither learns the other's IP address
+    // (js/online/privacy.js). Each player's relay credentials come from the
+    // room server for each link (its TURN key is the owner's, in the
+    // Worker's secrets: docs/development/online-server.md); nothing about
+    // them is set here.
     // The modes a room can be created for, in order: Quick Battle alone for
     // now (the server allows the same list: server/src/rules.js).
     modes: Object.freeze(['quick-battle']),

@@ -48,6 +48,7 @@ import { CharacterSelectScreen } from './character-select-screen.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { checkName, checkRoomName, fitName, normalizeCode, isValidCode, NAME_LIMITS, ROOM_NAME_LIMITS } from '../online/rules.js';
 import { readStart } from '../online/match-setup.js';
+import { ONLINE_VERSION } from '../online/online-session.js';
 
 // Online Play's setup, as the shared header names it (it has no steps:
 // rooms are not a sequence of choices).
@@ -75,6 +76,7 @@ const NOTICES = Object.freeze({
   timeout: ['online.lost.title', 'online.timeout.message'],
   desync: ['online.desync.title', 'online.desync.message'],
   peer: ['online.peerFailed.title', 'online.peerFailed.message'],
+  relay: ['online.peerFailed.title', 'online.relayFailed.message'],
   fighter: ['common.fighterUnavailable', 'online.fighterUnavailable.message'],
   error: ['online.unavailable.title', 'online.error.message'],
 });
@@ -91,8 +93,9 @@ export function showNotice(app, code, { detail = null } = {}) {
 }
 
 // The codes that all mean the room server cannot be used (its own refusal
-// of this page's origin and its unexpected failures included).
-export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error']);
+// of this page's origin, its unexpected failures, and its having no relay
+// for private connections included).
+export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error', 'relay_unavailable']);
 
 // What "Online play is unavailable" adds to say why, by the server's
 // answer to /health (RoomServerClient.diagnose).
@@ -101,6 +104,7 @@ const WHY_UNAVAILABLE = Object.freeze({
   unreachable: 'online.detail.unreachable',
   origin: 'online.detail.origin',
   server_error: 'online.detail.server',
+  relay: 'online.detail.relay',
   reachable: 'online.detail.reachable',
 });
 
@@ -491,7 +495,7 @@ export class OnlineLobbyScreen extends Screen {
   // One public room: its name, host, mode and players, and Join (or why
   // not).
   row(room) {
-    const sameVersion = !room.version || room.version === CONFIG.version;
+    const sameVersion = !room.version || room.version === ONLINE_VERSION;
     const joinable = !!room.joinable && sameVersion;
     const why = !sameVersion ? 'online.rooms.otherVersion' : room.status === 'playing' ? 'online.rooms.playing' : 'online.rooms.full';
     const name = el('span', { class: 'online-room-name' });
@@ -648,7 +652,9 @@ export class OnlineRoomScreen extends Screen {
     if (type === 'room' || type === 'peer') this.render();
     if (type === 'peer' && detail?.status === 'failed' && this.peerNoticeShown !== detail) {
       this.peerNoticeShown = detail;
-      if (this.app.screens.current === this) showNotice(this.app, 'peer');
+      // No relay for a private connection is said as such (no direct link is
+      // ever tried instead).
+      if (this.app.screens.current === this) showNotice(this.app, detail.reason === 'relay' ? 'relay' : 'peer');
     }
   }
 

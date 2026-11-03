@@ -11,9 +11,10 @@
 //     DAILY_REQUEST_LIMIT is spent, new rooms are refused as `full` while
 //     the rooms already open play on;
 //   - per address, at most CREATE_PER_MINUTE rooms created, JOIN_PER_MINUTE
-//     joins and LIST_PER_MINUTE list reads a minute (`rate_limited`). The
-//     addresses live in memory only, for that minute, and are never stored
-//     or logged.
+//     joins and LIST_PER_MINUTE list reads a minute (`rate_limited`).
+//     Counted by a salted hash of the address (server/src/privacy.js
+//     callerKey), in memory only, for that minute: the address itself is
+//     never kept, stored or logged.
 //
 // Each room's own state (its two players, their sockets) is its Room's
 // (server/src/room.js); the Lobby keeps its listing: id, code, name, host
@@ -35,6 +36,7 @@ import {
   randomHex, randomCode,
 } from './rules.js';
 import { json, error, readJson, utcDay, numberVar } from './http.js';
+import { callerKey } from './privacy.js';
 
 const MINUTE = 60_000;
 // How often the Lobby's alarm sweeps silent rooms and saves the budget.
@@ -60,9 +62,11 @@ export class Lobby {
       join: numberVar(env.JOIN_PER_MINUTE, 30),
       list: numberVar(env.LIST_PER_MINUTE, 120),
     };
-    // Per address, per action: the times of its recent requests (memory
-    // only).
+    // Per caller (a salted hash of its address, never the address), per
+    // action: the times of its recent requests (memory only). The salt is
+    // this instance's own, gone when it restarts.
     this.hits = new Map();
+    this.salt = randomHex(16, random);
     this.rooms = null;
     this.budget = null;
     this.loaded = null;
@@ -103,9 +107,10 @@ export class Lobby {
     return Object.values(this.rooms);
   }
 
-  // Whether `ip` may do `action` once more this minute (and counts it).
+  // Whether caller `ip` (its salted hash) may do `action` once more this
+  // minute (and counts it).
   allow(ip, action) {
-    const key = `${action}:${ip || '?'}`;
+    const key = `${action}:${ip}`;
     const t = this.now();
     const recent = (this.hits.get(key) ?? []).filter((at) => t - at < MINUTE);
     if (recent.length >= this.limits[action]) {
@@ -139,7 +144,7 @@ export class Lobby {
     await this.load();
     this.spend(1);
     const url = new URL(request.url);
-    const ip = request.headers.get('x-alva-ip') ?? '';
+    const ip = callerKey(request.headers.get('x-alva-ip') ?? '', this.salt);
     const route = `${request.method} ${url.pathname}`;
     try {
       switch (route) {

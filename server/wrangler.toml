@@ -28,15 +28,30 @@ name = "ROOM"
 class_name = "Room"
 
 # Logs (Workers Logs, included in the free plan): the dashboard's
-# alva-rooms › Logs shows refused origins and any unexpected error.
+# alva-rooms › Logs shows refused origins and any unexpected error, the
+# server's own messages, none of which names an address. Cloudflare's
+# per-request records (invocation logs, which hold each caller's IP
+# address) are off: no address is kept, not even in the logs.
 [observability]
 enabled = true
+
+[observability.logs]
+invocation_logs = false
 
 # The free plan only offers SQLite-backed Durable Objects, so both classes
 # are created as such.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Lobby", "Room"]
+
+# Private connections (server/src/privacy.js): players reach each other only
+# through Cloudflare's TURN relay, so no player learns another's IP address.
+# The relay's key is two secrets, never written here: TURN_KEY_ID and
+# TURN_KEY_API_TOKEN (Cloudflare dashboard › Realtime › TURN Server makes
+# them; alva-rooms › Settings › Variables and Secrets holds them). Without
+# them no room is made ("relay_unavailable"): Online Play never falls back
+# to a direct link. Cloudflare's TURN service is free up to 1,000 GB a
+# month; a match sends a few kilobytes a second.
 
 [vars]
 # Who may call the server: the itch.io pages that run the game (itch.io serves
