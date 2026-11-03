@@ -19,7 +19,8 @@ index.html                 the screens' <section>s, overlays, css/ parts in casc
       │                    fighter's controller layout) → one snapshot per step
       ├─ ControllerManager connected PlayStation / Xbox controllers, Player 1's
       ├─ AssetLoader       fighter frames, preloaded for playable fighters
-      └─ screens/BattleScreen or PracticeScreen
+      ├─ OnlineSession     Online Play: the room (room server), the peer link (WebRTC)
+      └─ screens/BattleScreen, OnlineBattleScreen or PracticeScreen
          └─ game/Battle or game/PracticeSession   (both extend game/Arena)
             └─ Arena       fixed-step world, camera, canvas drawing
                ├─ Fighter × 2       state machine; controller → input; movement rules
@@ -40,9 +41,12 @@ index.html                 the screens' <section>s, overlays, css/ parts in casc
    fighter that is not playable, and creates a `Battle` (Quick Battle or
    Watch Mode) or a `PracticeSession`. Both extend `Arena`.
 4. `Arena.frame(dt)` feeds the clamped frame time into an accumulator and
-   runs as many fixed steps of 1/60 s as it holds (at most six per frame),
-   then interpolates positions and draws. The frame rate never changes a
-   step, only how many run per frame.
+   runs as many fixed steps of 1/60 s as it holds (at most six per frame,
+   `Arena.advance`), then interpolates positions and draws. The frame rate
+   never changes a step, only how many run per frame. An online match hands
+   `advance` to its lockstep (`js/online/lockstep.js`), which runs the same
+   steps from the same clock but only once both players' inputs for a step
+   are known ([Online Play](../gameplay/online-play.md)).
 
 ## One fixed step
 
@@ -71,7 +75,9 @@ timer):
 Rendering (camera, interpolation, effects, drawing) happens after the
 steps, from the state they left; nothing it does is read by the next
 step. The simulation is deterministic: the same inputs and seeds give the
-same match step for step.
+same match step for step, which Online Play relies on: both browsers run the
+same Battle and compare a hash of it every second
+([online play](../gameplay/online-play.md#determinism)).
 
 ## Data and code
 
@@ -99,6 +105,12 @@ How the fighter data and the shared systems divide the work is in
   a step the game needs ([the itch.io release](../development/itch-release.md)).
 - **Fixed-step simulation.** Gameplay never reads wall-clock time;
   presentation (hit effects, camera, stage animation) never feeds back.
+  Online Play depends on it: two browsers stay in step only because a step
+  is a pure function of the state, the inputs and the seed.
+- **One small server, never in the match.** Online Play's room server
+  (`server/`, a Cloudflare Worker) only introduces two players; their match
+  goes peer to peer. The game never imports it, and the itch.io release
+  never includes it ([the room server](../development/online-server.md)).
 - **One rule set for every fighter.** Shared systems read every per-fighter
   value from the fighter's definition; none reads a fighter's id.
 - **No fabricated art.** A move, Shield, Dash or projectile without its

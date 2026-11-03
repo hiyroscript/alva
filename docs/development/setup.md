@@ -32,6 +32,17 @@ node --test
 ```
 
 A current Node (the suite runs on Node 22), nothing else. See [testing](testing.md).
+It includes the room server's tests (`server/tests/`), which need no
+Cloudflare account either.
+
+## Online Play's room server
+
+Online Play needs one small server, a Cloudflare Worker in `server/`
+(deployed on its own, never part of the game's files). Run it locally with
+`npx wrangler dev` from `server/` (no account needed) and point
+`CONFIG.online.serverUrl` at it for a two-tab test; put it online with
+`npx wrangler deploy`. Everything, step by step, in
+[the room server](online-server.md).
 
 ## Deploy to GitHub Pages
 
@@ -49,7 +60,7 @@ depends on the repository's name.
 ## Publish on itch.io
 
 itch.io takes at most 1,000 files in an HTML5 game, and the repository
-serves 1,223. The release export makes the same game in 14 files (the
+serves 1,236. The release export makes the same game in 14 files (the
 modules bundled, the stylesheets joined, the fighters' frames packed byte
 for byte):
 

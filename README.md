@@ -121,6 +121,11 @@ blocks every attack.
   PlayStation or Xbox controller: each picks a fighter (the same one too),
   then a stage, and they fight under the same rules, each with their own
   move HUD; Player 1 red, Player 2 blue.
+- **Online Play**: two players in two browsers, in rooms (no accounts, no
+  matchmaking): pick a name, create a room (public or private) or join one
+  by its code or from the public list, each pick a fighter, both press
+  Ready, and the same Quick Battle runs in both browsers on a random stage,
+  peer to peer (delay-based lockstep). No pause online.
 - **Practice Ground**: a training room with a stand-still dummy, damage
   numbers and fighter swaps.
 - **Five stages**, Yerma, Sol-Noir, Asperitas, Adamaris and Jökull, plus the
@@ -195,6 +200,11 @@ python3 -m http.server 8000
 Any static server works; there is nothing to install. Run the tests with
 `node --test`.
 
+Online Play needs its room server (`server/`, a Cloudflare Worker on the
+free plan): `npx wrangler dev` runs it locally with no account, and
+[the room server](docs/development/online-server.md) explains putting it
+online. Until it is, Online play says it is unavailable.
+
 ## Deploy it
 
 GitHub Pages: **Settings → Pages → Deploy from a branch**, the branch and
@@ -203,7 +213,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,223):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,236):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed
@@ -270,14 +280,17 @@ js/
     ai/                 the combat AI and its moveset reader
     rendering/          camera, sprites, hit and Shield effects, fighter status
   localization/         the translator and one string table per language
+  online/               Online Play: rooms' client, peer link, lockstep netcode
   stages/               procedural stage art
   screens/, ui/         screens; interface components, HUD, touch controls,
                         controller dialogs, editor and cursor
 assets/characters/<id>/ each fighter's art
-tests/                  systems/, fighters/<id>/, interface/, integration/, helpers/
+tests/                  systems/, fighters/<id>/, interface/, integration/, online/, helpers/
 docs/                   architecture, systems, characters, gameplay, development
 tools/itch/             the optional itch.io release export, its validation and
                         its equivalence check (package.json: esbuild, dev only)
+server/                 Online Play's room server: a Cloudflare Worker, deployed on
+                        its own (never part of the game's files)
 ALVA_SPEC.md            the product specification
 UPDATES.md              history: the named updates and other large changes
 codename_rule           the naming contract for controls, moves and art
@@ -292,7 +305,8 @@ max                     the owner's working prompt for the current task (not a s
 - [`docs/`](docs/README.md): how it is built, system by system, fighter by
   fighter.
 - [`UPDATES.md`](UPDATES.md): what changed when (the **movement**,
-  **effect** and **bounce** updates, among others).
+  **effect**, **bounce**, **Mash Combo** and **online** updates, among
+  others).
 
 ## Extending it
 

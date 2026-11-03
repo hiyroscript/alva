@@ -10,16 +10,18 @@
 // loads is in it under its exact, case-sensitive name (every fighter's
 // frames, in the pack byte for byte, the icons, the images the code
 // names), that nothing loads from
-// another host, and that the archive extracts to exactly the folder, with
-// index.html at its root.
+// another host (but the room server Online Play is set up with: hosts.mjs),
+// and that the archive extracts to exactly the folder, with index.html at
+// its root.
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { transform } from 'esbuild';
 import {
-  ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, COPIED_FILES, COPIED_DIRS, PACKED_DIRS, LIMITS,
+  ROOT, OUT_DIR, ZIP_PATH, BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, COPIED_FILES, COPIED_DIRS, PACKED_DIRS, LIMITS, DEVELOPMENT_ONLY,
   read, pageParts, joinStylesheets, releasePage, moduleOrder, isPacked, readPack,
 } from './release.mjs';
+import { EXTERNAL_URL, hostProblems } from './hosts.mjs';
 import { readZip } from './zip.mjs';
 
 // Every file under `dir`, as relative paths with their names' real case.
@@ -31,15 +33,8 @@ export function listFiles(dir, prefix = '') {
 }
 
 const RELEASE_ROOT = new Set(['index.html', BUNDLE_JS, BUNDLE_CSS, ASSET_PACK, ...COPIED_FILES, ...COPIED_DIRS]);
-const DEVELOPMENT_ONLY = [
-  /(^|\/)(tests?|docs|tools|node_modules|dist|\.git|\.github|\.claude)(\/|$)/,
-  /\.(map|mjs|md|log|zip)$/i,
-  /(^|\/)(package(-lock)?\.json|\.nojekyll|\.gitignore|codename_rule|character_rule|max)$/,
-  /\.test\./,
-];
 const SAFE_PATH = /^[A-Za-z0-9._\-/]+$/;
 const ASSET_PATH = /(["'`])((?:\.\/)?[A-Za-z0-9_\-./]+\.(?:png|jpe?g|gif|svg|webp|ico|ogg|mp3|wav|m4a|json|webmanifest|css|js|mjs|html))\1/gi;
-const EXTERNAL_URL = /https?:\/\/[^'"`\s)<>]+/g;
 const MODULE_MARKER = /^\/\/ (js\/\S+\.js)$/gm;
 
 // The braces of one stylesheet part balance outside its comments and
@@ -166,12 +161,12 @@ export async function validateRelease({ dir = OUT_DIR, zip = ZIP_PATH, checkZip 
   for (const icon of manifest.icons ?? []) if (!has(icon.src)) fail(`manifest icon ${icon.src} is not in the release`);
 
   // No other host: the only addresses in the release are the credits' links
-  // to the sprite sources (opened by the player, never loaded).
+  // to the sprite sources (opened by the player, never loaded) and the room
+  // server Online Play is set up with, if any (hosts.mjs).
   const approved = new Set(read('js/ui/credits.js').match(EXTERNAL_URL) ?? []);
+  const { CONFIG } = await import(pathToFileURL(`${ROOT}js/config.js`).href);
   for (const f of files.filter((p) => /\.(html|css|js|webmanifest)$/.test(p))) {
-    for (const url of bytes.get(f).toString('utf8').match(EXTERNAL_URL) ?? []) {
-      if (!approved.has(url)) fail(`${f}: ${url} is another host, not a credits link`);
-    }
+    for (const problem of hostProblems(bytes.get(f).toString('utf8'), f, { approved, serverUrl: CONFIG.online.serverUrl })) fail(problem);
   }
 
   // Copies, byte for byte: the root files and every asset, nothing more;

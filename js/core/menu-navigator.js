@@ -43,6 +43,20 @@ function buildCodeMap() {
   return map;
 }
 
+// Whether `el` takes typed text (Online Play's name and code fields): while
+// it has focus, the keys that type (letters, digits, Space, Backspace, ← →)
+// are the field's, never a menu command. ↑ ↓ still move between the
+// controls, Esc still goes back, and Enter is the field's own (each field
+// submits on it).
+const TEXT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', '']);
+export function isTextEntry(el) {
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  if (el.tagName === 'TEXTAREA') return true;
+  return el.tagName === 'INPUT' && TEXT_TYPES.has(String(el.getAttribute?.('type') ?? el.type ?? 'text').toLowerCase());
+}
+const TEXT_ENTRY_COMMANDS = new Set(['up', 'down', 'back']);
+
 function visible(el) {
   // aria-disabled items (e.g. locked roster slots) stay focusable on purpose.
   if (el.disabled) return false;
@@ -282,8 +296,14 @@ export class MenuNavigator {
     const cmd = this.codeMap.get(e.code);
     if (!cmd) return;
     if (!this.scopeEl) return;
-    // Native buttons already activate on Enter/Space.
     const active = document.activeElement;
+    // Typing in a text field: only ↑ ↓ (arrows, never W / S) and Esc are
+    // the menu's.
+    if (isTextEntry(active) && this.inScope(active)) {
+      const arrow = e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'Escape';
+      if (!arrow || !TEXT_ENTRY_COMMANDS.has(cmd)) return;
+    }
+    // Native buttons already activate on Enter/Space.
     const nativeConfirm = (e.code === 'Enter' || e.code === 'Space') && active?.matches?.('button, a, [role="button"]') && this.inScope(active);
     if (cmd === 'confirm' && nativeConfirm) return;
     if (e.repeat && (cmd === 'confirm' || cmd === 'back')) {

@@ -68,6 +68,20 @@ export function readPack(text) {
   return new Map(Object.entries(entries).map(([path, b64]) => [path, Buffer.from(b64, 'base64')]));
 }
 
+// What is development-only and never part of the release, wherever it
+// sits: the tests, documentation, tools, the room server (server/, a
+// Cloudflare Worker deployed on its own: docs/development/online-server.md),
+// npm, Git and editor files, source maps, Markdown and the repository's own
+// rule files. The build copies none of it, and the validation fails a
+// release holding any.
+export const DEVELOPMENT_ONLY = Object.freeze([
+  /(^|\/)(tests?|docs|tools|server|node_modules|dist|\.git|\.github|\.claude|\.wrangler)(\/|$)/,
+  /\.(map|mjs|md|log|zip|toml)$/i,
+  /(^|\/)(package(-lock)?\.json|\.nojekyll|\.gitignore|codename_rule|character_rule|max)$/,
+  /\.test\./,
+]);
+export const isDevelopmentOnly = (path) => DEVELOPMENT_ONLY.some((re) => re.test(path));
+
 // itch.io's limits for an HTML5 game's ZIP (as extracted), and the margin
 // the release keeps below the file limit.
 export const LIMITS = Object.freeze({

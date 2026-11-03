@@ -1,5 +1,5 @@
 // Run with node --test tests/interface/settings.test.mjs (no dependencies).
-// Settings: the versioned settings store (schema 8: language, Mobile
+// Settings: the versioned settings store (schema 9: language, Mobile
 // Controls, each scheme's custom touch layout, Automatic turn-around and the
 // controller profiles; the version 1 to 7 migrations, saved controller
 // layouts upgraded for the named sticks and the removed Combat Assist and
@@ -249,6 +249,16 @@ function boot(storage = memoryStorage()) {
 }
 
 const place = (el, left, top, width, height) => { el.rect = { left, top, width, height }; };
+// Home's menu as it is laid out: Play, Local play and the Online play
+// square side by side in the first row, Watch Mode, Practice Ground and
+// Discover under them.
+function placeMenu(home) {
+  const { play, local, online, watch, practice, discover } = home.actions;
+  place(play, 80, 300, 132, 44);
+  place(local, 220, 300, 132, 44);
+  place(online, 360, 300, 44, 44);
+  [watch, practice, discover].forEach((b, i) => place(b, 80, 350 + i * 50, 324, 44));
+}
 const languageNamed = (dialog, language) => dialog.languageOptions.find((o) => o.getAttribute('data-language') === language);
 const schemeNamed = (dialog, scheme) => dialog.schemeOptions.find((o) => o.getAttribute('data-mobile-controls') === scheme);
 const turnAroundNamed = (dialog, on) => dialog.turnAroundOptions.find((o) => o.getAttribute('data-automatic-turn-around') === (on ? 'on' : 'off'));
@@ -256,9 +266,9 @@ const checked = (options) => options.map((o) => o.getAttribute('aria-checked'));
 
 // ---- The settings store ---------------------------------------------------------
 
-test('schema 8: language (unchosen), Mobile Controls (Joystick), an empty custom layout per scheme, Automatic turn-around on and no controller profile by default', () => {
+test('schema 9: language (unchosen), Mobile Controls (Joystick), an empty custom layout per scheme, Automatic turn-around on, no controller profile and no online name by default', () => {
   assert.equal(SETTINGS_KEY, 'alva.settings');
-  assert.equal(SETTINGS_VERSION, 8);
+  assert.equal(SETTINGS_VERSION, 9);
   assert.equal(DEFAULT_AUTOMATIC_TURN_AROUND, true);
   assert.deepEqual([...LANGUAGES], ['en', 'fr']);
   assert.equal(DEFAULT_LANGUAGE, 'en');
@@ -266,7 +276,7 @@ test('schema 8: language (unchosen), Mobile Controls (Joystick), an empty custom
   assert.equal(DEFAULT_MOBILE_CONTROLS, 'joystick');
   assert.deepEqual(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), {
     language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
-    controllerProfiles: {},
+    controllerProfiles: {}, onlineName: null,
   });
   assert.ok(Object.isFrozen(DEFAULT_SETTINGS) && Object.isFrozen(DEFAULT_SETTINGS.touchLayouts));
   for (const gone of ['combatAssist', 'comboAssist']) assert.equal(Object.hasOwn(DEFAULT_SETTINGS, gone), false, `${gone} is no setting`);
@@ -295,7 +305,7 @@ test('choosing English or French is saved as a real choice; a reload keeps it', 
     assert.equal(settings.language, language);
     assert.deepEqual(heard, [['language', language]]);
     assert.deepEqual(stored(storage), {
-      version: 8, language, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {},
+      version: 9, language, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null,
     });
     assert.deepEqual([...storage.map.keys()], [SETTINGS_KEY], 'one key, nothing scattered');
     const again = new Settings(storage);
@@ -342,8 +352,8 @@ test('version 1 settings migrate: the Joystick / Classic choice survives, the la
     // The next save writes the current schema, the choice still there.
     settings.set('language', 'fr');
     assert.deepEqual(stored(storage), {
-      version: 8, language: 'fr', mobileControls: scheme, touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
-      controllerProfiles: {},
+      version: 9, language: 'fr', mobileControls: scheme, touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
+      controllerProfiles: {}, onlineName: null,
     });
   }
   // A version 1 object never had a language, layouts or anything else: any
@@ -351,7 +361,7 @@ test('version 1 settings migrate: the Joystick / Classic choice survives, the la
   assert.deepEqual(readSettings({
     version: 1, mobileControls: 'classic', language: 'fr', touchLayouts: { classic: { jump: { x: 0.5, y: 0.5, scale: 1 } } },
     combatAssist: false, automaticTurnAround: false,
-  }), { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {} });
+  }), { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null });
   // And its own value is still checked.
   assert.equal(readSettings({ version: 1, mobileControls: 'dpad' }).mobileControls, 'joystick');
 });
@@ -371,23 +381,23 @@ test('versions 2 and 3 migrate: language, Mobile Controls and both custom layout
     assert.deepEqual(settings.touchLayout('classic'), classic);
     assert.equal(settings.automaticTurnAround, true, why);
     assert.equal(storage.writes, 0, 'nothing written just by reading');
-    // The next save writes schema 8 with all of it, and nothing of the old
+    // The next save writes schema 9 with all of it, and nothing of the old
     // assist.
     settings.set('mobileControls', 'joystick');
     assert.deepEqual(stored(storage), {
-      version: 8, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic }, automaticTurnAround: true,
-      controllerProfiles: {},
+      version: 9, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic }, automaticTurnAround: true,
+      controllerProfiles: {}, onlineName: null,
     }, why);
   }
   // An unchosen language stays unchosen, and whatever an older object holds
   // under the new name, it is on.
   for (const odd of [false, 'off', 0, null]) {
     assert.deepEqual(readSettings({ version: 2, language: null, mobileControls: 'joystick', automaticTurnAround: odd }),
-      { language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {} }, String(odd));
+      { language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null }, String(odd));
   }
   // Its own values are still checked, each on its own.
   assert.deepEqual(readSettings({ version: 2, language: 'de', mobileControls: 'classic', touchLayouts: 'big' }),
-    { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {} });
+    { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null });
 });
 
 test('Automatic turn-around is a real boolean: saved, announced and read back; anything else is refused or falls back to on', () => {
@@ -400,8 +410,8 @@ test('Automatic turn-around is a real boolean: saved, announced and read back; a
   assert.equal(settings.automaticTurnAround, false);
   assert.deepEqual(heard, [['automaticTurnAround', false]]);
   assert.deepEqual(stored(storage), {
-    version: 8, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: false,
-    controllerProfiles: {},
+    version: 9, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: false,
+    controllerProfiles: {}, onlineName: null,
   });
   assert.equal(new Settings(storage).automaticTurnAround, false, 'off survives a reload');
   // The same value again is no change: nothing written or announced.
@@ -455,8 +465,8 @@ test('version 4 settings migrate: language, Mobile Controls, both custom layouts
   assert.equal(storage.writes, 0, 'nothing written just by reading');
   settings.set('mobileControls', 'joystick');
   assert.deepEqual(stored(storage), {
-    version: 8, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
-    controllerProfiles: { '0002': { jump: { ...profile.jump, stick: null } } },
+    version: 9, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
+    controllerProfiles: { '0002': { jump: { ...profile.jump, stick: null } } }, onlineName: null,
   });
 });
 
@@ -490,9 +500,9 @@ test('version 5 settings migrate: every setting survives; each saved controller 
     '#0004: its old Down + Square, read on the D-pad as it was');
   assert.equal(storage.writes, 0, 'nothing written just by reading');
   settings.set('mobileControls', 'joystick');
-  assert.equal(stored(storage).version, 8);
+  assert.equal(stored(storage).version, 9);
   assert.deepEqual(Object.keys(stored(storage)).sort(),
-    ['automaticTurnAround', 'controllerProfiles', 'language', 'mobileControls', 'touchLayouts', 'version'], 'no old assist written back');
+    ['automaticTurnAround', 'controllerProfiles', 'language', 'mobileControls', 'onlineName', 'touchLayouts', 'version'], 'no old assist written back');
   assert.deepEqual(Object.keys(stored(storage).controllerProfiles).sort(), ['0001', '0004']);
 });
 
@@ -517,8 +527,8 @@ test('versions 6 and 7 migrate: everything survives; whatever Combat Assist and 
         assert.equal(storage.writes, 0, 'nothing written just by reading');
         settings.set('mobileControls', 'joystick');
         assert.deepEqual(stored(storage), {
-          version: 8, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
-          controllerProfiles: { '0002': profile },
+          version: 9, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
+          controllerProfiles: { '0002': profile }, onlineName: null,
         }, `${why}: written back as version 8, the choice in it, no old assist`);
         // From then on the player's own choice is theirs.
         settings.set('automaticTurnAround', false);
@@ -531,7 +541,7 @@ test('versions 6 and 7 migrate: everything survives; whatever Combat Assist and 
   for (const version of [1, 2, 3, 4, 5, 6, 7]) {
     assert.equal(readSettings({ version, automaticTurnAround: false }).automaticTurnAround, true, `version ${version}`);
     const read = readSettings({ version, combatAssist: true, comboAssist: true });
-    assert.deepEqual(Object.keys(read).sort(), ['automaticTurnAround', 'controllerProfiles', 'language', 'mobileControls', 'touchLayouts'], `version ${version}`);
+    assert.deepEqual(Object.keys(read).sort(), ['automaticTurnAround', 'controllerProfiles', 'language', 'mobileControls', 'onlineName', 'touchLayouts'], `version ${version}`);
   }
 });
 
@@ -566,7 +576,7 @@ test('missing, corrupt, foreign or invalid stored settings fall back safely, val
   defaults(load('"classic"'), 'not an object');
   defaults(load('[]'), 'an array');
   defaults(load(JSON.stringify({ mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'no version');
-  defaults(load(JSON.stringify({ version: 9, mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'a future version');
+  defaults(load(JSON.stringify({ version: 10, mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'a future version');
   defaults(load(JSON.stringify({ version: 0, mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'no such version');
   defaults(load(JSON.stringify({ version: '8', mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'a version that is not a number');
   defaults(load(JSON.stringify({ version: 7.5, mobileControls: 'classic', language: 'fr' })), 'a version that is not a whole number');
@@ -584,8 +594,8 @@ test('missing, corrupt, foreign or invalid stored settings fall back safely, val
   const storage = memoryStorage({ [SETTINGS_KEY]: '{not json' });
   new Settings(storage).set('mobileControls', 'classic');
   assert.deepEqual(stored(storage), {
-    version: 8, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
-    controllerProfiles: {},
+    version: 9, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
+    controllerProfiles: {}, onlineName: null,
   });
 });
 
@@ -863,10 +873,10 @@ test('choosing after navigation does not restore focus to an inactive Home', asy
 
 // ---- Home's Settings gear ------------------------------------------------------------
 
-test('Home has four menu actions and a top-right Help, Controller, Settings group', () => {
+test('Home has six menu actions on four rows and a top-right Help, Controller, Settings group', () => {
   const { home, done } = boot();
   try {
-    assert.deepEqual(Object.keys(home.actions), ['play', 'local', 'watch', 'practice', 'discover']);
+    assert.deepEqual(Object.keys(home.actions), ['play', 'local', 'online', 'watch', 'practice', 'discover']);
     assert.deepEqual(home.el.querySelectorAll('.home-action'), Object.values(home.actions));
     assert.ok(!home.el.querySelectorAll('.home-action').some((b) => /Settings/.test(b.html)), 'no Settings action any more');
     const gear = home.settingsButton;
@@ -1029,9 +1039,11 @@ test('keyboard and gamepad open Why Alva? without changing Home, settings or gam
   const { app, home, dialog, storage, done } = boot();
   try {
     const why = home.el.querySelector('.home-why-alva');
-    Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
+    // The menu as it is laid out: Play, Local play and the Online play
+    // square side by side, the other actions under them.
+    placeMenu(home);
     place(home.settingsButton, 1180, 20, 44, 44);
-    place(why, 80, 550, 100, 16);
+    place(why, 80, 550, 324, 16);
     place(home.downloadButton, 1200, 676, 40, 40);
     const selection = structuredClone(app.selection);
     const stack = [...app.screens.stack];
@@ -1070,14 +1082,18 @@ test('keyboard and gamepad open Why Alva? without changing Home, settings or gam
 test('keyboard and gamepad reach Help, Controller and Settings from Home\'s menu', () => withTestFighters([TEST_A], () => {
   const { app, home, done } = boot();
   try {
-    Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
+    // The menu as it is laid out: Play, Local play and the Online play
+    // square side by side, the other actions under them.
+    placeMenu(home);
     place(home.settingsButton, 1180, 20, 44, 44);
     place(home.utilityButtons.children[0], 1076, 20, 44, 44);
     place(home.utilityButtons.children[1], 1128, 20, 44, 44);
-    place(home.el.querySelector('.home-why-alva'), 80, 550, 100, 16);
+    place(home.el.querySelector('.home-why-alva'), 80, 550, 324, 16);
     place(home.downloadButton, 1200, 676, 40, 40);
     assert.equal(document.activeElement, home.actions.play, 'Play is still the default');
-    // The nearest utility is Help, followed by Controller and Settings.
+    // From the first row's right end (Online play), → reaches the nearest
+    // utility, Help, followed by Controller and Settings.
+    home.actions.online.focus();
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, home.helpButton, '→ from the menu');
     app.input.key('KeyJ');
@@ -1094,7 +1110,7 @@ test('keyboard and gamepad reach Help, Controller and Settings from Home\'s menu
     assert.equal(document.activeElement, home.helpButton);
     app.input.key('ArrowLeft');
     app.input.key('ArrowUp');
-    assert.equal(document.activeElement, home.helpButton, '↑ from Play');
+    assert.equal(document.activeElement, home.helpButton, '↑ from the menu\'s first row');
     app.input.pad('confirm');
     assert.equal(app.infoDialog.isOpen, true);
     app.input.pad('back');

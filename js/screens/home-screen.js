@@ -6,15 +6,21 @@
 // a check (one to four), red with a cross (none), orange with an
 // exclamation mark (more than four), kept up to date as they change.
 //
-// Play and Local play share the menu's first row, half its width each:
-// Play (green) opens Select Mode, Local play Select local mode
-// (js/screens/local-play-screens.js) for two players on two controllers.
-// Local play always shows; it opens only while two supported controllers
-// are active (js/core/controller-manager.js localReady) and a fighter is
-// playable, and then wears the Download button's green edge and glow.
-// Otherwise it is disabled, with a localized reason (its description, and
-// its tooltip), and follows every controller connected or lost at once.
-// Coming back Home ends a Local Play session (App.endLocalPlay).
+// Play, Local play and Online play share the menu's first row: Play
+// (green) opens Select Mode, Local play Select local mode
+// (js/screens/local-play-screens.js) for two players on two controllers,
+// and Online play, a square globe the size of the Settings button, the
+// online name screen (js/screens/online-screens.js); Play and Local play
+// share the rest of the row. Local play always shows; it opens only while
+// two supported controllers are active (js/core/controller-manager.js
+// localReady) and a fighter is playable, and then wears the Download
+// button's green edge and glow. Otherwise it is disabled, with a localized
+// reason (its description, and its tooltip), and follows every controller
+// connected or lost at once. Coming back Home ends a Local Play session
+// (App.endLocalPlay). Online play opens while the device is online
+// (js/core/connectivity.js) and a fighter is playable, with the same green
+// edge and glow; offline it is disabled, says why ("You're offline…") the
+// same way, and glows red; it follows the connection live.
 //
 // Play, Local play, Watch Mode and Practice Ground each start a match, so
 // they are open only while a fighter is playable: with none, they are
@@ -43,6 +49,7 @@ import { playableCharacters } from '../data/characters.js';
 export const MATCH_ACTIONS = Object.freeze(['play', 'watch', 'practice']);
 const NO_FIGHTERS_NOTE = 'home-no-fighters';
 const LOCAL_NOTE = 'home-local-note';
+const ONLINE_NOTE = 'home-online-note';
 
 // Whether any fighter can be played: the one check behind every match
 // action.
@@ -51,6 +58,10 @@ export const hasPlayableFighters = () => playableCharacters().length > 0;
 // Whether Local play can start now: a playable fighter and two active
 // supported controllers on a working Gamepad API.
 export const localPlayOpen = (controllers) => hasPlayableFighters() && !!controllers?.localReady;
+
+// Whether Online play can open now: a playable fighter and the device
+// online (no connectivity to ask counts as online).
+export const onlinePlayOpen = (connectivity) => hasPlayableFighters() && connectivity?.online !== false;
 
 const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
@@ -94,6 +105,11 @@ export class HomeScreen extends Screen {
       class: 'home-action home-action--local', type: 'button', 'data-nav': true,
       'data-home-action': 'local', ...iconLabel('home.local', ICONS.right),
     });
+    // Online play: the third of the first row, a square globe.
+    const online = el('button', {
+      class: 'home-action home-action--online', type: 'button', 'data-nav': true, 'data-home-action': 'online',
+      ...tattr('aria-label', 'home.online'), ...tattr('title', 'home.online'), html: ICONS.globe,
+    });
     // The secondary actions, outlined with a chevron. Watch Mode (CPU vs
     // CPU) opens its own setup, never Select Mode; Practice Ground goes
     // straight into the training room (no mode, fighter or stage select);
@@ -118,11 +134,16 @@ export class HomeScreen extends Screen {
       if (localPlayOpen(app.controllers) && app.startLocalPlay?.()) app.screens.go('local-mode');
       else this.syncLocalAction();
     });
+    // Checked again as it is pressed, like Local play.
+    online.addEventListener('click', () => {
+      if (onlinePlayOpen(app.connectivity)) app.screens.go('online-name');
+      else this.syncOnlineAction();
+    });
     watch.addEventListener('click', startMatch('watch-difficulty'));
     practice.addEventListener('click', startMatch('practice'));
     discover.addEventListener('click', () => app.screens.go('discover'));
     // By name, in menu order.
-    this.actions = { play, local, watch, practice, discover };
+    this.actions = { play, local, online, watch, practice, discover };
     // Shown, and describing the match actions, only while none can start.
     this.noFightersNote = el('p', {
       class: 'home-note', id: NO_FIGHTERS_NOTE, role: 'status', hidden: true, ...tx('common.noFighters'),
@@ -132,7 +153,12 @@ export class HomeScreen extends Screen {
     // button lets the pointer reach).
     this.localNote = el('span', { class: 'home-sr', id: LOCAL_NOTE, ...tx('home.localNeedsControllers') });
     this.localCell = el('span', { class: 'home-action-cell' }, [local, this.localNote]);
-    this.firstRow = el('div', { class: 'home-actions-row' }, [play, this.localCell]);
+    // Why Online play is closed while fighters are not the reason, the same
+    // way.
+    this.onlineNote = el('span', { class: 'home-sr', id: ONLINE_NOTE, ...tx('home.onlineOffline') });
+    this.onlineCell = el('span', { class: 'home-action-cell home-action-cell--online' }, [online, this.onlineNote]);
+    this.firstRow = el('div', { class: 'home-actions-row' }, [play, this.localCell, this.onlineCell]);
+    app.connectivity?.onChange?.(() => this.syncOnlineAction());
 
     // Settings: Home chrome, not a menu action. The gear in the top right
     // corner opens the Settings dialog over Home (js/ui/settings-dialog.js)
@@ -324,6 +350,7 @@ export class HomeScreen extends Screen {
     this.noFightersNote.hidden = open;
     this.el.querySelector('.home-intro')?.classList.toggle('has-note', !open);
     this.syncLocalAction();
+    this.syncOnlineAction();
   }
 
   // Local play: open (and glowing green) while it can start, else
@@ -342,6 +369,27 @@ export class HomeScreen extends Screen {
     } else {
       button.setAttribute('aria-describedby', hasPlayableFighters() ? LOCAL_NOTE : NO_FIGHTERS_NOTE);
       setAttr(this.localCell, 'title', hasPlayableFighters() ? 'home.localNeedsControllers' : 'common.noFighters');
+    }
+  }
+
+  // Online play: open (and glowing green) while it can start, else
+  // disabled, described by why: no fighter (the note under the menu, no
+  // glow), or offline (its own description and tooltip, and a red glow).
+  syncOnlineAction() {
+    const button = this.actions.online;
+    const fighters = hasPlayableFighters();
+    const open = onlinePlayOpen(this.app.connectivity);
+    button.disabled = !open;
+    button.classList.toggle('is-ready', open);
+    button.classList.toggle('is-offline', fighters && !open);
+    this.onlineCell.classList.toggle('is-disabled', !open);
+    if (open) {
+      button.removeAttribute('aria-describedby');
+      this.onlineCell.removeAttribute('title');
+      this.onlineCell.removeAttribute('data-i18n-title');
+    } else {
+      button.setAttribute('aria-describedby', fighters ? ONLINE_NOTE : NO_FIGHTERS_NOTE);
+      setAttr(this.onlineCell, 'title', fighters ? 'home.onlineOffline' : 'common.noFighters');
     }
   }
 

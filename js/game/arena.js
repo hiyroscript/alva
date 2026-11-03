@@ -87,6 +87,9 @@ export class Arena {
     this.gravity = CONFIG.sim.gravity;
     this.step = CONFIG.sim.step;
     this.acc = 0;
+    // What feeds the fixed steps instead of the accumulator below (see
+    // advance): an online match's lockstep, else nothing.
+    this.stepper = null;
     this.debug = false;
     // `dpr`: device pixels per CSS pixel on the canvas, so drawn UI can keep
     // a readable size in CSS pixels however far the world zooms out.
@@ -190,15 +193,7 @@ export class Arena {
     dt = Math.min(dt, CONFIG.sim.maxFrameDelta);
     // A lethal launch's slow motion feeds the fixed steps more slowly (see
     // HitEffects.timeScale); each step is still exactly one step.
-    this.acc += dt * this.fx.timeScale;
-    let steps = 0;
-    while (this.acc >= this.step && steps < CONFIG.sim.maxStepsPerFrame) {
-      this.update(this.step);
-      this.acc -= this.step;
-      steps++;
-    }
-    if (steps >= CONFIG.sim.maxStepsPerFrame) this.acc = 0;
-    const alpha = this.acc / this.step;
+    const alpha = this.advance(dt * this.fx.timeScale);
     // Platforms and fighters drawn the same share of the way between steps,
     // so whoever stands on a moving platform stays on it on screen.
     this.stage.interpolate(alpha);
@@ -216,6 +211,26 @@ export class Arena {
     // Aged after drawing, so what this frame's steps started (a one-frame
     // flash, a spark at age 0) is drawn at least once.
     this.fx.update(dt);
+  }
+
+  // Feeds `dt` seconds of simulation clock to the fixed steps and runs every
+  // whole one due (at most CONFIG.sim.maxStepsPerFrame; a frame too long
+  // for them drops the rest of its time). Returns how far the clock is
+  // between steps (0 to 1), for drawing. An online match hands this to its
+  // `stepper` (js/online/lockstep.js), which runs a step only once both
+  // players' inputs for it are known: the same steps, fed from the same
+  // clock, only never ahead of the other browser.
+  advance(dt) {
+    if (this.stepper) return this.stepper.advance(dt);
+    this.acc += dt;
+    let steps = 0;
+    while (this.acc >= this.step && steps < CONFIG.sim.maxStepsPerFrame) {
+      this.update(this.step);
+      this.acc -= this.step;
+      steps++;
+    }
+    if (steps >= CONFIG.sim.maxStepsPerFrame) this.acc = 0;
+    return this.acc / this.step;
   }
 
   // One fixed step of the world. Modes with their own rules (phases, a

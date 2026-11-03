@@ -18,6 +18,7 @@ for where they moved). The game as it is now is specified in
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
+| **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code); part 2 (go live) to follow | part 1: `cb3c38b` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -4624,3 +4625,94 @@ the pack holding every fighter frame byte for byte, run as the page runs
 it, and the release page running it before the game); a packed case each
 in `ability-hud` and `controls-ui` (the touch buttons, a failure still
 naming the frame's file).
+
+## Online update
+
+Asked for (the `max` brief, "add Online Play to Alva") in two parts. Part 1
+([#160](https://github.com/hiyroscript/alva/pull/160), `cb3c38b`), here: all
+the game's side and the room server's code, tested without any
+server deployed, `CONFIG.online.serverUrl` left empty (Online play then says
+"Online play is unavailable right now."). Part 2 points the game at the
+owner's deployed server. Nothing of the offline modes changes: Quick Battle
+against the CPU, Watch Mode, Local Play and Practice Ground play exactly as
+before.
+
+- **Home's Online play** ([online play](./docs/gameplay/online-play.md#home),
+  [`ALVA_SPEC.md`](./ALVA_SPEC.md) §6.2, §6.5c): the first row's third, after
+  Local play, a square the Settings button's size (`--home-utility-size`)
+  with an original globe (`ICONS.globe`); Play and Local play share the rest.
+  Open and glowing green while the device is online (`Connectivity`, live),
+  disabled, described and glowing red (`--danger-*`) while offline.
+- **The flow** (`js/screens/online-screens.js`): the online name (every
+  time, remembered in the settings, schema 9, Suggest a name), the lobby
+  (Create room and its dialog, Join with code, the public rooms read every
+  5 s), the room (its code and Copy code, both seats, the fighter, the peer
+  link, Ready, the host's start, the drawn stage), every refusal a dialog
+  ("Servers are full…" apart from "Online play is unavailable…"), "The host
+  closed the room.", going offline ending it.
+- **The online battle** (`js/screens/online-battle-screen.js`): the normal
+  Quick Battle match, each player on their own side by name, no pause (a
+  menu with Leave match while the world runs on), leaving a forfeit
+  (`Battle.forfeit`), "Waiting for opponent…" then "Connection lost", the
+  result from each player's side, Rematch and Leave room.
+- **The netcode** (`js/online/`): delay-based lockstep (`LockstepSession`):
+  each step's local input sampled into a 26-bit frame for step n + 3, sent
+  with every frame not yet acknowledged, each step run only once both
+  frames are known, the Arena's steps handed to it (`Arena.advance`,
+  `stepper`); each fighter a `PlayerController` on a `LockstepChannel`; a
+  hash of the match compared every 60 steps (desync); a WebRTC DataChannel
+  (`PeerLink`, STUN, unordered, no retransmissions) behind a four-call
+  transport interface. Rollback is left for later
+  ([what it would need](./docs/gameplay/online-play.md#rollback-later)).
+- **The determinism audit** found nothing in a step to fix: no wall clock or
+  unseeded randomness, insertion-ordered collections, reduced motion only in
+  drawing, nothing outside `update` that a step reads. Each player's
+  Automatic turn-around goes in the start (`Battle`'s `automaticTurnAround`
+  may now be `{ p1, p2 }`), and how many steps a frame runs is the
+  lockstep's.
+- **The room server** (`server/`, [the room server](./docs/development/online-server.md)):
+  a Cloudflare Worker with a `Lobby` and a `Room` Durable Object per room
+  (WebSocket hibernation), every field checked, only itch.io's game hosts
+  (and a local copy) allowed, `MAX_ROOMS` and a daily request budget for the
+  free plan (both in `wrangler.toml` with their reasoning), per-address
+  limits, idle rooms closed; no accounts or stored identity. Development
+  only: never in the itch.io release.
+- **The itch.io release**: the validator allows the one host in
+  `CONFIG.online.serverUrl` and its WebSocket form, and now catches
+  WebSocket addresses too ([`tools/itch/hosts.mjs`](./tools/itch/hosts.mjs));
+  `server/` is on the shared development-only list. Menu navigation keeps
+  a focused text field's typing keys its own (`isTextEntry`).
+
+**Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
+(`serverUrl`, `inputDelay`, `iceServers` for a TURN relay later,
+`connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
+`hashInterval`, `resendWindow`, `colors`; `CONFIG.debug.online` logs a
+desync's states); the server's caps and allowed origins in
+[`server/wrangler.toml`](./server/wrangler.toml); `STAGE_REVEAL_MS` in
+`js/screens/online-screens.js`; `WAITING_NOTICE_MS` in
+`js/online/lockstep.js`; `SEAT_GRACE_MS` in `server/src/room.js`.
+
+**Code:** new `js/online/` (`rules.js`, `input-frame.js`, `transport.js`,
+`peer.js`, `lockstep.js`, `state-hash.js`, `match-setup.js`,
+`server-client.js`, `online-session.js`), `js/core/connectivity.js`,
+`js/screens/online-screens.js`, `js/screens/online-battle-screen.js`,
+`css/online.css` and `server/`; changed `js/config.js`, `js/core/app.js`,
+`js/core/settings.js` (schema 9), `js/core/menu-navigator.js`,
+`js/game/arena.js` (`advance`), `js/game/battle.js` (the online mode,
+`labels`, per-player turn-around, `forfeit`), `js/screens/home-screen.js`,
+`js/screens/battle-screen.js` (an id per battle screen, `playerFighter`,
+`holdsForPortrait`), `js/ui/hud.js` (`setNames`), `js/ui/icons.js`,
+`js/ui/overlays.js` (a one-button notice), `index.html`, `css/base.css`,
+`css/home.css`, the strings, `tools/itch/` and the documentation.
+
+**Tests:** new `tests/online/` (`determinism`, the most important: two
+Battles side by side for 6,000 steps, every fighter on both sides and every
+stage; `lockstep`; `online-play`, the whole flow on the real server code in
+process; `rules`; `itch-hosts`), `tests/helpers/online-app.mjs` and
+`server/tests/` (the Lobby, the Rooms, the Worker, the shared rules), all
+part of `node --test`. Revised for the new layout and schema, their rules
+kept: the Home menu's action lists and first-row grid
+(`practice-ground`, `watch-mode`, `local-play`, `settings`, `discover`:
+their fake layouts now put Online play in the first row), the battle modes'
+list (`local-play`, `watch-mode`), and the settings schema 8 → 9
+(`settings`).

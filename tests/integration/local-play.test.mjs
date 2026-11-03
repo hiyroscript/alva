@@ -373,9 +373,9 @@ test('Home: the Local play press checks the controllers again, and never starts 
   assert.equal(app.input.localPlay, true);
 });
 
-test('the stylesheet: two equal columns spanning the row, the Download button\'s glow on Local play once open, still with reduced motion', () => {
+test('the stylesheet: Play and Local play in two equal columns beside the Online play square, spanning the row, the Download button\'s glow on Local play once open, still with reduced motion', () => {
   const css = stylesheet();
-  assert.match(css, /\.home-actions-row \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*gap: inherit;/s);
+  assert.match(css, /\.home-actions-row \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) var\(--home-utility-size\);[^}]*gap: inherit;/s);
   assert.match(css, /\.home-action--local\.is-ready \{ border-color: rgba\(47, 191, 99, 0\.6\); \}/, 'a green edge between pulses');
   assert.match(css, /\.home-action--local\.is-ready::after \{[^}]*border: 1px solid rgba\(47, 191, 99, 0\.6\);[^}]*box-shadow: 0 0 10px 1px rgba\(47, 191, 99, 0\.32\);[^}]*animation: home-download-glow 3\.2s ease-in-out infinite;/s,
     'the Download button\'s own border, glow and cadence');
@@ -538,7 +538,7 @@ test('the Local Play battle: two players on their own controllers, no CPU, P1 an
   const { app, screens } = booted;
   const screen = screens.battle;
   assert.equal(battle.mode, 'local');
-  assert.deepEqual(Object.keys(BATTLE_MODES), ['quick-battle', 'watch', 'local']);
+  assert.deepEqual(Object.keys(BATTLE_MODES), ['quick-battle', 'watch', 'local', 'online']);
   for (const [f, slot] of [[battle.p1, 'p1'], [battle.p2, 'p2']]) {
     assert.ok(f.controller instanceof PlayerController, `${slot}: a player`);
     assert.ok(!(f.controller instanceof CombatAIController));

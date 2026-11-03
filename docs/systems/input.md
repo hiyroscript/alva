@@ -23,7 +23,8 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
 | [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Automatic turn-around on or off, and each fighter's saved controller layout (the only module touching storage). |
-| [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges. It also owns the dialog stack (see [Dialog layers](#dialog-layers)). |
+| [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges, and never the keys a focused text field types ([Text fields](#text-fields)). It also owns the dialog stack (see [Dialog layers](#dialog-layers)). |
+| [`js/online/lockstep.js`](../../js/online/lockstep.js), [`js/online/input-frame.js`](../../js/online/input-frame.js) | Online Play's input ([below](#online-play-the-remote-channel)): the local player's snapshot encoded into a frame for each step, sent to the other browser, and each fighter's `LockstepChannel` handing its PlayerController the frame of the step being run. |
 | [`js/core/input-modality.js`](../../js/core/input-modality.js) | The input modality (mouse, touch, keyboard or gamepad) on `<html>`, which keeps hover, focus and selection apart (see [Interaction states](#interaction-states)). |
 
 ## Controls
@@ -619,6 +620,49 @@ them, the settings upgrade each fighter's profile for that fighter
 One fighter's profile never touches another's, and nothing is written
 until a setting changes.
 
+## Online Play: the remote channel
+
+In [Online Play](../gameplay/online-play.md) each fighter is still a
+`PlayerController`, on a `LockstepChannel` (`OnlineInput.player(slot)`):
+the same `sample()` / `flush()` contract as Local Play's
+`ControllerChannel`, so nothing in the Fighter knows it is online.
+
+- **The local player** plays with their usual devices: the keyboard, the
+  touch controls (shown, with their fighter's art) or any controller,
+  through `InputManager.sample(context)` for their fighter as it is, its
+  controller profile and every rule above unchanged. The lockstep samples
+  it once per step, for step n + D (`CONFIG.online.inputDelay`, 3), and
+  encodes the snapshot into 26 bits (`encodeFrame`: every held control and
+  its press edge, `mouvementLeftPressed` / `mouvementRightPressed`,
+  `pressedOnGround` / `pressedInAir`). The snapshot carries no analog value
+  (the resolver turns the sticks into codenames first), so nothing is lost.
+  A controller press is resolved for the fighter as it was when sampled,
+  D steps before it plays.
+- **Both fighters**, on both browsers, read the frame of the step being run
+  (`decodeFrame`), the local one's and the remote one's alike, so both
+  simulations see exactly the same input.
+- **While a menu covers play** (the match menu, the Match Results) the
+  local player's frames are neutral (`muted`); keys pressed for the menu
+  never reach the fighter, while the world runs on.
+- **A flush** (a respawn, the fight starting) is a rule of the match: on
+  both browsers at the same step it drops the presses of that player's
+  frames already sampled (up to n + D), held controls kept, and the local
+  devices' buffered presses (`InputManager.flush`).
+- Options / Menu, Esc, P and the HUD's pause open the match menu, never a
+  pause.
+
+## Text fields
+
+Online Play's name, room name and code are text fields. While one has
+focus, the keys that type are the field's: letters (W A S D, J and K
+included), digits, Space, Backspace and ← → never move focus, confirm or
+go back. ↑ and ↓ (the arrows, not W / S) still move between the controls
+and Esc still goes back; Enter is the field's own (each submits on it).
+A controller's D-pad and buttons navigate as ever; Cross / A on a field
+focuses it (where the system offers an on-screen keyboard, it shows).
+`isTextEntry` (`js/core/menu-navigator.js`) says which elements are
+fields: text-like inputs, text areas and editable content, never a slider.
+
 ## Interaction states
 
 Four states, never confused (`js/core/input-modality.js`, the rules in
@@ -738,6 +782,13 @@ them as a stack (`MenuNavigator.syncLayers`):
   [`down.test.mjs`](../../tests/systems/down.test.mjs) and
   [`explicit-mouvement.test.mjs`](../../tests/systems/explicit-mouvement.test.mjs):
   press edges and Dash requests from every device.
+
+- [`tests/online/lockstep.test.mjs`](../../tests/online/lockstep.test.mjs):
+  the online input frame (every field of a player's snapshot, one bit
+  each), the delay, flushes on both sides, muting.
+- [`tests/online/online-play.test.mjs`](../../tests/online/online-play.test.mjs):
+  typing in a text field (no menu command), a controller confirming a
+  remembered name, Esc and the HUD's pause opening the match menu.
 
 These run on mocked controllers (`tests/helpers/fake-gamepad.mjs`); real
 PlayStation and Xbox hardware still needs a browser check.

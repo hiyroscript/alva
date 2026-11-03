@@ -66,6 +66,7 @@ parts in cascade order:
 | `components.css` | Shared controls, the menu screen frame, panels. |
 | `splash.css`, `home.css`, `setup.css`, `discover.css`, `settings.css` | Their screens (setup: Select Mode, Difficulty, Fighter, CPU and Stage; settings: the dialog, the language chooser and the touch layout editor). |
 | `battle.css`, `touch-controls.css`, `battle-overlays.css`, `practice.css`, `ability-hud.css` | Battle chrome and the HUD; the touch controls; banners and the pause and result panels; Practice Ground; the ability HUD (Player 1's moves in the bottom-right corner). |
+| `controller.css`, `online.css` | Controller Connections and the controller editor; Online Play's screens (the name, the lobby, the room), its Create room dialog and what an online battle adds. |
 | `overlays.css` | Loading, the dialogs' shared contract (one dim, one glass, the dialog layer) and the confirm, choice, information and install dialogs, the rotate prompt. |
 | `responsive.css` | Breakpoint adjustments. Always last. |
 

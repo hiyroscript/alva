@@ -3,10 +3,10 @@
 The repository is the site: `index.html`, its stylesheet parts in `css/`
 and its modules in `js/` run as they are, with no build, on GitHub Pages or
 any static server ([running and deploying](setup.md)). Served that way the
-game is 1,223 files (over a thousand of them fighter frames), and itch.io
+game is 1,236 files (over a thousand of them fighter frames), and itch.io
 accepts at most 1,000 in an HTML5 game's ZIP. The **release** is an
-optional, generated copy of the same game in 14 files: the 147 modules
-bundled into one `game.js`, the 15 stylesheet parts joined into one
+optional, generated copy of the same game in 14 files: the 159 modules
+bundled into one `game.js`, the 16 stylesheet parts joined into one
 `game.css`, every fighter's frames packed byte for byte into one
 `game-assets.js`, and everything else copied unchanged. However many
 fighters join the roster, the release stays at 14 files. It is never
@@ -60,8 +60,8 @@ dist/
   itch/
     index.html             the page, loading the three files below
     game-assets.js         every fighter's frames, packed byte for byte (about 1.7 MB)
-    game.js                the 147 modules of js/, bundled (about 1.7 MB)
-    game.css               the 15 parts of css/, joined (about 170 KB)
+    game.js                the 159 modules of js/, bundled (about 1.8 MB)
+    game.css               the 16 parts of css/, joined (about 180 KB)
     manifest.webmanifest   unchanged
     alvafav.PNG            unchanged (favicon, splash)
     controller.PNG         unchanged (Home's controller picture)
@@ -115,10 +115,15 @@ dist/
   root images and the rest of `assets/` (`assets/favicon.svg` is referenced
   by nothing, the favicon being `alvafav.PNG`, but stays a copy of `assets/`
   like the rest).
-- **Left out.** Everything development-only: `tests/`, `docs/`, `tools/`,
-  the specification and Markdown, `codename_rule`, `character_rule`, `max`,
-  `package.json`, `node_modules/`, `.nojekyll` (GitHub Pages only) and Git.
-  The repository keeps all of it.
+- **Left out.** Everything development-only (`DEVELOPMENT_ONLY` in
+  `release.mjs`, which the build and the validation share): `tests/`,
+  `docs/`, `tools/`, the room server (`server/`, deployed to Cloudflare on
+  its own: [the room server](online-server.md)), the specification and
+  Markdown, `codename_rule`, `character_rule`, `max`, `package.json`,
+  `node_modules/`, `.nojekyll` (GitHub Pages only) and Git. The build
+  copies only what the page loads and refuses to copy anything on that
+  list; the validation fails a release holding any of it. The repository
+  keeps all of it.
 
 ## The validation
 
@@ -141,9 +146,13 @@ build and on its own:
   code names (`./hs.jpg`, `./alvafav.PNG`, `controller.PNG`), every frame of
   every registered fighter (from the registry itself, in the pack), every
   manifest icon.
-- No other host: the only addresses are the credits' links to the sprite
-  sources (opened by the player, never loaded); no script, style or image
-  from elsewhere.
+- No other host ([`tools/itch/hosts.mjs`](../../tools/itch/hosts.mjs)):
+  the only addresses (http, https, ws or wss) are the credits' links to the
+  sprite sources (opened by the player, never loaded) and, for Online Play,
+  the room server: the single host in `CONFIG.online.serverUrl` and its
+  WebSocket form (wss for https). No script, style or image from
+  elsewhere, and no other path to another host; with `serverUrl` empty, as
+  until the server is deployed, nothing more is allowed.
 - The archive: every entry intact (CRC-32), exactly the folder's files and
   bytes, `index.html` at its root, no unsafe paths.
 
@@ -256,3 +265,9 @@ same; the page around it decides a few things:
 - **Installing Alva.** Browsers do not offer to install a page shown in an
   iframe, so Home's Download dialog shows its manual steps there.
   Installing is for the game's own site.
+- **Online Play.** The game runs on itch.io's game host
+  (`https://html-classic.itch.zone` and the like), which the room server
+  allows ([the room server](online-server.md)); the room's code is how
+  players invite each other (a link to the frame is not shareable), and
+  where the frame blocks the clipboard, Copy code selects the code to copy
+  by hand.

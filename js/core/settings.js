@@ -8,12 +8,13 @@
 //
 // Stored as
 //
-//   { version: 8,
+//   { version: 9,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
 //     automaticTurnAround: true | false,
-//     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... } }
+//     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... },
+//     onlineName: '<name>' | null }
 //
 // `language` stays null until the player picks one: the game then speaks
 // English, but the first-launch chooser still asks (languageChosen), so a
@@ -34,11 +35,17 @@
 // dropped (that action falls back to its recommended binding), never the
 // profile or the rest of the settings.
 //
+// `onlineName` is the last name the player chose for Online Play
+// (js/online/rules.js: 2 to 16 letters, digits, spaces, _ - . '), offered
+// again on the name screen next time; null until they choose one. It is
+// only ever shown to the players of a room they join, and the name screen
+// asks every time. A stored name the rules refuse is dropped (null).
+//
 // Older objects are migrated: version 1 ({ version: 1, mobileControls })
 // keeps its Mobile Controls choice, with no language chosen yet and no
 // custom layout; versions 2 and 3 keep their language, Mobile Controls and
 // both custom layouts; version 4 keeps all of that and its controller
-// profiles; versions 5 to 7 keep everything. Versions 1 to 3 get no
+// profiles; versions 5 to 8 keep everything. Versions 1 to 3 get no
 // controller profile. A controller profile saved under version 4 or 5
 // predates the named sticks and today's recommended layouts: it is upgraded
 // for its fighter (upgradeStoredProfiles, js/data/controller-profiles.js):
@@ -48,7 +55,8 @@
 // really changed plays with today's layout. No older version had Automatic
 // turn-around: every one starts with it on, and the Combat Assist and Combo
 // Assist choices versions 3 to 7 stored (both since removed from the game)
-// are dropped, never read into anything. Missing, blocked or unreadable
+// are dropped, never read into anything. No version before 9 had an online
+// name: every one starts with none. Missing, blocked or unreadable
 // storage, a stored object of any other version, and every value that is
 // not one of its setting's choices fall back to the defaults, value by
 // value, so the game always starts with a valid set.
@@ -56,6 +64,7 @@
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
 import { sanitizeStoredProfile, sanitizeStoredProfiles, upgradeStoredProfiles } from '../data/controller-profiles.js';
 import { getCharacter } from '../data/characters.js';
+import { checkName } from '../online/rules.js';
 
 // The interface languages (see js/localization/i18n.js). English is the language in
 // use until the player picks one.
@@ -73,7 +82,7 @@ export const DEFAULT_MOBILE_CONTROLS = 'joystick';
 export const DEFAULT_AUTOMATIC_TURN_AROUND = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 8;
+export const SETTINGS_VERSION = 9;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
@@ -81,12 +90,21 @@ export const DEFAULT_SETTINGS = Object.freeze({
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
   automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND,
   controllerProfiles: Object.freeze({}),
+  onlineName: null,
 });
 
 // The settings that are one choice from a list, and their allowed values.
 const CHOICES = Object.freeze({ language: LANGUAGES, mobileControls: MOBILE_CONTROLS });
 // The settings that are on or off: a real boolean, nothing else.
 const TOGGLES = Object.freeze(['automaticTurnAround']);
+
+// A stored online name, cleaned, or null when there is none or the rules
+// refuse it.
+export function readOnlineName(value) {
+  if (typeof value !== 'string') return null;
+  const checked = checkName(value);
+  return checked.ok ? checked.value : null;
+}
 
 // Whether `value` is one `name` may take: one of a choice's values, or a
 // boolean for a toggle.
@@ -110,6 +128,7 @@ function readCurrent(stored, profiles = sanitizeStoredProfiles) {
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     automaticTurnAround: resolveSetting('automaticTurnAround', stored.automaticTurnAround),
     controllerProfiles: profiles(stored.controllerProfiles),
+    onlineName: readOnlineName(stored.onlineName),
   };
 }
 
@@ -119,10 +138,15 @@ const upgradeProfiles = (raw) => upgradeStoredProfiles(raw, getCharacter);
 
 // An older version's `kept` values read into the current settings, each
 // checked (`profiles` reads its controller profiles), with Automatic
-// turn-around on: no older version had it, whatever the object may hold
+// turn-around on: no version before 8 had it, whatever the object may hold
 // under that name. Nothing else it held (Combat Assist, Combo Assist) is
-// read.
-const migrate = (kept, profiles) => readCurrent({ ...kept, automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND }, profiles);
+// read, and no version before 9 had an online name.
+const migrate = (kept, profiles) => readCurrent({
+  ...kept, automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND, onlineName: null,
+}, profiles);
+// Version 8: everything it had is kept as it is, Automatic turn-around
+// included; only the online name is new.
+const keep = (stored) => readCurrent({ ...stored, onlineName: null });
 
 // Older versions, each read into the current settings.
 const MIGRATIONS = Object.freeze({
@@ -144,10 +168,11 @@ const MIGRATIONS = Object.freeze({
   // shape they had before the sticks were named: all of it kept, every
   // fighter's layout upgraded.
   5: (stored) => migrate(stored, upgradeProfiles),
-  // Versions 6 and 7 had everything that is kept as it is now: all of it
-  // kept.
+  // Versions 6 and 7 had everything that is kept as it is now but
+  // Automatic turn-around: all of it kept. Version 8 had that too.
   6: (stored) => migrate(stored),
   7: (stored) => migrate(stored),
+  8: keep,
 });
 
 // The settings a stored value holds: checked if it is the current version,
@@ -316,5 +341,23 @@ export class Settings {
   // Puts fighter `id` back on its recommended controller layout.
   resetControllerProfile(id) {
     return this.setControllerProfile(id, null);
+  }
+
+  // The last name chosen for Online Play, or null.
+  get onlineName() {
+    return this.values.onlineName;
+  }
+
+  // Remembers `name` (checked and cleaned by the online name rules) and
+  // saves; a name the rules refuse is refused (false). Listeners hear
+  // ('onlineName', name) on a real change.
+  setOnlineName(name) {
+    const value = readOnlineName(name);
+    if (value === null) return false;
+    if (value === this.values.onlineName) return true;
+    this.values.onlineName = value;
+    this.save();
+    this.emit('onlineName', value);
+    return true;
   }
 }

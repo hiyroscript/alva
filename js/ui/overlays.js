@@ -133,14 +133,18 @@ export class ConfirmDialog {
   // `onSettings`, for a confirmation over a paused game, shows Settings and
   // the X at the top right: the gear calls it with itself (to open Settings
   // over this dialog and come back to it), the X cancels. Set per call, so
-  // no later dialog inherits either.
+  // no later dialog inherits either. `notice`: a message to acknowledge
+  // (Online Play's "Servers are full", "The host closed the room"): the
+  // confirm button alone, focused; Esc or Back close it too (resolving
+  // false).
   open({
     title, message, confirmLabel = t('common.confirm'), cancelLabel = t('common.cancel'), cancelOutlineOnly = false,
-    onSettings = null,
+    onSettings = null, notice = false,
   }) {
     if (this.resolve) this.close(false);
     this.onSettings = onSettings;
     this.controls.hidden = !onSettings;
+    this.cancelBtn.hidden = notice;
     this.title.textContent = title;
     this.message.textContent = message;
     this.okBtn.textContent = confirmLabel;
@@ -150,7 +154,7 @@ export class ConfirmDialog {
     this.root.hidden = false;
     this.scope = { el: this.root, onBack: () => this.close(false) };
     this.app.nav.pushScope(this.scope);
-    this.cancelBtn.focus();
+    (notice ? this.okBtn : this.cancelBtn).focus();
     return new Promise((resolve) => {
       this.resolve = resolve;
     });

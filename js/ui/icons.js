@@ -42,6 +42,9 @@ export const ICONS = {
   // Home's Download button: an arrow over a tray, the arrow its own group
   // so it can drop into the tray on its own (css/home.css).
   download: svg('<g class="icon-download-arrow"><path d="M12 3v12M7 10l5 5 5-5"/></g><path class="icon-download-tray" d="M4 16v5h16v-5"/>'),
+  // Home's Online play button: a globe, its outline, its equator and two
+  // meridians curving either side of the axis.
+  globe: svg('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c-2.6 2.4-3.9 5.2-3.9 8.5s1.3 6.1 3.9 8.5"/><path d="M12 3.5c2.6 2.4 3.9 5.2 3.9 8.5s-1.3 6.1-3.9 8.5"/>'),
   // Home's Settings button: an eight-toothed gear round a hub.
   settings: svg(
     '<path d="M10.34 5.1L10.66 2.49L13.34 2.49L13.66 5.1A7.1 7.1 0 0 1 15.71 5.95L17.78 4.33L19.67 6.22L18.05 8.29' +
