@@ -5,7 +5,7 @@
 //             one saves it and the whole interface switches at once, this
 //             dialog included; it stays open.
 //   Controls  Mobile Controls, the touch layout Quick Battle and Practice
-//             Ground use: Joystick (the default) or Classic Buttons, as two
+//             Ground use: Classic Buttons (the default) or Joystick, as two
 //             cards, and Customize touch controls, which opens the touch
 //             layout editor (js/ui/touch-layout-editor.js) for the scheme in
 //             use. Then Controller Controls: a line on what it is and
@@ -219,8 +219,8 @@ export class SettingsDialog {
 
   buildCombat() {
     // Automatic turn-around's two choices, On first, each named and ticked
-    // when it is the saved one; the default says so, as Joystick's card
-    // does.
+    // when it is the saved one; the default says so, as Classic Buttons'
+    // card does.
     this.turnAroundOptions = [true, false].map((on) => {
       const option = el('button', {
         class: 'settings-choice', type: 'button', role: 'radio', 'aria-checked': 'false',

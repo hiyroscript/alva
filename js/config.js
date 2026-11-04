@@ -28,9 +28,33 @@ export const CONFIG = Object.freeze({
     // air past each ledge (world units): narrow screens zoom out further for
     // it, but never below fighterScreenRatioMin.
     stageFrameMargin: 100,
+    // How much closer the battle camera sits than that whole-stage view:
+    // one tuning point for every fighter and every map. It multiplies the
+    // target fighter height and its min / max above, and relaxes the stage
+    // fit by the same factor, so at a zoom above 1 the view follows the
+    // fighters across the stage instead of always showing all of it (the
+    // view still never shows past the map's camera bounds).
+    cameraZoom: 1.35,
     // Snap sprite scale to whole device pixels per art pixel when the snapped
     // size stays inside the min/max ratio above.
     pixelPerfect: true,
+  },
+
+  // The smallest usable viewport Alva runs on (CSS pixels of the visible
+  // area, visualViewport where the browser has one; js/core/screen-guard.js).
+  // Smaller, a full-screen block says so and offers to install Alva. In a
+  // browser tab the minimum is taller: a phone's tab loses its address bar
+  // and toolbars, and even the largest phones' landscape tabs (about 330 to
+  // 395 px tall) are too cramped for the touch controls, so every phone tab
+  // is refused while every tablet (744 px tall and up) and desktop window
+  // passes. Running as an installed app (standalone or fullscreen) the
+  // whole screen is Alva's, so a phone whose screen is 360 px tall or more
+  // in landscape (iPhone SE and up, most Android phones) passes. 640 wide
+  // either way: any phone in landscape, never one held upright (that gets
+  // a line asking to turn it, when turned it would fit).
+  screen: {
+    browser: { minWidth: 640, minHeight: 400 },
+    installed: { minWidth: 640, minHeight: 360 },
   },
 
   sim: {

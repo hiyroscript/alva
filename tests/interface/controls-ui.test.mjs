@@ -91,6 +91,7 @@ const { SAMPLE_FIGHTER } = await import('../fighters/fixtures/sample-fighter.mjs
 const { TEST_MOVELESS } = await import('../fighters/fixtures/test-fighters.mjs');
 const { LOADOUT_CASES, WITH_EXTRA } = await import('../fighters/fixtures/loadout-fighters.mjs');
 const { attackSlots } = await import('../../js/ui/touch-controls.js');
+const { TOUCH_DEFAULT_SCALE } = await import('../../js/core/touch-layout.js');
 const { playerRig, press: pressed } = await import('../helpers/player-rig.mjs');
 const { DT } = await import('../helpers/fighter-harness.mjs');
 
@@ -1235,24 +1236,24 @@ test('Right works alongside every attack, Shield and Jump (multi-touch), each it
 
 const actionsOf = (cluster) => cluster.children.map((c) => c.getAttribute('data-action'));
 
-test('Joystick is the default scheme; setScheme switches layouts and anything unknown is the Joystick', () => {
+test('Classic Buttons is the default scheme; setScheme switches layouts and anything unknown is Classic Buttons', () => {
   const input = { setTouch() {}, queueTouchMouvement() {} };
   const tc = new TouchControls(new Element('div'), input);
-  assert.equal(tc.scheme, 'joystick', 'a player who never chose');
-  assert.equal(tc.root.dataset.scheme, 'joystick');
-  assert.ok(tc.root.classList.contains('is-joystick'));
-  assert.equal(tc.root.classList.contains('is-classic'), false);
-  tc.setScheme('classic');
-  assert.equal(tc.scheme, 'classic');
+  assert.equal(tc.scheme, 'classic', 'a player who never chose');
   assert.equal(tc.root.dataset.scheme, 'classic');
   assert.ok(tc.root.classList.contains('is-classic'));
   assert.equal(tc.root.classList.contains('is-joystick'), false);
-  for (const bad of ['dpad', '', null, undefined, 'Classic']) {
-    tc.setScheme('classic');
+  tc.setScheme('joystick');
+  assert.equal(tc.scheme, 'joystick');
+  assert.equal(tc.root.dataset.scheme, 'joystick');
+  assert.ok(tc.root.classList.contains('is-joystick'));
+  assert.equal(tc.root.classList.contains('is-classic'), false);
+  for (const bad of ['dpad', '', null, undefined, 'Joystick']) {
+    tc.setScheme('joystick');
     tc.setScheme(bad);
-    assert.equal(tc.scheme, 'joystick', String(bad));
+    assert.equal(tc.scheme, 'classic', String(bad));
   }
-  assert.equal(new TouchControls(new Element('div'), input, { scheme: 'classic' }).scheme, 'classic');
+  assert.equal(new TouchControls(new Element('div'), input, { scheme: 'joystick' }).scheme, 'joystick');
 });
 
 test('Classic Buttons has Run and Mouvement Left / Right at the lower left, the actions at the lower right', () => {
@@ -1735,59 +1736,162 @@ test('a scheme switch keeps the fighter\'s combat buttons and Jump: the same ele
   assert.deepEqual(calls, [['extra_attack', true]]);
 });
 
-test('the Joystick layout\'s geometry: the stick at the lower left with Dash buttons above its top corners', () => {
-  const rule = (selector) => CSS.match(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[2] ?? '';
-  // The same corner as the Classic cluster, safe areas included.
-  // Both start in from it by Down's room (a Dash button and a gap): Down sits
-  // at their far left.
-  assert.match(rule('.tc-dpad'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw \+ var\(--tc-down-room\)\);/);
-  assert.match(rule('.tc-joystick'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw \+ var\(--tc-down-room\)\);/);
-  assert.match(CSS, /--tc-down-room: calc\(var\(--tc-dash\) \+ var\(--tc-gap\)\);/);
-  const down = rule('.tc-down');
-  assert.match(down, /left: calc\(var\(--tc-down-room\) \* -1\);/);
-  assert.match(down, /width: var\(--tc-dash\);/);
-  assert.match(rule('.tc-joystick .tc-down'), /bottom: calc\(\(var\(--tc-stick\) - var\(--tc-dash\)\) \/ 2\);/, 'level with the stick\'s middle');
-  assert.match(rule('.tc-dpad .tc-down'), /bottom: calc\(\(var\(--tc\) - var\(--tc-dash\)\) \/ 2\);/, 'level with the Run arrows\' middle');
-  assert.match(rule('.tc-cluster'), /bottom: var\(--tc-bottom\);/);
-  assert.match(CSS, /--tc-bottom: calc\(max\(var\(--safe-b\), 10px\) \+ 1\.6vh\);/);
-  // A round, translucent base that takes the pointer and never scrolls or zooms.
-  const stick = rule('.tc-stick');
-  assert.match(stick, /border-radius: 50%;/);
-  assert.match(stick, /touch-action: none;/);
-  assert.match(stick, /pointer-events: auto;/);
-  assert.match(rule('.tc-stick-knob'), /pointer-events: none;/);
-  // No arrows drawn on the base.
-  assert.doesNotMatch(CSS, /\.tc-stick-arrow/);
-  assert.doesNotMatch(CSS, /--tc-stick-left|\.tc-stick-down/);
-  assert.match(stick, /left: 0;/);
-  assert.match(rule('.tc-joystick'), /width: var\(--tc-stick\);/);
-  // Dash buttons: small, above the stick (whose top is at 1.92 --tc), at its left and right.
-  assert.match(CSS, /--tc-stick: calc\(var\(--tc\) \* 1\.92\);/);
-  assert.match(rule('.tc-dash'), /bottom: calc\(var\(--tc\) \* 1\.82\);/);
-  assert.match(rule('.tc-dash'), /width: var\(--tc-dash\);/);
-  assert.match(CSS, /--tc-dash: calc\(var\(--tc\) \* 0\.62\);/);
-  assert.match(rule('.tc-dash-left'), /left: calc\(var\(--tc\) \* -0\.03\);/);
-  assert.match(rule('.tc-dash-right'), /right: calc\(var\(--tc\) \* -0\.03\);/);
-  // The lower-right cluster no longer rises: it sits exactly where Classic
-  // Buttons has it, untouched.
-  assert.doesNotMatch(CSS, /\.is-joystick \.tc-actions/);
-  assert.match(CSS, /\.tc-jump \{ right: 0; bottom: 0; \}/);
-  assert.match(CSS, /\.tc-attack\[data-slot="2"\] \{ right: var\(--tc-pitch\); bottom: 0; \}/);
-  assert.match(CSS, /\.tc-attack\[data-slot="1"\] \{ right: calc\(var\(--tc-pitch\) \* 2\); bottom: 0; \}/);
-  assert.match(CSS, /\.tc-attack\[data-slot="3"\] \{ right: calc\(var\(--tc-pitch\) \* 1\.5\); bottom: calc\(var\(--tc-pitch\) \* 0\.87\); \}/);
+// The stylesheet's touch-control geometry, evaluated: every custom
+// property of .touch-controls and of a rule resolved with --tc as 1 (all
+// lengths in buttons) and the default scales TouchControls sets
+// (TOUCH_DEFAULT_SCALE), so a place reads as a number.
+function touchGeometry() {
+  const block = (selector) => {
+    const re = new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`, 'g');
+    return [...CSS.matchAll(re)].map((m) => m[2]).join('\n');
+  };
+  const props = (text) => Object.fromEntries([...text.matchAll(/(--[\w-]+): ([^;]+);/g)].map((m) => [m[1], m[2]]));
+  const root = { ...props(block('.touch-controls')), '--tc': '1', '--tc-k': String(TOUCH_DEFAULT_SCALE.control), '--tc-ks': String(TOUCH_DEFAULT_SCALE.move) };
+  const evaluate = (expr, vars) => {
+    let e = expr;
+    for (let i = 0; i < 20 && /var\(/.test(e); i++) {
+      e = e.replace(/var\((--[\w-]+)(?:, ([^)]+))?\)/g, (_, name, fallback) => `(${vars[name] ?? fallback ?? 'NaN'})`);
+    }
+    e = e.replace(/calc\(/g, '(');
+    assert.match(e, /^[\d\s.+\-*/()]+$/, `${expr} evaluates (${e})`);
+    return Function(`return (${e});`)();
+  };
+  // `side` of the rules matching `selectors` (later ones win), with the
+  // custom properties they set.
+  const read = (selectors, side) => {
+    const vars = { ...root };
+    let value = null;
+    for (const sel of selectors) {
+      const text = block(sel);
+      Object.assign(vars, props(text));
+      const v = [...text.matchAll(new RegExp(`(?:^|[\\s;{])${side}: ([^;]+);`, 'g'))].at(-1)?.[1];
+      if (v) value = v;
+    }
+    assert.ok(value, `${selectors.join(' + ')}: ${side}`);
+    return evaluate(value, vars);
+  };
+  // A custom property of .touch-controls, in buttons.
+  const value = (name) => evaluate(root[name], root);
+  return { root, evaluate, read, value };
+}
+
+// A control drawn at `scale` round its own box's centre: its circle, from
+// its box's right (or left) and bottom offsets and box size, in buttons.
+const circle = ({ right, left, bottom, size, scale }) => ({
+  x: right !== undefined ? -(right + size / 2) : left + size / 2,
+  y: bottom + size / 2,
+  r: (size * scale) / 2,
 });
+const apart = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) - a.r - b.r;
 
-// ---- Button geometry -----------------------------------------------------------
-
-test('the Shield touch button keeps the old Defense / Block coordinates', () => {
-  assert.match(CSS, /\.tc-shield \{ right: calc\(var\(--tc-pitch\) \* 0\.5\); bottom: calc\(var\(--tc-pitch\) \* 0\.87\); \}/);
+test('the lower-right cluster: the two Mash Combo buttons and Jump flush along the bottom edge, Shield above Jump, the fighter\'s other moves higher and a little smaller', () => {
+  const { read } = touchGeometry();
+  const k = TOUCH_DEFAULT_SCALE.control;
+  const km = TOUCH_DEFAULT_SCALE.move;
+  assert.ok(km < k, 'the other moves a little smaller');
+  const at = (selectors, scale = k) => circle({ right: read(selectors, 'right'), bottom: read(selectors, 'bottom'), size: 1, scale });
+  const jump = at(['.tc-jump']);
+  const shield = at(['.tc-shield']);
+  const mashA = at(['.tc-act[data-mash="1"]']);
+  const mashB = at(['.tc-act[data-mash="2"]']);
+  const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} vs ${b}`);
+  // Jump in the corner, its drawn edge on the cluster's right and bottom,
+  // and the cluster itself flush with the screen's (only the safe area).
+  near(jump.x + jump.r, 0, 'Jump against the right edge');
+  near(jump.y - jump.r, 0, 'Jump against the bottom edge');
+  assert.match(CSS, /\.tc-actions \{[^}]*right: var\(--safe-r\);/, 'flush right');
+  assert.match(CSS, /--tc-bottom: var\(--safe-b\);/, 'flush with the bottom');
+  // The bottom row: Mash A, Mash B, Jump, evenly spaced, on the bottom edge.
+  for (const b of [mashA, mashB]) near(b.y, jump.y, 'one row');
+  assert.ok(mashA.x < mashB.x && mashB.x < jump.x);
+  near(mashB.x - mashA.x, jump.x - mashB.x, 'evenly spaced');
+  near(shield.x, jump.x, 'Shield over Jump');
+  assert.ok(shield.y > jump.y && apart(shield, jump) > 0.05);
+  // The other moves: column 1 left of Shield, starting higher than it;
+  // column 0 above Shield; column 2 above Mash A; each row one small pitch
+  // up, no gap left.
+  const move = (col, row) => at([`.tc-act[data-stack-col="${col}"]`, '.tc-act[data-stack-row]', `.tc-act[data-stack-row="${row}"]`], km);
+  assert.ok(move(1, 0).y > shield.y, 'left of Shield and higher than it');
+  assert.ok(move(1, 0).y - move(1, 0).r > shield.y - shield.r, 'its bottom above Shield\'s');
+  near(move(1, 0).x, mashB.x, 'column 1 over Mash B');
+  near(move(0, 0).x, shield.x, 'column 0 over Shield');
+  near(move(2, 0).x, mashA.x, 'column 2 over Mash A');
+  for (const [col, under] of [[0, shield], [1, mashB], [2, mashA]]) {
+    let below = under;
+    for (let row = 0; row < 4; row++) {
+      const b = move(col, row);
+      assert.ok(b.y > below.y && apart(b, below) > 0.05, `column ${col} row ${row} clear above`);
+      if (row > 0) assert.ok(apart(b, below) < 0.3, `column ${col} row ${row}: no gap left`);
+      below = b;
+    }
+  }
+  const all = [jump, shield, mashA, mashB, move(0, 0), move(0, 1), move(0, 2), move(1, 0), move(1, 1), move(1, 2), move(2, 0), move(2, 1)];
+  for (const [i, a] of all.entries()) for (const [j, b] of all.slice(i + 1).entries()) assert.ok(apart(a, b) > 0.05, `${i} and ${i + 1 + j} overlap`);
+  // No place is fixed to a button id: only roles.
+  assert.doesNotMatch(CSS, /\.tc-extra_attack \{|\.tc-attack\[data-slot/, 'places by role, never by button');
   assert.doesNotMatch(CSS, /\.tc-(block|defense)\b/);
 });
 
+test('Classic Buttons\' lower-left row: Run left, Down and Run right along the bottom edge, as large as every button, a Dash button just above each Run arrow', () => {
+  const { read, value } = touchGeometry();
+  const k = TOUCH_DEFAULT_SCALE.control;
+  const dash = value('--tc-dash');
+  const at = (selectors, size = 1) => circle({ left: read(selectors, 'left'), bottom: read(selectors, 'bottom'), size, scale: k });
+  const runLeft = at(['.tc-dpad .tc-pad', '.tc-dpad .tc-runLeft']);
+  const runRight = at(['.tc-dpad .tc-pad', '.tc-dpad .tc-runRight']);
+  const down = at(['.tc-down', '.tc-dpad .tc-down']);
+  assert.match(CSS, /\.tc-dpad \.tc-down \{[^}]*width: var\(--tc\);[^}]*height: var\(--tc\);/, 'Down as large as the Run arrows');
+  const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} vs ${b}`);
+  near(runLeft.x - runLeft.r, 0, 'Run left against the cluster\'s left edge');
+  near(read(['.tc-dpad'], 'height'), k, 'the cluster one row tall');
+  for (const b of [runLeft, down, runRight]) near(b.y - b.r, 0, 'on the bottom edge');
+  assert.ok(runLeft.x < down.x && down.x < runRight.x, 'Run left, Down, Run right');
+  near(down.x - runLeft.x, runRight.x - down.x, 'evenly spaced');
+  assert.ok(apart(runLeft, down) > 0.05 && apart(down, runRight) > 0.05);
+  const dashLeft = at(['.tc-dash', '.tc-dpad .tc-dash', '.tc-dpad .tc-dash-left'], dash);
+  const dashRight = at(['.tc-dash', '.tc-dpad .tc-dash', '.tc-dpad .tc-dash-right'], dash);
+  near(dashLeft.x, runLeft.x, 'Dash left centred over Run left');
+  near(dashRight.x, runRight.x, 'Dash right centred over Run right');
+  for (const [d, run] of [[dashLeft, runLeft], [dashRight, runRight]]) assert.ok(d.y > run.y && apart(d, run) > 0.05, 'just above, clear of it');
+  // Flush in the corner: nothing between it and the screen's edges but the
+  // safe-area insets.
+  assert.match(CSS, /\.tc-dpad \{[^}]*left: var\(--safe-l\);/, 'flush left');
+  assert.match(CSS, /--tc-bottom: var\(--safe-b\);/, 'flush with the bottom');
+});
+
+test('the Joystick layout\'s geometry at the default scale: the stick at the lower left with Dash buttons above its top corners and Down at its left, nothing overlapping', () => {
+  const { read, value } = touchGeometry();
+  const k = TOUCH_DEFAULT_SCALE.control;
+  const stickSize = value('--tc-stick');
+  const dash = value('--tc-dash');
+  const width = read(['.tc-joystick'], 'width');
+  const stick = circle({ left: read(['.tc-stick'], 'left'), bottom: read(['.tc-stick'], 'bottom'), size: stickSize, scale: k });
+  const dashLeft = circle({ left: read(['.tc-dash-left'], 'left'), bottom: read(['.tc-dash'], 'bottom'), size: dash, scale: k });
+  const dashRightBox = read(['.tc-dash-right'], 'right');
+  const dashRight = { x: width - dashRightBox - dash / 2, y: read(['.tc-dash'], 'bottom') + dash / 2, r: (dash * k) / 2 };
+  const down = circle({ left: read(['.tc-down', '.tc-joystick .tc-down'], 'left'), bottom: read(['.tc-down', '.tc-joystick .tc-down'], 'bottom'), size: dash, scale: k });
+  const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} vs ${b}`);
+  near(stick.x - stick.r, 0, 'the stick against the cluster\'s left');
+  near(stick.y - stick.r, 0, 'the stick on the bottom edge');
+  near(width, stickSize * k, 'the cluster as wide as the stick is drawn');
+  near(down.y, stick.y, 'Down level with the stick\'s middle');
+  assert.ok(down.x < stick.x - stick.r, 'Down at its left');
+  near(dashLeft.y, dashRight.y, 'the Dash buttons level');
+  near(stick.x - dashLeft.x, dashRight.x - stick.x, 'one either side');
+  for (const d of [dashLeft, dashRight]) assert.ok(d.y > stick.y, 'above the stick');
+  for (const [a, b] of [[stick, dashLeft], [stick, dashRight], [stick, down], [down, dashLeft]]) assert.ok(apart(a, b) > 0, 'nothing overlaps');
+  // A round, translucent base that takes the pointer and never scrolls or zooms.
+  assert.match(CSS, /\.tc-stick \{[^}]*border-radius: 50%;[^}]*pointer-events: auto;[^}]*touch-action: none;/);
+  assert.match(CSS, /\.tc-stick-knob \{[^}]*pointer-events: none;/);
+  assert.doesNotMatch(CSS, /\.tc-stick-arrow|--tc-stick-left|\.tc-stick-down/, 'no arrows drawn on the base');
+  assert.doesNotMatch(CSS, /\.is-joystick \.tc-actions/, 'the lower-right cluster is the same in both schemes');
+});
+
 test('Jump and Extra Attack inherit the shared normal and pressed action-button style', () => {
+  // Jump's own rule, and Extra Attack's (none: it is placed by its role) never restyle them.
   for (const selector of ['tc-jump', 'tc-extra_attack']) {
     const rules = [...CSS.matchAll(new RegExp(`\\.${selector} \\{([^}]*)\\}`, 'g'))];
-    assert.ok(rules.length > 0);
+    if (selector === 'tc-jump') assert.ok(rules.length > 0);
     for (const rule of rules) {
       assert.doesNotMatch(rule[1], /(?:width|height|border|background|opacity|shadow|transform|transition):/);
     }
@@ -1917,58 +2021,6 @@ test('five attack buttons and the extra attack work together, multi-touch includ
   assert.deepEqual(NUMBERED.map((a) => tc.buttons.get(a).getAttribute('data-slot')), ['1', '2', '3', null, null]);
   tc.setCharacter(DEF_0001);
   assert.deepEqual(NUMBERED.map((a) => tc.buttons.get(a).hidden ?? false), [false, false, false, false, false]);
-});
-
-test('the numbered attack slots are a honeycomb round Shield, three rows of three, two and three: no gap, no overlap, all inside the cluster', () => {
-  // Centres and radii, in units of --tc (a button is 1 across, the extra
-  // attack 1, and a pitch is 1.17: --tc plus a 0.17 gap), from the
-  // stylesheet's own rules.
-  const PITCH = 1.17;
-  const place = (selector) => {
-    const rule = CSS.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';
-    const k = (side) => {
-      const v = rule.match(new RegExp(`${side}: ([^;]+);`))?.[1];
-      assert.ok(v, `${selector} ${side}`);
-      if (v === '0') return 0;
-      if (v === 'var(--tc-pitch)') return PITCH;
-      return Number(v.match(/var\(--tc-pitch\) \* ([\d.]+)/)[1]) * PITCH;
-    };
-    return { right: k('right'), bottom: k('bottom') };
-  };
-  const buttons = {
-    jump: { ...place('.tc-jump'), size: 1 },
-    shield: { ...place('.tc-shield'), size: 1 },
-    extra_attack: { ...place('.tc-extra_attack'), size: 1 },
-  };
-  for (const n of [1, 2, 3, 4, 5]) buttons[`slot${n}`] = { ...place(`.tc-attack[data-slot="${n}"]`), size: 1 };
-  const entries = Object.entries(buttons).map(([name, b]) => [name, { x: -(b.right + b.size / 2), y: -(b.bottom + b.size / 2), r: b.size / 2 }]);
-  for (const [i, [a, p]] of entries.entries()) {
-    for (const [b, q] of entries.slice(i + 1)) {
-      const gap = Math.hypot(p.x - q.x, p.y - q.y) - p.r - q.r;
-      assert.ok(gap > 0.05, `${a} and ${b} are ${gap.toFixed(3)} --tc apart`);
-    }
-  }
-  // Slots 1 and 2 are where attack1 and attack2 have always been.
-  assert.deepEqual(place('.tc-attack[data-slot="1"]'), { right: 2 * PITCH, bottom: 0 });
-  assert.deepEqual(place('.tc-attack[data-slot="2"]'), { right: PITCH, bottom: 0 });
-  // The middle row is slot 3 beside Shield, one pitch apart: nothing kept
-  // between them, nothing past them.
-  assert.deepEqual(place('.tc-attack[data-slot="3"]'), { right: 1.5 * PITCH, bottom: 0.87 * PITCH });
-  assert.deepEqual(place('.tc-shield'), { right: 0.5 * PITCH, bottom: 0.87 * PITCH });
-  const rows = Object.groupBy(Object.entries(buttons), ([, b]) => b.bottom.toFixed(3));
-  assert.deepEqual(Object.values(rows).map((row) => row.length).sort(), [2, 3, 3], 'three, two and three buttons');
-  for (const row of Object.values(rows)) {
-    const rights = row.map(([, b]) => b.right).sort((a, b) => a - b);
-    for (const [i, right] of rights.slice(1).entries()) assert.ok(Math.abs(right - rights[i] - PITCH) < 1e-9, 'one pitch between neighbours: no empty place');
-  }
-  // One cluster box for every fighter, two numbered attacks to five: every
-  // button inside it, whichever slots are on show.
-  const box = { width: 2 * PITCH + 1, height: 1.74 * PITCH + 1 };
-  assert.match(CSS, /\.tc-actions \{[^}]*width: calc\(var\(--tc-pitch\) \* 2 \+ var\(--tc\)\);[^}]*height: calc\(var\(--tc-pitch\) \* 1\.74 \+ var\(--tc\)\);/);
-  for (const [name, b] of Object.entries(buttons)) {
-    assert.ok(b.right + b.size <= box.width + 1e-9 && b.bottom + b.size <= box.height + 1e-9, `${name} inside the cluster`);
-  }
-  assert.doesNotMatch(CSS, /data-attack-buttons/, 'the cluster never widens for a slot');
 });
 
 test('ground/air previews follow each loadout and reuse images, buttons and simultaneous held inputs', () => {

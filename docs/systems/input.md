@@ -89,17 +89,18 @@ observed touch), never because a desktop window is narrow; Watch Mode,
 where nobody plays, hides them. Two layouts, chosen under Settings →
 Controls → Mobile Controls:
 
-- **Joystick** (the default): one round joystick holding `runLeft` /
+- **Joystick**: one round joystick holding `runLeft` /
   `runRight` past a small deadzone (digital, like every other input; up and
   down on it hold nothing), with two one-tap Mouvement/Dash buttons with
   double directional arrows above it.
-- **Classic Buttons**: single Left and Right Run arrows with thumb sliding,
-  with smaller double-arrow Mouvement buttons directly above their matching Run buttons.
+- **Classic Buttons** (the default for a player who never chose): one row
+  along the bottom-left edge, Run Left, **Down** and Run Right, all the size
+  of every button, with thumb sliding between the Run arrows, and smaller
+  double-arrow Mouvement buttons directly above their matching Run buttons.
 
-Both put a small **Down** button (a downward chevron, the Dash buttons'
-size) at the far left of the lower-left cluster, level with the middle of
-the stick or of the Run arrows; the cluster starts that much further in
-(`--tc-down-room` in
+Joystick puts a small **Down** button (a downward chevron, the Dash
+buttons' size) at the far left of its cluster, level with the middle of
+the stick; the cluster starts that much further in (`--tc-down-room` in
 [`css/touch-controls.css`](../../css/touch-controls.css)). Held, it holds
 `down` exactly as S / ↓ or the left stick down do: the fast fall in the
 air, and pressed while standing on a one-way platform, a drop through it
@@ -114,21 +115,35 @@ it never requests again. Touch Mouvement holds no Run input.
 Opposing simultaneous requests cancel. The CPU emits the same explicit request
 fields; normal CPU running never Dashes.
 
-Both share the lower-right cluster: the numbered attack buttons fill fixed
-slots, as many as the fighter has numbered attacks (`attackSlots`:
-`attack1` in slot 1, `attack2` in slot 2, then the rest in order), in a
-honeycomb round Shield: three rows of three, two and three buttons, one
-pitch between neighbours, slot 3 beside Shield in the middle row:
+Both share the lower-right cluster, flush in the bottom-right corner (both
+clusters touch the screen's edges, only the safe-area insets between): the
+bottom row is the fighter's two Mash Combo buttons (`mashButtons`: the
+buttons whose ground moves are its own `mashCombo` pair, in its order, from
+[`js/data/mash-combo.js`](../../js/data/mash-combo.js), never a button id)
+and Jump in the corner, and nothing else ever; a pair with only one button
+(its other move `mash_attack`) puts it next to Jump, the outer place empty
+([a strict rule](../characters/adding-characters.md#the-mash-combo-row-strict)). Shield sits above Jump. Every other
+move of the fighter stands higher and a little smaller, in two columns
+growing up side by side, one move to each in turn: left of Shield (starting
+a little higher than it) and above Shield. A move the fighter lacks leaves
+no gap. Neither column rises past the top HUD
+(`setCeiling(hudCeiling(hudRoot))`): a full column passes its turn to the
+other, then a third column above the first Mash Combo button takes the
+rest, never shrunk:
 
 ```
-          [4]  [5]  [EXTRA]
-            [3]  [SHIELD]
-          [1]  [2]  [JUMP]
+           [M4]     [M3]
+           [M2]     [M1]
+                    [SHIELD]
+   [MASH A] [MASH B] [JUMP]
 ```
 
-The cluster is the same size for every fighter (two numbered attacks to
-five): a fighter with fewer leaves only its missing slots empty, and no
-button ever overlaps another.
+**Default sizes.** Every control defaults to 130 % (`TOUCH_DEFAULT_SCALE`
+in [`js/core/touch-layout.js`](../../js/core/touch-layout.js)), the two
+Mash Combo buttons included; the fighter's other moves to 110 %. A custom
+layout's own size replaces it, and Reset to defaults comes back to it. The
+stylesheet lays the clusters out at the scaled sizes (`--tc-k`, `--tc-ks`),
+inside the safe-area insets, so no control overlaps another.
 
 All action buttons, including Jump and Extra Attack, share the same diameter,
 border, background, shadow and pressed feedback. Reserved/unavailable states
@@ -179,7 +194,7 @@ press the button a second time.
 
 **Custom layouts.** Settings → Controls → Customize touch controls opens
 the editor over a still battle screen: every control can be moved and
-resized (70 % to 180 %), by pointer, keyboard or gamepad, and all five
+resized (70 % to 180 %; 130 % by default, the fighter's other moves 110 %), by pointer, keyboard or gamepad, and all five
 numbered buttons always show their matching one-to-five pip icons. Every
 editor control uses a universal icon and a neutral localized name, regardless
 of the selected fighter: Extra Attack uses the ring, Defence the shield,

@@ -1208,7 +1208,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
 
-test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
+test('Quick Battle uses the Mobile Controls setting: Classic Buttons by default, Joystick once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
   // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { MAPS } = await import('../../js/data/maps.js');
@@ -1220,22 +1220,22 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   const lowerLeft = () => touch.root.children[0];
 
   await screen.enter();
-  assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
-  assert.equal(touch.scheme, 'joystick');
-  assert.equal(lowerLeft(), touch.joystick);
-  assert.equal(touch.buttons.get('down'), touch.downButton, 'Down, by the stick');
-  assert.ok(touch.joystick.children.includes(touch.downButton));
-
-  app.settings.set('mobileControls', 'classic');
-  await screen.enter();
+  assert.equal(app.settings.mobileControls, 'classic', 'nothing stored: the default');
   assert.equal(touch.scheme, 'classic');
   assert.equal(lowerLeft(), touch.dpad);
-  assert.equal(touch.buttons.get('down'), touch.downButton, 'the same Down, by the Run arrows');
+  assert.equal(touch.buttons.get('down'), touch.downButton, 'Down, between the Run arrows');
   assert.ok(touch.dpad.children.includes(touch.downButton));
 
   app.settings.set('mobileControls', 'joystick');
   await screen.enter();
   assert.equal(touch.scheme, 'joystick');
+  assert.equal(lowerLeft(), touch.joystick);
+  assert.equal(touch.buttons.get('down'), touch.downButton, 'the same Down, by the stick');
+  assert.ok(touch.joystick.children.includes(touch.downButton));
+
+  app.settings.set('mobileControls', 'classic');
+  await screen.enter();
+  assert.equal(touch.scheme, 'classic');
   // The fighter's combat buttons were never rebuilt along the way.
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
   assert.equal(touch.buttons.get('attack1').getAttribute('aria-label'), 'Jab');
@@ -1256,9 +1256,10 @@ test('Quick Battle places the touch controls by the saved custom layout of the s
   const jump = touch.actionButtons.get('jump');
   jump.rect = { left: 920, top: 420, width: 60, height: 60 };
 
+  app.settings.set('mobileControls', 'joystick');
   await screen.enter();
   assert.equal(jump.style.translate ?? '', '', 'nothing saved: the stylesheet\'s own place');
-  assert.equal(jump.style.scale ?? '', '');
+  assert.equal(jump.style.scale, '1.3', 'at its default size');
 
   // Saved in Settings between two battles: the next one uses it.
   app.settings.setTouchLayout('joystick', { jump: { x: 0.5, y: 0.5, scale: 1.5 } });
@@ -1273,7 +1274,7 @@ test('Quick Battle places the touch controls by the saved custom layout of the s
   await screen.enter();
   assert.equal(touch.scheme, 'classic');
   assert.equal(jump.style.translate, '-750.0px -200.0px');
-  assert.equal(jump.style.scale, '');
+  assert.equal(jump.style.scale, '1');
 
   // Reset in Settings: back on the original layout next time.
   app.settings.resetTouchLayout('classic');
@@ -1544,4 +1545,16 @@ test('Return to home? over the pause menu has Settings and the X too: the X keep
   assert.equal(app.dialog.controls.hidden, true);
   app.dialog.cancelBtn.click();
   await other;
+});
+
+test('a screen grown too small mid-match pauses it under the small-screen block, and it stays paused once the block lifts', () => {
+  const { screen } = setup();
+  startBattle(screen);
+  assert.equal(screen.isRunning, true);
+  screen.onScreenBlocked();
+  assert.equal(screen.paused, true, 'paused under the block');
+  assert.equal(screen.needsResize, true, 'measured again on the next frame');
+  // Already paused: nothing more.
+  screen.onScreenBlocked();
+  assert.equal(screen.paused, true);
 });

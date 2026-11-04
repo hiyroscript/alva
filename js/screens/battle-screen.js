@@ -58,7 +58,7 @@ import { Battle, BATTLE_MODES } from '../game/battle.js';
 import { STAT_KEYS } from '../game/match-stats.js';
 import { HUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
-import { TouchControls } from '../ui/touch-controls.js';
+import { TouchControls, hudCeiling } from '../ui/touch-controls.js';
 import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
 import { deviceName } from '../ui/controller-dialog.js';
 import { PLAYER_NAMES, playerNumber } from '../ui/local-play.js';
@@ -162,6 +162,8 @@ export class BattleScreen extends Screen {
     this.hud = new HUD(this.hudRoot, { onPause: () => this.pauseCommand() });
     this.touchRoot = el('div', { class: 'touch-controls' });
     this.touch = new TouchControls(this.touchRoot, app.input);
+    // The moves stacked above Shield never rise past the top HUD.
+    this.touch.setCeiling(hudCeiling(this.hudRoot));
     // Player 1's moves in the corner, for keyboard and controller play
     // (never Watch Mode's: nobody plays there); in Local Play each player's,
     // Player 1's bottom left and Player 2's bottom right.
@@ -620,6 +622,15 @@ export class BattleScreen extends Screen {
   onDeviceChange() {
     this.needsResize = true;
     if (this.app.device.blockedPortrait && this.isRunning) this.pause();
+  }
+
+  // The screen became too small to play on (js/core/screen-guard.js): the
+  // match pauses under the block, and stays paused once it lifts (online,
+  // pause does nothing: the match runs on with no input, as for a hidden
+  // page).
+  onScreenBlocked() {
+    this.needsResize = true;
+    if (this.isRunning) this.pause();
   }
 
   // Whether a dialog that is not this screen's own (Settings, a

@@ -89,8 +89,12 @@ export function initialSelection() {
 }
 
 export class App {
-  constructor() {
+  // `install` and `screenGuard` are the ones main.js started before the App
+  // (js/core/web-app-install.js, js/core/screen-guard.js); without them the
+  // App makes its own installation offer and has no small-screen block.
+  constructor({ install = null, screenGuard = null } = {}) {
     this.config = CONFIG;
+    this.screenGuard = screenGuard;
     this.device = new Device().init();
     // The player's saved settings (Home › Settings), read once here, and
     // the interface language they hold (English until one is chosen). The
@@ -106,6 +110,8 @@ export class App {
     this.input = new InputManager(CONFIG.bindings, {
       controllers: this.controllers,
       profileFor: (def) => resolveProfile(def, def ? this.settings.controllerProfile(def.id) : null),
+      // Nothing reaches the game while the small-screen block shows.
+      blocked: () => !!this.screenGuard?.blocked,
     });
     this.settings.onChange((name) => {
       if (name === 'controllerProfiles') this.input.invalidateProfiles();
@@ -122,7 +128,7 @@ export class App {
     // Whether Alva can be installed as a web app here, and how (Home's
     // Download button and its dialog): listening for the browser's offer
     // from the start.
-    this.install = new WebAppInstall(window);
+    this.install = install ?? new WebAppInstall(window);
     this.assets = new AssetLoader();
     this.screens = new ScreenManager(this);
     this.nav = new MenuNavigator(this);
@@ -191,6 +197,13 @@ export class App {
 
     this.preloadFighters();
 
+    // The screen too small (js/core/screen-guard.js): everything held is let
+    // go and the screen in use holds its match (onScreenBlocked).
+    this.screenGuard?.onChange((blocked) => {
+      if (!blocked) return;
+      this.input.suspend();
+      this.screens.current?.onScreenBlocked?.();
+    });
     this.device.addEventListener('change', () => {
       this.screens.current?.onDeviceChange?.();
       if (this.touchEditor.isOpen) this.touchEditor.refresh();

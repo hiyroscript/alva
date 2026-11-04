@@ -411,7 +411,8 @@ buttons, pressed five times.
   optional `fallbackIcon` ([input](../systems/input.md#touch-controls)).
   Pick the frame that reads as the move (its strike, its release), not
   blindly the first. Jump and Shield (Deflect in the air) keep their
-  universal glyphs.
+  universal glyphs. Where each button stands is not the fighter's to
+  choose: see [the Mash Combo row](#the-mash-combo-row-strict).
 - **Ability names:** `abilityNames`, keyed by move codename
   (`attack1: 'Uppercut'`); a move left out keeps its neutral name
   ("Attack 1").
@@ -436,6 +437,36 @@ buttons, pressed five times.
   `ability.0027.<move>.description`
   ([localization](../systems/localization.md)). The i18n test fails while a
   key is missing in either language.
+
+#### The Mash Combo row (strict)
+
+The touch controls' bottom row is **a strict rule, for every fighter on the
+roster and every fighter added later**:
+
+- **The two buttons beside Jump are the fighter's two Mash Combo buttons,
+  and nothing else ever.** They are the buttons whose ground moves are its
+  `mashCombo` pair, in the pair's order (the first further from Jump),
+  whichever buttons those are (`attack1` and `extra_attack`, `attack1` and
+  `attack3`, ...). No other move, however important, ever takes one of
+  these two places, and neither is ever given to anything else to fill a
+  gap.
+- **A pair with only one button** (its other move the button-less
+  `mash_attack`) puts that button **next to Jump**, where a second button
+  would be, and leaves the outer place empty.
+- **Every other move of the fighter** stands higher than that row and a
+  little smaller (110 % to the row's 130 %), in the columns above it, never
+  in the row.
+
+Nothing in the definition places a button: the shared touch controls read
+the pair (`mashButtons` in
+[`js/ui/touch-controls.js`](../../js/ui/touch-controls.js), through
+`mashTriggers` in [`js/data/mash-combo.js`](../../js/data/mash-combo.js))
+and lay the row out from it, so a new fighter keeps the rule by having a
+valid pair, which the registry already requires (at least one of its two
+moves on a button). Never special-case a fighter's touch buttons to move
+one into the row, or out of it: change its pair instead, if its pair is
+wrong. `tests/interface/touch-layout.test.mjs` checks every playable
+fighter against the rule.
 
 ### Controller layout
 

@@ -1027,12 +1027,15 @@ export function computeWorldScale(pxW, pxH, sprites, map) {
   const r = CONFIG.render;
   // The reference height in `sprites`' art pixels.
   const artH = r.fighterHeight / sprites.worldPerArt;
-  const minPx = (r.fighterScreenRatioMin * pxH) / artH;
-  const maxPx = (r.fighterScreenRatioMax * pxH) / artH;
+  // The camera zoom scales every ratio and the stage fit alike, so the view
+  // at a zoom is the whole-stage view brought that much closer.
+  const zoom = r.cameraZoom ?? 1;
+  const minPx = (r.fighterScreenRatioMin * zoom * pxH) / artH;
+  const maxPx = (r.fighterScreenRatioMax * zoom * pxH) / artH;
   const main = map.mainStage;
-  const frameW = main.right - main.left + 2 * r.stageFrameMargin;
+  const frameW = (main.right - main.left + 2 * r.stageFrameMargin) / zoom;
   const fitPx = (pxW / frameW) * sprites.worldPerArt;
-  const ideal = Math.max(minPx, Math.min((r.fighterScreenRatio * pxH) / artH, fitPx));
+  const ideal = Math.max(minPx, Math.min((r.fighterScreenRatio * zoom * pxH) / artH, fitPx));
   let pxPerArt = ideal;
   if (r.pixelPerfect) {
     // Snap only when the whole-pixel size stays close to the target, inside

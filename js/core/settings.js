@@ -72,10 +72,11 @@ export const LANGUAGES = Object.freeze(['en', 'fr']);
 export const DEFAULT_LANGUAGE = 'en';
 
 // The touch layouts Quick Battle and Practice Ground can use (see
-// js/ui/touch-controls.js). Joystick is the default for a player who has
-// never chosen; Classic Buttons is the original Left / C / Right layout.
+// js/ui/touch-controls.js). Classic Buttons (Run left, Down, Run right
+// along the bottom) is the default for a player who has never chosen; a
+// stored choice of either is kept.
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
-export const DEFAULT_MOBILE_CONTROLS = 'joystick';
+export const DEFAULT_MOBILE_CONTROLS = 'classic';
 
 // Automatic turn-around (Home › Settings › Combat) is on for every player
 // who has not turned it off, a player whose settings predate it included.

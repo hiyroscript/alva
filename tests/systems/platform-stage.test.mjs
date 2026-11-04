@@ -490,32 +490,107 @@ test('the training CPU never walks off a ledge on its own', async () => {
 
 // ---- Camera -------------------------------------------------------------------------
 
-test('the world scale is a platform-fighter view: fighters about a tenth of the view, the whole main stage across it', () => {
+test('the world scale is a platform-fighter view brought CONFIG.render.cameraZoom closer: fighters about a tenth of the view times the zoom, the main stage across it divided by the zoom', () => {
   // #0001's art: 63 px tall, each art pixel 88/52 world units like every
   // fighter's. The scale is set by the reference height
   // (CONFIG.render.fighterHeight), so a fighter of that height is what
-  // stands at about a tenth of the view.
+  // stands at about a tenth of the view times the camera zoom.
   const sprites = { refArtHeight: 63, worldPerArt: def.visual.height / 63 };
   const r = CONFIG.render;
+  const zoom = r.cameraZoom;
   for (const m of ALL_MAPS) {
     const stageW = m.mainStage.right - m.mainStage.left;
     for (const [w, h] of [[1280, 720], [1920, 1080], [2560, 1440], [1688, 780], [2048, 1536], [800, 600]]) {
       const scale = computeWorldScale(w, h, sprites, m);
       const ratio = (r.fighterHeight * scale) / h;
-      assert.ok(ratio >= r.fighterScreenRatioMin - 1e-9 && ratio <= r.fighterScreenRatioMax + 1e-9, `${m.id} ${w}x${h}: ${ratio}`);
+      assert.ok(ratio >= r.fighterScreenRatioMin * zoom - 1e-9 && ratio <= r.fighterScreenRatioMax * zoom + 1e-9, `${m.id} ${w}x${h}: ${ratio}`);
       const viewW = w / scale;
-      // Wide screens show the whole stage and air past both ledges; narrow
-      // ones zoom out for it as far as readability allows.
-      if (w / h >= 16 / 9 - 0.01) assert.ok(viewW >= stageW + 2 * r.stageFrameMargin - 1, `${m.id} ${w}x${h}: ${viewW}`);
-      else assert.ok(viewW >= stageW || Math.abs(ratio - r.fighterScreenRatioMin) < 1e-6, `${m.id} ${w}x${h}`);
+      // Wide screens show the stage and its air brought `zoom` closer;
+      // narrow ones zoom out for it as far as readability allows.
+      if (w / h >= 16 / 9 - 0.01) assert.ok(viewW >= (stageW + 2 * r.stageFrameMargin) / zoom - 1, `${m.id} ${w}x${h}: ${viewW}`);
+      else assert.ok(viewW >= stageW / zoom || Math.abs(ratio - r.fighterScreenRatioMin * zoom) < 1e-6, `${m.id} ${w}x${h}`);
+      // Never wider or taller than the camera bounds.
+      const cb = m.cameraBounds;
+      assert.ok(viewW <= cb.right - cb.left + 1e-6 && h / scale <= cb.bottom - cb.top + 1e-6, `${m.id} ${w}x${h}: inside the camera bounds`);
     }
   }
-  // At 16:9 fighters stand at about a tenth of the height; #0001, drawn
-  // taller (63 art pixels to the reference 52), is just that.
+  // At 16:9 fighters stand at about a tenth of the height times the zoom;
+  // #0001, drawn taller (63 art pixels to the reference 52), is just that.
   const scale = computeWorldScale(1280, 720, sprites, getMap('desert'));
   const ratio = (r.fighterHeight * scale) / 720;
-  assert.ok(ratio >= 0.095 && ratio <= 0.105, `${ratio}`);
+  assert.ok(ratio >= 0.095 * zoom && ratio <= 0.105 * zoom, `${ratio}`);
   assert.ok(Math.abs((def.visual.height * scale) / 720 - ratio * (63 / 52)) < 1e-9);
+});
+
+test('the camera zoom is one tuning point: every fighter, every map, the same proportion closer than the whole-stage view', () => {
+  const r = CONFIG.render;
+  const saved = r.cameraZoom;
+  try {
+    // Without pixel snapping the view is exactly `zoom` times closer.
+    const snap = r.pixelPerfect;
+    r.pixelPerfect = false;
+    try {
+      for (const m of ALL_MAPS) {
+        for (const worldPerArt of [88 / 52, 88 / 63, 2]) {
+          const sprites = { worldPerArt };
+          for (const [w, h] of [[1864, 860], [2732, 1536], [1920, 1080]]) {
+            r.cameraZoom = 1;
+            const base = computeWorldScale(w, h, sprites, m);
+            r.cameraZoom = 1.35;
+            const closer = computeWorldScale(w, h, sprites, m);
+            assert.ok(Math.abs(closer / base - 1.35) < 1e-9, `${m.id} ${w}x${h}: ${closer / base}`);
+          }
+        }
+      }
+    } finally {
+      r.pixelPerfect = snap;
+    }
+    // With snapping on, the default zoom still lands on whole device
+    // pixels per art pixel where that stays close to the target.
+    r.cameraZoom = saved;
+    const sprites = { worldPerArt: 88 / 52 };
+    const s = computeWorldScale(1864, 860, sprites, getMap('desert'));
+    const px = s * sprites.worldPerArt;
+    assert.ok(Math.abs(px - Math.round(px)) < 1e-9, `${px} device pixels per art pixel`);
+  } finally {
+    r.cameraZoom = saved;
+  }
+});
+
+test('at the closer zoom the camera follows: both fighters framed when they fit, Player 1 kept in view when they do not, never past the camera bounds', () => {
+  const sprites = fakeSprites();
+  const fighter = (x, y) => ({ renderX: x, renderY: y, lastGroundY: y, body: { vx: 0, y, grounded: true, height: 80 } });
+  for (const m of ALL_MAPS) {
+    const stage = new StageCollision(m);
+    const y = m.mainStage.top;
+    for (const [w, h] of [[1864, 860], [2732, 1536], [1920, 1080]]) {
+      const scale = computeWorldScale(w, h, sprites, m);
+      const cam = new Camera();
+      cam.setBounds(m.cameraBounds);
+      cam.setAnchor(stage.centerX);
+      cam.setView(w / scale, h / scale, scale);
+      const label = `${m.id} ${w}x${h}`;
+      // The main stage no longer always fits across the view.
+      const stageW = m.mainStage.right - m.mainStage.left;
+      if (w / h > 2) assert.ok(cam.w < stageW + 2 * CONFIG.render.stageFrameMargin, `${label}: closer than the whole stage`);
+      const inView = (f) => f.renderX > cam.x && f.renderX < cam.x + cam.w;
+      // Close together: both framed.
+      const a = fighter(stage.centerX - 110, y);
+      const b = fighter(stage.centerX + 110, y);
+      cam.snap(a, b);
+      assert.ok(inView(a) && inView(b), `${label}: both framed`);
+      // At opposite ledges: Player 1 stays inside the margin, either side.
+      for (const [p, q] of [[m.mainStage.left + 20, m.mainStage.right - 20], [m.mainStage.right - 20, m.mainStage.left + 20]]) {
+        const p1 = fighter(p, y);
+        const p2 = fighter(q, y);
+        cam.snap(p1, p2);
+        assert.ok(p1.renderX >= cam.x + cam.w * 0.2 - 1 && p1.renderX <= cam.x + cam.w * 0.8 + 1, `${label}: Player 1 at ${p} in the margin`);
+        const cb = m.cameraBounds;
+        assert.ok(cam.x >= cb.left - 1e-6 && cam.x + cam.w <= cb.right + 1e-6, `${label}: inside the camera bounds`);
+        assert.ok(cam.y >= cb.top - 1e-6 && cam.y + cam.h <= cb.bottom + 1e-6, `${label}: inside the camera bounds vertically`);
+      }
+    }
+  }
 });
 
 test('the camera leans toward the stage while framing, never past a framed fighter\'s margin', () => {

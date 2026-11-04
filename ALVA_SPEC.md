@@ -31,7 +31,9 @@ behave, and how it must look.
   running text uses "Alva".
 - **Developer credit:** hiyroscript.
 - **Genre:** 2D sprite fighting game, played in the browser on desktop/laptop
-  and on phones and tablets in landscape.
+  and on tablets, and on phones in landscape when Alva runs as an installed
+  web app on a screen big enough for it (a phone's browser tab is too small
+  and is refused: 6.7, Small screens).
 - **Character:** calm, precise and professional. Alva should feel like opening
   a polished modern application, not a loud arcade title screen.
 
@@ -1173,6 +1175,50 @@ neither player learns the other's address.
 - Portrait on touch devices: a dark "Rotate your device — Alva is designed for
   landscape play." overlay; the battle pauses and resumes correctly on return
   to landscape.
+- **Small screens** (`js/core/screen-guard.js`). Alva refuses to run on a
+  screen too small to play on well. "Too small" is read from the usable
+  viewport, the CSS-pixel size of the visible area (`visualViewport` where
+  the browser has one, its zoom undone; else the window), never from the
+  user agent, against `CONFIG.screen`: in a browser tab at least 640 × 400,
+  as an installed app (standalone, fullscreen, minimal-ui or a desktop
+  app window, or iOS's `navigator.standalone`) at least 640 × 360, because
+  a tab loses its address bar and toolbars and an installed app has the
+  whole screen. So every phone in a browser tab is refused (the largest
+  phones' landscape tabs are about 330 to 395 px tall), the same phone as
+  an installed app passes when its landscape screen is 360 px tall or
+  more (iPhone SE and up, most Android phones), and every tablet (744 px
+  and up) and desktop window passes either way. It is checked at start
+  and on every resize, visible-area resize and orientation change; while a
+  text field has focus (an on-screen keyboard up) it waits, then measures
+  again once the field lets go. Too small, a full-screen, solid black
+  overlay above everything (every screen, dialog, the splash and the
+  navigator's raised dialogs; `alertdialog`, modal) shows, in white,
+  centred, in Alva's type: the title "Alva cannot be played on this
+  screen", the line "Because we want the best gameplay experience for you,
+  Alva isn't playable on a small screen. Please try downloading Alva as a
+  web app and launching it again to see if Alva accepts the screen size.
+  Otherwise, please try running Alva on a bigger screen, preferably a
+  tablet or a desktop device.", when the device is only too small because
+  it is held upright (turned, it would fit) "Turn your device sideways:
+  Alva may fit in landscape.", and a green **Download Alva** button, which
+  uses the installation the install dialog uses (`WebAppInstall`): the
+  browser's own prompt where it offered one (Chromium), with what came of
+  it; the same Add to Home Screen steps the install dialog shows on iOS
+  Safari and the same how-to elsewhere; "Alva is already installed, but
+  this screen is still too small for it…" when it is; and the install
+  dialog's word that this browser cannot install web apps where it cannot
+  (Firefox). Every word is a translation key in every language. The button
+  is focused while the block shows, focus stays inside it, and Enter /
+  Space or a controller's Cross / A press it (the block polls the
+  controllers itself). The block is built and put on the page by itself
+  and started by `main.js` before the App, so it works whatever else
+  loads: no screen, battle or menu has to exist. While it shows the game
+  takes no input at all (`InputManager`'s `blocked`), everything held is
+  let go, a Quick Battle, Watch Mode or Local Play match pauses (it stays
+  paused once the block lifts), Practice Ground opens its menu, and an
+  online match runs on with no input from this side, as it does for a
+  hidden page, so the two browsers never desync. The block goes the moment
+  the screen fits again.
 
 ### 6.8 Practice Ground
 
@@ -1466,10 +1512,10 @@ indicator. Each section keeps its existing settings, in this order:
   Practice Ground use (7.4), with exactly two choices shown as two cards,
   each with a small drawing of its lower-left corner and a line on what it
   gives:
-  - **Joystick** (marked "Default") — a circular joystick to move, the
+  - **Joystick** — a circular joystick to move, the
     single-tap **Left mouvement** / **Right mouvement** Dash buttons above
     it.
-  - **Classic Buttons** — Run Left and Run Right at the lower left, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above them.
+  - **Classic Buttons** (marked "Default") — Run Left, Down and Run Right in a row along the bottom-left edge, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above the Run arrows. A stored choice of either is kept; only a player who never chose gets Classic Buttons.
 
   The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
   described by its line); hover only previews. The one in use carries a green
@@ -1619,7 +1665,9 @@ existed places the Down button where the player put it.
 - **Select** a control (tap, click, or Enter / A on it): it wears a dashed
   green ring, and the compact glass toolbar across the top names it and
   enables **Smaller** (−), **Larger** (+) and a size slider, 70 % to 180 %
-  in 10 % steps, with the value beside them. The control grows or shrinks
+  in 10 % steps, with the value beside them (a control not yet resized
+  shows its default: 130 %, a fighter move other than its Mash Combo pair
+  110 %). The control grows or shrinks
   round its centre, and its touch area with it. The size controls are
   disabled while nothing is selected.
 - **Keyboard / gamepad:** in the editor (only there) the controls are
@@ -1627,7 +1675,8 @@ existed places the Down button where the player put it.
   starts moving it (announced, a solid ring): the arrows or D-pad nudge it by
   2 % of the area per press until Enter / A, `Esc` / Back or focus leaving
   it ends the move. ← / → on the focused slider resize the selected control.
-- **Reset to defaults** puts this layout back exactly on Alva's own; **Done**,
+- **Reset to defaults** puts this layout back exactly on Alva's own, at the
+  default sizes; **Done**,
   or `Esc` / Back when nothing is being moved, returns to Settings with focus
   on Customize touch controls.
 - **Saving** is automatic and deterministic: each change is saved as it
@@ -2075,10 +2124,20 @@ French, concise game terms).
   (`CONFIG.render.fighterHeight`, 88 world units: a fixed camera convention,
   what 52 art pixels make at the roster's art-pixel size, never a
   requirement on any fighter) occupies ≈ 10 % of
-  viewport height (8.8–11.5 %), whoever is picked, each fighter drawn at
-  its own art scale, so a shorter or taller fighter simply stands shorter
-  or taller on the same stage. A 16:9 view shows the whole main stage with air past both
-  ledges, and narrower screens zoom out further for it.
+  viewport height (8.8–11.5 %) times the camera zoom
+  (`CONFIG.render.cameraZoom`, 1.35: ≈ 13.5 %, 11.9–15.5 %), whoever is
+  picked, each fighter drawn at its own art scale, so a shorter or taller
+  fighter simply stands shorter or taller on the same stage. The zoom is
+  one tuning point, the same for every fighter and every map: it brings
+  the whole-stage view (a 16:9 view showing the whole main stage with 100
+  units of air past both ledges, narrower screens zooming out further for
+  it) that much closer, so the view is the main stage and its air divided
+  by the zoom and the camera follows the fight across the stage rather
+  than always showing all of it. When the two fighters are too far apart
+  to frame, Player 1 stays inside the view's middle 60 %, and a fighter
+  out of the view has its edge pointer. Pixel snapping still lands each art
+  pixel on whole device pixels where that stays close to the target, and a
+  lethal launch's zoom (7.2.4) closes in on top of it.
 
 ### 7.2 Fighters, physics and combat
 
@@ -4923,7 +4982,7 @@ Adding one is described in
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
   layouts chosen under Settings → Controls → Mobile Controls (6.10);
   `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
-  else is Joystick), and Quick Battle and Practice Ground apply the saved
+  else is Classic Buttons, the default), and Quick Battle and Practice Ground apply the saved
   one, and that layout's saved custom placement (`setLayout`, 6.10a), each
   time they are entered. A switch first lets go of everything held
   (every pointer, direction, Jump, Shield and the rest) and
@@ -4932,8 +4991,18 @@ Adding one is described in
     the layout names by the CSS `translate` property, from where the
     stylesheet puts it to its stored centre in the current touch-control
     area (kept whole inside it), and sizes it by `scale`, which grows its
-    hit area with it; controls the layout leaves out are untouched, so the
-    default layout is the stylesheet's own, pixel for pixel. Battle and
+    hit area with it; controls the layout leaves out stay where the
+    stylesheet puts them, at their default scale, so the default layout is
+    the stylesheet's own, pixel for pixel.
+  - **Default sizes.** Every touch control's default scale is 130 %
+    (`TOUCH_DEFAULT_SCALE.control`, 1.3, in `js/core/touch-layout.js`), the
+    same for every fighter, the two Mash Combo buttons beside Jump
+    included, except the fighter's other moves (TouchControls role
+    `move`), which default to 110 % (`TOUCH_DEFAULT_SCALE.move`).
+    `applyLayout` writes each control's scale (its custom layout's, else its
+    default); the stylesheet reads the same two numbers (`--tc-k`,
+    `--tc-ks`, set by `TouchControls`) and lays every cluster out at the
+    scaled sizes, so at 130 % nothing overlaps or leaves the safe area. Battle and
     Practice Ground re-apply it after every resize, orientation or device
     change. Every control keeps its element, handlers and codename: held
     buttons, the one-tap Dash buttons, multi-touch and `setCharacter` work
@@ -4943,7 +5012,7 @@ Adding one is described in
     hit-tests Left / Right where they are drawn, so a thumb slides
     between them wherever they sit. In battle the controls are never
     keyboard-focusable (`tabindex="-1"`); only the editor's copy is.
-  - **Joystick** (the default): the lower-left corner holds one circular
+  - **Joystick**: the lower-left corner holds one circular
     joystick (a translucent round base with no marks on it and a movable
     knob, in the buttons' style; a group named "Movement joystick"). It
     captures one pointer and holds the existing `runLeft` or `runRight` input
@@ -4967,10 +5036,11 @@ Adding one is described in
     platform, the drop through it, 7.2.2). The lower-left cluster starts
     that much further in (`--tc-down-room`) to make room for it. No other
     hit region exists.
-  - **Classic Buttons**: lower-left Run Left · Run Right with thumb sliding,
-    with two smaller Mouvement buttons directly above them and the same
-    small Down button to the left of Run Left, level with the Run arrows'
-    middle; the Run container never captures Down's pointer. Shared elements,
+  - **Classic Buttons** (the default): one row along the bottom-left edge,
+    Run Left, **Down** and Run Right, all three the size of every button,
+    with thumb sliding between the Run arrows, and two smaller Mouvement
+    buttons directly above the Run arrows, centred on them; the Run
+    container never captures Down's pointer. Shared elements,
     icons and one-shot handlers serve both schemes. Mouvement pointer events
     never enter the Run container's sliding/capture path; holding Run while
     tapping Mouvement or actions remains independent multi-touch input.
@@ -4987,31 +5057,46 @@ Adding one is described in
   Settings previews show the four Classic controls, with smaller Mouvement
   buttons above Run. English and French descriptions explain dedicated inputs.
 
-  Both layouts share the lower-right staggered cluster, in the same place
-  in both. For example, for #0001 (five numbered buttons) it is —
+  Both layouts share the lower-right cluster, in the same place in both,
+  flush in the bottom-right corner (nothing between it and the screen's
+  edges but the safe-area insets; the lower-left cluster is flush in its
+  corner the same way). The bottom row is the fighter's two **Mash Combo
+  buttons** (7.2.4c) and Jump in the corner, and nothing else ever: the two
+  combat buttons whose ground moves are the fighter's own `mashCombo` pair,
+  in the pair's order (`mashButtons` in `js/ui/touch-controls.js`, from
+  `mashTriggers` in `js/data/mash-combo.js`; never by button id: #0001's
+  are its Jab and High Kick, `attack1` and `extra_attack`, #0004's
+  `attack1` and `attack3`, #0002's `attack1` and `attack2`). A pair with
+  only one button (its other move `mash_attack`, which has none: #0005,
+  #0006, #0008) puts that button next to Jump and leaves the outer place
+  empty. This row is a strict rule for every fighter, now and added later
+  (`docs/characters/adding-characters.md`, The Mash Combo row). Shield sits directly above Jump. Every
+  other move of the fighter stands higher, a little smaller (110 %), in
+  two columns growing up side by side, one move to each in turn in button
+  order: the first left of Shield, starting a little higher than Shield
+  (`--tc-raise`), the second straight above Shield. For example, for
+  #0001 —
 
   ```
-             [VOID]  [PURPLE]  [HIGH KICK]
-                 [MAX BLUE]  [SHIELD]
-               [JAB]  [RED]  [JUMP]
+                  [VOID]    [PURPLE]
+                  [RED]     [MAX BLUE]
+                            [SHIELD]
+          [JAB]  [HIGH KICK] [JUMP]
   ```
 
-  The numbered attack buttons (`attack1` to `attack5`, `.tc-attack`) take
-  numbered slots (`data-slot`, set by `setCharacter` through
-  `attackSlots`): `attack1` is always slot 1 and `attack2` slot 2 (the
-  bottom row, where attack1 and attack2 have always been), and the fighter's
-  other numbered buttons fill slots 3, 4 and 5 in order: a honeycomb round
-  Shield of three rows (three buttons, two, three), one pitch between
-  neighbours, slot 3 beside Shield in the middle row. No button overlaps
-  another, no place in it is kept empty for anything but a numbered attack
-  the fighter lacks, and the cluster is the same size whatever the fighter
-  shows:
-
-  ```
-             [4]  [5]  [EXTRA]
-               [3]  [SHIELD]
-             [1]  [2]  [JUMP]
-  ```
+  A button the fighter does not have shows nothing and leaves no gap; a
+  reserved one still shows dashed. Neither column rises past the top HUD:
+  `applyLayout` places each move (`data-stack-col`, `data-stack-row`; the
+  Mash Combo buttons `data-mash`, all drawn by the stylesheet) while its
+  top stays at or below the ceiling the screen gives
+  (`setCeiling(hudCeiling(hudRoot))`: the lowest bottom edge of the HUD
+  parts over that column, else the top of the touch area). A full column
+  passes its turn to the other; with both full, a third column above the
+  first Mash Combo button takes the rest. Nothing is shrunk to make room.
+  On a phone in landscape (932 × 430) the column left of Shield holds
+  three and the one above it two, so every fighter's moves fit; in the
+  touch layout editor, which shows no fighter, the Mash Combo places hold
+  `attack1` and `attack2`.
 
   So N numbered buttons use slots 1 to N, whatever kind of move each one
   is: 2 → 1–2, 3 → 1–3 (#0002), 4 → 1–4 (#0003: Cherry Blossom Impact in

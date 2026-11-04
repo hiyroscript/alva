@@ -394,16 +394,16 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   app.screens.current = screen;
   const elements = new Map(screen.touch.actionButtons);
   await screen.enter();
-  assert.equal(screen.touch.scheme, 'joystick', 'the default');
-  assert.equal(screen.touch.root.children[0], screen.touch.joystick);
+  assert.equal(screen.touch.scheme, 'classic', 'the default');
+  assert.equal(screen.touch.root.children[0], screen.touch.dpad);
+  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Down', 'Left movement', 'Right movement']);
   assert.equal(screen.touch.enabled, true);
   screen.exit();
 
-  app.settings.set('mobileControls', 'classic');
+  app.settings.set('mobileControls', 'joystick');
   await screen.enter();
-  assert.equal(screen.touch.scheme, 'classic');
-  assert.equal(screen.touch.root.children[0], screen.touch.dpad);
-  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Down', 'Left movement', 'Right movement']);
+  assert.equal(screen.touch.scheme, 'joystick');
+  assert.equal(screen.touch.root.children[0], screen.touch.joystick);
   assert.equal(screen.touch.enabled, true);
   for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
   assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'High Kick', 'the fighter\'s own, whatever the layout');
@@ -419,6 +419,7 @@ test('Practice Ground places the touch controls by the saved custom layout on ev
   touch.root.rect = { left: 0, top: 0, width: 1000, height: 500 };
   const stick = touch.stick;
   stick.rect = { left: 80, top: 360, width: 120, height: 120 };
+  app.settings.set('mobileControls', 'joystick');
   app.settings.setTouchLayout('joystick', { stick: { x: 0.5, y: 0.5, scale: 1.2 } });
   await screen.enter();
   assert.equal(stick.style.translate, '360.0px -170.0px');
@@ -434,7 +435,7 @@ test('Practice Ground places the touch controls by the saved custom layout on ev
   app.settings.setTouchLayout('joystick', {});
   await screen.enter();
   assert.equal(stick.style.translate, '');
-  assert.equal(stick.style.scale, '');
+  assert.equal(stick.style.scale, '1.3', 'back at its default size');
   screen.exit();
 });
 

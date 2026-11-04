@@ -3,8 +3,8 @@
 ## Named updates
 
 The owner refers to past work by name: the **movement update**, the
-**effect update**, the **bounce update**, the **Mash Combo update** and the
-**online update**. [`UPDATES.md`](./UPDATES.md)
+**effect update**, the **bounce update**, the **Mash Combo update**, the
+**online update** and the **camera & mobile layout update**. [`UPDATES.md`](./UPDATES.md)
 says what each one is, which pull request and commit it was, where its
 tuning lives and which tests cover it. Read it whenever an update is named,
 and add an entry there when the owner names a new one.
@@ -38,5 +38,11 @@ and add an entry there when the owner names a new one.
   [adding characters](./docs/characters/adding-characters.md#the-comfort-rules-strict);
   the registry refuses a layout that breaks the checkable ones
   (`comfortProblems` in `js/data/controller-profiles.js`).
+- **The touch Mash Combo row is a strict rule.** The two touch buttons
+  beside Jump are only the fighter's two Mash Combo buttons (its
+  `mashCombo` pair, read by `mashButtons` in `js/ui/touch-controls.js`),
+  nothing else ever; a pair with one button puts it next to Jump. Every
+  fighter, now or added later, keeps it; never special-case a fighter's
+  buttons around it ([adding characters](./docs/characters/adding-characters.md#the-mash-combo-row-strict)).
 - Run the tests with `node --test`
   ([testing](./docs/development/testing.md)).

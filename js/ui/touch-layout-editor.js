@@ -12,7 +12,8 @@
 //   keys      Enter / A on a focused control starts moving it: the arrows
 //             or D-pad nudge it in small steps until Enter / A or Esc /
 //             Back again; ← / → on the focused slider resize;
-//   Reset to defaults puts this scheme back exactly on Alva's layout;
+//   Reset to defaults puts this scheme back exactly on Alva's layout, at
+//             the default sizes (130%; the fighter's other moves 110%);
 //   Done (or Esc / Back) returns to Settings.
 //
 // Every change is saved at once, as it lands (a drag when it ends, each
@@ -350,8 +351,11 @@ export class TouchLayoutEditor {
 
   // ---- Size --------------------------------------------------------------------------
 
+  // Control `id`'s size now: its custom one, else its default (130%, a
+  // fighter move that is not its Mash Combo pair 110%; see
+  // TOUCH_DEFAULT_SCALE).
   scaleOf(id) {
-    return this.layout[id]?.scale ?? 1;
+    return this.layout[id]?.scale ?? this.touch.defaultScaleOf(id);
   }
 
   // Gives the selected control scale `value` (held to the limits), keeping
@@ -416,7 +420,7 @@ export class TouchLayoutEditor {
     } else {
       setText(this.nameEl, 'editor.none');
     }
-    const scale = id ? this.scaleOf(id) : 1;
+    const scale = id ? this.scaleOf(id) : this.touch.defaultScaleOf(null);
     const value = t('editor.sizeValue', { percent: percent(scale) });
     this.slider.value = String(percent(scale));
     this.slider.setAttribute('aria-valuetext', value);

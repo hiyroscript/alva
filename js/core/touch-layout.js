@@ -12,7 +12,8 @@
 // .touch-controls in css/touch-controls.css), so a layout made on one landscape screen
 // fits another. `scale` multiplies the control's own size, and its hit area
 // with it. A control a layout leaves out stays exactly where the stylesheet
-// puts it, at its own size: the empty layout is Alva's original one.
+// puts it, at its default scale (defaultTouchScale): the empty layout is
+// Alva's own one.
 
 import { clamp } from './utils.js';
 import { NUMBERED_ATTACKS } from '../config.js';
@@ -41,6 +42,21 @@ export const TOUCH_CONTROL_IDS = Object.freeze({
 // Dash button on the smallest screen) above a 22 px target; 1.8 nearly
 // doubles the largest without covering the screen.
 export const TOUCH_SCALE = Object.freeze({ min: 0.7, max: 1.8, step: 0.1 });
+
+// The default scale of every control (the one tuning point of the default
+// sizes, the same for every fighter): 1.3 for every control, the universal
+// ones and the fighter's two Mash Combo buttons beside Jump alike, and a
+// little smaller, 1.1, for the fighter's other moves, which are many and
+// stand above them. Which buttons are the fighter's Mash Combo pair comes
+// from its own data (TouchControls.mashButtons). A custom layout's own
+// scale replaces it; Reset to defaults comes back to it.
+export const TOUCH_DEFAULT_SCALE = Object.freeze({ control: 1.3, move: 1.1 });
+
+// A control's default scale by its role: 'move' for one of the fighter's
+// own moves that is not its Mash Combo pair, anything else 'control'.
+export function defaultTouchScale(role) {
+  return role === 'move' ? TOUCH_DEFAULT_SCALE.move : TOUCH_DEFAULT_SCALE.control;
+}
 
 // How far one keyboard or gamepad nudge moves a control, as a fraction of
 // the area's width (across) or height (up and down).

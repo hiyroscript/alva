@@ -67,10 +67,15 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   waves run up to 4× faster (and hold still with reduced motion). The camera keeps
   the stage's own bounds. Practice Ground's Void never moves.
 
-The camera is a platform-fighter view: fighters stand about a tenth of the
-viewport tall, the whole main stage with some air past its ledges fits across
-a 16:9 view (narrower screens zoom out further, never below 8.8 %), and the
-framing leans toward the stage's centre while it follows the fight.
+The camera is a platform-fighter view brought closer by one zoom,
+`CONFIG.render.cameraZoom` (1.35), the same for every fighter and map:
+fighters stand about a tenth of the viewport tall times the zoom (≈ 13.5 %),
+and the view is the whole main stage with some air past its ledges (what a
+16:9 view would fit; narrower screens zoom out further, never below 8.8 %
+times the zoom) divided by the zoom, so the camera follows the fight across
+the stage. The framing leans toward the stage's centre while it follows,
+keeps Player 1 in view when the two are too far apart, and never shows past
+the camera bounds.
 
 Yerma (id `desert`) is a sandstone mesa over open desert air; Sol-Noir (id
 `city`) a rooftop block over the street canyon; Asperitas one great cloud

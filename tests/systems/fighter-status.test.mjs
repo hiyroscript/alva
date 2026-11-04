@@ -492,3 +492,46 @@ test('the rings and bar are canvas-drawn, never DOM in a HUD card', () => {
   const arena = readFileSync(new URL('../../js/game/arena.js', import.meta.url), 'utf8');
   assert.match(arena, /drawVoid[\s\S]*drawStatus\(fighters\)/, 'drawn after the Void');
 });
+
+test('at the closer camera zoom a fighter out of the view gets its edge pointer, and the lethal zoom still stays inside the camera bounds', async () => {
+  const { computeWorldScale } = await import('../../js/game/arena.js');
+  const { CONFIG } = await import('../../js/config.js');
+  const { battle, render } = renderedBattle();
+  const { p1, p2 } = battle;
+  const sprites = fakeSprites();
+  // A phone in landscape at 2x: the default zoom's own scale.
+  const pxW = 1864;
+  const pxH = 860;
+  const scale = computeWorldScale(pxW, pxH, sprites, battle.map);
+  Object.assign(battle.view, { pxW, pxH, scale, dpr: 2 });
+  battle.baseScale = scale;
+  battle.worldPerArt = sprites.worldPerArt;
+  battle.camera.setView(pxW / scale, pxH / scale, scale);
+  // Player 1 at one ledge, the other fighter knocked out past the far one:
+  // too far apart to frame at the closer zoom.
+  const { left, right } = battle.map.mainStage;
+  p1.body.x = p1.renderX = left + 30;
+  p2.body.x = p2.renderX = right + 250;
+  for (const f of [p1, p2]) f.renderY = f.body.y;
+  battle.snapCamera();
+  const frame = right - left + 2 * CONFIG.render.stageFrameMargin;
+  assert.ok(battle.camera.w < frame, `closer than the whole-stage view (${battle.camera.w} < ${frame}) at zoom ${CONFIG.render.cameraZoom}`);
+  const [x1] = battle.markerAnchor(p1);
+  const [x2] = battle.markerAnchor(p2);
+  assert.ok(x1 > 0 && x1 < pxW, 'Player 1 in view');
+  assert.ok(x2 > pxW + 10, 'the other fighter past the right edge');
+  const calls = render();
+  const pointer = calls.filter((c) => c.fn === 'arc' && c.args[0] > pxW / 2);
+  assert.ok(pointer.length >= 1, 'an edge pointer on the right');
+  assert.ok(pointer.every((c) => c.args[0] <= pxW && c.args[1] >= 0 && c.args[1] <= pxH), 'pinned inside the view');
+  // The lethal launch's zoom closes in on top of the base zoom, never
+  // past the camera bounds.
+  const fx = battle.fx;
+  Object.defineProperty(fx, 'zoom', { value: 1.35, configurable: true });
+  Object.defineProperty(fx, 'zoomFocus', { value: p2, configurable: true });
+  battle.syncView();
+  const v = battle.view;
+  const cb = battle.camera.bounds;
+  assert.ok(Math.abs(v.scale - scale * 1.35) < 1e-9, 'on top of the base zoom');
+  assert.ok(v.x >= cb.left - 1 && v.x + v.w <= cb.right + 1 && v.y >= cb.top - 1 && v.y + v.h <= cb.bottom + 1, 'inside the camera bounds');
+});
