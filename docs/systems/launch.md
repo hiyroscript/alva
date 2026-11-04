@@ -8,7 +8,7 @@ the Discover screen's LAUNCH page, built from the same registry.
 
 | Module | Owns |
 | --- | --- |
-| [`js/data/launch.js`](../../js/data/launch.js) | The registry and the one formula: `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`), `DIRECTIONAL_LAUNCHES` (`null`, `'horizontal'`, `'vertical'`, `'reverseVertical'`), `LAUNCH_UNIT_SPEED` (10 units/s per point), `resolveHitLaunch` (validation), `resolveLaunchStrength`, `resolveDirectionalLaunch`, and the reference copy Discover shows. |
+| [`js/data/launch.js`](../../js/data/launch.js) | The registry and the one formula: `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`), `DIRECTIONAL_LAUNCHES` (`null`, `'horizontal'`, `'vertical'`, `'reverseVertical'`), `LAUNCH_UNIT_SPEED` (7 units/s per point), `PERFECT_SHIELD_HEAL` (5), `resolveHitLaunch` (validation), `resolveLaunchStrength`, `resolveDirectionalLaunch`, and the reference copy Discover shows. |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem.applyHit` (the order below) and the launch reaction: `resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`. |
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | Each fighter's Launch Point and passive recovery clock, advanced by the existing fixed-step update. |
 | [`js/game/combat/launch-bounce.js`](../../js/game/combat/launch-bounce.js) | Rebounds: `LAUNCH_BOUNCE` (every setting), `resolveLaunchBounce`, `startLaunch`, `bounceLaunch`. |
@@ -25,11 +25,17 @@ the Void does.
 
 Every real, unblocked hit restarts recovery, including Base Launch 0 hits
 and each strike of a multi-hit attack. Nothing recovers for 2 seconds;
-then each complete 0.5-second interval removes 1 point, stopping at 0.
-The first point therefore recovers **2.5 seconds after the last hit**.
-For 10 points at t = 0: still 10 at t = 2.0, 9 at t = 2.5, 8 at t = 3.0,
-and 7 at t = 3.5. A new hit discards all partial progress and starts the
-full wait again. Shield blocks add nothing and **do not reset recovery**.
+then each complete 0.5-second interval removes 2 points, stopping at 0
+(an odd Launch Point ends at 0, never −1). The first drop therefore comes
+**2.5 seconds after the last hit**. For 10 points at t = 0: still 10 at
+t = 2.0, 8 at t = 2.5, 6 at t = 3.0, and 4 at t = 3.5. A new hit discards
+all partial progress and starts the full wait again. Shield blocks add
+nothing and **do not reset recovery**. A perfect block takes
+`PERFECT_SHIELD_HEAL` (5) off its own fighter at once, never below 0
+(`CombatState.heal`): a heal, so the schedule runs on as it was, neither
+restarted nor brought forward ([defense](defense.md)). The [launch &
+energy update](../../UPDATES.md#launch--energy-update) made it 2 a tick
+(it was 1) and added the perfect block's heal.
 
 The universal `LAUNCH_RECOVERY_DELAY`, `LAUNCH_RECOVERY_INTERVAL` and
 `LAUNCH_RECOVERY_AMOUNT` live in `js/data/launch.js`. `CombatState` keeps
@@ -48,8 +54,17 @@ Launch** (0, 1, 2 or 3: a multiplier, never a velocity) and a
 
 ```
 launch strength = Base Launch × the target's new Launch Point
-launch speed    = launch strength × LAUNCH_UNIT_SPEED (10 units/s per point)
+launch speed    = launch strength × LAUNCH_UNIT_SPEED (7 units/s per point)
 ```
+
+`LAUNCH_UNIT_SPEED` is 7 since the launch & energy update (it was 10):
+launches were nerfed there alone, with Base Launch, Launch Point and every
+damage untouched. The same hit at the same Launch Point flies 70 % as fast
+(30 Launch Point at Base Launch 2: strength 60, 420 units/s where it was
+600), so a fighter needs about 43 % more Launch Point to be launched as
+hard. It is the one knob. What is measured in units/s stays as it was and
+so comes later: the launch reaction's stun and tumble (below) and the
+rebound threshold (`minImpactSpeed`).
 
 The damage is added first, so the hit that raises the Launch Point
 already launches from the new total. The direction only decides where

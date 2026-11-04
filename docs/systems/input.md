@@ -91,9 +91,26 @@ Controls → Mobile Controls:
 
 - **Joystick** (the default for a player who never chose, and for an
   unknown or missing scheme): one round joystick holding `runLeft` /
-  `runRight` past a small deadzone (digital, like every other input; up and
-  down on it hold nothing), with two one-tap Mouvement/Dash buttons with
-  double directional arrows above it.
+  `runRight` past a small deadzone (digital, like every other input), with
+  two one-tap Mouvement/Dash buttons with double directional arrows above
+  it. Pushed down it is the Down button too (the [launch & energy
+  update](../../UPDATES.md#launch--energy-update)): past half its radius
+  and within 50° of straight down it holds `down`, letting go back inside
+  0.38 or past 60° (`JOYSTICK.downEngage`, `downDeadzone`, `downAngle`,
+  `downReleaseAngle` and the pure rule `joystickVertical` in
+  [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js)), so a run
+  with the thumb drifting low never holds it and a diagonal holds a run and
+  Down together. The stick's one pointer keeps its Down in a second slot
+  (`setStickDown`) pressed and let go through the Down button's own held
+  path, so it is a real `downPressed` edge, counted with the button (either
+  alone holds `down`), and let go with the stick: on lift, cancel, lost
+  capture, `releaseAll`, disabling (pause) and a scheme switch (a lost
+  window focus clears every touch input in `InputManager.suspend`, as for
+  every button). Stick down + Jump is the Super Jump, stick down in the air
+  the fast fall, a quick flick down and back on a droppable platform the
+  drop; held past `dropTapTime`, no drop, exactly as the button. Pushed up
+  it holds nothing. The stick shows it with `is-down` beside `is-left` /
+  `is-right`.
 - **Classic Buttons** (kept by every player who stored it, including
   those whose settings predate Joystick becoming the default): one row
   along the bottom-left edge, Run Left, **Down** and Run Right, all the size
@@ -104,7 +121,8 @@ Joystick puts a small **Down** button (a downward chevron, the Dash
 buttons' size) at the far left of its cluster, level with the middle of
 the stick; the cluster starts that much further in (`--tc-down-room` in
 [`css/touch-controls.css`](../../css/touch-controls.css)). Held, it holds
-`down` exactly as S / ↓ or the left stick down do: the fast fall in the
+`down` exactly as S / ↓, the controller's left stick down or the touch
+joystick pushed down do: the fast fall in the
 air, and pressed while standing on a one-way platform, a drop through it
 ([movement](movement.md#platform-drop)). Its press stops at the button, so
 Classic's sliding Run container never takes it for a Run arrow.
