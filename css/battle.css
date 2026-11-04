@@ -119,6 +119,68 @@
   font-variant-numeric: tabular-nums;
   color: var(--white);
 }
+/* The number itself, with room for the fire behind its digits. */
+.hud-launch-point-value { position: relative; display: inline-block; isolation: isolate; }
+/* It came down (a recovery tick, a perfect Shield, a heal: never a respawn,
+   see js/ui/hud.js): a soft green glow pops and fades, restarted by another
+   heal. Over the fire too: the flames behind stay lit. */
+.hud-launch-point-value.is-healing,
+.hud-launch-point-value.is-burning.is-healing { animation: hud-heal-glow 0.5s ease-out; }
+@keyframes hud-heal-glow {
+  0% { color: var(--accent-hi); text-shadow: 0 0 2px var(--accent-hi), 0 0 10px var(--accent), 0 0 18px var(--accent), 0 1px 2px rgba(0, 0, 0, 0.6); transform: scale(1.12); }
+  35% { color: var(--accent-hi); text-shadow: 0 0 2px var(--accent-hi), 0 0 8px var(--accent), 0 1px 2px rgba(0, 0, 0, 0.6); transform: scale(1); }
+  100% { text-shadow: 0 0 0 transparent, 0 1px 2px rgba(0, 0, 0, 0.6); }
+}
+/* High enough that the next solid hit can launch it hard: it burns. A hot
+   flicker on the digits and a flame layer rising behind them; hotter still
+   past the second threshold (is-inferno). */
+.hud-launch-point-value.is-burning {
+  color: #fff3c4;
+  animation: hud-fire-flicker 0.9s ease-in-out infinite alternate;
+}
+.hud-launch-point-value.is-burning::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -18%;
+  right: -18%;
+  top: -55%;
+  bottom: -12%;
+  border-radius: 50% 50% 40% 40% / 70% 70% 30% 30%;
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 214, 92, 0.85) 0%, rgba(255, 128, 32, 0.6) 38%, rgba(214, 38, 24, 0.28) 66%, rgba(214, 38, 24, 0) 80%);
+  filter: blur(3px);
+  transform-origin: 50% 100%;
+  animation: hud-fire-rise 0.7s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.hud-launch-point-value.is-inferno { color: #fffbe8; animation-duration: 0.55s; }
+.hud-launch-point-value.is-inferno::before { top: -85%; left: -28%; right: -28%; animation-duration: 0.45s; }
+@keyframes hud-fire-flicker {
+  0% { text-shadow: 0 0 3px #ffd75c, 0 -2px 7px #ff8a1f, 0 -5px 13px #e0301c, 0 1px 2px rgba(0, 0, 0, 0.7); }
+  50% { text-shadow: 0 0 4px #ffe58a, 0 -3px 9px #ff9d2e, 0 -7px 16px #ff4a1f, 0 1px 2px rgba(0, 0, 0, 0.7); }
+  100% { text-shadow: 0 0 2px #ffc94a, 0 -1px 6px #ff7a14, 0 -4px 11px #c8261a, 0 1px 2px rgba(0, 0, 0, 0.7); }
+}
+@keyframes hud-fire-rise {
+  0% { transform: scaleY(0.9) scaleX(1.02); opacity: 0.8; }
+  100% { transform: scaleY(1.12) scaleX(0.94) translateY(-6%); opacity: 1; }
+}
+/* Reduced motion: no pulse and no flicker, only colour. The heal is a short
+   static green; the fire a still hot colour with a still glow. */
+@media (prefers-reduced-motion: reduce) {
+  .hud-launch-point-value.is-healing,
+  .hud-launch-point-value.is-burning.is-healing { animation: hud-heal-static 0.5s steps(1, end); }
+  .hud-launch-point-value.is-burning,
+  .hud-launch-point-value.is-inferno {
+    animation: none;
+    color: #ffcf6a;
+    text-shadow: 0 0 3px #ff8a1f, 0 0 8px #e0301c, 0 1px 2px rgba(0, 0, 0, 0.7);
+  }
+  .hud-launch-point-value.is-burning::before { animation: none; transform: none; opacity: 0.75; }
+}
+@keyframes hud-heal-static {
+  0% { color: var(--accent-hi); text-shadow: 0 0 6px var(--accent), 0 1px 2px rgba(0, 0, 0, 0.6); }
+  100% { color: inherit; }
+}
 /* Quick Battle score: one small dot per point the match is played to,
    filled for each point scored. An outlined empty ring and a solid white
    dot, each with a dark edge, so both read on any stage. */

@@ -233,8 +233,8 @@ export const FR = {
 
   'launch.pointSummary':
     'Le Point d’éjection part de 0. Chaque coup non bloqué ajoute ses dégâts et relance la récupération : ' +
-    'après 2 secondes sans coup reçu, il baisse de 1 toutes les 0,5 secondes suivantes, jusqu’à 0 (premier point à 2,5 secondes). ' +
-    'Les coups bloqués ne relancent pas ce délai. Plus il est élevé, plus l’éjection est forte. Il revient à 0 à la réapparition.',
+    'après 2 secondes sans coup reçu, il baisse de 2 toutes les 0,5 secondes suivantes, jusqu’à 0 (première baisse à 2,5 secondes). ' +
+    'Les coups bloqués ne relancent pas ce délai ; un Bouclier parfait le baisse de 5 d’un coup. Plus il est élevé, plus l’éjection est forte. Il revient à 0 à la réapparition.',
   'launch.formula': 'Force d’éjection = Éjection de base × Point d’éjection',
   'launch.baseSummary':
     'Chaque coup a une Éjection de base de 0, 1, 2 ou 3. Les dégâts du coup s’ajoutent d’abord au Point d’éjection, ' +
@@ -412,7 +412,7 @@ export const FR = {
   'howToPlay.elimination.heading': 'Élimination',
   'howToPlay.elimination.description': 'Il n’y a pas de barre de vie dans Alva. Vous marquez un point chaque fois que votre adversaire tombe dans le Vide. Le premier à atteindre 3 points remporte le match.',
   'howToPlay.launchPoint.heading': 'Point d’éjection',
-  'howToPlay.launchPoint.description': 'Chaque coup non bloqué augmente votre Point d’éjection : vous êtes alors projeté plus loin. Il diminue progressivement quand vous ne recevez pas de coups.',
+  'howToPlay.launchPoint.description': 'Chaque coup non bloqué augmente votre Point d’éjection : vous êtes alors projeté plus loin. Il diminue progressivement quand vous ne recevez pas de coups, et un Bouclier parfait le baisse de 5.',
   'howToPlay.baseLaunch.heading': 'Éjection de base',
   'howToPlay.baseLaunch.description': 'L’Éjection de base détermine la force avec laquelle un coup projette quelqu’un. Plus sa valeur est élevée, plus la projection est forte, surtout si le Point d’éjection de la cible est élevé. Une Éjection de base de 0 ne projette personne.',
   'howToPlay.directionalLaunch.heading': 'Éjection directionnelle',
@@ -420,11 +420,11 @@ export const FR = {
   'howToPlay.overtime.heading': 'Prolongation',
   'howToPlay.overtime.description': 'Si les deux joueurs ont le même score à la fin des 5 minutes, une prolongation d’une minute commence. Le Vide se resserre progressivement, ce qui rend la survie plus difficile. Si le score est toujours à égalité à la fin de la prolongation, le joueur au Point d’éjection le plus bas gagne. Si les deux Points d’éjection sont égaux, le match se termine sur une égalité.',
   'howToPlay.energy.heading': 'Énergie',
-  'howToPlay.energy.description': 'L’Énergie sert à sprinter, à effectuer un Renvoi, à bloquer les coups avec votre Bouclier et aux coups qui créent quelque chose sans long temps de recharge, comme un projectile, une onde ou une invocation. Chacun coûte les mêmes 15 d’Énergie. Elle se recharge automatiquement, mais si elle se vide complètement, ces actions restent indisponibles jusqu’à ce qu’elle soit entièrement rechargée.',
+  'howToPlay.energy.description': 'L’Énergie sert à sprinter, à bloquer les coups avec votre Bouclier, à renvoyer un projectile avec un Renvoi et aux coups qui créent quelque chose sans long temps de recharge, comme un projectile, une onde ou une invocation. Chacun coûte les mêmes 15 d’Énergie. Elle se recharge automatiquement, mais si elle se vide complètement, ces actions restent indisponibles jusqu’à ce qu’elle soit entièrement rechargée.',
   'howToPlay.shield.heading': 'Bouclier',
-  'howToPlay.shield.description': 'Au sol, maintenez le bouton Bouclier pour bloquer les attaques venant de toutes les directions. Le Bouclier levé empêche les déplacements : relâchez-le pour vous déplacer à nouveau, ou sautez pour quitter la garde lorsque cela est permis. Garder le Bouclier levé ne coûte pas d’Énergie, mais chaque coup bloqué en consomme.',
+  'howToPlay.shield.description': 'Au sol, maintenez le bouton Bouclier pour bloquer les attaques venant de toutes les directions. Le Bouclier levé empêche les déplacements : relâchez-le pour vous déplacer à nouveau, ou sautez pour quitter la garde lorsque cela est permis. Garder le Bouclier levé ne coûte pas d’Énergie, mais chaque coup bloqué en consomme. Levé juste avant qu’un coup ne porte, c’est un Bouclier parfait : vous pouvez riposter aussitôt, et il baisse votre Point d’éjection de 5.',
   'howToPlay.deflect.heading': 'Renvoi',
-  'howToPlay.deflect.description': 'En l’air, appuyez sur le bouton Bouclier pour effectuer un Renvoi. Il peut frapper les adversaires proches et renvoyer les projectiles vers leur source. Un Renvoi coûte de l’Énergie, même s’il ne touche rien, et vous pouvez l’annuler à tout moment par un autre coup aérien, un saut aérien ou un sprint aérien.',
+  'howToPlay.deflect.description': 'En l’air, appuyez sur le bouton Bouclier pour effectuer un Renvoi. Il peut frapper les adversaires proches et renvoyer les projectiles vers leur source. Un Renvoi ne coûte de l’Énergie que s’il renvoie un projectile, une seule fois quel que soit leur nombre ; manqué ou s’il ne frappe qu’un adversaire, il est gratuit, mais impossible quand votre Énergie est épuisée. Vous pouvez l’annuler à tout moment par un autre coup aérien, un saut aérien ou un sprint aérien.',
 
   'credits.createdBy': 'Créé par {developer}',
   'credits.original.title': 'Création originale',

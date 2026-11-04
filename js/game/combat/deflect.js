@@ -27,10 +27,15 @@
 // attacker. Every Deflect must turn projectiles back
 // (`deflectProjectiles`), so it is always both.
 //
-// It costs Energy, the same for every fighter: DEFLECT_ENERGY_COST (15, see
-// js/data/energy.js), paid once as it starts (Fighter.tryDeflect),
-// whether it then strikes, turns a projectile back or meets nothing, and
-// never while the fighter is exhausted. Nothing it does gives any back.
+// It costs Energy, the same for every fighter, only when it does its job:
+// DEFLECT_ENERGY_COST (15, see js/data/energy.js), paid once per Deflect,
+// the first time it turns a projectile back
+// (CombatSystem.deflectProjectiles, through Fighter.payEnergy), however
+// many it turns back. Starting one is free (Fighter.tryDeflect), but never
+// while the fighter is exhausted; one that whiffs, only strikes a fighter
+// or is cut short before turning anything back costs nothing (the launch &
+// energy update; it was paid as it started). Nothing it does gives any
+// back.
 //
 // Its strike is the same for every fighter: DEFLECT_DAMAGE (3) Launch
 // Points at Base Launch DEFLECT_BASE_LAUNCH (2). A fighter authors the rest

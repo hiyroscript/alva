@@ -206,37 +206,38 @@ test('every fighter\'s Shield pays exactly 15 per block, a perfect block\'s incl
 
 // ---- Energy: the Deflect -------------------------------------------------------------------
 
-test('every fighter\'s Deflect pays exactly 15 as it starts, whiff or hit, never while exhausted, and nothing it does gives any back', () => {
+test('every fighter\'s Deflect is free to start and free when it turns nothing back, whiff or hit, and never starts while exhausted', () => {
   assert.equal(DEFLECT_ENERGY_COST, 15);
   for (const c of CHARACTERS) {
     const who = `#${c.id}`;
     const regen = resolveEnergy(c.energy).regen * DT;
-    // A whiff: nothing to strike, still 15.
+    // A whiff: nothing to strike, nothing turned back, nothing paid.
     const whiff = makeFighter({ character: c });
     aloft(whiff.fighter, 100);
+    whiff.fighter.combat.setEnergy(50);
     whiff.step(SHIELD);
     assert.equal(whiff.fighter.combat.attack?.def.id, 'deflect', who);
-    assert.equal(whiff.fighter.combat.energy, 100 - 15, `${who}: a whiffed Deflect, 15 as it starts`);
-    let steps = 0;
+    assert.ok(near(whiff.fighter.combat.energy, 50 + regen), `${who}: starting it costs nothing (the refill runs on)`);
+    let steps = 1;
     while (whiff.fighter.combat.attack) {
       whiff.step({});
       steps++;
     }
-    assert.ok(near(whiff.fighter.combat.energy, 85 + steps * regen), `${who}: the refill alone after it`);
-    // A hit: the same 15, and the hit gives nothing back.
+    assert.ok(near(whiff.fighter.combat.energy, 50 + steps * regen), `${who}: a whiffed Deflect costs 0, the refill alone`);
+    // A hit on a fighter, turning nothing back: still nothing.
     const hit = duel({ attackerCharacter: c, gap: 30 });
     aloft(hit.attacker, 500);
     aloft(hit.target, 500);
+    hit.attacker.combat.setEnergy(50);
     hit.tick(SHIELD);
-    assert.equal(hit.attacker.combat.energy, 85, `${who}: 15`);
-    let n = 0;
+    let n = 1;
     while (!hit.events.length) {
       hit.tick();
       n++;
     }
     assert.equal(hit.events[0].move, 'deflect');
     assert.equal(hit.events[0].damage, 3, `${who}: the Deflect still deals 3`);
-    assert.ok(near(hit.attacker.combat.energy, 85 + n * regen), `${who}: no refund for landing it`);
+    assert.ok(near(hit.attacker.combat.energy, 50 + n * regen), `${who}: striking a fighter costs 0, and gives nothing back`);
     // Exhausted: no Deflect at all, and nothing taken.
     const tired = makeFighter({ character: c });
     aloft(tired.fighter, 100);
@@ -244,17 +245,17 @@ test('every fighter\'s Deflect pays exactly 15 as it starts, whiff or hit, never
     tired.step(SHIELD);
     assert.equal(tired.fighter.combat.attack, null, `${who}: exhausted, no Deflect`);
     assert.equal(tired.fighter.combat.energyExhausted, true);
-    // Any Energy left, not exhausted, is enough: it takes the rest.
+    // Any Energy left, not exhausted, is enough to start one, for nothing.
     const low = makeFighter({ character: c });
     aloft(low.fighter, 100);
     low.fighter.combat.setEnergy(6);
     low.step(SHIELD);
     assert.equal(low.fighter.combat.attack?.def.id, 'deflect', `${who}: on 6`);
-    assert.deepEqual([low.fighter.combat.energy, low.fighter.combat.energyExhausted], [0, true], `${who}: all it had`);
+    assert.ok(near(low.fighter.combat.energy, 6 + regen), `${who}: nothing taken as it starts`);
   }
 });
 
-test('turning a projectile back with a Deflect gives no Energy back: the 15 it cost is all that moves, the refill aside', () => {
+test('turning a projectile back with a Deflect costs 15, once, on that step with no refill, and gives nothing back', () => {
   for (const c of CHARACTERS) {
     const who = `#${c.id}`;
     const regen = resolveEnergy(c.energy).regen * DT;
@@ -263,30 +264,30 @@ test('turning a projectile back with a Deflect gives no Energy back: the 15 it c
     const d = duel({ targetCharacter: c, gap: 120 });
     aloft(d.target, 400);
     aloft(d.attacker, 400);
+    d.target.combat.setEnergy(50);
     d.tick({}, SHIELD);
-    assert.equal(d.target.combat.energy, 85, `${who}: 15 as it starts`);
-    let n = 0;
-    while (d.target.combat.phase !== 'active') {
-      d.tick();
-      n++;
-    }
+    assert.ok(near(d.target.combat.energy, 50 + regen), `${who}: nothing as it starts`);
+    while (d.target.combat.phase !== 'active') d.tick();
     const box = worldBox(d.target, d.target.deflect.hitbox, {});
     const def = d.attacker.projectileDefs.attack2_object;
     const red = new Projectile({
       owner: d.attacker, def, anim: d.attacker.sprites.projectile(def.animation), x: box.x - def.speed * DT, y: box.y + box.h / 2, direction: 1,
     });
     d.projectiles.push(red);
+    const before = d.target.combat.energy;
     d.tick();
-    n++;
     assert.equal(red.owner, d.target, `${who}: turned back`);
-    assert.ok(near(d.target.combat.energy, 85 + n * regen), `${who}: no refund, no bonus refill`);
+    assert.ok(near(d.target.combat.energy, before - 15), `${who}: 15 on the step it turns back, no refill on it`);
+    assert.deepEqual(d.deflections.map((x) => x.energyCost), [15], `${who}: recorded on the deflection`);
+    const paid = d.target.combat.energy;
+    let n = 0;
     // Nor when the turned-back shot lands on its old owner.
     for (let i = 0; i < 20 && !d.events.some((e) => e.projectile === red); i++) {
       d.tick();
       n++;
     }
     assert.ok(d.events.some((e) => e.projectile === red && e.target === d.attacker), `${who}: it struck its thrower`);
-    assert.ok(near(d.target.combat.energy, Math.min(100, 85 + n * regen)), `${who}: still the refill alone`);
+    assert.ok(near(d.target.combat.energy, Math.min(100, paid + n * regen)), `${who}: still the refill alone`);
   }
 });
 
@@ -503,7 +504,7 @@ test('the same attack resolves identically under Easy, Medium, Hard and Brutal: 
   for (const r of runs) {
     assert.equal(r.built, runs[0].built, 'the fighter itself: every attack, its Energy, its movement');
     assert.deepEqual(r.hits, runs[0].hits, 'every hit and block, step for step');
-    assert.deepEqual([r.dashed, r.deflected], [85, 85], 'the Dash and the Deflect, 15 each');
+    assert.deepEqual([r.dashed, r.deflected], [85, 100], 'the Dash 15 as it starts; the Deflect free to start (it pays only to turn a projectile back)');
   }
   const [kick, jab, blocked] = runs[0].hits;
   assert.deepEqual(kick.slice(1, 5), ['hit', 'extra_attack', 5, 0]);

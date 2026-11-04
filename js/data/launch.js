@@ -57,7 +57,16 @@ export const ALLOWED_DAMAGE_VALUES = Object.freeze([1, 3, 5, 10]);
 // Every unblocked hit restarts both, even when its Base Launch is 0.
 export const LAUNCH_RECOVERY_DELAY = 2;
 export const LAUNCH_RECOVERY_INTERVAL = 0.5;
-export const LAUNCH_RECOVERY_AMOUNT = 1;
+// Points taken off per tick: 2 since the launch & energy update (it was 1),
+// so a fighter left alone comes back down twice as fast. An odd Launch
+// Point still ends at 0, never below (CombatState.updateLaunchRecovery).
+export const LAUNCH_RECOVERY_AMOUNT = 2;
+
+// A perfect Shield (Fighter.perfectShield) takes this many Launch Points
+// off its own fighter for every hit it blocks, never below 0, the same for
+// every fighter (CombatState.heal through CombatSystem.applyHit): a heal,
+// so it neither restarts nor speeds up the passive recovery above.
+export const PERFECT_SHIELD_HEAL = 5;
 
 // ---- Base Launch -----------------------------------------------------------------
 
@@ -138,7 +147,14 @@ export function resolveLaunchStrength(baseLaunch, launchPoint) {
 // every direction and every hit. Without it a launch would be measured on the
 // same scale as damage, far below the world's (gravity 2500, a jump 750), and
 // no hit would visibly move anyone until very high Launch Points.
-export const LAUNCH_UNIT_SPEED = 10;
+//
+// 7 since the launch & energy update (it was 10): launches were nerfed here,
+// and only here, without touching Base Launch, Launch Point or any damage.
+// The same hit at the same Launch Point now flies 70 % as fast, so a fighter
+// needs about 43 % more Launch Point (10 / 7) to be launched as hard as
+// before. It is the one knob: try 8 or 6 by editing this line alone
+// (everything else, the CPU's estimates included, reads it).
+export const LAUNCH_UNIT_SPEED = 7;
 
 const NO_LAUNCH = Object.freeze({ x: 0, y: 0 });
 
@@ -162,8 +178,8 @@ export function resolveDirectionalLaunch(direction, strength, facing = 1) {
 // ever named.
 export const LAUNCH_POINT_SUMMARY =
   'Launch Point starts at 0. Each unblocked hit adds its damage and restarts recovery: ' +
-  'after 2 seconds without a hit, it drops by 1 every following 0.5 seconds, down to 0 (first point at 2.5 seconds). ' +
-  'Blocks do not restart recovery. Higher Launch Point means a harder launch. Respawning resets it to 0.';
+  'after 2 seconds without a hit, it drops by 2 every following 0.5 seconds, down to 0 (the first drop at 2.5 seconds). ' +
+  'Blocks do not restart recovery; a perfect Shield takes 5 off at once. Higher Launch Point means a harder launch. Respawning resets it to 0.';
 
 export const LAUNCH_FORMULA = 'Launch strength = Base Launch × Launch Point';
 

@@ -28,6 +28,22 @@
 // Every label and spoken description is translated (js/localization/i18n.js): the
 // slot tags too (P1 reads J1 in French), while the tag the fighter carries
 // stays the same internally.
+//
+// The Launch Point number also shows how it is changing (the launch &
+// energy update), paint only, the same for every card (P1, P2, a CPU, Local
+// Play, Watch Mode, Online Play, Practice Ground):
+//
+//   - it glows green for a moment (is-healing, css/battle.css) every time it
+//     really comes down while its fighter stays in play: a recovery tick, a
+//     perfect Shield, a heal, a charm or a fear's feed. Its fighter's
+//     CombatState counts those (launchPointHeals); a respawn, a restart, a
+//     rematch or a Practice Ground reset or swap gives the fighter a fresh
+//     state, which the card only syncs with, so a reset never glows.
+//   - it burns (is-burning, then is-inferno) while it is high enough that
+//     the next solid hit can launch the fighter hard: LAUNCH_POINT_FIRE and
+//     LAUNCH_POINT_INFERNO, each with its own lower threshold to go out
+//     (hysteresis), so it never flickers around one. It goes out at once on
+//     a fresh state.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
@@ -44,6 +60,36 @@ const spokenSlot = (tag) => (SPOKEN[tag] ? t(SPOKEN[tag]) : slotLabel(tag));
 // The Launch Point on show: whole numbers, with no % sign.
 export function formatLaunchPoint(value) {
   return String(Math.round(value));
+}
+
+// The Launch Point at which the number catches fire, and the one below which
+// it goes out again. Picked for LAUNCH_UNIT_SPEED 7 (js/data/launch.js), by
+// simulated launches on Yerma (a solid 3-damage hit, sideways or straight
+// up, on a fighter that does not try to get back): from 60 a Base Launch 2
+// hit (strength 2 x 63 = 126, 882 units/s) carries a fighter in the air
+// within about 250 units of the ledge into the Void, and a Base Launch 3
+// one (189, 1323 units/s) within about 450, a third of the stage. That is
+// where the next solid hit becomes a likely end. Below 55 it is out. (At
+// the old 10 units/s a point the same launches began at about 45.)
+export const LAUNCH_POINT_FIRE = 60;
+export const LAUNCH_POINT_FIRE_OUT = 55;
+// The stronger tier: from 100 a Base Launch 3 hit ends a life from anywhere
+// on the stage, straight up included, and a Base Launch 2 one from the
+// middle third in the air (about 80 at the old scale). Below 95 it is back
+// to the first tier.
+export const LAUNCH_POINT_INFERNO = 100;
+export const LAUNCH_POINT_INFERNO_OUT = 95;
+
+// The fire a Launch Point shows (0 none, 1 burning, 2 inferno), from the
+// fire it showed (`current`): each tier lights at its threshold and only
+// goes out below its lower one.
+export function launchPointFire(lp, current = 0) {
+  let tier = current;
+  if (lp >= LAUNCH_POINT_INFERNO) tier = 2;
+  else if (tier === 2 && lp < LAUNCH_POINT_INFERNO_OUT) tier = 1;
+  if (tier === 0 && lp >= LAUNCH_POINT_FIRE) tier = 1;
+  if (tier >= 1 && lp < LAUNCH_POINT_FIRE_OUT) tier = 0;
+  return tier;
 }
 
 // Energy for screen readers, in steps of 5: "Energy 75 of 100", or while
@@ -63,6 +109,10 @@ function sidePanel(side, { inward, points = 0 }) {
   const tag = el('span', { class: 'hud-slot' });
   const name = el('span', { class: 'hud-name' });
   const launchPointValue = el('span', { class: 'hud-launch-point-value', text: '0' });
+  // The heal glow plays once (the fire's flicker never ends: not it).
+  launchPointValue.addEventListener?.('animationend', (e) => {
+    if (String(e?.animationName ?? '').startsWith('hud-heal')) launchPointValue.classList.remove('is-healing');
+  });
   const launchPoint = el('div', { class: 'hud-launch-point', role: 'group', ...tattr('aria-label', 'hud.launchPoint') }, [launchPointValue]);
   const energy = el('span', { class: 'hud-sr' });
   const info = el('div', { class: 'hud-info' }, [el('div', { class: 'hud-tag' }, [tag, name]), launchPoint]);
@@ -73,6 +123,7 @@ function sidePanel(side, { inward, points = 0 }) {
   return {
     wrap, root, portrait, divider, tag, name, info, launchPoint, launchPointValue, energy, score, dots, inward,
     shownLaunchPoint: null, shownEnergy: null, shownScore: null, sprites: null,
+    shownCombat: null, shownHeals: 0, shownFire: 0,
   };
 }
 
@@ -93,6 +144,18 @@ function bindPanel(panel, tag, fighter) {
   panel.shownLaunchPoint = null;
   panel.shownEnergy = null;
   panel.shownScore = null;
+  // A fighter bound afresh (a swap, a rematch) is synced with, never
+  // glowing, and its fire is worked out anew.
+  panel.shownCombat = null;
+  panel.launchPointValue.classList.remove('is-healing');
+}
+
+// Plays the heal glow on `value` from its start, restarting it when one is
+// already playing (the class taken off, a reflow, and put back).
+function glow(value) {
+  value.classList.remove('is-healing');
+  void value.offsetWidth;
+  value.classList.add('is-healing');
 }
 
 function updatePanel(panel, fighter) {
@@ -102,6 +165,19 @@ function updatePanel(panel, fighter) {
     panel.shownLaunchPoint = text;
     panel.launchPointValue.textContent = text;
   }
+  // The heal glow: only when the same state came down again. A new state
+  // (a respawn, a restart, a reset, a fresh bind) is only synced with.
+  const heals = combat.launchPointHeals ?? 0;
+  const same = combat === panel.shownCombat;
+  if (same && heals !== panel.shownHeals) glow(panel.launchPointValue);
+  const fire = launchPointFire(combat.launchPoint, same ? panel.shownFire : 0);
+  if (!same || fire !== panel.shownFire) {
+    panel.launchPointValue.classList.toggle('is-burning', fire >= 1);
+    panel.launchPointValue.classList.toggle('is-inferno', fire >= 2);
+  }
+  panel.shownCombat = combat;
+  panel.shownHeals = heals;
+  panel.shownFire = fire;
   const energy = describeEnergy(combat);
   if (energy !== panel.shownEnergy) {
     panel.shownEnergy = energy;

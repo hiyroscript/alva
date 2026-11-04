@@ -28,14 +28,17 @@ test('a harder launch stuns longer, up to a cap; a hit that launches nothing kee
   assert.ok(close(resolveLaunchStun(2000, R), 0.4));
   assert.equal(resolveLaunchStun(10000, R), R.maxStun, 'capped');
   // Through the real CombatSystem: the High Kick (5) on a target at 55
-  // launches at 1200.
+  // launches at strength 120, 120 x LAUNCH_UNIT_SPEED (840) units/s: its
+  // stun follows the speed, so the launch & energy update's slower launch
+  // stuns a little less (0.168 s more, where it was 0.24 at 1200).
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 55;
   d.tick(P('extra_attack'));
   d.until(() => d.events.length > 0, 30);
   const [e] = d.events;
   assert.equal(e.launchSpeed, 120 * U);
-  assert.ok(close(e.hitstun, def.attacks.extra_attack.hitstun + 0.24));
+  assert.ok(close(e.hitstun, def.attacks.extra_attack.hitstun + resolveLaunchStun(120 * U, R)));
+  assert.ok(close(resolveLaunchStun(120 * U, R), (120 * U * R.stunPerThousand) / 1000));
   assert.equal(d.target.combat.stun, e.hitstun);
   // Maximum Blue's grinding ticks never launch: their stun is their own.
   const s = duel({ gap: 200 });

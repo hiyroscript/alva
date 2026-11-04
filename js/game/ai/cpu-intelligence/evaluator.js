@@ -34,11 +34,11 @@
 // Important constraints: bounded work per reassessment (the arcs and Dash
 // lengths it tries are capped by the level's plan depth); read-only.
 
-import { moveReady } from './capabilities.js';
+import { moveReady, needsEnergy } from './capabilities.js';
 import {
   STEP, Track, moveContact, projectileContact, arcTrack, recoverySim, boxAt, bodyFrom,
 } from './prediction.js';
-import { LaunchJudge, KO_VALUE, riseOf } from './values.js';
+import { LaunchJudge, KO_VALUE, LAUNCH_POINT_SCALE, riseOf } from './values.js';
 import { stepBody } from '../../physics.js';
 import { attackPhase } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
@@ -130,7 +130,7 @@ export class Evaluator {
     if (m.air === grounded) return false;
     if ((self.combat.cooldowns.get(m.id) ?? 0) > wait + 0.01) return false;
     if (self.airStartBlocked(m.def) || self.combat.attack?.def.id === m.id || self.repeatsMove(m.action)) return false;
-    return !(m.energyCost > 0 && self.combat.energyExhausted);
+    return !(needsEnergy(m) && self.combat.energyExhausted);
   }
 
   // Move `m` started `k0` steps from now, from where the CPU is.
@@ -497,11 +497,25 @@ export class Evaluator {
     return !s.op.shielding && !(v.paralysis > 0) && !v.techniqueDef && !v.summon;
   }
 
+  // The Energy a Deflect `m` started now would cost: its turnBackCost when
+  // an opponent's projectile it can see is close enough to be turned back
+  // by it (the launch & energy update: it pays only for that), else 0.
+  deflectCost(s, m) {
+    const me = s.me;
+    for (const p of s.shots ?? []) {
+      if (p.owner === s.self || !p.ready) continue;
+      const dx = p.x - me.x;
+      const closing = Math.sign(p.vx) === -Math.sign(dx) || Math.abs(dx) < 80;
+      if (closing && Math.abs(dx) < 80 + Math.abs(p.vx) * m.total && Math.abs(p.y - (me.y - me.height / 2)) < me.height) return m.turnBackCost ?? 0;
+    }
+    return 0;
+  }
+
   // Whether aerial `m` could start later in this airtime: its cooldown
   // aside (it may run out by then), not in free fall, its starts for the
   // airtime not used up (all of them back once it has landed).
   readyInAir(self, m, fromGround) {
-    if (m.energyCost > 0 && self.combat.energyExhausted) return false;
+    if (needsEnergy(m) && self.combat.energyExhausted) return false;
     if (fromGround) return true;
     if (self.freeFall) return false;
     return !(m.airUses > 0 && (self.airAttacks.get(m.id) ?? 0) >= m.airUses);
@@ -580,7 +594,7 @@ export class Evaluator {
     // CPU's own Launch Point.
     const fear = Math.max(0, ...strikes.map((h) => h.fear ?? 0));
     if (fear > 0) vHit += fear * (op.frightened > 0 ? 0.5 : 3);
-    if (op.frightened > 0) vHit += Math.max(0, hv.lp - op.lp) * (1 + s.me.lp / 160) * 0.8;
+    if (op.frightened > 0) vHit += Math.max(0, hv.lp - op.lp) * (1 + s.me.lp / (160 * LAUNCH_POINT_SCALE)) * 0.8;
     // What a block costs: the Shield's stall and the recovery left against
     // the blockstun; a block that would exhaust the opponent is a win.
     let vBlock = 0;
@@ -638,11 +652,11 @@ export class Evaluator {
         interrupt = Math.max(interrupt, clamp(1 - Math.exp(-model.pressure * open), 0, 0.85));
       }
     }
-    // Resources: Energy (the Deflect's, a Dash's, a construct move's: one
-    // that throws, casts or summons with no special cooldown pays 15), a
-    // long cooldown.
+    // Resources: Energy (a Dash's, a construct move's: one that throws,
+    // casts or summons with no special cooldown pays 15; a Deflect's only
+    // if it will turn a projectile back), a long cooldown.
     let cost = 0;
-    const energy = (c.energy ?? 0) + (m.energyCost ?? 0);
+    const energy = (c.energy ?? 0) + (m.energyCost ?? 0) + (m.kind === 'deflect' ? this.deflectCost(s, m) : 0);
     if (energy > 0) {
       // Emptying the bar leaves no Shield, Dash or Deflect until it is full
       // again: worth it only for a hit that ends a life.
@@ -651,6 +665,9 @@ export class Evaluator {
       const empty = (8 + danger * 30 + this.foePunish * 0.5) * p.energySense;
       cost += (energy / 25) * (0.3 + p.energySense * 0.5) + (left <= 0 ? empty : left < 30 ? (1.5 + danger * 4) * p.energySense : 0);
     }
+    // A free Deflect is still no move to fill the air with: each one already
+    // started this airtime makes the next a worse idea.
+    if (m.kind === 'deflect') cost += 0.6 * (s.self.airAttacks?.get(m.id) ?? 0);
     if (m.abilityCooldown > 1) cost += Math.min(2.5, m.abilityCooldown * 0.25);
     else if (m.cooldown > 1) cost += Math.min(1.5, m.cooldown * 0.15);
     // A Super Jump commits the CPU to a long airtime and a late landing:

@@ -441,14 +441,14 @@ test('the Shield: all three raise their bubbles at once, one Shield blocks the h
   assert.deepEqual(keys(d.target), ['releaseshield', 'releaseshield', 'releaseshield']);
 });
 
-test('the Deflect: green alone whirls (pink and blue drop back behind her), one strike for 15 Energy, turning a projectile back once', () => {
+test('the Deflect: green alone whirls (pink and blue drop back behind her), one strike, free to start, 15 Energy for turning a projectile back once', () => {
   const { fighter: f, step } = solo();
   step(P('jump'));
   for (let i = 0; i < 8; i++) step({ jump: true });
   step(P('shield'));
   assert.equal(f.combat.attack.def.id, 'deflect');
   assert.deepEqual(keys(f), ['idle', 'deflect', 'idle']);
-  assert.equal(f.combat.energy, 85);
+  assert.equal(f.combat.energy, 100, 'nothing paid as it starts');
   for (let i = 0; i < 9; i++) step({});
   assert.deepEqual([member(f, 'green').x, member(f, 'green').y], [0, 0], 'green at the front');
   assert.ok(member(f, 'blue').x < 0 && member(f, 'pink').x < member(f, 'blue').x, 'the others behind her');
@@ -457,7 +457,7 @@ test('the Deflect: green alone whirls (pink and blue drop back behind her), one 
   const d = duel({ attackerCharacter: DEF_0001, targetCharacter: DEF, gap: 400 });
   Object.assign(d.target.body, { y: 400, prevY: 400, vx: 0, vy: 0, grounded: false, ground: null, gravityScale: 0 });
   d.tick({}, P('shield'));
-  assert.equal(d.target.combat.energy, 85, 'one Deflect, paid once');
+  assert.equal(d.target.combat.energy, 100, 'nothing paid as it starts');
   while (d.target.combat.phase !== 'startup' || d.target.combat.attack.time + DT < d.target.deflect.startup - 1e-6) d.tick();
   const b = d.target.body;
   const def = d.attacker.projectileDefs.attack2_object;
@@ -465,6 +465,7 @@ test('the Deflect: green alone whirls (pink and blue drop back behind her), one 
   d.projectiles.push(red);
   d.tick();
   assert.equal(red.owner, d.target, 'turned back, now #0006\'s');
+  assert.equal(d.target.combat.energy, 85, 'one Deflect, paid once, for turning it back');
   assert.equal(d.target.combat.launchPoint, 0, 'no hit on it');
 });
 
@@ -717,7 +718,7 @@ test('the camera, the CPU and a whole Battle treat it as one fighter; the CPU pl
   const kit = analyzeCapabilities(solo().fighter).moves.map((m) => m.key);
   // Its slow ground flurry is a rare pick now that its quick strikes never
   // wait (no repeat delay): the rest of the roster, if it has not come up.
-  const extra = [[getCharacter('0002'), 6], [getCharacter('0004'), 5]];
+  const extra = [[getCharacter('0002'), 4], [getCharacter('0004'), 3], [getCharacter('0010'), 5]];
   for (const entry of [[DEF_0001, 5], [getCharacter('0003'), 6], [getCharacter('0005'), 7], ...extra]) {
     if (extra.includes(entry) && kit.every((k) => used.get(k) > 0)) break;
     const [foe, seed] = entry;

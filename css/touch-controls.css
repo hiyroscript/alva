@@ -248,6 +248,13 @@ html.is-touch .touch-controls[hidden] { display: none; }
   border-color: var(--white);
   transition: background-color 120ms ease, border-color 120ms ease;
 }
+/* Pushed down, the stick holds Down (TouchControls.setStickDown): the base's
+   lower rim lights and the knob dims a little, as Down's own button would. */
+.tc-stick.is-down {
+  border-bottom-color: var(--white);
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), inset 0 -4px 0 rgba(255, 255, 255, 0.4);
+}
+.tc-stick.is-down .tc-stick-knob { background: rgba(255, 255, 255, 0.4); }
 .tc-dash {
   position: absolute;
   bottom: calc(var(--tc) * 1.82 * var(--tc-k) + var(--tc-dash) * var(--tc-kd));

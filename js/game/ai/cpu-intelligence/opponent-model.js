@@ -20,6 +20,8 @@
 // Important constraints: never reads inputs (only what the fighter did on
 // screen) and never predicts a random choice: it estimates tendencies.
 
+import { LAUNCH_POINT_SCALE } from './values.js';
+
 // How fast every rate forgets (per second): about a 12-second memory.
 const DECAY = 1 / 12;
 
@@ -107,13 +109,14 @@ export class OpponentModel {
     if (view.shielding) this.n.shieldHold += dt;
     if (!view.grounded || Math.abs(view.vx) > 60) this.n.moving += dt;
     // Pressing forward (toward the CPU) or backing off, and backing off
-    // with a high Launch Point: trying to recover.
+    // with a high Launch Point (40 at the old launch scale, LAUNCH_POINT_SCALE
+    // times that now): trying to recover.
     const toward = -Math.sign(dx) * view.vx;
     if (view.grounded && Math.abs(view.vx) > 60) {
       if (toward > 0) this.n.approach += dt;
       else {
         this.n.retreat += dt;
-        if (view.lp > 40) this.n.hurtRetreat += dt;
+        if (view.lp > 40 * LAUNCH_POINT_SCALE) this.n.hurtRetreat += dt;
       }
     }
     const a = this.n.approach + this.n.groundAttack * 0.4 + this.n.airAttack * 0.4;

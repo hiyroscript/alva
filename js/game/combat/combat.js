@@ -61,7 +61,8 @@
 // And a Shield may stall the blows it blocks (`defense.stall`, see
 // js/game/combat/defense.js): a melee attacker freezes in it.
 
-import { resolveLaunchStrength, resolveDirectionalLaunch } from '../../data/launch.js';
+import { resolveLaunchStrength, resolveDirectionalLaunch, PERFECT_SHIELD_HEAL } from '../../data/launch.js';
+import { DEFLECT_ENERGY_COST } from '../../data/energy.js';
 import { attackPhase, strikeLive } from './attacks.js';
 import { backTurned, hitReaches } from './hit-effects.js';
 
@@ -212,7 +213,9 @@ export class CombatSystem {
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
     // a perfect block's included, or whatever was left when that was less
-    // (0 on a hit).
+    // (0 on a hit). `heal` is the Launch Point a perfect block took off its
+    // own fighter (PERFECT_SHIELD_HEAL, or what was left when that was
+    // less; 0 for any other block or hit), already off `launchPointAfter`.
     // `baseLaunch` is the hit's Base Launch (0-3) and `directionalLaunch` its
     // direction; `launchStrength` is baseLaunch x launchPointAfter (0 on a
     // block), and `finalLaunch` the world-space velocity { x, y } the target
@@ -240,8 +243,11 @@ export class CombatSystem {
     // fighter's hit on its charmer is recorded as `charmed` (see applyHit):
     // `damage` 0, `heal` the Launch Point it took off the charmer instead.
     this.events = [];
-    // { fighter, projectile, from, direction }: the projectiles turned back
-    // this step (see deflectProjectiles), `from` the owner each one had.
+    // { fighter, projectile, from, direction, energyCost }: the projectiles
+    // turned back this step (see deflectProjectiles), `from` the owner each
+    // one had and `energyCost` what turning it back cost its fighter
+    // (DEFLECT_ENERGY_COST for the first one a Deflect turns back, 0 for
+    // every later one).
     this.deflections = [];
   }
 
@@ -342,6 +348,16 @@ export class CombatSystem {
   // it. It is not a hit: no event, no freeze, nothing used up (the box may
   // turn back more than one, and still strike a fighter). Startup and
   // recovery turn nothing back.
+  //
+  // Turning a projectile back is what a Deflect pays for: the first one an
+  // activation turns back costs its fighter DEFLECT_ENERGY_COST
+  // (energy.deflectCost, through Fighter.payEnergy: all that is left when
+  // that is less, and no refill on that step), once, the attack record
+  // marked `paid`; every later one it turns back, on this step or another,
+  // is free. A Deflect that turns nothing back costs nothing. The turning
+  // back never depends on the payment: a fighter somehow exhausted by then
+  // still turns the projectile back (its Deflect started legally) and pays
+  // nothing. Each deflection records what it cost (`energyCost`).
   deflectProjectiles(fighters, projectiles) {
     if (!projectiles.length) return;
     for (const f of fighters) {
@@ -353,7 +369,14 @@ export class CombatSystem {
         const from = p.owner;
         const direction = Math.sign(p.x - f.body.x) || f.facing;
         p.turnBack(f, direction);
-        this.deflections.push({ fighter: f, projectile: p, from, direction });
+        let energyCost = 0;
+        if (!atk.paid) {
+          atk.paid = true;
+          const spent = f.combat.energySpent;
+          f.payEnergy?.(f.energyDef?.deflectCost ?? DEFLECT_ENERGY_COST);
+          energyCost = f.combat.energySpent - spent;
+        }
+        this.deflections.push({ fighter: f, projectile: p, from, direction, energyCost });
       }
     }
   }
@@ -447,7 +470,11 @@ export class CombatSystem {
   // step (hits resolve in the fixed order of update), lands in full. The
   // block itself stands: the Shield was up when it met it. A blocked hit
   // never reaches what only a real hit does (the target's technique or
-  // summoning startup cut short, its takeHit).
+  // summoning startup cut short, its takeHit). A perfect block also heals
+  // its fighter: PERFECT_SHIELD_HEAL (5) Launch Points off, never below 0
+  // (CombatState.heal: a heal, so passive recovery runs on untouched), the
+  // same for every fighter. A blocked string stops at its first block (see
+  // strike), so one perfect block heals once.
   //
   // Otherwise the damage is added to the target's Launch Point first, so
   // the hit that raises it already launches from the new total. The launch
@@ -512,8 +539,9 @@ export class CombatSystem {
     // hit is consulted.
     const blocked = tc.shielding;
     // A perfect Shield (raised just in time, see Fighter.perfectShield)
-    // blocks with no blockstun, so its fighter can answer at once; it pays
-    // for the block like any other (no discount, nothing given back).
+    // blocks with no blockstun, so its fighter can answer at once, and
+    // heals it (PERFECT_SHIELD_HEAL off its Launch Point); it pays for the
+    // block like any other (no discount, nothing given back).
     const perfect = blocked && !!target.perfectShield;
     let energyCost = 0;
     if (blocked) {
@@ -529,6 +557,9 @@ export class CombatSystem {
     const damage = blocked ? 0 : stab ? stab.damage : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
+    // A perfect block heals its fighter (it added nothing above: a block
+    // deals no damage).
+    const heal = perfect ? tc.heal(PERFECT_SHIELD_HEAL) : 0;
     // Every real hit restarts recovery, including non-launching strikes.
     // A block leaves the existing schedule untouched.
     if (!blocked) tc.resetLaunchRecovery();
@@ -599,7 +630,7 @@ export class CombatSystem {
     }
     const event = {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
-      damage, energyCost, launchPointBefore, launchPointAfter,
+      damage, heal, energyCost, launchPointBefore, launchPointAfter,
       baseLaunch, authoredBaseLaunch: stab ? stab.baseLaunch : def.baseLaunch, mash,
       directionalLaunch, launchStrength, finalLaunch, backstab: !!stab,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,

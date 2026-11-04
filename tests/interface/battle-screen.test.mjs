@@ -15,9 +15,12 @@ import { readFileSync } from 'node:fs';
 import { Battle } from '../../js/game/battle.js';
 import { STAT_KEYS } from '../../js/game/match-stats.js';
 import { CombatState } from '../../js/game/combat/combat-state.js';
-import { formatLaunchPoint, describeEnergy } from '../../js/ui/hud.js';
+import {
+  formatLaunchPoint, describeEnergy, launchPointFire, LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT,
+} from '../../js/ui/hud.js';
+import { CombatSystem } from '../../js/game/combat/combat.js';
 import { CONFIG } from '../../js/config.js';
-import { duel, def as DEF_0001, fakeSprites, DT } from '../helpers/fighter-harness.mjs';
+import { duel, def as DEF_0001, fakeSprites, DT, STAGE } from '../helpers/fighter-harness.mjs';
 import { getMap } from '../../js/data/maps.js';
 import { setLanguage, localizeTree } from '../../js/localization/i18n.js';
 import { EN } from '../../js/localization/strings/en.js';
@@ -1557,4 +1560,142 @@ test('a screen grown too small mid-match pauses it under the small-screen block,
   // Already paused: nothing more.
   screen.onScreenBlocked();
   assert.equal(screen.paused, true);
+});
+
+// ---- The launch & energy update: the Launch Point's heal glow and fire ----------
+
+test('HUD: the Launch Point burns from LAUNCH_POINT_FIRE (60) and only goes out below 55; past 100 it is an inferno until below 95', () => {
+  assert.deepEqual([LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT], [60, 55, 100, 95]);
+  // The pure rule, from each tier.
+  assert.deepEqual([0, 59, 60, 120].map((lp) => launchPointFire(lp, 0)), [0, 0, 1, 2]);
+  assert.deepEqual([54, 55, 59, 99, 100].map((lp) => launchPointFire(lp, 1)), [0, 1, 1, 1, 2]);
+  assert.deepEqual([94, 95, 60, 54].map((lp) => launchPointFire(lp, 2)), [1, 2, 1, 0]);
+  // On the card, step by step.
+  const { screen } = setup();
+  const d = duel();
+  const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1, score: { p1: 0, p2: 0 } };
+  const { hud } = screen;
+  hud.bind(battle.p1, battle.p2);
+  const value = hud.right.launchPointValue;
+  const fire = () => (value.classList.contains('is-inferno') ? 'inferno' : value.classList.contains('is-burning') ? 'fire' : '-');
+  const seen = [];
+  for (const lp of [0, 59, 60, 56, 55, 54, 58, 60, 99, 100, 96, 95, 94, 70, 56]) {
+    battle.p2.combat.launchPoint = lp;
+    hud.update(battle);
+    seen.push(fire());
+  }
+  assert.deepEqual(seen, ['-', '-', 'fire', 'fire', 'fire', '-', '-', 'fire', 'fire', 'inferno', 'inferno', 'inferno', 'fire', 'fire', 'fire'],
+    'lit at its threshold, kept inside its band, out only below it');
+  assert.equal(hud.left.launchPointValue.classList.contains('is-burning'), false, 'the other card is its own');
+  // A respawn puts it out at once, whatever the band.
+  battle.p2.combat.launchPoint = 140;
+  hud.update(battle);
+  assert.equal(fire(), 'inferno');
+  battle.p2.respawn(STAGE);
+  hud.update(battle);
+  assert.equal(value.textContent, '0');
+  assert.equal(fire(), '-', 'out on the respawn');
+  // And a fresh bind (a rematch, a swap) works it out anew.
+  battle.p2.combat.launchPoint = 57;
+  hud.bind(battle.p1, battle.p2);
+  hud.update(battle);
+  assert.equal(fire(), '-', '57 never lit on this state: not burning');
+});
+
+test('HUD: the Launch Point glows green when it comes down in play (a recovery tick, a perfect Shield, a heal), never on a respawn or a rebind', () => {
+  const { screen } = setup();
+  const d = duel();
+  const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1, score: { p1: 0, p2: 0 } };
+  const { hud } = screen;
+  hud.bind(battle.p1, battle.p2);
+  const value = hud.right.launchPointValue;
+  const healing = () => value.classList.contains('is-healing');
+  const settle = () => value.classList.remove('is-healing'); // its animation over
+  const c = battle.p2.combat;
+  c.launchPoint = 20;
+  hud.update(battle);
+  assert.equal(healing(), false, 'a hit or a set value is no heal');
+  // A recovery tick.
+  c.update(2.5);
+  hud.update(battle);
+  assert.equal(value.textContent, '18');
+  assert.equal(healing(), true, 'a recovery tick glows');
+  settle();
+  hud.update(battle);
+  assert.equal(healing(), false, 'once, not every frame');
+  // A perfect Shield's heal.
+  c.shielding = true;
+  Object.defineProperty(battle.p2, 'perfectShield', { value: true, configurable: true });
+  const e = new CombatSystem().applyHit(battle.p1, battle.p2, battle.p1.attacks.attack1);
+  assert.deepEqual([e.type, e.perfect, e.heal], ['block', true, 5]);
+  hud.update(battle);
+  assert.equal(value.textContent, '13');
+  assert.equal(healing(), true, 'a perfect Shield glows');
+  // Another heal during the glow restarts it (it stays on).
+  c.heal(3);
+  hud.update(battle);
+  assert.equal(healing(), true);
+  settle();
+  // The glow and the fire together: the heal takes it under the fire's
+  // lower threshold, and the fire goes out as it glows.
+  delete battle.p2.perfectShield;
+  c.shielding = false;
+  c.launchPoint = 60;
+  hud.update(battle);
+  assert.equal(value.classList.contains('is-burning'), true);
+  c.heal(10);
+  hud.update(battle);
+  assert.deepEqual([healing(), value.classList.contains('is-burning')], [true, false], 'glowing, the fire out');
+  settle();
+  // A respawn: down to 0, but no glow.
+  c.launchPoint = 30;
+  hud.update(battle);
+  battle.p2.respawn(STAGE);
+  hud.update(battle);
+  assert.equal(value.textContent, '0');
+  assert.equal(healing(), false, 'a respawn is a reset, not a heal');
+  // A rebind (a restart, a rematch, a swap) syncs, never glows.
+  battle.p2.combat.launchPoint = 10;
+  battle.p2.combat.update(2.5);
+  hud.bind(battle.p1, battle.p2);
+  hud.update(battle);
+  assert.equal(healing(), false, 'synced with on a fresh bind');
+  // The CombatState counts only real reductions.
+  const fresh = new CombatState();
+  assert.equal(fresh.launchPointHeals, 0);
+  fresh.heal(5);
+  assert.equal(fresh.launchPointHeals, 0, 'nothing to take off: no heal');
+  fresh.launchPoint = 3;
+  fresh.heal(5);
+  fresh.update(5);
+  assert.equal(fresh.launchPointHeals, 1);
+});
+
+test('HUD: a restart or rematch of a real Battle never glows or burns, however high the Launch Points were', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen, { p1: 12, p2: 80, score: { p1: 1, p2: 1 } });
+  screen.hud.update(battle);
+  assert.equal(screen.hud.right.launchPointValue.classList.contains('is-burning'), true, '80 burns');
+  battle.timeLeft = 0;
+  finishOnNextFrame(screen, battle);
+  screen.openResults();
+  byText(resultsItems(screen), 'Rematch').click();
+  screen.hud.update(battle);
+  for (const side of [screen.hud.left, screen.hud.right]) {
+    assert.equal(side.launchPointValue.textContent, '0');
+    assert.equal(side.launchPointValue.classList.contains('is-healing'), false, 'a rematch is no heal');
+    assert.equal(side.launchPointValue.classList.contains('is-burning'), false, 'and its fire is out');
+  }
+});
+
+test('the heal glow and the fire are styled, with a still version under reduced motion', () => {
+  const css = stylesheet();
+  for (const rule of ['.hud-launch-point-value.is-healing', '.hud-launch-point-value.is-burning', '.hud-launch-point-value.is-burning::before', '.hud-launch-point-value.is-inferno']) {
+    assert.ok(css.includes(rule), rule);
+  }
+  assert.match(css, /@keyframes hud-heal-glow/);
+  assert.match(css, /@keyframes hud-fire-flicker/);
+  const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)', css.indexOf('hud-fire-rise')));
+  assert.match(reduced, /hud-heal-static/);
+  assert.match(reduced, /\.hud-launch-point-value\.is-burning,\s*\.hud-launch-point-value\.is-inferno\s*\{\s*animation: none;/);
 });

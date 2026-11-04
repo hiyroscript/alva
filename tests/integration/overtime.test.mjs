@@ -228,16 +228,17 @@ test('time-up with the points level: overtime, the same live fight; its clock st
 
 test('Watch Mode plays the same overtime: level at 5:00 it goes on 60 s under the closing Void, then points, then the lower Launch Point', () => {
   const { battle, run, toTimeUp } = match({ mode: 'watch' });
-  // Enough to remain distinct after the idle half-minute's passive recovery.
-  battle.p1.combat.launchPoint = 120;
-  battle.p2.combat.launchPoint = 150;
+  // Enough to remain distinct after the idle minute's passive recovery (2
+  // points every 0.5 s since the launch & energy update: 4 a second).
+  battle.p1.combat.launchPoint = 240;
+  battle.p2.combat.launchPoint = 300;
   toTimeUp();
   assert.equal(battle.phase, 'fight', 'no time-up: overtime');
   assert.equal(battle.overtime, true);
   near(battle.timeLeft, OT, 'its clock');
   assert.deepEqual([battle.p1.inputLocked, battle.p2.inputLocked], [false, false], 'both CPUs play on');
   run(Math.round(OT / 2 / DT));
-  assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [64, 94], 'recovery continues through overtime');
+  assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [128, 188], 'recovery continues through overtime');
   assert.ok(battle.stage.void.left > battle.map.voidBounds.left, 'the Void closes in here too');
   assert.equal(battle.stage.void.top, battle.map.voidBounds.top);
   assert.ok(battle.voidWaveSpeed > 1);

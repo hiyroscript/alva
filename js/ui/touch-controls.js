@@ -5,7 +5,14 @@
 // the bottom-left edge, Run left, Down and Run right, with sliding pointer
 // capture between the Run arrows, and the same Dash buttons just above the
 // Run arrows. Down held is Down (the fast fall in the air;
-// pressed on a one-way platform, a drop through it).
+// pressed on a one-way platform, a drop through it). In the Joystick
+// scheme pushing the stick down is that same Down too (the launch & energy
+// update): stick down + Jump a Super Jump, stick down in the air a fast
+// fall, a quick flick down and back on a droppable platform a drop through
+// it, exactly as the Down button, which stays and keeps working. Only a
+// push that is mostly downward counts (joystickVertical), so a run with the
+// thumb drifting low never holds Down; pushing up does nothing (Jump is its
+// button).
 // Both share the same action buttons. Jump always uses the upward arrow;
 // Defence its shield glyph, named Deflect while the fighter is in the
 // air (where the same button is its Deflect, for one that has one);
@@ -166,9 +173,19 @@ const MOUVEMENT_BUTTONS = [
 // The joystick, in fractions of its radius. Pushed sideways past `engage` it
 // holds runLeft or runRight; back inside `deadzone` it lets go. The gap between
 // the two keeps a thumb resting near the edge from flickering the direction
-// and changing Run unexpectedly. Only the sideways part counts: pushing up or down moves the knob, never Jump or
-// Down. The knob follows the thumb and stops `travel` from the centre, so it stays inside the base.
-export const JOYSTICK = Object.freeze({ deadzone: 0.24, engage: 0.34, travel: 0.56 });
+// and changing Run unexpectedly. Pushed down past `downEngage`, within
+// `downAngle` degrees of straight down, it also holds Down (the `down`
+// control, as the Down button does), and lets go back inside
+// `downDeadzone` or past `downReleaseAngle`: the same hysteresis. The angle
+// is what keeps a sideways run with the thumb drifting low from ever
+// holding Down (an accidental fast fall or drop would be worse than the
+// Down button it saves), and a diagonal push holds both a run and Down.
+// Pushed up it holds nothing: Jump stays on its button. The knob follows
+// the thumb and stops `travel` from the centre, so it stays inside the base.
+export const JOYSTICK = Object.freeze({
+  deadzone: 0.24, engage: 0.34, travel: 0.56,
+  downEngage: 0.5, downDeadzone: 0.38, downAngle: 50, downReleaseAngle: 60,
+});
 
 // The direction a joystick at sideways offset `x` (a fraction of its radius,
 // + right) holds, given the one it holds now: 'runLeft', 'runRight' or null.
@@ -179,6 +196,24 @@ export function joystickDirection(x, current = null) {
   if (current === 'runLeft' && x < -JOYSTICK.deadzone) return 'runLeft';
   return null;
 }
+
+// Whether a joystick at offset (`x`, `y`) (fractions of its radius, + right
+// and + down, as the screen's y grows downward) holds Down, given whether it
+// holds it now (`current`): engaged only by a push mostly downward and far
+// enough, released only once it is back near the centre or turned well
+// toward the side (see JOYSTICK). Never for a push up.
+export function joystickVertical(x, y, current = false) {
+  if (!(y > 0)) return false;
+  const angle = (Math.atan2(Math.abs(x), y) * 180) / Math.PI; // 0: straight down
+  if (current) return y > JOYSTICK.downDeadzone && angle <= JOYSTICK.downReleaseAngle;
+  return y >= JOYSTICK.downEngage && angle <= JOYSTICK.downAngle;
+}
+
+// The stick's second hold, apart from its pointer's run direction: its Down,
+// counted with the Down button's pointers like any shared action (see
+// assign), so either alone holds `down` and letting go of one keeps it held
+// while the other still does.
+const STICK_DOWN = Symbol('joystick down');
 
 const END_EVENTS = ['pointerup', 'pointercancel', 'lostpointercapture'];
 
@@ -217,6 +252,8 @@ export class TouchControls {
     this.stickPointer = null;
     this.stickFrame = null;
     this.knobOffset = { x: 0, y: 0 };
+    // Whether the stick, pushed down, holds Down (see joystickVertical).
+    this.stickDown = false;
     this.mouvementPointers = new Map(); // pointerId -> mouvement button
     // When a pointer last lifted off the controls (its event's timeStamp),
     // to tell its own trailing click from an assistive activation.
@@ -623,27 +660,43 @@ export class TouchControls {
   }
 
   // Moves the knob toward the thumb at (x, y), and holds whatever direction
-  // that offset means (see joystickDirection).
+  // that offset means (see joystickDirection) and, pushed down, Down too
+  // (see joystickVertical).
   steer(x, y) {
     const { x: cx, y: cy, radius } = this.stickFrame;
     const dx = x - cx;
     const dy = y - cy;
-    const held = joystickDirection(radius > 0 ? dx / radius : 0, this.pointers.get(this.stickPointer) ?? null);
+    const fx = radius > 0 ? dx / radius : 0;
+    const fy = radius > 0 ? dy / radius : 0;
+    const held = joystickDirection(fx, this.pointers.get(this.stickPointer) ?? null);
     const max = radius * JOYSTICK.travel;
     const len = Math.hypot(dx, dy);
     const k = len > max ? max / len : 1;
     this.setKnob(dx * k, dy * k);
     this.assign(this.stickPointer, held);
+    this.setStickDown(joystickVertical(fx, fy, this.stickDown));
     this.stick.classList.toggle('is-left', held === 'runLeft');
     this.stick.classList.toggle('is-right', held === 'runRight');
   }
 
-  // Lets go of the joystick: no direction held, the knob back in the middle.
+  // The stick holds Down (`on`) or lets go of it, through the same held
+  // path as the Down button (assign, so the press is a real `downPressed`
+  // edge and the count is shared with the button).
+  setStickDown(on) {
+    if (on === this.stickDown) return;
+    this.stickDown = on;
+    this.assign(STICK_DOWN, on ? 'down' : null);
+    this.stick.classList.toggle('is-down', on);
+  }
+
+  // Lets go of the joystick: no direction or Down held, the knob back in
+  // the middle.
   releaseStick() {
     if (this.stickPointer !== null) this.assign(this.stickPointer, null);
+    this.setStickDown(false);
     this.stickPointer = null;
     this.stickFrame = null;
-    this.stick.classList.remove('is-active', 'is-left', 'is-right');
+    this.stick.classList.remove('is-active', 'is-left', 'is-right', 'is-down');
     this.setKnob(0, 0);
   }
 

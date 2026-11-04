@@ -30,6 +30,7 @@ import { DIFFICULTY_IDS } from '../../js/data/difficulty.js';
 import { makePlan } from '../../js/game/ai/cpu-intelligence/plans.js';
 import { STILL_LIMIT, WAIT_LIMIT } from '../../js/game/ai/cpu-intelligence/telemetry.js';
 import { OBJECTIVES } from '../../js/game/ai/cpu-intelligence/objective.js';
+import { LAUNCH_UNIT_SPEED } from '../../js/data/launch.js';
 
 const F = playableCharacters();
 // Each fighter against the next one round the roster: every fighter plays,
@@ -37,6 +38,11 @@ const F = playableCharacters();
 const PAIRS = F.map((d, i) => [d, F[(i + 1) % F.length]]);
 const seconds = (s) => Math.round(s / DT);
 const ATTACKS = ['strike', 'dashStrike', 'jumpStrike'];
+// The Launch Point as dangerous as `lp` was at the old LAUNCH_UNIT_SPEED of
+// 10 (7 since the launch & energy update): the same launch takes about 43 %
+// more of it now, so a scenario that needs the CPU (or its opponent) in
+// danger reads its Launch Point through this.
+const scaled = (lp) => Math.ceil((lp * 10) / LAUNCH_UNIT_SPEED);
 
 // Runs `sc` for `secs`, counting the steps under each objective, the fresh
 // attack commitments on a free opponent (no follow-up, no answer to a
@@ -66,7 +72,7 @@ function watch(sc, secs) {
 test('A: with a dangerous Launch Point and time on the clock it breaks off to recover, rather than trading on', () => {
   for (const difficulty of ['medium', 'hard', 'brutal']) {
     for (const [cpuDef, foeDef] of PAIRS) {
-      const danger = watch(scenario({ difficulty, cpuDef, foeDef, cpuLP: 120, timeLeft: 220, foe: 'ref:competent', seed: 3 }), 4);
+      const danger = watch(scenario({ difficulty, cpuDef, foeDef, cpuLP: scaled(120), timeLeft: 220, foe: 'ref:competent', seed: 3 }), 4);
       const calm = watch(scenario({ difficulty, cpuDef, foeDef, cpuLP: 0, timeLeft: 220, foe: 'ref:competent', seed: 3 }), 4);
       const msg = `${difficulty} #${cpuDef.id}: ${JSON.stringify(danger.objectives)} vs ${JSON.stringify(calm.objectives)}`;
       assert.ok(danger.share('stabilize') > 0.6, msg);
@@ -86,7 +92,7 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
       for (const seed of [3, 4, 5]) {
         // Yerma's right ledge is at 2480: the opponent by it, the CPU on the
         // centre side.
-        const sc = scenario({ difficulty, cpuDef, foeDef, seed, cpuX: 2150, foeX: 2330, foeLP: 130, timeLeft: 200, foe: 'ref:competent' });
+        const sc = scenario({ difficulty, cpuDef, foeDef, seed, cpuX: 2150, foeX: 2330, foeLP: scaled(130), timeLeft: 200, foe: 'ref:competent' });
         let prev = null;
         sc.run(6, () => {
           const p = sc.ai.plan;
@@ -260,14 +266,14 @@ const stroller = (n, self) => {
   return Math.abs(dx) > 260 ? (dx > 0 ? { runRight: true } : { runLeft: true }) : {};
 };
 
-// One break-off at Launch Point 100 with lots of time: when the CPU took up
+// One break-off at Launch Point 100 (at the old launch scale: scaled) with lots of time: when the CPU took up
 // the stabilize objective and when it left it (still alive, and with what
 // Launch Point), and its telemetry. 100, so that the CPU is in danger
 // whoever its opponent is: at 90, #0008 (no launch that ends a life from
 // mid-stage at once, its upward bounce one hit away) does not yet put it in
 // danger, and a CPU that is not in danger rightly fights on.
 function breakOff(difficulty, cpuDef, foeDef, foe) {
-  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: 100, timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
+  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: scaled(100), timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
   const out = { entered: null, left: null, lpLeft: null, scored: false };
   sc.run(25, (i) => {
     if (sc.foe.lostToVoid) out.scored = true;
@@ -392,7 +398,7 @@ test('H: on a cloud that visibly starts to fade it steps off before the footing 
 
 test('I, N: a retreat whose spot comes under a hazard\'s warning is abandoned, and never toward one; a spot it picks is never under one', () => {
   for (const [cpuDef, foeDef] of PAIRS) {
-    const sc = scenario({ difficulty: 'brutal', cpuDef, foeDef, cpuLP: 120, timeLeft: 250, seed: 9, cpuX: 1800, foeX: 1900, foe: 'ref:competent' });
+    const sc = scenario({ difficulty: 'brutal', cpuDef, foeDef, cpuLP: scaled(120), timeLeft: 250, seed: 9, cpuX: 1800, foeX: 1900, foe: 'ref:competent' });
     let abandoned = false;
     let warned = null;
     sc.run(6, () => {
@@ -416,12 +422,12 @@ test('I, N: a retreat whose spot comes under a hazard\'s warning is abandoned, a
 test('N: breaking off to recover gives way to the finish when the opponent becomes exposed, without changing its mind back and forth', () => {
   for (const difficulty of ['hard', 'brutal']) {
     for (const [cpuDef, foeDef] of PAIRS) {
-      const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: 110, timeLeft: 250, seed: 11, cpuX: 1700, foeX: 2000, foe: 'ref:competent' });
+      const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: scaled(110), timeLeft: 250, seed: 11, cpuX: 1700, foeX: 2000, foe: 'ref:competent' });
       sc.run(2.5);
       assert.equal(sc.ai.objective.kind, 'stabilize', `${difficulty} #${cpuDef.id}: recovering first`);
       // The opponent battered and by the ledge, the CPU's Launch Point back down.
-      sc.cpu.combat.launchPoint = 20;
-      sc.foe.combat.launchPoint = 160;
+      sc.cpu.combat.launchPoint = scaled(20);
+      sc.foe.combat.launchPoint = scaled(160);
       sc.foe.body.x = 2400;
       const changes = sc.ai.telemetry.counters.objectiveChanges;
       let finishAt = null;
@@ -582,7 +588,7 @@ test('liveness: a deliberate wait is waiting, not inactivity; it is reassessed, 
 // ---- Telemetry -------------------------------------------------------------------------
 
 test('telemetry explains the match objective, waits, retreats and their ends, cheaply', () => {
-  const sc = scenario({ difficulty: 'hard', debug: true, cpuLP: 110, timeLeft: 250, seed: 17, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
+  const sc = scenario({ difficulty: 'hard', debug: true, cpuLP: scaled(110), timeLeft: 250, seed: 17, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
   sc.run(8);
   const t = sc.ai.telemetry;
   assert.ok(t.trace.every((e) => typeof e.objective === 'string' && typeof e.intent === 'string' && typeof e.plan === 'string'));
@@ -595,7 +601,7 @@ test('telemetry explains the match objective, waits, retreats and their ends, ch
   assert.ok(r.objectiveTime.stabilize > 2);
   assert.ok(r.lpRecovered > 0 && r.retreats + r.waits > 0, JSON.stringify(r));
   // Off, nothing is kept but the counters.
-  const quiet = scenario({ difficulty: 'hard', cpuLP: 110, timeLeft: 250, seed: 17, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
+  const quiet = scenario({ difficulty: 'hard', cpuLP: scaled(110), timeLeft: 250, seed: 17, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
   quiet.run(8);
   assert.equal(quiet.ai.telemetry.trace.length, 0);
   assert.equal(quiet.ai.telemetry.events.length, 0);

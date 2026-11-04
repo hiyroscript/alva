@@ -183,6 +183,13 @@ function rolesOf(m, height, fastest) {
   return r;
 }
 
+// Whether move `m` needs a fighter that is not exhausted to start: one that
+// costs Energy as it starts, or the Deflect (free to start, but refused
+// while exhausted: see Fighter.tryDeflect).
+export function needsEnergy(m) {
+  return m.energyCost > 0 || !!m.needsEnergy;
+}
+
 // A move built from an ordinary attack (melee or ranged) or the Deflect.
 function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
   const strikes = attackStrikes(atk);
@@ -306,7 +313,12 @@ export function analyzeCapabilities(f) {
   }
   let deflect = null;
   if (ms.deflect) {
-    deflect = attackMove('deflect', 'shield', true, ms.deflect.id, ms.deflect.atk, null, ms.deflect.cost);
+    // Free to start (energyCost 0), never while exhausted (needsEnergy), and
+    // turnBackCost only when it turns a projectile back.
+    deflect = {
+      ...attackMove('deflect', 'shield', true, ms.deflect.id, ms.deflect.atk, null, ms.deflect.cost),
+      turnBackCost: ms.deflect.turnBackCost, needsEnergy: true,
+    };
     moves.push(deflect);
   }
   const height = f.def.collider.height;
@@ -370,7 +382,7 @@ export function analyzeCapabilities(f) {
 export function moveReady(self, m) {
   const grounded = self.body.grounded;
   const combat = self.combat;
-  if (m.energyCost > 0 && combat.energyExhausted) return false;
+  if (needsEnergy(m) && combat.energyExhausted) return false;
   if (m.kind === 'technique' || m.kind === 'summon') {
     // A technique it is not in the danger for (inDanger) is no option yet.
     if (m.kind === 'technique' && !inDanger(self, m.def)) return false;

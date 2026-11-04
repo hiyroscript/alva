@@ -760,13 +760,13 @@ test('How to Play contains exactly the eight approved sections in order in both 
   const headings = ['Elimination', 'Launch Point', 'Base Launch', 'Directional Launch', 'Overtime', 'Energy', 'Shield', 'Deflect'];
   const descriptions = [
     "There’s no health bar in Alva. Instead, you score a point whenever your opponent falls into the Void. The first to reach 3 points wins the match.",
-    "Every unblocked hit raises your Launch Point, making you fly farther when launched. It gradually decreases when you go without taking hits.",
+    "Every unblocked hit raises your Launch Point, making you fly farther when launched. It gradually decreases when you go without taking hits, and a perfect Shield lowers it by 5.",
     "Base Launch determines how strongly a hit sends someone flying. The higher its value, the stronger the launch becomes, especially against someone with a high Launch Point. A Base Launch of 0 doesn’t send anyone flying.",
     "Not every hit sends you in the same direction. Depending on the attack, you can be launched sideways, upward, or downward.",
     "If both players have the same score when the 5-minute timer runs out, a 1-minute overtime begins. The Void gradually closes in, making it harder to stay safe. If the score is still tied when overtime ends, the player with the lower Launch Point wins. If both are equal, the match ends in a tie.",
-    "Energy is used for dashing, Deflecting, blocking hits with your Shield, and moves that create something without a long cooldown, like a projectile, a burst or a summon. Each costs the same 15 Energy. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.",
-    "Hold the Shield button while on the ground to block incoming attacks from any direction. While it’s raised you can’t move: release Shield to move again, or Jump to leave the Shield when allowed. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does.",
-    "While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. Deflecting costs Energy, even if it misses, and you can cancel it at any moment into another aerial move, an air jump or an air dash.",
+    "Energy is used for dashing, blocking hits with your Shield, sending a projectile back with a Deflect, and moves that create something without a long cooldown, like a projectile, a burst or a summon. Each costs the same 15 Energy. It refills automatically, but if it runs out completely, you can’t use those actions again until it’s fully restored.",
+    "Hold the Shield button while on the ground to block incoming attacks from any direction. While it’s raised you can’t move: release Shield to move again, or Jump to leave the Shield when allowed. Keeping your Shield raised doesn’t cost Energy, but each hit it blocks does. Raise it just before a hit lands for a perfect Shield: you can answer at once, and it lowers your Launch Point by 5.",
+    "While in the air, press the Shield button to perform a Deflect instead. It can strike nearby opponents and send incoming projectiles back toward their source. A Deflect only costs Energy when it sends a projectile back, once however many it sends; one that misses or only strikes an opponent is free, but you can’t Deflect while your Energy is exhausted. You can cancel it at any moment into another aerial move, an air jump or an air dash.",
   ];
   try {
     home.helpButton.click();
@@ -1151,8 +1151,9 @@ test('the Launch page explains Launch Point, then Base Launch 0-3 and its formul
   const lp = text(entries[0]);
   assert.match(lp, /starts at 0/);
   assert.match(lp, /Each unblocked hit adds its damage and restarts recovery/);
-  assert.match(lp, /after 2 seconds.*drops by 1 every following 0\.5 seconds, down to 0/);
-  assert.match(lp, /first point at 2\.5 seconds/);
+  assert.match(lp, /after 2 seconds.*drops by 2 every following 0\.5 seconds, down to 0/);
+  assert.match(lp, /the first drop at 2\.5 seconds/);
+  assert.match(lp, /a perfect Shield takes 5 off at once/);
   assert.match(lp, /Blocks do not restart recovery/);
   assert.match(lp, /Higher Launch Point means a harder launch/);
   assert.match(lp, /Respawning resets it to 0/);
@@ -1218,8 +1219,9 @@ test('the Launch page shows only Base Launch and recovery numbers, no fighter or
   const { launch } = sectionsOf(discover);
   launch.tab.click();
   const page = launch.panel;
-  // The Base Launch values and the recovery rule, never velocity tuning.
-  assert.deepEqual([...new Set(text(page).match(/\d+(?:\.\d+)?/g))].sort(), ['0', '0.5', '1', '2', '2.5', '3']);
+  // The Base Launch values, the recovery rule and the perfect Shield's heal,
+  // never velocity tuning.
+  assert.deepEqual([...new Set(text(page).match(/\d+(?:\.\d+)?/g))].sort(), ['0', '0.5', '1', '2', '2.5', '3', '5']);
   assert.doesNotMatch(everything(page), /#0001|\battack\s?\d|extra.attack|mid-?air|Throw|shuriken|Sphere|Rush|clone/i, 'no fighter or attack is named');
   assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
 });

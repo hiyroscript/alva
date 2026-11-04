@@ -110,7 +110,7 @@ When a fighter's Launch Point is high enough that the next solid hit can launch 
 
 The Shield should already pay only on a block (`applyHit`: `if (blocked) spendEnergy(shieldHitCost)`), and refill keeps running while it's held. **Audit this and make sure it holds**, then lock it in with tests:
 - Raising, holding or lowering the Shield, and perfect-Shield timing, cost nothing.
-- `blocked = tc.shielding` is decided before anything else in `applyHit`. Check every caller and every early-return path so Energy is only taken when a hit really **reached** the fighter and was stopped: hits that `hitReaches` passes by (`quake` on an airborne fighter, `gaze` on one facing away), a charmed attacker's "hit" (`charmed()`), stage and platform hazards (`stage-hazards.js`, `platform-hazards.js`), projectiles that `passed()` the target, piercing/erasing projectiles, summon/clone strikes and technique bursts. Each one pays only if it is actually blocked, and only once per blocked hit. If any path charges the Shield for something it didn't block, or charges twice for one hit, fix it.
+- `blocked = tc.shielding` is decided before anything else in `applyHit`. Check every caller and every early-return path so Energy is only taken when a hit really **reached** the fighter and was stopped: hits that `hitReaches` passes by (`quake` on an airborne fighter, `gaze` on one facing away), a charmed attacker's "hit" (`charmed()`), stage and platform hazards (`stage-hazards.js`, `platform-hazards.js`), projectiles that `passed()` the target, piercing/erasing projectiles, summon/clone strikes and technique bursts. Each one pays only if it is actually blocked, and only once per blocked hit. If any path takes Energy from the Shield for something it didn't block, or takes it twice for one hit, fix it.
 - Keep the existing rules: a block costs `shieldHitCost` (perfect included, as now), or whatever is left if that's less, and a block that empties the bar drops the Shield.
 - Tests (`tests/systems/shield-protection.test.mjs`, `energy.test.mjs`): holding the Shield for N seconds with nothing hitting it loses no Energy (it refills). One blocked hit costs exactly 15. A quake that passes over / a gaze from behind / a passed projectile cost nothing.
 
@@ -134,6 +134,6 @@ The CPU (`js/game/ai/`, `js/game/ai/cpu-intelligence/`: `brain.js`, `defense.js`
 - On a phone with the Joystick scheme: stick down + Jump Super Jumps, stick down in the air fast-falls, a flick down drops through platforms, and normal running never triggers Down by accident.
 - `LAUNCH_UNIT_SPEED` is 7, and launches feel weaker at the same Launch Point. Base Launch, damage and the formula are unchanged in code and data (`git diff` shows no changes to any `damage` or `baseLaunch`).
 - A perfect block takes 5 Launch Points off. Recovery ticks take 2. The number glows green on every heal or recovery but not on respawn, and burns when it's high.
-- A Deflect is only charged when it turns a projectile back (once per Deflect), and a Shield only when it blocks a hit.
+- A Deflect only costs Energy when it turns a projectile back (once per Deflect), and a Shield only when it blocks a hit.
 - CPUs at every difficulty play by these rules.
 - `UPDATES.md` has the **launch & energy update** entry, and the spec, docs and reference strings are updated.

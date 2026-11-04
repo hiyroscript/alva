@@ -4,7 +4,8 @@
 // joins them. A hit's damage is added to the target's Launch Point first;
 // its launch strength is then exactly Base Launch x that new Launch Point,
 // Directional Launch only decides where it goes, and one factor
-// (LAUNCH_UNIT_SPEED, 10 world units per second per point) turns it into a
+// (LAUNCH_UNIT_SPEED, 7 world units per second per point since the launch &
+// energy update; it was 10) turns it into a
 // speed. Covers the registry and
 // its validation, the shared resolvers, the real CombatSystem.applyHit path
 // (melee, projectiles, clones and techniques alike), the Shield's
@@ -16,7 +17,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import {
   BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES, resolveBaseLaunch, resolveDirectionalLaunchValue, resolveHitLaunch,
-  resolveLaunchStrength, resolveDirectionalLaunch, LAUNCH_UNIT_SPEED,
+  resolveLaunchStrength, resolveDirectionalLaunch, LAUNCH_UNIT_SPEED, LAUNCH_RECOVERY_AMOUNT,
 } from '../../js/data/launch.js';
 import * as launchModule from '../../js/data/launch.js';
 import { CHARACTERS } from '../../js/data/characters.js';
@@ -38,6 +39,8 @@ import { stylesheetFiles } from '../helpers/stylesheet.mjs';
 const ROOT = new URL('../../', import.meta.url);
 // World units per second per point of launch strength.
 const U = LAUNCH_UNIT_SPEED;
+// Launch Points each passive recovery tick takes off (2).
+const A = LAUNCH_RECOVERY_AMOUNT;
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 
 // Silences and collects console.warn while `fn` runs.
@@ -107,7 +110,7 @@ test('the launch module is small: values, directions, validation, resolution and
   assert.deepEqual(Object.keys(launchModule).sort(), [
     'BASE_LAUNCH_DESCRIPTIONS', 'BASE_LAUNCH_SUMMARY', 'BASE_LAUNCH_VALUES', 'DIRECTIONAL_LAUNCHES',
     'DIRECTIONAL_LAUNCH_SUMMARY', 'LAUNCH_FORMULA', 'LAUNCH_POINT_SUMMARY', 'LAUNCH_UNIT_SPEED', 'resolveBaseLaunch',
-    'LAUNCH_RECOVERY_DELAY', 'LAUNCH_RECOVERY_INTERVAL', 'LAUNCH_RECOVERY_AMOUNT',
+    'LAUNCH_RECOVERY_DELAY', 'LAUNCH_RECOVERY_INTERVAL', 'LAUNCH_RECOVERY_AMOUNT', 'PERFECT_SHIELD_HEAL',
     'resolveDirectionalLaunch', 'resolveDirectionalLaunchValue', 'resolveHitLaunch', 'resolveLaunchStrength',
   ].concat(['ALLOWED_DAMAGE_VALUES', 'resolveHitDamage']).sort());
   const code = read('js/data/launch.js').replace(/^\s*\/\/.*$/gm, '');
@@ -217,16 +220,16 @@ test('the hit\'s own damage is added before its launch: 115 + 5 = 120, so Base L
 
 // ---- Passive recovery -------------------------------------------------------------
 
-test('recovery constants are universal: two seconds of grace, half-second ticks, one point per tick', () => {
+test('recovery constants are universal: two seconds of grace, half-second ticks, two points per tick', () => {
   assert.deepEqual([
     launchModule.LAUNCH_RECOVERY_DELAY, launchModule.LAUNCH_RECOVERY_INTERVAL, launchModule.LAUNCH_RECOVERY_AMOUNT,
-  ], [2, 0.5, 1]);
+  ], [2, 0.5, 2]);
 });
 
 test('recovery waits two full seconds, then a full half second, and ticks every half second', () => {
   const { target } = hitAt(0, probe(10, 0, null));
   const c = target.combat;
-  for (const [dt, expected] of [[1, 10], [0.99, 10], [0.01, 10], [0.49, 10], [0.01, 9], [0.5, 8], [0.5, 7]]) {
+  for (const [dt, expected] of [[1, 10], [0.99, 10], [0.01, 10], [0.49, 10], [0.01, 8], [0.5, 6], [0.5, 4]]) {
     c.update(dt);
     assert.equal(c.launchPoint, expected);
   }
@@ -238,7 +241,7 @@ test('fixed steps hit exact recovery boundaries and non-divisor steps retain par
     for (let step = 1; step <= Math.ceil(5 / dt); step++) {
       target.combat.update(dt);
       const ticks = Math.max(0, Math.floor((step * dt - 2 + 1e-6) / 0.5));
-      assert.equal(target.combat.launchPoint, 10 - ticks, `dt ${dt}, step ${step}`);
+      assert.equal(target.combat.launchPoint, Math.max(0, 10 - ticks * A), `dt ${dt}, step ${step}`);
     }
   }
 });
@@ -246,11 +249,11 @@ test('fixed steps hit exact recovery boundaries and non-divisor steps retain par
 test('large updates consume all complete intervals and keep the remainder', () => {
   const { target } = hitAt(0, probe(10, 0, null));
   target.combat.update(3.7); // three ticks, with 0.2 s toward the fourth
-  assert.equal(target.combat.launchPoint, 7);
+  assert.equal(target.combat.launchPoint, 10 - 3 * A);
   target.combat.update(0.29);
-  assert.equal(target.combat.launchPoint, 7);
+  assert.equal(target.combat.launchPoint, 10 - 3 * A);
   target.combat.update(0.01);
-  assert.equal(target.combat.launchPoint, 6);
+  assert.equal(target.combat.launchPoint, 10 - 4 * A);
 });
 
 test('small and very large Launch Points recover whole points, stop at zero, and bank no spare time', () => {
@@ -258,7 +261,7 @@ test('small and very large Launch Points recover whole points, stop at zero, and
     const { attacker, target } = hitAt(0, probe(value, 0, null));
     const c = target.combat;
     c.update(2.5);
-    assert.equal(c.launchPoint, value - 1);
+    assert.equal(c.launchPoint, Math.max(0, value - A), 'an odd Launch Point ends at 0, never below');
     c.update(value * 0.5 + 100);
     assert.equal(c.launchPoint, 0);
     c.update(100);
@@ -267,7 +270,9 @@ test('small and very large Launch Points recover whole points, stop at zero, and
     c.update(2.49);
     assert.equal(c.launchPoint, 3, 'no overdue ticks after reaching zero');
     c.update(0.01);
-    assert.equal(c.launchPoint, 2);
+    assert.equal(c.launchPoint, 3 - A);
+    c.update(0.5);
+    assert.equal(c.launchPoint, 0, '3 - 2 - 2 stops at 0, not -1');
   }
   const fresh = new CombatState();
   fresh.update(100);
@@ -287,7 +292,7 @@ test('hits during grace, before the first tick, and during recovery discard ever
     c.update(0.49);
     assert.equal(c.launchPoint, before + 5);
     c.update(0.01);
-    assert.equal(c.launchPoint, before + 4);
+    assert.equal(c.launchPoint, before + 5 - A);
   }
 });
 
@@ -305,7 +310,7 @@ test('Shield blocks preserve recovery during grace and after recovery starts, in
     c.update(nextTick - elapsed - 0.01);
     assert.equal(c.launchPoint, before);
     c.update(0.01);
-    assert.equal(c.launchPoint, before - 1);
+    assert.equal(c.launchPoint, before - A);
   }
 });
 
@@ -341,7 +346,7 @@ test('all fighters and resolved hit sources restart recovery, including Base Lau
       c.update(2.49);
       assert.equal(c.launchPoint, 20 + hit.damage, `${character.id}: ${hit.id}`);
       c.update(0.01);
-      assert.equal(c.launchPoint, 19 + hit.damage);
+      assert.equal(c.launchPoint, 20 - A + hit.damage);
     }
   }
 });
@@ -366,7 +371,7 @@ test('each connecting strike in a real multi-hit attack restarts recovery', () =
   target.combat.update(2.49);
   assert.equal(target.combat.launchPoint, 3);
   target.combat.update(0.01);
-  assert.equal(target.combat.launchPoint, 2);
+  assert.equal(target.combat.launchPoint, 3 - A);
 });
 
 test('Fighter.update advances recovery while frozen, stunned, paralyzed or shielding, on the ground or airborne', () => {
@@ -377,7 +382,7 @@ test('Fighter.update advances recovery while frozen, stunned, paralyzed or shiel
       if (['hitstop', 'stun', 'paralysis'].includes(state)) fighter.combat[state] = 10;
       if (state === 'airborne') Object.assign(fighter.body, { y: -10000, grounded: false, ground: null });
       for (let i = 0; i < Math.round(2.5 / DT); i++) step(state === 'shielding' ? { shield: true } : {});
-      assert.equal(fighter.combat.launchPoint, 9, `${character.id}: ${state}`);
+      assert.equal(fighter.combat.launchPoint, 10 - A, `${character.id}: ${state}`);
     }
   }
 });
@@ -397,7 +402,7 @@ test('reset and respawn replace partially elapsed recovery with fresh state for 
       target.combat.update(2.49);
       assert.equal(target.combat.launchPoint, 3);
       target.combat.update(0.01);
-      assert.equal(target.combat.launchPoint, 2);
+      assert.equal(target.combat.launchPoint, 3 - A);
     }
   }
 });
@@ -413,8 +418,8 @@ test('launch strength is exactly Base Launch x Launch Point: 0 / 120 / 240 / 360
   }
 });
 
-test('one conversion to speed, 10 per point, the same for every direction: 1 x 120 is a strength of 120 and a speed of 1200', () => {
-  assert.equal(LAUNCH_UNIT_SPEED, 10);
+test('one conversion to speed, 7 per point, the same for every direction: 1 x 120 is a strength of 120 and a speed of 840', () => {
+  assert.equal(LAUNCH_UNIT_SPEED, 7);
   for (const [baseLaunch, expected] of [[1, 120], [2, 240], [3, 360]]) {
     for (const direction of ['horizontal', 'vertical', 'reverseVertical']) {
       const { target, event } = hitAt(120, probe(0, baseLaunch, direction));
@@ -423,6 +428,17 @@ test('one conversion to speed, 10 per point, the same for every direction: 1 x 1
       assert.equal(speed, expected * U, `${direction}: exactly the strength x ${U}, nothing added`);
     }
   }
+});
+
+test('the launch & energy update: 30 Launch Point x Base Launch 2 is still strength 60, now 420 units/s (it was 600)', () => {
+  assert.equal(resolveLaunchStrength(2, 30), 60, 'the strength itself is unchanged');
+  const { target, event } = hitAt(30, probe(0, 2, 'horizontal'));
+  assert.equal(event.launchStrength, 60);
+  assert.equal(target.body.vx, 60 * 7);
+  assert.equal(target.body.vx, 420);
+  assert.deepEqual(resolveDirectionalLaunch('vertical', 60, 1), { x: 0, y: -420 });
+  // Launched as hard as 30 used to be (600) now takes about 43 points.
+  assert.ok(resolveLaunchStrength(2, 43) * U >= 600 && resolveLaunchStrength(2, 42) * U < 600);
 });
 
 test('no hidden launch constant: speed stays proportional to Base Launch x Launch Point, from 1 point up', () => {
@@ -456,32 +472,32 @@ test('Base Launch 0 never launches, at 0, 1, 50, 120, 500 or 1000 Launch Point, 
 // ---- Direction --------------------------------------------------------------------
 
 test('resolveDirectionalLaunch: horizontal along the facing, vertical upward (world y grows down), reverse vertical downward, none nothing', () => {
-  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, 1), { x: 1200, y: 0 });
-  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, -1), { x: -1200, y: 0 });
-  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, 1), { x: 0, y: -1200 });
-  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, -1), { x: 0, y: -1200 });
-  assert.deepEqual(resolveDirectionalLaunch('reverseVertical', 120, -1), { x: 0, y: 1200 });
+  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, 1), { x: 120 * U, y: 0 });
+  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, -1), { x: -120 * U, y: 0 });
+  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, 1), { x: 0, y: -120 * U });
+  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, -1), { x: 0, y: -120 * U });
+  assert.deepEqual(resolveDirectionalLaunch('reverseVertical', 120, -1), { x: 0, y: 120 * U });
   assert.deepEqual(resolveDirectionalLaunch(null, 120, 1), { x: 0, y: 0 });
   assert.deepEqual(resolveDirectionalLaunch('horizontal', 0, -1), { x: 0, y: 0 });
 });
 
-test('through applyHit, at strength 120: horizontal right +1200 and left -1200 with no vertical launch; vertical -1200; reverse vertical +1200; none leaves it be', () => {
+test('through applyHit, at strength 120: horizontal right +840 and left -840 with no vertical launch; vertical -840; reverse vertical +840; none leaves it be', () => {
   for (const facing of [1, -1]) {
     const { target, event } = hitAt(120, probe(0, 1, 'horizontal'), { facing });
-    assert.equal(target.body.vx, 1200 * facing);
+    assert.equal(target.body.vx, 120 * U * facing);
     assert.equal(target.body.vy, 0, 'no launch-system vertical velocity');
-    assert.deepEqual(event.finalLaunch, { x: 1200 * facing, y: 0 });
+    assert.deepEqual(event.finalLaunch, { x: 120 * U * facing, y: 0 });
   }
   const up = hitAt(120, probe(0, 1, 'vertical'));
-  assert.deepEqual([up.target.body.vx, up.target.body.vy, up.target.body.grounded], [0, -1200, false]);
+  assert.deepEqual([up.target.body.vx, up.target.body.vy, up.target.body.grounded], [0, -120 * U, false]);
   const down = hitAt(120, probe(0, 1, 'reverseVertical'));
-  assert.deepEqual([down.target.body.vx, down.target.body.vy, down.target.body.grounded], [0, 1200, false]);
+  assert.deepEqual([down.target.body.vx, down.target.body.vy, down.target.body.grounded], [0, 120 * U, false]);
   const none = hitAt(120, probe(0, 1, null));
   assert.deepEqual([none.target.body.vx, none.target.body.vy], [0, 0]);
   assert.deepEqual(none.event.finalLaunch, { x: 0, y: 0 });
 });
 
-test('direction never changes magnitude: at strength 240, |vx| or |vy| is 2400 whichever way it goes', () => {
+test('direction never changes magnitude: at strength 240, |vx| or |vy| is 240 x LAUNCH_UNIT_SPEED whichever way it goes', () => {
   for (const direction of ['horizontal', 'vertical', 'reverseVertical']) {
     const { target } = hitAt(120, probe(0, 2, direction));
     assert.equal(Math.hypot(target.body.vx, target.body.vy), 240 * U, direction);
@@ -530,7 +546,7 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(115, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
-    'ability', 'attack', 'attacker', 'authoredBaseLaunch', 'backstab', 'baseLaunch', 'charm', 'damage', 'directionalLaunch', 'energyCost', 'fear', 'fed', 'finalLaunch', 'float', 'hazard', 'hitstun',
+    'ability', 'attack', 'attacker', 'authoredBaseLaunch', 'backstab', 'baseLaunch', 'charm', 'damage', 'directionalLaunch', 'energyCost', 'fear', 'fed', 'finalLaunch', 'float', 'hazard', 'heal', 'hitstun',
     'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'mash', 'move', 'paralysis', 'perfect', 'point',
     'projectile', 'redirected', 'source', 'stall', 'summon', 'target', 'technique', 'type',
   ]);
@@ -594,16 +610,16 @@ test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactl
 test('#0001 at work: each hit adds its damage, then launches at Base Launch x the new Launch Point along its direction', () => {
   const hits = realHits();
   const cases = [
-    // [hit, from, to, strength, finalLaunch facing right (strength x 10)]
-    ['attack1', 117, 120, 120, { x: 1200, y: 0 }],
-    ['midair_attack1', 117, 120, 120, { x: 1200, y: 0 }],
-    ['midair_attack2', 117, 120, 240, { x: 2400, y: 0 }],
-    ['midair_attack3', 117, 120, 120, { x: 0, y: -1200 }],
-    ['extra_attack', 115, 120, 240, { x: 0, y: -2400 }],
-    ['attack2_object', 117, 120, 120, { x: 1200, y: 0 }],
+    // [hit, from, to, strength, finalLaunch facing right (strength x LAUNCH_UNIT_SPEED)]
+    ['attack1', 117, 120, 120, { x: 120 * U, y: 0 }],
+    ['midair_attack1', 117, 120, 120, { x: 120 * U, y: 0 }],
+    ['midair_attack2', 117, 120, 240, { x: 240 * U, y: 0 }],
+    ['midair_attack3', 117, 120, 120, { x: 0, y: -120 * U }],
+    ['extra_attack', 115, 120, 240, { x: 0, y: -240 * U }],
+    ['attack2_object', 117, 120, 120, { x: 120 * U, y: 0 }],
     ['attack3_object', 119, 120, 0, { x: 0, y: 0 }],
-    ['attack3_finisher', 117, 120, 120, { x: 0, y: -1200 }],
-    ['attack5_object', 110, 120, 360, { x: 3600, y: 0 }],
+    ['attack3_finisher', 117, 120, 120, { x: 0, y: -120 * U }],
+    ['attack5_object', 110, 120, 360, { x: 360 * U, y: 0 }],
     ['burst', 117, 120, 0, { x: 0, y: 0 }],
   ];
   for (const [id, from, to, strength, final] of cases) {
@@ -619,8 +635,8 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
     }
   }
   // Facing left, the sideways hits travel left.
-  assert.equal(hitAt(117, hits.attack1, { facing: -1 }).target.body.vx, -1200);
-  assert.equal(hitAt(110, hits.attack5_object, { facing: -1 }).target.body.vx, -3600);
+  assert.equal(hitAt(117, hits.attack1, { facing: -1 }).target.body.vx, -120 * U);
+  assert.equal(hitAt(110, hits.attack5_object, { facing: -1 }).target.body.vx, -360 * U);
 });
 
 // ---- Respawn ----------------------------------------------------------------------

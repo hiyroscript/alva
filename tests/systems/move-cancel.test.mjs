@@ -280,7 +280,7 @@ test('a Deflect gives way to another aerial in its startup, active phase or reco
         r.tick(press('shield'));
         const deflect = r.player.combat.attack;
         assert.equal(deflect?.def, r.player.deflect, `#${c.id} ${who}: Deflecting`);
-        assert.equal(r.player.combat.energy, 100 - DEFLECT_ENERGY_COST);
+        assert.equal(r.player.combat.energy, 100, 'free to start: it pays only to turn a projectile back');
         for (let i = 1; i < at; i++) r.tick();
         if (r.player.combat.attack !== deflect || r.player.grounded) continue;
         const before = r.player.combat.energy;
@@ -289,14 +289,14 @@ test('a Deflect gives way to another aerial in its startup, active phase or reco
         assert.equal(attackOf(r.player), r.player.attackFor('attack1', false), `${why}: the aerial replaces it`);
         assert.equal(r.player.combat.attack.time, 0, `${why}: from its first frame`);
         assert.equal(r.player.combat.attack.def.deflectProjectiles, false, `${why}: nothing turns projectiles back any more`);
-        assert.ok(r.player.combat.energy >= before - EPS, `${why}: the Deflect's 15 is not given back, nothing else paid`);
+        assert.ok(r.player.combat.energy >= before - EPS, `${why}: nothing paid, for the Deflect or the aerial`);
         assert.equal(r.player.combat.cooldowns.size, 0, `${why}: no cooldown anywhere`);
       }
     }
   }
 });
 
-test('a Deflect gives way to an air jump and to an air dash, each paying only its own cost', () => {
+test('a Deflect gives way to an air jump and to an air dash, each paying only its own cost (the Deflect, turning nothing back, none)', () => {
   for (const c of playableCharacters()) {
     for (const [who, rig] of RIGS) {
       const j = airborne(rig(c));
@@ -316,8 +316,8 @@ test('a Deflect gives way to an air jump and to an air dash, each paying only it
       assert.equal(d.player.dash?.air, true, `#${c.id} ${who}: the air dash`);
       assert.equal(d.player.combat.attack, null, 'the Deflect is over');
       assert.ok(Math.abs(before - d.player.combat.energy - DASH_ENERGY_COST) < EPS, `#${c.id} ${who}: the air dash's own 15`);
-      assert.ok(Math.abs(d.player.combat.energy - (100 - DEFLECT_ENERGY_COST - DASH_ENERGY_COST) - d.player.energyDef.regen * DT) < EPS,
-        `#${c.id} ${who}: two separate payments`);
+      assert.ok(Math.abs(d.player.combat.energy - (100 - DASH_ENERGY_COST)) < EPS,
+        `#${c.id} ${who}: one payment, the air dash's: the Deflect turned nothing back`);
     }
   }
 });
@@ -339,12 +339,14 @@ test('a Deflect never restarts into itself, never gives way on its own step, and
       const same = airborne(rig(c));
       same.tick({ ...press('shield'), ...press('attack1') });
       assert.equal(same.player.combat.attack?.def, same.player.deflect, `#${c.id} ${who}: the Deflect on its own step`);
-      // Exhausted by the Deflect itself: an air dash cannot start, and the
+      // Exhausted while the Deflect plays: an air dash cannot start, and the
       // Deflect plays on.
       const tired = airborne(rig(c));
       tired.player.combat.setEnergy(DEFLECT_ENERGY_COST);
       tired.tick(press('shield'));
       const kept = tired.player.combat.attack;
+      assert.equal(kept?.def, tired.player.deflect, `#${c.id} ${who}: it started for nothing`);
+      tired.player.combat.setEnergy(0);
       assert.equal(tired.player.combat.energyExhausted, true);
       tired.tick(AIR_DASH);
       assert.equal(tired.player.combat.attack, kept, `#${c.id} ${who}: no air dash, the Deflect plays on`);
