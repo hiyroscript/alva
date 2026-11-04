@@ -92,8 +92,9 @@ export function showNotice(app, code, { detail = null } = {}) {
 }
 
 // The codes that all mean the room server cannot be used (its own refusal
-// of this page's origin and its unexpected failures included).
-export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error']);
+// of this page's origin, its unexpected failures, and its having no relay
+// for private connections included).
+export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error', 'relay_unavailable']);
 
 // What "Online play is unavailable" adds to say why, by the server's
 // answer to /health (RoomServerClient.diagnose).
@@ -102,6 +103,7 @@ const WHY_UNAVAILABLE = Object.freeze({
   unreachable: 'online.detail.unreachable',
   origin: 'online.detail.origin',
   server_error: 'online.detail.server',
+  relay: 'online.detail.relay',
   reachable: 'online.detail.reachable',
 });
 

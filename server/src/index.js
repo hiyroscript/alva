@@ -6,8 +6,9 @@
 // to put it online: docs/development/online-server.md.
 //
 // Endpoints (JSON):
-//   GET  /health            { ok, service, lobby, origin, originAllowed }: the server
-//                           is up and its Lobby answers (readable from any page)
+//   GET  /health            { ok, service, lobby, relay, origin, originAllowed }: the
+//                           server is up, its Lobby answers, and whether a TURN relay
+//                           is set up for its matches (readable from any page)
 //   GET  /rooms             the public rooms
 //   POST /rooms             create a room → { room, seat, token }, or { error: 'full' } (503)
 //   POST /rooms/join        join by code (or a public room by id) → { room, seat, token }
@@ -18,8 +19,10 @@
 // name, and a WebSocket upgrade is held to the same list. The caller's
 // address is passed to the Lobby for its per-minute limits only (which
 // count a salted hash of it, never the address: server/src/privacy.js).
-// The two players of a match never connect to each other: the match goes
-// through its Room, so no player learns another's address.
+// The two players of a match never connect straight to each other: only
+// through a TURN relay (its servers in the Worker's secrets:
+// server/src/privacy.js), so no player learns another's address. Without
+// one, no room is made or joined (`relay_unavailable`).
 //
 // So that "Online play is unavailable" can say why, two answers are
 // readable from any page (`access-control-allow-origin: *`), as they hold
@@ -33,6 +36,7 @@ import { Lobby } from './lobby.js';
 import { Room } from './room.js';
 import { json, error, parseOrigins, originAllowed, corsHeaders, withCors } from './http.js';
 import { validRoomId } from './rules.js';
+import { hasRelay } from './privacy.js';
 
 // What any page may read.
 const PUBLIC = Object.freeze({ 'access-control-allow-origin': '*' });
@@ -70,6 +74,9 @@ export async function handle(request, env) {
     return target.fetch(`https://lobby${path}`, { method: request.method, headers, body });
   };
 
+  // No room is made or joined without a relay to connect its players.
+  const joining = request.method === 'POST' && (url.pathname === '/rooms' || url.pathname === '/rooms/join');
+  if (joining && !hasRelay(env)) return withCors(error('relay_unavailable'), origin);
   if (url.pathname === '/rooms' && (request.method === 'GET' || request.method === 'POST')) {
     return withCors(await forward(lobby(), '/rooms'), origin);
   }
@@ -98,7 +105,7 @@ async function health(env, origin, fromGame) {
   } catch (err) {
     console.error('[alva-rooms] the Lobby did not answer /health', err?.stack ?? err);
   }
-  const body = { ok: lobby, service: 'alva-rooms', lobby, origin: origin ?? null, originAllowed: fromGame };
+  const body = { ok: lobby, service: 'alva-rooms', lobby, relay: hasRelay(env), origin: origin ?? null, originAllowed: fromGame };
   return json(body, lobby ? 200 : 503, PUBLIC);
 }
 

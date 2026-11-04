@@ -1,7 +1,7 @@
 // The link between the two browsers of an online match, as everything above
 // it sees it: four calls and nothing else, so the lockstep (js/online/
-// lockstep.js) never knows whether it runs through the room server
-// (js/online/room-relay.js), an in-memory pair in a test, or, one day,
+// lockstep.js) never knows whether it runs over the relay's WebRTC
+// DataChannel (js/online/peer.js), an in-memory pair in a test, or, one day,
 // rollback netcode's own transport.
 //
 //   transport.send(message)    a plain object that survives JSON; may be
@@ -34,8 +34,8 @@ export function listeners() {
 }
 
 // A transport around `sendRaw(text)`: messages go out as JSON and come in
-// through deliver(text). close() calls `closeRaw` once. The in-memory pair
-// is made of it.
+// through deliver(text). close() calls `closeRaw` once. The WebRTC peer and
+// the in-memory pair are both made of it.
 export class MessageTransport {
   constructor({ sendRaw, closeRaw = () => {} }) {
     this.sendRaw = sendRaw;

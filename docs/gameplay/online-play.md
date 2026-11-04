@@ -13,8 +13,10 @@ guide: [the room server](../development/online-server.md).
 | [`js/screens/online-battle-screen.js`](../../js/screens/online-battle-screen.js) | `OnlineBattleScreen` (`online-battle`): the Battle screen with Online Play's rules (no pause, Leave match, waiting, the result from this player's side, Rematch, Leave room). |
 | [`js/online/online-session.js`](../../js/online/online-session.js) | `OnlineSession` (`App.online`): the player's name and session id, the room's socket and state, the link to the other player, the host's start; `ONLINE_VERSION`. |
 | [`js/online/server-client.js`](../../js/online/server-client.js) | `RoomServerClient`: the server's HTTP calls and a room's WebSocket (`RoomLink`); `OnlineError` and its codes. |
-| [`js/online/delay.js`](../../js/online/delay.js) | Each match's input delay: `DelayProbe` (pings through the room, the round trips) and `chooseDelay` (the fewest steps covering them), `validDelay`. |
-| [`js/online/room-relay.js`](../../js/online/room-relay.js) | The link to the other player, through the room (`roomRelay`, `RelayTransport`): each match packet a `{ type: 'm' }` message on the room's socket, never a direct connection. |
+| [`js/online/delay.js`](../../js/online/delay.js) | Each match's input delay: `DelayProbe` (pings on the link, the round trips) and `chooseDelay` (the fewest steps covering them), `validDelay`. |
+| [`js/online/match-link.js`](../../js/online/match-link.js) | Each player's link (`matchLink`): the relay's servers asked of the room, then the relay-only WebRTC link; none, no link ("Couldn't connect"). |
+| [`js/online/peer.js`](../../js/online/peer.js) | `PeerLink`: the WebRTC DataChannel through the TURN relay, relay-only, signalled through the room. |
+| [`js/online/privacy.js`](../../js/online/privacy.js) | `scrubSignal` (the signalling sent and taken, with no address but the relay's) and `relayOnly` (the TURN servers a link may use); the server checks again with its own copy. |
 | [`js/online/transport.js`](../../js/online/transport.js) | The transport interface (`send`, `onMessage`, `close`, `onClose`), `MessageTransport`, and `memoryTransportPair` for tests. |
 | [`js/online/lockstep.js`](../../js/online/lockstep.js) | `LockstepSession`: delay-based lockstep, resends, waiting and timeouts, the desync check; `LockstepChannel` and `OnlineInput`, each fighter's input. |
 | [`js/online/input-frame.js`](../../js/online/input-frame.js) | One player's input for one step as a whole number (`encodeFrame`, `decodeFrame`, `FRAME_FIELDS`). |
@@ -28,7 +30,7 @@ guide: [the room server](../development/online-server.md).
 `CONFIG.online` ([`js/config.js`](../../js/config.js)) holds its settings:
 `serverUrl` (the deployed room server; empty, Online Play ends at "Online
 play is unavailable right now."), `inputDelay`, `inputDelayRange`,
-`delayMarginMs`, `pingIntervalMs`, `pingRefreshMs`, `sendIntervalMs`,
+`delayMarginMs`, `pingIntervalMs`, `pingRefreshMs`,
 `modes`, `connectTimeoutMs`, `disconnectGraceMs`,
 `loadTimeoutMs`, `listRefreshMs`, `hashInterval`, `resendWindow` and
 `colors`.
@@ -80,9 +82,10 @@ Going offline anywhere in Online Play ends it: the room is left, Home, and
   selects it), its visibility and mode, and both seats: each player's name,
   the host's mark, "You", their fighter and Ready. Choose fighter opens the
   shared roster (`online-character`, the choice in `app.selection.online`).
-  The link to the other player (through the room) is made as soon as both
-  are there; Ready opens once it is up and a fighter is chosen. A failed link says "Couldn't connect to
-  your opponent…" and offers Try again. Once both are ready the host's
+  The link to the other player (through the relay) is made as soon as
+  both are there; Ready opens once it is up and a fighter is chosen. A
+  link that cannot be made says "Couldn't connect to your opponent…" and
+  offers Try again. Once both are ready the host's
   browser sends the start; the room fills in the players and sends it to
   both; the drawn stage shows a moment (`STAGE_REVEAL_MS`), then the
   Battle. Leaving asks first (the host is told it closes the room); the
@@ -116,8 +119,8 @@ slow motion):
    host's browser from the trip it measured to the other player (3 to 12
    steps, 50 to 200 ms; see [Transport](#transport)) and carried to both
    in the start; steps 0 to D − 1 are neutral on both sides.
-3. **Resends.** At most every `sendIntervalMs` (33 ms, 30 a second) one
-   packet carries every local frame the other side has not acknowledged
+3. **Resends.** Every animation frame one packet carries every local frame
+   the other side has not acknowledged
    (up to `resendWindow`) and the last step this side holds the other's
    frames through. A lost packet costs nothing.
 4. **Stepping.** A step runs only once both frames are known; otherwise
@@ -173,41 +176,38 @@ as a desync.
 
 ## Transport
 
-The match goes through the room: `roomRelay` (`js/online/room-relay.js`)
-makes each player's link, a `RelayTransport` whose packets go out on the
-room's WebSocket as `{ type: 'm', d }`; the Room passes each one to the
-other player (server/src/room.js), and the other side's session hands it to
-its link. The link opens as soon as both players are in the room; like any
-transport it may lose a packet (a socket reconnecting, the room dropping
-one over its allowance), which the lockstep's resends cover.
+The match never goes straight from one browser to the other: a direct
+link hands each browser the other's IP address while it is set up
+([Privacy](#privacy)). It goes through a TURN relay (ExpressTURN's free
+plan, set up by the owner: its address and credentials in the Worker's
+secrets). `matchLink` (`js/online/match-link.js`) makes each player's
+link: it asks the room for the relay's servers (`{ type: 'relay' }`), then
+`PeerLink` (`js/online/peer.js`) makes a WebRTC DataChannel with
+`iceTransportPolicy: 'relay'` and those servers alone. The host offers, the
+guest answers, the offer, answer and ICE candidates going through the
+room's WebSocket as `signal` messages, scrubbed on both ends. The channel
+is unordered with no retransmissions; every frame goes at once, with about
+the delay of a direct link, and nothing of the match touches the room
+server.
 
-The match could connect the two browsers directly (a WebRTC DataChannel,
-as it first did), with less delay, but a direct link hands each browser
-the other's IP address while it is set up. Through the room, nobody's
-address reaches the other player ([Privacy](#privacy)). It costs two
-things, both set in `CONFIG.online`:
+There is no other way. With no relay's servers to be had, or the link not
+open within `connectTimeoutMs`, the link fails: "Couldn't connect to your
+opponent. One of your networks may be blocking it.", with Try again. A
+server with no relay set up makes no room at all ("The room server can't
+make private connections right now.").
 
-- **Delay.** A packet travels player → Cloudflare → the room → Cloudflare
-  → player, longer than a direct link, and waits up to `sendIntervalMs`
-  to be sent. So each match chooses its own delay (`js/online/delay.js`):
-  while both players are in the room, the host's browser pings the other
-  through the room (`DelayProbe`: every `pingIntervalMs`, 200 ms, until a
-  dozen round trips are in, then every `pingRefreshMs`, 5 s; the other
-  side answers at once), and the match's delay is the fewest steps that
-  cover the send interval, half the round trip (the 80th percentile of the
-  last dozen, so one stray trip is ignored) and `delayMarginMs` (15 ms),
-  within `inputDelayRange` (3 to 12). Nearby players get about 4 to 5
-  steps (67 to 83 ms), far ones more, with no pauses. With fewer than four
-  round trips measured, it is `inputDelay` (7, about 117 ms). Both browsers
-  must use the same delay, so the host's choice goes in its start and the
-  room hands the same one to both (`readStart`'s `delay`).
-- **The free plan.** The room server's plan counts every packet it
-  receives (at 20 : 1), so packets go at most every `sendIntervalMs`
-  (30 a second): about 7 hours of matches a day in all, across every
-  player ([the numbers](../development/online-server.md#staying-on-the-free-plan)).
-
-A relay closer to each player (a TURN server) would bring the delay down;
-Cloudflare's needs a payment method on the account, so it is not used.
+**The delay** is chosen for each match (`js/online/delay.js`): while both
+players are in the room, the host's browser pings the other on the link
+(`DelayProbe`: every `pingIntervalMs`, 200 ms, until a dozen round trips
+are in, then every `pingRefreshMs`, 5 s; the other side answers at once),
+and the match's delay is the fewest steps that cover half the round trip
+(the 80th percentile of the last dozen, so one stray trip is ignored) and
+`delayMarginMs` (15 ms), within `inputDelayRange` (3 to 12). Players near
+each other get 3 steps (50 ms), as a direct link had; far apart, more,
+with no pauses. With fewer than four round trips measured, it is
+`inputDelay` (7, about 117 ms). Both browsers must use the same delay, so
+the host's choice goes in its start and the room hands the same one to
+both (`readStart`'s `delay`).
 
 ## Privacy
 
@@ -215,22 +215,32 @@ No player ever learns another's network address (IP address), and nothing
 else about them but what they chose to show: the name they typed, their
 fighter, Ready, Rematch and whether they are connected.
 
-- **No direct connection.** The two browsers never connect to each other,
-  so neither receives the other's address: the room passes the match's
-  packets, which hold input frames, acknowledgements and hashes and
-  nothing else. The game makes no WebRTC connection at all.
-- **No signalling.** The room never passes on WebRTC signalling, so even an
-  older copy of the game that tried a direct link cannot make one through
-  it, and such a copy never shares a room with this one: a copy plays
-  online as `ONLINE_VERSION` (`js/online/online-session.js`: the game's
-  version marked `+relay`), and an older one shows as "Other version".
+- **No direct connection.** The two browsers reach each other only
+  through the relay, so each only ever sees the relay's address, never the
+  other player's. The link is relay-only: no STUN, no host or
+  server-reflexive candidate, so the browser never offers its own address;
+  with no relay, no link is made at all.
+- **Scrubbed signalling.** What a browser sends is scrubbed first
+  (`scrubSignal`, `js/online/privacy.js`): only relay candidates, their
+  related address (`raddr`, the player's own) blanked; host,
+  server-reflexive and peer-reflexive candidates dropped; the SDP's
+  connection and origin lines blanked. The room scrubs everything it
+  passes on again, by its own copy of the rules (a test holds the two to
+  the same answers), so even a copy of the game that tried a direct link
+  could not pass an address through it. What a browser takes is scrubbed
+  too.
+- **Older copies.** A copy plays online as `ONLINE_VERSION`
+  (`js/online/online-session.js`: the game's version marked `+turn`);
+  older copies show as "Other version".
 - **The server keeps none.** Its per-minute limits count a salted hash of
   the caller's address, in memory only, and Cloudflare's per-request logs
   are off ([the room server](../development/online-server.md#privacy)).
 - **What is visible:** the name a player types, to the other player; a
   public room's name and its host's name, to anyone in the lobby.
-  Cloudflare runs the server and so sees each player's address, as any host
-  does.
+  Cloudflare (the server) and the relay's service see each player's
+  address, as any host does. The relay's credentials reach every player in
+  a room (their browser needs them), so someone could use up its free
+  allowance; matches then fail to connect until it renews.
 
 ## Rollback, later
 
@@ -254,10 +264,11 @@ difference caught),
 flushes, muting, slow motion, catching up),
 [`tests/online/online-play.test.mjs`](../../tests/online/online-play.test.mjs)
 (Home, the name, the lobby, the room, the battle and its rules, on the real
-server code in process), [`tests/online/room-relay.test.mjs`](../../tests/online/room-relay.test.mjs)
-(the transport; two players connecting through their room with no WebRTC
-connection and no signalling; a match through the real Room code at the
-game's own rate, in step, nothing received naming an address),
+server code in process), [`tests/online/match-link.test.mjs`](../../tests/online/match-link.test.mjs)
+(the relay's servers first, no link without them, and a match over the
+relay through the real room server's code), [`tests/online/peer-privacy.test.mjs`](../../tests/online/peer-privacy.test.mjs)
+(the relay's link relay-only with TURN servers alone, never without one,
+only scrubbed relay candidates sent or taken),
 [`tests/online/delay.test.mjs`](../../tests/online/delay.test.mjs)
 (the delay for each round trip, its range, the start carrying it, the
 probe), [`tests/online/rules.test.mjs`](../../tests/online/rules.test.mjs)

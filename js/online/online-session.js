@@ -9,14 +9,16 @@
 //   - the room they are in: its WebSocket (js/online/server-client.js
 //     RoomLink), the room and both seats as the server last described them,
 //     their seat (host or guest) and so their side (the host plays p1);
-//   - the link to the other player (`peer`: js/online/room-relay.js), made
+//   - the link to the other player (`peer`: js/online/match-link.js), made
 //     as soon as both seats are filled and connected, made again if it
-//     drops while both are still there. It goes through the room, never
-//     straight to the other browser, so neither player ever learns the
-//     other's network address: each match packet is a { type: 'm' }
-//     message on the room's socket, passed on by the room;
+//     drops while both are still there. It goes through a TURN relay,
+//     never straight to the other browser, so neither player ever learns
+//     the other's network address: the relay's servers are asked of the
+//     room ({ type: 'relay' }), and the WebRTC signalling goes through the
+//     room, scrubbed. A link that cannot be made is 'failed' ("Couldn't
+//     connect to your opponent"; the player may try again);
 //   - measuring the trip to the other player while the link is open
-//     (`delayProbe`, js/online/delay.js: pings through the room), for the match's
+//     (`delayProbe`, js/online/delay.js: pings on the link), for the match's
 //     input delay;
 //   - starting a match: the host's browser sends the start, with a seed it
 //     draws and the input delay it chose from the trip it measured, once
@@ -31,7 +33,7 @@
 
 import { CONFIG } from '../config.js';
 import { RoomServerClient } from './server-client.js';
-import { roomRelay } from './room-relay.js';
+import { matchLink } from './match-link.js';
 import { DelayProbe } from './delay.js';
 import { sessionId } from './rules.js';
 import { listeners } from './transport.js';
@@ -43,14 +45,14 @@ const RECONNECT_DELAYS_MS = Object.freeze([1000, 2500, 5000]);
 const otherSeat = (seat) => (seat === 'host' ? 'guest' : 'host');
 
 // The version a copy of the game plays online as: the game's, marked as one
-// whose matches go through the room, so it never shares a room with an
-// older copy that connected straight to the other browser ("Other
-// version").
-export const ONLINE_VERSION = `${CONFIG.version}+relay`;
+// whose matches go through a TURN relay, so it never shares a room with an
+// older copy that connected straight to the other browser or through the
+// room ("Other version").
+export const ONLINE_VERSION = `${CONFIG.version}+turn`;
 
 export class OnlineSession {
   constructor({
-    client = new RoomServerClient(), peerFactory = roomRelay, settings = null, version = ONLINE_VERSION,
+    client = new RoomServerClient(), peerFactory = matchLink, settings = null, version = ONLINE_VERSION,
     random = globalThis.crypto, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id),
   } = {}) {
     this.client = client;
@@ -75,6 +77,7 @@ export class OnlineSession {
     this.peer = { status: 'idle', link: null, transport: null, reason: null };
     this.delayProbe?.stop();
     this.delayProbe = null;
+    this.endRelayWait?.();
     this.start = null;
     this.starting = false;
     this.rematchPending = false;
@@ -199,9 +202,13 @@ export class OnlineSession {
         this.syncPeer();
         this.maybeStart();
         return;
-      case 'm':
-        // The other player's match packet, for the link.
-        this.peer.link?.deliver?.(message.d);
+      case 'signal':
+        // The other player's WebRTC signalling (scrubbed by the room), for
+        // the relay's link.
+        this.peer.link?.handleSignal?.(message.data);
+        return;
+      case 'relay':
+        this.relayAnswer(message);
         return;
       case 'start':
         this.starting = false;
@@ -296,7 +303,8 @@ export class OnlineSession {
     this.closePeer({ quiet: true });
     const link = this.peerFactory({
       initiator: this.isHost,
-      send: (d) => this.send({ type: 'm', d }),
+      sendSignal: (data) => this.send({ type: 'signal', data }),
+      requestRelay: () => this.requestRelay(),
       timeoutMs: CONFIG.online.connectTimeoutMs,
     });
     this.peer = { status: 'connecting', link, transport: null, reason: null };
@@ -340,6 +348,44 @@ export class OnlineSession {
   retryPeer() {
     if (!this.opponent?.connected) return;
     this.startPeer();
+  }
+
+  // ---- The relay -------------------------------------------------------------------
+
+  // The relay's (TURN) servers for this player's relay link, asked of the
+  // room: resolves with them, or rejects ('relay_unavailable' with none set
+  // up, or 'timeout' after CONFIG.online.connectTimeoutMs). A new request
+  // replaces one still waiting.
+  requestRelay() {
+    this.endRelayWait();
+    return new Promise((resolve, reject) => {
+      const timer = this.setTimer(() => {
+        if (this.relayWait?.resolve !== resolve) return;
+        this.relayWait = null;
+        reject(new Error('timeout'));
+      }, CONFIG.online.connectTimeoutMs);
+      timer?.unref?.();
+      this.relayWait = { resolve, reject, timer };
+      if (!this.send({ type: 'relay' })) {
+        this.endRelayWait();
+        reject(new Error('timeout'));
+      }
+    });
+  }
+
+  relayAnswer(message) {
+    const wait = this.relayWait;
+    if (!wait) return;
+    this.relayWait = null;
+    this.clearTimer(wait.timer);
+    if (Array.isArray(message.iceServers) && message.iceServers.length) wait.resolve(message.iceServers);
+    else wait.reject(new Error(message.error === 'relay_unavailable' ? 'relay_unavailable' : 'timeout'));
+  }
+
+  endRelayWait() {
+    const wait = this.relayWait;
+    this.relayWait = null;
+    if (wait) this.clearTimer(wait.timer);
   }
 
   // ---- Starting a match ---------------------------------------------------------------

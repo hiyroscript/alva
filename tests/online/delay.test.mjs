@@ -15,14 +15,17 @@ useTestFighters(TEST_A, TEST_B);
 
 const steps = (n) => Array(SAMPLES_NEEDED).fill(n);
 
-test('the delay covers the send interval, half the round trip and the margin, in steps, within its range', () => {
-  // (33 + rtt / 2 + 15) / 16.67, rounded up.
+test('the delay covers half the round trip and the margin, in steps, within its range', () => {
+  // (rtt / 2 + 15) / 16.67, rounded up: every frame is sent at once.
   assert.equal(chooseDelay(steps(0)), 3, 'next door: the least, 50 ms');
-  assert.equal(chooseDelay(steps(20)), 4, '20 ms round trip: 67 ms');
-  assert.equal(chooseDelay(steps(60)), 5, '60 ms: 83 ms');
-  assert.equal(chooseDelay(steps(100)), 6, '100 ms: 100 ms');
-  assert.equal(chooseDelay(steps(130)), 7);
+  assert.equal(chooseDelay(steps(20)), 3, 'the same city: 50 ms');
+  assert.equal(chooseDelay(steps(60)), 3);
+  assert.equal(chooseDelay(steps(80)), 4, '80 ms round trip: 67 ms');
+  assert.equal(chooseDelay(steps(140)), 6, '140 ms: 100 ms');
+  assert.equal(chooseDelay(steps(200)), 7);
   assert.equal(chooseDelay(steps(400)), CONFIG.online.inputDelayRange.max, 'far: the most, 200 ms');
+  // A frame that waited to be sent would need more.
+  assert.equal(chooseDelay(steps(20), { sendIntervalMs: 33 }), 4);
   // Too few round trips: the game's default.
   assert.equal(chooseDelay([]), CONFIG.online.inputDelay);
   assert.equal(chooseDelay([20, 20, 20]), CONFIG.online.inputDelay);
@@ -30,7 +33,7 @@ test('the delay covers the send interval, half the round trip and the margin, in
   // Most of the ups and downs are covered, a single stray one is not.
   assert.equal(chooseDelay([20, 20, 20, 20, 20, 500]), chooseDelay(steps(20)), 'one stray round trip of six ignored');
   assert.equal(chooseDelay([20, 20, 20, 20, 120, 120]), chooseDelay(steps(120)), 'two of six slow: covered');
-  assert.equal(chooseDelay([20, -5, NaN, Infinity, 20, 20, 20]), 4, 'nonsense skipped');
+  assert.equal(chooseDelay([100, -5, NaN, Infinity, 100, 100, 100]), 4, 'nonsense skipped');
 });
 
 test('a valid delay is a whole number of steps in the range; the start reads it, or the default', () => {

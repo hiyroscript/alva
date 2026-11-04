@@ -261,12 +261,12 @@ export function backend(vars = {}, { origin = ITCH } = {}) {
   return { ...made, fetchImpl, WebSocket: FakeWebSocket };
 }
 
-// Links for both players of a room, joined in memory in place of the
-// room's relay (js/online/room-relay.js) so a test steps the match frame
-// by frame: once both players' links have started, they resolve with the
-// two ends of a pair (`hub.pair`, delivered by the test: the host's end is
-// `a`). With `hub.fail`, every link fails ("Couldn't connect"). Tests of
-// the relay itself use none (boot({ hub: null })).
+// Links for both players of a room, joined in memory in place of the relay's
+// (js/online/match-link.js) so a test steps the match frame by frame: once
+// both players' links have started, they resolve with the two ends of a
+// pair (`hub.pair`, delivered by the test: the host's end is `a`). With
+// `hub.fail`, every link fails ("Couldn't connect"). Tests of the link
+// itself give their own (tests/online/match-link.test.mjs).
 export function peerHub() {
   const hub = { waiting: null, pair: null, pairs: [], fail: false, links: 0 };
   hub.factory = ({ initiator }) => {
@@ -322,10 +322,9 @@ export function otherPlayer(server, hub, { name = 'Sam' } = {}) {
 }
 
 // The other player's side of a match: its own lockstep and Battle on its
-// peer link, from the start the room sent, with `script(n)` its inputs
-// (and, for a match through the room as the game plays it, its `clock` and
-// `sendIntervalMs`).
-export function otherSide(player, start, { script = () => null, clock, sendIntervalMs } = {}) {
+// peer link, from the start the room sent, with `script(n)` its inputs (and
+// its own `clock`, if given).
+export function otherSide(player, start, { script = () => null, clock } = {}) {
   const setup = readStart(start);
   let n = 0;
   const lockstep = new LockstepSession({
@@ -333,7 +332,6 @@ export function otherSide(player, start, { script = () => null, clock, sendInter
     delay: setup.delay,
     sampleLocal: () => script(n++),
     ...(clock ? { clock } : {}),
-    ...(sendIntervalMs !== undefined ? { sendIntervalMs } : {}),
   });
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: setup.map, mode: 'online', p1Def: setup.p1Def, p2Def: setup.p2Def,

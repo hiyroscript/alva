@@ -691,3 +691,28 @@ test('Copy code: the clipboard where allowed, else the code selected for the pla
     else delete globalThis.navigator;
   }
 });
+
+test('a server with no relay set up makes no room: "…can\'t make private connections right now."', async () => {
+  const { NO_RELAY } = await import('../../server/tests/fakes.mjs');
+  const server = backend(NO_RELAY);
+  const booted = boot({ server });
+  const { app, screens } = booted;
+  await toLobby(booted);
+  screens.lobby.createButton.click();
+  await settle();
+  app.createRoomDialog.createButton.click();
+  await settleAll(10);
+  assert.equal(current(app), 'online-lobby');
+  assert.equal(dialogText(app), "Online play unavailable — Online play is unavailable right now. The room server can't make private connections right now.");
+  setLanguage('fr');
+  try {
+    await acknowledge(app);
+    screens.lobby.createButton.click();
+    await settle();
+    app.createRoomDialog.createButton.click();
+    await settleAll(10);
+    assert.equal(app.dialog.message.textContent, 'Le jeu en ligne est indisponible pour le moment. Le serveur de salles ne peut pas établir de connexions privées pour le moment.');
+  } finally {
+    setLanguage('en');
+  }
+});

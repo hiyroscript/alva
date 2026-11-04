@@ -4803,15 +4803,49 @@ range, the start carrying it, the probe), the Room's start test, and the
 match through the real Room in `tests/online/room-relay.test.mjs` (the trip
 measured, the shortest delay chosen and used on both sides).
 
+**Later: fast and private, through a TURN relay.** Through the room, even
+a delay chosen per match was felt between two players in the same city:
+every packet still went up to the room server and back down. The owner
+chose a TURN relay (ExpressTURN's free plan, no card) and to drop the room
+path altogether:
+
+- **Through the relay only.** `js/online/match-link.js` asks the room for
+  the relay's servers (`{ type: 'relay' }`; the Room hands them from the
+  Worker's secrets `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`,
+  `server/src/privacy.js` `relayServers`, at most 10 per player per 10
+  minutes), then `PeerLink` (`js/online/peer.js`, back from the first
+  version of #167) connects with `iceTransportPolicy: 'relay'` and those
+  servers alone. The signalling goes through the room, scrubbed by the game
+  and again by the Room (`scrubSignal`, the two copies held to the same
+  answers). Every frame goes at once: a nearby relay gets the shortest
+  delay, 3 steps (50 ms), as the old direct link had.
+- **No other way.** The room's match packets (`{ type: 'm' }`,
+  `js/online/room-relay.js`, the seat allowance, `sendIntervalMs`) are
+  gone. With no relay set up, no room is made (`relay_unavailable`: "The
+  room server can't make private connections right now."); a link that
+  cannot be made says "Couldn't connect to your opponent…", with Try again.
+  The game plays online as `+turn`, so older copies show as "Other
+  version". The room server's plan is no longer spent on matches.
+
+Tried on Cloudflare's local runtime with a local TURN server (`node-turn`)
+and two Chromium pages: relay-only on both, every candidate a relay one,
+the shortest delay chosen, 60 steps a second with no wait, three
+signalling messages each through the room and nothing else; with the relay
+switched off, both players told "Couldn't connect". Tests:
+`tests/online/match-link.test.mjs`, `tests/online/peer-privacy.test.mjs`,
+`server/tests/privacy.test.mjs`, the Room's and the flow tests. The owner
+adds the relay's three secrets once ([the steps](./docs/development/online-server.md#its-relay-private-connections)).
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `inputDelayRange`, `delayMarginMs`,
-`pingIntervalMs`, `pingRefreshMs`, `sendIntervalMs`, `connectTimeoutMs`, `disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`,
-`hashInterval`, `resendWindow`, `colors`; `CONFIG.debug.online` logs a
-desync's states); the server's caps and allowed origins in
-[`server/wrangler.toml`](./server/wrangler.toml); `STAGE_REVEAL_MS` in
-`js/screens/online-screens.js`; `WAITING_NOTICE_MS` in
-`js/online/lockstep.js`; `SEAT_GRACE_MS`, `MATCH_RATE` and `MATCH_BURST`
-in `server/src/room.js`.
+`pingIntervalMs`, `pingRefreshMs`, `connectTimeoutMs`,
+`disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`, `hashInterval`,
+`resendWindow`, `colors`; `CONFIG.debug.online` logs a desync's states);
+the server's caps and allowed origins in
+[`server/wrangler.toml`](./server/wrangler.toml), its relay in the
+Worker's secrets; `STAGE_REVEAL_MS` in `js/screens/online-screens.js`;
+`WAITING_NOTICE_MS` in `js/online/lockstep.js`; `SEAT_GRACE_MS` and
+`RELAY_PER_WINDOW` in `server/src/room.js`.
 
 **Code:** new `js/online/` (`rules.js`, `input-frame.js`, `transport.js`,
 `peer.js`, `lockstep.js`, `state-hash.js`, `match-setup.js`,
