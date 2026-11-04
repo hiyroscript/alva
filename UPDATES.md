@@ -21,7 +21,7 @@ for where they moved). The game as it is now is specified in
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 | **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
 | **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
-| **Launch & energy update** | (this branch, `claude/busy-fermi-s77nbt`) | see the pull request | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
+| **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -5316,6 +5316,7 @@ elimination.
 
 ## Launch & energy update
 
+Pull request [#176](https://github.com/hiyroscript/alva/pull/176), commit `b4889f0`.
 Asked for in the `max` prompt, and named there: pushing the joystick down
 is the Down button, launches nerfed through the speed a point of launch
 strength gives, Launch Point recovered twice as fast and by a perfect
