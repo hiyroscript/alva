@@ -5069,8 +5069,13 @@ Adding one is described in
   `attack1` and `attack3`, #0002's `attack1` and `attack2`). A pair with
   only one button (its other move `mash_attack`, which has none: #0005,
   #0006, #0008) puts that button next to Jump and leaves the outer place
-  empty. This row is a strict rule for every fighter, now and added later
-  (`docs/characters/adding-characters.md`, The Mash Combo row). Shield sits directly above Jump. Every
+  empty. This row is one of the **touch comfort rules**, strict for every
+  fighter now and added later (`docs/characters/adding-characters.md`,
+  The touch comfort rules; `touchComfortProblems` in
+  `js/data/touch-comfort.js`, run by the registry): one button a move in
+  one plain tap; no touch layout, size or place of a fighter's own and no
+  art on a universal control; every button it has named and showing its
+  move's own art; beside Jump only its Mash Combo buttons. Shield sits directly above Jump. Every
   other move of the fighter stands higher, a little smaller (110 %), in
   two columns growing up side by side, one move to each in turn in button
   order: the first left of Shield, starting a little higher than Shield

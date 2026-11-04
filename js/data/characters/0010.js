@@ -394,7 +394,7 @@ export const CHARACTER_0010 = {
     extra_attack: { label: 'Vent', preview: { animation: 'extra_attack', frame: 2 } },
     attack1: { label: 'Punches', preview: { animation: 'attack1', frame: 4 }, previews: { air: { animation: 'midair_attack1', frame: 1 } } },
     attack2: { label: 'Pistol Whip', preview: { animation: 'attack2', frame: 3 }, previews: { air: { animation: 'midair_attack2', frame: 3 } } },
-    attack3: { label: 'Tongue Lash', preview: { animation: 'attack3', frame: 3 } },
+    attack3: { label: 'Tongue Lash', preview: { animation: 'attack3', frame: 3 }, previews: { air: { animation: 'attack3', frame: 3 } } },
     attack4: { label: 'Kill', preview: { animation: 'attack4_release', frame: 1 } },
     attack5: { label: 'Emergency Meeting', preview: { collection: 'projectileAnimations', animation: 'attack5_object', frame: 1 } },
   },

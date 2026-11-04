@@ -29,7 +29,9 @@
 //     assertControllerLayout (js/data/controller-profiles.js) and
 //     assertSpecialAbilities (js/data/special-abilities.js) and
 //     assertMashCombo (js/data/mash-combo.js: two grounded close-range
-//     melee strikes for its Mash Combo) as this module loads, every
+//     melee strikes for its Mash Combo) and assertTouchComfort
+//     (js/data/touch-comfort.js: the touch comfort rules) as this module
+//     loads, every
 //     problem named; one that breaks the
 //     loadout rules, declares movement of its own (a `movement` profile,
 //     `powers`), deals damage off the tiers (1, 3, 5, 10), declares a
@@ -76,6 +78,7 @@ import { assertEnsemble, ensembleFramePaths } from './ensemble.js';
 import { assertControllerLayout } from './controller-profiles.js';
 import { assertSpecialAbilities } from './special-abilities.js';
 import { assertMashCombo } from './mash-combo.js';
+import { assertTouchComfort } from './touch-comfort.js';
 import { assertUniversalMovement } from './movement.js';
 import { createAttackDefinition } from '../game/combat/attacks.js';
 import { resolveEnergy } from '../game/combat/combat-state.js';
@@ -187,8 +190,8 @@ export function assertCombatRules(def) {
 // (a fighter drawn as several members: who performs each move, every
 // member's group clips), declares movement of its own, breaks a combat
 // rule, authors an invalid or conflicting controller layout, classifies
-// as Special a move it cannot perform or lacks a valid Mash Combo pair is
-// ever loaded.
+// as Special a move it cannot perform, lacks a valid Mash Combo pair or
+// breaks the touch comfort rules is ever loaded.
 for (const def of CHARACTERS) {
   assertLoadout(def);
   assertEnsemble(def);
@@ -197,4 +200,5 @@ for (const def of CHARACTERS) {
   assertControllerLayout(def);
   assertSpecialAbilities(def);
   assertMashCombo(def);
+  assertTouchComfort(def);
 }

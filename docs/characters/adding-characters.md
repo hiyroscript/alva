@@ -412,7 +412,7 @@ buttons, pressed five times.
   Pick the frame that reads as the move (its strike, its release), not
   blindly the first. Jump and Shield (Deflect in the air) keep their
   universal glyphs. Where each button stands is not the fighter's to
-  choose: see [the Mash Combo row](#the-mash-combo-row-strict).
+  choose: see [the touch comfort rules](#the-touch-comfort-rules-strict).
 - **Ability names:** `abilityNames`, keyed by move codename
   (`attack1: 'Uppercut'`); a move left out keeps its neutral name
   ("Attack 1").
@@ -438,35 +438,74 @@ buttons, pressed five times.
   ([localization](../systems/localization.md)). The i18n test fails while a
   key is missing in either language.
 
-#### The Mash Combo row (strict)
+#### The touch comfort rules (strict)
 
-The touch controls' bottom row is **a strict rule, for every fighter on the
-roster and every fighter added later**:
+The comfort of the touch controls is **a strict rule, for every fighter on
+the roster and every fighter added later**, as the controller's comfort
+rules are: someone who has never played Alva must be able to pick up a
+phone or a tablet, choose any fighter and play it with their thumbs
+without fighting the buttons. A fighter that breaks a rule is not
+finished: fix the fighter, never relax a rule, or the shared touch
+controls, to fit one.
 
-- **The two buttons beside Jump are the fighter's two Mash Combo buttons,
-  and nothing else ever.** They are the buttons whose ground moves are its
-  `mashCombo` pair, in the pair's order (the first further from Jump),
-  whichever buttons those are (`attack1` and `extra_attack`, `attack1` and
-  `attack3`, ...). No other move, however important, ever takes one of
-  these two places, and neither is ever given to anything else to fill a
-  gap.
-- **A pair with only one button** (its other move the button-less
-  `mash_attack`) puts that button **next to Jump**, where a second button
-  would be, and leaves the outer place empty.
-- **Every other move of the fighter** stands higher than that row and a
-  little smaller (110 % to the row's 130 %), in the columns above it, never
-  in the row.
+What a definition could break, the registry checks as it loads
+(`touchComfortProblems` in
+[`js/data/touch-comfort.js`](../../js/data/touch-comfort.js), through
+`assertTouchComfort`): a definition that breaks one never loads, every
+problem named.
 
-Nothing in the definition places a button: the shared touch controls read
-the pair (`mashButtons` in
-[`js/ui/touch-controls.js`](../../js/ui/touch-controls.js), through
-`mashTriggers` in [`js/data/mash-combo.js`](../../js/data/mash-combo.js))
-and lay the row out from it, so a new fighter keeps the rule by having a
-valid pair, which the registry already requires (at least one of its two
-moves on a button). Never special-case a fighter's touch buttons to move
-one into the row, or out of it: change its pair instead, if its pair is
-wrong. `tests/interface/touch-layout.test.mjs` checks every playable
-fighter against the rule.
+1. **One button a move, pressed directly.** Every combat button the
+   fighter has (its `actions`) starts its move in one plain tap: a move
+   name, a `{ ground, air }` pair or a Special (`{ type, id }`), or `null`
+   for a reserved one. Never a combination, a held stance, a modifier, a
+   direction held with it, a double tap or a sequence.
+2. **The fighter never places, sizes or adds a touch control.** Its
+   `mobileAbilities` only say what a button shows (`label`, `preview`,
+   `previews`, `fallbackIcon`; a preview only `animation`, `frame`,
+   `collection`), only for its own combat buttons it has (never Jump,
+   Shield or a movement control: their glyphs are universal), and it has
+   no touch layout of its own (no `touch`, `touchControls`, `touchLayout`
+   or `touchButtons`).
+3. **The button shows the move.** Every combat button it has (not a
+   reserved one) is named (`label`) and shows a frame of its move's own
+   art (`preview`, a clip and frame it has); a distinct air move shows its
+   own (`previews.air`, the same clip's frame if the air move uses the
+   same clip).
+4. **The Mash Combo row.** The two buttons beside Jump are the fighter's
+   two Mash Combo buttons, and nothing else ever: the buttons whose ground
+   moves are its `mashCombo` pair, in the pair's order (the first further
+   from Jump), whichever buttons those are (`attack1` and `extra_attack`,
+   `attack1` and `attack3`, ...). A pair with only one button (its other
+   move the button-less `mash_attack`) puts that button **next to Jump**,
+   where a second button would be, and leaves the outer place empty; the
+   place next to Jump is never empty. No other move, however important,
+   ever takes one of these places.
+
+What no definition can touch, the shared touch controls
+([`js/ui/touch-controls.js`](../../js/ui/touch-controls.js),
+[`js/core/touch-layout.js`](../../js/core/touch-layout.js),
+[`css/touch-controls.css`](../../css/touch-controls.css)) keep for
+everyone, and `tests/systems/touch-comfort.test.mjs` guards:
+
+5. **The universal controls are the same for everyone:** Run left and
+   right, Down, the two Dash buttons (or the joystick), Jump and Shield, in
+   the same places, with the same glyphs.
+6. **Big enough for thumbs:** every control 130 % by default, the Mash
+   Combo pair included; the fighter's other moves a little smaller,
+   110 %, never smaller to make room.
+7. **In reach:** the clusters flush in the screen's corners, only the
+   safe-area insets between; the fighter's other moves above the bottom
+   row, in columns that never rise past the top HUD (a full column passes
+   its turn, then a third column takes the rest); no control overlapping
+   another.
+
+Nothing in a definition places a button, so a new fighter keeps rules 5 to
+7 by being an ordinary fighter. Never special-case a fighter's touch
+buttons in shared code to move one into the Mash Combo row, or out of it:
+change its pair instead, if its pair is wrong. A custom layout the player
+saves in the touch layout editor is the player's own and may move and
+resize anything; the rules are about the default every player starts
+from.
 
 ### Controller layout
 
