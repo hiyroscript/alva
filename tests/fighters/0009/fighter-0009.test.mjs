@@ -14,7 +14,7 @@
 // danger. A held direction bends its launches further than anyone's. The
 // roster, credits and translations it adds are checked in empty-roster,
 // settings and i18n. Layout and paint still need real-browser verification.
-import { LAUNCH_UNIT_SPEED } from '../../../js/data/launch.js';
+import { LAUNCH_POINT_SCALE } from '../../../js/game/ai/cpu-intelligence/values.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
@@ -633,12 +633,15 @@ test('the CPU plays its whole kit: its strikes, its staff, its wind, its rock, i
     assert.ok(used.get(move) > 0, `it uses ${move}`);
   }
   // Its trance only in danger: held at what 40 Launch Point was before the
-  // launch & energy update (58: the same launch takes 10 / 7 the Launch
-  // Point now) against an opponent that fights back, the CPU sinks into it
-  // now and then (its Mash Combo, when one is open, comes first).
+  // launch & energy update and the Void update (63: the same launch takes
+  // 10 / 7 the Launch Point now, and the farther Void about 10 % more, the
+  // CPU's own LAUNCH_POINT_SCALE) against an opponent that fights back, the
+  // CPU sinks into it now and then (its Mash Combo, when one is open, comes
+  // first). It is rare (about one 15-second fight in six, before the Void
+  // update as after it), so over two dozen seeds.
   let spheres = 0;
-  const inDanger = Math.ceil((40 * 10) / LAUNCH_UNIT_SPEED);
-  for (const seed of [1, 2, 3, 4, 5, 6]) {
+  const inDanger = Math.ceil(40 * LAUNCH_POINT_SCALE);
+  for (let seed = 1; seed <= 24; seed++) {
     const sc = scenario({ cpuDef: DEF, foeDef: DEF_0001, difficulty: 'brutal', seed, cpuLP: inDanger, holdLP: true, foe: 'ref:balanced' });
     sc.run(15);
     spheres += sc.ai.telemetry.moveUsage.get('attack5:ground') ?? 0;

@@ -827,8 +827,8 @@ test('overtime closes the Void round the glacier with both wings or neither: the
     for (let i = 0; i < steps(2.5); i++) battle.update(DT);
     battle.setVoidPressure(1);
     const v = battle.stage.void;
-    const { sideEndGap, bottomEndGap } = CONFIG.battle.overtimeVoid;
-    assert.deepEqual({ ...v }, { left: JOKULL.mainStage.left - sideEndGap, right: JOKULL.mainStage.right + sideEndGap, top: JOKULL.voidBounds.top, bottom: G + bottomEndGap });
+    const { sideEndGap, bottomEndGap, topEndGap } = CONFIG.battle.overtimeVoid;
+    assert.deepEqual({ ...v }, { left: JOKULL.mainStage.left - sideEndGap, right: JOKULL.mainStage.right + sideEndGap, top: G - topEndGap, bottom: G + bottomEndGap });
     assert.ok(v.left < CENTRE.left && v.right > CENTRE.right, 'the centre wholly inside');
     // Standing anywhere on the centre is safe.
     for (const x of [CENTRE.left + HALF, 1800, CENTRE.right - HALF]) assert.equal(battle.stage.inVoid({ x, y: G, height: 80 }), false);

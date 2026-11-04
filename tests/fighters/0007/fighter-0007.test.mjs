@@ -14,6 +14,7 @@
 // checked in empty-roster, settings and i18n. Layout and paint still need
 // real-browser verification.
 import test from 'node:test';
+import { scenario } from '../../helpers/cpu-scenario.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { DT, STAGE, duel, fakeSpritesOf, makeFighter, steps, cpuFight } from '../../helpers/fighter-harness.mjs';
@@ -507,12 +508,26 @@ test('the CPU plays its whole kit: its fists and feet, its gun, its fire, its bl
     }
   }
   for (const move of [
-    'attack1:ground', 'attack1:air', 'attack2:ground', 'attack2:air', 'attack3:ground', 'attack4:ground', 'attack5:ground',
+    'attack1:ground', 'attack1:air', 'attack2:ground', 'attack2:air', 'attack3:ground', 'attack5:ground',
     'extra_attack:ground',
   ]) {
     assert.ok(used.get(move) > 0, `it uses ${move}`);
   }
   assert.ok(rockets > 0, 'a rocket lands now and then');
+  // The Sawn-Offs blast straight up (Base Launch 2): since the Void update
+  // its top is 1040 over the stage (it was 800), so they end a life only
+  // from a high Launch Point, and the CPU, judging by that, keeps them for
+  // a battered opponent up close (in the fights above they were rare
+  // already: 2 in 176 before the update). There, it fires them.
+  let sawnOffs = 0;
+  for (const foe of playableCharacters()) {
+    for (const seed of [1, 2]) {
+      const sc = scenario({ cpuDef: DEF, foeDef: foe, difficulty: 'brutal', seed, foeLP: 180, holdLP: true, cpuX: 1750, foeX: 1820, foe: 'ref:balanced' });
+      sc.run(10);
+      sawnOffs += sc.ai.telemetry.moveUsage.get('attack4:ground') ?? 0;
+    }
+  }
+  assert.ok(sawnOffs > 0, 'it uses attack4:ground on a battered opponent up close');
 });
 
 // ---- Its source -----------------------------------------------------------------------

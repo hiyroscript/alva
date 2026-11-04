@@ -127,9 +127,9 @@ test('overtime closes the Void on the beach exactly as on every stage, and the s
   battle.setPhase('fight');
   battle.setVoidPressure(1);
   const m = ADAMARIS.mainStage;
-  const { sideEndGap, bottomEndGap } = CONFIG.battle.overtimeVoid;
+  const { sideEndGap, bottomEndGap, topEndGap } = CONFIG.battle.overtimeVoid;
   assert.deepEqual({ ...battle.stage.void }, {
-    left: m.left - sideEndGap, right: m.right + sideEndGap, top: ADAMARIS.voidBounds.top, bottom: m.top + bottomEndGap,
+    left: m.left - sideEndGap, right: m.right + sideEndGap, top: m.top - topEndGap, bottom: m.top + bottomEndGap,
   });
   // Standing on the sand just past the closed edge: taken at once, with the
   // Void's ripple where it crossed.
