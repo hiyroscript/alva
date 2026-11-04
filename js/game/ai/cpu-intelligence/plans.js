@@ -552,7 +552,10 @@ const STEPS = {
       const c = caps(s);
       const air = me.airJumps > 0 ? c.airJumpHeight * 0.8 : 0;
       const maxRise = (me.grounded || plan.super ? c.superJumpHeight : c.jumpHeight) + air;
-      const step = s.model.stepToward(me.grounded ? me.y : me.lastGroundY, foeY, s.op.x, me.x, maxRise * 0.92, me.ground);
+      // Never up to footing a normal jump from would carry it near the
+      // Void's top (late in overtime, as it closes in).
+      const minY = s.model.void.top + me.height / 2 + c.jumpHeight + 60;
+      const step = s.model.stepToward(me.grounded ? me.y : me.lastGroundY, foeY, s.op.x, me.x, maxRise * 0.92, me.ground, minY);
       if (step) {
         tx = Math.min(step.x1 - 18, Math.max(step.x0 + 18, s.op.x));
         if (me.grounded) {
@@ -560,8 +563,8 @@ const STEPS = {
           const under = !step.oneWay && gap === 0;
           if (under) tx = me.x < (step.x0 + step.x1) / 2 ? step.x0 - 34 : step.x1 + 34;
           else if (gap < 90) jump = true;
-          plan.super = me.y - step.y > c.jumpHeight * 0.85;
-        } else if (me.vy > -80 && me.airJumps > 0 && me.y > step.y + 6 && ex.jumpFree()) {
+          plan.super = me.y - step.y > c.jumpHeight * 0.85 && s.model.jumpClear(me.y, me.height, c.superJumpHeight);
+        } else if (me.vy > -80 && me.airJumps > 0 && me.y > step.y + 6 && ex.jumpFree() && s.model.jumpClear(me.y, me.height, c.airJumpHeight)) {
           ex.jump(self, 'air');
         }
       } else if (Math.abs(s.op.x - me.x) < 160 && me.grounded) {

@@ -107,6 +107,9 @@ export class Situation {
     me.offstage = this.model.offstage(b.x, b.y, b.halfW, b.grounded);
     me.lastGroundY = self.lastGroundY;
     this.match = this.readMatch(self, foe);
+    // In overtime, the Void as it will be a moment from now (see
+    // StageModel.forecast).
+    this.model.forecast(this.world);
     this.present = !!foe && !foe.lostToVoid;
     if (!this.present) return this;
     this.foeCaps = analyzeCapabilities(foe);

@@ -49,7 +49,7 @@ export function scenario({
   if (overtime) {
     battle.period = PERIODS.overtime;
     battle.timeLeft = timeLeft ?? battle.overtimeSeconds;
-    battle.setVoidPressure(battle.overtimeProgress);
+    battle.setVoidPressure(battle.overtimeVoidPressure);
   } else if (timeLeft != null) {
     battle.timeLeft = timeLeft;
   }

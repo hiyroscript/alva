@@ -15,7 +15,7 @@
 // Important constraints: pure judgement; caches per reassessment only.
 
 import { launchOutcome } from './prediction.js';
-import { LAUNCH_UNIT_SPEED, PERFECT_SHIELD_HEAL } from '../../../data/launch.js';
+import { LAUNCH_UNIT_SPEED, PERFECT_SHIELD_HEAL, LAUNCH_POINT_INFERNO } from '../../../data/launch.js';
 import { backTurned } from '../../combat/hit-effects.js';
 
 export const KO_VALUE = 70;
@@ -29,7 +29,16 @@ export const KO_VALUE = 70;
 // finish at a given Launch Point, and treats its own as safer for longer.
 // The launch outcomes themselves (LaunchJudge) need no scale: they run the
 // real conversion.
-export const LAUNCH_POINT_SCALE = 10 / LAUNCH_UNIT_SPEED;
+//
+// Since the Void update the stages' Void is farther away too (468 past each
+// ledge and 1040 above, where it was 360 and 800), so a life lasts longer:
+// VOID_REACH_SCALE is how much, read from the Launch Point from which a
+// Base Launch 3 hit ends a life from anywhere on the stage
+// (LAUNCH_POINT_INFERNO, derived by simulation against the stages:
+// tests/benchmarks/launch-thresholds.mjs) over the 100 it was when these
+// scales were last set. Both factors together are LAUNCH_POINT_SCALE.
+export const VOID_REACH_SCALE = LAUNCH_POINT_INFERNO / 100;
+export const LAUNCH_POINT_SCALE = (10 / LAUNCH_UNIT_SPEED) * VOID_REACH_SCALE;
 // The Launch Point at which a point dealt is worth twice a fresh one's.
 const LP_WORTH = 160 * LAUNCH_POINT_SCALE;
 

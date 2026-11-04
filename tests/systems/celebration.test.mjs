@@ -110,7 +110,14 @@ test('the match ends exactly once, on its result, and the world plays on: Team I
     assert.deepEqual(battle.result, { outcome, reason });
     assert.deepEqual(battle.final.launchPoints, { p1: a, p2: b }, 'the Launch Points it ended on');
     run(seconds(12));
-    for (const [f, was] of [[battle.p1, a], [battle.p2, b]]) assert.ok(f.combat.launchPoint < was || was === 0, 'recovered since');
+    // Whoever is still in play recovers; a loser ejected at the end (the
+    // Void update: out of play, as a fall takes it) keeps the Launch Point
+    // it lost on.
+    for (const [f, was] of [[battle.p1, a], [battle.p2, b]]) {
+      if (f.ejected) assert.equal(f.combat.launchPoint, was, 'the ejected loser, out of play');
+      else assert.ok(f.combat.launchPoint < was || was === 0, 'recovered since');
+    }
+    assert.equal(battle.fighters.filter((f) => f.ejected).length, outcome === 'draw' ? 0 : 1, 'the loser ejected, nobody after a draw');
     assert.deepEqual(battle.result, { outcome, reason }, 'and still the same result');
   }
 });

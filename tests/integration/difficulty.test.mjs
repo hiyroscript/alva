@@ -655,8 +655,10 @@ test('the CPU\'s launch judgement follows LAUNCH_UNIT_SPEED: the Launch Point it
   const { scenario } = await import('../helpers/cpu-scenario.mjs');
   const { getCharacter: character } = await import('../../js/data/characters.js');
   const { LAUNCH_UNIT_SPEED } = await import('../../js/data/launch.js');
-  const { LAUNCH_POINT_SCALE } = await import('../../js/game/ai/cpu-intelligence/values.js');
-  assert.ok(Math.abs(LAUNCH_POINT_SCALE - 10 / LAUNCH_UNIT_SPEED) < 1e-12, 'derived from the constant');
+  const { LAUNCH_POINT_SCALE, VOID_REACH_SCALE } = await import('../../js/game/ai/cpu-intelligence/values.js');
+  // The Launch Point scales follow the constant, and the Void update's
+  // farther Void (from the fire's inferno, derived by simulation).
+  assert.ok(Math.abs(LAUNCH_POINT_SCALE - (10 / LAUNCH_UNIT_SPEED) * VOID_REACH_SCALE) < 1e-12, 'derived from the constants');
   const sc = scenario({ difficulty: 'brutal', cpuDef: character('0001'), foeDef: character('0001'), cpuX: 1900, foeX: 2200 });
   sc.run(0.3);
   const s = sc.ai.situation;

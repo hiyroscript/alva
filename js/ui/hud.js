@@ -46,6 +46,7 @@
 //     a fresh state.
 
 import { CONFIG } from '../config.js';
+import { LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT } from '../data/launch.js';
 import { el } from '../core/utils.js';
 import { t, tattr, plural, slotLabel, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
@@ -62,31 +63,12 @@ export function formatLaunchPoint(value) {
   return String(Math.round(value));
 }
 
-// The Launch Point at which the number catches fire, and the one below which
-// it goes out again. Derived by simulation (tests/benchmarks/
-// launch-thresholds.mjs, re-run it whenever the stages, the Void or
-// launches change) against the Void update's geometry: every main stage
-// 1400 long, the Void 468 past each ledge, 1040 above and 400 below
-// (regular time: overtime's closing Void is deadlier than the fire says),
-// launches at LAUNCH_UNIT_SPEED 7. Each case is one solid 3-damage hit on
-// a fighter in the air at a jump's height that does nothing to get back,
-// lethal when it is in the Void before it could act again (the game's own
-// lethal launch: launchIsLethal), for every playable fighter on every
-// stage. From 70 a Base Launch 3 hit ends a life from a third of the stage
-// in (the highest over the roster on every stage with ledges: 62 to 70), a
-// Base Launch 2 one from about 120 to 280 in from the ledge (180 on Yerma,
-// its outcrops in the way): the next solid hit is a real danger. Below 65
-// it is out. (Against the Void before the update, side 360 and top 800,
-// the same simulation gives 65; the HUD had 60.)
-export const LAUNCH_POINT_FIRE = 70;
-export const LAUNCH_POINT_FIRE_OUT = 65;
-// The stronger tier: from 110 a Base Launch 3 hit ends a life from
-// anywhere on the stage, straight up included (straight up, the farther top
-// line, is what decides it: 104 to 106 over the roster; sideways from the
-// middle 75 to 97), on every stage. Below 105 it is back to the first
-// tier. (Before the update: 95; the HUD had 100.)
-export const LAUNCH_POINT_INFERNO = 110;
-export const LAUNCH_POINT_INFERNO_OUT = 105;
+// The Launch Point at which the number catches fire and goes out again, and
+// the inferno's: LAUNCH_POINT_FIRE (70, out below 65) and
+// LAUNCH_POINT_INFERNO (110, back below 105), data the HUD and the CPU
+// share (js/data/launch.js, where they are explained and how they were
+// derived: tests/benchmarks/launch-thresholds.mjs).
+export { LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT };
 
 // The fire a Launch Point shows (0 none, 1 burning, 2 inferno), from the
 // fire it showed (`current`): each tier lights at its threshold and only

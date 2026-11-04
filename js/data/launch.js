@@ -172,6 +172,35 @@ export function resolveDirectionalLaunch(direction, strength, facing = 1) {
   return NO_LAUNCH;
 }
 
+// ---- Danger ----------------------------------------------------------------------
+
+// The Launch Point at which the HUD's number catches fire (js/ui/hud.js), and
+// the one below which it goes out again: where the next solid hit can end a
+// life. The CPU reads the same numbers (js/game/ai/cpu-intelligence/values.js). Derived by simulation (tests/benchmarks/
+// launch-thresholds.mjs, re-run it whenever the stages, the Void or
+// launches change) against the Void update's geometry: every main stage
+// 1400 long, the Void 468 past each ledge, 1040 above and 400 below
+// (regular time: overtime's closing Void is deadlier than the fire says),
+// launches at LAUNCH_UNIT_SPEED 7. Each case is one solid 3-damage hit on
+// a fighter in the air at a jump's height that does nothing to get back,
+// lethal when it is in the Void before it could act again (the game's own
+// lethal launch: launchIsLethal), for every playable fighter on every
+// stage. From 70 a Base Launch 3 hit ends a life from a third of the stage
+// in (the highest over the roster on every stage with ledges: 62 to 70), a
+// Base Launch 2 one from about 120 to 280 in from the ledge (180 on Yerma,
+// its outcrops in the way): the next solid hit is a real danger. Below 65
+// it is out. (Against the Void before the update, side 360 and top 800,
+// the same simulation gives 65; the HUD had 60.)
+export const LAUNCH_POINT_FIRE = 70;
+export const LAUNCH_POINT_FIRE_OUT = 65;
+// The stronger tier: from 110 a Base Launch 3 hit ends a life from
+// anywhere on the stage, straight up included (straight up, the farther top
+// line, is what decides it: 104 to 106 over the roster; sideways from the
+// middle 75 to 97), on every stage. Below 105 it is back to the first
+// tier. (Before the update: 95; the HUD had 100.)
+export const LAUNCH_POINT_INFERNO = 110;
+export const LAUNCH_POINT_INFERNO_OUT = 105;
+
 // ---- Reference copy --------------------------------------------------------------
 
 // What Discover says about Launch. Mechanics only: no fighter or attack is
