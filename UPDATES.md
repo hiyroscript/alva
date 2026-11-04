@@ -5241,3 +5241,41 @@ Revised for the new default, their rules kept: `settings`, `controls-ui`,
 `battle-screen`, `i18n`, `practice-ground` and `watch-mode`. The online
 determinism and lockstep tests and the celebration test's elimination count
 pass unchanged.
+
+### Later: the burst comes before the respawn
+
+After seeing it, the owner asked for the burst to play before the
+character appears ("otherwise it makes no sense"), and for none where the
+characters are already there, as when a match starts or in Practice
+Ground. The spawn burst is now a **respawn burst** only:
+
+- **Before, not after:** `Arena.updateRespawns` starts it in the last
+  `HIT_FX.elimination.life` (0.55 s) of the respawn wait, once, on the step
+  the wait crosses into that stretch, while the fighter is still out of
+  play. The burst closes in and its flash pops on the step the fighter
+  appears. It was added just after `f.respawn`.
+- **Where it will appear:** new `Fighter.spawnPlacement(stage)` (which
+  `Fighter.reset` now uses too) gives the place a respawn will put the
+  fighter without moving it. `HitEffects.addSpawn(f, at)` and `burst` take
+  that point; they read the fighter's body before.
+- **None for a fighter already there:** `Battle.restart` (a match's start,
+  a restart, a rematch) and Practice Ground's `setFighter` and `setCPU` no
+  longer call `announceSpawn`. Every respawn still does, in every mode and
+  in Practice Ground. A restart during the wait clears the burst with the
+  other effects.
+
+Still paint only: the wait, the respawn and the fight are exactly as
+before, and a whole CPU match steps identically with and without it.
+
+**Code:** `js/game/arena.js` (`announceSpawn`, `updateRespawns`),
+`js/game/fighters/fighter.js` (`spawnPlacement`, `reset`),
+`js/game/rendering/hit-fx.js` (`addSpawn`, `burst`), `js/game/battle.js`,
+`js/game/practice.js`; `ALVA_SPEC.md`, `docs/systems/rendering.md`,
+`docs/development/testing.md`.
+
+**Tests:** `tests/systems/spawn-burst.test.mjs`: the burst starting its
+life before the fighter is back (within a step), at the place it comes
+back, ending as it appears, once per respawn, in every mode and Practice
+Ground; none at a match's start, on a restart or for Practice Ground's
+arrivals, CPUs and swaps; cleared by a restart during the wait; never an
+elimination.
