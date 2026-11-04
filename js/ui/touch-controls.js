@@ -17,8 +17,9 @@
 // row is the fighter's two Mash Combo buttons (the two close-range strikes
 // of its pair, js/data/mash-combo.js: whichever buttons they are, attack1
 // and extra_attack for one fighter, attack1 and attack2 for another) and
-// Jump in the corner, and nothing else ever: a pair whose second move has no
-// button of its own (mash_attack) leaves its place empty. Shield sits
+// Jump in the corner, and nothing else ever: a pair with only one button
+// (its other move mash_attack, which has none) puts that one next to Jump
+// and leaves the outer place empty. Shield sits
 // directly above Jump. Every other move of the fighter (TouchControls
 // role 'move') stands a little higher than those, a little smaller, in two
 // columns growing up side by side: the first left of Shield, raised a
@@ -118,15 +119,20 @@ const ACTION_BUTTONS = [
 // order they take them: left of Shield, above Shield, then above Mash A.
 const STACK_COLUMNS = Object.freeze([1, 0, 2]);
 
-// The two buttons of `def`'s Mash Combo pair, in the pair's order: the
-// combat button that starts each of its two moves on the ground, or null
-// for a move no button starts (mash_attack). With no fighter, attack1 and
-// attack2 (the touch layout editor's neutral places).
+// The two places beside Jump, [Mash A, Mash B] (Mash B the one next to
+// Jump): the combat buttons that start `def`'s Mash Combo pair on the
+// ground, in the pair's order. A pair with only one button (its other move
+// mash_attack, which has none) puts that button next to Jump, in Mash B,
+// and leaves Mash A empty (null). With no fighter, attack1 and attack2
+// (the touch layout editor's neutral places). See the strict rule in
+// docs/characters/adding-characters.md (The Mash Combo row).
 export function mashButtons(def) {
   const pair = mashPairOf(def);
   if (!def || !pair) return ['attack1', 'attack2'];
   const triggers = [...mashTriggers(def)];
-  return pair.map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+  const buttons = pair.map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+  const own = buttons.filter(Boolean);
+  return own.length === 1 ? [null, own[0]] : buttons;
 }
 
 // A top-HUD ceiling for setCeiling: the lowest bottom edge of the HUD's

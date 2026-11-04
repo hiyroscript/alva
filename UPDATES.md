@@ -4997,7 +4997,11 @@ controls' section above now superseded by them:
   #0001's and #0003's are `attack1` and `extra_attack`, #0004's `attack1`
   and `attack3`, #0002's, #0007's and #0009's to #0011's `attack1` and
   `attack2`. #0005, #0006 and #0008, whose second move is `mash_attack`
-  (no button), leave that place empty.
+  (no button), have their one Mash Combo button next to Jump, where a
+  second would be, and the outer place empty. The row is a strict rule
+  for every fighter added later ([adding
+  characters](./docs/characters/adding-characters.md#the-mash-combo-row-strict),
+  and in `CLAUDE.md`).
 - **Sizes:** every control 130 %, the two Mash Combo buttons included; the
   fighter's other moves a little smaller, 110 % (`TOUCH_DEFAULT_SCALE`:
   `{ control: 1.3, move: 1.1 }`; it was `{ control: 1.3, stacked: 1 }`).

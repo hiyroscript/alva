@@ -5066,9 +5066,11 @@ Adding one is described in
   in the pair's order (`mashButtons` in `js/ui/touch-controls.js`, from
   `mashTriggers` in `js/data/mash-combo.js`; never by button id: #0001's
   are its Jab and High Kick, `attack1` and `extra_attack`, #0004's
-  `attack1` and `attack3`, #0002's `attack1` and `attack2`). A pair whose
-  second move has no button of its own (`mash_attack`: #0005, #0006,
-  #0008) leaves that place empty. Shield sits directly above Jump. Every
+  `attack1` and `attack3`, #0002's `attack1` and `attack2`). A pair with
+  only one button (its other move `mash_attack`, which has none: #0005,
+  #0006, #0008) puts that button next to Jump and leaves the outer place
+  empty. This row is a strict rule for every fighter, now and added later
+  (`docs/characters/adding-characters.md`, The Mash Combo row). Shield sits directly above Jump. Every
   other move of the fighter stands higher, a little smaller (110 %), in
   two columns growing up side by side, one move to each in turn in button
   order: the first left of Shield, starting a little higher than Shield

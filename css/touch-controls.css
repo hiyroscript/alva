@@ -182,7 +182,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-shield { right: var(--tc-in); bottom: calc(var(--tc-p) + var(--tc-in)); }
 /* The fighter's two Mash Combo buttons (TouchControls.mashButtons, from its
    own pair): the bottom row beside Jump, the pair's first move furthest
-   left. */
+   left; a pair with one button has it next to Jump (data-mash="2"). */
 .tc-act[data-mash="1"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); bottom: var(--tc-in); }
 .tc-act[data-mash="2"] { right: calc(var(--tc-p) + var(--tc-in)); bottom: var(--tc-in); }
 /* The fighter's other moves, at their own smaller scale, one above another

@@ -1084,16 +1084,19 @@ test('beside Jump stand only the fighter\'s two Mash Combo buttons, from its own
     layOut(tc);
     stackBoxes(tc);
     tc.applyLayout();
-    // The buttons that start the pair's two moves, in the pair's order.
+    // The buttons that start the pair's two moves, in the pair's order; a
+    // pair with only one button (its other move mash_attack) puts it next
+    // to Jump (Mash B) and leaves the outer place empty.
     const triggers = [...mashTriggers(def)];
-    const expected = mashPairOf(def).map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+    const own = mashPairOf(def).map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+    const expected = own.filter(Boolean).length === 1 ? [null, own.find(Boolean)] : own;
     assert.deepEqual(mashButtons(def), expected, def.id);
-    assert.ok(expected[0], `${def.id}: a button for the pair's first move`);
+    assert.ok(expected[1], `${def.id}: the place next to Jump is never empty`);
     for (const [i, button] of expected.entries()) {
       if (button) assert.equal(placeOf(tc, button), `mash${i + 1}`, `${def.id}: ${button} beside Jump`);
     }
-    // Nothing else is ever in that row: a pair move with no button
-    // (mash_attack) leaves its place empty.
+    if (own.includes(null)) assert.equal(expected[0], null, `${def.id}: its one button next to Jump, the outer place empty`);
+    // Nothing else is ever in that row.
     const inRow = COMBAT.filter((a) => tc.actionButtons.get(a).getAttribute('data-mash'));
     assert.deepEqual(inRow.sort(), expected.filter(Boolean).sort(), `${def.id}: only the pair`);
     for (const a of COMBAT.filter((x) => !expected.includes(x))) {
@@ -1105,6 +1108,11 @@ test('beside Jump stand only the fighter\'s two Mash Combo buttons, from its own
   }
   // With no fighter (the editor), attack1 and attack2 hold the places.
   assert.deepEqual(mashButtons(null), ['attack1', 'attack2']);
+  // Every fighter with a button-less partner on the roster today: its one
+  // Mash Combo button next to Jump.
+  for (const id of ['0005', '0006', '0008']) assert.deepEqual(mashButtons(getCharacter(id)), [null, 'attack1'], id);
+  // A future fighter whose first pair move has no button: the same.
+  assert.deepEqual(mashButtons({ id: '9999', actions: { attack1: 'attack1', attack2: 'attack2' }, mashCombo: { attacks: ['mash_attack', 'attack2'] } }), [null, 'attack2']);
 });
 
 test('the fighter\'s other moves stand higher, two columns side by side, one to each in turn, no gap for a move it lacks', () => {

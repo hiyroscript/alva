@@ -120,8 +120,9 @@ clusters touch the screen's edges, only the safe-area insets between): the
 bottom row is the fighter's two Mash Combo buttons (`mashButtons`: the
 buttons whose ground moves are its own `mashCombo` pair, in its order, from
 [`js/data/mash-combo.js`](../../js/data/mash-combo.js), never a button id)
-and Jump in the corner, and nothing else ever; a pair move with no button
-(`mash_attack`) leaves its place empty. Shield sits above Jump. Every other
+and Jump in the corner, and nothing else ever; a pair with only one button
+(its other move `mash_attack`) puts it next to Jump, the outer place empty
+([a strict rule](../characters/adding-characters.md#the-mash-combo-row-strict)). Shield sits above Jump. Every other
 move of the fighter stands higher and a little smaller, in two columns
 growing up side by side, one move to each in turn: left of Shield (starting
 a little higher than it) and above Shield. A move the fighter lacks leaves
