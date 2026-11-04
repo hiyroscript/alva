@@ -1,139 +1,100 @@
-# Task: joystick Down, a launch-speed nerf, Launch Point recovery and HUD feedback, and Energy that is only paid when Shield / Deflect actually do something
+# Prompt: Stage geometry & Void update
 
-Read `CLAUDE.md` first and follow it: the character system rules (never special-case a fighter id in shared code), the controller and touch comfort rules (strict), `character_rule` is protected, and run `node --test`. Read these `UPDATES.md` entries for context: **Jump, Shield, turning and joystick changes**, **Deflect and air dash**, **Universal movement and momentum**, **CPU Intelligence**, the **effect update** and the **bounce update**. When you're done, add a new named entry to `UPDATES.md` called the **launch & energy update**. It should cover what changed, the PR/commit, where the tuning lives and which tests cover it. Also update `ALVA_SPEC.md`, `docs/` and the in-game reference strings (`js/localization/strings/en.js` and `fr.js`) wherever they describe the old behaviour. Find them with `grep -rni "recover\|LAUNCH_UNIT_SPEED\|deflect\|shield" ALVA_SPEC.md docs js/localization`.
+You are working in the `hiyroscript/alva` repo. Read `CLAUDE.md`, `UPDATES.md`, `ALVA_SPEC.md` and `docs/README.md` first and follow every rule in them (the character system, the protected `character_rule`, controller and touch comfort, never special-casing a fighter id in shared code). Run `node --test` before you start, so you know the baseline, and again at the end. This work is a new named update — call it the **Void update** — and gets its own entry in `UPDATES.md`.
 
-**Off limits:** don't change anything about **Base Launch** (`BASE_LAUNCH_VALUES`, any hit's `baseLaunch`), how **damage adds to Launch Point** (`launchPoint += damage` in `CombatSystem.applyHit`), the launch formula `launch strength = Base Launch × Launch Point` (`resolveLaunchStrength`), or **any damage value** (`ALLOWED_DAMAGE_VALUES`, `DEFLECT_DAMAGE`, any character's `damage`). The only exceptions are the explicit Launch Point *reductions* in sections 3 and 4.
+## What exists today (verified in the code)
 
----
+- Stage geometry is in `js/data/maps.js`. Each stage has a `*_MAIN` rectangle (`mainStage`) and a `*_VOID` built with `voidAround(main, { side, top, bottom })`: `side` = units past each ledge, `top` = units above the main stage's top, `bottom` = units below the main stage's top. `cameraBounds` is `cameraAround(VOID, 140)`. Practice Ground has its own in `js/data/practice-map.js`.
+- Current values:
 
-## 1. Joystick: pointing it down is the Down button
+| Stage | Main left–right | Main length | Void side | Void top | Void bottom |
+|---|---|---|---|---|---|
+| Desert | 1120–2480 | **1360** | 360 | **760** | 400 |
+| City | 1080–2520 | **1440** | **340** | 800 | **420** |
+| Asperitas | 1100–2500 | 1400 | 360 | **840** | 400 |
+| Adamaris (continuous ground) | 1100–2500 | 1400 (combat area) | 360 | 800 | 400 |
+| Jökull (3 sections 260/880/260) | 1100–2500 | 1400 | 360 | 800 | **420** |
+| Practice Ground | 1360–2640 | **1280** | **380** | **760** | 400 |
 
-### Current behaviour
-- `js/ui/touch-controls.js`: `JOYSTICK = { deadzone: 0.24, engage: 0.34, travel: 0.56 }`. `joystickDirection(x, current)` reads **only the sideways part** (comment: "pushing up or down moves the knob, never Jump or Down"). `steer()` calls `this.assign(this.stickPointer, held)`, which holds one action per pointer (`runLeft` / `runRight` / null).
-- Down is a separate held button (`DOWN_BUTTON`, `action: 'down'`, `.tc-down`) in both schemes. Holding it is exactly the `down` control (S / ↓ / left stick down). In `js/game/fighters/fighter.js` that gives:
-  - **Super Jump**: `jumpKind = input.down && body.grounded ? 'super' : 'normal'` (~line 463), Down held when Jump is pressed.
-  - **Fast fall**: Down held in the air while descending (~line 862, `fastFallVelocity`).
-  - **Platform drop**: a fresh `downPressed` on a droppable one-way platform, released within `movement.dropTapTime` (~lines 705–736, `dropTap`).
+  So they do **not** match today. The most common values are main length 1400 and margins side 360 / top 800 / bottom 400.
+- Overtime: `Battle.update` (`js/game/battle.js`) calls `setVoidPressure(this.overtimeProgress)` each step, where `overtimeProgress` is **linear** in overtime time. `Arena.setVoidPressure` (`js/game/arena.js`) calls `StageCollision.closeVoid(progress, CONFIG.battle.overtimeVoid)` (`js/game/physics.js`), which moves the sides linearly toward `sideEndGap` (120) past each ledge and the bottom toward `bottomEndGap` (140) below the top; the top never moves; `MIN_VOID_GAP` 40 is the floor. `Arena.voidWaveSpeed` already rises as `1 + (max − 1)·p²` with `maxWaveSpeedMultiplier` 4. Config is `CONFIG.battle.overtimeVoid` in `js/config.js` (`overtimeSeconds` 60).
+- Match end: `Battle.finishMatch` / `liveResult` decide the loser by points, then by Launch Point at time-out (`reason` `time`, `points`, `overtimePoints`, `overtimeLaunchPoint`, `void`, or a draw). Only a Void fall (`Arena.checkVoid`) plays the elimination burst (`HitEffects` in `js/game/rendering/hit-fx.js`, the burst in the fighter's `eliminationPalette`, plus `addVoidRipple`) and takes the fighter out (`lostToVoid`, `detachFromPlay`). A loser decided by the clock stays standing on screen.
+- The Launch Point fire: `LAUNCH_POINT_FIRE` 60 / `_OUT` 55 and `LAUNCH_POINT_INFERNO` 100 / `_OUT` 95 in `js/ui/hud.js`. The comment there explains they were picked by simulated launches on Yerma against today's Void distances (`LAUNCH_UNIT_SPEED` 7 in `js/data/launch.js`, Base Launch 2/3, 3-damage hit, fighter not recovering). `launchIsLethal` in `hit-fx.js` reads `stage.void` live.
+- The CPU reads the Void live through `js/game/ai/cpu-intelligence/stage-model.js` (`stage.void`), with judgement in `values.js`, `situation.js`, `prediction.js`, `strategy.js`, `defense.js`. There is a benchmark at `tests/benchmarks/cpu-benchmark.mjs`.
+- Each stage theme (`js/stages/*-theme.js`) paints scenery out to `m.cameraBounds`; the drawn Void is `stage-theme.js` `drawVoid`.
+- Tests that touch this: `tests/integration/overtime.test.mjs`, `match-score.test.mjs`, `practice-ground.test.mjs`, `tests/systems/platform-stage.test.mjs`, `jokull.test.mjs`, `adamaris.test.mjs`, `void-ripple.test.mjs`, `launch-bounce.test.mjs`, `stage-hazards.test.mjs`, `platform-hazards.test.mjs`, `tests/interface/battle-screen.test.mjs`.
 
-### Wanted
-In the **Joystick** scheme, pushing the stick down does exactly what holding the Down button does: Super Jump (stick held down + Jump), fast fall (stick down in the air while falling), and the platform drop (a quick flick down and back to centre on a droppable platform). It's a quality-of-life change. The Down button stays where it is and keeps working, and nothing in the fighter or physics code changes. The stick only produces the same `down` input the button already does.
+## Tasks, in order
 
-Implementation:
-1. Read the vertical offset in `steer()` as well (`dy / radius`, screen y grows downward). Add `downEngage` / `downDeadzone` to `JOYSTICK` with the same hysteresis idea as the sideways ones (e.g. engage 0.5, release 0.38). Tune them so a normal sideways run with the thumb drifting a bit low **never** triggers Down, since an accidental fast fall or drop would be worse than the problem being fixed. A possible approach is to engage Down only when the push is mostly downward (e.g. the angle is within about 55° of straight down), or with a separate higher threshold. Write the rule as a pure exported function (e.g. `joystickVertical(x, y, current)`) next to `joystickDirection` so it can be tested.
-2. The stick's one pointer now has to hold **two** actions at once (a run direction **and** `down`, for a diagonal down-left / down-right). `assign()` only holds one action per pointer, so give the stick its own second slot. For example, track the stick's Down separately and press/release `down` through the same path the Down button uses. Pressing it has to produce a real `downPressed` edge, or the platform-drop tap won't arm. Releasing it, or `releaseStick()` / `releaseAll()`, has to let go of `down` too, so Down is never left stuck on (check `pointercancel`, `lostpointercapture`, `blur`/visibility, scheme switch and pause).
-3. If both the Down button and the stick hold Down, it's one `down`. Letting go of one keeps it held while the other still holds it. Count the sources, like any other shared action.
-4. Pushing the stick **up** still does nothing (Jump stays on its button).
-5. Show it on screen: add an `is-down` class on `.tc-stick` alongside `is-left` / `is-right`, styled in the touch-controls CSS, and keep the knob following the thumb as it does now.
-6. Classic Buttons scheme, keyboard and gamepad: unchanged. The touch comfort rules are unaffected (no new button, nothing placed or sized by a fighter). Run `touchComfortProblems` and its tests to confirm.
-7. Update the comments at the top of `touch-controls.js` and around `JOYSTICK`, the joystick docs (`docs/`, the "Jump, Shield, turning and joystick changes" description), and the controls help/tutorial strings if they describe the stick.
-8. Tests (`tests/interface/controls-ui.test.mjs`, `touch-layout.test.mjs` or a new `joystick-down.test.mjs`):
-   - `joystickVertical` engages and releases at its thresholds with hysteresis, and a mostly sideways push with some downward drift doesn't engage Down.
-   - Stick pushed down makes the frame's `down` true. Pushed down-left gives both `runLeft` and `down`. Releasing the stick clears both.
-   - Through a simulated fighter: stick down + Jump is a Super Jump, stick down in the air while falling fast-falls, and a quick stick flick down and back on a droppable platform drops through. Holding the stick down past `dropTapTime` doesn't drop, matching the button exactly.
-   - The button and the stick held together, one released, means Down is still held.
+### 1. One main-stage length everywhere
 
----
+Make every finite main stage exactly **1400** units long (`right − left`). Today that means fixing **Desert** (1360) and **City** (1440), and **Practice Ground** (1280). Adamaris's continuous ground is excluded from the length rule (its `mainStage` is already 1400 as its combat area; leave it).
 
-## 2. Nerf the units: it takes more Launch Point to be launched hard
+- Keep each stage centred where it is (centre x 1800, Practice 2000) unless that breaks something; change `left`/`right`, not `top`/`bottom`.
+- Move whatever sits on or relative to the main stage so it still makes sense: spawns, platforms (City's racks at its ledges, `bulkhead` solid), Desert's rock outcrops, hazard envelopes (Asperitas clouds must stay disjoint from the main stage — the build check enforces it), Jökull's sections must still tile the main stage exactly with the centre one unbreakable.
+- Check the theme art that is drawn to the main stage's edges (cliff faces, slab ends, rubble, ledge details) still lines up.
+- Put the length in one shared constant in `maps.js` (e.g. `MAIN_STAGE_LENGTH = 1400`) and add a test that asserts every finite stage, Practice Ground included, uses it.
 
-### Current behaviour
-`js/data/launch.js`: `LAUNCH_UNIT_SPEED = 10`. It's the one conversion from launch strength (Base Launch × Launch Point) to world speed, used by `resolveDirectionalLaunch` (`speed = strength * LAUNCH_UNIT_SPEED`). The game's numbers stay as they are; only the physics' speed per point changes.
+### 2. One Void-free space everywhere
 
-### Wanted
-Change `LAUNCH_UNIT_SPEED` from **10 to 7**. This value is decided, so use exactly 7 and don't tune it to anything else. The same Launch Point and Base Launch then send a fighter less far: 30 Launch Point × Base Launch 2 = strength 60 used to be 600 units/s and is now 420. A fighter needs about 43 % more Launch Point (≈ 43 instead of 30) to be launched as hard as before. Keep it as the single tuning knob, so the owner can later try 8 or 6 by editing that one line. Add a comment explaining why it went from 10 to 7 (the **launch & energy update**: launches nerfed without touching Base Launch, Launch Point or damage). Don't change Base Launch, Launch Point or damage (see **Off limits**).
+Make the Void's margins identical on **every** stage, Adamaris and Practice Ground included: side **360**, top **800**, bottom **400** (the most common values today). Fix Desert (top 760), City (side 340, bottom 420), Asperitas (top 840), Jökull (bottom 420), Practice (side 380, top 760). Define the margins once in `maps.js` (e.g. `VOID_MARGINS`) and have every stage use it rather than its own literals. Add a test that the Void-free rectangle (Void minus main stage, measured as margins) is the same on every stage.
 
-Check everything that depends on launch speed rather than strength, and say in `UPDATES.md` whether you deliberately left each one alone or re-tuned it:
-- `js/game/combat/launch-bounce.js` (`LAUNCH_BOUNCE`; a comment there assumes "At LAUNCH_UNIT_SPEED 10…"). Rewrite that comment for 7. Only keep the bounce thresholds feeling the same if they were tuned around 10.
-- `launchReaction` (`stunPerThousand`, `tumbleSpeed`, in `combat.js` and each character's data): these are in units/s, so hitstun and tumble will kick in later. That's expected and part of the nerf. Don't raise them back.
-- CPU: `js/game/ai/cpu-intelligence/values.js` (`st.baseLaunch * lp * LAUNCH_UNIT_SPEED`) reads the constant, so it follows automatically. Check `prediction.js`, `evaluator.js`, `objective.js` and `plans.js` for any hard-coded kill / "launch hard" Launch Point thresholds or speeds that assumed 10, and switch them to derive from the constant.
-- The reference copy (`LAUNCH_FORMULA` etc. in `launch.js` and localization) if it names the number.
-- Tests that assert exact launch speeds (`tests/systems/launch.test.mjs`, `launch-bounce.test.mjs`, `launch-reaction.test.mjs`, `combat-rules.test.mjs`, fighter tests): update them to compute from `LAUNCH_UNIT_SPEED` instead of literals. Add a test that a fixed Launch Point / Base Launch now produces `strength × 7` and that strength itself is unchanged.
+Before moving on, confirm Asperitas's top margin change is still safe: its comment says no jump from its highest cloud reaches the top line — re-check that with the new number.
 
----
+### 3. Push the Void back 1.3×
 
-## 3. A perfect Shield takes 5 off the Launch Point
+Once step 2 is in, multiply the **side** and **top** margins by 1.3 and leave the **bottom** alone:
 
-### Current behaviour
-In `CombatSystem.applyHit` (`js/game/combat/combat.js` ~line 517), `perfect = blocked && !!target.perfectShield` (see `Fighter.perfectShield`: raised within `defense.perfectWindow` after `perfectRearm`). It blocks with no blockstun and pays the normal `shieldHitCost`. It doesn't affect the Launch Point.
+- side 360 → **468** past each ledge
+- top 800 → **1040** above the main stage's top
+- bottom stays **400**
 
-### Wanted
-Every perfect block also takes **5** Launch Points off the **blocking** fighter, never below 0. Use `CombatState.heal(5)` so it counts in `launchPointRecovered` and, like any heal, doesn't restart or speed up the passive recovery schedule. Add the amount as a named constant, e.g. `PERFECT_SHIELD_HEAL = 5`, in `js/data/launch.js` or with the defense data, the same for every fighter. Record it on the block event (e.g. `heal: 5`, or the actual amount taken off, plus the real `launchPointAfter`) so the HUD, the match stats and the effects can see it. Only a perfect block does this. One perfect block heals once, even for a multi-hit string, since a blocked string stops at the first block anyway; check that. It's simulation state, so online lockstep must stay deterministic (`tests/online/determinism.test.mjs`, `lockstep.test.mjs`).
+(1.3× applies to the margin — the distance from the ledge / from the stage top — not to the whole rectangle from the stage centre.) This must still be the one shared value, so every stage gets the same pushed-back Void. Update the tests from step 2 to the new numbers.
 
-Tests (`tests/systems/defense.test.mjs` / `shield-protection.test.mjs`): a perfect block at LP 12 leaves 7, at LP 3 leaves 0, a normal block leaves LP unchanged, and the recovery timer is untouched.
+Consequences to handle:
 
----
+- `cameraBounds` grows with it (it is derived). Check the camera still frames the fight well at the new size on desktop and phone landscape (`js/game/rendering/camera.js`, the camera & mobile layout update in `UPDATES.md`); don't let the default framing zoom out noticeably during normal play.
+- **Stage art.** Every theme paints out to `cameraBounds`, so now there is more open air at the sides and above. Open each stage (run the game, screenshot with Playwright at desktop and phone-landscape sizes, with the camera pushed to each corner of its bounds) and look for: scenery ending in a visible edge, stretched or tiled-looking backgrounds, empty sky bands, parallax layers that run out, the Void's edge showing through where it used to be hidden. Add real detail where the space now looks empty or unfinished, in each stage's existing style — e.g. more dunes / distant mesas / rock spires for Desert, more skyline, towers, rooftops and signage for City, more cloud banks and sky layers for Asperitas, more sea, horizon, distant islands and sky for Adamaris, more ice cliffs, peaks and aurora for Jökull, more grid for Practice. Respect `reducedMotion`. Keep the stage previews (`js/ui/stage-preview.js`) looking right too.
+- `ground.reach` on Adamaris: confirm the continuous ground still runs well past the wider Void.
 
-## 4. Passive recovery: 2 points per tick instead of 1
+### 4. Overtime closes in much more, and faster and faster
 
-`js/data/launch.js`: change `LAUNCH_RECOVERY_AMOUNT = 1` to **2**. Delay (2 s) and interval (0.5 s) stay the same. `CombatState.updateLaunchRecovery` already uses the constant and clamps at 0, so an odd Launch Point ends at 0, not -1. Test that. Update the header comment in `launch.js` ("it recovers 1 point per…"), the spec, docs and the in-game reference strings. The CPU's `objective.js` reads it through `RECOVERY_RATE`, so check that its estimates follow.
+Overtime should squeeze the arena **noticeably more** than today and accelerate:
 
----
+- **More closure.** Lower the end gaps in `CONFIG.battle.overtimeVoid` so the final Void is clearly tighter than now (currently 120 past each ledge and 140 below the top), starting from the new, larger margins. Also let the **top** close in during overtime (add a `topEndGap`, e.g. well above the highest jump/platform but far below 1040, and extend `closeVoid` to move the top edge the same way; never below the highest reachable footing plus a safe gap, never past `MIN_VOID_GAP`). Standing on the main stage must always remain safe, as `closeVoid` guarantees today.
+- **Accelerating closure.** Replace the linear progress with an easing that starts slow and speeds up continuously to the end — e.g. `pressure = t^k` with `k` around 2–2.5, where `t = overtimeProgress`; put the curve's exponent in `CONFIG.battle.overtimeVoid` (e.g. `closeCurve`). Apply it in one place (where `Battle.update` feeds `setVoidPressure`, or inside `setVoidPressure`), so collision, drawing, the CPU and `launchIsLethal` all keep reading the single `stage.void` in force.
+- **Waves accelerate with it.** The drawn waves must visibly speed up progressively as the Void closes. They already scale with `p²`; make them follow the new pressure and raise `maxWaveSpeedMultiplier` if needed so the end of overtime is clearly frantic. Wave speed must change smoothly (no jumps in wave phase — `advanceVoid` integrates speed, keep it that way).
+- Online play must stay deterministic: everything stays on the simulation clock (`js/online/lockstep.js`).
+- Update `tests/integration/overtime.test.mjs`: closure is monotonic, slower early than late (e.g. less than a quarter of the distance closed by half time with k=2), reaches the new end gaps at t=1, the top edge now closes, the main stage stays safe, and wave speed is non-decreasing.
 
-## 5. HUD: a green glow when the Launch Point goes down
+### 5. The loser is ejected
 
-### Current behaviour
-`js/ui/hud.js` `updatePanel` writes `formatLaunchPoint(combat.launchPoint)` into `.hud-launch-point-value` when the text changes. It's styled in `css/battle.css` (`.hud-launch-point` ~line 115).
+Whenever the match elects a loser (`finishMatch`, any reason that isn't a draw — clock time-out on points, time-out on Launch Point, overtime points, overtime Launch Point) and the loser is **still in play and visible** (not `lostToVoid`), play the same ejection as a Void fall at their position — the elimination burst in their `eliminationPalette` with its flash, shake and sound — and make them disappear (take them out of play the way `checkVoid`/`detachFromPlay` does, so they're undrawn and untargetable). It's purely presentation and state for the end of the match: it must **not** score a point, count as a fall in match statistics, trigger a respawn, or change the frozen result. A loser already taken by the Void doesn't burst twice. A draw ejects nobody. Make the winner's celebration (`js/game/ai/celebration.js`) work with an absent opponent. Same in Local Play and online. Add tests to `match-score.test.mjs` / `overtime.test.mjs` for each reason.
 
-### Wanted
-Each time the shown Launch Point **goes down while the fighter stays in play** (a passive recovery tick, a perfect-Shield heal, a technique's `heal`, a charm heal, a fear "feed"), the number briefly glows green: a soft green text-shadow/glow that pops and fades over about 0.4–0.6 s, restarted if another reduction lands during it. It must **not** play when the Launch Point drops to 0 because of a respawn, a restart, a rematch or a Practice Ground reset or swap. A respawn is a reset, not a heal.
+### 6. Recalculate the fire thresholds
 
-Implementation:
-1. Distinguish a heal from a reset in the simulation, not by guessing in the HUD. For example, have `CombatState` keep a counter or step stamp of the last real reduction (incremented in `heal()` and `updateLaunchRecovery()` when they take something off), which a fresh `CombatState` / respawn doesn't increment. The HUD glows when that counter changes. `resetPanel` (`shownLaunchPoint = null`) and a fighter swap must sync the counter without glowing. Paint only: it must not change simulation results.
-2. CSS: a `.is-healing` class (or a restarted animation) on `.hud-launch-point-value`, using a green that reads well on both HUD sides and over every stage. With `prefers-reduced-motion` / the game's reduced-motion setting, use a short static colour change instead of a pulse.
-3. Works the same for every HUD slot (P1/P2, CPU, Local Play, Watch, online, Practice Ground).
+With the Void farther away, 60 / 100 no longer mean "the next hit can end you". Re-derive `LAUNCH_POINT_FIRE`, `LAUNCH_POINT_FIRE_OUT`, `LAUNCH_POINT_INFERNO` and `LAUNCH_POINT_INFERNO_OUT` in `js/ui/hud.js` **by simulation, the same method as the comment there**, against the new geometry (side 468, top 1040, bottom 400, main 1400):
 
-## 6. HUD: fire on the Launch Point when it's really high
+- Burning (tier 1): the Launch Point from which a solid Base Launch 2 hit (3 damage) carries a fighter in the air near the ledge into the Void, and a Base Launch 3 hit does from about a third of the stage — i.e. the next hit is a real danger.
+- Inferno (tier 2): the point from which a Base Launch 3 hit ends a life from anywhere on the stage, straight up included.
+- Keep the 5-point hysteresis for going out. Write the simulation as a reusable script or test (e.g. under `tests/benchmarks/`) so the numbers can be re-derived later, and rewrite the comment in `hud.js` with the new numbers and what they mean. Check other fighters too, not only Yerma, and pick numbers that hold across the roster.
+- Check it against regular-time geometry, not overtime's closing Void (overtime is meant to be more dangerous than the fire says). Update tests that pin the old values, and the docs/spec that mention 60/100.
 
-When a fighter's Launch Point is high enough that the next solid hit can launch it hard, the number gets a **fire effect**: animated flame-coloured flicker/glow (orange→yellow→red), rising embers or a flame layer behind the digits. It can be CSS (layered animated `text-shadow`, a pseudo-element with an animated gradient) or a small canvas, whichever fits `hud.js`. Requirements:
-- A named threshold constant, e.g. `LAUNCH_POINT_FIRE = 60`, picked with the new `LAUNCH_UNIT_SPEED` in mind (it's where a Base Launch 2–3 hit becomes a likely Void KO; check it in a few simulated launches and write down the reasoning). Optionally add a stronger second tier (e.g. `LAUNCH_POINT_INFERNO = 100`).
-- Hysteresis so it doesn't flicker on and off around the threshold (e.g. on at ≥ 60, off below 55).
-- It goes out at once on respawn, restart or reset. The green heal glow (section 5) and the fire can coexist: the heal glow plays over the fire, and the fire goes out if the heal takes it below the off threshold.
-- Reduced motion: a static hot colour, no animation. HUD only: it doesn't draw on the fighter and doesn't change anything in the simulation.
-- Tests (`tests/interface/` HUD tests): the class appears at the threshold, stays inside the hysteresis band, clears on respawn, and the heal glow appears on recovery ticks and perfect-Shield heals but not on respawn or restart.
+### 7. CPUs must know all of this
 
----
+- The CPU already reads `stage.void` live; verify no CPU file caches Void distances, stage length, or hard-codes the old margins or old fire thresholds / "kill percent" assumptions. Search `js/game/ai/` for numeric constants tied to distances to the Void, edge-guard ranges, recovery distances, "safe Launch Point" values and the 60/100 thresholds; retune or derive them from the stage and launch data.
+- Their idea of when they or the opponent are in kill range must use the new thresholds (step 6) and the real geometry.
+- In overtime they must react to the accelerating, tightening Void, including the new closing top: stay central, avoid high jumps late in overtime, prefer finishing launches as the Void tightens, and anticipate where the edge will be soon (they can read the curve from config, not just the current rectangle).
+- Edge-guarding and recovery decisions must account for the longer sides (more room to recover from, longer way back).
+- Run `tests/benchmarks/cpu-benchmark.mjs` before and after; regressions in win rate balance, self-destructs (CPU falling into the Void on its own) or match length need fixing. Report the before/after numbers.
 
-## 7. Deflect only costs Energy when it turns a projectile back
+## Finishing
 
-### Current behaviour
-`Fighter.tryDeflect` (`fighter.js` ~line 1507) pays `energyDef.deflectCost` (`DEFLECT_ENERGY_COST = 15`, `js/data/energy.js`) **as it starts**, whatever it then meets. Projectiles are turned back in `CombatSystem.deflectProjectiles` (`combat.js` ~line 345), which pushes `{ fighter, projectile, from, direction }` into `this.deflections`. The docs in `js/game/combat/deflect.js`, `energy.js`, `combat-state.js` and `fighter.js` all say "paid as it starts".
+- `node --test` all green; add the tests listed above.
+- Update `ALVA_SPEC.md`, `docs/` (stages, overtime, Launch Point HUD, CPU), the comments in `maps.js`, `physics.js` (`closeVoid`), `arena.js`, `battle.js`, `hud.js`.
+- Add the **Void update** entry to `UPDATES.md` (what it is, PR, where the tuning lives: `MAIN_STAGE_LENGTH`, `VOID_MARGINS`, `CONFIG.battle.overtimeVoid`, the fire thresholds; which tests cover it).
+- Attach before/after screenshots of every stage at the camera's edges.
+- Branch, commit and open a pull request; don't push to `main` directly.
 
-### Wanted
-- Starting a Deflect costs nothing. It still needs the fighter **not exhausted** (`canUseEnergy()`), as now, so an exhausted fighter still can't Deflect.
-- The cost is paid **once per Deflect activation, the first time it actually turns a projectile back**. Turning back several projectiles in the same Deflect, on one step or across its active phase, still costs 15 once. Store a `paid` flag on that attack instance (`combat.attack`). A Deflect that only strikes a fighter (its melee hit, blocked or not), or whiffs, or is cancelled before turning anything back, costs **nothing**.
-- Pay it through the same path as other spending (`payEnergy` / `spendEnergy`, setting `energyPaidAt` so there's no refill that step, and with less than 15 left it empties the bar and exhausts). If the fighter is somehow exhausted at the moment of the deflection, the projectile is still turned back; the Deflect already started legally. Don't make the deflection depend on whether it could pay.
-- Record the cost on the deflection entry (`energyCost`) for effects, stats and the CPU.
-- Update every comment and doc that says "paid as it starts", `ENERGY_COST`'s summary and the in-game Deflect description.
-- Tests (`tests/systems/deflect.test.mjs`, `energy.test.mjs`): a whiffed Deflect costs 0. One that hits a fighter but turns nothing back costs 0. One that turns back one projectile costs 15. One that turns back two costs 15. An exhausted fighter still can't start one. No refill on the step it pays.
 
-## 8. Shield only costs Energy when it actually blocks something
-
-The Shield should already pay only on a block (`applyHit`: `if (blocked) spendEnergy(shieldHitCost)`), and refill keeps running while it's held. **Audit this and make sure it holds**, then lock it in with tests:
-- Raising, holding or lowering the Shield, and perfect-Shield timing, cost nothing.
-- `blocked = tc.shielding` is decided before anything else in `applyHit`. Check every caller and every early-return path so Energy is only taken when a hit really **reached** the fighter and was stopped: hits that `hitReaches` passes by (`quake` on an airborne fighter, `gaze` on one facing away), a charmed attacker's "hit" (`charmed()`), stage and platform hazards (`stage-hazards.js`, `platform-hazards.js`), projectiles that `passed()` the target, piercing/erasing projectiles, summon/clone strikes and technique bursts. Each one pays only if it is actually blocked, and only once per blocked hit. If any path takes Energy from the Shield for something it didn't block, or takes it twice for one hit, fix it.
-- Keep the existing rules: a block costs `shieldHitCost` (perfect included, as now), or whatever is left if that's less, and a block that empties the bar drops the Shield.
-- Tests (`tests/systems/shield-protection.test.mjs`, `energy.test.mjs`): holding the Shield for N seconds with nothing hitting it loses no Energy (it refills). One blocked hit costs exactly 15. A quake that passes over / a gaze from behind / a passed projectile cost nothing.
-
----
-
-## 9. CPUs must know about all of this
-
-The CPU (`js/game/ai/`, `js/game/ai/cpu-intelligence/`: `brain.js`, `defense.js`, `capabilities.js`, `moveset.js`, `values.js`, `objective.js`, `prediction.js`, `evaluator.js`, `plans.js`, `perception.js`, `situation.js`) and `js/data/difficulty.js` should reason with the new rules, in shared code only, never per fighter:
-1. **Launch nerf:** kill and launch estimates use `LAUNCH_UNIT_SPEED` (no literals). CPUs should now be a bit more patient about going for a KO at a given Launch Point, and treat their own Launch Point as safer for longer.
-2. **Faster recovery (2 per tick):** `objective.js`'s recovery model follows the constant. CPUs at high Launch Point value disengaging for 2+ s a little more, because it now pays back twice as fast.
-3. **Perfect Shield heals 5:** the defense planner (`defense.js` ~line 353, `p.perfectShield` per difficulty) should value a perfect block more, both as a counter and now as a heal. Raise its expected value accordingly, but keep the per-difficulty success chance (`perfectShield` in `difficulty.js`) as the human-like limit: easy CPUs still rarely manage it.
-4. **Deflect costs only on success:** `moveset.js` (~line 140, `cost: f.energyDef.deflectCost`) and the planners must stop counting the Deflect's 15 as spent at start. Its expected cost is 15 only when a projectile will actually be turned back. CPUs may use an aerial Deflect as a free poke or air option when no projectile is around, still never while exhausted, and they shouldn't fill the air with endless Deflects; respect the existing cancel and air-use rules.
-5. **Shield costs only on block:** `capabilities.js` (~line 327, `blockCost: f.energyDef.shieldHitCost`). Make sure the CPU budgets Energy per expected blocked hit, not for raising or holding the Shield, so a CPU can hold the Shield preemptively when that's sensible.
-6. **Joystick:** no CPU change needed (CPUs don't use touch), but confirm that the training CPU's `dropPressed` and fast-fall logic still work.
-7. Add or extend tests in `tests/integration/difficulty.test.mjs` / the CPU tests: a CPU's planned Deflect with no projectile around is costed at 0, the perfect-Shield value includes the heal, and the CPU's kill threshold at a given Base Launch is higher than before (derived from the constant). Run the CPU benchmarks and record before/after win rates by difficulty in `UPDATES.md`.
-
----
-
-## Done when
-- `node --test` passes in full, including the online determinism/lockstep tests and the comfort-rule checks, and the existing benchmarks still run.
-- On a phone with the Joystick scheme: stick down + Jump Super Jumps, stick down in the air fast-falls, a flick down drops through platforms, and normal running never triggers Down by accident.
-- `LAUNCH_UNIT_SPEED` is 7, and launches feel weaker at the same Launch Point. Base Launch, damage and the formula are unchanged in code and data (`git diff` shows no changes to any `damage` or `baseLaunch`).
-- A perfect block takes 5 Launch Points off. Recovery ticks take 2. The number glows green on every heal or recovery but not on respawn, and burns when it's high.
-- A Deflect only costs Energy when it turns a projectile back (once per Deflect), and a Shield only when it blocks a hit.
-- CPUs at every difficulty play by these rules.
-- `UPDATES.md` has the **launch & energy update** entry, and the spec, docs and reference strings are updated.
+these are new strict rules for the stages and void.
