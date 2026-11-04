@@ -2075,10 +2075,20 @@ French, concise game terms).
   (`CONFIG.render.fighterHeight`, 88 world units: a fixed camera convention,
   what 52 art pixels make at the roster's art-pixel size, never a
   requirement on any fighter) occupies ≈ 10 % of
-  viewport height (8.8–11.5 %), whoever is picked, each fighter drawn at
-  its own art scale, so a shorter or taller fighter simply stands shorter
-  or taller on the same stage. A 16:9 view shows the whole main stage with air past both
-  ledges, and narrower screens zoom out further for it.
+  viewport height (8.8–11.5 %) times the camera zoom
+  (`CONFIG.render.cameraZoom`, 1.35: ≈ 13.5 %, 11.9–15.5 %), whoever is
+  picked, each fighter drawn at its own art scale, so a shorter or taller
+  fighter simply stands shorter or taller on the same stage. The zoom is
+  one tuning point, the same for every fighter and every map: it brings
+  the whole-stage view (a 16:9 view showing the whole main stage with 100
+  units of air past both ledges, narrower screens zooming out further for
+  it) that much closer, so the view is the main stage and its air divided
+  by the zoom and the camera follows the fight across the stage rather
+  than always showing all of it. When the two fighters are too far apart
+  to frame, Player 1 stays inside the view's middle 60 %, and a fighter
+  out of the view has its edge pointer. Pixel snapping still lands each art
+  pixel on whole device pixels where that stays close to the target, and a
+  lethal launch's zoom (7.2.4) closes in on top of it.
 
 ### 7.2 Fighters, physics and combat
 

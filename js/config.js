@@ -34,7 +34,7 @@ export const CONFIG = Object.freeze({
     // fit by the same factor, so at a zoom above 1 the view follows the
     // fighters across the stage instead of always showing all of it (the
     // view still never shows past the map's camera bounds).
-    cameraZoom: 1,
+    cameraZoom: 1.35,
     // Snap sprite scale to whole device pixels per art pixel when the snapped
     // size stays inside the min/max ratio above.
     pixelPerfect: true,
