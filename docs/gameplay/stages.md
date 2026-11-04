@@ -30,11 +30,18 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   rectangle plus a 140-unit strip past it (`cameraAround`), so the black edge
   comes into view as a fighter nears it but the camera never wanders deep
   into it.
-- **The Void** (`voidBounds`): the kill boundary, a blast zone set by margins
-  around the main stage (`voidAround`): 340–380 units past each ledge,
-  400–420 below the stage's top and 760–840 above it (clear of any jump from
-  the highest footing, Asperitas's clouds at their highest included, so
-  only a launch reaches it). A fighter whose centre
+- **The Void** (`voidBounds`): the kill boundary, a blast zone set by the
+  same margins around every main stage (`VOID_MARGINS`, read by
+  `voidAround`, in `js/data/maps.js`): **468 units past each ledge, 1040
+  above the stage's top and 400 below it** on every stage, Adamaris's and
+  Practice Ground's included (the Void update: one Void-free space
+  everywhere, its side and top 1.3 times the 360 and 800 most stages had).
+  Its top is clear of any jump from the highest footing (Asperitas's
+  clouds at their highest included, with about 260 to spare), so only a
+  launch reaches it. Every finite main stage is the same length too,
+  `MAIN_STAGE_LENGTH` (1400), Practice Ground's block included; a stage is
+  built with `mainStageAround(centre, top, bottom)` and `voidAround(main)`,
+  never margins or a length of its own. A fighter whose centre
   leaves the Void in force (`StageCollision.inVoid`, which tests
   `stage.void`: this rectangle, except through a battle's overtime) is taken by it: out
   of play at once (not drawn, hit, targeted or framed), and back at its own
@@ -56,16 +63,30 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   only: they waver around the kill line, never move it. The Shield's circle
   (see Shield) shares this look, black with a red line, on the same kind of
   slow waves.
-- **Overtime's closing Void** (Quick Battle and Watch Mode, see
+- **Overtime's closing Void** (every Battle, see
   [Quick Battle](battle.md)): through its 60 seconds the Void's left and
-  right edges close in to 120 units past each ledge and its bottom rises
-  to 140 below the main stage's top, linearly, from each stage's own
-  `voidBounds` (never written: `StageCollision` keeps the map's rectangle
-  as `baseVoid` and the one in force as `void`, see `closeVoid`). The top
-  never moves, and the Void never reaches a ledge or the surface. The
-  drawn Void is traced around the same rectangle collision tests, and its
-  waves run up to 4× faster (and hold still with reduced motion). The camera keeps
-  the stage's own bounds. Practice Ground's Void never moves.
+  right edges close in to 90 units past each ledge, its bottom rises to 100
+  below the main stage's top and its top comes down to 600 above it, from
+  each stage's own `voidBounds` (never written: `StageCollision` keeps the
+  map's rectangle as `baseVoid` and the one in force as `void`, see
+  `closeVoid` and `closingVoid`), slowly at first and faster and faster
+  (`overtimePressure`: progress ^ 2.2). The Void never reaches a ledge or
+  the surface, and its top never comes within 240 of the highest footing.
+  The drawn Void is traced around the same rectangle collision tests, and
+  its waves run up to 6× faster with it (and hold still with reduced
+  motion). The camera keeps the stage's own bounds. Practice Ground's Void
+  never moves.
+- **Art for the open air.** Every theme paints out to the camera bounds,
+  so the larger Void shows more sky and more air past the ledges; each has
+  detail there in its own style, drawn from a random stream of its own so
+  the rest of its art never changes (Yerma's far rock needles and gold-lit
+  wisps; Sol-Noir's supertall towers with setbacks, spires and blinking
+  aviation lights; Asperitas's towering cumulus and drifting altocumulus;
+  Adamaris's sailboats, rocky islets and gulls; Jökull's faint aurora).
+  Anything a theme draws in screen space near the top (a sun, the moon,
+  clouds, the aurora) keeps below the Void's top line, so the black never
+  swallows it. Before and after shots of every stage at the camera's
+  edges: [`docs/screenshots/void-update/`](../screenshots/void-update/).
 
 The camera is a platform-fighter view brought closer by one zoom,
 `CONFIG.render.cameraZoom` (1.35), the same for every fighter and map:
@@ -96,7 +117,9 @@ The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.1.
 stage, platforms (one-way: fighters jump up through them from below, and
 a tap of Down drops a fighter through one unless its `dropThrough` is
 false, see [Platform drop](../systems/movement.md#platform-drop)),
-solids, spawn points and the Void's and camera's margins. Each stage's art
+solids and spawn points; its main stage's length and its Void's and
+camera's margins are the shared ones (`MAIN_STAGE_LENGTH`, `VOID_MARGINS`,
+the camera's 140 past the Void). Each stage's art
 is a procedural Canvas theme ([`js/stages/`](../../js/stages/)): flat
 parallax layers (sky, far, mid, near, atmosphere) generated once from a
 seeded RNG into cached `Path2D` geometry, and the playable geometry drawn
@@ -455,8 +478,11 @@ and their recovery target.
 ## Adding a stage
 
 Add an entry to `MAPS` in [`js/data/maps.js`](../../js/data/maps.js)
-(size, ground, bounds, spawns, platforms, solids, its Void and camera
-margins, its traits), then register a theme renderer in
+(ground, spawns, platforms, solids, its traits; its main stage
+`mainStageAround(centre, top, bottom)`, `MAIN_STAGE_LENGTH` long, its Void
+`voidAround(main)` and its camera `cameraAround(void)`: a stage never has a
+length, Void margins or camera margin of its own, and the tests refuse one
+that does), then register a theme renderer in
 [`js/stages/index.js`](../../js/stages/index.js). Every `MAPS` entry becomes
 a stage on Quick Battle's and Watch Mode's Select Stage, in the next slot
 of the roster (no layout change), with its own still thumbnail and live

@@ -5,7 +5,8 @@
 The owner refers to past work by name: the **movement update**, the
 **effect update**, the **bounce update**, the **Mash Combo update**, the
 **online update**, the **camera & mobile layout update**, the **spawn &
-landscape update** and the **launch & energy update**. [`UPDATES.md`](./UPDATES.md)
+landscape update**, the **launch & energy update** and the **Void
+update**. [`UPDATES.md`](./UPDATES.md)
 says what each one is, which pull request and commit it was, where its
 tuning lives and which tests cover it. Read it whenever an update is named,
 and add an entry there when the owner names a new one.
@@ -53,5 +54,20 @@ and add an entry there when the owner names a new one.
   [adding characters](./docs/characters/adding-characters.md#the-touch-comfort-rules-strict);
   the registry refuses a fighter that breaks the checkable ones
   (`touchComfortProblems` in `js/data/touch-comfort.js`).
+- **Stage geometry and the Void are a strict rule** (the Void update). Every
+  finite main stage, Practice Ground's included, is exactly
+  `MAIN_STAGE_LENGTH` (1400) long, and every stage's Void, Adamaris's and
+  Practice Ground's included, is the same `VOID_MARGINS` around its main
+  stage (468 past each ledge, 1040 above its top, 400 below), both in
+  `js/data/maps.js`: a stage is built with `mainStageAround` and
+  `voidAround` and never gets a length or margins of its own; whatever
+  sits on it is placed for that size. Overtime closes the Void from every
+  side, the top included, on its accelerating curve
+  (`CONFIG.battle.overtimeVoid`, `closingVoid` / `overtimePressure` in
+  `js/game/physics.js`), never onto the main stage; a match's loser still
+  on the stage is ejected (`Battle.ejectLoser`). Change the shared values,
+  never one stage; after any change to them re-derive the HUD fire
+  (`tests/benchmarks/launch-thresholds.mjs`) and check the stage art at the
+  camera's edges ([stages](./docs/gameplay/stages.md)).
 - Run the tests with `node --test`
   ([testing](./docs/development/testing.md)).

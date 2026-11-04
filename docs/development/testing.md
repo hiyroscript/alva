@@ -25,7 +25,7 @@ a real browser.
 | [`tests/helpers/`](../../tests/helpers/) | `online-app.mjs` (Online Play's screens on a fake DOM, the real room server's code in process, in-memory links in place of the room's relay and a headless other player), `fighter-harness.mjs` (the Fighter on a test stage), `cpu-match.mjs` (a whole seeded match on a real `Battle` between any two controllers, with its measurements), `cpu-scenario.mjs` (one CPU Intelligence on a real `Battle` with the match set up as a scenario needs it: score, clock, overtime and its closing Void, both Launch Points, positions, any opponent), `reference-opponents.mjs` (five scripted reference styles for the CPU benchmark, and `CompetentOpponent`, a scripted regular player: spacing, Shields, whiff punishes, anti-airs, recoveries), `png-art.mjs` (a PNG decoder and just enough canvas to normalize a fighter's real frames), `stylesheet.mjs` (the CSS as the page links it), `fake-gamepad.mjs` (Gamepad-API-shaped PlayStation, Xbox, Nintendo and generic pads with real id strings, and a rig wiring them into a real `ControllerManager` and `InputManager`). |
 | [`tests/online/`](../../tests/online/) | Online Play: two Battles side by side for 6,000 steps with scripted inputs, every fighter on both sides and every stage, their hashes compared every 60 steps, then through the real lockstep over a lossy, uneven link, and a planted difference of a billionth caught as a desync (`determinism`, the most important); the lockstep (`lockstep`: the input frame and its every field, the delay, loss and resends, waiting, the grace and the load allowance, leaving as a forfeit, another match's packets, flushes on both sides, muting, slow motion and the steps-per-frame cap, catching up); the names, room names, codes and the remembered name (`rules`); the itch.io release's hosts and the room server left out of it (`itch-hosts`); the link through the relay: its servers from the room, each player's own password, nothing without them, a match played over it through the real Room code, the link made again between matches once it is old and never during one, the hourly password cap (`match-link`); the relay-only WebRTC link, its scrubbed signalling sent and taken (`peer-privacy`); each match's delay from the measured trip, its range, the start carrying it, the ping probe and one started from round trips already measured (`delay`); and the whole flow on the real room server's code in process (`online-play`: Home's Online play, its size, glows and live connectivity, the name screen, typing in fields, no server, an unreachable one, the lobby, Create room, Join with code, the public list, "Servers are full", the room, the peer link, Ready and the start, the battle with no pause, leaving, an opponent leaving or going silent, the end, Rematch, Leave room, the host closing the room, a failed peer link and Try again, going offline, Copy code, Online play switched off or at its monthly limit in English and French, the matches at once all taken, the relay's passwords for the hour all handed out). |
 | [`server/tests/`](../../server/tests/) | The room server on fake Durable Objects (`fakes.mjs`): the Lobby (`lobby`: creating, validation, unique codes, the public list, joining, `MAX_ROOMS`, the daily budget and its UTC day, storage, rate limits, the sweep), the Rooms (`room`: seats and tokens, what each player sees, fighters and Ready, the start, rematches, the match's packets to the other player and signalling never, leaving, the host closing, reconnects and the grace, idle rooms, reports), the Worker (`worker`: `/health`, the allowed origins, CORS, a WebSocket's Origin, routes), privacy (`privacy`: the signalling scrubbed, the server's and the game's rules the same, the relay's servers handed out with a password from Cloudflare's TURN service (a fake one) that lasts an hour, its addresses picked, no room without the relay's key, no match packet through the room, no address answered, stored, listed or sent, the salted hash, the per-request logs off), the relay's safeguards (`safeguards`: at most `MAX_MATCHES` rooms with both players and two joins for the last place, the month's relay use counted, saved and its safety stop closing Online play until the next month, the reports that keep the count right, the hourly password cap, the `ONLINE_OPEN` switch, `wrangler.toml`'s values), the `pages.dev` gateway (`gateway`) and the rules shared with the game (`rules`). Part of `node --test`; `npm test` in `server/` runs them alone. |
-| [`tests/benchmarks/`](../../tests/benchmarks/) | Not run by `node --test`: `cpu-benchmark.mjs`, the CPU Intelligence match benchmark, and `feel-metrics.mjs`, the combat-feel responsiveness proxies (see below). |
+| [`tests/benchmarks/`](../../tests/benchmarks/) | Not run by `node --test`: `cpu-benchmark.mjs`, the CPU Intelligence match benchmark, `feel-metrics.mjs`, the combat-feel responsiveness proxies, and `launch-thresholds.mjs`, the HUD fire's thresholds re-derived by simulation (see below). |
 
 ## Universal tests and fighter tests
 
@@ -81,6 +81,27 @@ seeded matches of every mode on the modules as they are and bundled with
 the release's own options, and requires the two to agree step for step
 ([the itch.io release](itch-release.md#the-equivalence-check)). Run it
 after a change to the simulation before publishing a release.
+
+## The fire's thresholds
+
+```
+node tests/benchmarks/launch-thresholds.mjs                 # every playable fighter, every stage
+node tests/benchmarks/launch-thresholds.mjs --maps desert   # one stage
+node tests/benchmarks/launch-thresholds.mjs --json out.json # the raw table too
+```
+
+The Launch Point at which the HUD's number burns (`LAUNCH_POINT_FIRE`) and
+turns to an inferno (`LAUNCH_POINT_INFERNO`, both in `js/data/launch.js`),
+found by real launches: one solid 3-damage hit on a fighter caught in the
+air at a jump's height that does nothing to get back, lethal when it is in
+the Void before it could act again (the game's own `launchIsLethal`
+definition), toward the more open ledge, for every playable fighter on
+every stage's regular-time Void. Burning is the highest Launch Point from
+which a Base Launch 3 hit ends a life from a third of the stage in (on the
+stages with ledges), the inferno the highest from which one does from
+anywhere, straight up included; each rounded up to 5. Re-run it whenever the
+stages, the Void or launches change, and set the constants from what it
+prints.
 
 ## The CPU benchmark
 

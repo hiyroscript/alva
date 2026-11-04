@@ -21,9 +21,12 @@ unavailable, with Back to Home.
   draws nobody in and projectiles fly on and expire.
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
-  room as one square grid in one-point perspective: a back wall, and a
-  compact training block with open edges (its top, its outer side past
-  either ledge, a ruler along its front edge). A fighter that falls into the
+  room as one square grid in one-point perspective (70-unit cells running
+  from the room's centre axis): a back wall, and a compact training block
+  with open edges (its top, its outer side past either ledge, a ruler along
+  its front edge), as long as every stage's main stage (`MAIN_STAGE_LENGTH`,
+  1400, its ledges on major grid lines) with the same Void around it
+  (`VOID_MARGINS`: 468 past each ledge, 1040 above, 400 below). A fighter that falls into the
   Void is out of play for 2 seconds, then back at its own spawn in a fresh
   training state: 0 Launch Point, full Energy, every summon and technique cooldown ready and
   nothing transient left, with nothing keeping hold of or aiming at it. You

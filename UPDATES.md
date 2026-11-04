@@ -22,6 +22,7 @@ for where they moved). The game as it is now is specified in
 | **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
 | **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
 | **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
+| **Void update** | PRPLACE | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -5616,5 +5617,240 @@ retired stance mechanic were reworded, nothing else in it.
   same) and `tests/fighters/0006/fighter-0006.test.mjs` (its whole kit
   over a few other seeds: its rare Tornado Spin, as rare before as after,
   5 uses in 33 fights, did not come up on the old ones);
+- unchanged and passing: the online determinism and lockstep tests, the
+  touch and controller comfort rules.
+
+## Void update
+
+Pull request PRPLACE, commits `fc2c114` (one main-stage length, one Void
+pushed back, overtime), `982b009` (the loser ejected, the fire's
+thresholds), `8685674` and `0b3ce8e` (the CPUs, and the tests that follow
+the farther Void) and `75d153d` (the stage art). Asked for in the `max`
+prompt and named there, as new strict rules for the stages and the Void
+(now a strict rule in [`CLAUDE.md`](./CLAUDE.md)): every stage the same
+size with the same Void around it, that Void pushed back, overtime closing
+in much more and faster and faster, the match's loser ejected, the HUD's
+fire re-derived for the farther Void, and the CPUs knowing all of it.
+
+### One main-stage length
+
+`MAIN_STAGE_LENGTH` (1400, `js/data/maps.js`) is every finite main stage's
+`right − left`, built with `mainStageAround(centre, top, bottom)`; each
+stage kept its centre (x 1800; Practice Ground 2000) and its top and
+bottom. Adamaris's continuous beach is excluded from the rule, but its
+combat area was already 1400.
+
+| Stage | Before | After | What moved with the ledges |
+| --- | --- | --- | --- |
+| Yerma | 1120–2480 (1360) | 1100–2500 | the rock outcrops 20 out (`rock-west` x 1210 → 1190, `rock-east` 2200 → 2220), still 90 in from each ledge |
+| Sol-Noir | 1080–2520 (1440) | 1100–2500 | the racks and the bulkhead 20 in with their ledges (`rack-west` 1110 → 1130, `rack-east` 2315 → 2295, `bulkhead` 2432 → 2412, same gaps); the platforms between them drawn in toward the centre by 1400 / 1440 (`billboard` 1245 → 1258, `overpass` 1410 → 1418, `scaffold` 1960 → 1953, `sign-walk` 2160 → 2148; `tower-deck`, centred, unchanged) |
+| Practice Ground | 1360–2640 (1280) | 1300–2700 | spawns unchanged (2000, 2320); its grid now runs from the room's centre axis in 70-unit cells (it was 80 from world 0), so the 1400 block's ledges sit on major lines, 10 cells either way |
+| Asperitas, Adamaris, Jökull | 1100–2500 | unchanged | Asperitas's cloud regions stay disjoint from the main stage (the build check); Jökull's three sections (260 / 880 / 260) still tile it, the centre unbreakable |
+
+Every theme draws the main stage from `map.mainStage`, so the cliff faces,
+facade, slab ends, ruler and side faces follow the new edges with no change
+of their own.
+
+### One Void-free space, pushed back 1.3 times
+
+`VOID_MARGINS` (`js/data/maps.js`) is the Void's margins on every stage,
+Adamaris's and Practice Ground's included, read by `voidAround(main)` (no
+stage has margins of its own any more); the camera is `cameraAround(void)`
+(140 past it, as before). First the shared 360 / 800 / 400 (the most common
+values), fixing Yerma (top 760), Sol-Noir (side 340, bottom 420),
+Asperitas (top 840), Jökull (bottom 420) and Practice Ground (side 380,
+top 760); then the side and top margins pushed back 1.3 times, the bottom
+left alone: **468 past each ledge, 1040 above the main stage's top, 400
+below it**. Asperitas's comment (no jump from its highest cloud reaches the
+top line) was re-checked at both steps: at 800, a Super Jump and both air
+jumps from the cloud's highest (290 over the main cloud) left about 22
+units to spare (the `ordinary jumps never reach the upper Void` test's 20);
+at 1040 about 262.
+
+- **The camera.** Its bounds grow with the Void; the default framing
+  (`computeWorldScale`) reads only the main stage's length and the zoom, so
+  the fight frames exactly as before on desktop and phone landscape (Yerma
+  a hair wider, Sol-Noir a hair closer, now that both are 1400). The
+  neutral view still never shows the Void (`the neutral camera shows no
+  Void` test).
+- **The art.** Every theme paints out to the camera's bounds, so the
+  larger Void shows more sky and more air past the ledges. Each stage got
+  detail there, in its own style, drawn from a random stream of its own
+  (so the rest of its art is exactly as it was), still with reduced motion:
+  Yerma's far rock needles and gold-lit high wisps; Sol-Noir's supertall
+  towers (setbacks, a lit crown, a spire and a blinking red aviation
+  light); Asperitas's towering cumulus far off and drifting altocumulus
+  patches; Adamaris's sailboats, small rocky islets and gulls; Jökull's
+  faint aurora. A sun, moon, cloud or aurora drawn in screen space near the
+  top (Sol-Noir's moon, Adamaris's sun and cumulus, Jökull's aurora and
+  cirrus) keeps below the Void's top line, which used to swallow them at
+  the camera's top edge. Practice Ground's grid already filled any view.
+  Checked with Playwright at 1600 × 900 and phone landscape (844 × 390 at
+  2×), the camera at each corner and edge of its bounds; before and after
+  shots are in [`docs/screenshots/void-update/`](./docs/screenshots/void-update/).
+  The stage previews frame the main stage only, as before.
+- **Adamaris's ground** reaches 2400 past each side of the Void, which is
+  108 further out than before: still deep in the black.
+
+### Overtime closes in much more, faster and faster
+
+- **More, and from the top too.** `CONFIG.battle.overtimeVoid` closes the
+  Void to `sideEndGap` 90 past each ledge (was 120), `bottomEndGap` 100
+  below the main stage's top (was 140) and, new, `topEndGap` 600 above it
+  (the top never moved before). 600 is clear of every jump from the main
+  stage (a Super Jump and both air jumps put a fighter's centre about 490
+  over it), so only a high jump from high footing late on meets it. The
+  pure rule is `closingVoid` (`js/game/physics.js`; `StageCollision.closeVoid`
+  applies it): never past those lines, never outward, at least
+  `MIN_VOID_GAP` (40) past a ledge and below the surface, and the top never
+  within `MIN_VOID_TOP_CLEARANCE` (240) of the stage's highest footing
+  (`StageCollision.highestFooting`: its highest platform, solid or the top
+  of a drifting cloud's region).
+- **Faster and faster.** The pressure is `overtimePressure(progress)`,
+  overtime's progress raised to `closeCurve` (2.2): about a fifth of the
+  way at half time (0.218), the last fifth of overtime closing more than
+  the whole first half. Applied in one place, `Battle.overtimeVoidPressure`
+  handed to `setVoidPressure` each step, so collision, the drawn Void, the
+  CPU and `launchIsLethal` all read the one `stage.void`. All on the
+  simulation clock: the online determinism and lockstep tests pass
+  unchanged.
+- **The waves.** `voidWaveSpeed` is now `1 + (max − 1) × pressure` with
+  `maxWaveSpeedMultiplier` 6 (was 4, on progress²): calm early, frantic at
+  the end, and smooth (the theme still integrates the speed:
+  `advanceVoid`).
+
+### The loser is ejected
+
+`Battle.ejectLoser`, from `finishMatch`: any result with a loser (on time
+on points or on Launch Point, overtime's points or Launch Point, a forfeit)
+whose loser is still in play plays its elimination burst where it stands
+(`HitEffects.addElimination`: its `eliminationPalette`, the flash, the
+shards, the shake; no ripple, it touched no edge; the game has no sound
+yet), then takes it out of play as the Void does (`lostToVoid`, a new
+`ejected` flag, `endMashCombo`, `detachFromPlay`). The result is frozen
+first, so no point, no fall in the statistics, no respawn. A loser the Void
+took (a win by a fall, or one still waiting to respawn at time-up) does not
+burst twice; a draw ejects nobody; a restart or rematch brings it back. The
+winner's celebration needs no opponent (nothing in it reads one), and the
+camera frames whoever is left. Every mode, both browsers of an online match
+(it happens on the step the match ends).
+
+### The fire, re-derived
+
+`tests/benchmarks/launch-thresholds.mjs` re-derives the thresholds by real
+launches: one solid 3-damage hit on a fighter in the air at a jump's height
+that does nothing to get back, lethal when it is in the Void before it
+could act again (the game's own `launchIsLethal` window: the stun and
+`HIT_FX.lethal.grace`), toward the more open ledge, for every playable
+fighter on every stage's regular-time Void. Checked first against the old
+geometry: it gives 65 and 95 where the HUD had 60 and 100.
+
+| Case (highest over the roster) | Before (old Void) | After |
+| --- | --- | --- |
+| Base Launch 3 from a third of the stage in (stages with ledges) | 64 | 70 |
+| Base Launch 2 from 250 in | 77 | 85 |
+| Base Launch 3 from the middle, sideways | 91 | 97 (Adamaris) |
+| Base Launch 3 straight up | 95 | 106 |
+
+So `LAUNCH_POINT_FIRE` is **70** (out below 65) and
+`LAUNCH_POINT_INFERNO` **110** (back below 105). At 70 a Base Launch 2 hit
+is lethal from about 120 to 280 in from the ledge (180 on Yerma, its
+outcrops in the way). The constants moved to `js/data/launch.js` (the HUD
+re-exports them) so the CPU reads them without importing the interface.
+
+### The CPUs
+
+All shared code, never per fighter:
+
+1. **Audit.** No CPU file cached the Void, the stage's length or the old
+   margins: `StageModel` reads `stage.void` live, launch outcomes and
+   recoveries run the real physics against it, edge-guarding holds the
+   real ledge. Two normalisers in `saferSpot` were literals (a 1400 for the
+   stage and an 800 for the side Void) and now read the stage's own length
+   and its centre's distance to the Void it judges by; `crossover`'s 400
+   is two sevenths of the stage's length. No 60 / 100 fire or "kill
+   percent" literal existed.
+2. **Kill range.** `LAUNCH_POINT_SCALE` (`values.js`) is 10 /
+   `LAUNCH_UNIT_SPEED` × `VOID_REACH_SCALE`, the latter
+   `LAUNCH_POINT_INFERNO` / 100 (1.1): every Launch Point scale the CPU
+   reads (a point's worth, the Launch Point lead in `stabilize`, the
+   opponent model's "hurt") follows the farther Void; the launch outcomes
+   themselves need no scale.
+3. **Overtime, read ahead.** `StageModel.forecast` (from `Situation.read`):
+   in overtime the CPU judges by the Void as it will be `VOID_LOOKAHEAD`
+   (1) second from now on the curve (`closingVoid` at the pressure it will
+   have reached, never wider than now on any side, the top included), so
+   its launch outcomes, recoveries and blast room see the edge before it
+   arrives: finishing launches look better as the Void tightens, its own
+   spot riskier.
+4. **Stay central.** `overtimeCentre`: as overtime's Void closes, the room
+   the CPU wants from either ledge grows (up to about a third of the stage,
+   by how well its level reads the stage); with less, it heads back toward
+   the centre, over the opponent's head if it stands in the way. Its
+   footwork keeps more room from the ledges too, and `saferSpot` leans to
+   the centre. In late overtime brutal CPUs starting by a ledge average
+   279 from the centre against 383 in regular time.
+5. **No high jumps late.** `StageModel.jumpClear`: no Super Jump (cornered,
+   crossing over, toward the centre), air jump or climb to footing whose
+   jump would meet the top line it judges by.
+
+**Benchmark** BENCHPLACE
+
+**Where to tune it:**
+- `js/data/maps.js`: `MAIN_STAGE_LENGTH` (1400), `VOID_MARGINS` (468 /
+  1040 / 400), the camera's 140 past the Void (`cameraAround`).
+- `js/config.js`: `CONFIG.battle.overtimeVoid` (`sideEndGap` 90,
+  `bottomEndGap` 100, `topEndGap` 600, `closeCurve` 2.2,
+  `maxWaveSpeedMultiplier` 6); `js/game/physics.js`: `MIN_VOID_GAP` (40),
+  `MIN_VOID_TOP_CLEARANCE` (240).
+- `js/data/launch.js`: `LAUNCH_POINT_FIRE` (70) / `_OUT` (65),
+  `LAUNCH_POINT_INFERNO` (110) / `_OUT` (105); re-derive with
+  `tests/benchmarks/launch-thresholds.mjs`.
+- The CPU: `VOID_REACH_SCALE` (`values.js`), `VOID_LOOKAHEAD`
+  (`stage-model.js`), `overtimeCentre` and the footwork's edge room
+  (`brain.js`).
+
+**Code:** `js/data/maps.js`, `js/data/practice-map.js`,
+`js/data/launch.js`, `js/config.js`, `js/game/physics.js`,
+`js/game/arena.js`, `js/game/battle.js`, `js/game/fighters/fighter.js`
+(`ejected`), `js/ui/hud.js`, `js/game/ai/cpu-intelligence/`
+(`brain.js`, `plans.js`, `situation.js`, `stage-model.js`, `values.js`),
+`js/stages/` (`desert-`, `city-`, `asperitas-`, `adamaris-`, `jokull-` and
+`practice-theme.js`); `ALVA_SPEC.md`, `CLAUDE.md`,
+`docs/gameplay/stages.md`, `battle.md`, `practice.md`,
+`docs/systems/ai.md`, `rendering.md`,
+`docs/architecture/module-responsibilities.md`,
+`docs/development/testing.md`.
+
+**Tests:**
+- the geometry: `tests/systems/platform-stage.test.mjs` (every finite stage
+  `MAIN_STAGE_LENGTH` long and centred where it was; the same Void-free
+  rectangle, 468 / 1040 / 400, built from `VOID_MARGINS`, on every stage;
+  the camera derived from it), `jokull.test.mjs`, `adamaris.test.mjs`,
+  `tests/integration/practice-ground.test.mjs`;
+- overtime: `tests/integration/overtime.test.mjs` (the config; every side
+  closing, the top included, monotonic, each second closing more than the
+  last, under a quarter at half time and on the curve, exact end gaps; the
+  ledges, surface and highest footing always clear whatever the tuning; the
+  waves non-decreasing, smooth and eased to 6×), `jokull` and `adamaris`'s
+  closed Voids;
+- the ejection: `tests/integration/match-score.test.mjs` (time-up on
+  points, on Launch Point either side, a win by a fall and a loser waiting
+  to respawn not bursting twice, a draw, the winner's celebration with
+  nobody there, a rematch) and `overtime.test.mjs` (overtime's points and
+  Launch Point in Quick Battle and Watch Mode, a draw, a forfeit,
+  determinism); `tests/systems/celebration.test.mjs`;
+- the fire: `tests/interface/battle-screen.test.mjs` (70 / 65, 110 / 105),
+  `tests/systems/launch.test.mjs` (the launch module's exports);
+- the CPUs: `tests/systems/cpu-intelligence.test.mjs` (the Void read a
+  second ahead, never wider, the top included; no high jump from high
+  footing late on; the centre held in late overtime),
+  `tests/integration/difficulty.test.mjs` (the scale from both constants),
+  `tests/systems/cpu-behaviour.test.mjs` (its danger scenarios at the new
+  scale, Yerma's ledge at 2500, a CPU's time out of play not counted),
+  `tests/fighters/0007/fighter-0007.test.mjs` (the Sawn-Offs, straight up,
+  now fired on a battered opponent up close: they end a life only from a
+  high Launch Point under the farther top) and `0009` (the rare Air
+  Sphere over two dozen seeds);
 - unchanged and passing: the online determinism and lockstep tests, the
   touch and controller comfort rules.

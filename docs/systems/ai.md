@@ -224,7 +224,18 @@ Each fighter's exposure is read from the real launch rules
 smoothed over about a second, so a step toward a ledge and back changes
 nothing. Overtime's tiebreak is projected to the end of the clock, both
 Launch Points recovering as it runs. The closing Void is in every launch
-prediction, so late overtime makes the stage more dangerous to it.
+prediction, and read a second ahead on its curve (`StageModel.forecast`,
+`VOID_LOOKAHEAD`: `closingVoid` at the pressure overtime will have reached,
+from the clock and `CONFIG.battle.overtimeVoid` anyone can read), so late
+overtime makes the stage more dangerous to it before the edge arrives: its
+own launches look more lethal (it prefers finishing launches as the Void
+tightens), its own position riskier. In overtime it also heads back toward
+the centre as the Void closes (`overtimeCentre`: the room it wants from
+either ledge grows with the closing, up to about a third of the stage, as
+its level reads the stage; over the opponent's head if it stands in the
+way), keeps more room from the ledges in its footwork, and keeps its high
+jumps under the closing top (`StageModel.jumpClear`: no Super Jump, air
+jump or climb to footing whose jump would meet the top line it judges by).
 
 **Persistence.** An objective has a minimum dwell (1.2 s, plus up to 2.3 s
 with the level's `discipline`) and keeps a bonus while it holds; only an
@@ -439,9 +450,13 @@ predicted path, and scored as expected utility:
   fresh point's at 160 × `LAUNCH_POINT_SCALE`, about 229: every Launch
   Point scale the CPU reads, this one, a Launch Point lead's weight in
   `stabilize` and the opponent model's "backing off hurt", is read through
-  `LAUNCH_POINT_SCALE`, 10 / `LAUNCH_UNIT_SPEED`, so they follow the one
-  knob and the CPU is more patient about a finish at a given Launch Point
-  since the launch & energy update), the launch
+  `LAUNCH_POINT_SCALE`, 10 / `LAUNCH_UNIT_SPEED` × `VOID_REACH_SCALE`, so
+  they follow the one knob and the stages' Void: the CPU is more patient
+  about a finish at a given Launch Point since the launch & energy update,
+  and a little more again since the Void update, whose farther Void makes
+  a life last longer (`VOID_REACH_SCALE` is `LAUNCH_POINT_INFERNO` / 100:
+  the Launch Point from which a Base Launch 3 hit ends a life from
+  anywhere, derived by simulation, over the 100 it was), the launch
   judged by the real launch rules (a launch that ends a life is worth
   `KO_VALUE`, more at match point; one that leaves the target off the
   stage an edge-guard), a paralysis (or a float, which holds as one does)
