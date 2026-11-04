@@ -1,100 +1,120 @@
-# Prompt: Stage geometry & Void update
+# Prompt: add the "Screen touch" Mobile Controls scheme to Alva
 
-You are working in the `hiyroscript/alva` repo. Read `CLAUDE.md`, `UPDATES.md`, `ALVA_SPEC.md` and `docs/README.md` first and follow every rule in them (the character system, the protected `character_rule`, controller and touch comfort, never special-casing a fighter id in shared code). Run `node --test` before you start, so you know the baseline, and again at the end. This work is a new named update — call it the **Void update** — and gets its own entry in `UPDATES.md`.
+## Context: read these first
 
-## What exists today (verified in the code)
+You are working in the Alva repo (a browser fighting game, plain ES modules, tests with `node --test`). Before you change anything, read:
 
-- Stage geometry is in `js/data/maps.js`. Each stage has a `*_MAIN` rectangle (`mainStage`) and a `*_VOID` built with `voidAround(main, { side, top, bottom })`: `side` = units past each ledge, `top` = units above the main stage's top, `bottom` = units below the main stage's top. `cameraBounds` is `cameraAround(VOID, 140)`. Practice Ground has its own in `js/data/practice-map.js`.
-- Current values:
+- `CLAUDE.md`, especially the strict rules. **Touch comfort** (`js/data/touch-comfort.js`, `docs/characters/adding-characters.md#the-touch-comfort-rules-strict`) and the movement rule ("Movement is universal": `js/data/movement.js`, no fighter gets its own run, jump or Dash numbers) both apply here.
+- `codename_rule`. `mouvement` / `mouvment` are spelled that way on purpose. Keep the existing codenames: `runLeft`, `runRight`, `down`, `jump`, `mouvementLeft`, `mouvementRight`.
+- `UPDATES.md`, for how named updates are recorded. Call this work the **Screen touch update**: add an entry there, and add the name to the list in `CLAUDE.md`.
+- `ALVA_SPEC.md`, in the parts on Mobile Controls / touch controls, and `docs/README.md` to find the touch-control docs.
 
-| Stage | Main left–right | Main length | Void side | Void top | Void bottom |
-|---|---|---|---|---|---|
-| Desert | 1120–2480 | **1360** | 360 | **760** | 400 |
-| City | 1080–2520 | **1440** | **340** | 800 | **420** |
-| Asperitas | 1100–2500 | 1400 | 360 | **840** | 400 |
-| Adamaris (continuous ground) | 1100–2500 | 1400 (combat area) | 360 | 800 | 400 |
-| Jökull (3 sections 260/880/260) | 1100–2500 | 1400 | 360 | 800 | **420** |
-| Practice Ground | 1360–2640 | **1280** | **380** | **760** | 400 |
+How mobile controls work today (study these files):
 
-  So they do **not** match today. The most common values are main length 1400 and margins side 360 / top 800 / bottom 400.
-- Overtime: `Battle.update` (`js/game/battle.js`) calls `setVoidPressure(this.overtimeProgress)` each step, where `overtimeProgress` is **linear** in overtime time. `Arena.setVoidPressure` (`js/game/arena.js`) calls `StageCollision.closeVoid(progress, CONFIG.battle.overtimeVoid)` (`js/game/physics.js`), which moves the sides linearly toward `sideEndGap` (120) past each ledge and the bottom toward `bottomEndGap` (140) below the top; the top never moves; `MIN_VOID_GAP` 40 is the floor. `Arena.voidWaveSpeed` already rises as `1 + (max − 1)·p²` with `maxWaveSpeedMultiplier` 4. Config is `CONFIG.battle.overtimeVoid` in `js/config.js` (`overtimeSeconds` 60).
-- Match end: `Battle.finishMatch` / `liveResult` decide the loser by points, then by Launch Point at time-out (`reason` `time`, `points`, `overtimePoints`, `overtimeLaunchPoint`, `void`, or a draw). Only a Void fall (`Arena.checkVoid`) plays the elimination burst (`HitEffects` in `js/game/rendering/hit-fx.js`, the burst in the fighter's `eliminationPalette`, plus `addVoidRipple`) and takes the fighter out (`lostToVoid`, `detachFromPlay`). A loser decided by the clock stays standing on screen.
-- The Launch Point fire: `LAUNCH_POINT_FIRE` 60 / `_OUT` 55 and `LAUNCH_POINT_INFERNO` 100 / `_OUT` 95 in `js/ui/hud.js`. The comment there explains they were picked by simulated launches on Yerma against today's Void distances (`LAUNCH_UNIT_SPEED` 7 in `js/data/launch.js`, Base Launch 2/3, 3-damage hit, fighter not recovering). `launchIsLethal` in `hit-fx.js` reads `stage.void` live.
-- The CPU reads the Void live through `js/game/ai/cpu-intelligence/stage-model.js` (`stage.void`), with judgement in `values.js`, `situation.js`, `prediction.js`, `strategy.js`, `defense.js`. There is a benchmark at `tests/benchmarks/cpu-benchmark.mjs`.
-- Each stage theme (`js/stages/*-theme.js`) paints scenery out to `m.cameraBounds`; the drawn Void is `stage-theme.js` `drawVoid`.
-- Tests that touch this: `tests/integration/overtime.test.mjs`, `match-score.test.mjs`, `practice-ground.test.mjs`, `tests/systems/platform-stage.test.mjs`, `jokull.test.mjs`, `adamaris.test.mjs`, `void-ripple.test.mjs`, `launch-bounce.test.mjs`, `stage-hazards.test.mjs`, `platform-hazards.test.mjs`, `tests/interface/battle-screen.test.mjs`.
+- `js/ui/touch-controls.js` has the `TouchControls` class. It currently supports two schemes:
+  - **`joystick`** (the default): a stick that holds `runLeft` / `runRight`, and also holds `down` when pushed mostly downward (`JOYSTICK`, `joystickDirection`, `joystickVertical`). It has two small Dash buttons (`mouvementLeft` / `mouvementRight`, which call `input.queueTouchMouvement(±1)`) and a small Down button.
+  - **`classic`**: Run left / Run right buttons with sliding pointer capture, plus the same Down and Dash buttons.
+  - Both schemes share the lower-right action cluster: Jump in the corner, the fighter's two Mash Combo buttons beside it, Shield above Jump, and the fighter's other moves stacked above.
+  - Pointers are tracked by `pointerId` (`assign`, `bump`, `counts`), and the state goes to `InputManager.setTouch(action, held)`. `setScheme`, `releaseAll`, `applyLayout` and `controlElement` / `getControlElements` are the hooks a new scheme has to plug into.
+- `js/core/settings.js` has `MOBILE_CONTROLS = ['joystick', 'classic']`, `DEFAULT_MOBILE_CONTROLS`, per-scheme `touchLayouts`, and versioned migrations.
+- `js/core/touch-layout.js` has `TOUCH_CONTROL_IDS` per scheme, layout sanitizing, and geometry.
+- `js/ui/settings-dialog.js` has the Mobile Controls picker, with a preview per scheme (`settings-preview--classic`, etc.). The scheme names and descriptions come from `settings.scheme.*` strings in `js/localization/strings/en.js` and `fr.js`.
+- `js/ui/touch-layout-editor.js` is the custom layout editor.
+- `js/core/input-manager.js` has `setTouch`, `queueTouchMouvement`, `clearTouchMouvement`, and the sampling of `mouvementLeftPressed` / `mouvementRightPressed`.
+- `css/touch-controls.css` holds both schemes' styling (`.is-joystick`, `.is-classic`, `.tc-*`).
+- The tests are in `tests/interface/` (for example `controls-ui.test.mjs`), plus the settings and touch-comfort tests.
 
-## Tasks, in order
+## The feature
 
-### 1. One main-stage length everywhere
+Add a third Mobile Controls scheme, **`screen`**, shown to players as **"Screen touch"** (French: "Écran tactile"). It replaces the joystick, the Dash buttons and the Down button with a large **Mouvement pad** covering the left half of the screen. The right half keeps the existing action cluster exactly as it is.
 
-Make every finite main stage exactly **1400** units long (`right − left`). Today that means fixing **Desert** (1360) and **City** (1440), and **Practice Ground** (1280). Adamaris's continuous ground is excluded from the length rule (its `mainStage` is already 1400 as its combat area; leave it).
+### 1. Screen split
 
-- Keep each stage centred where it is (centre x 1800, Practice 2000) unless that breaks something; change `left`/`right`, not `top`/`bottom`.
-- Move whatever sits on or relative to the main stage so it still makes sense: spawns, platforms (City's racks at its ledges, `bulkhead` solid), Desert's rock outcrops, hazard envelopes (Asperitas clouds must stay disjoint from the main stage — the build check enforces it), Jökull's sections must still tile the main stage exactly with the centre one unbreakable.
-- Check the theme art that is drawn to the main stage's edges (cliff faces, slab ends, rubble, ledge details) still lines up.
-- Put the length in one shared constant in `maps.js` (e.g. `MAIN_STAGE_LENGTH = 1400`) and add a test that asserts every finite stage, Practice Ground included, uses it.
+- **Right half:** the existing lower-right action cluster (Jump, Mash Combo pair, Shield, the move stack), unchanged in content, placement rules, scales (130 % / 110 %), flush corner and HUD ceiling. Touching empty space on the right half does nothing.
+- **Left half: the Mouvement pad.** It is one touch surface filling the left half of the touch-control area. It respects the area's safe-area padding and never covers the top HUD (use the same ceiling idea as `setCeiling` / `hudCeiling`). It has no joystick, no Dash buttons and no Down button.
 
-### 2. One Void-free space everywhere
+### 2. Zones inside the Mouvement pad
 
-Make the Void's margins identical on **every** stage, Adamaris and Practice Ground included: side **360**, top **800**, bottom **400** (the most common values today). Fix Desert (top 760), City (side 340, bottom 420), Asperitas (top 840), Jökull (bottom 420), Practice (side 380, top 760). Define the margins once in `maps.js` (e.g. `VOID_MARGINS`) and have every stage use it rather than its own literals. Add a test that the Void-free rectangle (Void minus main stage, measured as margins) is the same on every stage.
+The pad is divided along two axes. Where a finger first lands decides what it does:
 
-Before moving on, confirm Asperitas's top margin change is still safe: its comment says no jump from its highest cloud reaches the top line — re-check that with the new number.
+- **Horizontal: a left side and a right side**, split at the pad's vertical centre line. The side gives the direction (left side → left, right side → right).
+- **Vertical: a Jump zone and a Down zone.** The Jump zone is the upper part and is deliberately **larger than half**. The Down zone is the smaller strip left at the bottom. Put the split in one named constant, for example `SCREEN_PAD.jumpShare = 0.62`, so the Jump zone is the top 62 % of the pad height and the Down zone the bottom 38 %. Tune and justify the value, and keep it a shared, universal value, never per fighter.
 
-### 3. Push the Void back 1.3×
+### 3. Gestures
 
-Once step 2 is in, multiply the **side** and **top** margins by 1.3 and leave the **bottom** alone:
+| Gesture on the pad | Result |
+| --- | --- |
+| Press and **hold** on the left side | Run left (`runLeft` held while the finger stays down) |
+| Press and **hold** on the right side | Run right (`runRight` held) |
+| **Double tap** on the left side | Dash left: one `queueTouchMouvement(-1)`, same as the old `mouvementLeft` button |
+| **Double tap** on the right side | Dash right: one `queueTouchMouvement(1)` |
+| Finger goes down in the **Jump zone** | Jump (`jump` pressed, held while the finger stays down, so short-hop vs full jump and Super Jump keep working as they do with the Jump button) |
+| Finger held in the **Down zone** | Down (`down` held: fast fall in the air, drop-through on a one-way platform, Super Jump with Jump, as the existing Down button and stick-down do) |
 
-- side 360 → **468** past each ledge
-- top 800 → **1040** above the main stage's top
-- bottom stays **400**
+Rules that make these combine predictably:
 
-(1.3× applies to the margin — the distance from the ledge / from the stage top — not to the whole rectangle from the stage centre.) This must still be the one shared value, so every stage gets the same pushed-back Void. Update the tests from step 2 to the new numbers.
+- A finger always holds the run direction of the side it is on, in either zone. Landing in the Jump zone on the right side jumps **and** runs right, which gives a running jump. Holding in the Down zone on the left side holds Down **and** runs left, matching the joystick's diagonal behaviour.
+- **Double tap:** two touch-downs on the **same side** within `SCREEN_PAD.doubleTapMs` (start around 250 ms; tune it). The first touch must be shorter than a tap limit (for example 200 ms) and must not move more than a small slop distance (for example 24 px). The second touch-down queues the Dash. If the second touch-down lands in the Jump zone, it **dashes and does not jump again**, so a double tap never spends the double jump by accident. If the second finger stays down after the Dash, it carries on as a normal hold (keeps running in that direction).
+- **Sliding:** keep the pad's pointer captured (as Classic does with `dpad.setPointerCapture`). A held finger that slides across the centre line switches run direction. One that slides into the Down zone starts holding Down, and one that slides out of it releases Down (use a little hysteresis, like `joystickVertical`, so a thumb resting on the line doesn't flicker). Sliding up into the Jump zone does **not** trigger a Jump: Jump fires only on touch-down, so a run never jumps by itself.
+- **Multi-touch:** a second finger on the pad is its own pointer. Shared actions are reference-counted through the existing `assign` / `bump` / `counts` path. Left and right held at once resolve the same way they do today with both Run buttons held. Fingers on the right-half action buttons keep working at the same time as the pad.
+- Use only the existing InputManager entry points (`setTouch`, `queueTouchMouvement`). Do not add new input codenames. The game must not be able to tell a Screen touch run, Dash, Jump or Down from the existing buttons.
+- `releaseAll`, `setEnabled(false)`, a scheme switch, pause and orientation change must let go of everything on the pad and clear its pending double-tap state.
 
-Consequences to handle:
+### 4. The Mouvement pad is always invisible
 
-- `cameraBounds` grows with it (it is derived). Check the camera still frames the fight well at the new size on desktop and phone landscape (`js/game/rendering/camera.js`, the camera & mobile layout update in `UPDATES.md`); don't let the default framing zoom out noticeably during normal play.
-- **Stage art.** Every theme paints out to `cameraBounds`, so now there is more open air at the sides and above. Open each stage (run the game, screenshot with Playwright at desktop and phone-landscape sizes, with the camera pushed to each corner of its bounds) and look for: scenery ending in a visible edge, stretched or tiled-looking backgrounds, empty sky bands, parallax layers that run out, the Void's edge showing through where it used to be hidden. Add real detail where the space now looks empty or unfinished, in each stage's existing style — e.g. more dunes / distant mesas / rock spires for Desert, more skyline, towers, rooftops and signage for City, more cloud banks and sky layers for Asperitas, more sea, horizon, distant islands and sky for Adamaris, more ice cliffs, peaks and aurora for Jökull, more grid for Practice. Respect `reducedMotion`. Keep the stage previews (`js/ui/stage-preview.js`) looking right too.
-- `ground.reach` on Adamaris: confirm the continuous ground still runs well past the wider Void.
+The pad must be **invisible at all times**. It is an invisible touch zone over the left half of the screen, so the player sees the fight and nothing else there:
 
-### 4. Overtime closes in much more, and faster and faster
+- Draw nothing for it: no fill, no outline, no dividers, no glyphs, no labels. Don't show a highlight when a finger is on it or a flash when a Dash happens. It is fully transparent (for example `background: transparent; border: none`, with no child art). It still catches touches: don't use `hidden`, `display: none`, `visibility: hidden` or `pointer-events: none` on it.
+- The joystick, the Dash buttons and the Down button are not shown in this scheme. The right-half action buttons stay visible as they are now.
+- The zones are only maths on the pointer position (the side from the centre line, Jump or Down from `SCREEN_PAD.jumpShare`). Nothing on screen shows them.
+- The pad stays accessible even though nothing draws it: `role="group"` with a translated `aria-label` (for example `touch.screenPad`). The assistive-click fallback in `build()` keeps working.
+- Since the player can't see the zones, the settings preview (section 5) and the scheme description are where the layout gets explained.
+- The pad can still carry state classes (`is-left`, `is-right`, `is-down`, `is-jump`) for tests and debugging, but those classes must never change how anything looks.
 
-Overtime should squeeze the arena **noticeably more** than today and accelerate:
+### 5. Settings, persistence, editor
 
-- **More closure.** Lower the end gaps in `CONFIG.battle.overtimeVoid` so the final Void is clearly tighter than now (currently 120 past each ledge and 140 below the top), starting from the new, larger margins. Also let the **top** close in during overtime (add a `topEndGap`, e.g. well above the highest jump/platform but far below 1040, and extend `closeVoid` to move the top edge the same way; never below the highest reachable footing plus a safe gap, never past `MIN_VOID_GAP`). Standing on the main stage must always remain safe, as `closeVoid` guarantees today.
-- **Accelerating closure.** Replace the linear progress with an easing that starts slow and speeds up continuously to the end — e.g. `pressure = t^k` with `k` around 2–2.5, where `t = overtimeProgress`; put the curve's exponent in `CONFIG.battle.overtimeVoid` (e.g. `closeCurve`). Apply it in one place (where `Battle.update` feeds `setVoidPressure`, or inside `setVoidPressure`), so collision, drawing, the CPU and `launchIsLethal` all keep reading the single `stage.void` in force.
-- **Waves accelerate with it.** The drawn waves must visibly speed up progressively as the Void closes. They already scale with `p²`; make them follow the new pressure and raise `maxWaveSpeedMultiplier` if needed so the end of overtime is clearly frantic. Wave speed must change smoothly (no jumps in wave phase — `advanceVoid` integrates speed, keep it that way).
-- Online play must stay deterministic: everything stays on the simulation clock (`js/online/lockstep.js`).
-- Update `tests/integration/overtime.test.mjs`: closure is monotonic, slower early than late (e.g. less than a quarter of the distance closed by half time with k=2), reaches the new end gaps at t=1, the top edge now closes, the main stage stays safe, and wave speed is non-decreasing.
+- Add `'screen'` to `MOBILE_CONTROLS`. **Joystick stays the default.** Bump the settings version and add a migration that keeps every stored choice and layout. Add tests for the migration.
+- Add `settings.scheme.screen` and `settings.scheme.screenDesc` in **every** strings file (`en.js`, `fr.js` and any others; `i18n.test.mjs` should pass). Suggested English description: "The left half of the screen is your Mouvement pad. Hold a side to run, double tap a side to Dash, touch the top part to jump and hold the bottom strip for Down. The pad is invisible."
+- Add a `settings-preview--screen` preview in `settings-dialog.js`: a mini screen with the split pad on the left and the action cluster on the right.
+- `TOUCH_CONTROL_IDS.screen`: the pad itself (for example `'pad'`) plus the shared action ids. Decide and document whether the pad can be moved or resized in the layout editor. Recommended: the action buttons stay customizable as in the other schemes, while the pad stays locked to the left half (it shows in the editor but cannot be dragged or resized), because its job is to *be* the half screen. Update `touch-layout-editor.js` to match, and make sure `sanitizeTouchLayout('screen', …)` drops anything that isn't allowed.
+- `controlElement`, `getControlElements`, `applyLayout` and `setScheme` must handle `'screen'`, adding `is-screen` and `data-scheme="screen"` on the root, without breaking the other two schemes.
 
-### 5. The loser is ejected
+### 6. Strict rules to respect
 
-Whenever the match elects a loser (`finishMatch`, any reason that isn't a draw — clock time-out on points, time-out on Launch Point, overtime points, overtime Launch Point) and the loser is **still in play and visible** (not `lostToVoid`), play the same ejection as a Void fall at their position — the elimination burst in their `eliminationPalette` with its flash, shake and sound — and make them disappear (take them out of play the way `checkVoid`/`detachFromPlay` does, so they're undrawn and untargetable). It's purely presentation and state for the end of the match: it must **not** score a point, count as a fall in match statistics, trigger a respawn, or change the frozen result. A loser already taken by the Void doesn't burst twice. A draw ejects nobody. Make the winner's celebration (`js/game/ai/celebration.js`) work with an absent opponent. Same in Local Play and online. Add tests to `match-score.test.mjs` / `overtime.test.mjs` for each reason.
+- **Touch comfort:** this is a universal control, the same for every fighter. No fighter places, sizes or changes the pad. The right cluster's rules (only the Mash Combo pair beside Jump, 130 % / 110 %, flush corners, nothing past the top HUD) are unchanged. `touchComfortProblems` must still pass for the whole roster.
+- **Movement is universal:** the pad only sends the existing inputs, so run, jump and Dash physics stay in `js/data/movement.js`. Don't touch the tuning.
+- Never special-case a fighter id in shared code.
 
-### 6. Recalculate the fire thresholds
+### 7. Tests (`node --test` must be fully green)
 
-With the Void farther away, 60 / 100 no longer mean "the next hit can end you". Re-derive `LAUNCH_POINT_FIRE`, `LAUNCH_POINT_FIRE_OUT`, `LAUNCH_POINT_INFERNO` and `LAUNCH_POINT_INFERNO_OUT` in `js/ui/hud.js` **by simulation, the same method as the comment there**, against the new geometry (side 468, top 1040, bottom 400, main 1400):
+Add tests next to the existing touch-control tests (for example in `tests/interface/controls-ui.test.mjs`, or a new `screen-touch.test.mjs`), using the repo's fake DOM and pointer helpers. They should cover:
 
-- Burning (tier 1): the Launch Point from which a solid Base Launch 2 hit (3 damage) carries a fighter in the air near the ledge into the Void, and a Base Launch 3 hit does from about a third of the stage — i.e. the next hit is a real danger.
-- Inferno (tier 2): the point from which a Base Launch 3 hit ends a life from anywhere on the stage, straight up included.
-- Keep the 5-point hysteresis for going out. Write the simulation as a reusable script or test (e.g. under `tests/benchmarks/`) so the numbers can be re-derived later, and rewrite the comment in `hud.js` with the new numbers and what they mean. Check other fighters too, not only Yerma, and pick numbers that hold across the roster.
-- Check it against regular-time geometry, not overtime's closing Void (overtime is meant to be more dangerous than the fire says). Update tests that pin the old values, and the docs/spec that mention 60/100.
+1. A hold on the left side holds `runLeft`, and lifting releases it. Same for the right side.
+2. A double tap on the left side queues exactly one Dash left (`mouvementLeftPressed` on the next sample only). Same for the right side.
+3. Two taps too far apart in time, on different sides, or with a long first press do **not** Dash.
+4. Touch-down in the Jump zone presses `jump`. Sliding up into the Jump zone during a run does not.
+5. The Jump/Down boundary sits at `SCREEN_PAD.jumpShare` (more than 0.5) of the pad height. A press just above it jumps, and one just below holds Down.
+6. Down held in the Down zone with a side gives Down and the run together. Sliding in and out of the Down zone uses hysteresis.
+7. A double tap whose second tap lands in the Jump zone dashes without a second jump.
+8. Pad and action buttons work together with several fingers, and `releaseAll` / scheme switch leave nothing held.
+9. The pad is invisible (it draws nothing: no art, glyphs, dividers or pressed look) yet still receives touches whenever the scheme is on. It is never inside the top HUD, and the old joystick, Dash and Down buttons aren't shown.
+10. The settings migration, the new strings in every language, and the touch-comfort checks for the whole roster.
 
-### 7. CPUs must know all of this
+### 8. Docs and wrap-up
 
-- The CPU already reads `stage.void` live; verify no CPU file caches Void distances, stage length, or hard-codes the old margins or old fire thresholds / "kill percent" assumptions. Search `js/game/ai/` for numeric constants tied to distances to the Void, edge-guard ranges, recovery distances, "safe Launch Point" values and the 60/100 thresholds; retune or derive them from the stage and launch data.
-- Their idea of when they or the opponent are in kill range must use the new thresholds (step 6) and the real geometry.
-- In overtime they must react to the accelerating, tightening Void, including the new closing top: stay central, avoid high jumps late in overtime, prefer finishing launches as the Void tightens, and anticipate where the edge will be soon (they can read the curve from config, not just the current rectangle).
-- Edge-guarding and recovery decisions must account for the longer sides (more room to recover from, longer way back).
-- Run `tests/benchmarks/cpu-benchmark.mjs` before and after; regressions in win rate balance, self-destructs (CPU falling into the Void on its own) or match length need fixing. Report the before/after numbers.
+- Update `ALVA_SPEC.md` and the touch-controls docs with the new scheme, its zones, its gestures and its constants.
+- Update the header comment at the top of `js/ui/touch-controls.js` to describe the third scheme in the same style as the existing ones, with a small ASCII sketch of the pad:
 
-## Finishing
+  ```
+  +-----------+-----------+
+  |    <-     |    ->     |
+  |   JUMP    |   JUMP    |   <- upper ~62 %
+  +-----------+-----------+
+  |  DOWN  <- |  DOWN  -> |   <- lower ~38 %
+  +-----------+-----------+
+     double tap a side = Dash that way
+  ```
 
-- `node --test` all green; add the tests listed above.
-- Update `ALVA_SPEC.md`, `docs/` (stages, overtime, Launch Point HUD, CPU), the comments in `maps.js`, `physics.js` (`closeVoid`), `arena.js`, `battle.js`, `hud.js`.
-- Add the **Void update** entry to `UPDATES.md` (what it is, PR, where the tuning lives: `MAIN_STAGE_LENGTH`, `VOID_MARGINS`, `CONFIG.battle.overtimeVoid`, the fire thresholds; which tests cover it).
-- Attach before/after screenshots of every stage at the camera's edges.
-- Branch, commit and open a pull request; don't push to `main` directly.
-
-
-these are new strict rules for the stages and void.
+- Add the **Screen touch update** entry to `UPDATES.md`: what it is, where its tuning lives (`SCREEN_PAD`), and which tests cover it. Add the name to `CLAUDE.md`'s list of named updates.
+- If there's a screenshots folder for touch layouts in `docs/screenshots`, add a landscape phone screenshot of the new scheme in battle, taken with Playwright.
+- Commit on a new branch and open a pull request describing the change.
