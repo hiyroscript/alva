@@ -75,7 +75,7 @@ test('the room as each player sees it: names, fighters, Ready, connection; never
   assert.equal(view.you, 'guest');
   assert.equal(host.last.you, 'host');
   assert.deepEqual(view.room, { ...view.room, id: created.room.id, code: created.room.code, status: 'full', mode: 'quick-battle' });
-  assert.deepEqual(view.players.host, { name: 'Chris', fighterId: null, ready: false, connected: true, rematch: false });
+  assert.deepEqual(view.players.host, { name: 'Jules', fighterId: null, ready: false, connected: true, rematch: false });
   assert.equal(view.players.guest.name, 'Sam');
   assert.doesNotMatch(JSON.stringify([...host.sent, ...guest.sent]), /token|session/);
 });
@@ -112,7 +112,7 @@ test('the start: only the host, only with both ready; the room fills in the play
   assert.deepEqual(hs, gs, 'both get the same start');
   assert.deepEqual(hs, {
     type: 'start', match: 1, seed: 123456,
-    p1: { name: 'Chris', fighterId: '0001', turn: false },
+    p1: { name: 'Jules', fighterId: '0001', turn: false },
     p2: { name: 'Sam', fighterId: '0003', turn: true },
   });
   assert.equal(guest.last.room.status, 'playing');

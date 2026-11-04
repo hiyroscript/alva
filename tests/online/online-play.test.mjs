@@ -37,7 +37,7 @@ const acknowledge = async (app) => {
 };
 
 // From Home to the lobby as `name`.
-async function toLobby(booted, name = 'Chris') {
+async function toLobby(booted, name = 'Jules') {
   const { app, screens } = booted;
   screens.home.actions.online.click();
   assert.equal(current(app), 'online-name');
@@ -249,7 +249,7 @@ test('no room server configured (CONFIG.online.serverUrl empty): after the name,
   const booted = boot({ serverUrl: '' });
   const { app, screens } = booted;
   screens.home.actions.online.click();
-  screens.name.field.input.type_('Chris');
+  screens.name.field.input.type_('Jules');
   screens.name.continueButton.click();
   await settleAll();
   assert.equal(dialogOpen(app), true);
@@ -264,7 +264,7 @@ test('a server that cannot be reached is "unavailable" too, never "full"', async
   const broken = { ...server, fetchImpl: () => Promise.reject(new TypeError('network')) };
   const { app, screens } = boot({ server: broken });
   screens.home.actions.online.click();
-  screens.name.field.input.type_('Chris');
+  screens.name.field.input.type_('Jules');
   screens.name.continueButton.click();
   await settleAll();
   assert.equal(dialogText(app), "Online play unavailable — Online play is unavailable right now. The room server can't be reached from here: it may be down, or blocked on this network.");
@@ -276,7 +276,7 @@ test('a server that refuses this page\'s address says so, without showing the ad
   const server = backend({ ALLOWED_ORIGINS: 'https://html.itch.zone' }, { origin: 'https://html-classic.itch.zone' });
   const { app, screens } = boot({ server });
   screens.home.actions.online.click();
-  screens.name.field.input.type_('Chris');
+  screens.name.field.input.type_('Jules');
   screens.name.continueButton.click();
   await settleAll(10);
   assert.equal(dialogText(app), "Online play unavailable — Online play is unavailable right now. The room server doesn't accept this page's address.");
@@ -300,7 +300,7 @@ test('a server whose rooms fail says the server answers but its rooms do not, an
   console.error = () => {};
   try {
     screens.home.actions.online.click();
-    screens.name.field.input.type_('Chris');
+    screens.name.field.input.type_('Jules');
     screens.name.continueButton.click();
     await settleAll(10);
   } finally {
@@ -314,12 +314,12 @@ test('a server whose rooms fail says the server answers but its rooms do not, an
 test('the lobby: Create room (its dialog: the name to start from, Public or Private, the one mode), into the room', async () => {
   const booted = boot();
   const { app, screens } = booted;
-  await toLobby(booted, 'Chris');
+  await toLobby(booted, 'Jules');
   assert.equal(text(screens.lobby.listStatus), 'No public rooms right now. Create one!');
   screens.lobby.createButton.click();
   await settle();
   const dialog = app.createRoomDialog;
-  assert.equal(dialog.field.input.value, "Chris's room");
+  assert.equal(dialog.field.input.value, "Jules's room");
   assert.deepEqual(dialog.visibilityButtons.map((b) => b.getAttribute('aria-checked')), ['true', 'false'], 'Public by default');
   assert.deepEqual(dialog.modeButtons.map((b) => [b.getAttribute('data-mode'), b.getAttribute('aria-checked'), text(b)]), [['quick-battle', 'true', 'Quick battle']],
     'Quick Battle, the one mode, shown as a choice of one');
@@ -341,7 +341,7 @@ test('the lobby: Create room (its dialog: the name to start from, Public or Priv
   assert.equal(text(room.modeChip), 'Quick battle');
   assert.equal(text(room.stageLine), 'Stage: drawn at random when the match starts');
   assert.equal(text(room.statusLine), 'Share the room code with a friend, or wait for someone to join.');
-  assert.equal(text(room.seats.host.root.querySelector('.online-seat-name')), 'Chris');
+  assert.equal(text(room.seats.host.root.querySelector('.online-seat-name')), 'Jules');
   assert.equal(room.seats.host.root.querySelector('.online-mark--you').hidden, false, 'You');
   assert.equal(text(room.seats.guest.root.querySelector('.online-seat-name')), 'Waiting for a player to join…');
   assert.equal(room.readyButton.disabled, true, 'nobody to play yet');
@@ -352,7 +352,7 @@ test('the lobby: Create room (its dialog: the name to start from, Public or Priv
   try {
     screens.lobby.createButton.click();
     await settle();
-    assert.equal(dialog.field.input.value, 'Salle de Chris');
+    assert.equal(dialog.field.input.value, 'Salle de Jules');
     dialog.close(null);
   } finally {
     setLanguage('en');
@@ -364,7 +364,7 @@ test('Join with code: any case, a malformed code said at once, a code nobody has
   const { app, screens, server, hub } = booted;
   const host = otherPlayer(server, hub, { name: 'Ana' });
   await host.session.createRoom({ name: "Ana's room", visibility: 'private', mode: 'quick-battle' });
-  await toLobby(booted, 'Chris');
+  await toLobby(booted, 'Jules');
   assert.equal(text(screens.lobby.listStatus), 'No public rooms right now. Create one!', 'a private room is never listed');
   const code = screens.lobby.code;
   code.input.type_('ab0');
@@ -401,7 +401,7 @@ test('the public list: rooms by name, host, mode and players, Join for an open o
   await b.session.createRoom({ name: 'Busy room', visibility: 'public', mode: 'quick-battle' });
   const c = otherPlayer(server, hub, { name: 'Cal' });
   await c.session.joinRoom({ code: b.session.room.code });
-  await toLobby(booted, 'Chris');
+  await toLobby(booted, 'Jules');
   await settleAll();
   const rows = screens.lobby.list.children;
   assert.deepEqual(rows.map((r) => text(r.querySelector('.online-room-name'))), ['Busy room', 'Open room']);
@@ -463,7 +463,7 @@ test('the room: the guest arrives, both browsers connect, fighters and Ready; th
   // Both get the same start: the seed, the fighters, the names.
   const start = app.online.start;
   assert.deepEqual(start, guest.session.start);
-  assert.equal(start.p1.name, 'Chris');
+  assert.equal(start.p1.name, 'Jules');
   assert.equal(start.p2.name, 'Sam');
   assert.equal(start.p1.fighterId, TEST_A.id);
   assert.equal(start.p2.fighterId, TEST_B.id);
@@ -473,9 +473,9 @@ test('the room: the guest arrives, both browsers connect, fighters and Ready; th
   assert.equal(battle.battle.map.id, other.battle.map.id, 'the same on both sides');
   assert.equal(battle.revealName.textContent, `${battle.battle.map.name}`, 'the drawn stage shows over the intro');
   assert.equal(battle.localSlot, 'p1', 'the host plays p1');
-  assert.equal(battle.battle.p1.label, 'Chris');
+  assert.equal(battle.battle.p1.label, 'Jules');
   assert.equal(battle.battle.p2.label, 'Sam');
-  assert.equal(battle.hud.left.tag.textContent, 'Chris', 'the HUD names the players');
+  assert.equal(battle.hud.left.tag.textContent, 'Jules', 'the HUD names the players');
   assert.equal(battle.hud.right.tag.textContent, 'Sam');
   assert.deepEqual(battle.battle.markerColors, CONFIG.online.colors);
   assert.ok(battle.el.classNames.has('is-online'));
@@ -574,7 +574,7 @@ test('the match\'s end: from this player\'s side, then Rematch (both accept, a n
   assert.equal(text(battle.toastText), 'You win!');
   battle.openResults();
   assert.deepEqual(battle.resultsActions.map(text), ['Rematch', 'Leave room']);
-  assert.deepEqual(battle.resultsLine.children.map(text), ['Chris — WINNER', 'Sam — DEFEATED']);
+  assert.deepEqual(battle.resultsLine.children.map(text), ['Jules — WINNER', 'Sam — DEFEATED']);
   assert.equal(text(battle.resultsTeams.p2.name), 'Sam');
   battle.rematchButton.click();
   await settleAll();
@@ -724,7 +724,7 @@ test('Online play switched off (ONLINE_OPEN "false"): after the name, "Online pl
   const booted = boot({ server });
   const { app, screens } = booted;
   screens.home.actions.online.click();
-  screens.name.field.input.type_('Chris');
+  screens.name.field.input.type_('Jules');
   screens.name.continueButton.click();
   await settleAll();
   assert.equal(dialogText(app), 'Online play closed — Online play is closed right now. Please try again later.');

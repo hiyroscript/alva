@@ -10,7 +10,7 @@ import * as game from '../../js/online/rules.js';
 import { CONFIG } from '../../js/config.js';
 
 const NAMES = [
-  'Chris', 'Zoë', 'Łukasz', 'Ана', 'さくら', '김민준', 'محمد', 'राम', 'Ngô Bảo', "O'Neil", 'mr.x', 'a_b-c', '  spaced   out  ',
+  'Jules', 'Zoë', 'Łukasz', 'Ана', 'さくら', '김민준', 'محمد', 'राम', 'Ngô Bảo', "O'Neil", 'mr.x', 'a_b-c', '  spaced   out  ',
   'd’Arc', 'A', 'AB', 'x'.repeat(16), 'x'.repeat(17), '<script>', 'a&b', 'Neo😎', '1️⃣2', 'tab\there', 'line\nbreak', 'bell\u0007',
   'zero​width', '--', '..', "''", '42', '', '   ', 'José', 'José', 'ﬁne', 'Ⅻ', '²²', 'emoji️',
 ];
@@ -21,7 +21,7 @@ test('names: the server cleans and accepts exactly what the game does', () => {
     const s = server.validName(raw);
     assert.equal(s, g.ok ? g.value : null, JSON.stringify(raw));
   }
-  for (const raw of [...NAMES, "Chris's room", 'Salle de Chris', 'r'.repeat(24), 'r'.repeat(25)]) {
+  for (const raw of [...NAMES, "Jules's room", 'Salle de Jules', 'r'.repeat(24), 'r'.repeat(25)]) {
     const g = game.checkRoomName(raw);
     assert.equal(server.validRoomName(raw), g.ok ? g.value : null, JSON.stringify(raw));
   }

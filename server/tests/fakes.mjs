@@ -217,7 +217,7 @@ let sessions = 0;
 export const newSession = () => (++sessions).toString(16).padStart(16, 'a');
 
 export const createBody = (over = {}) => ({
-  name: "Chris's room", playerName: 'Chris', visibility: 'public', mode: 'quick-battle', session: newSession(), version: VERSION, ...over,
+  name: "Jules's room", playerName: 'Jules', visibility: 'public', mode: 'quick-battle', session: newSession(), version: VERSION, ...over,
 });
 
 export const joinBody = (over = {}) => ({ playerName: 'Sam', session: newSession(), version: VERSION, ...over });

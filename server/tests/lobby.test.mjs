@@ -26,11 +26,11 @@ test('creating a room: a public or private room with a code from the unambiguous
   for (const c of data.room.code) assert.ok(CODE_ALPHABET.includes(c), `${c} is in the alphabet`);
   assert.doesNotMatch(data.room.code, /[01OIL]/, 'nothing ambiguous');
   assert.deepEqual({ ...data.room, id: undefined, code: undefined }, {
-    id: undefined, code: undefined, name: "Chris's room", host: 'Chris', visibility: 'public', mode: 'quick-battle', players: 1, status: 'open',
+    id: undefined, code: undefined, name: "Jules's room", host: 'Jules', visibility: 'public', mode: 'quick-battle', players: 1, status: 'open',
   });
   // The Room knows its host, and nobody else.
   const r = room(data.room.id);
-  assert.equal(r.state.seats.host.name, 'Chris');
+  assert.equal(r.state.seats.host.name, 'Jules');
   assert.equal(r.state.seats.guest, null);
   const priv = await body(await post(env, '/rooms', createBody({ visibility: 'private', name: 'Back room' })));
   assert.equal(priv.room.visibility, 'private');

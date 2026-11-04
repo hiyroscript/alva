@@ -16,7 +16,7 @@ import { setLanguage, t } from '../../js/localization/i18n.js';
 
 test('names: 2 to 16 characters, any language\'s letters, digits, spaces and _ - . \'', () => {
   assert.deepEqual({ ...NAME_LIMITS }, { min: 2, max: 16 });
-  for (const ok of ['Chris', 'Zoë', 'Łukasz', 'Ана', 'さくら', '김민준', 'محمد', 'राम', 'Ngô Bảo', "O'Neil", 'mr.x', 'a_b-c', '42', 'Jo']) {
+  for (const ok of ['Jules', 'Zoë', 'Łukasz', 'Ана', 'さくら', '김민준', 'محمد', 'राम', 'Ngô Bảo', "O'Neil", 'mr.x', 'a_b-c', '42', 'Jo']) {
     assert.deepEqual(checkName(ok), { ok: true, value: ok }, ok);
   }
   assert.equal(checkName('x'.repeat(16)).ok, true);
@@ -32,7 +32,7 @@ test('names: 2 to 16 characters, any language\'s letters, digits, spaces and _ -
 });
 
 test('names are cleaned: composed, one space at a time, trimmed, a typographic apostrophe read as \'', () => {
-  assert.equal(cleanName('  Chris   the   Great  '), 'Chris the Great');
+  assert.equal(cleanName('  Jules   the   Great  '), 'Jules the Great');
   assert.equal(cleanName('tab\there\nand there'), 'tab here and there');
   assert.equal(cleanName('d’Arc'), "d'Arc");
   assert.equal(cleanName('José'), 'José', 'composed (NFC)');
@@ -47,11 +47,11 @@ test('a room\'s name: the same rules up to 24 characters, starting from "{name}\
   assert.equal(checkRoomName('r'.repeat(24)).ok, true);
   assert.equal(checkRoomName('r'.repeat(25)).error, 'long');
   setLanguage('en');
-  assert.equal(t('online.roomDefault', { name: 'Chris' }), "Chris's room", 'a name ending in s reads fine');
+  assert.equal(t('online.roomDefault', { name: 'Jules' }), "Jules's room", 'a name ending in s reads fine');
   assert.equal(t('online.roomDefault', { name: 'Sam' }), "Sam's room");
   setLanguage('fr');
   try {
-    assert.equal(t('online.roomDefault', { name: 'Chris' }), 'Salle de Chris');
+    assert.equal(t('online.roomDefault', { name: 'Jules' }), 'Salle de Jules');
     // The longest name (16) makes 25 characters in French: fitted to 24.
     const long = 'Abcdefghijklmnop';
     assert.equal(fitName(t('online.roomDefault', { name: long })), 'Salle de Abcdefghijklmno');
@@ -60,7 +60,7 @@ test('a room\'s name: the same rules up to 24 characters, starting from "{name}\
     setLanguage('en');
   }
   // Every default is itself a valid room name.
-  for (const name of ['Jo', 'Chris', "O'Neil", 'x'.repeat(16), 'さくら']) {
+  for (const name of ['Jo', 'Jules', "O'Neil", 'x'.repeat(16), 'さくら']) {
     assert.equal(checkRoomName(fitName(t('online.roomDefault', { name }))).ok, true, name);
   }
 });
