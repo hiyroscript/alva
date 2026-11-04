@@ -22,7 +22,7 @@ for where they moved). The game as it is now is specified in
 | **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
 | **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
 | **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
-| **Void update** | PRPLACE | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
+| **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -5622,7 +5622,7 @@ retired stance mechanic were reworded, nothing else in it.
 
 ## Void update
 
-Pull request PRPLACE, commits `fc2c114` (one main-stage length, one Void
+Pull request [#177](https://github.com/hiyroscript/alva/pull/177), commits `fc2c114` (one main-stage length, one Void
 pushed back, overtime), `982b009` (the loser ejected, the fire's
 thresholds), `8685674` and `0b3ce8e` (the CPUs, and the tests that follow
 the farther Void) and `75d153d` (the stage art). Asked for in the `max`
@@ -5794,7 +5794,32 @@ All shared code, never per fighter:
    crossing over, toward the centre), air jump or climb to footing whose
    jump would meet the top line it judges by.
 
-**Benchmark** BENCHPLACE
+**Benchmark** (`node tests/benchmarks/cpu-benchmark.mjs --seeds 1 --maps <stage> --only <matchup>`,
+each matchup over all 121 pairings both ways round: 242 games; before is
+the commit before the update, after is the update; the first side's win
+rate with its 95 % interval, accidental self-eliminations first side /
+second side, and the average match length):
+
+| Stage, matchup | Win rate before → after | Self-eliminations | Match length |
+| --- | --- | --- | --- |
+| Yerma, Brutal v Hard | 90.1 % [86–93] → 88.4 % [84–92] | 1/0 → 1/1 | 136 → 151 s |
+| Yerma, Brutal v Medium | 99.2 % → 99.2 % | 0/0 → 3/1 | 100 → 119 s |
+| Yerma, Hard v Medium | 88.4 % [84–92] → 93.4 % [90–96] | 1/1 → 1/3 | 136 → 153 s |
+| Yerma, Medium v Easy | 100.0 % → 100.0 % | 1/0 → 2/1 | 117 → 133 s |
+| Yerma, Hard v Easy | 100.0 % → 100.0 % | 0/0 → 2/0 | 89 → 101 s |
+| Yerma, Brutal v each reference style | 100.0 % each → 100.0 % each | e.g. projectile 7/23 → 5/34, defensive 6/21 → 2/19 | e.g. aggressive 78 → 88 s |
+| Yerma, Easy v reference balanced | 95.9 % [93–98] → 97.5 % [95–99] | 3/153 → 8/163 | 117 → 131 s |
+| Sol-Noir, Brutal v Hard | 90.1 % [86–93] → 86.8 % [82–90] | 4/0 → 6/2 | 89 → 101 s |
+| Sol-Noir, Hard v Medium | 91.3 % [87–94] → 87.2 % [82–91] | 3/0 → 2/1 | 99 → 109 s |
+
+Every level still beats the one below it by about as much (every interval
+overlaps its old one; on Yerma Hard v Medium widened, on Sol-Noir both
+narrowed a little), and the references are still beaten every time.
+Self-eliminations stay rare (a handful in 242 games; Easy's, by design the
+sloppiest level, 3 → 8). Matches run 10–19 % longer: with the Void farther
+away a life takes more Launch Point to end (each side deals about 6–12 %
+more per game), the update's intended consequence, not a regression in the
+CPUs.
 
 **Where to tune it:**
 - `js/data/maps.js`: `MAIN_STAGE_LENGTH` (1400), `VOID_MARGINS` (468 /
