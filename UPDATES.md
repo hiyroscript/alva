@@ -5000,7 +5000,7 @@ controls' section above now superseded by them:
   (no button), have their one Mash Combo button next to Jump, where a
   second would be, and the outer place empty. The row is a strict rule
   for every fighter added later ([adding
-  characters](./docs/characters/adding-characters.md#the-mash-combo-row-strict),
+  characters](./docs/characters/adding-characters.md#the-touch-comfort-rules-strict),
   and in `CLAUDE.md`).
 - **Sizes:** every control 130 %, the two Mash Combo buttons included; the
   fighter's other moves a little smaller, 110 % (`TOUCH_DEFAULT_SCALE`:
@@ -5025,6 +5025,33 @@ controls' section above now superseded by them:
 beside Jump and nothing else, the columns in turn, the ceiling, the sizes),
 `tests/interface/controls-ui.test.mjs` (the geometry evaluated from the
 stylesheet: flush corners, the Mash Combo row, the raised columns).
+
+### Later: the touch comfort rules
+
+The owner made touch comfort a strict rule, as the controller's is, for
+every fighter now and added later ([adding
+characters](./docs/characters/adding-characters.md#the-touch-comfort-rules-strict),
+and in `CLAUDE.md`). The registry now refuses a definition that breaks the
+checkable ones (`touchComfortProblems` and `assertTouchComfort` in new
+`js/data/touch-comfort.js`, run with the other checks in
+`js/data/characters.js`): one button a move in one plain tap; no touch
+layout, size or place of the fighter's own and no art on a universal
+control; every button it has named and showing its move's own art, a
+distinct air move too; beside Jump only its Mash Combo buttons, the place
+next to Jump never empty (`mashRow`, moved into `js/data/mash-combo.js`;
+`mashButtons` in `js/ui/touch-controls.js` is it). The shared touch
+controls keep the rest (the universal controls, 130 % and 110 %, flush
+corners, nothing past the top HUD). One fighter needed a fix: #0010's
+Tongue Lash had a distinct air move with no art for it (the button showed a
+neutral pip in the air); it now shows the same clip's frame
+(`previews.air`, the air move uses the `attack3` clip), and its Discover
+profile's review was recorded (the change is art only, its difficulty and
+play style unchanged).
+
+**Tests:** new `tests/systems/touch-comfort.test.mjs` (every loaded
+fighter keeping the rules, each rule refused on its own for a current and
+a future fighter, the shared side), `tests/systems/loadout.test.mjs` (the
+registry runs the check).
 
 ### Small screens refused
 

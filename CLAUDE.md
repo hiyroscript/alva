@@ -38,11 +38,19 @@ and add an entry there when the owner names a new one.
   [adding characters](./docs/characters/adding-characters.md#the-comfort-rules-strict);
   the registry refuses a layout that breaks the checkable ones
   (`comfortProblems` in `js/data/controller-profiles.js`).
-- **The touch Mash Combo row is a strict rule.** The two touch buttons
-  beside Jump are only the fighter's two Mash Combo buttons (its
-  `mashCombo` pair, read by `mashButtons` in `js/ui/touch-controls.js`),
-  nothing else ever; a pair with one button puts it next to Jump. Every
-  fighter, now or added later, keeps it; never special-case a fighter's
-  buttons around it ([adding characters](./docs/characters/adding-characters.md#the-mash-combo-row-strict)).
+- **Touch comfort is a strict rule.** Every fighter's touch controls, on
+  the roster now or added later, keep the touch comfort rules: one button a
+  move, one plain tap (no combination, hold, modifier or sequence); the
+  fighter never places, sizes or adds a touch control, and never dresses a
+  universal one; every button it has named and showing its move's own art;
+  beside Jump only its two Mash Combo buttons (its `mashCombo` pair, read by
+  `mashRow` in `js/data/mash-combo.js`), nothing else ever, a pair with one
+  button putting it next to Jump. The shared touch controls keep the rest
+  for everyone (the universal controls, 130 % and 110 %, flush corners,
+  nothing past the top HUD). Never relax them or special-case a fighter's
+  buttons around them: fix the fighter. The rules and their reasons are in
+  [adding characters](./docs/characters/adding-characters.md#the-touch-comfort-rules-strict);
+  the registry refuses a fighter that breaks the checkable ones
+  (`touchComfortProblems` in `js/data/touch-comfort.js`).
 - Run the tests with `node --test`
   ([testing](./docs/development/testing.md)).

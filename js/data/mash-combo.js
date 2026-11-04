@@ -46,7 +46,7 @@
 // is then always triggered from the other move's button).
 //
 // Inputs: a character definition. Outputs: MASH_COMBO, MASH_PARTNER,
-// mashPairOf, mashTriggers, mashSequence, mashComboProblems,
+// mashPairOf, mashTriggers, mashRow, mashSequence, mashComboProblems,
 // assertMashCombo.
 // Important constraints: frozen and universal; nothing here names a
 // fighter. A move's eligibility comes from what it does, checked from its
@@ -115,6 +115,23 @@ export function mashTriggers(def) {
     if (button) out.set(button, id);
   }
   return out;
+}
+
+// `def`'s Mash Combo row on the touch controls, the two places beside Jump
+// as [Mash A, Mash B] (Mash B next to Jump): the combat buttons that start
+// its pair on the ground, in the pair's order. A pair with only one button
+// (its other move MASH_PARTNER, which has none) puts that button next to
+// Jump, in Mash B, and leaves Mash A empty (null). With no fighter or no
+// pair, attack1 and attack2 (the touch layout editor's neutral places).
+// Nothing else ever stands there (the touch comfort rules,
+// js/data/touch-comfort.js).
+export function mashRow(def) {
+  const pair = mashPairOf(def);
+  if (!def || !pair) return ['attack1', 'attack2'];
+  const triggers = [...mashTriggers(def)];
+  const buttons = pair.map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+  const own = buttons.filter(Boolean);
+  return own.length === 1 ? [null, own[0]] : buttons;
 }
 
 // The series for a combo triggered through `first` of `pair`: `turns`

@@ -171,7 +171,7 @@ export const FIGHTER_PROFILES = Object.freeze({
   '0010': Object.freeze({
     difficulty: 4,
     descriptionKey: 'discover.fighter.0010.playStyle',
-    reviewedSourceHash: '3a4c8ff36358c2f68e18b0344284d583e80b9ecfa3910ec8ce72b02d5855d014',
+    reviewedSourceHash: 'a1087fdebdb5e9d7641ee4be2fb28fca5fe3f8e87c96d8bb97d17d97d61a6e79',
   }),
   '0011': Object.freeze({
     difficulty: 3,

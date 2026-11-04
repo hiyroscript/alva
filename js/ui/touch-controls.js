@@ -84,7 +84,7 @@ import { assetSource } from '../core/asset-loader.js';
 import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { COMBAT_BUTTONS, NUMBERED_ATTACKS } from '../config.js';
-import { mashPairOf, mashTriggers } from '../data/mash-combo.js';
+import { mashRow } from '../data/mash-combo.js';
 import { ABILITY_ACTIONS, abilityPresence, abilityAvailable, jumpArt, mobileAbility, mobileAbilityLabelKey } from './mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import { abilityGroups, abilityStatus } from '../game/combat/move-status.js';
@@ -119,21 +119,10 @@ const ACTION_BUTTONS = [
 // order they take them: left of Shield, above Shield, then above Mash A.
 const STACK_COLUMNS = Object.freeze([1, 0, 2]);
 
-// The two places beside Jump, [Mash A, Mash B] (Mash B the one next to
-// Jump): the combat buttons that start `def`'s Mash Combo pair on the
-// ground, in the pair's order. A pair with only one button (its other move
-// mash_attack, which has none) puts that button next to Jump, in Mash B,
-// and leaves Mash A empty (null). With no fighter, attack1 and attack2
-// (the touch layout editor's neutral places). See the strict rule in
-// docs/characters/adding-characters.md (The Mash Combo row).
-export function mashButtons(def) {
-  const pair = mashPairOf(def);
-  if (!def || !pair) return ['attack1', 'attack2'];
-  const triggers = [...mashTriggers(def)];
-  const buttons = pair.map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
-  const own = buttons.filter(Boolean);
-  return own.length === 1 ? [null, own[0]] : buttons;
-}
+// The two places beside Jump, [Mash A, Mash B]: the fighter's Mash Combo
+// row (mashRow, js/data/mash-combo.js; a strict rule, see
+// js/data/touch-comfort.js).
+export const mashButtons = mashRow;
 
 // A top-HUD ceiling for setCeiling: the lowest bottom edge of the HUD's
 // parts (the children of `hud`) that span any of [left, right], or -Infinity
