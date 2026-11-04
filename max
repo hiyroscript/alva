@@ -41,7 +41,7 @@ Read `CLAUDE.md` first and follow it throughout. Also read `ALVA_SPEC.md`, `docs
 After the name, show the lobby with:
 
 - **Create room** opens a small form with:
-  - a **Room name**, prefilled as "{name}'s room" (FR: "Salle de {name}"; use the localization formatter, and handle names ending in "s" sensibly in English, e.g. "Chris's room" is fine). The player can edit it, using the same validation as names, up to 24 characters.
+  - a **Room name**, prefilled as "{name}'s room" (FR: "Salle de {name}"; use the localization formatter, and handle names ending in "s" sensibly in English, e.g. "Jules's room" is fine). The player can edit it, using the same validation as names, up to 24 characters.
   - **Visibility**: **Public** (listed in the lobby) or **Private** (only joinable with its code).
   - **Mode**: Quick Battle only for now. Show it as a fixed, single option so more modes can be added later without redesigning the screen. Put the list of online modes in config (e.g. `CONFIG.online.modes = ['quick-battle']`).
 - **Join with code**: a field for a room code. Codes are 5 characters from an unambiguous alphabet (no 0/O/1/I/L), shown in uppercase and entered case-insensitively.
