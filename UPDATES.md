@@ -19,7 +19,7 @@ for where they moved). The game as it is now is specified in
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
-| **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
+| **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
