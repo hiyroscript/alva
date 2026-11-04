@@ -8,7 +8,7 @@
 //
 // Stored as
 //
-//   { version: 9,
+//   { version: 10,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
 //     touchLayouts: { joystick: { ... }, classic: { ... } },
@@ -45,7 +45,7 @@
 // keeps its Mobile Controls choice, with no language chosen yet and no
 // custom layout; versions 2 and 3 keep their language, Mobile Controls and
 // both custom layouts; version 4 keeps all of that and its controller
-// profiles; versions 5 to 8 keep everything. Versions 1 to 3 get no
+// profiles; versions 5 to 9 keep everything. Versions 1 to 3 get no
 // controller profile. A controller profile saved under version 4 or 5
 // predates the named sticks and today's recommended layouts: it is upgraded
 // for its fighter (upgradeStoredProfiles, js/data/controller-profiles.js):
@@ -56,7 +56,12 @@
 // turn-around: every one starts with it on, and the Combat Assist and Combo
 // Assist choices versions 3 to 7 stored (both since removed from the game)
 // are dropped, never read into anything. No version before 9 had an online
-// name: every one starts with none. Missing, blocked or unreadable
+// name: every one starts with none. Mobile Controls' default became
+// Joystick in version 10 (it was Classic Buttons): a stored object cannot
+// tell a player's own choice from the old default (every save writes every
+// setting), so every older version keeps the scheme it played with, its
+// stored one, or Classic Buttons where it held none valid (the old
+// default); only new or empty storage starts on Joystick. Missing, blocked or unreadable
 // storage, a stored object of any other version, and every value that is
 // not one of its setting's choices fall back to the defaults, value by
 // value, so the game always starts with a valid set.
@@ -72,18 +77,22 @@ export const LANGUAGES = Object.freeze(['en', 'fr']);
 export const DEFAULT_LANGUAGE = 'en';
 
 // The touch layouts Quick Battle and Practice Ground can use (see
-// js/ui/touch-controls.js). Classic Buttons (Run left, Down, Run right
-// along the bottom) is the default for a player who has never chosen; a
-// stored choice of either is kept.
+// js/ui/touch-controls.js). Joystick is the default for a player who has
+// never chosen, and the fallback for an unknown or missing scheme, here and
+// everywhere that reads one; a stored choice of either is kept, and so is
+// what a player stored before version 10 (see SETTINGS_BEFORE_10_SCHEME).
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
-export const DEFAULT_MOBILE_CONTROLS = 'classic';
+export const DEFAULT_MOBILE_CONTROLS = 'joystick';
+// The default before version 10: what a stored object from before then
+// played with where it held no valid scheme of its own.
+export const SETTINGS_BEFORE_10_SCHEME = 'classic';
 
 // Automatic turn-around (Home › Settings › Combat) is on for every player
 // who has not turned it off, a player whose settings predate it included.
 export const DEFAULT_AUTOMATIC_TURN_AROUND = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 9;
+export const SETTINGS_VERSION = 10;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
@@ -121,11 +130,12 @@ export function resolveSetting(name, value) {
 
 // Every setting from a stored object of the current version, each checked.
 // `profiles` reads its controller profiles (an older version's are
-// upgraded first).
-function readCurrent(stored, profiles = sanitizeStoredProfiles) {
+// upgraded first); `scheme` is the Mobile Controls a missing or unknown
+// one falls back to (the default; an older version's, its default then).
+function readCurrent(stored, profiles = sanitizeStoredProfiles, scheme = DEFAULT_MOBILE_CONTROLS) {
   return {
     language: resolveSetting('language', stored.language),
-    mobileControls: resolveSetting('mobileControls', stored.mobileControls),
+    mobileControls: allowed('mobileControls', stored.mobileControls) ? stored.mobileControls : scheme,
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     automaticTurnAround: resolveSetting('automaticTurnAround', stored.automaticTurnAround),
     controllerProfiles: profiles(stored.controllerProfiles),
@@ -141,13 +151,21 @@ const upgradeProfiles = (raw) => upgradeStoredProfiles(raw, getCharacter);
 // checked (`profiles` reads its controller profiles), with Automatic
 // turn-around on: no version before 8 had it, whatever the object may hold
 // under that name. Nothing else it held (Combat Assist, Combo Assist) is
-// read, and no version before 9 had an online name.
+// read, and no version before 9 had an online name. Its Mobile Controls are
+// kept, Classic Buttons where it held none valid (the default before
+// version 10).
 const migrate = (kept, profiles) => readCurrent({
   ...kept, automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND, onlineName: null,
-}, profiles);
+}, profiles, SETTINGS_BEFORE_10_SCHEME);
 // Version 8: everything it had is kept as it is, Automatic turn-around
 // included; only the online name is new.
-const keep = (stored) => readCurrent({ ...stored, onlineName: null });
+const keep = (stored) => readCurrent({ ...stored, onlineName: null }, undefined, SETTINGS_BEFORE_10_SCHEME);
+// Version 9: everything kept as it is. Mobile Controls' default changed
+// to Joystick in version 10, and a version 9 object cannot tell the
+// player's own Classic Buttons from the old default (every save wrote it),
+// so its stored scheme is kept as it is, Classic Buttons where it held none
+// valid: nobody who played version 9 finds their controls changed.
+const keepScheme = (stored) => readCurrent(stored, undefined, SETTINGS_BEFORE_10_SCHEME);
 
 // Older versions, each read into the current settings.
 const MIGRATIONS = Object.freeze({
@@ -174,6 +192,7 @@ const MIGRATIONS = Object.freeze({
   6: (stored) => migrate(stored),
   7: (stored) => migrate(stored),
   8: keep,
+  9: keepScheme,
 });
 
 // The settings a stored value holds: checked if it is the current version,

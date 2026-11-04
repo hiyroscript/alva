@@ -1208,7 +1208,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
 
-test('Quick Battle uses the Mobile Controls setting: Classic Buttons by default, Joystick once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
+test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
   // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { MAPS } = await import('../../js/data/maps.js');
@@ -1220,22 +1220,22 @@ test('Quick Battle uses the Mobile Controls setting: Classic Buttons by default,
   const lowerLeft = () => touch.root.children[0];
 
   await screen.enter();
-  assert.equal(app.settings.mobileControls, 'classic', 'nothing stored: the default');
-  assert.equal(touch.scheme, 'classic');
-  assert.equal(lowerLeft(), touch.dpad);
-  assert.equal(touch.buttons.get('down'), touch.downButton, 'Down, between the Run arrows');
-  assert.ok(touch.dpad.children.includes(touch.downButton));
-
-  app.settings.set('mobileControls', 'joystick');
-  await screen.enter();
+  assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
   assert.equal(touch.scheme, 'joystick');
   assert.equal(lowerLeft(), touch.joystick);
-  assert.equal(touch.buttons.get('down'), touch.downButton, 'the same Down, by the stick');
+  assert.equal(touch.buttons.get('down'), touch.downButton, 'Down, by the stick');
   assert.ok(touch.joystick.children.includes(touch.downButton));
 
   app.settings.set('mobileControls', 'classic');
   await screen.enter();
   assert.equal(touch.scheme, 'classic');
+  assert.equal(lowerLeft(), touch.dpad);
+  assert.equal(touch.buttons.get('down'), touch.downButton, 'the same Down, between the Run arrows');
+  assert.ok(touch.dpad.children.includes(touch.downButton));
+
+  app.settings.set('mobileControls', 'joystick');
+  await screen.enter();
+  assert.equal(touch.scheme, 'joystick');
   // The fighter's combat buttons were never rebuilt along the way.
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
   assert.equal(touch.buttons.get('attack1').getAttribute('aria-label'), 'Jab');

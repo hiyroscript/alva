@@ -1172,9 +1172,25 @@ neither player learns the other's address.
   are distinct: dismissing chooses nothing and returns focus to the control
   that opened it. One column per choice side by side, stacked below 520 px
   wide.
-- Portrait on touch devices: a dark "Rotate your device — Alva is designed for
-  landscape play." overlay; the battle pauses and resumes correctly on return
-  to landscape.
+- **Landscape lock** (`js/core/orientation-lock.js`). On a touch device
+  Alva locks itself to landscape for the whole visit
+  (`screen.orientation.lock('landscape')`): an installed app at once; in a
+  browser tab the first press (a keydown, a mouse's pointerdown, a touch's
+  or pen's pointerup) takes the page fullscreen (`requestFullscreen`,
+  browser UI hidden, or `webkitRequestFullscreen`) and locks. The lock is
+  asked for again after every `fullscreenchange`, every return to the page
+  (`visibilitychange` back to visible, `pageshow`, `resume`) and every
+  orientation change; leaving fullscreen (switching apps, the player's
+  swipe) arms the next press to go back in and lock again. No setting turns
+  it off. It never throws: a refused lock or fullscreen is caught quietly,
+  and where there is no `lock()` at all (Safari on iPhone and iPad) nothing
+  is asked for, fullscreen included. A desktop or other non-touch device is
+  never locked and never taken fullscreen. The manifest's `"orientation":
+  "landscape"` stays.
+- Portrait on touch devices, only where the lock is unavailable or was
+  refused (a lock that holds keeps the window landscape): a dark "Rotate
+  your device — Alva is designed for landscape play." overlay; the battle
+  pauses and resumes correctly on return to landscape.
 - **Small screens** (`js/core/screen-guard.js`). Alva refuses to run on a
   screen too small to play on well. "Too small" is read from the usable
   viewport, the CSS-pixel size of the visible area (`visualViewport` where
@@ -1512,10 +1528,11 @@ indicator. Each section keeps its existing settings, in this order:
   Practice Ground use (7.4), with exactly two choices shown as two cards,
   each with a small drawing of its lower-left corner and a line on what it
   gives:
-  - **Joystick** — a circular joystick to move, the
+  - **Joystick** (marked "Default") — a circular joystick to move, the
     single-tap **Left mouvement** / **Right mouvement** Dash buttons above
-    it.
-  - **Classic Buttons** (marked "Default") — Run Left, Down and Run Right in a row along the bottom-left edge, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above the Run arrows. A stored choice of either is kept; only a player who never chose gets Classic Buttons.
+    it. A player with no stored settings gets Joystick, and so does an
+    unknown or missing scheme (`DEFAULT_MOBILE_CONTROLS`).
+  - **Classic Buttons** — Run Left, Down and Run Right in a row along the bottom-left edge, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above the Run arrows. A stored choice of either is kept: a player whose settings were saved before Joystick became the default (settings version 10) keeps the scheme they played with, Classic Buttons included, and both custom touch layouts.
 
   The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
   described by its line); hover only previews. The one in use carries a green
@@ -1590,24 +1607,30 @@ indicator. Each section keeps its existing settings, in this order:
   each change —
 
   ```
-  { "version": 8,
+  { "version": 10,
     "language": "en" | "fr" | null,
     "mobileControls": "joystick" | "classic",
     "touchLayouts": { "joystick": { … }, "classic": { … } },
     "automaticTurnAround": true | false,
-    "controllerProfiles": { "<fighter id>": { "<action id>": binding, … }, … } }
+    "controllerProfiles": { "<fighter id>": { "<action id>": binding, … }, … },
+    "onlineName": "<name>" | null }
   ```
 
   `language` is null until the player picks one (English is used meanwhile,
   but the first-launch chooser still asks: a default is never mistaken for a
   choice). `automaticTurnAround` is a real boolean, `true`
   (`DEFAULT_AUTOMATIC_TURN_AROUND`) unless the player turned it off. Older
-  objects (versions 1 to 7) are migrated: a version 1 object
+  objects (versions 1 to 9) are migrated: a version 1 object
   (`{ "version": 1, "mobileControls": … }`) keeps its Joystick / Classic
   choice, with no language chosen yet (so the chooser shows once) and both
   layouts empty; versions 2 and 3 keep their language, Mobile Controls and
   both custom layouts; version 4 keeps all of that and every controller
-  profile; versions 5 to 7 keep everything. No older version had Automatic
+  profile; versions 5 to 9 keep everything. Mobile Controls' default became
+  Joystick in version 10 (it was Classic Buttons); a stored object cannot
+  tell the player's own Classic Buttons from the old default, so every older
+  version keeps the scheme it played with (its stored one, or Classic
+  Buttons where it held none valid), and only new or empty storage starts on
+  Joystick. No version before 8 had Automatic
   turn-around: every player upgrading starts with it on, whatever they had
   chosen for Combat Assist or Combo Assist, and those two values (stored
   by versions 3 to 7, both settings since removed from the game) are
@@ -4787,6 +4810,19 @@ Adding one is described in
     burst always draws the same. A small shake comes with it. Paint only:
     no damage, launch or stun to anyone. Never a character-specific death
     animation, gore or a fighter id in the effect.
+  - *Spawn burst:* every fighter that appears (each spawn as a match starts,
+    every restart and rematch, every respawn after the Void, every fighter
+    or CPU Practice Ground puts on its floor, in every mode) materialises in
+    its own elimination burst played backwards, at its body's centre at the
+    spawn (`Arena.announceSpawn`, `HitEffects.addSpawn`, added after a
+    restart's effects reset): the shards fly in from their full reach to
+    its centre, quickening, the ring closes from its widest, everything
+    fades in, and the white flash grows and pops at the end, drawn over the
+    fighter. The same palette, size, seeded shards, life, shake and
+    reduced-motion handling as the elimination (`HIT_FX.elimination`); at
+    age t it draws exactly what the elimination draws at age life − t. It
+    never counts as an elimination. Paint only: the fighter is in play and
+    controllable from its first step, exactly as without it.
   - *Heal glow:* a fighter that heals itself (a technique's `heal`,
     `Fighter.heals`, handed over by the Arena each step) shows a soft green
     ring opening round the middle of its body and a few green plus marks
@@ -4982,7 +5018,7 @@ Adding one is described in
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
   layouts chosen under Settings → Controls → Mobile Controls (6.10);
   `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
-  else is Classic Buttons, the default), and Quick Battle and Practice Ground apply the saved
+  else is Joystick, the default, `DEFAULT_MOBILE_CONTROLS`), and Quick Battle and Practice Ground apply the saved
   one, and that layout's saved custom placement (`setLayout`, 6.10a), each
   time they are entered. A switch first lets go of everything held
   (every pointer, direction, Jump, Shield and the rest) and
@@ -5012,7 +5048,7 @@ Adding one is described in
     hit-tests Left / Right where they are drawn, so a thumb slides
     between them wherever they sit. In battle the controls are never
     keyboard-focusable (`tabindex="-1"`); only the editor's copy is.
-  - **Joystick**: the lower-left corner holds one circular
+  - **Joystick** (the default): the lower-left corner holds one circular
     joystick (a translucent round base with no marks on it and a movable
     knob, in the buttons' style; a group named "Movement joystick"). It
     captures one pointer and holds the existing `runLeft` or `runRight` input
@@ -5036,7 +5072,7 @@ Adding one is described in
     platform, the drop through it, 7.2.2). The lower-left cluster starts
     that much further in (`--tc-down-room`) to make room for it. No other
     hit region exists.
-  - **Classic Buttons** (the default): one row along the bottom-left edge,
+  - **Classic Buttons**: one row along the bottom-left edge,
     Run Left, **Down** and Run Right, all three the size of every button,
     with thumb sliding between the Run arrows, and two smaller Mouvement
     buttons directly above the Run arrows, centred on them; the Run

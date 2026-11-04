@@ -90,6 +90,9 @@ export class PracticeSession extends Arena {
     this.projectiles.length = 0;
     this.clones.length = 0;
     this.fx.reset();
+    // The new fighter materialises at its spawn, after the reset so the
+    // reset never clears it (paint only, see Arena.announceSpawn).
+    this.announceSpawn(this.player);
     this.acc = 0;
     this.input.flush();
     // Another fighter's art can change the world scale: refit, which also
@@ -107,6 +110,7 @@ export class PracticeSession extends Arena {
       slot: 'p2', label: 'CPU', controller: null,
     });
     this.pairFighters();
+    this.announceSpawn(this.cpu);
     this.acc = 0;
     this.snapCamera();
   }

@@ -11,7 +11,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows, and when a clip restarts (a new key, a new move activation). |
 | [`js/game/rendering/ensemble.js`](../../js/game/rendering/ensemble.js) | A fighter drawn as several members ([ensembles](#ensembles)): `EnsembleSprites` (its members' sprite sets as one), `EnsembleAnimator` (every member playing the fighter's state, its formation, glide and idle float), `fighterParts` (what is drawn of any fighter), `buildFighterSprites` and `createAnimator` (the factories every mode builds fighters' art with), `idlePose` (a menu's idle). |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
-| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the Super Jump's dust, the lethal launch's slow motion, the Void's elimination burst (`HIT_FX`, `eliminationPalette`). |
+| [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the heal glow (a technique's heal, a charmed hit's, or a hit that feeds on a fear), the Super Jump's dust, the lethal launch's slow motion, the Void's elimination burst and the spawn burst, the same played backwards (`HIT_FX`, `eliminationPalette`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar, cooldown rings, Special ability mark, charm mark, fear mark and Mash Combo counter drawn with each fighter. |
 | [`js/game/arena.js`](../../js/game/arena.js) | The draw order, a burst's art as it plays (`castEffects`) and the debug overlay. |
@@ -130,7 +130,8 @@ fights), clones, each fighter in play (the CPU, then Player 1 on top: its
 speed trail, the Shield's interior, the fighter, the Shield's rim), the
 technique objects, projectiles, hit sparks, the stage's foreground, the
 Void (with the ripples where it has just taken a fighter), the elimination
-bursts (over the black, where each fighter went in),
+bursts (over the black, where each fighter went in), the spawn bursts (over
+everything, where each fighter has just appeared),
 then each fighter's markers and status over everything, and the debug
 overlay when it is on (`` ` ``: solid platforms where they are drawn, and a
 line naming each stage hazard's state). A fighter's shadow and ground ring
@@ -393,6 +394,26 @@ launch or stun, and the fight steps the same with or without it. With
 reduced motion there is no shake and the shards travel about a third as
 far; the colour flash and fade stay.
 
+**The spawn burst.** Every fighter that appears materialises in its own
+elimination burst played backwards: as a match starts and on every restart
+or rematch (`Battle.restart`, after its effects reset, which would
+otherwise clear it), on every respawn after the Void
+(`Arena.updateRespawns`), and as Practice Ground puts a fighter or a CPU
+on its floor (`PracticeSession.setFighter`, `setCPU`), in every mode, all
+through `Arena.announceSpawn` and `HitEffects.addSpawn`. It is caught like
+an elimination (the body's centre at the spawn, its `visual.height`, its
+palette, a seed) into its own list (`spawns`), so it never counts as an
+elimination, and drawn by the same code (`drawBurst`) with its progress
+reversed (`drawSpawns`: k = 1 − age / life), over the fighters, the Void
+and the elimination bursts: at age t it draws exactly what an elimination
+draws at age life − t. The shards start at their full reach and fly in to
+the fighter's centre, quickening as they go; the ring closes from its
+widest; everything fades in; the white flash grows and pops at the very
+end. The same shake and the same reduced-motion handling (no shake, short
+travel). Tuning: `HIT_FX.elimination`, the one source for both. Paint only:
+the fighter is in play and controllable from its first step, with no added
+invulnerability or delay, and the fight steps the same with or without it.
+
 ## Tests
 
 - [`tests/systems/projectile-spin.test.mjs`](../../tests/systems/projectile-spin.test.mjs):
@@ -410,6 +431,13 @@ far; the colour flash and fade stay.
   (and still with reduced motion), and the elimination burst (one per
   fighter taken, its palette and place, outliving the fighter, gone after
   its life and on a restart, paint only).
+- [`tests/systems/spawn-burst.test.mjs`](../../tests/systems/spawn-burst.test.mjs):
+  the spawn burst at a match's start, on a restart (after the reset), on
+  every respawn and in Practice Ground, in every mode; each fighter's
+  palette and size; the exact time-reverse of the elimination; fading in,
+  closing in, the flash at the end; its life, shake and reduced motion; the
+  draw order; never an elimination; and a whole CPU match stepping the same
+  without it.
 - Normalization against real PNGs: [`tests/fighters/0001/fighter-animation.test.mjs`](../../tests/fighters/0001/fighter-animation.test.mjs),
   [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs),
   [`tests/fighters/0003/fighter-0003.test.mjs`](../../tests/fighters/0003/fighter-0003.test.mjs),

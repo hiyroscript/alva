@@ -89,11 +89,13 @@ observed touch), never because a desktop window is narrow; Watch Mode,
 where nobody plays, hides them. Two layouts, chosen under Settings →
 Controls → Mobile Controls:
 
-- **Joystick**: one round joystick holding `runLeft` /
+- **Joystick** (the default for a player who never chose, and for an
+  unknown or missing scheme): one round joystick holding `runLeft` /
   `runRight` past a small deadzone (digital, like every other input; up and
   down on it hold nothing), with two one-tap Mouvement/Dash buttons with
   double directional arrows above it.
-- **Classic Buttons** (the default for a player who never chose): one row
+- **Classic Buttons** (kept by every player who stored it, including
+  those whose settings predate Joystick becoming the default): one row
   along the bottom-left edge, Run Left, **Down** and Run Right, all the size
   of every button, with thumb sliding between the Run arrows, and smaller
   double-arrow Mouvement buttons directly above their matching Run buttons.

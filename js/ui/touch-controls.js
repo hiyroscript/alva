@@ -1,10 +1,10 @@
 // Multi-touch landscape controls using the existing Pointer Events input.
-// Classic (the default): one row along the bottom-left edge, Run left,
-// Down and Run right, with sliding pointer capture between the Run arrows,
-// and the small Left movement / Right movement Dash buttons (double
-// arrows) just above the Run arrows. Joystick: a horizontal stick with
-// the same Dash buttons above it and a small Down button at its far left,
-// level with its middle. Down held is Down (the fast fall in the air;
+// Joystick (the default): a horizontal stick with the small Left movement
+// / Right movement Dash buttons (double arrows) above it and a small Down
+// button at its far left, level with its middle. Classic: one row along
+// the bottom-left edge, Run left, Down and Run right, with sliding pointer
+// capture between the Run arrows, and the same Dash buttons just above the
+// Run arrows. Down held is Down (the fast fall in the air;
 // pressed on a one-way platform, a drop through it).
 // Both share the same action buttons. Jump always uses the upward arrow;
 // Defence its shield glyph, named Deflect while the fighter is in the
@@ -358,7 +358,8 @@ export class TouchControls {
   }
 
   // Shows the 'joystick' or 'classic' layout (anything else is the
-  // default, Classic Buttons), with that scheme's own custom layout. Everything held
+  // default, DEFAULT_MOBILE_CONTROLS: Joystick), with that scheme's own
+  // custom layout. Everything held
   // is let go first, so a switch never leaves a direction or any other
   // button down. The fighter's own art and names are untouched: the
   // combat buttons and Jump are the same elements in both.

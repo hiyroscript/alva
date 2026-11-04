@@ -191,6 +191,9 @@ export class Battle extends Arena {
     this.projectiles.length = 0;
     this.clones.length = 0;
     this.fx.reset();
+    // Each fighter materialises at its spawn, after the reset so the reset
+    // never clears it (paint only, see Arena.announceSpawn).
+    for (const f of this.fighters) this.announceSpawn(f);
     this.acc = 0;
     // Back to the normal clock at its full length, out of any overtime: the
     // map's own Void, its waves at their normal speed.
