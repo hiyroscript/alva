@@ -63,22 +63,30 @@ export function formatLaunchPoint(value) {
 }
 
 // The Launch Point at which the number catches fire, and the one below which
-// it goes out again. Picked for LAUNCH_UNIT_SPEED 7 (js/data/launch.js), by
-// simulated launches on Yerma (a solid 3-damage hit, sideways or straight
-// up, on a fighter that does not try to get back): from 60 a Base Launch 2
-// hit (strength 2 x 63 = 126, 882 units/s) carries a fighter in the air
-// within about 250 units of the ledge into the Void, and a Base Launch 3
-// one (189, 1323 units/s) within about 450, a third of the stage. That is
-// where the next solid hit becomes a likely end. Below 55 it is out. (At
-// the old 10 units/s a point the same launches began at about 45.)
-export const LAUNCH_POINT_FIRE = 60;
-export const LAUNCH_POINT_FIRE_OUT = 55;
-// The stronger tier: from 100 a Base Launch 3 hit ends a life from anywhere
-// on the stage, straight up included, and a Base Launch 2 one from the
-// middle third in the air (about 80 at the old scale). Below 95 it is back
-// to the first tier.
-export const LAUNCH_POINT_INFERNO = 100;
-export const LAUNCH_POINT_INFERNO_OUT = 95;
+// it goes out again. Derived by simulation (tests/benchmarks/
+// launch-thresholds.mjs, re-run it whenever the stages, the Void or
+// launches change) against the Void update's geometry: every main stage
+// 1400 long, the Void 468 past each ledge, 1040 above and 400 below
+// (regular time: overtime's closing Void is deadlier than the fire says),
+// launches at LAUNCH_UNIT_SPEED 7. Each case is one solid 3-damage hit on
+// a fighter in the air at a jump's height that does nothing to get back,
+// lethal when it is in the Void before it could act again (the game's own
+// lethal launch: launchIsLethal), for every playable fighter on every
+// stage. From 70 a Base Launch 3 hit ends a life from a third of the stage
+// in (the highest over the roster on every stage with ledges: 62 to 70), a
+// Base Launch 2 one from about 120 to 280 in from the ledge (180 on Yerma,
+// its outcrops in the way): the next solid hit is a real danger. Below 65
+// it is out. (Against the Void before the update, side 360 and top 800,
+// the same simulation gives 65; the HUD had 60.)
+export const LAUNCH_POINT_FIRE = 70;
+export const LAUNCH_POINT_FIRE_OUT = 65;
+// The stronger tier: from 110 a Base Launch 3 hit ends a life from
+// anywhere on the stage, straight up included (straight up, the farther top
+// line, is what decides it: 104 to 106 over the roster; sideways from the
+// middle 75 to 97), on every stage. Below 105 it is back to the first
+// tier. (Before the update: 95; the HUD had 100.)
+export const LAUNCH_POINT_INFERNO = 110;
+export const LAUNCH_POINT_INFERNO_OUT = 105;
 
 // The fire a Launch Point shows (0 none, 1 burning, 2 inferno), from the
 // fire it showed (`current`): each tier lights at its threshold and only

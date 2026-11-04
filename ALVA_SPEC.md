@@ -3960,10 +3960,11 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Shield, a heal, a charm, a fear's feed: `CombatState.launchPointHeals`,
   never a respawn, restart, rematch or Practice Ground reset or swap, which
   give a fresh state), and burns (an animated flame behind its digits)
-  from `LAUNCH_POINT_FIRE` (60, out below 55) and hotter from
-  `LAUNCH_POINT_INFERNO` (100, back below 95), where the next solid hit can
-  launch it hard (`js/ui/hud.js`; with reduced motion a still colour
-  instead; paint only). A
+  from `LAUNCH_POINT_FIRE` (70, out below 65) and hotter from
+  `LAUNCH_POINT_INFERNO` (110, back below 105), where the next solid hit can
+  end a life (`js/ui/hud.js`, derived by simulation against the stages'
+  shared geometry and regular-time Void: `tests/benchmarks/launch-thresholds.mjs`;
+  with reduced motion a still colour instead; paint only). A
   hit's `damage` is how much it adds (a hit a Shield blocks adds nothing);
   each fighter's hits are listed in its character specification (7.2.9).
   Every genuine unblocked hit resets recovery, including Base Launch 0

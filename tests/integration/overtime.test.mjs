@@ -835,3 +835,71 @@ function recordingContext() {
   });
   return ctx;
 }
+
+// ---- The loser ejected at overtime's end (the Void update) ----------------------
+
+test('overtime\'s end ejects its loser on points or on Launch Point, in Quick Battle and Watch Mode; a draw nobody', () => {
+  for (const mode of [undefined, 'watch']) {
+    // More points at overtime's end.
+    const points = match({ mode });
+    points.toTimeUp();
+    points.battle.score.p2 = 1;
+    points.battle.timeLeft = DT / 2;
+    points.run();
+    assert.deepEqual(points.battle.result, { outcome: 'p2', reason: 'overtimePoints' });
+    assert.equal(points.battle.p1.lostToVoid, true, `${mode ?? 'quick'}: Player 1's side ejected`);
+    assert.equal(points.battle.p1.ejected, true);
+    assert.deepEqual(points.battle.fx.eliminations.map((e) => e.slot), ['p1']);
+    assert.deepEqual(points.battle.score, { p1: 0, p2: 1 }, 'no point for it');
+    assert.equal(points.battle.final.stats.p1.voidFalls, 0, 'not a fall');
+    // The lower Launch Point at overtime's end.
+    const lp = match({ mode });
+    lp.toTimeUp();
+    lp.battle.p2.combat.launchPoint = 200;
+    lp.battle.timeLeft = DT / 2;
+    lp.run();
+    assert.deepEqual(lp.battle.result, { outcome: 'p1', reason: 'overtimeLaunchPoint' });
+    assert.equal(lp.battle.p2.lostToVoid, true);
+    assert.equal(lp.battle.p1.lostToVoid, false);
+    assert.equal(lp.battle.p2.respawnTimer, null, 'never respawning');
+    lp.run(RESPAWN_STEPS * 2);
+    assert.equal(lp.battle.p2.lostToVoid, true);
+    // Level on both: a draw, both stay.
+    const draw = match({ mode });
+    draw.toTimeUp();
+    draw.battle.timeLeft = DT / 2;
+    draw.run();
+    assert.equal(draw.battle.result.outcome, 'draw');
+    assert.deepEqual(draw.battle.fighters.map((f) => f.lostToVoid), [false, false]);
+    assert.equal(draw.battle.fx.eliminations.length, 0);
+  }
+});
+
+test('a third point in overtime: the Void took the loser, no second burst; a forfeit ejects the side that left', () => {
+  const { battle, run, toTimeUp } = match();
+  battle.score.p1 = 2;
+  battle.score.p2 = 2;
+  toTimeUp();
+  intoVoid(battle, battle.p2);
+  run();
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'void' });
+  assert.equal(battle.fx.eliminations.length, 1);
+  // A forfeit is a loser too: the side that gave up goes.
+  const left = match();
+  left.battle.forfeit('p2');
+  assert.deepEqual(left.battle.result, { outcome: 'p1', reason: 'forfeit' });
+  assert.equal(left.battle.p2.lostToVoid, true);
+  assert.deepEqual(left.battle.fx.eliminations.map((e) => e.slot), ['p2']);
+});
+
+test('the ejection is the same on every replay of the same match: deterministic, on the simulation clock', () => {
+  const trace = () => {
+    const { battle, run, toTimeUp, script } = match({ mode: 'watch' });
+    script.held = { right: true };
+    toTimeUp();
+    battle.p1.combat.launchPoint = 30;
+    run(Math.round(OT / DT) + 5);
+    return { result: battle.result, out: battle.fighters.map((f) => f.lostToVoid), bursts: battle.fx.eliminations.map((e) => [e.slot, e.x, e.y]) };
+  };
+  assert.deepEqual(trace(), trace());
+});

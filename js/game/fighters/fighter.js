@@ -218,6 +218,10 @@ export class Fighter {
     // it. `respawnTimer` counts down the wait (see Arena.updateRespawns);
     // null while there is none (in play, or Quick Battle's final loser).
     this.lostToVoid = false;
+    // Out of play because its match ended with it the loser while it still
+    // stood on the stage (Battle.ejectLoser), not because the Void took it:
+    // it went the same way, and for the same rest of the match.
+    this.ejected = false;
     this.respawnTimer = null;
     // The fighter whose pull is drawing this one in, or drew it and still
     // carries it, helpless, toward it (see applyPulls in
