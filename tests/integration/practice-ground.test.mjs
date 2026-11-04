@@ -15,6 +15,7 @@ import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT, startupSteps } from '.
 import { TEST_A, TEST_MOVELESS, TEST_SAMPLE, testFighter, useTestFighters } from '../fighters/fixtures/test-fighters.mjs';
 import { LOADOUT_CASES } from '../fighters/fixtures/loadout-fighters.mjs';
 import { stylesheet } from '../helpers/stylesheet.mjs';
+import { LAUNCH_UNIT_SPEED, LAUNCH_RECOVERY_AMOUNT } from '../../js/data/launch.js';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
 
@@ -1648,13 +1649,13 @@ test('Player 1\'s High Kick launches the CPU straight up (Base Launch 2, vertica
   assert.equal(numbers[0].text, '+5');
   // At impact: launched upward, not pushed sideways, at the High Kick's
   // Base Launch 2 x the CPU's new Launch Point: 25 + 5 = 30, a strength of
-  // 60, so 600. (Measured from where the kick struck: its step-in may have
+  // 60, so 420 at LAUNCH_UNIT_SPEED 7. (Measured from where the kick struck: its step-in may have
   // shoved it along a little through the pushboxes first.)
   const hitX = cpu.body.x;
   assert.ok(cpu.body.vx === 0, 'no sideways push');
   assert.equal(cpu.combat.launchPoint, 30);
   assert.equal(hit.launchStrength, 60);
-  assert.equal(cpu.body.vy, -600);
+  assert.equal(cpu.body.vy, -60 * LAUNCH_UNIT_SPEED);
   assert.equal(cpu.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !cpu.grounded; i++) {
@@ -1803,7 +1804,7 @@ test('the CPU is never knocked out: at any Launch Point it keeps taking hits, wi
   until(() => events.length > 1, 180);
   assert.equal(events[1].target, cpu);
   const elapsed = (cpu.steps - firstHitStep) * DT;
-  const recovered = Math.max(0, Math.floor((elapsed - 2 + 1e-6) / 0.5));
+  const recovered = Math.max(0, Math.floor((elapsed - 2 + 1e-6) / 0.5)) * LAUNCH_RECOVERY_AMOUNT;
   assert.ok(recovered > 0, 'passive recovery also runs on the practice CPU');
   assert.equal(events[1].launchPointBefore, 503 - recovered);
   assert.equal(events[1].damage, 1);

@@ -291,7 +291,7 @@ test('a move is one move however many bodies draw it: one strike across the whol
   assert.equal(back.target.combat.launchPoint, 3);
 });
 
-test('the Deflect: one member performs it, the others aside; one strike, one Energy cost', () => {
+test('the Deflect: one member performs it, the others aside; one strike, free to start', () => {
   const { fighter: f, step } = solo();
   step(P('jump'));
   for (let i = 0; i < 8; i++) step({ jump: true });
@@ -299,7 +299,7 @@ test('the Deflect: one member performs it, the others aside; one strike, one Ene
   step(P('shield'));
   assert.equal(f.combat.attack?.def.id, 'deflect');
   assert.deepEqual(keys(f), ['idle', 'deflect', 'idle'], 'green alone');
-  assert.equal(f.combat.energy, energy - 15, 'one Deflect, paid once');
+  assert.equal(f.combat.energy, Math.min(100, energy + f.energyDef.regen * DT), 'nothing paid as it starts: it pays only to turn a projectile back');
   assert.deepEqual(fighterParts(f).at(-1).member, 'green', 'drawn in front');
 });
 

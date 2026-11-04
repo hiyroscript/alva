@@ -2,10 +2,14 @@
 
 The one resource a fighter spends, on the same terms for every fighter,
 human or CPU, and at **one nominal price: 15**. It pays for a Dash or an
-air dash (as it starts, a Dash cancel included), the Deflect (as it
-starts), the Shield (for each hit it blocks, a perfect block included)
-and every ordinary move that creates a gameplay construct (a projectile,
-a burst, a clone: as it starts, once). There is no separate Shield meter:
+air dash (as it starts, a Dash cancel included), the Deflect (only when
+it turns a projectile back: once per Deflect, the first time it does),
+the Shield (for each hit it blocks, a perfect block included; raising or
+holding it is free) and every ordinary move that creates a gameplay
+construct (a projectile, a burst, a clone: as it starts, once). Since the
+[launch & energy update](../../UPDATES.md#launch--energy-update) the
+Shield and the Deflect pay only when they actually do something. There is
+no separate Shield meter:
 this is it. Movement, jumps, melee strikes, turning (Automatic turn-around
 included, see [combat](combat.md#facing-and-automatic-turn-around)), a
 heal of the fighter's own and every move with a 3 s or 5 s cooldown never
@@ -17,8 +21,8 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.5.
 | [`js/data/energy.js`](../../js/data/energy.js) | The policy, the one source of every price: `MAX_ENERGY`, `ENERGY_COST` (15), `DASH_ENERGY_COST`, `BLOCK_ENERGY_COST`, `DEFLECT_ENERGY_COST`, `CONSTRUCT_ENERGY_COST` (all `ENERGY_COST`), `createsConstruct`, `constructEnergyCost`, `resolveMoveEnergy`. |
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `resolveEnergy` (the rules and a fighter's refill rate; anything else refused), the constants re-exported, and the state on `CombatState`: `energy`, `maxEnergy`, `energyExhausted`, `spendEnergy`, `updateEnergy`, `setEnergy`. |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js), [`technique.js`](../../js/game/combat/technique.js), [`summon.js`](../../js/game/combat/summon.js) | Each definition's `energyCost`, derived from what it creates and its cooldown class. |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Paying for a Dash (`tryDash`), an air dash (`tryAirDash`), a Deflect (`tryDeflect`) or a construct move (`tryAction`, `trySummon`, `tryTechnique`), all through `payEnergy`, and refilling every step nothing was paid on. |
-| [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | Paying for a blocked hit (`applyHit`), a perfect one exactly as any other. |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Paying for a Dash (`tryDash`), an air dash (`tryAirDash`) or a construct move (`tryAction`, `trySummon`, `tryTechnique`), all through `payEnergy`; refusing a Deflect while exhausted (`tryDeflect`, which pays nothing); refilling every step nothing was paid on (a payment made later in the step, a Deflect's, takes that step's refill back: `energyRefilled`). |
+| [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | Paying for a blocked hit (`applyHit`), a perfect one exactly as any other, and for a Deflect's first projectile turned back (`deflectProjectiles`, through `payEnergy`, the attack record marked `paid`, the cost on the deflection's `energyCost`). |
 | [`js/data/characters.js`](../../js/data/characters.js) | Refusing, as the registry loads, a definition whose `energy` entry or whose move's `energyCost` breaks the rules (`assertCombatRules`). |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The bar over the fighter. |
 | [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js) | A move that costs Energy shown unavailable (`energy`) while the fighter is exhausted (the ability HUD, touch controls). |
@@ -31,7 +35,7 @@ The same for every fighter, written once in `js/data/energy.js`:
 | --- | --- | --- |
 | The bar, full: where every fighter starts, and what a respawn, a reset or a restart refills it to | 100 | `MAX_ENERGY` (`max`) |
 | A Dash, an air dash, or either cutting short a move (a Dash cancel) | 15, once, as it starts | `DASH_ENERGY_COST` (`dashCost`, `dashCancelCost`) |
-| A Deflect | 15, once, as it starts, whatever it meets | `DEFLECT_ENERGY_COST` (`deflectCost`) |
+| A Deflect that turns a projectile back | 15, once per Deflect, the first time it turns one back; starting one, whiffing, only striking a fighter or being cut short first is free (never while exhausted) | `DEFLECT_ENERGY_COST` (`deflectCost`) |
 | A hit the Shield blocks, a perfect block included | 15, per block | `BLOCK_ENERGY_COST` (`shieldHitCost`) |
 | An ordinary construct move (below) | 15, once per activation, as it starts | `CONSTRUCT_ENERGY_COST` (`constructCost`; each move's `energyCost`) |
 | Running, holding the Shield up, jumps, air jumps, the fast fall, turning (by hand or Automatic turn-around), air control, melee strikes, a heal of its own, any move with a 3 s or 5 s cooldown | 0 | — |
@@ -109,18 +113,27 @@ fighter and the field.
   kept in the buffer.
 - No refill on a step Energy was paid on (`Fighter.energyPaidAt`); every
   other step refills at the one rate, a held Shield and a block included.
-- Holding the Shield costs nothing; a miss costs nothing; a perfect
-  Shield costs the same 15 as any block (its advantage is no blockstun,
-  never Energy). A Deflect is no Shield: it pays its own 15 as it starts,
-  and a whiff has paid it all the same. Cancelled into an air dash, each
-  pays its own 15: never one payment for both.
+  A Deflect pays as the CombatSystem resolves the step, after the
+  fighter's refill: that step's refill is taken back first, so it is the
+  same.
+- Holding the Shield costs nothing; a miss costs nothing; only a hit that
+  really reaches it and is stopped costs it (a quake passing over it in
+  the air, a gaze from behind, a projectile that already passed it, never
+  reach it). A perfect Shield costs the same 15 as any block (its
+  advantages are no blockstun and its heal, 5 off its fighter's Launch
+  Point, never Energy). A Deflect is no Shield: it is free to start and
+  pays its own 15 only when it turns a projectile back, once however many;
+  the projectile is turned back even if the fighter has somehow become
+  exhausted by then (it pays nothing then). Cancelled into an air dash
+  before turning anything back, only the air dash pays.
 - Nothing gives Energy back: no block, perfect block, Deflect that lands,
   projectile turned back or cancelled move refunds anything or adds a
   refill of its own. Only the passive refill, and a full refill on a
   respawn, a reset or a restart, raise it.
 - Difficulty never changes any of it: the CPU pays what a player pays,
-  and plans with each move's own `energyCost`
-  ([ai](ai.md)).
+  and plans with each move's own `energyCost`, a Deflect's 15 only when
+  it will turn a projectile back (`turnBackCost`) and a Shield's per
+  expected blocked hit ([ai](ai.md)).
 - The bar shows over the fighter's name tag only while below full
   ([rendering](rendering.md#fighter-status)); the HUD card describes it to
   screen readers only.
@@ -137,12 +150,19 @@ CPU's costs),
 [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs)
 (every registered fighter: 100 everywhere it starts or refills, 15 for
 the Dash, the air dash and the Dash cancel, 15 for a block and a perfect
-block, 15 for a Deflect hit or whiffed, nothing back for landing one or
-turning a projectile back), the Dash cancel's cost in
+block, nothing for a Deflect that whiffs or only strikes a fighter, 15 for
+the one that turns a projectile back, nothing back for any of it), the
+Dash cancel's cost in
 [`tests/systems/combo.test.mjs`](../../tests/systems/combo.test.mjs), the
-Deflect's (and a Deflect then an air dash, each its own 15) in
+Deflect's (0 whiffed, cut short or striking a fighter, 15 for one or two
+projectiles turned back, never while exhausted, no refill on the step it
+pays; a Deflect then an air dash, only the air dash's 15) in
 [`tests/systems/move-cancel.test.mjs`](../../tests/systems/move-cancel.test.mjs)
 and [`tests/systems/deflect.test.mjs`](../../tests/systems/deflect.test.mjs),
+the Shield paying only for what it blocks (held for 3 s for nothing, one
+block 15, a quake over it, a gaze from behind and a passed projectile
+nothing) in
+[`tests/systems/shield-protection.test.mjs`](../../tests/systems/shield-protection.test.mjs),
 and melee attacks and Automatic turn-around never touching it in
 [`tests/systems/direct-input.test.mjs`](../../tests/systems/direct-input.test.mjs)
 and [`tests/systems/turn-around.test.mjs`](../../tests/systems/turn-around.test.mjs).

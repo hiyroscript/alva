@@ -19,6 +19,7 @@ import {
   DT, MOVEMENT, STAGE, cpuFight, duel, fakeSpritesOf, frameName, makeFighter, stageMap, stepUntil, steps,
 } from '../../helpers/fighter-harness.mjs';
 import { CONFIG, NUMBERED_ATTACKS } from '../../../js/config.js';
+import { LAUNCH_UNIT_SPEED } from '../../../js/data/launch.js';
 import { CHARACTERS, characterFramePaths, getCharacter, playableCharacters } from '../../../js/data/characters.js';
 import { abilityName } from '../../../js/data/abilities.js';
 import { describeLoadout, loadoutProblems, specialAttacks } from '../../../js/data/loadout.js';
@@ -375,7 +376,7 @@ test('the One-Two strikes twice in one press: the jab on frame 2 holds, the stra
   const [jab, straight] = d.events;
   assert.deepEqual([jab.move, jab.damage, jab.baseLaunch, jab.launchSpeed], ['attack1', 1, 0, 0]);
   assert.deepEqual([straight.move, straight.damage, straight.baseLaunch, straight.directionalLaunch], ['attack1', 3, 1, 'horizontal']);
-  assert.equal(straight.finalLaunch.x, 40, 'Base Launch 1 x the 4 Launch Point, sideways');
+  assert.equal(straight.finalLaunch.x, 4 * LAUNCH_UNIT_SPEED, 'Base Launch 1 x the 4 Launch Point, sideways');
   assert.ok(straight.launchPointBefore === 1, 'the jab\'s Launch Point is there first');
   const def = createAttackDefinition({ id: 'attack1', ...DEF.attacks.attack1 });
   assert.deepEqual(def.hits.map((h) => h.at * 20), [1, 3], 'frames 2 and 4');
@@ -394,7 +395,7 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   assert.deepEqual(kicks.map((e) => e.damage), [1, 1, 1, 3]);
   assert.deepEqual(kicks.slice(0, 3).map((e) => e.launchSpeed), [0, 0, 0], 'held in place');
   assert.deepEqual([kicks[3].baseLaunch, kicks[3].directionalLaunch], [2, 'horizontal']);
-  assert.equal(kicks[3].finalLaunch.x, 2 * 6 * 10);
+  assert.equal(kicks[3].finalLaunch.x, 2 * 6 * LAUNCH_UNIT_SPEED);
   // Each kick's stun outlasts the gap to the next: the target never gets out.
   const def = createAttackDefinition({ id: 'attack2', ...DEF.attacks.attack2 });
   for (let i = 0; i < 3; i++) assert.ok(def.hits[i].hitstun > def.hits[i + 1].at - def.hits[i].at + def.hits[i].hitstop);
@@ -424,7 +425,10 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
     }
   }
   const longest = Math.max(...strings);
-  assert.ok(longest > 4 && longest <= 12, `a few flurries at most in one string (${strings.join(', ')} kicks)`);
+  // Four flurries at most: the launch & energy update's weaker fling (the
+  // same Launch Point now launches at 7 units/s a point, not 10) lets one
+  // more flurry catch the target before it flies out of reach (it was three).
+  assert.ok(longest > 4 && longest <= 16, `a few flurries at most in one string (${strings.join(', ')} kicks)`);
 });
 
 test('a Shield stops the flurry at the kick it blocks: one block, one Energy cost, no later kick', () => {

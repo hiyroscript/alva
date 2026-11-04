@@ -33,8 +33,10 @@
 // fighter spends (there is no Shield meter apart from it), at one nominal
 // price for every fighter and everything, ENERGY_COST (15, the Energy
 // policy's: js/data/energy.js): a Dash or an air dash as it starts (a Dash
-// cancel included), the Deflect as it starts, every hit the Shield blocks
-// (a perfect Shield's included), and every move that creates a construct
+// cancel included), a Deflect once, the first time it turns a projectile
+// back (never as it starts: a whiff or a strike on a fighter is free),
+// every hit the Shield blocks (a perfect Shield's included; raising or
+// holding it is free), and every move that creates a construct
 // (a projectile, a clone, a burst) with no special cooldown, as it starts
 // (its definition's `energyCost`). Each works with less left than it
 // costs, but then takes all of it. It refills by itself at one passive
@@ -185,6 +187,13 @@ export class CombatState {
     // Nothing here reads them.
     this.launchPointRecovered = 0;
     this.energySpent = 0;
+    // How many times the Launch Point has really come down on this state (a
+    // recovery tick or a heal that took something off: see
+    // updateLaunchRecovery and heal), from 0 for every fresh state, so a
+    // respawn, a restart or a reset (a fresh state) is never one. The HUD
+    // glows green when it changes (js/ui/hud.js). Nothing in the simulation
+    // reads it.
+    this.launchPointHeals = 0;
     // Energy for the Dash, the Deflect and the Shield (see resolveEnergy):
     // full at the start, never below 0 or above maxEnergy (MAX_ENERGY for
     // every fighter). Emptying it (however it happens) exhausts the
@@ -433,6 +442,7 @@ export class CombatState {
         const before = this.launchPoint;
         this.launchPoint = Math.max(0, before - ticks * LAUNCH_RECOVERY_AMOUNT);
         this.launchPointRecovered += before - this.launchPoint;
+        if (this.launchPoint < before) this.launchPointHeals++;
         this.launchRecoveryRemaining += ticks * LAUNCH_RECOVERY_INTERVAL;
       }
     }
@@ -442,14 +452,17 @@ export class CombatState {
     }
   }
 
-  // A heal of its own (a technique's `heal`, see js/game/combat/technique.js):
-  // `amount` Launch Points off, never below 0. Returns what it took off.
+  // A heal of its own (a technique's `heal`, see js/game/combat/technique.js;
+  // a perfect Shield's PERFECT_SHIELD_HEAL, a charmed hit, a fear's feed, see
+  // CombatSystem.applyHit): `amount` Launch Points off, never below 0.
+  // Returns what it took off.
   // Recovery runs on as it was: a heal is no hit, so it neither restarts
   // nor speeds up the passive schedule.
   heal(amount) {
     const before = this.launchPoint;
     this.launchPoint = Math.max(0, before - Math.max(0, amount));
     this.launchPointRecovered += before - this.launchPoint;
+    if (this.launchPoint < before) this.launchPointHeals++;
     return before - this.launchPoint;
   }
 

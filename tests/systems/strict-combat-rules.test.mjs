@@ -288,8 +288,12 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // The CPU plans with the very cost the Fighter pays.
     f.opponent = makeFighter({ character: c, x: 900 }).fighter;
     for (const m of analyzeCapabilities(f).moves) {
-      const expected = m.kind === 'deflect' ? f.energyDef.deflectCost : m.def.energyCost;
+      // The Deflect pays nothing as it starts (the launch & energy update):
+      // its cost is on turning a projectile back, planned as turnBackCost,
+      // and it still needs a fighter that is not exhausted.
+      const expected = m.kind === 'deflect' ? 0 : m.def.energyCost;
       assert.equal(m.energyCost, expected, `#${c.id} ${m.key}`);
+      if (m.kind === 'deflect') assert.deepEqual([m.turnBackCost, m.needsEnergy], [f.energyDef.deflectCost, true], `#${c.id} Deflect`);
     }
   }
 });

@@ -309,6 +309,10 @@ export class Fighter {
     // The last step this fighter paid Energy on (a Dash, an air dash, a
     // Deflect or a construct move, see payEnergy): no refill on that step.
     this.energyPaidAt = -1;
+    // The last step the passive refill ran on, and what it added then: a
+    // payment later in that same step takes it back (see payEnergy).
+    this.energyRefilledAt = -1;
+    this.energyRefilled = 0;
     // Seconds the Shield has been up (from the step it went up) and down;
     // and whether this raise may block perfectly (see perfectShield).
     this.shieldUpTime = 0;
@@ -486,7 +490,10 @@ export class Fighter {
       }
       const frozenDash = this.dashAsked(input);
       if (frozenDash) this.bufferDash(frozenDash);
+      const before = combat.energy;
       combat.updateEnergy(dt);
+      this.energyRefilled = combat.energy - before;
+      this.energyRefilledAt = this.steps;
       this.updateState(0);
       return;
     }
@@ -966,7 +973,13 @@ export class Fighter {
     // block or a Deflect's strike included, at the one passive rate:
     // nothing held or done ever makes it faster, and no defense, however
     // well timed, gives any back.
-    if (this.energyPaidAt !== this.steps) combat.updateEnergy(dt);
+    if (this.energyPaidAt !== this.steps) {
+      const before = combat.energy;
+      combat.updateEnergy(dt);
+      // What this step's refill added (see payEnergy).
+      this.energyRefilled = combat.energy - before;
+      this.energyRefilledAt = this.steps;
+    }
 
     // A burst is over once the speed is back to top speed or less.
     if (this.burst && !this.dash && Math.abs(body.vx) <= mv.maxSpeed + TIME_EPSILON) this.burst = false;
@@ -1453,15 +1466,24 @@ export class Fighter {
     return true;
   }
 
-  // Pays `cost` Energy for something the fighter starts now (a Dash, an air
-  // dash, a Deflect, a construct move: its `energyCost`), if it is not
-  // exhausted (CombatState.spendEnergy: all that is left when that is
-  // less). A cost of 0 is free: always true, nothing touched. True when
-  // paid; the step it was paid on gets no refill (see the end of update).
-  // Nothing else the fighter does pays Energy, and one activation pays
-  // once.
+  // Pays `cost` Energy for something the fighter does now (a Dash, an air
+  // dash, a construct move as it starts: its `energyCost`; a Deflect the
+  // first time it turns a projectile back, see
+  // CombatSystem.deflectProjectiles), if it is not exhausted
+  // (CombatState.spendEnergy: all that is left when that is less). A cost
+  // of 0 is free: always true, nothing touched. True when paid; the step it
+  // was paid on gets no refill (see the end of update). A payment that
+  // comes after this step's refill (a Deflect's, paid as the CombatSystem
+  // resolves the step, after Fighter.update) takes that refill back first,
+  // so it is the same: no refill on the step it pays. Nothing else the
+  // fighter does pays Energy, and one activation pays once.
   payEnergy(cost) {
     if (!(cost > 0)) return true;
+    if (!this.combat.canUseEnergy()) return false;
+    if (this.energyRefilledAt === this.steps && this.energyRefilled > 0) {
+      this.combat.setEnergy(this.combat.energy - this.energyRefilled);
+      this.energyRefilled = 0;
+    }
     if (!this.combat.spendEnergy(cost)) return false;
     this.energyPaidAt = this.steps;
     return true;
@@ -1487,10 +1509,13 @@ export class Fighter {
   // already playing restarts nothing), never while its cooldown runs or the airtime rules
   // out an attack (free fall,
   // its `airUses`), and only with its art (missing art is reported once and
-  // refused). It pays DEFLECT_ENERGY_COST (energy.deflectCost) as it starts,
-  // whatever it then meets (see payEnergy): never while the fighter is
-  // exhausted, and nothing it strikes or turns back gives any back. True
-  // when it started; false with nothing paid. Once it plays, it yields to
+  // refused). Starting it costs nothing, but never while the fighter is
+  // exhausted (canUseEnergy). It pays DEFLECT_ENERGY_COST
+  // (energy.deflectCost) once, the first time it turns a projectile back
+  // (see CombatSystem.deflectProjectiles and payEnergy): a Deflect that only
+  // strikes a fighter, whiffs or is cut short before turning anything back
+  // costs nothing, and nothing it strikes or turns back gives any back. True
+  // when it started. Once it plays, it yields to
   // any valid request (moveYields): cancelling out of a Deflect is always
   // allowed, cancelling into one only as above.
   tryDeflect(dir = 0, at = this.steps) {
@@ -1504,7 +1529,7 @@ export class Fighter {
       this.missingDeflectArt = true;
       return false;
     }
-    if (!this.payEnergy(this.energyDef.deflectCost)) return false;
+    if (!combat.canUseEnergy()) return false;
     combat.lastIntent = 'shield';
     this.startAttack(atk, dir);
     return true;

@@ -27,6 +27,7 @@ import { COMBAT_ACTIONS } from '../../js/game/fighters/fighter.js';
 import { createDefenseDefinition } from '../../js/game/combat/defense.js';
 import { BLOCK_ENERGY_COST, CombatState, resolveEnergy } from '../../js/game/combat/combat-state.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
+import { LAUNCH_RECOVERY_DELAY, LAUNCH_RECOVERY_INTERVAL, PERFECT_SHIELD_HEAL } from '../../js/data/launch.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import {
   SHIELD_SHAPE, SHIELD_STYLE, drawShield, shieldCenter, shieldOutline, shieldRadius,
@@ -1634,6 +1635,83 @@ test('a Shield raised just before the hit blocks perfectly: no blockstun, free t
   d.tick({}, ATTACK1);
   assert.equal(d.target.combat.attack?.def.id, 'attack1');
   assert.ok(d.attacker.combat.attack, 'the attacker still in its recovery');
+});
+
+// The launch & energy update: a perfect block heals its own fighter.
+// A perfect (or, with `perfect` false, an ordinary) block of the Jab by a
+// target at `lp`.
+function blockAt(lp, { perfect = true } = {}) {
+  const d = duel({ targetCharacter: NO_REGEN });
+  d.target.combat.launchPoint = lp;
+  if (!perfect) {
+    d.tick({}, SHIELD);
+    for (let i = 0; i < 12; i++) d.tick({}, HOLD);
+  }
+  d.tick(ATTACK1, perfect ? {} : HOLD);
+  d.tick({}, perfect ? {} : HOLD);
+  d.tick({}, perfect ? SHIELD : HOLD);
+  for (let i = 0; i < 20 && !d.events.length; i++) d.tick({}, HOLD);
+  return { d, e: d.events[0] };
+}
+
+test('a perfect block takes PERFECT_SHIELD_HEAL (5) off its own fighter\'s Launch Point: 12 leaves 7, 3 leaves 0; an ordinary block none', () => {
+  assert.equal(PERFECT_SHIELD_HEAL, 5);
+  const twelve = blockAt(12);
+  assert.deepEqual([twelve.e.type, twelve.e.perfect], ['block', true]);
+  assert.equal(twelve.d.target.combat.launchPoint, 7, '12 - 5');
+  assert.deepEqual([twelve.e.launchPointBefore, twelve.e.launchPointAfter, twelve.e.heal], [12, 7, 5], 'on the block event');
+  assert.equal(twelve.d.target.combat.launchPointRecovered, 5, 'counted as a heal for the match statistics');
+  assert.equal(twelve.e.energyCost, COST, 'the block still costs its 15');
+  const three = blockAt(3);
+  assert.equal(three.e.perfect, true);
+  assert.equal(three.d.target.combat.launchPoint, 0, 'never below 0');
+  assert.equal(three.e.heal, 3, 'what it really took off');
+  const plain = blockAt(12, { perfect: false });
+  assert.deepEqual([plain.e.type, plain.e.perfect], ['block', false]);
+  assert.equal(plain.d.target.combat.launchPoint, 12, 'an ordinary block leaves Launch Point as it is');
+  assert.equal(plain.e.heal, 0);
+  // A hit never heals.
+  const hit = duel();
+  hit.target.combat.launchPoint = 12;
+  hit.tick(ATTACK1);
+  hit.until(() => hit.events.length > 0, 20);
+  assert.equal(hit.events[0].heal, 0);
+});
+
+test('a perfect block\'s heal leaves the passive recovery schedule untouched: neither restarted nor brought forward', () => {
+  for (const since of [0.7, 2.2, 2.6]) {
+    const d = duel({ targetCharacter: NO_REGEN });
+    const c = d.target.combat;
+    c.launchPoint = 20;
+    c.update(since);
+    const lp = c.launchPoint;
+    const clock = c.launchRecoveryRemaining;
+    c.shielding = true;
+    Object.defineProperty(d.target, 'perfectShield', { value: true });
+    const e = new CombatSystem().applyHit(d.attacker, d.target, d.attacker.attacks.attack1);
+    assert.deepEqual([e.type, e.perfect, e.heal], ['block', true, 5]);
+    assert.equal(c.launchPoint, lp - 5);
+    assert.equal(c.launchRecoveryRemaining, clock, `after ${since} s: the same clock, not restarted or brought forward`);
+    assert.ok(clock < LAUNCH_RECOVERY_DELAY + LAUNCH_RECOVERY_INTERVAL, 'a clock that had run');
+  }
+});
+
+test('a multi-hit string blocked perfectly heals once: it stops at its first block', () => {
+  // #0002's Rapid Kicks, four strikes, into a fresh Shield.
+  const kicks = duel({ attackerCharacter: getCharacter('0002'), targetCharacter: NO_REGEN, gap: 44 });
+  kicks.target.combat.launchPoint = 30;
+  kicks.tick({ attack2: true, attack2Pressed: true });
+  for (let i = 0; i < 40 && !kicks.events.length; i++) {
+    const a = kicks.attacker.combat.attack;
+    const strike = a?.def.hits?.[0];
+    const soon = strike && a.time + 3 * DT >= strike.at - 1e-6;
+    kicks.tick({}, soon ? (kicks.target.combat.shielding ? HOLD : SHIELD) : {});
+  }
+  for (let i = 0; i < 40; i++) kicks.tick({}, HOLD);
+  const blocks = kicks.events.filter((e) => e.type === 'block');
+  assert.equal(blocks.length, 1, 'the string stops at its first block');
+  assert.equal(blocks[0].perfect, true);
+  assert.equal(kicks.target.combat.launchPoint, 25, 'healed once: 30 - 5');
 });
 
 test('only a fresh raise is perfect: held long, or tapped again too soon after lowering, it is an ordinary block', () => {

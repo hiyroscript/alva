@@ -81,7 +81,7 @@ globalThis.document = {
   createTextNode: (text) => new Text(text),
 };
 
-const { TouchControls, JOYSTICK, joystickDirection } = await import('../../js/ui/touch-controls.js');
+const { TouchControls, JOYSTICK, joystickDirection, joystickVertical } = await import('../../js/ui/touch-controls.js');
 const { ACTION_LABELS, CONFIG } = await import('../../js/config.js');
 const { ICONS } = await import('../../js/ui/icons.js');
 const { ABILITY_ACTIONS, SPRITE_BUTTONS, abilityPresence, jumpArt, mobileAbility, previewFrame } = await import('../../js/ui/mobile-abilities.js');
@@ -1331,8 +1331,10 @@ function joystickControls() {
   return { ...made, down, move, end };
 }
 
-test('joystick thresholds: a deadzone round the centre, a little hysteresis, sideways only', () => {
-  assert.deepEqual({ ...JOYSTICK }, { deadzone: 0.24, engage: 0.34, travel: 0.56 });
+test('joystick thresholds: a deadzone round the centre, a little hysteresis, for the sideways run', () => {
+  assert.deepEqual({ ...JOYSTICK }, {
+    deadzone: 0.24, engage: 0.34, travel: 0.56, downEngage: 0.5, downDeadzone: 0.38, downAngle: 50, downReleaseAngle: 60,
+  });
   assert.equal(joystickDirection(0), null);
   assert.equal(joystickDirection(0.3), null, 'inside the engage line: nothing');
   assert.equal(joystickDirection(0.34), 'runRight');
@@ -1389,10 +1391,10 @@ test('crossing the centre releases the old direction before holding the new one'
   assert.deepEqual(calls.at(-1), ['runRight', false]);
 });
 
-test('up and down move the knob only: never Jump or Down; the knob stays inside the base', () => {
+test('up moves the knob only, never Jump; the knob stays inside the base', () => {
   const { tc, calls, down, move, end } = joystickControls();
   down(0, -90);
-  move(5, 95);
+  move(5, -95);
   move(-10, -200);
   assert.deepEqual(calls, [], 'no Jump, no Down, no direction');
   const travel = 100 * JOYSTICK.travel;
@@ -2219,4 +2221,206 @@ test('Mouvement artwork has centered bounds, even spacing, equal strokes and mir
   }
   assert.deepEqual(left.map((p) => p.map((v, i) => i % 2 === 0 ? 24 - v : v)).reverse(), right);
   assert.doesNotMatch(ICONS.mouvementLeft + ICONS.mouvementRight, /stroke-width|transform/);
+});
+
+// ---- Joystick: pushed down is Down (the launch & energy update) ------------------
+
+test('joystickVertical: Down engages past 0.5 within 50° of straight down, lets go inside 0.38 or past 60°, and a sideways run drifting low never holds it', () => {
+  assert.deepEqual([JOYSTICK.downEngage, JOYSTICK.downDeadzone, JOYSTICK.downAngle, JOYSTICK.downReleaseAngle], [0.5, 0.38, 50, 60]);
+  assert.equal(joystickVertical(0, 0), false);
+  assert.equal(joystickVertical(0, 0.45), false, 'inside the engage line: nothing');
+  assert.equal(joystickVertical(0, 0.5), true, 'straight down, at the line');
+  assert.equal(joystickVertical(0.5, 0.6), true, 'a diagonal down-right, 40° off');
+  assert.equal(joystickVertical(-0.5, 0.6), true, 'and down-left');
+  // Hysteresis: held until back inside the deadzone or turned well aside.
+  assert.equal(joystickVertical(0, 0.42, true), true, 'held between 0.38 and 0.5');
+  assert.equal(joystickVertical(0, 0.38, true), false, 'released at the deadzone');
+  assert.equal(joystickVertical(0.7, 0.5, true), true, '54°: still held');
+  assert.equal(joystickVertical(0.9, 0.5, true), false, '61°: released');
+  assert.equal(joystickVertical(0.7, 0.5, false), false, '54°: never engaged from a run');
+  // A sideways run with the thumb drifting low, however far out.
+  for (const [x, y] of [[0.5, 0.3], [0.7, 0.5], [0.9, 0.6], [1, 0.8], [-0.8, 0.6], [1.4, 1.1]]) {
+    assert.equal(joystickVertical(x, y), false, `run at (${x}, ${y})`);
+  }
+  // Up is never Down (nor anything else).
+  for (const y of [-0.2, -0.5, -1]) assert.equal(joystickVertical(0, y), false);
+  assert.equal(joystickVertical(0, -1, true), false, 'pushed up while held: let go');
+});
+
+test('the stick pushed down holds Down; down-left holds Run left and Down together; letting go clears both', () => {
+  const { tc, calls, down, move, end } = joystickControls();
+  down(0, 70);
+  assert.deepEqual(calls, [['down', true]], 'straight down: Down, no run');
+  assert.ok(tc.stick.classList.contains('is-down'));
+  assert.equal(tc.counts.get('down'), 1);
+  move(0, 80);
+  assert.deepEqual(calls, [['down', true]], 'no repeat presses while it stays down');
+  move(-50, 65);
+  assert.deepEqual(calls, [['down', true], ['runLeft', true]], 'down-left: both at once');
+  assert.ok(tc.stick.classList.contains('is-left') && tc.stick.classList.contains('is-down'));
+  move(-70, 10);
+  assert.deepEqual(calls.at(-1), ['down', false], 'turned to the side: Down lets go, the run stays');
+  assert.equal(tc.counts.get('runLeft'), 1);
+  move(-50, 65);
+  move(10, 0);
+  end();
+  assert.deepEqual(new Set(calls.slice(-2).map((c) => c.join())), new Set(['down,false', 'runLeft,false']), 'centred and let go: both released');
+  assert.equal(tc.counts.get('down'), 0);
+  assert.equal(tc.stick.classList.contains('is-down'), false);
+  // Down-left let go at once, in one lift.
+  const two = joystickControls();
+  two.down(-50, 65);
+  two.end();
+  assert.deepEqual(two.calls, [['runLeft', true], ['down', true], ['runLeft', false], ['down', false]]);
+  assert.equal(two.tc.pointers.size, 0, 'nothing left held');
+});
+
+test('the stick\'s Down never sticks: cancelled, capture lost, disabled, released, or the scheme switched, it lets go', () => {
+  for (const type of ['pointercancel', 'lostpointercapture', 'pointerup']) {
+    const { tc, calls, down, end } = joystickControls();
+    down(0, 80);
+    end(type);
+    assert.deepEqual(calls, [['down', true], ['down', false]], type);
+    assert.equal(tc.stickDown, false);
+  }
+  for (const stop of [(tc) => tc.setEnabled(false), (tc) => tc.releaseAll(), (tc) => tc.setScheme('classic')]) {
+    const { tc, calls, down } = joystickControls();
+    down(0, 80);
+    stop(tc);
+    assert.deepEqual(calls, [['down', true], ['down', false]]);
+    assert.equal(tc.counts.get('down') ?? 0, 0);
+    assert.equal(tc.stick.classList.contains('is-down'), false);
+  }
+});
+
+test('the Down button and the stick together are one Down: letting go of either keeps it held while the other still holds it', () => {
+  const { tc, calls, down, move, end } = joystickControls();
+  press(tc.downButton, 7);
+  down(0, 80);
+  assert.deepEqual(calls, [['down', true], ['down', true]]);
+  assert.equal(tc.counts.get('down'), 2);
+  move(0, 0);
+  assert.equal(tc.counts.get('down'), 1, 'the stick let go...');
+  assert.equal(calls.at(-1).join(), 'down,true', '...and Down is still held, by the button');
+  move(0, 80);
+  lift(tc.downButton, 7);
+  assert.equal(tc.counts.get('down'), 1, 'the button let go, the stick still holds it');
+  assert.equal(calls.at(-1).join(), 'down,true');
+  end();
+  assert.deepEqual(calls.at(-1), ['down', false], 'both let go: released');
+  // Classic Buttons has no stick: its Down button is as ever.
+  const classic = touchControls(DEF_0001, { scheme: 'classic' });
+  press(classic.tc.downButton, 3);
+  lift(classic.tc.downButton, 3);
+  assert.deepEqual(classic.calls, [['down', true], ['down', false]]);
+});
+
+test('the stick\'s look: is-down beside is-left and is-right, the knob following the thumb all the while', () => {
+  const { tc, down, move } = joystickControls();
+  down(-50, 65);
+  assert.deepEqual(['is-active', 'is-left', 'is-down'].map((c) => tc.stick.classList.contains(c)), [true, true, true]);
+  assert.ok(Math.hypot(tc.knobOffset.x, tc.knobOffset.y) <= 100 * JOYSTICK.travel + 1e-9);
+  assert.ok(tc.knobOffset.x < 0 && tc.knobOffset.y > 0, 'down and to the left, where the thumb is');
+  move(0, -80);
+  assert.deepEqual(['is-left', 'is-right', 'is-down'].map((c) => tc.stick.classList.contains(c)), [false, false, false], 'pushed up: nothing');
+  assert.match(CSS, /\.tc-stick\.is-down\s*\{/, 'styled');
+});
+
+// The real InputManager behind the real TouchControls, a real Fighter
+// played by it: what the stick does in a match.
+async function joystickPlay({ y = 800, x = 500 } = {}) {
+  globalThis.window ??= { addEventListener() {}, removeEventListener() {} };
+  globalThis.document.addEventListener ??= () => {};
+  const { InputManager } = await import('../../js/core/input-manager.js');
+  const { Fighter } = await import('../../js/game/fighters/fighter.js');
+  const { PlayerController } = await import('../../js/game/fighters/fighter-controller.js');
+  const { STAGE, SIM_CTX, fakeSpritesOf, MOVEMENT } = await import('../helpers/fighter-harness.mjs');
+  const input = new InputManager(CONFIG.bindings);
+  input.setGameplayActive(true);
+  input.sample();
+  const tc = new TouchControls(new Element('div'), input, { scheme: 'joystick' });
+  tc.setCharacter(DEF_0001);
+  tc.setEnabled(true);
+  tc.stick.rect = { left: 0, top: 100, width: 200, height: 200 };
+  const fighter = new Fighter({
+    def: DEF_0001, sprites: fakeSpritesOf(DEF_0001), stage: STAGE, slot: 0, label: 'P1',
+    controller: new PlayerController(input), spawn: { x, y, facing: 1 },
+  });
+  const at = (dx, dy) => ({ clientX: 100 + dx, clientY: 200 + dy });
+  return {
+    input, tc, fighter, MOVEMENT,
+    step: () => fighter.update(DT, SIM_CTX),
+    stick: (dx, dy) => tc.stick.dispatch(tc.stickPointer === null ? 'pointerdown' : 'pointermove', { pointerId: 1, ...at(dx, dy), preventDefault() {} }),
+    lift: () => tc.stick.dispatch('pointerup', { pointerId: 1 }),
+    jump: (on) => tc.buttons.get('jump').dispatch(on ? 'pointerdown' : 'pointerup', { pointerId: 2, preventDefault() {} }),
+  };
+}
+
+test('in play the stick down is exactly the Down button: its frame holds down, and down-left holds a run as well', async () => {
+  const p = await joystickPlay();
+  p.stick(0, 80);
+  let f = p.input.sample();
+  assert.deepEqual([f.down, f.downPressed], [true, true], 'a real press edge');
+  f = p.input.sample();
+  assert.deepEqual([f.down, f.downPressed], [true, false], 'held, no more edges');
+  p.stick(-50, 65);
+  f = p.input.sample();
+  assert.deepEqual([f.runLeft, f.down], [true, true]);
+  p.lift();
+  f = p.input.sample();
+  assert.deepEqual([f.runLeft, f.down], [false, false], 'let go: both clear');
+});
+
+test('through a real Fighter: stick down + Jump is a Super Jump, stick down in the air fast-falls, a flick on a platform drops through, a long hold does not', async () => {
+  // The Super Jump.
+  const sj = await joystickPlay();
+  for (let i = 0; i < 3; i++) sj.step();
+  sj.stick(0, 80);
+  for (let i = 0; i < 5; i++) sj.step();
+  sj.jump(true);
+  sj.step();
+  assert.ok(sj.fighter.superJumpTakeoff, 'its takeoff');
+  assert.ok(sj.fighter.body.vy < -sj.MOVEMENT.jumpVelocity, 'faster than a normal jump');
+  // The fast fall, in the air while descending.
+  const ff = await joystickPlay();
+  Object.assign(ff.fighter.body, { y: 300, prevY: 300, vy: 0, grounded: false, ground: null });
+  ff.step();
+  for (let i = 0; i < 30 && !(ff.fighter.body.vy > 0); i++) ff.step();
+  assert.equal(ff.fighter.grounded, false);
+  ff.stick(0, 80);
+  ff.step();
+  ff.step();
+  assert.equal(ff.fighter.fastFalling, true, 'fast-falling');
+  ff.lift();
+  ff.step();
+  assert.equal(ff.fighter.fastFalling, false, 'let go: a normal fall');
+  // The platform drop: a quick flick down and back to the centre.
+  const LEDGE_Y = 600;
+  const drop = await joystickPlay({ x: 1000, y: LEDGE_Y });
+  for (let i = 0; i < 3; i++) drop.step();
+  assert.equal(drop.fighter.body.ground?.id, 'ledge');
+  drop.stick(0, 80);
+  drop.step();
+  assert.equal(drop.fighter.body.ground?.id, 'ledge', 'pushed: still standing');
+  drop.stick(0, 0);
+  drop.step();
+  assert.equal(drop.fighter.grounded, false, 'flicked back: through the platform');
+  assert.equal(drop.fighter.body.dropId, 'ledge');
+  // Held down past dropTapTime: no drop, exactly as the button.
+  const hold = await joystickPlay({ x: 1000, y: LEDGE_Y });
+  for (let i = 0; i < 3; i++) hold.step();
+  hold.stick(0, 80);
+  for (let i = 0; i < Math.ceil(hold.MOVEMENT.dropTapTime / DT) + 2; i++) hold.step();
+  hold.stick(0, 0);
+  hold.step();
+  assert.equal(hold.fighter.body.ground?.id, 'ledge', 'held too long: it stays on the platform');
+  // A run with the thumb drifting low never drops it.
+  const run = await joystickPlay({ x: 1000, y: LEDGE_Y });
+  for (let i = 0; i < 3; i++) run.step();
+  for (const [dx, dy] of [[70, 30], [90, 60], [80, 20], [0, 0]]) {
+    run.stick(dx, dy);
+    run.step();
+  }
+  assert.ok(run.fighter.body.ground?.id === 'ledge' || run.fighter.body.dropId !== 'ledge', 'never a drop from a run');
+  assert.notEqual(run.fighter.body.dropId, 'ledge');
 });

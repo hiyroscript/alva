@@ -21,6 +21,7 @@ for where they moved). The game as it is now is specified in
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 | **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
 | **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
+| **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -258,6 +259,14 @@ jump again, exactly as before the update, and Jump held a little longer
 gives a higher jump instead. The air jump is unchanged. See
 [Jump, Shield, turning and joystick changes](#jump-shield-turning-and-joystick-changes).
 
+### Later: the perfect Shield heals, launches slower
+
+Not part of the update. Since the
+[launch & energy update](#launch--energy-update) a perfect block also
+takes 5 off its own fighter's Launch Point, and every launch flies at 7
+units/s a point of strength instead of 10, so the launch reaction's stun
+and tumble (in units/s, left as they were) come at a higher Launch Point.
+
 ## Bounce update
 
 A launch that drives its fighter hard into a wall, floor or ceiling now
@@ -300,6 +309,14 @@ ceiling and landing are unchanged.
 
 **Tests:** `tests/systems/launch-bounce.test.mjs`, plus the attack2 spike tests in
 `tests/fighters/0001/attack2.test.mjs`.
+
+### Later: the same thresholds, at 7 units/s a point
+
+Not part of the update. The [launch & energy update](#launch--energy-update)
+made `LAUNCH_UNIT_SPEED` 7 (it was 10). The bounce settings are speeds and
+were kept: a Base Launch 1 push now rebounds off a wall from about 72
+Launch Point (it was 50), a Base Launch 2 spike off the floor from about 36
+(it was 25).
 
 ## Jump, Shield, turning and joystick changes
 
@@ -364,6 +381,14 @@ Settings became a dialog).
   `tests/fighters/0001/attack2.test.mjs`, `tests/fighters/0001/extra-attack.test.mjs`, and the CPU's
   guard in `tests/systems/combat-ai.test.mjs`
 - the Joystick layout in `tests/interface/controls-ui.test.mjs`
+
+### Later: the stick pushed down is Down
+
+Not part of these changes. Since the
+[launch & energy update](#launch--energy-update), pushing the Joystick
+scheme's stick down (mostly downward) holds Down exactly as the Down
+button does (the Super Jump, the fast fall, the platform drop); pushed up
+it still holds nothing, and the Down button stays where it is.
 
 ## Roster reset
 
@@ -1146,6 +1171,14 @@ for either fighter, the refused fields), `dash.test.mjs`, `combo.test.mjs`
 `tests/fighters/0001/`, `tests/fighters/0002/`,
 `tests/interface/controls-ui.test.mjs` (the Deflect label) and
 `tests/integration/roster-matrix.test.mjs` updated.
+
+### Later: the Deflect pays only to turn a projectile back
+
+Not part of this change. Since the
+[launch & energy update](#launch--energy-update) a Deflect is free to
+start (still never while exhausted) and pays its 15 Energy once, the first
+time it turns a projectile back; one that whiffs or only strikes a fighter
+costs nothing.
 
 ## Universal movement and momentum
 
@@ -5280,3 +5313,308 @@ back, ending as it appears, once per respawn, in every mode and Practice
 Ground; none at a match's start, on a restart or for Practice Ground's
 arrivals, CPUs and swaps; cleared by a restart during the wait; never an
 elimination.
+
+## Launch & energy update
+
+Pull request [#176](https://github.com/hiyroscript/alva/pull/176), commit `b4889f0`.
+Asked for in the `max` prompt, and named there: pushing the joystick down
+is the Down button, launches nerfed through the speed a point of launch
+strength gives, Launch Point recovered twice as fast and by a perfect
+Shield, the HUD showing a Launch Point coming down (green) and one that is
+dangerously high (fire), Energy paid by the Shield and the Deflect only
+when they actually do something, and the CPUs playing by all of it.
+Nothing about Base Launch (`BASE_LAUNCH_VALUES`, any hit's `baseLaunch`),
+how damage adds to Launch Point (`launchPoint += damage` in
+`CombatSystem.applyHit`), the formula (`resolveLaunchStrength`: launch
+strength = Base Launch × Launch Point) or any damage value changed: `git
+diff` of the update shows no `damage` or `baseLaunch` line touched. The
+only Launch Point reductions added are the perfect Shield's heal and the
+faster recovery.
+
+### The joystick pushed down is Down
+
+In the Joystick scheme, the stick pushed down holds `down`, exactly as the
+Down button (and S / ↓, the controller's left stick down) does: stick down
++ Jump is the Super Jump, stick down in the air while falling the fast
+fall, a quick flick down and back on a droppable platform the drop (held
+past `dropTapTime`, no drop). Nothing in the fighter or physics changed:
+the stick only produces the input the button already did.
+
+- **The rule** (`joystickVertical(x, y, current)` in
+  `js/ui/touch-controls.js`, a pure exported function beside
+  `joystickDirection`): Down engages when the push is past
+  `JOYSTICK.downEngage` (0.5 of the radius) and within `downAngle` (50°)
+  of straight down, and lets go back inside `downDeadzone` (0.38) or once
+  turned past `downReleaseAngle` (60°): the same hysteresis as the run.
+  The angle keeps a sideways run with the thumb drifting low from ever
+  holding Down (an accidental fast fall or drop would be worse than the
+  problem fixed). The prompt suggested about 55°: 50 was chosen so that a
+  thumb at 0.7 across and 0.5 low, a run drifting down, holds nothing
+  (54°). A diagonal (say 0.5 across, 0.6 down) holds a run and Down.
+  Pushed up, nothing (Jump stays on its button).
+- **Two holds on one pointer:** the stick's run direction stays its
+  pointer's (`assign`); its Down is a second slot (`setStickDown`, keyed by
+  its own symbol in the same pointer map), pressed and released through
+  the same path as the Down button, so the press is a real `downPressed`
+  edge (the drop tap arms) and the count is shared: the button and the
+  stick together are one `down`, and letting go of either keeps it while
+  the other holds it. Released on lift, `pointercancel`,
+  `lostpointercapture`, `releaseStick`, `releaseAll`, disabling (pause, a
+  match over) and a scheme switch; a lost window focus or a hidden page
+  clears every touch input (`InputManager.suspend`), as for every button.
+- **On screen:** `is-down` on `.tc-stick` beside `is-left` / `is-right`
+  (the base's lower rim lit, the knob a little brighter,
+  `css/touch-controls.css`); the knob follows the thumb as before.
+- Classic Buttons, the keyboard and controllers are unchanged. No button
+  was added and nothing is placed or sized by a fighter: the touch comfort
+  rules and `touchComfortProblems` pass unchanged. CPUs do not use touch:
+  the training CPU's `dropPressed` and the CPU's fast fall are unchanged
+  (`tests/systems/drop-through.test.mjs`, `cpu-super-jump.test.mjs`).
+
+### Launches nerfed: `LAUNCH_UNIT_SPEED` 7
+
+`LAUNCH_UNIT_SPEED` in `js/data/launch.js` is 7 (it was 10), the value the
+prompt decided, still the one knob (8 or 6 is that line alone). The same
+Launch Point and Base Launch send a fighter less far: 30 Launch Point ×
+Base Launch 2 = strength 60, 420 units/s (it was 600); a fighter needs
+about 43 % more Launch Point (10 / 7) to be launched as hard.
+
+Everything that reads launch speed rather than strength, and what was done:
+
+| What | Decision |
+| --- | --- |
+| `LAUNCH_BOUNCE` (`js/game/combat/launch-bounce.js`) | **Left alone.** Its `minImpactSpeed` (500) and `hitstopSpeed` (1200) are speeds tuned for the world's physics, not around 10, so rebounds come later, part of the nerf: a Base Launch 1 push off a wall from about 72 Launch Point (it was 50), a Base Launch 2 spike off the floor from about 36 (it was 25). Its comment rewritten for 7. |
+| `launchReaction` (`stunPerThousand`, `tumbleSpeed`, `maxStun`: `combat.js` and every fighter's data) | **Left alone**, as asked: hitstun and tumbling come at a higher Launch Point, part of the nerf. |
+| The CPU's launch outcomes (`LaunchJudge` in `values.js`, `prediction.js`'s `launchOutcome`) | **Follow automatically**: they run the real conversion (`st.baseLaunch * lp * LAUNCH_UNIT_SPEED`) through the real physics. |
+| The CPU's Launch Point scales tuned at 10 (`values.js` 160, `evaluator.js` 160, `objective.js` 150, `opponent-model.js` 40) | **Derived from the constant**: each now reads Launch Points through `LAUNCH_POINT_SCALE` (10 / `LAUNCH_UNIT_SPEED`, in `values.js`). `prediction.js` and `plans.js` held no launch Launch Point or speed literals. |
+| The reference copy (`LAUNCH_FORMULA`, the summaries, both languages) | Names no unit speed: unchanged, but the recovery and perfect Shield copy updated (below). |
+| Tests asserting exact speeds | Computed from `LAUNCH_UNIT_SPEED`; scenarios built on a "battered" or "dangerous" Launch Point read it through `10 / LAUNCH_UNIT_SPEED` (so they stay equivalent and follow the knob). |
+
+### Recovery: 2 points a tick
+
+`LAUNCH_RECOVERY_AMOUNT` is 2 (it was 1). The delay (2 s) and the interval
+(0.5 s) are unchanged: from 10 at t = 0, still 10 at 2.0 s, 8 at 2.5 s, 6
+at 3.0 s, 4 at 3.5 s. `CombatState.updateLaunchRecovery` already clamped
+at 0, so an odd Launch Point ends at 0, never −1. The CPU's recovery model
+(`RECOVERY_RATE` in `objective.js`) follows the constant (4 a second).
+
+### A perfect Shield heals 5
+
+Every perfect block (`Fighter.perfectShield`) also takes
+`PERFECT_SHIELD_HEAL` (5, `js/data/launch.js`, the same for every fighter)
+Launch Points off the blocking fighter, never below 0, through
+`CombatState.heal`: it counts in `launchPointRecovered` (the match
+statistics), and like any heal neither restarts nor speeds up the passive
+recovery. The block event records it (`heal`, the amount really taken off,
+with the real `launchPointAfter`); every other event's `heal` is 0. The
+block still pays its 15 Energy, and an ordinary block still leaves Launch
+Point alone. One perfect block heals once: a blocked string stops at its
+first block (`CombatSystem.strike`), checked with #0002's Rapid Kicks. It
+is simulation state like everything in `applyHit`: the online determinism
+and lockstep tests pass unchanged.
+
+### The HUD: a green glow, and fire
+
+Paint only, the same for every HUD card (P1 and P2, a CPU, Local Play,
+Watch Mode, Online Play, Practice Ground: all through `updatePanel` in
+`js/ui/hud.js`):
+
+- **The heal glow:** each time the shown Launch Point really comes down
+  while its fighter stays in play (a recovery tick, a perfect Shield, a
+  technique's heal, a charm, a fear's feed), the number pops and fades
+  with a soft green glow over half a second (`is-healing`,
+  `@keyframes hud-heal-glow`, the game's `--accent` greens), restarted by
+  another heal during it. It is decided in the simulation, not guessed by
+  the HUD: `CombatState.launchPointHeals` counts every real reduction
+  (`heal` and `updateLaunchRecovery` when they take something off), and a
+  respawn, restart, rematch or Practice Ground reset or swap gives the
+  fighter a fresh `CombatState`, which the card only syncs with
+  (`bindPanel` forgets the state it watched). Nothing in the simulation
+  reads the counter.
+- **The fire:** from `LAUNCH_POINT_FIRE` (60) the number burns: a hot
+  flicker on the digits (layered animated `text-shadow`) and a flame layer
+  rising behind them (`::before`, an animated radial gradient); from
+  `LAUNCH_POINT_INFERNO` (100) it burns hotter and higher (`is-inferno`).
+  Hysteresis (`launchPointFire`): lit at 60, out only below 55; the
+  inferno at 100, back to the first tier below 95. It goes out at once on
+  a fresh state. The heal glow plays over the fire (the flames stay lit
+  behind), and a heal that takes it under 55 puts the fire out.
+- **Why 60 and 100:** simulated launches on Yerma at 7 units/s a point (a
+  3-damage hit, sideways or straight up, on a fighter that does not try to
+  get back): from 60 a Base Launch 2 hit carries a fighter in the air
+  within about 250 units of the ledge into the Void, a Base Launch 3 hit
+  within about 450 (a third of the stage), where the next solid hit
+  becomes a likely end. From 100 a Base Launch 3 hit ends a life from
+  anywhere on the stage, straight up included, and a Base Launch 2 hit
+  from the middle third. The same launches began at about 45 and 80
+  before the nerf.
+- **Reduced motion** (`prefers-reduced-motion`): the heal is a short
+  static green (`hud-heal-static`, a stepped colour, no pulse), the fire a
+  still hot colour and glow with the flame layer still.
+
+### Energy only when the Shield or the Deflect does something
+
+- **The Deflect** is free to start. It still needs a fighter that is not
+  exhausted (`canUseEnergy`), so an exhausted fighter still cannot
+  Deflect. It pays `DEFLECT_ENERGY_COST` (15) once per activation, the
+  first time it turns a projectile back (`CombatSystem.deflectProjectiles`,
+  the attack record marked `paid`), through `Fighter.payEnergy`:
+  `energyPaidAt` is set, and since the CombatSystem resolves after the
+  fighter's own step, `payEnergy` takes that step's refill back first
+  (`energyRefilled`, `energyRefilledAt`), so the step it pays has no
+  refill, exactly as a Dash's. With less than 15 left it empties the bar
+  and exhausts. Turning back two projectiles, on one step or across its
+  active phase, still costs 15 once. A Deflect that only strikes a fighter
+  (blocked or not), whiffs or is cancelled before turning anything back
+  costs nothing. A fighter somehow exhausted by the time it turns one back
+  still turns it back (its Deflect started legally) and pays nothing. Each
+  deflection records what it cost (`energyCost`: 15, or what was left, for
+  the first; 0 after).
+- **The Shield, audited.** It already paid only on a block (`applyHit`:
+  `blocked = tc.shielding`, then `spendEnergy(shieldHitCost)`), and the
+  refill runs while it is held. Every caller of `applyHit` was checked:
+  melee strikes, multi-hit strings, slam impacts, projectiles (piercing
+  and erasing ones included), clones and technique bursts all ask
+  `hitReaches` (a quake passes over a fighter in the air, a gaze past one
+  facing away) and the hitbox before `applyHit`, so nothing that does not
+  reach the fighter costs it; a projectile that `passed()` the target is
+  skipped; a blocked projectile dies, so it pays once; clones, bursts and
+  impacts strike each target once; stage hazards go through `hazardHit`
+  (the same checks) once per rock and fighter, and platform hazards never
+  hit. A charmed attacker's hit on a raised Shield is a real block (the
+  Shield rule comes first) and pays, once. Nothing needed fixing: the
+  update locks it in with tests. Perfect blocks still pay the 15.
+
+### The CPUs
+
+All in shared code, never per fighter:
+
+1. **Launch nerf:** kill and launch estimates come from the real rules
+   (`LaunchJudge`), and every Launch Point scale reads `LAUNCH_POINT_SCALE`
+   (above), so the CPU is more patient about a finish at a given Launch
+   Point and treats its own as safer for longer. At a given Base Launch,
+   the Launch Point at which its judgement says a launch ends a life is
+   about 10 / 7 what it was.
+2. **Faster recovery:** a break-off is worth all it can be once there is
+   time to take back `RECOVERABLE_POINTS` (40) Launch Point, that is
+   40 / `RECOVERY_RATE` seconds (20 s at the old rate, 10 now), so a CPU at
+   a high Launch Point values disengaging for a couple of seconds more.
+3. **Perfect Shield:** its value over a block (`perfectShieldValue` in
+   `values.js`) adds the heal (5, worth what dealing those points is worth
+   at that Launch Point, more the higher it is) to the free answer (1.2).
+   How often a level manages one is still its own `perfectShield` chance
+   (`js/data/difficulty.js`): Easy still rarely does.
+4. **Deflect:** the moveset's Deflect costs 0 to start (`energyCost` 0),
+   carries `turnBackCost` (15) and `needsEnergy` (never planned while
+   exhausted: `moveReady`, `readySoon`, `readyInAir` read `needsEnergy`).
+   The defense planner's Deflect against a shot pays `turnBackCost`; the
+   evaluator costs a Deflect strike 15 only when an opponent's projectile
+   it can see will be turned back (`Evaluator.deflectCost`), so an aerial
+   Deflect may be a free poke, made a worse idea by each Deflect already
+   started that airtime (0.6 each) so the air never fills with them.
+5. **Shield:** the CPU budgets `blockCost` per expected blocked hit and
+   nothing for raising or holding it, as before (checked).
+6. **Joystick:** nothing (CPUs do not use touch).
+
+**Benchmark** (`node tests/benchmarks/cpu-benchmark.mjs --seeds 1 --maps
+desert --only <matchup>`, each matchup over all 121 pairings both ways
+round: 242 games; before is the commit before the update, after is the
+update; the first side's win rate):
+
+| Matchup | Win rate before | Win rate after | Launch Point dealt : taken, before → after |
+| --- | --- | --- | --- |
+| Brutal v Hard | 83.1 % [78–87] | 90.1 % [86–93] | 319 : 221 → 501 : 367 |
+| Brutal v Medium | 99.2 % | 99.2 % | 306 : 129 → 432 : 206 |
+| Hard v Medium | 84.3 % [79–88] | 88.4 % [84–92] | 327 : 213 → 493 : 341 |
+| Medium v Easy | 99.6 % | 100.0 % | 334 : 105 → 461 : 161 |
+| Hard v Easy | 100.0 % | 100.0 % | 319 : 69 → 433 : 94 |
+| Brutal v each reference style (aggressive, defensive, projectile, jump-heavy, balanced) | 100.0 % each | 100.0 % each | e.g. aggressive 319 : 63 → 412 : 94 |
+| Easy v reference balanced | 93.0 % [89–96] | 95.9 % [93–98] | 188 : 156 → 223 : 193 |
+
+Every level still beats the one below it, and by a little more: with
+weaker launches a life takes about 40–55 % more Launch Point to end, so
+matches run longer (the Launch Point dealt per game rises by about that),
+which gives the stronger level more exchanges to show its edge. The
+references are still beaten every time. Combos per game rose with the
+lighter launches keeping targets in reach.
+
+**Where to tune it:**
+- `js/data/launch.js`: `LAUNCH_UNIT_SPEED` (7), `LAUNCH_RECOVERY_AMOUNT`
+  (2), `PERFECT_SHIELD_HEAL` (5).
+- `js/ui/touch-controls.js`: `JOYSTICK.downEngage` (0.5), `downDeadzone`
+  (0.38), `downAngle` (50), `downReleaseAngle` (60).
+- `js/ui/hud.js`: `LAUNCH_POINT_FIRE` (60) / `LAUNCH_POINT_FIRE_OUT`
+  (55), `LAUNCH_POINT_INFERNO` (100) / `LAUNCH_POINT_INFERNO_OUT` (95);
+  the glow and fire in `css/battle.css` (`hud-heal-glow`,
+  `hud-fire-flicker`, `hud-fire-rise`), the stick's `is-down` in
+  `css/touch-controls.css`.
+- `js/data/energy.js`: `DEFLECT_ENERGY_COST` (15), unchanged; what pays it
+  is `CombatSystem.deflectProjectiles`.
+- The CPU: `LAUNCH_POINT_SCALE` and `perfectShieldValue` in
+  `js/game/ai/cpu-intelligence/values.js`, `RECOVERABLE_POINTS` in
+  `objective.js`, the Deflect's per-airtime cost in `evaluator.js`.
+
+**Code:** `js/data/launch.js`, `js/data/energy.js` (comments),
+`js/game/combat/combat.js` (`applyHit`'s heal, `deflectProjectiles`'
+payment), `js/game/combat/combat-state.js` (`launchPointHeals`),
+`js/game/combat/deflect.js` and `launch-bounce.js` (comments),
+`js/game/fighters/fighter.js` (`tryDeflect`, `payEnergy`, the refill
+record), `js/ui/touch-controls.js`, `js/ui/hud.js`, `css/battle.css`,
+`css/touch-controls.css`, `js/game/ai/moveset.js`,
+`js/game/ai/cpu-intelligence/` (`capabilities.js`, `defense.js`,
+`evaluator.js`, `objective.js`, `opponent-model.js`, `values.js`),
+`js/localization/strings/en.js` and `fr.js` (How to Play: Launch Point,
+Energy, Shield, Deflect; Discover's Launch Point copy comes from
+`LAUNCH_POINT_SUMMARY`); `ALVA_SPEC.md`, `docs/systems/launch.md`,
+`energy.md`, `defense.md`, `input.md`, `ai.md`,
+`docs/characters/*.md` (each Deflect's and perfect Shield's cost),
+`docs/architecture/module-responsibilities.md`,
+`docs/development/testing.md`. The `max` prompt's two words that the
+retired-mechanic guard (`tests/systems/codenames.test.mjs`) reads as the
+retired stance mechanic were reworded, nothing else in it.
+
+**Tests:**
+- the joystick: `tests/interface/controls-ui.test.mjs` (`joystickVertical`
+  thresholds, hysteresis and a sideways run drifting low; the stick down,
+  down-left and let go; never stuck on cancel, lost capture, disabling,
+  `releaseAll` or a scheme switch; the button and the stick as one Down;
+  its look; through the real InputManager and a real Fighter: the frame's
+  `down`, the Super Jump, the fast fall, the platform drop, no drop held
+  past `dropTapTime` or from a run);
+- the launch nerf and recovery: `tests/systems/launch.test.mjs` (7 per
+  point, 30 × Base Launch 2 = 60 = 420 units/s, strength unchanged; 2 a
+  tick, an odd Launch Point ending at 0), `launch-bounce`,
+  `launch-reaction`, `hit-fx`, `fighter-stats`, `stage-hazards`,
+  `tests/fighters/0001/combos-0001.test.mjs` and
+  `tests/fighters/0002/fighter-0002.test.mjs` (its flurries now string
+  four deep at most, one more than before),
+  `tests/integration/overtime.test.mjs` and `practice-ground.test.mjs`;
+- the perfect Shield: `tests/systems/defense.test.mjs` (12 leaves 7, 3
+  leaves 0, an ordinary block none, the recovery clock untouched, a
+  blocked string healed once);
+- the HUD: `tests/interface/battle-screen.test.mjs` (the fire at its
+  thresholds and inside its band, out on a respawn and a fresh bind; the
+  glow on a recovery tick, a perfect Shield and a heal, restarted, with
+  the fire going out under it, never on a respawn, a rebind or a real
+  Battle's rematch; the CSS and its reduced-motion version);
+- Energy: `tests/systems/deflect.test.mjs` (0 whiffed, cut short or
+  striking a fighter, 15 for one, 15 for two on two steps or one, no
+  refill on that step, recorded on the deflection, exhausted none, on 6
+  the rest, exhausted mid-Deflect still turned back),
+  `tests/systems/shield-protection.test.mjs` (held 3 s for nothing, one
+  block 15, a quake over it, a gaze from behind and a passed projectile
+  nothing), `combat-rules`, `move-cancel`, `ensemble`,
+  `tests/fighters/0006/fighter-0006.test.mjs`,
+  `strict-combat-rules` (the CPU's Deflect at 0 and its `turnBackCost`);
+- the CPUs: `tests/integration/difficulty.test.mjs` (a Deflect with no
+  projectile costed 0, 15 with one coming, never while exhausted; the
+  perfect Shield's value with its heal and the levels' odds; the kill
+  threshold about 10 / 7 higher, from the constant),
+  `tests/systems/cpu-behaviour.test.mjs` (its scenarios' dangerous and
+  exposed Launch Points read at the launch scale),
+  `tests/fighters/0009/fighter-0009.test.mjs` (the Air Sphere's danger the
+  same) and `tests/fighters/0006/fighter-0006.test.mjs` (its whole kit
+  over a few other seeds: its rare Tornado Spin, as rare before as after,
+  5 uses in 33 fights, did not come up on the old ones);
+- unchanged and passing: the online determinism and lockstep tests, the
+  touch and controller comfort rules.

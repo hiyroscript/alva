@@ -173,7 +173,7 @@ registries through English/French translation keys and scroll independently.
 | `js/ui/` module | Owns | Used by |
 | --- | --- | --- |
 | `components.js` | Shared menu pieces (headers with their setup steps, each setup's steps and Quick Battle's play types, buttons, the Settings gear and X of a dialog that pauses play (`dialogControls`), hint bars). | the setup screens, battle, practice, discover |
-| `hud.js` | The battle and practice HUD (DOM). | `screens/battle-screen.js`, `screens/practice-screen.js` |
+| `hud.js` | The battle and practice HUD (DOM), the Launch Point's heal glow (on `CombatState.launchPointHeals`) and fire (`launchPointFire`, `LAUNCH_POINT_FIRE`, `LAUNCH_POINT_INFERNO`). | `screens/battle-screen.js`, `screens/practice-screen.js` |
 | `local-play.js` | Local Play's player identity: each player's tone (red, blue), badge and the setup's turn note. | `screens/local-play-screens.js`, `screens/battle-screen.js`, `ability-hud.js`, `hud.js` |
 | `ability-hud.js` | The ability HUD (DOM): Player 1's moves, art and keyboard or controller inputs on a ground / air wheel, with their cooldowns, for keyboard and controller play; in Local Play one for each player, on that player's own controller (`setPlayer`). | `screens/battle-screen.js`, `screens/practice-screen.js` |
 | `touch-controls.js` | `TouchControls`: both touch layouts, one press per touch, and Player 1's live move state on the combat buttons (`showStatus`, read through `game/combat/move-status.js`). | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |

@@ -22,7 +22,7 @@ Every attack is blockable: a raised Shield blocks whatever reaches it.
 | --- | --- |
 | [`js/game/combat/defense.js`](../../js/game/combat/defense.js) | `createDefenseDefinition`: the typed `defense` schema and its defaults (`SHIELD_DEFAULTS`); an air Shield's fields are refused, and so are a hit's (a Shield deals nothing: its `offense` is `PURE_DEFENSE`). |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | `createDeflectDefinition`: the `deflect` schema, an attack definition whose strike is fixed (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`). |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Raising, holding and lowering the Shield (`shieldAllowed`, the Shield step in `Fighter.update`), its poses, the perfect Shield's clock (`perfectShield`); starting the Deflect and paying for it (`tryDeflect`). |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Raising, holding and lowering the Shield (`shieldAllowed`, the Shield step in `Fighter.update`), its poses, the perfect Shield's clock (`perfectShield`); starting the Deflect (`tryDeflect`, free, refused while exhausted). [`js/game/combat/combat.js`](../../js/game/combat/combat.js) pays for it the first time it turns a projectile back (`deflectProjectiles`). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | What a block does (`CombatSystem.applyHit`); the projectiles a live Deflect turns back (`CombatSystem.deflectProjectiles`). |
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `shielding`, `shieldStun`, `canShield` (any Energy left). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's look, drawn by the Arena only; no gameplay code reads it. |
@@ -39,7 +39,7 @@ one type so far is the **Shield**:
 | `type` | — | `'shield'` |
 | `groundAnimation` | null | The held guard. Required to Shield. |
 | `groundStartAnimation` / `groundReleaseAnimation` | null | Optional one-pass raise and lower poses. |
-| `perfectWindow` / `perfectRearm` | 0 / 0 | A hit within `perfectWindow` s of raising a Shield that had been down at least `perfectRearm` s is a perfect block: no blockstun, for the same 15 Energy as any block. 0: no perfect Shield. |
+| `perfectWindow` / `perfectRearm` | 0 / 0 | A hit within `perfectWindow` s of raising a Shield that had been down at least `perfectRearm` s is a perfect block: no blockstun, for the same 15 Energy as any block, and `PERFECT_SHIELD_HEAL` (5) off its own fighter's Launch Point (`js/data/launch.js`, the same for every fighter). 0: no perfect Shield. |
 | `stall` | 0 | A melee blow it blocks freezes the attacker at least this many seconds (the hit's own hitstop if longer); a projectile's, a clone's or a technique's hit stalls nothing. 0: none. |
 
 There is no air Shield: `airAnimation`, `slowFallSpeed` and
@@ -91,6 +91,16 @@ value.
   pays 15 Energy for it (`BLOCK_ENERGY_COST`, the same for every fighter
   and every block, a perfect one's included: [Energy](energy.md)) and
   holds through its hitstop and blockstun. No block gives Energy back.
+  Only a hit that really reaches it pays: raising, holding and lowering
+  it are free, and a hit that passes it by (a quake over it in the air, a
+  gaze from behind, a projectile that already passed it) costs nothing.
+- A perfect block also heals its fighter: `PERFECT_SHIELD_HEAL` (5)
+  Launch Points off, never below 0 (`CombatState.heal`, so passive
+  recovery runs on untouched, and it counts in the match statistics'
+  Launch Point recovered), recorded on the block event (`heal`, with the
+  real `launchPointAfter`). One perfect block heals once: a blocked
+  string stops at its first block. Since the
+  [launch & energy update](../../UPDATES.md#launch--energy-update).
 - A Shield up when a hit reaches it blocks that hit even if paying for it
   empties the bar (it pays what is left). The fighter is then exhausted
   and the Shield drops at once: only a hit after that (another one on the
@@ -113,7 +123,8 @@ move), the share of its drift it keeps, under the universal air control,
 never stepping in), resolved by the same `CombatSystem` as
 any attack. Attack though it is, it is **cancellable** by explicit rule
 (below).
-It costs 15 Energy (`DEFLECT_ENERGY_COST`), paid once as it starts. Its strike
+It costs 15 Energy (`DEFLECT_ENERGY_COST`) only when it turns a projectile
+back, once per Deflect; starting it is free. Its strike
 is always **3** Launch Points at **Base Launch 2**, the shared rule
 (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`): a fighter leaves both out, and
 any other value is refused. Its direction is the fighter's own.
@@ -143,11 +154,19 @@ or `groundOnly`.
   in free fall or out of `airUses`.
   Tried before the attack buttons: an attack pressed on the same step
   loses to it.
-- **Its Energy.** 15 (`DEFLECT_ENERGY_COST`), paid as it starts
-  (`Fighter.tryDeflect`, through `payEnergy`; no refill on that step),
-  whatever it then meets: a whiff has paid it all the same, and one that
-  strikes or turns a projectile back gives none of it back. Exhausted, it
-  does not start; with less than 15 left it takes the rest.
+- **Its Energy.** Starting it costs nothing, but an exhausted fighter
+  cannot start one (`Fighter.tryDeflect`). It pays 15
+  (`DEFLECT_ENERGY_COST`) once per activation, the first time it turns a
+  projectile back (`CombatSystem.deflectProjectiles`, through
+  `Fighter.payEnergy`, the attack record marked `paid`; no refill on that
+  step, the step's refill taken back), however many it turns back, on that
+  step or later; the deflection records it (`energyCost`). A whiff, a
+  strike on a fighter (blocked or not) or a Deflect cut short before it
+  turns anything back costs nothing. With less than 15 left it takes the
+  rest; exhausted by then somehow, it still turns the projectile back and
+  pays nothing. Nothing it does gives any back (the [launch & energy
+  update](../../UPDATES.md#launch--energy-update); it was paid as it
+  started).
 - **An attack and a defense.** Its `offense` is `{ attack: true, defense:
   true }`: its strike is an attack in every way (startup, active frames,
   recovery, hit detection, damage, launch, hitstop, hit-cancels, the
@@ -162,11 +181,11 @@ or `groundOnly`.
   starts (its own checks first: one that cannot start, out of air jumps,
   exhausted, out of `airUses`, ends nothing). From then its box strikes
   nothing and turns nothing back; a projectile it already turned back
-  stays turned. Its 15 is never given back, and the replacement pays its
-  own (an air dash: another 15). Cancelling out of a Deflect is not
+  stays turned. A 15 it paid is never given back, and the replacement pays
+  its own (an air dash: 15). Cancelling out of a Deflect is not
   cancelling into one: a Deflect still cuts short only what may be cut.
 - **Not a Shield.** `combat.shielding` stays false throughout: no block,
-  no perfect Shield, no block's Energy (only its own 15), no blockstun, no
+  no perfect Shield, no block's Energy (only its own 15, for a turn-back), no blockstun, no
   stall, no Shield look and no slow fall. A blow it does not turn back
   reaches the fighter and lands in full, ending the Deflect, as it ends
   any attack; two strikes that connect on the same step trade.
@@ -211,10 +230,14 @@ or `groundOnly`.
   at a run, either direction, any device, for every fighter and the CPU,
   in blockstun, under a block's push and on a moving platform, at any frame
   rate), moving again once it is let go, and the jump out of it, plus the
-  ring's look and the rule that only the Arena draws it.
+  ring's look and the rule that only the Arena draws it; a perfect block's
+  heal (12 leaves 7, 3 leaves 0, an ordinary block none, the recovery
+  clock untouched, once for a blocked string).
 - [`tests/systems/deflect.test.mjs`](../../tests/systems/deflect.test.mjs):
   the Deflect for both fighters: the press, its length, the 3 / Base
-  Launch 2 rule, its 15 Energy, that it is no Shield, the projectiles it turns back (only
+  Launch 2 rule, its Energy (free to start, 0 whiffed, cut short or
+  striking a fighter, 15 once for one or two projectiles turned back, never
+  while exhausted), that it is no Shield, the projectiles it turns back (only
   while live, before they strike, to strike their thrower), Red's repel
   alongside it, and the CPU's use of it.
 - [`tests/systems/hit-effects.test.mjs`](../../tests/systems/hit-effects.test.mjs):

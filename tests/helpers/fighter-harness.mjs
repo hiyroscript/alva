@@ -218,6 +218,9 @@ export function duel({
   b.fighter.opponent = a.fighter;
   const system = new CombatSystem();
   const events = [];
+  // Every projectile turned back, as the CombatSystem records it
+  // ({ fighter, projectile, from, direction, energyCost }).
+  const deflections = [];
   const projectiles = [];
   const clones = [];
   const fighters = [a.fighter, b.fighter];
@@ -235,6 +238,7 @@ export function duel({
     spawnClones(fighters, clones, stage);
     applyPulls(fighters, projectiles, DT);
     events.push(...system.update(fighters, projectiles, clones));
+    deflections.push(...system.deflections);
     removeDeadProjectiles(projectiles);
     removeDeadClones(clones);
   };
@@ -243,7 +247,7 @@ export function duel({
     for (let i = 0; i < limit && !pred(); i++) tick();
     assert.ok(pred(), 'condition never reached');
   };
-  return { attacker: a.fighter, target: b.fighter, tick, until, events, projectiles, clones };
+  return { attacker: a.fighter, target: b.fighter, tick, until, events, deflections, projectiles, clones };
 }
 
 // Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in

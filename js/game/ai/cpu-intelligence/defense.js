@@ -32,6 +32,7 @@
 
 import { STEP, Track, arcTrack, boxAt } from './prediction.js';
 import { moveReady } from './capabilities.js';
+import { perfectShieldValue } from './values.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
 
@@ -349,11 +350,16 @@ export class Defense {
       // A Mash Combo turn blocked ends the whole series there: every turn
       // still to come is saved, the finisher's launch with them.
       if (threat.mash) score += 1.5 + threat.mash.turnsLeft * 0.4;
+      // A perfect Shield: tried only as often as the level's human-like
+      // timing allows (p.perfectShield), and worth more than a block: a free
+      // answer and, since the launch & energy update, a heal of its own
+      // (PERFECT_SHIELD_HEAL off the CPU's Launch Point, the more welcome
+      // the higher it is).
       const rearmed = self.shieldDownTime >= (shield.perfectRearm ?? 0);
       const perfect = shield.perfectWindow > 0 && rearmed && brain.rng() < p.perfectShield && threat.contact > 0.08;
       const raiseIn = perfect ? Math.max(0, threat.contact - shield.perfectWindow * 0.6) : Math.max(0, threat.contact - 0.16 - (1 - p.guard) * 0.1);
       options.push({
-        score: score + (perfect ? 1.2 : 0),
+        score: score + (perfect ? perfectShieldValue(me.lp) : 0),
         plan: { kind: 'shield', raiseAt: brain.clock + raiseIn, until: brain.clock + threat.end + 0.03 + (1 - p.guard) * 0.12, threat, perfect },
         why: perfect ? 'perfect Shield' : 'Shield',
       });
@@ -419,14 +425,16 @@ export class Defense {
         !self.combat.cooldowns.has(deflect.id)) {
       const d = this.deflectTiming(s, threat, deflect);
       if (d) {
-        const left = me.energy - deflect.energyCost;
+        // It pays only because it will turn this one back (the launch &
+        // energy update: free to start, its cost on the turning back).
+        const left = me.energy - deflect.turnBackCost;
         // Turned back, it is the CPU's own for the rest of its flight: a
         // hit on its thrower if it still reaches, most of all one still
         // recovering from the throw.
         const flight = Math.max(0, threat.def.lifetime - (threat.age ?? 0) - threat.contact) * threat.def.speed;
         const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + (threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
         options.push({
-          score: 0.4 + back - (deflect.energyCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0),
+          score: 0.4 + back - (deflect.turnBackCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0),
           plan: { kind: 'deflect', jump: d.jump, jumpAt: brain.clock + d.jumpAt, startAt: d.jump ? brain.clock + d.jumpAt : null, pressAt: brain.clock + d.press, why: 'Deflects it back' }, why: 'Deflect',
         });
       }

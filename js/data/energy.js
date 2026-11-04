@@ -3,10 +3,14 @@
 //
 // Purpose: one source of truth for Energy prices. Every action that spends
 // Energy costs the same nominal amount, ENERGY_COST (15): a Dash, an air
-// dash and a Dash cancel, a Deflect, each hit a Shield blocks (a perfect
-// Shield's included), and every move that creates a gameplay construct
-// without a special cooldown (constructEnergyCost). No fighter and no move
-// has a price of its own.
+// dash and a Dash cancel, a Deflect that turns a projectile back (once per
+// Deflect, the first time it does: starting one, whiffing or only striking
+// a fighter costs nothing), each hit a Shield blocks (a perfect Shield's
+// included; raising or holding it costs nothing), and every move that
+// creates a gameplay construct without a special cooldown
+// (constructEnergyCost). No fighter and no move has a price of its own.
+// That is the launch & energy update's rule: Energy is paid only when the
+// Shield or the Deflect actually does something.
 //
 // Inputs: a move's kind ('attack', 'technique' or 'summon'), its definition
 // (what it creates) and its cooldown class (js/data/cooldowns.js).
@@ -37,8 +41,8 @@ export const MAX_ENERGY = 100;
 export const ENERGY_COST = 15;
 
 export const DASH_ENERGY_COST = ENERGY_COST;      // a Dash or an air dash, a Dash cancel included
-export const BLOCK_ENERGY_COST = ENERGY_COST;     // each hit the Shield blocks, a perfect Shield's included
-export const DEFLECT_ENERGY_COST = ENERGY_COST;   // each Deflect, as it starts
+export const BLOCK_ENERGY_COST = ENERGY_COST;     // each hit the Shield blocks, a perfect Shield's included (never raising or holding it)
+export const DEFLECT_ENERGY_COST = ENERGY_COST;   // each Deflect that turns a projectile back, once, the first time it does
 export const CONSTRUCT_ENERGY_COST = ENERGY_COST; // each activation of an ordinary construct move, as it starts
 
 // Whether move `def` of `kind` creates a gameplay construct (see the top):

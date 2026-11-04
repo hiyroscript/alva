@@ -1476,8 +1476,9 @@ comes from its definition and its profile.
   summaries), retaining structured reference rows. Three entries:
   - **Launch Point**: starts at 0; each unblocked hit adds its damage and
     restarts recovery. After 2 seconds without a hit, every following 0.5
-    seconds removes 1 point down to 0 (first point at 2.5 seconds). Blocks
-    do not restart recovery. Higher Launch Point means a harder launch;
+    seconds removes 2 points down to 0 (the first drop at 2.5 seconds).
+    Blocks do not restart recovery; a perfect Shield takes 5 off at once.
+    Higher Launch Point means a harder launch;
     respawning resets it to 0. Explained, with no rows.
   - **Base Launch**: every hit has a Base Launch of 0, 1, 2 or 3; the hit's
     damage is added to the Launch Point first, then the new Launch Point is
@@ -3590,13 +3591,21 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   damaging one is never cut short by a Deflect outside its hit-confirmed
   window), already Deflecting (a press during it restarts nothing), in free fall or out of
   `airUses`, never while exhausted, and only with its art (missing art is
-  refused and logged once). It costs **15** Energy (`DEFLECT_ENERGY_COST`,
-  `energy.deflectCost`, the same for every fighter), paid once as it
-  starts (`Fighter.tryDeflect`), whatever it then meets: a Deflect that
-  whiffs has cost its 15 all the same, and one that strikes, or turns a
-  projectile back, gives none of it back and earns none (no refund, no
-  discount, no refill of its own; that step has no passive refill, as for
-  a Dash). With less than 15 left (not exhausted) it takes the rest. It is
+  refused and logged once). Starting it costs nothing. It costs **15**
+  Energy (`DEFLECT_ENERGY_COST`, `energy.deflectCost`, the same for every
+  fighter) only when it does its job: once per Deflect, the first time it
+  turns a projectile back (`CombatSystem.deflectProjectiles`, through
+  `Fighter.payEnergy`; the attack record is marked `paid` and the
+  deflection records its `energyCost`), however many it turns back, on
+  one step or across its active phase. A Deflect that whiffs, only
+  strikes a fighter (blocked or not) or is cut short before it turns
+  anything back costs nothing; nothing it does gives any back or earns any
+  (no refund, no discount, no refill of its own; the step it pays has no
+  passive refill, as for a Dash). With less than 15 left (not exhausted)
+  it takes the rest; a fighter somehow exhausted by the time it turns a
+  projectile back still turns it back (its Deflect started legally) and
+  pays nothing. (The launch & energy update; it was paid as it started,
+  whatever it met.) It is
   tried before the attack buttons on its step (an attack
   pressed with it loses), never buffered and never restarted by the
   button held. It is not a Shield: `CombatState.shielding` stays false, so
@@ -3624,8 +3633,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   starts (its own checks first: out of air jumps, exhausted, out of
   `airUses`, a request ends nothing). From then its box strikes nothing
   and turns nothing back (a projectile it already turned back stays
-  turned); its 15 is not given back, and the replacement pays its own. The
-  same for the human player and a CPU.
+  turned); a 15 it paid is not given back, and the replacement pays its
+  own. The same for the human player and a CPU.
 - **The Deflect is an attack and a defense.** Its strike is an attack in
   every way (startup, active frames, recovery, hit detection, its fixed 3
   at Base Launch 2, launch, hitstop, hit-cancels, the CPU's offense; and,
@@ -3643,7 +3652,14 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   for `perfectRearm` (every fighter's today: 0.25 s) has that window, so tapping `shield` over and
   over never keeps one open; held up longer, or raised again too soon, a
   block is an ordinary one. Perfect or not, a block costs the same 15
-  Energy: perfect timing earns no discount, refund or refill. It is drawn as a white ring bursting from the
+  Energy: perfect timing earns no discount, refund or refill. A perfect
+  block heals its own fighter instead: `PERFECT_SHIELD_HEAL` (5,
+  `js/data/launch.js`, the same for every fighter) Launch Points off,
+  never below 0 (`CombatState.heal`: counted in the Launch Point
+  recovered, and like any heal neither restarting nor speeding up the
+  passive recovery), recorded on its block event (`heal`, with the real
+  `launchPointAfter`); one perfect block heals once (a blocked string
+  stops at its first block). It is drawn as a white ring bursting from the
   block (see Hit effects, 7.3). Quick Battle's CPU pulls one off only as
   often as its level earns it: a raise that close to contact succeeds with
   a chance of its `guard` trait to the fourth power (Brutal often, Easy almost never),
@@ -3681,7 +3697,7 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   | --- | --- |
   | The bar, full (`MAX_ENERGY`) | 100 |
   | A Dash, an air dash, a Dash cancel (`DASH_ENERGY_COST`) | 15, as it starts |
-  | A Deflect (`DEFLECT_ENERGY_COST`) | 15, as it starts, hit or whiff |
+  | A Deflect that turns a projectile back (`DEFLECT_ENERGY_COST`) | 15, once per Deflect, the first time it turns one back (starting it, a whiff or a strike on a fighter: 0; never started while exhausted) |
   | A blocked hit, a perfect block's included (`BLOCK_ENERGY_COST`) | 15, per block |
   | An ordinary move that creates a construct (`CONSTRUCT_ENERGY_COST`, each definition's `energyCost`) | 15, once per activation, as it starts |
   | Running, holding the Shield up, jumps, air jumps, the fast fall, turning (Automatic turn-around included), air control, melee strikes, a heal of its own, any move with a 3 s or 5 s cooldown | 0 |
@@ -3938,16 +3954,28 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   (`CombatState.launchPoint`): it starts at 0 (a new fighter, a Quick
   Battle restart / rematch, a new Practice fighter and every respawn after
   the Void all start from 0), grows by exactly the damage received, never
-  goes below 0, has no maximum and is shown as a bare number (no % sign). A
+  goes below 0, has no maximum and is shown as a bare number (no % sign).
+  The number glows green for about half a second each time it really
+  comes down while its fighter stays in play (a recovery tick, a perfect
+  Shield, a heal, a charm, a fear's feed: `CombatState.launchPointHeals`,
+  never a respawn, restart, rematch or Practice Ground reset or swap, which
+  give a fresh state), and burns (an animated flame behind its digits)
+  from `LAUNCH_POINT_FIRE` (60, out below 55) and hotter from
+  `LAUNCH_POINT_INFERNO` (100, back below 95), where the next solid hit can
+  launch it hard (`js/ui/hud.js`; with reduced motion a still colour
+  instead; paint only). A
   hit's `damage` is how much it adds (a hit a Shield blocks adds nothing);
   each fighter's hits are listed in its character specification (7.2.9).
   Every genuine unblocked hit resets recovery, including Base Launch 0
   hits and each individual multi-hit strike, regardless of its source.
   For the next **2.0 seconds**, no Launch Point recovers. After that grace
-  period, each complete **0.5-second** interval removes **1** point,
-  stopping at 0. The first point is removed at **2.5 seconds**, never at
-  2.0: a fighter hit to 10 points at t = 0 still has 10 at t = 2.0, then
-  9 at t = 2.5, 8 at t = 3.0 and 7 at t = 3.5. Any new real hit discards
+  period, each complete **0.5-second** interval removes **2** points
+  (`LAUNCH_RECOVERY_AMOUNT`, 2 since the launch & energy update; it was
+  1), stopping at 0 (an odd Launch Point ends at 0, never −1). The first
+  drop comes at **2.5 seconds**, never at 2.0: a fighter hit to 10 points
+  at t = 0 still has 10 at t = 2.0, then 8 at t = 2.5, 6 at t = 3.0 and 4
+  at t = 3.5. A perfect Shield also takes 5 off at once (7.2.5's Perfect
+  Shield), as a heal: it neither restarts nor speeds up this schedule. Any new real hit discards
   all timing progress, including partial intervals; a Shield block does
   not reset it. Recovery uses simulation time in the shared combat state,
   through actions, stun and impact freeze alike, with no extra UI. Pausing
@@ -3972,16 +4000,21 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   `CombatSystem.applyHit` adds the damage first, then computes the strength
   (`resolveLaunchStrength`) and turns it into a velocity
   (`resolveDirectionalLaunch`, `js/data/launch.js`) at `LAUNCH_UNIT_SPEED`,
-  10 world units per second per point: horizontal along the hit's travel
-  (`vx = strength × 10 × facing`), vertical upward (`vy = −strength × 10`,
-  as world y grows downward), reverse vertical downward (`vy = +strength ×
-  10`), `null` nothing at all. That multiplication is the whole strength:
+  7 world units per second per point (10 before the launch & energy
+  update, which nerfed launches there alone, Base Launch, Launch Point and
+  damage untouched: the same hit at the same Launch Point flies 70 % as
+  fast, and it takes about 43 % more Launch Point to be launched as hard):
+  horizontal along the hit's travel (`vx = strength × 7 × facing`),
+  vertical upward (`vy = −strength × 7`, as world y grows downward),
+  reverse vertical downward (`vy = +strength × 7`), `null` nothing at
+  all. That multiplication is the whole strength:
   no base velocity is added, and horizontal and vertical launches use the
   same number. The one conversion factor is the same for every hit and
   direction, so it only puts the strength in the world's units (gravity
   2500, a jump 750) and never changes its proportions. At 120 Launch Point,
   Base Launch 0, 1, 2 and 3 give strengths of 0, 120, 240 and 360 (speeds
-  0, 1200, 2400 and 3600); at 37, 0, 37, 74 and 111. A hit a Shield
+  0, 840, 1680 and 2520); at 37, 0, 37, 74 and 111. 30 Launch Point at
+  Base Launch 2 is strength 60, 420 units/s (it was 600). A hit a Shield
   blocks is the one exception: it adds no Launch Point and launches
   nothing at all (launch strength 0), whatever its Base Launch and
   direction; there is no chip damage and no partial launch. A hit that
@@ -3995,9 +4028,11 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   `baseLaunch` (the integer), `directionalLaunch`, `launchStrength`,
   `finalLaunch` (the world-space `{ x, y }` velocity given, steered),
   `launchSpeed` (its length), `hitstun` (the stun dealt, launch stun
-  included), `perfect` (a perfect block), `point` (where the hit landed,
-  for its effects) and `energyCost` (the Shield's cost on a block, a
-  perfect one's included: 15, or all that was left; 0 on a hit). Launch Point
+  included), `perfect` (a perfect block), `heal` (the Launch Point a
+  perfect block took off its own fighter: 5, or what was left; 0
+  otherwise), `point` (where the hit landed, for its effects) and
+  `energyCost` (the Shield's cost on a block, a perfect one's included:
+  15, or all that was left; 0 on a hit). Launch Point
   never disables a fighter (`canAct()` never reads it) and never takes one
   out: only the Void does. At the end of overtime (Quick Battle and Watch
   Mode alike), level on points, the fighter with the lower Launch Point
@@ -4089,7 +4124,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
     the surface counts, so a glancing contact never rebounds hard. Slower, it
     is an ordinary stop, and that surface spends the launch on that axis.
     For example, #0001's Jab rebounds its target off a wall right behind
-    it from about 50 Launch Point, its Red Kick from about 25; the body's
+    it from about 72 Launch Point, its Red Kick from about 36 (500 / 7 and
+    500 / 14 at `LAUNCH_UNIT_SPEED` 7; they were 50 and 25 at 10); the body's
     `maxFallSpeed` (1500) still caps a downward launch.
   - *Rebound.* The stopped speed comes back reversed and scaled by the
     surface's restitution: a solid's side (`wallRestitution` 0.72), a floor
@@ -5058,8 +5094,21 @@ Adding one is described in
     once pushed sideways past 0.34 of its radius, letting go back inside
     0.24 (a deadzone with a little hysteresis, so a resting thumb never
     drifts or flickers). Crossing the centre releases one direction before
-    holding the other. Only the sideways part counts: up and down move the
-    knob, never Jump or Down. The knob follows the thumb, clamped to
+    holding the other. Pushed down it is the Down button too (the launch &
+    energy update): past 0.5 of its radius and within 50° of straight
+    down it holds the `down` control, and lets go back inside 0.38 or
+    turned past 60° (`JOYSTICK.downEngage`, `downDeadzone`, `downAngle`,
+    `downReleaseAngle`; the pure rule `joystickVertical`), so a run with
+    the thumb drifting low never holds Down, and a diagonal holds a run
+    and Down together. It is exactly the Down button's input, through the
+    same held path (a real `downPressed` edge, counted with the button's
+    pointers, so either alone holds it and letting go of one keeps it
+    while the other holds it): stick down + Jump is the Super Jump, stick
+    down in the air while falling the fast fall, a quick flick down and
+    back on a droppable platform the drop, and held past `dropTapTime` no
+    drop. The stick shows it (`is-down`). Pushed up it does nothing (Jump
+    is its button). The Down button stays and works as ever; Classic
+    Buttons, the keyboard and controllers are unchanged. The knob follows the thumb, clamped to
     0.56 of the radius, and eases back to the centre on release, cancel,
     lost capture, pause, disabling or a scheme switch. It is digital like
     the rest of ALVA's input: how far it is pushed never changes speed.

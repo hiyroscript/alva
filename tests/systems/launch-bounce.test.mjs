@@ -21,6 +21,11 @@ const G = CONFIG.sim.gravity;
 const B = LAUNCH_BOUNCE;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const HALF = def.collider.width / 2;
+// The Launch Point that launches as hard as `lp` did at the old
+// LAUNCH_UNIT_SPEED of 10 (the launch & energy update made it 7): the
+// rebound thresholds are speeds, so a "battered" target now needs about
+// 43 % more Launch Point. Rounded up, never weaker than the scenario meant.
+const battered = (lp) => Math.ceil((lp * 10) / LAUNCH_UNIT_SPEED);
 const HEIGHT = def.collider.height;
 const FLOOR = 800; // the test stages' main floor top
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -459,7 +464,7 @@ function tickForBounce(d, limit = 90, held = {}, targetHeld = {}) {
 
 test('Launch Point decides it: the same punch into the same wall stops a fresh target and rebounds a battered one', () => {
   const results = [];
-  for (const lp of [0, 20, 40, 60, 100, 160]) {
+  for (const lp of [0, 20, 40, 60, 100, 160].map(battered)) {
     const d = wallDuel();
     d.target.combat.launchPoint = lp;
     d.tick(P('attack1'));
@@ -633,7 +638,7 @@ test('no wall loop: punching a battered opponent into a wall over and over ends 
     }
     return best;
   };
-  for (const lp of [60, 70, 90, 120, 150]) {
+  for (const lp of [60, 70, 90, 120, 150].map(battered)) {
     for (const chase of [false, true]) {
       const n = longest(lp, chase);
       assert.ok(n <= B.maxBounces + 2, `from ${lp}${chase ? ', chasing' : ''}: ${n} hits`);
@@ -647,7 +652,7 @@ test('projectiles launch through the same system: Red drives a battered target i
   const x = 500;
   const stage = stageWith({ solids: [wallAt('wall', x + 200 + HALF + 10)] });
   const d = duel({ gap: 200, stage, x });
-  d.target.combat.launchPoint = 60;
+  d.target.combat.launchPoint = battered(60);
   d.tick(P('attack2'));
   const b = tickForBounce(d, 90);
   assert.equal(d.events[0].move, 'attack2_object');
@@ -666,7 +671,7 @@ test('a clone\'s strike launches through the same system: a battered target rebo
   const x = 300;
   const stage = stageWith({ solids: [wallAt('wall', 600, 40)] });
   const d = duel({ gap: 420, stage, x, attackerCharacter: summoner });
-  d.target.combat.launchPoint = 100;
+  d.target.combat.launchPoint = battered(100);
   d.tick(P('attack3'));
   // The summoning startup, then the clone.
   for (let i = 0; i < startupSteps(summoner, 'attack3'); i++) d.tick();
@@ -682,7 +687,7 @@ test('a technique\'s projectile launches through the same system: Hollow Purple 
   const x = 500;
   const stage = stageWith({ solids: [wallAt('wall', 800)] });
   const d = duel({ gap: 140, stage, x, pushboxes: true });
-  d.target.combat.launchPoint = 60;
+  d.target.combat.launchPoint = battered(60);
   d.tick(P('attack5'));
   assert.equal(d.attacker.technique?.action, 'attack5', 'Hollow Purple started');
   let b = null;
@@ -732,7 +737,7 @@ test('Desert: a hard punch drives the opponent into a rock outcrop and it reboun
   p2.body.x = p2.body.prevX = rock.x - HALF - 40;
   p1.body.x = p1.body.prevX = p2.body.x - 40;
   p1.facing = 1;
-  p2.combat.launchPoint = 140;
+  p2.combat.launchPoint = battered(140);
   script.once = P('attack1');
   let b = null;
   for (let i = 0; i < 60 && !b; i++) {

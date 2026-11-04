@@ -127,12 +127,21 @@ decision quality, never a rule):
   the CPU's own Launch Point is under it: `moveReady` asks the same
   `inDanger` the Fighter's press does, so the CPU never plans it early and
   reaches for it once it is in danger.
-- **Energy.** Each move's `energyCost` is the Fighter's own (15 for the
-  Deflect and for an ordinary move that creates a construct: a throw, a
-  burst, a clone; 0 for a melee strike and a 3 s / 5 s move), the Dash's
-  15 its own too. A move that costs Energy is never ready while the CPU is
-  exhausted, and the evaluator weighs what is left after it (below), so
-  projectiles stay in its game, used where they are worth their price.
+- **Energy.** Each move's `energyCost` is the Fighter's own (15 for an
+  ordinary move that creates a construct: a throw, a burst, a clone; 0 for
+  a melee strike and a 3 s / 5 s move), the Dash's 15 its own too. The
+  Deflect is free to start (`energyCost` 0) and costs its `turnBackCost`
+  (15) only when it turns a projectile back, so the CPU costs it 15 only
+  where an opponent's projectile it can see will be turned back
+  (`Evaluator.deflectCost`; the Deflect answer to a shot always pays it)
+  and may otherwise use it as a free aerial poke, made a worse idea by
+  each one already started that airtime so the air never fills with them.
+  The Shield is costed per expected blocked hit (`blockCost`), never for
+  raising or holding it. A move that costs Energy, and the Deflect
+  (`needsEnergy`), is never ready while the CPU is exhausted, and the
+  evaluator weighs what is left after it (below), so projectiles stay in
+  its game, used where they are worth their price (the [launch & energy
+  update](../../UPDATES.md#launch--energy-update)).
 
 ### Mash Combos
 
@@ -204,7 +213,7 @@ Four layers, each informing the one below and never reaching past it:
 | --- | --- | --- |
 | `build` | Even: nothing more pressing. | The modes as they are, waiting a little for clearer chances; grows as impatience does. |
 | `finish` | The opponent exposed: the CPU's best launch likely to end its life now or after another hit or two (more so off the stage, or at match point). | Finisher hunt and trap control, a lower bar, risk counting a little less, crossing over to launch toward the near ledge. |
-| `stabilize` | The CPU the exposed one, with time to recover (2 s unhit, then 2 Launch Point a second) and no comeback to make. | Survival and counterplay, a higher bar, risk counting more, and breaking off: a safer spot, then a deliberate wait there, Shield ready. |
+| `stabilize` | The CPU the exposed one, with time to recover (2 s unhit, then 4 Launch Point a second: 2 a tick since the launch & energy update, so a short break-off pays back twice as fast and is worth it with less time on the clock) and no comeback to make. | Survival and counterplay, a higher bar, risk counting more, and breaking off: a safer spot, then a deliberate wait there, Shield ready. |
 | `protect` | Ahead with the clock running down (against how long a point has been taking in this match), or ahead on overtime's tiebreak. | Counterplay and zoning, a higher bar, no needless risk: it lets the opponent come and still counters. |
 | `survive` | Ahead with seconds left. | Running the clock out: a safe spot, no edge-guarding. |
 | `force` | Behind with too little time to wait, or losing (or level on) overtime's tiebreak. | Rushdown and finisher hunt, a much lower bar, risk counting less, no waiting. |
@@ -273,7 +282,10 @@ Every fixed step, in this order:
    stepped out of, as often as the level notices.
 4. **Threats.** A newly recognized threat may interrupt any plan with the
    best answer: a Shield (raised in time, perfect when the level times
-   it), a jump over it (timed if it is still far), a step or a Dash out of
+   it: worth more than a block for the free answer and, since the launch
+   & energy update, for its heal, `perfectShieldValue`, the more the higher
+   the CPU's Launch Point; how often a level manages one is still its own
+   `perfectShield` chance), a jump over it (timed if it is still far), a step or a Dash out of
    reach, drifting away, the Deflect (timed so the swat is live as the
    shot arrives, and worth more when the turned-back shot can still hit
    its thrower), a strike that lands first, a projectile that erases or
@@ -423,7 +435,13 @@ predicted path, and scored as expected utility:
   before the move lands (held in its blockstun, or no time to react)
   blocks it for certain: the CPU never predicts a hit through a raised
   Shield, and at most a small chance (that it is lowered first) otherwise.
-- **Values:** damage weighed by the Launch Point it reaches, the launch
+- **Values:** damage weighed by the Launch Point it reaches (twice a
+  fresh point's at 160 × `LAUNCH_POINT_SCALE`, about 229: every Launch
+  Point scale the CPU reads, this one, a Launch Point lead's weight in
+  `stabilize` and the opponent model's "backing off hurt", is read through
+  `LAUNCH_POINT_SCALE`, 10 / `LAUNCH_UNIT_SPEED`, so they follow the one
+  knob and the CPU is more patient about a finish at a given Launch Point
+  since the launch & energy update), the launch
   judged by the real launch rules (a launch that ends a life is worth
   `KO_VALUE`, more at match point; one that leaves the target off the
   stage an edge-guard), a paralysis (or a float, which holds as one does)

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { HitEffects, HIT_FX, launchIsLethal, whiteFrame } from '../../js/game/rendering/hit-fx.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { CONFIG } from '../../js/config.js';
+import { LAUNCH_UNIT_SPEED } from '../../js/data/launch.js';
 import { def, DT, duel, makeFighter, stageMap, fakeSprites } from '../helpers/fighter-harness.mjs';
 
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
@@ -77,14 +78,17 @@ test('reduced motion: no shake and no zoom; the flash, sparks and trails stay', 
 test('a launch that will carry its fighter into the Void is lethal; one it can recover from is not', () => {
   // Near the right ledge, a hard sideways push.
   const stage = new StageCollision(stageMap({ left: 0, right: 700 }));
-  const far = hitWith({ lp: 200, stage, x: 560, gap: 40 });
+  // Launch Points that launch as hard as 200, 20 and 60 did at the old
+  // LAUNCH_UNIT_SPEED of 10 (7 since the launch & energy update).
+  const scaled = (lp) => Math.ceil((lp * 10) / LAUNCH_UNIT_SPEED);
+  const far = hitWith({ lp: scaled(200), stage, x: 560, gap: 40 });
   assert.ok(far.e.launchSpeed > 1500);
   assert.equal(launchIsLethal(far.e, stage, CONFIG.sim.gravity, DT), true);
   // The same hit at a low Launch Point, or far from any edge, is not.
-  const low = hitWith({ lp: 20, stage, x: 560, gap: 40 });
+  const low = hitWith({ lp: scaled(20), stage, x: 560, gap: 40 });
   assert.equal(launchIsLethal(low.e, stage, CONFIG.sim.gravity, DT), false);
   const wide = new StageCollision(stageMap({ left: 0, right: 6000 }));
-  const mid = hitWith({ lp: 60, stage: wide, x: 3000, gap: 40 });
+  const mid = hitWith({ lp: scaled(60), stage: wide, x: 3000, gap: 40 });
   assert.equal(launchIsLethal(mid.e, wide, CONFIG.sim.gravity, DT), false);
   // It only reads the body: the real one is untouched.
   const before = { ...far.d.target.body };

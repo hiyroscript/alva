@@ -10,6 +10,7 @@ import { CHARACTERS } from '../../js/data/characters.js';
 import { Fighter } from '../../js/game/fighters/fighter.js';
 import { CombatState } from '../../js/game/combat/combat-state.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
+import { LAUNCH_RECOVERY_AMOUNT } from '../../js/data/launch.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import { STAGE, DT, makeFighter, duel } from '../helpers/fighter-harness.mjs';
 
@@ -83,7 +84,7 @@ test('a high Launch Point alone never stops a fighter acting: it runs, jumps, at
     step({ jump: true, jumpPressed: true });
     assert.equal(fighter.grounded, false, `jumps at ${value}`);
     const elapsed = fighter.steps * DT;
-    const recovered = Math.max(0, Math.floor((elapsed - 2 + 1e-6) / 0.5));
+    const recovered = Math.max(0, Math.floor((elapsed - 2 + 1e-6) / 0.5)) * LAUNCH_RECOVERY_AMOUNT;
     assert.equal(fighter.combat.launchPoint, value - recovered, 'only passive recovery changes Launch Point while acting');
   }
 });

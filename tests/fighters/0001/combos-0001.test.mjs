@@ -9,9 +9,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { duel, steps } from '../../helpers/fighter-harness.mjs';
 import { getCharacter } from '../../../js/data/characters.js';
+import { LAUNCH_UNIT_SPEED } from '../../../js/data/launch.js';
 
 const DEF = getCharacter('0001');
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
+// The Launch Point that launches as hard as `lp` did at the old
+// LAUNCH_UNIT_SPEED of 10 (7 since the launch & energy update): a launch
+// is weaker at the same Launch Point, so a combo now holds on to about
+// 43 % more of it before it drops.
+const scaled = (lp) => Math.ceil((lp * 10) / LAUNCH_UNIT_SPEED);
 
 // #0001 against #0001 at `gap`, the target at `lp` Launch Point, run by
 // `script(step)` (the attacker's presses) for `count` steps. Returns the
@@ -45,7 +51,7 @@ const presses = (plan) => (i) => (plan[i] ? P(plan[i]) : {});
 test('Jab into High Kick: the Jab\'s follow-up launches, a true combo up to about 30 Launch Point', () => {
   const route = presses({ 0: 'attack1', 8: 'extra_attack' });
   for (const lp of [0, 10, 20, 30]) assert.deepEqual(combo(route, { lp }).moves, ['attack1', 'extra_attack'], `at ${lp}`);
-  assert.equal(combo(route, { lp: 50 }).chain, 1, 'at 50 the Jab pushes it out of the kick\'s reach');
+  assert.equal(combo(route, { lp: scaled(50) }).chain, 1, 'at what 50 was (72) the Jab pushes it out of the kick\'s reach');
 });
 
 test('repeated Jabs cannot form a true combo through the repeat cooldown', () => {
@@ -56,13 +62,13 @@ test('repeated Jabs cannot form a true combo through the repeat cooldown', () =>
 test('High Kick, jump, Floating Straight: the launcher chased up into the air, a true combo up to about 30', () => {
   const route = presses({ 0: 'extra_attack', 14: 'jump', 17: 'attack1' });
   for (const lp of [0, 10, 20, 30]) assert.deepEqual(combo(route, { lp }).moves, ['extra_attack', 'midair_attack1'], `at ${lp}`);
-  assert.equal(combo(route, { lp: 50 }).chain, 1, 'at 50 it flies out of reach');
+  assert.equal(combo(route, { lp: scaled(50) }).chain, 1, 'at what 50 was (72) it flies out of reach');
 });
 
 test('High Kick, jump, Blue: the pull reaches a target launched higher, a true combo up to about 60', () => {
   const route = presses({ 0: 'extra_attack', 14: 'jump', 17: 'attack3' });
   for (const lp of [0, 20, 40, 60]) assert.deepEqual(combo(route, { lp }).moves, ['extra_attack', 'midair_attack3'], `at ${lp}`);
-  assert.equal(combo(route, { lp: 120 }).chain, 1, 'at 120 not even Blue reaches it');
+  assert.equal(combo(route, { lp: scaled(120) }).chain, 1, 'at what 120 was (172) not even Blue reaches it');
 });
 
 test('Jab into Red: the orb catches the pushed target, a true combo up to about 40', () => {

@@ -53,9 +53,12 @@ export const LAUNCH_BOUNCE = Object.freeze({
   enabled: true,
   // Speed into the surface (world units per second, only the part crossing
   // it) a launched fighter needs to rebound: anything slower is an ordinary
-  // stop. At LAUNCH_UNIT_SPEED 10 a Base Launch 1 push needs about 50
-  // Launch Point to rebound off a wall right beside it, and a Base Launch 2
-  // spike about 25 off the floor.
+  // stop. It is a speed, tuned for the world's physics (gravity, a jump,
+  // a fall), not around any one launch scale, so it stays 500 whatever
+  // LAUNCH_UNIT_SPEED is: since the launch & energy update (7, it was 10)
+  // a Base Launch 1 push needs about 72 Launch Point (500 / 7) to rebound
+  // off a wall right beside it, and a Base Launch 2 spike about 36 off the
+  // floor (it was 50 and 25), part of the nerf.
   minImpactSpeed: 500,
   // The share of that speed each kind of surface sends back, reversed. What
   // runs along the surface is kept, so a diagonal impact ricochets instead

@@ -382,3 +382,87 @@ test('no hidden damage path: only CombatSystem.applyHit raises a Launch Point, s
   const combat = files.find(([path]) => path === 'game/combat/combat.js')[1];
   assert.match(combat, /const blocked = tc\.shielding;/);
 });
+
+// ---- The launch & energy update: the Shield pays only for what it blocks ------------
+
+// `def` (an attack definition) made live on `attacker` right now: its
+// active phase, nothing struck yet.
+function live(attacker, def) {
+  attacker.combat.attack = { def, time: def.startup, hasHit: false, confirmed: false };
+}
+
+const probeAttack = (spec) => probeHit({
+  id: 'shield-probe', damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal', hitbox: { x: 0, y: -120, w: 120, h: 120 },
+  startup: 0.05, active: 0.1, recovery: 0.1, hitstun: 0.2, blockstun: 0.1, hitstop: 0, ...spec,
+});
+
+test('raising, holding and lowering the Shield cost nothing: held for 3 s with nothing hitting it, the bar only refills', () => {
+  for (const c of playableCharacters()) {
+    const { fighter, step } = makeFighter({ character: c });
+    fighter.combat.setEnergy(40);
+    step(SHIELD);
+    assert.equal(fighter.combat.shielding, true, `#${c.id}: up`);
+    let last = fighter.combat.energy;
+    for (let i = 0; i < steps(3); i++) {
+      step(HOLD);
+      assert.ok(fighter.combat.energy >= last - 1e-9, `#${c.id}: never less while held`);
+      last = fighter.combat.energy;
+    }
+    step({});
+    step(SHIELD);
+    step({});
+    assert.equal(fighter.combat.energySpent, 0, `#${c.id}: raised, held, lowered and raised again, nothing paid`);
+    assert.ok(fighter.combat.energy > 40, `#${c.id}: it refilled meanwhile`);
+  }
+});
+
+test('one blocked hit costs exactly 15, once: the event, the bar and the running total agree', () => {
+  for (const c of playableCharacters()) {
+    const d = duel({ attackerCharacter: c, targetCharacter: c, gap: 40 });
+    d.tick({}, SHIELD);
+    for (let i = 0; i < 12; i++) d.tick({}, HOLD);
+    const before = d.target.combat.energy;
+    d.tick(P('attack1'), HOLD);
+    for (let i = 0; i < 20 && !d.events.length; i++) d.tick({}, HOLD);
+    for (let i = 0; i < 30; i++) d.tick({}, HOLD);
+    const blocks = d.events.filter((e) => e.type === 'block');
+    assert.equal(blocks.length, 1, `#${c.id}: one block`);
+    assert.equal(blocks[0].energyCost, 15);
+    assert.equal(d.target.combat.energySpent, 15, `#${c.id}: 15 in all`);
+    assert.ok(before === 100, 'full while it waited');
+  }
+});
+
+test('what never reaches a Shield costs it nothing: a quake passing over it in the air, a gaze from behind, a projectile that passed it', () => {
+  // A quake, against a fighter off the ground with its Shield up.
+  const q = duel({ gap: 40 });
+  Object.assign(q.target.body, { y: q.target.body.y - 60, grounded: false, ground: null });
+  q.target.combat.shielding = true;
+  live(q.attacker, probeAttack({ quake: true }));
+  const system = new CombatSystem();
+  assert.deepEqual(system.update([q.attacker, q.target]), [], 'the quake passes under it');
+  assert.deepEqual([q.target.combat.energy, q.target.combat.energySpent], [100, 0], 'a quake that passes over costs nothing');
+  // The same quake on the ground is blocked, and costs its 15.
+  const qg = duel({ gap: 40 });
+  qg.target.combat.shielding = true;
+  live(qg.attacker, probeAttack({ quake: true }));
+  assert.deepEqual(new CombatSystem().update([qg.attacker, qg.target]).map((e) => [e.type, e.energyCost]), [['block', 15]]);
+  // A gaze, against a Shield with its back turned to it.
+  const g = duel({ gap: 40, targetFacing: 1 });
+  g.target.combat.shielding = true;
+  live(g.attacker, probeAttack({ gaze: true }));
+  assert.deepEqual(new CombatSystem().update([g.attacker, g.target]), [], 'unseen, the gaze passes it by');
+  assert.deepEqual([g.target.combat.energy, g.target.combat.energySpent], [100, 0], 'a gaze from behind costs nothing');
+  // An erasing projectile that already flew through it.
+  const p = duel({ gap: 200 });
+  p.target.combat.shielding = true;
+  const def = p.attacker.projectileDefs.attack5_object;
+  const purple = new Projectile({
+    owner: p.attacker, def, anim: p.attacker.sprites.projectile(def.animation), x: p.target.body.x, y: p.target.body.y - 60, direction: 1,
+  });
+  purple.age = 10;
+  purple.through.add(p.target);
+  assert.equal(purple.ready, true);
+  assert.deepEqual(new CombatSystem().update([p.attacker, p.target], [purple]), [], 'it passed the target');
+  assert.deepEqual([p.target.combat.energy, p.target.combat.energySpent], [100, 0], 'a projectile that passed costs nothing');
+});

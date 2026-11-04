@@ -608,3 +608,76 @@ test('a higher level beats a lower one: Brutal against Easy, seeded', () => {
   assert.equal(battle.result.outcome, 'p2', `Brutal wins (${battle.score.p1} - ${battle.score.p2})`);
   assert.ok(battle.score.p2 > battle.score.p1);
 });
+
+// ---- The launch & energy update: every level plays by its rules ------------------
+
+test('the CPU plans a Deflect with no projectile around at 0 Energy, and at 15 only when one will be turned back', async () => {
+  const { scenario } = await import('../helpers/cpu-scenario.mjs');
+  const { getCharacter: character } = await import('../../js/data/characters.js');
+  for (const difficulty of DIFFICULTY_IDS) {
+    const sc = scenario({ difficulty, cpuDef: character('0001'), foeDef: character('0001'), cpuX: 1700, foeX: 2100 });
+    sc.run(0.5);
+    const s = sc.ai.situation;
+    const deflect = s.caps.deflect;
+    assert.deepEqual([deflect.energyCost, deflect.turnBackCost, deflect.needsEnergy], [0, 15, true], `${difficulty}: free to start, 15 to turn back`);
+    assert.equal(sc.ai.evaluator.deflectCost(s, deflect), 0, `${difficulty}: nothing to turn back, nothing to pay`);
+    // An orb of the opponent's coming straight at it: now the Deflect
+    // would pay.
+    const shot = { owner: sc.foe, ready: true, x: s.me.x + 120, y: s.me.y - s.me.height / 2, vx: -600 };
+    const shots = s.shots;
+    s.shots = [shot];
+    assert.equal(sc.ai.evaluator.deflectCost(s, deflect), 15, `${difficulty}: a projectile to turn back`);
+    s.shots = [{ ...shot, owner: sc.cpu }];
+    assert.equal(sc.ai.evaluator.deflectCost(s, deflect), 0, 'its own projectile is nothing to turn back');
+    s.shots = shots;
+    // Exhausted, it never plans one, free or not.
+    sc.cpu.combat.setEnergy(0);
+    const { moveReady } = await import('../../js/game/ai/cpu-intelligence/capabilities.js');
+    Object.assign(sc.cpu.body, { grounded: false, ground: null });
+    assert.equal(moveReady(sc.cpu, deflect), false, `${difficulty}: never while exhausted`);
+  }
+});
+
+test('the CPU values a perfect Shield more for its heal, the more the higher its Launch Point, while the levels keep their own odds of one', async () => {
+  const { perfectShieldValue } = await import('../../js/game/ai/cpu-intelligence/values.js');
+  assert.equal(perfectShieldValue(0), 1.2, 'nothing to heal: the free answer alone, as before');
+  assert.ok(perfectShieldValue(5) > 1.2, 'the heal counts');
+  assert.ok(perfectShieldValue(60) > perfectShieldValue(5), 'the more, the higher it is');
+  assert.ok(perfectShieldValue(120) > perfectShieldValue(60));
+  // The odds of managing one are the level's own, unchanged: Easy still
+  // rarely does.
+  const odds = DIFFICULTY_IDS.map((id) => getDifficultyProfile(id).perfectShield);
+  assert.ok(odds.every((v, i) => i === 0 || v >= odds[i - 1]), `rising with the level: ${odds}`);
+  assert.ok(odds[0] <= 0.15, 'Easy rarely manages one');
+});
+
+test('the CPU\'s launch judgement follows LAUNCH_UNIT_SPEED: the Launch Point it needs to end a life at a given Base Launch is about 10 / 7 what it was', async () => {
+  const { scenario } = await import('../helpers/cpu-scenario.mjs');
+  const { getCharacter: character } = await import('../../js/data/characters.js');
+  const { LAUNCH_UNIT_SPEED } = await import('../../js/data/launch.js');
+  const { LAUNCH_POINT_SCALE } = await import('../../js/game/ai/cpu-intelligence/values.js');
+  assert.ok(Math.abs(LAUNCH_POINT_SCALE - 10 / LAUNCH_UNIT_SPEED) < 1e-12, 'derived from the constant');
+  const sc = scenario({ difficulty: 'brutal', cpuDef: character('0001'), foeDef: character('0001'), cpuX: 1900, foeX: 2200 });
+  sc.run(0.3);
+  const s = sc.ai.situation;
+  const judge = sc.ai.evaluator.judge;
+  // The opponent in the air near Yerma's right ledge, a sideways hit away
+  // from the CPU.
+  const pos = { x: 2250, y: s.op.y - 120, grounded: false };
+  for (const baseLaunch of [2, 3]) {
+    const killAt = (bl) => {
+      for (let lp = 1; lp <= 400; lp++) {
+        judge.reset();
+        if (judge.launch(s, 'foe', pos, lp, { dir: 'horizontal', baseLaunch: bl, hitstun: 0.3 }, 1).ko >= 0.5) return lp;
+      }
+      return Infinity;
+    };
+    const now = killAt(baseLaunch);
+    // The same judgement had a point still launched at 10 units/s: the
+    // same speed from a Base Launch 10 / 7 as large.
+    const before = killAt((baseLaunch * 10) / LAUNCH_UNIT_SPEED);
+    assert.ok(Number.isFinite(now) && Number.isFinite(before), `Base Launch ${baseLaunch}: a kill somewhere`);
+    assert.ok(now > before, `Base Launch ${baseLaunch}: ${now} now against ${before} before`);
+    assert.ok(Math.abs(now / before - 10 / LAUNCH_UNIT_SPEED) < 0.08, `about 10 / 7 more: ${now} / ${before}`);
+  }
+});

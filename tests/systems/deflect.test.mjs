@@ -202,7 +202,8 @@ test('a Deflect may cut short an attack that hit, as any attack may (the reposit
   const energy = d.attacker.combat.energy;
   d.tick(PRESS);
   assert.equal(d.attacker.combat.attack?.def.id, 'deflect');
-  assert.equal(d.attacker.combat.energy, energy - DEFLECT_ENERGY_COST, 'cutting short costs the same 15');
+  assert.ok(Math.abs(d.attacker.combat.energy - Math.min(100, energy + d.attacker.energyDef.regen * DT)) < 1e-9,
+    'cutting short costs nothing either: a Deflect pays only to turn a projectile back');
   // Pressed with an attack button on the same step: the Deflect, and the
   // attack press is not kept for afterwards.
   const { fighter: f, step } = makeFighter();
@@ -217,16 +218,17 @@ test('a Deflect may cut short an attack that hit, as any attack may (the reposit
 // ---- Not a Shield ------------------------------------------------------------------
 
 for (const c of FIGHTERS) {
-  test(`#${c.id}: the Deflect strikes for 3 at Base Launch 2 through the one combat system, and costs exactly 15 as it starts`, () => {
+  test(`#${c.id}: the Deflect strikes for 3 at Base Launch 2 through the one combat system, and striking a fighter costs nothing`, () => {
     const regen = resolveEnergy(c.energy).regen * DT;
     for (const lp of [0, 40]) {
       const d = duel({ attackerCharacter: c, gap: 30 });
       aloft(d.attacker, 500);
       aloft(d.target, 500, d.target.body.x);
       d.target.combat.launchPoint = lp;
+      d.attacker.combat.setEnergy(50);
       d.tick(PRESS);
-      assert.equal(d.attacker.combat.energy, 100 - DEFLECT_ENERGY_COST, 'paid as it starts, no refill on that step');
-      let n = 0;
+      assert.ok(Math.abs(d.attacker.combat.energy - (50 + regen)) < 1e-9, 'nothing as it starts: the refill runs on');
+      let n = 1;
       while (!d.events.length) {
         d.tick();
         n++;
@@ -240,8 +242,8 @@ for (const c of FIGHTERS) {
       assert.equal(e.directionalLaunch, c.deflect.directionalLaunch);
       assert.equal(e.launchPointAfter, lp + 3);
       assert.equal(e.launchStrength, 2 * (lp + 3));
-      assert.ok(Math.abs(d.attacker.combat.energy - (100 - DEFLECT_ENERGY_COST + n * regen)) < 1e-9,
-        'the hit neither costs more nor gives any back: the refill alone');
+      assert.ok(Math.abs(d.attacker.combat.energy - (50 + n * regen)) < 1e-9,
+        'the hit on a fighter turns nothing back: it costs nothing and gives nothing back, the refill alone');
       assert.equal(d.attacker.combat.shielding, false);
     }
   });
@@ -254,11 +256,12 @@ test('a Deflect protects nothing: hit while it plays, the blow lands in full: no
     const d = duel({ targetCharacter: c, gap: 40, targetFacing: 1 });
     aloft(d.attacker, 500);
     aloft(d.target, 470, d.target.body.x);
+    d.target.combat.setEnergy(50);
     d.tick(ATTACK1, PRESS);
     assert.equal(d.target.combat.attack?.def.id, 'deflect');
-    assert.equal(d.target.combat.energy, 100 - DEFLECT_ENERGY_COST, 'its own price, as it started');
     const regen = resolveEnergy(c.energy).regen * DT;
-    let n = 0;
+    assert.ok(Math.abs(d.target.combat.energy - (50 + regen)) < 1e-9, 'nothing as it started');
+    let n = 1;
     while (!d.events.length) {
       d.tick();
       n++;
@@ -270,7 +273,7 @@ test('a Deflect protects nothing: hit while it plays, the blow lands in full: no
     assert.equal(e.energyCost, 0, 'no Shield paid');
     assert.equal(e.stall, 0, 'no stall');
     assert.equal(e.damage, DEF_0001.attacks.midair_attack1.damage);
-    assert.ok(Math.abs(d.target.combat.energy - (100 - DEFLECT_ENERGY_COST + n * regen)) < 1e-9, 'nothing more for the blow');
+    assert.ok(Math.abs(d.target.combat.energy - (50 + n * regen)) < 1e-9, 'nothing for the blow either');
     assert.equal(d.target.combat.shieldStun, 0, 'no blockstun');
     assert.ok(d.target.combat.stun > 0, 'hitstun instead');
     assert.equal(d.attacker.combat.hitstop, DEF_0001.attacks.midair_attack1.hitstop, 'the attacker freezes only for its own hit');
@@ -279,6 +282,114 @@ test('a Deflect protects nothing: hit while it plays, the blow lands in full: no
     assert.equal(d.target.combat.attack, null, 'the hit takes it out of its Deflect');
   }
 });
+
+// ---- Its Energy: only for turning a projectile back ----------------------------------
+
+// A fresh duel: #0001 throws, `c`'s Deflect hangs `gap` off at half Energy.
+function deflectDuel(c, gap = 400) {
+  const d = duel({ targetCharacter: c, gap });
+  aloft(d.target, 400, d.target.body.x);
+  d.target.combat.setEnergy(50);
+  return d;
+}
+
+for (const c of FIGHTERS) {
+  test(`#${c.id}: a Deflect costs 0 whiffed, 15 for the first projectile it turns back, and the same 15 for two, never with a refill on that step`, () => {
+    const regen = resolveEnergy(c.energy).regen * DT;
+    // Whiffed: nothing turned back, nothing paid, from its start to its end.
+    const whiff = deflectDuel(c);
+    whiff.tick({}, PRESS);
+    let n = 1;
+    while (whiff.target.combat.attack) {
+      whiff.tick();
+      n++;
+    }
+    assert.ok(Math.abs(whiff.target.combat.energy - (50 + n * regen)) < 1e-9, 'a whiffed Deflect costs 0');
+    assert.deepEqual(whiff.deflections, []);
+    // One projectile: 15, on the step it turns back, with no refill then.
+    const one = deflectDuel(c);
+    one.tick({}, PRESS);
+    while (one.target.combat.phase !== 'active') one.tick();
+    let box = deflectBox(one.target);
+    one.projectiles.push(shot(one.attacker, 'attack2_object', box.x - 600 * DT, box.y + box.h / 2, 1));
+    const before = one.target.combat.energy;
+    one.tick();
+    assert.equal(one.deflections.length, 1);
+    assert.ok(Math.abs(one.target.combat.energy - (before - DEFLECT_ENERGY_COST)) < 1e-9, '15, and no refill on the step it pays');
+    assert.equal(one.target.energyPaidAt, one.target.steps);
+    assert.deepEqual(one.deflections.map((x) => x.energyCost), [DEFLECT_ENERGY_COST], 'recorded on the deflection');
+    assert.equal(one.target.combat.attack.paid, true, 'marked on that activation');
+    // Two projectiles in the same Deflect, on different steps: still 15.
+    const two = deflectDuel(c);
+    two.tick({}, PRESS);
+    while (two.target.combat.phase !== 'active') two.tick();
+    box = deflectBox(two.target);
+    two.projectiles.push(shot(two.attacker, 'attack2_object', box.x - 600 * DT, box.y + box.h / 2, 1));
+    two.tick();
+    // The first flies off first (two shots of different owners that meet
+    // clash: see clashProjectiles), then a second one comes in.
+    two.tick();
+    two.tick();
+    const afterFirst = two.target.combat.energy;
+    assert.equal(two.target.combat.phase, 'active', 'still live for a second one');
+    box = deflectBox(two.target);
+    two.projectiles.push(shot(two.attacker, 'attack2_object', box.x + box.w / 2, box.y + box.h / 2, 1));
+    two.tick();
+    assert.equal(two.deflections.length, 2, 'both turned back');
+    assert.deepEqual(two.deflections.map((x) => x.energyCost), [DEFLECT_ENERGY_COST, 0], 'the second is free');
+    assert.ok(Math.abs(two.target.combat.energy - Math.min(100, afterFirst + regen)) < 1e-9, 'the refill alone after the first');
+    assert.ok(two.deflections[1].projectile !== two.deflections[0].projectile, 'two different projectiles');
+    assert.ok(Math.abs(two.target.combat.energySpent - DEFLECT_ENERGY_COST) < 1e-9, 'once per Deflect');
+    // Two on the same step: one payment.
+    const pair = deflectDuel(c);
+    pair.tick({}, PRESS);
+    while (pair.target.combat.phase !== 'active') pair.tick();
+    box = deflectBox(pair.target);
+    pair.projectiles.push(shot(pair.attacker, 'attack2_object', box.x - 600 * DT, box.y + box.h / 2 - 10, 1));
+    pair.projectiles.push(shot(pair.attacker, 'attack2_object', box.x - 600 * DT, box.y + box.h / 2 + 10, 1));
+    const ahead = pair.target.combat.energy;
+    pair.tick();
+    assert.equal(pair.deflections.length, 2);
+    assert.ok(Math.abs(pair.target.combat.energy - (ahead - DEFLECT_ENERGY_COST)) < 1e-9, 'two at once, 15 once');
+  });
+
+  test(`#${c.id}: a Deflect cut short before it turns anything back costs nothing; exhausted, none starts; low, it takes the rest only on a turn-back`, () => {
+    // Cut short by an air jump in its startup: nothing paid, ever.
+    const cut = deflectDuel(c);
+    cut.tick({}, PRESS);
+    cut.tick({}, JUMP);
+    assert.notEqual(cut.target.combat.attack?.def.id, 'deflect', 'the air jump ended it');
+    assert.equal(cut.target.combat.energySpent, 0, 'nothing paid');
+    // Exhausted: no Deflect at all, so nothing can turn back.
+    const tired = deflectDuel(c);
+    tired.target.combat.setEnergy(0);
+    tired.tick({}, PRESS);
+    assert.equal(tired.target.combat.attack, null, 'exhausted, no Deflect');
+    // On 6: it starts for nothing, and the turn-back takes all that is left.
+    const low = deflectDuel(c);
+    low.target.combat.setEnergy(6);
+    low.tick({}, PRESS);
+    assert.equal(low.target.combat.attack?.def.id, 'deflect');
+    while (low.target.combat.phase !== 'active') low.tick();
+    const box = deflectBox(low.target);
+    const red = shot(low.attacker, 'attack2_object', box.x - 600 * DT, box.y + box.h / 2, 1);
+    low.projectiles.push(red);
+    low.tick();
+    assert.equal(red.owner, low.target, 'turned back');
+    assert.deepEqual([low.target.combat.energy, low.target.combat.energyExhausted], [0, true], 'all it had: empty, exhausted');
+    // Exhausted by then (it started legally): still turned back, nothing paid.
+    const late = deflectDuel(c);
+    late.tick({}, PRESS);
+    while (late.target.combat.phase !== 'active') late.tick();
+    late.target.combat.setEnergy(0);
+    const lb = deflectBox(late.target);
+    const red2 = shot(late.attacker, 'attack2_object', lb.x - 600 * DT, lb.y + lb.h / 2, 1);
+    late.projectiles.push(red2);
+    late.tick();
+    assert.equal(red2.owner, late.target, 'exhausted mid-Deflect: the projectile is still turned back');
+    assert.deepEqual(late.deflections.map((x) => x.energyCost), [0]);
+  });
+}
 
 // ---- Turning projectiles back -----------------------------------------------------
 

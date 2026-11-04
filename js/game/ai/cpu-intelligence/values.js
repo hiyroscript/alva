@@ -15,10 +15,35 @@
 // Important constraints: pure judgement; caches per reassessment only.
 
 import { launchOutcome } from './prediction.js';
-import { LAUNCH_UNIT_SPEED } from '../../../data/launch.js';
+import { LAUNCH_UNIT_SPEED, PERFECT_SHIELD_HEAL } from '../../../data/launch.js';
 import { backTurned } from '../../combat/hit-effects.js';
 
 export const KO_VALUE = 70;
+
+// How many Launch Points now launch as hard as one did at LAUNCH_UNIT_SPEED
+// 10, where the CPU's Launch Point scales below were tuned (10 / 7 since the
+// launch & energy update, about 1.43). Every such scale (how much a point
+// dealt is worth as the total grows, how far ahead a Launch Point lead
+// counts, when an opponent backing off is "hurt") reads Launch Points
+// through it, so they follow the one knob: a CPU is more patient about a
+// finish at a given Launch Point, and treats its own as safer for longer.
+// The launch outcomes themselves (LaunchJudge) need no scale: they run the
+// real conversion.
+export const LAUNCH_POINT_SCALE = 10 / LAUNCH_UNIT_SPEED;
+// The Launch Point at which a point dealt is worth twice a fresh one's.
+const LP_WORTH = 160 * LAUNCH_POINT_SCALE;
+
+// What a perfect Shield is worth to the CPU at Launch Point `lp`, over an
+// ordinary block (js/game/ai/cpu-intelligence/defense.js): the free answer
+// it opens (1.2, as ever) and, since the launch & energy update, its heal
+// (PERFECT_SHIELD_HEAL off its own Launch Point, worth what dealing those
+// points is worth at that total, the more the higher it is). Whether the
+// CPU manages one at all is still its level's human-like chance
+// (`perfectShield`, js/data/difficulty.js).
+export function perfectShieldValue(lp) {
+  const heal = Math.min(Math.max(0, lp), PERFECT_SHIELD_HEAL);
+  return 1.2 + heal * 0.15 * (1 + lp / LP_WORTH);
+}
 // A launch that leaves its target off the stage (not a fall yet): an
 // edge-guard to play, a recovery to get wrong.
 const OFFSTAGE_VALUE = 9;
@@ -84,7 +109,7 @@ export class LaunchJudge {
     for (let i = 0; i < Math.min(n, strikes.length); i++) {
       const st = stabbed(strikes[i], who, pos, fromX, face);
       lp += st.damage;
-      value += st.damage * (1 + lp / 160);
+      value += st.damage * (1 + lp / LP_WORTH);
       if (st.dir && st.baseLaunch > 0) {
         const l = this.launch(s, target, pos, lp, st, face);
         if (l.ko > ko) ko = l.ko;
