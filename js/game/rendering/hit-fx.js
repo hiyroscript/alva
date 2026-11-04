@@ -31,6 +31,13 @@
 // - A fighter the Void takes bursts where it went in: a flash, a ring and
 //   shards in its own colours (its visual.eliminationPalette, see
 //   eliminationPalette), drawn on after it has gone. Nothing but paint.
+// - Every fighter that appears (each spawn as a match starts or restarts,
+//   each respawn after the Void, each fighter Practice Ground puts on its
+//   floor) materialises in the same burst played backwards (addSpawn): its
+//   shards fly in from their full reach to its centre, the ring closes, all
+//   of it fades in, and the white flash grows and pops at the very end.
+//   Drawn over the fighter. Paint only: the fighter is in play and
+//   controllable from its first step, exactly as without it.
 // - And the Void itself reacts where it took the fighter: a ripple at the
 //   very point on its boundary the fighter's centre crossed (see
 //   voidCrossing in js/game/arena.js): a bright pulse, its edge and red rim
@@ -52,10 +59,10 @@
 //   while the fighter rises away, and is drawn behind the fighters. Nothing
 //   but paint.
 //
-// With reduced motion there is no shake and no zoom, an elimination's
-// shards barely travel, a Super Jump's dust barely spreads and raises no
-// motes, and the Void's ripple is a still, fading pulse with no wave
-// running along its edge; the rest stays.
+// With reduced motion there is no shake and no zoom, an elimination's (and
+// a spawn's) shards barely travel, a Super Jump's dust barely spreads and
+// raises no motes, and the Void's ripple is a still, fading pulse with no
+// wave running along its edge; the rest stays.
 
 import { stepBody } from '../physics.js';
 import { bounceLaunch } from '../combat/launch-bounce.js';
@@ -100,7 +107,9 @@ export const HIT_FX = Object.freeze({
     spark: 0.22, // lifetime
   },
   // A fighter taken by the Void: its burst, sized from the fighter's own
-  // height (world units), so it reads the same at every zoom.
+  // height (world units), so it reads the same at every zoom. A fighter's
+  // spawn plays this very burst backwards (addSpawn), with these same
+  // values: tune both here.
   elimination: {
     life: 0.55, // seconds
     shards: 24,
@@ -224,6 +233,7 @@ export class HitEffects {
     this.trails = new Map(); // fighter -> { ghosts: [{ x, y, frame, flip, age }], since }
     this.slow = null; // { time, focus: fighter } while the lethal slow motion runs
     this.eliminations = []; // { slot, x, y, size, palette, age, life, seed }
+    this.spawns = []; // the same, each an elimination burst played backwards
     this.ripples = []; // { side, x, y, slot, age, life }
     this.dusts = []; // { x, y, ground, dx, dy, age, life, seed }
   }
@@ -287,14 +297,30 @@ export class HitEffects {
   // now, so the burst plays on after the fighter has left play. A small
   // shake with it (none with reduced motion).
   addElimination(f) {
+    this.eliminations.push(this.burst(f, this.eliminations.length));
+    this.addShake(HIT_FX.elimination.shake);
+  }
+
+  // `f` has just appeared at its spawn (Arena.announceSpawn): the same
+  // burst as its elimination, at its body's centre, its height and its
+  // colours, played backwards (drawSpawns). Its own list and entry point,
+  // so it never counts as an elimination. The same small shake (none with
+  // reduced motion).
+  addSpawn(f) {
+    this.spawns.push(this.burst(f, this.spawns.length));
+    this.addShake(HIT_FX.elimination.shake);
+  }
+
+  // One burst for fighter `f`, caught now: where, how big, in which
+  // colours, and its seed (`index` tells two at one place apart), so the
+  // same burst always draws the same shards.
+  burst(f, index) {
     const b = f.body;
-    const e = HIT_FX.elimination;
-    this.eliminations.push({
+    return {
       slot: f.slot ?? null, x: b.x, y: b.y - b.height / 2,
       size: f.def?.visual?.height ?? b.height, palette: eliminationPalette(f.def),
-      age: 0, life: e.life, seed: b.x * 0.23 + b.y * 0.31 + this.eliminations.length,
-    });
-    this.addShake(e.shake);
+      age: 0, life: HIT_FX.elimination.life, seed: b.x * 0.23 + b.y * 0.31 + index,
+    };
   }
 
   // The Void took `f` where its centre crossed the boundary at `crossing`
@@ -368,6 +394,10 @@ export class HitEffects {
     this.sparks = this.sparks.filter((s) => s.age < s.life);
     for (const e of this.eliminations) e.age += dt;
     this.eliminations = this.eliminations.filter((e) => e.age < e.life);
+    if (this.spawns.length) {
+      for (const e of this.spawns) e.age += dt;
+      this.spawns = this.spawns.filter((e) => e.age < e.life);
+    }
     for (const r of this.ripples) r.age += dt;
     this.ripples = this.ripples.filter((r) => r.age < r.life);
     if (this.dusts.length) {
@@ -674,64 +704,76 @@ export class HitEffects {
   // with reduced motion they travel only a short way. The same burst always
   // draws the same shards.
   drawEliminations(ctx, toScreen, scale, dpr = 1) {
+    for (const e of this.eliminations) this.drawBurst(ctx, e, Math.min(1, e.age / e.life), toScreen, scale, dpr);
+  }
+
+  // Draws every live spawn burst: the elimination burst run backwards, its
+  // progress k = 1 - age / life, so at age t it draws exactly what an
+  // elimination draws at age life - t. The shards start at their full reach
+  // and fly in to the fighter's centre, quickening as they go (the ease-out
+  // reversed), the ring closes from its widest, everything fades in, and
+  // the flash grows and pops at the end, as the fighter materialises.
+  drawSpawns(ctx, toScreen, scale, dpr = 1) {
+    for (const e of this.spawns) this.drawBurst(ctx, e, 1 - Math.min(1, e.age / e.life), toScreen, scale, dpr);
+  }
+
+  // One burst `e` at progress `k` (0 as it bursts, 1 as it is gone).
+  drawBurst(ctx, e, k, toScreen, scale, dpr) {
     const cfg = HIT_FX.elimination;
     const travel = this.reducedMotion ? cfg.reducedTravel : 1;
-    for (const e of this.eliminations) {
-      const [x, y] = toScreen(e.x, e.y);
-      const k = Math.min(1, e.age / e.life);
-      const fade = 1 - k;
-      const out = 1 - (1 - k) ** 3;
-      const size = e.size * scale;
-      const [main] = e.palette;
-      ctx.save();
-      ctx.lineCap = 'round';
-      // The flash: white, popping out and shrinking away in the first half.
-      if (k < 0.5) {
-        ctx.globalAlpha = (1 - k / 0.5) ** 2;
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(x, y, size * (0.18 + 0.22 * Math.min(1, k * 6)) * (1 - k), 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // The ring.
-      ctx.globalAlpha = fade;
-      ctx.strokeStyle = main;
-      ctx.lineWidth = Math.max(1, size * 0.06 * fade);
+    const [x, y] = toScreen(e.x, e.y);
+    const fade = 1 - k;
+    const out = 1 - (1 - k) ** 3;
+    const size = e.size * scale;
+    const [main] = e.palette;
+    ctx.save();
+    ctx.lineCap = 'round';
+    // The flash: white, popping out and shrinking away in the first half.
+    if (k < 0.5) {
+      ctx.globalAlpha = (1 - k / 0.5) ** 2;
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(x, y, size * (0.15 + (cfg.ring - 0.15) * out * travel), 0, Math.PI * 2);
-      ctx.stroke();
-      // The shards, round the whole circle with a little jitter.
-      const rnd = seeded(e.seed);
-      const shards = [];
-      for (let i = 0; i < cfg.shards; i++) {
-        const a = (i / cfg.shards) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
-        const reach = size * cfg.radius * (0.6 + rnd() * 0.5);
-        const r0 = size * 0.12 + reach * out * travel;
-        const r1 = r0 + size * cfg.shardLength * (0.6 + rnd() * 0.6) * (1 - 0.6 * k);
-        shards.push([e.palette[i % e.palette.length], x + Math.cos(a) * r0, y + Math.sin(a) * r0, x + Math.cos(a) * r1, y + Math.sin(a) * r1]);
-      }
-      const width = Math.max(1, size * 0.045 * (1 - 0.5 * k));
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-      ctx.lineWidth = width + 2 * dpr;
+      ctx.arc(x, y, size * (0.18 + 0.22 * Math.min(1, k * 6)) * (1 - k), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // The ring.
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = main;
+    ctx.lineWidth = Math.max(1, size * 0.06 * fade);
+    ctx.beginPath();
+    ctx.arc(x, y, size * (0.15 + (cfg.ring - 0.15) * out * travel), 0, Math.PI * 2);
+    ctx.stroke();
+    // The shards, round the whole circle with a little jitter.
+    const rnd = seeded(e.seed);
+    const shards = [];
+    for (let i = 0; i < cfg.shards; i++) {
+      const a = (i / cfg.shards) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+      const reach = size * cfg.radius * (0.6 + rnd() * 0.5);
+      const r0 = size * 0.12 + reach * out * travel;
+      const r1 = r0 + size * cfg.shardLength * (0.6 + rnd() * 0.6) * (1 - 0.6 * k);
+      shards.push([e.palette[i % e.palette.length], x + Math.cos(a) * r0, y + Math.sin(a) * r0, x + Math.cos(a) * r1, y + Math.sin(a) * r1]);
+    }
+    const width = Math.max(1, size * 0.045 * (1 - 0.5 * k));
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = width + 2 * dpr;
+    ctx.beginPath();
+    for (const [, x0, y0, x1, y1] of shards) {
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+    }
+    ctx.stroke();
+    ctx.lineWidth = width;
+    for (const color of e.palette) {
+      ctx.strokeStyle = color;
       ctx.beginPath();
-      for (const [, x0, y0, x1, y1] of shards) {
+      for (const [c, x0, y0, x1, y1] of shards) {
+        if (c !== color) continue;
         ctx.moveTo(x0, y0);
         ctx.lineTo(x1, y1);
       }
       ctx.stroke();
-      ctx.lineWidth = width;
-      for (const color of e.palette) {
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        for (const [c, x0, y0, x1, y1] of shards) {
-          if (c !== color) continue;
-          ctx.moveTo(x0, y0);
-          ctx.lineTo(x1, y1);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
     }
+    ctx.restore();
   }
 }
 

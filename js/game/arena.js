@@ -382,9 +382,21 @@ export class Arena {
     f.respawnTimer = CONFIG.battle.respawnSeconds;
   }
 
+  // `f` has just appeared at its spawn (a match's start or restart, a
+  // respawn, a fighter Practice Ground puts on its floor): it materialises
+  // in its elimination burst played backwards (HitEffects.addSpawn), in its
+  // own colours. Paint only: nothing of `f`, its controller or the match
+  // changes. A mode that clears the effects (HitEffects.reset) as it
+  // spawns its fighters calls this after the reset, or the burst goes with
+  // it.
+  announceSpawn(f) {
+    if (f) this.fx.addSpawn(f);
+  }
+
   // One step of every respawn wait. A fighter whose wait is over is back at
   // its own spawn (Fighter.respawn: 0 Launch Point, full Energy, every
-  // cooldown ready, nothing transient) and in play at once. Buffered presses
+  // cooldown ready, nothing transient), materialising (announceSpawn), and
+  // in play at once. Buffered presses
   // made while a player was out are dropped, so it comes back neutral: that
   // player's own (in Local Play the other player's are untouched).
   updateRespawns(dt) {
@@ -393,6 +405,7 @@ export class Arena {
       f.respawnTimer -= dt;
       if (f.respawnTimer > 1e-6) continue;
       f.respawn(this.stage);
+      this.announceSpawn(f);
       if (f.controller?.kind !== 'player') continue;
       if (f.controller.flush) f.controller.flush();
       else this.input.flush();
@@ -504,6 +517,9 @@ export class Arena {
     // A fighter the Void took bursts over the black where it went in, after
     // it has gone from the stage.
     this.fx.drawEliminations(ctx, (x, y) => this.toScreen(x, y), view.scale, view.dpr);
+    // A fighter just spawned materialises in its burst played backwards,
+    // drawn over it, so the burst covers its appearance.
+    this.fx.drawSpawns(ctx, (x, y) => this.toScreen(x, y), view.scale, view.dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the

@@ -20,6 +20,7 @@ for where they moved). The game as it is now is specified in
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 | **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
+| **Spawn & landscape update** | [#@@PR@@](https://github.com/hiyroscript/alva/pull/@@PR@@) | `@@COMMIT@@` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every spawn and respawn plays the elimination burst in reverse |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -4978,6 +4979,9 @@ not, and a fighter out of view keeps its edge pointer.
   leaves the safe area at 667 × 375, 844 × 390, 932 × 430, 1024 × 768 or
   1366 × 768, in either scheme.
 
+Later, the [spawn & landscape update](#spawn--landscape-update) made
+Joystick the default for new players; a stored Classic Buttons is kept.
+
 **Where to tune it:** `TOUCH_DEFAULT_SCALE` in
 [`js/core/touch-layout.js`](./js/core/touch-layout.js); the geometry in
 [`css/touch-controls.css`](./css/touch-controls.css) (`--tc`, `--tc-gap`,
@@ -5105,3 +5109,135 @@ on resize, Download Alva, the controller, both languages, no input),
 Revised for the new defaults, their rules kept: `settings`,
 `battle-screen`, `practice-ground`, `watch-mode`, `i18n` (Classic Buttons
 by default), `touch-layout` (130 % in place of 100 %).
+
+## Spawn & landscape update
+
+Asked for in the `max` prompt as three changes: Alva permanently locks
+itself to landscape, Joystick becomes the default Mobile Controls, and every
+spawn and respawn plays the elimination burst in reverse.
+
+### The landscape lock
+
+On a touch device Alva now turns itself to landscape and keeps it that way
+for the whole visit; before, it only asked the player to rotate (the rotate
+overlay). A new `OrientationLock` (`js/core/orientation-lock.js`, started by
+the App with the Device's touch UI) calls
+`screen.orientation.lock('landscape')`:
+
+- **An installed app** locks at once (no fullscreen needed).
+- **In a browser tab** most browsers lock only in fullscreen, and
+  fullscreen needs a real press, so the first press takes the whole page
+  fullscreen (`requestFullscreen({ navigationUI: 'hide' })`, or
+  `webkitRequestFullscreen`) and then locks. A press is a keydown, a
+  mouse's pointerdown or a touch's or pen's pointerup. The prompt named
+  `touchend`, but Alva uses no Touch Events (the zoom-prevention rule in
+  `tests/interface/controls-ui.test.mjs`), and a touch's pointerdown does
+  not grant user activation, so the touch's `pointerup` stands in for it.
+- **Kept, not set once:** the lock is asked for again after every
+  `fullscreenchange`, every return to the page (`visibilitychange` back to
+  visible, `pageshow`, `resume`) and every orientation change
+  (`screen.orientation`'s `change`, `orientationchange`), and whenever the
+  Device's touch UI changes. Leaving fullscreen (switching apps, the
+  player's swipe) arms the next press to go back in and lock again. No
+  setting turns it off.
+- **Never in the way:** nothing is ever thrown. A refused `lock()` or
+  fullscreen is caught quietly. Where there is no `lock()` at all (Safari on
+  iPhone and iPad) nothing is asked for, not even fullscreen, which would
+  be no use without the lock. A desktop or other non-touch device is never
+  locked and never taken fullscreen.
+- **The rotate overlay is the fallback:** `html.is-portrait-blocked`
+  (`js/core/device.js`) is unchanged. A lock that holds keeps the window
+  landscape, so the overlay only shows where the lock is unavailable or
+  refused. The manifest keeps `"orientation": "landscape"`, and
+  `index.html` has no meta tag that conflicts with it. The touch controls
+  and the touch layout editor already re-place themselves on every resize
+  and orientation change. The small-screen block, the install dialog,
+  online play and the splash run unchanged inside fullscreen, which only
+  enlarges the viewport.
+
+### Joystick by default
+
+`DEFAULT_MOBILE_CONTROLS` is `'joystick'` (it was `'classic'`), and every
+fallback for an unknown or missing scheme reads it: `resolveSetting` and the
+settings reader in `js/core/settings.js`, `TouchControls` and its
+`setScheme` (`js/ui/touch-controls.js`), the touch layout editor. The
+Settings dialog marks Joystick "Default"; it was already listed first.
+
+**Existing players:** settings are now schema 10. A stored object cannot
+tell a player's own Classic Buttons from the old default, because every
+save writes every setting. So every older version (1 to 9) keeps the scheme
+it played with: its stored one, or Classic Buttons where it held none valid
+(the default then). Only new or empty storage, and a version 10 object with
+no valid scheme, gets Joystick. Both custom touch layouts are kept as they
+were. The same decision is written in `js/core/settings.js`
+(`SETTINGS_BEFORE_10_SCHEME`, `keepScheme`).
+
+### The spawn burst
+
+Every fighter that appears now materialises in its own elimination burst
+played backwards. That covers each spawn as a match starts, every restart
+and rematch, every respawn after the Void, and every fighter or CPU
+Practice Ground puts on its floor, in every mode (Quick Battle, Watch Mode,
+Local Play and Online Play all go through `Battle.restart` and
+`Arena.updateRespawns`). The shards start at their full reach and fly in to
+the fighter's centre, quickening as they go (the ease-out reversed). The
+ring closes from its widest, everything fades in, and the white flash grows
+and pops at the very end. It uses the fighter's own palette
+(`eliminationPalette`), size (`visual.height`, else its body's) and seeded
+shards, centred on its body at the spawn, with the same small shake (none
+with reduced motion) and the same reduced-motion travel.
+
+- **One drawing, reversed:** `HitEffects.drawBurst` is the elimination's
+  drawing, unchanged. `drawEliminations` runs it at k = age / life and the
+  new `drawSpawns` at k = 1 − age / life, so at age t a spawn draws exactly
+  what an elimination draws at age life − t.
+- **Its own entry point and list:** `HitEffects.addSpawn` and `spawns`, so a
+  spawn is never counted as an elimination (`addElimination` and
+  `eliminations` are untouched).
+- **Where it is added:** `Arena.announceSpawn(f)`, called by
+  `Arena.updateRespawns` right after `f.respawn`, by `Battle.restart` after
+  its `fx.reset()` (which would otherwise wipe it), and by
+  `PracticeSession.setFighter` (after its reset) and `setCPU`.
+- **Drawn** after the elimination bursts, over the fighters and the Void,
+  so it covers the appearance.
+- **Paint only:** nothing of the fighter, its controller, the match, its
+  score or statistics changes. The fighter is in play and controllable from
+  its first step, with no invulnerability or delay added. The effects are
+  not simulated state, so online lockstep is untouched.
+
+**Where to tune it:** the landscape lock has no tuning (the events it
+listens to are `GESTURES` and `start` in `js/core/orientation-lock.js`).
+The default scheme is `DEFAULT_MOBILE_CONTROLS` in `js/core/settings.js`.
+The spawn burst is tuned by `HIT_FX.elimination` in
+`js/game/rendering/hit-fx.js`, the one source for both bursts.
+
+**Code:** new `js/core/orientation-lock.js`; `js/core/app.js` (starts the
+lock); `js/core/settings.js` (schema 10, the default, the migration);
+`js/ui/touch-controls.js` and `js/ui/settings-dialog.js` (comments);
+`js/game/rendering/hit-fx.js` (`addSpawn`, `burst`, `spawns`, `drawSpawns`,
+`drawBurst`); `js/game/arena.js` (`announceSpawn`, the respawn, the draw);
+`js/game/battle.js` (`restart`); `js/game/practice.js` (`setFighter`,
+`setCPU`); `ALVA_SPEC.md`, `docs/systems/input.md`,
+`docs/systems/rendering.md`, `docs/architecture/module-responsibilities.md`
+and `docs/development/testing.md`.
+
+**Tests:** new `tests/interface/orientation-lock.test.mjs` (the first
+press going fullscreen and locking on a touch device, a touch's pointerdown
+waiting for its pointerup, the webkit fallback, an installed app locking at
+once, nothing on a desktop, a device that turns out to be touch, the lock
+asked for again after every event, leaving fullscreen arming the next
+press, a refused or throwing `lock()`, a refused fullscreen, no API at all,
+and with the real Device: the rotate overlay staying up on a refusal and
+hidden by a lock). New `tests/systems/spawn-burst.test.mjs` (a match's
+start in every mode, a restart after its reset, every respawn, Practice
+Ground's arrival, CPU, swap and respawn, every fighter's palette and size,
+the exact time-reverse of the elimination with and without reduced motion,
+fading and closing in with the flash at the end, its life and shake, never
+an elimination, the draw order, no fighter id, and a whole CPU match
+stepping identically with and without it).
+`tests/interface/settings.test.mjs` adds fresh storage → Joystick and
+stored Classic Buttons → kept (with both layouts) for every older version.
+Revised for the new default, their rules kept: `settings`, `controls-ui`,
+`battle-screen`, `i18n`, `practice-ground` and `watch-mode`. The online
+determinism and lockstep tests and the celebration test's elimination count
+pass unchanged.

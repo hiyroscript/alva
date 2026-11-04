@@ -1236,24 +1236,24 @@ test('Right works alongside every attack, Shield and Jump (multi-touch), each it
 
 const actionsOf = (cluster) => cluster.children.map((c) => c.getAttribute('data-action'));
 
-test('Classic Buttons is the default scheme; setScheme switches layouts and anything unknown is Classic Buttons', () => {
+test('Joystick is the default scheme; setScheme switches layouts and anything unknown is Joystick', () => {
   const input = { setTouch() {}, queueTouchMouvement() {} };
   const tc = new TouchControls(new Element('div'), input);
-  assert.equal(tc.scheme, 'classic', 'a player who never chose');
-  assert.equal(tc.root.dataset.scheme, 'classic');
-  assert.ok(tc.root.classList.contains('is-classic'));
-  assert.equal(tc.root.classList.contains('is-joystick'), false);
-  tc.setScheme('joystick');
-  assert.equal(tc.scheme, 'joystick');
+  assert.equal(tc.scheme, 'joystick', 'a player who never chose');
   assert.equal(tc.root.dataset.scheme, 'joystick');
   assert.ok(tc.root.classList.contains('is-joystick'));
   assert.equal(tc.root.classList.contains('is-classic'), false);
-  for (const bad of ['dpad', '', null, undefined, 'Joystick']) {
-    tc.setScheme('joystick');
+  tc.setScheme('classic');
+  assert.equal(tc.scheme, 'classic');
+  assert.equal(tc.root.dataset.scheme, 'classic');
+  assert.ok(tc.root.classList.contains('is-classic'));
+  assert.equal(tc.root.classList.contains('is-joystick'), false);
+  for (const bad of ['dpad', '', null, undefined, 'Classic']) {
+    tc.setScheme('classic');
     tc.setScheme(bad);
-    assert.equal(tc.scheme, 'classic', String(bad));
+    assert.equal(tc.scheme, 'joystick', String(bad));
   }
-  assert.equal(new TouchControls(new Element('div'), input, { scheme: 'joystick' }).scheme, 'joystick');
+  assert.equal(new TouchControls(new Element('div'), input, { scheme: 'classic' }).scheme, 'classic');
 });
 
 test('Classic Buttons has Run and Mouvement Left / Right at the lower left, the actions at the lower right', () => {

@@ -13,6 +13,7 @@ import { ControllerManager } from './controller-manager.js';
 import { resolveProfile } from '../data/controller-profiles.js';
 import { AudioManager } from './audio-manager.js';
 import { Device } from './device.js';
+import { OrientationLock } from './orientation-lock.js';
 import { Connectivity } from './connectivity.js';
 import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
@@ -96,6 +97,11 @@ export class App {
     this.config = CONFIG;
     this.screenGuard = screenGuard;
     this.device = new Device().init();
+    // On a touch device Alva locks itself to landscape for the whole visit
+    // (js/core/orientation-lock.js), the rotate overlay only its fallback;
+    // a device that turns out to be touch locks from then on.
+    this.orientationLock = new OrientationLock({ win: window, doc: document, isTouch: () => this.device.touchUI }).start();
+    this.device.addEventListener('change', () => this.orientationLock.relock());
     // The player's saved settings (Home › Settings), read once here, and
     // the interface language they hold (English until one is chosen). The
     // language follows every change of the setting, and the whole page

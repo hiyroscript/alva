@@ -394,16 +394,16 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   app.screens.current = screen;
   const elements = new Map(screen.touch.actionButtons);
   await screen.enter();
-  assert.equal(screen.touch.scheme, 'classic', 'the default');
-  assert.equal(screen.touch.root.children[0], screen.touch.dpad);
-  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Down', 'Left movement', 'Right movement']);
+  assert.equal(screen.touch.scheme, 'joystick', 'the default');
+  assert.equal(screen.touch.root.children[0], screen.touch.joystick);
   assert.equal(screen.touch.enabled, true);
   screen.exit();
 
-  app.settings.set('mobileControls', 'joystick');
+  app.settings.set('mobileControls', 'classic');
   await screen.enter();
-  assert.equal(screen.touch.scheme, 'joystick');
-  assert.equal(screen.touch.root.children[0], screen.touch.joystick);
+  assert.equal(screen.touch.scheme, 'classic');
+  assert.equal(screen.touch.root.children[0], screen.touch.dpad);
+  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right', 'Down', 'Left movement', 'Right movement']);
   assert.equal(screen.touch.enabled, true);
   for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
   assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'High Kick', 'the fighter\'s own, whatever the layout');
