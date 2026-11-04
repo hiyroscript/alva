@@ -4836,13 +4836,60 @@ switched off, both players told "Couldn't connect". Tests:
 `server/tests/privacy.test.mjs`, the Room's and the flow tests. The owner
 adds the relay's three secrets once ([the steps](./docs/development/online-server.md#its-relay-private-connections)).
 
+**Later: Cloudflare's relay, with safeguards.** ExpressTURN's relay still
+felt slow to the owner (one fixed location). The owner chose Cloudflare's
+TURN relay instead (the location nearest each player; free up to 1,000 GB a
+month, then $0.05 a GB, a card on file), with safeguards so that it never
+costs anything, and ExpressTURN gone entirely:
+
+- **Passwords that last an hour.** Each player's relay servers come with a
+  password of their own from Cloudflare's TURN service
+  (`server/src/privacy.js` `relayServers`, `RELAY_TTL_SECONDS` 3600; the
+  Worker's secrets `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`; the UDP 3478
+  and TLS 443 addresses kept, `pickRelayServers`). Between matches, the
+  host's browser makes a link older than `CONFIG.online.linkRenewMs`
+  (40 minutes) again, the guest's following the new offer, with the trip
+  already measured kept (`DelayProbe`'s `samples`), so two players can
+  stay in a room for hours.
+- **At most 10 rooms with both players at once** (`MAX_MATCHES`). A host
+  waiting alone and the lobby do not count; there is no daily or hourly
+  limit on matches. One more join is "Servers are full right now".
+- **The monthly safety stop.** The Lobby counts the time rooms spend with
+  both players, at `RELAY_GB_PER_HOUR` (0.2 GB, the high end of a match's
+  0.1 to 0.2), and at `RELAY_MONTHLY_GB` (450 GB, under half the free
+  amount, so a billing month straddling two calendar months stays inside
+  it) closes Online play until the next month (`month_limit`: "Online play
+  has reached its limit for this month. It opens again next month.", back
+  Home; a room still open closes at its next relay password). A room in
+  use reports to the Lobby every two minutes so the count stays right.
+- **At most 120 relay passwords an hour** server-wide
+  (`RELAY_PASSWORDS_PER_HOUR`; a Room asks the Lobby before each,
+  `POST /relay`); past it, the link fails as "Servers are full".
+- **An on/off switch,** `ONLINE_OPEN` (`"false"`: "Online play is closed
+  right now. Please try again later.", back Home). `/health` says `open`
+  and `closed`.
+
+Tests: `server/tests/safeguards.test.mjs` (the match cap and two joins for
+its last place, the month's count and its stop and new month, the reports
+that keep it right, the password cap, the switch, `wrangler.toml`'s
+values), `server/tests/privacy.test.mjs` (the passwords from Cloudflare's
+service, a fake in `server/tests/fakes.mjs`), `tests/online/match-link.test.mjs`
+(the renewal, the password cap on a link), `tests/online/delay.test.mjs` (a
+probe started from round trips already measured) and the flow tests in
+`tests/online/online-play.test.mjs` (the closed and month-limit notices in
+English and French, "Servers are full"). The owner adds the two secrets
+and deletes ExpressTURN's three ([the steps](./docs/development/online-server.md#its-relay-private-connections),
+[the safeguards](./docs/development/online-server.md#the-relays-safeguards)).
+
 **Where to tune it:** `CONFIG.online` in [`js/config.js`](./js/config.js)
 (`serverUrl`, `inputDelay`, `inputDelayRange`, `delayMarginMs`,
 `pingIntervalMs`, `pingRefreshMs`, `connectTimeoutMs`,
-`disconnectGraceMs`, `loadTimeoutMs`, `listRefreshMs`, `hashInterval`,
+`disconnectGraceMs`, `linkRenewMs`, `loadTimeoutMs`, `listRefreshMs`, `hashInterval`,
 `resendWindow`, `colors`; `CONFIG.debug.online` logs a desync's states);
-the server's caps and allowed origins in
-[`server/wrangler.toml`](./server/wrangler.toml), its relay in the
+the server's caps, the relay's safeguards (`MAX_MATCHES`,
+`RELAY_GB_PER_HOUR`, `RELAY_MONTHLY_GB`, `RELAY_PASSWORDS_PER_HOUR`), the
+`ONLINE_OPEN` switch and the allowed origins in
+[`server/wrangler.toml`](./server/wrangler.toml), its relay's key in the
 Worker's secrets; `STAGE_REVEAL_MS` in `js/screens/online-screens.js`;
 `WAITING_NOTICE_MS` in `js/online/lockstep.js`; `SEAT_GRACE_MS` and
 `RELAY_PER_WINDOW` in `server/src/room.js`.

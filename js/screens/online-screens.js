@@ -35,7 +35,9 @@
 // Every screen is a menu screen like Local Play's and Quick Battle's setup
 // (the screen manager, menu navigation, the same header and panels), for
 // the keyboard, touch and controllers. Going offline anywhere here ends
-// Online Play: "Connection lost", then Home (App).
+// Online Play: "Connection lost", then Home (App). So does Online play
+// closing (CLOSED: switched off by the owner, or the relay's monthly safety
+// stop reached), on any of these screens: its own message, then Home.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -61,6 +63,8 @@ export const STAGE_REVEAL_MS = 1200;
 // error codes and the session's own: its title and message keys.
 const NOTICES = Object.freeze({
   full: ['online.full.title', 'online.full.message'],
+  closed: ['online.closed.title', 'online.closed.message'],
+  month_limit: ['online.closed.title', 'online.monthLimit.message'],
   unavailable: ['online.unavailable.title', 'online.unavailable.message'],
   rate_limited: ['online.rateLimited.title', 'online.rateLimited.message'],
   room_not_found: ['online.notFound.title', 'online.notFound.message'],
@@ -95,6 +99,15 @@ export function showNotice(app, code, { detail = null } = {}) {
 // of this page's origin, its unexpected failures, and its having no relay
 // for private connections included).
 export const UNAVAILABLE = Object.freeze(['unavailable', 'origin', 'server_error', 'relay_unavailable']);
+
+// The codes that mean Online play is closed: switched off by the game's
+// owner ('closed'), or the relay's monthly safety stop reached
+// ('month_limit', until the next month). Online Play ends then, back Home.
+export const CLOSED = Object.freeze(['closed', 'month_limit']);
+
+// Whether `code` ends Online Play (no server to use, or Online play
+// closed): back Home once the player has read why.
+export const endsOnline = (code) => UNAVAILABLE.includes(code) || CLOSED.includes(code);
 
 // What "Online play is unavailable" adds to say why, by the server's
 // answer to /health (RoomServerClient.diagnose).
@@ -246,8 +259,9 @@ export class OnlineNameScreen extends Screen {
       if (this.app.screens.current !== this) return;
       const code = err?.code ?? 'unavailable';
       await showFailure(this.app, err);
-      // No server to use: Online Play ends here, back Home.
-      if (UNAVAILABLE.includes(code) && this.app.screens.current === this) this.app.screens.go('home', {}, { reset: true });
+      // No server to use, or Online play closed: Online Play ends here, back
+      // Home.
+      if (endsOnline(code) && this.app.screens.current === this) this.app.screens.go('home', {}, { reset: true });
     } finally {
       this.busy = false;
       this.continueButton.disabled = false;
@@ -467,8 +481,14 @@ export class OnlineLobbyScreen extends Screen {
       const rooms = await this.session.listRooms();
       if (this.app.screens.current !== this) return;
       this.render(rooms);
-    } catch {
+    } catch (err) {
       if (this.app.screens.current !== this) return;
+      // Online play closed while the list showed: said, then back Home.
+      if (CLOSED.includes(err?.code)) {
+        await showNotice(this.app, err.code);
+        if (this.app.screens.current === this) this.app.screens.go('home', {}, { reset: true });
+        return;
+      }
       setText(this.listStatus, 'online.rooms.unavailable');
       this.listStatus.hidden = false;
     }
@@ -554,7 +574,9 @@ export class OnlineLobbyScreen extends Screen {
     } catch (err) {
       if (this.app.screens.current !== this) return;
       await showFailure(this.app, err);
-      if (this.app.screens.current === this) this.refresh();
+      if (this.app.screens.current !== this) return;
+      if (CLOSED.includes(err?.code)) this.app.screens.go('home', {}, { reset: true });
+      else this.refresh();
     } finally {
       this.busy = false;
     }
@@ -651,7 +673,9 @@ export class OnlineRoomScreen extends Screen {
     if (type === 'room' || type === 'peer') this.render();
     if (type === 'peer' && detail?.status === 'failed' && this.peerNoticeShown !== detail) {
       this.peerNoticeShown = detail;
-      if (this.app.screens.current === this) showNotice(this.app, 'peer');
+      // The relay's passwords for this hour all handed out: "Servers are
+      // full"; anything else: "Couldn't connect".
+      if (this.app.screens.current === this) showNotice(this.app, detail.reason === 'full' ? 'full' : 'peer');
     }
   }
 
@@ -837,8 +861,12 @@ export function routeOnlineEvents(app) {
     if (current?.onOnline?.(type, detail)) return;
     if (type === 'closed') {
       if (!current?.id?.startsWith('online-')) return;
-      showNotice(app, detail?.reason ?? 'lost').then(() => {
-        if (app.screens.current?.id?.startsWith('online-')) app.screens.backTo('online-lobby');
+      const reason = detail?.reason ?? 'lost';
+      showNotice(app, reason).then(() => {
+        if (!app.screens.current?.id?.startsWith('online-')) return;
+        // Online play closed: Home, as the lobby has nothing to show.
+        if (CLOSED.includes(reason)) app.screens.go('home', {}, { reset: true });
+        else app.screens.backTo('online-lobby');
       });
     } else if (type === 'start') {
       app.screens.get('online-room')?.startMatch(detail);

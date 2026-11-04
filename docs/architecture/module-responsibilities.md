@@ -129,7 +129,7 @@ There are no import cycles (checked over every module).
 | `server-client.js` | `RoomServerClient` (the room server's HTTP calls), `RoomLink` (a room's WebSocket), `OnlineError`. | `online-session.js` |
 | `online-session.js` | `OnlineSession` (`App.online`): name, session id, the room and both seats, the peer link, the host's start, rematches. | `core/app.js` |
 | `delay.js` | Each match's input delay: `DelayProbe` (pings on the link) and `chooseDelay`, `validDelay`. | `online-session.js`, `match-setup.js` |
-| `match-link.js` | `matchLink`: the relay's servers asked of the room, then the relay-only WebRTC link; none, no link. | `online-session.js` |
+| `match-link.js` | `matchLink`: the relay's servers (with this player's own password, lasting an hour) asked of the room, then the relay-only WebRTC link; none, no link. | `online-session.js` |
 | `peer.js` | `PeerLink`: the WebRTC DataChannel through the TURN relay, relay-only, signalled through the room. | `match-link.js` |
 | `privacy.js` | `scrubSignal`, `relayOnly`: the signalling sent and taken with no address but the relay's. | `peer.js` |
 | `transport.js` | The transport interface, `MessageTransport`, `memoryTransportPair`, `listeners`. | `peer.js`, `lockstep.js`, `online-session.js`, `server-client.js` |

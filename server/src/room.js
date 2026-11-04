@@ -18,6 +18,16 @@
 // it stands (names, fighters, Ready, connection), the start, the relay's
 // servers and scrubbed signalling.
 //
+// The relay's servers come with a password of the player's own from
+// Cloudflare's TURN service, lasting an hour (server/src/privacy.js
+// relayServers). Before asking for one, the room asks the Lobby (POST
+// /relay), which keeps the relay's safeguards (server/src/lobby.js): with
+// Online play closed ('closed', or 'month_limit' once the month's safety
+// stop is reached) the room closes, telling both players why; with this
+// hour's passwords all handed out, the player is told 'full'. A room also
+// closes as 'closed' when a player connects while Online play is switched
+// off.
+//
 // Its sockets use the WebSocket Hibernation API (ctx.acceptWebSocket), so a
 // room where nobody is sending anything costs no Durable Object duration;
 // its state is saved in its storage so it survives hibernation. A plain
@@ -33,7 +43,8 @@
 // (or stays gone past the grace) frees the seat. Every change is reported to
 // the Lobby, with the requests handled since the last report (counted for
 // the daily budget: connections and alarms one each, incoming messages at
-// Cloudflare's 20 : 1).
+// Cloudflare's 20 : 1), and a room in use reports at least every
+// REPORT_EVERY_MS anyway.
 //
 // Client → room messages (JSON):
 //   { type: 'fighter', fighterId }            the player's fighter
@@ -50,12 +61,12 @@
 //   { type: 'rematch' }                       both want a rematch: the host starts it
 //   { type: 'signal', data }                  the other player's signalling, with no address but the relay's
 //   { type: 'relay', iceServers }             the relay's servers, or { type: 'relay', error }
-//   { type: 'closed', reason }                the room is gone ('host_left', 'expired')
+//   { type: 'closed', reason }                the room is gone ('host_left', 'expired', 'closed', 'month_limit')
 //   { type: 'error', code }
 
 import { validFighterId, validDelay } from './rules.js';
 import { scrubSignal, relayServers } from './privacy.js';
-import { json, error, readJson, numberVar } from './http.js';
+import { json, error, readJson, numberVar, onlineOpen } from './http.js';
 
 const MINUTE = 60_000;
 // How long a seat waits for its player to (re)connect.
@@ -68,12 +79,19 @@ const SEATS = ['host', 'guest'];
 // link, a retry, a reconnect each ask once).
 const RELAY_PER_WINDOW = 10;
 const RELAY_WINDOW_MS = 10 * MINUTE;
+// A room in use reports to the Lobby at least this often, even with
+// nothing changing, so the Lobby keeps it (its match counts and its relay
+// use with it) while its players are there.
+const REPORT_EVERY_MS = 2 * MINUTE;
 
 export class Room {
-  constructor(ctx, env, { now = () => Date.now() } = {}) {
+  // `now` and `fetch` (what reaches Cloudflare's TURN service) are for
+  // tests.
+  constructor(ctx, env, { now = () => Date.now(), fetch = globalThis.fetch?.bind(globalThis) } = {}) {
     this.ctx = ctx;
     this.env = env;
     this.now = now;
+    this.fetchImpl = fetch;
     this.idleMs = numberVar(env.ROOM_IDLE_MINUTES, 10) * MINUTE;
     this.state = null;
     this.loaded = null;
@@ -181,6 +199,8 @@ export class Room {
     await this.save();
     this.broadcast();
     await this.report();
+    // Online play switched off: the room ends, and its players are told.
+    if (!onlineOpen(this.env)) await this.close('closed');
   }
 
   // ---- Messages ---------------------------------------------------------------------
@@ -204,6 +224,7 @@ export class Room {
     }
     if (!message || typeof message !== 'object') return;
     s.lastActive = this.now();
+    if (s.lastActive - (this.reportedAt ?? 0) >= REPORT_EVERY_MS) await this.report();
     const me = s.seats[name];
     const otherName = name === 'host' ? 'guest' : 'host';
     switch (message.type) {
@@ -289,10 +310,12 @@ export class Room {
     await this.report();
   }
 
-  // The relay's servers for this player's WebRTC link: only with the other
-  // seat taken, at most RELAY_PER_WINDOW per RELAY_WINDOW_MS, and only to
-  // this player. With no relay set up, 'relay_unavailable' (no room is made
-  // then anyway: server/src/index.js).
+  // The relay's servers for this player's WebRTC link, with a password of
+  // its own that lasts an hour: only with the other seat taken, at most
+  // RELAY_PER_WINDOW per RELAY_WINDOW_MS, only once the Lobby agrees (see
+  // the top), and only to this player. With no relay key, or Cloudflare's
+  // service not answering, 'relay_unavailable' (the player's link fails:
+  // "Couldn't connect").
   async relay(ws, name, otherName) {
     const s = this.state;
     const me = s.seats[name];
@@ -302,8 +325,30 @@ export class Room {
     if (me.relayAt.length >= RELAY_PER_WINDOW) return this.send(ws, { type: 'relay', error: 'rate_limited' });
     me.relayAt.push(t);
     await this.save();
-    const iceServers = relayServers(this.env);
-    this.send(ws, iceServers.length ? { type: 'relay', iceServers } : { type: 'relay', error: 'relay_unavailable' });
+    const verdict = await this.askLobby('/relay', { id: s.id });
+    if (verdict === 'closed' || verdict === 'month_limit') return this.close(verdict);
+    if (this.state.closed) return;
+    if (verdict) return this.send(ws, { type: 'relay', error: verdict });
+    let iceServers;
+    try {
+      iceServers = await relayServers(this.env, this.fetchImpl);
+    } catch (err) {
+      console.error('[alva-rooms] no relay password from the TURN service', err?.message ?? err);
+      return this.send(ws, { type: 'relay', error: 'relay_unavailable' });
+    }
+    this.send(ws, { type: 'relay', iceServers });
+  }
+
+  // Asks the Lobby `path` about this room: null for yes, or its error code
+  // ('relay_unavailable' when it does not answer).
+  async askLobby(path, body) {
+    try {
+      const res = await this.lobby.fetch(`https://lobby${path}`, { method: 'POST', body: JSON.stringify(body) });
+      if (res.ok) return null;
+      return (await res.json().catch(() => ({}))).error ?? 'relay_unavailable';
+    } catch {
+      return 'relay_unavailable';
+    }
   }
 
   async webSocketClose(ws) {
@@ -439,6 +484,7 @@ export class Room {
     if (!s?.id) return;
     const requests = Math.ceil(this.unreported);
     this.unreported = 0;
+    this.reportedAt = this.now();
     const players = s.seats?.guest ? 2 : 1;
     try {
       await this.lobby.fetch('https://lobby/report', {

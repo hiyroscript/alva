@@ -45,13 +45,14 @@ tag = "v1"
 new_sqlite_classes = ["Lobby", "Room"]
 
 # The relay every match goes through (server/src/privacy.js): the two
-# browsers connect only through a TURN relay (ExpressTURN's free plan), so
-# neither ever learns the other's address, with about the delay of a
-# direct link. Its address and credentials are three secrets, never written
-# here: TURN_URLS (for example turn:relay1.expressturn.com:3478),
-# TURN_USERNAME and TURN_CREDENTIAL (alva-rooms › Settings › Variables and
-# Secrets). Without them no room is made ("relay_unavailable"). The relay's
-# traffic counts nothing against the plan below.
+# browsers connect only through Cloudflare's TURN relay (Realtime › TURN
+# Server), so neither ever learns the other's address. Each player gets a
+# password of their own that lasts an hour. The relay's key is two secrets,
+# never written here: TURN_KEY_ID and TURN_KEY_API_TOKEN (alva-rooms ›
+# Settings › Variables and Secrets). Without them no room is made
+# ("relay_unavailable"). The relay's traffic counts nothing against the
+# Workers plan below; it has its own free amount (1,000 GB a month, then
+# $0.05 a GB), which the safeguards further down keep the server inside.
 
 [vars]
 # Who may call the server: the itch.io pages that run the game (itch.io serves
@@ -87,6 +88,41 @@ MAX_ROOMS = "50"
 # counts its own requests and those each Room reports.
 DAILY_REQUEST_LIMIT = "100000"
 BUDGET_SHARE = "0.8"
+# Online play's on/off switch: "false" closes it for everyone ("Online
+# play is closed right now"; a room still open closes when a player
+# connects or asks for the relay); "true" opens it again. The rest of the
+# game is not affected.
+ONLINE_OPEN = "true"
+
+# The relay's safeguards (Cloudflare Realtime TURN: 1,000 GB a month free,
+# checked on 2026-11-03; past it, $0.05 a GB). The Lobby counts them
+# (server/src/lobby.js):
+#
+# MAX_MATCHES: rooms with both players at once (the players of those rooms
+# are connected through the relay; a host waiting alone, or anyone in the
+# lobby, does not count). Past it, joining a room answers `full` ("Servers
+# are full right now") until a room ends or a player leaves.
+MAX_MATCHES = "10"
+# The monthly safety stop, the real guarantee: the Lobby estimates the
+# month's relay use (UTC) from the time rooms spend with both players
+# (menus included, not only matches), at RELAY_GB_PER_HOUR each, and once it
+# reaches RELAY_MONTHLY_GB, Online play closes until the next month
+# ("Online play has reached its limit for this month"). A match uses about
+# 0.1 to 0.2 GB of relay an hour (an estimate from the game's packets, 60 a
+# second each way: 0.2 if Cloudflare counts a packet at both players'
+# relays), so the estimate takes the high end. 450 is under half the free
+# 1,000 GB, so even a billing month that does not start on the 1st (it
+# straddles two calendar months) stays inside it. That is still about 2,250
+# hours of both players in a room a month (27,000 five-minute matches).
+# Cloudflare's own figure is in its dashboard (Realtime, and the account's
+# billing): after some play, compare, and the rate can be adjusted.
+RELAY_GB_PER_HOUR = "0.2"
+RELAY_MONTHLY_GB = "450"
+# Relay passwords handed out an hour, server-wide (each player gets one a
+# link; each lasts an hour, and the game renews its link between matches
+# before it runs out). 10 matches use about 20 to 40 an hour.
+RELAY_PASSWORDS_PER_HOUR = "120"
+
 # A room with no activity this long closes itself.
 ROOM_IDLE_MINUTES = "10"
 # Per address, a minute: rooms created, joins tried, list reads (the game

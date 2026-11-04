@@ -265,7 +265,8 @@ export function backend(vars = {}, { origin = ITCH } = {}) {
 // (js/online/match-link.js) so a test steps the match frame by frame: once
 // both players' links have started, they resolve with the two ends of a
 // pair (`hub.pair`, delivered by the test: the host's end is `a`). With
-// `hub.fail`, every link fails ("Couldn't connect"). Tests of the link
+// `hub.fail`, every link fails ("Couldn't connect"; a string: the failure
+// the link gives, such as 'full'). Tests of the link
 // itself give their own (tests/online/match-link.test.mjs).
 export function peerHub() {
   const hub = { waiting: null, pair: null, pairs: [], fail: false, links: 0 };
@@ -278,7 +279,7 @@ export function peerHub() {
           link.resolve = resolve;
           link.reject = reject;
           if (hub.fail) {
-            queueMicrotask(() => reject(new Error('timeout')));
+            queueMicrotask(() => reject(new Error(typeof hub.fail === 'string' ? hub.fail : 'timeout')));
             return;
           }
           const other = hub.waiting;

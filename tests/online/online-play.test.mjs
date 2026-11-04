@@ -716,3 +716,108 @@ test('a server with no relay set up makes no room: "…can\'t make private conne
     setLanguage('en');
   }
 });
+
+// ---- Online play closed, and the relay's limits ----------------------------------------
+
+test('Online play switched off (ONLINE_OPEN "false"): after the name, "Online play is closed right now", then Home; in French too', async () => {
+  const server = backend({ ONLINE_OPEN: 'false' });
+  const booted = boot({ server });
+  const { app, screens } = booted;
+  screens.home.actions.online.click();
+  screens.name.field.input.type_('Chris');
+  screens.name.continueButton.click();
+  await settleAll();
+  assert.equal(dialogText(app), 'Online play closed — Online play is closed right now. Please try again later.');
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+  setLanguage('fr');
+  try {
+    screens.home.actions.online.click();
+    screens.name.continueButton.click();
+    await settleAll();
+    assert.equal(dialogText(app), 'Jeu en ligne fermé — Le jeu en ligne est fermé pour le moment. Réessayez plus tard.');
+    await acknowledge(app);
+    assert.equal(current(app), 'home');
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('switched off while the lobby shows: its next refresh says so, then Home', async () => {
+  const booted = boot();
+  const { app, screens, server } = booted;
+  await toLobby(booted);
+  server.env.ONLINE_OPEN = 'false';
+  screens.lobby.refresh();
+  await settleAll();
+  assert.equal(dialogText(app), 'Online play closed — Online play is closed right now. Please try again later.');
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+});
+
+test('the monthly safety stop: a room still open closes at its next relay password ("…its limit for this month"), then Home; the lobby is closed too', async () => {
+  const server = backend({ RELAY_MONTHLY_GB: '1' });
+  const booted = boot({ server });
+  const { app } = booted;
+  const guest = await roomWithGuest(booted);
+  // Five match-hours at 0.2 GB each: the month's 1 GB.
+  server.clock.now += 5 * 3_600_000 + 1000;
+  app.online.requestRelay().catch(() => {});
+  await settleAll(10);
+  assert.equal(dialogText(app), 'Online play closed — Online play has reached its limit for this month. It opens again next month.');
+  assert.ok(guest.events.some(([type, detail]) => type === 'closed' && detail.reason === 'month_limit'), 'the other player is told too');
+  await acknowledge(app);
+  assert.equal(current(app), 'home');
+  assert.equal(app.online.inRoom, false);
+  setLanguage('fr');
+  try {
+    booted.screens.home.actions.online.click();
+    booted.screens.name.continueButton.click();
+    await settleAll();
+    assert.equal(dialogText(app), 'Jeu en ligne fermé — Le jeu en ligne a atteint sa limite pour ce mois-ci. Il rouvrira le mois prochain.');
+    await acknowledge(app);
+    assert.equal(current(app), 'home');
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('"Servers are full" when the matches at once are all taken (MAX_MATCHES): a host may still wait, nobody more joins', async () => {
+  const server = backend({ MAX_MATCHES: '1' });
+  const booted = boot({ server });
+  const { app, screens, hub } = booted;
+  const a = otherPlayer(server, hub, { name: 'Ana' });
+  const b = otherPlayer(server, hub, { name: 'Bo' });
+  await a.session.createRoom({ name: "Ana's room", visibility: 'private', mode: 'quick-battle' });
+  await b.session.joinRoom({ code: a.session.room.code });
+  await settleAll(10);
+  // A room waiting for someone: allowed.
+  const c = otherPlayer(server, hub, { name: 'Cy' });
+  await c.session.createRoom({ name: "Cy's room", visibility: 'private', mode: 'quick-battle' });
+  await toLobby(booted);
+  screens.lobby.code.input.type_(c.session.room.code);
+  screens.lobby.joinButton.click();
+  await settleAll(10);
+  assert.equal(dialogText(app), 'Servers are full — Servers are full right now. Please try again in a few minutes.');
+  await acknowledge(app);
+  assert.equal(current(app), 'online-lobby', 'the lobby stays');
+  // One of the match's players leaves: the place is free.
+  b.session.leaveRoom();
+  await settleAll(10);
+  screens.lobby.joinButton.click();
+  await settleAll(10);
+  assert.equal(current(app), 'online-room');
+});
+
+test('this hour\'s relay passwords all handed out: the link fails as "Servers are full", and Try again is offered', async () => {
+  const hub = peerHub();
+  hub.fail = 'full';
+  const booted = boot({ hub });
+  const { app, screens } = booted;
+  await roomWithGuest(booted);
+  await settleAll();
+  assert.equal(app.online.peer.status, 'failed');
+  assert.equal(dialogText(app), 'Servers are full — Servers are full right now. Please try again in a few minutes.');
+  await acknowledge(app);
+  assert.equal(screens.room.retryButton.hidden, false);
+});

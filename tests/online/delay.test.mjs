@@ -90,3 +90,22 @@ test('the probe: the host pings, the other side answers at once, the round trips
   assert.equal(pair.sent.a + pair.sent.b, before + 1, 'only the test\'s own ping went');
   assert.ok(timers.every((t) => t.cleared || t.ran), 'no timer left running');
 });
+
+test('a probe started from round trips already measured (a link made again): its delay at once, then quick pings until its own are in', () => {
+  const pair = memoryTransportPair();
+  const timers = [];
+  const timing = { setTimer: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; }, clearTimer: (t) => { if (t) t.cleared = true; } };
+  const kept = Array(SAMPLES_KEPT).fill(20);
+  const probe = new DelayProbe({ transport: pair.a, measuring: true, now: () => 0, samples: [...kept, NaN, -4], ...timing });
+  assert.deepEqual(probe.samples, kept, 'nonsense skipped');
+  assert.equal(probe.delay(), chooseDelay(kept), 'a delay at once');
+  assert.equal(timers.at(-1).ms, CONFIG.online.pingIntervalMs, 'still quick: none of its own yet');
+  for (let id = 1; id <= SAMPLES_NEEDED; id++) {
+    probe.receive({ t: 'pong', id });
+    probe.ping();
+  }
+  assert.equal(probe.measured, SAMPLES_NEEDED);
+  assert.equal(timers.at(-1).ms, CONFIG.online.pingRefreshMs, 'its own in: every few seconds');
+  assert.equal(probe.samples.length, SAMPLES_KEPT);
+  probe.stop();
+});

@@ -1,14 +1,16 @@
 // Alva's room server: a Cloudflare Worker and its two Durable Object
 // classes (the Lobby and one Room per room). It introduces two players and
 // nothing more: no accounts, no matchmaking, no chat, and never the match's
-// own traffic, which goes straight from one browser to the other
+// own traffic, which goes between the two browsers through the relay
 // (docs/gameplay/online-play.md). How to run it on your own computer and how
 // to put it online: docs/development/online-server.md.
 //
 // Endpoints (JSON):
-//   GET  /health            { ok, service, lobby, relay, origin, originAllowed }: the
-//                           server is up, its Lobby answers, and whether a TURN relay
-//                           is set up for its matches (readable from any page)
+//   GET  /health            { ok, service, lobby, relay, open, closed, origin, originAllowed }:
+//                           the server is up, its Lobby answers, whether the relay's key
+//                           is set up for its matches, and whether Online play is open
+//                           (closed: 'closed' switched off, 'month_limit' the month's
+//                           safety stop) (readable from any page)
 //   GET  /rooms             the public rooms
 //   POST /rooms             create a room → { room, seat, token }, or { error: 'full' } (503)
 //   POST /rooms/join        join by code (or a public room by id) → { room, seat, token }
@@ -20,9 +22,13 @@
 // address is passed to the Lobby for its per-minute limits only (which
 // count a salted hash of it, never the address: server/src/privacy.js).
 // The two players of a match never connect straight to each other: only
-// through a TURN relay (its servers in the Worker's secrets:
+// through a TURN relay, Cloudflare's (its key in the Worker's secrets:
 // server/src/privacy.js), so no player learns another's address. Without
-// one, no room is made or joined (`relay_unavailable`).
+// it, no room is made or joined (`relay_unavailable`). With ONLINE_OPEN
+// "false" (wrangler.toml), Online play is closed: the list, creating and
+// joining are refused (`closed`) before any Durable Object wakes, and a
+// room still open closes when a player connects or asks for the relay. The
+// relay's other safeguards are the Lobby's (server/src/lobby.js).
 //
 // So that "Online play is unavailable" can say why, two answers are
 // readable from any page (`access-control-allow-origin: *`), as they hold
@@ -34,7 +40,7 @@
 
 import { Lobby } from './lobby.js';
 import { Room } from './room.js';
-import { json, error, parseOrigins, originAllowed, corsHeaders, withCors } from './http.js';
+import { json, error, parseOrigins, originAllowed, corsHeaders, withCors, onlineOpen } from './http.js';
 import { validRoomId } from './rules.js';
 import { hasRelay } from './privacy.js';
 
@@ -74,8 +80,11 @@ export async function handle(request, env) {
     return target.fetch(`https://lobby${path}`, { method: request.method, headers, body });
   };
 
+  // Online play switched off: no list, no room, no join.
+  const lobbyRoute = url.pathname === '/rooms' || url.pathname === '/rooms/join';
+  if (lobbyRoute && !onlineOpen(env)) return withCors(error('closed'), origin);
   // No room is made or joined without a relay to connect its players.
-  const joining = request.method === 'POST' && (url.pathname === '/rooms' || url.pathname === '/rooms/join');
+  const joining = request.method === 'POST' && lobbyRoute;
   if (joining && !hasRelay(env)) return withCors(error('relay_unavailable'), origin);
   if (url.pathname === '/rooms' && (request.method === 'GET' || request.method === 'POST')) {
     return withCors(await forward(lobby(), '/rooms'), origin);
@@ -99,13 +108,17 @@ export async function handle(request, env) {
 // It also tells the asking page its origin and whether it is allowed.
 async function health(env, origin, fromGame) {
   let lobby = false;
+  let closed = onlineOpen(env) ? null : 'closed';
   try {
     const res = await env.LOBBY.get(env.LOBBY.idFromName('lobby')).fetch('https://lobby/health');
     lobby = res.ok;
+    if (lobby) closed ??= (await res.json().catch(() => ({}))).closed ?? null;
   } catch (err) {
     console.error('[alva-rooms] the Lobby did not answer /health', err?.stack ?? err);
   }
-  const body = { ok: lobby, service: 'alva-rooms', lobby, relay: hasRelay(env), origin: origin ?? null, originAllowed: fromGame };
+  const body = {
+    ok: lobby, service: 'alva-rooms', lobby, relay: hasRelay(env), open: !closed, closed, origin: origin ?? null, originAllowed: fromGame,
+  };
   return json(body, lobby ? 200 : 503, PUBLIC);
 }
 

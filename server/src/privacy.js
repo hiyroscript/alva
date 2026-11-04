@@ -3,8 +3,9 @@
 //
 // The two browsers of a match never connect straight to each other, so
 // neither ever learns the other's IP address: they connect only through a
-// TURN relay (its address and credentials in the Worker's secrets:
-// relayServers, below). And:
+// TURN relay, Cloudflare's, each player with a password of its own that
+// lasts an hour (relayServers, below; the relay's key in the Worker's
+// secrets). And:
 //
 //   - scrubSignal: the WebRTC signalling a Room passes from one player to
 //     the other (offer, answer, ICE candidates) loses every address it
@@ -120,20 +121,52 @@ function where(c) {
 
 // ---- The relay -----------------------------------------------------------------------
 
-// The TURN relay's servers for a player, as RTCPeerConnection's iceServers,
-// from the Worker's secrets (Cloudflare dashboard › alva-rooms › Settings ›
-// Variables and Secrets): TURN_URLS (one or more turn: or turns: addresses,
-// separated by commas or spaces), TURN_USERNAME and TURN_CREDENTIAL, as the
-// relay's service (ExpressTURN) gives them. Only TURN addresses are kept
-// (no STUN: a relay-only link never uses it). Empty when none is set up:
-// then no room is made.
-export function relayServers(env) {
-  const urls = String(env?.TURN_URLS ?? '').split(/[\s,]+/).filter((u) => /^turns?:[^\s]+$/i.test(u));
-  const username = env?.TURN_USERNAME;
-  const credential = env?.TURN_CREDENTIAL;
-  if (!urls.length || typeof username !== 'string' || !username || typeof credential !== 'string' || !credential) return [];
-  return [{ urls, username, credential }];
+// How long a player's relay password lasts: an hour. A copied one is soon
+// useless; the game renews its link between matches before it runs out
+// (js/online/online-session.js).
+export const RELAY_TTL_SECONDS = 60 * 60;
+
+// Whether the Worker has the relay's key (Cloudflare's TURN service, two
+// secrets: Cloudflare dashboard › alva-rooms › Settings › Variables and
+// Secrets).
+export const hasRelay = (env) => !!(env?.TURN_KEY_ID && env?.TURN_KEY_API_TOKEN);
+
+// Cloudflare's TURN service: short-lived credentials for one player.
+export const turnApiUrl = (env) => `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(env.TURN_KEY_ID)}/credentials/generate-ice-servers`;
+
+// The relay's servers for one player, as RTCPeerConnection's iceServers,
+// with a password of their own that lasts RELAY_TTL_SECONDS: only TURN
+// entries (no STUN: a relay-only link never uses it), and of their
+// addresses the UDP one on 3478 and the TLS one on 443 (Cloudflare lists
+// more, including port 53, which browsers refuse or time out on; each extra
+// address is one more allocation). Throws when there is no key or the
+// service gives none. (TURN_API_URL may point elsewhere for a test.)
+export async function relayServers(env, fetchImpl = globalThis.fetch?.bind(globalThis)) {
+  if (!hasRelay(env)) throw new Error('relay_unavailable');
+  const res = await fetchImpl(env.TURN_API_URL || turnApiUrl(env), {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.TURN_KEY_API_TOKEN}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ ttl: RELAY_TTL_SECONDS }),
+  });
+  if (!res.ok) throw new Error(`relay service answered ${res.status}`);
+  const data = await res.json();
+  const servers = pickRelayServers(data?.iceServers);
+  if (!servers.length) throw new Error('relay service gave no TURN server');
+  return servers;
 }
 
-// Whether the Worker has a relay to hand out.
-export const hasRelay = (env) => relayServers(env).length > 0;
+// The TURN entries of a TURN service's answer (an iceServers object or an
+// array of them), each with its preferred addresses.
+export function pickRelayServers(iceServers) {
+  const list = Array.isArray(iceServers) ? iceServers : iceServers ? [iceServers] : [];
+  const out = [];
+  for (const s of list) {
+    if (!s || typeof s.username !== 'string' || typeof s.credential !== 'string') continue;
+    const urls = (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u) => typeof u === 'string' && /^turns?:/i.test(u));
+    const usable = urls.filter((u) => !/:53(\?|$)/.test(u));
+    const preferred = usable.filter((u) => /^turn:[^?]*:3478\?transport=udp$/i.test(u) || /^turns:[^?]*:443(\?|$)/i.test(u));
+    const chosen = preferred.length ? preferred : usable;
+    if (chosen.length) out.push({ urls: chosen, username: s.username, credential: s.credential });
+  }
+  return out;
+}

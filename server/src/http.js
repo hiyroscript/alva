@@ -23,6 +23,8 @@ export const ERRORS = Object.freeze({
   server_error: 500,
   full: 503,
   relay_unavailable: 503,
+  closed: 503,
+  month_limit: 503,
 });
 
 export function json(data, status = 200, headers = {}) {
@@ -95,6 +97,17 @@ export function withCors(response, origin) {
 
 // Today in UTC as YYYY-MM-DD: the free plan's day, which starts at 00:00 UTC.
 export const utcDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// This month in UTC as YYYY-MM, and the moment it started.
+export const utcMonth = (ms) => new Date(ms).toISOString().slice(0, 7);
+export const monthStart = (ms) => {
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+};
+
+// Whether Online play is open (wrangler.toml's ONLINE_OPEN: anything but
+// "false", "off", "no" or "0", or none at all, is open).
+export const onlineOpen = (env) => !['false', 'off', 'no', '0'].includes(String(env?.ONLINE_OPEN ?? 'true').trim().toLowerCase());
 
 // A number variable from wrangler.toml, or `fallback`.
 export function numberVar(value, fallback) {

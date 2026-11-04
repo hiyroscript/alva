@@ -17,9 +17,9 @@ steps are [below](#putting-it-online-step-by-step)).
 | File | Owns |
 | --- | --- |
 | [`server/src/index.js`](../../server/src/index.js) | The Worker: the routes, the allowed origins (CORS, and a WebSocket upgrade's Origin), the caller's address passed to the Lobby. |
-| [`server/src/lobby.js`](../../server/src/lobby.js) | `Lobby`, one Durable Object for every room: ids and codes, the public list, joining, the caps (`MAX_ROOMS`, the daily request budget), the per-address limits, the sweep of silent rooms. |
-| [`server/src/room.js`](../../server/src/room.js) | `Room`, one Durable Object per room: both players' WebSockets (hibernated), seats by token, fighters, Ready, the host's start, rematches, the relay's servers handed to each player, the WebRTC signalling passed on scrubbed, leaving, closing, its alarms, its reports to the Lobby. |
-| [`server/src/privacy.js`](../../server/src/privacy.js) | What keeps every player's address to themselves: the signalling scrubbed (`scrubSignal`), the relay's servers from the Worker's secrets (`relayServers`, `hasRelay`), the salted hash the Lobby counts callers by (`callerKey`). |
+| [`server/src/lobby.js`](../../server/src/lobby.js) | `Lobby`, one Durable Object for every room: ids and codes, the public list, joining, the caps (`MAX_ROOMS`, the daily request budget), the relay's safeguards (`MAX_MATCHES`, the monthly safety stop, the hourly password cap, `ONLINE_OPEN`), the per-address limits, the sweep of silent rooms. |
+| [`server/src/room.js`](../../server/src/room.js) | `Room`, one Durable Object per room: both players' WebSockets (hibernated), seats by token, fighters, Ready, the host's start, rematches, a relay password for each player (once the Lobby agrees), the WebRTC signalling passed on scrubbed, leaving, closing, its alarms, its reports to the Lobby. |
+| [`server/src/privacy.js`](../../server/src/privacy.js) | What keeps every player's address to themselves: the signalling scrubbed (`scrubSignal`), the relay's servers with a password that lasts an hour from Cloudflare's TURN service (`relayServers`, `hasRelay`), the salted hash the Lobby counts callers by (`callerKey`). |
 | [`server/src/rules.js`](../../server/src/rules.js) | What the server accepts: names, room names, codes, modes, visibility (the game's own rules, again). |
 | [`server/src/http.js`](../../server/src/http.js) | JSON replies, error codes, body limits, origin patterns. |
 | [`server/wrangler.toml`](../../server/wrangler.toml) | The Worker's configuration: its Durable Objects (SQLite-backed, as the free plan requires), the allowed origins and the caps, each with its reasoning. |
@@ -30,7 +30,7 @@ steps are [below](#putting-it-online-step-by-step)).
 
 | Request | Answer |
 | --- | --- |
-| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "relay": …, "origin": …, "originAllowed": … }`: the server is up, its Lobby answers, and whether a TURN relay is set up for fast matches (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
+| `GET /health` | `{ "ok": true, "service": "alva-rooms", "lobby": true, "relay": …, "open": …, "closed": …, "origin": …, "originAllowed": … }`: the server is up, its Lobby answers, whether the relay's key is set up, and whether Online play is open (`closed`: `"closed"` when switched off, `"month_limit"` once the month's safety stop is reached, else `null`) (open it in a browser: `origin` is then `null`). Readable from any page, so the game can ask it why it cannot play online. |
 | `GET /rooms` | The public rooms: `{ rooms: [{ id, name, host, mode, players, status, version, joinable }] }`. |
 | `POST /rooms` | Create: `{ name, playerName, visibility, mode, session, version }` → `{ room, seat: 'host', token }`, or `{ error: 'full' }` (503). |
 | `POST /rooms/join` | Join by `{ code }` (any room) or `{ id }` (a public room), with `{ playerName, session, version }` → `{ room, seat: 'guest', token }`. |
@@ -40,8 +40,10 @@ Every field is checked on the server; a refusal is a code the game
 translates: `invalid_name`, `invalid_room_name`, `invalid_mode`,
 `invalid_visibility`, `invalid_code`, `room_not_found`, `room_full`,
 `version_mismatch` (two versions of the game never share a match), `full`,
-`rate_limited`, `origin`, `bad_request`, `server_error` (something failed:
-logged, see below). The refusal of an origin is readable from any page, as
+`rate_limited`, `origin`, `bad_request`, `relay_unavailable` (no relay
+key), `closed` (Online play switched off), `month_limit` (the relay's
+monthly safety stop), `server_error` (something failed: logged, see
+below). The refusal of an origin is readable from any page, as
 `/health` is, so the game can say which address was refused. The room's
 messages are listed at
 the top of [`server/src/room.js`](../../server/src/room.js).
@@ -68,15 +70,16 @@ server keeps none:
 
 - **No direct connection.** A direct link between the two browsers (WebRTC)
   would hand each one the other's address while it was set up. So there is
-  none: every match goes through a **TURN relay** (ExpressTURN's free plan,
-  set up once: [the steps](#its-relay-private-connections)). Each player
-  asks its room for the relay's servers (`{ type: 'relay' }`, from the
-  Worker's secrets, at most 10 per player per 10 minutes, only with the
-  other seat taken), and the two browsers connect through it relay-only,
-  each seeing only the relay's address. Without a relay no room is made
-  (`relay_unavailable`), and a link that cannot be made is "Couldn't
-  connect": there is no other way. No match packet goes through the room
-  server.
+  none: every match goes through a **TURN relay**, Cloudflare's (set up
+  once: [the steps](#its-relay-private-connections)). Each player asks
+  its room for the relay's servers (`{ type: 'relay' }`, at most 10 per
+  player per 10 minutes, only with the other seat taken); the room gets
+  them from Cloudflare's TURN service with the Worker's key, with a
+  password of that player's own that lasts **an hour**, and the two
+  browsers connect through it relay-only, each seeing only the relay's
+  address. Without the key no room is made (`relay_unavailable`), and a
+  link that cannot be made is "Couldn't connect": there is no other way.
+  No match packet goes through the room server.
 - **Scrubbed signalling.** Every `signal` a Room passes on goes through
   `scrubSignal` first (`server/src/privacy.js`): only relay candidates,
   their related address (`raddr`, the player's own) blanked; host,
@@ -97,11 +100,13 @@ server keeps none:
   off (`invocation_logs = false` in `wrangler.toml`); the Worker's own log
   lines name none.
 - **Who sees what, unavoidably:** Cloudflare runs the server (and the
-  `pages.dev` address), and the relay's service runs the relay, so each
-  sees players' addresses, as any host does. The other player never does.
-  The relay's credentials reach every player in a room (their browser
-  needs them to use it), so someone could use up its free allowance;
-  matches then fail to connect until it renews.
+  `pages.dev` address) and the relay, so it sees players' addresses, as
+  any host does. The other player never does. A relay password reaches
+  the player it is for (their browser needs it to use the relay), so
+  someone could copy theirs and use the relay for something else: it
+  stops working within the hour, the server hands out at most
+  `RELAY_PASSWORDS_PER_HOUR` an hour in all, and only to players in a room
+  with both seats taken ([the relay's safeguards](#the-relays-safeguards)).
 
 **Cleaning up.** A room with no activity for `ROOM_IDLE_MINUTES` (10)
 closes itself (an alarm); a host gone for 15 s (a reload has that long to
@@ -125,9 +130,8 @@ SQLite-backed Durable Objects, which `wrangler.toml` creates.
   join, two connections, the relay's servers, the signalling, the reports);
   a player waiting in the lobby about 12 a minute (the list refreshes every
   5 s). The match itself costs nothing here: it goes through the relay
-  ([privacy](#privacy)), whose own allowance is ExpressTURN's (about
-  100 GB a month on the free plan; a match is roughly 0.2 GB an hour, both
-  players' traffic through it counted, so several hundred hours a month).
+  ([privacy](#privacy)), which has its own allowance and safeguards
+  ([below](#the-relays-safeguards)).
 - `MAX_ROOMS` (50) rooms at once: one more answers `full` ("Servers are full
   right now. Please try again in a few minutes.").
 - The daily budget: the Lobby counts every request it handles and those each
@@ -141,6 +145,52 @@ itch.io itself sets no player limit on an HTML5 game; the caps protect the
 Cloudflare plan. The Worker's own free allowance (100,000 requests a day)
 runs alongside, and every request but `/health` also reaches a Durable
 Object, so the budget keeps both.
+
+### The relay's safeguards
+
+Cloudflare's TURN relay is free up to **1,000 GB a month**, then $0.05 a GB
+(checked on 2026-11-03). The server keeps Online play inside the free
+amount, each a line in `server/wrangler.toml`:
+
+- **`MAX_MATCHES` (10) rooms with both players at once.** Those are the
+  rooms whose players are connected through the relay; a host waiting
+  alone, or anyone in the lobby, does not count, and there is no daily or
+  hourly limit on matches. One more join answers `full` ("Servers are full
+  right now. Please try again in a few minutes.") until a room ends or a
+  player leaves.
+- **The monthly safety stop.** The Lobby estimates the month's relay use
+  (UTC) from the time rooms spend with both players (menus included, not
+  only matches), at `RELAY_GB_PER_HOUR` (0.2 GB, the high end of what a
+  match uses: about 0.1 to 0.2 GB an hour, from the game's 60 packets a
+  second each way). Once the estimate reaches `RELAY_MONTHLY_GB` (450 GB),
+  **Online play closes until the next month**: the name screen, the lobby
+  and a room still open all say "Online play has reached its limit for
+  this month. It opens again next month." and go back Home; no list, no
+  room, no join, no relay password. 450 is under half the free amount, so
+  even a billing month that does not start on the 1st, and so straddles
+  two calendar months, stays inside it. That still leaves about 2,250
+  hours of two players in a room a month (some 27,000 five-minute
+  matches).
+- **Passwords that last an hour,** at most `RELAY_PASSWORDS_PER_HOUR`
+  (120) handed out an hour server-wide (10 matches use about 20 to 40).
+  Past it, a player's link fails as "Servers are full", with **Try again**.
+  Two players can stay in a room far longer than an hour, so between
+  matches the host's browser makes a link older than 40 minutes again
+  (`CONFIG.online.linkRenewMs`), with new passwords; the players notice
+  nothing.
+- **`ONLINE_OPEN`, the switch.** `"false"` closes Online play for everyone
+  ("Online play is closed right now. Please try again later.", back Home;
+  a room still open closes when a player connects or asks for the relay);
+  `"true"` opens it again. The rest of the game is not affected. Merging
+  the change deploys it.
+
+What is left: a password already handed out keeps working until its hour
+is up, even once Online play has closed, and a copied one could be used
+for something else for that hour. The safety stop comes long before the
+free amount, so that is room to spare, not a bill. Cloudflare's own figure
+is in its dashboard (**Realtime**, and the account's billing); after some
+play, compare it with the estimate (Claude can adjust the rate), and turn
+on a usage or billing alert there if Cloudflare offers one.
 
 ## Testing it on your computer
 
@@ -172,11 +222,15 @@ Then, for the game, set `serverUrl: 'http://localhost:8787'` in
 the deployed server's), serve the repository and open it in two tabs as
 above. Open `http://localhost:8787/health` to see the server is up.
 
-A local server makes rooms only with a relay (`"relay":true` in its
-`/health`): give it one as variables for that run, never committed, either
-the real relay's details or a TURN server of your own on your computer
-(the `node-turn` package, for one, is how it was tried on 2026-11-04):
-`npx wrangler dev --var TURN_URLS:turn:127.0.0.1:3478?transport=udp --var TURN_USERNAME:… --var TURN_CREDENTIAL:…`.
+A local server makes rooms only with the relay's key (`"relay":true` in
+its `/health`): give it as variables for that run
+(`npx wrangler dev --var TURN_KEY_ID:… --var TURN_KEY_API_TOKEN:…`, never
+committed). To try it with no Cloudflare account, `TURN_API_URL` points the
+server at a stand-in for Cloudflare's credentials service instead: a small
+local TURN server (such as the `node-turn` package) and a page answering
+`{ "iceServers": [{ "urls": ["turn:127.0.0.1:3478?transport=udp"], "username": …, "credential": … }] }`
+(with any key values). The safeguards' settings can be tried the same way,
+for example `--var ONLINE_OPEN:false` or `--var MAX_MATCHES:1`.
 
 **The pages.dev gateway, locally** (`server/gateway/`), in front of that
 local server: with `npx wrangler dev` running in `server`, start it from
@@ -294,39 +348,42 @@ other branches than `main`, they can be turned off: only `main` matters.
 
 ### Its relay (private connections)
 
-Every match goes through a TURN relay, so neither player ever learns the
-other's address ([privacy](#privacy)), with about the delay of a direct
-link (50 ms between nearby players), and nothing of the match counts
-against the room server's plan. **Without one, no room is made**: Online
-play says "The room server can't make private connections right now." The
-relay is ExpressTURN's free plan (about 100 GB a month). Done once, on a
-phone:
+Every match goes through Cloudflare's TURN relay, so neither player ever
+learns the other's address ([privacy](#privacy)), through the relay
+location nearest each player, and nothing of the match counts against the
+room server's plan. **Without its key, no room is made**: Online play says
+"The room server can't make private connections right now." Free up to
+1,000 GB a month, which [the safeguards](#the-relays-safeguards) keep it
+inside. Done once, on a phone:
 
-1. **Sign up** at <https://www.expressturn.com> for the free plan. (If it
-   asks for a payment method, stop and tell Claude.)
-2. **Find your TURN details** in its dashboard: a server address (like
-   `relay1.expressturn.com:3478`), a username and a password. Keep them to
-   yourself: they go into Cloudflare, never into the repository or a
+1. **Subscribe to Realtime.** In the Cloudflare dashboard's menu, open
+   **Realtime** (it may be listed as **Calls**). Cloudflare asks for a card
+   or PayPal before the first key, even on the free amount: add it and
+   subscribe (it shows $0.00).
+2. **Make a TURN key.** In **Realtime**, open **TURN Server** and
+   **Create** a key. If it asks for a name, type `alva-relay`. Cloudflare
+   then shows two values: the key's **ID** (Turn Token ID) and its **API
+   token**. Keep the page open: the API token is shown only once. Keep both
+   to yourself: they go into Cloudflare, never into the repository or a
    message.
-3. **Give them to the server.** In Cloudflare, open **Workers & Pages** ›
-   **alva-rooms** › **Settings** › **Variables and Secrets**, and **Add**
-   three, each of type **Secret**:
-   - `TURN_URLS`: `turn:` and the server address, for example
-     `turn:relay1.expressturn.com:3478`. If the dashboard also lists a
-     TLS address (port 443 or 5349), add it after a comma, with `turns:`,
-     for strict networks: `turn:relay1.expressturn.com:3478,turns:relay1.expressturn.com:443`.
-   - `TURN_USERNAME`: the username.
-   - `TURN_CREDENTIAL`: the password.
+3. **Give them to the server.** Open **Workers & Pages** › **alva-rooms** ›
+   **Settings** › **Variables and Secrets**, and tap **Add**. Choose the
+   type **Secret**, name it `TURN_KEY_ID`, paste the key's ID as its value.
+   **Add** another: type **Secret**, name `TURN_KEY_API_TOKEN`, the API
+   token as its value. Then **Deploy** (or **Save**). Secrets stay through
+   every later deploy from GitHub.
+4. **Remove the old relay's secrets**, if they are there: `TURN_URLS`,
+   `TURN_USERNAME` and `TURN_CREDENTIAL` (ExpressTURN's, no longer used):
+   delete each one, then **Deploy** (or **Save**).
+5. **Check it.** Open <https://alva-online.pages.dev/health>: it should now
+   say `"relay":true` and `"open":true`. (With `"relay":false`, the two
+   names in step 3 are not exactly right, or not saved yet.)
+6. **Optional:** turn on a usage or billing alert in Cloudflare
+   (**Notifications**), if it offers one for Realtime.
 
-   Then **Deploy** (or **Save**). Secrets stay through every later deploy
-   from GitHub.
-4. **Check it.** <https://alva-online.pages.dev/health> should now say
-   `"relay":true`.
-
-Any other TURN service with a fixed username and password works the same
-way (its addresses in `TURN_URLS`). If the relay stops working (its
-allowance used up, its service down), matches cannot connect ("Couldn't
-connect to your opponent") until it works again.
+If Cloudflare's TURN service stops answering, rooms are still made but
+their links fail ("Couldn't connect to your opponent") until it answers
+again.
 
 ### With a terminal instead
 
@@ -377,9 +434,18 @@ answer (`/health`):
 | (opening `/health` says the page or server can't be found, on any network) | The address does not exist in DNS (what happened to the Worker's own `workers.dev` address: [why the pages.dev address](#why-the-pagesdev-address)). | Check the address in **Workers & Pages** › **alva-online**, and send it to Claude. |
 | "The room server doesn't accept this page's address." | The page runs from an origin missing from `ALLOWED_ORIGINS` (the game's GitHub Pages site, for one: Online Play is for the itch.io page). The message does not show the address. | Add that address to `ALLOWED_ORIGINS` in `server/wrangler.toml` and merge (Claude can). |
 | "The room server answers, but its rooms are not working right now." | The Worker answers but its Lobby (its Durable Objects) does not, or (`/health` says `"service":"alva-online"`) the Pages project cannot reach the Worker. | Open `/health` (`"lobby": false`, or the binding: step 9 [above](#putting-it-online-step-by-step)) and the Worker's **Logs** in the dashboard, and send them to Claude. |
-| "The room server can't make private connections right now." | The server has no relay (`/health` says `"relay":false`), so it makes no room. | Add the three secrets: [its relay](#its-relay-private-connections). |
-| "Couldn't connect to your opponent. One of your networks may be blocking it." (in a room) | The link through the relay did not open within 10 s: the relay is down or its free allowance is used up, its details are wrong, or a network blocks it. | Try again; if it keeps happening, check the relay's dashboard and the three secrets, or try another network. |
+| "The room server can't make private connections right now." | The server has no relay key (`/health` says `"relay":false`), so it makes no room. | Add the two secrets: [its relay](#its-relay-private-connections). |
+| "Couldn't connect to your opponent. One of your networks may be blocking it." (in a room) | The link through the relay did not open within 10 s: Cloudflare's TURN service did not answer, the key is wrong, or a network blocks the relay. | Try again; if it keeps happening, check the two secrets and the Worker's **Logs** ("no relay password from the TURN service"), or try another network. |
 | "The room server answers now: try again in a moment." | It failed once, then answered. | Try again. |
+
+When Online play is **closed** instead, it says so in its own message and
+goes back Home:
+
+| It says | What it means | What to do |
+| --- | --- | --- |
+| "Online play is closed right now. Please try again later." | `ONLINE_OPEN` is `"false"` in `server/wrangler.toml` (`/health`: `"closed":"closed"`). | Set it to `"true"` and merge, when you want it open. |
+| "Online play has reached its limit for this month. It opens again next month." | The month's estimated relay use reached `RELAY_MONTHLY_GB` (`/health`: `"closed":"month_limit"`). It opens again by itself on the 1st (UTC). | Nothing: that is the safety stop working. To open sooner, compare Cloudflare's real figure with the estimate first ([the safeguards](#the-relays-safeguards)). |
+| "Servers are full right now. Please try again in a few minutes." | `MAX_MATCHES` rooms have both players (joining), the relay's passwords for this hour are all handed out (in a room), or a free-plan cap. | Wait a few minutes; a place opens when a room ends or a player leaves. |
 
 **Logs.** `wrangler.toml` turns on Workers Logs (part of the free plan): the
 dashboard's **Workers & Pages** › **alva-rooms** › **Logs** lists every
@@ -387,7 +453,8 @@ refused origin and every unexpected error, with what failed.
 
 ### Later
 
-- **Changing a cap or the allowed origins:** edit `server/wrangler.toml`
+- **Closing or opening Online play, or changing a cap or the allowed
+  origins:** edit `server/wrangler.toml`
   in a pull request; merging it deploys the server again (with a terminal
   instead: `npx wrangler deploy` from the `server` folder).
 - **Seeing it work:** the Cloudflare dashboard, **Workers & Pages** ›

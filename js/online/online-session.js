@@ -14,9 +14,14 @@
 //     drops while both are still there. It goes through a TURN relay,
 //     never straight to the other browser, so neither player ever learns
 //     the other's network address: the relay's servers are asked of the
-//     room ({ type: 'relay' }), and the WebRTC signalling goes through the
+//     room ({ type: 'relay' }), each time with a password of this player's
+//     own that lasts an hour, and the WebRTC signalling goes through the
 //     room, scrubbed. A link that cannot be made is 'failed' ("Couldn't
-//     connect to your opponent"; the player may try again);
+//     connect to your opponent", or "Servers are full" when the relay's
+//     passwords for this hour are all handed out; the player may try
+//     again). Between matches, the host's browser makes a link older than
+//     CONFIG.online.linkRenewMs again (before its password runs out), and
+//     the guest's follows the new offer;
 //   - measuring the trip to the other player while the link is open
 //     (`delayProbe`, js/online/delay.js: pings on the link), for the match's
 //     input delay;
@@ -29,7 +34,9 @@
 // Events (on(fn) → fn(type, detail)): 'room' (the room changed), 'peer'
 // (the peer link's status changed), 'start' (a match starts: the start
 // message), 'rematch' (both accepted one), 'closed' ({ reason }: the room
-// is gone, 'host_left', 'expired' or 'lost'), 'error' ({ code }).
+// is gone, 'host_left', 'expired', 'lost', or Online play closed: 'closed'
+// switched off by the owner, 'month_limit' the relay's monthly safety
+// stop), 'error' ({ code }).
 
 import { CONFIG } from '../config.js';
 import { RoomServerClient } from './server-client.js';
@@ -54,6 +61,7 @@ export class OnlineSession {
   constructor({
     client = new RoomServerClient(), peerFactory = matchLink, settings = null, version = ONLINE_VERSION,
     random = globalThis.crypto, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id),
+    now = () => Date.now(),
   } = {}) {
     this.client = client;
     this.peerFactory = peerFactory;
@@ -62,6 +70,7 @@ export class OnlineSession {
     this.random = random;
     this.setTimer = setTimer;
     this.clearTimer = clearTimer;
+    this.now = now;
     this.sessionId = sessionId(random);
     this.name = settings?.onlineName ?? null;
     this.events = listeners();
@@ -200,11 +209,17 @@ export class OnlineSession {
         if (!this.players.host?.ready || !this.players.guest?.ready) this.starting = false;
         this.emit('room', this.room);
         this.syncPeer();
+        this.maybeRenew();
         this.maybeStart();
         return;
       case 'signal':
         // The other player's WebRTC signalling (scrubbed by the room), for
-        // the relay's link.
+        // the relay's link. A new offer while this guest's link is not
+        // waiting for one: the host is making the link again (renewing it,
+        // or trying again), so this side does too.
+        if (!this.isHost && message.data?.kind === 'offer' && this.peer.status !== 'connecting' && this.opponent?.connected) {
+          this.startPeer({ renew: this.peer.status === 'open' });
+        }
         this.peer.link?.handleSignal?.(message.data);
         return;
       case 'relay':
@@ -299,7 +314,10 @@ export class OnlineSession {
     if (this.peer.status === 'idle') this.startPeer();
   }
 
-  startPeer() {
+  // `renew`: the same two players' link made again, its measured round
+  // trips kept for the next match.
+  startPeer({ renew = false } = {}) {
+    const kept = renew ? [...(this.delayProbe?.samples ?? [])] : [];
     this.closePeer({ quiet: true });
     const link = this.peerFactory({
       initiator: this.isHost,
@@ -314,11 +332,13 @@ export class OnlineSession {
         transport.close();
         return;
       }
-      this.peer = { status: 'open', link, transport, reason: null };
+      this.peer = { status: 'open', link, transport, reason: null, openedAt: this.now() };
       // The trip to the other player, measured for the match's delay (the
       // host measures; both answer).
       this.delayProbe?.stop();
-      this.delayProbe = new DelayProbe({ transport, measuring: this.isHost, setTimer: this.setTimer, clearTimer: this.clearTimer });
+      this.delayProbe = new DelayProbe({
+        transport, measuring: this.isHost, setTimer: this.setTimer, clearTimer: this.clearTimer, samples: kept,
+      });
       transport.onClose(() => {
         if (this.peer.link !== link) return;
         this.peer = { status: 'idle', link: null, transport: null, reason: 'closed' };
@@ -350,6 +370,16 @@ export class OnlineSession {
     this.startPeer();
   }
 
+  // Between matches, the host's browser makes an open link older than
+  // CONFIG.online.linkRenewMs again, before the relay password it was made
+  // with runs out (an hour): never during a match or while one starts.
+  maybeRenew() {
+    if (!this.isHost || this.peer.status !== 'open' || this.start || this.starting) return;
+    if (this.room?.status === 'playing' || !this.opponent?.connected) return;
+    if (this.now() - (this.peer.openedAt ?? this.now()) < CONFIG.online.linkRenewMs) return;
+    this.startPeer({ renew: true });
+  }
+
   // ---- The relay -------------------------------------------------------------------
 
   // The relay's (TURN) servers for this player's relay link, asked of the
@@ -379,7 +409,7 @@ export class OnlineSession {
     this.relayWait = null;
     this.clearTimer(wait.timer);
     if (Array.isArray(message.iceServers) && message.iceServers.length) wait.resolve(message.iceServers);
-    else wait.reject(new Error(message.error === 'relay_unavailable' ? 'relay_unavailable' : 'timeout'));
+    else wait.reject(new Error(['relay_unavailable', 'full'].includes(message.error) ? message.error : 'timeout'));
   }
 
   endRelayWait() {
