@@ -3,25 +3,25 @@
 // screen offers every MAPS entry as a Quick Battle stage.
 //
 // One compact, flat training block with no platforms, solids or hazards,
-// open air past both of its edges and the Void a short way beyond (a little
-// further past the ledges than Quick Battle's wider stages, as the block is
-// narrower). Player 1 spawns on
-// the room's centre axis; the optional practice CPU spawns 320 units to its
-// right (as far apart as Quick Battle's two starting fighters), facing it.
-// The block's edges and both spawns sit on grid lines of the practice theme
-// (js/stages/practice-theme.js).
+// open air past both of its edges and the Void a short way beyond: the same
+// main-stage length (MAIN_STAGE_LENGTH) and the same Void margins
+// (VOID_MARGINS) as every Quick Battle stage. Player 1 spawns on the room's
+// centre axis; the optional practice CPU spawns 320 units to its right (as
+// far apart as Quick Battle's two starting fighters), facing it. The
+// block's edges sit on major lines of the practice theme's grid, which runs
+// from that centre axis (js/stages/practice-theme.js).
 
-import { voidAround, cameraAround } from './maps.js';
+import { voidAround, cameraAround, mainStageAround } from './maps.js';
 
-const MAIN = Object.freeze({ left: 1360, right: 2640, top: 900, bottom: 2040 });
-const VOID = voidAround(MAIN, { side: 380, top: 760, bottom: 400 });
+const MAIN = mainStageAround(2000, 900, 2040);
+const VOID = voidAround(MAIN);
 
 export const PRACTICE_MAP = {
   id: 'practice',
   name: 'Practice Ground',
   tagline: 'Training room',
   mainStage: MAIN,
-  cameraBounds: cameraAround(VOID, 140),
+  cameraBounds: cameraAround(VOID),
   voidBounds: VOID,
   spawnPoints: [
     { x: 2000, facing: 1 },

@@ -37,7 +37,55 @@
 const EPS = 0.5;
 // The least a closing Void ever leaves past a ledge or below the main
 // stage's top, in world units, whatever its tuning (see closeVoid).
-const MIN_VOID_GAP = 40;
+export const MIN_VOID_GAP = 40;
+// The least a closing Void's top ever leaves above the stage's highest
+// footing (its highest platform, solid or the top of a drifting platform's
+// region; the main stage's top on a stage with none), measured at a
+// fighter's centre: a fighter standing there, or taking its normal jump
+// from there (about 105 high), is never taken by the top line.
+export const MIN_VOID_TOP_CLEARANCE = 240;
+
+// How far a Battle's overtime has closed the Void, 0 to 1, when `progress`
+// (0 to 1) of overtime has run: progress ^ curve (CONFIG.battle.overtimeVoid
+// .closeCurve), so the Void starts closing slowly and closes faster and
+// faster, continuously, to the very end. Pure: the Battle feeds it to the
+// Arena (setVoidPressure) and the CPU reads it to see where the edges will
+// be.
+export function overtimePressure(progress, { closeCurve = 1 } = {}) {
+  const t = Math.min(1, Math.max(0, Number(progress) || 0));
+  return t ** Math.max(1, closeCurve);
+}
+
+// The Void closed in by `pressure` (0-1) from `base` (the map's own
+// rectangle) toward its end gaps around `main` (the main stage's left,
+// right and top): `sideEndGap` past each ledge, `bottomEndGap` below the
+// main stage's top and `topEndGap` above it (at a fighter's centre, like
+// StageCollision.inVoid), each edge moving straight from where it starts
+// to where it ends. Never past those lines (a side or bottom gap under
+// MIN_VOID_GAP counts as that; the top never comes within
+// MIN_VOID_TOP_CLEARANCE of `highestFooting`), never outward (an edge
+// already closer stays put), so standing on the main stage, or on any
+// footing, is always safe. Pure, for collision (closeVoid) and for whoever
+// looks ahead (the CPU); 0 is `base` itself.
+export function closingVoid(base, main, pressure, { sideEndGap, bottomEndGap, topEndGap = Infinity }, highestFooting = main.top) {
+  const p = Math.min(1, Math.max(0, Number(pressure) || 0));
+  if (p === 0) return base;
+  const side = Math.max(MIN_VOID_GAP, sideEndGap);
+  const below = Math.max(MIN_VOID_GAP, bottomEndGap);
+  const topLimit = Math.min(main.top, highestFooting) - MIN_VOID_TOP_CLEARANCE;
+  const left = Math.max(base.left, main.left - side);
+  const right = Math.min(base.right, main.right + side);
+  const bottom = Math.min(base.bottom, main.top + below);
+  const top = Math.max(base.top, Math.min(main.top - Math.max(0, topEndGap), topLimit));
+  // Exact at both ends: the map's own edge at 0, the destination at 1.
+  const lerp = (a, b) => a * (1 - p) + b * p;
+  return Object.freeze({
+    left: Math.min(lerp(base.left, left), main.left - MIN_VOID_GAP),
+    right: Math.max(lerp(base.right, right), main.right + MIN_VOID_GAP),
+    top: Math.min(lerp(base.top, top), topLimit),
+    bottom: Math.max(lerp(base.bottom, bottom), main.top + MIN_VOID_GAP),
+  });
+}
 
 // The kinds of main floor a stage may have (map.ground.type, see
 // js/data/maps.js): `finite` (the default) is the main stage itself, with a
@@ -177,36 +225,27 @@ export class StageCollision {
     // drawn Void, the debug overlay) always sees one consistent rectangle.
     this.baseVoid = Object.freeze({ ...map.voidBounds });
     this.void = this.baseVoid;
+    // The highest footing a fighter can ever stand on (smallest y): the
+    // main stage's top, every platform and solid, and the highest a
+    // drifting platform's region lets it rise. A closing Void's top keeps
+    // clear of it (closingVoid).
+    this.highestFooting = Math.min(
+      main.top,
+      ...map.platforms.map((p) => Math.min(p.y, p.dynamic?.region?.top ?? p.y)),
+      ...map.solids.map((so) => so.y),
+    );
   }
 
-  // Closes the Void in by `progress` (clamped to 0-1) of the way from the
-  // map's own rectangle to `sideEndGap` world units past each ledge and
-  // `bottomEndGap` below the main stage's top, linearly; the top never
-  // moves. Never past those lines (a gap under MIN_VOID_GAP counts as
-  // that), never outward (an edge already closer stays put), and never
-  // past a ledge or the surface whatever the numbers, so standing on the
-  // main stage is always safe. 0 restores the map's own rectangle.
-  closeVoid(progress, { sideEndGap, bottomEndGap }) {
-    const base = this.baseVoid;
-    const p = Math.min(1, Math.max(0, Number(progress) || 0));
-    if (p === 0) {
-      this.void = base;
-      return this.void;
-    }
-    const m = this.main;
-    const side = Math.max(MIN_VOID_GAP, sideEndGap);
-    const below = Math.max(MIN_VOID_GAP, bottomEndGap);
-    const left = Math.max(base.left, m.left - side);
-    const right = Math.min(base.right, m.right + side);
-    const bottom = Math.min(base.bottom, m.top + below);
-    // Exact at both ends: the map's own edge at 0, the destination at 1.
-    const lerp = (a, b) => a * (1 - p) + b * p;
-    this.void = Object.freeze({
-      left: Math.min(lerp(base.left, left), m.left - MIN_VOID_GAP),
-      right: Math.max(lerp(base.right, right), m.right + MIN_VOID_GAP),
-      top: base.top,
-      bottom: Math.max(lerp(base.bottom, bottom), m.top + MIN_VOID_GAP),
-    });
+  // Closes the Void in by `pressure` (clamped to 0-1) of the way from the
+  // map's own rectangle to its end gaps (`sideEndGap` past each ledge,
+  // `bottomEndGap` below the main stage's top, `topEndGap` above it), each
+  // edge moving straight there (see closingVoid: never past those lines,
+  // never outward, never past a ledge, the surface or the highest footing's
+  // clearance, so standing on the main stage is always safe). How fast the
+  // pressure itself rises is the caller's (a Battle's overtime eases it in:
+  // overtimePressure). 0 restores the map's own rectangle.
+  closeVoid(pressure, tuning) {
+    this.void = closingVoid(this.baseVoid, this.main, pressure, tuning, this.highestFooting);
     return this.void;
   }
 

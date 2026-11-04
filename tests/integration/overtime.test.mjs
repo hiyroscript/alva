@@ -3,8 +3,8 @@
 // and the fighter-coloured burst the Void leaves: the 5-minute clock, time-up
 // with the points apart or level, overtime as the same live fight played on
 // (score, Launch Points and everything in play kept), its results, the Void
-// closing in from the sides and bottom (collision and the drawn Void alike)
-// with its waves speeding up, restarts, Practice Ground left alone, and the
+// closing in from every side, slowly at first and faster and faster
+// (collision and the drawn Void alike), with its waves speeding up with it, restarts, Practice Ground left alone, and the
 // elimination burst. Runs the real Battle, Fighter, physics, themes and hit
 // effects on a stub canvas (see tests/helpers/fighter-harness.mjs); the
 // screen's banner, HUD and result copy are in
@@ -16,7 +16,7 @@ import { getMap, MAPS } from '../../js/data/maps.js';
 import { PRACTICE_MAP } from '../../js/data/practice-map.js';
 import { getCharacter } from '../../js/data/characters.js';
 import { CONFIG } from '../../js/config.js';
-import { StageCollision } from '../../js/game/physics.js';
+import { StageCollision, overtimePressure, closingVoid, MIN_VOID_GAP, MIN_VOID_TOP_CLEARANCE } from '../../js/game/physics.js';
 import { HIT_FX, HitEffects, eliminationPalette, NEUTRAL_ELIMINATION_PALETTE } from '../../js/game/rendering/hit-fx.js';
 import { Projectile } from '../../js/game/combat/projectile.js';
 import { def, DT, fakeSprites, fakeSpritesOf } from '../helpers/fighter-harness.mjs';
@@ -33,7 +33,7 @@ const { createTheme } = await import('../../js/stages/index.js');
 
 const RESPAWN_STEPS = Math.round(CONFIG.battle.respawnSeconds / DT);
 const OT = CONFIG.battle.overtimeSeconds;
-const { sideEndGap, bottomEndGap, maxWaveSpeedMultiplier } = CONFIG.battle.overtimeVoid;
+const { sideEndGap, bottomEndGap, topEndGap, closeCurve, maxWaveSpeedMultiplier } = CONFIG.battle.overtimeVoid;
 
 // A battle in its fight phase on `mapId`, Player 1 driven by `script.held`,
 // the other side by `script.cpu` (both stand still unless given input).
@@ -87,21 +87,35 @@ function expectedVoid(map, p) {
   return {
     left: lerp(base.left, m.left - sideEndGap),
     right: lerp(base.right, m.right + sideEndGap),
-    top: base.top,
+    top: lerp(base.top, m.top - topEndGap),
     bottom: lerp(base.bottom, m.top + bottomEndGap),
   };
 }
+
+// The highest footing on `map` (smallest y), drifting platforms' highest
+// reach included.
+const highestFooting = (map) => Math.min(map.mainStage.top, ...map.platforms.map((p) => Math.min(p.y, p.dynamic?.region?.top ?? p.y)), ...map.solids.map((s) => s.y));
 
 const near = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-6, `${what}: ${a} vs ${b}`);
 
 // ---- The clocks --------------------------------------------------------------------
 
-test('config: 5:00 and 60 s of overtime for every Battle; the Void closes to 120 past each ledge and 140 below the top; waves to 4x', () => {
+test('config: 5:00 and 60 s of overtime for every Battle; the Void closes to 90 past each ledge, 100 below the top and 600 above it, on a 2.2 curve; waves to 6x', () => {
   assert.equal(CONFIG.battle.matchSeconds, 300);
   assert.equal('roundSeconds' in CONFIG.battle, false, 'no second, shorter clock');
   assert.equal('quickBattleSeconds' in CONFIG.battle, false);
   assert.equal(OT, 60);
-  assert.deepEqual({ sideEndGap, bottomEndGap, maxWaveSpeedMultiplier }, { sideEndGap: 120, bottomEndGap: 140, maxWaveSpeedMultiplier: 4 });
+  assert.deepEqual(
+    { sideEndGap, bottomEndGap, topEndGap, closeCurve, maxWaveSpeedMultiplier },
+    { sideEndGap: 90, bottomEndGap: 100, topEndGap: 600, closeCurve: 2.2, maxWaveSpeedMultiplier: 6 },
+  );
+  // The Void update: clearly tighter than before (120 past each ledge, 140
+  // below the top, the top never moving), from the larger Void.
+  assert.ok(sideEndGap < 120 && bottomEndGap < 140);
+  // The top closes, but stays well above every jump from the main stage
+  // (the Super Jump and both air jumps: about 490 to a fighter's centre) and
+  // far below the Void's own 1040.
+  assert.ok(topEndGap > 540 && topEndGap < 1040 * 0.7);
   assert.equal(CONFIG.battle.pointsToWin, 3, 'still first to 3');
   for (const mode of Object.keys(BATTLE_MODES)) {
     assert.equal('seconds' in BATTLE_MODES[mode], false, `${mode}: no clock of its own`);
@@ -240,7 +254,7 @@ test('Watch Mode plays the same overtime: level at 5:00 it goes on 60 s under th
   run(Math.round(OT / 2 / DT));
   assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [128, 188], 'recovery continues through overtime');
   assert.ok(battle.stage.void.left > battle.map.voidBounds.left, 'the Void closes in here too');
-  assert.equal(battle.stage.void.top, battle.map.voidBounds.top);
+  assert.ok(battle.stage.void.top > battle.map.voidBounds.top, 'its top too');
   assert.ok(battle.voidWaveSpeed > 1);
   battle.timeLeft = DT / 2;
   run();
@@ -399,23 +413,42 @@ test('overtime progress is deterministic, monotonic and clamped to 0-1, from ove
   assert.equal(normal.overtimeProgress, 0);
 });
 
-test('through overtime the Void closes linearly from the left, right and bottom only; the top never moves; on both stages', () => {
+test('through overtime the Void closes in from every side, the top included, slowly at first and faster and faster; on every stage', () => {
   for (const map of MAPS) {
     const { battle, run, toTimeUp } = match({ mapId: map.id });
     const base = { ...map.voidBounds };
+    const m = map.mainStage;
     toTimeUp();
     let last = { ...battle.stage.void };
+    // How far the left edge has come, a share of its whole way, at each step.
+    const share = [];
+    const whole = (m.left - sideEndGap) - base.left;
     for (let s = 0; s < Math.ceil(OT / DT) + 2; s++) {
       run();
       const v = battle.stage.void;
-      assert.ok(v.left >= last.left && v.right <= last.right && v.bottom <= last.bottom, `${map.id}: only ever closing`);
-      assert.equal(v.top, base.top, `${map.id}: the top never moves`);
+      assert.ok(v.left >= last.left && v.right <= last.right && v.bottom <= last.bottom && v.top >= last.top, `${map.id}: only ever closing`);
       last = { ...v };
+      share.push((v.left - base.left) / whole);
     }
-    // At its end: exactly the destinations, relative to the main stage.
-    const m = map.mainStage;
-    assert.deepEqual({ ...battle.stage.void }, { left: m.left - sideEndGap, right: m.right + sideEndGap, top: base.top, bottom: m.top + bottomEndGap });
-    // In between, a straight line from the map's own.
+    // Monotonic, and accelerating: each second closes more than the one
+    // before it.
+    const perSecond = [];
+    const stepsPerSecond = Math.round(1 / DT);
+    for (let i = stepsPerSecond; i < Math.round(OT / DT); i += stepsPerSecond) perSecond.push(share[i] - share[i - stepsPerSecond]);
+    for (let i = 1; i < perSecond.length; i++) assert.ok(perSecond[i] > perSecond[i - 1], `${map.id}: second ${i + 1} closes more than second ${i}`);
+    // Slower early than late: under a quarter of the way at half time
+    // (0.5 ^ 2.2), the last fifth of overtime closing more than the first
+    // half did.
+    const half = share[Math.round(OT / 2 / DT) - 1];
+    assert.ok(half < 0.25, `${map.id}: ${(half * 100).toFixed(1)}% closed at half time`);
+    near(half, 0.5 ** closeCurve, `${map.id}: on the curve at half time`);
+    const late = share[Math.round((OT * 0.8) / DT) - 1];
+    assert.ok(1 - late > half, `${map.id}: the last fifth closes ${((1 - late) * 100).toFixed(0)}%, the first half ${(half * 100).toFixed(0)}%`);
+    // At its end: exactly the destinations, relative to the main stage, the
+    // top included.
+    assert.deepEqual({ ...battle.stage.void }, { left: m.left - sideEndGap, right: m.right + sideEndGap, top: m.top - topEndGap, bottom: m.top + bottomEndGap });
+    // In between, each edge a straight line from the map's own in the
+    // pressure; and the pressure is the progress raised to closeCurve.
     for (const p of [0, 0.25, 0.5, 0.75, 1]) {
       battle.setVoidPressure(p);
       const want = expectedVoid(map, p);
@@ -424,31 +457,49 @@ test('through overtime the Void closes linearly from the left, right and bottom 
     assert.deepEqual({ ...map.voidBounds }, base, 'map.voidBounds never written');
     assert.ok(Object.isFrozen(map.voidBounds));
   }
+  for (const t of [0, 0.1, 0.5, 0.9, 1]) near(overtimePressure(t, CONFIG.battle.overtimeVoid), t ** closeCurve, `pressure at ${t}`);
+  assert.equal(overtimePressure(-1, CONFIG.battle.overtimeVoid), 0);
+  assert.equal(overtimePressure(2, CONFIG.battle.overtimeVoid), 1);
+  // The Battle hands the eased pressure on, and the Arena holds exactly it.
+  const { battle, run, toTimeUp } = match();
+  toTimeUp();
+  run(Math.round(OT / 2 / DT));
+  near(battle.overtimeProgress, 0.5, 'half time');
+  near(battle.voidPressure, 0.5 ** closeCurve, 'the pressure in force');
+  near(battle.overtimeVoidPressure, battle.voidPressure, 'one value');
 });
 
-test('the closed Void always leaves the ledges and the surface clear, whatever the tuning; it never moves outward', () => {
+test('the closed Void always leaves the ledges, the surface and the highest footing clear, whatever the tuning; it never moves outward', () => {
   for (const map of [...MAPS, PRACTICE_MAP]) {
     const m = map.mainStage;
     const stage = new StageCollision(map);
+    assert.equal(stage.highestFooting, highestFooting(map), `${map.id}: its highest footing`);
     const v = stage.closeVoid(1, CONFIG.battle.overtimeVoid);
-    assert.ok(v.left < m.left - 100 && v.right > m.right + 100, `${map.id}: outside both ledges`);
-    assert.ok(v.bottom > m.top + 100, `${map.id}: below the surface`);
+    assert.ok(v.left < m.left - 60 && v.right > m.right + 60, `${map.id}: outside both ledges`);
+    assert.ok(v.bottom > m.top + 60, `${map.id}: below the surface`);
+    assert.ok(v.top <= stage.highestFooting - MIN_VOID_TOP_CLEARANCE, `${map.id}: well over the highest footing`);
     // A fighter standing on either ledge's very edge, or anywhere on the
-    // main stage, is never in it.
+    // main stage, is never in it; nor one taking a full Super Jump from
+    // the main stage (its centre about 490 over the surface).
     for (const x of [m.left + 1, (m.left + m.right) / 2, m.right - 1]) {
       assert.equal(stage.inVoid({ x, y: m.top, height: 100 }), false);
+      assert.equal(stage.inVoid({ x, y: m.top - 450, height: 88 }), false, `${map.id}: a Super Jump and both air jumps from the main stage`);
     }
     // Hostile tuning: no gap, or a negative one, still never reaches the
-    // stage; out-of-range progress is clamped.
-    for (const gaps of [{ sideEndGap: 0, bottomEndGap: 0 }, { sideEndGap: -500, bottomEndGap: -500 }]) {
+    // stage or the highest footing; out-of-range progress is clamped.
+    for (const gaps of [{ sideEndGap: 0, bottomEndGap: 0, topEndGap: 0 }, { sideEndGap: -500, bottomEndGap: -500, topEndGap: -500 }]) {
       const w = stage.closeVoid(7, gaps);
-      assert.ok(w.left < m.left && w.right > m.right && w.bottom > m.top, `${map.id}: clamped clear of the stage`);
-      assert.equal(w.top, stage.baseVoid.top);
+      assert.ok(w.left <= m.left - MIN_VOID_GAP && w.right >= m.right + MIN_VOID_GAP && w.bottom >= m.top + MIN_VOID_GAP, `${map.id}: clamped clear of the stage`);
+      near(w.top, stage.highestFooting - MIN_VOID_TOP_CLEARANCE, `${map.id}: the top clamped clear of the highest footing`);
     }
+    // No top gap at all (the Void's tuning before this update): the top stays.
+    assert.equal(stage.closeVoid(1, { sideEndGap, bottomEndGap }).top, stage.baseVoid.top);
     assert.equal(stage.closeVoid(-3, CONFIG.battle.overtimeVoid), stage.baseVoid, 'below 0 is the map\'s own');
     // A gap wider than the map's own Void never pushes it out.
-    const wide = stage.closeVoid(1, { sideEndGap: 5000, bottomEndGap: 5000 });
+    const wide = stage.closeVoid(1, { sideEndGap: 5000, bottomEndGap: 5000, topEndGap: 5000 });
     assert.deepEqual({ ...wide }, { ...stage.baseVoid });
+    // The pure rule is the one collision uses.
+    assert.deepEqual({ ...closingVoid(stage.baseVoid, stage.main, 0.3, CONFIG.battle.overtimeVoid, stage.highestFooting) }, { ...stage.closeVoid(0.3, CONFIG.battle.overtimeVoid) });
   }
 });
 
@@ -532,29 +583,35 @@ test('the drawn Void is handed exactly the rectangle collision tests, every fram
 
 // ---- Void waves ------------------------------------------------------------------------
 
-test('the Void\'s waves speed up through overtime, smoothly and ever faster, to about 4x; never with reduced motion', () => {
+test('the Void\'s waves speed up through overtime with its pressure, smoothly and ever faster, to 6x; never with reduced motion', () => {
   const { battle, toTimeUp, run } = match();
   assert.equal(battle.voidWaveSpeed, 1);
   const speeds = [];
   for (const p of [0, 0.25, 0.5, 0.75, 1]) {
     battle.setVoidPressure(p);
     speeds.push(battle.voidWaveSpeed);
-    near(battle.voidWaveSpeed, 1 + 3 * p * p, `speed at ${p}`);
+    near(battle.voidWaveSpeed, 1 + (maxWaveSpeedMultiplier - 1) * p, `speed at ${p}`);
   }
   assert.equal(speeds[0], 1);
-  near(speeds.at(-1), maxWaveSpeedMultiplier, 'about 4x at the end');
+  near(speeds.at(-1), maxWaveSpeedMultiplier, '6x at the end');
   for (let i = 1; i < speeds.length; i++) assert.ok(speeds[i] > speeds[i - 1]);
-  assert.ok(speeds[4] - speeds[3] > speeds[1] - speeds[0], 'the speeding-up grows (an ease-in)');
   battle.setVoidPressure(0);
-  // Through a real overtime, step by step.
+  // Through a real overtime, step by step: never slowing, the rise itself
+  // growing (the pressure's ease-in), with no jump from one step to the next.
   toTimeUp();
   let last = battle.voidWaveSpeed;
+  const trace = [last];
   for (let s = 0; s < Math.ceil(OT / DT); s++) {
     run();
-    assert.ok(battle.voidWaveSpeed >= last);
+    assert.ok(battle.voidWaveSpeed >= last, 'non-decreasing');
+    assert.ok(battle.voidWaveSpeed - last < 0.01, 'smoothly');
     last = battle.voidWaveSpeed;
+    trace.push(last);
   }
   near(last, maxWaveSpeedMultiplier, 'at its end');
+  const q = Math.floor(trace.length / 4);
+  assert.ok(trace[4 * q - 1] - trace[3 * q] > trace[q] - trace[0], 'the speeding-up grows (an ease-in)');
+  assert.ok(trace[2 * q] < 1 + (maxWaveSpeedMultiplier - 1) * 0.25, 'still calm at half time');
 
   // The theme runs its waves on at the speed it is given, its shape the
   // same; its phase never jumps when the speed changes.
@@ -582,7 +639,7 @@ test('the Void\'s waves speed up through overtime, smoothly and ever faster, to 
   let prev = shot(theme);
   for (let i = 1; i <= 60; i++) {
     theme.update(1 / 60, view);
-    theme.advanceVoid(1 / 60, 1 + 3 * (i / 60) ** 2);
+    theme.advanceVoid(1 / 60, 1 + (maxWaveSpeedMultiplier - 1) * (i / 60) ** closeCurve);
     const now = shot(theme);
     const moved = Math.max(...now.map((y, j) => Math.abs(y - prev[j])));
     assert.ok(moved < 1.5, `frame ${i}: the edge moves on smoothly (${moved.toFixed(2)})`);

@@ -15,7 +15,7 @@
 // paint still needs real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MAPS, getMap, stageSlots, voidAround } from '../../js/data/maps.js';
+import { MAPS, getMap, stageSlots, voidAround, VOID_MARGINS } from '../../js/data/maps.js';
 import { StageCollision, createBody, stepBody, resolveSolidOverlap } from '../../js/game/physics.js';
 import {
   MAX_ICE_CONTACTS, ICE_SECTION, ICE_SECTION_STATES, ICE_DAMAGE_LEVELS, BLIZZARD_CHANCE, BLIZZARD, WEATHER_STATES, VOLCANIC_ROCKS,
@@ -183,7 +183,7 @@ test('three contiguous sections at one exact height make one glacier; the centre
   assert.deepEqual(stage.breakableFloors, [w, e]);
   for (const sp of JOKULL.spawnPoints) assert.ok(sp.x - HALF > c.x && sp.x + HALF < c.x + c.w, `spawn ${sp.x} on the centre`);
   // The Void and the camera are set round the whole glacier as it starts.
-  assert.deepEqual({ ...JOKULL.voidBounds }, { ...voidAround(JOKULL.mainStage, { side: 360, top: 800, bottom: 420 }) });
+  assert.deepEqual({ ...JOKULL.voidBounds }, { ...voidAround(JOKULL.mainStage, VOID_MARGINS) });
   assert.ok(JOKULL.cameraBounds.left < JOKULL.voidBounds.left && JOKULL.cameraBounds.right > JOKULL.voidBounds.right);
   // A sectioned floor is checked as it is built.
   const bad = (sections) => () => new StageCollision({ ...JOKULL, ground: { type: 'finite', sections } });

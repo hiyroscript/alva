@@ -7,7 +7,7 @@
 // recording stand-in, so paint still needs real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MAPS, getMap, voidAround, cameraAround } from '../../js/data/maps.js';
+import { MAPS, getMap, voidAround, cameraAround, MAIN_STAGE_LENGTH, VOID_MARGINS, mainStageAround } from '../../js/data/maps.js';
 import { PRACTICE_MAP } from '../../js/data/practice-map.js';
 import { StageCollision, createBody, stepBody, separate, resolveSolidOverlap } from '../../js/game/physics.js';
 import { Camera } from '../../js/game/rendering/camera.js';
@@ -42,7 +42,8 @@ function realBattle(mapId = 'desert') {
 
 // ---- Stage data: four separate areas ---------------------------------------------
 
-// Each stage's Void before this pass, as margins from its main stage: 860
+// Each stage's Void before the blast-zone pass that first brought it in close,
+// as margins from its main stage: 860
 // past each ledge, 740 below its top and 1160 above it.
 const OLD_VOID_MARGINS = {
   desert: { side: 860, top: 1160, bottom: 740 },
@@ -74,7 +75,7 @@ test('every stage keeps its main stage, camera bounds and Void apart, the Void a
     // a blast zone, neither against the ledge nor a distant world edge.
     const g = margins(m);
     for (const side of ['left', 'right']) {
-      assert.ok(g[side] >= 250 && g[side] <= 400, `${m.id}: ${g[side]} past the ${side} ledge`);
+      assert.ok(g[side] >= 250 && g[side] <= 500, `${m.id}: ${g[side]} past the ${side} ledge`);
     }
     assert.ok(g.bottom >= 300 && g.bottom <= 450, `${m.id}: ${g.bottom} below the stage's top`);
     assert.ok(g.top > 0, `${m.id}: above the stage`);
@@ -92,15 +93,38 @@ test('every stage keeps its main stage, camera bounds and Void apart, the Void a
   }
 });
 
-test('the Void is much closer than before on every stage: at least 30% nearer on every side, over half nearer past the ledges', () => {
-  assert.deepEqual(HAD_OLD_VOID.map((m) => m.id).sort(), Object.keys(OLD_VOID_MARGINS).sort(), 'every stage that had them is still here');
-  for (const m of HAD_OLD_VOID) {
-    const old = OLD_VOID_MARGINS[m.id];
-    const g = margins(m);
-    assert.ok(g.left <= old.side * 0.5 && g.right <= old.side * 0.5, `${m.id}: sides ${g.left} / ${g.right} vs ${old.side}`);
-    assert.ok(g.bottom <= old.bottom * 0.7, `${m.id}: bottom ${g.bottom} vs ${old.bottom}`);
-    assert.ok(g.top <= old.top * 0.7, `${m.id}: top ${g.top} vs ${old.top}`);
+test('every finite main stage, Practice Ground\'s included, is MAIN_STAGE_LENGTH (1400) long, centred where it was', () => {
+  assert.equal(MAIN_STAGE_LENGTH, 1400);
+  assert.ok(FINITE_MAPS.length >= 5, 'Yerma, Sol-Noir, Asperitas, Jökull and Practice Ground');
+  for (const m of FINITE_MAPS) assert.equal(m.mainStage.right - m.mainStage.left, MAIN_STAGE_LENGTH, m.id);
+  // Adamaris's ground runs on past its Void, but its combat area is that
+  // long too.
+  const beach = getMap('adamaris').mainStage;
+  assert.equal(beach.right - beach.left, MAIN_STAGE_LENGTH);
+  for (const m of ALL_MAPS) {
+    const centre = (m.mainStage.left + m.mainStage.right) / 2;
+    assert.equal(centre, m.id === 'practice' ? 2000 : 1800, `${m.id}: centred where it was`);
   }
+  assert.deepEqual(mainStageAround(1000, 50, 90), { left: 300, right: 1700, top: 50, bottom: 90 });
+});
+
+test('the Void-free space is the same on every stage: VOID_MARGINS, 468 past each ledge, 1040 above, 400 below', () => {
+  // The Void update: the shared 360 / 800 / 400, the side and top then
+  // pushed back 1.3 times, the bottom left alone.
+  assert.deepEqual({ ...VOID_MARGINS }, { side: 468, top: 1040, bottom: 400 });
+  assert.equal(VOID_MARGINS.side, Math.round(360 * 1.3));
+  assert.equal(VOID_MARGINS.top, Math.round(800 * 1.3));
+  assert.ok(Object.isFrozen(VOID_MARGINS));
+  const shapes = new Set();
+  for (const m of ALL_MAPS) {
+    const g = margins(m);
+    assert.deepEqual(g, { left: VOID_MARGINS.side, right: VOID_MARGINS.side, top: VOID_MARGINS.top, bottom: VOID_MARGINS.bottom }, m.id);
+    assert.deepEqual(m.voidBounds, voidAround(m.mainStage), `${m.id}: built from the shared margins`);
+    assert.deepEqual(m.cameraBounds, cameraAround(m.voidBounds), `${m.id}: the camera derived from it`);
+    const v = m.voidBounds;
+    shapes.add(`${v.right - v.left}x${v.bottom - v.top}`);
+  }
+  assert.equal(shapes.size, 1, 'one Void-free rectangle, whatever the stage');
   // The helpers build the rectangles from the margins, nothing else.
   const main = { left: 100, right: 500, top: 300, bottom: 900 };
   assert.deepEqual(voidAround(main, { side: 50, top: 70, bottom: 30 }), { left: 50, right: 550, top: 230, bottom: 330 });

@@ -45,6 +45,7 @@ import { PlayerController } from './fighters/fighter-controller.js';
 import { CombatAIController } from './ai/combat-ai.js';
 import { CelebrationController, CELEBRATIONS, LOSER_CELEBRATIONS, DRAW_CELEBRATIONS } from './ai/celebration.js';
 import { MatchStats } from './match-stats.js';
+import { overtimePressure } from './physics.js';
 import { resolveDifficulty } from '../data/difficulty.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 
@@ -241,9 +242,18 @@ export class Battle extends Arena {
     return Math.min(1, Math.max(0, 1 - this.timeLeft / this.overtimeSeconds));
   }
 
+  // How far overtime has closed the Void, 0 to 1: its progress eased in by
+  // CONFIG.battle.overtimeVoid.closeCurve (overtimePressure), so the Void
+  // closes slowly at first and faster and faster to the end. 0 outside it.
+  get overtimeVoidPressure() {
+    return overtimePressure(this.overtimeProgress, CONFIG.battle.overtimeVoid);
+  }
+
   // The match's phases and clock, then the shared world step, then (while
   // the match was live) the step's statistics. Through overtime the Void
-  // closes in on every step as its clock runs, before the world steps, so
+  // closes in on every step as its clock runs (overtimeVoidPressure, all on
+  // the simulation clock, so a lockstep match closes it the same in both
+  // browsers), before the world steps, so
   // a fighter the new edge has passed is taken this very step, by the usual
   // Void check. The clock running out ends the match before the world
   // steps; the winning point ends it within the step, as the Void takes
@@ -262,7 +272,7 @@ export class Battle extends Arena {
             if (this.goesToOvertime) this.startOvertime();
             else this.finishMatch();
           }
-          if (this.overtime) this.setVoidPressure(this.overtimeProgress);
+          if (this.overtime) this.setVoidPressure(this.overtimeVoidPressure);
         }
         break;
       default:

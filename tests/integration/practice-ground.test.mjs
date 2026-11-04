@@ -182,7 +182,7 @@ globalThis.document = {
 
 const { CONFIG } = await import('../../js/config.js');
 const { CHARACTERS, getCharacter } = await import('../../js/data/characters.js');
-const { MAPS, getMap } = await import('../../js/data/maps.js');
+const { MAPS, getMap, MAIN_STAGE_LENGTH, VOID_MARGINS, voidAround } = await import('../../js/data/maps.js');
 const { PRACTICE_MAP } = await import('../../js/data/practice-map.js');
 const { createTheme } = await import('../../js/stages/index.js');
 const { PracticeTheme } = await import('../../js/stages/practice-theme.js');
@@ -2257,12 +2257,14 @@ test('the training stage is its own map, outside MAPS and so outside Select Stag
   // starting fighters, each facing the other.
   assert.equal(PRACTICE_MAP.spawnPoints.length, 2);
   const { left, right, top } = PRACTICE_MAP.mainStage;
-  assert.ok(right - left >= 1200 && right - left <= 1500, 'a compact training block');
-  // The Void a short way past its edges (room to recover), a little below
-  // it and well above it (see platform-stage.test.mjs).
+  assert.equal(right - left, MAIN_STAGE_LENGTH, 'a training block as long as every stage');
+  // The Void the same Void-free space as every stage's: past its edges
+  // (room to recover), a little below it and well above it (see
+  // platform-stage.test.mjs).
   const v = PRACTICE_MAP.voidBounds;
-  assert.ok(v.left <= left - 250 && v.left >= left - 400 && v.right >= right + 250 && v.right <= right + 400);
-  assert.ok(v.bottom >= top + 300 && v.bottom <= top + 450 && v.top < top - 400);
+  assert.deepEqual(v, voidAround(PRACTICE_MAP.mainStage, VOID_MARGINS));
+  assert.equal(v.left, left - VOID_MARGINS.side);
+  assert.equal(v.bottom, top + VOID_MARGINS.bottom);
   const [p1, cpu] = PRACTICE_MAP.spawnPoints;
   assert.deepEqual(p1, { x: 2000, facing: 1 }, 'Player 1\'s spawn is unchanged');
   for (const { x } of [p1, cpu]) assert.ok(x > left && x < right);

@@ -54,16 +54,20 @@
 //               other hazard's (checked as a stage is built), so platforms
 //               never meet.
 // solids:       full AABB blocks (collide on every side).
+//               Every finite main stage is MAIN_STAGE_LENGTH (1400) long
+//               (right - left), Practice Ground's included; a continuous
+//               ground's mainStage, the combat area, is that long too.
 // cameraBounds: where the camera may travel to frame the fight: the stage,
 //               the open air around it and a strip of the Void past its
 //               edge (cameraAround), never far into the black.
 // voidBounds:   the Void, the kill boundary (see StageCollision.inVoid): a
 //               fighter whose centre leaves this rectangle is lost to it.
-//               Set by margins around the main stage (voidAround): past
-//               each ledge by enough to be knocked off, fight briefly and
-//               drift back; below the stage's top by enough to fall a
-//               little way first; and above it clear of every jump from the
-//               highest footing, so only a launch reaches it.
+//               Set by margins around the main stage (voidAround), the
+//               same VOID_MARGINS on every stage: past each ledge by enough
+//               to be knocked off, fight briefly and drift back; below the
+//               stage's top by enough to fall a little way first; and above
+//               it clear of every jump from the highest footing, so only a
+//               launch reaches it.
 // hazards:      optional stage hazards that are not platforms (see
 //               js/data/stage-hazards.js and js/game/stage-hazards.js): each
 //               { id, behavior, ... } runs its own controller, e.g.
@@ -74,10 +78,42 @@
 
 import { CONFIG } from '../config.js';
 
+// Every finite main stage's length, right - left, world units: one size of
+// stage everywhere (Practice Ground's training block included), so a
+// fighter's spacing, recovery and launches mean the same on every one. A
+// continuous ground (Adamaris) runs on past its Void, but its mainStage,
+// the combat area the camera frames and the Void is set around, is this
+// long too. Each stage keeps its own centre (x 1800; Practice Ground 2000).
+export const MAIN_STAGE_LENGTH = 1400;
+
+// The Void-free space, the same on every stage (Practice Ground's and
+// Adamaris's included): the Void's margins around the main stage, in world
+// units at a fighter's centre (see voidAround). `side` past each ledge,
+// `top` above the main stage's top, `bottom` below it. These are the Void
+// update's: the shared 360 / 800 / 400 the stages mostly had, then the side
+// and top margins pushed back 1.3 times (360 -> 468, 800 -> 1040), the
+// bottom left as it was. The top is far clear of every jump from every
+// stage's highest footing (Asperitas's highest cloud, 290 over its main
+// cloud, Super Jump and triple jump included: about 260 to spare), so only
+// a launch reaches it. Overtime closes the Void in from these
+// (CONFIG.battle.overtimeVoid, StageCollision.closeVoid).
+export const VOID_MARGINS = Object.freeze({ side: 468, top: 1040, bottom: 400 });
+
+// How far the camera may see past the Void's edge on every stage (see
+// cameraAround).
+const CAMERA_PAST_VOID = 140;
+
+// A main stage centred on `centerX`, MAIN_STAGE_LENGTH long, its top at
+// `top` and its body down to `bottom`.
+export function mainStageAround(centerX, top, bottom) {
+  const half = MAIN_STAGE_LENGTH / 2;
+  return Object.freeze({ left: centerX - half, right: centerX + half, top, bottom });
+}
+
 // The Void's rectangle from margins around `main`: `side` world units past
 // each ledge, `top` above the stage's top and `bottom` below it (measured at
 // a fighter's centre, like StageCollision.inVoid).
-export function voidAround(main, { side, top, bottom }) {
+export function voidAround(main, { side, top, bottom } = VOID_MARGINS) {
   return Object.freeze({
     left: main.left - side, right: main.right + side, top: main.top - top, bottom: main.top + bottom,
   });
@@ -86,7 +122,7 @@ export function voidAround(main, { side, top, bottom }) {
 // Camera bounds: the Void's rectangle and `margin` world units more on every
 // side, so the black edge comes into view as a fighter nears it but the
 // camera never wanders deep into it.
-export function cameraAround(bounds, margin) {
+export function cameraAround(bounds, margin = CAMERA_PAST_VOID) {
   return Object.freeze({
     left: bounds.left - margin, right: bounds.right + margin, top: bounds.top - margin, bottom: bounds.bottom + margin,
   });
@@ -94,21 +130,20 @@ export function cameraAround(bounds, margin) {
 
 // Yerma (id desert) and Sol-Noir (id city): their ids are the ones they
 // were first given, kept so every reference stays valid.
-const DESERT_MAIN = Object.freeze({ left: 1120, right: 2480, top: 860, bottom: 2000 });
+const DESERT_MAIN = mainStageAround(1800, 860, 2000);
 // No platforms: the rock outcrops are the highest footing.
-const DESERT_VOID = voidAround(DESERT_MAIN, { side: 360, top: 760, bottom: 400 });
+const DESERT_VOID = voidAround(DESERT_MAIN);
 
-const CITY_MAIN = Object.freeze({ left: 1080, right: 2520, top: 980, bottom: 2120 });
-// A little more headroom than Desert, over its highest deck (272 above the
-// roof), and a little more fall below the roof.
-const CITY_VOID = voidAround(CITY_MAIN, { side: 340, top: 800, bottom: 420 });
+// Its highest deck is 272 above the roof.
+const CITY_MAIN = mainStageAround(1800, 980, 2120);
+const CITY_VOID = voidAround(CITY_MAIN);
 
 // A cloud slab floating in open sky: its collision is the cloud's dense
 // core, 64 units deep, with nothing at all beneath it.
-const ASPERITAS_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 964 });
-// More headroom than City: the drifting clouds can rise to 290 above the
-// main cloud, and no jump from the highest of them reaches the line.
-const ASPERITAS_VOID = voidAround(ASPERITAS_MAIN, { side: 360, top: 840, bottom: 400 });
+const ASPERITAS_MAIN = mainStageAround(1800, 900, 964);
+// The drifting clouds can rise to 290 above the main cloud, and no jump
+// from the highest of them reaches the Void's top line (VOID_MARGINS.top).
+const ASPERITAS_VOID = voidAround(ASPERITAS_MAIN);
 
 // Asperitas's two drifting clouds: hazards because they will not stay put
 // (they drift, rest, fade out from under a fighter and form again
@@ -131,27 +166,25 @@ const cloudHazard = (region) => Object.freeze({
 // Adamaris: a beach. Its sand is the ground itself, continuous past both
 // sides of the Void (no ledge, no slab, nothing to walk off), with the same
 // compact combat area and blast zone as every other stage around it; and
-// there are no platforms or solids on the sand, only open beach. Its top
-// line is 800 above the sand (as City's), well clear of every jump.
-const ADAMARIS_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 1300 });
-const ADAMARIS_VOID = voidAround(ADAMARIS_MAIN, { side: 360, top: 800, bottom: 400 });
+// there are no platforms or solids on the sand, only open beach.
+const ADAMARIS_MAIN = mainStageAround(1800, 900, 1300);
+const ADAMARIS_VOID = voidAround(ADAMARIS_MAIN);
 
-// Jökull: one great glacier block over an open frozen abyss, as wide as
-// Asperitas's cloud and Adamaris's combat area, its ice 330 deep (a real
-// foundation, its underside in view above the Void). Its floor is three
-// sections side by side at one height (see `ground`): the centre, 880 wide
-// (63%), permanent; the two wings, 260 each (19%), breakable. Both spawns
-// are on the centre, and once both wings are gone the centre alone is
-// still wider than any Dash and jump needs. The Void is set around the
-// whole glacier as it starts (360 past each ledge, 420 below its top, 800
-// above it, clear of every jump), so a broken wing leaves open air inside
-// it to fall through and recover across.
-const JOKULL_MAIN = Object.freeze({ left: 1100, right: 2500, top: 900, bottom: 1230 });
-const JOKULL_VOID = voidAround(JOKULL_MAIN, { side: 360, top: 800, bottom: 420 });
+// Jökull: one great glacier block over an open frozen abyss, as long as
+// every other main stage, its ice 330 deep (a real foundation, its
+// underside in view above the Void). Its floor is three sections side by
+// side at one height (see `ground`): the centre, 880 wide (63%), permanent;
+// the two wings, 260 each (19%), breakable. Both spawns are on the centre,
+// and once both wings are gone the centre alone is still wider than any
+// Dash and jump needs. The Void is set around the whole glacier as it
+// starts (VOID_MARGINS, as everywhere), so a broken wing leaves open air
+// inside it to fall through and recover across.
+const JOKULL_MAIN = mainStageAround(1800, 900, 1230);
+const JOKULL_VOID = voidAround(JOKULL_MAIN);
 const JOKULL_SECTIONS = Object.freeze([
-  Object.freeze({ id: 'jokull-west', left: 1100, right: 1360, breakable: true }),
-  Object.freeze({ id: 'jokull-centre', left: 1360, right: 2240 }),
-  Object.freeze({ id: 'jokull-east', left: 2240, right: 2500, breakable: true }),
+  Object.freeze({ id: 'jokull-west', left: JOKULL_MAIN.left, right: JOKULL_MAIN.left + 260, breakable: true }),
+  Object.freeze({ id: 'jokull-centre', left: JOKULL_MAIN.left + 260, right: JOKULL_MAIN.right - 260 }),
+  Object.freeze({ id: 'jokull-east', left: JOKULL_MAIN.right - 260, right: JOKULL_MAIN.right, breakable: true }),
 ]);
 
 export const MAPS = [
@@ -168,7 +201,7 @@ export const MAPS = [
       ['Light', 'Sunset'],
     ],
     mainStage: DESERT_MAIN,
-    cameraBounds: cameraAround(DESERT_VOID, 140),
+    cameraBounds: cameraAround(DESERT_VOID),
     voidBounds: DESERT_VOID,
     spawnPoints: [
       { x: 1640, facing: 1 },
@@ -176,8 +209,8 @@ export const MAPS = [
     ],
     platforms: [],
     solids: [
-      { id: 'rock-west', x: 1210, y: 792, w: 176, h: 68 },
-      { id: 'rock-east', x: 2200, y: 796, w: 188, h: 64 },
+      { id: 'rock-west', x: 1190, y: 792, w: 176, h: 68 },
+      { id: 'rock-east', x: 2220, y: 796, w: 188, h: 64 },
     ],
     theme: 'desert',
   },
@@ -194,23 +227,23 @@ export const MAPS = [
       ['Light', 'Night'],
     ],
     mainStage: CITY_MAIN,
-    cameraBounds: cameraAround(CITY_VOID, 140),
+    cameraBounds: cameraAround(CITY_VOID),
     voidBounds: CITY_VOID,
     spawnPoints: [
       { x: 1630, facing: 1 },
       { x: 1970, facing: -1 },
     ],
     platforms: [
-      { id: 'rack-west', x: 1110, y: 876, w: 115, h: 16, dropThrough: true, kind: 'rack' },
-      { id: 'billboard', x: 1245, y: 752, w: 145, h: 18, dropThrough: true, kind: 'catwalk' },
-      { id: 'overpass', x: 1410, y: 830, w: 220, h: 22, dropThrough: true, kind: 'girder' },
+      { id: 'rack-west', x: 1130, y: 876, w: 115, h: 16, dropThrough: true, kind: 'rack' },
+      { id: 'billboard', x: 1258, y: 752, w: 145, h: 18, dropThrough: true, kind: 'catwalk' },
+      { id: 'overpass', x: 1418, y: 830, w: 220, h: 22, dropThrough: true, kind: 'girder' },
       { id: 'tower-deck', x: 1720, y: 708, w: 160, h: 20, dropThrough: false, kind: 'deck' },
-      { id: 'scaffold', x: 1960, y: 840, w: 180, h: 16, dropThrough: true, kind: 'scaffold' },
-      { id: 'sign-walk', x: 2160, y: 730, w: 140, h: 18, dropThrough: true, kind: 'catwalk' },
-      { id: 'rack-east', x: 2315, y: 864, w: 105, h: 16, dropThrough: true, kind: 'rack' },
+      { id: 'scaffold', x: 1953, y: 840, w: 180, h: 16, dropThrough: true, kind: 'scaffold' },
+      { id: 'sign-walk', x: 2148, y: 730, w: 140, h: 18, dropThrough: true, kind: 'catwalk' },
+      { id: 'rack-east', x: 2295, y: 864, w: 105, h: 16, dropThrough: true, kind: 'rack' },
     ],
     solids: [
-      { id: 'bulkhead', x: 2432, y: 884, w: 76, h: 96 },
+      { id: 'bulkhead', x: 2412, y: 884, w: 76, h: 96 },
     ],
     theme: 'city',
   },
@@ -228,7 +261,7 @@ export const MAPS = [
       ['Light', 'Daylight'],
     ],
     mainStage: ASPERITAS_MAIN,
-    cameraBounds: cameraAround(ASPERITAS_VOID, 140),
+    cameraBounds: cameraAround(ASPERITAS_VOID),
     voidBounds: ASPERITAS_VOID,
     spawnPoints: [
       { x: 1640, facing: 1 },
@@ -262,7 +295,7 @@ export const MAPS = [
     ],
     ground: Object.freeze({ type: 'continuous', reach: 2400 }),
     mainStage: ADAMARIS_MAIN,
-    cameraBounds: cameraAround(ADAMARIS_VOID, 140),
+    cameraBounds: cameraAround(ADAMARIS_VOID),
     voidBounds: ADAMARIS_VOID,
     spawnPoints: [
       { x: 1640, facing: 1 },
@@ -294,7 +327,7 @@ export const MAPS = [
     // nothing but air.
     ground: Object.freeze({ type: 'finite', sections: JOKULL_SECTIONS }),
     mainStage: JOKULL_MAIN,
-    cameraBounds: cameraAround(JOKULL_VOID, 140),
+    cameraBounds: cameraAround(JOKULL_VOID),
     voidBounds: JOKULL_VOID,
     spawnPoints: [
       { x: 1640, facing: 1 },
