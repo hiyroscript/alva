@@ -52,13 +52,16 @@ export function chooseDelay(samples, {
 // One player's pings over the match's `transport`: answers the other
 // player's at once, and (for `measuring`, the host) sends its own and keeps
 // the round trips (`samples`). Every CONFIG.online.pingIntervalMs until
-// SAMPLES_KEPT are in, then every CONFIG.online.pingRefreshMs. `now()`:
-// milliseconds. stop() ends it.
+// SAMPLES_KEPT are in, then every CONFIG.online.pingRefreshMs. `samples`:
+// round trips to start from (a link made again to the same player: the
+// next match need not wait for new ones), pinged for at the quick rate
+// until SAMPLES_NEEDED of its own are in. `now()`: milliseconds. stop()
+// ends it.
 export class DelayProbe {
   constructor({
     transport, measuring = false, now = () => globalThis.performance?.now?.() ?? Date.now(),
     setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id),
-    intervalMs = CONFIG.online.pingIntervalMs, refreshMs = CONFIG.online.pingRefreshMs,
+    intervalMs = CONFIG.online.pingIntervalMs, refreshMs = CONFIG.online.pingRefreshMs, samples = [],
   }) {
     this.transport = transport;
     this.measuring = !!measuring;
@@ -67,7 +70,9 @@ export class DelayProbe {
     this.clearTimer = clearTimer;
     this.intervalMs = intervalMs;
     this.refreshMs = refreshMs;
-    this.samples = [];
+    this.samples = (Array.isArray(samples) ? samples : []).filter((r) => Number.isFinite(r) && r >= 0).slice(-SAMPLES_KEPT);
+    // Round trips this probe measured itself.
+    this.measured = 0;
     this.sent = new Map();
     this.nextId = 1;
     this.timer = null;
@@ -85,7 +90,8 @@ export class DelayProbe {
     // Pings never answered are forgotten.
     if (this.sent.size > SAMPLES_KEPT) this.sent.delete(this.sent.keys().next().value);
     this.transport.send({ t: 'ping', id });
-    const wait = this.samples.length >= SAMPLES_KEPT ? this.refreshMs : this.intervalMs;
+    const enough = this.samples.length >= SAMPLES_KEPT && this.measured >= SAMPLES_NEEDED;
+    const wait = enough ? this.refreshMs : this.intervalMs;
     this.timer = this.setTimer(() => this.ping(), wait);
     this.timer?.unref?.();
   }
@@ -98,6 +104,7 @@ export class DelayProbe {
       const rtt = this.now() - this.sent.get(m.id);
       this.sent.delete(m.id);
       this.samples.push(rtt);
+      this.measured += 1;
       if (this.samples.length > SAMPLES_KEPT) this.samples.shift();
     }
   }

@@ -2,7 +2,9 @@
 // address reaches anyone: the WebRTC signalling a Room passes on is
 // scrubbed of every address but the relay's (the server's copy of the
 // rules and the game's give the same answers), each player gets the
-// relay's servers and nothing more, no room is made without a relay, no
+// relay's servers with a password of their own (from Cloudflare's TURN
+// service, lasting an hour) and nothing more, no room is made without the
+// relay's key, no
 // match packet goes through the room, nothing the server answers, stores
 // or sends a player holds an address, the Lobby counts callers by a salted
 // hash, and Cloudflare's per-request logs are off.
@@ -13,7 +15,7 @@ import * as server from '../src/privacy.js';
 import * as game from '../../js/online/privacy.js';
 import { callerKey } from '../src/privacy.js';
 import { handle } from '../src/index.js';
-import { makeEnv, gameRequest, createBody, joinBody, FakeSocket, NO_RELAY } from './fakes.mjs';
+import { makeEnv, gameRequest, createBody, joinBody, FakeSocket, NO_RELAY, relayFor } from './fakes.mjs';
 
 // Addresses that must never reach anyone: each player's public, local and
 // IPv6 ones.
@@ -173,11 +175,23 @@ test('a Room passes the other player WebRTC signalling only scrubbed: no address
   assert.equal(host.of('signal').length, 0, 'never echoed back');
 });
 
-test('the relay\'s servers go to the player who asks, only with the other seat taken, a few at a time', async () => {
-  const { host, guest, say, clock } = await room();
+test('the relay\'s servers go to the player who asks, each with a password of their own that lasts an hour, only with the other seat taken, a few at a time', async () => {
+  const { host, guest, say, clock, turn } = await room();
   await say(host, { type: 'relay' });
-  assert.deepEqual(host.of('relay').at(-1), { type: 'relay', iceServers: [{ urls: ['turn:relay1.example.com:3478', 'turns:relay1.example.com:443'], username: 'alva-user', credential: 'alva-secret' }] }, 'TURN addresses only');
+  assert.deepEqual(host.of('relay').at(-1), { type: 'relay', iceServers: relayFor(1) }, 'TURN addresses only: UDP 3478 and TLS 443');
   assert.equal(guest.of('relay').length, 0, 'only to who asked');
+  await say(guest, { type: 'relay' });
+  assert.deepEqual(guest.of('relay').at(-1), { type: 'relay', iceServers: relayFor(2) }, 'the guest\'s own password');
+  // Asked of Cloudflare's service with the Worker's key, for an hour.
+  assert.equal(turn.requests.length, 2);
+  for (const r of turn.requests) {
+    assert.equal(r.url, 'https://rtc.live.cloudflare.com/v1/turn/keys/test-key-id/credentials/generate-ice-servers');
+    assert.equal(r.method, 'POST');
+    assert.equal(r.headers.authorization, 'Bearer test-key-token');
+    assert.deepEqual(r.body, { ttl: 3600 });
+  }
+  assert.equal(server.RELAY_TTL_SECONDS, 60 * 60, 'a password lasts an hour');
+  holdsNone(turn.requests, 'what Cloudflare\'s service was sent');
   for (let i = 0; i < 10; i++) await say(host, { type: 'relay' });
   assert.deepEqual(host.of('relay').at(-1), { type: 'relay', error: 'rate_limited' }, 'ten in ten minutes: the eleventh is refused');
   clock.now += 10 * 60_000;
@@ -190,12 +204,23 @@ test('the relay\'s servers go to the player who asks, only with the other seat t
   await alone.room(created.room.id).connect('host', ws);
   await alone.room(created.room.id).webSocketMessage(ws, JSON.stringify({ type: 'relay' }));
   assert.deepEqual(ws.of('relay').at(-1), { type: 'relay', error: 'bad_request' });
-  // Half set up is none.
-  assert.equal((await import('../src/privacy.js')).relayServers({ TURN_URLS: 'turn:a:3478', TURN_USERNAME: 'u' }).length, 0);
-  assert.equal((await import('../src/privacy.js')).relayServers({ TURN_URLS: 'stun:a:3478', TURN_USERNAME: 'u', TURN_CREDENTIAL: 'c' }).length, 0);
+  assert.equal(alone.turn.requests.length, 0, 'no password asked for');
 });
 
-test('without a relay no room is made or joined, and /health says so; a room still asking is told relay_unavailable', async () => {
+test('of the TURN service\'s answer, only TURN entries and their UDP 3478 and TLS 443 addresses are kept', () => {
+  const answer = [
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: ['turn:t.example:53?transport=udp', 'turn:t.example:3478?transport=udp', 'turn:t.example:80?transport=tcp', 'turns:t.example:443?transport=tcp'], username: 'u', credential: 'c' },
+    { urls: ['turn:t.example:3478?transport=udp'], username: 'u' },
+  ];
+  assert.deepEqual(server.pickRelayServers(answer), [{ urls: ['turn:t.example:3478?transport=udp', 'turns:t.example:443?transport=tcp'], username: 'u', credential: 'c' }]);
+  // A single object, and addresses on other ports only: those (but never 53).
+  assert.deepEqual(server.pickRelayServers({ urls: ['turn:t.example:53', 'turn:t.example:3479'], username: 'u', credential: 'c' }), [{ urls: ['turn:t.example:3479'], username: 'u', credential: 'c' }]);
+  assert.deepEqual(server.pickRelayServers(null), []);
+  assert.deepEqual(server.pickRelayServers([{ urls: 'stun:x' }]), []);
+});
+
+test('without the relay\'s key no room is made or joined, and /health says so; a room whose relay fails is told relay_unavailable', async () => {
   const { env } = makeEnv(NO_RELAY);
   for (const [path, body] of [['/rooms', createBody()], ['/rooms/join', joinBody({ code: 'ABCDE' })]]) {
     const res = await handle(gameRequest(path, { method: 'POST', body }), env);
@@ -208,8 +233,14 @@ test('without a relay no room is made or joined, and /health says so; a room sti
   assert.equal(health.relay, false);
   assert.equal(health.ok, true, 'the server itself is up');
   assert.equal((await (await handle(gameRequest('/health'), makeEnv().env)).json()).relay, true);
-  // A room made while there was one, after it was taken away.
-  const { host, say, env: roomEnv } = await room();
+  assert.equal(server.hasRelay({ TURN_KEY_ID: 'k' }), false, 'half a key is none');
+  await assert.rejects(server.relayServers({ TURN_KEY_ID: 'k' }, async () => { throw new Error('never asked'); }), /relay_unavailable/);
+  // Cloudflare's service down, or the key taken away after the room was made.
+  const { host, say, env: roomEnv, turn } = await room();
+  turn.fail = true;
+  await say(host, { type: 'relay' });
+  assert.deepEqual(host.of('relay').at(-1), { type: 'relay', error: 'relay_unavailable' });
+  turn.fail = false;
   Object.assign(roomEnv, NO_RELAY);
   await say(host, { type: 'relay' });
   assert.deepEqual(host.of('relay').at(-1), { type: 'relay', error: 'relay_unavailable' });

@@ -1040,12 +1040,26 @@ neither player learns the other's address.
   per-address limits, rooms cleaned up after 10 minutes without activity. It allows only itch.io's game hosts
   (and a local copy for testing). No login, cookie or stored identity;
   names last as long as their room (docs/development/online-server.md).
+- **The relay's safeguards** keep Online play inside the relay's free
+  monthly amount (Cloudflare's, 1,000 GB): at most 10 rooms with both
+  players at once (a host waiting alone and the lobby do not count; one
+  more join is "Servers are full right now. Please try again in a few
+  minutes."); a monthly safety stop that, once the month's estimated relay
+  use reaches 450 GB, closes Online play until the next month ("Online play
+  has reached its limit for this month. It opens again next month.", then
+  Home, a room still open included); relay passwords that last an hour, at
+  most 120 handed out an hour (past it, "Servers are full", with Try
+  again), a link older than 40 minutes made again between matches; and an
+  on/off switch for the owner ("Online play is closed right now. Please
+  try again later.", then Home). All are settings in `server/wrangler.toml`
+  (docs/development/online-server.md, The relay's safeguards).
 - **Privacy.** No player ever learns another's network address: the two
-  browsers connect only through a TURN relay (the owner's, its servers
-  handed to each player by the room), relay-only, never directly, and every
+  browsers connect only through a TURN relay (Cloudflare's, its servers
+  handed to each player by the room with a password of their own that
+  lasts an hour), relay-only, never directly, and every
   signalling message is scrubbed of addresses by the game and again by the
   server. A player sees of the other only their name, fighter, Ready,
-  Rematch and connection. There is no other way: a server with no relay
+  Rematch and connection. There is no other way: a server with no relay key
   makes no room ("The room server can't make private connections right
   now."), and a link that cannot be made says "Couldn't connect to your
   opponent. One of your networks may be blocking it.", with Try again. The

@@ -63,7 +63,12 @@ Going offline anywhere in Online Play ends it: the room is left, Home, and
   once cleaned, letters of any language, digits, spaces and `_ - . '`.
   Continue asks the server for the public rooms; if it cannot be reached
   (or there is no `serverUrl`), "Online play is unavailable right now",
-  then Home.
+  then Home. If Online play is closed, its own message, then Home: "Online
+  play is closed right now. Please try again later." (`closed`, the
+  owner's switch) or "Online play has reached its limit for this month. It
+  opens again next month." (`month_limit`, the relay's safety stop); the
+  lobby and a room still open say the same if it closes while they show
+  ([the relay's safeguards](../development/online-server.md#the-relays-safeguards)).
 - **Typing.** While a text field has focus, the keys that type are the
   field's ([input](../systems/input.md#text-fields)): ↑ ↓ and Esc still
   navigate, Enter submits the field.
@@ -74,9 +79,10 @@ Going offline anywhere in Online Play ends it: the room is left, Home, and
   are read again every `listRefreshMs` while the lobby shows (a hidden page
   skips its turn); a full room, one in a match or one of another version
   shows without Join. Every refusal is a dialog (`showNotice`), the lobby
-  staying: "Servers are full right now…" (`full`), "Online play is
-  unavailable right now." (`unavailable`), a code nobody has, a full room,
-  too many tries, another version.
+  staying: "Servers are full right now…" (`full`: also when 10 rooms
+  already have both players, `MAX_MATCHES`), "Online play is unavailable
+  right now." (`unavailable`), a code nobody has, a full room, too many
+  tries, another version.
 - **Room.** Its name, its code (a read-only field: Copy code writes it to
   the clipboard, or, where the clipboard is blocked as in itch.io's frame,
   selects it), its visibility and mode, and both seats: each player's name,
@@ -84,8 +90,11 @@ Going offline anywhere in Online Play ends it: the room is left, Home, and
   shared roster (`online-character`, the choice in `app.selection.online`).
   The link to the other player (through the relay) is made as soon as
   both are there; Ready opens once it is up and a fighter is chosen. A
-  link that cannot be made says "Couldn't connect to your opponent…" and
-  offers Try again. Once both are ready the host's
+  link that cannot be made says "Couldn't connect to your opponent…" (or
+  "Servers are full…" when the relay's passwords for this hour are all
+  handed out) and offers Try again. Between matches, a link older than
+  `linkRenewMs` (40 minutes) is made again, before its relay passwords
+  (an hour) run out. Once both are ready the host's
   browser sends the start; the room fills in the players and sends it to
   both; the drawn stage shows a moment (`STAGE_REVEAL_MS`), then the
   Battle. Leaving asks first (the host is told it closes the room); the
@@ -178,10 +187,11 @@ as a desync.
 
 The match never goes straight from one browser to the other: a direct
 link hands each browser the other's IP address while it is set up
-([Privacy](#privacy)). It goes through a TURN relay (ExpressTURN's free
-plan, set up by the owner: its address and credentials in the Worker's
-secrets). `matchLink` (`js/online/match-link.js`) makes each player's
-link: it asks the room for the relay's servers (`{ type: 'relay' }`), then
+([Privacy](#privacy)). It goes through Cloudflare's TURN relay, at the
+location nearest each player (its key in the Worker's secrets, set up by
+the owner). `matchLink` (`js/online/match-link.js`) makes each player's
+link: it asks the room for the relay's servers (`{ type: 'relay' }`, each
+time with a password of that player's own that lasts an hour), then
 `PeerLink` (`js/online/peer.js`) makes a WebRTC DataChannel with
 `iceTransportPolicy: 'relay'` and those servers alone. The host offers, the
 guest answers, the offer, answer and ICE candidates going through the
@@ -193,8 +203,12 @@ server.
 There is no other way. With no relay's servers to be had, or the link not
 open within `connectTimeoutMs`, the link fails: "Couldn't connect to your
 opponent. One of your networks may be blocking it.", with Try again. A
-server with no relay set up makes no room at all ("The room server can't
-make private connections right now.").
+server with no relay key makes no room at all ("The room server can't
+make private connections right now."). The relay is free up to a monthly
+amount, which the server's safeguards keep Online play inside: at most 10
+rooms with both players at once, a monthly safety stop, at most 120
+passwords an hour, and an on/off switch
+([the relay's safeguards](../development/online-server.md#the-relays-safeguards)).
 
 **The delay** is chosen for each match (`js/online/delay.js`): while both
 players are in the room, the host's browser pings the other on the link
@@ -237,10 +251,10 @@ fighter, Ready, Rematch and whether they are connected.
   are off ([the room server](../development/online-server.md#privacy)).
 - **What is visible:** the name a player types, to the other player; a
   public room's name and its host's name, to anyone in the lobby.
-  Cloudflare (the server) and the relay's service see each player's
-  address, as any host does. The relay's credentials reach every player in
-  a room (their browser needs them), so someone could use up its free
-  allowance; matches then fail to connect until it renews.
+  Cloudflare (the server and the relay) sees each player's address, as any
+  host does. A relay password reaches the player it is for (their browser
+  needs it), so someone could copy theirs: it stops working within the
+  hour, and the server hands out at most 120 an hour.
 
 ## Rollback, later
 

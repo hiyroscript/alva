@@ -136,6 +136,11 @@ export const CONFIG = Object.freeze({
     // stopped answering before "Connection lost".
     connectTimeoutMs: 10000,
     disconnectGraceMs: 10000,
+    // Each player's relay password lasts an hour (server/src/privacy.js),
+    // and two players can stay in a room far longer, so between matches the
+    // host's browser makes the link again once it is this old: well before
+    // the password runs out, and with time left for one more match on it.
+    linkRenewMs: 40 * 60 * 1000,
     // How long a match waits for the other browser's first input while
     // both load their fighters (slow connections load slowly).
     loadTimeoutMs: 30000,

@@ -129,19 +129,50 @@ export class FakeNamespace {
   }
 }
 
-// A TURN relay's secrets, as the owner sets them (fake ones): every match
-// needs a relay, so the test environment has one unless `vars` empties it.
-export const RELAY_VARS = Object.freeze({
-  TURN_URLS: 'turn:relay1.example.com:3478, turns:relay1.example.com:443 stun:stun.example.com',
-  TURN_USERNAME: 'alva-user',
-  TURN_CREDENTIAL: 'alva-secret',
-});
-export const NO_RELAY = Object.freeze({ TURN_URLS: '', TURN_USERNAME: '', TURN_CREDENTIAL: '' });
+// The relay's key, as the owner sets it (fake): every match needs a relay,
+// so the test environment has one unless `vars` empties it.
+export const RELAY_VARS = Object.freeze({ TURN_KEY_ID: 'test-key-id', TURN_KEY_API_TOKEN: 'test-key-token' });
+export const NO_RELAY = Object.freeze({ TURN_KEY_ID: '', TURN_KEY_API_TOKEN: '' });
+
+// Cloudflare's TURN service as a test sees it: every request it was sent
+// (`turn.requests`), answered with a new password in the service's own
+// shape (more addresses than the game uses, and STUN), or failing while
+// `turn.fail` is set.
+export function fakeTurn() {
+  const turn = { requests: [], fail: false, issued: 0 };
+  turn.fetch = async (url, init = {}) => {
+    turn.requests.push({ url: String(url), method: init.method, headers: { ...init.headers }, body: init.body ? JSON.parse(init.body) : null });
+    if (turn.fail) return new Response('{"error":"down"}', { status: 503 });
+    turn.issued += 1;
+    return new Response(JSON.stringify({
+      iceServers: [
+        { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] },
+        {
+          urls: [
+            'turn:turn.cloudflare.com:3478?transport=udp', 'turn:turn.cloudflare.com:53?transport=udp',
+            'turn:turn.cloudflare.com:3478?transport=tcp', 'turn:turn.cloudflare.com:80?transport=tcp',
+            'turns:turn.cloudflare.com:5349?transport=tcp', 'turns:turn.cloudflare.com:443?transport=tcp',
+          ],
+          username: `user-${turn.issued}`,
+          credential: `secret-${turn.issued}`,
+        },
+      ],
+    }), { status: 201, headers: { 'content-type': 'application/json' } });
+  };
+  return turn;
+}
+
+// What the game's link is given from the fake service's password `n`.
+export const relayFor = (n) => [{
+  urls: ['turn:turn.cloudflare.com:3478?transport=udp', 'turns:turn.cloudflare.com:443?transport=tcp'],
+  username: `user-${n}`,
+  credential: `secret-${n}`,
+}];
 
 // The server's environment: its variables (wrangler.toml's and the relay's
-// secrets, overridden by `vars`), a Lobby namespace and a Room namespace
-// wired together, one clock (`clock.now`, milliseconds) and a seeded
-// source of random bytes.
+// key, overridden by `vars`), a Lobby namespace and a Room namespace wired
+// together, one clock (`clock.now`, milliseconds), a seeded source of
+// random bytes and a fake TURN service (`turn`) the Rooms reach.
 export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
   const clock = { now: start };
   const now = () => clock.now;
@@ -155,16 +186,19 @@ export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
       return bytes;
     },
   };
+  const turn = fakeTurn();
   const env = {
     ALLOWED_ORIGINS: 'https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*',
+    ONLINE_OPEN: 'true',
     MAX_ROOMS: '50', DAILY_REQUEST_LIMIT: '100000', BUDGET_SHARE: '0.8', ROOM_IDLE_MINUTES: '10',
+    MAX_MATCHES: '10', RELAY_GB_PER_HOUR: '0.2', RELAY_MONTHLY_GB: '450', RELAY_PASSWORDS_PER_HOUR: '120',
     CREATE_PER_MINUTE: '10', JOIN_PER_MINUTE: '30', LIST_PER_MINUTE: '120',
     ...RELAY_VARS,
     ...vars,
   };
   env.LOBBY = new FakeNamespace((state) => new Lobby(state, env, { now, random }));
-  env.ROOM = new FakeNamespace((state) => new Room(state, env, { now }));
-  return { env, clock, lobby: () => env.LOBBY.object('lobby'), room: (id) => env.ROOM.object(id) };
+  env.ROOM = new FakeNamespace((state) => new Room(state, env, { now, fetch: (url, init) => turn.fetch(url, init) }));
+  return { env, clock, turn, lobby: () => env.LOBBY.object('lobby'), room: (id) => env.ROOM.object(id) };
 }
 
 export const ITCH = 'https://html-classic.itch.zone';

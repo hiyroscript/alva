@@ -1,9 +1,30 @@
 // The Lobby: one Durable Object (a single named instance) that knows every
 // open room. It hands out room ids and codes, serves the public rooms list,
 // sends a joining player to the right room, and keeps the server inside
-// Cloudflare's free plan (wrangler.toml explains the numbers):
+// Cloudflare's free allowances (wrangler.toml explains the numbers):
 //
 //   - at most MAX_ROOMS rooms open at once: one more is refused as `full`;
+//   - at most MAX_MATCHES rooms with both players at once (the rooms whose
+//     players are connected through the relay; a host waiting alone, or
+//     anyone in the lobby, does not count): one more join is refused as
+//     `full` ("Servers are full right now"), until a room ends or a player
+//     leaves;
+//   - the relay's monthly safety stop: the Lobby estimates this month's
+//     relay use (UTC) from the time rooms spend with both players (menus
+//     included), at RELAY_GB_PER_HOUR each (the high end of what a match
+//     uses), and once it reaches RELAY_MONTHLY_GB,
+//     Online play closes until the next month (`month_limit`): no list, no
+//     room, no join, no relay password, and an open room closes at its next
+//     relay request. RELAY_MONTHLY_GB is under half the relay's free monthly
+//     amount, so even a billing month that straddles two calendar months
+//     stays inside it;
+//   - relay passwords (each lasts an hour: server/src/privacy.js): at most
+//     RELAY_PASSWORDS_PER_HOUR handed out in an hour, server-wide (a Room
+//     asks before each one, POST /relay), so passwords cannot be gathered
+//     in bulk;
+//   - ONLINE_OPEN (wrangler.toml): "false" closes Online play (`closed`;
+//     the Worker refuses before the Lobby wakes, and the Lobby refuses
+//     relay passwords);
 //   - a daily request budget, counted here and reset at 00:00 UTC (the free
 //     plan's own day): every request the Lobby handles, plus what each Room
 //     reports it handled (WebSocket connections, messages at the 20 : 1
@@ -26,16 +47,18 @@
 // room's names go with it.
 //
 // Requests (from the Worker, server/src/index.js, or a Room):
+//   GET  /health       { ok, open, closed }: the Lobby answers, and whether Online play is open
 //   GET  /rooms        the public rooms, newest first
 //   POST /rooms        create: { name, playerName, visibility, mode, session, version }
 //   POST /rooms/join   join: { code } or { id } (public rooms only), with { playerName, session, version }
 //   POST /report       a Room's change: { id, players, status, closed, requests }
+//   POST /relay        a Room asks to hand out one relay password: { id } → { ok } or { error }
 
 import {
   validName, validRoomName, validCode, validMode, validVisibility, validRoomId, validSession, validVersion,
   randomHex, randomCode,
 } from './rules.js';
-import { json, error, readJson, utcDay, numberVar } from './http.js';
+import { json, error, readJson, utcDay, utcMonth, monthStart, numberVar, onlineOpen } from './http.js';
 import { callerKey } from './privacy.js';
 
 const MINUTE = 60_000;
@@ -44,6 +67,7 @@ const SWEEP_MS = MINUTE;
 // A silent room is dropped this long after its idle time (its Room closes
 // itself at the idle time; this is the backstop).
 const SILENT_GRACE_MS = 5 * MINUTE;
+const HOUR = 60 * MINUTE;
 
 export class Lobby {
   // `ctx` and `env` are the Durable Object's (or a test's fakes). `now` and
@@ -54,6 +78,10 @@ export class Lobby {
     this.now = now;
     this.random = random;
     this.maxRooms = numberVar(env.MAX_ROOMS, 50);
+    this.maxMatches = numberVar(env.MAX_MATCHES, 10);
+    this.gbPerHour = numberVar(env.RELAY_GB_PER_HOUR, 0.2);
+    this.monthlyGb = numberVar(env.RELAY_MONTHLY_GB, 450);
+    this.passwordsPerHour = numberVar(env.RELAY_PASSWORDS_PER_HOUR, 120);
     this.dailyLimit = numberVar(env.DAILY_REQUEST_LIMIT, 100_000);
     this.budgetShare = numberVar(env.BUDGET_SHARE, 0.8);
     this.idleMs = numberVar(env.ROOM_IDLE_MINUTES, 10) * MINUTE;
@@ -69,25 +97,32 @@ export class Lobby {
     this.salt = randomHex(16, random);
     this.rooms = null;
     this.budget = null;
+    this.relay = null;
+    // Joins on their way to a Room, counted as matches until they land.
+    this.joining = new Set();
     this.loaded = null;
   }
 
-  // The stored rooms and budget, read once per wake-up.
+  // The stored rooms, budget and relay use, read once per wake-up.
   load() {
     this.loaded ??= (async () => {
+      const t = this.now();
       this.rooms = (await this.ctx.storage.get('rooms')) ?? {};
-      this.budget = (await this.ctx.storage.get('budget')) ?? { day: utcDay(this.now()), used: 0 };
+      this.budget = (await this.ctx.storage.get('budget')) ?? { day: utcDay(t), used: 0 };
+      this.relay = (await this.ctx.storage.get('relay')) ?? freshRelay(t);
     })();
     return this.loaded;
   }
 
-  // The rooms, and the budget with them (what the alarm would save anyway).
+  // The rooms, with the budget and the relay use (what the alarm would save
+  // anyway). Saved together, so the relay use counted since its last save
+  // can always be counted again from the rooms as stored.
   saveRooms() {
-    return this.ctx.storage.put({ rooms: this.rooms, budget: this.budget });
+    return this.ctx.storage.put({ rooms: this.rooms, budget: this.budget, relay: this.relay });
   }
 
   saveBudget() {
-    return this.ctx.storage.put('budget', this.budget);
+    return this.ctx.storage.put({ budget: this.budget, relay: this.relay });
   }
 
   // Counts `n` requests against today's budget (a new UTC day starts it
@@ -105,6 +140,38 @@ export class Lobby {
 
   get openRooms() {
     return Object.values(this.rooms);
+  }
+
+  // Rooms with both players (and joins on their way): the relay's matches.
+  get matches() {
+    return this.openRooms.filter((r) => r.players === 2).length + this.joining.size;
+  }
+
+  // Counts the relay's use up to now: every room with both players, for
+  // the time since the last count. A new month (UTC) starts it again.
+  accrue() {
+    const t = this.now();
+    if (this.relay.month !== utcMonth(t)) {
+      // A new month: counted from its first moment (the part of the gap
+      // since the last count that is this month's).
+      const { hour, passwords } = this.relay;
+      this.relay = { ...freshRelay(t), at: monthStart(t), hour, passwords };
+    }
+    const pairs = this.openRooms.filter((r) => r.players === 2).length;
+    if (t > this.relay.at) this.relay.seconds += ((t - this.relay.at) / 1000) * pairs;
+    this.relay.at = t;
+  }
+
+  // This month's estimated relay use, in GB.
+  get relayGb() {
+    return (this.relay.seconds / 3600) * this.gbPerHour;
+  }
+
+  // Why Online play is closed now ('closed', 'month_limit'), or null.
+  get closedBy() {
+    if (!onlineOpen(this.env)) return 'closed';
+    if (this.relayGb >= this.monthlyGb) return 'month_limit';
+    return null;
   }
 
   // Whether caller `ip` (its salted hash) may do `action` once more this
@@ -143,21 +210,24 @@ export class Lobby {
   async fetch(request) {
     await this.load();
     this.spend(1);
+    this.accrue();
     const url = new URL(request.url);
     const ip = callerKey(request.headers.get('x-alva-ip') ?? '', this.salt);
     const route = `${request.method} ${url.pathname}`;
     try {
       switch (route) {
         case 'GET /health':
-          return json({ ok: true });
+          return json({ ok: true, open: !this.closedBy, closed: this.closedBy });
         case 'GET /rooms':
-          return this.list(ip);
+          return this.closedBy ? error(this.closedBy) : this.list(ip);
         case 'POST /rooms':
-          return await this.create(await readJson(request), ip);
+          return this.closedBy ? error(this.closedBy) : await this.create(await readJson(request), ip);
         case 'POST /rooms/join':
-          return await this.join(await readJson(request), ip);
+          return this.closedBy ? error(this.closedBy) : await this.join(await readJson(request), ip);
         case 'POST /report':
           return await this.report(await readJson(request, 4096));
+        case 'POST /relay':
+          return await this.grantRelay(await readJson(request, 1024));
         default:
           return error('not_found');
       }
@@ -239,19 +309,33 @@ export class Lobby {
     }
     if (!record) return error('room_not_found');
     if (record.version !== version) return error('version_mismatch');
+    // A second player makes one more match through the relay (a room
+    // already counted as one, or already being joined, is the Room's to
+    // answer: a reload gets its seat back, anyone else 'room_full').
+    const counted = record.players === 2 || this.joining.has(record.id);
+    if (!counted && this.matches >= this.maxMatches) return error('full');
     const token = randomHex(16, this.random);
-    const res = await this.room(record.id).fetch('https://room/reserve', {
-      method: 'POST',
-      body: JSON.stringify({ name: playerName, token, session, version }),
-    });
-    const answer = await res.json().catch(() => ({}));
+    if (!counted) this.joining.add(record.id);
+    let res;
+    let answer;
+    try {
+      res = await this.room(record.id).fetch('https://room/reserve', {
+        method: 'POST',
+        body: JSON.stringify({ name: playerName, token, session, version }),
+      });
+      answer = await res.json().catch(() => ({}));
+    } finally {
+      if (!counted) this.joining.delete(record.id);
+    }
     if (!res.ok) {
       if (answer.error === 'room_not_found') {
+        this.accrue();
         delete this.rooms[record.id];
         await this.saveRooms();
       }
       return error(answer.error ?? 'room_not_found');
     }
+    this.accrue();
     record.players = 2;
     record.status = 'full';
     record.lastActive = this.now();
@@ -265,6 +349,7 @@ export class Lobby {
     this.spend(Math.min(10_000, Math.max(0, Number(body.requests) || 0)));
     const record = this.rooms[body.id];
     if (!record) return json({ ok: true });
+    this.accrue();
     if (body.closed) delete this.rooms[body.id];
     else {
       if ([1, 2].includes(body.players)) record.players = body.players;
@@ -275,13 +360,33 @@ export class Lobby {
     return json({ ok: true });
   }
 
+  // A Room asks to hand one relay password to one of its players: yes
+  // while Online play is open, the room is known, and this hour's
+  // passwords are not all handed out ('full' then: the player may try
+  // again in a moment).
+  async grantRelay(body) {
+    if (this.closedBy) return error(this.closedBy);
+    const record = body?.id ? this.rooms[body.id] : null;
+    if (!record) return error('room_not_found');
+    const hour = Math.floor(this.now() / HOUR);
+    if (this.relay.hour !== hour) {
+      this.relay.hour = hour;
+      this.relay.passwords = 0;
+    }
+    if (this.relay.passwords >= this.passwordsPerHour) return error('full');
+    this.relay.passwords += 1;
+    await this.saveBudget();
+    return json({ ok: true });
+  }
+
   // Every minute while anything is open: rooms silent well past their idle
-  // time are dropped (their Room has closed or vanished), and the budget is
-  // saved.
+  // time are dropped (their Room has closed or vanished), and the budget
+  // and relay use are saved.
   async alarm() {
     await this.load();
     this.alarmSet = false;
     this.spend(1);
+    this.accrue();
     const t = this.now();
     let changed = false;
     for (const r of this.openRooms) {
@@ -298,6 +403,13 @@ export class Lobby {
       this.alarmSet = true;
     }
   }
+}
+
+// The relay's use at the start of a month: { month, seconds (room-seconds
+// with both players), at (when last counted), hour, passwords (handed out
+// in that hour) }.
+function freshRelay(t) {
+  return { month: utcMonth(t), seconds: 0, at: t, hour: Math.floor(t / HOUR), passwords: 0 };
 }
 
 // What a player is told about a room.
