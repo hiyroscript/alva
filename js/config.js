@@ -28,6 +28,13 @@ export const CONFIG = Object.freeze({
     // air past each ledge (world units): narrow screens zoom out further for
     // it, but never below fighterScreenRatioMin.
     stageFrameMargin: 100,
+    // How much closer the battle camera sits than that whole-stage view:
+    // one tuning point for every fighter and every map. It multiplies the
+    // target fighter height and its min / max above, and relaxes the stage
+    // fit by the same factor, so at a zoom above 1 the view follows the
+    // fighters across the stage instead of always showing all of it (the
+    // view still never shows past the map's camera bounds).
+    cameraZoom: 1,
     // Snap sprite scale to whole device pixels per art pixel when the snapped
     // size stays inside the min/max ratio above.
     pixelPerfect: true,
