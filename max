@@ -1,85 +1,139 @@
-# Task: three changes to Alva — permanent landscape lock, Joystick as default Mobile Controls, and a reverse-elimination "spawn burst"
+# Task: joystick Down, a launch-speed nerf, Launch Point recovery and HUD feedback, and Energy that is only paid when Shield / Deflect actually do something
 
-Read `CLAUDE.md` first and follow it (character system rules, touch comfort rules, `character_rule` is protected, run `node --test`). Read the "Camera & mobile layout update" and "effect update" entries in `UPDATES.md` for context. When done, add a new named entry to `UPDATES.md` called the **spawn & landscape update** (what changed, the PR/commit, where the tuning lives, which tests cover it), and update `ALVA_SPEC.md` / `docs/` wherever they describe the old behaviour.
+Read `CLAUDE.md` first and follow it: the character system rules (never special-case a fighter id in shared code), the controller and touch comfort rules (strict), `character_rule` is protected, and run `node --test`. Read these `UPDATES.md` entries for context: **Jump, Shield, turning and joystick changes**, **Deflect and air dash**, **Universal movement and momentum**, **CPU Intelligence**, the **effect update** and the **bounce update**. When you're done, add a new named entry to `UPDATES.md` called the **launch & energy update**. It should cover what changed, the PR/commit, where the tuning lives and which tests cover it. Also update `ALVA_SPEC.md`, `docs/` and the in-game reference strings (`js/localization/strings/en.js` and `fr.js`) wherever they describe the old behaviour. Find them with `grep -rni "recover\|LAUNCH_UNIT_SPEED\|deflect\|shield" ALVA_SPEC.md docs js/localization`.
+
+**Off limits:** don't change anything about **Base Launch** (`BASE_LAUNCH_VALUES`, any hit's `baseLaunch`), how **damage adds to Launch Point** (`launchPoint += damage` in `CombatSystem.applyHit`), the launch formula `launch strength = Base Launch × Launch Point` (`resolveLaunchStrength`), or **any damage value** (`ALLOWED_DAMAGE_VALUES`, `DEFLECT_DAMAGE`, any character's `damage`). The only exceptions are the explicit Launch Point *reductions* in sections 3 and 4.
 
 ---
 
-## 1. Alva permanently auto-locks itself to landscape
+## 1. Joystick: pointing it down is the Down button
 
 ### Current behaviour
-- `manifest.webmanifest` already declares `"orientation": "landscape"`, but that only works for an installed PWA on some platforms.
-- `js/core/device.js` sets `portrait = h > w * 1.05` and `blockedPortrait = touchUI && portrait`, and toggles `html.is-portrait-blocked`. That class shows the `.rotate-overlay` in `index.html` ("Rotate your device / Alva is designed for landscape play", styled in `css/overlays.css`, strings `rotate.title` / `rotate.text` in `js/localization/strings/en.js` + `fr.js`).
-- Nothing in `js/` calls `screen.orientation.lock`, so the game never rotates itself. It only asks the player to rotate.
+- `js/ui/touch-controls.js`: `JOYSTICK = { deadzone: 0.24, engage: 0.34, travel: 0.56 }`. `joystickDirection(x, current)` reads **only the sideways part** (comment: "pushing up or down moves the knob, never Jump or Down"). `steer()` calls `this.assign(this.stickPointer, held)`, which holds one action per pointer (`runLeft` / `runRight` / null).
+- Down is a separate held button (`DOWN_BUTTON`, `action: 'down'`, `.tc-down`) in both schemes. Holding it is exactly the `down` control (S / ↓ / left stick down). In `js/game/fighters/fighter.js` that gives:
+  - **Super Jump**: `jumpKind = input.down && body.grounded ? 'super' : 'normal'` (~line 463), Down held when Jump is pressed.
+  - **Fast fall**: Down held in the air while descending (~line 862, `fastFallVelocity`).
+  - **Platform drop**: a fresh `downPressed` on a droppable one-way platform, released within `movement.dropTapTime` (~lines 705–736, `dropTap`).
 
 ### Wanted
-On touch devices Alva locks itself to landscape automatically, keeps the lock for the whole session, and puts it back whenever it is lost.
+In the **Joystick** scheme, pushing the stick down does exactly what holding the Down button does: Super Jump (stick held down + Jump), fast fall (stick down in the air while falling), and the platform drop (a quick flick down and back to centre on a droppable platform). It's a quality-of-life change. The Down button stays where it is and keeps working, and nothing in the fighter or physics code changes. The stick only produces the same `down` input the button already does.
 
 Implementation:
-1. Create a small module, e.g. `js/core/orientation-lock.js`, or add the logic to `Device` in `js/core/device.js`, whichever fits the existing structure better. It should:
-   - Call `screen.orientation.lock('landscape')` when the API exists (feature-detect it, and catch the rejected promise quietly because it rejects on unsupported browsers and outside fullscreen).
-   - Most browsers only allow `lock()` in fullscreen or in an installed app (`display-mode: standalone/fullscreen`, see `APP_DISPLAY_MODES` in `js/core/web-app-install.js`). On touch UI, on the first user gesture (`pointerdown` / `touchend` / `keydown`, once), call `document.documentElement.requestFullscreen({ navigationUI: 'hide' })` (with the webkit prefix fallback), then lock. Don't request fullscreen on desktop / non-touch devices, and don't lock there.
-   - Lock again after `fullscreenchange`, `visibilitychange` (back to visible), `orientationchange` / `screen.orientation` `change`, and app resume. "Permanently" means the game keeps restoring the lock. There's no setting to turn it off.
-   - Never throw. On iOS Safari, which has no `lock()`, fall back silently.
-2. Keep the rotate overlay (`is-portrait-blocked`) as the **fallback only**, for when the lock is unavailable or was refused. When the lock succeeds, the player should never see the overlay. The existing `blockedPortrait` logic in `device.js` can stay as-is, since a successful lock keeps the window landscape.
-3. Keep `"orientation": "landscape"` in the manifest. Also check that `index.html` has no conflicting meta tags.
-4. Make sure nothing else breaks: the touch layout editor (`js/ui/touch-layout-editor.js`) and `touch-controls.js` re-place themselves on orientation/resize, and online play, the install dialog and the splash screen have to work while in fullscreen.
-5. Tests: add tests (e.g. in `tests/interface/screen-guard.test.mjs` or a new `orientation-lock.test.mjs`) with a fake `screen.orientation` and fullscreen API covering: lock is requested on touch after the first gesture; lock is not requested on desktop; it is re-requested after `visibilitychange` / `fullscreenchange`; a rejected `lock()` or a missing API doesn't throw and leaves the rotate overlay as the fallback.
+1. Read the vertical offset in `steer()` as well (`dy / radius`, screen y grows downward). Add `downEngage` / `downDeadzone` to `JOYSTICK` with the same hysteresis idea as the sideways ones (e.g. engage 0.5, release 0.38). Tune them so a normal sideways run with the thumb drifting a bit low **never** triggers Down, since an accidental fast fall or drop would be worse than the problem being fixed. A possible approach is to engage Down only when the push is mostly downward (e.g. the angle is within about 55° of straight down), or with a separate higher threshold. Write the rule as a pure exported function (e.g. `joystickVertical(x, y, current)`) next to `joystickDirection` so it can be tested.
+2. The stick's one pointer now has to hold **two** actions at once (a run direction **and** `down`, for a diagonal down-left / down-right). `assign()` only holds one action per pointer, so give the stick its own second slot. For example, track the stick's Down separately and press/release `down` through the same path the Down button uses. Pressing it has to produce a real `downPressed` edge, or the platform-drop tap won't arm. Releasing it, or `releaseStick()` / `releaseAll()`, has to let go of `down` too, so Down is never left stuck on (check `pointercancel`, `lostpointercapture`, `blur`/visibility, scheme switch and pause).
+3. If both the Down button and the stick hold Down, it's one `down`. Letting go of one keeps it held while the other still holds it. Count the sources, like any other shared action.
+4. Pushing the stick **up** still does nothing (Jump stays on its button).
+5. Show it on screen: add an `is-down` class on `.tc-stick` alongside `is-left` / `is-right`, styled in the touch-controls CSS, and keep the knob following the thumb as it does now.
+6. Classic Buttons scheme, keyboard and gamepad: unchanged. The touch comfort rules are unaffected (no new button, nothing placed or sized by a fighter). Run `touchComfortProblems` and its tests to confirm.
+7. Update the comments at the top of `touch-controls.js` and around `JOYSTICK`, the joystick docs (`docs/`, the "Jump, Shield, turning and joystick changes" description), and the controls help/tutorial strings if they describe the stick.
+8. Tests (`tests/interface/controls-ui.test.mjs`, `touch-layout.test.mjs` or a new `joystick-down.test.mjs`):
+   - `joystickVertical` engages and releases at its thresholds with hysteresis, and a mostly sideways push with some downward drift doesn't engage Down.
+   - Stick pushed down makes the frame's `down` true. Pushed down-left gives both `runLeft` and `down`. Releasing the stick clears both.
+   - Through a simulated fighter: stick down + Jump is a Super Jump, stick down in the air while falling fast-falls, and a quick stick flick down and back on a droppable platform drops through. Holding the stick down past `dropTapTime` doesn't drop, matching the button exactly.
+   - The button and the stick held together, one released, means Down is still held.
 
 ---
 
-## 2. Default Mobile Controls becomes Joystick (not Classic Buttons)
+## 2. Nerf the units: it takes more Launch Point to be launched hard
 
 ### Current behaviour
-- `js/core/settings.js`: `MOBILE_CONTROLS = ['joystick', 'classic']`, `DEFAULT_MOBILE_CONTROLS = 'classic'`, `SETTINGS_VERSION = 9` with a migration table.
-- `js/ui/touch-controls.js` comments and `setScheme` fallback: "anything else is the default, Classic Buttons".
-- `js/ui/settings-dialog.js`: comments and the "(default)" badge say Classic Buttons is the default (around lines 8 and 222).
-- Tests hard-code it, e.g. `tests/interface/battle-screen.test.mjs:1223` (`'nothing stored: the default'` expects `'classic'`), plus `tests/interface/settings.test.mjs`, `touch-layout.test.mjs` and `controls-ui.test.mjs`.
+`js/data/launch.js`: `LAUNCH_UNIT_SPEED = 10`. It's the one conversion from launch strength (Base Launch × Launch Point) to world speed, used by `resolveDirectionalLaunch` (`speed = strength * LAUNCH_UNIT_SPEED`). The game's numbers stay as they are; only the physics' speed per point changes.
 
 ### Wanted
-- Set `DEFAULT_MOBILE_CONTROLS = 'joystick'`.
-- Wherever an unknown or missing scheme falls back to a default (e.g. `setScheme` in `touch-controls.js`, the settings reader/validation in `settings.js`, the layout editor), it should fall back to **Joystick**. Use `DEFAULT_MOBILE_CONTROLS` rather than a literal so this stays in one place.
-- The settings dialog shows Joystick as the default option, with the "default" badge/label moved to it, and the Joystick option listed first if the dialog orders the default first.
-- **Existing players:** a player who explicitly chose Classic keeps Classic, and their saved custom touch layouts (`touchLayouts.classic` / `.joystick`) stay untouched. Decide how stored settings that only have `classic` because it used to be the default are handled. If the stored data can't tell an explicit choice from the old default, bump `SETTINGS_VERSION` to 10 and add a migration that **keeps the stored value** (safest). Only new or empty storage gets Joystick. Write down this decision in the code comment and in `UPDATES.md`.
-- Update every comment, doc and spec line that says Classic is the default (`grep -rni "classic" js docs ALVA_SPEC.md css`).
-- Update the tests to the new default, and add one asserting fresh storage → `'joystick'` and stored `'classic'` → stays `'classic'`.
+Change `LAUNCH_UNIT_SPEED` from **10 to 7**. This value is decided, so use exactly 7 and don't tune it to anything else. The same Launch Point and Base Launch then send a fighter less far: 30 Launch Point × Base Launch 2 = strength 60 used to be 600 units/s and is now 420. A fighter needs about 43 % more Launch Point (≈ 43 instead of 30) to be launched as hard as before. Keep it as the single tuning knob, so the owner can later try 8 or 6 by editing that one line. Add a comment explaining why it went from 10 to 7 (the **launch & energy update**: launches nerfed without touching Base Launch, Launch Point or damage). Don't change Base Launch, Launch Point or damage (see **Off limits**).
+
+Check everything that depends on launch speed rather than strength, and say in `UPDATES.md` whether you deliberately left each one alone or re-tuned it:
+- `js/game/combat/launch-bounce.js` (`LAUNCH_BOUNCE`; a comment there assumes "At LAUNCH_UNIT_SPEED 10…"). Rewrite that comment for 7. Only keep the bounce thresholds feeling the same if they were tuned around 10.
+- `launchReaction` (`stunPerThousand`, `tumbleSpeed`, in `combat.js` and each character's data): these are in units/s, so hitstun and tumble will kick in later. That's expected and part of the nerf. Don't raise them back.
+- CPU: `js/game/ai/cpu-intelligence/values.js` (`st.baseLaunch * lp * LAUNCH_UNIT_SPEED`) reads the constant, so it follows automatically. Check `prediction.js`, `evaluator.js`, `objective.js` and `plans.js` for any hard-coded kill / "launch hard" Launch Point thresholds or speeds that assumed 10, and switch them to derive from the constant.
+- The reference copy (`LAUNCH_FORMULA` etc. in `launch.js` and localization) if it names the number.
+- Tests that assert exact launch speeds (`tests/systems/launch.test.mjs`, `launch-bounce.test.mjs`, `launch-reaction.test.mjs`, `combat-rules.test.mjs`, fighter tests): update them to compute from `LAUNCH_UNIT_SPEED` instead of literals. Add a test that a fixed Launch Point / Base Launch now produces `strength × 7` and that strength itself is unchanged.
 
 ---
 
-## 3. Every spawn and respawn plays the elimination burst in reverse
+## 3. A perfect Shield takes 5 off the Launch Point
 
-### Current behaviour (the "ejected" effect)
-- When a fighter is taken by the Void, `Arena.checkVoid` (`js/game/arena.js` ~line 340) calls `this.fx.addElimination(f)`.
-- `HitEffects.addElimination` / `drawEliminations` in `js/game/rendering/hit-fx.js` (~lines 289 and 676), tuned by `HIT_FX.elimination` (life 0.55 s, 24 shards, radius 0.95, shardLength 0.2, ring 0.85, shake 5, reducedTravel 0.3). The burst has a white flash that pops and shrinks, a ring opening outward in the fighter's first palette colour, and shards in the fighter's `visual.eliminationPalette` (or `NEUTRAL_ELIMINATION_PALETTE`) flying outward with an ease-out, each with a thin dark under-stroke, all fading out. The shards are seeded, so the same burst always draws the same shards.
-- Spawns happen at: match start and `Battle.restart()` (`js/game/battle.js`, `f.reset(this.stage)`, followed by `this.fx.reset()`, so any effect added before that reset is wiped); respawn in `Arena.updateRespawns` (`f.respawn(this.stage)`); and Practice Ground creating or replacing fighters (`js/game/practice.js` ~lines 72–110, also calls `this.fx.reset()`), plus its respawns. Check online (`js/online/`), Local Play, Quick Battle, Watch mode and rematch paths too: they should all go through these, but verify it.
+### Current behaviour
+In `CombatSystem.applyHit` (`js/game/combat/combat.js` ~line 517), `perfect = blocked && !!target.perfectShield` (see `Fighter.perfectShield`: raised within `defense.perfectWindow` after `perfectRearm`). It blocks with no blockstun and pays the normal `shieldHitCost`. It doesn't affect the Launch Point.
 
 ### Wanted
-Each time a fighter appears (initial spawn at match start, every restart/rematch, every respawn after the Void, every Practice Ground fighter spawn or swap), play the **same elimination burst run backwards** at the fighter's spawn position:
-- The shards start at their full outward reach and fly **inward** to the fighter's centre (the time-reverse of the ease-out, so they accelerate in, the same curve as `out` evaluated at `1 - k`).
-- The ring starts at its widest (`cfg.ring` fighter heights) and **closes** to its smallest.
-- Things fade **in** instead of out, and the white flash grows and pops at the **end**, as the fighter "materialises".
-- It uses the same palette (`eliminationPalette(f.def)`), the same size (`f.def.visual.height ?? body.height`), and is centred on `body.x, body.y - body.height / 2` at the spawn point, with a deterministic seed.
-- The same shake (none with reduced motion), and the same reduced-motion handling (`reducedTravel`).
+Every perfect block also takes **5** Launch Points off the **blocking** fighter, never below 0. Use `CombatState.heal(5)` so it counts in `launchPointRecovered` and, like any heal, doesn't restart or speed up the passive recovery schedule. Add the amount as a named constant, e.g. `PERFECT_SHIELD_HEAL = 5`, in `js/data/launch.js` or with the defense data, the same for every fighter. Record it on the block event (e.g. `heal: 5`, or the actual amount taken off, plus the real `launchPointAfter`) so the HUD, the match stats and the effects can see it. Only a perfect block does this. One perfect block heals once, even for a multi-hit string, since a blocked string stops at the first block anyway; check that. It's simulation state, so online lockstep must stay deterministic (`tests/online/determinism.test.mjs`, `lockstep.test.mjs`).
 
-Implementation guidance:
-1. Generalise rather than duplicate: give elimination entries a `reverse` flag (or add `addSpawn(f)` that pushes into the same list with `reverse: true`), and in `drawEliminations` map `k → 1 - k` for the reversed ones, so it really is the same drawing played backwards. Keep `HIT_FX.elimination` as the single source of tuning. If a separate knob is needed (e.g. its own `life`), add `HIT_FX.spawn` next to it with a comment saying it mirrors elimination.
-2. Shared code only: never special-case a fighter id (`CLAUDE.md`). Each fighter's look comes from its existing `visual.eliminationPalette` character data.
-3. Call it from the spawn points:
-   - `Arena.updateRespawns`: right after `f.respawn(this.stage)`.
-   - `Battle.restart()` and Practice Ground's spawn/swap: **after** `this.fx.reset()`, otherwise the reset clears it. Put a helper on `Arena`, e.g. `announceSpawn(f)`, and use it everywhere.
-4. **Paint only.** It must not change the fighter's state, physics, hitboxes, timers, input, CPU decisions, score or match stats. The fighter is in play and controllable exactly as it is now (no added invulnerability or delay). Online lockstep determinism (`tests/online/determinism.test.mjs`, `lockstep.test.mjs`) must still pass, since fx is not part of simulated state. Check that, and that the celebration test which counts `addElimination` calls (`tests/systems/celebration.test.mjs:329`) still counts only eliminations. If the spawn burst shares the function, keep a separate entry point so that count isn't polluted.
-5. Draw order: in `Arena` render (~line 506, `drawEliminations`), the reversed burst draws over the fighter so it covers the appearance.
-6. Tests (extend `tests/systems/hit-fx.test.mjs`, `void-ripple.test.mjs` or add `spawn-burst.test.mjs`):
-   - A spawn burst is added on match start, on restart (and still present after `fx.reset()`), on every respawn, and on Practice Ground spawn/swap.
-   - It uses the fighter's palette and size, and it expires after its life.
-   - It is the elimination run backwards: at age `t` the reversed burst draws the same geometry as the elimination at age `life - t` (compare with a recording fake ctx, like the `overtime.test.mjs` draw tests).
-   - Reduced motion: no shake, short travel.
-   - A battle simulated with and without the spawn burst produces identical simulation state (paint only).
+Tests (`tests/systems/defense.test.mjs` / `shield-protection.test.mjs`): a perfect block at LP 12 leaves 7, at LP 3 leaves 0, a normal block leaves LP unchanged, and the recovery timer is untouched.
+
+---
+
+## 4. Passive recovery: 2 points per tick instead of 1
+
+`js/data/launch.js`: change `LAUNCH_RECOVERY_AMOUNT = 1` to **2**. Delay (2 s) and interval (0.5 s) stay the same. `CombatState.updateLaunchRecovery` already uses the constant and clamps at 0, so an odd Launch Point ends at 0, not -1. Test that. Update the header comment in `launch.js` ("it recovers 1 point per…"), the spec, docs and the in-game reference strings. The CPU's `objective.js` reads it through `RECOVERY_RATE`, so check that its estimates follow.
+
+---
+
+## 5. HUD: a green glow when the Launch Point goes down
+
+### Current behaviour
+`js/ui/hud.js` `updatePanel` writes `formatLaunchPoint(combat.launchPoint)` into `.hud-launch-point-value` when the text changes. It's styled in `css/battle.css` (`.hud-launch-point` ~line 115).
+
+### Wanted
+Each time the shown Launch Point **goes down while the fighter stays in play** (a passive recovery tick, a perfect-Shield heal, a technique's `heal`, a charm heal, a fear "feed"), the number briefly glows green: a soft green text-shadow/glow that pops and fades over about 0.4–0.6 s, restarted if another reduction lands during it. It must **not** play when the Launch Point drops to 0 because of a respawn, a restart, a rematch or a Practice Ground reset or swap. A respawn is a reset, not a heal.
+
+Implementation:
+1. Distinguish a heal from a reset in the simulation, not by guessing in the HUD. For example, have `CombatState` keep a counter or step stamp of the last real reduction (incremented in `heal()` and `updateLaunchRecovery()` when they take something off), which a fresh `CombatState` / respawn doesn't increment. The HUD glows when that counter changes. `resetPanel` (`shownLaunchPoint = null`) and a fighter swap must sync the counter without glowing. Paint only: it must not change simulation results.
+2. CSS: a `.is-healing` class (or a restarted animation) on `.hud-launch-point-value`, using a green that reads well on both HUD sides and over every stage. With `prefers-reduced-motion` / the game's reduced-motion setting, use a short static colour change instead of a pulse.
+3. Works the same for every HUD slot (P1/P2, CPU, Local Play, Watch, online, Practice Ground).
+
+## 6. HUD: fire on the Launch Point when it's really high
+
+When a fighter's Launch Point is high enough that the next solid hit can launch it hard, the number gets a **fire effect**: animated flame-coloured flicker/glow (orange→yellow→red), rising embers or a flame layer behind the digits. It can be CSS (layered animated `text-shadow`, a pseudo-element with an animated gradient) or a small canvas, whichever fits `hud.js`. Requirements:
+- A named threshold constant, e.g. `LAUNCH_POINT_FIRE = 60`, picked with the new `LAUNCH_UNIT_SPEED` in mind (it's where a Base Launch 2–3 hit becomes a likely Void KO; check it in a few simulated launches and write down the reasoning). Optionally add a stronger second tier (e.g. `LAUNCH_POINT_INFERNO = 100`).
+- Hysteresis so it doesn't flicker on and off around the threshold (e.g. on at ≥ 60, off below 55).
+- It goes out at once on respawn, restart or reset. The green heal glow (section 5) and the fire can coexist: the heal glow plays over the fire, and the fire goes out if the heal takes it below the off threshold.
+- Reduced motion: a static hot colour, no animation. HUD only: it doesn't draw on the fighter and doesn't change anything in the simulation.
+- Tests (`tests/interface/` HUD tests): the class appears at the threshold, stays inside the hysteresis band, clears on respawn, and the heal glow appears on recovery ticks and perfect-Shield heals but not on respawn or restart.
+
+---
+
+## 7. Deflect only costs Energy when it turns a projectile back
+
+### Current behaviour
+`Fighter.tryDeflect` (`fighter.js` ~line 1507) pays `energyDef.deflectCost` (`DEFLECT_ENERGY_COST = 15`, `js/data/energy.js`) **as it starts**, whatever it then meets. Projectiles are turned back in `CombatSystem.deflectProjectiles` (`combat.js` ~line 345), which pushes `{ fighter, projectile, from, direction }` into `this.deflections`. The docs in `js/game/combat/deflect.js`, `energy.js`, `combat-state.js` and `fighter.js` all say "paid as it starts".
+
+### Wanted
+- Starting a Deflect costs nothing. It still needs the fighter **not exhausted** (`canUseEnergy()`), as now, so an exhausted fighter still can't Deflect.
+- The cost is paid **once per Deflect activation, the first time it actually turns a projectile back**. Turning back several projectiles in the same Deflect, on one step or across its active phase, still costs 15 once. Store a `paid` flag on that attack instance (`combat.attack`). A Deflect that only strikes a fighter (its melee hit, blocked or not), or whiffs, or is cancelled before turning anything back, costs **nothing**.
+- Pay it through the same path as other spending (`payEnergy` / `spendEnergy`, setting `energyPaidAt` so there's no refill that step, and with less than 15 left it empties the bar and exhausts). If the fighter is somehow exhausted at the moment of the deflection, the projectile is still turned back; the Deflect already started legally. Don't make the deflection depend on whether it could pay.
+- Record the cost on the deflection entry (`energyCost`) for effects, stats and the CPU.
+- Update every comment and doc that says "paid as it starts", `ENERGY_COST`'s summary and the in-game Deflect description.
+- Tests (`tests/systems/deflect.test.mjs`, `energy.test.mjs`): a whiffed Deflect costs 0. One that hits a fighter but turns nothing back costs 0. One that turns back one projectile costs 15. One that turns back two costs 15. An exhausted fighter still can't start one. No refill on the step it pays.
+
+## 8. Shield only costs Energy when it actually blocks something
+
+The Shield should already pay only on a block (`applyHit`: `if (blocked) spendEnergy(shieldHitCost)`), and refill keeps running while it's held. **Audit this and make sure it holds**, then lock it in with tests:
+- Raising, holding or lowering the Shield, and perfect-Shield timing, cost nothing.
+- `blocked = tc.shielding` is decided before anything else in `applyHit`. Check every caller and every early-return path so Energy is only taken when a hit really **reached** the fighter and was stopped: hits that `hitReaches` passes by (`quake` on an airborne fighter, `gaze` on one facing away), a charmed attacker's "hit" (`charmed()`), stage and platform hazards (`stage-hazards.js`, `platform-hazards.js`), projectiles that `passed()` the target, piercing/erasing projectiles, summon/clone strikes and technique bursts. Each one pays only if it is actually blocked, and only once per blocked hit. If any path charges the Shield for something it didn't block, or charges twice for one hit, fix it.
+- Keep the existing rules: a block costs `shieldHitCost` (perfect included, as now), or whatever is left if that's less, and a block that empties the bar drops the Shield.
+- Tests (`tests/systems/shield-protection.test.mjs`, `energy.test.mjs`): holding the Shield for N seconds with nothing hitting it loses no Energy (it refills). One blocked hit costs exactly 15. A quake that passes over / a gaze from behind / a passed projectile cost nothing.
+
+---
+
+## 9. CPUs must know about all of this
+
+The CPU (`js/game/ai/`, `js/game/ai/cpu-intelligence/`: `brain.js`, `defense.js`, `capabilities.js`, `moveset.js`, `values.js`, `objective.js`, `prediction.js`, `evaluator.js`, `plans.js`, `perception.js`, `situation.js`) and `js/data/difficulty.js` should reason with the new rules, in shared code only, never per fighter:
+1. **Launch nerf:** kill and launch estimates use `LAUNCH_UNIT_SPEED` (no literals). CPUs should now be a bit more patient about going for a KO at a given Launch Point, and treat their own Launch Point as safer for longer.
+2. **Faster recovery (2 per tick):** `objective.js`'s recovery model follows the constant. CPUs at high Launch Point value disengaging for 2+ s a little more, because it now pays back twice as fast.
+3. **Perfect Shield heals 5:** the defense planner (`defense.js` ~line 353, `p.perfectShield` per difficulty) should value a perfect block more, both as a counter and now as a heal. Raise its expected value accordingly, but keep the per-difficulty success chance (`perfectShield` in `difficulty.js`) as the human-like limit: easy CPUs still rarely manage it.
+4. **Deflect costs only on success:** `moveset.js` (~line 140, `cost: f.energyDef.deflectCost`) and the planners must stop counting the Deflect's 15 as spent at start. Its expected cost is 15 only when a projectile will actually be turned back. CPUs may use an aerial Deflect as a free poke or air option when no projectile is around, still never while exhausted, and they shouldn't fill the air with endless Deflects; respect the existing cancel and air-use rules.
+5. **Shield costs only on block:** `capabilities.js` (~line 327, `blockCost: f.energyDef.shieldHitCost`). Make sure the CPU budgets Energy per expected blocked hit, not for raising or holding the Shield, so a CPU can hold the Shield preemptively when that's sensible.
+6. **Joystick:** no CPU change needed (CPUs don't use touch), but confirm that the training CPU's `dropPressed` and fast-fall logic still work.
+7. Add or extend tests in `tests/integration/difficulty.test.mjs` / the CPU tests: a CPU's planned Deflect with no projectile around is costed at 0, the perfect-Shield value includes the heal, and the CPU's kill threshold at a given Base Launch is higher than before (derived from the constant). Run the CPU benchmarks and record before/after win rates by difficulty in `UPDATES.md`.
 
 ---
 
 ## Done when
-- `node --test` passes in full, and the existing benchmarks still run.
-- On a phone browser, the first tap goes fullscreen and locks to landscape, the lock comes back after switching apps, and the rotate overlay only appears where locking is impossible.
-- Fresh installs get the Joystick scheme, and existing Classic players keep Classic.
-- Every fighter, on every mode's spawn and respawn, appears with the reversed burst in its own colours.
-- `UPDATES.md` has the **spawn & landscape update** entry, and the docs/spec are updated.
+- `node --test` passes in full, including the online determinism/lockstep tests and the comfort-rule checks, and the existing benchmarks still run.
+- On a phone with the Joystick scheme: stick down + Jump Super Jumps, stick down in the air fast-falls, a flick down drops through platforms, and normal running never triggers Down by accident.
+- `LAUNCH_UNIT_SPEED` is 7, and launches feel weaker at the same Launch Point. Base Launch, damage and the formula are unchanged in code and data (`git diff` shows no changes to any `damage` or `baseLaunch`).
+- A perfect block takes 5 Launch Points off. Recovery ticks take 2. The number glows green on every heal or recovery but not on respawn, and burns when it's high.
+- A Deflect is only charged when it turns a projectile back (once per Deflect), and a Shield only when it blocks a hit.
+- CPUs at every difficulty play by these rules.
+- `UPDATES.md` has the **launch & energy update** entry, and the spec, docs and reference strings are updated.
