@@ -54,6 +54,9 @@ const C = {
   sunGlow: 'rgba(255, 250, 238, 0.55)',
   halo: 'rgba(255, 255, 255, 0.22)',
   cirrus: 'rgba(250, 252, 255, 0.5)',
+  // A faint aurora high in the polar sky (the Void update's open air over
+  // the glacier): pale green to teal curtains, barely there by day.
+  aurora: [[0, 'rgba(150, 255, 214, 0)'], [0.35, 'rgba(150, 255, 214, 0.2)'], [0.75, 'rgba(120, 230, 236, 0.1)'], [1, 'rgba(120, 230, 236, 0)']],
   // Ranges, cold blue with distance; snow on their upper slopes.
   farRange: '#b2c3d8',
   farRangeLit: '#c7d5e6',
@@ -186,6 +189,14 @@ export class JokullTheme extends StageTheme {
     const bottom = cb.bottom + 900;
     const end = (p) => cb.right * p + 2600;
 
+    // The aurora: a few curtains, each a wavy line across the sky (its
+    // shape in fractions of the view) hung with soft vertical rays.
+    // Its own random stream, so the rest of the art is as it always was.
+    const arng = mulberry32(0xa0a0a1);
+    this.aurora = Array.from({ length: 3 }, (_, i) => ({
+      y: 0.08 + i * 0.07 + range(arng, 0, 0.04), h: range(arng, 0.12, 0.2), k: range(arng, 2.5, 4.5), p: arng() * 6.3,
+      speed: range(arng, 0.05, 0.12), amp: range(arng, 0.025, 0.05), x: arng(),
+    }));
     // Sky: high icy cirrus, as fractions of the view.
     this.cirrus = Array.from({ length: 7 }, () => ({
       x: rng(), y: range(rng, 0.05, 0.32), w: range(rng, 0.18, 0.4), h: range(rng, 0.008, 0.02), speed: range(rng, 0.002, 0.006), a: range(rng, 0.35, 0.7),
@@ -545,6 +556,34 @@ export class JokullTheme extends StageTheme {
 
   // ---- Background ---------------------------------------------------------------
 
+  // The aurora's curtains: each a band of soft vertical rays hung from a
+  // wavy line, rippling slowly sideways (still with reduced motion), faint
+  // against the day sky.
+  drawAurora(ctx, view, t, top, h) {
+    const W = view.pxW;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const step = Math.max(3, Math.round(W / 140));
+    for (const a of this.aurora) {
+      const band = a.h * h;
+      const g = ctx.createLinearGradient(0, 0, 0, band);
+      for (const [at, color] of C.aurora) g.addColorStop(at, color);
+      ctx.fillStyle = g;
+      const shift = a.x - view.x * view.scale * 0.00002 + t * a.speed * 0.05;
+      for (let x = 0; x < W; x += step) {
+        const u = x / W;
+        const y = top + (a.y + Math.sin((u + shift) * Math.PI * a.k + a.p + t * a.speed) * a.amp) * h;
+        // Brighter folds where the curtain turns.
+        const fold = 0.55 + 0.45 * Math.sin((u + shift) * Math.PI * a.k * 2.3 + a.p * 1.7 + t * a.speed * 1.6);
+        ctx.globalAlpha = fold;
+        ctx.save();
+        ctx.translate(0, y);
+        ctx.fillRect(x, 0, step + 1, band);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   drawBackground(ctx, view) {
     if (!this.faceGrad) this.resize(view);
     const G = this.groundY;
@@ -575,12 +614,17 @@ export class JokullTheme extends StageTheme {
     ctx.arc(sunX, sunY, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+    // The sky's top on screen: the view's, or the Void's top line when the
+    // camera nears it (the aurora and the cirrus keep below the black).
+    const skyTop = Math.max(0, (this.map.voidBounds.top - view.y) * s + 14 * s);
+    const skyH = view.pxH - skyTop;
+    this.drawAurora(ctx, view, t, skyTop, skyH);
     // Cirrus: thin streaks of ice cloud, each a few strands.
     ctx.lineCap = 'round';
     ctx.strokeStyle = C.cirrus;
     for (const c of this.cirrus) {
       const x = (frac(c.x + t * c.speed * 0.15 - view.x * s * 0.00001) * 1.6 - 0.3) * view.pxW;
-      const y = c.y * view.pxH;
+      const y = skyTop + c.y * skyH;
       const w = c.w * view.pxW;
       ctx.globalAlpha = c.a * 0.6;
       ctx.lineWidth = Math.max(1, c.h * view.pxH);

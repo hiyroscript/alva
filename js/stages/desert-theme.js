@@ -18,6 +18,12 @@ import { mulberry32, range } from '../core/utils.js';
 const C = {
   sky: ['#d9703a', '#ee9a55', '#f7c585', '#fde0b0'],
   sunCore: '#fff5dc',
+  // The high sky the Void update opened up: far rock needles hazed with
+  // distance, and thin cloud wisps lit gold underneath by the low sun.
+  needle: 'rgba(214, 150, 112, 0.5)',
+  needleLit: 'rgba(236, 176, 128, 0.42)',
+  wisp: 'rgba(255, 226, 184, 0.42)',
+  wispLit: 'rgba(255, 244, 222, 0.5)',
   farMesa: '#e6ad86',
   farDune: '#e8ad78',
   butteLit: '#c46d3e',
@@ -139,6 +145,49 @@ export class DesertTheme extends StageTheme {
       else this.addHoodoo(rng, x, floor, range(rng, 34, 70), range(rng, 90, 230));
       for (let i = 0; i < 3; i++) this.addShrub(rng, this.shrubs, x + range(rng, -160, 260), floor, range(rng, 8, 16));
     }
+
+    // Layer 0b (0.05) and 0c (0.12): tall rock needles far off past the
+    // mesas, and thin high wisps of cloud, on their own random stream so
+    // the rest of the art is as it always was.
+    const hrng = mulberry32(0xde5ee0);
+    this.needles = new Path2D();
+    this.needlesLit = new Path2D();
+    for (let nx = range(hrng, -200, 200); nx < end(0.05); nx += range(hrng, 520, 1100)) {
+      const w = range(hrng, 26, 60);
+      const h = range(hrng, 220, 400);
+      const base = G - 150;
+      const lean = range(hrng, -10, 10);
+      const pts = [[nx - w * 0.7, base], [nx - w * 0.5, base - h * 0.35], [nx - w * 0.42 + lean * 0.5, base - h * 0.8], [nx - w * 0.3 + lean, base - h],
+        [nx + w * 0.25 + lean, base - h], [nx + w * 0.4 + lean * 0.5, base - h * 0.78], [nx + w * 0.5, base - h * 0.3], [nx + w * 0.75, base]];
+      this.needles.moveTo(pts[0][0], bottom);
+      for (const [px, py] of pts) this.needles.lineTo(px, py);
+      this.needles.lineTo(pts[pts.length - 1][0], bottom);
+      this.needles.closePath();
+      // Its sunlit right side.
+      this.needlesLit.moveTo(nx + lean * 0.6, base - h);
+      for (const [px, py] of pts.slice(4)) this.needlesLit.lineTo(px, py);
+      this.needlesLit.lineTo(nx + w * 0.75, bottom);
+      this.needlesLit.lineTo(nx + w * 0.1, bottom);
+      this.needlesLit.closePath();
+    }
+    this.wisps = new Path2D();
+    this.wispsLit = new Path2D();
+    for (let i = 0; i < 18; i++) {
+      const wx = range(hrng, -300, end(0.12));
+      const wy = range(hrng, G - 760, G - 420);
+      const len = range(hrng, 180, 460);
+      for (let k = 0; k < 4; k++) {
+        const ex = wx + k * len * 0.2 + range(hrng, -10, 10);
+        const ey = wy + k * range(hrng, 2, 5);
+        const rx = len * range(hrng, 0.18, 0.3);
+        const ry = range(hrng, 2.5, 6);
+        this.wisps.moveTo(ex + rx, ey);
+        this.wisps.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
+        this.wispsLit.moveTo(ex + rx * 0.8, ey + ry * 0.6);
+        this.wispsLit.ellipse(ex, ey + ry * 0.6, rx * 0.8, ry * 0.45, 0, 0, Math.PI * 2);
+      }
+    }
+    this.wispSpan = end(0.12) + 800;
 
     // Layer 4: the mesa and the rock outcrops on it (perspective, 1.0)
     this.buildMesa(rng);
@@ -389,6 +438,22 @@ export class DesertTheme extends StageTheme {
     ctx.beginPath();
     ctx.arc(sunX, sunY, r, 0, Math.PI * 2);
     ctx.fill();
+
+    // Layer 0b — far rock needles; 0c — high wisps drifting slowly.
+    this.layer(ctx, view, 0.05, 0.07);
+    ctx.fillStyle = C.needle;
+    ctx.fill(this.needles);
+    ctx.fillStyle = C.needleLit;
+    ctx.fill(this.needlesLit);
+    this.layer(ctx, view, 0.12, 0.14);
+    ctx.translate(this.reducedMotion ? 0 : -((this.time * 2.5) % this.wispSpan), 0);
+    for (let k = 0; k < 2; k++) {
+      ctx.fillStyle = C.wisp;
+      ctx.fill(this.wisps);
+      ctx.fillStyle = C.wispLit;
+      ctx.fill(this.wispsLit);
+      ctx.translate(this.wispSpan, 0);
+    }
 
     // Layer 1 — far mesas & dunes
     this.layer(ctx, view, 0.08, 0.1);

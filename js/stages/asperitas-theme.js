@@ -44,6 +44,10 @@ const C = {
   bank: { halo: 'rgba(214, 230, 250, 0.18)', shade: 'rgba(146, 176, 224, 0.42)', body: [[0, 'rgba(222, 235, 251, 0.62)'], [1, 'rgba(172, 198, 236, 0.56)']], crest: 'rgba(240, 247, 255, 0.32)' },
   near: { halo: 'rgba(245, 248, 254, 0.3)', shade: 'rgba(182, 196, 232, 0.7)', body: [[0, 'rgba(255, 255, 255, 0.94)'], [1, 'rgba(210, 220, 242, 0.9)']], crest: 'rgba(255, 253, 244, 0.55)' },
   cirrus: 'rgba(255, 255, 255, 0.34)',
+  // The high sky the Void update opened up: cloud towers rising far off,
+  // and small high patches of altocumulus, paler still.
+  tower: { halo: 'rgba(214, 230, 250, 0.14)', shade: 'rgba(146, 172, 220, 0.3)', body: [[0, 'rgba(236, 244, 253, 0.56)'], [0.6, 'rgba(206, 222, 246, 0.46)'], [1, 'rgba(178, 202, 236, 0.4)']], crest: 'rgba(255, 252, 240, 0.34)' },
+  alto: { halo: 'rgba(230, 240, 252, 0.12)', shade: 'rgba(150, 180, 226, 0.26)', body: [[0, 'rgba(246, 250, 255, 0.6)'], [1, 'rgba(200, 218, 244, 0.5)']], crest: 'rgba(255, 255, 255, 0.4)' },
   // The cloud sea below the stage level.
   sea: { halo: 'rgba(240, 246, 253, 0.3)', shade: 'rgba(178, 194, 230, 0.7)', body: [[0, '#f4f8fe'], [1, '#cfdbf1']], crest: 'rgba(255, 255, 255, 0.45)' },
   seaNear: { halo: 'rgba(240, 246, 253, 0.3)', shade: 'rgba(168, 184, 224, 0.75)', body: [[0, '#f8fbff'], [1, '#c6d3ee']], crest: 'rgba(255, 255, 255, 0.5)' },
@@ -205,6 +209,31 @@ function cumulus(rng, { x, w, base, h, rMin, rMax }) {
   return c;
 }
 
+// A towering cumulus (sky art): a column of puffs filled row by row from
+// a flat base at `base` up to `h`, `w` wide at its base, swelling a little
+// as it rises and rounding off in a broad cauliflower dome, its sides lumpy.
+function cloudTower(rng, { x, w, base, h, rMin, rMax }) {
+  const c = new Puffs();
+  const cx = x + w / 2;
+  c.rect(x + rMin, base - rMax, x + w - rMin, base, rMax * 0.6, 4);
+  const lean = range(rng, -0.12, 0.12) * w;
+  for (let y = base - rMin; y > base - h;) {
+    const u = (base - y) / h;
+    // Half-width of this row: the column, tapering into the dome.
+    const half = (w / 2) * (0.72 + 0.28 * Math.sin(u * Math.PI)) * Math.sqrt(Math.max(0.04, 1 - u ** 4));
+    const mid = cx + lean * u;
+    const r = range(rng, rMin, rMax) * (0.75 + 0.25 * (1 - u));
+    for (let px = mid - half + r * 0.6; px <= mid + half - r * 0.6; px += r * range(rng, 0.7, 0.95)) {
+      c.add(px + range(rng, -4, 4), y + range(rng, -5, 5), r * range(rng, 0.85, 1.1));
+    }
+    // A lump out of either side now and then.
+    if (rng() < 0.6) c.add(mid - half - r * 0.1, y + range(rng, -6, 6), r * range(rng, 0.6, 0.9));
+    if (rng() < 0.6) c.add(mid + half + r * 0.1, y + range(rng, -6, 6), r * range(rng, 0.6, 0.9));
+    y -= r * range(rng, 0.6, 0.8);
+  }
+  return c;
+}
+
 // FNV-1a of a string: each drifting cloud's own shape from its id.
 function hash(id) {
   let h = 0x811c9dc5;
@@ -282,6 +311,36 @@ export class AsperitasTheme extends StageTheme {
     this.rays = Array.from({ length: 7 }, (_, i) => ({ a: -2.2 + i * 0.32 + range(rng, -0.08, 0.08), w: range(rng, 0.04, 0.09), p: rng() * 6 }));
 
     this.buildMainCloud(rng);
+    // The high sky's clouds (the Void update), on their own random stream so
+    // the rest of the art is as it always was.
+    const hrng = mulberry32(0xa5c1e5);
+    // Layer 1b (0.1): a few cloud towers rising far off from the horizon
+    // high into the sky, so the open air over the stage (the Void's top,
+    // 1040 over it since the Void update) is never an empty band.
+    const towers = new Puffs();
+    for (let x = range(hrng, -300, 200); x < end(0.1); x += range(hrng, 560, 980)) {
+      const c = cloudTower(hrng, { x, w: range(hrng, 240, 400), base: G - 30, h: range(hrng, 260, 520), rMin: 30, rMax: 54 });
+      towers.circles.push(...c.circles);
+      towers.rects.push(...c.rects);
+    }
+    this.towers = towers.build({ feather: 7 });
+    // Layer 2b (0.22): small high patches of altocumulus, rows of little
+    // puffs drifting slowly far over the stage.
+    const alto = new Puffs();
+    for (let x0 = range(hrng, -300, 0); x0 < end(0.22); x0 += range(hrng, 380, 760)) {
+      const y0 = range(hrng, G - 760, G - 430);
+      // A patch: two or three rows of small puffs, a ripple running along.
+      const rows = Math.round(range(hrng, 2, 3));
+      const n = Math.round(range(hrng, 6, 12));
+      for (let row = 0; row < rows; row++) {
+        for (let k = 0; k < n - row * 2; k++) {
+          const r = range(hrng, 11, 19) * (1 - row * 0.15);
+          alto.add(x0 + row * 18 + k * range(hrng, 24, 32), y0 + row * 20 + Math.sin(k * 0.8 + row) * 6 + range(hrng, -3, 3), r);
+        }
+      }
+    }
+    this.alto = alto.build({ feather: 4 });
+    this.altoSpan = end(0.22) + 900;
     this.hazardArt = new Map();
 
     // Atmosphere: a few motes of light catching the sun.
@@ -379,6 +438,8 @@ export class AsperitasTheme extends StageTheme {
       const wg = (y0, y1, stops) => this.worldGradient(ctx, y0, y1, stops);
       this.grads = {
         far: wg(G - 240, G - 30, C.far.body),
+        towers: wg(G - 680, G - 30, C.tower.body),
+        alto: wg(G - 780, G - 380, C.alto.body),
         bank: wg(G - 120, G + 46, C.bank.body),
         seaFar: wg(G + 20, G + 360, C.sea.body),
         seaNear: wg(G + 130, G + 520, C.seaNear.body),
@@ -457,6 +518,10 @@ export class AsperitasTheme extends StageTheme {
     this.layer(ctx, view, 0.06, 0.08);
     this.paintCloud(ctx, this.far, C.far, this.grads.far);
 
+    // Layer 1b — cloud towers far off.
+    this.layer(ctx, view, 0.1, 0.12);
+    this.paintCloud(ctx, this.towers, C.tower, this.grads.towers);
+
     // Layer 2 — high cirrus, drifting very slowly.
     this.layer(ctx, view, 0.14, 0.16);
     ctx.translate(-((t * 3) % 2000), 0);
@@ -464,6 +529,11 @@ export class AsperitasTheme extends StageTheme {
     ctx.fill(this.cirrus);
     ctx.translate(2000, 0);
     ctx.fill(this.cirrus);
+
+    // Layer 2b — high altocumulus, drifting slowly the other way.
+    this.layer(ctx, view, 0.22, 0.24);
+    ctx.translate((t * 4) % this.altoSpan - 450, 0);
+    this.paintCloud(ctx, this.alto, C.alto, this.grads.alto);
 
     // A soft band of haze along the horizon.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
