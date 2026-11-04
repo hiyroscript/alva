@@ -27,24 +27,14 @@ import { el } from '../core/utils.js';
 import { tx, tattr, setText } from '../localization/i18n.js';
 import { ModalDialog } from './overlays.js';
 import { ICONS } from './icons.js';
+import { INSTALL_INSTRUCTIONS } from '../core/web-app-install.js';
 
 // The intro's paragraphs, in order.
 export const INSTALL_INTRO = Object.freeze(['install.intro1', 'install.intro2', 'install.intro3', 'install.intro4']);
 
-// How to install by hand, by platform (installPlatform in
-// js/core/web-app-install.js): a heading and numbered steps, or a heading
-// and one line.
-export const INSTALL_INSTRUCTIONS = Object.freeze({
-  ios: Object.freeze({ heading: 'install.ios.heading', steps: ['install.ios.step1', 'install.ios.step2', 'install.ios.step3', 'install.ios.step4'] }),
-  android: Object.freeze({ heading: 'install.howTo', text: 'install.android' }),
-  'android-samsung': Object.freeze({ heading: 'install.howTo', text: 'install.androidSamsung' }),
-  'android-firefox': Object.freeze({ heading: 'install.howTo', text: 'install.androidFirefox' }),
-  'desktop-edge': Object.freeze({ heading: 'install.howTo', text: 'install.edge' }),
-  'desktop-chromium': Object.freeze({ heading: 'install.howTo', text: 'install.chromium' }),
-  'desktop-safari': Object.freeze({ heading: 'install.howTo', text: 'install.safariMac' }),
-  'desktop-firefox': Object.freeze({ heading: 'install.howTo', text: 'install.unavailable' }),
-  other: Object.freeze({ heading: 'install.howTo', text: 'install.other' }),
-});
+// How to install by hand, by platform: kept with the installation itself
+// (js/core/web-app-install.js), so the small-screen block shows the same.
+export { INSTALL_INSTRUCTIONS } from '../core/web-app-install.js';
 
 // The status line for an installation attempt's status, if any.
 const STATUS_TEXT = Object.freeze({

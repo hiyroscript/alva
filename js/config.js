@@ -40,6 +40,23 @@ export const CONFIG = Object.freeze({
     pixelPerfect: true,
   },
 
+  // The smallest usable viewport Alva runs on (CSS pixels of the visible
+  // area, visualViewport where the browser has one; js/core/screen-guard.js).
+  // Smaller, a full-screen block says so and offers to install Alva. In a
+  // browser tab the minimum is taller: a phone's tab loses its address bar
+  // and toolbars, and even the largest phones' landscape tabs (about 330 to
+  // 395 px tall) are too cramped for the touch controls, so every phone tab
+  // is refused while every tablet (744 px tall and up) and desktop window
+  // passes. Running as an installed app (standalone or fullscreen) the
+  // whole screen is Alva's, so a phone whose screen is 360 px tall or more
+  // in landscape (iPhone SE and up, most Android phones) passes. 640 wide
+  // either way: any phone in landscape, never one held upright (that gets
+  // a line asking to turn it, when turned it would fit).
+  screen: {
+    browser: { minWidth: 640, minHeight: 400 },
+    installed: { minWidth: 640, minHeight: 360 },
+  },
+
   sim: {
     step: 1 / 60,          // fixed simulation step (seconds)
     maxFrameDelta: 0.25,   // clamp for long frames / tab switches

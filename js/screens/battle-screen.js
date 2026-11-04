@@ -624,6 +624,15 @@ export class BattleScreen extends Screen {
     if (this.app.device.blockedPortrait && this.isRunning) this.pause();
   }
 
+  // The screen became too small to play on (js/core/screen-guard.js): the
+  // match pauses under the block, and stays paused once it lifts (online,
+  // pause does nothing: the match runs on with no input, as for a hidden
+  // page).
+  onScreenBlocked() {
+    this.needsResize = true;
+    if (this.isRunning) this.pause();
+  }
+
   // Whether a dialog that is not this screen's own (Settings, a
   // confirmation) is open over it: then no key here pauses, resumes or
   // opens anything.

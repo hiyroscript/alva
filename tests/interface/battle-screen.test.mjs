@@ -1546,3 +1546,15 @@ test('Return to home? over the pause menu has Settings and the X too: the X keep
   app.dialog.cancelBtn.click();
   await other;
 });
+
+test('a screen grown too small mid-match pauses it under the small-screen block, and it stays paused once the block lifts', () => {
+  const { screen } = setup();
+  startBattle(screen);
+  assert.equal(screen.isRunning, true);
+  screen.onScreenBlocked();
+  assert.equal(screen.paused, true, 'paused under the block');
+  assert.equal(screen.needsResize, true, 'measured again on the next frame');
+  // Already paused: nothing more.
+  screen.onScreenBlocked();
+  assert.equal(screen.paused, true);
+});

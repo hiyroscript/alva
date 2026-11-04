@@ -177,6 +177,12 @@ export const EN = {
   'install.status.installing': 'Installing Alva…',
   'install.status.dismissed': 'Alva wasn’t installed. You can add it anytime.',
   'install.status.failed': 'Your browser couldn’t start the installation. You can still add Alva from its menu.',
+  'screenBlock.title': 'Alva cannot be played on this screen',
+  'screenBlock.body': 'Because we want the best gameplay experience for you, Alva isn’t playable on a small screen. Please try downloading Alva as a web app and launching it again to see if Alva accepts the screen size. Otherwise, please try running Alva on a bigger screen, preferably a tablet or a desktop device.',
+  'screenBlock.rotate': 'Turn your device sideways: Alva may fit in landscape.',
+  'screenBlock.download': 'Download Alva',
+  'screenBlock.installed': 'Alva is already installed, but this screen is still too small for it. Please try a bigger screen, preferably a tablet or a desktop device.',
+  'screenBlock.accepted': 'Installing Alva… Once it’s on your device, launch it from your home screen or app list.',
 
   'howToPlay.title': 'How to play',
   'howToPlay.elimination.heading': 'Elimination',

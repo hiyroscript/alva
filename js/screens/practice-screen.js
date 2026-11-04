@@ -350,6 +350,13 @@ export class PracticeGroundScreen extends Screen {
     if (this.app.device.blockedPortrait && this.isRunning) this.openMenu();
   }
 
+  // The screen became too small (js/core/screen-guard.js): the practice
+  // waits under its menu.
+  onScreenBlocked() {
+    this.needsResize = true;
+    if (this.isRunning) this.openMenu();
+  }
+
   onKey(e) {
     if (e.menuHandled || !this.session || this.app.dialog.resolve || this.app.settingsDialog?.isOpen) return;
     if (e.code === CONFIG.debug.overlayKey && !e.repeat) {

@@ -32,7 +32,14 @@ Each fighter is drawn at its own art scale (`Arena.pxPerArtOf`), from its
 `visual.height`; the view is sized for a fighter of the reference height
 (`CONFIG.render.fighterHeight`, 88 units: a fixed camera convention, not
 a requirement on any fighter), so a shorter or taller fighter simply
-stands shorter or taller on the same stage. Projectile and effect art keeps
+stands shorter or taller on the same stage. The camera sits
+`CONFIG.render.cameraZoom` (1.35) closer than the whole-stage view, one
+tuning point for every fighter and every map: `computeWorldScale` in
+[`js/game/arena.js`](../../js/game/arena.js) multiplies the target fighter
+height (a tenth of the view) and its minimum and maximum by it and relaxes
+the stage fit by the same factor, so fighters stand about 13.5 % of the
+view tall and the camera follows them across the stage, never past the
+camera bounds; a lethal launch's zoom closes in on top of it. Projectile and effect art keeps
 its own size, centre-anchored at the fighter's art-pixel scale. Sprites
 are drawn with image smoothing off and, where the size allows, whole
 device pixels per art pixel. Each clip says which way its art faces

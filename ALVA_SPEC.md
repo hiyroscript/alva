@@ -31,7 +31,9 @@ behave, and how it must look.
   running text uses "Alva".
 - **Developer credit:** hiyroscript.
 - **Genre:** 2D sprite fighting game, played in the browser on desktop/laptop
-  and on phones and tablets in landscape.
+  and on tablets, and on phones in landscape when Alva runs as an installed
+  web app on a screen big enough for it (a phone's browser tab is too small
+  and is refused: 6.7, Small screens).
 - **Character:** calm, precise and professional. Alva should feel like opening
   a polished modern application, not a loud arcade title screen.
 
@@ -1173,6 +1175,50 @@ neither player learns the other's address.
 - Portrait on touch devices: a dark "Rotate your device — Alva is designed for
   landscape play." overlay; the battle pauses and resumes correctly on return
   to landscape.
+- **Small screens** (`js/core/screen-guard.js`). Alva refuses to run on a
+  screen too small to play on well. "Too small" is read from the usable
+  viewport, the CSS-pixel size of the visible area (`visualViewport` where
+  the browser has one, its zoom undone; else the window), never from the
+  user agent, against `CONFIG.screen`: in a browser tab at least 640 × 400,
+  as an installed app (standalone, fullscreen, minimal-ui or a desktop
+  app window, or iOS's `navigator.standalone`) at least 640 × 360, because
+  a tab loses its address bar and toolbars and an installed app has the
+  whole screen. So every phone in a browser tab is refused (the largest
+  phones' landscape tabs are about 330 to 395 px tall), the same phone as
+  an installed app passes when its landscape screen is 360 px tall or
+  more (iPhone SE and up, most Android phones), and every tablet (744 px
+  and up) and desktop window passes either way. It is checked at start
+  and on every resize, visible-area resize and orientation change; while a
+  text field has focus (an on-screen keyboard up) it waits, then measures
+  again once the field lets go. Too small, a full-screen, solid black
+  overlay above everything (every screen, dialog, the splash and the
+  navigator's raised dialogs; `alertdialog`, modal) shows, in white,
+  centred, in Alva's type: the title "Alva cannot be played on this
+  screen", the line "Because we want the best gameplay experience for you,
+  Alva isn't playable on a small screen. Please try downloading Alva as a
+  web app and launching it again to see if Alva accepts the screen size.
+  Otherwise, please try running Alva on a bigger screen, preferably a
+  tablet or a desktop device.", when the device is only too small because
+  it is held upright (turned, it would fit) "Turn your device sideways:
+  Alva may fit in landscape.", and a green **Download Alva** button, which
+  uses the installation the install dialog uses (`WebAppInstall`): the
+  browser's own prompt where it offered one (Chromium), with what came of
+  it; the same Add to Home Screen steps the install dialog shows on iOS
+  Safari and the same how-to elsewhere; "Alva is already installed, but
+  this screen is still too small for it…" when it is; and the install
+  dialog's word that this browser cannot install web apps where it cannot
+  (Firefox). Every word is a translation key in every language. The button
+  is focused while the block shows, focus stays inside it, and Enter /
+  Space or a controller's Cross / A press it (the block polls the
+  controllers itself). The block is built and put on the page by itself
+  and started by `main.js` before the App, so it works whatever else
+  loads: no screen, battle or menu has to exist. While it shows the game
+  takes no input at all (`InputManager`'s `blocked`), everything held is
+  let go, a Quick Battle, Watch Mode or Local Play match pauses (it stays
+  paused once the block lifts), Practice Ground opens its menu, and an
+  online match runs on with no input from this side, as it does for a
+  hidden page, so the two browsers never desync. The block goes the moment
+  the screen fits again.
 
 ### 6.8 Practice Ground
 

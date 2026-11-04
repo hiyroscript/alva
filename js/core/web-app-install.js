@@ -75,6 +75,22 @@ export function installPlatform({ userAgent = '', maxTouchPoints = 0 } = {}) {
   return 'other';
 }
 
+// How to install by hand, by platform (installPlatform): a heading and
+// numbered steps, or a heading and one line, as translation keys. The
+// install dialog (js/ui/install-dialog.js) and the small-screen block
+// (js/core/screen-guard.js) show them.
+export const INSTALL_INSTRUCTIONS = Object.freeze({
+  ios: Object.freeze({ heading: 'install.ios.heading', steps: ['install.ios.step1', 'install.ios.step2', 'install.ios.step3', 'install.ios.step4'] }),
+  android: Object.freeze({ heading: 'install.howTo', text: 'install.android' }),
+  'android-samsung': Object.freeze({ heading: 'install.howTo', text: 'install.androidSamsung' }),
+  'android-firefox': Object.freeze({ heading: 'install.howTo', text: 'install.androidFirefox' }),
+  'desktop-edge': Object.freeze({ heading: 'install.howTo', text: 'install.edge' }),
+  'desktop-chromium': Object.freeze({ heading: 'install.howTo', text: 'install.chromium' }),
+  'desktop-safari': Object.freeze({ heading: 'install.howTo', text: 'install.safariMac' }),
+  'desktop-firefox': Object.freeze({ heading: 'install.howTo', text: 'install.unavailable' }),
+  other: Object.freeze({ heading: 'install.howTo', text: 'install.other' }),
+});
+
 // Whether the page is running as an installed app (see above).
 export function runningInstalled(win = globalThis.window) {
   if (win?.navigator?.standalone === true) return true;

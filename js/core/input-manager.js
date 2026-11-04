@@ -160,8 +160,12 @@ export class InputManager {
   // `controllers`: the connection manager (one of its own by default).
   // `profileFor(def)`: the controller profile `def` plays with (the
   // recommended one by default; App gives the player's saved ones).
-  constructor(bindings, { controllers = null, profileFor = null } = {}) {
+  // `blocked()`, when given, says whether the game takes no input at all
+  // right now (the small-screen block, js/core/screen-guard.js): keys and
+  // controllers then reach neither play nor the menus.
+  constructor(bindings, { controllers = null, profileFor = null, blocked = null } = {}) {
     this.bindings = bindings;
+    this.blocked = typeof blocked === 'function' ? blocked : () => false;
     this.codeToActions = new Map();
     for (const [action, codes] of Object.entries(bindings)) {
       for (const code of codes) {
@@ -312,6 +316,7 @@ export class InputManager {
   }
 
   _onKeyDown(e) {
+    if (this.blocked()) return;
     this.lastDevice = 'keyboard';
     const actions = this.codeToActions.get(e.code);
     if (this.gameplayActive && actions) {
@@ -472,6 +477,11 @@ export class InputManager {
   pollGamepads(now) {
     const dt = this.lastPoll === null ? 0 : Math.max(0, Math.min(0.1, (now - this.lastPoll) / 1000));
     this.lastPoll = now;
+    // Blocked: nothing held, nothing pressed, no menu command.
+    if (this.blocked()) {
+      for (const channel of Object.values(this.channels)) channel.release();
+      return;
+    }
     const slots = this.padSlots;
     const states = this.controllers.pollPlayers ? this.controllers.pollPlayers({ p2: this.localPlay }) : { p1: this.controllers.poll() };
     const live = [];

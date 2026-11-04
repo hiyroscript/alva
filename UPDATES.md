@@ -19,6 +19,7 @@ for where they moved). The game as it is now is specified in
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
+| **Camera & mobile layout update** | branch `claude/serene-franklin-fppga6` (no pull request yet) | camera: `1b4df65`; controls: `378d44d`; small screens: the commit adding this entry | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout with Classic Buttons by default, and a block on screens too small to play on |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -4918,3 +4919,121 @@ kept: the Home menu's action lists and first-row grid
 their fake layouts now put Online play in the first row), the battle modes'
 list (`local-play`, `watch-mode`), and the settings schema 8 → 9
 (`settings`).
+
+## Camera & mobile layout update
+
+Three parts, made in this order. The owner picked the camera's zoom from
+screenshots at 1.00, 1.30, 1.35, 1.40, 1.60, 2.00 and 2.50, and gave the
+reference screenshot the touch layout follows.
+
+### The closer camera
+
+The battle camera sits 1.35 times closer than the whole-stage view, the
+same for every fighter and every map: fighters stand about 13.5 % of the
+view tall (they were about 10 %). `computeWorldScale` multiplies the target
+fighter height (`fighterScreenRatio`) and its minimum and maximum by the
+zoom and divides the stage fit (the main stage plus `stageFrameMargin`
+either side) by it, so the view follows the fighters across the stage
+instead of always showing all of it. Pixel-perfect snapping still lands
+each art pixel on whole device pixels where that stays close to the target
+(on a 932 × 430 phone at 2×, 1.30 and 1.35 both snap to 2 device pixels per
+art pixel), the view never shows past the camera bounds, and the lethal
+launch's zoom (`HIT_FX.lethal.zoom`) closes in on top. The framing itself
+(`STAGE_LEAN`, `LEAD`, `floorLine`) is unchanged: both fighters are framed
+when they fit, Player 1 is kept inside the view's middle 60 % when they do
+not, and a fighter out of view keeps its edge pointer.
+
+**Where to tune it:** `CONFIG.render.cameraZoom` in
+[`js/config.js`](./js/config.js) (1.35).
+
+### Touch controls at 130 %, laid out like the reference
+
+- **Default sizes.** Every touch control defaults to 130 %
+  (`TOUCH_DEFAULT_SCALE.control`), except the fighter's moves stacked above
+  Shield (`STACKED_CONTROLS`: every combat button but `attack1`, `attack2`
+  and `extra_attack`), which default to 100 % (`TOUCH_DEFAULT_SCALE.stacked`).
+  No code set any control to 140 % before: the 140 % the owner saw is a
+  custom layout saved on that device, which still overrides the defaults
+  until its Reset to defaults. Reset now comes back to 130 % / 100 %, and the
+  editor shows 130 % for a control not yet resized.
+- **Classic Buttons is the default** for a player who never chose (a
+  stored choice of either is kept): Run left, Down and Run right in a row
+  along the bottom-left edge, all three full size, the small Dash buttons
+  just above the Run arrows. Joystick keeps its stick, Dash buttons and
+  Down, at 130 %.
+- **The lower-right cluster** (both schemes): Attack 1 and Attack 2 (the
+  Mash Combo's pair, each with the fighter's own art) and Jump along the
+  bottom edge, Jump in the corner; Shield directly above Jump, the extra
+  attack directly left of it (its place left empty for a fighter with
+  none); every other move stacked straight up from Shield in slot order,
+  with no gap for a move the fighter lacks, reserved ones still dashed.
+- **The stack never rises past the top HUD.** A stacked move whose top
+  would go above the bottom of the HUD parts over its column goes up a
+  second column above the extra attack, then a third above Attack 1;
+  nothing is shrunk. On a phone in landscape (932 × 430, 844 × 390,
+  667 × 375) two fit above Shield, so the fighters with three stacked
+  moves (#0001, #0004 to #0011) have their third (`attack5`) above the
+  extra attack; #0002 (one) and #0003 (two) fit in one column; on a tablet
+  or desktop all three stand above Shield. No control overlaps another or
+  leaves the safe area at 667 × 375, 844 × 390, 932 × 430, 1024 × 768 or
+  1366 × 768, in either scheme.
+
+**Where to tune it:** `TOUCH_DEFAULT_SCALE` and `STACKED_CONTROLS` in
+[`js/core/touch-layout.js`](./js/core/touch-layout.js); the geometry in
+[`css/touch-controls.css`](./css/touch-controls.css) (`--tc`, `--tc-gap`,
+the `--tc-k` family it lays out at); `STACK_COLUMNS` in
+`js/ui/touch-controls.js`; `DEFAULT_MOBILE_CONTROLS` in
+`js/core/settings.js`.
+
+### Small screens refused
+
+A screen too small to play on shows a full-screen, solid black block over
+everything, with the owner's title and text, a line asking to turn a phone
+held upright when turned it would fit, and **Download Alva** through the
+existing installation (the browser's prompt on Chromium, the Add to Home
+Screen steps on iOS Safari, a word when Alva is already installed or the
+browser cannot install it). "Too small" is the usable viewport
+(`visualViewport`), never the user agent: at least 640 × 400 in a browser
+tab, 640 × 360 as an installed app. Every phone's browser tab is refused
+(about 330 to 395 px tall in landscape, the iPhone 16 Pro Max's 956 × 392
+included); the same phone installed passes from 360 px tall (iPhone SE
+667 × 375, iPhone 15 852 × 393, Pro Max 932 × 430, Pixel 7 915 × 388);
+every tablet and desktop window passes. It is checked at start and on
+every resize and orientation change; it waits while a text field has
+focus (an on-screen keyboard). While it shows the game takes no input,
+an offline match pauses and stays paused after, Practice Ground opens its
+menu, and an online match runs on with no input from this side, never
+desyncing. The block is built by itself and started before the App, so it
+needs no screen, battle or menu.
+
+**Where to tune it:** `CONFIG.screen` in [`js/config.js`](./js/config.js)
+(`browser`, `installed`); the words under `screenBlock.*` in
+`js/localization/strings/`.
+
+**Code:** `js/config.js` (`render.cameraZoom`, `screen`),
+`js/game/arena.js` (`computeWorldScale`), `js/core/touch-layout.js`,
+`js/ui/touch-controls.js` (`applyLayout`, `placeStack`, `setCeiling`,
+`hudCeiling`), `css/touch-controls.css`, `js/ui/touch-layout-editor.js`,
+`js/core/settings.js`, `js/ui/settings-dialog.js`, new
+`js/core/screen-guard.js`, `js/core/web-app-install.js`
+(`INSTALL_INSTRUCTIONS`, moved from the install dialog), `js/main.js`,
+`js/core/app.js`, `js/core/input-manager.js` (`blocked`),
+`js/screens/battle-screen.js` and `js/screens/practice-screen.js`
+(`setCeiling`, `onScreenBlocked`), `css/overlays.css`, the strings and the
+documentation.
+
+**Tests:** `tests/systems/platform-stage.test.mjs` (the world scale at the
+zoom, the zoom one proportional tuning point, snapping at the default, the
+camera following inside its bounds), `tests/systems/fighter-status.test.mjs`
+(the edge pointer and the lethal zoom at the closer view),
+`tests/interface/touch-layout.test.mjs` (the default scales, the editor at
+130 %, Reset, the stack's columns under a ceiling, `hudCeiling`),
+`tests/interface/controls-ui.test.mjs` (the reference layout, Classic's row
+and the Joystick evaluated from the stylesheet, Classic by default),
+new `tests/interface/screen-guard.test.mjs` (the size check on common
+phones in both modes, tablets and desktops, the portrait line, the overlay
+on resize, Download Alva, the controller, both languages, no input),
+`tests/interface/battle-screen.test.mjs` (a match paused by the block).
+Revised for the new defaults, their rules kept: `settings`,
+`battle-screen`, `practice-ground`, `watch-mode`, `i18n` (Classic Buttons
+by default), `touch-layout` (130 % in place of 100 %).

@@ -224,3 +224,43 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
 }
 .boot-error[hidden] { display: none; }
 
+
+/* ---------------------------------------------------------------------
+   The small-screen block (js/core/screen-guard.js): a screen too small to
+   play on. Full screen, solid black, above everything (every screen,
+   dialog, the splash and the navigator's raised dialogs), its text centred
+   in white in Alva's own type; the panel scrolls on its own if a tiny
+   screen cannot hold it, and the page beneath never does.
+   --------------------------------------------------------------------- */
+.screen-block {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: max(var(--safe-t), 16px) max(var(--safe-r), 16px) max(var(--safe-b), 16px) max(var(--safe-l), 16px);
+  background: #000;
+  color: #fff;
+  font-family: var(--font);
+  text-align: center;
+  touch-action: pan-y;
+}
+.screen-block[hidden] { display: none; }
+.screen-block-panel { display: grid; justify-items: center; gap: 14px; width: min(560px, 100%); }
+.screen-block-title { margin: 0; font-size: clamp(20px, 5vw, 28px); font-weight: 700; line-height: 1.2; color: #fff; }
+.screen-block-body, .screen-block-rotate, .screen-block-status {
+  margin: 0;
+  font-size: clamp(14px, 3.6vw, 16px);
+  line-height: 1.5;
+  color: #fff;
+}
+.screen-block-rotate { font-weight: 600; }
+.screen-block-status { opacity: 0.85; }
+.screen-block-status[hidden], .screen-block-rotate[hidden], .screen-block-steps[hidden] { display: none; }
+.screen-block-download { min-width: 200px; }
+.screen-block-download:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.screen-block-steps { display: grid; gap: 6px; text-align: left; font-size: 14px; line-height: 1.5; }
+.screen-block-steps-title { margin: 0; font-size: 15px; font-weight: 700; color: #fff; }
+.screen-block-step-list { margin: 0; padding-left: 1.4em; }
+.screen-block-steps-body p { margin: 0; }

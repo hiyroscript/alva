@@ -401,6 +401,12 @@ export const FR = {
   'install.status.installing': 'Installation d’Alva…',
   'install.status.dismissed': 'Alva n’a pas été installé. Vous pouvez l’ajouter à tout moment.',
   'install.status.failed': 'Votre navigateur n’a pas pu lancer l’installation. Vous pouvez toujours ajouter Alva depuis son menu.',
+  'screenBlock.title': 'Alva ne peut pas être joué sur cet écran',
+  'screenBlock.body': 'Parce que nous voulons vous offrir la meilleure expérience de jeu, Alva n’est pas jouable sur un petit écran. Essayez de télécharger Alva comme application web et de le relancer pour voir si Alva accepte la taille de l’écran. Sinon, essayez de lancer Alva sur un écran plus grand, de préférence une tablette ou un ordinateur.',
+  'screenBlock.rotate': 'Tournez votre appareil à l’horizontale : Alva y trouvera peut-être sa place.',
+  'screenBlock.download': 'Télécharger Alva',
+  'screenBlock.installed': 'Alva est déjà installé, mais cet écran reste trop petit pour lui. Essayez un écran plus grand, de préférence une tablette ou un ordinateur.',
+  'screenBlock.accepted': 'Installation d’Alva… Une fois sur votre appareil, lancez-le depuis votre écran d’accueil ou votre liste d’applications.',
 
   'howToPlay.title': 'Comment jouer',
   'howToPlay.elimination.heading': 'Élimination',
