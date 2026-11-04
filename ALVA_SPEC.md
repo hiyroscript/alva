@@ -4810,19 +4810,22 @@ Adding one is described in
     burst always draws the same. A small shake comes with it. Paint only:
     no damage, launch or stun to anyone. Never a character-specific death
     animation, gore or a fighter id in the effect.
-  - *Spawn burst:* every fighter that appears (each spawn as a match starts,
-    every restart and rematch, every respawn after the Void, every fighter
-    or CPU Practice Ground puts on its floor, in every mode) materialises in
-    its own elimination burst played backwards, at its body's centre at the
-    spawn (`Arena.announceSpawn`, `HitEffects.addSpawn`, added after a
-    restart's effects reset): the shards fly in from their full reach to
-    its centre, quickening, the ring closes from its widest, everything
-    fades in, and the white flash grows and pops at the end, drawn over the
-    fighter. The same palette, size, seeded shards, life, shake and
-    reduced-motion handling as the elimination (`HIT_FX.elimination`); at
-    age t it draws exactly what the elimination draws at age life − t. It
-    never counts as an elimination. Paint only: the fighter is in play and
-    controllable from its first step, exactly as without it.
+  - *Respawn burst:* a fighter coming back from the Void (every respawn,
+    in every mode and in Practice Ground) is announced by its own
+    elimination burst played backwards, before it is back: in the last
+    `HIT_FX.elimination.life` (0.55 s) of its wait, still out of play, at
+    the centre of where its respawn will put it (`Fighter.spawnPlacement`,
+    `Arena.announceSpawn`, `HitEffects.addSpawn`). The shards fly in from
+    their full reach to that centre, quickening, the ring closes from its
+    widest, everything fades in, and the white flash grows and pops at the
+    end, as the fighter appears there. A fighter already on the stage gets
+    none: not as a match starts, on a restart or rematch, or as Practice
+    Ground puts a fighter or a CPU on its floor. The same palette, size,
+    seeded shards, life, shake and reduced-motion handling as the
+    elimination (`HIT_FX.elimination`); at age t it draws exactly what the
+    elimination draws at age life − t. It never counts as an elimination,
+    and a restart during the wait clears it. Paint only: the wait and the
+    respawn are exactly as without it.
   - *Heal glow:* a fighter that heals itself (a technique's `heal`,
     `Fighter.heals`, handed over by the Arena each step) shows a soft green
     ring opening round the middle of its body and a few green plus marks

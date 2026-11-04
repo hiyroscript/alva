@@ -20,7 +20,7 @@ for where they moved). The game as it is now is specified in
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
 | **Camera & mobile layout update** | [#172](https://github.com/hiyroscript/alva/pull/172), then [#173](https://github.com/hiyroscript/alva/pull/173) (the touch comfort rules) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
-| **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174) | `caa0042` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every spawn and respawn plays the elimination burst in reverse |
+| **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -5241,3 +5241,42 @@ Revised for the new default, their rules kept: `settings`, `controls-ui`,
 `battle-screen`, `i18n`, `practice-ground` and `watch-mode`. The online
 determinism and lockstep tests and the celebration test's elimination count
 pass unchanged.
+
+### Later: the burst comes before the respawn
+
+Pull request [#175](https://github.com/hiyroscript/alva/pull/175), commit `c48cb24`.
+After seeing it, the owner asked for the burst to play before the
+character appears ("otherwise it makes no sense"), and for none where the
+characters are already there, as when a match starts or in Practice
+Ground. The spawn burst is now a **respawn burst** only:
+
+- **Before, not after:** `Arena.updateRespawns` starts it in the last
+  `HIT_FX.elimination.life` (0.55 s) of the respawn wait, once, on the step
+  the wait crosses into that stretch, while the fighter is still out of
+  play. The burst closes in and its flash pops on the step the fighter
+  appears. It was added just after `f.respawn`.
+- **Where it will appear:** new `Fighter.spawnPlacement(stage)` (which
+  `Fighter.reset` now uses too) gives the place a respawn will put the
+  fighter without moving it. `HitEffects.addSpawn(f, at)` and `burst` take
+  that point; they read the fighter's body before.
+- **None for a fighter already there:** `Battle.restart` (a match's start,
+  a restart, a rematch) and Practice Ground's `setFighter` and `setCPU` no
+  longer call `announceSpawn`. Every respawn still does, in every mode and
+  in Practice Ground. A restart during the wait clears the burst with the
+  other effects.
+
+Still paint only: the wait, the respawn and the fight are exactly as
+before, and a whole CPU match steps identically with and without it.
+
+**Code:** `js/game/arena.js` (`announceSpawn`, `updateRespawns`),
+`js/game/fighters/fighter.js` (`spawnPlacement`, `reset`),
+`js/game/rendering/hit-fx.js` (`addSpawn`, `burst`), `js/game/battle.js`,
+`js/game/practice.js`; `ALVA_SPEC.md`, `docs/systems/rendering.md`,
+`docs/development/testing.md`.
+
+**Tests:** `tests/systems/spawn-burst.test.mjs`: the burst starting its
+life before the fighter is back (within a step), at the place it comes
+back, ending as it appears, once per respawn, in every mode and Practice
+Ground; none at a match's start, on a restart or for Practice Ground's
+arrivals, CPUs and swaps; cleared by a restart during the wait; never an
+elimination.

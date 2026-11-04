@@ -31,13 +31,13 @@
 // - A fighter the Void takes bursts where it went in: a flash, a ring and
 //   shards in its own colours (its visual.eliminationPalette, see
 //   eliminationPalette), drawn on after it has gone. Nothing but paint.
-// - Every fighter that appears (each spawn as a match starts or restarts,
-//   each respawn after the Void, each fighter Practice Ground puts on its
-//   floor) materialises in the same burst played backwards (addSpawn): its
-//   shards fly in from their full reach to its centre, the ring closes, all
-//   of it fades in, and the white flash grows and pops at the very end.
-//   Drawn over the fighter. Paint only: the fighter is in play and
-//   controllable from its first step, exactly as without it.
+// - A fighter coming back from the Void (a respawn) is announced by the
+//   same burst played backwards (addSpawn), at the place it will stand,
+//   during the last moments of its wait: its shards fly in from their full
+//   reach to that centre, the ring closes, all of it fades in, and the
+//   white flash grows and pops at the very end, as the fighter appears
+//   there. Paint only: the wait, the respawn and the fighter are exactly as
+//   without it.
 // - And the Void itself reacts where it took the fighter: a ripple at the
 //   very point on its boundary the fighter's centre crossed (see
 //   voidCrossing in js/game/arena.js): a bright pulse, its edge and red rim
@@ -108,8 +108,8 @@ export const HIT_FX = Object.freeze({
   },
   // A fighter taken by the Void: its burst, sized from the fighter's own
   // height (world units), so it reads the same at every zoom. A fighter's
-  // spawn plays this very burst backwards (addSpawn), with these same
-  // values: tune both here.
+  // respawn is announced by this very burst played backwards (addSpawn),
+  // starting `life` before the fighter is back: tune both here.
   elimination: {
     life: 0.55, // seconds
     shards: 24,
@@ -301,25 +301,29 @@ export class HitEffects {
     this.addShake(HIT_FX.elimination.shake);
   }
 
-  // `f` has just appeared at its spawn (Arena.announceSpawn): the same
-  // burst as its elimination, at its body's centre, its height and its
-  // colours, played backwards (drawSpawns). Its own list and entry point,
-  // so it never counts as an elimination. The same small shake (none with
-  // reduced motion).
-  addSpawn(f) {
-    this.spawns.push(this.burst(f, this.spawns.length));
+  // `f` is about to come back at `at` ({ x, y }: where its feet will be,
+  // Fighter.spawnPlacement; its body's place when not given), announced by
+  // Arena.updateRespawns while it is still out of play: the same burst as
+  // its elimination, centred where its body's centre will be, its height
+  // and its colours, played backwards (drawSpawns), so it closes in and
+  // pops as the fighter appears. Its own list and entry point, so it never
+  // counts as an elimination. The same small shake (none with reduced
+  // motion).
+  addSpawn(f, at = f.body) {
+    this.spawns.push(this.burst(f, this.spawns.length, at));
     this.addShake(HIT_FX.elimination.shake);
   }
 
-  // One burst for fighter `f`, caught now: where, how big, in which
-  // colours, and its seed (`index` tells two at one place apart), so the
-  // same burst always draws the same shards.
-  burst(f, index) {
-    const b = f.body;
+  // One burst for fighter `f` with its feet at `at` (its body by default),
+  // caught now: where, how big, in which colours, and its seed (`index`
+  // tells two at one place apart), so the same burst always draws the same
+  // shards.
+  burst(f, index, at = f.body) {
+    const height = f.body?.height ?? f.def?.collider?.height ?? 0;
     return {
-      slot: f.slot ?? null, x: b.x, y: b.y - b.height / 2,
-      size: f.def?.visual?.height ?? b.height, palette: eliminationPalette(f.def),
-      age: 0, life: HIT_FX.elimination.life, seed: b.x * 0.23 + b.y * 0.31 + index,
+      slot: f.slot ?? null, x: at.x, y: at.y - height / 2,
+      size: f.def?.visual?.height ?? height, palette: eliminationPalette(f.def),
+      age: 0, life: HIT_FX.elimination.life, seed: at.x * 0.23 + at.y * 0.31 + index,
     };
   }
 
@@ -710,9 +714,10 @@ export class HitEffects {
   // Draws every live spawn burst: the elimination burst run backwards, its
   // progress k = 1 - age / life, so at age t it draws exactly what an
   // elimination draws at age life - t. The shards start at their full reach
-  // and fly in to the fighter's centre, quickening as they go (the ease-out
-  // reversed), the ring closes from its widest, everything fades in, and
-  // the flash grows and pops at the end, as the fighter materialises.
+  // and fly in to the centre of where the fighter will stand, quickening as
+  // they go (the ease-out reversed), the ring closes from its widest,
+  // everything fades in, and the flash grows and pops at the end, as the
+  // fighter appears.
   drawSpawns(ctx, toScreen, scale, dpr = 1) {
     for (const e of this.spawns) this.drawBurst(ctx, e, 1 - Math.min(1, e.age / e.life), toScreen, scale, dpr);
   }

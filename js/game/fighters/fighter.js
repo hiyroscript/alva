@@ -202,14 +202,10 @@ export class Fighter {
     const { def, spawn } = this;
     // The stage it stands on (it was reset or respawned on).
     this.stage = stage;
-    const half = def.collider.width / 2;
-    const from = spawn.y ?? stage.groundY;
-    // On the surface under the spawn; with nothing under it (open air past
-    // the main floor's edges), in the air where it is, and falling.
-    const ground = stage.surfaceBelow(spawn.x - half, spawn.x + half, from);
+    const ground = this.spawnPlacement(stage);
     this.body = createBody({
-      x: spawn.x,
-      y: ground.ref ? ground.y : from,
+      x: ground.x,
+      y: ground.y,
       width: def.collider.width,
       height: def.collider.height,
       gravityScale: this.movement.gravityScale,
@@ -351,6 +347,20 @@ export class Fighter {
     this.animator.play('idle', { restart: true });
     // An ensemble's members start in formation, the way it faces.
     this.animator.snap?.(this.facing);
+  }
+
+  // Where a reset or a respawn puts this fighter on `stage`, without moving
+  // it: { x, y (its feet), ref (the surface under it, or null) }. On the
+  // surface under its spawn; with nothing under it (open air past the main
+  // floor's edges), in the air where the spawn is (and falling, once
+  // placed). Read-only: the respawn's burst is painted here before the
+  // fighter is back (Arena.updateRespawns).
+  spawnPlacement(stage = this.stage) {
+    const { def, spawn } = this;
+    const half = def.collider.width / 2;
+    const from = spawn.y ?? stage.groundY;
+    const ground = stage.surfaceBelow(spawn.x - half, spawn.x + half, from);
+    return { x: spawn.x, y: ground.ref ? ground.y : from, ref: ground.ref };
   }
 
   // Back at its own spawn after the Void's wait (see Arena.updateRespawns):

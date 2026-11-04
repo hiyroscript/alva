@@ -1,10 +1,11 @@
 // Run with node --test tests/systems/spawn-burst.test.mjs (no dependencies).
-// The spawn burst (HitEffects.addSpawn, drawSpawns; Arena.announceSpawn):
-// every fighter that appears materialises in its own elimination burst
-// played backwards. Added as a match starts, on every restart (and still
-// there after the restart's effects reset), on every respawn after the
-// Void, and as Practice Ground puts a fighter or a CPU on its floor; in the
-// fighter's own palette and size, at its centre; gone after its life; the
+// The respawn burst (HitEffects.addSpawn, drawSpawns; Arena.announceSpawn):
+// a fighter coming back from the Void is announced by its own elimination
+// burst played backwards, before it is back: started its life before the
+// wait ends, where it will stand, popping as it appears. None for a fighter
+// already on the stage (a match's start, a restart, Practice Ground's
+// arrivals); in every mode and Practice Ground's respawns; cleared by a
+// restart during the wait; in the fighter's own palette and size; the
 // exact time-reverse of the elimination (the same strokes at age t as the
 // elimination at age life - t); the same reduced-motion handling; drawn
 // over the fighters; never counted as an elimination; and paint only, the
@@ -85,85 +86,127 @@ const draw = (fx, kind) => {
   return ctx.calls;
 };
 
-// ---- Where it is added -----------------------------------------------------------
+// ---- When and where it is added --------------------------------------------------
 
-test('a match starts with each fighter materialising at its spawn, in its own palette and size', () => {
-  const p1Def = getCharacter('0001');
-  const p2Def = getCharacter('0002');
-  const battle = battleOf({ p1Def, p2Def });
-  assert.equal(battle.fx.spawns.length, 2, 'one burst each');
-  const bySlot = Object.fromEntries(battle.fx.spawns.map((b) => [b.slot, b]));
-  assertBurstOf(bySlot.p1, battle.p1, 'Player 1');
-  assertBurstOf(bySlot.p2, battle.p2, 'Player 2');
-  assert.notDeepEqual(bySlot.p1.palette, bySlot.p2.palette, 'two fighters, two bursts');
-  assert.deepEqual(battle.fx.eliminations, [], 'a spawn is no elimination');
-});
+// Steps the arena one fixed step and ages its effects by the same time, as a
+// rendered frame at the simulation's own speed would.
+const step = (arena) => {
+  arena.update(DT);
+  arena.fx.update(DT);
+};
 
-test('every mode spawns the same way: Quick Battle, Watch Mode, Local Play and Online Play', () => {
+// Takes `f` by the Void, then steps through its wait, recording the step
+// its burst was added and the step it came back.
+function throughRespawn(arena, f) {
+  intoVoid(arena, f);
+  step(arena);
+  assert.equal(f.lostToVoid, true, 'taken');
+  const placed = f.spawnPlacement(arena.stage);
+  let added = null;
+  let back = null;
+  let gone = null;
+  let burst = null;
+  let count = 0;
+  for (let i = 1; i <= RESPAWN_STEPS + 6 && (back === null || gone === null); i++) {
+    const before = new Set(arena.fx.spawns);
+    step(arena);
+    const fresh = arena.fx.spawns.filter((b) => !before.has(b) && b.slot === f.slot);
+    count += fresh.length;
+    if (added === null && fresh.length) {
+      added = i;
+      [burst] = fresh;
+      assert.equal(f.lostToVoid, true, 'the burst starts while the fighter is still out of play');
+    }
+    if (back === null && !f.lostToVoid) back = i;
+    if (burst && gone === null && !arena.fx.spawns.includes(burst)) gone = i;
+  }
+  return { added, back, gone, burst, placed, count };
+}
+
+test('a fighter already on the stage gets no burst: not as a match starts, in any mode, nor on a restart or a rematch', () => {
   for (const mode of ['quick-battle', 'watch', 'local', 'online']) {
     const battle = battleOf({ mode });
-    assert.deepEqual(battle.fx.spawns.map((b) => b.slot), ['p1', 'p2'], mode);
+    assert.deepEqual(battle.fx.spawns, [], `${mode}: the match starts with both fighters there`);
+    battle.setPhase('fight');
+    for (let i = 0; i < 30; i++) step(battle);
+    assert.deepEqual(battle.fx.spawns, [], mode);
+    battle.restart();
+    assert.deepEqual(battle.fx.spawns, [], `${mode}: a restart puts them back, with no burst`);
   }
 });
 
-test('a restart (and so a rematch) materialises both again, after its effects reset, so the reset never wipes it', () => {
-  const battle = battleOf();
-  battle.setPhase('fight');
-  intoVoid(battle, battle.p2);
-  battle.update(DT);
-  assert.equal(battle.fx.eliminations.length, 1);
-  battle.fx.update(life + 0.01);
-  assert.deepEqual(battle.fx.spawns, [], 'the start\'s bursts are over');
-  battle.restart();
-  assert.deepEqual(battle.fx.eliminations, [], 'the reset cleared the old effects');
-  assert.deepEqual(battle.fx.spawns.map((b) => b.slot), ['p1', 'p2'], 'and the new spawns are there');
-  for (const b of battle.fx.spawns) assertBurstOf(b, battle[b.slot], `restart ${b.slot}`);
-  assert.equal(battle.fx.spawns.every((b) => b.age === 0), true);
-});
-
-test('every respawn after the Void materialises the fighter at its spawn, exactly once each time', () => {
-  const p2Def = getCharacter('0003');
-  const battle = battleOf({ p2Def });
-  battle.setPhase('fight');
-  battle.fx.update(life + 0.01);
-  for (let round = 1; round <= 2; round++) {
-    intoVoid(battle, battle.p2);
-    battle.update(DT);
-    assert.equal(battle.p2.lostToVoid, true);
-    assert.deepEqual(battle.fx.spawns, [], `${round}: nothing while it waits`);
-    for (let i = 0; i < RESPAWN_STEPS + 2 && battle.p2.lostToVoid; i++) battle.update(DT);
-    assert.equal(battle.p2.lostToVoid, false, `${round}: back`);
-    assert.equal(battle.fx.spawns.length, 1, `${round}: one burst`);
-    assertBurstOf(battle.fx.spawns[0], battle.p2, `respawn ${round}`);
-    battle.fx.update(life + 0.01);
-  }
-});
-
-test('Practice Ground: its fighter on arrival, a CPU added or replaced, a swapped fighter and every respawn all materialise', () => {
+test('Practice Ground gets none for a fighter it puts on its floor: its arrival, a CPU added or replaced, a swapped fighter', () => {
   const a = getCharacter('0001');
   const b = getCharacter('0004');
   const session = new PracticeSession({ canvas, map: PRACTICE_MAP, def: a, sprites: fakeSpritesOf(a), input: input() });
-  assert.equal(session.fx.spawns.length, 1, 'the player\'s fighter');
-  assertBurstOf(session.fx.spawns[0], session.player, 'practice fighter');
+  assert.deepEqual(session.fx.spawns, []);
   session.setCPU(b, fakeSpritesOf(b));
-  assert.equal(session.fx.spawns.length, 2);
-  assertBurstOf(session.fx.spawns[1], session.cpu, 'practice CPU');
   session.setCPU(a, fakeSpritesOf(a));
-  assert.equal(session.fx.spawns.length, 3, 'a replaced CPU too');
-  assertBurstOf(session.fx.spawns[2], session.cpu, 'replaced CPU');
-  // A swap clears the effects, then the new fighter appears.
   session.setFighter(b, fakeSpritesOf(b));
-  assert.equal(session.fx.spawns.length, 1, 'after the reset, the new fighter\'s');
-  assertBurstOf(session.fx.spawns[0], session.player, 'swapped fighter');
-  // A respawn.
-  session.fx.update(life + 0.01);
-  intoVoid(session, session.cpu);
-  session.update(DT);
-  assert.equal(session.cpu.lostToVoid, true);
-  for (let i = 0; i < RESPAWN_STEPS + 2 && session.cpu.lostToVoid; i++) session.update(DT);
-  assert.equal(session.cpu.lostToVoid, false);
-  assert.equal(session.fx.spawns.length, 1);
-  assertBurstOf(session.fx.spawns[0], session.cpu, 'practice respawn');
+  assert.deepEqual(session.fx.spawns, []);
+});
+
+test('a respawn is announced before the fighter is back: the burst starts its life before, where it will stand, and pops as it appears', () => {
+  const p2Def = getCharacter('0003');
+  const battle = battleOf({ p2Def });
+  battle.setPhase('fight');
+  for (let round = 1; round <= 2; round++) {
+    const f = battle.p2;
+    const { added, back, gone, burst, placed, count } = throughRespawn(battle, f);
+    assert.ok(added !== null, `${round}: a burst`);
+    assert.ok(back !== null, `${round}: back`);
+    assert.equal(count, 1, `${round}: exactly one`);
+    // Started the burst's life before the fighter is back, within a step.
+    const lead = (back - added) * DT;
+    assert.ok(Math.abs(lead - life) <= DT + 1e-9, `${round}: started ${lead.toFixed(3)} s before (life ${life} s)`);
+    // Over (its flash popped) on the very step the fighter appears, give or
+    // take one.
+    assert.ok(Math.abs(gone - back) <= 1, `${round}: it ends as the fighter appears (gone at step ${gone}, back at ${back})`);
+    // Where the fighter came back, in its palette and size.
+    near(burst.x, placed.x, `${round}: x`);
+    near(burst.y, placed.y - f.body.height / 2, `${round}: y, its centre`);
+    near(f.body.x, placed.x, `${round}: the fighter is where the burst was`);
+    near(f.body.y, placed.y, `${round}: the fighter's feet`);
+    assert.equal(burst.slot, 'p2');
+    assert.equal(burst.size, p2Def.visual.height);
+    assert.deepEqual(burst.palette, eliminationPalette(p2Def));
+  }
+});
+
+test('every mode announces its respawns the same way: Quick Battle, Watch Mode, Local Play and Online Play', () => {
+  for (const mode of ['quick-battle', 'watch', 'local', 'online']) {
+    const battle = battleOf({ mode });
+    battle.setPhase('fight');
+    const { added, back } = throughRespawn(battle, battle.p1);
+    assert.ok(added !== null && back !== null && added < back, mode);
+  }
+});
+
+test('Practice Ground announces every respawn too, the player\'s and the CPU\'s', () => {
+  const a = getCharacter('0001');
+  const b = getCharacter('0004');
+  const session = new PracticeSession({ canvas, map: PRACTICE_MAP, def: a, sprites: fakeSpritesOf(a), input: input() });
+  session.setCPU(b, fakeSpritesOf(b));
+  for (const f of [session.cpu, session.player]) {
+    const { added, back, burst, placed } = throughRespawn(session, f);
+    assert.ok(added !== null && back !== null && added < back, f.slot);
+    near(burst.x, placed.x, `${f.slot}: x`);
+    assert.deepEqual(burst.palette, eliminationPalette(f.def));
+  }
+});
+
+test('a restart during the wait clears the burst, and no burst comes for a respawn that never happens', () => {
+  const battle = battleOf();
+  battle.setPhase('fight');
+  intoVoid(battle, battle.p2);
+  step(battle);
+  for (let i = 0; i < RESPAWN_STEPS - 5; i++) step(battle);
+  assert.equal(battle.fx.spawns.length, 1, 'announced, the fighter still out');
+  battle.restart();
+  assert.deepEqual(battle.fx.spawns, [], 'the restart clears it');
+  battle.setPhase('fight');
+  for (let i = 0; i < RESPAWN_STEPS + 5; i++) step(battle);
+  assert.deepEqual(battle.fx.spawns, [], 'nothing waits to respawn: no burst');
 });
 
 // ---- What it is ----------------------------------------------------------------------
@@ -265,16 +308,15 @@ test('it lasts the elimination\'s life, then is gone; a spawn shakes as an elimi
   assert.ok(reach(calm) < reach(full) * 0.6, 'short travel with reduced motion');
 });
 
-test('a spawn is never counted as an elimination, and a restart clears none it should keep', () => {
+test('a respawn\'s burst is never counted as an elimination', () => {
   const battle = battleOf();
+  battle.setPhase('fight');
   let eliminations = 0;
   const add = battle.fx.addElimination.bind(battle.fx);
   battle.fx.addElimination = (f) => { eliminations++; return add(f); };
-  battle.restart();
-  battle.setPhase('fight');
-  for (let i = 0; i < 30; i++) battle.update(DT);
-  assert.equal(eliminations, 0, 'spawning is no elimination');
-  assert.deepEqual(battle.fx.eliminations, []);
+  const { added } = throughRespawn(battle, battle.p2);
+  assert.ok(added !== null);
+  assert.equal(eliminations, 1, 'the fall, and only the fall');
 });
 
 test('the Arena draws the spawn burst over the fighters, and the shared code knows no fighter by id', () => {
@@ -290,7 +332,7 @@ test('the Arena draws the spawn burst over the fighters, and the shared code kno
 
 // ---- Paint only ---------------------------------------------------------------------
 
-test('paint only: a whole CPU match (eliminations, respawns, a restart) steps identically with and without the spawn burst', () => {
+test('paint only: a whole CPU match (eliminations, respawns, a restart) steps identically with and without the respawn burst', () => {
   const p1Def = getCharacter('0001');
   const p2Def = getCharacter('0002');
   const snapshot = (battle) => JSON.stringify({
