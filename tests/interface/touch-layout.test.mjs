@@ -141,7 +141,7 @@ globalThis.document = {
 
 const {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, sanitizeTouchLayout, placeControl, normalizePoint, layoutArea, clampScale,
-  TOUCH_DEFAULT_SCALE, STACKED_CONTROLS, defaultTouchScale,
+  TOUCH_DEFAULT_SCALE, defaultTouchScale,
 } = await import('../../js/core/touch-layout.js');
 const { TouchControls } = await import('../../js/ui/touch-controls.js');
 const { TouchLayoutEditor } = await import('../../js/ui/touch-layout-editor.js');
@@ -302,16 +302,19 @@ test('a stored layout keeps every numbered attack button by its codename, in the
 
 // ---- Applying a layout ------------------------------------------------------------------
 
-test('with no custom layout nothing is moved, and every control is at its default scale: 130%, the moves stacked above Shield 100%', () => {
-  assert.deepEqual({ ...TOUCH_DEFAULT_SCALE }, { control: 1.3, stacked: 1 });
-  assert.deepEqual([...STACKED_CONTROLS], ['attack3', 'attack4', 'attack5'], 'every combat button but the Mash Combo pair and the extra attack');
+test('with no custom layout nothing is moved, and every control is at its default scale: 130%, the fighter\'s moves other than its Mash Combo pair 110%', () => {
+  assert.deepEqual({ ...TOUCH_DEFAULT_SCALE }, { control: 1.3, move: 1.1 });
+  assert.equal(defaultTouchScale('control'), 1.3);
+  assert.equal(defaultTouchScale('mash'), 1.3, 'the two Mash Combo buttons as big as every control');
+  assert.equal(defaultTouchScale('move'), 1.1);
   for (const scheme of MOBILE_CONTROLS) {
+    // #0001's pair is its Jab (attack1) and its High Kick (extra_attack).
     const { tc } = touchControls(scheme);
     layOut(tc);
     tc.applyLayout();
     for (const [id, node] of tc.getControlElements()) {
-      const expected = STACKED_CONTROLS.includes(id) ? 1 : 1.3;
-      assert.equal(defaultTouchScale(id), expected, id);
+      const expected = ['attack2', 'attack3', 'attack4', 'attack5'].includes(id) ? 1.1 : 1.3;
+      assert.equal(tc.defaultScaleOf(id), expected, id);
       assert.equal(node.style.translate ?? '', '', `${scheme} ${id}: not moved`);
       assert.equal(node.style.scale, String(expected), `${scheme} ${id}: at its default scale`);
       const place = tc.placements.get(id);
@@ -410,7 +413,7 @@ test('Reset (the empty layout) returns every control to its original place and i
     tc.setLayout({});
     for (const [id, node] of tc.getControlElements()) {
       assert.equal(node.style.translate, '', `${scheme} ${id}`);
-      assert.equal(node.style.scale, String(defaultTouchScale(id)), `${scheme} ${id}`);
+      assert.equal(node.style.scale, String(tc.defaultScaleOf(id)), `${scheme} ${id}`);
       assert.deepEqual(tc.placements.get(id).center, tc.placements.get(id).home);
     }
     assert.deepEqual(tc.getLayout(), {});
@@ -860,11 +863,12 @@ test('size: Smaller / Larger and the slider resize the selected control within t
   editor.smaller.click();
   assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 1.3);
   assert.equal(editor.sizeValue.textContent, '130%');
-  // A stacked move starts at 100%.
+  // One of the fighter's other moves starts at 110% (the editor's neutral
+  // Mash Combo places are attack1 and attack2).
   const attack3 = editor.touch.actionButtons.get('attack3');
   attack3.dispatch('pointerdown', { pointerId: 2, button: 0, ...centre(attack3) });
   attack3.dispatch('pointerup', { pointerId: 2 });
-  assert.equal(editor.sizeValue.textContent, '100%');
+  assert.equal(editor.sizeValue.textContent, '110%');
   runRight.dispatch('pointerdown', { pointerId: 3, button: 0, ...centre(runRight) });
   runRight.dispatch('pointerup', { pointerId: 3 });
   assert.deepEqual(editor.touch.placements.get('runRight').center, home, 'grows round its centre');
@@ -898,7 +902,7 @@ test('Reset to defaults puts only this scheme back on Alva\'s own layout, saved'
   editor.resetButton.click();
   for (const [id, node] of editor.touch.getControlElements('classic')) {
     assert.equal(node.style.translate, '', id);
-    assert.equal(node.style.scale, String(defaultTouchScale(id)), `${id}: its new default size`);
+    assert.equal(node.style.scale, String(editor.touch.defaultScaleOf(id)), `${id}: its new default size`);
   }
   assert.deepEqual(saved(storage).touchLayouts.classic, {});
   assert.deepEqual(saved(storage).touchLayouts.joystick, { jump: { x: 0.4, y: 0.4, scale: 1.3 } }, 'Joystick keeps its own');
@@ -1042,78 +1046,100 @@ test('Classic Mouvement controls move, resize, persist and reset independently w
   editor.close();
 });
 
-// ---- The stack above Shield ------------------------------------------------------------
+// ---- The Mash Combo row and the fighter's other moves ---------------------------------
 
-// Boxes that follow the stack's attributes, as the stylesheet places them:
-// column 0 over Shield at x 900, each column 100 px further left, each row
-// 70 px higher, the first row's top at y 230.
+const COMBAT = ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
+
+// Boxes that follow the places' attributes, as the stylesheet sets them:
+// column 0 over Shield at x 900, each column 100 px further left; column 0
+// starting at y 230, columns 1 and 2 (raised from lower down) at y 300,
+// each row 70 px higher.
 function stackBoxes(tc) {
-  for (const action of ['attack3', 'attack4', 'attack5']) {
+  for (const action of COMBAT) {
     const b = tc.actionButtons.get(action);
     Object.defineProperty(b, 'rect', {
       configurable: true,
       get() {
         const col = Number(b.getAttribute('data-stack-col') ?? 0);
         const row = Number(b.getAttribute('data-stack-row') ?? 0);
-        return { left: 900 - col * 100, top: 230 - row * 70, width: 60, height: 60, right: 960 - col * 100, bottom: 290 - row * 70 };
+        const top = (col === 0 ? 230 : 300) - row * 70;
+        return { left: 900 - col * 100, top, width: 60, height: 60, right: 960 - col * 100, bottom: top + 60 };
       },
     });
   }
 }
-const stackOf = (tc) => Object.fromEntries(['attack3', 'attack4', 'attack5'].map((a) => {
-  const b = tc.actionButtons.get(a);
-  return [a, b.hidden ? null : [b.getAttribute('data-stack-col'), b.getAttribute('data-stack-row')]];
-}));
+const placeOf = (tc, action) => {
+  const b = tc.actionButtons.get(action);
+  if (b.hidden) return null;
+  if (b.getAttribute('data-mash')) return `mash${b.getAttribute('data-mash')}`;
+  return b.getAttribute('data-stack-col') === null ? 'none' : `${b.getAttribute('data-stack-col')}:${b.getAttribute('data-stack-row')}`;
+};
 
-test('the moves past Attack 1 and Attack 2 stack straight up from Shield with no gap, for every fighter from its own data', async () => {
+test('beside Jump stand only the fighter\'s two Mash Combo buttons, from its own pair, whichever buttons they are; nothing else ever', async () => {
   const { playableCharacters } = await import('../../js/data/characters.js');
-  const counts = {};
+  const { mashPairOf, mashTriggers } = await import('../../js/data/mash-combo.js');
+  const { mashButtons } = await import('../../js/ui/touch-controls.js');
   for (const def of playableCharacters()) {
     const { tc } = touchControls('classic', def);
     layOut(tc);
     stackBoxes(tc);
     tc.applyLayout();
-    const shown = ['attack3', 'attack4', 'attack5'].filter((a) => !tc.actionButtons.get(a).hidden);
-    // In slot order, one row after another in column 0: nothing skipped.
-    assert.deepEqual(shown.map((a) => stackOf(tc)[a]), shown.map((_, i) => ['0', String(i)]), def.id);
-    for (const a of ['attack3', 'attack4', 'attack5'].filter((x) => !shown.includes(x))) {
-      assert.equal(tc.actionButtons.get(a).getAttribute('data-stack-col'), null, `${def.id} ${a}: absent, no place kept`);
+    // The buttons that start the pair's two moves, in the pair's order.
+    const triggers = [...mashTriggers(def)];
+    const expected = mashPairOf(def).map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+    assert.deepEqual(mashButtons(def), expected, def.id);
+    assert.ok(expected[0], `${def.id}: a button for the pair's first move`);
+    for (const [i, button] of expected.entries()) {
+      if (button) assert.equal(placeOf(tc, button), `mash${i + 1}`, `${def.id}: ${button} beside Jump`);
     }
-    // attack1 and attack2 keep their bottom-row slots, never stacked.
-    for (const a of ['attack1', 'attack2']) assert.equal(tc.actionButtons.get(a).getAttribute('data-stack-col'), null);
-    assert.equal(tc.stackOverflow, false);
-    counts[def.id] = shown.length;
+    // Nothing else is ever in that row: a pair move with no button
+    // (mash_attack) leaves its place empty.
+    const inRow = COMBAT.filter((a) => tc.actionButtons.get(a).getAttribute('data-mash'));
+    assert.deepEqual(inRow.sort(), expected.filter(Boolean).sort(), `${def.id}: only the pair`);
+    for (const a of COMBAT.filter((x) => !expected.includes(x))) {
+      const place = placeOf(tc, a);
+      assert.ok(place === null || /^\d:\d$/.test(place), `${def.id} ${a}: one of its other moves, above (${place})`);
+      if (place) assert.equal(tc.actionButtons.get(a).style.scale, '1.1', `${def.id} ${a}: a little smaller`);
+    }
+    for (const button of expected.filter(Boolean)) assert.equal(tc.actionButtons.get(button).style.scale, '1.3', `${def.id} ${button}: as big as every button`);
   }
-  // From each fighter's own buttons: #0002 one stacked move, #0003 two, #0001 three.
-  assert.equal(counts['0002'], 1);
-  assert.equal(counts['0003'], 2);
-  assert.equal(counts['0001'], 3);
+  // With no fighter (the editor), attack1 and attack2 hold the places.
+  assert.deepEqual(mashButtons(null), ['attack1', 'attack2']);
 });
 
-test('the stack never rises past the top HUD: what would goes up the next column, above the extra attack, then above Attack 1', () => {
+test('the fighter\'s other moves stand higher, two columns side by side, one to each in turn, no gap for a move it lacks', () => {
+  // #0001: its pair is attack1 and extra_attack; attack2 to attack5 are its other moves.
   const { tc } = touchControls('classic', DEF_0001);
   layOut(tc);
   stackBoxes(tc);
-  // A HUD whose bottom is at y 170 over the whole width: one row fits (top
-  // 230), the second (160) does not.
-  tc.setCeiling(() => 170);
-  assert.deepEqual(stackOf(tc), { attack3: ['0', '0'], attack4: ['1', '0'], attack5: ['2', '0'] });
+  tc.applyLayout();
+  assert.deepEqual(COMBAT.map((a) => placeOf(tc, a)), ['mash2', 'mash1', '1:0', '0:0', '1:1', '0:1']);
   assert.equal(tc.stackOverflow, false);
-  // Room for two rows (tops 230 and 160, not 90): the third move starts column 1.
-  tc.setCeiling(() => 100);
-  assert.deepEqual(stackOf(tc), { attack3: ['0', '0'], attack4: ['0', '1'], attack5: ['1', '0'] });
-  // Room for all three: one column.
+  // #0002 (pair attack1 and attack2): its extra attack and attack3 only.
+  tc.setCharacter(getCharacter('0002'));
+  tc.applyLayout();
+  assert.deepEqual(COMBAT.map((a) => placeOf(tc, a)), ['1:0', 'mash1', 'mash2', '0:0', null, null]);
+});
+
+test('the other moves never rise past the top HUD: a full column passes its turn, then a third column takes the rest, never shrunk', () => {
+  const { tc } = touchControls('classic', DEF_0001);
+  layOut(tc);
+  stackBoxes(tc);
+  // A HUD bottom at y 200: column 0 holds one (230; 160 does not), column 1
+  // two (300, 230; 160 does not): the fourth move goes to column 2.
+  tc.setCeiling(() => 200);
+  assert.deepEqual(COMBAT.slice(2).map((a) => placeOf(tc, a)), ['1:0', '0:0', '1:1', '2:0']);
+  assert.equal(tc.stackOverflow, false);
+  // Room everywhere: two and two.
   tc.setCeiling(() => 0);
-  assert.deepEqual(stackOf(tc), { attack3: ['0', '0'], attack4: ['0', '1'], attack5: ['0', '2'] });
+  assert.deepEqual(COMBAT.slice(2).map((a) => placeOf(tc, a)), ['1:0', '0:0', '1:1', '0:1']);
   // No room even for one: they still show, up the last column, and it says so.
   tc.setCeiling(() => 400);
-  assert.deepEqual(stackOf(tc).attack3, ['2', '0']);
+  assert.deepEqual(COMBAT.slice(2).map((a) => placeOf(tc, a)), ['2:0', '2:1', '2:2', '2:3']);
   assert.equal(tc.stackOverflow, true);
-  // No ceiling: the touch area's own top.
   tc.setCeiling(null);
   assert.equal(tc.stackOverflow, false);
-  // The default scales hold wherever a move is stacked.
-  for (const a of ['attack3', 'attack4', 'attack5']) assert.equal(tc.actionButtons.get(a).style.scale, '1');
+  for (const a of COMBAT.slice(2)) assert.equal(tc.actionButtons.get(a).style.scale, '1.1', 'never shrunk past their size');
   assert.equal(tc.actionButtons.get('shield').style.scale, '1.3');
 });
 

@@ -115,30 +115,34 @@ it never requests again. Touch Mouvement holds no Run input.
 Opposing simultaneous requests cancel. The CPU emits the same explicit request
 fields; normal CPU running never Dashes.
 
-Both share the lower-right cluster, along the bottom-right edges: the
-bottom row is `attack1` and `attack2` (the Mash Combo's pair) and Jump in
-the corner; Shield above Jump, the extra attack left of it; and every other
-move stacked straight up from Shield (`attackSlots`: `attack1` in slot 1,
-`attack2` in slot 2, the rest in slots 3 and up, which is their order up
-the stack). A move the fighter lacks leaves no gap. The stack never rises
-past the top HUD (`setCeiling(hudCeiling(hudRoot))`): what would goes up a
-second column above the extra attack's place, then a third above
-`attack1`, never shrunk (on a phone in landscape two fit above Shield):
+Both share the lower-right cluster, flush in the bottom-right corner (both
+clusters touch the screen's edges, only the safe-area insets between): the
+bottom row is the fighter's two Mash Combo buttons (`mashButtons`: the
+buttons whose ground moves are its own `mashCombo` pair, in its order, from
+[`js/data/mash-combo.js`](../../js/data/mash-combo.js), never a button id)
+and Jump in the corner, and nothing else ever; a pair move with no button
+(`mash_attack`) leaves its place empty. Shield sits above Jump. Every other
+move of the fighter stands higher and a little smaller, in two columns
+growing up side by side, one move to each in turn: left of Shield (starting
+a little higher than it) and above Shield. A move the fighter lacks leaves
+no gap. Neither column rises past the top HUD
+(`setCeiling(hudCeiling(hudRoot))`): a full column passes its turn to the
+other, then a third column above the first Mash Combo button takes the
+rest, never shrunk:
 
 ```
-                   [5]
-                   [4]
-                   [3]
-           [EXTRA] [SHIELD]
-     [1]   [2]     [JUMP]
+           [M4]     [M3]
+           [M2]     [M1]
+                    [SHIELD]
+   [MASH A] [MASH B] [JUMP]
 ```
 
 **Default sizes.** Every control defaults to 130 % (`TOUCH_DEFAULT_SCALE`
-in [`js/core/touch-layout.js`](../../js/core/touch-layout.js)); the moves
-stacked above Shield (`STACKED_CONTROLS`) to 100 %. A custom layout's own
-size replaces it, and Reset to defaults comes back to it. The stylesheet
-lays the clusters out at the scaled sizes (`--tc-k`, `--tc-ks`), inside the
-safe-area insets, so no control overlaps another.
+in [`js/core/touch-layout.js`](../../js/core/touch-layout.js)), the two
+Mash Combo buttons included; the fighter's other moves to 110 %. A custom
+layout's own size replaces it, and Reset to defaults comes back to it. The
+stylesheet lays the clusters out at the scaled sizes (`--tc-k`, `--tc-ks`),
+inside the safe-area insets, so no control overlaps another.
 
 All action buttons, including Jump and Extra Attack, share the same diameter,
 border, background, shadow and pressed feedback. Reserved/unavailable states
@@ -189,7 +193,7 @@ press the button a second time.
 
 **Custom layouts.** Settings → Controls → Customize touch controls opens
 the editor over a still battle screen: every control can be moved and
-resized (70 % to 180 %; 130 % by default, a stacked move 100 %), by pointer, keyboard or gamepad, and all five
+resized (70 % to 180 %; 130 % by default, the fighter's other moves 110 %), by pointer, keyboard or gamepad, and all five
 numbered buttons always show their matching one-to-five pip icons. Every
 editor control uses a universal icon and a neutral localized name, regardless
 of the selected fighter: Extra Attack uses the ring, Defence the shield,

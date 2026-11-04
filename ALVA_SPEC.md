@@ -1666,7 +1666,8 @@ existed places the Down button where the player put it.
   green ring, and the compact glass toolbar across the top names it and
   enables **Smaller** (−), **Larger** (+) and a size slider, 70 % to 180 %
   in 10 % steps, with the value beside them (a control not yet resized
-  shows its default: 130 %, a move stacked above Shield 100 %). The control grows or shrinks
+  shows its default: 130 %, a fighter move other than its Mash Combo pair
+  110 %). The control grows or shrinks
   round its centre, and its touch area with it. The size controls are
   disabled while nothing is selected.
 - **Keyboard / gamepad:** in the editor (only there) the controls are
@@ -4995,9 +4996,9 @@ Adding one is described in
     the stylesheet's own, pixel for pixel.
   - **Default sizes.** Every touch control's default scale is 130 %
     (`TOUCH_DEFAULT_SCALE.control`, 1.3, in `js/core/touch-layout.js`), the
-    same for every fighter, except the fighter's moves stacked above Shield
-    (`STACKED_CONTROLS`: every combat button but `attack1`, `attack2` and
-    `extra_attack`), which default to 100 % (`TOUCH_DEFAULT_SCALE.stacked`).
+    same for every fighter, the two Mash Combo buttons beside Jump
+    included, except the fighter's other moves (TouchControls role
+    `move`), which default to 110 % (`TOUCH_DEFAULT_SCALE.move`).
     `applyLayout` writes each control's scale (its custom layout's, else its
     default); the stylesheet reads the same two numbers (`--tc-k`,
     `--tc-ks`, set by `TouchControls`) and lays every cluster out at the
@@ -5057,47 +5058,43 @@ Adding one is described in
   buttons above Run. English and French descriptions explain dedicated inputs.
 
   Both layouts share the lower-right cluster, in the same place in both,
-  along the bottom-right edges: the bottom row is `attack1`, `attack2` (the
-  Mash Combo's two strikes, 7.2.4c) and Jump in the far bottom-right
-  corner; Shield sits directly above Jump and the extra attack directly
-  left of Shield (above `attack2`; its place stays empty for a fighter
-  with none); and every other move the fighter has is stacked one above
-  another going up from Shield, at 100 %. For example, for #0001 on a
-  tablet —
+  flush in the bottom-right corner (nothing between it and the screen's
+  edges but the safe-area insets; the lower-left cluster is flush in its
+  corner the same way). The bottom row is the fighter's two **Mash Combo
+  buttons** (7.2.4c) and Jump in the corner, and nothing else ever: the two
+  combat buttons whose ground moves are the fighter's own `mashCombo` pair,
+  in the pair's order (`mashButtons` in `js/ui/touch-controls.js`, from
+  `mashTriggers` in `js/data/mash-combo.js`; never by button id: #0001's
+  are its Jab and High Kick, `attack1` and `extra_attack`, #0004's
+  `attack1` and `attack3`, #0002's `attack1` and `attack2`). A pair whose
+  second move has no button of its own (`mash_attack`: #0005, #0006,
+  #0008) leaves that place empty. Shield sits directly above Jump. Every
+  other move of the fighter stands higher, a little smaller (110 %), in
+  two columns growing up side by side, one move to each in turn in button
+  order: the first left of Shield, starting a little higher than Shield
+  (`--tc-raise`), the second straight above Shield. For example, for
+  #0001 —
 
   ```
-                          [PURPLE]
-                          [VOID]
-                          [MAX BLUE]
-                 [HIGH KICK] [SHIELD]
-          [JAB]  [RED]       [JUMP]
+                  [VOID]    [PURPLE]
+                  [RED]     [MAX BLUE]
+                            [SHIELD]
+          [JAB]  [HIGH KICK] [JUMP]
   ```
 
-  The numbered attack buttons (`attack1` to `attack5`, `.tc-attack`) take
-  numbered slots (`data-slot`, set by `setCharacter` through
-  `attackSlots`): `attack1` is always slot 1 and `attack2` slot 2 (the
-  bottom row), and the fighter's other numbered buttons fill slots 3, 4 and
-  5 in order, which is their order up the stack. A button the fighter does
-  not have shows nothing and leaves no gap; a reserved one still shows
-  dashed. The stack never rises past the top HUD: `applyLayout` places
-  each stacked button (`data-stack-col`, `data-stack-row`, drawn by the
-  stylesheet) in column 0 above Shield while its top stays at or below the
-  ceiling the screen gives (`setCeiling(hudCeiling(hudRoot))`: the lowest
-  bottom edge of the HUD parts over that column, else the top of the touch
-  area), then up column 1 above the extra attack's place, then column 2
-  above `attack1`. Nothing is shrunk to make room. On a phone in landscape
-  (932 × 430, 844 × 390, 667 × 375) the column above Shield holds two, so a
-  fighter with three stacked moves (every fighter but #0002 and #0003) has
-  its third above the extra attack; on a tablet or a desktop window all
-  three stand above Shield:
-
-  ```
-                   [5]
-                   [4]          phone:        [5] [4]
-                   [3]                            [3]
-           [EXTRA] [SHIELD]               [EXTRA] [SHIELD]
-     [1]   [2]     [JUMP]           [1]   [2]     [JUMP]
-  ```
+  A button the fighter does not have shows nothing and leaves no gap; a
+  reserved one still shows dashed. Neither column rises past the top HUD:
+  `applyLayout` places each move (`data-stack-col`, `data-stack-row`; the
+  Mash Combo buttons `data-mash`, all drawn by the stylesheet) while its
+  top stays at or below the ceiling the screen gives
+  (`setCeiling(hudCeiling(hudRoot))`: the lowest bottom edge of the HUD
+  parts over that column, else the top of the touch area). A full column
+  passes its turn to the other; with both full, a third column above the
+  first Mash Combo button takes the rest. Nothing is shrunk to make room.
+  On a phone in landscape (932 × 430) the column left of Shield holds
+  three and the one above it two, so every fighter's moves fit; in the
+  touch layout editor, which shows no fighter, the Mash Combo places hold
+  `attack1` and `attack2`.
 
   So N numbered buttons use slots 1 to N, whatever kind of move each one
   is: 2 → 1–2, 3 → 1–3 (#0002), 4 → 1–4 (#0003: Cherry Blossom Impact in

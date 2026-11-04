@@ -19,7 +19,7 @@ for where they moved). The game as it is now is specified in
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 | **Mash Combo update** | branch `claude/gallant-johnson-ovqtek` (no pull request yet) | `7b63c5f` | Five rapid presses set off a twelve-turn automatic series of two close-range strikes; clips no longer stick on one frame |
 | **Online update** | [#160](https://github.com/hiyroscript/alva/pull/160) (part 1: game and server code), then [#161](https://github.com/hiyroscript/alva/pull/161) (part 2: go live) | part 1: `cb3c38b`; part 2: `887b256` | Online Play: rooms players create and join, a peer-to-peer match in delay-based lockstep, and the room server on Cloudflare's free plan |
-| **Camera & mobile layout update** | branch `claude/serene-franklin-fppga6` (no pull request yet) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout with Classic Buttons by default, and a block on screens too small to play on |
+| **Camera & mobile layout update** | branch `claude/serene-franklin-fppga6` (no pull request yet) | camera: `1b4df65`; controls: `378d44d`; small screens: `9c3727f` | A closer battle camera (zoom 1.35), touch controls at 130 % in the reference layout (the fighter's two Mash Combo buttons beside Jump) with Classic Buttons by default, and a block on screens too small to play on |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -4978,12 +4978,49 @@ not, and a fighter out of view keeps its edge pointer.
   leaves the safe area at 667 × 375, 844 × 390, 932 × 430, 1024 × 768 or
   1366 × 768, in either scheme.
 
-**Where to tune it:** `TOUCH_DEFAULT_SCALE` and `STACKED_CONTROLS` in
+**Where to tune it:** `TOUCH_DEFAULT_SCALE` in
 [`js/core/touch-layout.js`](./js/core/touch-layout.js); the geometry in
 [`css/touch-controls.css`](./css/touch-controls.css) (`--tc`, `--tc-gap`,
 the `--tc-k` family it lays out at); `STACK_COLUMNS` in
 `js/ui/touch-controls.js`; `DEFAULT_MOBILE_CONTROLS` in
 `js/core/settings.js`.
+
+### Later: the Mash Combo row, flush corners
+
+After seeing the layout, the owner asked for four changes, the touch
+controls' section above now superseded by them:
+
+- **Beside Jump, only the fighter's two Mash Combo buttons, nothing else
+  ever.** They are read from each fighter's own `mashCombo` pair
+  (`mashButtons` in `js/ui/touch-controls.js`, through `mashTriggers` in
+  `js/data/mash-combo.js`), never assumed to be `attack1` and `attack2`:
+  #0001's and #0003's are `attack1` and `extra_attack`, #0004's `attack1`
+  and `attack3`, #0002's, #0007's and #0009's to #0011's `attack1` and
+  `attack2`. #0005, #0006 and #0008, whose second move is `mash_attack`
+  (no button), leave that place empty.
+- **Sizes:** every control 130 %, the two Mash Combo buttons included; the
+  fighter's other moves a little smaller, 110 % (`TOUCH_DEFAULT_SCALE`:
+  `{ control: 1.3, move: 1.1 }`; it was `{ control: 1.3, stacked: 1 }`).
+- **Flush corners:** both clusters touch the screen's edges, only the
+  safe-area insets between (`--tc-bottom: var(--safe-b)`, `left:
+  var(--safe-l)`, `right: var(--safe-r)`; there were 10 to 12 px and a
+  little of the screen's size before).
+- **The other moves stand higher:** in two columns side by side, one move
+  to each in turn, the first left of Shield starting a little higher than
+  it (`--tc-raise`, 0.35 of a button), the second above Shield; a third
+  column above the first Mash Combo button only when both are full under
+  the top HUD. The extra attack no longer has a fixed place: it is one of
+  these moves unless it is in the pair. On a 932 × 430 phone every
+  fighter's moves fit in the first two columns.
+
+**Where to tune it:** `TOUCH_DEFAULT_SCALE` in
+`js/core/touch-layout.js`; `--tc-raise` and the cluster offsets in
+`css/touch-controls.css`; `STACK_COLUMNS` in `js/ui/touch-controls.js`.
+
+**Tests:** `tests/interface/touch-layout.test.mjs` (every fighter's pair
+beside Jump and nothing else, the columns in turn, the ceiling, the sizes),
+`tests/interface/controls-ui.test.mjs` (the geometry evaluated from the
+stylesheet: flush corners, the Mash Combo row, the raised columns).
 
 ### Small screens refused
 

@@ -13,36 +13,36 @@
 // move names. Ground-only abilities stay visible but marked unavailable in
 // the air. Presentation never changes the input codename or pointer owner.
 //
-// The lower-right cluster sits along the bottom-right edges: the bottom row
-// is attack1 and attack2 (the Mash Combo's two strikes, js/data/mash-combo.js)
-// and Jump in the corner; Shield above Jump, the extra attack left of it
-// (its place left empty for a fighter with none); and the fighter's other
-// numbered buttons (STACKED_CONTROLS, js/core/touch-layout.js) stacked one
-// above another going up from Shield, at their own smaller default scale,
-// with no gap for a button the fighter does not have:
+// The lower-right cluster sits flush in the bottom-right corner. The bottom
+// row is the fighter's two Mash Combo buttons (the two close-range strikes
+// of its pair, js/data/mash-combo.js: whichever buttons they are, attack1
+// and extra_attack for one fighter, attack1 and attack2 for another) and
+// Jump in the corner, and nothing else ever: a pair whose second move has no
+// button of its own (mash_attack) leaves its place empty. Shield sits
+// directly above Jump. Every other move of the fighter (TouchControls
+// role 'move') stands a little higher than those, a little smaller, in two
+// columns growing up side by side: the first left of Shield, raised a
+// little above it, the second straight above Shield, one move to each in
+// turn, with no gap for a button the fighter does not have:
 //
-//                           [5]
-//                           [4]
-//                           [3]
-//                  [EXTRA]  [SHIELD]
-//            [1]   [2]      [JUMP]
+//                    [M4] [M3]
+//                    [M2] [M1]
+//                         [SHIELD]
+//            [MASH A] [MASH B] [JUMP]
 //
-// The numbered buttons on show take slots (attackSlots): attack1 always in
-// slot 1 and attack2 in slot 2, then the others in slots 3, 4 and 5, which
-// is their order in the stack. The stack never rises past the top HUD
-// (setCeiling): what would is placed in the next column, above the extra
-// attack's place, then above attack1 (see placeStack).
+// Neither column ever rises past the top HUD (setCeiling): when one is
+// full the other takes the rest, then a third column above Mash A (see
+// placeStack). In the touch layout editor, which shows no fighter, the
+// Mash Combo places hold attack1 and attack2.
 //
-//   2 attacks   slots 1 2
-//   3 attacks   slots 1 2 3 (attack3 in 3; #0002)
-//   4 attacks   slots 1 2 3 4
-//   5 attacks   slots 1 2 3 4 5 (#0001: its two techniques, Unlimited
-//               Void and Hollow Purple, in 4 and 5)
+// The numbered buttons on show also take slots (attackSlots, data-slot):
+// attack1 always slot 1 and attack2 slot 2, then the others in order. A
+// slot numbers them; where a button stands is its role's.
 //
 // Every control's default size is its default scale (TOUCH_DEFAULT_SCALE:
-// 1.3, the stacked moves 1), written as its `scale` by applyLayout like a
-// custom layout's; the stylesheet lays the clusters out at those scaled
-// sizes.
+// 1.3, the fighter's other moves 1.1), written as its `scale` by
+// applyLayout like a custom layout's; the stylesheet lays the clusters out
+// at those scaled sizes.
 //
 // Whatever kind of move a numbered button is (an ordinary attack, a summon,
 // a technique), it is pressed the same way. Only the art and accessible
@@ -82,13 +82,14 @@ import { el } from '../core/utils.js';
 import { assetSource } from '../core/asset-loader.js';
 import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
-import { NUMBERED_ATTACKS } from '../config.js';
+import { COMBAT_BUTTONS, NUMBERED_ATTACKS } from '../config.js';
+import { mashPairOf, mashTriggers } from '../data/mash-combo.js';
 import { ABILITY_ACTIONS, abilityPresence, abilityAvailable, jumpArt, mobileAbility, mobileAbilityLabelKey } from './mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import { abilityGroups, abilityStatus } from '../game/combat/move-status.js';
 import { formatCooldown } from '../game/rendering/fighter-status.js';
 import {
-  TOUCH_CONTROL_IDS, TOUCH_DEFAULT_SCALE, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl, touchScaleOf,
+  TOUCH_CONTROL_IDS, TOUCH_DEFAULT_SCALE, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl, defaultTouchScale,
 } from '../core/touch-layout.js';
 
 // Classic Buttons' lower-left cluster, in on-screen order. `label` is the
@@ -113,8 +114,20 @@ const ACTION_BUTTONS = [
   { action: 'jump', label: 'control.jump', icon: ICONS.jump, pos: 'jump' },
 ];
 
-// How many columns the stack above Shield may use (see placeStack).
-const STACK_COLUMNS = 3;
+// The columns the fighter's other moves stand in (see placeStack), in the
+// order they take them: left of Shield, above Shield, then above Mash A.
+const STACK_COLUMNS = Object.freeze([1, 0, 2]);
+
+// The two buttons of `def`'s Mash Combo pair, in the pair's order: the
+// combat button that starts each of its two moves on the ground, or null
+// for a move no button starts (mash_attack). With no fighter, attack1 and
+// attack2 (the touch layout editor's neutral places).
+export function mashButtons(def) {
+  const pair = mashPairOf(def);
+  if (!def || !pair) return ['attack1', 'attack2'];
+  const triggers = [...mashTriggers(def)];
+  return pair.map((id) => triggers.find(([, move]) => move === id)?.[0] ?? null);
+}
 
 // A top-HUD ceiling for setCeiling: the lowest bottom edge of the HUD's
 // parts (the children of `hud`) that span any of [left, right], or -Infinity
@@ -226,7 +239,9 @@ export class TouchControls {
     this.stackOverflow = false;
     // The default scales, for the stylesheet's geometry.
     root.style?.setProperty?.('--tc-k', String(TOUCH_DEFAULT_SCALE.control));
-    root.style?.setProperty?.('--tc-ks', String(TOUCH_DEFAULT_SCALE.stacked));
+    root.style?.setProperty?.('--tc-ks', String(TOUCH_DEFAULT_SCALE.move));
+    // The fighter's Mash Combo buttons (setCharacter): the two beside Jump.
+    this.mash = mashButtons(null);
     this.build();
     this.setScheme(scheme);
   }
@@ -451,7 +466,7 @@ export class TouchControls {
     }
     // At its default scale first, so the stack and every home are measured
     // as the default layout draws them.
-    for (const [id, node] of controls) node.style.scale = String(touchScaleOf(null, id));
+    for (const [id, node] of controls) node.style.scale = String(this.defaultScaleOf(id));
     this.placements = new Map();
     const area = this.measureArea();
     this.area = area;
@@ -471,7 +486,7 @@ export class TouchControls {
     for (const { id, node, home, size } of measured) {
       const entry = layout[id];
       const center = entry ? placeControl(area, entry, size) : home;
-      const scale = touchScaleOf(layout, id);
+      const scale = entry ? entry.scale : this.defaultScaleOf(id);
       if (entry) node.style.translate = `${(center.x - home.x).toFixed(1)}px ${(center.y - home.y).toFixed(1)}px`;
       node.style.scale = String(scale);
       this.placements.set(id, { home, center, size, scale });
@@ -479,44 +494,70 @@ export class TouchControls {
     return true;
   }
 
-  // Gives each numbered button on show past slot 2 its place in the stack
-  // above Shield (data-stack-col, data-stack-row; drawn by the stylesheet):
-  // in slot order, one above another in column 0 as long as its top stays
-  // at or below the ceiling (setCeiling; the area's top by default), then
-  // on up column 1, then column 2. Whatever still cannot fit goes on up the
-  // last column, and `stackOverflow` says so. Buttons it does not hold have
-  // no place.
+  // Control `id`'s role: 'mash' for one of the fighter's two Mash Combo
+  // buttons, 'move' for any other of its combat buttons, 'control' for the
+  // universal ones (Shield, Jump, the movement controls).
+  roleOf(id) {
+    if (this.mash.includes(id)) return 'mash';
+    return COMBAT_BUTTONS.includes(id) ? 'move' : 'control';
+  }
+
+  // Control `id`'s default scale, by its role (TOUCH_DEFAULT_SCALE).
+  defaultScaleOf(id) {
+    return defaultTouchScale(this.roleOf(id));
+  }
+
+  // Gives the fighter's other moves on show (role 'move', in button order)
+  // their places (data-stack-col, data-stack-row; drawn by the stylesheet):
+  // one to each of the two columns in turn, column 1 (left of Shield,
+  // raised a little) first, then column 0 (above Shield), each move on the
+  // next row of its column as long as its top stays at or below the ceiling
+  // (setCeiling; the area's top by default). A full column passes its turn
+  // to the other; with both full, column 2 (above Mash A) takes the rest,
+  // and whatever still cannot fit goes on up it, `stackOverflow` saying so.
+  // The Mash Combo buttons take their places beside Jump (data-mash, 1 and
+  // 2 in the pair's order); a button with neither has no place.
   placeStack(area) {
-    const stacked = [];
-    for (const action of NUMBERED_ATTACKS) {
+    const moves = [];
+    for (const action of COMBAT_BUTTONS) {
       const b = this.actionButtons.get(action);
-      const slot = Number(b.getAttribute('data-slot'));
-      const place = !b.hidden && slot > 2;
-      if (place) stacked.push([slot, b]);
+      const mash = this.mash.indexOf(action);
+      if (mash >= 0) b.setAttribute('data-mash', String(mash + 1));
+      else b.removeAttribute('data-mash');
+      if (!b.hidden && mash < 0) moves.push(b);
       else {
         b.removeAttribute('data-stack-col');
         b.removeAttribute('data-stack-row');
       }
     }
-    stacked.sort((a, b) => a[0] - b[0]);
     const limit = (r) => Math.max(area.top, this.ceiling?.(r.left, r.right) ?? -Infinity);
-    let col = 0;
-    let row = 0;
+    const rows = new Map(STACK_COLUMNS.map((col) => [col, 0]));
+    const full = new Set();
+    const [first, second, last] = STACK_COLUMNS;
+    let turn = 0;
     let over = false;
-    for (const [, b] of stacked) {
-      for (;;) {
-        b.setAttribute('data-stack-col', String(col));
-        b.setAttribute('data-stack-row', String(row));
-        const r = b.getBoundingClientRect();
-        if (r.top >= limit(r) - 0.5) break;
-        if (col === STACK_COLUMNS - 1) {
-          over = true;
-          break;
-        }
-        col += 1;
-        row = 0;
+    const tryAt = (b, col) => {
+      b.setAttribute('data-stack-col', String(col));
+      b.setAttribute('data-stack-row', String(rows.get(col)));
+      const r = b.getBoundingClientRect();
+      return r.top >= limit(r) - 0.5;
+    };
+    for (const b of moves) {
+      let placed = false;
+      // The two side by side, in turn.
+      for (let i = 0; i < 2 && !placed; i++) {
+        const col = [first, second][(turn + i) % 2];
+        if (full.has(col)) continue;
+        if (tryAt(b, col)) {
+          rows.set(col, rows.get(col) + 1);
+          turn = ([first, second].indexOf(col) + 1) % 2;
+          placed = true;
+        } else full.add(col);
       }
-      row += 1;
+      if (placed) continue;
+      // Both full: the last column, past the ceiling if it must.
+      if (!tryAt(b, last)) over = true;
+      rows.set(last, rows.get(last) + 1);
     }
     this.stackOverflow = over;
   }
@@ -696,6 +737,11 @@ export class TouchControls {
   // them.
   setCharacter(def) {
     this.character = def;
+    // The fighter's own Mash Combo pair beside Jump; the editor, whose
+    // controls are neutral, keeps attack1 and attack2 there.
+    const mash = mashButtons(this.showAbsent ? null : def);
+    const regrouped = mash.join() !== this.mash.join();
+    this.mash = mash;
     this.airborne = false;
     // Each place's moves by button, for showStatus.
     const groups = def ? abilityGroups(def) : { ground: [], air: [] };
@@ -704,6 +750,8 @@ export class TouchControls {
       air: new Map(groups.air.map((e) => [e.action, e])),
     };
     this.refreshAbilities();
+    // Another pair beside Jump: every move stands somewhere new.
+    if (regrouped) this.applyLayout();
     this.showStatus(null);
   }
 

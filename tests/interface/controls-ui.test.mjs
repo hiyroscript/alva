@@ -1746,7 +1746,7 @@ function touchGeometry() {
     return [...CSS.matchAll(re)].map((m) => m[2]).join('\n');
   };
   const props = (text) => Object.fromEntries([...text.matchAll(/(--[\w-]+): ([^;]+);/g)].map((m) => [m[1], m[2]]));
-  const root = { ...props(block('.touch-controls')), '--tc': '1', '--tc-k': String(TOUCH_DEFAULT_SCALE.control), '--tc-ks': String(TOUCH_DEFAULT_SCALE.stacked) };
+  const root = { ...props(block('.touch-controls')), '--tc': '1', '--tc-k': String(TOUCH_DEFAULT_SCALE.control), '--tc-ks': String(TOUCH_DEFAULT_SCALE.move) };
   const evaluate = (expr, vars) => {
     let e = expr;
     for (let i = 0; i < 20 && /var\(/.test(e); i++) {
@@ -1784,51 +1784,51 @@ const circle = ({ right, left, bottom, size, scale }) => ({
 });
 const apart = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) - a.r - b.r;
 
-test('the lower-right cluster matches the reference: Attack 1, Attack 2 and Jump along the bottom edge, Shield above Jump, the extra attack left of it, the other moves stacked above Shield at 100%', () => {
+test('the lower-right cluster: the two Mash Combo buttons and Jump flush along the bottom edge, Shield above Jump, the fighter\'s other moves higher and a little smaller', () => {
   const { read } = touchGeometry();
   const k = TOUCH_DEFAULT_SCALE.control;
-  const ks = TOUCH_DEFAULT_SCALE.stacked;
+  const km = TOUCH_DEFAULT_SCALE.move;
+  assert.ok(km < k, 'the other moves a little smaller');
   const at = (selectors, scale = k) => circle({ right: read(selectors, 'right'), bottom: read(selectors, 'bottom'), size: 1, scale });
   const jump = at(['.tc-jump']);
   const shield = at(['.tc-shield']);
-  const extra = at(['.tc-extra_attack']);
-  const a1 = at(['.tc-attack[data-slot="1"]']);
-  const a2 = at(['.tc-attack[data-slot="2"]']);
+  const mashA = at(['.tc-act[data-mash="1"]']);
+  const mashB = at(['.tc-act[data-mash="2"]']);
   const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} vs ${b}`);
-  // Jump in the far bottom-right corner of the cluster: its drawn edge on
-  // the cluster's right and bottom.
+  // Jump in the corner, its drawn edge on the cluster's right and bottom,
+  // and the cluster itself flush with the screen's (only the safe area).
   near(jump.x + jump.r, 0, 'Jump against the right edge');
   near(jump.y - jump.r, 0, 'Jump against the bottom edge');
-  // The bottom row, left to right: Attack 1, Attack 2, Jump, all on the
-  // bottom edge, one pitch apart.
-  for (const b of [a1, a2]) near(b.y, jump.y, 'one row');
-  assert.ok(a1.x < a2.x && a2.x < jump.x, 'Attack 1, Attack 2, Jump from left to right');
-  near(a2.x - a1.x, jump.x - a2.x, 'evenly spaced');
-  // Shield directly above Jump; the extra attack directly left of Shield,
-  // above Attack 2.
+  assert.match(CSS, /\.tc-actions \{[^}]*right: var\(--safe-r\);/, 'flush right');
+  assert.match(CSS, /--tc-bottom: var\(--safe-b\);/, 'flush with the bottom');
+  // The bottom row: Mash A, Mash B, Jump, evenly spaced, on the bottom edge.
+  for (const b of [mashA, mashB]) near(b.y, jump.y, 'one row');
+  assert.ok(mashA.x < mashB.x && mashB.x < jump.x);
+  near(mashB.x - mashA.x, jump.x - mashB.x, 'evenly spaced');
   near(shield.x, jump.x, 'Shield over Jump');
-  assert.ok(shield.y > jump.y);
-  near(extra.y, shield.y, 'the extra attack level with Shield');
-  near(extra.x, a2.x, 'the extra attack over Attack 2');
-  // The stack: column 0 straight up from Shield, column 1 from the extra
-  // attack's place, column 2 from Attack 1; each row one small pitch above
-  // the last, at the stacked scale, never touching what is under it.
-  const stacked = (col, row) => at([`.tc-attack[data-stack-col="${col}"]`, '.tc-attack[data-stack-row]', `.tc-attack[data-stack-row="${row}"]`], ks);
-  for (const [col, base] of [[0, shield], [1, extra], [2, a1]]) {
-    let under = base;
+  assert.ok(shield.y > jump.y && apart(shield, jump) > 0.05);
+  // The other moves: column 1 left of Shield, starting higher than it;
+  // column 0 above Shield; column 2 above Mash A; each row one small pitch
+  // up, no gap left.
+  const move = (col, row) => at([`.tc-act[data-stack-col="${col}"]`, '.tc-act[data-stack-row]', `.tc-act[data-stack-row="${row}"]`], km);
+  assert.ok(move(1, 0).y > shield.y, 'left of Shield and higher than it');
+  assert.ok(move(1, 0).y - move(1, 0).r > shield.y - shield.r, 'its bottom above Shield\'s');
+  near(move(1, 0).x, mashB.x, 'column 1 over Mash B');
+  near(move(0, 0).x, shield.x, 'column 0 over Shield');
+  near(move(2, 0).x, mashA.x, 'column 2 over Mash A');
+  for (const [col, under] of [[0, shield], [1, mashB], [2, mashA]]) {
+    let below = under;
     for (let row = 0; row < 4; row++) {
-      const b = row === 0 ? stacked(col, 0) : stacked(col, row);
-      near(b.x, base.x, `column ${col} straight up`);
-      assert.ok(b.y > under.y && apart(b, under) > 0.05, `column ${col} row ${row} clear above`);
-      assert.ok(apart(b, under) < 0.3, `column ${col} row ${row}: no gap left`);
-      under = b;
+      const b = move(col, row);
+      assert.ok(b.y > below.y && apart(b, below) > 0.05, `column ${col} row ${row} clear above`);
+      if (row > 0) assert.ok(apart(b, below) < 0.3, `column ${col} row ${row}: no gap left`);
+      below = b;
     }
   }
-  // Nothing overlaps: the fixed buttons and the first two rows of every column.
-  const all = [jump, shield, extra, a1, a2, stacked(0, 0), stacked(0, 1), stacked(1, 0), stacked(1, 1), stacked(2, 0)];
-  for (const [i, a] of all.entries()) for (const b of all.slice(i + 1)) assert.ok(apart(a, b) > 0.05, `${i} and another overlap`);
-  // The cluster's box spans the bottom row.
-  near(read(['.tc-actions'], 'width'), -(a1.x - a1.r), 'the cluster as wide as the bottom row');
+  const all = [jump, shield, mashA, mashB, move(0, 0), move(0, 1), move(0, 2), move(1, 0), move(1, 1), move(1, 2), move(2, 0), move(2, 1)];
+  for (const [i, a] of all.entries()) for (const [j, b] of all.slice(i + 1).entries()) assert.ok(apart(a, b) > 0.05, `${i} and ${i + 1 + j} overlap`);
+  // No place is fixed to a button id: only roles.
+  assert.doesNotMatch(CSS, /\.tc-extra_attack \{|\.tc-attack\[data-slot/, 'places by role, never by button');
   assert.doesNotMatch(CSS, /\.tc-(block|defense)\b/);
 });
 
@@ -1843,6 +1843,7 @@ test('Classic Buttons\' lower-left row: Run left, Down and Run right along the b
   assert.match(CSS, /\.tc-dpad \.tc-down \{[^}]*width: var\(--tc\);[^}]*height: var\(--tc\);/, 'Down as large as the Run arrows');
   const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} vs ${b}`);
   near(runLeft.x - runLeft.r, 0, 'Run left against the cluster\'s left edge');
+  near(read(['.tc-dpad'], 'height'), k, 'the cluster one row tall');
   for (const b of [runLeft, down, runRight]) near(b.y - b.r, 0, 'on the bottom edge');
   assert.ok(runLeft.x < down.x && down.x < runRight.x, 'Run left, Down, Run right');
   near(down.x - runLeft.x, runRight.x - down.x, 'evenly spaced');
@@ -1852,9 +1853,10 @@ test('Classic Buttons\' lower-left row: Run left, Down and Run right along the b
   near(dashLeft.x, runLeft.x, 'Dash left centred over Run left');
   near(dashRight.x, runRight.x, 'Dash right centred over Run right');
   for (const [d, run] of [[dashLeft, runLeft], [dashRight, runRight]]) assert.ok(d.y > run.y && apart(d, run) > 0.05, 'just above, clear of it');
-  assert.match(CSS, /\.tc-dpad \{[^}]*left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw\);/, 'inside the left safe area');
-  assert.match(CSS, /\.tc-actions \{[^}]*right: calc\(max\(var\(--safe-r\), 12px\) \+ 1\.4vw\);/, 'inside the right safe area');
-  assert.match(CSS, /--tc-bottom: calc\(max\(var\(--safe-b\), 10px\) \+ 1\.6vh\);/, 'above the bottom safe area');
+  // Flush in the corner: nothing between it and the screen's edges but the
+  // safe-area insets.
+  assert.match(CSS, /\.tc-dpad \{[^}]*left: var\(--safe-l\);/, 'flush left');
+  assert.match(CSS, /--tc-bottom: var\(--safe-b\);/, 'flush with the bottom');
 });
 
 test('the Joystick layout\'s geometry at the default scale: the stick at the lower left with Dash buttons above its top corners and Down at its left, nothing overlapping', () => {
@@ -1886,9 +1888,10 @@ test('the Joystick layout\'s geometry at the default scale: the stick at the low
 });
 
 test('Jump and Extra Attack inherit the shared normal and pressed action-button style', () => {
+  // Jump's own rule, and Extra Attack's (none: it is placed by its role) never restyle them.
   for (const selector of ['tc-jump', 'tc-extra_attack']) {
     const rules = [...CSS.matchAll(new RegExp(`\\.${selector} \\{([^}]*)\\}`, 'g'))];
-    assert.ok(rules.length > 0);
+    if (selector === 'tc-jump') assert.ok(rules.length > 0);
     for (const rule of rules) {
       assert.doesNotMatch(rule[1], /(?:width|height|border|background|opacity|shadow|transform|transition):/);
     }

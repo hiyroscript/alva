@@ -9,7 +9,9 @@
   --tc: clamp(52px, min(15.5vh, 10.5vw), 96px);
   --tc-gap: calc(var(--tc) * 0.17);
   --tc-pitch: calc(var(--tc) + var(--tc-gap));
-  --tc-bottom: calc(max(var(--safe-b), 10px) + 1.6vh);
+  /* The clusters sit flush against the screen's edges: nothing between
+     them and the corner but the safe-area insets. */
+  --tc-bottom: var(--safe-b);
   /* Stick geometry and the smaller Mouvement buttons shared by both schemes. */
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
@@ -24,7 +26,8 @@
      TouchControls.applyLayout writes), so the places below are laid out
      at the scaled sizes: --tc-big is a default-scale button as drawn,
      --tc-in how far its box sits inside that, --tc-small and --tc-in-s
-     the same for a stacked move. */
+     the same for one of the fighter's other moves. --tc-raise is how much
+     higher than Shield the moves left of it start. */
   --tc-k: 1;
   --tc-ks: 1;
   --tc-kd: calc((var(--tc-k) - 1) / 2);
@@ -35,6 +38,7 @@
   --tc-small: calc(var(--tc) * var(--tc-ks));
   --tc-in-s: calc((var(--tc-small) - var(--tc)) / 2);
   --tc-sp: calc(var(--tc-small) + var(--tc-gap) * var(--tc-ks));
+  --tc-raise: calc(var(--tc-big) * 0.35);
   display: none;
   position: absolute;
   inset: 0;
@@ -54,7 +58,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
    Run left, Down, Run right, each the size of every button; a small Dash
    button just above each Run arrow. */
 .tc-dpad {
-  left: calc(max(var(--safe-l), 12px) + 1.4vw);
+  left: var(--safe-l);
   width: calc(var(--tc-p) * 2 + var(--tc-big));
   height: var(--tc-big);
   pointer-events: auto;
@@ -63,17 +67,17 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-dpad .tc-pad { position: absolute; bottom: var(--tc-in); }
 .tc-dpad .tc-runLeft { left: var(--tc-in); }
 .tc-dpad .tc-runRight { left: calc(var(--tc-p) * 2 + var(--tc-in)); }
-/* The lower-right cluster (both schemes), along the bottom-right edges:
-   the bottom row Attack 1, Attack 2 (the Mash Combo's two strikes) and
-   Jump in the corner; Shield above Jump, the extra attack left of it; the
-   fighter's other moves stacked above Shield (see .tc-attack[data-stack-col]).
-                         [5]
-                         [4]
-                         [3]
-                 [EXTRA] [SHIELD]
-           [1]   [2]     [JUMP]          */
+/* The lower-right cluster (both schemes), flush in the bottom-right corner:
+   the bottom row the fighter's two Mash Combo buttons (data-mash) and
+   Jump in the corner, nothing else; Shield above Jump; the fighter's other
+   moves a little higher, in columns left of and above Shield (see
+   .tc-act[data-stack-col]).
+                    [M4] [M3]
+                    [M2] [M1]
+                         [SHIELD]
+           [MASH A] [MASH B] [JUMP]      */
 .tc-actions {
-  right: calc(max(var(--safe-r), 12px) + 1.4vw);
+  right: var(--safe-r);
   width: calc(var(--tc-p) * 2 + var(--tc-big));
   height: calc(var(--tc-p) * 2 + var(--tc-sp) * 3);
 }
@@ -176,26 +180,25 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-btn.is-spent { opacity: 0.4; border-style: dashed; }
 .tc-jump { right: var(--tc-in); bottom: var(--tc-in); }
 .tc-shield { right: var(--tc-in); bottom: calc(var(--tc-p) + var(--tc-in)); }
-.tc-extra_attack { right: calc(var(--tc-p) + var(--tc-in)); bottom: calc(var(--tc-p) + var(--tc-in)); }
-/* Numbered attack buttons, by the slot TouchControls.setCharacter gives the
-   ones on show (attackSlots): slots 1 and 2 (attack1, attack2) the bottom
-   row beside Jump. */
-.tc-attack[data-slot="1"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); bottom: var(--tc-in); }
-.tc-attack[data-slot="2"] { right: calc(var(--tc-p) + var(--tc-in)); bottom: var(--tc-in); }
-/* Every other move on show (slots 3 and up) is stacked upward at its own
-   smaller scale, one above another with no gaps, in the place
-   TouchControls.applyLayout gives it: column 0 above Shield first, as many
-   as stay clear of the top HUD (setCeiling); then column 1, above the
-   extra attack's place; then column 2, above Attack 1. Each column is
-   centred on the buttons under it. */
-.tc-attack[data-stack-col="0"] { right: var(--tc-in); --tc-floor: calc(var(--tc-p) * 2); }
-.tc-attack[data-stack-col="1"] { right: calc(var(--tc-p) + var(--tc-in)); --tc-floor: calc(var(--tc-p) * 2); }
-.tc-attack[data-stack-col="2"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); --tc-floor: var(--tc-p); }
-.tc-attack[data-stack-row] { bottom: calc(var(--tc-floor) + var(--tc-row, 0) * var(--tc-sp) + var(--tc-in-s)); }
-.tc-attack[data-stack-row="1"] { --tc-row: 1; }
-.tc-attack[data-stack-row="2"] { --tc-row: 2; }
-.tc-attack[data-stack-row="3"] { --tc-row: 3; }
-.tc-attack[data-stack-row="4"] { --tc-row: 4; }
+/* The fighter's two Mash Combo buttons (TouchControls.mashButtons, from its
+   own pair): the bottom row beside Jump, the pair's first move furthest
+   left. */
+.tc-act[data-mash="1"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); bottom: var(--tc-in); }
+.tc-act[data-mash="2"] { right: calc(var(--tc-p) + var(--tc-in)); bottom: var(--tc-in); }
+/* The fighter's other moves, at their own smaller scale, one above another
+   with no gaps, in the place TouchControls.placeStack gives each: column 1
+   left of Shield, starting --tc-raise higher than it; column 0 straight
+   above Shield; column 2, for what neither holds under the top HUD, above
+   Mash A. Each column is centred on the buttons under it. */
+.tc-act[data-stack-col="0"] { right: var(--tc-in); --tc-floor: calc(var(--tc-p) * 2); }
+.tc-act[data-stack-col="1"] { right: calc(var(--tc-p) + var(--tc-in)); --tc-floor: calc(var(--tc-p) + var(--tc-raise)); }
+.tc-act[data-stack-col="2"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); --tc-floor: calc(var(--tc-p) + var(--tc-raise)); }
+.tc-act[data-stack-row] { bottom: calc(var(--tc-floor) + var(--tc-row, 0) * var(--tc-sp) + var(--tc-in-s)); }
+.tc-act[data-stack-row="1"] { --tc-row: 1; }
+.tc-act[data-stack-row="2"] { --tc-row: 2; }
+.tc-act[data-stack-row="3"] { --tc-row: 3; }
+.tc-act[data-stack-row="4"] { --tc-row: 4; }
+.tc-act[data-stack-row="5"] { --tc-row: 5; }
 
 /* Joystick scheme. The lower-left cluster is one round stick in the same
    translucent style as the buttons (a plain base and knob, no arrows in
@@ -205,7 +208,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
    plus --tc-kd of the control's own box (it is drawn scaled round its
    centre). */
 .tc-joystick {
-  left: calc(max(var(--safe-l), 12px) + 1.4vw + var(--tc-down-room) * var(--tc-k));
+  left: calc(var(--safe-l) + var(--tc-down-room) * var(--tc-k));
   width: calc(var(--tc-stick) * var(--tc-k));
   height: calc(var(--tc) * 2.44 * var(--tc-k));
 }
