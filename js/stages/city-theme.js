@@ -24,6 +24,13 @@ const C = {
   moon: '#d9d5cc',
   far: '#111116',
   farWin: 'rgba(255, 170, 90, 0.28)',
+  // The supertall towers far off (the Void update's open sky over the
+  // roof): a shade lighter than the far skyline, their lit crowns cool.
+  spire: '#14141b',
+  spireEdge: '#20202a',
+  spireWin: 'rgba(255, 186, 120, 0.32)',
+  crown: 'rgba(196, 210, 236, 0.42)',
+  aviation: '#ff3a2a',
   mid: '#17171c',
   midEdge: '#202027',
   warm: 'rgba(255, 158, 64, 0.75)',
@@ -203,6 +210,53 @@ export class CityTheme extends StageTheme {
       else if (rng() < 0.6) this.addCrane(x + w * 0.5, top);
       x += w + range(rng, 30, 120);
       n++;
+    }
+
+    // Layer 0b: a handful of supertall towers far off (0.06), rising high
+    // over the skyline into the open sky above the roof: stepped setbacks,
+    // a lit crown band, a spire with a blinking red aviation light. They
+    // fill the air the Void update opened up (its top 1040 over the roof).
+    // On their own random stream, so the rest of the art is as it always was.
+    const srng = mulberry32(0x5e1e5);
+    this.spires = new Path2D();
+    this.spireEdge = new Path2D();
+    this.spireWin = new Path2D();
+    this.crowns = new Path2D();
+    this.aviation = [];
+    for (let sx = range(srng, -200, 100); sx < end(0.06); sx += range(srng, 420, 760)) {
+      const w = range(srng, 54, 90);
+      const h = range(srng, 300, 470);
+      const base = G - 170;
+      let top = base - h;
+      // The shaft, then one or two setbacks, each narrower.
+      this.spires.rect(sx, top + h * 0.35, w, bottom - top);
+      this.spireEdge.rect(sx + w - 3, top + h * 0.35, 3, h * 0.65);
+      const tiers = srng() < 0.5 ? 2 : 1;
+      let tx = sx;
+      let tw = w;
+      let ty = top + h * 0.35;
+      for (let k = 0; k < tiers; k++) {
+        const nw = tw * range(srng, 0.62, 0.78);
+        tx += (tw - nw) / 2;
+        tw = nw;
+        const nh = h * (k === 0 ? range(srng, 0.2, 0.3) : range(srng, 0.1, 0.16));
+        ty -= nh;
+        this.spires.rect(tx, ty, tw, nh + 2);
+        this.spireEdge.rect(tx + tw - 3, ty, 3, nh);
+      }
+      top = ty;
+      this.crowns.rect(tx, top + 6, tw, 3);
+      // The spire, and its light.
+      const spireH = range(srng, 40, 100);
+      this.spires.rect(tx + tw / 2 - 1.5, top - spireH, 3, spireH);
+      this.aviation.push({ x: tx + tw / 2, y: top - spireH, p: srng() * 4 });
+      if (srng() < 0.6) this.aviation.push({ x: tx + 3, y: top + 1, p: srng() * 4 });
+      for (let wy = top + 18; wy < base; wy += 13) {
+        for (let wx = sx + 6; wx < sx + w - 6; wx += 10) {
+          if (wy < top + h * 0.35 && (wx < tx + 4 || wx > tx + tw - 6)) continue;
+          if (srng() < 0.07) this.spireWin.rect(wx, wy, 3, 5);
+        }
+      }
     }
 
     // Layer 4: the rooftop block, its platforms and the bulkhead
@@ -519,8 +573,10 @@ export class CityTheme extends StageTheme {
       ctx.fillRect(Math.round(sx), Math.round(st.y * view.pxH), st.s * Math.max(1, s * 0.5), st.s * Math.max(1, s * 0.5));
     }
     ctx.globalAlpha = 1;
+    // The moon a fifth of the way down the screen, and lower only as the
+    // view nears the Void's top line, so the black never hides it.
     const mx = view.pxW * 0.2 - view.x * s * 0.015;
-    const my = view.pxH * 0.2;
+    const my = Math.max(view.pxH * 0.2, (this.map.voidBounds.top - view.y) * s + 26 * s * 2.6);
     const mr = 26 * s;
     const glow = ctx.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 4);
     glow.addColorStop(0, 'rgba(230, 226, 214, 0.18)');
@@ -565,6 +621,21 @@ export class CityTheme extends StageTheme {
     hg.addColorStop(1, 'rgba(255, 122, 0, 0.12)');
     ctx.fillStyle = hg;
     ctx.fillRect(0, hy, view.pxW, 220 * s);
+
+    // Layer 0b — supertall towers far off, their aviation lights blinking.
+    this.layer(ctx, view, 0.06, 0.08);
+    ctx.fillStyle = C.spire;
+    ctx.fill(this.spires);
+    ctx.fillStyle = C.spireEdge;
+    ctx.fill(this.spireEdge);
+    ctx.fillStyle = C.spireWin;
+    ctx.fill(this.spireWin);
+    ctx.fillStyle = C.crown;
+    ctx.fill(this.crowns);
+    ctx.fillStyle = C.aviation;
+    for (const a of this.aviation) {
+      if (still || Math.sin(t * 1.6 + a.p) > 0.3) ctx.fillRect(a.x - 2, a.y - 2, 4, 4);
+    }
 
     // Layer 1 — far skyline
     this.layer(ctx, view, 0.1, 0.12);

@@ -1280,7 +1280,9 @@ A training room, entered straight from Home.
   Quick Battle stage list. Original Canvas artwork of a minimalist combat
   laboratory: a pale, cool-gray room built from one square grid, with a gridded
   back wall (continuing down past the block's edges) and one compact training
-  block in one-point perspective, 1280 units wide, open at both edges: its top
+  block in one-point perspective, `MAIN_STAGE_LENGTH` (1400) units wide like
+  every stage, open at both edges: its grid of 70-unit cells running from the
+  room's centre axis (so its edges sit on major lines), its top
   gridded with stronger lines every five cells and a darker centre axis, its
   outer side face past either ledge, and a ruler along its front edge. No side
   walls, scenery, particles, hazards or moving parts. Only the camera moves the
@@ -1900,20 +1902,35 @@ French, concise game terms).
   it (gone from every collision query at once), the one under the main
   stage's centre never breakable. No engine code names a stage: every
   stage with an undivided finite floor keeps exactly its old collision.
-- Main stages are 1280–1440 units wide (Yerma 1360, Sol-Noir 1440,
-  Asperitas 1400, Adamaris 1400, Jökull 1400, Practice Ground 1280). The Void is a blast zone set by margins
-  around the main stage (`voidAround` in `js/data/maps.js`, data per
-  stage): Yerma 360 past each ledge, 400 below the stage's top and 760
-  above it; Sol-Noir 340, 420 and 800 (over its highest deck); Asperitas 360,
-  400 and 840 (over the highest its clouds can rise); Adamaris 360, 400 and
-  800; Jökull 360, 420 and 800 (round its whole starting footprint, wings
-  included); Practice Ground 380
-  (its block is the narrowest), 400 and 760. There is room to be knocked off, fight briefly
-  and drift back, but a fighter carried on outward is lost soon after; no
-  jump (both air jumps of the triple jump included) from any stage's highest footing reaches the upper line. Camera
-  bounds are the Void's rectangle plus 140 on every side (`cameraAround`),
-  so the neutral view never shows the Void and the camera never wanders deep
-  into it.
+- **One stage size and one Void-free space, everywhere (strict).** Every
+  finite main stage is exactly `MAIN_STAGE_LENGTH` (1400) units long
+  (`right − left`), Practice Ground's training block included, each centred
+  where it always was (x 1800; Practice Ground 2000); Adamaris's continuous
+  beach runs on past its Void, but its `mainStage` (the combat area) is 1400
+  too. The Void is a blast zone set by the same margins around every main
+  stage, Adamaris's and Practice Ground's included (`VOID_MARGINS` in
+  `js/data/maps.js`, read by `voidAround`; no stage has margins of its own):
+  **468 past each ledge, 1040 above the main stage's top and 400 below it**
+  (the Void update: the 360 / 800 / 400 the stages mostly had, its side and
+  top pushed back 1.3 times). Whatever sits on a main stage (spawns,
+  outcrops, racks, the bulkhead, platforms, sections, hazard regions) is
+  placed for that length. A new stage keeps both: its main stage
+  `mainStageAround(centre, top, bottom)`, its Void `voidAround(main)`.
+  There is room to be knocked off, fight briefly and drift back, but a
+  fighter carried on outward is lost soon after; no jump (the Super Jump
+  and both air jumps of the triple jump included) from any stage's highest
+  footing reaches the upper line (from Asperitas's highest cloud, 290 over
+  its main cloud, about 260 to spare). Camera bounds are the Void's
+  rectangle plus 140 on every side (`cameraAround`), so the neutral view
+  never shows the Void and the camera never wanders deep into it. The
+  default framing reads only the main stage's length
+  (`computeWorldScale`), so the larger Void never zooms the fight out. Every
+  theme paints its scenery out to those bounds, with detail in the open air
+  the larger Void shows (Yerma's far rock needles and high wisps, Sol-Noir's
+  supertall towers and aviation lights, Asperitas's towering cumulus and
+  altocumulus, Adamaris's sailboats, islets and gulls, Jökull's faint
+  aurora); a sun, moon or cloud drawn in screen space keeps below the Void's
+  top line wherever the camera goes.
 - Backgrounds are flat parallax layers (sky, far, mid, near, atmosphere)
   cached as `Path2D`. The playable geometry (main stage, platforms, solids)
   is drawn in one shared one-point perspective (`js/stages/perspective.js`,
@@ -2114,24 +2131,38 @@ French, concise game terms).
   at once two independent ones; they expire and a restart clears them. With
   reduced motion only a still dip, a still ring and the pulse show, and no
   shake. Paint only: the kill boundary, scoring and respawns never read it.
-- **Overtime's closing Void** (Quick Battle and Watch Mode, 7.2.8): through
-  overtime's 60 seconds the Void closes in, linearly over the whole period
-  (`StageCollision.closeVoid`, driven by `Battle.overtimeProgress`, 0 to 1,
-  from overtime's own clock): its left and right edges from the stage's
-  `voidBounds` to `CONFIG.battle.overtimeVoid.sideEndGap` (120) world units
-  past each main-stage ledge, its bottom to `bottomEndGap` (140) below the
-  main stage's top, all measured from the stage's own `mainStage`. **The
-  top never moves.** It never closes past those lines, never moves outward,
-  and never reaches a ledge or the surface whatever its tuning (at least
-  40 units clear), so standing on the main stage is always safe. The main
+- **Overtime's closing Void** (Quick Battle, Watch Mode, Local Play and
+  Online Play, 7.2.8): through overtime's 60 seconds the Void closes in,
+  slowly at first and faster and faster to the very end
+  (`StageCollision.closeVoid` at `Battle.overtimeVoidPressure`: overtime's
+  progress, 0 to 1 from its own clock, raised to
+  `CONFIG.battle.overtimeVoid.closeCurve` (2.2), `overtimePressure` in
+  `js/game/physics.js`; at half time about a fifth of the way, the last
+  fifth of overtime more than the whole first half): its left and right
+  edges from the stage's `voidBounds` to `sideEndGap` (90) world units past
+  each main-stage ledge, its bottom to `bottomEndGap` (100) below the main
+  stage's top and **its top down to `topEndGap` (600) above it**, all
+  measured from the stage's own `mainStage`, each edge moving straight in
+  with that pressure (`closingVoid`). It never closes past those lines,
+  never moves outward, never reaches a ledge or the surface whatever its
+  tuning (at least 40 units clear), and its top never comes within 240
+  (`MIN_VOID_TOP_CLEARANCE`) of the stage's highest footing (its highest
+  platform, solid or drifting cloud's reach), so standing on the main
+  stage, or on any footing, is always safe; 600 is clear of every jump from
+  the main stage (a Super Jump and both air jumps put a fighter's centre
+  about 490 over it), so only a high jump from high footing late on can
+  meet it. The main
   stage, platforms, solids, spawns and camera bounds do not change. It is
   the real kill boundary: inVoid, projectiles, the lethal-launch preview and
   the CPU (through `ctx.stage`) read it, the drawn edge is traced around
   it, and a fighter the closing edge passes is taken on that very step
-  through the usual flow. Its drawn waves speed up with it, smoothly and
-  ever faster, from their normal speed to
-  `CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier` (4×) at its end
-  (`1 + 3 × progress²`), keeping their shape, amplitude, rim and black;
+  through the usual flow. Everything stays on the simulation clock, so a
+  lockstep match closes it identically in both browsers. Its drawn waves
+  speed up with it, smoothly and ever faster, from their normal speed to
+  `CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier` (6×) at its end
+  (`1 + 5 × pressure`, the same eased pressure: the waves are frantic at
+  the end), the theme integrating the speed so their phase never jumps,
+  keeping their shape, amplitude, rim and black;
   with reduced motion they hold still while the boundary still closes in.
   Restart and rematch restore the stage's own Void and normal waves.
   Practice Ground's Void never moves.
@@ -3960,10 +3991,11 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Shield, a heal, a charm, a fear's feed: `CombatState.launchPointHeals`,
   never a respawn, restart, rematch or Practice Ground reset or swap, which
   give a fresh state), and burns (an animated flame behind its digits)
-  from `LAUNCH_POINT_FIRE` (60, out below 55) and hotter from
-  `LAUNCH_POINT_INFERNO` (100, back below 95), where the next solid hit can
-  launch it hard (`js/ui/hud.js`; with reduced motion a still colour
-  instead; paint only). A
+  from `LAUNCH_POINT_FIRE` (70, out below 65) and hotter from
+  `LAUNCH_POINT_INFERNO` (110, back below 105), where the next solid hit can
+  end a life (`js/ui/hud.js`, derived by simulation against the stages'
+  shared geometry and regular-time Void: `tests/benchmarks/launch-thresholds.mjs`;
+  with reduced motion a still colour instead; paint only). A
   hit's `damage` is how much it adds (a hit a Shield blocks adds nothing);
   each fighter's hits are listed in its character specification (7.2.9).
   Every genuine unblocked hit resets recovery, including Base Launch 0
@@ -4435,6 +4467,22 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   `celebration`. `Battle.result` keeps answering with the frozen outcome
   and reason; nothing that happens afterwards changes them, the
   statistics or the score.
+- **The loser ejected** (`Battle.ejectLoser`, the Void update): whenever
+  the match has a loser (every result but a draw: on time on points or on
+  Launch Point, overtime's points or Launch Point, a forfeit) and that
+  fighter is still in play, it goes as a fall into the Void goes, where it
+  stands, on the step the match ends: its elimination burst in its own
+  `eliminationPalette` (the flash, the ring, the shards and the small
+  shake; no ripple, as it touched no edge), then out of play (`lostToVoid`,
+  `ejected`) and detached like a fallen fighter (undrawn, unframed,
+  untargetable; whatever aimed at it goes). It is presentation and the
+  state of the match's end only: the result is already frozen, so it
+  scores no point, counts as no fall in the statistics and never
+  respawns. A loser the Void already took (a match won by a fall, or one
+  still waiting to respawn when the clock ran out) does not burst twice; a
+  draw ejects nobody. The same in every mode, on both browsers of an
+  online match (it is simulation state on the step the match ends).
+  A restart or rematch brings it back.
 - **The celebration.** The world goes on: the same fixed steps, rendering,
   camera (following whoever is still in play), stage, effects and
   animations; no new match, round, overtime or scoring starts, no stage
@@ -4461,8 +4509,10 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   fresh Jump press each time, let go in between, now and then a Super
   Jump from the ground, air jumps included).
   Never the same one twice running, never all five by force; the Void run
-  comes up less often than the others. A losing CPU stays calm (idle);
-  after a draw both CPUs only idle, dash dance or jump. Every behaviour is
+  comes up less often than the others. A losing CPU stays calm (idle) when
+  it is still there (ejected, it is never asked); after a draw both CPUs
+  only idle, dash dance or jump. Every behaviour works with the opponent
+  gone (ejected or fallen): nothing in it needs one. Every behaviour is
   plain input through the universal rules: nothing is forced, teleported
   or special-cased for a fighter.
 - **Match statistics** (`js/game/match-stats.js`, `Battle.stats`), per side

@@ -45,6 +45,7 @@ import { PlayerController } from './fighters/fighter-controller.js';
 import { CombatAIController } from './ai/combat-ai.js';
 import { CelebrationController, CELEBRATIONS, LOSER_CELEBRATIONS, DRAW_CELEBRATIONS } from './ai/celebration.js';
 import { MatchStats } from './match-stats.js';
+import { overtimePressure } from './physics.js';
 import { resolveDifficulty } from '../data/difficulty.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 
@@ -241,9 +242,18 @@ export class Battle extends Arena {
     return Math.min(1, Math.max(0, 1 - this.timeLeft / this.overtimeSeconds));
   }
 
+  // How far overtime has closed the Void, 0 to 1: its progress eased in by
+  // CONFIG.battle.overtimeVoid.closeCurve (overtimePressure), so the Void
+  // closes slowly at first and faster and faster to the end. 0 outside it.
+  get overtimeVoidPressure() {
+    return overtimePressure(this.overtimeProgress, CONFIG.battle.overtimeVoid);
+  }
+
   // The match's phases and clock, then the shared world step, then (while
   // the match was live) the step's statistics. Through overtime the Void
-  // closes in on every step as its clock runs, before the world steps, so
+  // closes in on every step as its clock runs (overtimeVoidPressure, all on
+  // the simulation clock, so a lockstep match closes it the same in both
+  // browsers), before the world steps, so
   // a fighter the new edge has passed is taken this very step, by the usual
   // Void check. The clock running out ends the match before the world
   // steps; the winning point ends it within the step, as the Void takes
@@ -262,7 +272,7 @@ export class Battle extends Arena {
             if (this.goesToOvertime) this.startOvertime();
             else this.finishMatch();
           }
-          if (this.overtime) this.setVoidPressure(this.overtimeProgress);
+          if (this.overtime) this.setVoidPressure(this.overtimeVoidPressure);
         }
         break;
       default:
@@ -340,7 +350,8 @@ export class Battle extends Arena {
   // whether overtime was played and how long the match ran, all frozen
   // (`final`; its statistics are sealed once this step's are counted, see
   // sealFinal). The clock stops where it is, every respawn wait is called
-  // off, and the celebration starts. A later call changes nothing.
+  // off, a loser still on the stage is ejected (ejectLoser), and the
+  // celebration starts. A later call changes nothing.
   finishMatch(result = this.liveResult) {
     if (this.final) return this.final;
     const { outcome, reason } = result;
@@ -354,11 +365,38 @@ export class Battle extends Arena {
       stats: null,
     };
     for (const f of this.fighters) f.respawnTimer = null;
+    this.ejectLoser();
     this.setPhase(PHASES.celebration);
     this.startCelebration();
     // Ended from outside a step: nothing of this step is left to count.
     if (!this.stepping) this.sealFinal();
     return this.final;
+  }
+
+  // The match has a loser (any result but a draw: on time on points or on
+  // Launch Point, in overtime on either, a forfeit): if that fighter is
+  // still in play, it goes as a fall into the Void goes, where it stands,
+  // so a match never ends with its loser standing on the stage. Its
+  // elimination burst in its own palette (HitEffects.addElimination: the
+  // flash, the shards and the shake), then out of play (lostToVoid) and
+  // detached as the Void detaches a fighter (detachFromPlay: undrawn,
+  // untargetable, nothing aimed at it left). Presentation and the state of
+  // the match's end only: the result is already frozen, so no point is
+  // scored, no fall is counted in the statistics and nobody respawns. A
+  // loser the Void already took (a match won by a fall, or one still
+  // waiting to respawn when the clock ran out) does not burst twice; a
+  // draw ejects nobody. Called on both browsers of an online match alike,
+  // on the step the match ends.
+  ejectLoser() {
+    const winner = this.final?.winner;
+    if (!winner) return;
+    const loser = this.fighters.find((f) => f.slot !== winner);
+    if (!loser || loser.lostToVoid) return;
+    this.fx.addElimination(loser);
+    loser.lostToVoid = true;
+    loser.ejected = true;
+    loser.endMashCombo?.('void');
+    this.detachFromPlay(loser, 'void');
   }
 
   // Side `slot` gives the match up (an online player who left it): it ends

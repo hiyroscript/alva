@@ -349,25 +349,30 @@ export class Arena {
     for (const f of taken) this.onVoid(f);
   }
 
-  // Closes the Void in by `progress` (0-1: 0 is the map's own Void), for
-  // collision and the drawn Void alike: both read the one rectangle in
-  // force, `stage.void` (see StageCollision.closeVoid), so the black edge
-  // is exactly where a fighter is taken. The tuning is
-  // CONFIG.battle.overtimeVoid. Only a mode that closes the Void calls it
-  // (a Battle's overtime); 0 also brings the waves back to their
-  // normal speed and phase.
-  setVoidPressure(progress) {
-    this.voidPressure = Math.min(1, Math.max(0, Number(progress) || 0));
+  // Closes the Void in by `pressure` (0-1: 0 is the map's own Void, 1 its
+  // end gaps), for collision and the drawn Void alike: both read the one
+  // rectangle in force, `stage.void` (see StageCollision.closeVoid), so the
+  // black edge is exactly where a fighter is taken, and the CPU and the
+  // lethal-launch check (launchIsLethal) read that same rectangle. The
+  // tuning is CONFIG.battle.overtimeVoid. Only a mode that closes the Void
+  // calls it (a Battle's overtime, which hands in the eased pressure:
+  // overtimePressure); 0 also brings the waves back to their normal speed
+  // and phase.
+  setVoidPressure(pressure) {
+    this.voidPressure = Math.min(1, Math.max(0, Number(pressure) || 0));
     this.stage.closeVoid(this.voidPressure, CONFIG.battle.overtimeVoid);
     if (this.voidPressure === 0) this.theme.resetVoid();
   }
 
-  // How many times their normal speed the Void's drawn waves run: 1, rising
-  // smoothly and ever faster with the Void's pressure to
-  // CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier (1 + (max - 1) p²).
+  // How many times their normal speed the Void's drawn waves run: 1,
+  // rising with the Void's pressure to
+  // CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier (1 + (max - 1) x
+  // pressure). Through overtime that pressure is itself eased in
+  // (overtimePressure), so the waves speed up slowly at first and ever
+  // faster to a frantic end; smoothly, as the theme integrates the speed
+  // (StageTheme.advanceVoid), so their phase never jumps.
   get voidWaveSpeed() {
-    const p = this.voidPressure;
-    return 1 + (CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier - 1) * p * p;
+    return 1 + (CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier - 1) * this.voidPressure;
   }
 
   // What entering the Void means is each mode's rule: Quick Battle scores a

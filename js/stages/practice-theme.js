@@ -22,7 +22,8 @@
 
 import { StageTheme } from './stage-theme.js';
 
-const CELL = 80;      // grid cell at the fighters' plane, world units
+const CELL = 70;      // grid cell at the fighters' plane, world units (the
+                      // main stage's 1400 is 20 of them, its ledges on major lines)
 const MAJOR = 5;      // a stronger line every MAJOR cells
 const FAR = 0.55;     // parallax of the back wall
 const NEAR = 1.1;     // parallax of the block's front face (in front of the fighters)
@@ -51,7 +52,8 @@ const MAJOR_LINE = 1;
 const AXIS = 2;
 const KINDS = [MINOR, MAJOR_LINE, AXIS];
 
-// Grid index -> line kind (`axis` marks the room's centre line).
+// Grid index (0 the room's centre axis, see gridX) -> line kind (`axis`
+// marks that centre line).
 const kindOf = (i, axis = false) => (axis ? AXIS : i % MAJOR === 0 ? MAJOR_LINE : MINOR);
 
 // Crisp 1-device-pixel alignment for a horizontal or vertical line.
@@ -85,14 +87,20 @@ export class PracticeTheme extends StageTheme {
     return this.persp.y(view, this.groundY, f);
   }
 
+  // World x of grid line `i`: the room's centre axis is line 0, the
+  // grid running CELL apart either way from it.
+  gridX(i) {
+    return this.axisX + i * CELL;
+  }
+
   // Lowest and highest grid index of the lines at parallax `f` that can be
   // on screen, kept inside [x0, x1].
   cellRange(view, f, x0 = -Infinity, x1 = Infinity) {
     const cx = view.x + view.w / 2;
     const half = view.w / 2 / f;
     return [
-      Math.ceil(Math.max(cx - half, x0) / CELL),
-      Math.floor(Math.min(cx + half, x1) / CELL),
+      Math.ceil((Math.max(cx - half, x0) - this.axisX) / CELL),
+      Math.floor((Math.min(cx + half, x1) - this.axisX) / CELL),
     ];
   }
 
@@ -143,8 +151,8 @@ export class PracticeTheme extends StageTheme {
     for (const kind of KINDS) {
       ctx.beginPath();
       for (let i = i0; i <= i1; i++) {
-        if (kindOf(i, i * CELL === this.axisX) !== kind) continue;
-        const x = snap(this.sx(view, i * CELL, FAR), widths[kind]);
+        if (kindOf(i, i === 0) !== kind) continue;
+        const x = snap(this.sx(view, this.gridX(i), FAR), widths[kind]);
         ctx.moveTo(x, 0);
         ctx.lineTo(x, view.pxH);
       }
@@ -203,8 +211,8 @@ export class PracticeTheme extends StageTheme {
           }
         }
         for (let i = i0; i <= i1; i++) {
-          const x = i * CELL;
-          if (kindOf(i, x === this.axisX) !== kind) continue;
+          const x = this.gridX(i);
+          if (kindOf(i, i === 0) !== kind) continue;
           ctx.moveTo(this.sx(view, x, NEAR), yNear);
           ctx.lineTo(this.sx(view, x, FAR), yFar);
         }
@@ -303,9 +311,9 @@ export class PracticeTheme extends StageTheme {
     const [t0, t1] = this.cellRange(view, NEAR, left, right);
     ctx.beginPath();
     for (let i = t0 * 2 - 1; i <= t1 * 2 + 1; i++) {
-      const x = (i * CELL) / 2;
+      const x = this.axisX + (i * CELL) / 2;
       if (x < left || x > right) continue;
-      const len = x === this.axisX ? 30 : i % (MAJOR * 2) === 0 ? 20 : i % 2 === 0 ? 11 : 6;
+      const len = i === 0 ? 30 : i % (MAJOR * 2) === 0 ? 20 : i % 2 === 0 ? 11 : 6;
       const sx = snap(this.sx(view, x, NEAR), widths[MINOR]);
       ctx.moveTo(sx, top);
       ctx.lineTo(sx, top + len * unit);

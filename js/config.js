@@ -84,17 +84,29 @@ export const CONFIG = Object.freeze({
     // everything in play kept) under a closing Void. 0: none, the Launch
     // Point decides at once.
     overtimeSeconds: 60,
-    // How the Void closes in through overtime, linearly over its whole
-    // length: its left and right edges in to `sideEndGap` world units past
-    // each main-stage ledge, its bottom up to `bottomEndGap` below the main
-    // stage's top (both measured at a fighter's centre, like
-    // StageCollision.inVoid, and never closer than that), its top never.
-    // Its drawn waves run up to `maxWaveSpeedMultiplier` times their
-    // normal speed, easing in (1 + (max - 1) x progress squared).
+    // How the Void closes in through overtime (StageCollision.closeVoid,
+    // closingVoid in js/game/physics.js), from every stage's own Void
+    // (VOID_MARGINS in js/data/maps.js: 468 past each ledge, 1040 above
+    // the main stage's top, 400 below it): its left and right edges in to
+    // `sideEndGap` world units past each main-stage ledge, its bottom up to
+    // `bottomEndGap` below the main stage's top and its top down to
+    // `topEndGap` above it (all measured at a fighter's centre, like
+    // StageCollision.inVoid, and never closer than that; the top never
+    // within MIN_VOID_TOP_CLEARANCE of the stage's highest footing). 600 is
+    // well above every jump from the main stage (the Super Jump and both
+    // air jumps put a fighter's centre about 490 over it) but within reach
+    // of a full triple jump from a high platform late on. How far it has
+    // closed is overtimePressure: the progress through overtime raised to
+    // `closeCurve`, so it starts slowly and closes faster and faster to the
+    // very end (at half time, 0.5 ^ 2.2: about a fifth of the way). Its
+    // drawn waves run up to `maxWaveSpeedMultiplier` times their normal
+    // speed, rising with that same pressure (1 + (max - 1) x pressure).
     overtimeVoid: {
-      sideEndGap: 120,
-      bottomEndGap: 140,
-      maxWaveSpeedMultiplier: 4,
+      sideEndGap: 90,
+      bottomEndGap: 100,
+      topEndGap: 600,
+      closeCurve: 2.2,
+      maxWaveSpeedMultiplier: 6,
     },
     introSeconds: 1.7,
     // First to this many points wins: a point for each time the opponent

@@ -46,6 +46,7 @@
 //     a fresh state.
 
 import { CONFIG } from '../config.js';
+import { LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT } from '../data/launch.js';
 import { el } from '../core/utils.js';
 import { t, tattr, plural, slotLabel, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
@@ -62,23 +63,12 @@ export function formatLaunchPoint(value) {
   return String(Math.round(value));
 }
 
-// The Launch Point at which the number catches fire, and the one below which
-// it goes out again. Picked for LAUNCH_UNIT_SPEED 7 (js/data/launch.js), by
-// simulated launches on Yerma (a solid 3-damage hit, sideways or straight
-// up, on a fighter that does not try to get back): from 60 a Base Launch 2
-// hit (strength 2 x 63 = 126, 882 units/s) carries a fighter in the air
-// within about 250 units of the ledge into the Void, and a Base Launch 3
-// one (189, 1323 units/s) within about 450, a third of the stage. That is
-// where the next solid hit becomes a likely end. Below 55 it is out. (At
-// the old 10 units/s a point the same launches began at about 45.)
-export const LAUNCH_POINT_FIRE = 60;
-export const LAUNCH_POINT_FIRE_OUT = 55;
-// The stronger tier: from 100 a Base Launch 3 hit ends a life from anywhere
-// on the stage, straight up included, and a Base Launch 2 one from the
-// middle third in the air (about 80 at the old scale). Below 95 it is back
-// to the first tier.
-export const LAUNCH_POINT_INFERNO = 100;
-export const LAUNCH_POINT_INFERNO_OUT = 95;
+// The Launch Point at which the number catches fire and goes out again, and
+// the inferno's: LAUNCH_POINT_FIRE (70, out below 65) and
+// LAUNCH_POINT_INFERNO (110, back below 105), data the HUD and the CPU
+// share (js/data/launch.js, where they are explained and how they were
+// derived: tests/benchmarks/launch-thresholds.mjs).
+export { LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT };
 
 // The fire a Launch Point shows (0 none, 1 burning, 2 inferno), from the
 // fire it showed (`current`): each tier lights at its threshold and only

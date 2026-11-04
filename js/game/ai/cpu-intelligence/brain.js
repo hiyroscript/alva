@@ -788,6 +788,10 @@ export class CpuIntelligence {
     const p = this.profile;
     const obj = this.objective;
     if (!me.grounded) return makePlan('air', { spacing: this.spacing(s), fastFall: this.rng() < 0.4 + p.stageSense * 0.4, until: this.clock + 0.5, reason: 'air control toward a safe landing' }, this);
+    // Overtime's Void closing in on the ledge near it: back toward the
+    // centre first.
+    const centre = this.overtimeCentre(s);
+    if (centre) return centre;
     // Breaking off to recover (the objective's call, the level's
     // discipline whether it heeds it), protecting a lead or running out the
     // clock: the safer spot, then a deliberate wait there.
@@ -808,13 +812,13 @@ export class CpuIntelligence {
       return this.continued('edgeguard', { targetX, until: this.clock + 0.8, why: 'edge-guarding', reason: 'edge-guard: holding the ledge the opponent must return to' }, s);
     }
     // Cornered with the opponent in front: get past it, over its head.
-    if (s.myEdge < 90 && s.dist < 160 && p.stageSense > 0.5 && this.rng() < p.stageSense * 0.5) {
+    if (s.myEdge < 90 && s.dist < 160 && p.stageSense > 0.5 && this.superJumpClear(s) && this.rng() < p.stageSense * 0.5) {
       return makePlan('jump', { jump: 'super', dir: s.dir, hold: 0.5, reason: 'cornered: Super Jumping past the opponent toward the centre' }, this);
     }
     // Hunting the finish from the wrong side (a horizontal launch from here
     // would send the opponent the long way, toward the centre): over it, to
     // launch it toward the nearer ledge.
-    if (obj.kind === 'finish' && this.crossover(s)) {
+    if (obj.kind === 'finish' && this.superJumpClear(s) && this.crossover(s)) {
       return makePlan('jump', { jump: 'super', dir: s.dir, hold: 0.5, reason: 'finish: crossing over to launch it toward the near ledge' }, this);
     }
     if (defensive) {
@@ -842,7 +846,11 @@ export class CpuIntelligence {
     return this.continued('neutral', {
       dist, baitRange: this.strategy.params.spacing === 'bait' ? 30 : 0,
       band: 14 + (1 - p.stageSense) * 14,
-      edgeRoom: me.halfW + 12 + p.stageSense * 30 + (this.strategy.danger > 0.3 ? 80 : 0),
+      // More room from the ledges as overtime's Void closes in (up to a
+      // fifth of the stage's length either side, as the level reads the
+      // stage), so it holds the centre while the edges shrink.
+      edgeRoom: me.halfW + 12 + p.stageSense * 30 + (this.strategy.danger > 0.3 ? 80 : 0) +
+        s.model.closing * s.model.width * 0.2 * (0.5 + 0.5 * p.stageSense),
       dashIn: offense && !!dash && this.rng() < 0.35 + p.energySense * 0.4, dashFrom: (dash?.distance ?? 200) + 80,
       dashEnergy: 35 + p.energySense * 35, until: this.clock + 0.7, targetX: s.op.x - s.dir * dist, why: 'holding spacing',
       reason: resetting ? `${mode}: pressure not working, resetting to ${Math.round(dist)} from the opponent` :
@@ -961,12 +969,20 @@ export class CpuIntelligence {
     if (p.stageSense > 0.6) xs.push(me.x + away * 480);
     let best = { x: me.x, danger: here, here, stay: true, score: -Infinity, gain: 0 };
     let stayScore = -Infinity;
+    // The scale of this stage: its length, and how far its centre is from
+    // the side Void it judges by (closer in, in overtime).
+    const span = Math.max(1, model.width);
+    const reach = Math.max(1, Math.min(model.centerX - model.void.left, model.void.right - model.centerX));
     const score = (x, danger) => {
       const sep = Math.abs(x - op.x);
       const behind = model.edgeRoom(x, Math.sign(x - op.x) || away);
       const v = model.blast(x, me.y, me.height);
+      // In overtime, the closing Void pulls it toward the centre, more the
+      // further it has closed.
+      const central = model.closing * Math.abs(x - model.centerX) / (span / 2) * 0.8;
       return -danger * 3 + Math.min(sep, 500) / 500 * 0.6 + Math.min(behind, 300) / 300 * 0.5 -
-        Math.abs(x - me.x) / 1400 * 0.3 + Math.min(v.left, v.right) / 800 * 0.3 + (this.rng() * 2 - 1) * (1 - p.stageSense) * 0.5;
+        Math.abs(x - me.x) / span * 0.3 + Math.min(v.left, v.right) / reach * 0.4 - central +
+        (this.rng() * 2 - 1) * (1 - p.stageSense) * 0.5;
     };
     for (let i = 0; i < xs.length; i++) {
       // Where it stands is always weighed as it is; every other spot is
@@ -987,6 +1003,40 @@ export class CpuIntelligence {
     return best;
   }
 
+  // Overtime's Void closing in (StageModel.closing: how far it will have
+  // closed a moment from now): the room the CPU wants from either ledge
+  // grows with it, up to about a third of the stage's length (as its level
+  // reads the stage), and with less than that it heads back toward the
+  // centre, over the opponent's head when the opponent stands in the way
+  // (a Super Jump while it clears the Void's top, a normal jump after). Null
+  // when it has the room, or outside overtime.
+  overtimeCentre(s) {
+    const model = s.model;
+    const me = s.me;
+    if (!(model.closing > 0.15) || !me.grounded || !model.ledges) return null;
+    const p = this.profile;
+    const want = model.closing * model.width * 0.32 * (0.5 + 0.5 * p.stageSense);
+    const room = Math.min(model.edgeRoom(me.x, 1), model.edgeRoom(me.x, -1));
+    if (room >= want) return null;
+    const dir = Math.sign(model.centerX - me.x) || 1;
+    if (s.present && Math.sign(s.op.x - me.x) === dir && Math.abs(s.op.x - me.x) < 170) {
+      const jump = this.superJumpClear(s) ? 'super' : 'ground';
+      return makePlan('jump', { jump, dir, hold: 0.5, reason: 'overtime: over the opponent, back toward the centre as the Void closes in' }, this);
+    }
+    return this.continued('reposition', {
+      targetX: model.safeSpot(me.x, want), until: this.clock + 0.6, why: 'overtime centre',
+      reason: `overtime: the Void closing in, back toward the centre (${Math.round(room)} from the ledge, wants ${Math.round(want)})`,
+    }, s);
+  }
+
+  // Whether a Super Jump from here keeps clear of the Void's top as the
+  // CPU judges it (in overtime, where it will be a moment from now: see
+  // StageModel.forecast). Late in overtime the top closes in, so the high
+  // jumps go first.
+  superJumpClear(s) {
+    return s.model.jumpClear(s.me.y, s.me.height, s.caps.movement.superJumpHeight);
+  }
+
   // Hunting the finish, but on the wrong side: the CPU's horizontal
   // launchers would send the opponent toward the centre (far from any
   // Void) while the ledge behind the opponent's other side is near. Only
@@ -997,7 +1047,9 @@ export class CpuIntelligence {
     if (!s.caps.moves.some((m) => m.finisher.dir === 'horizontal' && m.finisher.baseLaunch >= 2)) return false;
     const longWay = s.model.edgeRoom(s.op.x, s.dir);
     const shortWay = s.model.edgeRoom(s.op.x, -s.dir);
-    if (!(longWay > shortWay + 400)) return false;
+    // At least about two sevenths of the stage's length (400 on every
+    // stage: MAIN_STAGE_LENGTH 1400) nearer the other way.
+    if (!(longWay > shortWay + s.model.width * (2 / 7))) return false;
     return this.rng() < this.profile.stageSense * this.profile.opportunity * 0.5;
   }
 

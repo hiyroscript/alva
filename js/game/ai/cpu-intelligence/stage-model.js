@@ -30,7 +30,22 @@
 // going; a wing it can see is critically unstable is a danger zone it may
 // step off (dangerZones), as its level reads the stage.
 //
+// In a Battle's overtime it also looks ahead (forecast): the Void closes on
+// a curve anyone can read (CONFIG.battle.overtimeVoid, overtimePressure and
+// closingVoid in js/game/physics.js) from the clock everyone sees, so the
+// CPU judges by the Void as it will be VOID_LOOKAHEAD seconds from now (its
+// edges, the top included, further in than now, never further out): where
+// a launch will carry it, where it can still get back from, how much room
+// is left. `closing` is how far that Void has closed (0 to 1).
+//
 // Inputs: a StageCollision. Outputs: StageModel (one per stage, cached).
+
+import { CONFIG } from '../../../config.js';
+import { overtimePressure, closingVoid } from '../../physics.js';
+
+// Seconds ahead the CPU reads a closing Void: about the time a launch takes
+// to play out, or to get back toward the centre.
+export const VOID_LOOKAHEAD = 1;
 // Important constraints: read-only; nothing here plans a platform drop (a
 // player's tap of Down on a platform, which the CPU never makes: see
 // Executor.finish): the CPU's way down from a platform is to walk off its
@@ -69,6 +84,33 @@ export class StageModel {
       ...stage.solids.filter((s) => !this.floors.includes(s)).map((s) => ({ ref: s, x0: s.x, x1: s.x + s.w, y: s.y, main: false, oneWay: false, dynamic: false })),
     ];
     this.dynamic = stage.platforms.filter((p) => p.dynamic);
+    // The Void as it will be a moment from now in overtime (forecast), or
+    // null: the one in force.
+    this.ahead = null;
+    this.closing = 0;
+  }
+
+  // Looks ahead along overtime's closing Void from `world` (a Battle: its
+  // overtime, its progress and its own overtime length), VOID_LOOKAHEAD
+  // seconds on; outside overtime (or with no Battle) the Void in force is
+  // what counts. Called on every reassessment (Situation.read).
+  forecast(world) {
+    const seconds = world?.overtimeSeconds;
+    if (!world?.overtime || !(seconds > 0) || !this.stage.baseVoid || !this.stage.main) {
+      this.ahead = null;
+      this.closing = 0;
+      return;
+    }
+    const tuning = CONFIG.battle.overtimeVoid;
+    const progress = Math.min(1, (world.overtimeProgress ?? 0) + VOID_LOOKAHEAD / seconds);
+    this.closing = overtimePressure(progress, tuning);
+    const soon = closingVoid(this.stage.baseVoid, this.stage.main, this.closing, tuning, this.stage.highestFooting);
+    const now = this.stage.void;
+    // Never wider than the one in force on any side.
+    this.ahead = {
+      left: Math.max(now.left, soon.left), right: Math.min(now.right, soon.right),
+      top: Math.max(now.top, soon.top), bottom: Math.min(now.bottom, soon.bottom),
+    };
   }
 
   // Whether floor section `f` is footing to count on: there, and not
@@ -164,9 +206,11 @@ export class StageModel {
     return model;
   }
 
-  // The Void in force (the map's own, or closer in through overtime).
+  // The Void the CPU judges by: the one in force (the map's own, or
+  // closer in through overtime), or in overtime the one it will be a
+  // moment from now (forecast).
   get void() {
-    return this.stage.void;
+    return this.ahead ?? this.stage.void;
   }
 
   // The surface entry standing on `ref` (a body's `ground`), or null
@@ -205,18 +249,28 @@ export class StageModel {
   }
 
   // How far a body whose feet are at (x, y) and `height` tall is from the
-  // Void in force on each side, measured at its centre as the Void takes it.
+  // Void it judges by (see void) on each side, measured at its centre as
+  // the Void takes it.
   blast(x, y, height) {
-    const v = this.stage.void;
+    const v = this.void;
     const cy = y - height / 2;
     return { left: x - v.left, right: v.right - x, up: cy - v.top, down: v.bottom - cy };
   }
 
-  // Whether a body centre at (x, y - height/2) is in the Void in force.
+  // Whether a body centre at (x, y - height/2) is in the Void it judges by
+  // (see void).
   inVoid(x, y, height) {
-    const v = this.stage.void;
+    const v = this.void;
     const cy = y - height / 2;
     return x < v.left || x > v.right || cy < v.top || cy > v.bottom;
+  }
+
+  // Whether a jump rising `rise` from feet at `y` keeps a body `height` tall
+  // at least `margin` clear of the Void's top it judges by (see void): late
+  // in overtime the top closes in, and a high jump from high footing would
+  // carry the CPU into it.
+  jumpClear(y, height, rise, margin = 60) {
+    return y - rise - height / 2 > this.void.top + margin;
   }
 
   // Off the stage: in the air with nothing at all under it.
@@ -245,12 +299,13 @@ export class StageModel {
   // surface at `toY` near `toX`: one within `maxRise` above `fromY` (the
   // jump a fighter has), not below the target, and nearest it. Null when
   // none is needed or there is none. Never a platform visibly fading out
-  // from under whoever would land on it.
-  stepToward(fromY, toY, toX, x, maxRise, current = null) {
+  // from under whoever would land on it, nor one higher than `minY` (too
+  // near a closing Void's top).
+  stepToward(fromY, toY, toX, x, maxRise, current = null, minY = -Infinity) {
     let best = null;
     let bestScore = Infinity;
     for (const s of this.surfaces) {
-      if (s.ref === current || s.fading) continue;
+      if (s.ref === current || s.fading || s.y < minY) continue;
       const rise = fromY - s.y;
       if (rise < 16 || rise > maxRise || s.y < toY - 20) continue;
       const cx = Math.min(s.x1, Math.max(s.x0, toX));

@@ -156,7 +156,8 @@ Battle's overtime (`StageCollision.closeVoid`). The theme keeps no copy and
 never decides the boundary, so the drawn edge and the kill line can never
 drift apart. Its waves (`VOID.waves`) run on the theme's clock plus
 `voidSurge`, the extra wave motion `advanceVoid(dt, speed)` adds while the
-Arena's `voidWaveSpeed` is above 1 (up to 4× through overtime): a change of
+Arena's `voidWaveSpeed` is above 1 (up to 6× through overtime, rising with
+the Void's eased pressure): a change of
 speed never jumps their phase, and their shape, amplitude, rim and black
 never change. `resetVoid` brings them back to normal on a restart. With
 reduced motion they hold still at any speed.

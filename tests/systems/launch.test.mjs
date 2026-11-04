@@ -111,6 +111,8 @@ test('the launch module is small: values, directions, validation, resolution and
     'BASE_LAUNCH_DESCRIPTIONS', 'BASE_LAUNCH_SUMMARY', 'BASE_LAUNCH_VALUES', 'DIRECTIONAL_LAUNCHES',
     'DIRECTIONAL_LAUNCH_SUMMARY', 'LAUNCH_FORMULA', 'LAUNCH_POINT_SUMMARY', 'LAUNCH_UNIT_SPEED', 'resolveBaseLaunch',
     'LAUNCH_RECOVERY_DELAY', 'LAUNCH_RECOVERY_INTERVAL', 'LAUNCH_RECOVERY_AMOUNT', 'PERFECT_SHIELD_HEAL',
+    // The HUD's fire, shared with the CPU (the Void update).
+    'LAUNCH_POINT_FIRE', 'LAUNCH_POINT_FIRE_OUT', 'LAUNCH_POINT_INFERNO', 'LAUNCH_POINT_INFERNO_OUT',
     'resolveDirectionalLaunch', 'resolveDirectionalLaunchValue', 'resolveHitLaunch', 'resolveLaunchStrength',
   ].concat(['ALLOWED_DAMAGE_VALUES', 'resolveHitDamage']).sort());
   const code = read('js/data/launch.js').replace(/^\s*\/\/.*$/gm, '');

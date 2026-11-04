@@ -68,29 +68,43 @@ normal clock (the last ten seconds in the usual brighter digits; spoken as
 "POINTS LEVEL" shows for about 1.4 s, then gets out of the way. Pause
 freezes it all, as ever. Through overtime the Void presses in:
 
-- its left and right edges close in and its bottom rises, linearly over the
-  whole 60 seconds, from the stage's own Void to 120 world units past each
-  ledge and 140 below the main stage's top
-  (`CONFIG.battle.overtimeVoid.sideEndGap` / `bottomEndGap`, measured from
-  each stage's `mainStage`, so every stage closes the same way). **The top
-  never moves.** It never reaches a ledge or the surface: the main stage is
-  always safe to stand on. The stage itself (floor, platforms, solids,
-  spawns) and the camera's bounds do not change;
+- its left and right edges close in, its bottom rises and **its top comes
+  down**, from the stage's own Void (468 past each ledge, 1040 above, 400
+  below on every stage) to 90 world units past each ledge, 100 below the
+  main stage's top and 600 above it (`CONFIG.battle.overtimeVoid`
+  `sideEndGap` / `bottomEndGap` / `topEndGap`, measured from each stage's
+  `mainStage`, so every stage closes the same way). It closes slowly at
+  first and faster and faster to the very end: the pressure is overtime's
+  progress raised to `closeCurve` (2.2; at half time about a fifth of the
+  way, the last fifth of overtime closing more than the whole first half),
+  applied in one place (`Battle.overtimeVoidPressure`). It never reaches a
+  ledge or the surface, and the top never comes within 240 of the highest
+  footing: the main stage is always safe to stand on, and 600 is clear of
+  every jump from it (only a high jump from a high platform late on can
+  meet it). The stage itself (floor, platforms, solids, spawns) and the
+  camera's bounds do not change;
 - it is the real kill boundary, not a picture: collision
   (`StageCollision.inVoid`), projectiles, the lethal-launch preview and the
   CPU all read the one rectangle in force (`stage.void`), and the drawn
   black edge is traced around exactly that rectangle. A fighter the closing
   edge passes is taken on that very step, through the usual Void flow
   (point, respawn, burst);
-- its waves speed up, smoothly and ever faster, to 4× their normal speed at
-  the end (`1 + 3 × progress²`, `maxWaveSpeedMultiplier`), keeping their
+- its waves speed up with the same pressure, smoothly and ever faster, to
+  6× their normal speed at the end (`1 + 5 × pressure`,
+  `maxWaveSpeedMultiplier`), frantic by the last seconds, keeping their
   shape, amplitude, red rim and black. With reduced motion the waves stay
   still; the boundary still closes in, since that is gameplay.
 
 When overtime runs out, more points wins; level on points, the lower
 Launch Point (the number on the HUD; a fighter still out counts the one it
 fell with) wins. Level on both (within 1e-6) is a **draw**, naming no
-winner. Each is decided at that very step: Launch Point recovered
+winner. **The loser is ejected:** whenever the match ends with a loser
+still on the stage (on time, on points or Launch Point, in overtime, or a
+forfeit), it bursts where it stands, in its own colours with the
+elimination's flash and shake, and is gone, as a Void fall takes a
+fighter (`Battle.ejectLoser`). It scores nothing, counts as no fall and
+never respawns; a loser the Void already took does not burst twice, and a
+draw ejects nobody. Each is decided at that very step: Launch Point recovered
 afterwards never changes it. Restart and Rematch clear overtime: 0–0,
 `5:00`, the stage's own Void and normal waves.
 

@@ -289,3 +289,125 @@ test('a rematch (or a restart) resets the points to 0 and brings everyone back',
   assert.equal(p1.respawnTimer, null);
   assert.equal(p1.lostToVoid, false);
 });
+
+// ---- The loser ejected (the Void update) ---------------------------------------
+
+// What the ejection must never touch: the score, the frozen result and the
+// falls counted in the statistics.
+function ended(battle) {
+  return {
+    score: { ...battle.score },
+    result: { ...battle.result },
+    falls: { p1: battle.final.stats.p1.voidFalls, p2: battle.final.stats.p2.voidFalls },
+  };
+}
+
+test('time-up on points: the loser, still on the stage, bursts in its own colours where it stands and is out of play', () => {
+  const { battle, run } = match();
+  const { p1, p2 } = battle;
+  battle.score.p1 = 1;
+  run(5);
+  const at = { x: p2.body.x, y: p2.body.y };
+  const shake = battle.fx.shake;
+  battle.timeLeft = DT / 2;
+  run();
+  assert.equal(battle.phase, 'celebration');
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'points' });
+  assert.equal(p2.lostToVoid, true, 'gone');
+  assert.equal(p2.ejected, true, 'ejected, not taken by the Void');
+  assert.equal(p1.lostToVoid, false, 'the winner stays');
+  assert.deepEqual(battle.inPlay, [p1], 'undrawn and unframed: only the winner is in play');
+  // The same burst as a Void fall, at its body, in its palette, with its
+  // shake; no ripple, as it never touched the Void's edge.
+  assert.equal(battle.fx.eliminations.length, 1);
+  const burst = battle.fx.eliminations[0];
+  assert.equal(burst.slot, 'p2');
+  assert.equal(burst.x, at.x);
+  assert.ok(Math.abs(burst.y - (at.y - p2.body.height / 2)) < 1e-6, 'centred on its body');
+  assert.ok(battle.fx.shake >= shake, 'its shake');
+  assert.equal(battle.fx.ripples.length, 0);
+  // Not a fall: no point, no statistic, no respawn, the result unchanged.
+  assert.deepEqual(ended(battle), { score: { p1: 1, p2: 0 }, result: { outcome: 'p1', reason: 'points' }, falls: { p1: 0, p2: 0 } });
+  assert.equal(p2.respawnTimer, null);
+  run(RESPAWN_STEPS * 2);
+  assert.equal(p2.lostToVoid, true, 'it never comes back');
+  assert.deepEqual(ended(battle), { score: { p1: 1, p2: 0 }, result: { outcome: 'p1', reason: 'points' }, falls: { p1: 0, p2: 0 } });
+  assert.equal(battle.fx.eliminations.filter((e) => e.slot === 'p2').length <= 1, true, 'once');
+});
+
+test('time-up on Launch Point (overtime off): the higher Launch Point is ejected; Player 1 just the same when it loses', () => {
+  for (const loser of ['p1', 'p2']) {
+    const { battle, run } = match();
+    battle.overtimeSeconds = 0;
+    battle[loser].combat.launchPoint = 90;
+    battle.timeLeft = DT / 2;
+    run();
+    const winner = loser === 'p1' ? 'p2' : 'p1';
+    assert.deepEqual(battle.result, { outcome: winner, reason: 'time' });
+    assert.equal(battle[loser].lostToVoid, true, `${loser} ejected`);
+    assert.equal(battle[winner].lostToVoid, false);
+    assert.deepEqual(battle.fx.eliminations.map((e) => e.slot), [loser]);
+    assert.deepEqual(battle.final.launchPoints[loser], 90, 'the Launch Point it lost on, frozen');
+    assert.deepEqual(battle.score, { p1: 0, p2: 0 });
+  }
+});
+
+test('a match won by a fall does not burst its loser twice, nor one still waiting to respawn when time runs out', () => {
+  const { battle, run } = match();
+  const { p2 } = battle;
+  battle.score.p1 = 2;
+  intoVoid(battle, p2);
+  run();
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'void' });
+  assert.equal(battle.fx.eliminations.length, 1, 'the Void\'s burst only');
+  assert.equal(p2.ejected, false, 'taken by the Void');
+  run(30);
+  assert.equal(battle.fx.eliminations.length, 1);
+  // Out and waiting when the clock runs out: already gone.
+  const waiting = match();
+  waiting.battle.timeLeft = 0.2;
+  intoVoid(waiting.battle, waiting.battle.p1);
+  waiting.run();
+  waiting.run(20);
+  assert.deepEqual(waiting.battle.result, { outcome: 'p2', reason: 'points' });
+  assert.equal(waiting.battle.fx.eliminations.length, 1, 'one burst: its fall');
+  assert.equal(waiting.battle.p1.ejected, false);
+});
+
+test('a draw ejects nobody', () => {
+  const { battle, run } = match();
+  battle.overtimeSeconds = 0;
+  battle.timeLeft = DT / 2;
+  run();
+  assert.deepEqual(battle.result, { outcome: 'draw', reason: 'time' });
+  assert.deepEqual(battle.fighters.map((f) => f.lostToVoid), [false, false]);
+  assert.equal(battle.fx.eliminations.length, 0);
+});
+
+test('whatever aimed at the ejected loser goes; the winner\'s celebration plays on with it gone; a rematch brings it back', async () => {
+  const { CelebrationController, CELEBRATIONS } = await import('../../js/game/ai/celebration.js');
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const { battle, run } = match();
+    const { p1, p2 } = battle;
+    battle.score.p2 = 1;
+    // The winner a CPU celebrating: every behaviour may come up, the Void
+    // run included, all with nobody to face.
+    battle.timeLeft = DT / 2;
+    run();
+    assert.equal(p1.lostToVoid, true);
+    let s = seed;
+    p2.controller = new CelebrationController({ behaviours: CELEBRATIONS, rng: () => ((s = (s * 16807) % 2147483647) / 2147483647) });
+    run(Math.round(8 / DT));
+    assert.deepEqual(battle.score, { p1: 0, p2: 1 }, 'nothing it does there counts');
+    assert.equal(p1.lostToVoid, true, 'the loser stays out');
+    battle.restart();
+    assert.deepEqual([p1.lostToVoid, p1.ejected, p2.lostToVoid], [false, false, false], 'a rematch: both back');
+  }
+  // A projectile in flight at the loser goes with it.
+  const { battle, run } = match();
+  battle.score.p1 = 1;
+  battle.projectiles.push({ owner: battle.p1, target: battle.p2, update() {}, interpolate() {} });
+  battle.timeLeft = DT / 2;
+  run();
+  assert.equal(battle.projectiles.filter((p) => p.target === battle.p2).length, 0);
+});

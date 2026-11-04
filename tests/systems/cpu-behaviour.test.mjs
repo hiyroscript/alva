@@ -30,7 +30,7 @@ import { DIFFICULTY_IDS } from '../../js/data/difficulty.js';
 import { makePlan } from '../../js/game/ai/cpu-intelligence/plans.js';
 import { STILL_LIMIT, WAIT_LIMIT } from '../../js/game/ai/cpu-intelligence/telemetry.js';
 import { OBJECTIVES } from '../../js/game/ai/cpu-intelligence/objective.js';
-import { LAUNCH_UNIT_SPEED } from '../../js/data/launch.js';
+import { LAUNCH_POINT_SCALE } from '../../js/game/ai/cpu-intelligence/values.js';
 
 const F = playableCharacters();
 // Each fighter against the next one round the roster: every fighter plays,
@@ -39,10 +39,12 @@ const PAIRS = F.map((d, i) => [d, F[(i + 1) % F.length]]);
 const seconds = (s) => Math.round(s / DT);
 const ATTACKS = ['strike', 'dashStrike', 'jumpStrike'];
 // The Launch Point as dangerous as `lp` was at the old LAUNCH_UNIT_SPEED of
-// 10 (7 since the launch & energy update): the same launch takes about 43 %
-// more of it now, so a scenario that needs the CPU (or its opponent) in
-// danger reads its Launch Point through this.
-const scaled = (lp) => Math.ceil((lp * 10) / LAUNCH_UNIT_SPEED);
+// 10 against the Void before the Void update: the same launch takes about
+// 43 % more of it at 7, and the Void farther away (468 past each ledge and
+// 1040 above, where it was 360 and 800) about 10 % more again
+// (VOID_REACH_SCALE), so a scenario that needs the CPU (or its opponent) in
+// danger reads its Launch Point through the CPU's own scale for both.
+const scaled = (lp) => Math.ceil(lp * LAUNCH_POINT_SCALE);
 
 // Runs `sc` for `secs`, counting the steps under each objective, the fresh
 // attack commitments on a free opponent (no follow-up, no answer to a
@@ -90,9 +92,9 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
     for (const [cpuDef, foeDef] of PAIRS) {
       let kos = 0;
       for (const seed of [3, 4, 5]) {
-        // Yerma's right ledge is at 2480: the opponent by it, the CPU on the
+        // Yerma's right ledge is at 2500: the opponent by it, the CPU on the
         // centre side.
-        const sc = scenario({ difficulty, cpuDef, foeDef, seed, cpuX: 2150, foeX: 2330, foeLP: scaled(130), timeLeft: 200, foe: 'ref:competent' });
+        const sc = scenario({ difficulty, cpuDef, foeDef, seed, cpuX: 2170, foeX: 2350, foeLP: scaled(130), timeLeft: 200, foe: 'ref:competent' });
         let prev = null;
         sc.run(6, () => {
           const p = sc.ai.plan;
@@ -232,7 +234,7 @@ test('K: level in overtime it reads the Launch Point tiebreak: protects a lower 
 
 test('K: in late overtime the closing Void makes the stage more dangerous to it, as its launch predictions see the live Void', () => {
   for (const [cpuDef, foeDef] of PAIRS) {
-    // Over a band of spots up to the right ledge (2480) and of Launch
+    // Over a band of spots up to the right ledge (2500) and of Launch
     // Points, struck from the centre side: how many it would likely not
     // survive (Alva's recoveries are strong: only near the ledge is a
     // launch lethal, and nearer the closing Void sooner).
@@ -266,14 +268,18 @@ const stroller = (n, self) => {
   return Math.abs(dx) > 260 ? (dx > 0 ? { runRight: true } : { runLeft: true }) : {};
 };
 
-// One break-off at Launch Point 100 (at the old launch scale: scaled) with lots of time: when the CPU took up
+// One break-off at Launch Point 110 (at the old launch scale: scaled) with lots of time: when the CPU took up
 // the stabilize objective and when it left it (still alive, and with what
-// Launch Point), and its telemetry. 100, so that the CPU is in danger
-// whoever its opponent is: at 90, #0008 (no launch that ends a life from
-// mid-stage at once, its upward bounce one hit away) does not yet put it in
-// danger, and a CPU that is not in danger rightly fights on.
+// Launch Point), and its telemetry. 110, so that the CPU is in danger
+// whoever its opponent is: #0008 (no launch that ends a life from mid-stage
+// at once, its upward bounce one hit away) puts it in danger only from
+// about there. It was 100 before the Void update: the Void's top, 1040
+// over the stage where it was 800, is what an upward launch must reach,
+// about 16 % farther in Launch Point (tests/benchmarks/launch-thresholds.mjs:
+// straight up from 90 to 106), more than the 10 % scaled gives. A CPU that
+// is not in danger rightly fights on.
 function breakOff(difficulty, cpuDef, foeDef, foe) {
-  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: scaled(100), timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
+  const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: scaled(110), timeLeft: 250, foe, seed: 4, cpuX: 1750, foeX: 2000 });
   const out = { entered: null, left: null, lpLeft: null, scored: false };
   sc.run(25, (i) => {
     if (sc.foe.lostToVoid) out.scored = true;
@@ -304,7 +310,9 @@ test('E: in danger with room to spare it breaks off and recovers; pressed, it gu
       assert.ok(alone.entered != null && alone.entered < 2, `${difficulty} #${cpuDef.id} alone: broke off at ${alone.entered} s`);
       // Back on the attack: the objective left once recovered, or the
       // harmless opponent knocked out meanwhile.
-      if ((alone.left != null && alone.lpLeft < 85) || alone.scored) back++;
+      // Recovered: with at most 60 % of the Launch Point it broke off with
+      // (85 of 143 when this was written).
+      if ((alone.left != null && alone.lpLeft < scaled(110) * 0.6) || alone.scored) back++;
     }
     assert.ok(shielded >= 3, `${difficulty}: Shielded while pressed in ${shielded} of ${PAIRS.length}`);
     assert.ok(recovered >= 2, `${difficulty}: recovered Launch Point keeping out of the fight in ${recovered} of ${PAIRS.length}`);
@@ -425,19 +433,23 @@ test('N: breaking off to recover gives way to the finish when the opponent becom
       const sc = scenario({ difficulty, cpuDef, foeDef, cpuLP: scaled(110), timeLeft: 250, seed: 11, cpuX: 1700, foeX: 2000, foe: 'ref:competent' });
       sc.run(2.5);
       assert.equal(sc.ai.objective.kind, 'stabilize', `${difficulty} #${cpuDef.id}: recovering first`);
-      // The opponent battered and by the ledge, the CPU's Launch Point back down.
+      // The opponent battered and by the ledge (2500), the CPU's Launch Point back down.
       sc.cpu.combat.launchPoint = scaled(20);
       sc.foe.combat.launchPoint = scaled(160);
-      sc.foe.body.x = 2400;
+      sc.foe.body.x = 2420;
       const changes = sc.ai.telemetry.counters.objectiveChanges;
+      // Counted in play: a CPU still waiting to come back from a fall it
+      // took while recovering decides nothing until it is back.
       let finishAt = null;
-      sc.run(3, (i) => {
-        if (sc.ai.objective.kind === 'finish' && finishAt == null) finishAt = i * DT;
+      let inPlay = 0;
+      sc.run(4, (i) => {
+        if (sc.ai.objective.kind === 'finish' && finishAt == null) finishAt = inPlay;
+        if (!sc.cpu.lostToVoid) inPlay += DT;
         if (sc.foe.lostToVoid) return false;
         return true;
       });
       assert.ok(finishAt != null || sc.foe.lostToVoid, `${difficulty} #${cpuDef.id}: ${sc.ai.objective.kind}`);
-      assert.ok(finishAt == null || finishAt < 2, `${difficulty} #${cpuDef.id}: took up the finish after ${finishAt} s`);
+      assert.ok(finishAt == null || finishAt < 2, `${difficulty} #${cpuDef.id}: took up the finish after ${finishAt} s in play`);
       assert.ok(sc.ai.telemetry.counters.objectiveChanges - changes <= 3, `${difficulty} #${cpuDef.id}: ${sc.ai.telemetry.counters.objectiveChanges - changes} changes of mind`);
     }
   }
@@ -545,8 +557,8 @@ test('liveness: a plan that should move but does not is an incident, by its caus
 });
 
 test('liveness: a walk the ledge guard keeps holding back is a navigation failure, not a wait', () => {
-  const sc = scenario({ difficulty: 'hard', seed: 15, cpuX: 2440, foeX: 1500 });
-  // Standing at rest near the right ledge (2480), its own initiative held.
+  const sc = scenario({ difficulty: 'hard', seed: 15, cpuX: 2460, foeX: 1500 });
+  // Standing at rest near the right ledge (2500), its own initiative held.
   sc.ai.neutral = false;
   sc.run(0.3);
   assert.ok(sc.cpu.body.grounded && Math.abs(sc.cpu.body.vx) < 1, 'at rest on the stage');

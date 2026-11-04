@@ -1564,22 +1564,22 @@ test('a screen grown too small mid-match pauses it under the small-screen block,
 
 // ---- The launch & energy update: the Launch Point's heal glow and fire ----------
 
-test('HUD: the Launch Point burns from LAUNCH_POINT_FIRE (60) and only goes out below 55; past 100 it is an inferno until below 95', () => {
-  assert.deepEqual([LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT], [60, 55, 100, 95]);
+test('HUD: the Launch Point burns from LAUNCH_POINT_FIRE (70) and only goes out below 65; past 110 it is an inferno until below 105', () => {
+  assert.deepEqual([LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT], [70, 65, 110, 105]);
   // The pure rule, from each tier.
-  assert.deepEqual([0, 59, 60, 120].map((lp) => launchPointFire(lp, 0)), [0, 0, 1, 2]);
-  assert.deepEqual([54, 55, 59, 99, 100].map((lp) => launchPointFire(lp, 1)), [0, 1, 1, 1, 2]);
-  assert.deepEqual([94, 95, 60, 54].map((lp) => launchPointFire(lp, 2)), [1, 2, 1, 0]);
+  assert.deepEqual([0, 69, 70, 130].map((lp) => launchPointFire(lp, 0)), [0, 0, 1, 2]);
+  assert.deepEqual([64, 65, 69, 109, 110].map((lp) => launchPointFire(lp, 1)), [0, 1, 1, 1, 2]);
+  assert.deepEqual([104, 105, 70, 64].map((lp) => launchPointFire(lp, 2)), [1, 2, 1, 0]);
   // On the card, step by step.
   const { screen } = setup();
   const d = duel();
-  const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1, score: { p1: 0, p2: 0 } };
+  const battle = { p1: d.attacker, p2: d.target, timeLeft: 109, round: 1, score: { p1: 0, p2: 0 } };
   const { hud } = screen;
   hud.bind(battle.p1, battle.p2);
   const value = hud.right.launchPointValue;
   const fire = () => (value.classList.contains('is-inferno') ? 'inferno' : value.classList.contains('is-burning') ? 'fire' : '-');
   const seen = [];
-  for (const lp of [0, 59, 60, 56, 55, 54, 58, 60, 99, 100, 96, 95, 94, 70, 56]) {
+  for (const lp of [0, 69, 70, 66, 65, 64, 68, 70, 109, 110, 106, 105, 104, 80, 66]) {
     battle.p2.combat.launchPoint = lp;
     hud.update(battle);
     seen.push(fire());
@@ -1588,7 +1588,7 @@ test('HUD: the Launch Point burns from LAUNCH_POINT_FIRE (60) and only goes out 
     'lit at its threshold, kept inside its band, out only below it');
   assert.equal(hud.left.launchPointValue.classList.contains('is-burning'), false, 'the other card is its own');
   // A respawn puts it out at once, whatever the band.
-  battle.p2.combat.launchPoint = 140;
+  battle.p2.combat.launchPoint = 150;
   hud.update(battle);
   assert.equal(fire(), 'inferno');
   battle.p2.respawn(STAGE);
@@ -1596,10 +1596,10 @@ test('HUD: the Launch Point burns from LAUNCH_POINT_FIRE (60) and only goes out 
   assert.equal(value.textContent, '0');
   assert.equal(fire(), '-', 'out on the respawn');
   // And a fresh bind (a rematch, a swap) works it out anew.
-  battle.p2.combat.launchPoint = 57;
+  battle.p2.combat.launchPoint = 67;
   hud.bind(battle.p1, battle.p2);
   hud.update(battle);
-  assert.equal(fire(), '-', '57 never lit on this state: not burning');
+  assert.equal(fire(), '-', '67 never lit on this state: not burning');
 });
 
 test('HUD: the Launch Point glows green when it comes down in play (a recovery tick, a perfect Shield, a heal), never on a respawn or a rebind', () => {
@@ -1640,7 +1640,7 @@ test('HUD: the Launch Point glows green when it comes down in play (a recovery t
   // lower threshold, and the fire goes out as it glows.
   delete battle.p2.perfectShield;
   c.shielding = false;
-  c.launchPoint = 60;
+  c.launchPoint = LAUNCH_POINT_FIRE;
   hud.update(battle);
   assert.equal(value.classList.contains('is-burning'), true);
   c.heal(10);

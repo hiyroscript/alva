@@ -742,3 +742,76 @@ test('the debug trace explains each decision from its own data, and costs nothin
   assert.ok(quiet.ai.telemetry.counters.decisions > 10, 'the counters still run');
   assert.ok(new CpuIntelligence({ difficulty: 'easy' }) instanceof CpuIntelligence);
 });
+
+// ---- The Void update: the closing Void read ahead --------------------------------------
+
+test('in overtime the CPU judges by the Void a moment ahead on its curve: never wider than the one in force, the top included; outside it, the one in force', async () => {
+  const { scenario } = await import('../helpers/cpu-scenario.mjs');
+  const { closingVoid, overtimePressure } = await import('../../js/game/physics.js');
+  const { VOID_LOOKAHEAD } = await import('../../js/game/ai/cpu-intelligence/stage-model.js');
+  const tuning = CONFIG.battle.overtimeVoid;
+  // Regular time: exactly the Void in force, nothing closing.
+  const regular = scenario({ difficulty: 'hard', timeLeft: 100, cpuX: 1700, foeX: 1900 });
+  regular.run(0.3);
+  const rm = regular.ai.situation.model;
+  assert.equal(rm.void, regular.battle.stage.void);
+  assert.equal(rm.closing, 0);
+  for (const timeLeft of [55, 30, 10, 2]) {
+    const sc = scenario({ difficulty: 'hard', overtime: true, timeLeft, cpuX: 1700, foeX: 1900 });
+    sc.run(0.3);
+    const model = sc.ai.situation.model;
+    const now = sc.battle.stage.void;
+    const ahead = model.void;
+    const progress = Math.min(1, sc.battle.overtimeProgress + VOID_LOOKAHEAD / sc.battle.overtimeSeconds);
+    const want = closingVoid(now === sc.battle.stage.baseVoid ? now : sc.battle.stage.baseVoid, sc.battle.stage.main, overtimePressure(progress, tuning), tuning, sc.battle.stage.highestFooting);
+    for (const k of ['left', 'top']) assert.ok(Math.abs(ahead[k] - Math.max(now[k], want[k])) < 1e-6, `${timeLeft}: ${k}`);
+    for (const k of ['right', 'bottom']) assert.ok(Math.abs(ahead[k] - Math.min(now[k], want[k])) < 1e-6, `${timeLeft}: ${k}`);
+    assert.ok(ahead.left > now.left && ahead.right < now.right && ahead.top > now.top && ahead.bottom < now.bottom, `${timeLeft} s left: tighter than now on every side`);
+    assert.ok(model.closing > sc.battle.voidPressure, 'further on than now');
+    // Its own blast distances and Void checks read the same rectangle.
+    const b = model.blast(1800, sc.battle.stage.main.top, 88);
+    assert.ok(Math.abs(b.right - (ahead.right - 1800)) < 1e-6);
+    assert.equal(model.inVoid(ahead.right + 1, sc.battle.stage.main.top, 88), true, 'past the edge to come: lost, as it judges it');
+  }
+});
+
+test('late in overtime the CPU keeps its high jumps under the closing top: a Super Jump from the main stage is fine, a full triple jump from a high cloud is not', async () => {
+  const { scenario } = await import('../helpers/cpu-scenario.mjs');
+  const early = scenario({ map: 'asperitas', difficulty: 'brutal', overtime: true, timeLeft: 59, cpuX: 1700, foeX: 1900 });
+  const late = scenario({ map: 'asperitas', difficulty: 'brutal', overtime: true, timeLeft: 1, cpuX: 1700, foeX: 1900 });
+  for (const sc of [early, late]) sc.run(0.2);
+  const caps = early.ai.situation.caps.movement;
+  const top = early.battle.stage.main.top;
+  const cloud = top - 290;
+  const highRise = caps.superJumpHeight + 2 * caps.airJumpHeight;
+  for (const sc of [early, late]) {
+    assert.equal(sc.ai.situation.model.jumpClear(top, 88, caps.superJumpHeight), true, 'a Super Jump from the main stage');
+  }
+  assert.equal(early.ai.situation.model.jumpClear(cloud, 88, highRise), true, 'early on, even the highest jump from the highest cloud');
+  assert.equal(late.ai.situation.model.jumpClear(cloud, 88, highRise), false, 'at the end, not from there');
+});
+
+test('the closing Void draws the CPU toward the centre: in late overtime it keeps more room from the ledges than in regular time', async () => {
+  const { scenario } = await import('../helpers/cpu-scenario.mjs');
+  const spread = (overtime) => {
+    let total = 0;
+    let n = 0;
+    for (const [cpuDef, foeDef] of FIGHTERS.slice(0, 4).map((d, i, a) => [d, a[(i + 1) % a.length]])) {
+      for (const seed of [2, 3]) {
+        // Starting by the left ledge, the opponent between it and the centre.
+        const sc = scenario({ difficulty: 'brutal', cpuDef, foeDef, seed, overtime, timeLeft: overtime ? 6 : 200, cpuX: 1180, foeX: 1420, foe: 'ref:balanced', holdLP: true });
+        sc.run(5, () => {
+          if (!sc.cpu.lostToVoid && sc.cpu.body.grounded) {
+            total += Math.abs(sc.cpu.body.x - sc.battle.stage.centerX);
+            n++;
+          }
+          return !sc.battle.matchOver;
+        });
+      }
+    }
+    return total / Math.max(1, n);
+  };
+  const regular = spread(false);
+  const late = spread(true);
+  assert.ok(late < regular * 0.9, `late overtime ${late.toFixed(0)} from the centre on average, regular time ${regular.toFixed(0)}`);
+});

@@ -62,6 +62,17 @@ const C = {
   swell: 'rgba(235, 252, 255, 0.55)',
   swellShade: 'rgba(8, 82, 120, 0.28)',
   glint: 'rgba(255, 255, 248, 0.85)',
+  // Sailboats far out on the bay, and gulls wheeling over it (the open
+  // water and sky the Void update brought into view).
+  sail: 'rgba(252, 250, 244, 0.95)',
+  sailShade: 'rgba(206, 214, 222, 0.95)',
+  hull: '#5a4a3e',
+  wake: 'rgba(240, 252, 255, 0.55)',
+  gull: 'rgba(40, 56, 72, 0.7)',
+  islet: '#5b6f6a',
+  isletLit: '#7a8f86',
+  isletGreen: '#4f8a64',
+  isletFoam: 'rgba(255, 255, 255, 0.7)',
   horizon: 'rgba(230, 248, 252, 0.6)',
   foam: 'rgba(255, 255, 255, 0.92)',
   foamSoft: 'rgba(255, 255, 255, 0.45)',
@@ -183,6 +194,25 @@ export class AdamarisTheme extends StageTheme {
     this.buildSand(rng, cb, G);
     this.buildPalms(rng, G);
 
+    // The bay's boats, gulls and islets (the Void update), on their own
+    // random stream, so the rest of the art is as it always was.
+    const brng = mulberry32(0xb0a7);
+    // Sailboats far out on the bay: each on its own plane (`f`, its depth on
+    // the water), drifting slowly along it, its sail leaning in the wind.
+    this.boats = Array.from({ length: 7 }, () => ({
+      u: brng(), f: range(brng, 0.22, 0.5), speed: range(brng, 0.004, 0.012) * (brng() < 0.5 ? -1 : 1),
+      size: range(brng, 1.8, 2.6), bob: brng() * 6.3, two: brng() < 0.4,
+    }));
+    // A few small rocky islets out on the bay, a palm or two on the larger
+    // ones, foam round their feet: each on its own plane on the water.
+    this.islets = [[-2600, 0.3, 520, 80], [1900, 0.36, 380, 60], [-900, 0.44, 240, 40], [3400, 0.26, 640, 110]].map(([dx, f, w, h]) => ({
+      f, x: cx + dx, w, h, path: this.hillPath(brng, cx + dx, w, h, G), cap: this.hillPath(brng, cx + dx - w * 0.08, w * 0.6, h * 0.55, G - h * 0.42),
+    }));
+    // Gulls wheeling over the bay: screen-space fractions of the sky,
+    // each gliding on a slow loop of its own.
+    this.gulls = Array.from({ length: 9 }, () => ({
+      x: brng(), y: range(brng, 0.12, 0.5), r: range(brng, 0.02, 0.06), speed: range(brng, 0.15, 0.35), p: brng() * 6.3, size: range(brng, 0.7, 1.2),
+    }));
     // Smoke puffs and lava sparks: fixed seeds, moved by the clock.
     this.steam = Array.from({ length: 18 }, (_, i) => ({ p: i / 18, sx: range(rng, -1, 1), r: range(rng, 0.8, 1.3), wob: rng() * 6.3 }));
     this.ash = Array.from({ length: 34 }, (_, i) => ({ p: i / 34, sx: range(rng, -1, 1), r: range(rng, 0.7, 1.4), wob: rng() * 6.3 }));
@@ -452,10 +482,11 @@ export class AdamarisTheme extends StageTheme {
       ctx.fillStyle = warm;
       ctx.fillRect(0, 0, view.pxW, view.pxH * 0.5);
     }
-    // The sun, high on the right.
-    const sx = view.pxW * 0.82 - view.x * s * 0.01;
-    const sy = view.pxH * 0.12;
+    // The sun, high on the right (below the Void's top line when the
+    // camera nears it).
     const sr = 26 * s;
+    const sx = view.pxW * 0.82 - view.x * s * 0.01;
+    const sy = Math.max(view.pxH * 0.12, this.skyTop(view) + sr * 1.6);
     const glow = ctx.createRadialGradient(sx, sy, sr * 0.5, sx, sy, sr * 7);
     glow.addColorStop(0, C.sunGlow);
     glow.addColorStop(1, 'rgba(255, 249, 220, 0)');
@@ -468,6 +499,7 @@ export class AdamarisTheme extends StageTheme {
     this.drawClouds(ctx, view, t);
 
     const horizon = this.groundAt(view, 0);
+    this.drawGulls(ctx, view, t, horizon);
     // Distant islands and headlands.
     for (const isl of this.islands) {
       this.persp.plane(ctx, view, isl.f);
@@ -483,13 +515,21 @@ export class AdamarisTheme extends StageTheme {
     this.drawSea(ctx, view, t, horizon);
   }
 
+  // The sky's top on screen: the top of the view, or the Void's top line
+  // when the camera is near it (the clouds and gulls keep below it, so the
+  // black never swallows them).
+  skyTop(view) {
+    return Math.max(0, (this.map.voidBounds.top - view.y) * view.scale + 16 * view.scale);
+  }
+
   drawClouds(ctx, view, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const W = view.pxW;
     const H = view.pxH;
+    const top = this.skyTop(view);
     for (const c of this.clouds) {
       const x = (frac(c.x + t * c.speed * 0.2 - view.x * view.scale * 0.00002) * 1.4 - 0.2) * W;
-      const y = c.y * H;
+      const y = top + c.y * (H - top);
       const w = c.w * W;
       ctx.globalAlpha = c.a;
       for (const [fill, dy] of [[C.cloudShade, 0.12], [C.cloud, 0]]) {
@@ -506,6 +546,81 @@ export class AdamarisTheme extends StageTheme {
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Gulls: small dark wing strokes gliding in slow loops between the sky's
+  // top and a little over the horizon, wings beating now and then. With
+  // reduced motion they hold still, wings spread.
+  drawGulls(ctx, view, t, horizon) {
+    const W = view.pxW;
+    const top = this.skyTop(view);
+    const bottom = Math.min(view.pxH, horizon) - 20 * view.scale;
+    if (bottom <= top + 10) return;
+    const s = view.scale;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.strokeStyle = C.gull;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1, 1.6 * s);
+    ctx.beginPath();
+    for (const g of this.gulls) {
+      const a = t * g.speed + g.p;
+      const x = (frac(g.x - view.x * s * 0.00004 + Math.cos(a) * g.r) * 1.2 - 0.1) * W;
+      const y = top + (g.y + Math.sin(a * 1.3) * g.r * 0.5) * (bottom - top);
+      const span = 7 * g.size * s;
+      const flap = this.reducedMotion ? 0.35 : 0.2 + 0.4 * Math.max(0, Math.sin(a * 9));
+      ctx.moveTo(x - span, y - span * flap);
+      ctx.quadraticCurveTo(x - span * 0.45, y - span * (flap + 0.25), x, y);
+      ctx.quadraticCurveTo(x + span * 0.45, y - span * (flap + 0.25), x + span, y - span * flap);
+    }
+    ctx.stroke();
+  }
+
+  // Sailboats on their planes far out on the bay: a dark hull, a white
+  // sail (two on some) leaning a little, a thin wake, bobbing on the swell.
+  drawBoats(ctx, view, t, shore) {
+    const s = view.scale;
+    const W = view.pxW;
+    for (const b of this.boats) {
+      const y0 = this.groundAt(view, b.f);
+      if (y0 > shore - 2) continue;
+      const wx = this.centerX + (frac(b.u + t * b.speed * 0.02) - 0.5) * 12000;
+      const x = this.persp.x(view, wx, b.f);
+      const k = b.f * s * b.size;
+      if (x < -60 * k || x > W + 60 * k) continue;
+      const y = y0 + (this.reducedMotion ? 0 : Math.sin(t * 1.1 + b.bob) * 1.2 * k);
+      const dir = Math.sign(b.speed);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // The wake behind it.
+      ctx.fillStyle = C.wake;
+      ctx.fillRect(x - dir * 34 * k - (dir > 0 ? 0 : 0), y + 1 * k, dir * 30 * k, Math.max(1, 1.4 * k));
+      // The hull.
+      ctx.fillStyle = C.hull;
+      ctx.beginPath();
+      ctx.moveTo(x - 16 * k, y - 4 * k);
+      ctx.lineTo(x + 16 * k, y - 4 * k);
+      ctx.lineTo(x + 11 * k, y + 1 * k);
+      ctx.lineTo(x - 11 * k, y + 1 * k);
+      ctx.closePath();
+      ctx.fill();
+      // The sail(s).
+      ctx.fillStyle = C.sail;
+      ctx.beginPath();
+      ctx.moveTo(x - 1 * k, y - 46 * k);
+      ctx.lineTo(x - 1 * k + dir * 15 * k, y - 7 * k);
+      ctx.lineTo(x - 1 * k, y - 7 * k);
+      ctx.closePath();
+      ctx.fill();
+      if (b.two) {
+        ctx.fillStyle = C.sailShade;
+        ctx.beginPath();
+        ctx.moveTo(x - 3 * k, y - 38 * k);
+        ctx.lineTo(x - 3 * k - dir * 11 * k, y - 7 * k);
+        ctx.lineTo(x - 3 * k, y - 7 * k);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
   }
 
   // The volcano on its plane: its flanks, forest, gullies, haze, then its
@@ -704,6 +819,21 @@ export class AdamarisTheme extends StageTheme {
       ctx.fillRect(x, y, g.w * f * s, Math.max(1, 1.4 * f * s));
     }
     ctx.globalAlpha = 1;
+    // The islets, then the boats.
+    for (const isl of this.islets) {
+      const y = this.groundAt(view, isl.f);
+      if (y > shore - 2) continue;
+      this.persp.plane(ctx, view, isl.f);
+      ctx.fillStyle = C.islet;
+      ctx.fill(isl.path);
+      ctx.fillStyle = C.isletGreen;
+      ctx.fill(isl.cap);
+      ctx.fillStyle = C.isletFoam;
+      const lap = this.reducedMotion ? 0 : Math.sin(t * 0.9 + isl.x) * 6;
+      ctx.fillRect(isl.x - isl.w / 2 - 10 + lap, this.groundY, isl.w + 20, 5);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.drawBoats(ctx, view, t, shore);
     // Wet sand, glossy where the water just left it.
     const wg = ctx.createLinearGradient(0, shore, 0, Math.max(shore + 1, wet));
     for (const [at, color] of C.wetSand) wg.addColorStop(at, color);
