@@ -12,7 +12,8 @@
 //   keys      Enter / A on a focused control starts moving it: the arrows
 //             or D-pad nudge it in small steps until Enter / A or Esc /
 //             Back again; ← / → on the focused slider resize;
-//   Reset to defaults puts this scheme back exactly on Alva's layout;
+//   Reset to defaults puts this scheme back exactly on Alva's layout, at
+//             the default sizes (130%; the stacked moves 100%);
 //   Done (or Esc / Back) returns to Settings.
 //
 // Every change is saved at once, as it lands (a drag when it ends, each
@@ -26,7 +27,7 @@ import { el } from '../core/utils.js';
 import { t, tx, tattr, iconLabel, setText, localizeTree } from '../localization/i18n.js';
 import { resolveSetting } from '../core/settings.js';
 import {
-  TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, clampScale, normalizePoint, placeControl,
+  TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, clampScale, normalizePoint, placeControl, touchScaleOf,
 } from '../core/touch-layout.js';
 import { TouchControls } from './touch-controls.js';
 import { ICONS } from './icons.js';
@@ -350,8 +351,10 @@ export class TouchLayoutEditor {
 
   // ---- Size --------------------------------------------------------------------------
 
+  // Control `id`'s size now: its custom one, else its default (130%, a
+  // stacked move 100%; see TOUCH_DEFAULT_SCALE).
   scaleOf(id) {
-    return this.layout[id]?.scale ?? 1;
+    return touchScaleOf(this.layout, id);
   }
 
   // Gives the selected control scale `value` (held to the limits), keeping
@@ -416,7 +419,7 @@ export class TouchLayoutEditor {
     } else {
       setText(this.nameEl, 'editor.none');
     }
-    const scale = id ? this.scaleOf(id) : 1;
+    const scale = id ? this.scaleOf(id) : touchScaleOf(null, null);
     const value = t('editor.sizeValue', { percent: percent(scale) });
     this.slider.value = String(percent(scale));
     this.slider.setAttribute('aria-valuetext', value);

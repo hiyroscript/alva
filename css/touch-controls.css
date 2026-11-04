@@ -14,9 +14,27 @@
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
   --tc-dash: calc(var(--tc) * 0.62);
-  /* Down sits at the far left of the lower-left cluster, the size of a
-     Dash button: the cluster starts this much further in to make room. */
+  /* Down sits at the far left of the Joystick cluster, the size of a Dash
+     button: the cluster starts this much further in to make room. */
   --tc-down-room: calc(var(--tc-dash) + var(--tc-gap));
+  /* The default scales (TOUCH_DEFAULT_SCALE in js/core/touch-layout.js,
+     set on this element by TouchControls: every control, and the moves
+     stacked above Shield). Each control's box keeps its own size and is
+     drawn at its scale round its centre (the `scale` property, which
+     TouchControls.applyLayout writes), so the places below are laid out
+     at the scaled sizes: --tc-big is a default-scale button as drawn,
+     --tc-in how far its box sits inside that, --tc-small and --tc-in-s
+     the same for a stacked move. */
+  --tc-k: 1;
+  --tc-ks: 1;
+  --tc-kd: calc((var(--tc-k) - 1) / 2);
+  --tc-big: calc(var(--tc) * var(--tc-k));
+  --tc-g: calc(var(--tc-gap) * var(--tc-k));
+  --tc-p: calc(var(--tc-big) + var(--tc-g));
+  --tc-in: calc(var(--tc) * var(--tc-kd));
+  --tc-small: calc(var(--tc) * var(--tc-ks));
+  --tc-in-s: calc((var(--tc-small) - var(--tc)) / 2);
+  --tc-sp: calc(var(--tc-small) + var(--tc-gap) * var(--tc-ks));
   display: none;
   position: absolute;
   inset: 0;
@@ -32,17 +50,32 @@ html.is-touch .touch-controls { display: block; }
 html.is-touch .touch-controls[hidden] { display: none; }
 .is-paused .touch-controls { opacity: 0.25; }
 .tc-cluster { position: absolute; bottom: var(--tc-bottom); }
+/* Classic Buttons' lower-left cluster: one row along the bottom edge,
+   Run left, Down, Run right, each the size of every button; a small Dash
+   button just above each Run arrow. */
 .tc-dpad {
-  left: calc(max(var(--safe-l), 12px) + 1.4vw + var(--tc-down-room));
-  display: flex;
-  gap: var(--tc-gap);
+  left: calc(max(var(--safe-l), 12px) + 1.4vw);
+  width: calc(var(--tc-p) * 2 + var(--tc-big));
+  height: var(--tc-big);
   pointer-events: auto;
   touch-action: none;
 }
+.tc-dpad .tc-pad { position: absolute; bottom: var(--tc-in); }
+.tc-dpad .tc-runLeft { left: var(--tc-in); }
+.tc-dpad .tc-runRight { left: calc(var(--tc-p) * 2 + var(--tc-in)); }
+/* The lower-right cluster (both schemes), along the bottom-right edges:
+   the bottom row Attack 1, Attack 2 (the Mash Combo's two strikes) and
+   Jump in the corner; Shield above Jump, the extra attack left of it; the
+   fighter's other moves stacked above Shield (see .tc-attack[data-stack-col]).
+                         [5]
+                         [4]
+                         [3]
+                 [EXTRA] [SHIELD]
+           [1]   [2]     [JUMP]          */
 .tc-actions {
   right: calc(max(var(--safe-r), 12px) + 1.4vw);
-  width: calc(var(--tc-pitch) * 2 + var(--tc));
-  height: calc(var(--tc-pitch) * 1.74 + var(--tc));
+  width: calc(var(--tc-p) * 2 + var(--tc-big));
+  height: calc(var(--tc-p) * 2 + var(--tc-sp) * 3);
 }
 .tc-btn {
   position: relative;
@@ -141,41 +174,45 @@ html.is-touch .touch-controls[hidden] { display: none; }
   pointer-events: none;
 }
 .tc-btn.is-spent { opacity: 0.4; border-style: dashed; }
-.tc-jump { right: 0; bottom: 0; }
-.tc-shield { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
+.tc-jump { right: var(--tc-in); bottom: var(--tc-in); }
+.tc-shield { right: var(--tc-in); bottom: calc(var(--tc-p) + var(--tc-in)); }
+.tc-extra_attack { right: calc(var(--tc-p) + var(--tc-in)); bottom: calc(var(--tc-p) + var(--tc-in)); }
 /* Numbered attack buttons, by the slot TouchControls.setCharacter gives the
-   ones on show (attackSlots): a honeycomb round Shield, three rows of
-   three, two and three buttons, all inside the cluster's box whatever the
-   fighter shows. Slots 1 and 2 (attack1, attack2) are the lower row beside
-   Jump; slot 3 the middle row, beside Shield; slots 4 and 5 the top row,
-   left of the extra attack (aligned with the lower row).
-                 [4]  [5]  [EXTRA]
-                   [3]  [SHIELD]
-                 [1]  [2]  [JUMP]            */
-.tc-attack[data-slot="1"] { right: calc(var(--tc-pitch) * 2); bottom: 0; }
-.tc-attack[data-slot="2"] { right: var(--tc-pitch); bottom: 0; }
-.tc-attack[data-slot="3"] { right: calc(var(--tc-pitch) * 1.5); bottom: calc(var(--tc-pitch) * 0.87); }
-.tc-attack[data-slot="4"] { right: calc(var(--tc-pitch) * 2); bottom: calc(var(--tc-pitch) * 1.74); }
-.tc-attack[data-slot="5"] { right: var(--tc-pitch); bottom: calc(var(--tc-pitch) * 1.74); }
-.tc-extra_attack {
-  right: 0;
-  bottom: calc(var(--tc-pitch) * 1.74);
-}
+   ones on show (attackSlots): slots 1 and 2 (attack1, attack2) the bottom
+   row beside Jump. */
+.tc-attack[data-slot="1"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); bottom: var(--tc-in); }
+.tc-attack[data-slot="2"] { right: calc(var(--tc-p) + var(--tc-in)); bottom: var(--tc-in); }
+/* Every other move on show (slots 3 and up) is stacked upward at its own
+   smaller scale, one above another with no gaps, in the place
+   TouchControls.applyLayout gives it: column 0 above Shield first, as many
+   as stay clear of the top HUD (setCeiling); then column 1, above the
+   extra attack's place; then column 2, above Attack 1. Each column is
+   centred on the buttons under it. */
+.tc-attack[data-stack-col="0"] { right: var(--tc-in); --tc-floor: calc(var(--tc-p) * 2); }
+.tc-attack[data-stack-col="1"] { right: calc(var(--tc-p) + var(--tc-in)); --tc-floor: calc(var(--tc-p) * 2); }
+.tc-attack[data-stack-col="2"] { right: calc(var(--tc-p) * 2 + var(--tc-in)); --tc-floor: var(--tc-p); }
+.tc-attack[data-stack-row] { bottom: calc(var(--tc-floor) + var(--tc-row, 0) * var(--tc-sp) + var(--tc-in-s)); }
+.tc-attack[data-stack-row="1"] { --tc-row: 1; }
+.tc-attack[data-stack-row="2"] { --tc-row: 2; }
+.tc-attack[data-stack-row="3"] { --tc-row: 3; }
+.tc-attack[data-stack-row="4"] { --tc-row: 4; }
 
-/* Joystick scheme (the Mobile Controls setting's default). The lower-left
-   cluster is one round stick in the same translucent style as the buttons
-   (a plain base and knob, no arrows in it), with a small Dash button just
-   above each of its top corners (their centres sit 120deg and 60deg round
-   from the stick's, clear of its rim), and Down to its left. */
+/* Joystick scheme. The lower-left cluster is one round stick in the same
+   translucent style as the buttons (a plain base and knob, no arrows in
+   it), with a small Dash button just above each of its top corners (their
+   centres sit 120deg and 60deg round from the stick's, clear of its rim),
+   and Down to its left. Every offset is the unscaled one times --tc-k,
+   plus --tc-kd of the control's own box (it is drawn scaled round its
+   centre). */
 .tc-joystick {
-  left: calc(max(var(--safe-l), 12px) + 1.4vw + var(--tc-down-room));
-  width: var(--tc-stick);
-  height: calc(var(--tc) * 2.44);
+  left: calc(max(var(--safe-l), 12px) + 1.4vw + var(--tc-down-room) * var(--tc-k));
+  width: calc(var(--tc-stick) * var(--tc-k));
+  height: calc(var(--tc) * 2.44 * var(--tc-k));
 }
 .tc-stick {
   position: absolute;
-  left: 0;
-  bottom: 0;
+  left: calc(var(--tc-stick) * var(--tc-kd));
+  bottom: calc(var(--tc-stick) * var(--tc-kd));
   width: var(--tc-stick);
   height: var(--tc-stick);
   display: grid;
@@ -210,33 +247,43 @@ html.is-touch .touch-controls[hidden] { display: none; }
 }
 .tc-dash {
   position: absolute;
-  bottom: calc(var(--tc) * 1.82);
+  bottom: calc(var(--tc) * 1.82 * var(--tc-k) + var(--tc-dash) * var(--tc-kd));
   width: var(--tc-dash);
   height: var(--tc-dash);
   font-size: calc(var(--tc-dash) * 0.46);
 }
-.tc-dash-left { left: calc(var(--tc) * -0.03); }
-.tc-dash-right { right: calc(var(--tc) * -0.03); }
+.tc-dash-left { left: calc(var(--tc) * -0.03 * var(--tc-k) + var(--tc-dash) * var(--tc-kd)); }
+.tc-dash-right { right: calc(var(--tc) * -0.03 * var(--tc-k) + var(--tc-dash) * var(--tc-kd)); }
 
-/* Classic: each smaller Mouvement target sits above its matching Run
-   target. The container still captures only Run pointers for sliding. */
-.tc-dpad .tc-dash { bottom: var(--tc-pitch); }
-.tc-dpad .tc-dash-left { left: calc((var(--tc) - var(--tc-dash)) / 2); }
-.tc-dpad .tc-dash-right { right: calc((var(--tc) - var(--tc-dash)) / 2); }
+/* Classic: each smaller Mouvement target sits just above its matching Run
+   target, centred on it. The container still captures only Run pointers
+   for sliding. */
+.tc-dpad .tc-dash { bottom: calc(var(--tc-p) + var(--tc-dash) * var(--tc-kd)); }
+.tc-dpad .tc-dash-left { left: calc((var(--tc-big) - var(--tc-dash)) / 2); right: auto; }
+.tc-dpad .tc-dash-right { left: calc(var(--tc-p) * 2 + (var(--tc-big) - var(--tc-dash)) / 2); right: auto; }
 .tc-dash .icon { display: block; }
 
-/* Down (both schemes): a small button, the size of a Dash button, at the
-   far left of the lower-left cluster, level with the middle of the stick
-   (Joystick) or of the Run arrows (Classic). Held, it is Down: the fast
-   fall, or on a one-way platform a drop through it. Classic's Run
-   container never captures its pointer. */
+/* Down (both schemes). Held, it is Down: the fast fall, or on a one-way
+   platform a drop through it. In Classic it is the middle of the bottom
+   row, between the Run arrows, as large as they are; in Joystick a small
+   button, the size of a Dash button, at the far left of the cluster, level
+   with the middle of the stick. Classic's Run container never captures
+   its pointer. */
 .tc-down {
   position: absolute;
-  left: calc(var(--tc-down-room) * -1);
   width: var(--tc-dash);
   height: var(--tc-dash);
   font-size: calc(var(--tc-dash) * 0.46);
 }
-.tc-joystick .tc-down { bottom: calc((var(--tc-stick) - var(--tc-dash)) / 2); }
-.tc-dpad .tc-down { bottom: calc((var(--tc) - var(--tc-dash)) / 2); }
+.tc-joystick .tc-down {
+  left: calc(var(--tc-down-room) * var(--tc-k) * -1 + var(--tc-dash) * var(--tc-kd));
+  bottom: calc((var(--tc-stick) - var(--tc-dash)) / 2 * var(--tc-k) + var(--tc-dash) * var(--tc-kd));
+}
+.tc-dpad .tc-down {
+  left: calc(var(--tc-p) + var(--tc-in));
+  bottom: var(--tc-in);
+  width: var(--tc);
+  height: var(--tc);
+  font-size: calc(var(--tc) * 0.42);
+}
 .tc-down .icon { display: block; }

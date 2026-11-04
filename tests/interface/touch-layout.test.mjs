@@ -141,6 +141,7 @@ globalThis.document = {
 
 const {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, sanitizeTouchLayout, placeControl, normalizePoint, layoutArea, clampScale,
+  TOUCH_DEFAULT_SCALE, STACKED_CONTROLS, defaultTouchScale,
 } = await import('../../js/core/touch-layout.js');
 const { TouchControls } = await import('../../js/ui/touch-controls.js');
 const { TouchLayoutEditor } = await import('../../js/ui/touch-layout-editor.js');
@@ -301,22 +302,27 @@ test('a stored layout keeps every numbered attack button by its codename, in the
 
 // ---- Applying a layout ------------------------------------------------------------------
 
-test('with no custom layout nothing is moved or sized: the stylesheet\'s own layout, exactly', () => {
+test('with no custom layout nothing is moved, and every control is at its default scale: 130%, the moves stacked above Shield 100%', () => {
+  assert.deepEqual({ ...TOUCH_DEFAULT_SCALE }, { control: 1.3, stacked: 1 });
+  assert.deepEqual([...STACKED_CONTROLS], ['attack3', 'attack4', 'attack5'], 'every combat button but the Mash Combo pair and the extra attack');
   for (const scheme of MOBILE_CONTROLS) {
     const { tc } = touchControls(scheme);
     layOut(tc);
     tc.applyLayout();
     for (const [id, node] of tc.getControlElements()) {
+      const expected = STACKED_CONTROLS.includes(id) ? 1 : 1.3;
+      assert.equal(defaultTouchScale(id), expected, id);
       assert.equal(node.style.translate ?? '', '', `${scheme} ${id}: not moved`);
-      assert.equal(node.style.scale ?? '', '', `${scheme} ${id}: not sized`);
+      assert.equal(node.style.scale, String(expected), `${scheme} ${id}: at its default scale`);
       const place = tc.placements.get(id);
       assert.deepEqual(place.center, place.home, `${scheme} ${id}: where the stylesheet puts it`);
-      assert.equal(place.scale, 1);
+      assert.equal(place.scale, expected);
     }
+    // The stylesheet lays the clusters out at the same default scales.
+    assert.equal(tc.root.style.getPropertyValue?.('--tc-k') ?? tc.root.cssVars?.['--tc-k'] ?? '1.3', '1.3');
   }
-  // Nothing in the stylesheet's control geometry was touched for this.
   const css = stylesheet();
-  assert.match(css, /\.tc-jump \{ right: 0; bottom: 0; \}/);
+  assert.match(css, /\.tc-jump \{ right: var\(--tc-in\); bottom: var\(--tc-in\); \}/, 'Jump in the bottom-right corner');
   assert.match(css, /--tc-stick: calc\(var\(--tc\) \* 1\.92\);/);
   assert.match(css.match(/\n\.touch-controls \{([^}]*)\}/)[1], /padding: max\(var\(--safe-t\), 6px\) max\(var\(--safe-r\), 6px\) max\(var\(--safe-b\), 6px\) max\(var\(--safe-l\), 6px\);/,
     'the area is the safe area less a margin');
@@ -339,10 +345,12 @@ test('a custom layout moves and sizes each control by id, kept on screen, and a 
   assert.equal(jump.style.translate, '-4.0px -4.0px');
   assert.equal(jump.style.scale, '1.8');
   assert.deepEqual(tc.placements.get('jump').center, { x: 946, y: 446 });
-  // Moved without resizing: no scale written.
+  // Moved at an authored 100%: that scale, not the default's.
   const dashLeft = tc.mouvementButtons.get('mouvementLeft');
   assert.equal(dashLeft.style.translate, '-10.0px -250.0px');
-  assert.equal(dashLeft.style.scale ?? '', '');
+  assert.equal(dashLeft.style.scale, '1');
+  // A control the layout leaves out keeps its default scale.
+  assert.equal(tc.mouvementButtons.get('mouvementRight').style.scale, '1.3');
   // Everything else is left alone.
   for (const id of ['mouvementRight', 'extra_attack', 'shield', 'attack1', 'attack2']) {
     assert.equal(tc.controlElement(id).style.translate, '', id);
@@ -387,12 +395,12 @@ test('each scheme keeps its own layout, and switching schemes restores that sche
   layOut(tc, 'joystick');
   tc.applyLayout();
   assert.equal(jump.style.translate, '-450.0px -200.0px');
-  assert.equal(jump.style.scale ?? '', '');
+  assert.equal(jump.style.scale, '1');
   assert.equal(tc.padButtons.get('runLeft').style.translate, '', 'the other scheme\'s controls are off screen and unset');
   assert.deepEqual(tc.getLayout('classic'), { runLeft: { x: 0.5, y: 0.2, scale: 1 }, jump: { x: 0.2, y: 0.5, scale: 1.2 } });
 });
 
-test('Reset (the empty layout) returns every control to its original place and size', () => {
+test('Reset (the empty layout) returns every control to its original place and its default size', () => {
   for (const scheme of MOBILE_CONTROLS) {
     const { tc } = touchControls(scheme);
     layOut(tc);
@@ -402,7 +410,7 @@ test('Reset (the empty layout) returns every control to its original place and s
     tc.setLayout({});
     for (const [id, node] of tc.getControlElements()) {
       assert.equal(node.style.translate, '', `${scheme} ${id}`);
-      assert.equal(node.style.scale, '', `${scheme} ${id}`);
+      assert.equal(node.style.scale, String(defaultTouchScale(id)), `${scheme} ${id}`);
       assert.deepEqual(tc.placements.get(id).center, tc.placements.get(id).home);
     }
     assert.deepEqual(tc.getLayout(), {});
@@ -765,12 +773,12 @@ test('dragging a control moves it on screen and saves once, as fractions, when t
   assert.equal(jump.style.translate, '-450.0px -200.0px', 'the preview follows at once');
   assert.equal(storage.writes, writes, 'nothing saved mid-drag');
   jump.dispatch('pointermove', { pointerId: 7, clientX: 5000, clientY: -900 });
-  assert.deepEqual(editor.touch.placements.get('jump').center, { x: 970, y: 30 }, 'never past the screen\'s edge');
+  assert.deepEqual(editor.touch.placements.get('jump').center, { x: 961, y: 39 }, 'never past the screen\'s edge, at its default 130%');
   jump.dispatch('pointermove', { pointerId: 7, clientX: 500, clientY: 250 });
   jump.dispatch('pointerup', { pointerId: 7 });
   jump.dispatch('lostpointercapture', { pointerId: 7 });
   assert.equal(storage.writes, writes + 1, 'saved once, as the drag ends');
-  assert.deepEqual(saved(storage).touchLayouts.joystick, { jump: { x: 0.5, y: 0.5, scale: 1 } });
+  assert.deepEqual(saved(storage).touchLayouts.joystick, { jump: { x: 0.5, y: 0.5, scale: 1.3 } }, 'moved at its default size');
   assert.deepEqual(saved(storage).touchLayouts.classic, {}, 'the other scheme untouched');
   assert.equal(editor.root.classList.contains('is-dragging'), false);
   // A tap: selected, nothing saved.
@@ -786,7 +794,7 @@ test('dragging a control moves it on screen and saves once, as fractions, when t
   editor.stage.dispatch('pointerdown', { pointerId: 9, button: 0 });
   assert.equal(editor.selected, null);
   editor.close();
-  assert.deepEqual(app.settings.touchLayout('joystick'), { jump: { x: 0.5, y: 0.5, scale: 1 } });
+  assert.deepEqual(app.settings.touchLayout('joystick'), { jump: { x: 0.5, y: 0.5, scale: 1.3 } });
 });
 
 test('keyboard and gamepad: Enter / A moves a control with the arrows in small steps, Back stops, Back again closes', () => {
@@ -806,11 +814,11 @@ test('keyboard and gamepad: Enter / A moves a control with the arrows in small s
   app.nav.command('down', null); // D-pad
   const moved = editor.touch.placements.get('stick').center;
   assert.ok(Math.abs(moved.x - (home.x + TOUCH_NUDGE * 1000)) < 0.01, 'one small step right');
-  assert.ok(Math.abs(moved.y - Math.min(home.y + TOUCH_NUDGE * 500, 500 - 60)) < 0.01, 'one small step down (kept on screen)');
+  assert.ok(Math.abs(moved.y - Math.min(home.y + TOUCH_NUDGE * 500, 500 - 60 * 1.3)) < 0.01, 'one small step down (kept on screen at its 130%)');
   assert.equal(document.activeElement, stick, 'the arrows move the control, not the focus');
   const layout = saved(storage).touchLayouts.joystick.stick;
   assert.ok(layout.x > 0 && layout.x < 1 && layout.y > 0 && layout.y <= 1, 'saved as fractions');
-  assert.equal(layout.scale, 1);
+  assert.equal(layout.scale, 1.3, 'at its default size');
   // Back: stop moving, still in the editor.
   app.input.key('Escape');
   assert.equal(editor.moving, null);
@@ -839,12 +847,26 @@ test('size: Smaller / Larger and the slider resize the selected control within t
   runRight.dispatch('pointerdown', { pointerId: 1, button: 0, ...centre(runRight) });
   runRight.dispatch('pointerup', { pointerId: 1 });
   const home = { ...editor.touch.placements.get('runRight').center };
+  // Selected at its default size: 130%.
+  assert.equal(editor.sizeValue.textContent, '130%');
+  assert.equal(editor.slider.value, '130');
   editor.larger.click();
-  assert.equal(runRight.style.scale, '1.1');
-  assert.deepEqual(saved(storage).touchLayouts.classic.runRight.scale, 1.1);
-  assert.equal(editor.sizeValue.textContent, '110%');
-  assert.equal(editor.slider.getAttribute('aria-valuetext'), '110%');
-  assert.equal(editor.slider.value, '110');
+  assert.equal(runRight.style.scale, '1.4');
+  assert.deepEqual(saved(storage).touchLayouts.classic.runRight.scale, 1.4);
+  assert.equal(editor.sizeValue.textContent, '140%');
+  assert.equal(editor.slider.getAttribute('aria-valuetext'), '140%');
+  assert.equal(editor.slider.value, '140');
+  // Back to 130% exactly: a valid size with its own label.
+  editor.smaller.click();
+  assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 1.3);
+  assert.equal(editor.sizeValue.textContent, '130%');
+  // A stacked move starts at 100%.
+  const attack3 = editor.touch.actionButtons.get('attack3');
+  attack3.dispatch('pointerdown', { pointerId: 2, button: 0, ...centre(attack3) });
+  attack3.dispatch('pointerup', { pointerId: 2 });
+  assert.equal(editor.sizeValue.textContent, '100%');
+  runRight.dispatch('pointerdown', { pointerId: 3, button: 0, ...centre(runRight) });
+  runRight.dispatch('pointerup', { pointerId: 3 });
   assert.deepEqual(editor.touch.placements.get('runRight').center, home, 'grows round its centre');
   editor.slider.value = '150';
   editor.slider.dispatch('input');
@@ -876,7 +898,7 @@ test('Reset to defaults puts only this scheme back on Alva\'s own layout, saved'
   editor.resetButton.click();
   for (const [id, node] of editor.touch.getControlElements('classic')) {
     assert.equal(node.style.translate, '', id);
-    assert.equal(node.style.scale, '', id);
+    assert.equal(node.style.scale, String(defaultTouchScale(id)), `${id}: its new default size`);
   }
   assert.deepEqual(saved(storage).touchLayouts.classic, {});
   assert.deepEqual(saved(storage).touchLayouts.joystick, { jump: { x: 0.4, y: 0.4, scale: 1.3 } }, 'Joystick keeps its own');
@@ -1013,9 +1035,112 @@ test('Classic Mouvement controls move, resize, persist and reset independently w
   editor.resetButton.click();
   for (const id of ['runLeft', 'runRight', 'mouvementLeft', 'mouvementRight']) {
     assert.equal(editor.touch.controlElement(id).style.translate, '');
-    assert.equal(editor.touch.controlElement(id).style.scale, '');
+    assert.equal(editor.touch.controlElement(id).style.scale, '1.3', `${id}: back at the default 130%`);
   }
   assert.deepEqual(saved(storage).touchLayouts.classic, {});
   assert.deepEqual(saved(storage).touchLayouts.joystick, joystick);
   editor.close();
+});
+
+// ---- The stack above Shield ------------------------------------------------------------
+
+// Boxes that follow the stack's attributes, as the stylesheet places them:
+// column 0 over Shield at x 900, each column 100 px further left, each row
+// 70 px higher, the first row's top at y 230.
+function stackBoxes(tc) {
+  for (const action of ['attack3', 'attack4', 'attack5']) {
+    const b = tc.actionButtons.get(action);
+    Object.defineProperty(b, 'rect', {
+      configurable: true,
+      get() {
+        const col = Number(b.getAttribute('data-stack-col') ?? 0);
+        const row = Number(b.getAttribute('data-stack-row') ?? 0);
+        return { left: 900 - col * 100, top: 230 - row * 70, width: 60, height: 60, right: 960 - col * 100, bottom: 290 - row * 70 };
+      },
+    });
+  }
+}
+const stackOf = (tc) => Object.fromEntries(['attack3', 'attack4', 'attack5'].map((a) => {
+  const b = tc.actionButtons.get(a);
+  return [a, b.hidden ? null : [b.getAttribute('data-stack-col'), b.getAttribute('data-stack-row')]];
+}));
+
+test('the moves past Attack 1 and Attack 2 stack straight up from Shield with no gap, for every fighter from its own data', async () => {
+  const { playableCharacters } = await import('../../js/data/characters.js');
+  const counts = {};
+  for (const def of playableCharacters()) {
+    const { tc } = touchControls('classic', def);
+    layOut(tc);
+    stackBoxes(tc);
+    tc.applyLayout();
+    const shown = ['attack3', 'attack4', 'attack5'].filter((a) => !tc.actionButtons.get(a).hidden);
+    // In slot order, one row after another in column 0: nothing skipped.
+    assert.deepEqual(shown.map((a) => stackOf(tc)[a]), shown.map((_, i) => ['0', String(i)]), def.id);
+    for (const a of ['attack3', 'attack4', 'attack5'].filter((x) => !shown.includes(x))) {
+      assert.equal(tc.actionButtons.get(a).getAttribute('data-stack-col'), null, `${def.id} ${a}: absent, no place kept`);
+    }
+    // attack1 and attack2 keep their bottom-row slots, never stacked.
+    for (const a of ['attack1', 'attack2']) assert.equal(tc.actionButtons.get(a).getAttribute('data-stack-col'), null);
+    assert.equal(tc.stackOverflow, false);
+    counts[def.id] = shown.length;
+  }
+  // From each fighter's own buttons: #0002 one stacked move, #0003 two, #0001 three.
+  assert.equal(counts['0002'], 1);
+  assert.equal(counts['0003'], 2);
+  assert.equal(counts['0001'], 3);
+});
+
+test('the stack never rises past the top HUD: what would goes up the next column, above the extra attack, then above Attack 1', () => {
+  const { tc } = touchControls('classic', DEF_0001);
+  layOut(tc);
+  stackBoxes(tc);
+  // A HUD whose bottom is at y 170 over the whole width: one row fits (top
+  // 230), the second (160) does not.
+  tc.setCeiling(() => 170);
+  assert.deepEqual(stackOf(tc), { attack3: ['0', '0'], attack4: ['1', '0'], attack5: ['2', '0'] });
+  assert.equal(tc.stackOverflow, false);
+  // Room for two rows (tops 230 and 160, not 90): the third move starts column 1.
+  tc.setCeiling(() => 100);
+  assert.deepEqual(stackOf(tc), { attack3: ['0', '0'], attack4: ['0', '1'], attack5: ['1', '0'] });
+  // Room for all three: one column.
+  tc.setCeiling(() => 0);
+  assert.deepEqual(stackOf(tc), { attack3: ['0', '0'], attack4: ['0', '1'], attack5: ['0', '2'] });
+  // No room even for one: they still show, up the last column, and it says so.
+  tc.setCeiling(() => 400);
+  assert.deepEqual(stackOf(tc).attack3, ['2', '0']);
+  assert.equal(tc.stackOverflow, true);
+  // No ceiling: the touch area's own top.
+  tc.setCeiling(null);
+  assert.equal(tc.stackOverflow, false);
+  // The default scales hold wherever a move is stacked.
+  for (const a of ['attack3', 'attack4', 'attack5']) assert.equal(tc.actionButtons.get(a).style.scale, '1');
+  assert.equal(tc.actionButtons.get('shield').style.scale, '1.3');
+});
+
+test('hudCeiling reads the bottom of the HUD parts over a column only, live', async () => {
+  const { hudCeiling } = await import('../../js/ui/touch-controls.js');
+  const hud = new Element('div');
+  const part = (left, right, bottom) => {
+    const p = new Element('div');
+    p.rect = { left, right, top: 8, bottom, width: right - left, height: bottom - 8 };
+    hud.append(p);
+    return p;
+  };
+  const p1 = part(280, 410, 69);
+  part(427, 505, 82);
+  const p2 = part(520, 660, 69);
+  const ceiling = hudCeiling(hud);
+  assert.equal(ceiling(830, 900), -Infinity, 'nothing of the HUD over the right edge');
+  assert.equal(ceiling(600, 700), 69, 'under the second fighter\'s panel');
+  assert.equal(ceiling(400, 530), 82, 'the lowest part it spans');
+  p2.hidden = true;
+  assert.equal(ceiling(600, 700), -Infinity, 'a hidden part is no ceiling');
+  p1.rect = { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+  assert.equal(ceiling(0, 300), -Infinity, 'nor one with no size');
+});
+
+test('Battle and Practice Ground keep the stack under their own top HUD', () => {
+  for (const file of ['js/screens/battle-screen.js', 'js/screens/practice-screen.js']) {
+    assert.match(read(file), /this\.touch\.setCeiling\(hudCeiling\(this\.hudRoot\)\);/, file);
+  }
 });

@@ -1140,12 +1140,13 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
     screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
     for (const b of screen.touch.mouvementButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
   };
-  assert.equal(screen.touch.scheme, 'joystick');
+  assert.equal(screen.touch.scheme, 'classic', 'the default');
   tryEverything();
   assert.deepEqual(touches, []);
   screen.exit();
 
-  // Classic Buttons: just as absent.
+  // Classic Buttons, chosen: just as absent.
+  app.settings.set('mobileControls', 'joystick');
   app.settings.set('mobileControls', 'classic');
   app.screens.go('home', {}, { reset: true });
   await startWatch(booted, { mapId: MAPS[0].id });

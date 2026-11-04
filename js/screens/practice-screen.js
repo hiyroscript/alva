@@ -31,7 +31,7 @@ import { PRACTICE_MAP } from '../data/practice-map.js';
 import { PracticeSession } from '../game/practice.js';
 import { PracticeHUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
-import { TouchControls } from '../ui/touch-controls.js';
+import { TouchControls, hudCeiling } from '../ui/touch-controls.js';
 
 // Every fresh visit from Home starts with this fighter, and a practice CPU
 // of the same fighter, sharing its one loaded sprite set: the first
@@ -54,6 +54,8 @@ export class PracticeGroundScreen extends Screen {
     this.hud = new PracticeHUD(this.hudRoot, { onMore: () => this.toggleMenu() });
     this.touchRoot = el('div', { class: 'touch-controls' });
     this.touch = new TouchControls(this.touchRoot, app.input);
+    // The moves stacked above Shield never rise past the top HUD.
+    this.touch.setCeiling(hudCeiling(this.hudRoot));
     // The practice fighter's moves in the corner, for keyboard and
     // controller play.
     this.abilityRoot = el('div');

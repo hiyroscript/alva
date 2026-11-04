@@ -1466,10 +1466,10 @@ indicator. Each section keeps its existing settings, in this order:
   Practice Ground use (7.4), with exactly two choices shown as two cards,
   each with a small drawing of its lower-left corner and a line on what it
   gives:
-  - **Joystick** (marked "Default") — a circular joystick to move, the
+  - **Joystick** — a circular joystick to move, the
     single-tap **Left mouvement** / **Right mouvement** Dash buttons above
     it.
-  - **Classic Buttons** — Run Left and Run Right at the lower left, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above them.
+  - **Classic Buttons** (marked "Default") — Run Left, Down and Run Right in a row along the bottom-left edge, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above the Run arrows. A stored choice of either is kept; only a player who never chose gets Classic Buttons.
 
   The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
   described by its line); hover only previews. The one in use carries a green
@@ -1619,7 +1619,8 @@ existed places the Down button where the player put it.
 - **Select** a control (tap, click, or Enter / A on it): it wears a dashed
   green ring, and the compact glass toolbar across the top names it and
   enables **Smaller** (−), **Larger** (+) and a size slider, 70 % to 180 %
-  in 10 % steps, with the value beside them. The control grows or shrinks
+  in 10 % steps, with the value beside them (a control not yet resized
+  shows its default: 130 %, a move stacked above Shield 100 %). The control grows or shrinks
   round its centre, and its touch area with it. The size controls are
   disabled while nothing is selected.
 - **Keyboard / gamepad:** in the editor (only there) the controls are
@@ -1627,7 +1628,8 @@ existed places the Down button where the player put it.
   starts moving it (announced, a solid ring): the arrows or D-pad nudge it by
   2 % of the area per press until Enter / A, `Esc` / Back or focus leaving
   it ends the move. ← / → on the focused slider resize the selected control.
-- **Reset to defaults** puts this layout back exactly on Alva's own; **Done**,
+- **Reset to defaults** puts this layout back exactly on Alva's own, at the
+  default sizes; **Done**,
   or `Esc` / Back when nothing is being moved, returns to Settings with focus
   on Customize touch controls.
 - **Saving** is automatic and deterministic: each change is saved as it
@@ -4933,7 +4935,7 @@ Adding one is described in
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
   layouts chosen under Settings → Controls → Mobile Controls (6.10);
   `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
-  else is Joystick), and Quick Battle and Practice Ground apply the saved
+  else is Classic Buttons, the default), and Quick Battle and Practice Ground apply the saved
   one, and that layout's saved custom placement (`setLayout`, 6.10a), each
   time they are entered. A switch first lets go of everything held
   (every pointer, direction, Jump, Shield and the rest) and
@@ -4942,8 +4944,18 @@ Adding one is described in
     the layout names by the CSS `translate` property, from where the
     stylesheet puts it to its stored centre in the current touch-control
     area (kept whole inside it), and sizes it by `scale`, which grows its
-    hit area with it; controls the layout leaves out are untouched, so the
-    default layout is the stylesheet's own, pixel for pixel. Battle and
+    hit area with it; controls the layout leaves out stay where the
+    stylesheet puts them, at their default scale, so the default layout is
+    the stylesheet's own, pixel for pixel.
+  - **Default sizes.** Every touch control's default scale is 130 %
+    (`TOUCH_DEFAULT_SCALE.control`, 1.3, in `js/core/touch-layout.js`), the
+    same for every fighter, except the fighter's moves stacked above Shield
+    (`STACKED_CONTROLS`: every combat button but `attack1`, `attack2` and
+    `extra_attack`), which default to 100 % (`TOUCH_DEFAULT_SCALE.stacked`).
+    `applyLayout` writes each control's scale (its custom layout's, else its
+    default); the stylesheet reads the same two numbers (`--tc-k`,
+    `--tc-ks`, set by `TouchControls`) and lays every cluster out at the
+    scaled sizes, so at 130 % nothing overlaps or leaves the safe area. Battle and
     Practice Ground re-apply it after every resize, orientation or device
     change. Every control keeps its element, handlers and codename: held
     buttons, the one-tap Dash buttons, multi-touch and `setCharacter` work
@@ -4953,7 +4965,7 @@ Adding one is described in
     hit-tests Left / Right where they are drawn, so a thumb slides
     between them wherever they sit. In battle the controls are never
     keyboard-focusable (`tabindex="-1"`); only the editor's copy is.
-  - **Joystick** (the default): the lower-left corner holds one circular
+  - **Joystick**: the lower-left corner holds one circular
     joystick (a translucent round base with no marks on it and a movable
     knob, in the buttons' style; a group named "Movement joystick"). It
     captures one pointer and holds the existing `runLeft` or `runRight` input
@@ -4977,10 +4989,11 @@ Adding one is described in
     platform, the drop through it, 7.2.2). The lower-left cluster starts
     that much further in (`--tc-down-room`) to make room for it. No other
     hit region exists.
-  - **Classic Buttons**: lower-left Run Left · Run Right with thumb sliding,
-    with two smaller Mouvement buttons directly above them and the same
-    small Down button to the left of Run Left, level with the Run arrows'
-    middle; the Run container never captures Down's pointer. Shared elements,
+  - **Classic Buttons** (the default): one row along the bottom-left edge,
+    Run Left, **Down** and Run Right, all three the size of every button,
+    with thumb sliding between the Run arrows, and two smaller Mouvement
+    buttons directly above the Run arrows, centred on them; the Run
+    container never captures Down's pointer. Shared elements,
     icons and one-shot handlers serve both schemes. Mouvement pointer events
     never enter the Run container's sliding/capture path; holding Run while
     tapping Mouvement or actions remains independent multi-touch input.
@@ -4997,30 +5010,47 @@ Adding one is described in
   Settings previews show the four Classic controls, with smaller Mouvement
   buttons above Run. English and French descriptions explain dedicated inputs.
 
-  Both layouts share the lower-right staggered cluster, in the same place
-  in both. For example, for #0001 (five numbered buttons) it is —
+  Both layouts share the lower-right cluster, in the same place in both,
+  along the bottom-right edges: the bottom row is `attack1`, `attack2` (the
+  Mash Combo's two strikes, 7.2.4c) and Jump in the far bottom-right
+  corner; Shield sits directly above Jump and the extra attack directly
+  left of Shield (above `attack2`; its place stays empty for a fighter
+  with none); and every other move the fighter has is stacked one above
+  another going up from Shield, at 100 %. For example, for #0001 on a
+  tablet —
 
   ```
-             [VOID]  [PURPLE]  [HIGH KICK]
-                 [MAX BLUE]  [SHIELD]
-               [JAB]  [RED]  [JUMP]
+                          [PURPLE]
+                          [VOID]
+                          [MAX BLUE]
+                 [HIGH KICK] [SHIELD]
+          [JAB]  [RED]       [JUMP]
   ```
 
   The numbered attack buttons (`attack1` to `attack5`, `.tc-attack`) take
   numbered slots (`data-slot`, set by `setCharacter` through
   `attackSlots`): `attack1` is always slot 1 and `attack2` slot 2 (the
-  bottom row, where attack1 and attack2 have always been), and the fighter's
-  other numbered buttons fill slots 3, 4 and 5 in order: a honeycomb round
-  Shield of three rows (three buttons, two, three), one pitch between
-  neighbours, slot 3 beside Shield in the middle row. No button overlaps
-  another, no place in it is kept empty for anything but a numbered attack
-  the fighter lacks, and the cluster is the same size whatever the fighter
-  shows:
+  bottom row), and the fighter's other numbered buttons fill slots 3, 4 and
+  5 in order, which is their order up the stack. A button the fighter does
+  not have shows nothing and leaves no gap; a reserved one still shows
+  dashed. The stack never rises past the top HUD: `applyLayout` places
+  each stacked button (`data-stack-col`, `data-stack-row`, drawn by the
+  stylesheet) in column 0 above Shield while its top stays at or below the
+  ceiling the screen gives (`setCeiling(hudCeiling(hudRoot))`: the lowest
+  bottom edge of the HUD parts over that column, else the top of the touch
+  area), then up column 1 above the extra attack's place, then column 2
+  above `attack1`. Nothing is shrunk to make room. On a phone in landscape
+  (932 × 430, 844 × 390, 667 × 375) the column above Shield holds two, so a
+  fighter with three stacked moves (every fighter but #0002 and #0003) has
+  its third above the extra attack; on a tablet or a desktop window all
+  three stand above Shield:
 
   ```
-             [4]  [5]  [EXTRA]
-               [3]  [SHIELD]
-             [1]  [2]  [JUMP]
+                   [5]
+                   [4]          phone:        [5] [4]
+                   [3]                            [3]
+           [EXTRA] [SHIELD]               [EXTRA] [SHIELD]
+     [1]   [2]     [JUMP]           [1]   [2]     [JUMP]
   ```
 
   So N numbered buttons use slots 1 to N, whatever kind of move each one

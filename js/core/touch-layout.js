@@ -12,10 +12,11 @@
 // .touch-controls in css/touch-controls.css), so a layout made on one landscape screen
 // fits another. `scale` multiplies the control's own size, and its hit area
 // with it. A control a layout leaves out stays exactly where the stylesheet
-// puts it, at its own size: the empty layout is Alva's original one.
+// puts it, at its default scale (defaultTouchScale): the empty layout is
+// Alva's own one.
 
 import { clamp } from './utils.js';
-import { NUMBERED_ATTACKS } from '../config.js';
+import { COMBAT_BUTTONS, NUMBERED_ATTACKS } from '../config.js';
 
 // Every control each scheme shows, in reading order: the lower-left cluster
 // first (Down at its far left), then the lower-right actions, all five
@@ -41,6 +42,32 @@ export const TOUCH_CONTROL_IDS = Object.freeze({
 // Dash button on the smallest screen) above a 22 px target; 1.8 nearly
 // doubles the largest without covering the screen.
 export const TOUCH_SCALE = Object.freeze({ min: 0.7, max: 1.8, step: 0.1 });
+
+// The fighter's combat buttons stacked above Shield in the default layout:
+// every combat button but the two Mash Combo strikes (attack1 and attack2,
+// the bottom row beside Jump) and extra_attack (left of Shield), in button
+// order. From the data, never from a fighter: a fighter shows the ones it
+// has (see TouchControls.setCharacter).
+export const STACKED_CONTROLS = Object.freeze(
+  COMBAT_BUTTONS.filter((id) => !['attack1', 'attack2', 'extra_attack'].includes(id)),
+);
+
+// The default scale of every control (the one tuning point of the default
+// sizes, the same for every fighter): 1.3 for every control, and 1 for the
+// moves stacked above Shield, which are many and need the room. A custom
+// layout's own scale replaces it; Reset to defaults comes back to it.
+export const TOUCH_DEFAULT_SCALE = Object.freeze({ control: 1.3, stacked: 1 });
+
+// Control `id`'s default scale (see TOUCH_DEFAULT_SCALE).
+export function defaultTouchScale(id) {
+  return STACKED_CONTROLS.includes(id) ? TOUCH_DEFAULT_SCALE.stacked : TOUCH_DEFAULT_SCALE.control;
+}
+
+// Where control `id` stands at scale `scale` from `layout` (the scheme's
+// custom one): its own entry's scale, else its default.
+export function touchScaleOf(layout, id) {
+  return layout?.[id]?.scale ?? defaultTouchScale(id);
+}
 
 // How far one keyboard or gamepad nudge moves a control, as a fraction of
 // the area's width (across) or height (up and down).

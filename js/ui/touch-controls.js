@@ -1,10 +1,11 @@
 // Multi-touch landscape controls using the existing Pointer Events input.
-// Joystick: horizontal stick with Left movement / Right movement Dash
-// buttons with double arrows above it. Classic: the same buttons above
-// single Left / Right Run arrows, with sliding pointer capture. Both have
-// a small Down button at the far left of that cluster, level with the
-// stick's (or the Run arrows') middle: held, it is Down (the fast fall in
-// the air; pressed on a one-way platform, a drop through it).
+// Classic (the default): one row along the bottom-left edge, Run left,
+// Down and Run right, with sliding pointer capture between the Run arrows,
+// and the small Left movement / Right movement Dash buttons (double
+// arrows) just above the Run arrows. Joystick: a horizontal stick with
+// the same Dash buttons above it and a small Down button at its far left,
+// level with its middle. Down held is Down (the fast fall in the air;
+// pressed on a one-way platform, a drop through it).
 // Both share the same action buttons. Jump always uses the upward arrow;
 // Defence its shield glyph, named Deflect while the fighter is in the
 // air (where the same button is its Deflect, for one that has one);
@@ -12,20 +13,36 @@
 // move names. Ground-only abilities stay visible but marked unavailable in
 // the air. Presentation never changes the input codename or pointer owner.
 //
-// Numbered attack slots, a honeycomb round Shield, filled in order by the
-// numbered attacks the fighter has (every one a button of its own, see
-// js/data/loadout.js): attack1 always in slot 1 and attack2 in slot 2 (the
-// lower row), then its other buttons in slots 3, 4 and 5:
+// The lower-right cluster sits along the bottom-right edges: the bottom row
+// is attack1 and attack2 (the Mash Combo's two strikes, js/data/mash-combo.js)
+// and Jump in the corner; Shield above Jump, the extra attack left of it
+// (its place left empty for a fighter with none); and the fighter's other
+// numbered buttons (STACKED_CONTROLS, js/core/touch-layout.js) stacked one
+// above another going up from Shield, at their own smaller default scale,
+// with no gap for a button the fighter does not have:
 //
-//                  [4]  [5]  [EXTRA]
-//                    [3]  [SHIELD]
-//                  [1]  [2]  [JUMP]
+//                           [5]
+//                           [4]
+//                           [3]
+//                  [EXTRA]  [SHIELD]
+//            [1]   [2]      [JUMP]
+//
+// The numbered buttons on show take slots (attackSlots): attack1 always in
+// slot 1 and attack2 in slot 2, then the others in slots 3, 4 and 5, which
+// is their order in the stack. The stack never rises past the top HUD
+// (setCeiling): what would is placed in the next column, above the extra
+// attack's place, then above attack1 (see placeStack).
 //
 //   2 attacks   slots 1 2
 //   3 attacks   slots 1 2 3 (attack3 in 3; #0002)
 //   4 attacks   slots 1 2 3 4
 //   5 attacks   slots 1 2 3 4 5 (#0001: its two techniques, Unlimited
 //               Void and Hollow Purple, in 4 and 5)
+//
+// Every control's default size is its default scale (TOUCH_DEFAULT_SCALE:
+// 1.3, the stacked moves 1), written as its `scale` by applyLayout like a
+// custom layout's; the stylesheet lays the clusters out at those scaled
+// sizes.
 //
 // Whatever kind of move a numbered button is (an ordinary attack, a summon,
 // a technique), it is pressed the same way. Only the art and accessible
@@ -42,8 +59,9 @@
 // resizes any of its controls by stable control id. A control keeps its own
 // element, handlers and codename wherever it sits; applyLayout only shifts
 // it (the CSS `translate` property, from where the stylesheet puts it) and
-// sizes it (`scale`, which grows its hit area with it), so the default
-// layout is the stylesheet's own, untouched, and holding, sliding and
+// sizes it (`scale`, which grows its hit area with it, in place of its
+// default scale), so the default layout is the stylesheet's own at the
+// default scales, and holding, sliding and
 // multi-touch work exactly as before. Classic Buttons' Left / Right
 // still slide into one another wherever they are: their cluster captures the
 // pointer and hit-tests the buttons where they are drawn.
@@ -70,7 +88,7 @@ import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import { abilityGroups, abilityStatus } from '../game/combat/move-status.js';
 import { formatCooldown } from '../game/rendering/fighter-status.js';
 import {
-  TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,
+  TOUCH_CONTROL_IDS, TOUCH_DEFAULT_SCALE, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl, touchScaleOf,
 } from '../core/touch-layout.js';
 
 // Classic Buttons' lower-left cluster, in on-screen order. `label` is the
@@ -94,6 +112,25 @@ const ACTION_BUTTONS = [
   ...NUMBERED_ATTACKS.map((action) => ({ action, pos: action, attack: true, ability: true })),
   { action: 'jump', label: 'control.jump', icon: ICONS.jump, pos: 'jump' },
 ];
+
+// How many columns the stack above Shield may use (see placeStack).
+const STACK_COLUMNS = 3;
+
+// A top-HUD ceiling for setCeiling: the lowest bottom edge of the HUD's
+// parts (the children of `hud`) that span any of [left, right], or -Infinity
+// where none does. Read live, so a HUD that changes size is followed.
+export function hudCeiling(hud) {
+  return (left, right) => {
+    let y = -Infinity;
+    for (const part of hud?.children ?? []) {
+      if (part.hidden) continue;
+      const r = part.getBoundingClientRect?.();
+      if (!r || !(r.width > 0 && r.height > 0)) continue;
+      if (r.right > left && r.left < right) y = Math.max(y, r.bottom);
+    }
+    return y;
+  };
+}
 
 // The slot of each numbered attack button a fighter shows (see above):
 // attack1 and attack2 keep slots 1 and 2 whatever else is shown (a hidden
@@ -183,6 +220,13 @@ export class TouchControls {
     this.area = null;
     // Sprite files that failed to load: their buttons show glyphs instead.
     this.failedArt = new Set();
+    // How high the stack above Shield may rise (setCeiling), and whether
+    // the last placement had to go past it.
+    this.ceiling = null;
+    this.stackOverflow = false;
+    // The default scales, for the stylesheet's geometry.
+    root.style?.setProperty?.('--tc-k', String(TOUCH_DEFAULT_SCALE.control));
+    root.style?.setProperty?.('--tc-ks', String(TOUCH_DEFAULT_SCALE.stacked));
     this.build();
     this.setScheme(scheme);
   }
@@ -304,7 +348,7 @@ export class TouchControls {
   }
 
   // Shows the 'joystick' or 'classic' layout (anything else is the
-  // default, Joystick), with that scheme's own custom layout. Everything held
+  // default, Classic Buttons), with that scheme's own custom layout. Everything held
   // is let go first, so a switch never leaves a direction or any other
   // button down. The fighter's own art and names are untouched: the
   // combat buttons and Jump are the same elements in both.
@@ -377,13 +421,23 @@ export class TouchControls {
     } : {});
   }
 
+  // How high the stack above Shield may rise: `ceiling(left, right)` is the
+  // lowest screen y a stacked button spanning [left, right] may reach (its
+  // top edge), such as hudCeiling(the screen's HUD); null for the touch
+  // area's own top. Applied at once.
+  setCeiling(ceiling) {
+    this.ceiling = typeof ceiling === 'function' ? ceiling : null;
+    this.applyLayout();
+  }
+
   // Puts every control of the scheme on show where its layout says, kept
   // whole inside the area, at its size. Controls the layout leaves out stay
-  // exactly where the stylesheet puts them. Called on every scheme or
-  // layout change, and by the screens after a resize or orientation change;
-  // while the controls are hidden there is nothing to measure, so it tries
-  // again next time. Records each control's place (placements): its
-  // stylesheet centre (home), its centre now, unscaled size and scale.
+  // exactly where the stylesheet puts them, at their default scale. Called
+  // on every scheme or layout change, and by the screens after a resize or
+  // orientation change; while the controls are hidden there is nothing to
+  // measure, so it tries again next time. Records each control's place
+  // (placements): its stylesheet centre (home), its centre now, unscaled
+  // size and scale.
   applyLayout() {
     const layout = this.layouts[this.scheme] ?? {};
     const controls = [...this.getControlElements()];
@@ -395,13 +449,19 @@ export class TouchControls {
         node.style.scale = '';
       }
     }
+    // At its default scale first, so the stack and every home are measured
+    // as the default layout draws them.
+    for (const [id, node] of controls) node.style.scale = String(touchScaleOf(null, id));
     this.placements = new Map();
     const area = this.measureArea();
     this.area = area;
     if (!(area.width > 0 && area.height > 0)) return false;
+    this.placeStack(area);
     // Measure everything first, then move: one layout pass.
     const measured = controls.map(([id, node]) => {
       const r = node.getBoundingClientRect();
+      // Its own unscaled box (offsetWidth ignores `scale`); the drawn box
+      // centre is its home either way.
       return {
         id, node,
         home: { x: r.left + r.width / 2, y: r.top + r.height / 2 },
@@ -411,14 +471,54 @@ export class TouchControls {
     for (const { id, node, home, size } of measured) {
       const entry = layout[id];
       const center = entry ? placeControl(area, entry, size) : home;
-      const scale = entry ? entry.scale : 1;
-      if (entry) {
-        node.style.translate = `${(center.x - home.x).toFixed(1)}px ${(center.y - home.y).toFixed(1)}px`;
-        if (scale !== 1) node.style.scale = String(scale);
-      }
+      const scale = touchScaleOf(layout, id);
+      if (entry) node.style.translate = `${(center.x - home.x).toFixed(1)}px ${(center.y - home.y).toFixed(1)}px`;
+      node.style.scale = String(scale);
       this.placements.set(id, { home, center, size, scale });
     }
     return true;
+  }
+
+  // Gives each numbered button on show past slot 2 its place in the stack
+  // above Shield (data-stack-col, data-stack-row; drawn by the stylesheet):
+  // in slot order, one above another in column 0 as long as its top stays
+  // at or below the ceiling (setCeiling; the area's top by default), then
+  // on up column 1, then column 2. Whatever still cannot fit goes on up the
+  // last column, and `stackOverflow` says so. Buttons it does not hold have
+  // no place.
+  placeStack(area) {
+    const stacked = [];
+    for (const action of NUMBERED_ATTACKS) {
+      const b = this.actionButtons.get(action);
+      const slot = Number(b.getAttribute('data-slot'));
+      const place = !b.hidden && slot > 2;
+      if (place) stacked.push([slot, b]);
+      else {
+        b.removeAttribute('data-stack-col');
+        b.removeAttribute('data-stack-row');
+      }
+    }
+    stacked.sort((a, b) => a[0] - b[0]);
+    const limit = (r) => Math.max(area.top, this.ceiling?.(r.left, r.right) ?? -Infinity);
+    let col = 0;
+    let row = 0;
+    let over = false;
+    for (const [, b] of stacked) {
+      for (;;) {
+        b.setAttribute('data-stack-col', String(col));
+        b.setAttribute('data-stack-row', String(row));
+        const r = b.getBoundingClientRect();
+        if (r.top >= limit(r) - 0.5) break;
+        if (col === STACK_COLUMNS - 1) {
+          over = true;
+          break;
+        }
+        col += 1;
+        row = 0;
+      }
+      row += 1;
+    }
+    this.stackOverflow = over;
   }
 
   hitDpad(x, y) {

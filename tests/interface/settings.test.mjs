@@ -266,16 +266,16 @@ const checked = (options) => options.map((o) => o.getAttribute('aria-checked'));
 
 // ---- The settings store ---------------------------------------------------------
 
-test('schema 9: language (unchosen), Mobile Controls (Joystick), an empty custom layout per scheme, Automatic turn-around on, no controller profile and no online name by default', () => {
+test('schema 9: language (unchosen), Mobile Controls (Classic Buttons), an empty custom layout per scheme, Automatic turn-around on, no controller profile and no online name by default', () => {
   assert.equal(SETTINGS_KEY, 'alva.settings');
   assert.equal(SETTINGS_VERSION, 9);
   assert.equal(DEFAULT_AUTOMATIC_TURN_AROUND, true);
   assert.deepEqual([...LANGUAGES], ['en', 'fr']);
   assert.equal(DEFAULT_LANGUAGE, 'en');
   assert.deepEqual([...MOBILE_CONTROLS], ['joystick', 'classic']);
-  assert.equal(DEFAULT_MOBILE_CONTROLS, 'joystick');
+  assert.equal(DEFAULT_MOBILE_CONTROLS, 'classic');
   assert.deepEqual(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), {
-    language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
+    language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
     controllerProfiles: {}, onlineName: null,
   });
   assert.ok(Object.isFrozen(DEFAULT_SETTINGS) && Object.isFrozen(DEFAULT_SETTINGS.touchLayouts));
@@ -285,7 +285,7 @@ test('schema 9: language (unchosen), Mobile Controls (Joystick), an empty custom
   assert.equal(settings.languageChosen, false, 'a fresh device has no language choice yet');
   assert.equal(settings.language, 'en', 'English is used meanwhile, but it is not a choice');
   assert.equal(settings.get('language'), null);
-  assert.equal(settings.mobileControls, 'joystick');
+  assert.equal(settings.mobileControls, 'classic');
   assert.deepEqual(settings.touchLayout('joystick'), {});
   assert.deepEqual(settings.touchLayout('classic'), {});
   assert.equal(settings.automaticTurnAround, true, 'Automatic turn-around is on for a new player');
@@ -305,7 +305,7 @@ test('choosing English or French is saved as a real choice; a reload keeps it', 
     assert.equal(settings.language, language);
     assert.deepEqual(heard, [['language', language]]);
     assert.deepEqual(stored(storage), {
-      version: 9, language, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null,
+      version: 9, language, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null,
     });
     assert.deepEqual([...storage.map.keys()], [SETTINGS_KEY], 'one key, nothing scattered');
     const again = new Settings(storage);
@@ -324,20 +324,20 @@ test('a Mobile Controls choice is saved in the same object and read back', () =>
   const settings = new Settings(storage);
   const heard = [];
   const off = settings.onChange((name, value) => heard.push([name, value]));
-  assert.equal(settings.set('mobileControls', 'classic'), true);
-  assert.equal(settings.mobileControls, 'classic');
-  assert.equal(stored(storage).mobileControls, 'classic');
-  assert.deepEqual(heard, [['mobileControls', 'classic']]);
+  assert.equal(settings.set('mobileControls', 'joystick'), true);
+  assert.equal(settings.mobileControls, 'joystick');
+  assert.equal(stored(storage).mobileControls, 'joystick');
+  assert.deepEqual(heard, [['mobileControls', 'joystick']]);
   // Setting the same value again is no change: nothing written or announced.
   const writes = storage.writes;
-  settings.set('mobileControls', 'classic');
+  settings.set('mobileControls', 'joystick');
   assert.equal(storage.writes, writes);
   assert.equal(heard.length, 1);
   off();
-  settings.mobileControls = 'joystick';
+  settings.mobileControls = 'classic';
   assert.equal(heard.length, 1, 'unsubscribed');
-  settings.set('mobileControls', 'classic');
-  assert.equal(new Settings(storage).mobileControls, 'classic');
+  settings.set('mobileControls', 'joystick');
+  assert.equal(new Settings(storage).mobileControls, 'joystick');
 });
 
 test('version 1 settings migrate: the Joystick / Classic choice survives, the language is still to be chosen', () => {
@@ -359,45 +359,45 @@ test('version 1 settings migrate: the Joystick / Classic choice survives, the la
   // A version 1 object never had a language, layouts or anything else: any
   // found are ignored.
   assert.deepEqual(readSettings({
-    version: 1, mobileControls: 'classic', language: 'fr', touchLayouts: { classic: { jump: { x: 0.5, y: 0.5, scale: 1 } } },
+    version: 1, mobileControls: 'joystick', language: 'fr', touchLayouts: { classic: { jump: { x: 0.5, y: 0.5, scale: 1 } } },
     combatAssist: false, automaticTurnAround: false,
-  }), { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null });
+  }), { language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null });
   // And its own value is still checked.
-  assert.equal(readSettings({ version: 1, mobileControls: 'dpad' }).mobileControls, 'joystick');
+  assert.equal(readSettings({ version: 1, mobileControls: 'dpad' }).mobileControls, 'classic');
 });
 
 test('versions 2 and 3 migrate: language, Mobile Controls and both custom layouts survive; Combat Assist is dropped and Automatic turn-around on', () => {
   const joystick = { jump: { x: 0.8, y: 0.7, scale: 1.2 } };
   const classic = { shield: { x: 0.6, y: 0.75, scale: 0.9 } };
   for (const [version, extra] of [[2, {}], [3, { combatAssist: true }], [3, { combatAssist: false }]]) {
-    const old = { version, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick, classic }, ...extra };
+    const old = { version, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic }, ...extra };
     const storage = memoryStorage({ [SETTINGS_KEY]: JSON.stringify(old) });
     const settings = new Settings(storage);
     const why = `version ${version} ${JSON.stringify(extra)}`;
     assert.equal(settings.language, 'fr', why);
     assert.equal(settings.languageChosen, true, 'a chosen language stays chosen: no chooser after the update');
-    assert.equal(settings.mobileControls, 'classic');
+    assert.equal(settings.mobileControls, 'joystick');
     assert.deepEqual(settings.touchLayout('joystick'), joystick);
     assert.deepEqual(settings.touchLayout('classic'), classic);
     assert.equal(settings.automaticTurnAround, true, why);
     assert.equal(storage.writes, 0, 'nothing written just by reading');
     // The next save writes schema 9 with all of it, and nothing of the old
     // assist.
-    settings.set('mobileControls', 'joystick');
+    settings.set('mobileControls', 'classic');
     assert.deepEqual(stored(storage), {
-      version: 9, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic }, automaticTurnAround: true,
+      version: 9, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick, classic }, automaticTurnAround: true,
       controllerProfiles: {}, onlineName: null,
     }, why);
   }
   // An unchosen language stays unchosen, and whatever an older object holds
   // under the new name, it is on.
   for (const odd of [false, 'off', 0, null]) {
-    assert.deepEqual(readSettings({ version: 2, language: null, mobileControls: 'joystick', automaticTurnAround: odd }),
-      { language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null }, String(odd));
+    assert.deepEqual(readSettings({ version: 2, language: null, mobileControls: 'classic', automaticTurnAround: odd }),
+      { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null }, String(odd));
   }
   // Its own values are still checked, each on its own.
-  assert.deepEqual(readSettings({ version: 2, language: 'de', mobileControls: 'classic', touchLayouts: 'big' }),
-    { language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null });
+  assert.deepEqual(readSettings({ version: 2, language: 'de', mobileControls: 'joystick', touchLayouts: 'big' }),
+    { language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true, controllerProfiles: {}, onlineName: null });
 });
 
 test('Automatic turn-around is a real boolean: saved, announced and read back; anything else is refused or falls back to on', () => {
@@ -410,7 +410,7 @@ test('Automatic turn-around is a real boolean: saved, announced and read back; a
   assert.equal(settings.automaticTurnAround, false);
   assert.deepEqual(heard, [['automaticTurnAround', false]]);
   assert.deepEqual(stored(storage), {
-    version: 9, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: false,
+    version: 9, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: false,
     controllerProfiles: {}, onlineName: null,
   });
   assert.equal(new Settings(storage).automaticTurnAround, false, 'off survives a reload');
@@ -432,11 +432,11 @@ test('Automatic turn-around is a real boolean: saved, announced and read back; a
   // to on, its neighbours kept.
   for (const bad of [undefined, 'false', 0, null, 'off', {}]) {
     const loaded = new Settings(memoryStorage({
-      [SETTINGS_KEY]: JSON.stringify({ version: 8, language: 'fr', mobileControls: 'classic', automaticTurnAround: bad }),
+      [SETTINGS_KEY]: JSON.stringify({ version: 8, language: 'fr', mobileControls: 'joystick', automaticTurnAround: bad }),
     }));
     assert.equal(loaded.automaticTurnAround, true, JSON.stringify(bad));
     assert.equal(loaded.language, 'fr');
-    assert.equal(loaded.mobileControls, 'classic');
+    assert.equal(loaded.mobileControls, 'joystick');
   }
   for (const value of [true, false]) {
     assert.equal(readSettings({ version: 8, automaticTurnAround: value }).automaticTurnAround, value, String(value));
@@ -452,20 +452,20 @@ test('version 4 settings migrate: language, Mobile Controls, both custom layouts
   const joystick = { jump: { x: 0.8, y: 0.7, scale: 1.2 } };
   const profile = { jump: { button: 'l2', modifier: null, direction: null, activation: 'continuous' } };
   const v4 = {
-    version: 4, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick, classic: {} }, combatAssist: false,
+    version: 4, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, combatAssist: false,
     controllerProfiles: { '0002': profile },
   };
   const storage = memoryStorage({ [SETTINGS_KEY]: JSON.stringify(v4) });
   const settings = new Settings(storage);
   assert.equal(settings.language, 'fr');
-  assert.equal(settings.mobileControls, 'classic');
+  assert.equal(settings.mobileControls, 'joystick');
   assert.deepEqual(settings.touchLayout('joystick'), joystick);
   assert.deepEqual(settings.controllerProfile('0002'), { jump: { ...profile.jump, stick: null } }, 'a customized fighter keeps its layout');
   assert.equal(settings.automaticTurnAround, true, 'Automatic turn-around on after the update');
   assert.equal(storage.writes, 0, 'nothing written just by reading');
-  settings.set('mobileControls', 'joystick');
+  settings.set('mobileControls', 'classic');
   assert.deepEqual(stored(storage), {
-    version: 9, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
+    version: 9, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
     controllerProfiles: { '0002': { jump: { ...profile.jump, stick: null } } }, onlineName: null,
   });
 });
@@ -478,7 +478,7 @@ test('version 5 settings migrate: every setting survives; each saved controller 
   // exactly as it shipped then; #0004 moved to the D-pad.
   const then = (def) => ({ ...LEGACY_UNIVERSAL_DEFAULTS, ...def.controller.previous });
   const v5 = {
-    version: 5, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, combatAssist: false, comboAssist: false,
+    version: 5, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, combatAssist: false, comboAssist: false,
     controllerProfiles: {
       '0001': { ...then(one), pause: { button: 'select', modifier: null, direction: null, activation: 'press' } },
       '0002': then(getCharacter('0002')),
@@ -499,7 +499,7 @@ test('version 5 settings migrate: every setting survives; each saved controller 
   assert.deepEqual(four['air:attack3'], { button: 'west', modifier: null, stick: 'dpad', direction: 'down', activation: 'press' },
     '#0004: its old Down + Square, read on the D-pad as it was');
   assert.equal(storage.writes, 0, 'nothing written just by reading');
-  settings.set('mobileControls', 'joystick');
+  settings.set('mobileControls', 'classic');
   assert.equal(stored(storage).version, 9);
   assert.deepEqual(Object.keys(stored(storage)).sort(),
     ['automaticTurnAround', 'controllerProfiles', 'language', 'mobileControls', 'onlineName', 'touchLayouts', 'version'], 'no old assist written back');
@@ -513,7 +513,7 @@ test('versions 6 and 7 migrate: everything survives; whatever Combat Assist and 
     for (const combatAssist of [true, false]) {
       for (const comboAssist of [true, false]) {
         const old = {
-          version, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick, classic: {} }, combatAssist, comboAssist,
+          version, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, combatAssist, comboAssist,
           controllerProfiles: { '0002': profile },
         };
         const why = JSON.stringify({ version, combatAssist, comboAssist });
@@ -521,13 +521,13 @@ test('versions 6 and 7 migrate: everything survives; whatever Combat Assist and 
         const settings = new Settings(storage);
         assert.equal(settings.automaticTurnAround, true, why);
         assert.equal(settings.language, 'fr');
-        assert.equal(settings.mobileControls, 'classic');
+        assert.equal(settings.mobileControls, 'joystick');
         assert.deepEqual(settings.touchLayout('joystick'), joystick);
         assert.deepEqual(settings.controllerProfile('0002'), profile, `${why}: the controller layout as it was`);
         assert.equal(storage.writes, 0, 'nothing written just by reading');
-        settings.set('mobileControls', 'joystick');
+        settings.set('mobileControls', 'classic');
         assert.deepEqual(stored(storage), {
-          version: 9, language: 'fr', mobileControls: 'joystick', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
+          version: 9, language: 'fr', mobileControls: 'classic', touchLayouts: { joystick, classic: {} }, automaticTurnAround: true,
           controllerProfiles: { '0002': profile }, onlineName: null,
         }, `${why}: written back as version 8, the choice in it, no old assist`);
         // From then on the player's own choice is theirs.
@@ -557,7 +557,7 @@ test('unknown values are refused and never stored', () => {
   assert.equal(settings.set('volume', 3), false, 'no such setting');
   assert.equal(settings.set('touchLayouts', {}), false, 'layouts have their own setter');
   assert.equal(settings.setTouchLayout('dpad', {}), false, 'no such scheme');
-  assert.equal(settings.mobileControls, 'joystick');
+  assert.equal(settings.mobileControls, 'classic');
   assert.equal(settings.languageChosen, false);
   assert.equal(storage.writes, 0);
 });
@@ -565,7 +565,7 @@ test('unknown values are refused and never stored', () => {
 test('missing, corrupt, foreign or invalid stored settings fall back safely, value by value', () => {
   const load = (raw) => new Settings(memoryStorage(raw === undefined ? {} : { [SETTINGS_KEY]: raw }));
   const defaults = (settings, why) => {
-    assert.equal(settings.mobileControls, 'joystick', why);
+    assert.equal(settings.mobileControls, 'classic', why);
     assert.equal(settings.languageChosen, false, why);
     assert.deepEqual(settings.touchLayout('joystick'), {}, why);
     assert.equal(settings.automaticTurnAround, true, why);
@@ -575,33 +575,33 @@ test('missing, corrupt, foreign or invalid stored settings fall back safely, val
   defaults(load('null'), 'null');
   defaults(load('"classic"'), 'not an object');
   defaults(load('[]'), 'an array');
-  defaults(load(JSON.stringify({ mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'no version');
-  defaults(load(JSON.stringify({ version: 10, mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'a future version');
-  defaults(load(JSON.stringify({ version: 0, mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'no such version');
-  defaults(load(JSON.stringify({ version: '8', mobileControls: 'classic', language: 'fr', automaticTurnAround: false })), 'a version that is not a number');
-  defaults(load(JSON.stringify({ version: 7.5, mobileControls: 'classic', language: 'fr' })), 'a version that is not a whole number');
+  defaults(load(JSON.stringify({ mobileControls: 'joystick', language: 'fr', automaticTurnAround: false })), 'no version');
+  defaults(load(JSON.stringify({ version: 10, mobileControls: 'joystick', language: 'fr', automaticTurnAround: false })), 'a future version');
+  defaults(load(JSON.stringify({ version: 0, mobileControls: 'joystick', language: 'fr', automaticTurnAround: false })), 'no such version');
+  defaults(load(JSON.stringify({ version: '8', mobileControls: 'joystick', language: 'fr', automaticTurnAround: false })), 'a version that is not a number');
+  defaults(load(JSON.stringify({ version: 7.5, mobileControls: 'joystick', language: 'fr' })), 'a version that is not a whole number');
   // Within version 3 (migrated), each value on its own.
-  const partial = load(JSON.stringify({ version: 3, language: 'de', mobileControls: 'classic', touchLayouts: 'big', combatAssist: 'no' }));
+  const partial = load(JSON.stringify({ version: 3, language: 'de', mobileControls: 'joystick', touchLayouts: 'big', combatAssist: 'no' }));
   assert.equal(partial.languageChosen, false, 'an unknown language is no choice');
-  assert.equal(partial.mobileControls, 'classic', 'a valid neighbour is kept');
+  assert.equal(partial.mobileControls, 'joystick', 'a valid neighbour is kept');
   assert.deepEqual(partial.touchLayout('classic'), {});
   assert.equal(partial.automaticTurnAround, true);
   const other = load(JSON.stringify({ version: 8, language: 'fr', mobileControls: 'CLASSIC', automaticTurnAround: false }));
   assert.equal(other.automaticTurnAround, false);
   assert.equal(other.language, 'fr');
-  assert.equal(other.mobileControls, 'joystick');
+  assert.equal(other.mobileControls, 'classic');
   // A bad stored value is replaced cleanly by the next choice.
   const storage = memoryStorage({ [SETTINGS_KEY]: '{not json' });
-  new Settings(storage).set('mobileControls', 'classic');
+  new Settings(storage).set('mobileControls', 'joystick');
   assert.deepEqual(stored(storage), {
-    version: 9, language: null, mobileControls: 'classic', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
+    version: 9, language: null, mobileControls: 'joystick', touchLayouts: { joystick: {}, classic: {} }, automaticTurnAround: true,
     controllerProfiles: {}, onlineName: null,
   });
 });
 
 test('custom layouts are checked: malformed objects, unknown ids, non-finite coordinates and out-of-range scales never get through', () => {
   const raw = {
-    version: 2, language: 'en', mobileControls: 'classic',
+    version: 2, language: 'en', mobileControls: 'joystick',
     touchLayouts: {
       joystick: {
         stick: { x: 0.2, y: 0.8, scale: 1.25 },
@@ -665,20 +665,20 @@ test('custom positions and sizes round-trip, each scheme on its own, and Reset e
   assert.deepEqual(after.touchLayout('joystick'), {});
   assert.deepEqual(after.touchLayout('classic'), { runRight: { x: 0.2, y: 0.5, scale: 1 } });
   // Switching schemes keeps each one's layout.
-  after.set('mobileControls', 'classic');
   after.set('mobileControls', 'joystick');
+  after.set('mobileControls', 'classic');
   assert.deepEqual(after.touchLayout('classic'), { runRight: { x: 0.2, y: 0.5, scale: 1 } });
 });
 
 test('blocked or absent storage never breaks the game: defaults, and choices last for the visit', () => {
   for (const storage of [blockedStorage, null]) {
     const settings = new Settings(storage);
-    assert.equal(settings.mobileControls, 'joystick');
+    assert.equal(settings.mobileControls, 'classic');
     assert.equal(settings.languageChosen, false);
-    assert.equal(settings.set('mobileControls', 'classic'), true);
+    assert.equal(settings.set('mobileControls', 'joystick'), true);
     assert.equal(settings.set('language', 'fr'), true);
     assert.equal(settings.setTouchLayout('classic', { jump: { x: 0.5, y: 0.5, scale: 1.2 } }), true);
-    assert.equal(settings.mobileControls, 'classic', 'kept in memory');
+    assert.equal(settings.mobileControls, 'joystick', 'kept in memory');
     assert.equal(settings.language, 'fr');
     assert.equal(settings.languageChosen, true);
     assert.deepEqual(settings.touchLayout('classic'), { jump: { x: 0.5, y: 0.5, scale: 1.2 } });
@@ -690,14 +690,14 @@ test('blocked or absent storage never breaks the game: defaults, and choices las
   try {
     const browser = memoryStorage();
     stub({ value: browser });
-    new Settings().set('mobileControls', 'classic');
-    assert.equal(stored(browser).mobileControls, 'classic');
+    new Settings().set('mobileControls', 'joystick');
+    assert.equal(stored(browser).mobileControls, 'joystick');
     stub({ value: undefined });
     assert.equal(new Settings().storage, null);
-    assert.equal(new Settings().mobileControls, 'joystick');
+    assert.equal(new Settings().mobileControls, 'classic');
     stub({ get() { throw new Error('SecurityError'); } });
     assert.equal(new Settings().storage, null);
-    assert.equal(new Settings().mobileControls, 'joystick');
+    assert.equal(new Settings().mobileControls, 'classic');
   } finally {
     if (saved) Object.defineProperty(globalThis, 'localStorage', saved);
     else delete globalThis.localStorage;
@@ -1244,7 +1244,7 @@ test('Language: English and Français as two radio buttons; picking one saves it
     assert.deepEqual(dialog.root.querySelectorAll('.settings-group-title').map((h) => h.textContent), ['Langue', 'Commandes', 'Combat']);
     assert.equal(dialog.closeButton.getAttribute('aria-label'), 'Fermer les paramètres');
     assert.equal(schemeNamed(dialog, 'classic').querySelector('.settings-option-name').children[0].textContent, 'Boutons classiques');
-    assert.equal(dialog.customizeNote.textContent, 'Joystick : déplacez et redimensionnez chaque commande.');
+    assert.equal(dialog.customizeNote.textContent, 'Boutons classiques : déplacez et redimensionnez chaque commande.');
     // And behind it, Home: the gear, the tagline, the menu's name.
     assert.equal(home.settingsButton.getAttribute('aria-label'), 'Paramètres');
     assert.equal(home.el.querySelector('.home-lede').textContent, 'Un projet de fan, fait avec cœur.');
@@ -1279,19 +1279,20 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
       assert.ok(desc, 'described by its line');
     }
     const [joystick, classic] = dialog.schemeOptions;
-    assert.match(joystick.textContent, /Default/, 'the default is marked');
-    assert.doesNotMatch(classic.textContent, /Default/);
-    assert.deepEqual(checked(dialog.schemeOptions), ['true', 'false']);
-    classic.click();
-    assert.equal(app.settings.mobileControls, 'classic');
+    assert.match(classic.textContent, /Default/, 'the default is marked: Classic Buttons');
+    assert.doesNotMatch(joystick.textContent, /Default/);
     assert.deepEqual(checked(dialog.schemeOptions), ['false', 'true']);
-    assert.equal(stored(storage).mobileControls, 'classic');
-    assert.equal(dialog.isOpen, true);
     assert.equal(dialog.customizeNote.textContent, 'Classic buttons: move and resize each control.');
-    // Reopened on a new visit (the same device): Classic Buttons, checked.
+    joystick.click();
+    assert.equal(app.settings.mobileControls, 'joystick');
+    assert.deepEqual(checked(dialog.schemeOptions), ['true', 'false']);
+    assert.equal(stored(storage).mobileControls, 'joystick');
+    assert.equal(dialog.isOpen, true);
+    assert.equal(dialog.customizeNote.textContent, 'Joystick: move and resize each control.');
+    // Reopened on a new visit (the same device): Joystick, checked.
     const again = boot(storage);
     again.home.settingsButton.click();
-    assert.deepEqual(checked(again.dialog.schemeOptions), ['false', 'true']);
+    assert.deepEqual(checked(again.dialog.schemeOptions), ['true', 'false']);
     again.done();
 
     // Customize touch controls: the editor, a second modal layer on top.
@@ -1301,7 +1302,7 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
     customize.focus();
     customize.click();
     assert.equal(app.touchEditor.isOpen, true);
-    assert.equal(app.touchEditor.scheme, 'classic', 'the scheme in use');
+    assert.equal(app.touchEditor.scheme, 'joystick', 'the scheme in use');
     assert.equal(app.nav.scopes.at(-1), app.touchEditor.scope, 'on top of the Settings scope');
     assert.equal(app.nav.scopes.at(-2), dialog.scope);
     assert.equal(dialog.root.inert, true, 'Settings waits beneath it');
@@ -1459,7 +1460,7 @@ test('Combat: Automatic turn-around On (the default) and Off as two radio button
     assert.equal(dialog.isOpen, true, 'the dialog stays open');
     for (const gone of ['combatAssist', 'comboAssist']) assert.equal(Object.hasOwn(stored(storage), gone), false, `${gone} never saved`);
     // Nothing else changed.
-    assert.equal(app.settings.mobileControls, 'joystick');
+    assert.equal(app.settings.mobileControls, 'classic');
     assert.equal(app.settings.languageChosen, false);
     // A change made elsewhere shows while the dialog is open.
     app.settings.automaticTurnAround = false;
@@ -1512,11 +1513,10 @@ test('keyboard and gamepad navigate tabs, visible settings and Close inside the 
     assert.equal(dialog.activeSection, 'controls');
     assert.equal(document.activeElement, dialog.tabs[1]);
     app.input.key('ArrowDown');
-    assert.equal(document.activeElement, schemeNamed(dialog, 'joystick'));
-    app.input.key('ArrowRight');
-    app.input.pad('confirm');
-    assert.equal(app.settings.mobileControls, 'classic');
+    assert.equal(document.activeElement, schemeNamed(dialog, 'classic'), 'the scheme in use');
     app.input.key('ArrowLeft');
+    app.input.pad('confirm');
+    assert.equal(app.settings.mobileControls, 'joystick');
     app.input.key('ArrowDown');
     assert.equal(document.activeElement, dialog.customizeButton);
     app.input.key('ArrowDown');
