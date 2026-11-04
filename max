@@ -1,80 +1,85 @@
-# Task: closer battle camera, new mobile control layout, and a small-screen block
+# Task: three changes to Alva — permanent landscape lock, Joystick as default Mobile Controls, and a reverse-elimination "spawn burst"
 
-Read CLAUDE.md, UPDATES.md and ALVA_SPEC.md first. Follow every rule in them, especially: never special-case a fighter's id in shared code, never touch `character_rule`, follow the spelling in `codename_rule` (e.g. `mouvment`), and keep the controller comfort rules. Run `node --test` after each part and keep every test passing. Update tests that encode the old defaults instead of deleting them. Write new tests for new behaviour.
-
-This is three parts. Do them in order. Part 1 needs my input before you finish it.
+Read `CLAUDE.md` first and follow it (character system rules, touch comfort rules, `character_rule` is protected, run `node --test`). Read the "Camera & mobile layout update" and "effect update" entries in `UPDATES.md` for context. When done, add a new named entry to `UPDATES.md` called the **spawn & landscape update** (what changed, the PR/commit, where the tuning lives, which tests cover it), and update `ALVA_SPEC.md` / `docs/` wherever they describe the old behaviour.
 
 ---
 
-## Part 1: Zoom the in-game camera closer (I pick the zoom)
+## 1. Alva permanently auto-locks itself to landscape
 
 ### Current behaviour
-- The world-to-screen scale comes from `computeWorldScale(pxW, pxH, sprites, map)` in `js/game/arena.js`. It aims for a fighter height of `CONFIG.render.fighterScreenRatio` (currently 0.1 of the view height), clamped between `fighterScreenRatioMin` (0.088) and `fighterScreenRatioMax` (0.115). It is also limited by `fitPx`, so the main stage plus `stageFrameMargin` (100) always fits across the view. Then `pixelPerfect` snaps it to whole art pixels.
-- `js/game/rendering/camera.js` handles following and framing (STAGE_LEAN, LEAD, FOLLOW_X/Y, floorLine 0.7, clamped to camera bounds).
-- `js/game/rendering/hit-fx.js` adds a temporary lethal zoom (`HIT_FX.lethal.zoom` 1.35) on top. Keep it working at the new base zoom.
+- `manifest.webmanifest` already declares `"orientation": "landscape"`, but that only works for an installed PWA on some platforms.
+- `js/core/device.js` sets `portrait = h > w * 1.05` and `blockedPortrait = touchUI && portrait`, and toggles `html.is-portrait-blocked`. That class shows the `.rotate-overlay` in `index.html` ("Rotate your device / Alva is designed for landscape play", styled in `css/overlays.css`, strings `rotate.title` / `rotate.text` in `js/localization/strings/en.js` + `fr.js`).
+- Nothing in `js/` calls `screen.orientation.lock`, so the game never rotates itself. It only asks the player to rotate.
 
-### Goal
-Fighters should look noticeably bigger on screen, closer to the reference screenshot I gave (fighters are about a quarter of the screen height there). It must not be a one-off hack. Put the zoom in `CONFIG.render` as named values so it stays a single tuning point, the same for every fighter and every map.
+### Wanted
+On touch devices Alva locks itself to landscape automatically, keeps the lock for the whole session, and puts it back whenever it is lost.
 
-### How
-1. Add a zoom factor (for example `CONFIG.render.cameraZoom`), or raise the fighter-height ratios. Pick whichever fits the existing design best. The "stage must fit across the view" rule (`fitPx`) is what currently stops the camera from coming closer. Relax it in proportion to the zoom: at the closer zoom the camera should follow the fighters rather than always showing the whole stage. Camera bounds clamping must still work, the view must never show outside the camera bounds, and pixel-perfect snapping must still work.
-2. Check that the camera still frames both fighters properly at the closer zoom. When they are too far apart to fit, it should keep Player 1 comfortably in view as it does now. Re-tune STAGE_LEAN, LEAD and floorLine only if the closer zoom makes them feel wrong, and tell me if you do.
-3. Off-screen fighter markers (arena.js, around the `onScreen` check) must still appear when a fighter leaves the view, which will happen more often now.
-
-### Screenshots for me to choose from (required, do not skip)
-Before you settle on a value:
-- Use the pre-installed Playwright (`require('playwright')`, `chromium.launch()`, do NOT reinstall it). Serve the game locally and start a real battle (any two fighters, same map for every shot), with both fighters standing near each other on the ground like in my screenshot.
-- Capture the SAME moment at at least 4 zoom levels, for example current (baseline), +15%, +30%, +45%, +60%. Take each one at a phone-landscape size (e.g. 932×430) AND at a tablet/desktop size (e.g. 1366×768), at deviceScaleFactor 2. Include the touch controls in the phone shots.
-- Label every image clearly in the filename and the caption with its zoom value (e.g. `zoom-1.30-phone.png`).
-- Send them all to me with SendUserFile, then STOP and ask me which one I prefer. Do not commit a final value until I answer. If I say "between two of them", make a new pair of shots at the in-between values and ask again.
-- After I choose, set that value as the default, re-run the tests, and send one final confirmation screenshot.
+Implementation:
+1. Create a small module, e.g. `js/core/orientation-lock.js`, or add the logic to `Device` in `js/core/device.js`, whichever fits the existing structure better. It should:
+   - Call `screen.orientation.lock('landscape')` when the API exists (feature-detect it, and catch the rejected promise quietly because it rejects on unsupported browsers and outside fullscreen).
+   - Most browsers only allow `lock()` in fullscreen or in an installed app (`display-mode: standalone/fullscreen`, see `APP_DISPLAY_MODES` in `js/core/web-app-install.js`). On touch UI, on the first user gesture (`pointerdown` / `touchend` / `keydown`, once), call `document.documentElement.requestFullscreen({ navigationUI: 'hide' })` (with the webkit prefix fallback), then lock. Don't request fullscreen on desktop / non-touch devices, and don't lock there.
+   - Lock again after `fullscreenchange`, `visibilitychange` (back to visible), `orientationchange` / `screen.orientation` `change`, and app resume. "Permanently" means the game keeps restoring the lock. There's no setting to turn it off.
+   - Never throw. On iOS Safari, which has no `lock()`, fall back silently.
+2. Keep the rotate overlay (`is-portrait-blocked`) as the **fallback only**, for when the lock is unavailable or was refused. When the lock succeeds, the player should never see the overlay. The existing `blockedPortrait` logic in `device.js` can stay as-is, since a successful lock keeps the window landscape.
+3. Keep `"orientation": "landscape"` in the manifest. Also check that `index.html` has no conflicting meta tags.
+4. Make sure nothing else breaks: the touch layout editor (`js/ui/touch-layout-editor.js`) and `touch-controls.js` re-place themselves on orientation/resize, and online play, the install dialog and the splash screen have to work while in fullscreen.
+5. Tests: add tests (e.g. in `tests/interface/screen-guard.test.mjs` or a new `orientation-lock.test.mjs`) with a fake `screen.orientation` and fullscreen API covering: lock is requested on touch after the first gesture; lock is not requested on desktop; it is re-requested after `visibilitychange` / `fullscreenchange`; a rejected `lock()` or a missing API doesn't throw and leaves the rotate overlay as the fallback.
 
 ---
 
-## Part 2: Mobile controls, scaled to 130% and laid out like the screenshot
+## 2. Default Mobile Controls becomes Joystick (not Classic Buttons)
 
-### Default scale
-- Every mobile/touch control defaults to 130% scale (1.3). Today the scales live in `js/core/touch-layout.js` (`TOUCH_SCALE` min 0.7 / max 1.8 / step 0.1) and are applied in `js/ui/touch-controls.js` (`node.style.scale`). The default must be 1.3 for every control EXCEPT the fighter-move buttons stacked above the shield (see below), which default to 1.0 (100%), not the 140% some of them use now. Find where the 140% comes from and change it.
-- A player's saved custom layout from the touch layout editor (`js/ui/touch-layout-editor.js`) still overrides the defaults. The editor's "reset" goes back to these NEW defaults. Make sure 1.3 is still a valid value with a correct percentage label in the editor.
-- At 130% the controls must not overlap each other or run off the screen. Respect the safe-area insets already used in `css/touch-controls.css` (`--safe-l`, `--safe-r`, etc.).
+### Current behaviour
+- `js/core/settings.js`: `MOBILE_CONTROLS = ['joystick', 'classic']`, `DEFAULT_MOBILE_CONTROLS = 'classic'`, `SETTINGS_VERSION = 9` with a migration table.
+- `js/ui/touch-controls.js` comments and `setScheme` fallback: "anything else is the default, Classic Buttons".
+- `js/ui/settings-dialog.js`: comments and the "(default)" badge say Classic Buttons is the default (around lines 8 and 222).
+- Tests hard-code it, e.g. `tests/interface/battle-screen.test.mjs:1223` (`'nothing stored: the default'` expects `'classic'`), plus `tests/interface/settings.test.mjs`, `touch-layout.test.mjs` and `controls-ui.test.mjs`.
 
-### Layout (match the reference screenshot exactly)
-All controls sit along the bottom edges of the screen, in the same positions as my screenshot:
-- **Bottom-left, in a row along the bottom edge:** left, down, right (the mouvment buttons).
-- **Bottom-right, in a row along the bottom edge, from left to right:** the punch-position button, the kick-position button, Jump (up arrow) in the far bottom-right corner.
-  - In Alva, the punch-position button is the fighter's **attack1** and the kick-position button is the fighter's **attack2**. These are the two attacks that trigger the Mash Combo (read the Mash Combo update in UPDATES.md and `js/data/mash-combo.js`). They keep the fighter's own icons from `js/ui/mobile-abilities.js`, not a punch or kick glyph. Today `touch-controls.js` reserves slots 1 and 2 for attack1/attack2. Keep that logic, just move them.
-- **Right edge, above the bottom row:** the Shield button sits directly above Jump (the grey shield in the screenshot). The blue button to its left in the screenshot is extra_attack/special, if the fighter has one. Place it as shown, and leave the place empty if the fighter has none.
-- **Above the shield:** every OTHER fighter move (attack3–attack5, the red dash-style button in the screenshot, and any other combat button from `COMBAT_BUTTONS` that is not attack1, attack2, Jump or Shield) is stacked **vertically on top of each other**, going up from the shield, at **100% scale**. Buttons a fighter does not have ('absent' in mobile-abilities.js) do not appear and leave no gaps. 'Reserved' buttons still show dashed, as they do now. The stack must never go above the top HUD (health bars/portraits). If a fighter has too many moves to fit, tell me which fighters overflow and what you did about it, rather than silently shrinking them.
-- The layout comes from data and works for every fighter. No fighter ids in shared code.
-
-Send me phone-landscape screenshots of this layout for at least 3 fighters with different move counts (including the one with the most moves) before you finish.
+### Wanted
+- Set `DEFAULT_MOBILE_CONTROLS = 'joystick'`.
+- Wherever an unknown or missing scheme falls back to a default (e.g. `setScheme` in `touch-controls.js`, the settings reader/validation in `settings.js`, the layout editor), it should fall back to **Joystick**. Use `DEFAULT_MOBILE_CONTROLS` rather than a literal so this stays in one place.
+- The settings dialog shows Joystick as the default option, with the "default" badge/label moved to it, and the Joystick option listed first if the dialog orders the default first.
+- **Existing players:** a player who explicitly chose Classic keeps Classic, and their saved custom touch layouts (`touchLayouts.classic` / `.joystick`) stay untouched. Decide how stored settings that only have `classic` because it used to be the default are handled. If the stored data can't tell an explicit choice from the old default, bump `SETTINGS_VERSION` to 10 and add a migration that **keeps the stored value** (safest). Only new or empty storage gets Joystick. Write down this decision in the code comment and in `UPDATES.md`.
+- Update every comment, doc and spec line that says Classic is the default (`grep -rni "classic" js docs ALVA_SPEC.md css`).
+- Update the tests to the new default, and add one asserting fresh storage → `'joystick'` and stored `'classic'` → stays `'classic'`.
 
 ---
 
-## Part 3: Refuse screens that are too small
+## 3. Every spawn and respawn plays the elimination burst in reverse
 
-### Why
-Playing Alva in a phone browser tab (Safari, Chrome, etc.) makes the game far too small to play well, especially with the bigger controls above. Alva must now refuse to run on really small screens.
+### Current behaviour (the "ejected" effect)
+- When a fighter is taken by the Void, `Arena.checkVoid` (`js/game/arena.js` ~line 340) calls `this.fx.addElimination(f)`.
+- `HitEffects.addElimination` / `drawEliminations` in `js/game/rendering/hit-fx.js` (~lines 289 and 676), tuned by `HIT_FX.elimination` (life 0.55 s, 24 shards, radius 0.95, shardLength 0.2, ring 0.85, shake 5, reducedTravel 0.3). The burst has a white flash that pops and shrinks, a ring opening outward in the fighter's first palette colour, and shards in the fighter's `visual.eliminationPalette` (or `NEUTRAL_ELIMINATION_PALETTE`) flying outward with an ease-out, each with a thin dark under-stroke, all fading out. The shards are seeded, so the same burst always draws the same shards.
+- Spawns happen at: match start and `Battle.restart()` (`js/game/battle.js`, `f.reset(this.stage)`, followed by `this.fx.reset()`, so any effect added before that reset is wiped); respawn in `Arena.updateRespawns` (`f.respawn(this.stage)`); and Practice Ground creating or replacing fighters (`js/game/practice.js` ~lines 72–110, also calls `this.fx.reset()`), plus its respawns. Check online (`js/online/`), Local Play, Quick Battle, Watch mode and rematch paths too: they should all go through these, but verify it.
 
-### Behaviour
-- Decide "too small" from the usable viewport (the CSS-pixel size of the visible area, using `visualViewport` where it exists), not from the user agent. Put the minimum width and height in `js/config.js` as named values. Pick the threshold so that a phone in a normal browser tab (with the address bar and toolbars) is refused, but the same phone running Alva as an installed web app (standalone/fullscreen, see `isRunningAsApp`-style logic in `js/core/web-app-install.js`) can pass if it is big enough. Tablets and desktops always pass. Tell me the numbers you chose and why, and test them against common phone sizes in both modes.
-- Check it at startup AND on every resize/orientation change. If the screen becomes too small mid-match, pause the game (online matches: use whatever the existing pause/disconnect handling allows, and do not desync), show the block screen, and remove the block screen when the size is acceptable again. Portrait vs landscape: if the game is only too small because the phone is in portrait, add a line asking the player to rotate the device.
-- The block screen is a full-screen, solid black overlay above everything (menus, splash, battle), with centred white text:
+### Wanted
+Each time a fighter appears (initial spawn at match start, every restart/rematch, every respawn after the Void, every Practice Ground fighter spawn or swap), play the **same elimination burst run backwards** at the fighter's spawn position:
+- The shards start at their full outward reach and fly **inward** to the fighter's centre (the time-reverse of the ease-out, so they accelerate in, the same curve as `out` evaluated at `1 - k`).
+- The ring starts at its widest (`cfg.ring` fighter heights) and **closes** to its smallest.
+- Things fade **in** instead of out, and the white flash grows and pops at the **end**, as the fighter "materialises".
+- It uses the same palette (`eliminationPalette(f.def)`), the same size (`f.def.visual.height ?? body.height`), and is centred on `body.x, body.y - body.height / 2` at the spawn point, with a deterministic seed.
+- The same shake (none with reduced motion), and the same reduced-motion handling (`reducedTravel`).
 
-  **Title:** "Alva cannot be played on this screen"
-  **Body:** "Because we want the best gameplay experience for you, Alva isn't playable on a small screen. Please try downloading Alva as a web app and launching it again to see if Alva accepts the screen size. Otherwise, please try running Alva on a bigger screen, preferably a tablet or a desktop device."
-
-  Put these strings in the localization files (`js/localization/strings`) for every language Alva supports, not hard-coded.
-- **Download button:** a clear "Download Alva" button on the block screen that uses the existing install flow (`js/core/web-app-install.js` / `js/ui/install-dialog.js`): on Chromium it triggers the saved `beforeinstallprompt`; on iOS Safari (no prompt) it shows the existing "Add to Home Screen" instructions. If Alva is already installed, or the browser can't install it, the button explains that instead of doing nothing.
-- The overlay must work without the rest of the game loading correctly (no dependency on a battle or a menu existing), must be keyboard/controller reachable for the button, and must use the existing visual style (fonts) on a black background.
-
-### Tests
-Add tests for the size check (passing sizes, failing sizes, the browser-tab vs installed difference, the portrait message) and for the overlay showing and hiding on resize.
+Implementation guidance:
+1. Generalise rather than duplicate: give elimination entries a `reverse` flag (or add `addSpawn(f)` that pushes into the same list with `reverse: true`), and in `drawEliminations` map `k → 1 - k` for the reversed ones, so it really is the same drawing played backwards. Keep `HIT_FX.elimination` as the single source of tuning. If a separate knob is needed (e.g. its own `life`), add `HIT_FX.spawn` next to it with a comment saying it mirrors elimination.
+2. Shared code only: never special-case a fighter id (`CLAUDE.md`). Each fighter's look comes from its existing `visual.eliminationPalette` character data.
+3. Call it from the spawn points:
+   - `Arena.updateRespawns`: right after `f.respawn(this.stage)`.
+   - `Battle.restart()` and Practice Ground's spawn/swap: **after** `this.fx.reset()`, otherwise the reset clears it. Put a helper on `Arena`, e.g. `announceSpawn(f)`, and use it everywhere.
+4. **Paint only.** It must not change the fighter's state, physics, hitboxes, timers, input, CPU decisions, score or match stats. The fighter is in play and controllable exactly as it is now (no added invulnerability or delay). Online lockstep determinism (`tests/online/determinism.test.mjs`, `lockstep.test.mjs`) must still pass, since fx is not part of simulated state. Check that, and that the celebration test which counts `addElimination` calls (`tests/systems/celebration.test.mjs:329`) still counts only eliminations. If the spawn burst shares the function, keep a separate entry point so that count isn't polluted.
+5. Draw order: in `Arena` render (~line 506, `drawEliminations`), the reversed burst draws over the fighter so it covers the appearance.
+6. Tests (extend `tests/systems/hit-fx.test.mjs`, `void-ripple.test.mjs` or add `spawn-burst.test.mjs`):
+   - A spawn burst is added on match start, on restart (and still present after `fx.reset()`), on every respawn, and on Practice Ground spawn/swap.
+   - It uses the fighter's palette and size, and it expires after its life.
+   - It is the elimination run backwards: at age `t` the reversed burst draws the same geometry as the elimination at age `life - t` (compare with a recording fake ctx, like the `overtime.test.mjs` draw tests).
+   - Reduced motion: no shake, short travel.
+   - A battle simulated with and without the spawn burst produces identical simulation state (paint only).
 
 ---
 
-## When you are done
-- Add an entry to UPDATES.md for this as a named update (call it the **camera & mobile layout update**) listing the PR, where its tuning lives (zoom value, touch scales, minimum screen size) and which tests cover it.
-- Update ALVA_SPEC.md / docs where they describe the camera, the touch controls or supported devices.
-- `node --test` passes.
-- Send me a final set of screenshots: the chosen zoom on phone (installed-app size) and desktop, the new control layout, and the small-screen block screen on a phone browser tab size.
+## Done when
+- `node --test` passes in full, and the existing benchmarks still run.
+- On a phone browser, the first tap goes fullscreen and locks to landscape, the lock comes back after switching apps, and the rotate overlay only appears where locking is impossible.
+- Fresh installs get the Joystick scheme, and existing Classic players keep Classic.
+- Every fighter, on every mode's spawn and respawn, appears with the reversed burst in its own colours.
+- `UPDATES.md` has the **spawn & landscape update** entry, and the docs/spec are updated.
