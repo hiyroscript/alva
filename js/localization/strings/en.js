@@ -807,5 +807,6 @@ export const EN = {
   'online.detail.unreachable': "The room server can't be reached from here: it may be down, or blocked on this network.",
   'online.detail.origin': "The room server doesn't accept this page's address.",
   'online.detail.server': 'The room server answers, but its rooms are not working right now.',
+  'online.detail.relay': "The room server can't make private connections right now.",
   'online.detail.reachable': 'The room server answers now: try again in a moment.',
 };

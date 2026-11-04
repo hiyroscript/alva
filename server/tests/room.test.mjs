@@ -1,11 +1,11 @@
 // Run with node --test server/tests/room.test.mjs (no dependencies, no
 // Cloudflare account). A Room on fake Durable Objects and sockets: seats by
 // token, the room as each player sees it, fighters and Ready, the host's
-// start (filled in by the room itself), rematches, the match's packets
-// passed to the other player (and WebRTC signalling never), a guest leaving, the host leaving (the room
-// closes and says why), reconnecting within the grace, the alarms that
-// close a room left idle or free a seat left empty, and its reports to the
-// Lobby.
+// start (filled in by the room itself), rematches, no match packet (WebRTC
+// signalling passed on scrubbed, the relay's servers), a guest leaving, the
+// host leaving (the room closes and says why), reconnecting within the
+// grace, the alarms that close a room left idle or free a seat left empty,
+// and its reports to the Lobby.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { handle } from '../src/index.js';
@@ -162,23 +162,20 @@ test('a rematch: both must accept; then the host starts the next match without R
   assert.equal(guest.of('start').at(-1).seed, 2);
 });
 
-test('a match packet goes to the other player only, as it came; signalling never; anything else unknown is refused', async () => {
+test('signalling goes to the other player only, scrubbed; no match packet through the room; anything else unknown is refused', async () => {
   const { host, guest, say } = await roomWithPlayers();
   const before = host.sent.length;
+  // The match itself never comes through the room (the relay carries it).
   await say(host, { type: 'm', d: { t: 'in', m: 1, s: 3, f: [0, 5], a: 2 } });
-  assert.deepEqual(guest.last, { type: 'm', d: { t: 'in', m: 1, s: 3, f: [0, 5], a: 2 } });
-  assert.equal(host.sent.length, before, 'never echoed');
-  await say(guest, { type: 'm', d: { t: 'hash', m: 1, s: 60, h: 'abc' } });
-  assert.deepEqual(host.last, { type: 'm', d: { t: 'hash', m: 1, s: 60, h: 'abc' } });
-  // A packet that is not an object, or too large, is dropped.
-  const guestBefore = guest.sent.length;
-  for (const d of [null, 'text', [1, 2], { f: 'x'.repeat(3000) }]) await say(host, { type: 'm', d });
-  assert.equal(guest.sent.length, guestBefore);
-  // WebRTC signalling (an older copy's) is never passed on: no address
-  // could reach the other player through it.
-  await say(host, { type: 'signal', data: { kind: 'offer', sdp: { type: 'offer', sdp: 'v=0…' } } });
+  assert.deepEqual(host.last, { type: 'error', code: 'bad_request' });
+  assert.equal(guest.of('m').length, 0);
+  assert.equal(host.sent.length, before + 1);
+  // WebRTC signalling is passed on scrubbed: a candidate with the
+  // player's own address never.
+  await say(host, { type: 'signal', data: { kind: 'offer', sdp: { type: 'offer', sdp: 'v=0' } } });
+  assert.deepEqual(guest.last, { type: 'signal', data: { kind: 'offer', sdp: { type: 'offer', sdp: 'v=0' } } });
   await say(guest, { type: 'signal', data: { kind: 'ice', candidate: { candidate: 'candidate:1 1 udp 1 203.0.113.50 5 typ srflx' } } });
-  assert.equal(guest.of('signal').length + host.of('signal').length, 0);
+  assert.equal(host.of('signal').length, 0);
   await say(host, { type: 'input', frames: [1, 2, 3] });
   assert.deepEqual(host.last, { type: 'error', code: 'bad_request' }, 'only the room\'s own kinds');
   await say(host, 'x'.repeat(20000));

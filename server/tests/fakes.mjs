@@ -129,9 +129,19 @@ export class FakeNamespace {
   }
 }
 
-// The server's environment: its variables (wrangler.toml's, overridden by
-// `vars`), a Lobby namespace and a Room namespace wired together, one clock
-// (`clock.now`, milliseconds) and a seeded source of random bytes.
+// A TURN relay's secrets, as the owner sets them (fake ones): every match
+// needs a relay, so the test environment has one unless `vars` empties it.
+export const RELAY_VARS = Object.freeze({
+  TURN_URLS: 'turn:relay1.example.com:3478, turns:relay1.example.com:443 stun:stun.example.com',
+  TURN_USERNAME: 'alva-user',
+  TURN_CREDENTIAL: 'alva-secret',
+});
+export const NO_RELAY = Object.freeze({ TURN_URLS: '', TURN_USERNAME: '', TURN_CREDENTIAL: '' });
+
+// The server's environment: its variables (wrangler.toml's and the relay's
+// secrets, overridden by `vars`), a Lobby namespace and a Room namespace
+// wired together, one clock (`clock.now`, milliseconds) and a seeded
+// source of random bytes.
 export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
   const clock = { now: start };
   const now = () => clock.now;
@@ -149,6 +159,7 @@ export function makeEnv(vars = {}, { start = Date.UTC(2026, 10, 3, 12) } = {}) {
     ALLOWED_ORIGINS: 'https://html-classic.itch.zone,https://html.itch.zone,https://*.itch.zone,http://localhost:*,http://127.0.0.1:*',
     MAX_ROOMS: '50', DAILY_REQUEST_LIMIT: '100000', BUDGET_SHARE: '0.8', ROOM_IDLE_MINUTES: '10',
     CREATE_PER_MINUTE: '10', JOIN_PER_MINUTE: '30', LIST_PER_MINUTE: '120',
+    ...RELAY_VARS,
     ...vars,
   };
   env.LOBBY = new FakeNamespace((state) => new Lobby(state, env, { now, random }));

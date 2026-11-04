@@ -280,7 +280,7 @@ js/
     ai/                 the combat AI and its moveset reader
     rendering/          camera, sprites, hit and Shield effects, fighter status
   localization/         the translator and one string table per language
-  online/               Online Play: rooms' client, the link through the room, lockstep netcode
+  online/               Online Play: rooms' client, the link through the relay, lockstep netcode
   stages/               procedural stage art
   screens/, ui/         screens; interface components, HUD, touch controls,
                         controller dialogs, editor and cursor

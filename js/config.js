@@ -112,33 +112,28 @@ export const CONFIG = Object.freeze({
     serverUrl: 'https://alva-online.pages.dev',
     // Steps between sampling the local player's input and playing it: the
     // time a frame has to reach the other browser before it is needed. The
-    // match goes through the room server, never straight to the other
-    // browser (js/online/room-relay.js: so neither player learns the
-    // other's address), and a frame may wait up to sendIntervalMs to be
-    // sent. Each match chooses its own (js/online/delay.js): the smallest
-    // that covers the send interval, the trip the host's browser measured
-    // to the other player and delayMarginMs, within inputDelayRange (3 is
-    // 50 ms, 12 is 200 ms). inputDelay (7, about 117 ms) is the delay when
-    // the trip could not be measured.
+    // match goes through a TURN relay, never straight to the other browser
+    // (js/online/match-link.js: so neither player learns the other's
+    // address), every frame sent at once. Each match chooses its own
+    // (js/online/delay.js): the smallest that covers the trip the host's
+    // browser measured to the other player and delayMarginMs, within
+    // inputDelayRange (3 is 50 ms, 12 is 200 ms). inputDelay (7, about
+    // 117 ms) is the delay when the trip could not be measured.
     inputDelay: 7,
     inputDelayRange: Object.freeze({ min: 3, max: 12 }),
     delayMarginMs: 15,
-    // How often each player's browser pings the other in the room to measure
+    // How often the host's browser pings the other in the room to measure
     // the trip: every pingIntervalMs until a dozen round trips are in, then
     // every pingRefreshMs.
     pingIntervalMs: 200,
     pingRefreshMs: 5000,
-    // The match's packets go at most this far apart (30 a second): the room
-    // server's free plan counts every one it receives, and 30 a second keeps
-    // about 7 hours of matches a day inside it
-    // (docs/development/online-server.md, "Staying on the free plan").
-    sendIntervalMs: 33,
     // The modes a room can be created for, in order: Quick Battle alone for
     // now (the server allows the same list: server/src/rules.js).
     modes: Object.freeze(['quick-battle']),
-    // How long the peer-to-peer connection may take before "Couldn't
-    // connect to your opponent", and how long a match waits for an
-    // opponent who stopped answering before "Connection lost".
+    // How long the link through the relay may take (the relay's servers
+    // asked of the room, then the connection) before "Couldn't connect to
+    // your opponent", and how long a match waits for an opponent who
+    // stopped answering before "Connection lost".
     connectTimeoutMs: 10000,
     disconnectGraceMs: 10000,
     // How long a match waits for the other browser's first input while

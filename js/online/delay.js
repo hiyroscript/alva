@@ -1,13 +1,12 @@
 // How long each online match waits between sampling a player's input and
 // playing it (its input delay, in steps), chosen for that match from how
-// long a packet takes between the two players, so nearby players get a
-// short delay and far ones a longer one with no pauses.
+// long a packet takes between the two players, so nearby players get the
+// shortest delay and far ones a longer one with no pauses.
 //
-// The match goes through the room server (js/online/room-relay.js), and a
+// The match goes through a TURN relay (js/online/match-link.js), and a
 // frame for step n must reach the other browser before step n runs there:
-// it is sampled D steps earlier, may wait up to CONFIG.online.
-// sendIntervalMs to be sent, then takes its one-way trip. So D is the
-// smallest number of steps that covers the send interval, the trip and a
+// it is sampled D steps earlier and sent at once, then takes its one-way
+// trip. So D is the smallest number of steps that covers the trip and a
 // margin for its ups and downs (CONFIG.online.delayMarginMs), within
 // CONFIG.online.inputDelayRange. The trip is measured in the room before
 // the match: while the link is open, each player's DelayProbe bounces pings
@@ -18,9 +17,8 @@
 // inputDelay.
 //
 // The pings are packets on the match's link like any other ({ t: 'ping' }
-// and { t: 'pong' }: the lockstep ignores them), cheap for the room
-// server's plan: five a second for the first two or three seconds, then
-// one every few seconds.
+// and { t: 'pong' }: the lockstep ignores them): five a second for the
+// first two or three seconds, then one every few seconds.
 
 import { CONFIG } from '../config.js';
 
@@ -37,9 +35,11 @@ export function validDelay(d, range = CONFIG.online.inputDelayRange) {
 }
 
 // The input delay, in steps, for round trips `samples` (milliseconds):
-// see the top. `fallback` when too few were measured.
+// see the top (`sendIntervalMs`: how long a frame may wait to be sent, none
+// as the game sends every frame at once). `fallback` when too few were
+// measured.
 export function chooseDelay(samples, {
-  sendIntervalMs = CONFIG.online.sendIntervalMs, marginMs = CONFIG.online.delayMarginMs,
+  sendIntervalMs = 0, marginMs = CONFIG.online.delayMarginMs,
   stepMs = CONFIG.sim.step * 1000, range = CONFIG.online.inputDelayRange, fallback = CONFIG.online.inputDelay,
 } = {}) {
   const rtts = (samples ?? []).filter((r) => Number.isFinite(r) && r >= 0).sort((a, b) => a - b);

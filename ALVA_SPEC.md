@@ -71,9 +71,9 @@ behave, and how it must look.
   broken), never imports it, and the itch.io release
   never includes it; that one host (and its WebSocket form) is the only one
   the release may name besides the credits' links. Every other mode needs
-  no network at all. Matches go through their room on that server, never
-  straight from one browser to the other, so no player learns another's IP
-  address (6.5c, Privacy).
+  no network at all. Matches go between the two browsers through a TURN
+  relay, never straight from one to the other and never through the room
+  server, so no player learns another's IP address (6.5c, Privacy).
 - Viewport: `width=device-width, initial-scale=1, maximum-scale=1,
   user-scalable=no, viewport-fit=cover`: a web game, so rapid taps and
   pinches never zoom the page. Together with `touch-action: none` on the
@@ -962,9 +962,9 @@ Two people in two browsers (`js/screens/online-screens.js`,
 `js/screens/online-battle-screen.js`, `js/online/`): Home → Online play →
 Online name → Online lobby → a room → Battle. Rooms that players create and
 join, through a small room server (`server/`, a Cloudflare Worker); no
-accounts, no matchmaking, no chat. The match itself goes through the room
-too, never straight between the two browsers, so neither player learns the
-other's address.
+accounts, no matchmaking, no chat. The match itself goes between the two
+browsers through a TURN relay, never straight from one to the other, so
+neither player learns the other's address.
 
 - **Home's Online play** (6.2): the first row's third, a square globe the
   size of Settings, green while it can open, disabled and red while the
@@ -1036,26 +1036,26 @@ other's address.
   stage) and **Leave room**.
 - **The room server** caps itself to stay within Cloudflare's free plan:
   at most 50 rooms open at once and a daily request budget (refusing new
-  rooms as "full" past 80% of the plan's day, while open rooms play on:
-  about 7 hours of matches a day in all, the match's packets being most
-  of what it spends), per-address limits, a limit on each seat's packets
-  (a flood is dropped, a seat that keeps flooding is closed), rooms cleaned
-  up after 10 minutes without activity. It allows only itch.io's game hosts
+  rooms as "full" past 80% of the plan's day, while open rooms play on),
+  per-address limits, rooms cleaned up after 10 minutes without activity. It allows only itch.io's game hosts
   (and a local copy for testing). No login, cookie or stored identity;
   names last as long as their room (docs/development/online-server.md).
 - **Privacy.** No player ever learns another's network address: the two
-  browsers never connect to each other (no WebRTC); each match packet goes
-  to the room and the room passes it to the other player. The room never
-  passes on WebRTC signalling. A player sees of the other only their name,
-  fighter, Ready, Rematch and connection. The server stores and logs no
-  address (its per-minute limits count a salted hash, in memory only;
-  Cloudflare's per-request logs are off). A copy of the game plays online
-  as its version marked `+relay`, so it never shares a room with an older
-  copy that connected directly. The cost is delay: each match measures the
-  trip between the two players through the room (the host's pings) and
-  plays inputs the fewest steps after they are sampled that cover it, 3 to
-  12 (50 to 200 ms; about 67 to 83 ms for nearby players; 7 when nothing
-  could be measured), the same on both; and packets go 30 a second
+  browsers connect only through a TURN relay (the owner's, its servers
+  handed to each player by the room), relay-only, never directly, and every
+  signalling message is scrubbed of addresses by the game and again by the
+  server. A player sees of the other only their name, fighter, Ready,
+  Rematch and connection. There is no other way: a server with no relay
+  makes no room ("The room server can't make private connections right
+  now."), and a link that cannot be made says "Couldn't connect to your
+  opponent. One of your networks may be blocking it.", with Try again. The
+  server stores and logs no address (its per-minute limits count a salted
+  hash, in memory only; Cloudflare's per-request logs are off). A copy of
+  the game plays online as its version marked `+turn`, so it never shares a
+  room with an older copy. Each match measures the trip between the two
+  players (the host's pings on the link) and plays inputs the fewest steps
+  after they are sampled that cover it, 3 to 12 (50 to 200 ms; 50 ms for
+  nearby players; 7 when nothing could be measured), the same on both
   (docs/gameplay/online-play.md, Transport and Privacy).
 
 ### 6.6 Credits

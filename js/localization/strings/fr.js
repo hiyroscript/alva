@@ -1028,5 +1028,6 @@ export const FR = {
   'online.detail.unreachable': 'Le serveur de salles est injoignable d’ici : il est peut-être arrêté, ou bloqué sur ce réseau.',
   'online.detail.origin': 'Le serveur de salles n’accepte pas l’adresse de cette page.',
   'online.detail.server': 'Le serveur de salles répond, mais ses salles ne fonctionnent pas pour le moment.',
+  'online.detail.relay': 'Le serveur de salles ne peut pas établir de connexions privées pour le moment.',
   'online.detail.reachable': 'Le serveur de salles répond maintenant : réessayez dans un instant.',
 };

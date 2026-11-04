@@ -88,7 +88,7 @@ test('the online modes and a visit\'s session id', () => {
   assert.notEqual(sessionId(), a);
 });
 
-test('CONFIG.online: the deployed server (one https origin, nothing more), the delay and send interval for a match through it, no server for a direct link, the waits and the colours; frozen', () => {
+test('CONFIG.online: the deployed server (one https origin, nothing more), the delay for a match through the relay, no server of its own for a link, the waits and the colours; frozen', () => {
   const o = CONFIG.online;
   const url = new URL(o.serverUrl);
   assert.equal(url.protocol, 'https:', 'a secure address: itch.io serves the game over https');
@@ -96,13 +96,12 @@ test('CONFIG.online: the deployed server (one https origin, nothing more), the d
   // The pages.dev gateway (server/gateway/), which passes everything to the
   // Worker: the Worker has no public address of its own.
   assert.match(url.hostname, /\.pages\.dev$/, 'the room server\'s pages.dev address');
-  // The match goes through the room server: 30 packets a second, and a
+  // The match goes through a TURN relay, every frame sent at once, with a
   // delay chosen for each match from the trip (3 to 12 steps), 7 (about
   // 117 ms) when it could not be measured.
-  assert.equal(o.sendIntervalMs, 33);
   assert.equal(o.inputDelay, 7);
   assert.deepEqual({ ...o.inputDelayRange }, { min: 3, max: 12 });
-  assert.ok(o.inputDelay * CONFIG.sim.step * 1000 - o.sendIntervalMs - o.delayMarginMs >= 60, 'the default leaves 60 ms for the trip');
+  assert.equal(o.sendIntervalMs, undefined, 'no packet waits to be sent');
   assert.equal(o.delayMarginMs, 15);
   assert.equal(o.pingIntervalMs, 200);
   assert.equal(o.pingRefreshMs, 5000);
