@@ -128,6 +128,22 @@
 //     groundOnly: true,
 //   },
 //
+// A volley (`volley: { count, interval }` on the `projectile` entry) throws
+// `count` of that projectile one after another, the first as the time
+// crosses `spawnAt` and each next one `interval` seconds after the one
+// before (at least one fixed step apart, the last within the attack), all
+// from the same `offset`, each aimed where the fighter faces as it leaves.
+// Each is a projectile of its own (each strikes, is blocked or is turned
+// back on its own); together they are one use of the move: one press, one
+// Energy cost, one cooldown, released with the first. A hit that stops the
+// throw stops the shots still to come, and a Shield that blocks any shot
+// stops the volley, as a blocked strike stops a string: its shots still
+// flying are gone and no more are thrown (CombatSystem.stopVolley), so a
+// volley never costs a Shield more than one block.
+//
+//   extra_attack: { ..., projectile: { id: 'extra_attack_object', spawnAt: 2 / 15, offset: { x: 30, y: -50 },
+//     volley: { count: 3, interval: 1 / 15 } } },
+//
 // A multi-hit attack lists its strikes in `hits` instead of one hitbox:
 // each strikes at most once, while its own window is open (`at` to `at +
 // active`, seconds into the attack), on the first opponent its box meets,
@@ -304,6 +320,7 @@
 //
 //   attack1: { animation: 'attack1', pending: true },
 
+import { CONFIG } from '../../config.js';
 import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveMoveEnergy } from '../../data/energy.js';
 import { resolveAttackCarry, resolveStepIn } from '../../data/attack-movement.js';
@@ -328,7 +345,7 @@ const ATTACK_DEFAULTS = {
   hitCancel: null,   // seconds in: from then on, once it has hit, an attack, a jump or a Dash may cut it short
   baseLaunch: 0,
   directionalLaunch: null,
-  projectile: null, // { id, spawnAt, offset } for a projectile attack
+  projectile: null, // { id, spawnAt, offset, volley } for a projectile attack
   pending: false,   // art only, its attributes not authored yet (see above)
   hits: null,        // a multi-hit attack's strikes (see above)
   carry: null,       // { lift }: a real hit drags its target along (see above)
@@ -427,6 +444,29 @@ export function resolvePull(spec, owner) {
   if (spec.front !== undefined && typeof spec.front !== 'boolean') throw new Error(`[Alva] ${owner}'s pull front must be true or false`);
   const o = spec.offset ?? {};
   return Object.freeze({ ...spec, front: !!spec.front, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
+}
+
+// The frozen projectile release of `owner` from its `projectile` entry, or
+// null: its volley (see above) checked and frozen, or null for one shot. A
+// volley throws two or more, at least one fixed step apart, so no two shots
+// ever leave on the same step.
+function resolveRelease(spec, owner) {
+  if (!spec) return null;
+  if (spec.volley === undefined || spec.volley === null) return Object.freeze({ ...spec, volley: null });
+  const { count, interval } = spec.volley;
+  if (!Number.isInteger(count) || count < 2) throw new Error(`[Alva] ${owner}'s volley needs a whole count of 2 or more`);
+  if (!(interval >= CONFIG.sim.step - PHASE_EPSILON) || !Number.isFinite(interval)) {
+    throw new Error(`[Alva] ${owner}'s volley needs an interval of at least one fixed step (${CONFIG.sim.step} s)`);
+  }
+  return Object.freeze({ ...spec, volley: Object.freeze({ count, interval }) });
+}
+
+// When the last shot of attack `def`'s projectile leaves, seconds in (its
+// one shot's `spawnAt`, or a volley's last), or null with no projectile.
+export function lastShotAt(def) {
+  const p = def?.projectile;
+  if (!p) return null;
+  return (p.spawnAt ?? 0) + ((p.volley?.count ?? 1) - 1) * (p.volley?.interval ?? 0);
 }
 
 // The fields a strike of a multi-hit attack takes from the attack when it
@@ -625,6 +665,7 @@ export function createAttackDefinition(spec, { clipDuration = 0, projectiles = n
   else if (spec.damage !== undefined) {
     throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
   }
+  def.projectile = resolveRelease(spec.projectile, owner);
   def.cooldownClass = cooldownClass('attack', spec, { projectiles });
   def.cooldown = resolveCooldown(spec.cooldown, owner, { cls: def.cooldownClass });
   def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'attack', def, def.cooldownClass);
@@ -634,6 +675,9 @@ export function createAttackDefinition(spec, { clipDuration = 0, projectiles = n
   def.deflectProjectiles = !!def.deflectProjectiles;
   if (def.deflectProjectiles && !def.hitbox) throw new Error(`[Alva] ${owner} deflects projectiles but has no hitbox to do it with`);
   def.total = def.startup + def.active + def.recovery;
+  if (def.projectile?.volley && lastShotAt(def) >= def.total - PHASE_EPSILON) {
+    throw new Error(`[Alva] ${owner}'s volley throws its last shot after the attack is over`);
+  }
   if (def.motion?.type === 'tunnel' && def.motion.show > def.total + PHASE_EPSILON) {
     throw new Error(`[Alva] ${owner}'s tunnel comes out after the attack is over`);
   }

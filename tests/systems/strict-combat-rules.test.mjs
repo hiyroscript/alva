@@ -277,6 +277,9 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // pay. Camouflage (a cloak, 3 s) and the Venom Punch (a hold, 3 s) pay
     // nothing either, and every other move is melee.
     '0011': { 'tech:attack4': 0, 'tech:attack5': 0 },
+    // Shuriken, an ordinary volley: one 15 for its three shots. Dragonblade
+    // (5 s) pays nothing, and every other move is its own blade.
+    '0012': { extra_attack: 15, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

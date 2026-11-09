@@ -38,6 +38,13 @@
 // it there, an erasing one included (no projectile flies on through a
 // Shield to strike the fighter behind it later).
 //
+// An attack may throw a volley of one projectile (see `volley` in
+// js/game/combat/attacks.js): each shot a Projectile of its own, carrying
+// the throw it belongs to (`volleyOf`). A Shield that blocks one of them
+// stops the volley: the shots of it still flying are gone and the throw
+// throws no more (CombatSystem.stopVolley), so a volley never costs a
+// Shield more than one block, as a blocked strike stops a string.
+//
 // A piercing projectile (`pierce: { hits, interval }`) strikes up to `hits`
 // times instead, at least `interval` seconds apart, staying in play between
 // them; every strike before the last deals the projectile's own `damage`,
@@ -185,9 +192,13 @@ export class Projectile {
   // turnBack changes it). `ability` is the attack or technique that
   // released it (its id), kept whoever owns it later: where the attack came
   // from, for the combat events.
-  constructor({ owner, def, anim, x, y, direction, sprites = owner?.sprites ?? null, ability = def?.id ?? null }) {
+  constructor({ owner, def, anim, x, y, direction, sprites = owner?.sprites ?? null, ability = def?.id ?? null, volleyOf = null }) {
     this.owner = owner;
     this.ability = ability;
+    // The throw it is one shot of, for a volley (see `volley` in
+    // js/game/combat/attacks.js): a Shield that blocks any shot of it
+    // stops them all (CombatSystem.stopVolley). Null for a lone shot.
+    this.volleyOf = volleyOf;
     // Turned back at least once (by a Deflect or a repelling projectile):
     // still an attack, now its new owner's.
     this.redirected = false;
@@ -266,6 +277,8 @@ export class Projectile {
   turnBack(owner, direction) {
     this.owner = owner;
     this.redirected = true;
+    // Its new owner's now, and no longer one of its thrower's volley.
+    this.volleyOf = null;
     this.direction = direction;
     this.vx = this.speed * direction;
     this.hits = 0;
@@ -275,7 +288,7 @@ export class Projectile {
 
   // Builds the projectile an owner released, or null if it has no such
   // projectile or no art for it (never an invisible hitbox).
-  static release(owner, { id, offset, direction, ability = id }) {
+  static release(owner, { id, offset, direction, ability = id, volleyOf = null }) {
     const def = owner.projectileDefs?.[id];
     const anim = def && owner.sprites.projectile(def.animation);
     if (!anim) {
@@ -284,7 +297,7 @@ export class Projectile {
     }
     const b = owner.body;
     return new Projectile({
-      owner, def, anim, direction, ability,
+      owner, def, anim, direction, ability, volleyOf,
       x: b.x + (offset?.x ?? 0) * direction,
       y: b.y + (offset?.y ?? 0),
     });

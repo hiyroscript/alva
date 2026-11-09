@@ -104,8 +104,16 @@ function projectileStrikes(proj) {
   return out;
 }
 
-function projectileModel(proj, spawnAt, offset) {
-  const strikes = projectileStrikes(proj);
+// A thrown projectile as the intelligence weighs it. A volley's later shots
+// (see `volley` in js/game/combat/attacks.js) are more strikes on the same
+// line, `interval` after one another: weighed as a piercing one's are.
+function projectileModel(proj, spawnAt, offset, volley = null) {
+  const one = projectileStrikes(proj);
+  const strikes = [];
+  for (let k = 0; k < (volley?.count ?? 1); k++) {
+    const lag = k * (volley?.interval ?? 0);
+    for (const s of one) strikes.push(k ? Object.freeze({ ...s, at: s.at + lag, end: s.end + lag }) : s);
+  }
   return Object.freeze({
     def: proj, id: proj.id, speed: proj.speed, lifetime: proj.lifetime, range: proj.speed * proj.lifetime,
     spawnAt, offset: { x: offset?.x ?? 0, y: offset?.y ?? 0 }, hitbox: proj.hitbox,
@@ -193,7 +201,7 @@ export function needsEnergy(m) {
 // A move built from an ordinary attack (melee or ranged) or the Deflect.
 function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
   const strikes = attackStrikes(atk);
-  const projectile = proj ? projectileModel(proj, atk.projectile.spawnAt, atk.projectile.offset) : null;
+  const projectile = proj ? projectileModel(proj, atk.projectile.spawnAt, atk.projectile.offset, atk.projectile.volley) : null;
   const impact = impactOf(atk);
   const sum = sumStrikes(projectile ? projectile.strikes : impact ? [...strikes, impact.strike] : strikes);
   const lead = projectile ? atk.projectile.spawnAt : strikes[0]?.at ?? atk.startup;

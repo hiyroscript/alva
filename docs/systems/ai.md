@@ -502,7 +502,9 @@ are attacks to the CPU too, the Deflect a defense as well), its role
 `counterProjectile`, `shieldPressure`, `defensiveDisengage`, `spike`,
 `heal`; none gets past a Shield), its reach swept along its motion (a
 slam's to where it would land, with its impact), its projectile's range
-and pull, its technique's burst and heal, its summon's clone, whether a
+and pull (and a volley's later shots, each weighed as a piercing
+projectile's later strike, `interval` after the one before), its
+technique's burst and heal, its summon's clone, whether a
 hit is a quake or a gaze, its cooldowns and air uses. A ranged move's
 shot may fly or, with no speed, stand where it appears for its lifetime
 (#0009's Earth Pillar): `readMoveset` reads both, and the shot's path is

@@ -16,7 +16,7 @@ The steps below use `0027` as the new fighter's id.
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
   of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4, 5, 6, 7,
-  8, 9 and 10 are taken.
+  8, 9, 10 and 11 are taken.
 
 ## 2. Add the art
 
@@ -296,7 +296,9 @@ An attack whose art is in but whose attributes are not can be
 and its art in `projectileAnimations`
 ([projectiles](../systems/combat.md#projectiles)). It may pierce
 (`pierce`, `finisher`), pull (`pull`), turn other fighters' projectiles
-back (`repel`) or erase them and fly through fighters (`erase`). With no
+back (`repel`) or erase them and fly through fighters (`erase`); the
+attack may throw several in a row, `volley: { count, interval }` on its
+`projectile` entry (one press, one Energy cost; #0012's Shuriken). With no
 `speed` it stays where it appears: an obstacle (#0004's dancing double).
 Keep its box clear of the floor where it appears (its `offset` up at least
 half its box's height): a shot that meets a solid block, the main floor
@@ -610,7 +612,8 @@ Then:
    [#0002](0002.md#controller-layout), [#0003](0003.md#controller-layout),
    [#0004](0004.md#controller-layout), [#0005](0005.md#controller-layout),
    [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout),
-   [#0010](0010.md#controller-layout) and [#0011](0011.md#controller-layout) do.
+   [#0010](0010.md#controller-layout), [#0011](0011.md#controller-layout) and
+   [#0012](0012.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (the comfortable inputs in order, one input a

@@ -304,6 +304,7 @@ export class CombatSystem {
           facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 }, fromX: p.x,
         });
         p.struck(event.type === 'block', target);
+        if (event.type === 'block' && p.volleyOf) this.stopVolley(p.volleyOf, projectiles);
         break;
       }
     }
@@ -403,6 +404,15 @@ export class CombatSystem {
         atk.confirmedAt = atk.time;
       }
     }
+  }
+
+  // A Shield blocked a shot of the volley thrown by attack activation
+  // `throwRecord` (see `volley` in js/game/combat/attacks.js): the volley
+  // stops there, as a blocked strike stops a string. Its other shots still
+  // flying are gone, and the throw, if it is still playing, throws no more.
+  stopVolley(throwRecord, projectiles) {
+    throwRecord.volleyStopped = true;
+    for (const q of projectiles) if (q.alive && q.volleyOf === throwRecord) q.alive = false;
   }
 
   // A multi-hit attack's strikes (see `hits` above) this step: each one

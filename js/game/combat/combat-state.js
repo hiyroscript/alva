@@ -209,7 +209,9 @@ export class CombatState {
     this.shieldStun = 0;    // blockstun remaining, held in the Shield
     this.hitstop = 0;       // freeze frames on impact
     // { def, time, hasHit, confirmed, confirmedAt, projectileSpawned,
-    // released, step, stepped, struck, blocked, motion }:
+    // shots, released, step, stepped, struck, blocked, motion }:
+    // projectileSpawned once its (first) projectile is out, shots how many
+    // of a volley's are (see `volley` in js/game/combat/attacks.js),
     // released once it has emitted what it authors (see releaseAttack),
     // hasHit once its hitbox (any of its strikes) has struck anyone,
     // confirmed (at its time confirmedAt) only for a hit a Shield did not
@@ -569,13 +571,20 @@ export class CombatState {
       // Nothing comes out of an attack while its fighter is stunned or held
       // (Fighter.update takes the attack away on this same step).
       const free = this.stun <= 0 && !this.immobilized;
-      // One-shot release: the step the attack's time crosses `spawnAt`. A
-      // throw interrupted by a hit before that point throws nothing.
+      // The release: the step the attack's time crosses `spawnAt`, and for
+      // a volley each later shot `interval` after the one before (never two
+      // on one step: see `volley` in js/game/combat/attacks.js). A throw
+      // interrupted by a hit before a shot throws nothing more, and nor
+      // does a volley a Shield has stopped (CombatSystem.stopVolley).
       const proj = a.def.projectile;
-      if (proj && !a.projectileSpawned && a.time >= proj.spawnAt - PHASE_EPSILON) {
+      const shots = proj ? proj.volley?.count ?? 1 : 0;
+      if (proj && !a.volleyStopped && (a.shots ?? 0) < shots && a.time >= proj.spawnAt + (a.shots ?? 0) * (proj.volley?.interval ?? 0) - PHASE_EPSILON) {
+        a.shots = (a.shots ?? 0) + 1;
         a.projectileSpawned = true;
-        // Whatever releases it, the attack that threw it is its ability.
-        if (this.stun <= 0) this.release = { ...proj, ability: a.def.id };
+        // Whatever releases it, the attack that threw it is its ability; a
+        // volley's shots also carry the throw they belong to (`volleyOf`,
+        // this activation).
+        if (this.stun <= 0) this.release = { ...proj, ability: a.def.id, volleyOf: proj.volley ? a : null };
       }
       // Released once its time reaches its release point (a slam with an
       // impact is released by the impact itself: Fighter.landSlam).

@@ -517,7 +517,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0008](../characters/0008.md#controller-layout),
 [#0009](../characters/0009.md#controller-layout),
 [#0010](../characters/0010.md#controller-layout),
-[#0011](../characters/0011.md#controller-layout).
+[#0011](../characters/0011.md#controller-layout),
+[#0012](../characters/0012.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -543,6 +544,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0010 air | Air Kick | Tentacle Sweep | | Tongue Lash | | |
 | #0011 ground | Punches | Spin Kick | Venom Punch | Web Shot | Camouflage | up: Venom Jump |
 | #0011 air | Air Kick | Somersault Kick | | Web Lines | | up: Venom Jump |
+| #0012 ground | Twin Cuts | Cleave | Deflect Stance | Shuriken | Dragonblade | forward: Swift Strike |
+| #0012 air | Whirlwind Cut | Rising Arc | Falling Cut | Shuriken | | up: Rising Strike |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -575,8 +578,8 @@ itself classifies as Special (its `specialAbilities`,
 Purple, #0003's Mystical Palm Technique, #0004's World is Mine, #0005's
 Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
 Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
-Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent and
-#0011's Camouflage and Venom Punch, each
+Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
+#0011's Camouflage and Venom Punch and #0012's Dragonblade, each
 tagged Ground or Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category

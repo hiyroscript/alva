@@ -5879,3 +5879,120 @@ CPUs.
   Sphere over two dozen seeds);
 - unchanged and passing: the online determinism and lockstep tests, the
   touch and controller comfort rules.
+
+## #0012, the cyborg ninja in silver armour
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0012 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon, no move the
+character cannot perform in canon, the sheet's DeviantArt page credited
+and the character named nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0012 in roster slot 12, playable: 151 frames cut from
+  the sheet into `assets/characters/0012/`, read at 1× (one file pixel per
+  art pixel), each frame cropped tight to its own pieces of the sheet's
+  art, the flat teal background (30, 159, 157) made transparent, nothing
+  redrawn or recoloured, every file `0012_<codename>_<frame>.png`: 136 of
+  the fighter, 4 of its shuriken (a projectile) and 11 of Dragonblade's
+  dragon spirit (an effect). The sheet repeats many drawings from one row
+  in another (Dragonblade's row is mostly the Deflect Stance's guard and
+  Swift Strike's draw and dash): each is cut once, for the one move that
+  has it, so no two files are the same picture. Drawn at the roster's
+  art-pixel size (a 57-pixel standing pose, about 96 units); every clip
+  authors its own `anchorX` on its body and, where the art reaches below
+  its feet, `anchorY`. Movement is the universal one; its Energy refills at
+  the shared 12 a second.
+- **Its blade, its shuriken, its dash and its dragon**, from its canon (a
+  swordsman rebuilt with a machine body: shuriken thrown three at a time,
+  a blade that turns shots back, a dash that cuts through everyone in its
+  way, aimed up too, and the sword that carries a dragon's spirit), each
+  with a mechanic: **Twin Cuts** (1 that holds, then 3) and the **Cleave**
+  (3 at Base Launch 2), its Mash Combo pair; the **Whirlwind Cut** (a
+  spin: 1 ahead, 1 behind, 3 over it), the **Rising Arc** (launching
+  straight up) and the **Falling Cut** (a spike, no plunge) in the air;
+  **Shuriken** (its extra attack: three thrown one after another, 1 each,
+  on the ground and in the air, 15 Energy for the three); the **Deflect
+  Stance** (its blade held out on the ground for seven twelfths of a
+  second, turning back every shot that meets it, ended by any move);
+  **Swift Strike** (a roll of about 210 units that passes through its
+  target: 3) and in the air the **Rising Strike** (the same dash straight
+  up, a `rise` that passes through, once per airtime: its way back to the
+  stage); **Dragonblade** (a technique and its Special: half a second's
+  stance, then a burst all round it, 10 at Base Launch 3, the dragon
+  spirit coiling round it; 5 s). Its guard is its blade held across; its
+  Deflect, in the air, its canon's own whirl of orange cuts; its Dash a
+  blur of speed, its air dash a leap. It heals nobody, summons nobody,
+  never homes in and throws nothing but its shuriken.
+- **One shared capability, for any attack: `volley`**, on a `projectile`
+  entry (`volley: { count, interval }`): `count` shots of the projectile,
+  the first at `spawnAt` and each next one `interval` later (at least one
+  fixed step apart, the last within the attack: `lastShotAt`), each a
+  projectile of its own aimed where its fighter faces as it leaves, all
+  one use of the move (one press, one Energy cost, one cooldown, released
+  with the first). The cooldown policy counts every shot (`moveImpact`),
+  and so does the CPU (a later shot weighed as a piercing projectile's
+  later strike). A hit on the thrower stops the shots still to come; a
+  Shield that blocks any shot stops the volley (`CombatSystem.stopVolley`:
+  its shots still flying are gone, `volleyStopped` throws no more), so a
+  volley never costs a Shield more than one block, as a blocked strike
+  stops a string; a shot turned back leaves its volley. A technique that
+  declares a volley is refused. A lone shot's release is unchanged.
+- **Its controller layout** by the comfort rules (Square Twin Cuts /
+  Whirlwind Cut, Triangle the Cleave / Rising Arc, Circle the Deflect
+  Stance / Falling Cut, R2 Shuriken both ways, L2 Dragonblade, the right
+  stick forward Swift Strike and up the Rising Strike), touch buttons,
+  names and descriptions in English and French, a Discover profile (3/5)
+  and its credits (the sheet by xxalexsmashxx on DeviantArt, linked by the
+  deviation's number alone).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, three seeds: 132 matches a level): #0012 wins 0.60
+at Medium, 0.48 at Hard and 0.50 at Brutal (#0011, measured the same way,
+0.51 at Medium); weakest against #0008 (2 to 4 of 12). Its first tuning
+won 0.80 at Medium: its Mash Combo cuts' boxes were trimmed from the whole
+sweep the art draws (60 × 120) to where the blade cuts, and its two big
+aerials' boxes made smaller. Details in
+[#0012's specification](docs/characters/0012.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0012.js`: the
+moves' phases are whole frames of their clips at `FPS_0012` (the orders
+`TWIN_CUTS_0012`, `CLEAVE_0012`, `STANCE_0012`, `SWIFT_STRIKE_0012`,
+`SHURIKEN_0012` and the rest); reaches are the attacks' `hitbox`es and
+Dragonblade's `burst`; the volley is `attacks.extra_attack.projectile`
+(`volley`) and each shuriken `projectiles.extra_attack_object`; the dashes
+are `attacks.attack4.motion` and `attacks.midair_attack4.motion`; the
+anchors and feet are `ANCHORS_0012` and `FEET_0012`. The volley's rules
+are in `js/game/combat/attacks.js` (`resolveRelease`), its release in
+`js/game/combat/combat-state.js` and its Shield rule in
+`CombatSystem.stopVolley`.
+
+**Code:** `js/data/characters/0012.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/attacks.js` (`volley`, `lastShotAt`),
+`js/game/combat/combat-state.js` (a volley's shots, one a step),
+`js/game/combat/combat.js` (`stopVolley`), `js/game/combat/projectile.js`
+(`volleyOf`), `js/game/combat/technique.js` (no volley),
+`js/game/fighters/fighter.js` (a shot carries its throw),
+`js/data/cooldowns.js` (every shot counted),
+`js/game/ai/cpu-intelligence/capabilities.js` (every shot weighed); the
+specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0012.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy,
+input, launch, rendering, the AI, testing, the served file count).
+
+**Tests:** new `tests/fighters/0012/fighter-0012.test.mjs` (registration
+and kit; its costs and cooldowns; its Special; its Mash Combo; its names,
+touch buttons and controller layout; the 151 files, clean and tight, none
+a copy, at one scale, anchored on its body and feet, its shuriken and
+dragon centred; every move's mechanic: the volley, the stance turning a
+shot back and giving way, the dashes through and the Shield that stops
+one, Dragonblade either side, its dragon, its block and its broken cast;
+its Deflect; the CPU playing its whole kit; its source named nowhere); new
+`tests/systems/volley.test.mjs` (the shared capability on a test-only
+fighter); the roster-wide tables (`cooldown-policy`, `special-abilities`:
+eighteen Specials, `strict-combat-rules`, `mash-combo`), `i18n` (Shuriken,
+the same word in French), `empty-roster`, `discover`, `practice-ground`,
+`watch-mode`, `settings` (its credits) and each fighter's roster list.

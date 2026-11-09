@@ -204,6 +204,7 @@ test('French is really French: only proper names, codes and shared words read th
     'ability.0004.attack4', // Ievan Polkka, a song's title
     'ability.0004.attack5', // World is Mine, a song's title
     'ability.0011.attack4', // Camouflage, the same word
+    'ability.0012.extra_attack', // Shuriken, the same word
     'binding.direction', // Direction, the same word
     'brand.title', // ALVA
     'control.pause', // Pause
