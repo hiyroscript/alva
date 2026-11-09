@@ -1236,24 +1236,31 @@ test('Right works alongside every attack, Shield and Jump (multi-touch), each it
 
 const actionsOf = (cluster) => cluster.children.map((c) => c.getAttribute('data-action'));
 
-test('Joystick is the default scheme; setScheme switches layouts and anything unknown is Joystick', () => {
+test('Screen Pad is the default scheme; setScheme switches layouts and anything unknown is Screen Pad', () => {
   const input = { setTouch() {}, queueTouchMouvement() {} };
   const tc = new TouchControls(new Element('div'), input);
-  assert.equal(tc.scheme, 'joystick', 'a player who never chose');
+  assert.equal(tc.scheme, 'screenpad', 'a player who never chose');
+  assert.equal(tc.root.dataset.scheme, 'screenpad');
+  assert.ok(tc.root.classList.contains('is-screenpad'));
+  assert.equal(tc.root.classList.contains('is-joystick'), false);
+  assert.equal(tc.root.classList.contains('is-classic'), false);
+  tc.setScheme('joystick');
+  assert.equal(tc.scheme, 'joystick');
   assert.equal(tc.root.dataset.scheme, 'joystick');
   assert.ok(tc.root.classList.contains('is-joystick'));
-  assert.equal(tc.root.classList.contains('is-classic'), false);
+  assert.equal(tc.root.classList.contains('is-screenpad'), false);
   tc.setScheme('classic');
   assert.equal(tc.scheme, 'classic');
   assert.equal(tc.root.dataset.scheme, 'classic');
   assert.ok(tc.root.classList.contains('is-classic'));
   assert.equal(tc.root.classList.contains('is-joystick'), false);
-  for (const bad of ['dpad', '', null, undefined, 'Classic']) {
+  for (const bad of ['dpad', '', null, undefined, 'Classic', 'ScreenPad']) {
     tc.setScheme('classic');
     tc.setScheme(bad);
-    assert.equal(tc.scheme, 'joystick', String(bad));
+    assert.equal(tc.scheme, 'screenpad', String(bad));
   }
   assert.equal(new TouchControls(new Element('div'), input, { scheme: 'classic' }).scheme, 'classic');
+  assert.equal(new TouchControls(new Element('div'), input, { scheme: 'joystick' }).scheme, 'joystick');
 });
 
 test('Classic Buttons has Run and Mouvement Left / Right at the lower left, the actions at the lower right', () => {
@@ -1709,6 +1716,43 @@ test('switching schemes lets go of everything first: no direction, Jump or Shiel
   press(tc.buttons.get('attack1'), 8);
   tc.setScheme('joystick');
   assert.deepEqual(calls.at(-1), ['attack1', false]);
+});
+
+test('Screen Pad shows only the right-hand cluster, and switching to or from it lets go of everything first', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'screenpad' });
+  assert.deepEqual(tc.root.children, [tc.pad, tc.actions], 'the invisible pad and the lower-right cluster');
+  assert.deepEqual(actionsOf(tc.actions), ['extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']);
+  assert.equal(tc.buttons.has('down'), false);
+  assert.equal(tc.root.querySelectorAll('.tc-stick').length, 0);
+  assert.equal(tc.root.querySelectorAll('.tc-dash').length, 0);
+  assert.equal(tc.root.querySelectorAll('.tc-down').length, 0);
+  assert.equal(tc.root.querySelectorAll('.tc-pad').length, 0);
+  // Holding a run and Down on the pad, Jump and Shield on the right.
+  const ev = (pointerId, clientX, clientY, timeStamp) => ({ pointerId, clientX, clientY, timeStamp, preventDefault() {} });
+  globalThis.innerWidth = 844;
+  globalThis.innerHeight = 390;
+  try {
+    tc.pad.dispatch('pointerdown', ev(1, 200, 200, 0));
+    tc.pad.dispatch('pointermove', ev(1, 230, 230, 300));
+  } finally {
+    delete globalThis.innerWidth;
+    delete globalThis.innerHeight;
+  }
+  for (const [action, id] of [['jump', 3], ['shield', 4]]) press(tc.buttons.get(action), id);
+  const before = calls.length;
+  assert.deepEqual(calls.slice(0, before).filter(([a]) => a === 'runRight' || a === 'down'), [['runRight', true], ['down', true]]);
+  tc.setScheme('joystick');
+  assert.deepEqual(calls.slice(before).sort(), [['down', false], ['jump', false], ['runRight', false], ['shield', false]]);
+  assert.equal(tc.pointers.size, 0);
+  assert.equal(tc.gesture.active, null);
+  assert.ok([...tc.counts.values()].every((n) => n === 0));
+  // Its late lift changes nothing, and back on Screen Pad nothing is held.
+  tc.pad.dispatch('pointerup', ev(1, 230, 230, 320));
+  assert.equal(calls.length, before + 4);
+  press(tc.buttons.get('attack1'), 8);
+  tc.setScheme('screenpad');
+  assert.deepEqual(calls.at(-1), ['attack1', false]);
+  assert.deepEqual(tc.root.children, [tc.pad, tc.actions]);
 });
 
 test('a scheme switch keeps the fighter\'s combat buttons and Jump: the same elements, art and names', () => {

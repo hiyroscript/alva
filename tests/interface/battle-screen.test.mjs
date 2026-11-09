@@ -1211,7 +1211,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
 
-test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
+test('Quick Battle uses the Mobile Controls setting: Screen Pad by default, Joystick or Classic Buttons once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
   // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { MAPS } = await import('../../js/data/maps.js');
@@ -1223,7 +1223,14 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   const lowerLeft = () => touch.root.children[0];
 
   await screen.enter();
-  assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
+  assert.equal(app.settings.mobileControls, 'screenpad', 'nothing stored: the default');
+  assert.equal(touch.scheme, 'screenpad');
+  assert.equal(lowerLeft(), touch.pad, 'the invisible pad, no lower-left cluster');
+  assert.equal(touch.buttons.has('down'), false, 'no Down button');
+  assert.ok(!touch.root.children.includes(touch.joystick) && !touch.root.children.includes(touch.dpad));
+
+  app.settings.set('mobileControls', 'joystick');
+  await screen.enter();
   assert.equal(touch.scheme, 'joystick');
   assert.equal(lowerLeft(), touch.joystick);
   assert.equal(touch.buttons.get('down'), touch.downButton, 'Down, by the stick');

@@ -1140,8 +1140,12 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
     screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
     for (const b of screen.touch.mouvementButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
   };
-  assert.equal(screen.touch.scheme, 'joystick', 'the default');
+  assert.equal(screen.touch.scheme, 'screenpad', 'the default');
   tryEverything();
+  screen.touch.pad.dispatch('pointerdown', { pointerId: 6, clientX: 10, clientY: 10, timeStamp: 0, preventDefault: noop });
+  screen.touch.pad.dispatch('pointerup', { pointerId: 6, clientX: 10, clientY: 10, timeStamp: 50 });
+  assert.deepEqual(touches, [], 'a tap on the pad plays nobody either');
+  assert.equal(app.input.touchPulses?.size ?? 0, 0);
   assert.deepEqual(touches, []);
   screen.exit();
 

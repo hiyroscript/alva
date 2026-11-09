@@ -733,6 +733,9 @@ export const FR = {
   'touch.deflect': 'Renvoi',
   'touch.mouvementLeft': 'Mouvement à gauche',
   'touch.mouvementRight': 'Mouvement à droite',
+  'touch.screenPadHint.title': 'Pavé tactile',
+  'touch.screenPadHint.body': 'Moitié gauche de l’écran — Touchez : sauter · Glissez : sprinter · Maintenez et glissez : bouger · Glissez vers le bas : Bas · Glissez vers le haut : super saut',
+  'touch.screenPadHint.dismiss': 'Touchez l’écran pour jouer.',
 
   'firstRun.title': 'Langue',
   'firstRun.prompt': 'Choisissez votre langue',
@@ -746,6 +749,8 @@ export const FR = {
   'settings.controls': 'Commandes',
   'settings.mobileControls': 'Commandes tactiles',
   'settings.controlsNote': 'Les dispositions tactiles et de manette du Combat rapide et du Terrain d’entraînement. Les commandes au clavier ne changent pas.',
+  'settings.scheme.screenpad': 'Pavé tactile',
+  'settings.scheme.screenpadDesc': 'Moitié gauche : touchez pour sauter, glissez pour sprinter, maintenez et faites glisser pour bouger.',
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Boutons classiques',
   'settings.scheme.joystickDesc': 'Utilisez le joystick pour vous déplacer. Touchez un bouton de mouvement une fois pour sprinter à gauche ou à droite.',

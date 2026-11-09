@@ -176,6 +176,11 @@ export class InputManager {
 
     this.keys = new Set();
     this.touch = new Set();
+    // Touch controls held for one sample only (pulseTouch): Screen Pad's
+    // tap (Jump) and swipe up (Down and Jump together).
+    this.touchPulses = new Set();
+    // Told whenever everything is let go for focus lost (suspend).
+    this.suspendListeners = new Set();
     this.state = {};
     for (const a of [...HELD_CONTROLS, 'pause', ...MOUVEMENT_CONTROLS]) this.state[a] = { held: false, presses: 0 };
     // The Dash a touch mouvement button asked for since the last sample:
@@ -339,7 +344,7 @@ export class InputManager {
   _refresh(action) {
     const st = this.state[action];
     if (!st) return;
-    let held = this.touch.has(action);
+    let held = this.touch.has(action) || this.touchPulses.has(action);
     if (!held) {
       for (const code of this.bindings[action] || []) {
         if (this.keys.has(code)) {
@@ -357,6 +362,33 @@ export class InputManager {
     else this.touch.delete(action);
     this.lastDevice = 'touch';
     this._refresh(action);
+  }
+
+  // A touch control pressed and held through the next sample only, then
+  // let go: one real press edge, exactly as a tap that lasted one step.
+  // Screen Pad's gestures send it (a tap's Jump, a swipe up's Down and
+  // Jump in the same sample, the Super Jump; js/ui/touch-controls.js). A
+  // control a finger already holds stays held after it.
+  pulseTouch(action) {
+    if (!this.state[action]) return;
+    this.touchPulses.add(action);
+    this.lastDevice = 'touch';
+    this._refresh(action);
+  }
+
+  // Discard every pulse not sampled yet (the touch controls let go).
+  clearTouchPulses() {
+    if (!this.touchPulses.size) return;
+    const ended = [...this.touchPulses];
+    this.touchPulses.clear();
+    for (const action of ended) this._refresh(action);
+  }
+
+  // Calls `listener()` whenever focus is lost or the page hidden and
+  // everything is let go (suspend); returns an unsubscribe.
+  onSuspend(listener) {
+    this.suspendListeners.add(listener);
+    return () => this.suspendListeners.delete(listener);
   }
 
   // One Dash toward `direction` (1 right, -1 left), asked for by a single
@@ -402,6 +434,7 @@ export class InputManager {
   clear() {
     this.keys.clear();
     this.touch.clear();
+    this.touchPulses.clear();
     for (const st of Object.values(this.state)) {
       st.held = false;
       st.presses = 0;
@@ -416,6 +449,7 @@ export class InputManager {
     this.clear();
     this.controllers.suspend();
     for (const channel of Object.values(this.channels)) channel.release();
+    for (const fn of [...this.suspendListeners]) fn();
   }
 
   resumeDevices() {
@@ -436,7 +470,8 @@ export class InputManager {
   }
 
   // Build the per-simulation-step input snapshot for Player 1: every held
-  // control (runLeft ... attack5) and its press edge, the Dash requests
+  // control (runLeft ... attack5, a touch pulse among them) and its press
+  // edge, the Dash requests
   // (Q / E, a touch movement button, the controller's Dash), and where the
   // controller's combat presses were made. `context` is the fighter as it
   // is now ({ grounded, facing, character }): the controller resolves for
@@ -457,6 +492,8 @@ export class InputManager {
     f.mouvementLeftPressed = left || this.touchMouvement === -1 || pad?.dash === -1;
     f.mouvementRightPressed = right || this.touchMouvement === 1 || pad?.dash === 1;
     this.touchMouvement = 0;
+    // A pulse lasted this one sample.
+    this.clearTouchPulses();
     // A keyboard or touch combat press in the same sample makes no claim
     // about where the presses are for.
     const place = ownPress ? null : pad?.place ?? null;

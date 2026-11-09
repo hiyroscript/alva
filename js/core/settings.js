@@ -8,17 +8,26 @@
 //
 // Stored as
 //
-//   { version: 10,
+//   { version: 11,
 //     language: 'en' | 'fr' | null,
-//     mobileControls: 'joystick' | 'classic',
-//     touchLayouts: { joystick: { ... }, classic: { ... } },
+//     mobileControls: 'screenpad' | 'joystick' | 'classic',
+//     mobileControlsChosen: true | false,
+//     touchLayouts: { screenpad: { ... }, joystick: { ... }, classic: { ... } },
+//     screenPadHintSeen: true | false,
 //     automaticTurnAround: true | false,
 //     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... },
 //     onlineName: '<name>' | null }
 //
 // `language` stays null until the player picks one: the game then speaks
 // English, but the first-launch chooser still asks (languageChosen), so a
-// default is never mistaken for a choice. Each scheme keeps its own custom
+// default is never mistaken for a choice. Mobile Controls follows the same
+// rule: `mobileControlsChosen` says whether the stored scheme is one the
+// player picked (in Settings) or kept from before (a migration); while it is
+// false the scheme read is always today's default, whatever was written
+// with it, so a later change of the default reaches everyone who never
+// chose. `screenPadHintSeen` is whether the one-time Screen Pad hint
+// (js/ui/screen-pad-hint.js) has been shown and dismissed. Each scheme
+// keeps its own custom
 // touch layout (see js/core/touch-layout.js); an empty one is Alva's
 // original layout. `automaticTurnAround` is whether the human player's
 // fighter faces the closest enemy by itself (see Fighter.turnAroundFacing
@@ -61,7 +70,16 @@
 // tell a player's own choice from the old default (every save writes every
 // setting), so every older version keeps the scheme it played with, its
 // stored one, or Classic Buttons where it held none valid (the old
-// default); only new or empty storage starts on Joystick. Missing, blocked or unreadable
+// default); only new or empty storage started on Joystick. Screen Pad became
+// the default in version 11 (the Screen Pad update), with
+// `mobileControlsChosen` so that the next change of default can tell a
+// choice from a default. A version 10 object still cannot (every save wrote
+// Joystick, chosen or not), so its stored scheme is kept, never taken away,
+// and counted as chosen from now on; it starts on Screen Pad only where it
+// held no valid scheme at all. Every older object keeps its scheme as
+// before (Classic Buttons where it held none valid), also counted as
+// chosen. No version before 11 had the Screen Pad hint: not seen yet.
+// Missing, blocked or unreadable
 // storage, a stored object of any other version, and every value that is
 // not one of its setting's choices fall back to the defaults, value by
 // value, so the game always starts with a valid set.
@@ -76,13 +94,14 @@ import { checkName } from '../online/rules.js';
 export const LANGUAGES = Object.freeze(['en', 'fr']);
 export const DEFAULT_LANGUAGE = 'en';
 
-// The touch layouts Quick Battle and Practice Ground can use (see
-// js/ui/touch-controls.js). Joystick is the default for a player who has
-// never chosen, and the fallback for an unknown or missing scheme, here and
-// everywhere that reads one; a stored choice of either is kept, and so is
-// what a player stored before version 10 (see SETTINGS_BEFORE_10_SCHEME).
-export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
-export const DEFAULT_MOBILE_CONTROLS = 'joystick';
+// The touch layouts Quick Battle, Practice Ground and Online Play can use
+// (see js/ui/touch-controls.js), in the order Settings lists them. Screen
+// Pad is the default for a player who has never chosen, and the fallback
+// for an unknown or missing scheme, here and everywhere that reads one; a
+// stored choice of any is kept, and so is what a player stored before
+// version 11 (see SETTINGS_BEFORE_10_SCHEME and the migrations below).
+export const MOBILE_CONTROLS = Object.freeze(['screenpad', 'joystick', 'classic']);
+export const DEFAULT_MOBILE_CONTROLS = 'screenpad';
 // The default before version 10: what a stored object from before then
 // played with where it held no valid scheme of its own.
 export const SETTINGS_BEFORE_10_SCHEME = 'classic';
@@ -92,21 +111,24 @@ export const SETTINGS_BEFORE_10_SCHEME = 'classic';
 export const DEFAULT_AUTOMATIC_TURN_AROUND = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 10;
+export const SETTINGS_VERSION = 11;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
   mobileControls: DEFAULT_MOBILE_CONTROLS,
+  mobileControlsChosen: false,
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
   automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND,
   controllerProfiles: Object.freeze({}),
   onlineName: null,
+  screenPadHintSeen: false,
 });
 
 // The settings that are one choice from a list, and their allowed values.
 const CHOICES = Object.freeze({ language: LANGUAGES, mobileControls: MOBILE_CONTROLS });
 // The settings that are on or off: a real boolean, nothing else.
-const TOGGLES = Object.freeze(['automaticTurnAround']);
+// (`mobileControlsChosen` is not one: only choosing a scheme sets it.)
+const TOGGLES = Object.freeze(['automaticTurnAround', 'screenPadHintSeen']);
 
 // A stored online name, cleaned, or null when there is none or the rules
 // refuse it.
@@ -128,20 +150,43 @@ export function resolveSetting(name, value) {
   return allowed(name, value) ? value : DEFAULT_SETTINGS[name];
 }
 
+// The Mobile Controls of a stored object of the current version: its
+// scheme only if the player chose it (mobileControlsChosen), else today's
+// default, as { mobileControls, mobileControlsChosen }.
+function readScheme(stored) {
+  const chosen = stored.mobileControlsChosen === true && allowed('mobileControls', stored.mobileControls);
+  return { mobileControls: chosen ? stored.mobileControls : DEFAULT_MOBILE_CONTROLS, mobileControlsChosen: chosen };
+}
+
+// The Mobile Controls of an older version's object, which cannot tell a
+// choice from its default: its stored scheme kept (counted as chosen from
+// now on, so no later default takes it away), else `fallback` (the scheme it
+// played with) counted as chosen too, or, with no fallback, today's default,
+// not chosen.
+function keptScheme(stored, fallback = null) {
+  if (allowed('mobileControls', stored.mobileControls)) return { mobileControls: stored.mobileControls, mobileControlsChosen: true };
+  if (fallback) return { mobileControls: fallback, mobileControlsChosen: true };
+  return { mobileControls: DEFAULT_MOBILE_CONTROLS, mobileControlsChosen: false };
+}
+
 // Every setting from a stored object of the current version, each checked.
 // `profiles` reads its controller profiles (an older version's are
-// upgraded first); `scheme` is the Mobile Controls a missing or unknown
-// one falls back to (the default; an older version's, its default then).
-function readCurrent(stored, profiles = sanitizeStoredProfiles, scheme = DEFAULT_MOBILE_CONTROLS) {
+// upgraded first); `scheme` reads its Mobile Controls (readScheme; an older
+// version's, keptScheme).
+function readCurrent(stored, profiles = sanitizeStoredProfiles, scheme = readScheme) {
   return {
     language: resolveSetting('language', stored.language),
-    mobileControls: allowed('mobileControls', stored.mobileControls) ? stored.mobileControls : scheme,
+    ...scheme(stored),
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
     automaticTurnAround: resolveSetting('automaticTurnAround', stored.automaticTurnAround),
     controllerProfiles: profiles(stored.controllerProfiles),
     onlineName: readOnlineName(stored.onlineName),
+    screenPadHintSeen: resolveSetting('screenPadHintSeen', stored.screenPadHintSeen),
   };
 }
+
+// What every version before 10 played with where it held no valid scheme.
+const before10 = (stored) => keptScheme(stored, SETTINGS_BEFORE_10_SCHEME);
 
 // Controller profiles saved under version 4 or 5, upgraded for the fighter
 // each belongs to.
@@ -153,19 +198,25 @@ const upgradeProfiles = (raw) => upgradeStoredProfiles(raw, getCharacter);
 // under that name. Nothing else it held (Combat Assist, Combo Assist) is
 // read, and no version before 9 had an online name. Its Mobile Controls are
 // kept, Classic Buttons where it held none valid (the default before
-// version 10).
+// version 10). No version before 11 had the Screen Pad hint.
 const migrate = (kept, profiles) => readCurrent({
-  ...kept, automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND, onlineName: null,
-}, profiles, SETTINGS_BEFORE_10_SCHEME);
+  ...kept, automaticTurnAround: DEFAULT_AUTOMATIC_TURN_AROUND, onlineName: null, screenPadHintSeen: false,
+}, profiles, before10);
 // Version 8: everything it had is kept as it is, Automatic turn-around
 // included; only the online name is new.
-const keep = (stored) => readCurrent({ ...stored, onlineName: null }, undefined, SETTINGS_BEFORE_10_SCHEME);
+const keep = (stored) => readCurrent({ ...stored, onlineName: null, screenPadHintSeen: false }, undefined, before10);
 // Version 9: everything kept as it is. Mobile Controls' default changed
 // to Joystick in version 10, and a version 9 object cannot tell the
 // player's own Classic Buttons from the old default (every save wrote it),
 // so its stored scheme is kept as it is, Classic Buttons where it held none
 // valid: nobody who played version 9 finds their controls changed.
-const keepScheme = (stored) => readCurrent(stored, undefined, SETTINGS_BEFORE_10_SCHEME);
+const keepScheme = (stored) => readCurrent({ ...stored, screenPadHintSeen: false }, undefined, before10);
+// Version 10: everything kept as it is. Screen Pad became the default in
+// version 11, and a version 10 object cannot tell the player's own
+// Joystick from the default it then was (every save wrote it), so its
+// stored scheme is kept, Joystick or Classic Buttons, never taken away;
+// only one that held no valid scheme (it never chose) starts on Screen Pad.
+const keep10 = (stored) => readCurrent({ ...stored, screenPadHintSeen: false }, undefined, (value) => keptScheme(value));
 
 // Older versions, each read into the current settings.
 const MIGRATIONS = Object.freeze({
@@ -193,6 +244,7 @@ const MIGRATIONS = Object.freeze({
   7: (stored) => migrate(stored),
   8: keep,
   9: keepScheme,
+  10: keep10,
 });
 
 // The settings a stored value holds: checked if it is the current version,
@@ -256,10 +308,19 @@ export class Settings {
   }
 
   // Sets choice `name` (language or mobileControls) or toggle
-  // (automaticTurnAround) to `value` and saves; an unknown setting or value
-  // is refused (false). Listeners hear about real changes only.
+  // (automaticTurnAround, screenPadHintSeen) to `value` and saves; an
+  // unknown setting or value is refused (false). Listeners hear about real
+  // changes only. Setting Mobile Controls is the player's choice, even of
+  // the scheme already in use (mobileControlsChosen; saved, not announced).
   set(name, value) {
     if (!allowed(name, value)) return false;
+    if (name === 'mobileControls' && !this.values.mobileControlsChosen) {
+      this.values.mobileControlsChosen = true;
+      if (this.values[name] === value) {
+        this.save();
+        return true;
+      }
+    }
     if (this.values[name] === value) return true;
     this.values[name] = value;
     this.save();
@@ -288,13 +349,24 @@ export class Settings {
     return this.values.language !== null;
   }
 
-  // 'joystick' or 'classic'.
+  // 'screenpad', 'joystick' or 'classic'.
   get mobileControls() {
     return this.values.mobileControls;
   }
 
   set mobileControls(value) {
     this.set('mobileControls', value);
+  }
+
+  // Whether the player picked their Mobile Controls (or kept them from
+  // before version 11), rather than playing with the default.
+  get mobileControlsChosen() {
+    return this.values.mobileControlsChosen;
+  }
+
+  // Whether the one-time Screen Pad hint has been dismissed.
+  get screenPadHintSeen() {
+    return this.values.screenPadHintSeen;
   }
 
   // Whether the human player's Automatic turn-around is on (see the top of

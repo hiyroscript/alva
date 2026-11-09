@@ -32,6 +32,7 @@ import { PracticeSession } from '../game/practice.js';
 import { PracticeHUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
 import { TouchControls, hudCeiling } from '../ui/touch-controls.js';
+import { ScreenPadHint } from '../ui/screen-pad-hint.js';
 
 // Every fresh visit from Home starts with this fighter, and a practice CPU
 // of the same fighter, sharing its one loaded sprite set: the first
@@ -56,6 +57,8 @@ export class PracticeGroundScreen extends Screen {
     this.touch = new TouchControls(this.touchRoot, app.input);
     // The moves stacked above Shield never rise past the top HUD.
     this.touch.setCeiling(hudCeiling(this.hudRoot));
+    // The one-time Screen Pad hint, while the touch controls play.
+    this.padHint = new ScreenPadHint(app.settings, () => !!app.device?.touchUI);
     // The practice fighter's moves in the corner, for keyboard and
     // controller play.
     this.abilityRoot = el('div');
@@ -66,7 +69,7 @@ export class PracticeGroundScreen extends Screen {
     this.buildCpuRoster();
 
     this.el.replaceChildren(
-      this.canvas, this.hudRoot, this.abilityRoot, this.touchRoot, this.menuOverlay, this.rosterOverlay, this.cpuRosterOverlay,
+      this.canvas, this.hudRoot, this.abilityRoot, this.touchRoot, this.padHint.root, this.menuOverlay, this.rosterOverlay, this.cpuRosterOverlay,
     );
 
     this.session = null;
@@ -295,6 +298,7 @@ export class PracticeGroundScreen extends Screen {
     this.hideMenu();
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);
+    this.padHint.sync(false);
     this.app.loading.hide();
     this.abilityHud.clear();
     this.session?.destroy();
@@ -390,6 +394,7 @@ export class PracticeGroundScreen extends Screen {
   play() {
     this.app.input.setGameplayActive(true);
     this.touch.setEnabled(true);
+    this.padHint.sync(true, this.touch.scheme);
     document.activeElement?.blur?.();
   }
 
@@ -409,6 +414,7 @@ export class PracticeGroundScreen extends Screen {
     this.menuOpen = true;
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);
+    this.padHint.sync(false);
     this.el.classList.add('is-menu-open');
     this.hud.setMenuOpen(true);
     this.menuOverlay.hidden = false;

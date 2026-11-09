@@ -11,6 +11,8 @@ export const ICONS = {
   mouvementRight: svg('<path d="M4 6 10 12 4 18"/><path d="M14 6 20 12 14 18"/>'),
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
+  // A finger touching the screen: Settings' drawing of the Screen Pad.
+  hand: svg('<path d="M9 12.5V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 10V8.5a1.5 1.5 0 0 1 3 0V11"/><path d="M15 10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.6a5.6 5.6 0 0 1-4.5-2.3L4.7 15.6a1.5 1.5 0 0 1 2.4-1.8L9 16"/>'),
   // The touch Down button (the fast fall, a drop through a platform).
   down: svg('<path d="M4.5 9 12 16.5 19.5 9"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/>'),

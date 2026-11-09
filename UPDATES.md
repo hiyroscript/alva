@@ -23,6 +23,7 @@ for where they moved). The game as it is now is specified in
 | **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
 | **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
 | **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
+| **Screen Pad update** | [#180](https://github.com/hiyroscript/alva/pull/180) | `92592dc` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -5996,3 +5997,101 @@ fighter); the roster-wide tables (`cooldown-policy`, `special-abilities`:
 eighteen Specials, `strict-combat-rules`, `mash-combo`), `i18n` (Shuriken,
 the same word in French), `empty-roster`, `discover`, `practice-ground`,
 `watch-mode`, `settings` (its credits) and each fighter's roster list.
+
+## Screen Pad update
+
+Pull request [#180](https://github.com/hiyroscript/alva/pull/180), commit `92592dc`. Asked for in the `max` prompt
+and named there: a third Mobile Controls scheme, **Screen Pad** (French
+**Pavé tactile**, settings id `screenpad`), made the default. The
+lower-left cluster is gone; the whole left half of the screen is an
+invisible gesture surface for movement, and the right half keeps the
+lower-right action cluster exactly as before (the Mash Combo pair and Jump
+in the corner, Shield above Jump, the other moves above, the same sizes,
+art and live states). Every gesture becomes the controls every other device
+sends: nothing in the Fighter, the movement rules, `js/data/movement.js`,
+Online Play's `encodeFrame`, the CPU or the controller code changed.
+
+### The gestures
+
+| Gesture | Result | Input |
+| --- | --- | --- |
+| Tap (lifted within 0.20 s, moved under 0.03) | Jump on lift; in the air an air jump (tap, tap, tap: the triple jump) | `jump` pulsed for one sample |
+| Swipe left / right (within 0.25 s, past 0.08, within 35° of horizontal) | a Dash that way, an air dash in the air | one `queueTouchMouvement` |
+| Touch, hold and drag (a floating stick, radius 0.10, anchored where the finger landed, dragged along past 0.08) | Run left / right; pushed down, Down (a diagonal both); up, nothing | `runLeft` / `runRight` / `down` held, the joystick's own hysteresis |
+| Quick flick down | the platform drop on a one-way platform, a short fast fall in the air | a short `down` |
+| Swipe up (within 0.25 s, past 0.08, within 40° of vertical) | the Super Jump on the ground, a jump in the air | `down` and `jump` pulsed in the same sample |
+| Flick while holding (past 1.5 short sides a second) | one Dash that way, the run going on behind it | one `queueTouchMouvement`, the stick re-anchored |
+| Down held on the pad + Jump on the right (or a second thumb's tap on the pad) | the Super Jump | the existing chord |
+
+Distances are fractions of the viewport's short side, times seconds. A
+gesture is classified once, on lift (a tap, else a swipe, else nothing); a
+finger that held a Run or Down for longer than 0.20 s is a stick and never
+jumps or dashes on lift. The pad is never drawn (no ring, knob, trail,
+divider, tint or pressed state), is `aria-hidden`, and takes every pixel of
+the left half, the safe-area insets and the strip under the top HUD
+included; only the pause or More button and the right-hand buttons
+(wherever a custom layout puts them) take a touch before it. A one-time
+card on the first play with Screen Pad says what the left half does,
+dismissed by any touch and remembered.
+
+### The default, and nobody's controls changed
+
+`DEFAULT_MOBILE_CONTROLS` is `'screenpad'` and the settings are version 11.
+They now record whether the scheme was chosen (`mobileControlsChosen`), as
+the language already did, so a default is never mistaken for a choice: a
+player who never chose follows the default, now and after any later
+change. A version 10 object cannot tell a chosen Joystick from the default
+it then was (every save wrote it), so every stored scheme is kept, Joystick
+and Classic Buttons alike, and counted as chosen from then on; only one
+with no valid scheme starts on Screen Pad. Every custom touch layout is
+kept, and Screen Pad has its own (its right-hand controls only).
+
+### Where to tune it
+
+- `SCREEN_PAD` in [`js/ui/touch-controls.js`](./js/ui/touch-controls.js):
+  `tapTime` 0.2, `tapSlop` 0.03, `swipeTime` 0.25, `swipeDistance` 0.08,
+  `swipeAngle` 35, `upAngle` 40, `radius` 0.1, `maxRadius` 0.08, `flick`
+  true, `flickSpeed` 1.5, `flickWindow` 0.05, `flickRearm` 0.5, `flickRun`
+  0.5; the stick's own fractions are `JOYSTICK`'s.
+- The pad's box: `.tc-screenpad` in
+  [`css/touch-controls.css`](./css/touch-controls.css); the hint card
+  `.screenpad-hint` beside it.
+
+### Code
+
+- [`js/ui/touch-controls.js`](./js/ui/touch-controls.js): `SCREEN_PAD`,
+  `classifyGesture`, `padHold`, `followAnchor`, `ScreenPadGesture`; the
+  pad (`TouchControls.pad`, `onPadDown`, `onPadEnd`, `pulse`), its holds in
+  their own slots, released with everything else.
+- [`js/core/input-manager.js`](./js/core/input-manager.js): `pulseTouch`
+  (a touch control held through the next sample only), `clearTouchPulses`,
+  `onSuspend`.
+- [`js/core/settings.js`](./js/core/settings.js): `'screenpad'`, version 11,
+  `mobileControlsChosen`, `screenPadHintSeen`;
+  [`js/core/touch-layout.js`](./js/core/touch-layout.js):
+  `TOUCH_CONTROL_IDS.screenpad`.
+- [`js/ui/screen-pad-hint.js`](./js/ui/screen-pad-hint.js), wired into
+  Quick Battle, Practice Ground and Online Play.
+- [`js/ui/settings-dialog.js`](./js/ui/settings-dialog.js) (three cards,
+  Screen Pad's drawing and "Default"), `ICONS.hand`, the strings in both
+  languages, the layout editor (Screen Pad's right-hand controls only).
+
+### Tests
+
+- `tests/systems/screen-pad.test.mjs`: the thresholds and pure rules, then
+  the real touch controls, `InputManager` and a Fighter: tap and the triple
+  jump, swipes on the ground and in the air, hold and drag, a slow drift, a
+  drag down (Super Jump, fast fall, diagonal), the flick down and the long
+  hold on a one-way platform, swipe up on the ground and in the air, the
+  mid-run flick, a second finger, buttons never gestures, cancel / pause /
+  focus lost / scheme switch, a trailing click, nothing drawn during a
+  gesture, the pad's box and paint from the stylesheet, the hint;
+- `tests/interface/controls-ui.test.mjs` (Screen Pad the default, only the
+  right cluster, switching releases everything), `settings.test.mjs`
+  (version 11, the third choice, the default for no / unknown / missing
+  schemes, version 10's Joystick and Classic kept with their layouts, the
+  hint flag, three cards with Screen Pad "Default"), `touch-layout.test.mjs`,
+  `battle-screen`, `practice-ground`, `watch-mode`, `i18n`;
+- unchanged and passing: `touch-comfort` for every fighter, the online
+  determinism and lockstep tests.
+

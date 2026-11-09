@@ -395,7 +395,14 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   app.screens.current = screen;
   const elements = new Map(screen.touch.actionButtons);
   await screen.enter();
-  assert.equal(screen.touch.scheme, 'joystick', 'the default');
+  assert.equal(screen.touch.scheme, 'screenpad', 'the default');
+  assert.deepEqual(screen.touch.root.children, [screen.touch.pad, screen.touch.actions], 'the pad and the right-hand cluster only');
+  assert.equal(screen.touch.enabled, true);
+  screen.exit();
+
+  app.settings.set('mobileControls', 'joystick');
+  await screen.enter();
+  assert.equal(screen.touch.scheme, 'joystick');
   assert.equal(screen.touch.root.children[0], screen.touch.joystick);
   assert.equal(screen.touch.enabled, true);
   screen.exit();
