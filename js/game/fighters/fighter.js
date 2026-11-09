@@ -454,7 +454,10 @@ export class Fighter {
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
     if (combat.release) {
-      this.releases.push({ id: combat.release.id, offset: combat.release.offset, direction: this.facing, ability: combat.release.ability });
+      const release = { id: combat.release.id, offset: combat.release.offset, direction: this.facing, ability: combat.release.ability };
+      // A volley's shot also carries the throw it is one of.
+      if (combat.release.volleyOf) release.volleyOf = combat.release.volleyOf;
+      this.releases.push(release);
       combat.release = null;
     }
     // Jump presses count from the step they are made, the freeze included,
@@ -1751,7 +1754,7 @@ export class Fighter {
     const runningSpeed = this.body.vx;
     this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
     combat.attack = {
-      def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, released: false,
+      def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, shots: 0, released: false,
       step: activationStep(atk, this.body.grounded), stepped: false,
       struck: null, blocked: false, motion: null, airborne: !this.body.grounded, button,
       // A Mash Combo turn ({ turn, turns, final }, see startMashTurn) plays

@@ -199,6 +199,12 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 3, midair_attack3: 0, extra_attack: 0,
       attack4: 3, attack5: 3, deflect: 0,
     },
+    // Dragonblade: its cleave deals 10. Shuriken's three shots add up to 3,
+    // and the Deflect Stance turns shots back: neither earns anything.
+    '0012': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 0, midair_attack4: 0,
+      extra_attack: 0, attack5: 5, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

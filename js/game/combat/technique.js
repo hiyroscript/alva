@@ -165,6 +165,9 @@ export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
   const cls = cooldownClass('technique', spec, { projectiles });
   const def = { ...TECHNIQUE_DEFAULTS, ...spec, cooldownClass: cls, cooldown: resolveCooldown(spec.cooldown, owner, { cls }) };
   if (def.projectile) {
+    // A technique lets go of one projectile: a volley is an attack's (see
+    // `volley` in js/game/combat/attacks.js).
+    if (def.projectile.volley !== undefined) throw new Error(`[Alva] Technique "${spec.id}" releases a volley: only an attack throws one`);
     const o = def.projectile.offset ?? {};
     def.projectile = Object.freeze({ id: def.projectile.id, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
   }

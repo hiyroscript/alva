@@ -130,7 +130,13 @@ export function moveImpact(kind, spec, { projectiles = null, attacks = null } = 
     else if (spec.hitbox !== null && spec.damage !== undefined) hits.push(hit(spec));
     if (spec.motion?.impact?.hit) hits.push(hit(spec.motion.impact.hit));
   }
-  if (spec.projectile?.id) hits.push(...projectileHits(projectiles?.[spec.projectile.id]));
+  // Every shot of a volley can reach the same target (see `volley` in
+  // js/game/combat/attacks.js): each one's strikes count.
+  if (spec.projectile?.id) {
+    const shot = projectileHits(projectiles?.[spec.projectile.id]);
+    const count = kind === 'attack' ? spec.projectile.volley?.count ?? 1 : 1;
+    for (let k = 0; k < count; k++) hits.push(...shot);
+  }
   return { hits, heal: kind === 'technique' ? spec.heal ?? 0 : 0, cloak: kind === 'technique' ? spec.cloak ?? 0 : 0 };
 }
 
