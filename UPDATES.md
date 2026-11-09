@@ -6020,7 +6020,7 @@ Online Play's `encodeFrame`, the CPU or the controller code changed.
 | Touch, hold and drag (a floating stick, radius 0.10, anchored where the finger landed, dragged along past 0.08) | Run left / right; pushed down, Down (a diagonal both); up, nothing | `runLeft` / `runRight` / `down` held, the joystick's own hysteresis |
 | Quick flick down | the platform drop on a one-way platform, a short fast fall in the air | a short `down` |
 | Swipe up (within 0.25 s, past 0.08, within 40° of vertical) | the Super Jump on the ground, a jump in the air | `down` and `jump` pulsed in the same sample |
-| Flick while holding (past 1.5 short sides a second) | one Dash that way, the run going on behind it | one `queueTouchMouvement`, the stick re-anchored |
+| Flick while running, the way it runs (past 1.5 short sides a second) | one Dash that way, the run going on behind it (against the run: a quick turn, never a Dash; see [below](#later-turning-round-never-dashes)) | one `queueTouchMouvement`, the stick re-anchored |
 | Down held on the pad + Jump on the right (or a second thumb's tap on the pad) | the Super Jump | the existing chord |
 
 Distances are fractions of the viewport's short side, times seconds. A
@@ -6045,6 +6045,24 @@ it then was (every save wrote it), so every stored scheme is kept, Joystick
 and Classic Buttons alike, and counted as chosen from then on; only one
 with no valid scheme starts on Screen Pad. Every custom touch layout is
 kept, and Screen Pad has its own (its right-hand controls only).
+
+### Later: turning round never Dashes
+
+Players Dashed by mistake when they only meant to run the other way: any
+fast sideways move of a holding finger was a flick, so turning round
+quickly asked for a Dash. Now only a flick **the way the stick already
+runs**, held that way for at least `tapTime` (0.20 s), Dashes. The same
+fast move against the run, with no run held, or just after a turn, is a
+**quick turn**: the stick re-anchors behind the finger (`flickRun`), so the
+run turns at once, and no Dash is asked for. A thumb that rests (sends no
+move for a `flickWindow`) is ready for the next flick or turn at once; it
+used to stay disarmed until a slow move. Thresholds unchanged
+(`flickSpeed` 1.5, `flickRearm` 0.5); `ScreenPadGesture.flick` in
+[`js/ui/touch-controls.js`](./js/ui/touch-controls.js). Tests:
+`tests/systems/screen-pad.test.mjs` (turning round at every speed through
+the recogniser and a real Fighter, back and forth, a pause just after a
+turn, never a Dash; the same-way flick still one Dash, rearmed once the
+finger slows or rests).
 
 ### Where to tune it
 
