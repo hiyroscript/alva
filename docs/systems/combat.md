@@ -112,7 +112,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `momentum` / `airMomentum` / `friction` | 1 / 1 / 1 | What it keeps of the speed it starts with (on the ground, in the air) and × the ground deceleration its speed runs down under ([movement](movement.md#5-attack-movement)). Nothing held steers a grounded attack; in the air every attack keeps the universal air control. `mobility`, `control`, `airControl`, `topSpeed`, `airTopSpeed` and `lockMovement` are refused. |
 | `step` | the shared Step-in | `{ at, speed }` for a lunge of its own, `false` for a move that never lunges; left out, a grounded direct strike gets the shared Step-in and anything else none. The definition records the verdict (`stepIn`: `authored`, `universal`, `declined`, `exempt`; [movement](movement.md#5-attack-movement)). |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. The only way a request ever cuts an attack that can harm short. |
-| `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
+| `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`; with `volley: { count, interval }`, `count` of them, `interval` apart (below). |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
 | `hits`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
 | `paralyze` / `blockPush` / `quake` / `charm` / `float` / `fear` / `gaze` | 0 / 0 / false / 0 / 0 / 0 / false | The shared hit effects (below). |
@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0011 use them between them
+is built, and usable by any fighter (#0001 to #0012 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -312,6 +312,25 @@ today):
   needs a hitbox. A move that has it is a defense as well as an attack,
   and gives way to a valid request as the Deflect does ([requests and
   cancellation](#requests-and-cancellation)).
+- **Volley** (`projectile: { id, spawnAt, offset, volley: { count,
+  interval } }`): a throw of `count` shots of its projectile one after
+  another, the first as its time crosses `spawnAt` and each next one
+  `interval` later (at least one fixed step apart, so never two on one
+  step, and the last within the attack: `lastShotAt`), all from the same
+  `offset`, each aimed where its fighter faces as it leaves. Each shot is a
+  projectile of its own (it strikes, is blocked, is turned back on its own,
+  and a shot turned back is no longer part of the volley); together they
+  are one use of the move: one press, one Energy cost (an ordinary
+  volley's 15, once), one cooldown, released with the first shot. The
+  cooldown policy weighs every shot (`moveImpact`: three of 1 are
+  ordinary, four of 3 add up to 10), and the CPU every shot too (a later
+  shot weighed as a piercing one's later strike). A hit that stops the
+  throw stops the shots still to come; a raised Shield that blocks any shot
+  stops the volley, as a blocked strike stops a string
+  (`CombatSystem.stopVolley`): its shots still flying are gone and no more
+  are thrown, so a volley never costs a Shield more than one block. Only
+  an attack throws one: a technique that declares a volley is refused
+  (#0012's Shuriken).
 - **Per airtime** (`airUses`) and **free fall** (`freeFall: true`).
 - **Body** (`passThrough: true`: no pushbox while it plays; `hurtboxes`:
   the fighter's own replaced while it plays: #0002's Spin Attack a smaller
@@ -393,6 +412,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0009 | `['attack4', 'attack5']` | the Freezing Splash (a freeze that holds its target for a follow-up), the Air Sphere (its trance, a 10-damage burst open only in danger) | the Air Blast, the Air Gust, the Earth Pillar |
 | #0010 | `['attack4', 'extra_attack', 'attack5']` | the Kill (twice as strong on a back turned to it, then its kill cooldown), the Vent (a way under the floor, only its hatch open to a hit), the Emergency Meeting (everyone near called to the button and held there) | the Tongue Lash |
 | #0011 | `['attack4', 'attack5']` | Camouflage (out of sight, a CPU losing track of it, until it strikes or is struck), the Venom Punch (its lightning stuns whoever it reaches stiff) | the Web Shot, Web Lines, the Venom Jump |
+| #0012 | `['attack5']` | Dragonblade (a 10-damage cleave all round it, the dragon spirit coiling round it, after half a second's breakable stance) | Shuriken (a volley), the Deflect Stance (it turns shots back), Swift Strike and the Rising Strike (dashes through) |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -490,7 +510,8 @@ nothing reads them back into the simulation.
 ## Projectiles
 
 `projectiles.<attack>_object`, released by an attack's `projectile`
-entry. Fields (`PROJECTILE_DEFAULTS`): `animation` (a
+entry (once, or `count` times in a row for a
+[volley](#attack-mechanics-beyond-a-timed-hitbox)). Fields (`PROJECTILE_DEFAULTS`): `animation` (a
 `projectileAnimations` clip; missing art refuses the attack), `speed`,
 `lifetime` (1 s), `hitbox` (centred, mirrored with its direction),
 `damage`, `baseLaunch`, `directionalLaunch`, `hitstun`, `blockstun`,
@@ -751,7 +772,7 @@ Feast 3 s (a heal) and Gum-Gum Giant Pistol 5 s (a 10-damage fist); #0009's
 Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
 #0010's Kill 5 s (its backstab's 10) and Emergency Meeting 3 s (its hold);
 #0011's Web Shot 3 s (its webbing's hold), Camouflage 3 s (a cloak) and
-Venom Punch 3 s (its hold).
+Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -760,12 +781,15 @@ a block push), #0007's Molotov Cocktail (a fire that strikes four times,
 6 in all) and Sawn-Offs, #0008's Gatling (8 at the most), Balloon (a
 turn-back and a block push) and Rocket (a homing dash) included, has no
 cooldown, and so has every move of #0009's but its two Specials (the Air
-Blast's drag, a carry, and the Earth Pillar's quake earn nothing), and
-every Deflect none.
+Blast's drag, a carry, and the Earth Pillar's quake earn nothing), and of
+#0012's but Dragonblade (Shuriken's three shots add up to 3, the Deflect
+Stance turns shots back, Swift Strike and the Rising Strike are motions),
+and every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
-Earth Pillar) cost 15 Energy instead ([energy](energy.md#construct-moves)).
+Earth Pillar, Shuriken: once for its volley of three) cost 15 Energy
+instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and
 `CombatState.abilityCooldowns` are the only stores. The player's presses,
@@ -1116,7 +1140,8 @@ or changes a hitbox, a range or a stun. The rules are
   [`fear.test.mjs`](../../tests/systems/fear.test.mjs),
   [`gaze.test.mjs`](../../tests/systems/gaze.test.mjs),
   [`backstab.test.mjs`](../../tests/systems/backstab.test.mjs),
-  [`tunnel.test.mjs`](../../tests/systems/tunnel.test.mjs).
+  [`tunnel.test.mjs`](../../tests/systems/tunnel.test.mjs),
+  [`volley.test.mjs`](../../tests/systems/volley.test.mjs).
 - Each fighter's moves: [`tests/fighters/0001/`](../../tests/fighters/0001/)
   (every move's mechanic, its combos, the CPU playing it),
   [`tests/fighters/0002/`](../../tests/fighters/0002/),

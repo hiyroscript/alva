@@ -75,11 +75,12 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0009 | the Air Blast (attack3), the Air Gust (midair_attack3), the Earth Pillar (extra_attack) | the Freezing Splash (3 s), the Air Sphere (5 s) |
 | #0010 | — (nothing of its own created but the meeting's call; the Vent and the Tongue Lash are strikes) | the Emergency Meeting (3 s; the Kill is a burst with its 5 s) |
 | #0011 | — (its one projectile, the Web Shot's webbing, holds and has its 3 s; Web Lines and the Venom Jump are strikes) | the Web Shot (3 s), the Venom Punch (3 s; Camouflage releases no construct, only its cloak) |
+| #0012 | Shuriken (extra_attack: a volley of three, one activation, so one 15) | Dragonblade (5 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):
 never per projectile update, per hit (a piercing orb's several strikes),
-per frame a construct lives, per clone strike, per projectile turned back,
+per shot of a volley (#0012's three shuriken), per frame a construct lives, per clone strike, per projectile turned back,
 per phase. Interrupted after it started (a hit in its startup, a summon's
 startup broken), nothing is given back.
 
@@ -93,7 +94,7 @@ A fighter's `energy` entry sets one thing, its refill rate:
 
 #0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
 `regen` 14, #0005 `regen` 14, #0006 `regen` 14, #0007 `regen` 14; #0008,
-#0009, #0010 and #0011 leave it out (12). Nothing
+#0009, #0010, #0011 and #0012 leave it out (12). Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost`, `deflectCost` and `constructCost` may be left out (and
 are, by every fighter), and declaring any of them with another value than

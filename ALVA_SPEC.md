@@ -122,7 +122,7 @@ behave, and how it must look.
   `assets/characters/0004/`, `assets/characters/0005/`,
   `assets/characters/0006/` (its three members' frames),
   `assets/characters/0007/`, `assets/characters/0008/`,
-  `assets/characters/0009/`, `assets/characters/0010/` and `assets/characters/0011/` are the only fighter art in the repository today, and any future fighter's frames go
+  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/` and `assets/characters/0012/` are the only fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
   character specification (7.2.9).
@@ -159,8 +159,8 @@ behave, and how it must look.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
   never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's,
-  #0006's, #0007's, #0008's, #0009's, #0010's and #0011's art faces right; #0001's three orbs, #0004's note,
-  #0005's balloons, #0007's molotov fire and #0010's meeting call are direction-neutral.)
+  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's and #0012's art faces right; #0001's three orbs, #0004's note,
+  #0005's balloons, #0007's molotov fire, #0010's meeting call and #0012's shuriken are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -171,7 +171,7 @@ behave, and how it must look.
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
   artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's,
-  #0007's, #0008's, #0009's, #0010's, #0011's or any later fighter's). Do not download
+  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -720,7 +720,7 @@ no header, build label, eyebrow or keyboard hint bar.
   focused by default, as the first playable fighter), `#0002` in slot 02,
   `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
   slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09,
-  `#0010` in slot 10 and `#0011` in slot 11; the other 37 are locked. A fighter that is not
+  `#0010` in slot 10, `#0011` in slot 11 and `#0012` in slot 12; the other 36 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -1126,6 +1126,9 @@ neither player learns the other's address.
   - **#0011 sprite source** — sprite sheet by xxalexsmashxx on DeviantArt,
     the line linked to the sheet's page (by the deviation's number alone,
     so the address names nothing).
+  - **#0012 sprite source** — sprite sheet by xxalexsmashxx on DeviantArt,
+    the line linked to the sheet's page (by the deviation's number alone,
+    so the address names nothing).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -1137,9 +1140,10 @@ neither player learns the other's address.
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
 - The UI does not name the character behind #0001, #0002, #0003, #0004,
-  #0005, #0006, #0007, #0008, #0009, #0010 or #0011 (or any fighter): each
-  stays `#0001` / `#0002` / `#0003` / `#0004` / `#0005` / `#0006` / `#0007`
-  / `#0008` / `#0009` / `#0010` / `#0011` in game, and
+  #0005, #0006, #0007, #0008, #0009, #0010, #0011 or #0012 (or any
+  fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` / `#0005` /
+  `#0006` / `#0007` / `#0008` / `#0009` / `#0010` / `#0011` / `#0012` in
+  game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
@@ -1754,7 +1758,8 @@ English and French.
   #0005's Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
   Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
   Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
-  #0011's Camouflage and Venom Punch, marked Ground or Air;
+  #0011's Camouflage and Venom Punch, #0012's Dragonblade, marked Ground
+  or Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -2207,11 +2212,12 @@ each fighter's own values are in its character specification (7.2.9).
   `js/data/characters.js`) holds ten definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
   `0004.js`, `0005.js`, `0006.js`, `0007.js`, `0008.js`, `0009.js`,
-  `0010.js`, `0011.js`): `#0001` in roster slot 01, `#0002` in slot 02,
-  `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
-  slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09,
-  `#0010` in slot 10 and `#0011` in slot 11, each fully implemented
-  (7.2.9) and playable: `available: true`. All eleven are
+  `0010.js`, `0011.js`, `0012.js`): `#0001` in roster slot 01, `#0002` in
+  slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05,
+  `#0006` in slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in
+  slot 09, `#0010` in slot 10, `#0011` in slot 11 and `#0012` in slot 12,
+  each fully implemented
+  (7.2.9) and playable: `available: true`. All twelve are
   preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -2368,6 +2374,13 @@ each fighter's own values are in its character specification (7.2.9).
   attacks, `attack4` (Camouflage) and `attack5` (the Venom Punch)
   techniques, and `extra_attack` is its Venom Jump (on the ground and in
   the air).
+  #0012 has five: `attack1` (Twin Cuts; `midair_attack1`, the Whirlwind
+  Cut), `attack2` (the Cleave; `midair_attack2`, the Rising Arc),
+  `attack3` (the Deflect Stance; `midair_attack3`, the Falling Cut) and
+  `attack4` (Swift Strike; `midair_attack4`, the Rising Strike) are
+  ordinary attacks, `attack5` (Dragonblade) a technique, and
+  `extra_attack` is its Shuriken, a volley of three (on the ground and in
+  the air).
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -2381,13 +2394,14 @@ each fighter's own values are in its character specification (7.2.9).
   Deadlights and the Red Balloon; #0006: Ice Breath; #0007: the Rocket
   Launcher; #0008: the Feast and the Gum-Gum Giant Pistol; #0009: the
   Freezing Splash and the Air Sphere; #0010: the Kill, the Vent and the
-  Emergency Meeting; #0011: Camouflage and the Venom Punch: seventeen
-  across the roster. Red, Maximum Blue, the
+  Emergency Meeting; #0011: Camouflage and the Venom Punch; #0012:
+  Dragonblade: eighteen across the roster. Red, Maximum Blue, the
   Whirlwind, Cherry Blossom Impact, Ievan Polkka, Dark Tendrils, Heat
   Vision, the Sonic Scream, the Triple Strike, the Molotov Cocktail, the
   Sawn-Offs, the Pistol, the Gum-Gum Balloon, the Gum-Gum Rocket, the Air
   Blast, the Air Gust, the Earth Pillar, the Tongue Lash, the Web Shot, Web
-  Lines and the Venom Jump are ordinary. The
+  Lines, the Venom Jump, Shuriken, the Deflect Stance, Swift Strike and the
+  Rising Strike are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -2854,14 +2868,17 @@ each fighter's own values are in its character specification (7.2.9).
     burst), #0010 the Kill 5 s (its backstab's 10, its kill cooldown) and
     the Emergency Meeting 3 s (its hold), #0011 the Web Shot 3 s (its
     webbing's hold), Camouflage 3 s (its cloak) and the Venom Punch 3 s
-    (its hold); every other move of the eleven, Red,
+    (its hold), #0012 Dragonblade 5 s (its 10-damage cleave); every other
+    move of the twelve, Red,
     Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly Foot of Pain,
     the Stage Dive, Dark Tendrils, the Tornado Spin, Heat Vision, the Sonic
     Scream, the Molotov Cocktail, the Sawn-Offs, #0008's Gatling (8 at the
     most), Balloon and Rocket, #0009's Air Blast (a carry), Air Gust and
     Earth Pillar (a quake), #0010's Tongue Lash (a pull) and Vent (a
-    tunnel) and #0011's Web Lines (a pull) and Venom Jump (a lift that
-    carries) included, none at all (the ordinary ones
+    tunnel), #0011's Web Lines (a pull) and Venom Jump (a lift that
+    carries) and #0012's Shuriken (a volley of three adding up to 3), Deflect
+    Stance (a turn-back), Swift Strike (a roll that passes through) and
+    Rising Strike (a lift) included, none at all (the ordinary ones
     that create a construct cost 15 Energy instead, 7.2.5). The player, the
     CPU and the ability HUD all read the same built definitions and combat
     state (`js/game/combat/move-status.js` for presentation).
@@ -3255,6 +3272,19 @@ each fighter's own values are in its character specification (7.2.9).
     them; the last resolves as the projectile's `finisher` (its own damage
     and launch, its stuns and hit effects defaulting to the projectile's).
     A block stops it.
+  - **Volleys** (`projectile: { id, spawnAt, offset, volley: { count,
+    interval } }`, an attack's only): `count` shots of its projectile, the
+    first as its time crosses `spawnAt`, each next one `interval` later (at
+    least one fixed step apart, the last within the attack), each a
+    projectile of its own aimed where its fighter faces as it leaves, all
+    one use of the move: one press, one Energy cost, one cooldown, released
+    with the first. The cooldown policy and the CPU weigh every shot. A hit
+    on the thrower stops the shots still to come; a Shield that blocks any
+    shot stops the volley (its shots still flying are gone, no more are
+    thrown: `CombatSystem.stopVolley`), so a volley never costs a Shield
+    more than one block, as a blocked strike stops a string; a shot turned
+    back is no longer part of it. A technique that declares one is refused
+    (#0012's Shuriken).
   - **Projectiles that act on each other** (`clashProjectiles`): `repel:
     true` turns another fighter's projectile it meets back the way it
     flies, that projectile its owner's from then on (as if thrown by it, its
@@ -3266,8 +3296,9 @@ each fighter's own values are in its character specification (7.2.9).
   - **Turning projectiles back** (`deflectProjectiles: true`): while the
     attack is live its hitbox turns back every other fighter's projectile
     it meets, by the repel's own `turnBack`, before any projectile strikes
-    that step. Every fighter's Deflect has it (7.2.5); no other attack
-    does, and a hitbox alone never stops a projectile.
+    that step. Every fighter's Deflect has it (7.2.5), and so do #0008's
+    Gum-Gum Balloon and #0012's Deflect Stance; a hitbox alone never stops
+    a projectile.
   - The CPU reads all of it from the data: each attack's reach swept along
     its motion (`attackReach`: a roll's path, a plunge's depth, a lift's
     height, a homing dash's lock-on range) for choosing and fearing it, the
@@ -3748,16 +3779,17 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   the Air Gust and the Earth Pillar (#0008 has none: it creates nothing,
   every move its own body; nor has #0010: its one construct, the
   Emergency Meeting's call, has its 3 s; nor has #0011: its one
-  projectile, the Web Shot's webbing, has its 3 s). One
+  projectile, the Web Shot's webbing, has its 3 s), and #0012 Shuriken. One
   activation pays once: never per projectile update, per hit (a piercing
-  orb's several strikes), per frame a construct lives, per clone strike,
+  orb's several strikes), per shot of a volley (#0012's three shuriken:
+  one 15), per frame a construct lives, per clone strike,
   per projectile turned back or per phase; a refused press pays nothing
   (the payment comes after every other check); a move interrupted after
   it started gets nothing back.
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12). The maximum and every
+  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12). The maximum and every
   cost are universal (a move's own `energyCost` too: one it declares must
   agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
@@ -3825,7 +3857,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   #0009 the Freezing Splash 3 s (its freeze) and the Air Sphere 5 s (its
   10-damage burst), #0010 the Kill 5 s (its backstab's 10) and the
   Emergency Meeting 3 s (its call's hold), #0011 Camouflage 3 s (its
-  cloak) and the Venom Punch 3 s (its hold), with cast/release timing,
+  cloak) and the Venom Punch 3 s (its hold), #0012 Dragonblade 5 s (its
+  10-damage cleave), with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from attacks' cooldowns in
@@ -3967,7 +4000,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Emergency Meeting (a projectile that never moves, pulls either side and
   holds, docs/characters/0010.md), and #0011's Camouflage (a cloak) and
   Venom Punch (a burst that holds, its lightning as its art,
-  docs/characters/0011.md); a
+  docs/characters/0011.md), and #0012's Dragonblade (a 10-damage burst
+  round it, the dragon spirit as its art, docs/characters/0012.md); a
   technique of another shape would be a new
   form in the runtime, not a new reading of these fields. The CPU reads a
   technique's lead (its cast), where it lands (its burst's box, its
@@ -4620,6 +4654,17 @@ there, and nothing in one is a rule for another fighter.
   struck, and the Venom Punch, stunning whoever its lightning reaches
   stiff, as techniques and its Specials; its forearm raised for its guard
   and a flip for its Deflect).
+- **#0012**: [docs/characters/0012.md](docs/characters/0012.md) (the
+  cyborg ninja in silver armour with a green-lit visor: Twin Cuts and the
+  Cleave up close, its Mash Combo; the Whirlwind Cut, the Rising Arc and
+  the Falling Cut in the air; Shuriken, three thrown one after another (a
+  volley), on the ground and in the air; the Deflect Stance, its blade held
+  out to turn shots back on the ground; Swift Strike, a dash that cuts
+  through its target, and the Rising Strike, the same dash straight up,
+  once per airtime; Dragonblade, a 10-damage cleave all round it with the
+  dragon spirit coiling round it, as a technique and its Special; its
+  blade held across for its guard and its canon's own whirl of cuts for
+  its Deflect).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -4636,7 +4681,7 @@ reviewedSourceHash"), and whenever a playable fighter has no valid profile
 or description in both languages, so every change to a fighter brings its
 profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
 #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5,
-#0010 4/5, #0011 3/5.
+#0010 4/5, #0011 3/5, #0012 3/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -4695,7 +4740,8 @@ Adding one is described in
   is Mine 3 s, #0005 Deadlights 3 s and Red Balloon 3 s, #0006 Ice Breath
   3 s, #0007 Rocket Launcher 5 s, #0008 Feast 3 s and Gum-Gum Giant Pistol
   5 s, #0009 Freezing Splash 3 s and Air Sphere 5 s, #0010 Kill 5 s and
-  Emergency Meeting 3 s, #0011 Camouflage 3 s and Venom Punch 3 s). The fighter the
+  Emergency Meeting 3 s, #0011 Camouflage 3 s and Venom Punch 3 s, #0012
+  Dragonblade 5 s). The fighter the
   ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
@@ -4797,7 +4843,10 @@ Adding one is described in
     Lash, the Kill, the Emergency Meeting and the Vent, air the Air Kick,
     the Tentacle Sweep and the Tongue Lash; #0011: ground Punches, the Spin
     Kick, the Web Shot, Camouflage, the Venom Punch and the Venom Jump, air
-    the Air Kick, the Somersault Kick, Web Lines and the Venom Jump.
+    the Air Kick, the Somersault Kick, Web Lines and the Venom Jump;
+    #0012: ground Twin Cuts, the Cleave, the Deflect Stance, Swift Strike,
+    Dragonblade and Shuriken, air the Whirlwind Cut, the Rising Arc, the
+    Falling Cut, the Rising Strike and Shuriken.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -5085,7 +5134,9 @@ Adding one is described in
   Splash and `,` the Air Sphere; for #0010, O is the Tongue Lash (in the
   air too), M the Kill and `,` the Emergency Meeting; for #0011, O is the
   Web Shot (Web Lines in the air), M Camouflage, `,` the Venom Punch and J
-  the Venom Jump (in the air too). The
+  the Venom Jump (in the air too); for #0012, O is the Deflect Stance (the
+  Falling Cut in the air), M Swift Strike (the Rising Strike in the air),
+  `,` Dragonblade and J Shuriken (in the air too). The
   input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
@@ -5254,7 +5305,8 @@ Adding one is described in
   Freezing Splash in slot 4 and the Air Sphere in slot 5; #0010: the Tongue
   Lash in slot 3, the Kill in slot 4 and the Emergency Meeting in slot 5;
   #0011: the Web Shot in slot 3, Camouflage in slot 4 and the Venom Punch
-  in slot 5). A summon or technique button is
+  in slot 5; #0012: the Deflect Stance in slot 3, Swift Strike in slot 4
+  and Dragonblade in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -5575,7 +5627,11 @@ codename is sent, never what an action does.
   Square, Tentacle Sweep Triangle, Tongue Lash R2. #0011: Punches Square,
   Spin Kick Triangle, Web Shot R2, Camouflage L2, Venom Punch Circle,
   Venom Jump the right stick up; in the air Air Kick Square, Somersault
-  Kick Triangle, Web Lines R2, Venom Jump the right stick up. A
+  Kick Triangle, Web Lines R2, Venom Jump the right stick up. #0012: Twin
+  Cuts Square, Cleave Triangle, Deflect Stance Circle, Shuriken R2,
+  Dragonblade L2, Swift Strike the right stick forward; in the air
+  Whirlwind Cut Square, Rising Arc Triangle, Falling Cut Circle, Shuriken
+  R2, Rising Strike the right stick up. A
   fighter without a
   layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter
