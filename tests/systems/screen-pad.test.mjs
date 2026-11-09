@@ -519,7 +519,7 @@ test('a swipe up is the Super Jump on the ground and a normal jump in the air', 
   assert.equal(a.fighter.airJumps, airJumps - 1);
 });
 
-test('a flick while running is one Dash that way, the run goes on, and another needs the finger to slow first', () => {
+test('a flick the way the stick runs is one Dash that way, the run goes on, and another needs the finger to slow first', () => {
   const p = padPlay();
   p.steps(3);
   p.down(200, 200);
@@ -536,17 +536,93 @@ test('a flick while running is one Dash that way, the run goes on, and another n
   p.drag(200 + px(0.16), 200, 200 + px(0.26), 200, 30);
   p.steps(30);
   assert.equal(p.dashes, 1, 'one Dash a spike');
-  // Slowed down, then a flick back left: a Dash left, and the run turns.
+  // Slowed down, then a flick on the same way again: a second Dash.
   p.drag(200 + px(0.26), 200, 200 + px(0.265), 200, 200);
-  p.drag(200 + px(0.265), 200, 200 + px(0.165), 200, 30);
+  p.drag(200 + px(0.265), 200, 200 + px(0.365), 200, 30);
   p.step();
-  assert.equal(p.dashes, 2);
-  assert.equal(p.fighter.dash.direction, -1);
-  assert.equal(p.input.isHeld('runLeft'), true, 'running the way of the Dash');
+  assert.equal(p.dashes, 2, 'rearmed once the finger slowed');
+  assert.equal(p.fighter.dash.direction, 1);
+  // Slowed down, then a fast move back left: a quick turn, never a Dash.
+  p.steps(30);
+  p.drag(200 + px(0.365), 200, 200 + px(0.37), 200, 200);
+  p.drag(200 + px(0.37), 200, 200 + px(0.165), 200, 30);
+  p.step();
+  assert.equal(p.dashes, 2, 'turning round is no Dash');
+  assert.equal(p.input.isHeld('runLeft'), true, 'the run turned at once');
   p.wait(100);
   p.up(200 + px(0.165), 200);
   const f = p.input.sample();
   assert.deepEqual([f.runLeft, f.jumpPressed, f.mouvementLeftPressed, f.mouvementRightPressed], [false, false, false, false], 'lifting a stick: nothing more');
+});
+
+test('turning round while running never Dashes, however fast: the run turns at once', () => {
+  // Through the recogniser: running right, then back left at every speed,
+  // a move every 15 ms as a touchscreen sends them, then held there.
+  for (const ms of [30, 60, 120, 250]) {
+    const { g, log } = recorder();
+    g.begin(1, 200, 200, 0);
+    g.move(1, 220, 200, 50);
+    g.move(1, 225, 200, 400);
+    const n = Math.max(2, Math.round(ms / 15));
+    for (let i = 1; i <= n; i++) g.move(1, 225 - (90 * i) / n, 200, 400 + (ms * i) / n);
+    g.move(1, 225 - 92, 200, 400 + ms + 300);
+    assert.equal(log.some(([kind]) => kind === 'dash'), false, `back left in ${ms} ms: no Dash`);
+    assert.deepEqual(log.filter(([kind]) => kind === 'hold').at(-1), ['hold', 'runLeft', true], `${ms} ms: running left`);
+    g.end(1, 225 - 92, 200, 400 + ms + 600);
+    assert.equal(log.some(([kind]) => kind === 'dash'), false, `${ms} ms: nor on lift`);
+  }
+  // Turned, a brief pause, then on the new way fast: still the turn.
+  {
+    const { g, log } = recorder();
+    g.begin(1, 200, 200, 0);
+    g.move(1, 220, 200, 50);
+    g.move(1, 225, 200, 400);
+    g.move(1, 165, 200, 420);
+    g.move(1, 135, 200, 500);
+    assert.equal(log.some(([kind]) => kind === 'dash'), false, 'no Dash just after a turn');
+  }
+  // And back and forth through a real Fighter: it runs, turns, never Dashes.
+  for (const ms of [20, 40, 80]) {
+    const p = padPlay();
+    p.steps(3);
+    p.down(300, 200);
+    p.drag(300, 200, 300 + px(0.06), 200, 300);
+    p.steps(10);
+    let x = 300 + px(0.06);
+    for (const dir of [-1, 1, -1, 1]) {
+      p.drag(x, 200, x + dir * px(0.15), 200, ms);
+      x += dir * px(0.15);
+      p.steps(2);
+      assert.equal(p.input.isHeld(dir < 0 ? 'runLeft' : 'runRight'), true, `${ms} ms: turned ${dir < 0 ? 'left' : 'right'} at once`);
+      p.steps(20);
+    }
+    p.up(x, 200);
+    p.steps(10);
+    assert.equal(p.dashes, 0, `${ms} ms: no Dash in four turns`);
+  }
+  // A thumb that rests between turns (sending no move at all) turns again
+  // at once, and a same-way flick after a rest still Dashes.
+  {
+    const { g, log } = recorder();
+    g.begin(1, 200, 200, 0);
+    g.move(1, 220, 200, 50);
+    g.move(1, 225, 200, 400);
+    g.move(1, 165, 200, 420);
+    assert.deepEqual(log.filter(([kind]) => kind === 'hold').at(-1), ['hold', 'runLeft', true], 'turned left');
+    g.move(1, 195, 200, 820);
+    assert.deepEqual(log.filter(([kind]) => kind === 'hold').at(-1), ['hold', 'runRight', true], 'rested, then turned right at once');
+    g.move(1, 235, 200, 1220);
+    assert.deepEqual(log.filter(([kind]) => kind === 'dash'), [['dash', 1]], 'rested, then a flick the way it runs: one Dash');
+  }
+  // With no run held (a resting thumb, or Down only), a fast sideways move
+  // starts a run, never a Dash.
+  const { g, log } = recorder();
+  g.begin(1, 200, 200, 0);
+  g.move(1, 200, 230, 50);
+  g.move(1, 200, 232, 400);
+  g.move(1, 260, 232, 420);
+  assert.equal(log.some(([kind]) => kind === 'dash'), false);
+  assert.ok(log.some(([kind, control, on]) => kind === 'hold' && control === 'runRight' && on));
 });
 
 test('a second finger on the pad is ignored while the first steers; a button press is never a gesture', () => {

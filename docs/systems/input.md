@@ -33,7 +33,7 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | Action | Codename | Keyboard | Controller (recommended) | Touch |
 | --- | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | A D or ← → | Left stick | Screen Pad: hold and drag on the left half; Joystick; or Classic ◀ ▶ |
-| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Screen Pad: a swipe left / right on the left half (or a flick while running); Joystick and Classic: one tap of **Left movement** / **Right movement** |
+| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Screen Pad: a swipe left / right on the left half (or a flick the way it already runs); Joystick and Classic: one tap of **Left movement** / **Right movement** |
 | Down (fast fall in the air; steer a launch down; held on the ground as Jump is pressed: the Super Jump; tapped on a one-way platform: a drop through it) | `down` | S or ↓ | Left stick down | Screen Pad: drag down on the left half (a quick flick: the drop); Joystick and Classic: the small **Down** button at the far left of the lower-left cluster |
 | Jump (a press: the normal jump, the same however long it is held; with Down held on the ground: the Super Jump; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow; Screen Pad also a tap on the left half (a swipe up: Down and Jump together, the Super Jump) |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
@@ -133,13 +133,18 @@ Controls → Mobile Controls:
   - **Swipe up**: lifted within `swipeTime`, past `swipeDistance`, within
     `upAngle` (40°) of straight up: `down` and `jump` pulsed in the same
     sample, the Super Jump on the ground and a normal jump in the air.
-  - **Flick while holding** (`flick`, on): a stick's finger suddenly going
-    sideways past `flickSpeed` (1.5 short sides a second, over the last
-    `flickWindow`, 0.05 s, a finger that sent no move meanwhile counted as
-    resting) asks for one Dash that way and re-anchors the stick
-    `flickRun` (0.5 of its radius) behind the finger, so the run goes on
-    the Dash's way; it must slow below `flickRearm` (half) of that speed
-    before another.
+  - **Flick while running** (`flick`, on): a stick's finger suddenly
+    going sideways past `flickSpeed` (1.5 short sides a second, over the
+    last `flickWindow`, 0.05 s, a finger that sent no move meanwhile counted
+    as resting) the way the stick has run for at least `tapTime` asks for
+    one Dash that way and re-anchors the stick `flickRun` (0.5 of its
+    radius) behind the finger, so the run goes on. The same fast move
+    against the run, with no run held, or just after a turn (the run held
+    that way for less than `tapTime`), is a **quick turn**: the same
+    re-anchoring, so the run turns at once, and never a Dash, so turning
+    round never Dashes by mistake. Either way it must slow below
+    `flickRearm` (half) of that speed, or rest for a `flickWindow`, before
+    another.
 
   A gesture is classified once, as it lifts: a tap, else a swipe, else
   nothing. A finger that has held a Run or Down for longer than `tapTime`

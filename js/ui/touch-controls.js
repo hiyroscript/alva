@@ -239,7 +239,10 @@ export function joystickVertical(x, y, current = false) {
 //                            through it, in the air a short fast fall.
 //   Swipe up                 Down and Jump in the same sample: the Super
 //                            Jump on the ground, a normal jump in the air.
-//   Flick while holding      one Dash that way (FLICK), and the run goes on.
+//   Flick while running      a flick the way the stick already runs: one
+//                            Dash that way, and the run goes on. A fast
+//                            move the other way is a quick turn, never a
+//                            Dash: the run turns at once.
 //
 // A gesture is classified once, as it lifts: a tap, else a swipe, else
 // nothing. A finger that has held a Run or Down for longer than `tapTime`
@@ -270,14 +273,20 @@ export function joystickVertical(x, y, current = false) {
 //                  little inside the stick's radius, so turning back after
 //                  a long slide takes no more than a short push the other
 //                  way (maxRadius + the engage line).
-//   flick          whether a flick while holding the stick is a Dash.
-//   flickSpeed     the sideways speed that is a flick (short sides a
-//                  second), measured over the last `flickWindow` (s) (a
-//                  finger that sent no move meanwhile was resting); it must
-//                  slow below `flickRearm` of it before another.
-//   flickRun       where a flick re-anchors the stick: this far behind the
-//                  finger (fractions of `radius`, past JOYSTICK.engage), so
-//                  the run goes on the way of the Dash.
+//   flick          whether a flick along the run the stick holds (held
+//                  that way for at least `tapTime`) is a Dash. Only that
+//                  way: a fast move against the run, with no run held, or
+//                  just after a turn, is a quick turn, never a Dash, so a
+//                  player turning round never Dashes by mistake.
+//   flickSpeed     the sideways speed that is a flick or a quick turn
+//                  (short sides a second), measured over the last
+//                  `flickWindow` (s) (a finger that sent no move meanwhile
+//                  was resting); it must slow below `flickRearm` of it
+//                  (or rest) before another.
+//   flickRun       where a flick or a quick turn re-anchors the stick: this
+//                  far behind the finger (fractions of `radius`, past
+//                  JOYSTICK.engage), so the run goes on (or turns at once)
+//                  the way the finger went.
 export const SCREEN_PAD = Object.freeze({
   tapTime: 0.2,
   tapSlop: 0.03,
@@ -369,7 +378,7 @@ export class ScreenPadGesture {
     const unit = Math.max(1, this.shortSide?.() || 0);
     this.active = {
       id, unit, start: { x, y, t }, anchor: { x, y }, travel: 0,
-      run: null, down: false, heldSince: null, stick: false,
+      run: null, runSince: null, down: false, heldSince: null, stick: false,
       samples: [{ x, t }], flickArmed: true,
     };
     return true;
@@ -383,7 +392,8 @@ export class ScreenPadGesture {
     g.travel = Math.max(g.travel, Math.hypot(x - g.start.x, y - g.start.y) / u);
     if (g.heldSince !== null && !g.stick && (t - g.heldSince) / 1000 > SCREEN_PAD.tapTime) g.stick = true;
     if (this.flick(g, x, t)) {
-      // Re-anchored behind the finger, the way of the Dash: the run goes on.
+      // Re-anchored behind the finger, the way it went: the run goes on
+      // after a Dash, or turns at once after a quick turn.
       const dir = Math.sign(g.flickDir);
       g.anchor = { x: x - dir * SCREEN_PAD.flickRun * SCREEN_PAD.radius * u, y };
     }
@@ -398,6 +408,7 @@ export class ScreenPadGesture {
       if (g.run) this.sink.hold(g.run, false);
       if (next.run) this.sink.hold(next.run, true);
       g.run = next.run;
+      g.runSince = next.run ? t : null;
     }
     if (next.down !== g.down) {
       this.sink.hold('down', next.down);
@@ -407,10 +418,15 @@ export class ScreenPadGesture {
     else if (!g.stick) g.heldSince = null;
   }
 
-  // Whether this move is a flick (see SCREEN_PAD.flick): a stick's finger
-  // suddenly going sideways past flickSpeed. Asks for its Dash.
+  // Whether this move is a flick or a quick turn (see SCREEN_PAD.flick): a
+  // stick's finger suddenly going sideways past flickSpeed. Only a flick
+  // the way the stick already runs asks for a Dash; against the run, or
+  // with none held, it is a turn and asks for nothing.
   flick(g, x, t) {
     const span = SCREEN_PAD.flickWindow * 1000;
+    // A finger that sent no move for a whole window was resting: as slow
+    // as it gets, so the next flick or quick turn is armed.
+    if (t - g.samples.at(-1).t >= span) g.flickArmed = true;
     g.samples.push({ x, t });
     while (g.samples.length > 2 && t - g.samples[1].t >= span) g.samples.shift();
     const first = g.samples[0];
@@ -426,7 +442,11 @@ export class ScreenPadGesture {
     if (!SCREEN_PAD.flick || !g.stick || Math.abs(speed) < SCREEN_PAD.flickSpeed) return false;
     g.flickArmed = false;
     g.flickDir = speed;
-    this.sink.dash(speed < 0 ? -1 : 1);
+    const dir = speed < 0 ? -1 : 1;
+    // A Dash only along a run already held that way for a moment: right
+    // after a turn, going on the new way is still the turn.
+    const along = g.run === (dir < 0 ? 'runLeft' : 'runRight') && t - g.runSince >= SCREEN_PAD.tapTime * 1000;
+    if (along) this.sink.dash(dir);
     return true;
   }
 

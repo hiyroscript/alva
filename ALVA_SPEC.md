@@ -2670,7 +2670,7 @@ each fighter's own values are in its character specification (7.2.9).
   a controller's Dash binding (R1 / RB by default: toward the movement
   stick's side, else the way the fighter faces; a stick input Dashes the way
   it is pushed; 7.4a), one tap of the Joystick or Classic Buttons
-  layout's Mouvement button, or a swipe (or a flick mid-run) on Screen
+  layout's Mouvement button, or a swipe (or a flick the way it runs) on Screen
   Pad's left half. Held inputs never repeat a
   request. Run taps, including repeated taps and joystick flicks, never Dash.
   Opposing simultaneous requests ask for nothing. `Fighter.tryMouvment`
@@ -5246,10 +5246,15 @@ Adding one is described in
     - **Swipe up** (lifted within 0.25 s, past 0.08, within 40° of
       vertical): `down` and `jump` in the same sample: the Super Jump on
       the ground, a normal jump in the air.
-    - **Flick while holding** (on by default, `SCREEN_PAD.flick`): the
-      finger suddenly going sideways past 1.5 short sides a second is one
-      Dash that way, and the stick re-anchors behind it so the run goes on
-      the Dash's way; the finger must slow below half that before another.
+    - **Flick while running** (on by default, `SCREEN_PAD.flick`): the
+      finger suddenly going sideways past 1.5 short sides a second, the
+      way the stick has run for at least 0.20 s, is one Dash that way, and
+      the stick re-anchors behind it so the run goes on. The same fast move
+      against the run, with no run held, or just after a turn, is a **quick
+      turn**, never a Dash: the stick re-anchors behind the finger and the
+      run turns at once, so a player turning round never Dashes by mistake.
+      The finger must slow below half that speed (or rest) before another
+      flick or quick turn.
     A gesture is classified once, as it lifts: a tap, else a swipe, else
     nothing; a finger that has held a Run or Down for longer than 0.20 s is
     a stick, and lifting it never jumps or dashes. Everything is let go on
