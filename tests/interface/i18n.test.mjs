@@ -598,7 +598,9 @@ test('Settings labels use sentence case and dynamic editor copy preserves locali
 test('internal identifiers never change with the language', () => {
   inFrench(() => {
     const touch = new TouchControls(new Element('div'), { setTouch: noop, queueTouchMouvement: noop });
-    assert.equal(touch.scheme, 'joystick');
+    assert.equal(touch.scheme, 'screenpad');
+    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'shield']);
+    touch.setScheme('joystick');
     assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'extra_attack', 'jump', 'shield']);
     touch.setScheme('classic');
     assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'extra_attack', 'jump', 'runLeft', 'runRight', 'shield']);

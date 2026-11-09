@@ -4,9 +4,10 @@
 //   Language  English / Français, a single choice (radio buttons). Picking
 //             one saves it and the whole interface switches at once, this
 //             dialog included; it stays open.
-//   Controls  Mobile Controls, the touch layout Quick Battle and Practice
-//             Ground use: Joystick (the default) or Classic Buttons, as two
-//             cards, and Customize touch controls, which opens the touch
+//   Controls  Mobile Controls, the touch layout Quick Battle, Practice
+//             Ground and Online Play use: Screen Pad (the default), Joystick
+//             or Classic Buttons, as three cards, and Customize touch
+//             controls, which opens the touch
 //             layout editor (js/ui/touch-layout-editor.js) for the scheme in
 //             use. Then Controller Controls: a line on what it is and
 //             Customize controller controls, which opens the fighter roster
@@ -34,9 +35,21 @@ import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../loc
 import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_AUTOMATIC_TURN_AROUND } from '../core/settings.js';
 import { ICONS } from './icons.js';
 
-// A small picture of each layout's lower-left corner, for sighted players
-// only (the card's name and line say the same).
+// A small picture of each layout's lower-left corner (Screen Pad's: the
+// whole screen split in two, a finger and its arrows on the left half, the
+// buttons on the right), for sighted players only (the card's name and
+// line say the same).
 const PREVIEW = Object.freeze({
+  screenpad: () => el('span', { class: 'settings-preview settings-preview--screenpad', 'aria-hidden': 'true' }, [
+    el('span', { class: 'sp-screen' }, [
+      el('span', { class: 'sp-half sp-half--pad' }, [
+        el('span', { class: 'sp-arrow', html: ICONS.left }),
+        el('span', { class: 'sp-hand', html: ICONS.hand }),
+        el('span', { class: 'sp-arrow', html: ICONS.right }),
+      ]),
+      el('span', { class: 'sp-half sp-half--buttons' }, [el('i'), el('i'), el('i')]),
+    ]),
+  ]),
   joystick: () => el('span', { class: 'settings-preview settings-preview--joystick', 'aria-hidden': 'true' }, [
     el('i', { class: 'sp-dash sp-dash--left', html: ICONS.mouvementLeft }),
     el('i', { class: 'sp-stick' }, [el('i', { class: 'sp-knob' })]),
@@ -219,7 +232,7 @@ export class SettingsDialog {
 
   buildCombat() {
     // Automatic turn-around's two choices, On first, each named and ticked
-    // when it is the saved one; the default says so, as Joystick's card
+    // when it is the saved one; the default says so, as Screen Pad's card
     // does.
     this.turnAroundOptions = [true, false].map((on) => {
       const option = el('button', {

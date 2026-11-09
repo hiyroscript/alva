@@ -159,8 +159,9 @@ blocks every attack.
   Shield, Energy, hit-cancels and an input buffer, launch steering and
   tumbling, launches that rebound off walls, and hit effects.
 - **Every input**: keyboard, PlayStation and Xbox controllers, and touch in
-  two layouts (a joystick or classic buttons), both with dedicated
-  left/right Mouvement buttons, that players can rearrange and resize,
+  three layouts (Screen Pad, the default: the left half of the screen an
+  invisible gesture pad; a joystick; or classic buttons, the last two with
+  dedicated left/right Mouvement buttons), that players can rearrange and resize,
   with each fighter's own art on its touch buttons.
 - **Controllers**: DualShock 4, DualSense, Xbox One and Xbox Series pads,
   up to four connected (one plays Player 1), a connection indicator on
@@ -220,7 +221,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,394):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,395):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed

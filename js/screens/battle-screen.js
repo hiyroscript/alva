@@ -59,6 +59,7 @@ import { STAT_KEYS } from '../game/match-stats.js';
 import { HUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
 import { TouchControls, hudCeiling } from '../ui/touch-controls.js';
+import { ScreenPadHint } from '../ui/screen-pad-hint.js';
 import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
 import { deviceName } from '../ui/controller-dialog.js';
 import { PLAYER_NAMES, playerNumber } from '../ui/local-play.js';
@@ -164,6 +165,8 @@ export class BattleScreen extends Screen {
     this.touch = new TouchControls(this.touchRoot, app.input);
     // The moves stacked above Shield never rise past the top HUD.
     this.touch.setCeiling(hudCeiling(this.hudRoot));
+    // The one-time Screen Pad hint, while the touch controls play.
+    this.padHint = new ScreenPadHint(app.settings, () => !!app.device?.touchUI);
     // Player 1's moves in the corner, for keyboard and controller play
     // (never Watch Mode's: nobody plays there); in Local Play each player's,
     // Player 1's bottom left and Player 2's bottom right.
@@ -182,7 +185,7 @@ export class BattleScreen extends Screen {
     this.buildResults();
 
     this.el.replaceChildren(
-      this.canvas, this.hudRoot, this.abilityRoot, this.abilityRoot2, this.touchRoot, this.banner, this.toast,
+      this.canvas, this.hudRoot, this.abilityRoot, this.abilityRoot2, this.touchRoot, this.padHint.root, this.banner, this.toast,
       this.pauseOverlay, this.resultsOverlay,
     );
 
@@ -541,6 +544,7 @@ export class BattleScreen extends Screen {
     const playing = on && this.mode !== 'watch';
     this.app.input.setGameplayActive(playing);
     this.touch.setEnabled(playing && this.mode !== 'local');
+    this.padHint.sync(playing && this.mode !== 'local', this.touch.scheme);
   }
 
   exit() {

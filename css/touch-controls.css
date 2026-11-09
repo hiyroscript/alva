@@ -1,5 +1,6 @@
-/* Touch controls: both Mobile Controls schemes (Joystick and Classic
-   Buttons), in Battle, Practice Ground and the touch layout editor. One
+/* Touch controls: the three Mobile Controls schemes (Screen Pad, Joystick
+   and Classic Buttons), in Battle, Practice Ground and the touch layout
+   editor. One
    part of the stylesheet index.html loads in order (css/base.css first;
    see docs/development/conventions.md). */
 
@@ -12,7 +13,7 @@
   /* The clusters sit flush against the screen's edges: nothing between
      them and the corner but the safe-area insets. */
   --tc-bottom: var(--safe-b);
-  /* Stick geometry and the smaller Mouvement buttons shared by both schemes. */
+  /* Stick geometry and the smaller Mouvement buttons shared by Joystick and Classic Buttons. */
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
   --tc-dash: calc(var(--tc) * 0.62);
@@ -54,6 +55,42 @@ html.is-touch .touch-controls { display: block; }
 html.is-touch .touch-controls[hidden] { display: none; }
 .is-paused .touch-controls { opacity: 0.25; }
 .tc-cluster { position: absolute; bottom: var(--tc-bottom); }
+/* Screen Pad (the default scheme): the whole left half of the screen,
+   from its left edge to the middle, top to bottom, the safe-area insets and
+   the strip under the top HUD included (the HUD takes no pointer there,
+   only its pause or More button does), is one invisible gesture surface
+   (TouchControls.onPadDown, ScreenPadGesture). Sized from the controls'
+   own box, which is the whole screen, so it follows every resize and
+   orientation change. It is never drawn, in play, in pause, in Practice
+   Ground or anywhere else: no fill, border, shadow, outline, highlight or
+   pseudo-element, and nothing is ever added to it. The lower-right cluster
+   sits above it, so a button, wherever a layout puts it, takes its own
+   press first. The browser never scrolls, zooms or selects from it. */
+.tc-screenpad {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  z-index: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none;
+  opacity: 1;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tc-screenpad::before, .tc-screenpad::after { content: none; }
+.touch-controls[data-scheme="screenpad"] .tc-actions { z-index: 1; }
+/* The layout editor has nothing to place there: the pad is not shown. */
+.touch-controls.is-editing .tc-screenpad { display: none; }
 /* Classic Buttons' lower-left cluster: one row along the bottom edge,
    Run left, Down, Run right, each the size of every button; a small Dash
    button just above each Run arrow. */
@@ -67,7 +104,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-dpad .tc-pad { position: absolute; bottom: var(--tc-in); }
 .tc-dpad .tc-runLeft { left: var(--tc-in); }
 .tc-dpad .tc-runRight { left: calc(var(--tc-p) * 2 + var(--tc-in)); }
-/* The lower-right cluster (both schemes), flush in the bottom-right corner:
+/* The lower-right cluster (every scheme), flush in the bottom-right corner:
    the bottom row the fighter's two Mash Combo buttons (data-mash) and
    Jump in the corner, nothing else; Shield above Jump; the fighter's other
    moves a little higher, in columns left of and above Shield (see
@@ -273,7 +310,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-dpad .tc-dash-right { left: calc(var(--tc-p) * 2 + (var(--tc-big) - var(--tc-dash)) / 2); right: auto; }
 .tc-dash .icon { display: block; }
 
-/* Down (both schemes). Held, it is Down: the fast fall, or on a one-way
+/* Down (Joystick and Classic Buttons). Held, it is Down: the fast fall, or on a one-way
    platform a drop through it. In Classic it is the middle of the bottom
    row, between the Run arrows, as large as they are; in Joystick a small
    button, the size of a Dash button, at the far left of the cluster, level
@@ -297,3 +334,28 @@ html.is-touch .touch-controls[hidden] { display: none; }
   font-size: calc(var(--tc) * 0.42);
 }
 .tc-down .icon { display: block; }
+
+/* The one-time Screen Pad hint (js/ui/screen-pad-hint.js): a card of text
+   over the top of the stage, under the HUD, on a touch screen only. It
+   takes no pointer: the first touch anywhere dismisses it and still plays.
+   Never a drawing of the pad. */
+.screenpad-hint {
+  display: none;
+  position: absolute;
+  top: calc(max(var(--safe-t), 8px) + clamp(64px, 17vh, 120px));
+  left: 50%;
+  translate: -50% 0;
+  z-index: 4;
+  width: max-content;
+  /* Narrow enough to stay clear of the right-hand cluster. */
+  max-width: min(460px, calc(100% - 32px));
+  padding: clamp(8px, 1.8vh, 14px) clamp(12px, 2vw, 18px);
+  border-radius: var(--radius-menu);
+  color: var(--text);
+  text-align: center;
+  pointer-events: none;
+}
+html.is-touch .screenpad-hint:not([hidden]) { display: grid; gap: 4px; }
+.screenpad-hint-title { font-size: clamp(13px, 2.4vh, 16px); }
+.screenpad-hint-body { margin: 0; font-size: clamp(12px, 2.1vh, 14px); line-height: 1.45; }
+.screenpad-hint-dismiss { margin: 0; color: var(--text-secondary); font-size: clamp(11px, 1.9vh, 13px); }

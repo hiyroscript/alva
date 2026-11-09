@@ -19,7 +19,8 @@ import { clamp } from './utils.js';
 import { NUMBERED_ATTACKS } from '../config.js';
 
 // Every control each scheme shows, in reading order: the lower-left cluster
-// first (Down at its far left), then the lower-right actions, all five
+// first (Down at its far left; Screen Pad has none), then the lower-right
+// actions, all five
 // numbered attack buttons included (a fighter shows only the ones it has;
 // the layout is every fighter's). `stick` is the joystick itself. Retired
 // ids such as `transform` are discarded by sanitization. A control id is
@@ -27,6 +28,9 @@ import { NUMBERED_ATTACKS } from '../config.js';
 // id simply leaves that out. (`down` was retired once and is back: a
 // layout saved while the old down arrow existed puts it where it was.)
 export const TOUCH_CONTROL_IDS = Object.freeze({
+  // Screen Pad: the lower-right cluster only. Its left half is the gesture
+  // pad, which is not a control: never placed, sized or stored.
+  screenpad: Object.freeze(['extra_attack', 'shield', ...NUMBERED_ATTACKS, 'jump']),
   joystick: Object.freeze([
     'down', 'mouvementLeft', 'stick', 'mouvementRight',
     'extra_attack', 'shield', ...NUMBERED_ATTACKS, 'jump',
@@ -100,7 +104,8 @@ export function sanitizeTouchLayout(scheme, value) {
   return layout;
 }
 
-// Every scheme's layout from `value` ({ joystick, classic }), each checked.
+// Every scheme's layout from `value` ({ screenpad, joystick, classic }),
+// each checked.
 export function sanitizeTouchLayouts(value) {
   const source = isPlainObject(value) ? value : {};
   return Object.fromEntries(Object.keys(TOUCH_CONTROL_IDS).map((scheme) => [

@@ -153,6 +153,7 @@ export class OnlineBattleScreen extends BattleScreen {
   setPlayActive(on) {
     this.app.input.setGameplayActive(on);
     this.touch.setEnabled(on);
+    this.padHint.sync(on, this.touch.scheme);
     if (this.lockstep) this.lockstep.muted = !on;
   }
 

@@ -198,7 +198,7 @@ behave, and how it must look.
   for the combat AI and its moveset reader, and `rendering/` for the
   camera, sprite normalizer and animator, hit and Shield effects and the
   fighter status); `js/stages/` (stage themes); `js/screens/`;
-  `js/ui/` (components, the HUD, touch controls in two layouts, each
+  `js/ui/` (components, the HUD, touch controls in three layouts, each
   rearrangeable (7.4), the fighter roster, dialogs).
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
   rendering. `Battle` adds the combat-AI CPU at the chosen difficulty (in
@@ -1531,17 +1531,32 @@ indicator. Each section keeps its existing settings, in this order:
   buttons; the one in use is ticked and outlined in green. Choosing one saves
   it at once and the whole interface switches immediately (6.11), this
   dialog included; the dialog stays open on Language.
-- **Controls** — **Mobile Controls**, the touch layout Quick Battle and
-  Practice Ground use (7.4), with exactly two choices shown as two cards,
-  each with a small drawing of its lower-left corner and a line on what it
-  gives:
-  - **Joystick** (marked "Default") — a circular joystick to move, the
+- **Controls** — **Mobile Controls**, the touch layout Quick Battle,
+  Practice Ground and Online Play use (7.4), with three choices shown as
+  three cards, each with a small drawing of its lower-left corner (Screen
+  Pad's: the whole screen split in two, a finger and its arrows on the left
+  half) and a line on what it gives:
+  - **Screen Pad** (French **Pavé tactile**; marked "Default"; the Screen
+    Pad update) — no lower-left cluster: the left half of the screen is an
+    invisible gesture surface ("Left half: tap to jump, swipe to Dash, hold
+    and drag to move."). A player with no stored settings gets Screen Pad,
+    and so does an unknown or missing scheme (`DEFAULT_MOBILE_CONTROLS`).
+  - **Joystick** — a circular joystick to move, the
     single-tap **Left mouvement** / **Right mouvement** Dash buttons above
-    it. A player with no stored settings gets Joystick, and so does an
-    unknown or missing scheme (`DEFAULT_MOBILE_CONTROLS`).
-  - **Classic Buttons** — Run Left, Down and Run Right in a row along the bottom-left edge, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above the Run arrows. A stored choice of either is kept: a player whose settings were saved before Joystick became the default (settings version 10) keeps the scheme they played with, Classic Buttons included, and both custom touch layouts.
+    it.
+  - **Classic Buttons** — Run Left, Down and Run Right in a row along the bottom-left edge, with smaller dedicated Mouvement Left and Mouvement Right buttons directly above the Run arrows.
 
-  The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
+  A choice the player made is kept, and only a choice: the settings record
+  whether the scheme was chosen (`mobileControlsChosen`), so a default is
+  never mistaken for a choice and a later change of default reaches every
+  player who never chose. Settings saved before Screen Pad became the
+  default (version 10 and older) cannot tell a chosen Joystick from the
+  default it then was, so every stored scheme is kept, Joystick and Classic
+  Buttons alike, with every custom touch layout, and counted as chosen from
+  then on; one with no valid scheme starts on Screen Pad (version 10) or on
+  Classic Buttons, the scheme it played with (older versions).
+
+  The cards are a `radiogroup` of three `radio` buttons (`aria-checked`, each
   described by its line); hover only previews. The one in use carries a green
   "Selected" pill and border. Choosing one saves it at once; the next battle
   or practice uses it. Beneath them, **Customize touch controls** opens the
@@ -1669,6 +1684,10 @@ real touch controls: a `TouchControls` instance drawn and placed by the same
 code and stylesheet as in battle, never enabled, so nothing it does reaches
 gameplay. Every control of the layout can be moved and resized, the joystick
 itself included:
+
+- **Screen Pad:** the actions only (Extra Attack, Shield, Attack 1 through
+  Attack 5, Jump). The gesture pad is not a control: it is never drawn,
+  moved or resized, here or anywhere.
 
 - **Joystick:** Down (the downward chevron), Left mouvement (double left
   arrows), the joystick, Right mouvement (double right arrows), and the
@@ -2650,8 +2669,9 @@ each fighter's own values are in its character specification (7.2.9).
   (`mouvementLeftPressed` / `mouvementRightPressed`) starts it: keyboard Q/E,
   a controller's Dash binding (R1 / RB by default: toward the movement
   stick's side, else the way the fighter faces; a stick input Dashes the way
-  it is pushed; 7.4a), or one tap of either layout's
-  Mouvement button. Held inputs never repeat a
+  it is pushed; 7.4a), one tap of the Joystick or Classic Buttons
+  layout's Mouvement button, or a swipe (or a flick mid-run) on Screen
+  Pad's left half. Held inputs never repeat a
   request. Run taps, including repeated taps and joystick flicks, never Dash.
   Opposing simultaneous requests ask for nothing. `Fighter.tryMouvment`
   selects `tryDash` on the ground and `tryAirDash` in the air. Every existing
@@ -5155,10 +5175,10 @@ Adding one is described in
   key.
 - Game controllers (PlayStation and Xbox, in the standard mapping), sending
   the same codenames through each fighter's controller layout: see 7.4a.
-- Touch (landscape, Pointer Events, true multi-touch), in one of two
+- Touch (landscape, Pointer Events, true multi-touch), in one of three
   layouts chosen under Settings → Controls → Mobile Controls (6.10);
-  `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
-  else is Joystick, the default, `DEFAULT_MOBILE_CONTROLS`), and Quick Battle and Practice Ground apply the saved
+  `TouchControls.setScheme('screenpad' | 'joystick' | 'classic')` switches them (anything
+  else is Screen Pad, the default, `DEFAULT_MOBILE_CONTROLS`), and Quick Battle, Practice Ground and Online Play apply the saved
   one, and that layout's saved custom placement (`setLayout`, 6.10a), each
   time they are entered. A switch first lets go of everything held
   (every pointer, direction, Jump, Shield and the rest) and
@@ -5188,7 +5208,59 @@ Adding one is described in
     hit-tests Left / Right where they are drawn, so a thumb slides
     between them wherever they sit. In battle the controls are never
     keyboard-focusable (`tabindex="-1"`); only the editor's copy is.
-  - **Joystick** (the default): the lower-left corner holds one circular
+  - **Screen Pad** (the default; the Screen Pad update): no lower-left
+    cluster at all. The whole left half of the screen (from its left edge
+    to its middle, top to bottom, the safe-area insets and the strip under
+    the top HUD included; the HUD takes no touch there but its pause or
+    More button) is one invisible gesture surface, sized from the screen's
+    own box so it follows every resize and rotation. It is never drawn: no
+    ring, knob, anchor, trail, divider, outline, tint or pressed state, in
+    play, in pause, in Practice Ground or in the editor, and it is no
+    button to assistive technology (`aria-hidden`). The right half keeps
+    the lower-right cluster exactly as the other layouts do, Jump in the
+    corner included, and its buttons sit above the pad, so a button
+    (wherever a layout puts it) always takes its own press. Every gesture
+    becomes the controls every other device sends; nothing in the Fighter,
+    the movement rules, Online Play's frames or the CPU changes. One finger
+    steers; a second landing on the pad is ignored, except that its tap
+    while the first holds Down is a Jump (the Super Jump chord). Distances
+    are fractions of the viewport's short side, times in seconds
+    (`SCREEN_PAD` in `js/ui/touch-controls.js`):
+    - **Tap** (lifted within 0.20 s, moved less than 0.03): Jump, on
+      lift, never on touch-down and never waiting for a second tap; in the
+      air an air jump (tap, tap, tap: the triple jump). Jump is pressed for
+      one sample (`InputManager.pulseTouch`).
+    - **Swipe left / right** (lifted within 0.25 s, past 0.08, within 35°
+      of horizontal): one Dash that way (`queueTouchMouvement`), an air
+      dash in the air, even against a run it crossed on the way.
+    - **Touch, hold and drag**: a floating stick anchored where the finger
+      landed, radius 0.10, read by the joystick's own rules
+      (`joystickDirection`, `joystickVertical`, the same fractions):
+      `runLeft` / `runRight` held past the engage line, `down` pushed
+      down, a diagonal both, pushing up nothing. The anchor is dragged
+      along once the finger is 0.08 from it, so a long slide never runs
+      out of stick and turning back is always a short push.
+    - **Quick flick down**: a short `down`, so on a droppable platform the
+      drop (`dropTapTime`), in the air a short fast fall; held longer, no
+      drop.
+    - **Swipe up** (lifted within 0.25 s, past 0.08, within 40° of
+      vertical): `down` and `jump` in the same sample: the Super Jump on
+      the ground, a normal jump in the air.
+    - **Flick while holding** (on by default, `SCREEN_PAD.flick`): the
+      finger suddenly going sideways past 1.5 short sides a second is one
+      Dash that way, and the stick re-anchors behind it so the run goes on
+      the Dash's way; the finger must slow below half that before another.
+    A gesture is classified once, as it lifts: a tap, else a swipe, else
+    nothing; a finger that has held a Run or Down for longer than 0.20 s is
+    a stick, and lifting it never jumps or dashes. Everything is let go on
+    lift, cancel, lost capture, pause, disabling, a scheme switch and focus
+    lost (`InputManager.onSuspend`); a pulse not yet sampled is dropped. The
+    first time a player plays with Screen Pad on a touch screen, a small
+    card says what the left half does ("Left half of the screen — Tap:
+    jump · Swipe: Dash · Hold & drag: move · Drag down: Down · Swipe up:
+    Super Jump"); it takes no pointer, the first touch anywhere dismisses
+    it (and still plays), and it never shows again (`screenPadHintSeen`).
+  - **Joystick**: the lower-left corner holds one circular
     joystick (a translucent round base with no marks on it and a movable
     knob, in the buttons' style; a group named "Movement joystick"). It
     captures one pointer and holds the existing `runLeft` or `runRight` input

@@ -17,12 +17,13 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 | [`js/ui/controller-cursor.js`](../../js/ui/controller-cursor.js) | The circular controller cursor, part of `MenuNavigator`. |
 | [`js/ui/controller-dialog.js`](../../js/ui/controller-dialog.js), [`js/ui/controller-editor.js`](../../js/ui/controller-editor.js), [`js/ui/controller-glyphs.js`](../../js/ui/controller-glyphs.js) | Controller Connections; Settings › Controls › Controller controls (roster, editor, binding dialog); button and stick names, binding phrases, chips (`stickGlyph`) and the controller diagram, either stick lit on its own. |
 | [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Automatic turn-around setting, see [combat](combat.md#facing-and-automatic-turn-around); its presses go through the same request and cancellation rules as a CPU's, see [combat](combat.md#requests-and-cancellation)), `blankInput`, `HELD_CONTROLS`. |
-| [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
+| [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the three touch layouts (Screen Pad's gestures: `SCREEN_PAD`, `ScreenPadGesture`), multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
 | [`js/ui/ability-hud.js`](../../js/ui/ability-hud.js), [`css/ability-hud.css`](../../css/ability-hud.css) | The ability HUD: Player 1's moves, their art and their keyboard or controller inputs in the bottom-right corner, on a ground / air wheel, with their cooldowns ([below](#the-ability-hud)). |
 | [`js/ui/mobile-abilities.js`](../../js/ui/mobile-abilities.js) | Which buttons a fighter has (`abilityPresence`, from its `actions`), and each button's name and frame (`previewFrame`, from its `mobileAbilities`). |
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
+| [`js/ui/screen-pad-hint.js`](../../js/ui/screen-pad-hint.js) | The one-time Screen Pad hint card. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
-| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, Automatic turn-around on or off, and each fighter's saved controller layout (the only module touching storage). |
+| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice (and whether it was chosen) and each layout's custom placement, whether the Screen Pad hint was seen, Automatic turn-around on or off, and each fighter's saved controller layout (the only module touching storage). |
 | [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and the controller (its D-pad, buttons and cursor); menus read their own bindings, never gameplay edges, and never the keys a focused text field types ([Text fields](#text-fields)). It also owns the dialog stack (see [Dialog layers](#dialog-layers)). |
 | [`js/online/lockstep.js`](../../js/online/lockstep.js), [`js/online/input-frame.js`](../../js/online/input-frame.js) | Online Play's input ([below](#online-play-the-remote-channel)): the local player's snapshot encoded into a frame for each step, sent to the other browser, and each fighter's `LockstepChannel` handing its PlayerController the frame of the step being run. |
 | [`js/core/input-modality.js`](../../js/core/input-modality.js) | The input modality (mouse, touch, keyboard or gamepad) on `<html>`, which keeps hover, focus and selection apart (see [Interaction states](#interaction-states)). |
@@ -31,10 +32,10 @@ controllers), §6.2 (Home's controller button), §6.10 (Settings), §6.10a
 
 | Action | Codename | Keyboard | Controller (recommended) | Touch |
 | --- | --- | --- | --- | --- |
-| Move left / right | `runLeft` / `runRight` | A D or ← → | Left stick | Joystick, or Classic ◀ ▶ |
-| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Both layouts: one tap of **Left movement** / **Right movement** |
-| Down (fast fall in the air; steer a launch down; held on the ground as Jump is pressed: the Super Jump; tapped on a one-way platform: a drop through it) | `down` | S or ↓ | Left stick down | both layouts: the small **Down** button at the far left of the lower-left cluster |
-| Jump (a press: the normal jump, the same however long it is held; with Down held on the ground: the Super Jump; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow |
+| Move left / right | `runLeft` / `runRight` | A D or ← → | Left stick | Screen Pad: hold and drag on the left half; Joystick; or Classic ◀ ▶ |
+| Dash (on the ground) / air dash (in the air) | `mouvementLeft` / `mouvementRight` (request-only) | Q / E | R1 / RB: the way the left stick points, else the way the fighter faces | Screen Pad: a swipe left / right on the left half (or a flick while running); Joystick and Classic: one tap of **Left movement** / **Right movement** |
+| Down (fast fall in the air; steer a launch down; held on the ground as Jump is pressed: the Super Jump; tapped on a one-way platform: a drop through it) | `down` | S or ↓ | Left stick down | Screen Pad: drag down on the left half (a quick flick: the drop); Joystick and Classic: the small **Down** button at the far left of the lower-left cluster |
+| Jump (a press: the normal jump, the same however long it is held; with Down held on the ground: the Super Jump; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | Cross / A | the upward arrow; Screen Pad also a tap on the left half (a swipe up: Down and Jump together, the Super Jump) |
 | Extra attack | `extra_attack` | J | the fighter's own layout | top of the cluster |
 | Shield (on the ground, held: it holds the fighter still, a direction held with it only turns it, Jump jumps out of it) / Deflect (in the air, a fresh press) | `shield` | L | L1 / LB (held on the ground, pressed in the air) | **Shield** glyph always; named **Deflect** while airborne when supported |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | the fighter's own layout (see below) | slots 1 to 5 |
@@ -46,7 +47,9 @@ ground. The Fighter reads it from the one snapshot every device fills
 (`down`, `jumpPressed`), so S / ↓ with W / Space / ↑, the left stick down
 with Cross / A (or wherever the player has bound Jump and the fast fall),
 and the touch Down button held by one finger with Jump pressed by another
-(both layouts; each pointer is its own control) all make the same Super
+(Joystick and Classic Buttons; each pointer is its own control), Screen
+Pad's left half dragged down with the right-hand Jump, and Screen Pad's
+swipe up (Down and Jump in the same sample) all make the same Super
 Jump. Down and Jump pressed in the same sample count; Down pressed after
 Jump never upgrades it. Because Down held on the ground is half of that
 chord, the platform drop is a *tap* of Down (pressed and let go within
@@ -71,7 +74,7 @@ nothing in play.
 A [Mash Combo](combat.md#mash-combo) needs no button of its own: it is five
 fresh presses of one of the fighter's two Mash Combo moves' existing
 buttons, read from the same `…Pressed` edges every device produces, so it
-works the same on the keyboard, touch (either layout: each tap is one
+works the same on the keyboard, touch (any layout: each tap is one
 press; a held touch button is one press), a PlayStation or Xbox pad, any
 custom binding a player gives those moves, and the CPU's executor. Only
 fresh edges count: a held key or button is one press, and a key's
@@ -86,11 +89,81 @@ universal input changes, and a controller layout never names it.
 
 Touch controls show on touch-first devices only (a coarse pointer or an
 observed touch), never because a desktop window is narrow; Watch Mode,
-where nobody plays, hides them. Two layouts, chosen under Settings →
+where nobody plays, hides them. Three layouts, chosen under Settings →
 Controls → Mobile Controls:
 
-- **Joystick** (the default for a player who never chose, and for an
-  unknown or missing scheme): one round joystick holding `runLeft` /
+- **Screen Pad** (the default for a player who never chose, and for an
+  unknown or missing scheme; the [Screen Pad
+  update](../../UPDATES.md#screen-pad-update)): no lower-left cluster. The
+  whole left half of the screen is one invisible gesture surface
+  (`.tc-screenpad`, `TouchControls.pad`): `position: absolute`, from the
+  controls' left edge to their middle, top to bottom, in the controls' own
+  box, which is the whole screen, so the safe-area insets and the strip
+  under the top HUD are in it and it follows every resize and rotation.
+  The HUD takes no pointer over it (only the pause or More button does),
+  and the lower-right cluster sits above it (`z-index`), so any button,
+  wherever a custom layout puts it, takes its own press first; the pad
+  never sees it. It is never drawn (transparent, no border, shadow,
+  outline, tap highlight or pseudo-element, nothing added during a
+  gesture), is `aria-hidden` and `touch-action: none`, and the layout
+  editor does not show it. Its gestures (`ScreenPadGesture`, the pure
+  rules `classifyGesture`, `padHold` and `followAnchor`, every threshold
+  in the frozen `SCREEN_PAD`, distances as fractions of the viewport's
+  short side, times in seconds):
+  - **Tap**: lifted within `tapTime` (0.20 s), moved less than `tapSlop`
+    (0.03): Jump, on lift, never on touch-down, never waiting for a second
+    tap; in the air an air jump, so tap-tap-tap is the triple jump.
+  - **Swipe left / right**: lifted within `swipeTime` (0.25 s), at least
+    `swipeDistance` (0.08) from where it landed, within `swipeAngle` (35°)
+    of horizontal: exactly one `queueTouchMouvement` that way (a Dash, an
+    air dash in the air). It may hold a Run for a few frames first, and a
+    swipe against a held Run is still a Dash its own way.
+  - **Touch, hold and drag**: a floating stick anchored where the finger
+    landed, `radius` 0.10, read by the joystick's own rules
+    (`joystickDirection`, `joystickVertical`, `JOYSTICK`'s fractions of
+    that radius): `runLeft` / `runRight` held, `down` pushed down, a
+    diagonal both, pushing up nothing. Once the finger is `maxRadius`
+    (0.08) from the anchor, the anchor is dragged along behind it, so a
+    long slide never runs out of stick and turning back is a short push
+    (0.08 + the engage line, about 0.11).
+  - **Quick flick down**: a short `down` hold (the finger's lift position
+    is read too, so even a flick between two frames is one), so on a
+    droppable platform the drop and in the air a short fast fall; held past
+    `dropTapTime`, no drop.
+  - **Swipe up**: lifted within `swipeTime`, past `swipeDistance`, within
+    `upAngle` (40°) of straight up: `down` and `jump` pulsed in the same
+    sample, the Super Jump on the ground and a normal jump in the air.
+  - **Flick while holding** (`flick`, on): a stick's finger suddenly going
+    sideways past `flickSpeed` (1.5 short sides a second, over the last
+    `flickWindow`, 0.05 s, a finger that sent no move meanwhile counted as
+    resting) asks for one Dash that way and re-anchors the stick
+    `flickRun` (0.5 of its radius) behind the finger, so the run goes on
+    the Dash's way; it must slow below `flickRearm` (half) of that speed
+    before another.
+
+  A gesture is classified once, as it lifts: a tap, else a swipe, else
+  nothing. A finger that has held a Run or Down for longer than `tapTime`
+  is a stick: lifting it never jumps or dashes. One finger steers; another
+  landing on the pad is ignored, except that its tap while the first holds
+  Down is a Jump (the Super Jump chord with both thumbs on the pad; Down
+  on the pad and the right-hand Jump is the same chord). The runs and Down
+  go through the held path in their own slots (like `setStickDown`), so
+  they are real `…Pressed` edges; a tap's Jump and a swipe up's Down and
+  Jump are pulses (`InputManager.pulseTouch`: pressed, held through the
+  next sample, let go; `clearTouchPulses` drops one not yet sampled).
+  Everything is let go on lift, `pointercancel`, lost capture,
+  `releaseAll`, disabling (pause), a scheme switch and focus lost
+  (`InputManager.onSuspend`), and the pad is no button, so a trailing click
+  presses nothing. The touch rule for Dash requests is unchanged: one
+  sample each, the latest of two in one sample kept.
+
+  The first time a player plays with Screen Pad on a touch screen, a card
+  (`ScreenPadHint`, [`js/ui/screen-pad-hint.js`](../../js/ui/screen-pad-hint.js))
+  says what the left half does. It is text, never a drawing of the pad,
+  takes no pointer, is dismissed by the first touch anywhere (which still
+  plays) and is remembered in the settings (`screenPadHintSeen`); a pause
+  only hides it until play resumes.
+- **Joystick**: one round joystick holding `runLeft` /
   `runRight` past a small deadzone (digital, like every other input), with
   two one-tap Mouvement/Dash buttons with double directional arrows above
   it. Pushed down it is the Down button too (the [launch & energy
@@ -111,11 +184,17 @@ Controls → Mobile Controls:
   drop; held past `dropTapTime`, no drop, exactly as the button. Pushed up
   it holds nothing. The stick shows it with `is-down` beside `is-left` /
   `is-right`.
-- **Classic Buttons** (kept by every player who stored it, including
-  those whose settings predate Joystick becoming the default): one row
+- **Classic Buttons**: one row
   along the bottom-left edge, Run Left, **Down** and Run Right, all the size
   of every button, with thumb sliding between the Run arrows, and smaller
   double-arrow Mouvement buttons directly above their matching Run buttons.
+
+A scheme a player chose is kept, and only a chosen one: the settings
+record it (`mobileControlsChosen`), so a later change of default reaches
+everyone who never chose. Settings saved before Screen Pad became the
+default (version 10 and older) keep their stored Joystick or Classic
+Buttons and every custom layout, counted as chosen, since they cannot tell
+a choice from the old default (`js/core/settings.js`; [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.10).
 
 Joystick puts a small **Down** button (a downward chevron, the Dash
 buttons' size) at the far left of its cluster, level with the middle of
@@ -802,6 +881,12 @@ them as a stack (`MenuNavigator.syncLayers`):
   a different attack pressed during the Jab never cutting it on any
   device, Run never a request.
 
+- [`tests/systems/screen-pad.test.mjs`](../../tests/systems/screen-pad.test.mjs):
+  Screen Pad's thresholds and pure rules, and its gestures through the real
+  touch controls, `InputManager` and a Fighter (tap and triple jump, swipes,
+  hold and drag, drag down, the platform flick, swipe up, the mid-run
+  flick, a second finger, buttons, every release), the pad's box and paint,
+  and the one-time hint.
 - [`tests/interface/controls-ui.test.mjs`](../../tests/interface/controls-ui.test.mjs):
   both layouts, the art on every button for both fighters, fallbacks, names
   in both languages, multi-touch, one press per touch (a pointer's own

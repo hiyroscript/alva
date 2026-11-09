@@ -1,5 +1,9 @@
 // Multi-touch landscape controls using the existing Pointer Events input.
-// Joystick (the default): a horizontal stick with the small Left movement
+// Screen Pad (the default, the Screen Pad update): no lower-left cluster at
+// all; the whole left half of the screen is an invisible gesture surface
+// for movement (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe
+// up: the Super Jump; see SCREEN_PAD below), the lower-right cluster
+// exactly as the other schemes'. Joystick: a horizontal stick with the small Left movement
 // / Right movement Dash buttons (double arrows) above it and a small Down
 // button at its far left, level with its middle. Classic: one row along
 // the bottom-left edge, Run left, Down and Run right, with sliding pointer
@@ -13,7 +17,7 @@
 // push that is mostly downward counts (joystickVertical), so a run with the
 // thumb drifting low never holds Down; pushing up does nothing (Jump is its
 // button).
-// Both share the same action buttons. Jump always uses the upward arrow;
+// All three share the same action buttons. Jump always uses the upward arrow;
 // Defence its shield glyph, named Deflect while the fighter is in the
 // air (where the same button is its Deflect, for one that has one);
 // attacks use the fighter's authored ground/air previews and translated
@@ -58,8 +62,9 @@
 // Unlimited Void is attack4 and Hollow Purple is attack5, and nothing a
 // button shows decides what it does.
 //
-// Every pointer is tracked by pointerId, so the joystick (or Left / Right)
-// and Jump, or any other combination, work simultaneously. State is pushed
+// Every pointer is tracked by pointerId, so the joystick (or Left / Right,
+// or the Screen Pad's finger) and Jump, or any other combination, work
+// simultaneously. State is pushed
 // into InputManager.setTouch().
 //
 // Custom layouts (the Mobile Controls setting's editor; see
@@ -158,11 +163,11 @@ export function attackSlots(shown) {
   return slots;
 }
 
-// Both schemes' shared Down button: held for as long as a pointer stays on
+// Joystick's and Classic Buttons' shared Down button: held for as long as a pointer stays on
 // it, exactly as S / ↓ or the left stick held down (the `down` control).
 const DOWN_BUTTON = { action: 'down', label: 'control.down', icon: ICONS.down };
 
-// Both schemes' shared single-tap Dash buttons, mouvementLeft and
+// Joystick's and Classic Buttons' shared single-tap Dash buttons, mouvementLeft and
 // mouvementRight. Keep those internal codenames; their display names are
 // localized independently (Left movement / Right movement in English).
 const MOUVEMENT_BUTTONS = [
@@ -209,11 +214,285 @@ export function joystickVertical(x, y, current = false) {
   return y >= JOYSTICK.downEngage && angle <= JOYSTICK.downAngle;
 }
 
+// ---- Screen Pad -------------------------------------------------------------
+//
+// Screen Pad (the Screen Pad update): the Mobile Controls scheme whose
+// lower-left cluster is gone. The whole left half of the screen is an
+// invisible gesture surface for movement, and the right half keeps the
+// lower-right action cluster exactly as the other schemes show it.
+//
+// Every gesture is translated into the controls every other device sends,
+// through the touch controls' own paths (js/ui/touch-controls.js): held
+// `runLeft` / `runRight` / `down`, a one-sample `jump` or `down` (a pulse:
+// pressed, held through the next sample, let go) and one Dash request
+// (queueTouchMouvement). The Fighter, the movement rules, Online Play's
+// frames and the CPU never know the pad exists.
+//
+//   Tap                      Jump (in the air an air jump: tap, tap, tap
+//                            is the triple jump). On lift, never on touch.
+//   Swipe left / right       one Dash that way (an air dash in the air).
+//   Touch, hold and drag     a floating stick anchored where the finger
+//                            landed: Run left / right past the joystick's
+//                            engage line (joystickDirection), Down pushed
+//                            down (joystickVertical), a diagonal both.
+//   Quick flick down         a short Down: on a one-way platform a drop
+//                            through it, in the air a short fast fall.
+//   Swipe up                 Down and Jump in the same sample: the Super
+//                            Jump on the ground, a normal jump in the air.
+//   Flick while holding      one Dash that way (FLICK), and the run goes on.
+//
+// A gesture is classified once, as it lifts: a tap, else a swipe, else
+// nothing. A finger that has held a Run or Down for longer than `tapTime`
+// is a stick, and lifting a stick never jumps or dashes. Pushing up while
+// holding does nothing. Only one finger steers; a second one landing on
+// the pad is ignored, except that its tap while the first holds Down is
+// a Jump (the Down + Jump chord, the Super Jump, with both thumbs on the
+// pad).
+//
+// Distances are fractions of the viewport's short side and times are in
+// seconds, so a phone and a tablet feel the same. Nothing about the pad is
+// ever drawn.
+
+// Every Screen Pad threshold, in one place.
+//
+//   tapTime        a tap lifts within this (s)…
+//   tapSlop        …having moved less than this (short sides).
+//   swipeTime      a swipe lifts within this (s)…
+//   swipeDistance  …having travelled at least this far from where it
+//                  landed (short sides),
+//   swipeAngle     within this many degrees of horizontal for a Dash,
+//   upAngle        or within this many degrees of straight up for the
+//                  Super Jump.
+//   radius         the floating stick's radius (short sides): JOYSTICK's
+//                  fractions (engage, deadzone, downEngage, …) are of it.
+//   maxRadius      how far the finger may get from the anchor before the
+//                  anchor is dragged along behind it (short sides): a
+//                  little inside the stick's radius, so turning back after
+//                  a long slide takes no more than a short push the other
+//                  way (maxRadius + the engage line).
+//   flick          whether a flick while holding the stick is a Dash.
+//   flickSpeed     the sideways speed that is a flick (short sides a
+//                  second), measured over the last `flickWindow` (s) (a
+//                  finger that sent no move meanwhile was resting); it must
+//                  slow below `flickRearm` of it before another.
+//   flickRun       where a flick re-anchors the stick: this far behind the
+//                  finger (fractions of `radius`, past JOYSTICK.engage), so
+//                  the run goes on the way of the Dash.
+export const SCREEN_PAD = Object.freeze({
+  tapTime: 0.2,
+  tapSlop: 0.03,
+  swipeTime: 0.25,
+  swipeDistance: 0.08,
+  swipeAngle: 35,
+  upAngle: 40,
+  radius: 0.1,
+  maxRadius: 0.08,
+  flick: true,
+  flickSpeed: 1.5,
+  flickWindow: 0.05,
+  flickRearm: 0.5,
+  flickRun: 0.5,
+});
+
+const DEG = 180 / Math.PI;
+
+// What a lifted gesture is, from how far it went (`dx`, `dy`: + right and
+// + down, in short sides) and how long it lasted (`seconds`), `travel`
+// being the furthest it ever got from where it landed: 'tap', 'left',
+// 'right' (a Dash), 'up' (the Super Jump) or null (nothing). A stick never
+// reaches this (see ScreenPadGesture.end).
+export function classifyGesture(dx, dy, seconds, travel = Math.hypot(dx, dy)) {
+  const P = SCREEN_PAD;
+  if (seconds <= P.tapTime && travel < P.tapSlop) return 'tap';
+  const distance = Math.hypot(dx, dy);
+  if (!(seconds <= P.swipeTime) || distance < P.swipeDistance) return null;
+  const fromHorizontal = Math.atan2(Math.abs(dy), Math.abs(dx)) * DEG;
+  if (fromHorizontal <= P.swipeAngle) return dx < 0 ? 'left' : 'right';
+  if (dy < 0 && 90 - fromHorizontal <= P.upAngle) return 'up';
+  return null;
+}
+
+// The stick's held controls for a finger `dx`, `dy` (short sides) from its
+// anchor, given what it holds now ({ run, down }): the joystick's own
+// hysteresis, measured against the floating stick's radius.
+export function padHold(dx, dy, current = { run: null, down: false }) {
+  const fx = dx / SCREEN_PAD.radius;
+  const fy = dy / SCREEN_PAD.radius;
+  return { run: joystickDirection(fx, current.run), down: joystickVertical(fx, fy, current.down) };
+}
+
+// The anchor of a floating stick whose finger is at (`x`, `y`): `anchor`
+// itself while the finger is within `maxRadius` of it, else dragged along
+// to exactly that far behind the finger. Same units as the points.
+export function followAnchor(anchor, x, y, maxRadius) {
+  const dx = x - anchor.x;
+  const dy = y - anchor.y;
+  const d = Math.hypot(dx, dy);
+  if (d <= maxRadius || d === 0) return anchor;
+  const k = maxRadius / d;
+  return { x: x - dx * k, y: y - dy * k };
+}
+
+// One gesture recogniser for the pad. Points are screen px with a time in
+// milliseconds (an event's timeStamp); `shortSide()` is the viewport's
+// short side in px, read as each gesture starts. `sink` receives what the
+// gestures mean:
+//
+//   hold(control, on)   'runLeft' / 'runRight' / 'down' held or let go;
+//   pulse(control)      'jump' or 'down' for one sample;
+//   dash(direction)     one Dash, -1 left or 1 right.
+//
+// It never draws anything and keeps no DOM of its own.
+export class ScreenPadGesture {
+  constructor(sink, shortSide) {
+    this.sink = sink;
+    this.shortSide = shortSide;
+    this.active = null;
+    // A second finger on the pad (see begin): only its tap is ever read.
+    this.extra = new Map();
+  }
+
+  // Whether pointer `id` is the finger steering.
+  owns(id) {
+    return this.active?.id === id;
+  }
+
+  // A finger landed at (`x`, `y`) at `t` ms. Returns whether the pad took
+  // it: the first finger steers; another is kept only to see whether it is
+  // a tap while the first holds Down.
+  begin(id, x, y, t) {
+    if (this.active) {
+      if (this.active.id === id || this.extra.has(id)) return false;
+      this.extra.set(id, { x, y, t });
+      return true;
+    }
+    const unit = Math.max(1, this.shortSide?.() || 0);
+    this.active = {
+      id, unit, start: { x, y, t }, anchor: { x, y }, travel: 0,
+      run: null, down: false, heldSince: null, stick: false,
+      samples: [{ x, t }], flickArmed: true,
+    };
+    return true;
+  }
+
+  // The steering finger moved to (`x`, `y`) at `t` ms.
+  move(id, x, y, t) {
+    const g = this.active;
+    if (!g || g.id !== id) return;
+    const u = g.unit;
+    g.travel = Math.max(g.travel, Math.hypot(x - g.start.x, y - g.start.y) / u);
+    if (g.heldSince !== null && !g.stick && (t - g.heldSince) / 1000 > SCREEN_PAD.tapTime) g.stick = true;
+    if (this.flick(g, x, t)) {
+      // Re-anchored behind the finger, the way of the Dash: the run goes on.
+      const dir = Math.sign(g.flickDir);
+      g.anchor = { x: x - dir * SCREEN_PAD.flickRun * SCREEN_PAD.radius * u, y };
+    }
+    g.anchor = followAnchor(g.anchor, x, y, SCREEN_PAD.maxRadius * u);
+    this.steer(g, (x - g.anchor.x) / u, (y - g.anchor.y) / u, t);
+  }
+
+  // Holds what the stick at offset (`dx`, `dy`) (short sides) means.
+  steer(g, dx, dy, t) {
+    const next = padHold(dx, dy, g);
+    if (next.run !== g.run) {
+      if (g.run) this.sink.hold(g.run, false);
+      if (next.run) this.sink.hold(next.run, true);
+      g.run = next.run;
+    }
+    if (next.down !== g.down) {
+      this.sink.hold('down', next.down);
+      g.down = next.down;
+    }
+    if (g.run || g.down) g.heldSince ??= t;
+    else if (!g.stick) g.heldSince = null;
+  }
+
+  // Whether this move is a flick (see SCREEN_PAD.flick): a stick's finger
+  // suddenly going sideways past flickSpeed. Asks for its Dash.
+  flick(g, x, t) {
+    const span = SCREEN_PAD.flickWindow * 1000;
+    g.samples.push({ x, t });
+    while (g.samples.length > 2 && t - g.samples[1].t >= span) g.samples.shift();
+    const first = g.samples[0];
+    // A finger sends no move while it rests: an older sample means it was
+    // still there until the window began.
+    const seconds = (t - Math.max(first.t, t - span)) / 1000;
+    if (!(seconds > 0)) return false;
+    const speed = (x - first.x) / g.unit / seconds;
+    if (!g.flickArmed) {
+      if (Math.abs(speed) < SCREEN_PAD.flickSpeed * SCREEN_PAD.flickRearm) g.flickArmed = true;
+      return false;
+    }
+    if (!SCREEN_PAD.flick || !g.stick || Math.abs(speed) < SCREEN_PAD.flickSpeed) return false;
+    g.flickArmed = false;
+    g.flickDir = speed;
+    this.sink.dash(speed < 0 ? -1 : 1);
+    return true;
+  }
+
+  // The finger lifted at (`x`, `y`) at `t` ms: the last move is read, then
+  // the gesture is classified (once) and everything it held let go.
+  end(id, x, y, t) {
+    const extra = this.extra.get(id);
+    if (extra) {
+      this.extra.delete(id);
+      const u = this.active?.unit ?? 1;
+      const tap = classifyGesture((x - extra.x) / u, (y - extra.y) / u, (t - extra.t) / 1000) === 'tap';
+      if (tap && this.active?.down) this.sink.pulse('jump');
+      return;
+    }
+    const g = this.active;
+    if (!g || g.id !== id) return;
+    if (Number.isFinite(x) && Number.isFinite(y)) this.move(id, x, y, t);
+    if (g.heldSince !== null && (t - g.heldSince) / 1000 > SCREEN_PAD.tapTime) g.stick = true;
+    const u = g.unit;
+    const kind = g.stick || !Number.isFinite(x)
+      ? null
+      : classifyGesture((x - g.start.x) / u, (y - g.start.y) / u, (t - g.start.t) / 1000, g.travel);
+    if (kind === 'tap') this.sink.pulse('jump');
+    else if (kind === 'left' || kind === 'right') this.sink.dash(kind === 'left' ? -1 : 1);
+    else if (kind === 'up') {
+      this.sink.pulse('down');
+      this.sink.pulse('jump');
+    }
+    this.letGo();
+  }
+
+  // The finger was cancelled (pointercancel, lost capture): everything it
+  // held let go, nothing classified.
+  cancel(id) {
+    this.extra.delete(id);
+    if (this.active?.id === id) this.letGo();
+  }
+
+  // Lets go of whatever the steering finger holds, and forgets it.
+  letGo() {
+    const g = this.active;
+    this.active = null;
+    if (!g) return;
+    if (g.run) this.sink.hold(g.run, false);
+    if (g.down) this.sink.hold('down', false);
+  }
+
+  // Forgets every finger, letting go of what the steering one held (pause,
+  // a scheme switch, focus lost).
+  reset() {
+    this.extra.clear();
+    this.letGo();
+  }
+}
+
 // The stick's second hold, apart from its pointer's run direction: its Down,
 // counted with the Down button's pointers like any shared action (see
 // assign), so either alone holds `down` and letting go of one keeps it held
 // while the other still does.
 const STICK_DOWN = Symbol('joystick down');
+// The Screen Pad's two holds, its Run and its Down, counted the same way.
+const PAD_RUN = Symbol('screen pad run');
+const PAD_DOWN = Symbol('screen pad down');
+
+// An event's time in ms (its timeStamp, else now).
+const eventTime = (e) => (Number.isFinite(e?.timeStamp) ? e.timeStamp : globalThis.performance?.now?.() ?? Date.now());
 
 const END_EVENTS = ['pointerup', 'pointercancel', 'lostpointercapture'];
 
@@ -255,6 +534,13 @@ export class TouchControls {
     // Whether the stick, pushed down, holds Down (see joystickVertical).
     this.stickDown = false;
     this.mouvementPointers = new Map(); // pointerId -> mouvement button
+    // The Screen Pad's gesture recogniser (see ScreenPadGesture), its
+    // distances measured against the viewport's short side.
+    this.gesture = new ScreenPadGesture({
+      hold: (control, on) => this.assign(control === 'down' ? PAD_DOWN : PAD_RUN, on ? control : null),
+      pulse: (control) => this.pulse(control),
+      dash: (direction) => this.input.queueTouchMouvement(direction),
+    }, () => this.shortSide());
     // When a pointer last lifted off the controls (its event's timeStamp),
     // to tell its own trailing click from an assistive activation.
     this.lastPointerEnd = -Infinity;
@@ -276,6 +562,9 @@ export class TouchControls {
     this.mash = mashButtons(null);
     this.build();
     this.setScheme(scheme);
+    // Focus lost or the page hidden: nothing stays held (the Screen Pad's
+    // finger, the stick, every button).
+    input.onSuspend?.(() => this.releaseAll());
   }
 
   build() {
@@ -302,13 +591,19 @@ export class TouchControls {
       b._direction = spec.direction;
       this.mouvementButtons.set(spec.control, b);
     }
-    // Down, shared by both schemes' lower-left cluster (see setScheme).
+    // Down, shared by Joystick's and Classic Buttons' lower-left cluster
+    // (see setScheme).
     this.downButton = makeButton(DOWN_BUTTON, 'tc-down');
     const joystick = el('div', { class: 'tc-cluster tc-joystick' }, [
       this.downButton, this.mouvementButtons.get('mouvementLeft'), this.stick, this.mouvementButtons.get('mouvementRight'),
     ]);
 
-    // Lower-right cluster, shared by both schemes.
+    // The Screen Pad: the left half of the screen, a transparent surface
+    // that only takes pointers. Never drawn, never a button, never
+    // announced (aria-hidden): the fighter's own movement is its feedback.
+    this.pad = el('div', { class: 'tc-screenpad', 'aria-hidden': 'true' });
+
+    // Lower-right cluster, shared by every scheme.
     this.actionButtons = new Map();
     const actions = el('div', { class: 'tc-cluster tc-actions', role: 'group', ...tattr('aria-label', 'touch.actions') });
     for (const spec of ACTION_BUTTONS) {
@@ -342,6 +637,16 @@ export class TouchControls {
         if (e.pointerId === this.stickPointer) this.releaseStick();
       });
     }
+
+    // The Screen Pad captures each finger it takes and reads its gesture
+    // (ScreenPadGesture): a lift is classified, a cancel or a lost capture
+    // only lets go. The buttons sit above it, so a press on one (wherever a
+    // layout put it) never reaches the pad.
+    this.pad.addEventListener('pointerdown', (e) => this.onPadDown(e));
+    this.pad.addEventListener('pointermove', (e) => {
+      this.gesture.move(e.pointerId, e.clientX, e.clientY, eventTime(e));
+    });
+    for (const type of END_EVENTS) this.pad.addEventListener(type, (e) => this.onPadEnd(e));
 
     // Held buttons (the lower-right actions, and Down):
     // each button owns its pointers. Classic's Run container must never
@@ -394,21 +699,24 @@ export class TouchControls {
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  // Shows the 'joystick' or 'classic' layout (anything else is the
-  // default, DEFAULT_MOBILE_CONTROLS: Joystick), with that scheme's own
-  // custom layout. Everything held
+  // Shows the 'screenpad', 'joystick' or 'classic' layout (anything else
+  // is the default, DEFAULT_MOBILE_CONTROLS: Screen Pad), with that
+  // scheme's own custom layout. Everything held
   // is let go first, so a switch never leaves a direction or any other
   // button down. The fighter's own art and names are untouched: the
-  // combat buttons and Jump are the same elements in both.
+  // combat buttons and Jump are the same elements in all three. Screen Pad
+  // shows the pad and the lower-right cluster only: no Down, Run or Dash
+  // button, no stick.
   setScheme(scheme) {
     const next = resolveSetting('mobileControls', scheme);
     this.releaseAll();
     if (next === this.scheme) return;
     this.scheme = next;
     const joystick = next === 'joystick';
+    const screenpad = next === 'screenpad';
     this.buttons = new Map([
-      ['down', this.downButton],
-      ...(joystick ? [] : this.padButtons),
+      ...(screenpad ? [] : [['down', this.downButton]]),
+      ...(joystick || screenpad ? [] : this.padButtons),
       ...this.actionButtons,
     ]);
     // Reuse the same Down and Mouvement elements and handlers in either
@@ -418,10 +726,11 @@ export class TouchControls {
     if (joystick) this.joystick.replaceChildren(
       this.downButton, this.mouvementButtons.get('mouvementLeft'), this.stick, this.mouvementButtons.get('mouvementRight'),
     );
-    else this.dpad.append(this.downButton, ...this.mouvementButtons.values());
-    this.root.replaceChildren(joystick ? this.joystick : this.dpad, this.actions);
+    else if (!screenpad) this.dpad.append(this.downButton, ...this.mouvementButtons.values());
+    this.root.replaceChildren(screenpad ? this.pad : joystick ? this.joystick : this.dpad, this.actions);
+    this.root.classList.toggle('is-screenpad', screenpad);
     this.root.classList.toggle('is-joystick', joystick);
-    this.root.classList.toggle('is-classic', !joystick);
+    this.root.classList.toggle('is-classic', next === 'classic');
     this.root.dataset.scheme = next;
     this.applyLayout();
   }
@@ -489,7 +798,7 @@ export class TouchControls {
   applyLayout() {
     const layout = this.layouts[this.scheme] ?? {};
     const controls = [...this.getControlElements()];
-    // Every control of both schemes starts from the stylesheet's place, so
+    // Every control of every scheme starts from the stylesheet's place, so
     // none keeps a stale one from the scheme shown before.
     for (const scheme of Object.keys(TOUCH_CONTROL_IDS)) {
       for (const node of this.getControlElements(scheme).values()) {
@@ -707,6 +1016,44 @@ export class TouchControls {
     this.knob.style.transform = x || y ? `translate(${(x / k).toFixed(1)}px, ${(y / k).toFixed(1)}px)` : '';
   }
 
+  // ---- Screen Pad ---------------------------------------------------------------
+
+  // The viewport's short side in px, what every Screen Pad distance is a
+  // fraction of; the controls' own box where there is no viewport.
+  shortSide() {
+    const w = globalThis.innerWidth;
+    const h = globalThis.innerHeight;
+    if (w > 0 && h > 0) return Math.min(w, h);
+    const r = this.root.getBoundingClientRect?.();
+    return r ? Math.min(r.width, r.height) : 0;
+  }
+
+  onPadDown(e) {
+    if (!this.enabled || this.scheme !== 'screenpad') return;
+    e.preventDefault();
+    if (!this.gesture.begin(e.pointerId, e.clientX, e.clientY, eventTime(e))) return;
+    this.pad.setPointerCapture?.(e.pointerId);
+  }
+
+  // A lift is the gesture's end (classified once); a cancel or a lost
+  // capture only lets go. Either way its trailing click is its own.
+  onPadEnd(e) {
+    this.notePointerEnd(e);
+    if (e.type === 'pointerup') this.gesture.end(e.pointerId, e.clientX, e.clientY, eventTime(e));
+    else this.gesture.cancel(e.pointerId);
+  }
+
+  // `control` pressed for one sample (InputManager.pulseTouch); an input
+  // without pulses gets a short tap instead.
+  pulse(control) {
+    if (typeof this.input.pulseTouch === 'function') {
+      this.input.pulseTouch(control);
+      return;
+    }
+    this.input.setTouch(control, true);
+    setTimeout(() => this.input.setTouch(control, (this.counts.get(control) || 0) > 0), 120);
+  }
+
   // ---- Mouvement buttons ------------------------------------------------------
 
   onMouvementEnd(e) {
@@ -746,9 +1093,12 @@ export class TouchControls {
     this.input.setTouch(action, held);
   }
 
-  // Lets go of everything: every held action, the joystick (recentred) and
-  // the mouvement buttons' pressed look.
+  // Lets go of everything: every held action, the joystick (recentred), the
+  // Screen Pad's fingers and any pulse not sampled yet, and the mouvement
+  // buttons' pressed look.
   releaseAll() {
+    this.gesture?.reset();
+    this.input.clearTouchPulses?.();
     this.releaseStick();
     for (const id of [...this.pointers.keys()]) this.assign(id, null);
     this.counts.clear();

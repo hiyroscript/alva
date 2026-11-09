@@ -492,6 +492,9 @@ export const EN = {
   'touch.deflect': 'Deflect',
   'touch.mouvementLeft': 'Left movement',
   'touch.mouvementRight': 'Right movement',
+  'touch.screenPadHint.title': 'Screen pad',
+  'touch.screenPadHint.body': 'Left half of the screen — Tap: jump · Swipe: Dash · Hold & drag: move · Drag down: Down · Swipe up: Super Jump',
+  'touch.screenPadHint.dismiss': 'Touch anywhere to play.',
 
   'firstRun.title': 'Language',
   'firstRun.prompt': 'Choose your language',
@@ -505,6 +508,8 @@ export const EN = {
   'settings.controls': 'Controls',
   'settings.mobileControls': 'Mobile controls',
   'settings.controlsNote': 'The touch and controller layouts for Quick battle and Practice ground. Keyboard controls stay the same.',
+  'settings.scheme.screenpad': 'Screen pad',
+  'settings.scheme.screenpadDesc': 'Left half: tap to jump, swipe to Dash, hold and drag to move.',
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Classic buttons',
   'settings.scheme.joystickDesc': 'Use the joystick to move. Tap either movement button once to Dash left or right.',

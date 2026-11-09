@@ -956,18 +956,20 @@ test('legacy layouts discard Transform alone and keep all other positions and sc
     const oldDown = { x: 0.3, y: 0.4, scale: 1.7 };
     const legacy = { ...kept, down: oldDown, transform: { x: 0.55, y: 0.45, scale: 1.4 } };
     // In the scheme's own order, Down first: where the player once put it.
-    const expected = { down: oldDown, ...kept };
+    // Screen Pad has no Down control (its Down is a gesture): none is kept.
+    const hasDown = TOUCH_CONTROL_IDS[scheme].includes('down');
+    const expected = hasDown ? { down: oldDown, ...kept } : kept;
     assert.deepEqual(sanitizeTouchLayout(scheme, legacy), expected);
     const { tc } = touchControls(scheme);
     tc.setLayout(legacy);
     assert.deepEqual(tc.getLayout(), expected);
     assert.equal(tc.getControlElements().has('transform'), false);
     assert.equal(tc.controlElement('transform'), null);
-    assert.equal(tc.getControlElements().get('down'), tc.downButton, 'Down is a control again');
+    assert.equal(tc.getControlElements().get('down'), hasDown ? tc.downButton : undefined, 'Down is a control again, where there is one');
     const { editor } = editorApp();
     editor.open({ scheme });
     assert.equal(editor.touch.getControlElements().has('transform'), false);
-    assert.ok(editor.touch.getControlElements().has('down'));
+    assert.equal(editor.touch.getControlElements().has('down'), hasDown);
     editor.close();
   }
 });
@@ -979,7 +981,7 @@ test('a saved layout from before Transform was removed loads, edits and resets c
   // beside other customised controls.
   const joystick = { transform: { x: 0.6, y: 0.5, scale: 1.5 }, attack1: { x: 0.7, y: 0.8, scale: 1.3 }, stick: { x: 0.15, y: 0.75, scale: 1.1 } };
   const classic = { runLeft: { x: 0.1, y: 0.8, scale: 1.2 }, transform: { x: 0.65, y: 0.55, scale: 0.8 }, jump: { x: 0.9, y: 0.85, scale: 1 } };
-  storage.setItem(SETTINGS_KEY, JSON.stringify({ version: SETTINGS_VERSION, mobileControls: 'classic', touchLayouts: { joystick, classic } }));
+  storage.setItem(SETTINGS_KEY, JSON.stringify({ version: SETTINGS_VERSION, mobileControls: 'classic', mobileControlsChosen: true, touchLayouts: { joystick, classic } }));
   app.settings = new Settings(storage);
   const { transform: _j, ...joystickKept } = joystick;
   const { transform: _c, ...classicKept } = classic;
@@ -994,7 +996,8 @@ test('a saved layout from before Transform was removed loads, edits and resets c
     assert.equal(editor.touchRoot.querySelectorAll('button').filter((b) => b.getAttribute('data-action') === 'transform' || b.getAttribute('data-control') === 'transform').length, 0);
     editor.select('transform');
     assert.equal(editor.selected, null, `${scheme}: nothing to select`);
-    assert.deepEqual(editor.touch.getLayout(), scheme === 'joystick' ? joystickKept : classicKept, `${scheme}: the rest as saved`);
+    // (Screen Pad, which came after Transform, has no older layout.)
+    assert.deepEqual(editor.touch.getLayout(), { screenpad: {}, joystick: joystickKept, classic: classicKept }[scheme], `${scheme}: the rest as saved`);
     // Editing another control saves the layout without it.
     editor.select('jump');
     editor.slider.value = '110';

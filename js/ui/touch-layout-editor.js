@@ -1,7 +1,8 @@
 // TOUCH LAYOUT EDITOR: the second layer of Settings, opened by Settings ›
 // Controls › Customize touch controls. Over a stand-in of the battle screen
-// it shows the scheme in use (Joystick or Classic Buttons) with its real
-// touch controls, drawn with neutral icons and placed by the same battle code
+// it shows the scheme in use (Screen Pad, Joystick or Classic Buttons) with
+// its real touch controls (Screen Pad's right-hand ones only: its gesture pad
+// is no control), drawn with neutral icons and placed by the same battle code
 // (a TouchControls instance that is never enabled, so nothing it does
 // reaches gameplay), and lets the player move and resize every one of them:
 //
