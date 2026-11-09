@@ -23,7 +23,7 @@ for where they moved). The game as it is now is specified in
 | **Spawn & landscape update** | [#174](https://github.com/hiyroscript/alva/pull/174), then [#175](https://github.com/hiyroscript/alva/pull/175) ([the burst before the respawn](#later-the-burst-comes-before-the-respawn)) | `caa0042`, then `c48cb24` | Touch devices lock themselves to landscape, Joystick is the default Mobile Controls for new players, and every respawn is announced by the elimination burst in reverse |
 | **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
 | **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
-| **Screen Pad update** | [#PR_NUM](https://github.com/hiyroscript/alva/pull/PR_NUM) | `COMMIT_SHA` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
+| **Screen Pad update** | [#180](https://github.com/hiyroscript/alva/pull/180) | `92592dc` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -6000,7 +6000,7 @@ the same word in French), `empty-roster`, `discover`, `practice-ground`,
 
 ## Screen Pad update
 
-Pull request [#PR_NUM](https://github.com/hiyroscript/alva/pull/PR_NUM), commit `COMMIT_SHA`. Asked for in the `max` prompt
+Pull request [#180](https://github.com/hiyroscript/alva/pull/180), commit `92592dc`. Asked for in the `max` prompt
 and named there: a third Mobile Controls scheme, **Screen Pad** (French
 **Pavé tactile**, settings id `screenpad`), made the default. The
 lower-left cluster is gone; the whole left half of the screen is an
