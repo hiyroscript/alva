@@ -283,7 +283,7 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // The Twin Lion Fists, an ordinary technique that lets its lions go (a
     // projectile): 15. The Sixty-Four Palms (5 s) pays nothing, and every
     // other move is its own palms and kicks.
-    '0013': { 'tech:attack4': 15, 'tech:attack5': 0 },
+    '0013': { 'tech:attack3': 15, 'tech:attack4': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

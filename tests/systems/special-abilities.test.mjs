@@ -55,7 +55,7 @@ const SPECIALS = Object.freeze({
   '0010': ['attack4', 'extra_attack', 'attack5'],
   '0011': ['attack4', 'attack5'],
   '0012': ['attack5'],
-  '0013': ['attack4', 'attack5'],
+  '0013': ['attack3', 'attack4'],
 });
 
 // ---- The classification ------------------------------------------------------------------
@@ -111,7 +111,7 @@ test('exactly twenty Specials across the roster: Unlimited Void and Hollow Purpl
   assert.deepEqual(specialAbilities(getCharacter('0013')).map((m) => name('0013', m)), ['Twin Lion Fists', 'Sixty-Four Palms']);
   // The Protective Palms turn shots back and its palms drain: its everyday
   // tools, ordinary.
-  for (const move of ['attack1', 'attack3', 'midair_attack2']) {
+  for (const move of ['attack1', 'extra_attack', 'midair_attack2']) {
     assert.equal(isSpecialAbility(getCharacter('0013'), move), false, `${name('0013', move)} is not Special`);
   }
   // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
@@ -222,9 +222,9 @@ test('the controller editor\'s categories follow the classification; every bindi
       abilities: ['ground:attack5'],
     },
     '0013': {
-      ground: ['attack1', 'attack2', 'attack3'],
-      air: ['attack1', 'attack2', 'attack3'],
-      abilities: ['ground:attack4', 'ground:attack5'],
+      ground: ['attack1', 'attack2', 'extra_attack'],
+      air: ['attack1', 'attack2'],
+      abilities: ['ground:attack3', 'ground:attack4'],
     },
   };
   for (const def of playableCharacters()) {

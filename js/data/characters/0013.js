@@ -9,8 +9,8 @@
 // power off (a hit's `drain`: Energy taken from the target, so a Shield, a
 // Dash or a recovery it was counting on may not be there). Every move is
 // one it uses in its canon: it heals nobody, summons nobody, makes no clone,
-// throws nothing and never homes in. Five numbered attacks, each a button
-// of its own, and no extra_attack:
+// throws nothing and never homes in. Four numbered attacks, each a button
+// of its own, plus its extra_attack:
 //
 //   attack1  the Gentle Fist, three chakra palms, the last a heavy blow,
 //            each cutting off a little of its target's power; in the air
@@ -18,16 +18,16 @@
 //   attack2  the Sweep Kick, a low sweep, then a high kick launching up;
 //            in the air the Falling Palm, a dive palm-first (motion
 //            `slam`) whose chakra bursts where it meets the ground
-//   attack3  the Protective Palms, a dome of chakra spun round it that
-//            strikes everyone inside and turns back every shot that meets
-//            it (`deflectProjectiles`); in the air the Rising Palm, a palm
-//            thrust up, launching up
-//   attack4  the Twin Lion Fists, a technique: chakra gathered into a lion
+//   attack3  the Twin Lion Fists, a technique: chakra gathered into a lion
 //            on each hand, which surge out ahead of it (a projectile) and
 //            bite, draining 50 Energy
-//   attack5  the Sixty-Four Palms, a technique: its eyes woken and its field
+//   attack4  the Sixty-Four Palms, a technique: its eyes woken and its field
 //            of divination spread round it, then a flurry of palms that
 //            seals its target's chakra (10, and its whole bar drained)
+//   extra_attack  the Protective Palms, a dome of chakra spun round it that
+//            strikes everyone inside and turns back every shot that meets
+//            it (`deflectProjectiles`), on the ground only: the sheet draws
+//            no aerial for it, so it has none
 //
 // Its Mash Combo (js/data/mash-combo.js) alternates the Gentle Fist and the
 // Sweep Kick, its two close-range strikes.
@@ -39,7 +39,7 @@
 // (js/data/cooldowns.js), derived from what each move does, never authored
 // here: the Sixty-Four Palms waits 5 s (its 10) from its release, every
 // other move none at all, and the Deflect none. The Twin Lion Fists costs
-// 15 Energy (its burst, an ordinary construct), the Deflect its 15, nothing
+// 15 Energy (its lions, an ordinary construct), the Deflect its 15, nothing
 // else anything. The sheet's getting up, its intro, support, wins and
 // losses, its edit notes, its portrait and story panels, the dome drawn on
 // its own and its lion flames drawn on their own (for laying over frames:
@@ -82,13 +82,12 @@ const FPS_0013 = Object.freeze({
   midair_attack1: 15,
   attack2: 15,
   midair_attack2: 15,
-  attack3: 20,
-  midair_attack3: 15,
-  attack4_cast: 10,
-  attack4_release: 10,
-  attack4_object: 15,
-  attack5_cast: 12,
-  attack5_release: 15,
+  extra_attack: 20,
+  attack3_cast: 10,
+  attack3_release: 10,
+  attack3_object: 15,
+  attack4_cast: 12,
+  attack4_release: 15,
 });
 
 // The Falling Palm's plunge, in seconds: the hang (its first two frames)
@@ -121,10 +120,9 @@ const ANCHORS_0013 = Object.freeze({
   midair_attack1: [12.5, 15.5, 16, 17, 18],
   attack2: [13, 15.5, 17, 24.5, 18, 18],
   midair_attack2: [17, 21.5, 22.5, 23, 14.5],
-  attack3: [12.5, 13, 17, 33, 38, 41, 41, 41, 41, 56, 54, 51.5, 20, 13.5],
-  midair_attack3: [20, 22.5, 23, 23, 20.5],
-  attack4: [17.5, 17.5, 17.5, 17.5, 21.5, 22.5, 22.5, 23.5],
-  attack5: [17.5, 9.5, 9.5, 29.5, 34.5, 38.5, 9.5, 16, 23, 21, 25, 10, 11.5, 12],
+  extra_attack: [12.5, 13, 17, 33, 38, 41, 41, 41, 41, 56, 54, 51.5, 20, 13.5],
+  attack3: [17.5, 17.5, 17.5, 17.5, 21.5, 22.5, 22.5, 23.5],
+  attack4: [17.5, 9.5, 9.5, 29.5, 34.5, 38.5, 9.5, 16, 23, 21, 25, 10, 11.5, 12],
 });
 
 // Where its feet are in each file of a codename whose art reaches below
@@ -133,7 +131,7 @@ const ANCHORS_0013 = Object.freeze({
 // would otherwise lift its whole body off the ground. A codename left out
 // stands on the bottom of its art.
 const FEET_0013 = Object.freeze({
-  attack3: [45, 49, 47, 51, 52, 66, 66, 66, 66, 77, 81, 78, 41, 48],
+  extra_attack: [45, 49, 47, 51, 52, 66, 66, 66, 66, 77, 81, 78, 41, 48],
 });
 
 // The height in art pixels of each file of a codename, file by file (what
@@ -155,10 +153,9 @@ const HEIGHTS_0013 = Object.freeze({
   midair_attack1: [53, 52, 52, 48, 48],
   attack2: [49, 44, 45, 41, 47, 46],
   midair_attack2: [48, 45, 45, 46, 42],
-  attack3: [45, 49, 47, 51, 52, 66, 66, 66, 66, 80, 81, 78, 41, 48],
-  midair_attack3: [45, 47, 48, 48, 47],
-  attack4: [48, 47, 46, 47, 48, 47, 46, 47],
-  attack5: [49, 49, 49, 64, 81, 71, 49, 41, 49, 63, 57, 60, 40, 40],
+  extra_attack: [45, 49, 47, 51, 52, 66, 66, 66, 66, 80, 81, 78, 41, 48],
+  attack3: [48, 47, 46, 47, 48, 47, 46, 47],
+  attack4: [49, 49, 49, 64, 81, 71, 49, 41, 49, 63, 57, 60, 40, 40],
 });
 
 // A clip of codename `codename`'s files, in the order `order` plays them (a
@@ -213,9 +210,6 @@ const FALLING_PALM_IMPACT_0013 = [5];
 // outward in rings (10) and rising off it in wisps (11, 12), turning back
 // round (3 again, 13) to its stance (14).
 const PROTECTIVE_PALMS_0013 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 13, 14];
-// The Rising Palm's: its fist drawn back (1), the palm thrust up, chakra at
-// it (2), high over its head (3), lowered (4) to its guard (5).
-const RISING_PALM_0013 = [1, 2, 3, 4, 5];
 // Its Deflect's: crouched (1), its palm swept up through an arc of chakra
 // before it (2), over its head (3), its palm raised (4).
 const DEFLECT_0013 = [1, 2, 3, 4];
@@ -269,31 +263,29 @@ export const CHARACTER_0013 = {
     // landing (midair_attack2_impact).
     midair_attack2: clip('midair_attack2', FALLING_PALM_0013, FPS_0013.midair_attack2),
     midair_attack2_impact: clip('midair_attack2', FALLING_PALM_IMPACT_0013, FPS_0013.midair_attack2),
-    // attack3, the Protective Palms (see PROTECTIVE_PALMS_0013).
-    attack3: clip('attack3', PROTECTIVE_PALMS_0013, FPS_0013.attack3),
-    // midair_attack3, the Rising Palm (see RISING_PALM_0013).
-    midair_attack3: clip('midair_attack3', RISING_PALM_0013, FPS_0013.midair_attack3),
-    // attack4, the Twin Lion Fists (a technique, see `techniques`): the cast
+    // extra_attack, the Protective Palms (see PROTECTIVE_PALMS_0013).
+    extra_attack: clip('extra_attack', PROTECTIVE_PALMS_0013, FPS_0013.extra_attack),
+    // attack3, the Twin Lion Fists (a technique, see `techniques`): the cast
     // is its stance, its arms low and open as it gathers its chakra (1-4);
     // the release, a lion of blue chakra blazing on each hand (5-8).
-    attack4_cast: clip('attack4', [1, 2, 3, 4], FPS_0013.attack4_cast),
-    attack4_release: clip('attack4', [5, 6, 7, 8], FPS_0013.attack4_release),
-    // attack5, the Sixty-Four Palms (a technique, see `techniques`): the
+    attack3_cast: clip('attack3', [1, 2, 3, 4], FPS_0013.attack3_cast),
+    attack3_release: clip('attack3', [5, 6, 7, 8], FPS_0013.attack3_release),
+    // attack4, the Sixty-Four Palms (a technique, see `techniques`): the
     // cast is its arms opened (1), its hands brought together (2), its eyes
     // woken, white (3), its field of divination drawn round it in a ring of
     // chakra lines (4), spreading (5) and fading (6), its hands together
     // (7), dropping into its stance (8); the release is the flurry, its
     // palms whirling chakra in arcs all round it (9-12), and its guard again
     // (13, 14).
-    attack5_cast: clip('attack5', [1, 2, 3, 4, 5, 6, 7, 8], FPS_0013.attack5_cast),
-    attack5_release: clip('attack5', [9, 10, 11, 12, 13, 14], FPS_0013.attack5_release),
+    attack4_cast: clip('attack4', [1, 2, 3, 4, 5, 6, 7, 8], FPS_0013.attack4_cast),
+    attack4_release: clip('attack4', [9, 10, 11, 12, 13, 14], FPS_0013.attack4_release),
   },
 
   // The Twin Lion Fists' lions as they surge out ahead of it, a lion's head
   // of blue chakra, jaws open (1-4, over and over for as long as it flies).
   // Drawn facing right, so it turns with the way it flies.
   projectileAnimations: {
-    attack4_object: object('attack4_object', [1, 2, 3, 4], FPS_0013.attack4_object, { loop: true, sourceFacing: 1 }),
+    attack3_object: object('attack3_object', [1, 2, 3, 4], FPS_0013.attack3_object, { loop: true, sourceFacing: 1 }),
   },
 
   // A still stance frame for the airborne, landing and hurt clips if their
@@ -378,15 +370,16 @@ export const CHARACTER_0013 = {
     deflectProjectiles: true,
   },
 
-  // Five numbered attacks, each a button of its own (see
-  // js/data/loadout.js): attack1 to attack3 ordinary attacks with their
-  // mid-air versions, attack4 and attack5 techniques. No extra_attack.
+  // Four numbered attacks, each a button of its own (see
+  // js/data/loadout.js): attack1 and attack2 ordinary attacks with their
+  // mid-air versions, attack3 and attack4 techniques; and its extra_attack,
+  // on the ground only (its attack is `groundOnly`).
   actions: {
+    extra_attack: 'extra_attack', // the Protective Palms
     attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Gentle Fist / the Air Palm
     attack2: { ground: 'attack2', air: 'midair_attack2' }, // the Sweep Kick / the Falling Palm
-    attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Protective Palms / the Rising Palm
-    attack4: { type: 'technique', id: 'attack4' }, // the Twin Lion Fists
-    attack5: { type: 'technique', id: 'attack5' }, // the Sixty-Four Palms
+    attack3: { type: 'technique', id: 'attack3' }, // the Twin Lion Fists
+    attack4: { type: 'technique', id: 'attack4' }, // the Sixty-Four Palms
   },
 
   // Its Mash Combo pair (js/data/mash-combo.js): the Gentle Fist and the
@@ -399,43 +392,41 @@ export const CHARACTER_0013 = {
   // Sixty-Four Palms, which seals its target's chakra (its whole bar).
   // The Protective Palms and its plain palms are its everyday tools:
   // ordinary to the player.
-  specialAbilities: ['attack4', 'attack5'],
+  specialAbilities: ['attack3', 'attack4'],
 
-  // UI only: a frame of each move's own art (zero-based frames): the second
-  // palm's chakra, the air palm's spray, the high kick, the dive, the dome,
-  // the rising palm, the lions on its hands, the flurry of palms.
+  // UI only: a frame of each move's own art (zero-based frames): the dome,
+  // the second palm's chakra, the air palm's spray, the high kick, the dive,
+  // the lions on its hands, the flurry of palms.
   mobileAbilities: {
+    extra_attack: { label: 'Protective Palms', preview: { animation: 'extra_attack', frame: 6 } },
     attack1: { label: 'Gentle Fist', preview: { animation: 'attack1', frame: 3 }, previews: { air: { animation: 'midair_attack1', frame: 3 } } },
     attack2: { label: 'Sweep Kick', preview: { animation: 'attack2', frame: 4 }, previews: { air: { animation: 'midair_attack2', frame: 2 } } },
-    attack3: { label: 'Protective Palms', preview: { animation: 'attack3', frame: 6 }, previews: { air: { animation: 'midair_attack3', frame: 1 } } },
-    attack4: { label: 'Twin Lion Fists', preview: { animation: 'attack4_release', frame: 0 } },
-    attack5: { label: 'Sixty-Four Palms', preview: { animation: 'attack5_release', frame: 2 } },
+    attack3: { label: 'Twin Lion Fists', preview: { animation: 'attack3_release', frame: 0 } },
+    attack4: { label: 'Sixty-Four Palms', preview: { animation: 'attack4_release', frame: 2 } },
   },
 
   // In-game ability names (js/data/abilities.js).
   abilityNames: {
+    extra_attack: 'Protective Palms',
     attack1: 'Gentle Fist',
     midair_attack1: 'Air Palm',
     attack2: 'Sweep Kick',
     midair_attack2: 'Falling Palm',
-    attack3: 'Protective Palms',
-    midair_attack3: 'Rising Palm',
-    attack4: 'Twin Lion Fists',
-    attack5: 'Sixty-Four Palms',
+    attack3: 'Twin Lion Fists',
+    attack4: 'Sixty-Four Palms',
   },
 
   // What each move does, in a line, for the controller editor (Settings ›
   // Controls › Controller controls). English here; other languages by key
   // (ability.0013.<move>.description).
   abilityDescriptions: {
+    extra_attack: 'Spins a dome of chakra around itself that strikes everyone inside and turns back every projectile; any move ends it.',
     attack1: 'Three chakra palms, the last knocking the opponent back; each cuts off some of its Energy.',
     midair_attack1: 'Two chakra palms in the air, the second knocking the opponent away; each cuts off some of its Energy.',
     attack2: 'A low sweep along the ground, then a high kick that launches the opponent upward.',
     midair_attack2: 'Dives palm-first, spiking anyone in its way; its chakra bursts where it lands, draining Energy. Once per jump.',
-    attack3: 'Spins a dome of chakra around itself that strikes everyone inside and turns back every projectile; any move ends it.',
-    midair_attack3: 'A palm thrust straight up that launches the opponent upward and cuts off some of its Energy.',
-    attack4: 'Gathers chakra into a lion on each hand, which surge out ahead and bite, draining much of the opponent\'s Energy.',
-    attack5: 'Wakes its eyes and spreads its field around it, then strikes with a flurry of palms that seals the opponent\'s Energy completely.',
+    attack3: 'Gathers chakra into a lion on each hand, which surge out ahead and bite, draining much of the opponent\'s Energy.',
+    attack4: 'Wakes its eyes and spreads its field around it, then strikes with a flurry of palms that seals the opponent\'s Energy completely.',
   },
 
   // Its recommended controller layout (js/data/controller-profiles.js):
@@ -449,9 +440,9 @@ export const CHARACTER_0013 = {
   //                  Air Palm, its basic aerial
   //   Triangle / Y   the Sweep Kick, its other everyday strike, a thumb's
   //                  roll from Square for its Mash Combo
-  //   Circle / B     the Protective Palms, spun where it stands; in the air
-  //                  the Rising Palm, a palm thrust up (it rises nowhere
-  //                  itself: never the stick)
+  //   Circle / B     the Protective Palms, spun where it stands (no
+  //                  direction of its own: never the stick); on the ground
+  //                  only
   //   R2 / RT        the Twin Lion Fists, its ranged move: the lions surge
   //                  out ahead of it
   //   L2 / LT        the Sixty-Four Palms, its first Special: a deliberate
@@ -462,12 +453,11 @@ export const CHARACTER_0013 = {
     layout: {
       'ground:attack1': pad('west'),
       'ground:attack2': pad('north'),
-      'ground:attack3': pad('east'),
-      'ground:attack4': pad('r2'),
-      'ground:attack5': pad('l2'),
+      'ground:extra_attack': pad('east'),
+      'ground:attack3': pad('r2'),
+      'ground:attack4': pad('l2'),
       'air:attack1': pad('west'),
       'air:attack2': flick('down'),
-      'air:attack3': pad('east'),
     },
   },
 
@@ -484,10 +474,10 @@ export const CHARACTER_0013 = {
     // Two fifths of a second more, the lions blazing on its hands. No
     // cooldown (5 and a drain are ordinary); the lions are a construct, 15
     // Energy.
-    attack4: {
-      castAnimation: 'attack4_cast',
-      releaseAnimation: 'attack4_release',
-      projectile: { id: 'attack4_object', offset: { x: 40, y: -50 } },
+    attack3: {
+      castAnimation: 'attack3_cast',
+      releaseAnimation: 'attack3_release',
+      projectile: { id: 'attack3_object', offset: { x: 40, y: -50 } },
     },
     // The Sixty-Four Palms: two thirds of a second waking its eyes and
     // spreading its field of divination round it (nothing protects it),
@@ -498,9 +488,9 @@ export const CHARACTER_0013 = {
     // exhausted until its bar is full again. Two fifths of a
     // second more as its palms come to rest. The policy's 5 s, for its 10,
     // from the release; no Energy.
-    attack5: {
-      castAnimation: 'attack5_cast',
-      releaseAnimation: 'attack5_release',
+    attack4: {
+      castAnimation: 'attack4_cast',
+      releaseAnimation: 'attack4_release',
       burst: {
         hitbox: { x: -40, y: -100, w: 125, h: 102 },
         hit: { damage: 10, baseLaunch: 3, directionalLaunch: 'horizontal', drain: 100, hitstun: 0.6, blockstun: 0.2, hitstop: 0.12 },
@@ -515,8 +505,8 @@ export const CHARACTER_0013 = {
     // (about 190 units past where they leave its hands). Whoever they bite
     // takes 5 at Base Launch 2, thrown the way they fly, and loses 50 Energy
     // to them (`drain`: the lions feed on the chakra they touch).
-    attack4_object: {
-      animation: 'attack4_object',
+    attack3_object: {
+      animation: 'attack3_object',
       speed: 750,
       lifetime: 0.25,
       hitbox: { x: -22, y: -18, w: 44, h: 36 },
@@ -665,45 +655,25 @@ export const CHARACTER_0013 = {
     // turns shots back, so it is a defense as well as an attack: any valid
     // request ends it (a move, a jump, a Dash, the Shield). On the ground;
     // spun on the move, it slides on with the speed it had, as any attack
-    // does, and never steps in (a defense).
-    attack3: {
-      animation: 'attack3',
-      recovery: 5 / FPS_0013.attack3,
+    // does, and never steps in (a defense). Its extra attack, on the ground
+    // only: the sheet draws no aerial for it.
+    extra_attack: {
+      animation: 'extra_attack',
+      recovery: 5 / FPS_0013.extra_attack,
       hitstun: 0.3,
       blockstun: 0.12,
       hitstop: 1 / 30,
       drain: 5,
       hits: [
-        { at: 4 / FPS_0013.attack3, active: 2 / FPS_0013.attack3, damage: 1, hitbox: { x: -64, y: -92, w: 128, h: 94 } },
-        { at: 6 / FPS_0013.attack3, active: 2 / FPS_0013.attack3, damage: 1, hitbox: { x: -68, y: -112, w: 136, h: 114 } },
+        { at: 4 / FPS_0013.extra_attack, active: 2 / FPS_0013.extra_attack, damage: 1, hitbox: { x: -64, y: -92, w: 128, h: 94 } },
+        { at: 6 / FPS_0013.extra_attack, active: 2 / FPS_0013.extra_attack, damage: 1, hitbox: { x: -68, y: -112, w: 136, h: 114 } },
         {
-          at: 8 / FPS_0013.attack3, active: 2 / FPS_0013.attack3, damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal',
+          at: 8 / FPS_0013.extra_attack, active: 2 / FPS_0013.extra_attack, damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal',
           hitbox: { x: -68, y: -112, w: 136, h: 114 }, hitstun: 0.36, hitstop: 0.05,
         },
       ],
       deflectProjectiles: true,
       groundOnly: true,
-    },
-    // The Rising Palm: its fist drawn back (frame 1, a fifteenth of a
-    // second), then the palm thrust up, chakra at it, and high over its head
-    // (frames 2-3, live: in front of it out to 42 units, from its chest to
-    // well over its head), 3, Base Launch 2 straight up, cutting off 5 of
-    // its target's Energy; lowered to its guard (frames 4-5): a third of a
-    // second. It rises nowhere itself (no motion of its own). Its drift
-    // under the universal air control.
-    midair_attack3: {
-      animation: 'midair_attack3',
-      startup: 1 / FPS_0013.midair_attack3,
-      active: 2 / FPS_0013.midair_attack3,
-      recovery: 2 / FPS_0013.midair_attack3,
-      damage: 3,
-      baseLaunch: 2,
-      directionalLaunch: 'vertical',
-      drain: 5,
-      hitbox: { x: 0, y: -104, w: 42, h: 62 },
-      hitstun: 0.36,
-      blockstun: 0.14,
-      hitstop: 0.05,
     },
   },
 };

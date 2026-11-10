@@ -6246,3 +6246,30 @@ key); the roster-wide tables (`cooldown-policy`, `special-abilities`:
 twenty Specials, `strict-combat-rules`, `mash-combo`), `empty-roster`,
 `discover`, `practice-ground`, `watch-mode`, `settings` (its credits),
 each fighter's roster list, `determinism` and `cpu-behaviour` (above).
+
+### Later: the Rising Palm removed
+
+Asked for by the owner: #0013's aerial Rising Palm (`midair_attack3`)
+played frames the sheet draws standing on the ground, so it did not look
+right in the air; it is gone, with nothing in its place. An ordinary
+numbered attack must have its mid-air version and an extra attack need
+not, so the Protective Palms, whose ground move is unchanged, became its
+`extra_attack` (on the ground only, `groundOnly`), and the two techniques
+moved down a button: the Twin Lion Fists to `attack3`, the Sixty-Four
+Palms to `attack4`, their art renamed with them (`0013_extra_attack_*`,
+`0013_attack3_*` and `0013_attack3_object_*`, `0013_attack4_*`); the
+Rising Palm's five frames are deleted (95 frames, the repository now
+serving 1,491 files). Every other move is unchanged. Keys: J the
+Protective Palms, O the Twin Lion Fists, M the Sixty-Four Palms; on a
+controller every remaining move keeps its input (Circle the Protective
+Palms on the ground, and nothing in the air). Balance with the same seeds:
+0.57 at Medium, 0.50 at Hard, 0.49 at Brutal (0.56, 0.52, 0.50 before).
+
+**Tests:** `fighter-0013` (the new buttons, no Rising Palm left in either
+language, nothing on its extra attack's button in the air, 95 files),
+the roster tables (`cooldown-policy`, `special-abilities`,
+`strict-combat-rules`), and `move-cancel`, whose check that a request never
+cuts an attack short now opens, as its pairs already did, with an attack
+that keeps its commitment (#0013's first ground button, the Protective
+Palms, turns shots back and so gives way to any request by rule, as
+#0012's Deflect Stance does).

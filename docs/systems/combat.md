@@ -423,7 +423,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0010 | `['attack4', 'extra_attack', 'attack5']` | the Kill (twice as strong on a back turned to it, then its kill cooldown), the Vent (a way under the floor, only its hatch open to a hit), the Emergency Meeting (everyone near called to the button and held there) | the Tongue Lash |
 | #0011 | `['attack4', 'attack5']` | Camouflage (out of sight, a CPU losing track of it, until it strikes or is struck), the Venom Punch (its lightning stuns whoever it reaches stiff) | the Web Shot, Web Lines, the Venom Jump |
 | #0012 | `['attack5']` | Dragonblade (a 10-damage cleave all round it, the dragon spirit coiling round it, after half a second's breakable stance) | Shuriken (a volley), the Deflect Stance (it turns shots back), Swift Strike and the Rising Strike (dashes through) |
-| #0013 | `['attack4', 'attack5']` | the Twin Lion Fists (lions of chakra that surge out and drain half the target's Energy), the Sixty-Four Palms (a 10-damage flurry that seals the target's chakra: its whole bar drained) | the Protective Palms (a dome that turns shots back), its draining palms |
+| #0013 | `['attack3', 'attack4']` | the Twin Lion Fists (lions of chakra that surge out and drain half the target's Energy), the Sixty-Four Palms (a 10-damage flurry that seals the target's chakra: its whole bar drained) | the Protective Palms (a dome that turns shots back), its draining palms |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
