@@ -16,7 +16,7 @@ The steps below use `0027` as the new fighter's id.
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
   of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4, 5, 6, 7,
-  8, 9, 10, 11 and 12 are taken.
+  8, 9, 10, 11, 12 and 13 are taken.
 
 ## 2. Add the art
 
@@ -278,8 +278,10 @@ its limit (and, if it throws, its 15 Energy). For more than a timed hitbox, use 
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`, `slam`: a plunge that lands with an `impact`,
 `tunnel`: a way under the floor to further along it, only its `hurtboxes`
-open to a hit meanwhile), `pull`, `airUses`, `freeFall`, `passThrough`,
-`hurtboxes`, and on any hit the shared hit effects (`paralyze`,
+open to a hit meanwhile), `grab` (a throw: its first strike seizes, and
+the rest of the move, its motion included, follows only a seizure; one
+that seizes nobody lets go at once), `pull`, `airUses`, `freeFall`,
+`passThrough`, `hurtboxes`, and on any hit the shared hit effects (`paralyze`,
 `blockPush`, `quake`: a hit that reaches only fighters standing on the
 ground, `charm`: for its seconds the target's hits on this fighter heal it
 instead, `backstab`: what the hit deals instead to a fighter with its back
@@ -327,7 +329,11 @@ sight: drawn as a shimmer, invisible to a CPU, until it strikes or is
 struck; never an invulnerability), or any of them together
 ([techniques](../systems/combat.md#techniques); #0001's Unlimited Void and
 Hollow Purple, #0003's Cherry Blossom Impact and Mystical Palm Technique,
-#0004's Ievan Polkka and World is Mine, #0011's Camouflage).
+#0004's Ievan Polkka and World is Mine, #0011's Camouflage). It may open
+only in danger (`minLaunchPoint`, #0009's Air Sphere) or only once its
+fighter's Limit gauge, filled by the damage it takes, holds enough
+(`limit`, a Limit Break that spends the gauge as it lets go: #0014's Final
+Heaven).
 A technique that only heals or cloaks is no attack. A technique of a different
 shape needs a new form in the runtime first.
 
@@ -613,7 +619,8 @@ Then:
    [#0004](0004.md#controller-layout), [#0005](0005.md#controller-layout),
    [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout),
    [#0010](0010.md#controller-layout), [#0011](0011.md#controller-layout),
-   [#0012](0012.md#controller-layout) and [#0013](0013.md#controller-layout) do.
+   [#0012](0012.md#controller-layout), [#0013](0013.md#controller-layout) and
+   [#0014](0014.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (the comfortable inputs in order, one input a

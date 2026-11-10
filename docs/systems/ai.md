@@ -127,6 +127,13 @@ decision quality, never a rule):
   the CPU's own Launch Point is under it: `moveReady` asks the same
   `inDanger` the Fighter's press does, so the CPU never plans it early and
   reaches for it once it is in danger.
+- **Limit.** A Limit Break (a technique's `limit`,
+  [combat](combat.md#techniques): #0014's Sunburst Fist) is no option until
+  its fighter's Limit gauge is full: `moveReady` asks the same
+  `limitReady` the Fighter's press does. Nor is it a threat the CPU fears
+  from an opponent whose gauge is not full, nor a finishing chance it
+  counts on of its own (`Strategy.koThreat` leaves it out): a CPU knows
+  how full both gauges are, as it knows both bars of Energy.
 - **Energy.** Each move's `energyCost` is the Fighter's own (15 for an
   ordinary move that creates a construct: a throw, a burst, a clone; 0 for
   a melee strike and a 3 s / 5 s move), the Dash's 15 its own too. The
