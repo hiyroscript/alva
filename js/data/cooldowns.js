@@ -75,13 +75,15 @@ export const COOLDOWN_CLASSES = Object.freeze({
 export const EXCEPTIONAL_EFFECTS = Object.freeze(['heal', 'cloak', 'paralyze', 'charm', 'float', 'fear']);
 
 // Every other combat capability a hit or a move may declare, classified as
-// routine: none of them earns a cooldown, however strong it looks. Every
+// routine: none of them earns a cooldown, however strong it looks (a hit's
+// `drain` included: it takes Energy, which stops nobody acting and refills
+// on its own, so a light strike may drain and stay ordinary). Every
 // shared hit effect (HIT_EFFECT_FIELDS) and every field that shapes a
 // strike, a projectile or a move's motion is in one list or the other (the
 // cooldown tests check it), so a new one has to be classified on purpose.
 export const ROUTINE_EFFECTS = Object.freeze([
   'damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'blockstun', 'hitstop',
-  'blockPush', 'quake', 'gaze', 'backstab', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
+  'blockPush', 'quake', 'gaze', 'backstab', 'drain', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
   'motion', 'step', 'momentum', 'hits', 'projectile', 'burst', 'deflectProjectiles', 'passThrough', 'hurtboxes',
   'airUses', 'freeFall', 'groundOnly', 'hitCancel',
 ]);

@@ -70,7 +70,7 @@ function strikeOf(h, at, end) {
     // as one.
     paralyze: Math.max(h.paralyze ?? 0, h.float ?? 0), float: h.float ?? 0,
     blockPush: h.blockPush ?? 0, carry: h.carry ?? null, quake: !!h.quake, gaze: !!h.gaze,
-    charm: h.charm ?? 0, fear: h.fear ?? 0, backstab: h.backstab ?? null,
+    charm: h.charm ?? 0, fear: h.fear ?? 0, backstab: h.backstab ?? null, drain: h.drain ?? 0,
   });
 }
 

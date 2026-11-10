@@ -364,6 +364,7 @@ const ATTACK_DEFAULTS = {
   fear: 0,
   gaze: false,
   backstab: null,
+  drain: 0,
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -473,6 +474,7 @@ export function lastShotAt(def) {
 // does not declare its own, and the ones only the strikes may declare.
 const STRIKE_INHERITS = Object.freeze([
   'hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab',
+  'drain',
 ]);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
@@ -623,7 +625,7 @@ export function attackReleaseAt(def) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab', 'energyCost', 'step',
+  'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab', 'drain', 'energyCost', 'step',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).

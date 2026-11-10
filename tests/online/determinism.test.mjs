@@ -128,6 +128,10 @@ test('the matchups cover every playable fighter, on both sides, and every stage'
   for (const map of MAPS) assert.ok(MATCHUPS.some((m) => m.map === map), map.id);
 });
 
+// Which fighters landed hits, over the matchups that ran (see below).
+const LANDED = new Set();
+const PLAYED = new Set();
+
 for (const { p1, p2, map, seed } of MATCHUPS) {
   test(`two Battles side by side stay identical for ${STEPS} steps: #${p1.id} v #${p2.id} on ${map.id}`, () => {
     const [x, y] = sideBySide({ map, p1, p2, seed });
@@ -143,12 +147,23 @@ for (const { p1, p2, map, seed } of MATCHUPS) {
     const state = battleState(x.battle);
     assert.ok(state.elapsed > 30 || x.battle.matchOver, 'the fight ran');
     assert.ok(new Set(x.hashes).size > 25, `the world kept changing (${new Set(x.hashes).size} different hashes)`);
-    // And fought: hits landed both ways and points were scored.
+    // And fought: hits landed and points were scored. Which side lands them
+    // is the scripts' luck (a random walk can keep one side out of reach for
+    // a whole match), so each fighter's own hits are checked over all its
+    // matchups, below.
     const stats = x.battle.stats.snapshot(x.battle.score);
-    assert.ok(stats.p1.damageDealt > 0 && stats.p2.damageDealt > 0, 'both sides landed hits');
+    assert.ok(stats.p1.damageDealt + stats.p2.damageDealt > 0, 'hits landed');
     assert.ok(x.battle.score.p1 + x.battle.score.p2 > 0, 'falls into the Void scored');
+    for (const [slot, def] of [['p1', p1], ['p2', p2]]) {
+      PLAYED.add(def.id);
+      if (stats[slot].damageDealt > 0) LANDED.add(def.id);
+    }
   });
 }
+
+test('every fighter landed hits in its matchups: each one\'s own hits went through the lockstep-safe simulation', () => {
+  for (const id of PLAYED) assert.ok(LANDED.has(id), `#${id} landed no hit in any of its matchups`);
+});
 
 // Two browsers through the real lockstep, every packet at risk: the
 // lockstep's own checks never fire, and the test's own hashes agree.

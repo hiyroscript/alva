@@ -5,7 +5,8 @@
 // Dazz & Fret, The Spriters Resource, xmaygrrr, imhomiejaydev,
 // regularDor8go, NotEverything123, Cosbydaf, Kenshin Himura,
 // Misse-the-cat, xxalexsmashxx, degue-1297, Alejo & Grim, gameinvader247,
-// GameInvader) stay as they are in every language. A line may also link to
+// GameInvader, prodijiu, Dittron, Illmatic, yondy-hokage) stay as they are
+// in every language. A line may also link to
 // its source: { label: key or [key, params], href }, the label still
 // translated and the address never.
 
@@ -60,6 +61,10 @@ const SPRITES_0011 = 'https://www.deviantart.com/xxalexsmashxx/art/955488395';
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0012 is never named).
 const SPRITES_0012 = 'https://www.deviantart.com/xxalexsmashxx/art/1262864119';
+// Where #0013's sprite sheet was published: its DeviantArt page, found by
+// the deviation's number alone (the page's title is left out of the
+// address: the character behind #0013 is never named).
+const SPRITES_0013 = 'https://www.deviantart.com/prodijiu/art/826586119';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -133,6 +138,13 @@ export const CREDITS = [
   {
     title: 'credits.sprites0012.title',
     lines: [{ label: 'credits.sprites0012.sheet', href: SPRITES_0012 }],
+  },
+  // #0013's sheet, linked to where it was published, and the credits the
+  // sheet itself gives (each one's part said without the name of the work
+  // it comes from).
+  {
+    title: 'credits.sprites0013.title',
+    lines: [{ label: 'credits.sprites0013.sheet', href: SPRITES_0013 }, 'credits.sprites0013.sheetCredits'],
   },
   {
     title: 'credits.rights.title',
