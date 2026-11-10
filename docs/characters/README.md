@@ -23,8 +23,9 @@ pages are part of the product specification
 | #0011 | 11 | yes | 5: Punches / Air Kick, Spin Kick / Somersault Kick, Web Shot (its webbing sticks its target where it stands) / Web Lines (they reel it in), Camouflage (technique: out of sight, a CPU losing track of it, until it strikes or is struck), Venom Punch (technique: its lightning stuns whoever it reaches stiff); extra attack: the Venom Jump, an uppercut that rises off the ground carrying its target, on the ground and in the air | [0011.md](0011.md) |
 | #0012 | 12 | yes | 5: Twin Cuts / Whirlwind Cut, Cleave / Rising Arc, Deflect Stance (it turns shots back) / Falling Cut, Swift Strike (a dash through its target) / Rising Strike (the same dash straight up), Dragonblade (technique: a 10-damage cleave all round it, the dragon spirit coiling round it); extra attack: Shuriken, three thrown one after another (a volley), on the ground and in the air | [0012.md](0012.md) |
 | #0013 | 13 | yes | 4: Gentle Fist / Air Palm, Sweep Kick / Falling Palm (a dive palm-first), Twin Lion Fists (technique: lions of chakra that surge out and drain half the target's Energy), Sixty-Four Palms (technique: a 10-damage flurry that seals the target's chakra, its whole bar drained); extra attack: the Protective Palms, a dome that turns shots back, on the ground only; every palm it lands drains its target's Energy | [0013.md](0013.md) |
+| #0014 | 14 | yes | 5: Beat Rush / Air Combo, Meteodrive (a grab: a suplex into the floor) / Divekick (a dive heel-first), Meteor Strike (a grab that leaps carrying its target, then hurls it down) / Somersault (a rising kick, its recovery), Waterkick (technique: a wave along the ground that only the grounded meet), the Sunburst Fist (technique: its Limit Break, a 10-damage punch open only once its Limit gauge, filled by the damage it takes, is full); extra attack: the Whirling Uppercut, on the ground only; its grabs let go at once when they seize nobody | [0014.md](0014.md) |
 
-The other 35 of the 48 roster slots are locked placeholders. #0001 is the
+The other 34 of the 48 roster slots are locked placeholders. #0001 is the
 first playable fighter, so it is what
 startup preloads first, Quick Battle's initial pick, both Watch Mode CPUs
 and the Practice Ground default; that is an ordering, not a special role:
@@ -37,7 +38,7 @@ Where things are:
 | | |
 | --- | --- |
 | Definitions | [`js/data/characters/<id>.js`](../../js/data/characters/), registered in [`js/data/characters.js`](../../js/data/characters.js) |
-| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5, #0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
+| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5, #0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
 | Art | [`assets/characters/<id>/`](../../assets/characters/) |
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | A fighter drawn as several members (#0006) | its `ensemble` ([the character system](../architecture/character-system.md#ensembles-one-fighter-several-members), [adding a fighter](adding-characters.md#a-fighter-of-several-members)) |

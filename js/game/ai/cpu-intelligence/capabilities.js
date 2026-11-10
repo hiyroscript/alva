@@ -39,7 +39,7 @@ import { stepInTravel, jumpRise } from '../../fighters/movement.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../../data/movement.js';
 import { CONFIG } from '../../../config.js';
 import { attackOffense, summonOffense, techniqueOffense } from '../../combat/offense.js';
-import { inDanger } from '../../combat/technique.js';
+import { inDanger, limitReady } from '../../combat/technique.js';
 import { MASH_COMBO, mashSequence } from '../../../data/mash-combo.js';
 
 // Every role a move can be given (a move may have several at once).
@@ -394,6 +394,8 @@ export function moveReady(self, m) {
   if (m.kind === 'technique' || m.kind === 'summon') {
     // A technique it is not in the danger for (inDanger) is no option yet.
     if (m.kind === 'technique' && !inDanger(self, m.def)) return false;
+    // ...and so is one its Limit gauge is not full enough for (limitReady).
+    if (m.kind === 'technique' && !limitReady(self, m.def)) return false;
     const gone = !!self.opponent?.lostToVoid;
     const pureHeal = m.kind === 'technique' && (m.heal > 0 || m.cloak > 0) && !m.projectile && !m.burst;
     if (self.technique?.def.id === m.id || self.pendingSummon?.id === m.id) return false;

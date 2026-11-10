@@ -170,6 +170,13 @@ export function sweepAttack(a, dt) {
   a.samples = out;
 }
 
+// When attack record `a` is over: its full length, or, for a grab that
+// missed (see `grab` in js/game/combat/attacks.js), its recovery after the
+// miss.
+export function attackEndsAt(a) {
+  return a.whiffAt ?? a.def.total;
+}
+
 // Per-fighter combat state.
 export class CombatState {
   constructor(energy = resolveEnergy()) {
@@ -194,6 +201,11 @@ export class CombatState {
     // glows green when it changes (js/ui/hud.js). Nothing in the simulation
     // reads it.
     this.launchPointHeals = 0;
+    // The Limit gauge (see fillLimit): the damage this fighter has taken
+    // from real hits since this life began or it last broke its Limit, from
+    // 0 for every fresh state (a respawn empties it). Only a technique with
+    // a `limit` reads it (js/game/combat/technique.js).
+    this.limitGauge = 0;
     // Energy for the Dash, the Deflect and the Shield (see resolveEnergy):
     // full at the start, never below 0 or above maxEnergy (MAX_ENERGY for
     // every fighter). Emptying it (however it happens) exhausts the
@@ -468,6 +480,24 @@ export class CombatState {
     return before - this.launchPoint;
   }
 
+  // ---- The Limit gauge --------------------------------------------------------
+
+  // A real hit dealt this fighter `damage` (CombatSystem.applyHit): its
+  // Limit gauge fills by exactly that much. A blocked hit deals nothing and
+  // fills nothing; nothing else ever fills it, and nothing drains it but
+  // breaking its Limit (spendLimit) or a fresh life: Launch Point recovery
+  // and heals never touch it.
+  fillLimit(damage) {
+    if (damage > 0) this.limitGauge += damage;
+  }
+
+  // Its Limit broken (a technique with a `limit` let go, see
+  // js/game/combat/technique.js): the gauge is empty again, all of it
+  // spent whatever it held.
+  spendLimit() {
+    this.limitGauge = 0;
+  }
+
   // ---- Energy -----------------------------------------------------------------
 
   // Whether something that costs Energy may start now: any time the fighter
@@ -600,7 +630,13 @@ export class CombatState {
       // impact is released by the impact itself: Fighter.landSlam).
       const at = a.def.releaseAt;
       if (at != null && !a.released && free && a.time >= at - PHASE_EPSILON) this.releaseAttack();
-      if (a.time >= a.def.total - PHASE_EPSILON) this.endAttack();
+      // A grab whose seizing strike is over with nobody seized has missed
+      // (see `grab` in js/game/combat/attacks.js): it lets go, no later
+      // strike is live (CombatSystem.strike), and it ends its recovery after
+      // (`whiffAt`), not at its full length.
+      const grab = a.def.grab;
+      if (grab && !a.confirmed && a.whiffAt == null && a.time >= grab.until - PHASE_EPSILON) a.whiffAt = grab.until + grab.recovery;
+      if (a.time >= attackEndsAt(a) - PHASE_EPSILON) this.endAttack();
     }
   }
 }

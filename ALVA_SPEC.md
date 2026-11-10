@@ -122,7 +122,7 @@ behave, and how it must look.
   `assets/characters/0004/`, `assets/characters/0005/`,
   `assets/characters/0006/` (its three members' frames),
   `assets/characters/0007/`, `assets/characters/0008/`,
-  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/`, `assets/characters/0012/` and `assets/characters/0013/` are the only fighter art in the repository today, and any future fighter's frames go
+  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/`, `assets/characters/0012/`, `assets/characters/0013/` and `assets/characters/0014/` are the only fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
   character specification (7.2.9).
@@ -159,8 +159,8 @@ behave, and how it must look.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
   never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's,
-  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's, #0012's and #0013's art faces right; #0001's three orbs, #0004's note,
-  #0005's balloons, #0007's molotov fire, #0010's meeting call and #0012's shuriken are direction-neutral.)
+  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's and #0014's art faces right; #0001's three orbs, #0004's note,
+  #0005's balloons, #0007's molotov fire, #0010's meeting call, #0012's shuriken and #0014's explosion are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -171,7 +171,7 @@ behave, and how it must look.
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
   artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's,
-  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's or any later fighter's). Do not download
+  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -720,7 +720,7 @@ no header, build label, eyebrow or keyboard hint bar.
   focused by default, as the first playable fighter), `#0002` in slot 02,
   `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
   slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09,
-  `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12 and `#0013` in slot 13; the other 35 are locked. A fighter that is not
+  `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12, `#0013` in slot 13 and `#0014` in slot 14; the other 34 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -1133,6 +1133,12 @@ neither player learns the other's address.
     line linked to the sheet's page (by the deviation's number alone, so the
     address names nothing), and the credits the sheet itself gives: Dittron,
     Illmatic (portrait), yondy-hokage (eye effects).
+  - **#0014 sprite source** — sprite sheet by xelectromanx10 on DeviantArt,
+    the line linked to the sheet's page (by the deviation's number alone,
+    so the address names nothing), and the credits the sheet itself gives:
+    Soulfire, thekrillmaster, mestreax, Redballbomb, lk-sixtyfour,
+    Dantewrecker999, Neimad, Hyperlon and Biometalneo; all the editing by
+    xelectromanx10.
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -1144,10 +1150,10 @@ neither player learns the other's address.
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
 - The UI does not name the character behind #0001, #0002, #0003, #0004,
-  #0005, #0006, #0007, #0008, #0009, #0010, #0011, #0012 or #0013 (or any
-  fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` / `#0005` /
-  `#0006` / `#0007` / `#0008` / `#0009` / `#0010` / `#0011` / `#0012` /
-  `#0013` in
+  #0005, #0006, #0007, #0008, #0009, #0010, #0011, #0012, #0013 or #0014
+  (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` /
+  `#0005` / `#0006` / `#0007` / `#0008` / `#0009` / `#0010` / `#0011` /
+  `#0012` / `#0013` / `#0014` in
   game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
@@ -1783,7 +1789,7 @@ English and French.
   Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
   Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
   #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin
-  Lion Fists and Sixty-Four Palms, marked Ground
+  Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, marked Ground
   or Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
@@ -2237,12 +2243,12 @@ each fighter's own values are in its character specification (7.2.9).
   `js/data/characters.js`) holds ten definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
   `0004.js`, `0005.js`, `0006.js`, `0007.js`, `0008.js`, `0009.js`,
-  `0010.js`, `0011.js`, `0012.js`, `0013.js`): `#0001` in roster slot 01, `#0002` in
+  `0010.js`, `0011.js`, `0012.js`, `0013.js`, `0014.js`): `#0001` in roster slot 01, `#0002` in
   slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05,
   `#0006` in slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in
-  slot 09, `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12 and
-  `#0013` in slot 13, each fully implemented
-  (7.2.9) and playable: `available: true`. All thirteen are
+  slot 09, `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12,
+  `#0013` in slot 13 and `#0014` in slot 14, each fully implemented
+  (7.2.9) and playable: `available: true`. All fourteen are
   preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -2411,6 +2417,12 @@ each fighter's own values are in its character specification (7.2.9).
   are ordinary attacks, `attack3` (the Twin Lion Fists) and `attack4` (the
   Sixty-Four Palms) techniques, and `extra_attack` is its Protective Palms,
   on the ground only (the sheet draws no aerial for it).
+  #0014 has five: `attack1` (Beat Rush; `midair_attack1`, the Air Combo),
+  `attack2` (Meteodrive, a grab; `midair_attack2`, the Divekick) and
+  `attack3` (Meteor Strike, a grab that leaps; `midair_attack3`, the
+  Somersault) are ordinary attacks, `attack4` (Waterkick) and `attack5`
+  (the Sunburst Fist, its Limit Break) techniques, and `extra_attack` is its
+  Whirling Uppercut, on the ground only (the sheet draws it standing).
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -2425,14 +2437,15 @@ each fighter's own values are in its character specification (7.2.9).
   Launcher; #0008: the Feast and the Gum-Gum Giant Pistol; #0009: the
   Freezing Splash and the Air Sphere; #0010: the Kill, the Vent and the
   Emergency Meeting; #0011: Camouflage and the Venom Punch; #0012:
-  Dragonblade; #0013: the Twin Lion Fists and the Sixty-Four Palms: twenty
-  across the roster. Red, Maximum Blue, the
+  Dragonblade; #0013: the Twin Lion Fists and the Sixty-Four Palms; #0014:
+  the Sunburst Fist: twenty-one across the roster. Red, Maximum Blue, the
   Whirlwind, Cherry Blossom Impact, Ievan Polkka, Dark Tendrils, Heat
   Vision, the Sonic Scream, the Triple Strike, the Molotov Cocktail, the
   Sawn-Offs, the Pistol, the Gum-Gum Balloon, the Gum-Gum Rocket, the Air
   Blast, the Air Gust, the Earth Pillar, the Tongue Lash, the Web Shot, Web
   Lines, the Venom Jump, Shuriken, the Deflect Stance, Swift Strike, the
-  Rising Strike and the Protective Palms are ordinary. The
+  Rising Strike, the Protective Palms, Meteodrive, Meteor Strike and
+  Waterkick are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -2852,7 +2865,7 @@ each fighter's own values are in its character specification (7.2.9).
     paralysis is 5 s, never 8). Nothing else earns a cooldown, however strong
     it looks (`ROUTINE_EFFECTS`): launching, pushing, pulling (Blue and
     Maximum Blue), homing, carrying, a projectile, a quake, a bounce, a slam,
-    ordinary hitstun or blockstun, a long animation. Every shared hit effect
+    a grab, ordinary hitstun or blockstun, a long animation. Every shared hit effect
     is classified one way or the other on purpose. The cooldown is the move's
     (the button's), never one per projectile or hitbox it creates. A
     definition leaves `cooldown` out; one that declares it must agree with
@@ -2901,8 +2914,8 @@ each fighter's own values are in its character specification (7.2.9).
     the Emergency Meeting 3 s (its hold), #0011 the Web Shot 3 s (its
     webbing's hold), Camouflage 3 s (its cloak) and the Venom Punch 3 s
     (its hold), #0012 Dragonblade 5 s (its 10-damage cleave), #0013 the
-    Sixty-Four Palms 5 s (its 10-damage flurry); every other move of the
-    thirteen, Red,
+    Sixty-Four Palms 5 s (its 10-damage flurry), #0014 Sunburst Fist 5 s (its
+    10-damage punch); every other move of the fourteen, Red,
     Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly Foot of Pain,
     the Stage Dive, Dark Tendrils, the Tornado Spin, Heat Vision, the Sonic
     Scream, the Molotov Cocktail, the Sawn-Offs, #0008's Gatling (8 at the
@@ -2913,7 +2926,8 @@ each fighter's own values are in its character specification (7.2.9).
     Stance (a turn-back), Swift Strike (a roll that passes through) and
     Rising Strike (a lift) and #0013's palms and Twin Lion Fists (a drain,
     however much), Protective Palms (a turn-back) and Falling Palm (a slam)
-    included, none at all (the ordinary ones
+    and #0014's grabs (Meteodrive, Meteor Strike's carry and lift), Divekick
+    (a slam) and Waterkick (a ground wave) included, none at all (the ordinary ones
     that create a construct cost 15 Energy instead, 7.2.5). The player, the
     CPU and the ability HUD all read the same built definitions and combat
     state (`js/game/combat/move-status.js` for presentation).
@@ -3307,6 +3321,17 @@ each fighter's own values are in its character specification (7.2.9).
     the fighter lands or is hit. **Free fall** (`freeFall: true`): started
     in the air, it leaves the fighter with no attack and no air jump until
     it lands or is hit.
+  - **Grab** (`grab: { recovery }`, a multi-hit attack's): its first strike
+    seizes, and the rest of the move follows only a seizure. If that strike
+    has made no real hit by the end of its window (it found nobody, or a
+    raised Shield blocked it), the grab has missed: no later strike is
+    live, and the attack ends `recovery` seconds after the window
+    (`whiffAt`), well before its full length. Until it has seized someone
+    its motion never moves it, so a lift (motion `rise`) that misses never
+    leaves the ground. Nothing passes a Shield: a blocked grab is a missed
+    one. A single strike, a bad recovery or a pending attack's grab is
+    refused; it is routine for the cooldown policy (#0014's Meteodrive and
+    Meteor Strike).
   - **Body** (`passThrough: true`): no pushbox against other fighters while
     it plays. (`hurtboxes`): the fighter's own replaced while it plays.
   - **Piercing projectiles** (`pierce: { hits, interval }`): strike up to
@@ -3822,7 +3847,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   every move its own body; nor has #0010: its one construct, the
   Emergency Meeting's call, has its 3 s; nor has #0011: its one
   projectile, the Web Shot's webbing, has its 3 s), #0012 Shuriken and
-  #0013 the Twin Lion Fists (its lions, a projectile). One
+  #0013 the Twin Lion Fists (its lions, a projectile) and #0014 Waterkick
+  (its wave, a projectile). One
   activation pays once: never per projectile update, per hit (a piercing
   orb's several strikes), per shot of a volley (#0012's three shuriken:
   one 15), per frame a construct lives, per clone strike,
@@ -3832,7 +3858,7 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12, #0013 12). The maximum and every
+  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12, #0013 12, #0014 12). The maximum and every
   cost are universal (a move's own `energyCost` too: one it declares must
   agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
@@ -3905,7 +3931,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   Emergency Meeting 3 s (its call's hold), #0011 Camouflage 3 s (its
   cloak) and the Venom Punch 3 s (its hold), #0012 Dragonblade 5 s (its
   10-damage cleave), #0013 the Sixty-Four Palms 5 s (its 10-damage flurry)
-  and the Twin Lion Fists none (15 Energy), with cast/release timing,
+  and the Twin Lion Fists none (15 Energy), #0014 Sunburst Fist 5 s (its
+  10-damage punch) and Waterkick none (15 Energy), with cast/release timing,
   damage and effects unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from attacks' cooldowns in
@@ -4033,7 +4060,22 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   read one `inDanger`, so they never disagree. Only the start reads it:
   once cast, it plays out whatever its fighter's Launch Point does, and its
   cooldown, Energy and classification are its own as ever (#0009's Air
-  Sphere, its trance, opens at 30). #0001's
+  Sphere, its trance, opens at 30). Or it may be a **Limit Break**
+  (`limit`, a whole number of Launch Points, 0 by default: none): it
+  starts only once its own fighter's **Limit gauge**
+  (`CombatState.limitGauge`) holds that much. Every fighter has the gauge,
+  empty for every fresh state (a respawn included); every real hit the
+  fighter takes adds its damage to it (`CombatState.fillLimit`, in
+  `applyHit`), whoever deals it, and nothing else touches it: it never
+  recovers as the Launch Point does, a heal (a perfect Shield's included)
+  takes nothing off it, and a blocked hit deals nothing and fills nothing.
+  Below its `limit` a press does nothing at all, the CPU never plans it
+  (nor fears it from an opponent whose gauge is not full) and the ability
+  HUD shows it held back (`limit`), the gauge's fill in its sweep
+  (`limitFill`); all of them read one `limitReady`. Letting it go breaks
+  the Limit: on its release step the whole gauge is spent
+  (`CombatState.spendLimit`), whatever it held; a cast broken before its
+  release spends nothing (#0014's Sunburst Fist opens at 40). #0001's
   Unlimited Void (a burst) and Hollow Purple (a projectile) are casts
   (docs/characters/0001.md), and so are #0003's Cherry Blossom Impact (a
   burst that is a quake) and Mystical Palm Technique (a heal,
@@ -4051,7 +4093,10 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   round it, the dragon spirit as its art, docs/characters/0012.md), and
   #0013's Twin Lion Fists (a projectile, its lions, that drains) and
   Sixty-Four Palms (a 10-damage burst that drains the whole bar,
-  docs/characters/0013.md); a
+  docs/characters/0013.md), and #0014's Waterkick (a projectile, its wave
+  along the ground, a quake) and the Sunburst Fist (a 10-damage burst, its
+  explosion as its art, open only once its Limit gauge is full: a `limit`,
+  below; docs/characters/0014.md); a
   technique of another shape would be a new
   form in the runtime, not a new reading of these fields. The CPU reads a
   technique's lead (its cast), where it lands (its burst's box, its
@@ -4727,6 +4772,21 @@ there, and nothing in one is a rule for another fighter.
   it, then a 10-damage flurry that seals its target's power (its whole bar
   drained), as techniques and its Specials; its arms crossed for its guard
   and a palm swept up through an arc of chakra for its Deflect).
+- **#0014**: [docs/characters/0014.md](docs/characters/0014.md) (the
+  long-haired martial artist in a white top and red gloves, who fights
+  bare-handed and grows stronger the more it is beaten: Beat Rush and the
+  Whirling Uppercut up close, its Mash Combo; Meteodrive, a grab that
+  suplexes its target into the floor, and Meteor Strike, a grab that leaps
+  carrying its target up and hurls it down (a `grab`, a capability any
+  fighter may now use: the rest of the move follows only a seizure, and a
+  missed one lets go at once); the Air Combo, the Divekick (a dive
+  heel-first) and the Somersault (a rising kick, its recovery) in the air;
+  Waterkick, a wave along the ground that only the grounded meet, as a
+  technique; and the Sunburst Fist, its Limit Break and Special, a 10-damage
+  punch that explodes, open only once its Limit gauge, filled by the
+  damage it takes, is full (a technique's `limit`, a capability any
+  fighter may now use); its fists raised for its guard and a high kick
+  through a red arc for its Deflect).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -4743,7 +4803,7 @@ reviewedSourceHash"), and whenever a playable fighter has no valid profile
 or description in both languages, so every change to a fighter brings its
 profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
 #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5,
-#0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5.
+#0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -4803,7 +4863,7 @@ Adding one is described in
   3 s, #0007 Rocket Launcher 5 s, #0008 Feast 3 s and Gum-Gum Giant Pistol
   5 s, #0009 Freezing Splash 3 s and Air Sphere 5 s, #0010 Kill 5 s and
   Emergency Meeting 3 s, #0011 Camouflage 3 s and Venom Punch 3 s, #0012
-  Dragonblade 5 s, #0013 Sixty-Four Palms 5 s). The fighter the
+  Dragonblade 5 s, #0013 Sixty-Four Palms 5 s, #0014 Sunburst Fist 5 s). The fighter the
   ability HUD
   shows (below) has no rings while that HUD is on show
   (`Arena.hudCooldownsFor`): the HUD carries its cooldowns, so the same
@@ -4910,7 +4970,9 @@ Adding one is described in
     Dragonblade and Shuriken, air the Whirlwind Cut, the Rising Arc, the
     Falling Cut, the Rising Strike and Shuriken; #0013: ground the Gentle
     Fist, the Sweep Kick, the Protective Palms, the Twin Lion Fists and the
-    Sixty-Four Palms, air the Air Palm and the Falling Palm.
+    Sixty-Four Palms, air the Air Palm and the Falling Palm; #0014: ground
+    Beat Rush, Meteodrive, Meteor Strike, Waterkick, the Sunburst Fist and the
+    Whirling Uppercut, air the Air Combo, the Divekick and the Somersault.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -5202,7 +5264,9 @@ Adding one is described in
   Falling Cut in the air), M Swift Strike (the Rising Strike in the air),
   `,` Dragonblade and J Shuriken (in the air too); for #0013, O is the
   Twin Lion Fists, M the Sixty-Four Palms, `,` nothing and J the
-  Protective Palms (on the ground only). The
+  Protective Palms (on the ground only); for #0014, O is Meteor Strike (the
+  Somersault in the air), M Waterkick, `,` Sunburst Fist and J the Whirling
+  Uppercut (on the ground only). The
   input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
@@ -5430,7 +5494,8 @@ Adding one is described in
   #0011: the Web Shot in slot 3, Camouflage in slot 4 and the Venom Punch
   in slot 5; #0012: the Deflect Stance in slot 3, Swift Strike in slot 4
   and Dragonblade in slot 5), 4 again for #0013 (the Twin Lion Fists in
-  slot 3 and the Sixty-Four Palms in slot 4). A summon or technique button is
+  slot 3 and the Sixty-Four Palms in slot 4) and 5 for #0014 (Meteor Strike
+  in slot 3, Waterkick in slot 4 and the Sunburst Fist in slot 5). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -5757,7 +5822,11 @@ codename is sent, never what an action does.
   Whirlwind Cut Square, Rising Arc Triangle, Falling Cut Circle, Shuriken
   R2, Rising Strike the right stick up. #0013: Gentle Fist Square, Sweep
   Kick Triangle, Protective Palms Circle, Twin Lion Fists R2, Sixty-Four
-  Palms L2; in the air Air Palm Square, Falling Palm the right stick down. A
+  Palms L2; in the air Air Palm Square, Falling Palm the right stick down.
+  #0014: Beat Rush Square, Whirling Uppercut Triangle, Meteodrive Circle,
+  Meteor Strike the right stick up, Waterkick R2, the Sunburst Fist L2; in the
+  air Air Combo Square, Divekick the right stick down, Somersault the right
+  stick up. A
   fighter without a
   layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter

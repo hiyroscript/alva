@@ -305,6 +305,22 @@
 // the fighter's own hurtboxes while it plays (a roll tucked into a ball is
 // a smaller target).
 //
+// A grab (`grab: { recovery }`, a multi-hit attack only) seizes with its
+// first strike, and the rest of the move follows only what it seized: if
+// that strike has made no real hit by the end of its window (it found
+// nobody, or a raised Shield blocked it), the grab has missed and lets go:
+// no later strike is live and the attack ends `recovery` seconds after
+// that window (`grab.until`), well before its full length. Until it has
+// seized someone, its motion never moves it: a lift (motion `rise`) waits
+// on the ground for the seizure, so a grab that misses never leaves the
+// ground. Nothing passes a Shield: a blocked grab is a missed one. E.g.
+// #0014's Meteodrive (a suplex) and Meteor Strike (a leap carrying its
+// target):
+//
+//   attack3: { ..., grab: { recovery: 0 }, carry: { lift: 0 },
+//     hits: [{ at: 2 / 15, active: 1 / 15, damage: 1, ... }, ...],
+//     motion: { type: 'rise', speed: 450 } },
+//
 // A pending attack (`pending: true`) is one whose art is in but whose
 // combat attributes are not authored yet: it plays its clip once, first
 // frame to last, and strikes nothing. It has no hitbox, projectile, damage
@@ -348,6 +364,7 @@ const ATTACK_DEFAULTS = {
   projectile: null, // { id, spawnAt, offset, volley } for a projectile attack
   pending: false,   // art only, its attributes not authored yet (see above)
   hits: null,        // a multi-hit attack's strikes (see above)
+  grab: null,        // { recovery }: the rest follows only a seizure by its first strike (see above)
   carry: null,       // { lift }: a real hit drags its target along (see above)
   motion: null,      // movement the attack makes itself (see above)
   airUses: 0,        // starts allowed per airtime; 0 is no limit
@@ -400,6 +417,22 @@ function resolveMotion(spec, owner, id) {
   if (spec.type === 'slam') motion.impact = resolveImpact(spec.impact, owner, id);
   if (spec.type === 'tunnel') resolveTunnel(motion, owner);
   return Object.freeze(motion);
+}
+
+// A grab's frozen settings (see `grab` above) from its `grab` entry, or
+// null: its `recovery` once it has missed (seconds from 0) and `until`, the
+// end of its seizing strike's window, from which a miss is known. Only a
+// multi-hit attack seizes and goes on: one with a single strike, or none,
+// is refused.
+function resolveGrab(spec, def, owner) {
+  if (spec == null) return null;
+  if (!(def.hits?.length >= 2)) throw new Error(`[Alva] ${owner} grabs but has no strikes to follow its seizure: a grab is a multi-hit attack`);
+  const recovery = spec.recovery ?? 0;
+  if (!(typeof recovery === 'number' && Number.isFinite(recovery) && recovery >= 0)) {
+    throw new Error(`[Alva] ${owner}'s grab recovery must be a number of seconds from 0`);
+  }
+  const first = def.hits[0];
+  return Object.freeze({ recovery, until: first.at + first.active });
 }
 
 // A tunnel's times and the hurtboxes it has inside the floor (see `tunnel`
@@ -624,7 +657,7 @@ export function attackReleaseAt(def) {
 // or time a strike.
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
-  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
+  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'grab', 'carry', 'motion', 'pull',
   'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab', 'drain', 'energyCost', 'step',
 ]);
 
@@ -667,6 +700,7 @@ export function createAttackDefinition(spec, { clipDuration = 0, projectiles = n
   else if (spec.damage !== undefined) {
     throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
   }
+  def.grab = resolveGrab(spec.grab, def, owner);
   def.projectile = resolveRelease(spec.projectile, owner);
   def.cooldownClass = cooldownClass('attack', spec, { projectiles });
   def.cooldown = resolveCooldown(spec.cooldown, owner, { cls: def.cooldownClass });

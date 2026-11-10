@@ -211,6 +211,13 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
     '0013': {
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, extra_attack: 0, attack3: 0, attack4: 5, deflect: 0,
     },
+    // Sunburst Fist: its punch deals 10. Its throws, its leap carrying its
+    // target, its wave and its Limit (a start condition, never a
+    // mechanic of the hit) are routine: none earns anything of its own.
+    '0014': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0,
+      attack4: 0, attack5: 5, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
@@ -288,10 +295,11 @@ test('14: the CPU and the player read the same cooldowns and the CPU never press
       assert.equal(planned, m.def.cooldown, `#${c.id} ${m.id}`);
     }
     for (const m of analyzeCapabilities(cpu).moves.filter((x) => x.kind === 'technique')) {
-      // One that needs danger (#0009's Air Sphere) waits for it, as the
-      // player's press does.
+      // One that needs danger (#0009's Air Sphere) or a full Limit gauge
+      // (#0014's Sunburst Fist) waits for it, as the player's press does.
       cpu.combat.launchPoint = 0;
-      assert.equal(moveReady(cpu, m), !(m.def.minLaunchPoint > 0), `#${c.id} ${m.id}: out of danger`);
+      cpu.combat.limitGauge = 0;
+      assert.equal(moveReady(cpu, m), !(m.def.minLaunchPoint > 0) && !(m.def.limit > 0), `#${c.id} ${m.id}: out of danger, Limit empty`);
       endanger(cpu);
       assert.equal(moveReady(cpu, m), true, `#${c.id} ${m.id}: ready`);
       cpu.combat.abilityCooldowns.start(m.id, m.def.cooldown);

@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Thirteen playable fighters** on a 48-slot roster:
+- **Fourteen playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -101,24 +101,33 @@ blocks every attack.
   turn shots back at their thrower, a dash that cuts straight through its
   opponent and the same dash straight up to get back to the stage, quick
   cuts and spinning ones, and a cleave all round it as the dragon spirit
-  of its blade coils round it), and [#0013](docs/characters/0013.md), the
+  of its blade coils round it), [#0013](docs/characters/0013.md), the
   pale-eyed palm fighter whose palms strike the flow of power inside its
   opponents (every palm it lands drains some of their Energy, so the
   Shield, Dash or recovery they were counting on may not be there; a dome
   of chakra spun round it that strikes everyone inside and turns shots
   back, a dive palm-first, lions of chakra on its hands that surge out and
   drain half the bar, and a flurry of sixty-four palms, its eyes woken and
-  its field spread round it, that seals its opponent's power completely).
-  All thirteen Shield
+  its field spread round it, that seals its opponent's power completely),
+  and [#0014](docs/characters/0014.md), the long-haired martial artist
+  who fights bare-handed and grows stronger the more it is beaten (rushes
+  of blows and a whirling uppercut, a grab that suplexes its opponent into
+  the floor and another that leaps carrying it up to hurl it down, each
+  letting go at once if it seizes nobody, a dive heel-first, a rising
+  somersault kick, a wave along the ground that only the grounded meet,
+  and the Sunburst Fist, a punch that explodes, open only once its Limit gauge,
+  filled by every hit it takes, is full).
+  All fourteen Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all thirteen Dash on the ground and air dash. Each fighter
+  back at their thrower), and all fourteen Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
   #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
   Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent
   and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's
-  Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms): an orange
+  Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's Final
+  Heaven): an orange
   exclamation
   mark floats over
   a fighter while it performs one.
@@ -228,7 +237,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,491):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,593):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed
@@ -395,6 +404,12 @@ sheet's own credit: GameInvader.
 [DeviantArt](https://www.deviantart.com/prodijiu/art/826586119); the
 sheet's own credits: Dittron, Illmatic (portrait), yondy-hokage (eye
 effects).
+
+**#0014 sprite source.** Sprite sheet by xelectromanx10 on
+[DeviantArt](https://www.deviantart.com/xelectromanx10/art/1138904217); the
+sheet's own credits: Soulfire, thekrillmaster, mestreax, Redballbomb,
+lk-sixtyfour, Dantewrecker999, Neimad, Hyperlon and Biometalneo; all the
+editing by xelectromanx10.
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

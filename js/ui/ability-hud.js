@@ -377,20 +377,25 @@ export class AbilityHUD {
 
   // One tile's state: 'ready', 'cooling' (a 3 s or 5 s cooldown: sweep and
   // seconds) or 'restricted' (spent for this airtime, no Energy while
-  // exhausted, or missing its art: muted, no countdown).
+  // exhausted, or missing its art: muted, no countdown). A Limit Break held
+  // back by its fighter's Limit gauge (restriction 'limit') shows the gauge
+  // filling in the same sweep, with no seconds: it fills as its fighter
+  // takes damage, never with time.
   paint(tile, status) {
     const cd = status.cooldown;
     const state = status.restriction ? 'restricted' : cd.cooling ? 'cooling' : 'ready';
     const shown = tile.shown;
     if (state !== shown.state) {
-      // A long cooldown just over: a brief, quiet highlight.
-      if (state === 'ready' && shown.state === 'cooling') this.flash(tile);
+      // A long cooldown just over, or a Limit just full: a brief, quiet
+      // highlight.
+      if (state === 'ready' && (shown.state === 'cooling' || tile.el.dataset.restriction === 'limit')) this.flash(tile);
       tile.el.dataset.state = state;
       tile.el.dataset.restriction = status.restriction ?? '';
       shown.state = state;
       shown.label = null;
     }
-    const progress = cd.cooling ? Math.round(cd.progress * 200) / 200 : 1;
+    const filling = status.restriction === 'limit';
+    const progress = filling ? Math.round((status.limitFill ?? 0) * 200) / 200 : cd.cooling ? Math.round(cd.progress * 200) / 200 : 1;
     if (progress !== shown.progress) {
       shown.progress = progress;
       tile.el.style.setProperty('--ah-progress', String(progress));

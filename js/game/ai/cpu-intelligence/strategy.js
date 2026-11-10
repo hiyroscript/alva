@@ -37,6 +37,8 @@
 // objective. Outputs: Strategy (mode, params, adaptive, the launch
 // estimates: danger, dangerSoon, finish, finishSoon; dangerAt).
 
+import { limitReady } from '../../combat/technique.js';
+
 const MODES = ['rushdown', 'controlledOffense', 'neutral', 'counterplay', 'zoning', 'trapControl', 'survival', 'finisherHunt', 'recovery'];
 
 // What each mode asks of the tactical layer: `aggro` lowers the bar for a
@@ -83,7 +85,9 @@ export class Strategy {
   // target's life (0-1), as `judge` reckons it at the target's Launch Point
   // plus `extra`: the CPU's own danger ('me') or its finishing chances
   // ('foe'), where the target stands or at `at` ({ x, y, grounded }), struck
-  // from the attacker's side.
+  // from the attacker's side. A Limit Break its attacker's Limit gauge is
+  // not yet full enough for (see limitReady in js/game/combat/technique.js)
+  // is no launch available to it yet: no threat and no finishing chance.
   koThreat(s, judge, attackerCaps, target, extra = 0, at = null) {
     const who = target === 'foe' ? s.op : s.me;
     const from = target === 'foe' ? s.me : s.op;
@@ -92,8 +96,10 @@ export class Strategy {
       : { x: who.x, y: who.y, grounded: who.grounded, halfW: who.halfW, height: who.height };
     // A launch sends its target away from whoever strikes it.
     const face = Math.sign(pos.x - from.x) || (target === 'foe' ? 1 : -1);
+    const attacker = target === 'foe' ? s.self : s.foe;
     let best = 0;
     for (const m of attackerCaps.moves) {
+      if (m.kind === 'technique' && !limitReady(attacker, m.def)) continue;
       let lp = who.lp + extra;
       const list = m.projectile ? m.projectile.strikes : m.strikes;
       for (const st of list) {

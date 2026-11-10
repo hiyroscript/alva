@@ -6273,3 +6273,168 @@ cuts an attack short now opens, as its pairs already did, with an attack
 that keeps its commitment (#0013's first ground button, the Protective
 Palms, turns shots back and so gives way to any request by rule, as
 #0012's Deflect Stance does).
+
+## #0014, the long-haired martial artist
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0014 from a
+supplied sprite sheet, without its dolphin move, then open a pull
+request. `character_rule` asks for abilities with real mechanics from the
+character's canon, no move the character cannot perform in canon, the
+sheet's DeviantArt page credited and the character named nowhere.
+`character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0014 in roster slot 14, playable: 101 frames cut from
+  the sheet into `assets/characters/0014/`, read at 1× (one file pixel per
+  art pixel), each frame the whole pieces of the sheet's own drawing (the
+  spray of its wave and the embers of its explosion included, never a
+  neighbour), the flat green background (21, 108, 56) made transparent,
+  nothing redrawn, recoloured or laid over anything, every file
+  `0014_<codename>_<frame>.png`: 94 of the fighter, 3 of its wave (a
+  projectile) and 4 of the Sunburst Fist's explosion (an effect). A drawing a
+  row repeats (two of its stance's poses) is cut once and played again;
+  where two rows draw the same picture each clip plays its own codename's
+  file. The row the owner left out (its dolphin) is not cut at all. Drawn
+  at the roster's art-pixel size (a 50-pixel stance, about 85 units);
+  every clip authors its own `anchorX` (between its feet where both are
+  planted, on its white top elsewhere: its long hair would pull the
+  automatic anchor back off its body). Movement is the universal one; its
+  Energy refills at the shared 12 a second.
+- **Its moves**, from its canon (a martial artist who fights with fists
+  and feet, whose Limit gauge fills as it takes damage and whose Limit
+  Breaks are a flurry of blows, a flipping kick, a kick that sends water
+  along the ground, a seizure and suplex, a seizure, leap and slam, and a
+  last punch that explodes), each with a mechanic: **Beat Rush** (a jab
+  and a blurred fist, 1, 1, then a heavy 5 at Base Launch 1) and the
+  **Whirling Uppercut** (a whirl and a fist, 1, then an uppercut, 3 at Base
+  Launch 2 straight up; on the ground only), its Mash Combo pair;
+  **Meteodrive** (a grab: it seizes, 1, holding its target with `carry`,
+  then suplexes it into the floor, 5 at Base Launch 3 straight down, which
+  a target hurt enough rebounds off); **Meteor Strike** (a grab that leaps
+  carrying its target, `motion: rise` and `carry`, then hurls it down, 1,
+  1, then 5 at Base Launch 3 straight down); in the air the **Air Combo**
+  (1, then 3), the **Divekick** (a dive heel-first, `motion: slam`, 3 at
+  Base Launch 2 straight down; once per airtime) and the **Somersault** (a
+  flipping kick that rises, 1, then 3 straight up; once per airtime, its
+  recovery); **Waterkick** (a technique: a fifth of a second lunging low,
+  then a wave runs out along the ground, about 260 units, a `quake`: only
+  a fighter standing on the ground meets it, 3 at Base Launch 1; 15
+  Energy); and the **Sunburst Fist** (a technique, its Limit Break and its one
+  Special: open only once its Limit gauge holds 40; 0.65 s gathering, then
+  a punch, 10 at Base Launch 3 sideways, its explosion played where it
+  lands; the gauge spent; 5 s). Its guard is its fists raised; its
+  Deflect, in the air, a high kick through a red arc; its Dash and air
+  dash a low lunge. It heals nobody, summons nobody, makes no clone and
+  never homes in; its spells (fire and ice, magic its equipment lends it)
+  are not its own fighting and not in the game.
+- **Two shared capabilities.** A technique's **`limit`**
+  (`js/game/combat/technique.js`): a Limit Break that opens only once its
+  fighter's **Limit gauge** (`CombatState.limitGauge`, new for every
+  fighter, empty for every fresh state) holds that many Launch Points.
+  Every real hit a fighter takes adds its damage to its gauge
+  (`CombatState.fillLimit`, in `CombatSystem.applyHit`), whoever deals it;
+  nothing else touches it: it never recovers as the Launch Point does, a
+  heal takes nothing off it, a blocked hit fills nothing. Below its `limit`
+  a press does nothing and pays nothing, the CPU never plans it
+  (`moveReady`) nor counts it among an attacker's launches
+  (`Strategy.koThreat`: without that, an opponent's empty Limit Break read
+  as a threat everywhere), and the ability HUD shows it held back
+  (`moveRestriction` gives `limit`) with the gauge's fill in its sweep
+  (`abilityStatus`'s `limitFill`) and a brief highlight once full; all ask
+  one `limitReady`. Releasing it spends the whole gauge
+  (`Technique.takeLimit`, `CombatState.spendLimit`); a cast broken before
+  its release spends nothing. And an attack's **`grab: { recovery }`**
+  (`js/game/combat/attacks.js`): a multi-hit attack whose first strike
+  seizes; if that strike has made no real hit by the end of its window
+  (nobody, or a raised Shield), the grab has missed: no later strike is
+  live (`CombatSystem.strike`) and it ends `recovery` after the window
+  (`whiffAt`, `attackEndsAt`), and until it has seized someone its motion
+  never moves it, so a lift that misses never leaves the ground
+  (`Fighter.moveMotion`). Both are routine for the cooldown policy (`grab`
+  in `ROUTINE_EFFECTS`; `limit` a start condition), and neither passes a
+  Shield.
+- **Its controller layout** by the comfort rules (Square Beat Rush / Air
+  Combo, Triangle the Whirling Uppercut, Circle Meteodrive, the right
+  stick up Meteor Strike / the Somersault, the right stick down the
+  Divekick, R2 Waterkick, L2 Sunburst Fist), touch buttons, names and
+  descriptions in English and French, a Discover profile (3/5) and its
+  credits (the sheet by xelectromanx10 on DeviantArt, linked by the
+  deviation's number alone, and the credits the sheet itself gives:
+  Soulfire, thekrillmaster, mestreax, Redballbomb, lk-sixtyfour,
+  Dantewrecker999, Neimad, Hyperlon and Biometalneo; all the editing by
+  xelectromanx10).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 312 matches a level): #0014 wins 0.50 at
+Medium, 0.50 at Hard and 0.37 at Brutal, the low end of the roster at
+Brutal (as #0006); weakest against #0007 (6 of 24 at Hard). Its first
+tuning won 0.71 at Medium (its strings opening at a twentieth of a second,
+a long wave at Base Launch 2, a Limit of 30), then, slower, as little as
+0.20 at Brutal, its throws punished whenever they missed: they became
+grabs, its spikes Base Launch 3, its Deflect sideways and Beat Rush's last
+straight a heavy 5. Details in
+[#0014's specification](docs/characters/0014.md#balance).
+
+**Two tests read differently with a fourteenth fighter, and two others
+with a ground move that leaves the ground.** The CPU-behaviour check that
+an opponent exposed by the ledge is finished paired each CPU with the next
+fighter, so #0013 now met #0014, whose scripted moves, drawn from the same
+seeds, hop over it at the start; #0013's Deflect then sent it back to the
+middle in two of three seeds at Hard (every other CPU finishes #0014, and
+#0013 finishes #0001 at every level). That check now gives every CPU one
+reference body, the first playable fighter's, so adding a fighter never
+changes another's (`FINISH_PAIRS`). The overtime check (K) failed because
+the CPU counted #0014's Sunburst Fist as a threat with its gauge empty: the
+`Strategy.koThreat` fix above. Meteor Strike is the roster's first ground
+move that ends in the air, and its grabs end early when they miss:
+`move-cancel` expects what a button starts where the fighter is when the
+move ends (the button's air move after a lift, nothing for a ground-only
+one in the air), and its waits use a grab's length when it seizes nobody.
+
+**Where to tune it.** Every value is in `js/data/characters/0014.js`: the
+moves' phases are whole frames of their clips at `FPS_0014` (the orders
+`BEAT_RUSH_0014`, `METEODRIVE_0014`, `METEOR_STRIKE_0014` and the rest);
+reaches are the attacks' `hitbox`es, the Sunburst Fist's `burst` and the wave's
+`projectiles.attack4_object`; the leaps are `LEAP_0014` and `FLIP_0014`;
+the Limit is `LIMIT_0014`; the anchors `ANCHORS_0014`. The Limit's rules
+are in `js/game/combat/technique.js` (`limit`, `limitReady`, `limitFill`),
+`CombatState.fillLimit` / `spendLimit` and `CombatSystem.applyHit`; the
+grab's in `js/game/combat/attacks.js` (`grab`), `CombatState.update`
+(`whiffAt`), `CombatSystem.strike` and `Fighter.moveMotion`.
+
+**Code:** `js/data/characters/0014.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/technique.js` (`limit`), `combat-state.js` (the
+gauge, `whiffAt`, `attackEndsAt`), `combat.js` (the gauge filled, a missed
+grab's strikes), `attacks.js` (`grab`), `move-status.js` (`limit`,
+`limitFill`), `js/game/fighters/fighter.js` (the start gate, the gauge
+spent, a grab's motion), `js/data/cooldowns.js` (`grab` routine),
+`js/game/ai/cpu-intelligence/capabilities.js` and `strategy.js` (the
+Limit read), `js/ui/ability-hud.js` and `css/ability-hud.css` (the gauge
+in the sweep); the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0014.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy,
+input, launch, rendering, AI, testing, the served file count, 1,593).
+
+**Tests:** new `tests/fighters/0014/fighter-0014.test.mjs` (registration
+and kit; its costs and cooldowns; its one Special; its Mash Combo; its
+names, touch buttons and controller layout; the 101 files, clean and
+tight, no copy within a codename, at one scale, anchored on its body, its
+wave and explosion centred; every move's mechanic: Beat Rush, the Air
+Combo, the Whirling Uppercut, Meteodrive's suplex and a hurt target's
+rebound, a missed or blocked grab letting go, Meteor Strike's leap
+carrying its target, a missed one never leaving the ground, the
+Divekick, the Somersault, its Deflect, Waterkick's wave passing under a
+fighter in the air, the Sunburst Fist held back until the gauge is full, the
+gauge filling by the damage taken, the punch, its explosion and the spent
+gauge, its block and its broken cast; the CPU playing its whole kit and
+the Sunburst Fist; its source named nowhere); new `tests/systems/limit.test.mjs`
+and `grab.test.mjs` (the shared capabilities on test-only fighters);
+`endanger` in the harness fills a Limit too; the roster-wide tables
+(`cooldown-policy`, `special-abilities`: twenty-one Specials,
+`strict-combat-rules`, `mash-combo`), `empty-roster`, `discover`,
+`practice-ground`, `watch-mode`, `settings` (its credits), each fighter's
+roster list, `cpu-intelligence` (an opportunity for a Limit Break gives it
+its gauge), `move-cancel` and `cpu-behaviour` (above).

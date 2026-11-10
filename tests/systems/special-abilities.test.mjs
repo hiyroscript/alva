@@ -56,11 +56,12 @@ const SPECIALS = Object.freeze({
   '0011': ['attack4', 'attack5'],
   '0012': ['attack5'],
   '0013': ['attack3', 'attack4'],
+  '0014': ['attack5'],
 });
 
 // ---- The classification ------------------------------------------------------------------
 
-test('exactly twenty Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash, the Air Sphere, the Kill, the Vent, the Emergency Meeting, Camouflage, the Venom Punch, Dragonblade, the Twin Lion Fists and the Sixty-Four Palms', () => {
+test('exactly twenty-one Specials across the roster: Unlimited Void and Hollow Purple, none for #0002, the Mystical Palm Technique, World is Mine, the Deadlights, the Red Balloon, Ice Breath, the Rocket Launcher, the Feast, the Gum-Gum Giant Pistol, the Freezing Splash, the Air Sphere, the Kill, the Vent, the Emergency Meeting, Camouflage, the Venom Punch, Dragonblade, the Twin Lion Fists, the Sixty-Four Palms and Sunburst Fist', () => {
   let total = 0;
   for (const def of playableCharacters()) {
     assert.deepEqual(def.specialAbilities, SPECIALS[def.id], `#${def.id} declares its own, explicitly`);
@@ -70,7 +71,7 @@ test('exactly twenty Specials across the roster: Unlimited Void and Hollow Purpl
     }
     total += specialAbilities(def).length;
   }
-  assert.equal(total, 20);
+  assert.equal(total, 21);
   const name = (id, move) => getCharacter(id).abilityNames[move];
   assert.deepEqual(specialAbilities(getCharacter('0001')).map((m) => name('0001', m)), ['Unlimited Void', 'Hollow Purple']);
   assert.deepEqual(specialAbilities(getCharacter('0003')).map((m) => name('0003', m)), ['Mystical Palm Technique']);
@@ -114,6 +115,13 @@ test('exactly twenty Specials across the roster: Unlimited Void and Hollow Purpl
   for (const move of ['attack1', 'extra_attack', 'midair_attack2']) {
     assert.equal(isSpecialAbility(getCharacter('0013'), move), false, `${name('0013', move)} is not Special`);
   }
+  assert.deepEqual(specialAbilities(getCharacter('0014')).map((m) => name('0014', m)), ['Sunburst Fist']);
+  // Its throws, its leap, its wave and its rushes are its everyday tools:
+  // ordinary, Waterkick a technique all the same.
+  for (const move of ['attack1', 'attack2', 'attack3', 'midair_attack3', 'attack4', 'extra_attack']) {
+    assert.equal(isSpecialAbility(getCharacter('0014'), move), false, `${name('0014', move)} is not Special`);
+  }
+  assert.equal(actionType(getCharacter('0014'), 'attack4'), 'technique');
   // The Molotov Cocktail and the Sawn-Offs are techniques too, and ordinary.
   for (const move of ['attack3', 'attack4']) {
     assert.equal(actionType(getCharacter('0007'), move), 'technique');
@@ -225,6 +233,11 @@ test('the controller editor\'s categories follow the classification; every bindi
       ground: ['attack1', 'attack2', 'extra_attack'],
       air: ['attack1', 'attack2'],
       abilities: ['ground:attack3', 'ground:attack4'],
+    },
+    '0014': {
+      ground: ['attack1', 'attack2', 'attack3', 'attack4', 'extra_attack'],
+      air: ['attack1', 'attack2', 'attack3'],
+      abilities: ['ground:attack5'],
     },
   };
   for (const def of playableCharacters()) {

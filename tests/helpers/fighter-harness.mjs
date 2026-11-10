@@ -154,11 +154,16 @@ export function makeFighter({ character = DEFAULT_CHARACTER, sprites = fakeSprit
 
 // Raises `fighter`'s Launch Point to the danger its techniques need to
 // start (each one's `minLaunchPoint`, see js/game/combat/technique.js; #0009's
-// Air Sphere), so a test that presses every move finds every one of them
-// open. Nothing else about it changes. Returns the fighter.
+// Air Sphere) and fills its Limit gauge as far as they need (each one's
+// `limit`; #0014's Sunburst Fist), so a test that presses every move finds
+// every one of them open. Nothing else about it changes. Returns the
+// fighter.
 export function endanger(fighter) {
-  const need = Math.max(0, ...Object.values(fighter.techniqueDefs ?? {}).map((t) => t.minLaunchPoint ?? 0));
+  const defs = Object.values(fighter.techniqueDefs ?? {});
+  const need = Math.max(0, ...defs.map((t) => t.minLaunchPoint ?? 0));
   fighter.combat.launchPoint = Math.max(fighter.combat.launchPoint, need);
+  const limit = Math.max(0, ...defs.map((t) => t.limit ?? 0));
+  fighter.combat.limitGauge = Math.max(fighter.combat.limitGauge, limit);
   return fighter;
 }
 

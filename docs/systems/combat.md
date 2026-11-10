@@ -114,7 +114,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. The only way a request ever cuts an attack that can harm short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`; with `volley: { count, interval }`, `count` of them, `interval` apart (below). |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
-| `hits`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
+| `hits`, `grab`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
 | `paralyze` / `blockPush` / `quake` / `charm` / `float` / `fear` / `gaze` | 0 / 0 / false / 0 / 0 / 0 / false | The shared hit effects (below). |
 | `offensive` | — | Optional, and only to agree with what the attack does ([attack classification](#attack-classification)). |
 
@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0013 use them between them
+is built, and usable by any fighter (#0001 to #0014 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -342,6 +342,20 @@ today):
   an attack throws one: a technique that declares a volley is refused
   (#0012's Shuriken).
 - **Per airtime** (`airUses`) and **free fall** (`freeFall: true`).
+- **Grab** (`grab: { recovery }`, a multi-hit attack's): its first strike
+  seizes, and the rest of the move follows only a seizure. If that strike
+  has made no real hit by the end of its window (`grab.until`: it found
+  nobody, or a raised Shield blocked it), the grab has missed and lets go:
+  no later strike is live (`CombatSystem.strike`) and the attack ends
+  `recovery` seconds after the window (`whiffAt`, `attackEndsAt` in
+  [`combat-state.js`](../../js/game/combat/combat-state.js)), well before
+  its full length. Until it has seized someone its motion never moves it
+  (`Fighter.moveMotion` holds it as in its startup), so a lift (`motion:
+  rise`) that misses never leaves the ground. Nothing passes a Shield: a
+  blocked grab is a missed one. A single strike, a bad recovery or a
+  pending attack's grab is refused; it is routine for the cooldown policy.
+  A seizure with `carry` holds its target to the grab (#0014's Meteodrive
+  and Meteor Strike).
 - **Body** (`passThrough: true`: no pushbox while it plays; `hurtboxes`:
   the fighter's own replaced while it plays: #0002's Spin Attack a smaller
   ball, #0008's stretched arms and legs a bigger target, its body and the
@@ -424,6 +438,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0011 | `['attack4', 'attack5']` | Camouflage (out of sight, a CPU losing track of it, until it strikes or is struck), the Venom Punch (its lightning stuns whoever it reaches stiff) | the Web Shot, Web Lines, the Venom Jump |
 | #0012 | `['attack5']` | Dragonblade (a 10-damage cleave all round it, the dragon spirit coiling round it, after half a second's breakable stance) | Shuriken (a volley), the Deflect Stance (it turns shots back), Swift Strike and the Rising Strike (dashes through) |
 | #0013 | `['attack3', 'attack4']` | the Twin Lion Fists (lions of chakra that surge out and drain half the target's Energy), the Sixty-Four Palms (a 10-damage flurry that seals the target's chakra: its whole bar drained) | the Protective Palms (a dome that turns shots back), its draining palms |
+| #0014 | `['attack5']` | Sunburst Fist (its Limit Break: a 10-damage punch that only a Limit gauge filled by the damage it takes opens) | Meteodrive and Meteor Strike (grabs), Waterkick (a ground wave), its rushes |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -632,7 +647,7 @@ reaches it (`CombatSystem.applyHit`) shows it at once
 (`CombatState.reveal`); running, jumping and Dashing never do. A cast
 broken before its release cloaks nothing (#0011's Camouflage). Fields:
 `castAnimation`, `releaseAnimation`, `cooldown`, `energyCost`,
-`projectile`, `burst`, `heal`, `cloak`, `minLaunchPoint`; the
+`projectile`, `burst`, `heal`, `cloak`, `minLaunchPoint`, `limit`; the
 burst's hit is validated like an attack's (damage, launch, stuns and hit
 effects). E.g. #0001's Unlimited Void (a burst that paralyzes) and Hollow
 Purple (a projectile that erases), each blocked by a raised Shield ([its
@@ -664,6 +679,26 @@ three ask one `inDanger(fighter, def)` in
 disagree. Only the start reads it: once cast, the technique plays out
 whatever its fighter's Launch Point does, and its cooldown, Energy and
 classification are its own as ever.
+
+**A Limit Break** (`limit`, a whole number of Launch Points; 0, the
+default, is none): a technique may open only once its own fighter's
+**Limit gauge** holds that much (#0014's Sunburst Fist, at 40). Every
+fighter has the gauge (`CombatState.limitGauge`), empty for every fresh
+state (a respawn included): every real hit it takes adds its damage to it
+(`CombatState.fillLimit`, in `CombatSystem.applyHit`), whoever deals it,
+and nothing else touches it. Unlike the Launch Point it never recovers, and
+a heal (a perfect Shield's included) never takes anything off it; a
+blocked hit deals nothing and fills nothing. Below its `limit` a press does
+nothing at all, nothing paid and nothing kept for later; the CPU never
+plans it (`moveReady`) and does not count it among the launches its
+attacker has (`Strategy.koThreat`); the ability HUD shows it held back,
+the gauge's fill in its sweep (`moveRestriction` gives `limit`,
+`abilityStatus` its `limitFill`). All of them ask one `limitReady(fighter,
+def)` (and `limitFill`) in [`technique.js`](../../js/game/combat/technique.js).
+Letting it go breaks the Limit: on its release step its whole gauge is
+spent (`Technique.takeLimit`, `CombatState.spendLimit`), whatever it
+held; a cast broken before its release spends nothing. Only the start
+reads it: its cooldown, Energy and classification are its own as ever.
 
 Any clip missing, the projectile's or the burst effect's art missing, nothing to release (no
 projectile, burst or heal), invalid data, or Energy it cannot pay, and
@@ -784,7 +819,8 @@ Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
 #0010's Kill 5 s (its backstab's 10) and Emergency Meeting 3 s (its hold);
 #0011's Web Shot 3 s (its webbing's hold), Camouflage 3 s (a cloak) and
 Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10);
-#0013's Sixty-Four Palms 5 s (its flurry's 10).
+#0013's Sixty-Four Palms 5 s (its flurry's 10); #0014's Sunburst Fist 5 s
+(its punch's 10).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -798,12 +834,15 @@ Blast's drag, a carry, and the Earth Pillar's quake earn nothing), and of
 Stance turns shots back, Swift Strike and the Rising Strike are motions),
 and of #0013's but the Sixty-Four Palms (a drain, however much, earns
 nothing: the Twin Lion Fists' lions and every palm drain and stay
-ordinary), and every Deflect none.
+ordinary), and of #0014's but the Sunburst Fist (its grabs, the carry and lift
+of Meteor Strike, the Divekick's slam and Waterkick's ground wave earn
+nothing; its Limit is a start condition, never a mechanic of the hit), and
+every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
 Earth Pillar, Shuriken: once for its volley of three, the Twin Lion
-Fists) cost 15 Energy
+Fists, Waterkick) cost 15 Energy
 instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and
@@ -813,8 +852,9 @@ presentation read them; presentation goes through
 [`js/game/combat/move-status.js`](../../js/game/combat/move-status.js):
 `moveCooldown(fighter, id, kind)` (`{ id, duration, remaining, progress,
 cooling, special }`), `moveRestriction` (`art`, `energy` while exhausted
-for a move that costs Energy, `airUses` or `freeFall`: an unavailability
-that is no cooldown), `abilityStatus` and
+for a move that costs Energy, `danger` or `limit` for a technique not yet
+open, `airUses` or `freeFall`: an unavailability that is no cooldown),
+`abilityStatus` (with a Limit Break's `limitFill`) and
 `abilityGroups(def)` (each place's moves, from the loadout). It writes
 nothing and keeps no time, so the ability HUD ([input](input.md#the-ability-hud)),
 the player's presses and the CPU can never disagree, and changing place
