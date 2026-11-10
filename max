@@ -1,79 +1,270 @@
-# Prompt: add the "Screen Pad" Mobile Controls scheme to ALVA
+# Alva — the Adventure update
 
-You are working in the `hiyroscript/alva` repository. Read `CLAUDE.md` first and follow it, plus `ALVA_SPEC.md` §6.10 / §6.10a / §7.4, `docs/systems/input.md` (the "Touch controls" section especially), `docs/systems/movement.md`, `codename_rule`, and `docs/characters/adding-characters.md#the-touch-comfort-rules-strict`. Never edit `character_rule`. Run `node --test` before and after; everything must stay green.
+Add a new single-player game mode to Alva, **Adventure**: a 30-level progression mode. It has its own difficulty, **Venture**, which gets stronger with every level. Every 5 levels it also offers **Perquisites**, permanent upgrades the player picks from cards. This prompt is the whole specification. Read all of it before you write any code.
 
-## Goal
+## 0. Before you start
 
-Add a third Mobile Controls scheme, **Screen Pad** (French: **Pavé tactile**; settings id `screenpad`), next to **Joystick** and **Classic Buttons**, and make it **the new default** (see "Default scheme" below). In Screen Pad, the lower-left cluster disappears entirely: no joystick, no Run arrows, no Left/Right mouvement buttons, no Down button. Instead, **the left half of the screen is an invisible gesture surface for movement**, and **the right half keeps the existing lower-right action cluster exactly as it is today** (Mash Combo pair + Jump in the corner, Shield above Jump, the fighter's other moves in columns above, same sizes, same art, same live cooldown/spent states).
+1. Read `CLAUDE.md`, then `UPDATES.md`. Then read these sections of `ALVA_SPEC.md`: §6 (Screens and flow), §6.3 Select Mode, §6.3a Select Difficulty, §6.4 Select Fighter, §7.2.4 Combat, §7.2.5 Defense and Energy, §7.2.7 Launch, §7.2.8 Matches and the combat AI and §7.2.10 The match's end. Also read `docs/systems/ai.md`, `docs/systems/launch.md`, `docs/systems/energy.md` and `docs/architecture/character-system.md`.
+2. Read these files before you change them:
+   - `js/screens/mode-select-screen.js`
+   - `js/screens/difficulty-select-screen.js`
+   - `js/screens/character-select-screen.js`
+   - `js/screens/battle-screen.js`
+   - `js/game/battle.js`
+   - `js/data/difficulty.js`
+   - `js/game/ai/combat-ai.js`
+   - `js/game/ai/cpu-intelligence/brain.js` and its sibling modules, especially `evaluator.js`, `objective.js`, `situation.js` and `values.js`
+   - `js/game/combat/combat.js`, especially `CombatSystem.applyHit`
+   - `js/game/combat/combat-state.js`, especially `updateLaunchRecovery`, `heal` and `spendEnergy`
+   - `js/data/launch.js` and `js/data/energy.js`
+   - `js/core/app.js`, especially `initialSelection` and screen registration
+   - `js/core/settings.js`, for the versioned localStorage pattern
+   - `js/ui/components.js`, especially `screenHeader`, `refreshSteps` and `quickBattleSetup`
+   - `js/localization/strings/en.js` and `fr.js`
+   - `css/setup.css` and `css/responsive.css`
+3. The level-selector reference is the owner's **vl** repo (`hiyroscript/vl`, one file, `index.html`). Look at:
+   - the `/* levels */` CSS block, which contains `.grid`, `.cell`, `.cell.locked`, `.cell.done`, `.cell.next` and the wide `.echo-cell` row
+   - the `#levels` section markup (a panel head with a title and close button, a grid, then one wide cell)
+   - `paintLevels()` and the `#lvGrid` click handler
+   - the progress reset in the settings handler, a two-step "Reset" → "Confirm" button that disarms after 3.2 s
 
-Screen Pad must produce the same control codenames and snapshot fields as every other device (`runLeft`, `runRight`, `down`, `jump`, `mouvementLeft` / `mouvementRight` via `queueTouchMouvement`, with their `…Pressed` edges). The Fighter, the movement rules, `js/data/movement.js`, Online Play's `encodeFrame`, the CPU and the controller code must not change at all. If something looks like it needs a Fighter change, stop and reconsider: the gesture layer should translate into existing inputs.
+   Rebuild that look and behaviour **in Alva's own design language**: charcoal, off-white and the green accent, Alva's type, 3 px radii on the setup screens and its focus ring. Do not copy vl's colours or fonts.
+4. Run `node --test` before you start, so you know the baseline, and again at the end. Everything must pass.
 
-## The gestures (left half)
+The whole project rules still apply: one character system, never special-casing a fighter's id in shared code, the comfort rules, the Void rules, English **and** French for every string, and keyboard, mouse, touch and gamepad navigation on every new screen through the shared menu navigator.
 
-**The pad covers the whole left half of the screen**: every pixel from the left edge to the horizontal midpoint, top to bottom, the safe-area insets and the area under the top HUD included (the HUD is display only and must not swallow touches there: give it `pointer-events: none` over the pad). The only things on the left half that take a touch before the pad are the pause button and any right-cluster button a player has moved there in the editor. Size it from the live viewport (resize and orientation changes included), never from a fixed box. Each pointer that goes down in it is a **gesture pointer**. Only one gesture pointer is active at a time; a second finger landing on the left half while one is active is ignored (except for the Super Jump chord below). Fingers on the right-hand buttons are fully independent (multi-touch, as today).
+## 1. Where Adventure is available
 
-All thresholds are in CSS pixels scaled by the viewport's short side (define them as a fraction, e.g. `0.06 * shortSide`, so phones and tablets feel the same), and live in one frozen `SCREEN_PAD` object in `js/ui/touch-controls.js` (or a new `js/ui/screen-pad.js`), next to `JOYSTICK`, with pure functions you can unit-test, like `joystickDirection` / `joystickVertical`.
+- **Only** under Home → **Play** → Select Mode.
+- **Not** in Local Play, Online Play, Watch Mode or Practice Ground. None of their screens, rails or rules may list it, link to it or read its state. Add tests that confirm this (§10).
 
-| Gesture | Result | Codename(s) |
-| --- | --- | --- |
-| **Tap** (down and up within `tapTime` ≈ 0.20 s, moved less than `tapSlop` ≈ 3 % of the short side) | Jump. In the air, an air jump (so tap-tap-tap = the triple jump). | one `jump` press (held for one step, then let go) |
-| **Swipe left / right** (lifted within `swipeTime` ≈ 0.25 s, travelled past `swipeDistance` ≈ 8 % of short side, horizontal dominant: within 35° of horizontal) | Dash on the ground, air dash in the air, toward the swipe. | `queueTouchMouvement('left' \| 'right')` exactly once |
-| **Touch, hold and drag sideways** (a *floating stick*: the anchor is where the finger landed) | Run left / right for as long as the finger is held past the deadzone. Reuse `joystickDirection`'s engage/deadzone hysteresis, with distance measured from the anchor. | `runLeft` / `runRight` held |
-| **Drag down while holding** (past `downEngage`, within the down angle) | Down: fast fall in the air; held on the ground it arms the Super Jump. Reuse `joystickVertical`'s engage/release/angle hysteresis. A diagonal holds a Run and Down together, as the joystick does. | `down` held |
-| **Quick flick down** (down past threshold and lifted within `dropTapTime`) | Drop through a one-way platform. Falls out naturally: it is a short `down` tap, exactly the joystick's flick. In the air it is a short fast fall. | short `down` hold |
-| **Swipe up** (fast, vertical dominant, lifted within `swipeTime`) | **Super Jump** on the ground (a normal jump in the air). Emit `down` held and `jump` pressed **in the same sample**, then release both: the Fighter already treats Down + fresh Jump on the same sample as the Super Jump (`movement.md`). | `down` + `jump` same sample |
-| **Hold down on the pad + tap Jump on the right** | Also the Super Jump: the existing chord, unchanged. | `down` held + right Jump |
+## 2. Select Mode changes
 
-The floating stick re-anchors if the finger drifts far beyond `maxRadius` (drag the anchor along, like a mobile-game floating joystick), so a long slide never "runs out" of stick.
+- The rail now holds two cards, in this order:
+  - **01 Adventure** — description: "Thirty levels against an ever-sharper CPU. Earn Perquisites as you climb." French: « Trente niveaux face à un CPU toujours plus redoutable. Gagnez des Perquisites en progressant. »
+  - **02 Quick Battle** — it was 01 and is now 02. Its name, description, play-type dialog and flow are otherwise unchanged.
+- Adventure is the default card (`data-nav-default`) and the first focus. Arrow keys and the D-pad move between the two cards, then to the details panel's content if it scrolls.
+- **Make the Mode details panel smaller to give the rail more room.**
+  - Change `.mode-layout` in `css/setup.css` so the rail clearly dominates, for example `minmax(0, 2.4fr) minmax(200px, 0.85fr)`.
+  - Reduce the panel's padding, heading and paragraph sizes by one step: the heading about 13–14 px and the paragraphs about 12–13 px, keeping the `clamp()` style.
+  - Keep internal scrolling.
+  - On the stacked layout (`css/responsive.css`, ≤ 720 px and tall/narrow screens), the panel takes `auto` height capped at roughly 32 vh and scrolls internally, so both cards stay fully visible.
+  - Check it on desktop, a phone held sideways (the reference is the attached 2000×924 screenshot) and a tall/narrow window.
+- The details panel now has **two sections**: Adventure first, then Quick Battle, each with the existing section styling.
+  - Adventure's overview: "Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits 5% harder. Every 5 levels, choose one Perquisite to keep." Translate it into French.
+  - Adventure's rules: "Your opponent's fighter and the stage are drawn at random. Standard match rules: first to 3 points, 5 minutes, then overtime." Translate it into French.
+- Selecting Adventure does **not** open the play-type dialog. It sets `app.selection.mode = 'adventure'` and goes straight to the Adventure level selector.
+- Select Mode's setup steps follow the focused or selected mode. Adventure's steps are **Mode · Level · Fighter**; Quick Battle's are unchanged. Add an `adventureSetup()` next to `quickBattleSetup()` in `js/ui/components.js`.
 
-### Disambiguation rules (the important part)
+## 3. The Adventure level selector (new screen `adventure-levels`)
 
-1. **Jump fires on lift, not on touch-down.** Otherwise every run would start with a jump. To keep it responsive, emit the jump the moment the tap is recognised (on `pointerup`), never wait for a possible double-tap.
-2. **A gesture is classified once.** On lift: tap → swipe (left/right/up) → nothing. Once a pointer has started holding a Run or Down (dragged past the stick's engage distance *and* held past `tapTime`), it is a stick: lifting it never also jumps or dashes.
-3. **Swipes may briefly run first.** A fast swipe may cross the Run engage distance before it is recognised; that is fine (a few frames of `runLeft` before the Dash in the same direction). A swipe *opposite* to the held Run is still a Dash that way.
-4. **Mid-hold flick = Dash (optional, behind a constant, default ON):** while holding a Run, a sudden horizontal velocity spike past `flickSpeed` (≈ 1.5 short-sides / second) in either direction queues one Dash that way and re-anchors the stick at the finger, so the player can run → dash → keep running without lifting. One Dash per spike; the stick must slow below half `flickSpeed` before another can fire.
-5. **Pushing up while holding** does nothing (same as the Joystick scheme): Jump is a tap, so a drifting thumb never jumps.
-6. Opposing Dash requests in one step cancel, as everywhere else.
+New file: `js/screens/adventure-level-screen.js`, registered in `js/core/app.js`.
 
-### Invisible at all times
+- **Header:** use the standard `screenHeader`, with kicker "Adventure", title "Select Level" (French « Choisir le niveau ») and the steps Mode ✓ · **Level** (current) · Fighter. Back returns to Select Mode, with focus on the Adventure card.
+- **Grid:** 30 square cells numbered `01`–`30`, mono figures, modelled on vl's `.grid` / `.cell`.
+  - Use `repeat(auto-fill, minmax(54px, 1fr))` on wide screens. In short landscape, use 10 per row so all 30 fit without scrolling where possible. Otherwise the grid scrolls internally and Back stays reachable.
+  - **Locked** cells (level > highest unlocked) are dimmed, with a faint border, `disabled` and `aria-disabled`. Their name is "Level 07, locked".
+  - **Cleared** cells (level < highest unlocked) use a green-tinted fill and border with green text and a small check. Their name is "Level 03, cleared".
+  - **Next** cell (the highest unlocked level) uses a solid off-white fill with charcoal text. It is the default focus. Its name is "Level 08, next".
+  - **Milestone** cells (5, 10, 15, 20, 25, 30) carry a small card glyph in a corner, so the player can see where Perquisites are offered. Show the glyph as a filled mark once that milestone's Perquisite has been claimed, and as a hollow mark before.
+- **Wide row under the grid**, modelled on vl's `.echo-cell`:
+  - Left side: "Venture · Level NN" and a muted line with Venture's multiplier for the focused level, e.g. "×11.39 smarter · ×1.22 damage vs Level 1" (Level 7).
+  - Right side: the player's current Perquisites as compact chips, e.g. "Brave Soldier II", or "—" if they have none.
+  - This row is informational and not focusable.
+- **Progression reset button**, outlined and danger-tinted, at the bottom of the screen and labelled "Reset progress" (French « Réinitialiser la progression »). It uses vl's two-step pattern:
+  - The first press turns it into "Confirm reset" (French « Confirmer ») for 3.2 s, then it disarms.
+  - The second press within that time resets the unlocked level to 1, the cleared set, every Perquisite level and every milestone claim. It then repaints the grid and moves focus back to cell 01.
+  - It works with click, Enter/J and gamepad A, never on hover.
+  - It is disabled when there is nothing to reset.
+- Choosing an unlocked cell sets `app.selection.adventureLevel` and opens **Select Fighter** in Adventure mode. Replaying a cleared level is allowed.
 
-The pad is **always invisible**: no ring, knob, anchor, trail, swipe streak, divider, outline, tint or pressed state, ever, in play, in pause, in Practice Ground and in the touch layout editor. It is a transparent element (`background: transparent`, no border, no shadow, no `::before` / `::after` art) that only receives pointers. Nothing about it is drawn when a gesture is recognised; the fighter's own movement is the feedback. It must not be announced as a button to assistive technology (`aria-hidden="true"`); keyboard and controller play are unaffected.
+## 4. Adventure flow
 
-The only text that may ever mention it is outside the pad: the Settings card's description, and a one-time hint card on the first battle with Screen Pad ("Left half of the screen — Tap: jump · Swipe: dash · Hold & drag: move · Drag down: down · Swipe up: Super Jump"), dismissed by any touch, remembered in `settings.js` (the only module touching storage). The hint is a card, not a drawing of the pad.
+```
+Home → Play → Select Mode → Adventure → Select Level → Select Fighter
+     → [levels 5, 10, 15, 20, 25, 30 with that milestone unclaimed: the Perquisite cards]
+     → Battle (the CPU's fighter and the stage drawn at random, Venture at that level)
+```
 
-## The right half
+- **Select Fighter** reuses `character-select-screen.js`. The kicker is "Adventure", the steps are Mode ✓ · Level ✓ · **Fighter**, and Back returns to Select Level. There is **no** difficulty step and no CPU or stage step.
+- **CPU and stage:** draw them at random exactly as Regular Play does (reuse its draw from `quick-battle-setup.js`; do not duplicate it), seeded per battle.
+- **Match rules:** these are the normal Quick Battle rules: 3 points, 5:00, overtime with the closing Void, the Launch Point tiebreak, the celebration, the result toast and Match Results.
+- **Win:** if this was the highest unlocked level, unlock the next one. Mark the level cleared and save immediately, so progress survives closing the tab mid-celebration.
+- **Loss or draw:** nothing unlocks. Progress already made is kept.
+- **Match Results in Adventure:**
+  - **Next level** (green, primary) appears only after a win when the next level exists. It goes to that level's Perquisite cards if it is an unclaimed milestone, otherwise straight into battle with the same fighter and a fresh random CPU and stage.
+  - **Retry level** replays the same level with a new random draw.
+  - **Change fighter** goes to Adventure's Select Fighter.
+  - **Level select** goes to the Adventure level selector.
+  - **Return to Home Screen** stays as it is.
+  - **Change stage** is **not** offered.
+  - The results header shows "Adventure · Level NN".
+- **Clearing Level 30** shows a completion line on the toast: "Adventure complete!" (French « Aventure terminée ! »). On the selector, all 30 cells show as cleared and the cleared state persists.
+- **Pause menu:** Restart Battle restarts the same level. Every other option behaves as in Quick Battle.
+- **Battle HUD:** next to the timer, or in the existing place the difficulty would otherwise show, add a small tag such as "LV 07 · VENTURE" so the player always knows where they are. It must respect the "nothing past the top HUD" touch rule.
 
-Unchanged: same buttons, sizes (130 % / 110 %), positions, art, `showStatus`, Mash Combo row, Shield/Deflect, and the right-hand **Jump button stays** (the touch comfort rule requires Jump in the corner beside the Mash pair, and it gives players a second jump and the Down + Jump chord). Taps on any right-hand button never count as left-zone gestures, even if a button sits left of the midpoint after customization: buttons always win over the pad (stop propagation at the button, as the Down button already does for Classic's sliding container).
+## 5. Venture: the Adventure difficulty
 
-## Wiring
+Venture replaces Easy, Medium, Hard and Brutal inside Adventure. It is one difficulty that grows with the level. **The key rule: at Level 1 Venture is easy, and every level it is exactly 1.5× smarter and 1.05× stronger than the level before.** Smarter and stronger grow at different rates on purpose, each from its own constant in `js/data/adventure.js` so they can be tuned separately:
 
-- `js/core/settings.js`: add `'screenpad'` to `MOBILE_CONTROLS` and set `DEFAULT_MOBILE_CONTROLS = 'screenpad'` (see "Default scheme").
-- `js/core/touch-layout.js`: `TOUCH_CONTROL_IDS.screenpad = ['extra_attack', 'shield', ...NUMBERED_ATTACKS, 'jump']` (no `down`, `stick`, run or mouvement ids). Its own custom layout, sanitized like the others.
-- `js/ui/touch-controls.js`: `setScheme('screenpad')` hides the lower-left cluster, mounts the gesture surface, and routes into the existing held/press paths (`queueTouchMouvement`, the Down held path with its own slot like `setStickDown`). Release everything on lift, `pointercancel`, lost capture, `releaseAll`, disable (pause), scheme switch and `InputManager.suspend`. Respect `notePointerEnd` / `POINTER_CLICK_MS` so a trailing click never presses anything. Use `touch-action: none` on the surface so the browser never scrolls or zooms.
-- `css/touch-controls.css`: `[data-scheme="screenpad"]` rules; the surface sits under the right cluster's z-index.
-- `js/ui/settings-dialog.js`: a third card **Screen Pad**, listed first and carrying the "Default" mark (moved off Joystick), with a small drawing of a split screen (hand icon + arrows on the left), line: "Left half: tap to jump, swipe to dash, hold and drag to move." French: "Moitié gauche : touchez pour sauter, glissez pour un dash, maintenez et faites glisser pour bouger." Add strings to `js/localization/strings/en.js` and `fr.js`.
-- `js/ui/touch-layout-editor.js`: Screen Pad shows only the right-hand controls (movable/resizable as usual); the pad is not drawn and not editable.
-- Practice Ground, Quick Battle and Online Play's local player must all work; Watch Mode hides it like every scheme; Local Play (controllers only) is unaffected.
+- `VENTURE_SMARTS_GROWTH = 1.5`: the intelligence factor at level L is `1.5 ** (L − 1)`. It is bounded by perfect play (§5.1).
+- `VENTURE_STRENGTH_GROWTH = 1.05`: the damage factor at level L is `1.05 ** (L − 1)`. That is ×1 at L1, about ×1.55 at L10, about ×2.53 at L20 and about ×4.12 at L30.
 
-## Default scheme
+Strength grows more gently because damage is unbounded. At 1.5× per level the damage would reach about ×128,000 by Level 30 and turn the late game into one-hit knockouts. At 1.05× Level 30 is brutal but still winnable, and the Perquisites still matter.
 
-Screen Pad is the new default Mobile Controls:
-- `DEFAULT_MOBILE_CONTROLS` becomes `'screenpad'`: a new player, and a stored scheme that is unknown or missing, get Screen Pad.
-- A player who **explicitly chose** Joystick or Classic Buttons keeps that choice, and every custom touch layout is kept. Follow the pattern already used when Joystick became the default (`SETTINGS_BEFORE_10_SCHEME` and the version 10 upgrade in `settings.js`): bump the settings version and make sure a stored `'joystick'` that was only the old default (never chosen) is distinguished from one the player picked, per the existing "a default is never mistaken for a choice" rule. If the stored data cannot tell them apart, keep the stored scheme (never take a choice away) and note it in your report.
-- Update `ALVA_SPEC.md` §6.10 (Screen Pad marked "Default"; Joystick no longer is), `docs/systems/input.md` and the Settings strings in both languages accordingly.
+Create `js/data/adventure.js` for all Adventure data: the level count (30), the milestone levels, Venture, and the Perquisite table (§6).
 
-## Tests (add, don't weaken)
+### 5.1 Smarter
 
-- `tests/interface/controls-ui.test.mjs`: Screen Pad renders only the right cluster; scheme switching releases everything.
-- New `tests/systems/screen-pad.test.mjs`, on the pure functions and through the real `InputManager` / Fighter (see `tests/helpers/fighter-harness.mjs`): tap → one jump (and three taps → triple jump); swipe L/R → exactly one Dash each way, ground and air; hold-drag → run, no jump on lift; drag down → `down` held, Super Jump with right Jump, fast fall in air; quick flick down on a one-way platform → drop, held past `dropTapTime` → no drop; swipe up → Super Jump on the ground, normal jump in the air; mid-hold flick → Dash and run continues; a slow drift never jumps or dashes; second left-zone finger ignored; a right-button tap never a gesture; pointer cancel / pause / blur release all; nothing fires from a trailing click.
-- `tests/interface/settings.test.mjs` & `touch-layout.test.mjs`: the third choice saves and loads; no stored settings, an unknown scheme and a missing scheme give Screen Pad; a stored explicit Joystick or Classic choice is kept through the upgrade; old custom layouts are kept; the screenpad layout sanitizes; the Settings card for Screen Pad carries "Default".
-- Pad coverage and invisibility: the pad's rect equals the left half of the viewport (x from 0 to width/2, y from 0 to height) at several sizes and after an orientation change; a touch at each left-half corner and under the top HUD reaches the pad; its computed style draws nothing (transparent background, no border, no shadow, no pseudo-element content) before, during and after a gesture; no visual element is added to the DOM while a gesture runs.
-- `tests/systems/touch-comfort.test.mjs` must still pass for every fighter.
+CPU Intelligence must stay the same engine with the same capabilities. Venture is a **profile**, the same shape as the profiles in `js/data/difficulty.js`, generated per level by `ventureProfile(level)`:
 
-## Docs
+- **Start point:** Level 1 is the `easy` profile exactly.
+- **Each level, every trait's distance from perfect play is divided by `VENTURE_SMARTS_GROWTH` (1.5).** For a trait where lower is better (`react`, `lapse`, `think`, `noise`, `rangeError`, `predictError`, `timing`), compute `value(L) = floor + (easy − floor) / 1.5^(L−1)`. For a trait where higher is better, compute `value(L) = ceil − (ceil − easy) / 1.5^(L−1)`.
+- **Bounds:** the floor and ceil are the physical limits of play, not Brutal. Never make reaction zero: keep the react floor at least 2 simulation frames, matching the spirit of "never on the frame it starts". `planDepth` is an integer from 1 to 4, so round it. Probabilities stay within 0–1.
+- **Result:** the CPU really is 1.5× closer to perfect every level. By about Level 6 it matches Brutal on most traits, and from there it keeps closing in on perfect play.
+- **Ordering:** honour the `CAPABILITY` ordering. No trait may get worse from one level to the next. Write a test for this across all 30 levels.
+- **Wiring:** expose the profile through the same path the brain already uses (`getDifficultyProfile`). Let `CombatAIController` and `Brain` accept a `profile` (or `{ venture: level }`) as well as a difficulty id. Do not add a fifth entry to `DIFFICULTIES`: the Difficulty screen and Watch Mode must still list only Easy to Brutal.
 
-Update `docs/systems/input.md` (controls table's Touch column, a "Screen Pad" bullet in Touch controls with every threshold), `ALVA_SPEC.md` §6.10 (three cards, not "exactly two") and §6.10a/§7.4, and add an `UPDATES.md` entry named **the Screen Pad update** plus a mention in `CLAUDE.md`'s named-updates list.
+### 5.2 Stronger
 
-## Done when
+This is the one deliberate exception to the "no difficulty ever scales a hit" rule in the header of `js/data/difficulty.js`. Update that comment and §7.2.8 of the spec to say so: **only in Adventure**, and only through the battle-level modifier described in §7.
 
-All tests pass; on a real phone (or Chromium touch emulation at 390×844 landscape) you can run, Dash, air-dash, jump/triple-jump, fast fall, drop through a platform and Super Jump using only the left thumb, while the right thumb attacks and shields with no misfires. Report the final threshold values you tuned and anything that felt off.
+- Venture's fighter deals `damage × ventureStrength(L)`, where `ventureStrength(L) = VENTURE_STRENGTH_GROWTH ** (L − 1)`, on every real (unblocked) hit. That covers its attacks, strikes, projectiles, summons, techniques and backstabs: everything that goes through `CombatSystem.applyHit` with the Venture fighter as the credited attacker, including hits credited through a projectile, summon or technique owner.
+- The authored tiers (`ALLOWED_DAMAGE_VALUES`: 1, 3, 5, 10) are still validated on the **definition**. The multiplier applies at **resolution time**, in `applyHit`, to the amount added to the target's Launch Point and Limit gauge. So the launch strength (Base Launch × new Launch Point) grows with it, which is the point.
+- Blocked hits still deal 0 and still cost the normal Energy. Shield, Deflect, Energy, speed, cooldowns, hitboxes and stun are untouched. "Stronger" means damage dealt.
+- Keep fractional Launch Points internally if a multiplier produces them. The HUD and Match Results display whole numbers (rounded), and the overtime Launch Point tiebreak compares the real values.
+- **Show it to the player, honestly:** before the battle, show a brief line on the loading or versus transition, e.g. "Venture · ×11.39 smarter · ×1.22 damage". On the level selector, show it in the wide row.
+
+> Keep `VENTURE_STRENGTH_GROWTH` and the single `ventureStrength(level)` function as the only places to change if strength is retuned later. Do the same for `VENTURE_SMARTS_GROWTH` and `ventureProfile(level)`.
+
+## 6. Perquisites
+
+### 6.1 When the cards appear
+
+- **Before** the battle of levels **5, 10, 15, 20, 25 and 30**, the first time the player starts that level (the milestone is not yet claimed), after Select Fighter.
+- Replaying a level whose milestone is already claimed shows no cards.
+- **Losing does not unclaim it.** The choice is made when picked, not when the level is won.
+- That makes six picks in a full run.
+
+### 6.2 The overlay (new: `js/ui/perquisite-cards.js`)
+
+- Use a modal `role="dialog"` over the dimmed screen, like `ChoiceDialog`. Kicker: "Level NN". Title: "Choose a Perquisite" (French « Choisissez une Perquisite »).
+- **Exactly two cards** pop in side by side, with a short scale and fade entrance. Respect reduced motion: no scale, just a fade. On a narrow portrait screen, stack them.
+- Each card shows:
+  - an original icon, drawn as an SVG in `js/ui/icons.js`
+  - the name
+  - the level badge in Roman numerals I–V, plus "NEW" when it is level I
+  - the effect at that level in plain numbers, e.g. "Take 15% less damage"
+  - if it is an upgrade, a muted "was 10%"
+- The player **must** pick one. There is no close button, and Esc or Back does nothing on this dialog. Arrow keys and the D-pad move between the cards. Click, Enter/J or gamepad A picks. Hover previews only.
+- Picking saves at once (level +1 for that Perquisite, milestone marked claimed), then the battle starts.
+
+### 6.3 Which two cards
+
+- Each of the five Perquisites has five levels (I–V). An offer is always the **next** level of a Perquisite: level I if the player doesn't have it, or one above what they own. Once a Perquisite reaches level V it never appears again.
+- **A level the player already owns never comes back.** After picking Brave Soldier I, Brave Soldier I is gone forever, and only Brave Soldier II can be offered.
+- Draw the two cards from the Perquisites that are not yet at level V, with a seeded RNG: the run seed plus the milestone level. The two cards are always two **different** Perquisites. Save the drawn pair with the milestone, so reloading the page mid-choice shows the same two cards rather than a reroll.
+- With 5 × 5 = 25 levels available and only 6 picks, there is always at least two Perquisites available. Assert this in a test anyway.
+
+### 6.4 The five Perquisites and their scaling
+
+"Every level amplifies the Perquisite by 0.5×": level n's effect is `base × (1 + 0.5 × (n − 1))`. That gives I = ×1, II = ×1.5, III = ×2, IV = ×2.5, V = ×3 the base. Put every base value in `js/data/adventure.js`.
+
+| id | Name (EN / FR) | Effect | Base (I) | II | III | IV | V |
+|---|---|---|---|---|---|---|---|
+| `braveSoldier` | Brave Soldier / Brave Soldat | Damage **received** reduced (the amount added to the player's Launch Point by real hits) | 8% | 12% | 16% | 20% | 24% |
+| `nearlyImmortal` | Nearly Immortal / Presque Immortel | Launch Points recovered **per recovery tick** increased (`LAUNCH_RECOVERY_AMOUNT`, normally 2) | +0.5 | +0.75 | +1 | +1.25 | +1.5 |
+| `velociousImmuneSystem` | Velocious Immune System / Système Immunitaire Véloce | **Recovery ticks come faster**: `LAUNCH_RECOVERY_INTERVAL` (0.5 s) shortened. This is NOT the 2 s `LAUNCH_RECOVERY_DELAY` before recovery starts, which stays untouched | −8% interval | −12% | −16% | −20% | −24% |
+| `maximumEnergy` | Maximum Energy / Énergie Maximale | Energy **cost** of everything that costs Energy reduced (Dash, air dash, Shield block, Deflect, constructs, any move's own cost) | 8% | 12% | 16% | 20% | 24% |
+| `redoutableStrength` | Redoutable Strength / Force Redoutable | Damage **dealt** increased (on real hits, the same resolution point as Venture's strength) | 8% | 12% | 16% | 20% | 24% |
+
+Fix the spellings in the UI: "Brave Soldier", "Maximum Energy", "Redoutable Strength" and "Velocious Immune System". The ids above are final.
+
+Each card states its effect in plain words and real numbers. For example, for Velocious Immune System: "Launch Point recovers every 0.44 s instead of 0.5 s (recovery still starts after 2 s)".
+
+## 7. How modifiers reach the fighters (architecture)
+
+- Add a per-fighter **`modifiers`** object to the Battle, built once at battle creation. Default to identity for every mode: `damageDealt: 1, damageTaken: 1, recoveryAmountBonus: 0, recoveryIntervalScale: 1, energyCostScale: 1`.
+  - Only Adventure builds non-identity values: the player's from their Perquisites, and the CPU's from Venture's strength.
+  - Quick Battle, Watch, Local, Online and Practice must be byte-for-byte the same in behaviour. Online lockstep must not change at all, and the state hash must be unaffected when modifiers are identity.
+- **Never** read a fighter id, a mode string or Adventure state inside the combat engine. The engine reads only the modifiers object it is handed (`fighter.combat.modifiers` or similar). That keeps the character-system rule intact.
+- **Hooks:**
+  - `CombatSystem.applyHit`: `damage = base × attacker.damageDealt × target.damageTaken`, applied to the Launch Point increase and to `fillLimit`. A hit with a base of 0 stays 0.
+  - `CombatState.updateLaunchRecovery`: amount `LAUNCH_RECOVERY_AMOUNT + recoveryAmountBonus`, interval `LAUNCH_RECOVERY_INTERVAL × recoveryIntervalScale`. The delay is unchanged.
+  - `spendEnergy` callers, or better the fighter's `energySpec` built per battle: every cost × `energyCostScale`.
+- **CPUs have no Perquisites.** The Venture CPU's modifiers are identity except `damageDealt`.
+- **Match statistics** (`js/game/match-stats.js`) report the real, modified numbers.
+
+## 8. CPUs must acknowledge this update
+
+The CPU Intelligence must reason with the **real, modified** numbers in Adventure, not the authored ones. Otherwise its finisher, risk and objective reasoning will be wrong. Audit every place the brain predicts damage, launch strength, recovery or Energy. Start with `evaluator.js`, `situation.js`, `objective.js`, `strategy.js`, `plans.js`, `defense.js`, `values.js` and `opponent-model.js`. Route those predictions through helpers that take the modifiers, e.g. `effectiveDamage(attacker, target, def)`, `effectiveRecovery(fighter)` and `effectiveEnergyCost(fighter, cost)`. Specifically:
+
+- **Its own hits:** it knows each hit lands `× damageDealt`, so it recognises a kill-confirm at the level-scaled launch strength. At high levels it should go for finishers much earlier.
+- **The player's Perquisites:**
+  - Against Brave Soldier, it knows its hits do less and the player survives longer.
+  - Against Nearly Immortal and Velocious Immune System, it knows the player's Launch Point drains faster, so pressure that lets up is worth less. It should keep momentum instead of waiting.
+  - Against Redoutable Strength, it respects the player's hits more in its risk and guard weighting.
+  - Against Maximum Energy, its read of "the opponent is about to run dry" uses the player's reduced costs.
+- **Its own Energy reads** still use full costs, since it has no Perquisites.
+- **Overtime and the tiebreak:** its awareness of the Launch Point tiebreak uses the real, possibly fractional, values.
+- **The CPU's perception rules are unchanged:** it still sees only what has been on screen for its reaction window. The modifiers are known rules of the match, like the clock, not perception.
+- **Celebration AI** (`js/game/ai/celebration.js`) and the Watch Mode CPUs are unaffected.
+- **Tests (in `tests/systems/`):**
+  - With identity modifiers the brain's decisions are identical to before, using the same seeded scenario.
+  - With `damageDealt` raised, its evaluated finisher threshold drops.
+  - With the player's `damageTaken` lowered, the brain predicts the lower Launch Point.
+
+## 9. Saved progress
+
+- Save it in its own versioned localStorage key, `alva.adventure`, following `js/core/settings.js` exactly: one object, a `version`, `MIGRATIONS`, every field validated on read, and a storage that refuses or is missing keeps progress for this visit only and never throws. Shape:
+  ```js
+  { version: 1, unlocked: 1..31 /* 31 = all cleared */, cleared: [levels], perquisites: { braveSoldier: 0..5, ... }, milestones: { "5": { offer: ["idA","idB"], picked: "idA" | null }, ... }, seed }
+  ```
+- Corrupt or unknown data means fresh progress. Clamp everything (vl's `clamp(out.unlocked | 0 || 1, …)` pattern).
+- Only the reset button (§3) clears it. Clearing site data obviously also does.
+
+## 10. Localization, docs and tests
+
+- **Strings:** add every new string to `en.js` **and** `fr.js` (mode card, details, level selector, cell names, reset, Perquisite names, effects and card lines, Venture labels, results actions and the completion line). The language must switch live without a reload, as everywhere else.
+- **Docs:**
+  - Add a **§6.3b Adventure** to `ALVA_SPEC.md` covering the selector, flow, Venture and Perquisites. Update §6's flow block, §6.3 (two cards, renumbering, the smaller details panel) and §7.2.8 (the Venture exception).
+  - Add `docs/gameplay/adventure.md` and link it from `docs/README.md`.
+  - Add an **"Adventure update"** entry to `UPDATES.md` and add the name to the list of named updates in `CLAUDE.md`.
+- **Tests** (`node --test`), including at least:
+  - `tests/interface/adventure.test.mjs` (Select Mode and selector):
+    - Select Mode lists Adventure 01 then Quick Battle 02, Adventure focused by default.
+    - Adventure opens the selector with no play-type dialog.
+    - Locked, cleared and next states; locked cells can't be chosen.
+    - The two-step reset arms, disarms after 3.2 s and resets.
+    - Back paths.
+    - French strings.
+    - The details panel is narrower than before, and both cards stay fully visible at 2000×924, a phone in landscape and a tall/narrow window.
+  - `tests/systems/venture.test.mjs`:
+    - Level 1 equals the Easy profile.
+    - Each trait's distance from perfect divides by exactly 1.5 per level, within bounds.
+    - No trait regresses across 30 levels.
+    - `ventureStrength(L) === 1.05 ** (L−1)` (Level 30 ≈ 4.12), kept separate from the 1.5 smarts growth.
+    - A Venture hit adds the scaled damage.
+    - Blocked hits still add 0.
+  - `tests/systems/perquisites.test.mjs`:
+    - Scaling I to V equals base × (1, 1.5, 2, 2.5, 3).
+    - An offer is always two different Perquisites, each the next level of one not yet at V.
+    - An owned level never reappears.
+    - A same-seed reload gives the same offer.
+    - Each effect hooks in at exactly its place (damage taken, recovery amount, recovery interval but **not** delay, Energy costs, damage dealt).
+  - `tests/integration/adventure.test.mjs`:
+    - The full flow: level → fighter → cards at 5 → battle.
+    - A win unlocks the next level; a loss doesn't.
+    - Next level, Retry and Level select.
+    - Clearing 30.
+    - Persistence across a fresh `App`.
+  - Regression:
+    - Quick Battle, Watch, Local, Online (lockstep hash) and Practice behave identically with identity modifiers.
+    - Adventure appears nowhere in Local, Online or Watch.
+- Update any existing tests that assumed Quick Battle is `'01'` or the only mode card.
+
+## 11. Definition of done
+
+- Every item above is done, `node --test` passes in full, and no existing behaviour outside Adventure has changed.
+- Screenshots of the Select Mode screen, the level selector (fresh, mid-run and complete), the Perquisite cards and the in-battle "LV · VENTURE" tag, at the 2000×924 landscape size and on a desktop window, in both English and French.
+- One commit per logical step on a feature branch, then a pull request titled **"The Adventure update"** whose description summarises the mode, Venture's maths and the Perquisite table.
