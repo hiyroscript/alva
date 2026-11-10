@@ -228,7 +228,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,496):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,491):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed

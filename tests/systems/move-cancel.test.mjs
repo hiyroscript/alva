@@ -121,7 +121,10 @@ test('the Extra Attack, a summon or technique, a jump, a Dash, a Shield press an
       ];
       for (const request of requests) {
         const r = rig(c);
-        const first = groundAttacks(r.player).find((a) => !(request[`${a}Pressed`]));
+        // An attack that keeps its commitment: a defense gives way to any
+        // request by explicit rule (see pairs, above).
+        const first = groundAttacks(r.player)
+          .find((a) => !(request[`${a}Pressed`]) && !yieldsToRequests(r.player.attacks[r.player.attackFor(a)].offense));
         r.tick(press(first));
         const record = r.player.combat.attack;
         const paid = r.player.combat.energy;

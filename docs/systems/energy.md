@@ -76,7 +76,7 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0010 | — (nothing of its own created but the meeting's call; the Vent and the Tongue Lash are strikes) | the Emergency Meeting (3 s; the Kill is a burst with its 5 s) |
 | #0011 | — (its one projectile, the Web Shot's webbing, holds and has its 3 s; Web Lines and the Venom Jump are strikes) | the Web Shot (3 s), the Venom Punch (3 s; Camouflage releases no construct, only its cloak) |
 | #0012 | Shuriken (extra_attack: a volley of three, one activation, so one 15) | Dragonblade (5 s) |
-| #0013 | the Twin Lion Fists (attack4: its lions, a projectile) | the Sixty-Four Palms (5 s) |
+| #0013 | the Twin Lion Fists (attack3: its lions, a projectile) | the Sixty-Four Palms (5 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):

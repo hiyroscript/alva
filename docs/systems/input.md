@@ -632,7 +632,7 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0012 ground | Twin Cuts | Cleave | Deflect Stance | Shuriken | Dragonblade | forward: Swift Strike |
 | #0012 air | Whirlwind Cut | Rising Arc | Falling Cut | Shuriken | | up: Rising Strike |
 | #0013 ground | Gentle Fist | Sweep Kick | Protective Palms | Twin Lion Fists | Sixty-Four Palms | |
-| #0013 air | Air Palm | | Rising Palm | | | down: Falling Palm |
+| #0013 air | Air Palm | | | | | down: Falling Palm |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as

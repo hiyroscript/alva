@@ -3,10 +3,10 @@
 // roster slot 13, its clips cut from one sprite sheet into its own folder
 // and read from the real PNGs (tight, 1x, one art-pixel scale, anchored on
 // its body wherever its chakra, its dome or its field reach, a drawing the
-// sheet repeats cut once), five numbered buttons (three ordinary attacks
-// with their mid-air versions and two techniques) and no extra attack. The
-// Gentle Fist and the Sweep Kick up close (its Mash Combo), the Air Palm, the
-// Falling Palm and the Rising Palm in the air, the Protective Palms that
+// sheet repeats cut once), four numbered buttons (two ordinary attacks
+// with their mid-air versions and two techniques) and an extra attack on the
+// ground only. The Gentle Fist and the Sweep Kick up close (its Mash Combo),
+// the Air Palm and the Falling Palm in the air, the Protective Palms that
 // strike all round it and turn shots back, its Deflect, the Twin Lion Fists
 // and the Sixty-Four Palms, and the shared `drain` its palms cut its
 // targets' Energy with. The roster, credits and translations it adds are
@@ -90,22 +90,21 @@ const CLIPS = {
   attack2: named('attack2', [1, 2, 3, 4, 5, 6, 6]),
   midair_attack2: named('midair_attack2', 4),
   midair_attack2_impact: named('midair_attack2', [5]),
-  attack3: named('attack3', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 13, 14]),
-  midair_attack3: named('midair_attack3', 5),
-  attack4_cast: named('attack4', 4),
-  attack4_release: named('attack4', range(4, 5)),
-  attack5_cast: named('attack5', 8),
-  attack5_release: named('attack5', range(6, 9)),
+  extra_attack: named('extra_attack', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 13, 14]),
+  attack3_cast: named('attack3', 4),
+  attack3_release: named('attack3', range(4, 5)),
+  attack4_cast: named('attack4', 8),
+  attack4_release: named('attack4', range(6, 9)),
 };
-const PROJECTILES = { attack4_object: named('attack4_object', 4) };
+const PROJECTILES = { attack3_object: named('attack3_object', 4) };
 const FILES = [...new Set([...Object.values(CLIPS), ...Object.values(PROJECTILES)].flat())].sort();
 
 // The tallest frame of each clip, in art pixels (one per file pixel).
 const HEIGHTS = {
   idle: 50, run: 46, jump: 53, fall: 53, land: 44, mouvment: 44, midair_mouvment: 44, hurt: 45, midair_hurt: 44,
   prepshield: 48, shielding: 44, deflect: 52, attack1: 48, midair_attack1: 53, attack2: 49, midair_attack2: 48,
-  midair_attack2_impact: 42, attack3: 81, midair_attack3: 48, attack4_cast: 48, attack4_release: 48, attack5_cast: 81,
-  attack5_release: 63,
+  midair_attack2_impact: 42, extra_attack: 81, attack3_cast: 48, attack3_release: 48, attack4_cast: 81,
+  attack4_release: 63,
 };
 
 // ---- Registration -------------------------------------------------------------------
@@ -124,24 +123,31 @@ test('#0013 is a real CHARACTERS entry: available, in roster slot 13, after #000
   assert.equal(DEF.ensemble, undefined, 'one body, drawn as one');
 });
 
-test('five numbered attacks, each a button of its own: three ordinary with mid-air versions and two techniques; no extra attack', () => {
+test('four numbered attacks, each a button of its own: two ordinary with mid-air versions and two techniques; plus the Protective Palms, on the ground only', () => {
   assert.deepEqual(loadoutProblems(DEF), []);
   assert.deepEqual(DEF.actions, {
+    extra_attack: 'extra_attack',
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
-    attack3: { ground: 'attack3', air: 'midair_attack3' },
+    attack3: { type: 'technique', id: 'attack3' },
     attack4: { type: 'technique', id: 'attack4' },
-    attack5: { type: 'technique', id: 'attack5' },
   });
   assert.deepEqual(Object.keys(DEF.attacks).sort(), [
-    'attack1', 'attack2', 'attack3', 'midair_attack1', 'midair_attack2', 'midair_attack3',
+    'attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2',
   ]);
-  assert.deepEqual(Object.keys(DEF.techniques), ['attack4', 'attack5']);
+  assert.equal(DEF.attacks.midair_attack3, undefined, 'no Rising Palm: the sheet draws no aerial for it');
+  assert.equal(DEF.attacks.extra_attack.groundOnly, true, 'the Protective Palms on the ground only');
+  assert.deepEqual(Object.keys(DEF.techniques), ['attack3', 'attack4']);
   assert.equal(DEF.summons, undefined, 'it summons nobody');
-  assert.deepEqual(Object.keys(DEF.projectiles), ['attack4_object'], 'nothing let go but its lions');
+  assert.deepEqual(Object.keys(DEF.projectiles), ['attack3_object'], 'nothing let go but its lions');
   assert.equal(DEF.effectAnimations, undefined);
-  assert.equal(DEF.attacks.extra_attack, undefined);
   for (const t of Object.values(DEF.techniques)) assert.equal(t.heal, undefined, 'it heals nobody');
+  // In the air its Circle / O does nothing: the Protective Palms are a
+  // ground move and nothing takes their place.
+  const { fighter, step } = solo();
+  airborne(step);
+  step(P('extra_attack'));
+  assert.equal(fighter.combat.attack, null, 'nothing in the air');
 });
 
 test('only the Twin Lion Fists costs Energy (its burst, 15) and only the Sixty-Four Palms waits: the policy\'s 5 s for its 10', () => {
@@ -150,17 +156,17 @@ test('only the Twin Lion Fists costs Energy (its burst, 15) and only the Sixty-F
     assert.equal(a.energyCost, 0, `${a.id}: no Energy`);
     assert.equal(a.cooldown, 0, `${a.id}: no cooldown, a drain is ordinary`);
   }
-  const lions = fighter.techniqueDefs.attack4;
+  const lions = fighter.techniqueDefs.attack3;
   assert.deepEqual([lions.energyCost, lions.cooldown, lions.cooldownClass], [15, 0, 'ordinary']);
-  const palms = fighter.techniqueDefs.attack5;
+  const palms = fighter.techniqueDefs.attack4;
   assert.deepEqual([palms.energyCost, palms.cooldown, palms.cooldownClass], [0, 5, 'tenDamage']);
   assert.equal(lions.offense.attack && palms.offense.attack, true);
 });
 
 test('two Specials: the Twin Lion Fists and the Sixty-Four Palms; its palms, kicks and dome are ordinary to the player', () => {
-  assert.deepEqual(DEF.specialAbilities, ['attack4', 'attack5']);
-  for (const move of ['attack4', 'attack5']) assert.equal(isSpecialAbility(DEF, move), true, move);
-  for (const move of ['attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3']) {
+  assert.deepEqual(DEF.specialAbilities, ['attack3', 'attack4']);
+  for (const move of ['attack3', 'attack4']) assert.equal(isSpecialAbility(DEF, move), true, move);
+  for (const move of ['attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'extra_attack']) {
     assert.equal(isSpecialAbility(DEF, move), false, move);
   }
 });
@@ -181,29 +187,30 @@ test('its Mash Combo: the Gentle Fist and the Sweep Kick, its two close-range st
 });
 
 test('its in-game names and touch buttons name each move, in English and French, each on a frame of its own art', () => {
-  const moves = ['attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3', 'attack4', 'attack5'];
+  const moves = ['attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'extra_attack', 'attack3', 'attack4'];
   assert.deepEqual(moves.map((m) => abilityName(DEF, m)), [
-    'Gentle Fist', 'Air Palm', 'Sweep Kick', 'Falling Palm', 'Protective Palms', 'Rising Palm', 'Twin Lion Fists', 'Sixty-Four Palms',
+    'Gentle Fist', 'Air Palm', 'Sweep Kick', 'Falling Palm', 'Protective Palms', 'Twin Lion Fists', 'Sixty-Four Palms',
   ]);
   const buttons = (language) => {
     setLanguage(language);
     try {
-      return ['attack1', 'attack2', 'attack3', 'attack4', 'attack5'].map((a) => mobileAbility(DEF, a).label);
+      return ['attack1', 'attack2', 'extra_attack', 'attack3', 'attack4'].map((a) => mobileAbility(DEF, a).label);
     } finally {
       setLanguage('en');
     }
   };
   assert.deepEqual(buttons('en'), ['Gentle Fist', 'Sweep Kick', 'Protective Palms', 'Twin Lion Fists', 'Sixty-Four Palms']);
   assert.deepEqual(buttons('fr'), ['Poing souple', 'Balayage', 'Paumes protectrices', 'Poings des lions jumeaux', 'Soixante-quatre paumes']);
-  assert.deepEqual(['midair_attack1', 'midair_attack2', 'midair_attack3'].map((m) => STRINGS.fr[`ability.0013.${m}`]),
-    ['Paume aérienne', 'Paume plongeante', 'Paume ascendante']);
+  assert.deepEqual(['midair_attack1', 'midair_attack2'].map((m) => STRINGS.fr[`ability.0013.${m}`]),
+    ['Paume aérienne', 'Paume plongeante']);
+  assert.equal(STRINGS.fr['ability.0013.midair_attack3'], undefined, 'no Rising Palm left in French either');
+  assert.equal(STRINGS.en['ability.0013.midair_attack3'], undefined);
   const art = (a, air = false) => previewFrame(DEF, a, air)?.url.split('/').pop() ?? null;
-  assert.deepEqual(['attack1', 'attack2', 'attack3', 'attack4', 'attack5'].map((a) => art(a)), [
-    '0013_attack1_4.png', '0013_attack2_5.png', '0013_attack3_7.png', '0013_attack4_5.png', '0013_attack5_11.png',
+  assert.deepEqual(['attack1', 'attack2', 'extra_attack', 'attack3', 'attack4'].map((a) => art(a)), [
+    '0013_attack1_4.png', '0013_attack2_5.png', '0013_extra_attack_7.png', '0013_attack3_5.png', '0013_attack4_11.png',
   ]);
-  assert.deepEqual(['attack1', 'attack2', 'attack3'].map((a) => art(a, true)),
-    ['0013_midair_attack1_4.png', '0013_midair_attack2_3.png', '0013_midair_attack3_2.png']);
-  for (const a of ['attack1', 'attack2', 'attack3', 'attack4', 'attack5']) {
+  assert.deepEqual(['attack1', 'attack2'].map((a) => art(a, true)), ['0013_midair_attack1_4.png', '0013_midair_attack2_3.png']);
+  for (const a of ['attack1', 'attack2', 'extra_attack', 'attack3', 'attack4']) {
     assert.ok(existsSync(`${ROOT}${mobileAbility(DEF, a).sprite.url.slice(2)}`), a);
   }
   for (const move of Object.keys(DEF.abilityDescriptions)) {
@@ -211,19 +218,17 @@ test('its in-game names and touch buttons name each move, in English and French,
   }
 });
 
-test('its recommended controller layout: its palms on Square, its kicks on Triangle, its dome on Circle, the lions on R2, the Sixty-Four Palms on L2, the dive on the right stick down', () => {
+test('its recommended controller layout: its palms on Square, its kicks on Triangle, its dome on Circle (on the ground only), the lions on R2, the Sixty-Four Palms on L2, the dive on the right stick down', () => {
   assert.deepEqual(DEF.controller.layout, {
     'ground:attack1': pad('west'),
     'ground:attack2': pad('north'),
-    'ground:attack3': pad('east'),
-    'ground:attack4': pad('r2'),
-    'ground:attack5': pad('l2'),
+    'ground:extra_attack': pad('east'),
+    'ground:attack3': pad('r2'),
+    'ground:attack4': pad('l2'),
     'air:attack1': pad('west'),
     'air:attack2': flick('down'),
-    'air:attack3': pad('east'),
   });
   assert.equal(DEF.attacks.midair_attack2.motion.type, 'slam', 'the stick down for the move that plunges');
-  assert.equal(DEF.attacks.midair_attack3.motion, undefined, 'the Rising Palm rises nowhere: never the stick up');
   assert.equal(DEF.controller.previous, undefined, 'new: no layout of before');
 });
 
@@ -231,7 +236,7 @@ test('its recommended controller layout: its palms on Square, its kicks on Trian
 
 test('its folder holds exactly the frames its clips and its lions play: every file named <id>_<codename>_<frame>.png, none a copy', () => {
   assert.deepEqual(readdirSync(`${ROOT}${DIR}`).sort(), FILES);
-  assert.equal(FILES.length, 100);
+  assert.equal(FILES.length, 95);
   for (const [key, want] of Object.entries(CLIPS)) assert.deepEqual(DEF.animations[key].frames.map(file), want, key);
   assert.deepEqual(Object.keys(DEF.animations).sort(), Object.keys(CLIPS).sort());
   for (const [key, want] of Object.entries(PROJECTILES)) assert.deepEqual(DEF.projectileAnimations[key].frames.map(file), want, key);
@@ -279,13 +284,13 @@ test('the real art normalizes at one art pixel per file pixel, the roster\'s siz
   }
   // Its lions are drawn at the same art-pixel size, centred where they are,
   // turned with the way they fly, their jaws working for as long as they fly.
-  for (const f of REAL.projectiles.attack4_object.frames) {
+  for (const f of REAL.projectiles.attack3_object.frames) {
     assert.ok(near(f.unit, 1) && near(f.anchorArtX, f.artW / 2) && near(f.anchorArtY, f.artH / 2));
   }
-  assert.deepEqual(Object.keys(REAL.projectiles), ['attack4_object']);
+  assert.deepEqual(Object.keys(REAL.projectiles), ['attack3_object']);
   assert.deepEqual(Object.keys(REAL.effects), []);
-  assert.equal(REAL.projectiles.attack4_object.sourceFacing, 1, 'the lions turn with their flight');
-  assert.equal(REAL.projectiles.attack4_object.loop, true);
+  assert.equal(REAL.projectiles.attack3_object.sourceFacing, 1, 'the lions turn with their flight');
+  assert.equal(REAL.projectiles.attack3_object.loop, true);
 });
 
 test('anchors keep the body in place: between its feet where both are planted, on its jacket elsewhere, on the dome\'s middle while the dome is round it', () => {
@@ -298,16 +303,16 @@ test('anchors keep the body in place: between its feet where both are planted, o
   assert.ok(auto('deflect')[1] - ax('deflect')[1] > 4);
   assert.ok(auto('midair_attack2')[2] - ax('midair_attack2')[2] > 4);
   // Its dome, drawn 82 pixels wide round it: on its middle.
-  assert.deepEqual(ax('attack3').slice(5, 9), [41, 41, 41, 41]);
+  assert.deepEqual(ax('extra_attack').slice(5, 9), [41, 41, 41, 41]);
   // The wisps swept under it as the dome breaks would lift it off the
   // ground.
-  assert.equal(ay('attack3')[9], 77);
-  assert.ok(ay('attack3')[9] < REAL.animations.attack3.frames[9].artH);
+  assert.equal(ay('extra_attack')[9], 77);
+  assert.ok(ay('extra_attack')[9] < REAL.animations.extra_attack.frames[9].artH);
   // Its field of divination spread round it: on its body, not the ring.
-  assert.deepEqual(ax('attack5_cast').slice(3, 6), [29.5, 34.5, 38.5]);
+  assert.deepEqual(ax('attack4_cast').slice(3, 6), [29.5, 34.5, 38.5]);
   // Its stance between its planted feet.
   assert.deepEqual(ax('idle'), [12.5, 11.5, 12.5, 13.5]);
-  for (const key of ['idle', 'run', 'jump', 'fall', 'land', 'shielding', 'attack1', 'attack4_release', 'attack5_release']) {
+  for (const key of ['idle', 'run', 'jump', 'fall', 'land', 'shielding', 'attack1', 'attack3_release', 'attack4_release']) {
     for (const f of REAL.animations[key].frames) assert.equal(f.anchorArtY, f.artH, `${key}: stands on the bottom of its art`);
   }
 });
@@ -361,18 +366,6 @@ test('the Air Palm: two palms in the air (1, then 3 at Base Launch 2), each cutt
   assert.deepEqual([hits[1].baseLaunch, hits[1].directionalLaunch], [2, 'horizontal']);
 });
 
-test('the Rising Palm: a palm thrust straight up in the air (3 at Base Launch 2 straight up, 5 drained); it rises nowhere', () => {
-  const d = versus({ gap: 40 });
-  hold(d.attacker, 40);
-  hold(d.target, 70);
-  const y = d.attacker.body.y;
-  d.tick(P('attack3'));
-  after(d, 0.4);
-  assert.deepEqual(mine(d, 'midair_attack3').map((e) => [e.type, e.damage, e.baseLaunch, e.directionalLaunch, e.drained]),
-    [['hit', 3, 2, 'vertical', 5]]);
-  assert.equal(d.attacker.body.y, y, 'held where it was: no motion of its own');
-});
-
 // ---- Its kicks and its dive ------------------------------------------------------------
 
 test('the Sweep Kick: a low sweep (1) that holds, then a high kick launching straight up (3 at Base Launch 2)', () => {
@@ -422,13 +415,13 @@ test('the Protective Palms: a dome all round it strikes either side (1, 1, then 
   for (const gap of [50, -50]) {
     const d = versus({ gap, targetFacing: gap > 0 ? -1 : 1 });
     d.attacker.facing = 1;
-    d.tick(P('attack3'));
+    d.tick(P('extra_attack'));
     after(d, 0.8);
-    const hits = mine(d, 'attack3');
+    const hits = mine(d, 'extra_attack');
     assert.deepEqual(hits.map((e) => [e.type, e.damage, e.drained]), [['hit', 1, 5], ['hit', 1, 5], ['hit', 3, 5]], `gap ${gap}`);
     assert.deepEqual([hits[2].baseLaunch, hits[2].directionalLaunch], [2, 'horizontal']);
   }
-  const atk = createAttackDefinition({ id: 'attack3', ...DEF.attacks.attack3 });
+  const atk = createAttackDefinition({ id: 'extra_attack', ...DEF.attacks.extra_attack });
   assert.ok(near(atk.total, 0.75), 'three quarters of a second');
   assert.equal(atk.offense.defense, true, 'a defense as well as an attack');
   assert.equal(atk.freeCancel, true, 'so it gives way to any valid request');
@@ -438,8 +431,8 @@ test('the Protective Palms: a dome all round it strikes either side (1, 1, then 
 test('the Protective Palms turn a shot back at its thrower, from either side, and give way to any move', () => {
   for (const [dx, dir] of [[-90, 1], [90, -1]]) {
     const d = duel({ attackerCharacter: DEF_0007, targetCharacter: DEF, targetSprites: SPRITES, gap: 400, targetFacing: -1 });
-    d.tick({}, P('attack3'));
-    assert.equal(d.target.combat.attack?.def.id, 'attack3');
+    d.tick({}, P('extra_attack'));
+    assert.equal(d.target.combat.attack?.def.id, 'extra_attack');
     after(d, 0.2);
     shotAt(d, d.attacker, d.target, dx, dir);
     after(d, 0.3);
@@ -447,7 +440,7 @@ test('the Protective Palms turn a shot back at its thrower, from either side, an
     assert.ok(d.projectiles.some((p) => p.redirected && p.owner === d.target) || d.deflections.length, 'turned back');
   }
   const { fighter, step } = solo();
-  step(P('attack3'));
+  step(P('extra_attack'));
   for (let i = 0; i < 6; i++) step({});
   step(P('attack1'));
   assert.equal(fighter.combat.attack?.def.id, 'attack1', 'cut short for the Gentle Fist');
@@ -471,45 +464,45 @@ test('its Deflect: a palm swept up through an arc of chakra, in the air, that tu
 // ---- The Twin Lion Fists -----------------------------------------------------------------
 
 test('the Twin Lion Fists: two fifths of a second gathering, then its lions surge out ahead (5 at Base Launch 2, 50 Energy drained); 15 Energy', () => {
-  const t = DEF.techniques.attack4;
+  const t = DEF.techniques.attack3;
   assert.ok(near(SPRITES.duration(t.castAnimation), 0.4) && near(SPRITES.duration(t.releaseAnimation), 0.4));
-  assert.deepEqual(t.projectile, { id: 'attack4_object', offset: { x: 40, y: -50 } });
+  assert.deepEqual(t.projectile, { id: 'attack3_object', offset: { x: 40, y: -50 } });
   const d = versus({ gap: 150 });
-  d.tick(P('attack4'));
-  assert.equal(activeSpecialAbility(d.attacker), 'attack4', 'under the Special mark');
+  d.tick(P('attack3'));
+  assert.equal(activeSpecialAbility(d.attacker), 'attack3', 'under the Special mark');
   assert.equal(d.attacker.combat.energy, 85, 'its 15 as it starts');
   after(d, 0.35);
   assert.equal(d.projectiles.length, 0, 'nothing yet: still gathering');
-  assert.deepEqual(mine(d, 'attack4'), []);
+  assert.deepEqual(mine(d, 'attack3'), []);
   let lions = null;
   for (let i = 0; i < steps(0.4); i++) {
     d.tick();
     lions ??= d.projectiles.find((p) => p.owner === d.attacker) ?? null;
   }
   assert.ok(lions, 'its lions let go');
-  assert.equal(lions.def.animation, 'attack4_object');
+  assert.equal(lions.def.animation, 'attack3_object');
   assert.equal(lions.direction, 1, 'the way it faces');
-  assert.deepEqual(mine(d, 'attack4').map((e) => [e.type, e.source, e.damage, e.baseLaunch, e.directionalLaunch, e.drained]),
+  assert.deepEqual(mine(d, 'attack3').map((e) => [e.type, e.source, e.damage, e.baseLaunch, e.directionalLaunch, e.drained]),
     [['hit', 'projectile', 5, 2, 'horizontal', 50]]);
   assert.ok(d.target.combat.energy < 60, 'half its bar bitten off');
   // Out of reach (about 230 units ahead), and behind it, nothing.
   for (const gap of [400, -60]) {
     const miss = versus({ gap, targetFacing: gap > 0 ? -1 : 1 });
     miss.attacker.facing = 1;
-    miss.tick(P('attack4'));
+    miss.tick(P('attack3'));
     after(miss, 1.2);
-    assert.deepEqual(mine(miss, 'attack4'), [], `gap ${gap}`);
+    assert.deepEqual(mine(miss, 'attack3'), [], `gap ${gap}`);
   }
   // A raised Shield blocks the lions: nothing drained.
   const guarded = versus({ gap: 150 });
-  guarded.tick(P('attack4'), P('shield'));
+  guarded.tick(P('attack3'), P('shield'));
   after(guarded, 1, {}, { shield: true });
-  assert.deepEqual(mine(guarded, 'attack4').map((e) => [e.type, e.drained]), [['block', 0]]);
+  assert.deepEqual(mine(guarded, 'attack3').map((e) => [e.type, e.drained]), [['block', 0]]);
 });
 
 test('the Twin Lion Fists is broken by a hit before its lions bite: nothing released', () => {
   const d = duel({ attackerCharacter: DEF_0001, targetCharacter: DEF, targetSprites: SPRITES, gap: 40 });
-  d.tick({}, P('attack4'));
+  d.tick({}, P('attack3'));
   assert.ok(d.target.technique, 'gathering');
   d.tick(P('attack1'));
   after(d, 0.6);
@@ -520,49 +513,49 @@ test('the Twin Lion Fists is broken by a hit before its lions bite: nothing rele
 // ---- The Sixty-Four Palms -----------------------------------------------------------------
 
 test('the Sixty-Four Palms: its eyes and its field, then the flurry: 10 at Base Launch 3 and its whole bar drained, its target exhausted; every 5 s', () => {
-  const t = DEF.techniques.attack5;
+  const t = DEF.techniques.attack4;
   assert.ok(near(SPRITES.duration(t.castAnimation), 8 / 12) && near(SPRITES.duration(t.releaseAnimation), 0.4));
   for (const gap of [70, -35]) {
     const d = versus({ gap, targetFacing: gap > 0 ? -1 : 1 });
     d.attacker.facing = 1;
-    d.tick(P('attack5'));
-    assert.equal(activeSpecialAbility(d.attacker), 'attack5', 'under the Special mark');
+    d.tick(P('attack4'));
+    assert.equal(activeSpecialAbility(d.attacker), 'attack4', 'under the Special mark');
     after(d, 0.6);
-    assert.deepEqual(mine(d, 'attack5'), [], 'nothing yet: still spreading its field');
+    assert.deepEqual(mine(d, 'attack4'), [], 'nothing yet: still spreading its field');
     after(d, 0.2);
-    const hits = mine(d, 'attack5');
+    const hits = mine(d, 'attack4');
     assert.deepEqual(hits.map((e) => [e.type, e.damage, e.baseLaunch, e.directionalLaunch]), [['hit', 10, 3, 'horizontal']], `gap ${gap}`);
     assert.ok(hits[0].drained > 90, 'all it had');
     assert.equal(d.target.combat.energyExhausted, true, 'its chakra sealed');
-    assert.ok(d.attacker.combat.abilityCooldowns.active('attack5'), 'its 5 s from the release');
+    assert.ok(d.attacker.combat.abilityCooldowns.active('attack4'), 'its 5 s from the release');
     assert.equal(d.attacker.combat.energy, 100, 'no Energy');
   }
   // Sealed, it has no Shield until its bar is full again.
   const sealed = versus({ gap: 70 });
-  sealed.tick(P('attack5'));
+  sealed.tick(P('attack4'));
   after(sealed, 1.5);
   sealed.tick({}, P('shield'));
   assert.equal(sealed.target.combat.shielding, false, 'no Shield while sealed');
   // Out of its field, nothing.
   const far = versus({ gap: 180 });
-  far.tick(P('attack5'));
+  far.tick(P('attack4'));
   after(far, 1);
-  assert.deepEqual(mine(far, 'attack5'), []);
+  assert.deepEqual(mine(far, 'attack4'), []);
   // A raised Shield blocks it like any hit: nothing drained.
   const guarded = versus({ gap: 70 });
-  guarded.tick(P('attack5'), P('shield'));
+  guarded.tick(P('attack4'), P('shield'));
   after(guarded, 1, {}, { shield: true });
-  assert.deepEqual(mine(guarded, 'attack5').map((e) => [e.type, e.drained]), [['block', 0]]);
+  assert.deepEqual(mine(guarded, 'attack4').map((e) => [e.type, e.drained]), [['block', 0]]);
 });
 
 test('the Sixty-Four Palms is broken by a hit before its palms strike: no flurry, no cooldown', () => {
   const d = duel({ attackerCharacter: DEF_0001, targetCharacter: DEF, targetSprites: SPRITES, gap: 40 });
-  d.tick({}, P('attack5'));
+  d.tick({}, P('attack4'));
   assert.ok(d.target.technique, 'casting');
   d.tick(P('attack1'));
   after(d, 0.6);
   assert.equal(d.target.technique, null, 'broken');
-  assert.equal(d.target.combat.abilityCooldowns.active('attack5'), false, 'nothing released, no cooldown');
+  assert.equal(d.target.combat.abilityCooldowns.active('attack4'), false, 'nothing released, no cooldown');
   assert.deepEqual(d.events.filter((e) => e.attacker === d.target), []);
 });
 
@@ -580,7 +573,7 @@ test('the CPU plays its whole kit: its palms, its kicks, its dive, its dome, its
     }
   }
   for (const move of [
-    'attack1:ground', 'attack1:air', 'attack2:ground', 'attack2:air', 'attack3:ground', 'attack3:air', 'attack4:ground', 'attack5:ground',
+    'attack1:ground', 'attack1:air', 'attack2:ground', 'attack2:air', 'extra_attack:ground', 'attack3:ground', 'attack4:ground',
   ]) {
     assert.ok(used.get(move) > 0, `it uses ${move}`);
   }

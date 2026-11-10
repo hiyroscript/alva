@@ -14,7 +14,7 @@ dependencies, and requires every path to be relative.
 ## The itch.io release: bundled, never rewritten
 
 itch.io accepts at most 1,000 files in an HTML5 game, and the repository
-serves 1,496. Rather than merge modules, stylesheets or frames in the source
+serves 1,491. Rather than merge modules, stylesheets or frames in the source
 (which would make the code harder to read, test and extend), an optional
 export generates a copy for release: the modules bundled into `game.js`,
 the stylesheet parts joined into `game.css`, every fighter's frames packed

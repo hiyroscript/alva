@@ -2406,11 +2406,11 @@ each fighter's own values are in its character specification (7.2.9).
   ordinary attacks, `attack5` (Dragonblade) a technique, and
   `extra_attack` is its Shuriken, a volley of three (on the ground and in
   the air).
-  #0013 has five: `attack1` (the Gentle Fist; `midair_attack1`, the Air
-  Palm), `attack2` (the Sweep Kick; `midair_attack2`, the Falling Palm) and
-  `attack3` (the Protective Palms; `midair_attack3`, the Rising Palm) are
-  ordinary attacks, `attack4` (the Twin Lion Fists) and `attack5` (the
-  Sixty-Four Palms) techniques; it has no `extra_attack`.
+  #0013 has four: `attack1` (the Gentle Fist; `midair_attack1`, the Air
+  Palm) and `attack2` (the Sweep Kick; `midair_attack2`, the Falling Palm)
+  are ordinary attacks, `attack3` (the Twin Lion Fists) and `attack4` (the
+  Sixty-Four Palms) techniques, and `extra_attack` is its Protective Palms,
+  on the ground only (the sheet draws no aerial for it).
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -4720,8 +4720,7 @@ there, and nothing in one is a rule for another fighter.
   of power inside its opponents, each one it lands draining some of their
   Energy (a hit's `drain`, a capability any fighter may now use): the
   Gentle Fist's three palms and the Sweep Kick up close, its Mash Combo;
-  the Air Palm, the Rising Palm and the Falling Palm, a dive palm-first, in
-  the air; the Protective Palms, a dome of chakra spun round it that
+  the Air Palm and the Falling Palm, a dive palm-first, in the air; the Protective Palms, a dome of chakra spun round it that
   strikes everyone inside and turns shots back; the Twin Lion Fists, lions
   of chakra on its hands that surge out ahead of it and drain half the
   bar, and the Sixty-Four Palms, its eyes woken and its field spread round
@@ -4911,8 +4910,7 @@ Adding one is described in
     Dragonblade and Shuriken, air the Whirlwind Cut, the Rising Arc, the
     Falling Cut, the Rising Strike and Shuriken; #0013: ground the Gentle
     Fist, the Sweep Kick, the Protective Palms, the Twin Lion Fists and the
-    Sixty-Four Palms, air the Air Palm, the Falling Palm and the Rising
-    Palm.
+    Sixty-Four Palms, air the Air Palm and the Falling Palm.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -5203,8 +5201,8 @@ Adding one is described in
   the Venom Jump (in the air too); for #0012, O is the Deflect Stance (the
   Falling Cut in the air), M Swift Strike (the Rising Strike in the air),
   `,` Dragonblade and J Shuriken (in the air too); for #0013, O is the
-  Protective Palms (the Rising Palm in the air), M the Twin Lion Fists,
-  `,` the Sixty-Four Palms and J nothing. The
+  Twin Lion Fists, M the Sixty-Four Palms, `,` nothing and J the
+  Protective Palms (on the ground only). The
   input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
@@ -5431,8 +5429,8 @@ Adding one is described in
   Lash in slot 3, the Kill in slot 4 and the Emergency Meeting in slot 5;
   #0011: the Web Shot in slot 3, Camouflage in slot 4 and the Venom Punch
   in slot 5; #0012: the Deflect Stance in slot 3, Swift Strike in slot 4
-  and Dragonblade in slot 5; #0013: the Protective Palms in slot 3, the
-  Twin Lion Fists in slot 4 and the Sixty-Four Palms in slot 5). A summon or technique button is
+  and Dragonblade in slot 5), 4 again for #0013 (the Twin Lion Fists in
+  slot 3 and the Sixty-Four Palms in slot 4). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -5759,8 +5757,7 @@ codename is sent, never what an action does.
   Whirlwind Cut Square, Rising Arc Triangle, Falling Cut Circle, Shuriken
   R2, Rising Strike the right stick up. #0013: Gentle Fist Square, Sweep
   Kick Triangle, Protective Palms Circle, Twin Lion Fists R2, Sixty-Four
-  Palms L2; in the air Air Palm Square, Rising Palm Circle, Falling Palm the
-  right stick down. A
+  Palms L2; in the air Air Palm Square, Falling Palm the right stick down. A
   fighter without a
   layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter
