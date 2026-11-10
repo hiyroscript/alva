@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0012 use them between them
+is built, and usable by any fighter (#0001 to #0013 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -297,7 +297,17 @@ today):
   `backstab`; everything else, a block's stuns and the other effects, stays
   the hit's; a Shield blocks it like any hit, either way round; the
   cooldown policy weighs a move by the harder of the two, so a backstab of
-  10 earns 5 s; #0010's Kill). A strike inherits its
+  10 earns 5 s; #0010's Kill), `drain` (Energy, from 0 to the whole bar,
+  100, that a real hit takes off its target at once,
+  `CombatState.drain`: never below 0 and given to nobody, since nothing
+  gives Energy back; reaching 0 exhausts the target as any 0 does, so it
+  has no Dash, air dash, Deflect, Shield or construct move until its bar
+  is full again; no payment, so the target's refill runs on; a blocked hit
+  drains nothing, the block's own price being the Shield's; the event says
+  how much, `drained`; routine for the cooldown policy, so a light strike
+  may drain and stay ordinary, and valued by the CPU, the more when it
+  would empty the bar; #0013's palms, its lions and its Sixty-Four Palms).
+  A strike inherits its
   attack's and a finisher its projectile's. Each defaults to changing
   nothing; a value of the wrong kind is refused. There is no hit effect
   that gets past a Shield: `unblockable` (gone) and every other field of
@@ -413,6 +423,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0010 | `['attack4', 'extra_attack', 'attack5']` | the Kill (twice as strong on a back turned to it, then its kill cooldown), the Vent (a way under the floor, only its hatch open to a hit), the Emergency Meeting (everyone near called to the button and held there) | the Tongue Lash |
 | #0011 | `['attack4', 'attack5']` | Camouflage (out of sight, a CPU losing track of it, until it strikes or is struck), the Venom Punch (its lightning stuns whoever it reaches stiff) | the Web Shot, Web Lines, the Venom Jump |
 | #0012 | `['attack5']` | Dragonblade (a 10-damage cleave all round it, the dragon spirit coiling round it, after half a second's breakable stance) | Shuriken (a volley), the Deflect Stance (it turns shots back), Swift Strike and the Rising Strike (dashes through) |
+| #0013 | `['attack4', 'attack5']` | the Twin Lion Fists (lions of chakra that surge out and drain half the target's Energy), the Sixty-Four Palms (a 10-damage flurry that seals the target's chakra: its whole bar drained) | the Protective Palms (a dome that turns shots back), its draining palms |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -772,7 +783,8 @@ Feast 3 s (a heal) and Gum-Gum Giant Pistol 5 s (a 10-damage fist); #0009's
 Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
 #0010's Kill 5 s (its backstab's 10) and Emergency Meeting 3 s (its hold);
 #0011's Web Shot 3 s (its webbing's hold), Camouflage 3 s (a cloak) and
-Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10).
+Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10);
+#0013's Sixty-Four Palms 5 s (its flurry's 10).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -784,11 +796,14 @@ cooldown, and so has every move of #0009's but its two Specials (the Air
 Blast's drag, a carry, and the Earth Pillar's quake earn nothing), and of
 #0012's but Dragonblade (Shuriken's three shots add up to 3, the Deflect
 Stance turns shots back, Swift Strike and the Rising Strike are motions),
-and every Deflect none.
+and of #0013's but the Sixty-Four Palms (a drain, however much, earns
+nothing: the Twin Lion Fists' lions and every palm drain and stay
+ordinary), and every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
-Earth Pillar, Shuriken: once for its volley of three) cost 15 Energy
+Earth Pillar, Shuriken: once for its volley of three, the Twin Lion
+Fists) cost 15 Energy
 instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and

@@ -6113,3 +6113,136 @@ finger slows or rests).
 - unchanged and passing: `touch-comfort` for every fighter, the online
   determinism and lockstep tests.
 
+
+## #0013, the pale-eyed palm fighter
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0013 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon, no move the
+character cannot perform in canon, the sheet's DeviantArt page credited
+and the character named nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0013 in roster slot 13, playable: 100 frames cut from
+  the sheet into `assets/characters/0013/`, read at 1× (one file pixel per
+  art pixel), each frame the whole pieces of the sheet's own drawing (the
+  specks of its chakra and the loose lines of its field included, never a
+  neighbour), the flat teal background (0, 128, 128) made transparent,
+  nothing redrawn, recoloured or laid over anything, every file
+  `0013_<codename>_<frame>.png`: 96 of the fighter and 4 of its lions (a
+  projectile). A drawing the sheet repeats (its stance, its guard's raise
+  and lower, its spin's turned back) is cut once and played again, so no
+  two files are the same picture. Drawn at the roster's art-pixel size (a
+  50-pixel stance, about 85 units); every clip authors its own `anchorX`
+  (between its feet where both are planted, on its jacket elsewhere, on
+  the dome's middle while the dome is round it) and, where the dome's wisps
+  reach below its feet, `anchorY`. Movement is the universal one; its
+  Energy refills at the shared 12 a second.
+- **Its palms, its dome, its lions and its Sixty-Four Palms**, from its
+  canon (eyes that see into the chakra network, a Gentle Fist that closes
+  its points, a protective dome of chakra, lions of chakra on its hands
+  that absorb the chakra they touch, and a flurry of sixty-four palms that
+  seals its target's chakra), each with a mechanic: the **Gentle Fist**
+  (three palms: 1, 1, then a heavy 5 at Base Launch 1, each draining 5)
+  and the **Sweep Kick** (a sweep that holds, then a kick launching up),
+  its Mash Combo pair; the **Air Palm** (1, then 3), the **Falling Palm**
+  (a dive palm-first, `motion: slam`: a spike, then a burst where it lands
+  that drains 15; once per airtime) and the **Rising Palm** (launching
+  straight up) in the air; the **Protective Palms** (a dome round it that
+  strikes either side, 1, 1, then 3, each draining 5, and turns back every
+  shot that meets it, ended by any move); the **Twin Lion Fists** (a
+  technique and a Special: two fifths of a second gathering, then its
+  lions surge out ahead of it, a projectile: 5 at Base Launch 2 and 50
+  drained; 15 Energy); the **Sixty-Four Palms** (a technique and a
+  Special: two thirds of a second waking its eyes and spreading its field,
+  then a flurry round it, 10 at Base Launch 3 and its target's whole bar
+  drained; 5 s). Its guard is its arms crossed; its Deflect, in the air, a
+  palm swept up through an arc of chakra; its Dash a blur of speed, its air
+  dash a lunge. It heals nobody, summons nobody, makes no clone, throws
+  nothing and never homes in; it has no extra attack.
+- **One shared capability, for any hit: `drain`** (`js/game/combat/hit-effects.js`):
+  Energy, from 0 to the whole bar (100), that a real hit takes off its
+  target at once (`CombatState.drain`), never below 0 and given to nobody
+  (nothing gives Energy back); reaching 0 exhausts the target as any 0
+  does; it is no payment, so the target's refill runs on; a blocked hit
+  drains nothing. The hit's event says how much (`drained`). Strikes and
+  finishers inherit it like the other hit effects. It is routine for the
+  cooldown policy (`ROUTINE_EFFECTS`: a light strike may drain and stay
+  ordinary), and the CPU reads it on every strike and values it, the more
+  when it would empty its opponent's bar. A hit that declares none drains
+  nothing, so every other fighter is unchanged.
+- **Its controller layout** by the comfort rules (Square the Gentle Fist /
+  Air Palm, Triangle the Sweep Kick, Circle the Protective Palms / Rising
+  Palm, R2 the Twin Lion Fists, L2 the Sixty-Four Palms, the right stick
+  down the Falling Palm), touch buttons, names and descriptions in English
+  and French, a Discover profile (3/5) and its credits (the sheet by
+  prodijiu on DeviantArt, linked by the deviation's number alone, and the
+  credits the sheet itself gives: Dittron, Illmatic for the portrait,
+  yondy-hokage for the eye effects).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 288 matches a level): #0013 wins 0.56 at
+Medium, 0.52 at Hard and 0.50 at Brutal; weakest against #0011 (6 to 8 of
+24). Its first tuning won 0.30 at Medium and 0.24 at Hard, finishing
+almost nobody (its launchers mostly sending straight up, nothing reaching
+past its palms): its dome's burst and its Deflect were turned sideways,
+the Falling Palm's spike made Base Launch 2, the Twin Lion Fists' lions
+made a short projectile, the Gentle Fist's third palm a heavy 5 and its
+first palm a standard jab's tenth of a second. Details in
+[#0013's specification](docs/characters/0013.md#balance).
+
+**Two statistical tests read differently with a thirteenth fighter.** The
+online determinism test plays one scripted random match per pairing, and
+in the new #0012 v #0013 one the random walk kept #0013 out of reach for
+the whole match: every determinism check passed, but it landed no hit. Its
+"both sides landed hits" check now asks that hits landed in each matchup
+and that every fighter landed hits in at least one of its matchups (#0013
+does in #0013 v #0001). And the CPU-behaviour test that a CPU ahead late
+takes less Launch Point than one building came out level at Medium (0.553
+against 0.545 a second, about one palm over the 256 seconds measured): a
+CPU that lets #0013 come takes its palm strings about as often as one that
+builds. Medium now has the same 0.05 slack Brutal had; Hard keeps none and
+passes (0.14 against 0.38).
+
+**Where to tune it.** Every value is in `js/data/characters/0013.js`: the
+moves' phases are whole frames of their clips at `FPS_0013` (the orders
+`GENTLE_FIST_0013`, `SWEEP_KICK_0013`, `PROTECTIVE_PALMS_0013` and the
+rest); reaches are the attacks' `hitbox`es, the Sixty-Four Palms' `burst`
+and the lions' `projectiles.attack4_object`; the drains are each hit's
+`drain`; the dive is `attacks.midair_attack2.motion`; the anchors and feet
+are `ANCHORS_0013` and `FEET_0013`. The drain's rules are in
+`js/game/combat/hit-effects.js`, `CombatState.drain` and
+`CombatSystem.applyHit`, and the CPU's value for it in
+`js/game/ai/cpu-intelligence/evaluator.js`.
+
+**Code:** `js/data/characters/0013.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/hit-effects.js` (`drain`),
+`js/game/combat/combat-state.js` (`drain`), `js/game/combat/combat.js`
+(applied, `drained` on the event), `js/game/combat/attacks.js` and
+`js/game/combat/projectile.js` (inherited, refused on a pending attack),
+`js/game/combat/offense.js` (a hit that drains is harmful),
+`js/data/cooldowns.js` (routine),
+`js/game/ai/cpu-intelligence/capabilities.js` and `evaluator.js` (read and
+valued); the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0013.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, combat, defense, Energy,
+input, launch, rendering, testing, the served file count).
+
+**Tests:** new `tests/fighters/0013/fighter-0013.test.mjs` (registration
+and kit; its costs and cooldowns; its two Specials; its Mash Combo; its
+names, touch buttons and controller layout; the 100 files, clean and
+tight, none a copy, at one scale, anchored on its body, feet and dome, its
+lions centred; every move's mechanic and drain: the palms and a Shield
+that blocks them, the sweep passing under a fighter in the air, the dive
+and its landing, the dome either side and turning shots back, its
+Deflect, the lions surging out, the Sixty-Four Palms exhausting its
+target, the broken casts; the CPU playing its whole kit; its source named
+nowhere); new `tests/systems/drain.test.mjs` (the shared capability on a
+test-only fighter); `hit-effects` and `launch` (the new field and event
+key); the roster-wide tables (`cooldown-policy`, `special-abilities`:
+twenty Specials, `strict-combat-rules`, `mash-combo`), `empty-roster`,
+`discover`, `practice-ground`, `watch-mode`, `settings` (its credits),
+each fighter's roster list, `determinism` and `cpu-behaviour` (above).

@@ -76,6 +76,7 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0010 | — (nothing of its own created but the meeting's call; the Vent and the Tongue Lash are strikes) | the Emergency Meeting (3 s; the Kill is a burst with its 5 s) |
 | #0011 | — (its one projectile, the Web Shot's webbing, holds and has its 3 s; Web Lines and the Venom Jump are strikes) | the Web Shot (3 s), the Venom Punch (3 s; Camouflage releases no construct, only its cloak) |
 | #0012 | Shuriken (extra_attack: a volley of three, one activation, so one 15) | Dragonblade (5 s) |
+| #0013 | the Twin Lion Fists (attack4: its lions, a projectile) | the Sixty-Four Palms (5 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):
@@ -94,7 +95,7 @@ A fighter's `energy` entry sets one thing, its refill rate:
 
 #0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
 `regen` 14, #0005 `regen` 14, #0006 `regen` 14, #0007 `regen` 14; #0008,
-#0009, #0010, #0011 and #0012 leave it out (12). Nothing
+#0009, #0010, #0011, #0012 and #0013 leave it out (12). Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost`, `deflectCost` and `constructCost` may be left out (and
 are, by every fighter), and declaring any of them with another value than
@@ -131,6 +132,14 @@ fighter and the field.
   projectile turned back or cancelled move refunds anything or adds a
   refill of its own. Only the passive refill, and a full refill on a
   respawn, a reset or a restart, raise it.
+- A hit may take Energy away: a real hit with a `drain` (a shared hit
+  effect, [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox))
+  takes that much off its target at once (`CombatState.drain`), never
+  below 0, and gives it to nobody: its attacker gains nothing. It is no
+  payment (the target's refill runs on, `energySpent` is untouched), and
+  reaching 0 exhausts the target as any 0 does. A blocked hit drains
+  nothing: the Shield pays its own 15 for the block, as ever (#0013's
+  palms, its lions and its Sixty-Four Palms).
 - Difficulty never changes any of it: the CPU pays what a player pays,
   and plans with each move's own `energyCost`, a Deflect's 15 only when
   it will turn a projectile back (`turnBackCost`) and a Shield's per

@@ -78,10 +78,11 @@ export function assertNoShieldBypass(spec, owner = 'A hit') {
 }
 
 // Whether hit definition `hit` can do anything to whoever it reaches: it
-// adds Launch Point, paralyzes, charms, floats, frightens or launches.
+// adds Launch Point, paralyzes, charms, floats, frightens, drains Energy or
+// launches.
 export function isHarmfulHit(hit) {
   return !!hit && (
-    hit.damage > 0 || hit.paralyze > 0 || hit.charm > 0 || hit.float > 0 || hit.fear > 0 ||
+    hit.damage > 0 || hit.paralyze > 0 || hit.charm > 0 || hit.float > 0 || hit.fear > 0 || hit.drain > 0 ||
     (hit.baseLaunch > 0 && !!hit.directionalLaunch)
   );
 }

@@ -497,6 +497,16 @@ export class CombatState {
     this.setEnergy(this.energy + amount);
   }
 
+  // A hit's `drain` (js/game/combat/hit-effects.js): `amount` Energy taken
+  // off at once, never below 0; reaching 0 exhausts the fighter as any 0
+  // does. No payment (energySpent and the step's refill are untouched) and
+  // given to nobody. Returns what it took.
+  drain(amount) {
+    const before = this.energy;
+    this.setEnergy(before - Math.max(0, amount));
+    return before - this.energy;
+  }
+
   // One step of passive recovery: regen per second.
   updateEnergy(dt) {
     this.regenEnergy(dt * this.energySpec.regen);

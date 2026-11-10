@@ -280,6 +280,10 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // Shuriken, an ordinary volley: one 15 for its three shots. Dragonblade
     // (5 s) pays nothing, and every other move is its own blade.
     '0012': { extra_attack: 15, 'tech:attack5': 0 },
+    // The Twin Lion Fists, an ordinary technique that lets its lions go (a
+    // projectile): 15. The Sixty-Four Palms (5 s) pays nothing, and every
+    // other move is its own palms and kicks.
+    '0013': { 'tech:attack4': 15, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

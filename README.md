@@ -24,14 +24,14 @@ every fighter runs, jumps, triple-jumps and Dashes exactly alike, and
 speed you build carries on through jumps, attacks and landings. Moves are
 mechanics, not just poses with damage: summons, techniques, projectiles
 that pull, repel or erase or fly in volleys (and a Deflect that turns them back), paralysis,
-charms, homing dashes, hovers, plunges, rolls, lifts and multi-hit strings are all
+charms, hits that drain Energy, homing dashes, hovers, plunges, rolls, lifts and multi-hit strings are all
 part of the shared engine for any fighter to use. However a move is
 executed, if it can deal damage it is an attack, and a raised Shield
 blocks every attack.
 
 ## What's in it
 
-- **Twelve playable fighters** on a 48-slot roster:
+- **Thirteen playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -95,23 +95,30 @@ blocks every attack.
   sticks its target where it stands, web lines that reel it in, a venom
   punch that stuns it stiff, an uppercut crackling with venom that carries
   it up off the ground, and a camouflage that turns it all but invisible,
-  a CPU losing track of it altogether, until it strikes or is struck), and
+  a CPU losing track of it altogether, until it strikes or is struck),
   [#0012](docs/characters/0012.md), the cyborg ninja in silver armour (a
   volley of three shuriken thrown one after another, its blade held out to
   turn shots back at their thrower, a dash that cuts straight through its
   opponent and the same dash straight up to get back to the stage, quick
   cuts and spinning ones, and a cleave all round it as the dragon spirit
-  of its blade coils round it).
-  All twelve Shield
+  of its blade coils round it), and [#0013](docs/characters/0013.md), the
+  pale-eyed palm fighter whose palms strike the flow of power inside its
+  opponents (every palm it lands drains some of their Energy, so the
+  Shield, Dash or recovery they were counting on may not be there; a dome
+  of chakra spun round it that strikes everyone inside and turns shots
+  back, a dive palm-first, lions of chakra on its hands that surge out and
+  drain half the bar, and a flurry of sixty-four palms, its eyes woken and
+  its field spread round it, that seals its opponent's power completely).
+  All thirteen Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all twelve Dash on the ground and air dash. Each fighter
+  back at their thrower), and all thirteen Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
   #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
   Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent
   and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's
-  Dragonblade): an orange
+  Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms): an orange
   exclamation
   mark floats over
   a fighter while it performs one.
@@ -221,7 +228,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,395):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,496):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed
@@ -383,6 +390,11 @@ sheet's own credit: GameInvader.
 
 **#0012 sprite source.** Sprite sheet by xxalexsmashxx on
 [DeviantArt](https://www.deviantart.com/xxalexsmashxx/art/1262864119).
+
+**#0013 sprite source.** Sprite sheet by prodijiu on
+[DeviantArt](https://www.deviantart.com/prodijiu/art/826586119); the
+sheet's own credits: Dittron, Illmatic (portrait), yondy-hokage (eye
+effects).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

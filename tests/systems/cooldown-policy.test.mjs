@@ -205,6 +205,12 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 0, midair_attack4: 0,
       extra_attack: 0, attack5: 5, deflect: 0,
     },
+    // The Sixty-Four Palms: its flurry deals 10. Every drain (its palms',
+    // the lions', the flurry's) is routine, and the Protective Palms turn
+    // shots back: none earns anything of its own.
+    '0013': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 0, attack5: 5, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

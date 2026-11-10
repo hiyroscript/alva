@@ -84,6 +84,16 @@
 //                       A Shield, raised toward it or not, still blocks it
 //                       like any hit. The cooldown policy weighs a move by
 //                       the harder of the two (js/data/cooldowns.js).
+//   drain: 15           Energy a real hit takes off its target (see
+//                       CombatState.drain), from 0 to the whole bar,
+//                       MAX_ENERGY: the flow of its power cut off where it
+//                       was struck. Taken at once and given to nobody
+//                       (nothing gives Energy back); reaching 0 exhausts the
+//                       target as any 0 does (no Dash, air dash, Deflect,
+//                       Shield or construct move until its bar is full
+//                       again). It is no payment: the target's refill runs
+//                       on as ever. A blocked hit drains nothing (the
+//                       block's own price is the Shield's, as ever).
 //
 // For example:
 //
@@ -95,12 +105,14 @@
 //   attack5: { ..., damage: 3, fear: 2.5 },
 //   burst: { hitbox: { ... }, hit: { damage: 5, baseLaunch: 2, directionalLaunch: 'horizontal',
 //     backstab: { damage: 10, baseLaunch: 3, directionalLaunch: 'horizontal' } } },
+//   hits: [{ ..., damage: 1, drain: 5 }, ...],
 
+import { MAX_ENERGY } from '../../data/energy.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { assertNoShieldBypass } from './offense.js';
 
 // The fields a hit may declare here, with the value that changes nothing.
-const DEFAULTS = Object.freeze({ paralyze: 0, blockPush: 0, quake: false, charm: 0, float: 0, fear: 0, gaze: false, backstab: null });
+const DEFAULTS = Object.freeze({ paralyze: 0, blockPush: 0, quake: false, charm: 0, float: 0, fear: 0, gaze: false, backstab: null, drain: 0 });
 
 // What a hit's `backstab` may declare (see above): the rest stays the hit's.
 const BACKSTAB_FIELDS = Object.freeze(['damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'hitstop']);
@@ -132,7 +144,11 @@ export function resolveHitEffects(spec, owner = 'A hit') {
   if (!seconds(fear)) throw new Error(`[Alva] ${owner}'s fear must be seconds from 0`);
   if (typeof gaze !== 'boolean') throw new Error(`[Alva] ${owner}'s gaze must be true or false`);
   const backstab = resolveBackstab(spec?.backstab ?? DEFAULTS.backstab, owner);
-  return { paralyze, blockPush, quake, charm, float, fear, gaze, backstab };
+  const drain = spec?.drain ?? DEFAULTS.drain;
+  if (!(typeof drain === 'number' && Number.isFinite(drain) && drain >= 0 && drain <= MAX_ENERGY)) {
+    throw new Error(`[Alva] ${owner}'s drain must be Energy from 0 to ${MAX_ENERGY}`);
+  }
+  return { paralyze, blockPush, quake, charm, float, fear, gaze, backstab, drain };
 }
 
 // A hit's frozen `backstab` (see above) from its entry, or null: its own

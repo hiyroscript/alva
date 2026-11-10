@@ -207,7 +207,7 @@ export class CombatSystem {
     // { type: 'hit' | 'block' | 'charmed', attacker, target, move, damage,
     //   heal, energyCost, launchPointBefore, launchPointAfter, baseLaunch,
     //   directionalLaunch, launchStrength, finalLaunch, launchSpeed, hitstun,
-    //   perfect, point, paralysis, float, charm, fear, fed, stall,
+    //   perfect, point, paralysis, float, charm, fear, fed, drained, stall,
     //   projectile, summon, technique, attack, source, ability, redirected }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
@@ -228,8 +228,9 @@ export class CombatSystem {
     // on its target (seconds, 0 for none; a float's included), `float` the
     // float it put on it, `charm` the charm and `fear` the fear (seconds
     // each, 0 for none), `fed` the Launch Point the hit took off its
-    // attacker because the target was frightened of it (0 for none) and
-    // `stall` how long a melee blow
+    // attacker because the target was frightened of it (0 for none),
+    // `drained` the Energy the hit's `drain` took off the target (0 for
+    // none: a block drains nothing) and `stall` how long a melee blow
     // the target's Shield blocked froze its attacker (0 for none). `attacker`
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee. `attack` is always
@@ -620,6 +621,9 @@ export class CombatSystem {
     }
     if (!blocked && def.charm > 0) tc.charmBy(def.charm, attacker);
     if (!blocked && def.fear > 0) tc.frightenBy(def.fear, attacker);
+    // A drain takes its Energy off the target (see `drain` in
+    // hit-effects.js); a block drains nothing.
+    const drained = !blocked && def.drain > 0 ? tc.drain(def.drain) : 0;
     const fed = feeds && damage > 0 ? attacker.combat.heal(damage) : 0;
     if (blocked && def.blockPush > 0) target.body.vx = facing * def.blockPush;
     if (finalLaunch.x || finalLaunch.y) {
@@ -646,7 +650,7 @@ export class CombatSystem {
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || launched ? 0 : Math.max(def.paralyze ?? 0, def.float ?? 0),
       float: blocked || launched ? 0 : def.float ?? 0, charm: blocked ? 0 : def.charm ?? 0,
-      fear: blocked ? 0 : def.fear ?? 0, fed, stall,
+      fear: blocked ? 0 : def.fear ?? 0, fed, drained, stall,
       projectile, summon, technique, hazard, attack: !hazard,
       source: sourceOf(def, projectile, summon, technique, hazard), ability: hazard ? def.id ?? null : abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,
@@ -673,7 +677,7 @@ export class CombatSystem {
       type: 'charmed', attacker, target, move: def.id ?? null,
       damage: 0, heal, energyCost: 0, launchPointBefore, launchPointAfter: tc.launchPoint,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength: 0, finalLaunch: NO_LAUNCH,
-      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, float: 0, charm: 0, fear: 0, fed: 0, stall: 0,
+      launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, float: 0, charm: 0, fear: 0, fed: 0, drained: 0, stall: 0,
       projectile, summon, technique, attack: true,
       source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,

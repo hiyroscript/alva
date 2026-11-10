@@ -234,6 +234,9 @@ export const EN = {
   'credits.sprites0011.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
   'credits.sprites0012.title': '#0012 sprite source',
   'credits.sprites0012.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
+  'credits.sprites0013.title': '#0013 sprite source',
+  'credits.sprites0013.sheet': 'Sprite sheet by prodijiu on DeviantArt',
+  'credits.sprites0013.sheetCredits': 'Sheet credits: Dittron, Illmatic (portrait), yondy-hokage (eye effects)',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -485,6 +488,7 @@ export const EN = {
   'discover.fighter.0010.playStyle': 'A small, sly ambusher that wins by catching opponents off guard: it slips under the floor to appear elsewhere, reels them in from afar and strikes hardest when their back is turned. Its plain blows are modest and its deadliest strike comes rarely, so a watchful opponent leaves it little to work with.',
   'discover.fighter.0011.playStyle': 'An agile all-rounder that pins opponents from afar with webbing, stuns them up close with crackling blows and can slip out of sight to choose when it strikes. Its plain strikes are light and its strongest tools need a moment to gather, so a fast, aggressive opponent can catch it mid-preparation.',
   'discover.fighter.0012.playStyle': 'A swift duelist that pokes from afar with thrown blades, darts through opponents to strike and turns their shots back on them before closing in to cut. Its plain blows are light and its mightiest cut takes a long moment to ready, so a patient opponent who keeps its guard can wear it down.',
+  'discover.fighter.0013.playStyle': 'A graceful close-range fighter whose every palm saps the opponent\'s power, stripping the guard, dash or recovery it was counting on, while a spinning dome of chakra sends shots back. It is light and short of reach, and its strongest techniques need a breakable moment to gather.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

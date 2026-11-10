@@ -27,7 +27,7 @@
 // `directionalLaunch` are the projectile's own damage, Base Launch and
 // Directional Launch (see js/data/launch.js), validated here exactly like
 // an attack's, and so are the shared hit effects (`paralyze`,
-// `blockPush`, `quake`, `charm`, `float`, `fear`, `gaze`; see
+// `blockPush`, `quake`, `charm`, `float`, `fear`, `gaze`, `drain`; see
 // js/game/combat/hit-effects.js). A horizontal launch
 // travels along the projectile's own direction. A projectile with Base
 // Launch 0 or no direction never launches.
@@ -136,7 +136,9 @@ const PROJECTILE_DEFAULTS = {
 };
 
 // What a finisher takes from its projectile when it does not say.
-const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab']);
+const FINISHER_INHERITS = Object.freeze([
+  'hitstun', 'blockstun', 'hitstop', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab', 'drain',
+]);
 
 // Age is a sum of fixed steps; compare against boundaries with a little slack
 // (see PHASE_EPSILON in attacks.js).

@@ -595,6 +595,11 @@ export class Evaluator {
     const fear = Math.max(0, ...strikes.map((h) => h.fear ?? 0));
     if (fear > 0) vHit += fear * (op.frightened > 0 ? 0.5 : 3);
     if (op.frightened > 0) vHit += Math.max(0, hv.lp - op.lp) * (1 + s.me.lp / (160 * LAUNCH_POINT_SCALE)) * 0.8;
+    // A drain: Energy cut off the opponent. Worth a little on its own, and
+    // much more when it empties the bar: an exhausted opponent has no
+    // Shield, Dash, air dash or Deflect until it has refilled completely.
+    const drain = strikes.slice(0, Math.max(1, c.strikes)).reduce((total, h) => total + (h.drain ?? 0), 0);
+    if (drain > 0 && !op.exhausted) vHit += drain / 30 + (op.energy <= drain ? 5 : 0);
     // What a block costs: the Shield's stall and the recovery left against
     // the blockstun; a block that would exhaust the opponent is a win.
     let vBlock = 0;
