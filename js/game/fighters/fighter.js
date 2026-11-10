@@ -44,7 +44,7 @@ import { FLOAT_RISE_SPEED } from '../combat/hit-effects.js';
 import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
-import { Technique, createTechniqueDefinition, inDanger, techniqueProblem } from '../combat/technique.js';
+import { Technique, createTechniqueDefinition, inDanger, limitReady, techniqueProblem } from '../combat/technique.js';
 import { MashCombo, resolveMashPair } from '../combat/mash-combo.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
@@ -672,6 +672,9 @@ export class Fighter {
       // CombatState.cloakFor), until it runs out or the fighter shows itself.
       const cloak = this.technique?.takeCloak();
       if (cloak > 0) combat.cloakFor(cloak);
+      // A Limit Break let go breaks this fighter's Limit: its whole gauge is
+      // spent now (see CombatState.spendLimit), once.
+      if (this.technique?.takeLimit()) combat.spendLimit();
       if (ended) this.endTechnique(ended);
     }
 
@@ -1632,11 +1635,12 @@ export class Fighter {
   // that releases a projectile or a burst). Its cooldown starts only as it
   // releases (see update). False, with nothing paid, if there is no such
   // technique, the fighter is not in the danger it needs (its Launch Point
-  // under its `minLaunchPoint`: see inDanger), its art or data is missing
+  // under its `minLaunchPoint`: see inDanger), its Limit gauge is not full
+  // enough (under its `limit`: see limitReady), its art or data is missing
   // (logged) or it costs Energy the exhausted fighter cannot pay.
   tryTechnique(action, id, dir = 0) {
     const def = this.techniqueDefs[id];
-    if (!def || !inDanger(this, def)) return false;
+    if (!def || !inDanger(this, def) || !limitReady(this, def)) return false;
     const problem = techniqueProblem(this, def);
     if (problem) {
       console.warn(`[Alva] Technique "${id}" is unavailable: ${problem}; ignoring.`);
@@ -1872,7 +1876,10 @@ export class Fighter {
       return 0;
     }
     this.moveAttack(atk, dir, dt);
-    if (phase === 'startup') body.vy = 0;
+    // A grab moves only once it has seized someone (see `grab` in
+    // js/game/combat/attacks.js): until then it holds where it is, as in
+    // its startup, so one that misses never leaves the ground.
+    if (phase === 'startup' || (atk.def.grab && !atk.confirmed)) body.vy = 0;
     else body.vy = spec.type === 'rise' ? -spec.speed : spec.fallSpeed;
     return 0;
   }

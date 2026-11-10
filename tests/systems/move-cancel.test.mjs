@@ -63,11 +63,27 @@ function driven(character, kind, opts = {}) {
   return r;
 }
 
+// How long attack `def` plays here, far from anyone: its full length, or,
+// for a grab (which seizes nobody this far out: #0014's Meteodrive and
+// Meteor Strike), its seizing strike's window and its recovery after it
+// (see `grab` in js/game/combat/attacks.js).
+const unopposed = (def) => (def.grab ? def.grab.until + def.grab.recovery : def.total);
+
 // Every way a fighter is driven: the human player's and a CPU's.
 const RIGS = [['player', (c, o) => far(c, o)], ['cpu', (c, o) => driven(c, 'cpu', o)]];
 
 // The ground attack buttons `f` has (attacks, not specials).
 const groundAttacks = (f) => COMBAT_BUTTONS.filter((a) => !specialAction(f.def, a) && f.attackFor(a, true));
+
+// What `action` starts for `f` where it is now: its move there, or nothing
+// for a ground-only move in the air. A ground move may end with its fighter
+// in the air (a lift: #0014's Meteor Strike leaps carrying its target), and
+// a request that comes out as it ends comes out there, as the button's air
+// move, or waits for the ground.
+const startable = (f, action) => {
+  const id = f.attackFor(action);
+  return id && !(f.attacks[id]?.groundOnly && !f.body.grounded) ? id : null;
+};
 
 // Every pair of different ground attack buttons of `f`, the first one an
 // attack that keeps its commitment: a defense (one that turns projectiles
@@ -93,7 +109,7 @@ test('a different attack asked for in an attack\'s startup, active phase or reco
     for (const [who, rig] of RIGS) {
       const probe = rig(c).player;
       for (const [first, second] of pairs(probe)) {
-        const total = probe.attacks[probe.attackFor(first)].total;
+        const total = unopposed(probe.attacks[probe.attackFor(first)]);
         for (const at of [1, Math.floor(total / DT / 2), Math.round(total / DT) - 2]) {
           const why = `#${c.id} ${who} ${first} -> ${second} at step ${at}`;
           const r = rig(c);
@@ -105,7 +121,7 @@ test('a different attack asked for in an attack\'s startup, active phase or reco
           assert.equal(r.player.combat.attack, record, `${why}: still playing`);
           assert.ok(r.player.combat.energy >= paid - EPS, `${why}: nothing paid for the request`);
           while (r.player.combat.attack === record) r.tick();
-          assert.ok(record.time >= record.def.total - EPS, `${why}: played out in full`);
+          assert.ok(record.time >= unopposed(record.def) - EPS, `${why}: played out in full`);
         }
       }
     }
@@ -168,12 +184,12 @@ test('a request made during an attack waits in the buffer and comes out as the a
         r.tick(press(first));
         const record = r.player.combat.attack;
         // Pressed two steps before its end, within the buffer.
-        while (record.time + 3 * DT < record.def.total - EPS) r.tick();
+        while (record.time + 3 * DT < unopposed(record.def) - EPS) r.tick();
         r.tick(press(second));
         assert.equal(r.player.combat.attack, record, `#${c.id} ${who}: not yet`);
         r.until(() => r.player.combat.attack !== record);
-        assert.ok(record.time >= record.def.total - EPS, `#${c.id} ${who} ${first}: ended naturally`);
-        assert.equal(attackOf(r.player), r.player.attackFor(second), `#${c.id} ${who} ${first} -> ${second}: out on the first free step`);
+        assert.ok(record.time >= unopposed(record.def) - EPS, `#${c.id} ${who} ${first}: ended naturally`);
+        assert.equal(attackOf(r.player), startable(r.player, second), `#${c.id} ${who} ${first} -> ${second}: out on the first free step`);
       }
     }
   }
@@ -186,7 +202,7 @@ test('the press for the attack already playing never restarts or stacks it; once
         const r = rig(c);
         r.tick(press(action));
         const record = r.player.combat.attack;
-        while (record.time + DT < record.def.total - EPS) {
+        while (record.time + DT < unopposed(record.def) - EPS) {
           r.tick(press(action));
           assert.equal(r.player.combat.attack, record, `#${c.id} ${who} ${action}: never restarted`);
           assert.equal(r.player.bufferedAttack, null, `#${c.id} ${who} ${action}: never stacked`);
@@ -196,7 +212,9 @@ test('the press for the attack already playing never restarts or stacks it; once
         r.until(() => r.player.canAct());
         r.tick(press(action));
         assert.notEqual(r.player.combat.attack, record, `#${c.id} ${who} ${action}`);
-        assert.equal(attackOf(r.player), record.def.id, `#${c.id} ${who} ${action}: again, no repeat delay`);
+        // Again where it stands (the button's air move after a lift).
+        const again = r.player.body.grounded ? record.def.id : startable(r.player, action);
+        assert.equal(attackOf(r.player), again, `#${c.id} ${who} ${action}: again, no repeat delay`);
       }
     }
   }

@@ -122,6 +122,24 @@
 //
 //   attack5: { castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release',
 //     minLaunchPoint: 30, burst: { ... } },
+//
+// Or a Limit Break: `limit` (a whole number of Launch Points; 0, the
+// default, is none) is how full its own fighter's Limit gauge must be for
+// it to start. The gauge (CombatState.limitGauge) fills by the damage of
+// every real hit its fighter takes, whoever deals it, and nothing else:
+// unlike the Launch Point it never recovers, a heal never touches it and a
+// blocked hit fills nothing. Below `limit` a press does nothing at all, the
+// CPU never plans it and the ability HUD shows it held back, filling
+// ('limit', see moveRestriction); all three ask limitReady. Letting it go
+// breaks the Limit: on its release step the whole gauge is spent
+// (CombatState.spendLimit, through takeLimit), whatever it held; a cast
+// broken before its release spends nothing. A fresh life starts with an
+// empty gauge. Only the start reads it; once cast, the technique plays out
+// as ever, its cooldown, Energy and classification its own. E.g. #0014's
+// Sunburst Fist, which only a fighter beaten long enough can unleash:
+//
+//   attack5: { castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release',
+//     limit: 30, burst: { ... } },
 
 import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveMoveEnergy } from '../../data/energy.js';
@@ -148,6 +166,10 @@ const TECHNIQUE_DEFAULTS = {
   // The least Launch Point its own fighter must have for it to start (a
   // whole number; 0 is none): see `minLaunchPoint` above.
   minLaunchPoint: 0,
+  // How full its own fighter's Limit gauge must be for it to start, spent
+  // as it releases (a whole number of Launch Points; 0 is none): see
+  // `limit` above.
+  limit: 0,
 };
 
 // Clocks are sums of fixed steps; compare against boundaries with a little
@@ -184,6 +206,9 @@ export function createTechniqueDefinition(spec, { projectiles = null } = {}) {
   if (!(Number.isInteger(def.minLaunchPoint) && def.minLaunchPoint >= 0)) {
     throw new Error(`[Alva] ${owner}'s minLaunchPoint must be a whole number of Launch Points from 0`);
   }
+  if (!(Number.isInteger(def.limit) && def.limit >= 0)) {
+    throw new Error(`[Alva] ${owner}'s limit must be a whole number of Launch Points from 0`);
+  }
   def.energyCost = resolveMoveEnergy(spec.energyCost, owner, 'technique', def, cls);
   def.offense = resolveOffense(spec, techniqueOffense(def), owner);
   def.freeCancel = yieldsToRequests(def.offense);
@@ -207,6 +232,22 @@ function resolveBurstEffect(spec, owner) {
 // (moveRestriction), so the three never disagree.
 export function inDanger(owner, def) {
   return !(def?.minLaunchPoint > 0) || (owner?.combat?.launchPoint ?? 0) >= def.minLaunchPoint;
+}
+
+// Whether `owner`'s Limit gauge is full enough for technique `def` to start
+// (see `limit` above): always, for a technique that needs none. Read by
+// every start (Fighter.tryTechnique), the CPU (moveReady) and the ability
+// HUD (moveRestriction), so the three never disagree.
+export function limitReady(owner, def) {
+  return !(def?.limit > 0) || (owner?.combat?.limitGauge ?? 0) >= def.limit;
+}
+
+// How full `owner`'s Limit gauge is for technique `def`, from 0 (empty) to
+// 1 (ready): what the ability HUD shows while it fills. 1 for a technique
+// that needs none.
+export function limitFill(owner, def) {
+  if (!(def?.limit > 0)) return 1;
+  return Math.min(1, Math.max(0, (owner?.combat?.limitGauge ?? 0) / def.limit));
 }
 
 // The fields naming a technique's fighter clips (fighter animations).
@@ -252,6 +293,7 @@ export class Technique {
     this.effectDue = false; // the burst's art, waiting for its fighter (see takeEffect)
     this.healDue = 0; // the heal, waiting for its fighter (see takeHeal)
     this.cloakDue = 0; // the cloak, waiting for its fighter (see takeCloak)
+    this.limitDue = false; // its Limit broken, waiting for its fighter (see takeLimit)
     this.cooldownDue = false; // its cooldown, waiting for its fighter (see takeCooldown)
     this.endReason = null;
     this.castDuration = owner.sprites.duration(def.castAnimation);
@@ -288,7 +330,17 @@ export class Technique {
     if (this.def.burst?.effect) this.effectDue = true;
     if (this.def.heal > 0) this.healDue = this.def.heal;
     if (this.def.cloak > 0) this.cloakDue = this.def.cloak;
+    if (this.def.limit > 0) this.limitDue = true;
     this.cooldownDue = true;
+  }
+
+  // Whether it breaks its fighter's Limit this step, taken (its fighter
+  // spends the gauge, see Fighter.update): true exactly once, on the step a
+  // technique with a `limit` releases.
+  takeLimit() {
+    const due = this.limitDue;
+    this.limitDue = false;
+    return due;
   }
 
   // Whether its cooldown is due this step, taken (its fighter starts it,
@@ -379,6 +431,7 @@ export class Technique {
     this.effectDue = false;
     this.healDue = 0;
     this.cloakDue = 0;
+    this.limitDue = false;
     this.cooldownDue = false;
     this.owner = null;
   }

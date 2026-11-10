@@ -23,7 +23,7 @@ import { moveFor } from '../../data/controller-profiles.js';
 import { specialAction } from '../../data/loadout.js';
 import { isSpecialAbility } from '../../data/special-abilities.js';
 import { summonProblem } from './summon.js';
-import { inDanger, techniqueProblem } from './technique.js';
+import { inDanger, limitFill, limitReady, techniqueProblem } from './technique.js';
 
 // The combat buttons in control order: the numbered attacks, then the extra
 // attack, as the keyboard lays them out.
@@ -99,7 +99,9 @@ export function moveCooldown(fighter, id, kind = null) {
 // faked), 'energy' (it costs Energy, its `energyCost`, and the fighter is
 // exhausted until its bar is full again, in either place), 'danger' (a
 // technique its fighter's Launch Point is still under the `minLaunchPoint`
-// of: see inDanger in js/game/combat/technique.js), 'airUses' (its starts
+// of: see inDanger in js/game/combat/technique.js), 'limit' (a technique
+// its fighter's Limit gauge is not yet full enough for, its `limit`: see
+// limitReady in the same module), 'airUses' (its starts
 // for this airtime are used up) and 'freeFall' (an earlier move spent the
 // airtime). Only the place the fighter is in now can be spent for the
 // airtime; the other place's moves are a preview of what comes after
@@ -112,6 +114,7 @@ export function moveRestriction(fighter, entry, place) {
     const problem = entry.special === 'technique' ? techniqueProblem(fighter, def) : summonProblem(fighter, def);
     if (problem) return 'art';
     if (entry.special === 'technique' && !inDanger(fighter, def)) return 'danger';
+    if (entry.special === 'technique' && !limitReady(fighter, def)) return 'limit';
     return def.energyCost > 0 && fighter.combat?.energyExhausted ? 'energy' : null;
   }
   const atk = fighter.attacks?.[entry.move];
@@ -125,14 +128,19 @@ export function moveRestriction(fighter, entry, place) {
 }
 
 // Everything a reader shows for `entry` in `place`: { action, move,
-// special, cooldown (moveCooldown), restriction (moveRestriction), ready }.
-// `ready` is neither cooling nor restricted (whether
+// special, cooldown (moveCooldown), restriction (moveRestriction),
+// limitFill, ready }. `limitFill` is how full its fighter's Limit gauge is
+// for it, from 0 to 1 (see limitFill: 1 for any move that needs no Limit).
+// `ready` is
+// neither cooling nor restricted (whether
 // the fighter is free to act at this instant is its own business: a hit or
 // an attack in progress holds every move alike).
 export function abilityStatus(fighter, entry, place) {
   const cooldown = moveCooldown(fighter, entry.move, entry.special);
   const restriction = moveRestriction(fighter, entry, place);
-  return { ...entry, cooldown, restriction, ready: !cooldown.cooling && !restriction };
+  const def = entry.special === 'technique' ? fighter.techniqueDefs?.[entry.move] : null;
+  const fill = def ? limitFill(fighter, def) : 1;
+  return { ...entry, cooldown, restriction, limitFill: fill, ready: !cooldown.cooling && !restriction };
 }
 
 // The move `fighter` is performing at this instant, by its codename, or

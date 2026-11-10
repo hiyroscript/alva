@@ -217,6 +217,9 @@ html.is-touch .ability-hud { display: none; }
 .ah-tile[data-state="restricted"] .ah-sprite,
 .ah-tile[data-state="restricted"] .ah-art .icon { filter: grayscale(1) brightness(0.55); opacity: 0.75; }
 .ah-tile[data-state="restricted"] .ah-input { opacity: 0.6; }
+/* A Limit Break whose Limit gauge is still filling: the same sweep, the
+   gauge's fill (--ah-progress) over the muted art, no seconds. */
+.ah-tile[data-restriction="limit"] .ah-cd { opacity: 1; }
 /* A long cooldown just over: a brief, quiet edge light. */
 .ah-tile.is-recovered { animation: ah-recovered 160ms ease-out; }
 @keyframes ah-recovered {

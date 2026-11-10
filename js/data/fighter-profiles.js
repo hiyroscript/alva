@@ -188,6 +188,18 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0013.playStyle',
     reviewedSourceHash: '0a4fadc487e53141c7b1f9bb02f322015d3c91da9c018236c70755ac0094bb4e',
   }),
+  // A bare-fisted rushdown grappler: quick strings up close, throws that
+  // drive the target into the floor, a leap that carries it up to hurl it
+  // down, a wave along the ground, and a Limit Break that only a beating
+  // opens. Approachable: its strikes are plain; mastery in landing its
+  // throws and leap at close range without being punished when they miss,
+  // catching grounded opponents with the wave, and cashing in a full Limit
+  // through its long, breakable gathering.
+  '0014': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0014.playStyle',
+    reviewedSourceHash: '1eba4853e9c67ac1720436508451db2864d1de609afe4ef8639fb484ad6c58ff',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

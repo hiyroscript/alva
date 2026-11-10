@@ -423,7 +423,9 @@ export class CombatSystem {
   strike(attacker, atk, fighters) {
     atk.struck ??= new Set();
     for (const h of atk.def.hits) {
-      if (atk.blocked) return;
+      // A blocked string stops; so does a grab that missed (its `whiffAt`,
+      // see CombatState.update): nothing after its seizing strike.
+      if (atk.blocked || atk.whiffAt != null) return;
       if (atk.struck.has(h.index) || !strikeLiveNow(h, atk)) continue;
       const box = worldBox(attacker, h.hitbox, scratchHit);
       for (const target of fighters) {
@@ -488,7 +490,9 @@ export class CombatSystem {
   // strike), so one perfect block heals once.
   //
   // Otherwise the damage is added to the target's Launch Point first, so
-  // the hit that raises it already launches from the new total. The launch
+  // the hit that raises it already launches from the new total, and to its
+  // Limit gauge (CombatState.fillLimit: what a technique with a `limit`
+  // waits for). The launch
   // strength is exactly Base Launch x that Launch Point, sent along the
   // hit's Directional Launch at LAUNCH_UNIT_SPEED world units per second per
   // point (see js/data/launch.js). A hit that does not launch (Base Launch
@@ -568,6 +572,9 @@ export class CombatSystem {
     const damage = blocked ? 0 : stab ? stab.damage : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
+    // ...and fills its Limit gauge by as much (CombatState.fillLimit): a
+    // block deals nothing, so it fills nothing.
+    tc.fillLimit(damage);
     // A perfect block heals its fighter (it added nothing above: a block
     // deals no damage).
     const heal = perfect ? tc.heal(PERFECT_SHIELD_HEAL) : 0;
