@@ -1011,9 +1011,10 @@ export class Fighter {
     }
 
     // Nothing asked for during a Mash Combo is kept for after it: no attack,
-    // Dash or jump comes out of a press made while it ran (the step it ends
-    // on included).
-    if (this.mash.active || this.mashEndedAt === this.steps) this.dropRequests();
+    // Dash or jump comes out of a press made while it was armed (waiting for
+    // the move its first press started to end) or ran (the step it ends on
+    // included).
+    if (this.mash.engaged || this.mashEndedAt === this.steps) this.dropRequests();
 
     this.updateFacing(dir, held);
     this.updateState(dt);

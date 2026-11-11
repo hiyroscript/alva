@@ -85,7 +85,7 @@ export const ROUTINE_EFFECTS = Object.freeze([
   'damage', 'baseLaunch', 'directionalLaunch', 'hitstun', 'blockstun', 'hitstop',
   'blockPush', 'quake', 'gaze', 'backstab', 'drain', 'carry', 'pull', 'repel', 'erase', 'pierce', 'finisher', 'stall',
   'motion', 'step', 'momentum', 'hits', 'projectile', 'burst', 'deflectProjectiles', 'passThrough', 'hurtboxes',
-  'airUses', 'freeFall', 'groundOnly', 'hitCancel', 'grab',
+  'airUses', 'freeFall', 'groundOnly', 'hitCancel', 'grab', 'maxInPlay',
 ]);
 
 const sum = (hits) => hits.reduce((total, h) => total + h.damage, 0);
