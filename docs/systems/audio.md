@@ -210,6 +210,33 @@ slows it into a minor mode (Phrygian or Aeolian) with a falling cadence; Draw
 leaves it unresolved on suspended chords with a dignified open hit. Each
 ending is a short sting (4–6 s) then a calm loop.
 
+### Levels
+
+Every channel's level was set from measurements, not by guesswork: each
+channel rendered on its own (an `OfflineAudioContext` driving
+`MusicVoice`) and set to its role's target loudness in the 200–5000 Hz
+band (the hook's carrier loudest, then the answering lines, harmonies,
+arpeggios and pads; the drums and the bass by their whole level), then
+every version rendered through the whole engine and checked. At the default
+settings, after the master's compressor and limiter:
+
+| What | Level (RMS) |
+| --- | --- |
+| Main Battle, every stage | about -22 dB (within 1.5 dB of each other), peaks under -4 dB |
+| Overtime | as loud at first, 2–3 dB louder as the Void closes |
+| Victory sting | -18 to -21 dB (its big final hit) |
+| Defeat and Draw stings | about -25 dB |
+| The calm loops after the match | -29 to -35 dB |
+| Practice Ground's ambience | about -27 dB |
+| The ejections | peaks about -10 dB, over the music ducked by 4 dB |
+| Deflect, Perfect Shield | peaks about -13 to -15 dB, the Perfect Shield above the block |
+| Shield block | about -16 dB |
+| Shield held | about -30 dB, well under the music |
+
+Every render was free of clicks and gaps, every change of version landed on
+its beat, and each Main Battle's loop came round with no seam. A new theme
+is levelled the same way: render it, compare it with these.
+
 ### The notation
 
 [`js/core/audio/theory.js`](../../js/core/audio/theory.js) says it all; in
