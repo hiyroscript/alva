@@ -431,7 +431,7 @@ test('Mode details translate every section immediately in place and also render 
       'Aventure', 'Combat rapide',
     ]);
     assert.deepEqual(panel.querySelectorAll('p').map((node) => node.textContent), [
-      'Franchissez les 30 niveaux dans l’ordre. À chaque niveau, Venture — le CPU — devient 1,5 fois plus intelligent et frappe 5 % plus fort. Tous les 5 niveaux, choisissez une Perquisite à conserver.',
+      'Franchissez les 30 niveaux dans l’ordre. À chaque niveau, Venture — le CPU — devient 1,5 fois plus intelligent. Tous les 5 niveaux, choisissez une Perquisite à conserver.',
       'Le combattant de votre adversaire et l’arène sont tirés au sort. Règles de match habituelles : le premier à 3 points, 5 minutes, puis la prolongation.',
       'Affrontez un adversaire contrôlé par le CPU. Projetez-le dans le Vide pour marquer des points. Le premier à atteindre 3 points gagne.',
       'En combat rapide, les matchs durent jusqu’à 5 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',

@@ -2,17 +2,17 @@
 // Venture, Adventure's own difficulty (the Adventure update,
 // js/data/adventure.js): its profile at every level (Easy at Level 1, every
 // trait's distance from perfect play divided by exactly 1.5 a level, within
-// its bounds, never a trait getting worse), its strength (1.05 a level,
-// apart from the smarts), and that strength reaching the fighters through
-// the battle's modifiers alone: a Venture hit adds the scaled damage (and
-// launches from it), a blocked one still adds nothing and costs the normal
-// Energy, and nothing outside Adventure ever scales a hit.
+// its bounds, never a trait getting worse), and that smarter is all it
+// gets: at every level from 1 to 30 its fighter deals exactly what any
+// other CPU's does (no modifier, the Battle refusing one for a CPU), while
+// the player's Perquisites reach the player's fighter through the
+// battle's modifiers, and nothing outside Adventure builds a modifier.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  ADVENTURE_LEVELS, VENTURE_SMARTS_GROWTH, VENTURE_STRENGTH_GROWTH, VENTURE_LIMITS, VENTURE_BASE_DIFFICULTY,
-  ventureProfile, ventureSmarts, ventureStrength, ventureModifiers, ventureSpec, adventureModifiers,
+  ADVENTURE_LEVELS, VENTURE_SMARTS_GROWTH, VENTURE_LIMITS, VENTURE_BASE_DIFFICULTY,
+  ventureProfile, ventureSmarts, ventureSpec, ventureNumbers, adventureModifiers,
 } from '../../js/data/adventure.js';
 import {
   CAPABILITY, DIFFICULTIES, DIFFICULTY_IDS, getDifficultyProfile, resolveDifficulty,
@@ -49,7 +49,7 @@ test('Level 1 is the Easy profile exactly', () => {
   assert.equal(ventureProfile(1), getDifficultyProfile('easy'), 'the very profile, not a copy');
   assert.deepEqual(ventureProfile(1), getDifficultyProfile('easy'));
   assert.equal(ventureSmarts(1), 1);
-  assert.equal(ventureStrength(1), 1);
+  assert.deepEqual(ventureNumbers(1), { smarts: 1 }, 'how much smarter, and nothing else');
 });
 
 test('every level holds every trait of a difficulty profile and nothing else', () => {
@@ -90,6 +90,10 @@ test('each level, every trait\'s distance from perfect play is divided by exactl
       });
     }
   }
+  assert.equal(ventureSmarts(30).toFixed(0), '127834');
+  // One function computes it: nothing else in the game does.
+  const src = readFileSync(new URL('../../js/data/adventure.js', import.meta.url), 'utf8');
+  assert.equal(src.match(/VENTURE_SMARTS_GROWTH \*\*/g)?.length, 1);
 });
 
 test('perfect play is the physical limit: reactions of at least two steps, no lapse, plan depth 4, probabilities 1', () => {
@@ -124,19 +128,24 @@ test('no trait ever gets worse from one level to the next, across all 30 (the CA
   }
 });
 
-test('Venture passes Brutal on most traits by Level 9 and keeps closing in: past it everywhere Brutal is not already perfect', () => {
+test('Venture passes Brutal on most traits by Level 9 and keeps closing in: past it on every trait but plan depth from Level 11', () => {
   const brutal = getDifficultyProfile('brutal');
   const atLeast = (p) => TRAITS.filter((t) => values(p[t]).every((v, i) => CAPABILITY[t] * (v - values(brutal[t])[i]) >= -1e-12));
-  assert.ok(atLeast(ventureProfile(6)).length >= 6, 'by Level 6 it reacts and plans like Brutal');
-  assert.ok(atLeast(ventureProfile(9)).length >= 18, 'by Level 9 most traits match or pass Brutal');
-  // Brutal is already perfect on its plan depth (4, a whole number Venture
-  // reaches), stage sense, launch steering and recovery skill (1): Venture
-  // only ever closes in on the last three.
+  const past = (p) => TRAITS.filter((t) => values(p[t]).every((v, i) => CAPABILITY[t] * (v - values(brutal[t])[i]) > 1e-12));
+  const six = atLeast(ventureProfile(6));
+  assert.ok(six.includes('react') && six.includes('planDepth'), 'by Level 6 it reacts faster than Brutal and plans as deep');
+  assert.ok(six.length >= 13, `by Level 6, ${six.length} of 24 traits`);
+  assert.ok(atLeast(ventureProfile(5)).length < 13, 'not yet at Level 5');
+  assert.ok(atLeast(ventureProfile(9)).length >= 22, 'by Level 9 nearly every trait matches or passes Brutal');
+  assert.ok(atLeast(ventureProfile(10)).length < 24, 'not yet all of them at Level 10');
+  // Brutal is perfect only on its plan depth (4, a whole number Venture
+  // reaches): every other trait Venture passes, from Level 11 on.
   const perfect = TRAITS.filter((t) => values(brutal[t]).every((v) => v === VENTURE_LIMITS[t]));
-  assert.deepEqual(perfect.sort(), ['diSkill', 'planDepth', 'recoverySkill', 'stageSense']);
-  const short = TRAITS.filter((t) => !atLeast(ventureProfile(30)).includes(t));
-  assert.deepEqual(short.sort(), ['diSkill', 'recoverySkill', 'stageSense']);
-  for (const t of short) assert.ok(ventureProfile(30)[t] > 0.9999, `${t} within a hair of perfect`);
+  assert.deepEqual(perfect, ['planDepth']);
+  for (let level = 11; level <= ADVENTURE_LEVELS; level++) {
+    assert.deepEqual(TRAITS.filter((t) => !past(ventureProfile(level)).includes(t)), ['planDepth'], `level ${level}`);
+    assert.equal(ventureProfile(level).planDepth, 4);
+  }
 });
 
 test('Venture is no fifth difficulty: four levels listed, its profile reached through getDifficultyProfile({ venture })', () => {
@@ -156,73 +165,66 @@ test('Venture is no fifth difficulty: four levels listed, its profile reached th
   assert.equal(new CombatAIController({ difficulty: 'nonsense' }).profile, getDifficultyProfile('medium'));
 });
 
-// ---- Stronger --------------------------------------------------------------------------
-
-test('ventureStrength(L) is 1.05^(L-1): x1 at 1, about x1.55 at 10, x2.53 at 20 and x4.12 at 30, apart from the smarts', () => {
-  assert.equal(VENTURE_STRENGTH_GROWTH, 1.05);
-  assert.notEqual(VENTURE_STRENGTH_GROWTH, VENTURE_SMARTS_GROWTH, 'each grows from its own constant');
-  for (const level of LEVELS) {
-    assert.equal(ventureStrength(level), 1.05 ** (level - 1), `level ${level}`);
-    assert.deepEqual(ventureModifiers(level), { damageDealt: 1.05 ** (level - 1) }, 'its strength and nothing else');
-  }
-  assert.equal(ventureStrength(10).toFixed(2), '1.55');
-  assert.equal(ventureStrength(20).toFixed(2), '2.53');
-  assert.equal(ventureStrength(30).toFixed(2), '4.12');
-  assert.equal(ventureSmarts(30).toFixed(0), '127834', 'the smarts grow far faster; damage never does');
-  // One function each: nothing else in the game computes them.
-  const src = readFileSync(new URL('../../js/data/adventure.js', import.meta.url), 'utf8');
-  assert.equal(src.match(/VENTURE_STRENGTH_GROWTH \*\*/g)?.length, 1);
-  assert.equal(src.match(/VENTURE_SMARTS_GROWTH \*\*/g)?.length, 1);
-});
+// ---- The same hits at every level ---------------------------------------------------
 
 // A plain hit, launching sideways from the target's new Launch Point.
 const probe = (damage, baseLaunch = 1) => probeHit({
   id: 'probe', damage, baseLaunch, directionalLaunch: 'horizontal', hitstun: 0, blockstun: 0, hitstop: 0,
 });
 
-test('a Venture hit adds the scaled damage, fills the Limit gauge by as much and launches from the new total', () => {
-  const level = 10;
-  const d = duel({ attackerModifiers: ventureModifiers(level) });
-  d.target.combat.launchPoint = 40;
-  const e = new CombatSystem().applyHit(d.attacker, d.target, probe(5, 2));
-  const damage = 5 * 1.05 ** 9;
-  assert.equal(e.type, 'hit');
-  assert.equal(e.damage, damage);
-  assert.equal(e.launchPointAfter, 40 + damage, 'fractional, kept as it is');
-  assert.equal(d.target.combat.limitGauge, damage);
-  assert.equal(e.launchStrength, 2 * (40 + damage), 'Base Launch x the new Launch Point');
-  assert.ok(Math.abs(d.target.body.vx - 2 * (40 + damage) * LAUNCH_UNIT_SPEED) < 1e-9);
-  // The same hit from anyone else adds its own damage.
-  const plain = duel();
-  plain.target.combat.launchPoint = 40;
-  assert.equal(new CombatSystem().applyHit(plain.attacker, plain.target, probe(5, 2)).damage, 5);
+const input = { flush() {}, sample: () => ({}) };
+const quickBattle = (extra = {}) => new Battle({
+  canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'quick-battle', seed: 3, p1Def: def, p2Def: def,
+  p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input, ...extra,
 });
 
-test('Venture\'s strength reaches every hit it is credited with: a projectile, a clone or a technique hits through its owner', () => {
-  const d = duel({ attackerModifiers: ventureModifiers(30) });
+// What the CPU's fighter (p2) adds with the same hit, struck straight, from
+// a projectile, a clone and a technique credited to it, and blocked:
+// [damage, Launch Point after, launch strength, Limit gauge, Energy paid].
+function dealt(battle) {
   const system = new CombatSystem();
-  for (const via of [{ projectile: { owner: d.attacker } }, { summon: { owner: d.attacker } }, { technique: { id: 'probe' } }]) {
-    d.target.combat.launchPoint = 0;
-    const e = system.applyHit(d.attacker, d.target, probe(3, 0), via);
-    assert.equal(e.damage, 3 * 1.05 ** 29, Object.keys(via)[0]);
+  const out = [];
+  for (const via of [undefined, { projectile: { owner: battle.p2 } }, { summon: { owner: battle.p2 } }, { technique: { id: 'probe' } }, 'block']) {
+    const target = battle.p1.combat;
+    target.launchPoint = 40;
+    target.limitGauge = 0;
+    target.shielding = via === 'block';
+    target.setEnergy(target.maxEnergy);
+    const e = system.applyHit(battle.p2, battle.p1, probe(5, 2), via === 'block' ? undefined : via);
+    out.push([e.type, e.damage, target.launchPoint, e.launchStrength ?? 0, target.limitGauge, target.maxEnergy - target.energy]);
   }
-  // A hazard has no attacker: no strength.
-  d.target.combat.launchPoint = 0;
-  assert.equal(system.applyHit(null, d.target, probe(3, 0), { hazard: { id: 'rock' } }).damage, 3);
-});
+  battle.p1.combat.shielding = false;
+  return out;
+}
 
-test('a blocked Venture hit still adds nothing and costs the normal Energy', () => {
-  const d = duel({ attackerModifiers: ventureModifiers(30) });
-  d.target.combat.launchPoint = 20;
-  d.target.combat.shielding = true;
-  const before = d.target.combat.energy;
-  const e = new CombatSystem().applyHit(d.attacker, d.target, probe(10, 3));
-  assert.equal(e.type, 'block');
-  assert.equal(e.damage, 0);
-  assert.equal(d.target.combat.launchPoint, 20);
-  assert.equal(d.target.combat.limitGauge, 0);
-  assert.equal(e.energyCost, BLOCK_ENERGY_COST);
-  assert.equal(before - d.target.combat.energy, BLOCK_ENERGY_COST);
+test('Venture never scales a hit: at every level from 1 to 30 its fighter deals exactly what any other CPU\'s does', () => {
+  // The same hits from a Quick Battle CPU at each of the four difficulties.
+  const reference = dealt(quickBattle({ difficulty: 'easy' }));
+  for (const difficulty of DIFFICULTY_IDS) assert.deepEqual(dealt(quickBattle({ difficulty })), reference, `${difficulty}: the same hits`);
+  assert.deepEqual(reference[0].slice(0, 5), ['hit', 5, 45, 90, 5], 'its authored damage, launching from 45');
+  assert.deepEqual(reference.at(-1).slice(0, 3), ['block', 0, 40], 'blocked: nothing added');
+  assert.equal(reference.at(-1)[5], BLOCK_ENERGY_COST, 'and the normal Energy paid');
+  for (const level of LEVELS) {
+    // An Adventure battle at that level, as the game builds it. The player
+    // owning Redoutable Strength V changes nothing here: it is the player's
+    // own damage, never the CPU's.
+    const battle = quickBattle({ cpuLevel: ventureSpec(level), modifiers: adventureModifiers({ redoutableStrength: 5 }) });
+    assert.equal(battle.p2.controller.profile, ventureProfile(level), `level ${level}: Venture plays it`);
+    assert.equal(battle.p2.modifiers, IDENTITY_MODIFIERS, `level ${level}: no damageDealt, no modifier at all`);
+    assert.equal(battle.p2.combat.modifiers, IDENTITY_MODIFIERS);
+    assert.deepEqual(dealt(battle), reference, `level ${level}: the same damage, launch, Limit and Energy as any CPU`);
+  }
+  // Adventure's data gives the CPU's side nothing, whatever the player owns,
+  // and computes no growth of damage at all.
+  assert.deepEqual(Object.keys(adventureModifiers({ redoutableStrength: 5 })), ['p1']);
+  const src = readFileSync(new URL('../../js/data/adventure.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /\bVENTURE_STRENGTH|\bventureStrength\b|\bventureModifiers\b/);
+  // And the Battle refuses a modifier for a CPU's side, at any level or
+  // difficulty, Watch Mode's two included.
+  assert.throws(() => quickBattle({ cpuLevel: ventureSpec(30), modifiers: { p2: { damageDealt: 1.5 } } }), /CPU's fighter plays with the identity/);
+  assert.throws(() => quickBattle({ difficulty: 'brutal', modifiers: { p2: { damageTaken: 0.5 } } }), /Side p2/);
+  assert.throws(() => quickBattle({ mode: 'watch', modifiers: { p1: { damageDealt: 2 } } }), /Side p1/);
+  assert.equal(quickBattle({ modifiers: { p2: { damageDealt: 1 } } }).p2.modifiers, IDENTITY_MODIFIERS, 'the identity spelled out is fine');
 });
 
 test('a hit of 0 stays 0 whatever the modifiers, and the identity changes nothing', () => {
@@ -235,22 +237,21 @@ test('a hit of 0 stays 0 whatever the modifiers, and the identity changes nothin
   assert.throws(() => resolveModifiers({ recoveryIntervalScale: 0 }), /recoveryIntervalScale/);
 });
 
-test('an Adventure Battle hands Venture its level and strength, the player their Perquisites, through every restart and respawn', () => {
+test('an Adventure Battle hands Venture its level, the player their Perquisites, through every restart and respawn', () => {
   const level = 7;
-  const battle = new Battle({
-    canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'quick-battle', seed: 3, p1Def: def, p2Def: def,
-    p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input: { flush() {}, sample: () => ({}) },
-    cpuLevel: ventureSpec(level), modifiers: adventureModifiers(level, { braveSoldier: 2 }),
-  });
+  const battle = quickBattle({ cpuLevel: ventureSpec(level), modifiers: adventureModifiers({ braveSoldier: 2 }) });
   assert.equal(battle.p2.controller.profile, ventureProfile(level));
-  assert.equal(battle.p2.modifiers.damageDealt, 1.05 ** 6);
-  assert.equal(battle.p2.combat.modifiers, battle.p2.modifiers);
+  assert.equal(battle.p2.modifiers, IDENTITY_MODIFIERS, 'Venture: the identity');
+  assert.equal(battle.p1.combat.modifiers, battle.p1.modifiers);
   assert.equal(battle.p1.modifiers.damageTaken, 1 - 0.12);
   assert.equal(battle.p1.modifiers.damageDealt, 1);
   battle.restart();
-  assert.equal(battle.p2.combat.modifiers.damageDealt, 1.05 ** 6, 'a restart keeps them');
+  assert.equal(battle.p1.combat.modifiers.damageTaken, 1 - 0.12, 'a restart keeps them');
+  assert.equal(battle.p2.combat.modifiers, IDENTITY_MODIFIERS);
+  battle.p1.respawn(battle.stage);
+  assert.equal(battle.p1.combat.modifiers.damageTaken, 1 - 0.12, 'and so does a respawn');
   battle.p2.respawn(battle.stage);
-  assert.equal(battle.p2.combat.modifiers.damageDealt, 1.05 ** 6, 'and so does a respawn');
+  assert.equal(battle.p2.combat.modifiers, IDENTITY_MODIFIERS);
   assert.equal(battle.p2.controller.profile, ventureProfile(level), 'the same level for the whole battle');
   // Every other battle: identity on both sides, the chosen difficulty.
   const quick = new Battle({

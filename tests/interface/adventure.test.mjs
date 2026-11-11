@@ -77,7 +77,7 @@ test('the details panel describes Adventure first, then Quick Battle, in two sec
   const sections = info.querySelectorAll('.mode-info-section');
   assert.deepEqual(sections.map((s) => s.getAttribute('data-mode')), ['adventure', 'quick-battle']);
   assert.deepEqual(sections[0].querySelectorAll('p').map((p) => p.textContent), [
-    'Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits 5% harder. Every 5 levels, choose one Perquisite to keep.',
+    'Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter. Every 5 levels, choose one Perquisite to keep.',
     'Your opponent’s fighter and the stage are drawn at random. Standard match rules: first to 3 points, 5 minutes, then overtime.',
   ]);
   assert.equal(info.querySelectorAll('[data-nav]').length, 0, 'text that fits is no stop for the arrows');
@@ -177,8 +177,8 @@ test('the wide row: Venture at the level focused and the Perquisites owned, info
   const { levels } = booted.screens;
   levels.cellFor(7).focus();
   assert.equal(levels.ventureTitle.textContent, 'Venture · Level 07');
-  // 1.5^6 and 1.05^6, to two decimals.
-  assert.equal(levels.ventureLine.textContent, '×11.39 smarter · ×1.34 damage vs Level 1');
+  // 1.5^6, to two decimals: how much smarter, and nothing about damage.
+  assert.equal(levels.ventureLine.textContent, '×11.39 smarter vs Level 1');
   assert.deepEqual(levels.perquisiteList.children.map((li) => li.textContent), ['Brave SoldierII', 'Maximum EnergyI']);
   assert.equal(levels.wide.querySelectorAll('[data-nav]').length, 0, 'never focused');
   // None owned: a dash.
@@ -351,12 +351,12 @@ test('the selector and Select Mode read in French, live, without a reload', () =
     assert.equal(label(levels.cellFor(8)), 'Niveau 08, suivant');
     assert.equal(label(levels.cellFor(9)), 'Niveau 09, verrouillé');
     assert.equal(levels.ventureTitle.textContent, 'Venture · Niveau 07');
-    assert.equal(levels.ventureLine.textContent, '×11,39 plus intelligent · ×1,34 de dégâts par rapport au niveau 1');
+    assert.equal(levels.ventureLine.textContent, '×11,39 plus intelligent par rapport au niveau 1');
     assert.equal(levels.perquisiteList.children[0].textContent, 'Force RedoutableI');
     assert.equal(levels.resetButton.getAttribute('data-i18n-span'), 'adventure.reset');
     assert.deepEqual(mode.el.querySelectorAll('.mode-name').map((n) => n.textContent), ['Aventure', 'Combat rapide']);
     assert.equal(mode.cardFor('adventure').querySelector('.mode-desc').textContent,
-      'Trente niveaux face à un CPU toujours plus redoutable. Gagnez des Perquisites en progressant.');
+      'Trente niveaux face à un CPU toujours plus intelligent. Gagnez des Perquisites en progressant.');
   } finally {
     setLanguage('en');
     off();

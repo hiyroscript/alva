@@ -5,10 +5,10 @@
 // 25 and 30.
 //
 // Everything Adventure decides is here: how many levels there are and which
-// offer a Perquisite, how much smarter and stronger Venture is at each
-// level, the Perquisites and their scaling, which two cards a milestone
-// offers, and the modifiers (js/game/combat/modifiers.js) each side's
-// fighter gets in an Adventure battle. The saved progress (the levels
+// offer a Perquisite, how much smarter Venture is at each level, the
+// Perquisites and their scaling, which two cards a milestone offers, and
+// the modifiers (js/game/combat/modifiers.js) the player's fighter gets in
+// an Adventure battle. The saved progress (the levels
 // unlocked and cleared, the Perquisites owned, the milestones' offers and
 // picks) lives in js/core/adventure-progress.js; the screens in
 // js/screens/adventure-*.js. Nothing outside Adventure reads any of it: no
@@ -24,22 +24,23 @@
 //   physical limit of each trait (VENTURE_LIMITS), never Brutal: a reaction
 //   and a reassessment of at least two simulation steps, no lapse, no
 //   noise, no misjudgement, no timing error, a full plan depth (4) and every
-//   probability 1. By about Level 6 it matches Brutal on most traits and it
-//   keeps closing in from there. No trait ever gets worse from one level to
-//   the next (the CAPABILITY ordering).
+//   probability 1. By Level 6 it reacts faster than Brutal and plans as
+//   deep, by Level 9 it matches or passes Brutal on 22 of its 24 traits, and
+//   from Level 11 it is past Brutal on every trait but plan depth (4 for
+//   both). No trait ever gets worse from one level to the next (the
+//   CAPABILITY ordering).
 //
-//   It is also VENTURE_STRENGTH_GROWTH (1.05) times stronger: its fighter's
-//   real hits deal ventureStrength(L) = 1.05^(L-1) times their damage (x1 at
-//   Level 1, about x1.55 at 10, x2.53 at 20 and x4.12 at 30), through the
-//   battle's modifiers (damageDealt), so the launch that follows grows with
-//   it. It grows more gently than the smarts on purpose: damage has no
-//   bound, and at 1.5 a level Level 30 would hit about 128,000 times as
-//   hard. Strength is the one exception to "no difficulty scales a hit",
-//   and only here.
+//   Smarter is all it ever gets: Venture never scales a hit. Its fighter is
+//   the same at every level as at any difficulty, with the same damage,
+//   launch, speed, Energy and every other mechanic. A CPU has no Perquisite
+//   and a difficulty has no modifier, so an Adventure battle gives the CPU's
+//   side nothing (adventureModifiers): the identity's modifiers, which the
+//   Battle insists on for a CPU (js/game/battle.js). Level 30 hits exactly
+//   as hard as Level 1, and as Easy does in Quick Battle.
 //
-//   ventureProfile and ventureStrength are the only places either is
-//   computed: retune VENTURE_SMARTS_GROWTH or VENTURE_STRENGTH_GROWTH and
-//   everything (the CPU, the HUD's line, the level selector's) follows.
+//   ventureProfile is the only place the smarts are computed: retune
+//   VENTURE_SMARTS_GROWTH and everything (the CPU, the HUD's line, the
+//   level selector's) follows.
 //
 // Perquisites
 //
@@ -77,7 +78,6 @@ export const levelLabel = (level) => String(level).padStart(2, '0');
 // ---- Venture ------------------------------------------------------------------------
 
 export const VENTURE_SMARTS_GROWTH = 1.5;
-export const VENTURE_STRENGTH_GROWTH = 1.05;
 
 // The level Venture starts from.
 export const VENTURE_BASE_DIFFICULTY = 'easy';
@@ -105,12 +105,6 @@ const clampLevel = (level) => Math.min(ADVENTURE_LEVELS, Math.max(1, Math.floor(
 // How much smarter Venture is at `level` than at Level 1: 1.5^(L-1).
 export function ventureSmarts(level) {
   return VENTURE_SMARTS_GROWTH ** (clampLevel(level) - 1);
-}
-
-// How much harder Venture's fighter hits at `level`: 1.05^(L-1). The one
-// place it is computed.
-export function ventureStrength(level) {
-  return VENTURE_STRENGTH_GROWTH ** (clampLevel(level) - 1);
 }
 
 // One trait value `easy` moved toward its `limit` by `factor`: its distance
@@ -149,14 +143,8 @@ export function ventureProfile(level) {
 }
 
 // The difficulty spec for Venture at `level`, as getDifficultyProfile takes
-// it ({ venture: level }).
+// it ({ venture: level }): how well the CPU thinks, and nothing else.
 export const ventureSpec = (level) => Object.freeze({ venture: clampLevel(level) });
-
-// What Venture's fighter carries into an Adventure battle at `level`: its
-// strength as damage dealt, nothing else (a CPU has no Perquisite).
-export function ventureModifiers(level) {
-  return Object.freeze({ damageDealt: ventureStrength(level) });
-}
 
 // ---- Perquisites --------------------------------------------------------------------
 
@@ -175,8 +163,7 @@ export const PERQUISITE_LEVEL_STEP = 0.5;
 //                          recovery starts)
 //   maximumEnergy          every Energy cost down (the Dash, the air dash,
 //                          a blocked hit, the Deflect, every move's own)
-//   redoutableStrength     damage dealt up (on real hits, where Venture's
-//                          strength applies)
+//   redoutableStrength     damage dealt up (on the player's real hits)
 export const PERQUISITES = Object.freeze([
   { id: 'braveSoldier', base: 0.08, unit: 'share' },
   { id: 'nearlyImmortal', base: 0.5, unit: 'points' },
@@ -263,15 +250,16 @@ export function offerLevel(levels, id) {
 
 // ---- An Adventure battle --------------------------------------------------------------
 
-// Each side's modifiers in an Adventure battle at `level`: the player's from
-// the Perquisites they own (`levels`), the CPU's from Venture's strength.
-export function adventureModifiers(level, levels) {
-  return Object.freeze({ p1: perquisiteModifiers(levels), p2: ventureModifiers(level) });
+// The modifiers an Adventure battle hands its sides, at any level: the
+// player's (p1) from the Perquisites they own (`levels`); the CPU's (p2)
+// none, so the identity's at every level (Venture never scales a hit).
+export function adventureModifiers(levels) {
+  return Object.freeze({ p1: perquisiteModifiers(levels) });
 }
 
 // The numbers the interface shows for Venture at `level`: how many times
-// smarter and stronger than at Level 1 (each language writes them to two
-// decimals: ×11.39, ×11,39).
+// smarter than at Level 1 (each language writes it to two decimals:
+// ×11.39, ×11,39).
 export function ventureNumbers(level) {
-  return { smarts: ventureSmarts(level), strength: ventureStrength(level) };
+  return { smarts: ventureSmarts(level) };
 }

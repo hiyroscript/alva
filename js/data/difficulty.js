@@ -16,13 +16,13 @@
 // (CAPABILITY): no multiplier for any of those exists, so none can scale a
 // hit.
 //
-// The one deliberate exception is Adventure's own difficulty, Venture
-// (js/data/adventure.js, the Adventure update), and only in Adventure: its
-// profile is built from Easy's here (getDifficultyProfile({ venture })), and
-// its strength scales the damage of its fighter's real hits, never through
-// a profile but through the battle's per-fighter modifiers
-// (js/game/combat/modifiers.js), the one thing the combat engine reads.
-// Every other difficulty, and every other mode, scales nothing.
+// There is no exception. No difficulty and no mode scales a hit, Venture
+// included: Adventure's own difficulty (js/data/adventure.js, the Adventure
+// update) is a profile built from Easy's (getDifficultyProfile({ venture })),
+// smarter level by level and nothing else, and a CPU's fighter always fights
+// with the identity's per-fighter modifiers (js/game/combat/modifiers.js;
+// the Battle refuses anything else for a CPU's side). A higher level is a
+// smarter CPU, never one that hits harder.
 //
 // Profile traits (seconds and world units are simulation time and space):
 //
@@ -85,7 +85,7 @@ import { ventureProfile } from './adventure.js';
 
 export const DEFAULT_DIFFICULTY = 'medium';
 
-// Which way each trait improves: 1 when a larger value is the stronger CPU,
+// Which way each trait improves: 1 when a larger value is the smarter CPU,
 // -1 when a smaller one is. Ranges compare both bounds.
 export const CAPABILITY = Object.freeze({
   react: -1, lapse: -1, think: -1, noise: -1, rangeError: -1, predictError: -1, timing: -1,
@@ -95,37 +95,47 @@ export const CAPABILITY = Object.freeze({
 });
 
 // The reaction windows are the same for every fighter. They are set
-// against startups from about 1/12 s (a jab) through a quarter of a second
-// (a telegraphed kick) to half a second or more (a technique's cast, a
-// clone's cloud): Easy, a casual player, is usually too late even for the
-// kick; Medium answers the slower moves; Hard, a tournament player, reads
-// the kick reliably; Brutal sometimes even the jab, but never on the frame
-// it starts. Another fighter's moves are read by the same windows, so a
+// against startups from about a tenth of a second (a jab) through a
+// quarter of a second (a telegraphed kick) to half a second or more (a
+// technique's cast, a clone's cloud): Easy, a casual player (0.38-0.58 s),
+// is always too late for the kick and in time for a half-second cast only
+// more often than not; Medium (0.24-0.38 s) answers the kick only at its
+// very quickest and the casts every time; Hard, a tournament player
+// (0.16-0.24 s), still reads the kick every time; Brutal (0.08-0.12 s) is
+// in time for the jab about half the time, and never on the frame it
+// starts. Another fighter's moves are read by the same windows, so a
 // faster or slower startup is simply harder or easier to answer.
+//
+// Every level was made less smart (the Easy and Medium traits a quarter to
+// two fifths of the way toward worse, Hard's and Brutal's about a tenth):
+// later, more lapses and noise, bigger misjudgements, a shorter lookahead,
+// a weaker guard, fewer punishes and looser combos, and less sense of the
+// stage, the match and its own recovery. Brutal is no longer perfect on
+// any trait but its plan depth.
 const PROFILES = {
   easy: {
-    react: [0.3, 0.46], lapse: 0.33, think: [0.22, 0.36], noise: 0.65, rangeError: 34, predictError: 0.42, timing: 0.085,
-    lookahead: 0.1, planDepth: 1, comboReliability: 0.32, guard: 0.3, perfectShield: 0.03, punish: 0.28, adapt: 0.12,
-    energySense: 0.25, riskSense: 0.25, stageSense: 0.35, opportunity: 0.28, diSkill: 0.15, recoverySkill: 0.5, initiative: 0.45,
-    patience: 0.3, discipline: 0.35, awareness: 0.35,
+    react: [0.38, 0.58], lapse: 0.45, think: [0.26, 0.42], noise: 0.85, rangeError: 45, predictError: 0.55, timing: 0.11,
+    lookahead: 0.07, planDepth: 1, comboReliability: 0.22, guard: 0.2, perfectShield: 0.02, punish: 0.18, adapt: 0.08,
+    energySense: 0.17, riskSense: 0.17, stageSense: 0.24, opportunity: 0.19, diSkill: 0.1, recoverySkill: 0.35, initiative: 0.45,
+    patience: 0.3, discipline: 0.24, awareness: 0.24,
   },
   medium: {
-    react: [0.19, 0.3], lapse: 0.14, think: [0.08, 0.14], noise: 0.32, rangeError: 15, predictError: 0.2, timing: 0.04,
-    lookahead: 0.25, planDepth: 2, comboReliability: 0.64, guard: 0.57, perfectShield: 0.2, punish: 0.58, adapt: 0.4,
-    energySense: 0.55, riskSense: 0.55, stageSense: 0.65, opportunity: 0.6, diSkill: 0.5, recoverySkill: 0.8, initiative: 0.6,
-    patience: 0.5, discipline: 0.6, awareness: 0.6,
+    react: [0.24, 0.38], lapse: 0.22, think: [0.1, 0.18], noise: 0.43, rangeError: 20, predictError: 0.27, timing: 0.052,
+    lookahead: 0.18, planDepth: 2, comboReliability: 0.46, guard: 0.42, perfectShield: 0.13, punish: 0.45, adapt: 0.28,
+    energySense: 0.4, riskSense: 0.4, stageSense: 0.48, opportunity: 0.44, diSkill: 0.35, recoverySkill: 0.62, initiative: 0.6,
+    patience: 0.5, discipline: 0.44, awareness: 0.44,
   },
   hard: {
-    react: [0.15, 0.22], lapse: 0.06, think: [0.04, 0.07], noise: 0.13, rangeError: 7, predictError: 0.1, timing: 0.02,
-    lookahead: 0.4, planDepth: 3, comboReliability: 0.86, guard: 0.82, perfectShield: 0.5, punish: 0.85, adapt: 0.7,
-    energySense: 0.8, riskSense: 0.8, stageSense: 0.85, opportunity: 0.82, diSkill: 0.8, recoverySkill: 0.93, initiative: 0.68,
-    patience: 0.75, discipline: 0.8, awareness: 0.82,
+    react: [0.16, 0.24], lapse: 0.07, think: [0.045, 0.078], noise: 0.145, rangeError: 8, predictError: 0.11, timing: 0.022,
+    lookahead: 0.36, planDepth: 3, comboReliability: 0.77, guard: 0.73, perfectShield: 0.44, punish: 0.8, adapt: 0.62,
+    energySense: 0.71, riskSense: 0.71, stageSense: 0.76, opportunity: 0.73, diSkill: 0.71, recoverySkill: 0.84, initiative: 0.68,
+    patience: 0.75, discipline: 0.71, awareness: 0.73,
   },
   brutal: {
-    react: [0.07, 0.105], lapse: 0.015, think: [0.034, 0.056], noise: 0.04, rangeError: 2, predictError: 0.04, timing: 0.008,
-    lookahead: 0.6, planDepth: 4, comboReliability: 0.98, guard: 0.96, perfectShield: 0.85, punish: 0.98, adapt: 0.95,
-    energySense: 0.95, riskSense: 0.96, stageSense: 1, opportunity: 0.97, diSkill: 1, recoverySkill: 1, initiative: 0.72,
-    patience: 0.85, discipline: 0.92, awareness: 0.95,
+    react: [0.08, 0.12], lapse: 0.017, think: [0.038, 0.063], noise: 0.06, rangeError: 2.3, predictError: 0.045, timing: 0.009,
+    lookahead: 0.54, planDepth: 4, comboReliability: 0.9, guard: 0.87, perfectShield: 0.75, punish: 0.95, adapt: 0.85,
+    energySense: 0.85, riskSense: 0.86, stageSense: 0.9, opportunity: 0.87, diSkill: 0.9, recoverySkill: 0.92, initiative: 0.72,
+    patience: 0.85, discipline: 0.83, awareness: 0.85,
   },
 };
 

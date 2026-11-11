@@ -2,7 +2,7 @@
 
 **Home → Play → Select Mode → Adventure** is Alva's single-player
 progression: thirty levels played in order against one CPU difficulty of
-its own, **Venture**, which grows stronger with every level, and five
+its own, **Venture**, which grows smarter with every level, and five
 **Perquisites**, permanent upgrades the player picks from two cards every
 five levels. It is only there: Local Play, Online Play, Watch Mode and
 Practice Ground never list it, link to it or read its state. The product
@@ -17,12 +17,12 @@ Select Mode → 01 Adventure → Select Level → Select Fighter
 
 | Module | Owns |
 | --- | --- |
-| [`js/data/adventure.js`](../../js/data/adventure.js) | All of Adventure's data: `ADVENTURE_LEVELS` (30), `PERQUISITE_MILESTONES`, Venture (`VENTURE_SMARTS_GROWTH`, `VENTURE_STRENGTH_GROWTH`, `VENTURE_LIMITS`, `ventureProfile`, `ventureStrength`, `ventureModifiers`), the Perquisites (`PERQUISITES`, `perquisiteScale`, `perquisiteEffect`, `perquisiteModifiers`, `perquisiteOffer`) and each side's modifiers in a battle (`adventureModifiers`). |
+| [`js/data/adventure.js`](../../js/data/adventure.js) | All of Adventure's data: `ADVENTURE_LEVELS` (30), `PERQUISITE_MILESTONES`, Venture (`VENTURE_SMARTS_GROWTH`, `VENTURE_LIMITS`, `ventureProfile`, `ventureSmarts`), the Perquisites (`PERQUISITES`, `perquisiteScale`, `perquisiteEffect`, `perquisiteModifiers`, `perquisiteOffer`) and the player's modifiers in a battle (`adventureModifiers`; Venture's fighter has none). |
 | [`js/core/adventure-progress.js`](../../js/core/adventure-progress.js) | The saved progress (`AdventureProgress`, key `alva.adventure`): levels unlocked and cleared, Perquisites owned, each milestone's offer and pick, the run's seed. |
 | [`js/screens/adventure-level-screen.js`](../../js/screens/adventure-level-screen.js) | Select Level (`adventure-levels`). |
 | [`js/screens/adventure-setup.js`](../../js/screens/adventure-setup.js) | The flow from a level to its Battle: Adventure's Select Fighter (`adventure-character`), the cards when due, each battle's draw. |
 | [`js/ui/perquisite-cards.js`](../../js/ui/perquisite-cards.js) | The Perquisite cards' dialog. |
-| [`js/game/combat/modifiers.js`](../../js/game/combat/modifiers.js) | The per-fighter modifiers the combat engine reads (identity everywhere but Adventure). |
+| [`js/game/combat/modifiers.js`](../../js/game/combat/modifiers.js) | The per-fighter modifiers the combat engine reads (identity everywhere but the Adventure player's fighter). |
 | [`js/game/ai/cpu-intelligence/effective.js`](../../js/game/ai/cpu-intelligence/effective.js) | The CPU's reads of the real, modified numbers. |
 
 ## Select Mode
@@ -53,7 +53,7 @@ progress saved on this device:
   that milestone's Perquisite is picked, filled after.
 
 Under the grid, a wide row, information only: Venture at the level focused
-("Venture · Level 07", "×11.39 smarter · ×1.34 damage vs Level 1") and the
+("Venture · Level 07", "×11.39 smarter vs Level 1") and the
 Perquisites owned as chips ("Brave Soldier II"), or a dash. **Reset
 progress** at the bottom, outlined in the warning tone: a first press arms
 it ("Confirm reset") for 3.2 s; a second press within that time clears
@@ -92,29 +92,29 @@ line.
 ## Venture
 
 One difficulty that grows with the level, never a fifth choice beside
-Easy to Brutal (the Difficulty screen and Watch Mode list four). Its two
-growths are separate constants, each read by one function:
+Easy to Brutal (the Difficulty screen and Watch Mode list four). It only
+ever grows **smarter** (`VENTURE_SMARTS_GROWTH`, 1.5; `ventureProfile`,
+the one place it is computed): Level 1 is Easy's profile exactly. Each
+level, every trait's distance from perfect play is divided by 1.5:
+`value(L) = limit + (easy − limit) / 1.5^(L−1)`. Perfect play is each
+trait's physical limit (`VENTURE_LIMITS`), not Brutal: a reaction and a
+reassessment of at least two simulation steps (never on the frame
+something starts), no lapse, noise, misjudgement or timing error, a
+lookahead of 1 s, a plan depth of 4 (rounded, a whole number) and every
+probability 1. No trait ever gets worse from a level to the next. By
+Level 6 it already reacts faster than Brutal and plans as deep (13 of its
+24 traits at least Brutal's); by Level 9 it matches or passes Brutal on 22
+of them (all but its lapses and how often it reassesses); from Level 11 it
+is past Brutal on every trait but plan depth, where both are at the limit
+(4).
 
-- **Smarter** (`VENTURE_SMARTS_GROWTH`, 1.5; `ventureProfile`): Level 1 is
-  Easy's profile exactly. Each level, every trait's distance from perfect
-  play is divided by 1.5: `value(L) = limit + (easy − limit) / 1.5^(L−1)`.
-  Perfect play is each trait's physical limit (`VENTURE_LIMITS`), not
-  Brutal: a reaction and a reassessment of at least two simulation steps
-  (never on the frame something starts), no lapse, noise, misjudgement or
-  timing error, a lookahead of 1 s, a plan depth of 4 (rounded, a whole
-  number) and every probability 1. No trait ever gets worse from a level
-  to the next. By Level 6 it already reacts faster than Brutal and plans
-  as deep; by Level 9 it matches or passes Brutal on 18 of its 24 traits;
-  from about Level 15 it is past Brutal everywhere Brutal is not already
-  perfect (stage sense, launch steering and recovery skill, 1, which it
-  only closes in on).
-- **Stronger** (`VENTURE_STRENGTH_GROWTH`, 1.05; `ventureStrength`): its
-  fighter's real hits deal `1.05^(L−1)` times their damage: ×1 at Level 1,
-  ×1.55 at 10, ×2.53 at 20, ×4.12 at 30. Damage has no bound, so it grows
-  far more gently than the smarts (at 1.5 a level it would be about
-  ×128,000 by Level 30). It is the one exception to "no difficulty ever
-  scales a hit", and only here: it reaches the fighter through the battle's
-  modifiers, never through the profile.
+Venture never scales a hit. Its fighter is the same at every level as at
+any difficulty: the same damage, launch, speed, Energy and every other
+mechanic. A CPU has no Perquisite and a difficulty has no modifier, so its
+side of the battle always has the identity's modifiers (the Battle refuses
+anything else for a CPU's side): Level 30 hits exactly as hard as Level 1,
+or as Easy in Quick Battle. Its hits used to grow 1.05 times a level;
+that growth was [removed](../../UPDATES.md#later-venture-only-gets-smarter).
 
 ## Perquisites
 
@@ -150,9 +150,10 @@ and respawn): `damageDealt`, `damageTaken`, `recoveryAmountBonus`,
 `recoveryIntervalScale`, `energyCostScale`. Every mode but Adventure
 leaves them out, so both sides have the identity's, which changes nothing
 bit for bit (the online state hash and lockstep included). In Adventure the
-player's come from their Perquisites and the CPU's from Venture's strength
-(a CPU has no Perquisite). The combat engine reads only the object it is
-handed, never a mode, a fighter id or Adventure state:
+player's come from their Perquisites; the CPU's are the identity's at every
+level (a CPU has no Perquisite, and no difficulty scales a hit). The combat
+engine reads only the object it is handed, never a mode, a fighter id or
+Adventure state:
 
 - `CombatSystem.applyHit`: a real hit's damage is its own × the
   attacker's `damageDealt` × the target's `damageTaken`, added to the
@@ -173,13 +174,14 @@ really paid).
 
 CPU Intelligence reasons with the real numbers
 (`js/game/ai/cpu-intelligence/effective.js`, the engine's own functions):
-its own hits land × its `damageDealt`, so a high-level Venture sees a
-kill-confirm at a lower Launch Point (`LaunchJudge.strikes`,
-`Strategy.koThreat`); against Brave Soldier it knows its hits do less;
-against Redoutable Strength it weighs the player's hits more in its guard
-and risk; against Nearly Immortal and Velocious Immune System it knows the
-player's Launch Point drains faster, so waiting is worth less and a finish
-now worth more (it keeps its momentum); against Maximum Energy its read of
+its own hits land as authored (Venture's `damageDealt` is 1 at every
+level); against Brave Soldier it knows its hits do less, so it sees a
+kill-confirm at a higher Launch Point (`LaunchJudge.strikes`,
+`Strategy.koThreat`); against Redoutable Strength it weighs the player's
+hits more in its guard and risk; against Nearly Immortal and Velocious
+Immune System it knows the player's Launch Point drains faster, so waiting
+is worth less and a finish now worth more (it keeps its momentum); against
+Maximum Energy its read of
 "about to run dry" uses the player's costs; overtime's tiebreak projects
 each fighter's own recovery. Its own Energy reads use full costs. The
 modifiers are rules of the match, known like the clock; perception is
@@ -224,9 +226,10 @@ Mode stacked on a tall, narrow window (`08-…`).
   fighter, Level 30, progress across a fresh app, Adventure nowhere else,
   the identity in every other mode.
 - [`tests/systems/venture.test.mjs`](../../tests/systems/venture.test.mjs):
-  Venture's profile and strength, a Venture hit, a blocked one.
+  Venture's profile at every level, and its hits dealing exactly what any
+  other CPU's do at every level from 1 to 30.
 - [`tests/systems/perquisites.test.mjs`](../../tests/systems/perquisites.test.mjs):
   the table, the offers, every effect at its place, the saved progress.
 - [`tests/systems/adventure-cpu.test.mjs`](../../tests/systems/adventure-cpu.test.mjs):
-  the CPU with the identity (the same seeded matches as before the update)
-  and with Adventure's modifiers.
+  the CPU with the identity (the same seeded matches with and without the
+  identity spelled out) and against the player's Perquisites.

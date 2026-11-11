@@ -147,7 +147,8 @@ blocks every attack.
   mark floats over
   a fighter while it performs one.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
-  Brutal): difficulty changes how well it thinks, never what its fighter
+  Brutal): a higher difficulty is a smarter CPU, never one that hits
+  harder; difficulty changes how well it thinks, never what its fighter
   can do. **Regular Play** picks the difficulty and your fighter, then
   draws the CPU's fighter and the stage at random; **Custom Play** also
   picks the CPU's fighter and the stage. Five minutes; level on points at

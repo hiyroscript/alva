@@ -138,7 +138,9 @@ export class MatchObjective {
     this.myExp = 0;
     this.foeExp = 0;
     this.bias = BIAS.build;
-    this.strength = 0.35 + 0.65 * this.profile.awareness;
+    // How much the objective weighs in what it does: as fully as the level
+    // reads the match (its awareness).
+    this.weight = 0.35 + 0.65 * this.profile.awareness;
     // This match's temperament: a little bolder or warier, more or less
     // patient, within what the level allows.
     const draw = () => (rng ? rng() * 2 - 1 : 0);
@@ -155,23 +157,23 @@ export class MatchObjective {
   // opponent (a factor on the value of waiting), as fully as it reads the
   // match.
   get select() {
-    return 1 + (this.bias.select - 1) * this.strength;
+    return 1 + (this.bias.select - 1) * this.weight;
   }
 
   // The bar shift and risk factor the strategy applies, as fully as the
   // level reads the match (impatience lowers the bar whatever the
   // objective).
   get aggro() {
-    return this.bias.aggro * this.strength + this.impatience * 0.4 + this.temper.boldness;
+    return this.bias.aggro * this.weight + this.impatience * 0.4 + this.temper.boldness;
   }
 
   get risk() {
-    return 1 + (this.bias.risk - 1) * this.strength;
+    return 1 + (this.bias.risk - 1) * this.weight;
   }
 
   // The bias the objective gives strategy mode `mode`.
   modeBias(mode) {
-    return (this.bias.modes[mode] ?? 0) * this.strength;
+    return (this.bias.modes[mode] ?? 0) * this.weight;
   }
 
   // Seconds of patience before waiting turns to impatience, for this level
@@ -215,7 +217,7 @@ export class MatchObjective {
       this.choose('regroup', urgent, brain, 'opponent out of play: regrouping for its return');
       return this;
     }
-    const aw = this.strength;
+    const aw = this.weight;
     const me = s.me;
     const op = s.op;
     // Each fighter's exposure: how likely the other's best launch is to end

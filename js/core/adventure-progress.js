@@ -248,10 +248,11 @@ export class AdventureProgress {
     this.save();
   }
 
-  // The modifiers an Adventure battle at `level` hands each side (the
-  // player's Perquisites, Venture's strength: js/data/adventure.js).
-  modifiersFor(level) {
-    return adventureModifiers(level, this.values.perquisites);
+  // The modifiers an Adventure battle hands its sides, at any level: the
+  // player's from their Perquisites, the CPU's the identity's (Venture
+  // never scales a hit: js/data/adventure.js).
+  modifiersFor() {
+    return adventureModifiers(this.values.perquisites);
   }
 
   // Every milestone, in order, with whether it is claimed (the selector's

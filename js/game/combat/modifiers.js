@@ -31,11 +31,13 @@
 // The combat engine never knows where a modifiers object came from: no
 // mode, no fighter id, no Adventure state is read here or by any rule that
 // reads one. Only the Battle builds them (js/game/battle.js), and only
-// Adventure gives a fighter anything but the identity
-// (js/data/adventure.js: the player's Perquisites, Venture's strength). The
-// CPU reads the same functions to predict what its hits and its opponent's
-// really do (js/game/ai/cpu-intelligence/effective.js), so nothing is
-// computed twice.
+// Adventure gives a fighter anything but the identity, and only the
+// player's (js/data/adventure.js: their Perquisites, Redoutable Strength's
+// damageDealt among them). A CPU's fighter always has the identity: no
+// difficulty, Venture included, feeds any of these, and the Battle refuses
+// anything else for a CPU's side. The CPU reads the same functions to
+// predict what its hits and its opponent's really do
+// (js/game/ai/cpu-intelligence/effective.js), so nothing is computed twice.
 
 import { LAUNCH_RECOVERY_AMOUNT, LAUNCH_RECOVERY_INTERVAL } from '../../data/launch.js';
 

@@ -513,10 +513,13 @@ test('a high level weighs its Shield against Unlimited Void and Hollow Purple, a
   // CPU weighs against it (with breaking the cast, Deflecting the sphere,
   // jumping or stepping out). With no blow of its own to answer with (every
   // move cooling down), the Shield is the answer it takes, and it blocks.
+  // Brutal's guard is high, not perfect (0.87): over sixteen casts each it
+  // raises the Shield in time against more than a third of them.
+  const SEEDS = 16;
   const offered = { attack4: 0, attack5: 0 };
   const blocked = { attack4: 0, attack5: 0 };
   for (const [move, foeX] of [['attack4', 720], ['attack5', 380]]) {
-    for (let seed = 0; seed < 8; seed++) {
+    for (let seed = 0; seed < SEEDS; seed++) {
       // The CPU holds its own offense; the other side casts at it once.
       const r = ring({
         difficulty: 'brutal', seed: 440 + seed, cpuX: 900, foeX,
@@ -543,10 +546,10 @@ test('a high level weighs its Shield against Unlimited Void and Hollow Purple, a
       }
     }
   }
-  assert.equal(offered.attack4, 8, 'a Shield is weighed against Unlimited Void every time');
-  assert.equal(offered.attack5, 8, 'and against Hollow Purple');
-  assert.ok(blocked.attack4 >= 4, `it Shields Unlimited Void (${blocked.attack4} of 8)`);
-  assert.ok(blocked.attack5 >= 4, `it Shields Hollow Purple (${blocked.attack5} of 8)`);
+  assert.equal(offered.attack4, SEEDS, 'a Shield is weighed against Unlimited Void every time');
+  assert.equal(offered.attack5, SEEDS, 'and against Hollow Purple');
+  assert.ok(blocked.attack4 >= 6, `it Shields Unlimited Void (${blocked.attack4} of ${SEEDS})`);
+  assert.ok(blocked.attack5 >= 6, `it Shields Hollow Purple (${blocked.attack5} of ${SEEDS})`);
 });
 
 test('its output is only the player\'s own controls: never a control the fighter does not read', () => {

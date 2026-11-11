@@ -4,8 +4,8 @@
 // Energy reads the numbers as the match really applies them, through each
 // fighter's modifiers (js/game/combat/modifiers.js), not the authored ones.
 // In every mode but Adventure the modifiers are the identity and nothing
-// here changes a value, bit for bit. In Adventure the CPU (Venture) deals
-// `damageDealt` times its hits' damage, and the player may take less
+// here changes a value, bit for bit. In Adventure the CPU's own are the
+// identity too (Venture never scales a hit), and the player may take less
 // (Brave Soldier), deal more (Redoutable Strength), recover more a tick
 // (Nearly Immortal) or more often (Velocious Immune System), and pay less
 // for everything that costs Energy (Maximum Energy).

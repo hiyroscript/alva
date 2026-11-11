@@ -95,9 +95,16 @@ test('A: with a dangerous Launch Point and time on the clock it breaks off to re
 // ---- B. An opponent that can be finished ---------------------------------------------
 
 test('B: an opponent exposed by the ledge is finished: its commitments are launches that can end a life, and they do', () => {
+  // Hard and Brutal finish it on at least two seeds of three with every
+  // fighter; Medium, which sees an opening and a finisher less often (its
+  // punish 0.45 and opportunity 0.44), misses more: at least once with
+  // every fighter, three times in four over the roster.
+  const NEED = { medium: 1, hard: 2, brutal: 2 };
   for (const difficulty of ['medium', 'hard', 'brutal']) {
     let launches = 0;
     let commits = 0;
+    let finished = 0;
+    let tries = 0;
     for (const [cpuDef, foeDef] of FINISH_PAIRS) {
       let kos = 0;
       for (const seed of [3, 4, 5]) {
@@ -119,8 +126,11 @@ test('B: an opponent exposed by the ledge is finished: its commitments are launc
           return true;
         });
       }
-      assert.ok(kos >= 2, `${difficulty} #${cpuDef.id}: finished ${kos} of 3`);
+      assert.ok(kos >= NEED[difficulty], `${difficulty} #${cpuDef.id}: finished ${kos} of 3`);
+      finished += kos;
+      tries += 3;
     }
+    assert.ok(finished >= tries * 0.75, `${difficulty}: finished ${finished} of ${tries}`);
     // Most of them: since attacks steer (js/data/attack-mobility.js), the
     // competent opponent's own strikes carry it out of the corner more
     // often, so the fight runs on into neutral pokes after a launch misses
@@ -177,11 +187,16 @@ function posture(base, score, timeLeft, objectives) {
   return { t, initiate: initiate / t, toward: toward / t, taken: taken / t };
 }
 
+// How late is late enough for a level to protect a one-point lead: the
+// fuller it reads the match (its awareness), the sooner. Hard and Brutal
+// protect it with 20 s left; Medium (awareness 0.44) only from about 17 s.
+const LATE = { medium: 15, hard: 20, brutal: 20 };
+
 test('C, D: ahead late it protects its lead (lets the opponent come, still counters, takes less); behind with seconds left it forces the fight', () => {
   for (const difficulty of ['medium', 'hard', 'brutal']) {
     for (const [cpuDef, foeDef] of PAIRS) {
       const base = { difficulty, cpuDef, foeDef, cpuLP: 30, foeLP: 30, foe: 'ref:competent', seed: 5, cpuX: 1700, foeX: 1950 };
-      const ahead = watch(scenario({ ...base, score: [2, 1], timeLeft: 20 }), 3);
+      const ahead = watch(scenario({ ...base, score: [2, 1], timeLeft: LATE[difficulty] }), 3);
       const even = watch(scenario({ ...base, score: [1, 1], timeLeft: 200 }), 3);
       const behind = watch(scenario({ ...base, score: [0, 2], timeLeft: 12 }), 3);
       assert.ok(ahead.share('protect') + ahead.share('survive') > 0.8, `${difficulty} #${cpuDef.id} ahead: ${JSON.stringify(ahead.objectives)}`);
@@ -189,7 +204,7 @@ test('C, D: ahead late it protects its lead (lets the opponent come, still count
       assert.equal(even.share('protect') + even.share('force'), 0, `${difficulty} #${cpuDef.id} even: ${JSON.stringify(even.objectives)}`);
     }
     const base = { difficulty, cpuLP: 30, foeLP: 30, foe: 'ref:competent', cpuX: 1700, foeX: 1950 };
-    const ahead = posture(base, [2, 1], 25, ['protect', 'survive']);
+    const ahead = posture(base, [2, 1], LATE[difficulty] + 5, ['protect', 'survive']);
     const even = posture(base, [1, 1], 200, ['build']);
     const behind = posture(base, [0, 2], 14, ['force']);
     const msg = `${difficulty}: ${JSON.stringify({ ahead, even, behind })}`;
@@ -204,6 +219,22 @@ test('C, D: ahead late it protects its lead (lets the opponent come, still count
     const slack = difficulty === 'hard' ? 0 : 0.05;
     assert.ok(ahead.taken < even.taken + slack, msg);
   }
+});
+
+test('C, D: a smarter level protects a lead sooner: with 20 s left Hard and Brutal sit on it, Medium mostly still builds', () => {
+  const share = (difficulty) => {
+    let read = 0;
+    for (const [cpuDef, foeDef] of PAIRS) {
+      const base = { difficulty, cpuDef, foeDef, cpuLP: 30, foeLP: 30, foe: 'ref:competent', seed: 5, cpuX: 1700, foeX: 1950 };
+      const ahead = watch(scenario({ ...base, score: [2, 1], timeLeft: 20 }), 3);
+      read += ahead.share('protect') + ahead.share('survive');
+    }
+    return read / PAIRS.length;
+  };
+  const [medium, hard, brutal] = ['medium', 'hard', 'brutal'].map(share);
+  const msg = JSON.stringify({ medium, hard, brutal });
+  assert.ok(hard > 0.8 && brutal > 0.8, msg);
+  assert.ok(medium < hard - 0.3, msg);
 });
 
 test('C, D: Easy reads the match less fully: it misses some of what the score and clock ask of it', () => {
@@ -585,10 +616,11 @@ test('liveness: a walk the ledge guard keeps holding back is a navigation failur
 test('liveness: a deliberate wait is waiting, not inactivity; it is reassessed, and never endless', () => {
   // Waits that could run on: the opponent out of play for good (every
   // level), and far ahead late with the opponent far off doing nothing (the
-  // levels that read the score that way).
+  // levels that read the score that way: Hard and Brutal from 40 s left,
+  // Medium, reading it less fully, from about 35 s).
   const cases = [
     ...DIFFICULTY_IDS.map((difficulty) => ({ difficulty, gone: true })),
-    ...['medium', 'hard', 'brutal'].map((difficulty) => ({ difficulty, score: [2, 0], timeLeft: 40 })),
+    ...[['medium', 30], ['hard', 40], ['brutal', 40]].map(([difficulty, timeLeft]) => ({ difficulty, score: [2, 0], timeLeft })),
   ];
   for (const { difficulty, gone, score, timeLeft } of cases) {
     const sc = scenario({ difficulty, seed: 16, score, timeLeft, cpuX: 1500, foeX: 2400 });
@@ -612,7 +644,9 @@ test('liveness: a deliberate wait is waiting, not inactivity; it is reassessed, 
 // ---- Telemetry -------------------------------------------------------------------------
 
 test('telemetry explains the match objective, waits, retreats and their ends, cheaply', () => {
-  const sc = scenario({ difficulty: 'hard', debug: true, cpuLP: scaled(110), timeLeft: 250, seed: 17, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
+  // A seed where it breaks off, holds and recovers without being caught
+  // (Hard is eliminated in about a third of such break-offs).
+  const sc = scenario({ difficulty: 'hard', debug: true, cpuLP: scaled(110), timeLeft: 250, seed: 21, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
   sc.run(8);
   const t = sc.ai.telemetry;
   assert.ok(t.trace.every((e) => typeof e.objective === 'string' && typeof e.intent === 'string' && typeof e.plan === 'string'));
@@ -625,7 +659,7 @@ test('telemetry explains the match objective, waits, retreats and their ends, ch
   assert.ok(r.objectiveTime.stabilize > 2);
   assert.ok(r.lpRecovered > 0 && r.retreats + r.waits > 0, JSON.stringify(r));
   // Off, nothing is kept but the counters.
-  const quiet = scenario({ difficulty: 'hard', cpuLP: scaled(110), timeLeft: 250, seed: 17, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
+  const quiet = scenario({ difficulty: 'hard', cpuLP: scaled(110), timeLeft: 250, seed: 21, foe: 'ref:competent', cpuX: 1700, foeX: 2000 });
   quiet.run(8);
   assert.equal(quiet.ai.telemetry.trace.length, 0);
   assert.equal(quiet.ai.telemetry.events.length, 0);

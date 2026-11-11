@@ -24,7 +24,7 @@ for where they moved). The game as it is now is specified in
 | **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
 | **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
 | **Screen Pad update** | [#180](https://github.com/hiyroscript/alva/pull/180) | `92592dc` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
-| **Adventure update** | [#185](https://github.com/hiyroscript/alva/pull/185) | `48efc0a` (modifiers), `a708c97` (Venture, Perquisites, progress), `dd2dc29` (screens), `7afbb9a` (the CPU) | Select Mode's new first mode: thirty levels against Venture, a CPU 1.5 times smarter and 1.05 times stronger every level, with a Perquisite picked from two cards every five levels; per-fighter modifiers in the combat engine, identity everywhere else |
+| **Adventure update** | [#185](https://github.com/hiyroscript/alva/pull/185) | `48efc0a` (modifiers), `a708c97` (Venture, Perquisites, progress), `dd2dc29` (screens), `7afbb9a` (the CPU) | Select Mode's new first mode: thirty levels against Venture, a CPU 1.5 times smarter every level (its hits also grew 1.05 times a level until that growth was [removed](#later-venture-only-gets-smarter)), with a Perquisite picked from two cards every five levels; per-fighter modifiers in the combat engine, identity everywhere else |
 | **Sound update** | [#187](https://github.com/hiyroscript/alva/pull/187) | `cba16c8` (the engine, themes, effects, settings), `658e752` (the effects rebalanced), `85c66db` (the mix) | Alva's first sound, all of it synthesized live from code: each battle stage's own theme in five versions (Main Battle, Overtime following the closing Void, Victory, Defeat, Draw), Practice Ground's factory ambience, seven effects (three ejections, the Deflect, the Perfect Shield, the block, the Shield held), and Settings › Audio (settings version 12) |
 
 They were made in that order and build on each other: the effect update
@@ -5538,7 +5538,7 @@ update; the first side's win rate):
 Every level still beats the one below it, and by a little more: with
 weaker launches a life takes about 40–55 % more Launch Point to end, so
 matches run longer (the Launch Point dealt per game rises by about that),
-which gives the stronger level more exchanges to show its edge. The
+which gives the smarter level more exchanges to show its edge. The
 references are still beaten every time. Combos per game rose with the
 lighter launches keeping targets in reach.
 
@@ -6528,8 +6528,10 @@ tiebreak).
 
 - [`js/data/adventure.js`](./js/data/adventure.js): `ADVENTURE_LEVELS`
   (30), `PERQUISITE_MILESTONES`, `VENTURE_SMARTS_GROWTH` (1.5),
-  `VENTURE_STRENGTH_GROWTH` (1.05), `VENTURE_LIMITS`, `PERQUISITES` (each
-  base), `PERQUISITE_LEVEL_STEP` (0.5), `PERQUISITE_MAX_LEVEL` (5).
+  `VENTURE_STRENGTH_GROWTH` (1.05; removed since, see
+  [below](#later-venture-only-gets-smarter)), `VENTURE_LIMITS`,
+  `PERQUISITES` (each base), `PERQUISITE_LEVEL_STEP` (0.5),
+  `PERQUISITE_MAX_LEVEL` (5).
 - [`js/screens/adventure-level-screen.js`](./js/screens/adventure-level-screen.js):
   `RESET_ARM_SECONDS` (3.2).
 - The look: the Adventure block of [`css/setup.css`](./css/setup.css), the
@@ -6580,6 +6582,21 @@ Venture (its label hidden) so all thirty cells fit without scrolling.
   focused first); the sentence-case rule knows Adventure's game terms
   (Level, Venture, Perquisite) and the Perquisites' own names; the
   French-is-French list allows Adventure's dash.
+
+### Later: Venture only gets smarter
+
+On 2026-11-11 Venture's damage growth was removed ([CPU difficulty:
+smarter only, every level less smart](#cpu-difficulty-smarter-only-every-level-less-smart)).
+Its fighter's real hits no longer deal 1.05^(L−1) times their damage (×4.12
+at Level 30): the growth's constant, the function that computed it and
+Venture's modifiers are gone, `adventureModifiers(levels)` gives only the
+player's side its Perquisites, and the Battle refuses any modifier for a
+CPU's side. Every level from 1 to 30 deals exactly what any other CPU
+deals; Venture still grows 1.5 times smarter a level. Its lines read
+"×11.39 smarter vs Level 1" and "Venture · ×11.39 smarter" (« ×11,39 plus
+intelligent par rapport au niveau 1 », « Venture · ×11,39 plus
+intelligent »), and Select Mode's overview no longer says it hits 5%
+harder. The rest of this entry is the update as it was made.
 
 
 ## #0015, the small hammer-swinging hedgehog girl
@@ -6949,3 +6966,126 @@ the roster-wide tables (`cooldown-policy`, `special-abilities`:
 twenty-four Specials, `strict-combat-rules`, `mash-combo`),
 `empty-roster`, `discover`, `practice-ground`, `watch-mode`, `settings`
 (her credit) and each fighter's roster list.
+
+## CPU difficulty: smarter only, every level less smart
+
+Not a named update (it can become one if the owner names it). Asked for in
+the `max` prompt: three changes to CPU difficulty, made on 2026-11-11.
+
+**1. No difficulty scales a hit, Venture included.** Every difficulty
+(Easy, Medium, Hard, Brutal, and Adventure's Venture at every level) plays
+the same fighter with the same damage, launch, speed, Energy and every
+other mechanic; a difficulty is only how well the CPU thinks. Venture's
+1.05-a-level damage growth is gone (see [Later: Venture only gets
+smarter](#later-venture-only-gets-smarter)): its constant, the function
+that computed it and Venture's modifiers are deleted,
+`adventureModifiers(levels)` gives only the player's side its
+Perquisites (Redoutable Strength's `damageDealt` is still the player's),
+`ventureNumbers` gives only `smarts`, and `Battle` refuses any
+modifier but the identity for a CPU's side (`sideModifiers` in
+`js/game/battle.js`), so no future difficulty or mode can scale one
+either. `js/game/combat/modifiers.js` is unchanged but for its comment.
+Venture's lines and
+Select Mode's overview say only how much smarter it is, in English and
+French.
+
+**2. One word for a CPU that plays better: smarter.** A CPU that plays
+better is "smarter" (« plus intelligent »), or a level is "higher" or
+"harder"; no word of might or of hitting harder is used for it, in code,
+comments, identifiers, docs, interface text or test names.
+`MatchObjective`'s weight of the match objective (from `awareness`) is
+now `MatchObjective.weight`; two test names, the difficulty and Adventure
+headers, `docs/systems/ai.md`, `docs/gameplay/adventure.md`,
+`ALVA_SPEC.md`, `README.md` and #0004's balance notes say "smarter".
+French Adventure's card now reads « un CPU toujours plus intelligent ».
+Words that mean something else are untouched: a launch's force, the stage
+art, the Practice Ground's grid, the input manager's stick helper, the
+fighters' own lore and moves, and the player's Redoutable Strength
+Perquisite.
+
+**3. Every level less smart.** Easy and Medium a quarter to two fifths of
+the way toward worse on each skill trait, Hard and Brutal about a tenth;
+`planDepth`, `initiative` and `patience` (style more than skill)
+unchanged, the ordering Easy < Medium < Hard < Brutal kept on every trait.
+Brutal is now perfect on nothing but its plan depth.
+
+| Trait | Easy | Medium | Hard | Brutal |
+| --- | --- | --- | --- | --- |
+| `react` | 0.3–0.46 → 0.38–0.58 | 0.19–0.3 → 0.24–0.38 | 0.15–0.22 → 0.16–0.24 | 0.07–0.105 → 0.08–0.12 |
+| `lapse` | 0.33 → 0.45 | 0.14 → 0.22 | 0.06 → 0.07 | 0.015 → 0.017 |
+| `think` | 0.22–0.36 → 0.26–0.42 | 0.08–0.14 → 0.1–0.18 | 0.04–0.07 → 0.045–0.078 | 0.034–0.056 → 0.038–0.063 |
+| `noise` | 0.65 → 0.85 | 0.32 → 0.43 | 0.13 → 0.145 | 0.04 → 0.06 |
+| `rangeError` | 34 → 45 | 15 → 20 | 7 → 8 | 2 → 2.3 |
+| `predictError` | 0.42 → 0.55 | 0.2 → 0.27 | 0.1 → 0.11 | 0.04 → 0.045 |
+| `timing` | 0.085 → 0.11 | 0.04 → 0.052 | 0.02 → 0.022 | 0.008 → 0.009 |
+| `lookahead` | 0.1 → 0.07 | 0.25 → 0.18 | 0.4 → 0.36 | 0.6 → 0.54 |
+| `planDepth` | 1 | 2 | 3 | 4 |
+| `comboReliability` | 0.32 → 0.22 | 0.64 → 0.46 | 0.86 → 0.77 | 0.98 → 0.9 |
+| `guard` | 0.3 → 0.2 | 0.57 → 0.42 | 0.82 → 0.73 | 0.96 → 0.87 |
+| `perfectShield` | 0.03 → 0.02 | 0.2 → 0.13 | 0.5 → 0.44 | 0.85 → 0.75 |
+| `punish` | 0.28 → 0.18 | 0.58 → 0.45 | 0.85 → 0.8 | 0.98 → 0.95 |
+| `adapt` | 0.12 → 0.08 | 0.4 → 0.28 | 0.7 → 0.62 | 0.95 → 0.85 |
+| `energySense` | 0.25 → 0.17 | 0.55 → 0.4 | 0.8 → 0.71 | 0.95 → 0.85 |
+| `riskSense` | 0.25 → 0.17 | 0.55 → 0.4 | 0.8 → 0.71 | 0.96 → 0.86 |
+| `stageSense` | 0.35 → 0.24 | 0.65 → 0.48 | 0.85 → 0.76 | 1 → 0.9 |
+| `opportunity` | 0.28 → 0.19 | 0.6 → 0.44 | 0.82 → 0.73 | 0.97 → 0.87 |
+| `diSkill` | 0.15 → 0.1 | 0.5 → 0.35 | 0.8 → 0.71 | 1 → 0.9 |
+| `recoverySkill` | 0.5 → 0.35 | 0.8 → 0.62 | 0.93 → 0.84 | 1 → 0.92 |
+| `initiative` | 0.45 | 0.6 | 0.68 | 0.72 |
+| `patience` | 0.3 | 0.5 | 0.75 | 0.85 |
+| `discipline` | 0.35 → 0.24 | 0.6 → 0.44 | 0.8 → 0.71 | 0.92 → 0.83 |
+| `awareness` | 0.35 → 0.24 | 0.6 → 0.44 | 0.82 → 0.73 | 0.95 → 0.85 |
+
+What it does, measured on the tests' seeded scenarios:
+
+- **Medium reads the match less fully.** It protects a one-point lead from
+  about 17 s left (Hard and Brutal from 20 s or more), waits on a two-point
+  lead from about 35 s left (they from 40 s), and finishes an opponent
+  exposed by the ledge on 40 of 48 seeded tries (was 46; Hard 46, Brutal
+  45).
+- **Easy sees openings less often**: against a standing dummy it may take a
+  few seconds, or another seed, to set off a Mash Combo (it used to on its
+  first look).
+- **Brutal's guard is high, not perfect**: it Shields a Hollow Purple cast
+  in 7 of 16 seeded casts (was 12) and an Unlimited Void burst in 10 (was
+  13). The closing Void still draws it toward the centre in late
+  overtime, a little less (0.90 of its regular-time distance from the
+  centre over eight seeds, was 0.81).
+- **Hard, breaking off at a dangerous Launch Point**, is caught and
+  eliminated in 6 of 20 seeded tries (was 2; Medium 13, was 8; Brutal 4,
+  was 2).
+- **Venture**, built from Easy's profile, starts lower and passes Brutal
+  sooner (Brutal is less smart too): by Level 6 it reacts faster than
+  Brutal and plans as deep (13 of its 24 traits), by Level 9 it matches or
+  passes Brutal on 22, and from Level 11 it is past Brutal on every trait
+  but plan depth (4 for both). `VENTURE_SMARTS_GROWTH` (1.5) and
+  `VENTURE_LIMITS` are unchanged.
+
+The benchmark in `docs/systems/ai.md` was measured before this change and
+was not re-run (`node tests/benchmarks/cpu-benchmark.mjs --suite all`).
+
+**Where to tune it.** `PROFILES` in [`js/data/difficulty.js`](./js/data/difficulty.js);
+Venture's growth and limits in [`js/data/adventure.js`](./js/data/adventure.js).
+
+**Code:** `js/data/difficulty.js`, `js/data/adventure.js`,
+`js/game/battle.js`, `js/core/adventure-progress.js`,
+`js/screens/battle-screen.js`, `js/screens/adventure-level-screen.js`,
+both string tables, and comments in `js/game/combat/modifiers.js`,
+`js/game/ai/cpu-intelligence/effective.js`, `objective.js` (the
+rename) and `brain.js`.
+
+**Tests:** `tests/systems/venture.test.mjs` (the damage-growth tests
+replaced by one: at every level from 1 to 30 Venture's hits, struck, from a
+projectile, a clone, a technique and blocked, deal exactly what each
+difficulty's CPU does, and the Battle refuses a CPU modifier; the
+milestones against Brutal), `tests/systems/adventure-cpu.test.mjs` (the
+two seeded fingerprints re-taken; the player's Perquisites in place of
+Venture's damage growth), the Adventure interface and integration tests, the
+i18n and Quick Battle tests (the strings). Measured on the new profiles,
+never turned round: Medium's "late" in the score-and-clock tests (a new
+test checks that the smarter levels protect a lead sooner), Medium's
+finishing (at least once a fighter, three in four overall), the Shield
+against Unlimited Void and Hollow Purple (16 casts each, more than a
+third), the closing Void (eight seeds, 5 % nearer the centre), the Mash
+Combo test (a few more seeds for a lower level), and the telemetry test's
+seed.

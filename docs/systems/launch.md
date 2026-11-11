@@ -38,15 +38,16 @@ energy update](../../UPDATES.md#launch--energy-update) made it 2 a tick
 (it was 1) and added the perfect block's heal.
 
 The universal `LAUNCH_RECOVERY_DELAY`, `LAUNCH_RECOVERY_INTERVAL` and
-`LAUNCH_RECOVERY_AMOUNT` live in `js/data/launch.js`. In Adventure alone a
-fighter's modifiers ([`js/game/combat/modifiers.js`](../../js/game/combat/modifiers.js))
+`LAUNCH_RECOVERY_AMOUNT` live in `js/data/launch.js`. In Adventure alone the
+player's fighter's modifiers ([`js/game/combat/modifiers.js`](../../js/game/combat/modifiers.js))
 may add to the amount (Nearly Immortal) and shorten the interval
 (Velocious Immune System), never the delay, and may scale the damage a
-real hit adds (Venture's strength, Brave Soldier, Redoutable Strength:
-the hit's damage × the attacker's `damageDealt` × the target's
-`damageTaken`), so the launch grows with it; a Launch Point may then be
-fractional ([Adventure](../gameplay/adventure.md)). Every other mode's
-modifiers are the identity's and change nothing. `CombatState` keeps
+real hit adds (Brave Soldier, Redoutable Strength: the hit's damage × the
+attacker's `damageDealt` × the target's `damageTaken`), so the launch
+grows with it; a Launch Point may then be fractional
+([Adventure](../gameplay/adventure.md)). A CPU's fighter, Venture's at
+every level included, and every other mode's have the identity's, which
+change nothing. `CombatState` keeps
 the seconds until the next point: initially delay + interval, then one
 interval per tick. Its existing `update(dt)` consumes every complete tick
 (even with a large dt), using `PHASE_EPSILON` at boundaries and preserving

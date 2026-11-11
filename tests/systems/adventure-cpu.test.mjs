@@ -1,12 +1,14 @@
 // Run with node --test tests/systems/adventure-cpu.test.mjs (no dependencies).
 // CPU Intelligence and the match's real numbers (the Adventure update,
 // js/game/ai/cpu-intelligence/effective.js): with the identity's modifiers
-// (every mode but Adventure) its decisions are exactly what they were
-// before the update, seeded match for seeded match; with Adventure's it
-// reasons with what the match really does: a CPU that hits harder (Venture's
-// strength) sees a finish at a lower Launch Point, and against a player who
-// takes less (Brave Soldier) it predicts the lower Launch Point its hits
-// leave. Recovery and Energy are read through the same modifiers.
+// (every mode but Adventure, and the CPU's own side in Adventure: Venture
+// never scales a hit) its decisions are the same whether the identity is
+// left out or spelled out, seeded match for seeded match; against the
+// player's Perquisites it reasons with what the match really does: against
+// a player who takes less (Brave Soldier) it predicts the lower Launch Point
+// its hits leave and sees a finish later, and against one who hits harder
+// (Redoutable Strength) it weighs that player's hits more. Recovery and
+// Energy are read through the same modifiers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Battle } from '../../js/game/battle.js';
@@ -14,7 +16,7 @@ import { getMap } from '../../js/data/maps.js';
 import { getCharacter } from '../../js/data/characters.js';
 import { battleState, hashState } from '../../js/online/state-hash.js';
 import { IDENTITY_MODIFIERS } from '../../js/game/combat/modifiers.js';
-import { ventureModifiers, perquisiteModifiers, ventureSpec } from '../../js/data/adventure.js';
+import { perquisiteModifiers, ventureSpec, adventureModifiers } from '../../js/data/adventure.js';
 import {
   effectiveDamage, effectiveRecovery, effectiveEnergyCost, recoveryRelief, BASE_RECOVERY_RATE, modsOf,
 } from '../../js/game/ai/cpu-intelligence/effective.js';
@@ -43,37 +45,42 @@ function fingerprint({ a, b, map, seed, difficulty, seconds = 25, extra = {} }) 
   return hash;
 }
 
-// The same two seeded matches, fingerprinted on the code just before the
-// Adventure update (commit c5dd654): the identity's modifiers change no
-// decision and no step. A deliberate change to a fighter or a shared rule
-// may move them (then re-take them on the code before that change); nothing
-// Adventure does may.
+// The same two seeded matches, fingerprinted with no modifiers given at
+// all, as every mode but Adventure plays: the identity's modifiers change no
+// decision and no step. First taken on the code just before the Adventure
+// update (commit c5dd654); re-taken when every difficulty was made less
+// smart (the profiles, js/data/difficulty.js, decide every CPU step). A
+// deliberate change to a fighter, a shared rule or a profile may move them
+// (then re-take them with the modifiers left out); nothing Adventure does
+// may.
 const BEFORE = [
-  { a: '0001', b: '0002', map: 'desert', seed: 5, difficulty: 'hard', hash: 2110199624 },
-  { a: '0007', b: '0003', map: 'city', seed: 9, difficulty: 'medium', hash: 1511309430 },
+  { a: '0001', b: '0002', map: 'desert', seed: 5, difficulty: 'hard', hash: 2668964452 },
+  { a: '0007', b: '0003', map: 'city', seed: 9, difficulty: 'medium', hash: 1562088838 },
 ];
 
-test('with the identity\'s modifiers the CPU decides exactly as before, seeded match for seeded match', () => {
+test('with the identity\'s modifiers the CPU decides exactly as with none, seeded match for seeded match', () => {
   for (const { hash, ...match } of BEFORE) {
-    assert.equal(fingerprint(match), hash, `${match.a} v ${match.b}: as before the update`);
+    assert.equal(fingerprint(match), hash, `${match.a} v ${match.b}: as fingerprinted`);
     const spelledOut = fingerprint({ ...match, extra: { modifiers: { p1: IDENTITY_MODIFIERS, p2: { damageDealt: 1, energyCostScale: 1 } } } });
     assert.equal(spelledOut, hash, 'the identity spelled out is the same match');
   }
 });
 
-test('Venture\'s strength changes the match: the same seed, another fight', () => {
+test('an Adventure battle with no Perquisite is the same match, step for step: the CPU\'s side has nothing; the player\'s Perquisites change it', () => {
   const { hash, ...match } = BEFORE[0];
-  assert.notEqual(fingerprint({ ...match, extra: { modifiers: { p2: ventureModifiers(30) } } }), hash);
+  assert.equal(fingerprint({ ...match, extra: { modifiers: adventureModifiers({}) } }), hash);
+  assert.notEqual(fingerprint({ ...match, extra: { modifiers: adventureModifiers({ redoutableStrength: 5 }) } }), hash);
 });
 
 // A Quick Battle's CPU (p2) a few steps into the fight, close to a still
-// opponent, its picture of the fight built: { battle, ai, s, judge }.
-function lookingAt({ cpuMods = null, foeMods = null } = {}) {
+// opponent, its picture of the fight built: { battle, ai, s, judge }. The
+// opponent (the player's side) has `foeMods`; the CPU never has any.
+function lookingAt({ foeMods = null, cpuLevel = null } = {}) {
   const def = getCharacter('0001');
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'quick-battle', seed: 4, difficulty: 'brutal',
     p1Def: def, p2Def: def, p1Sprites: fakeSpritesOf(def), p2Sprites: fakeSpritesOf(def), input,
-    modifiers: { p1: foeMods, p2: cpuMods },
+    modifiers: { p1: foeMods }, cpuLevel,
   });
   battle.p1.controller = { getInput: () => ({}) };
   battle.setPhase('fight');
@@ -94,27 +101,29 @@ function finisherThreshold(look) {
   return Infinity;
 }
 
-test('the CPU knows the match\'s modifiers as rules, like the clock: its own and its opponent\'s', () => {
-  const cpuMods = ventureModifiers(12);
+test('the CPU knows the match\'s modifiers as rules, like the clock: its opponent\'s, and its own, the identity\'s', () => {
   const foeMods = perquisiteModifiers({ braveSoldier: 1 });
-  const { battle, s } = lookingAt({ cpuMods, foeMods });
+  const { battle, s } = lookingAt({ foeMods, cpuLevel: ventureSpec(12) });
   assert.ok(s.present);
   assert.equal(s.me.mods, battle.p2.modifiers);
+  assert.equal(s.me.mods, IDENTITY_MODIFIERS, 'Venture deals its hits as authored');
   assert.equal(s.op.mods, battle.p1.modifiers);
-  assert.equal(modsOf(battle.p2).damageDealt, cpuMods.damageDealt);
+  assert.equal(modsOf(battle.p2).damageDealt, 1);
+  assert.equal(modsOf(battle.p1).damageTaken, foeMods.damageTaken);
   const plain = lookingAt();
   assert.equal(plain.s.me.mods, IDENTITY_MODIFIERS);
   assert.equal(plain.s.op.mods, IDENTITY_MODIFIERS);
 });
 
-test('with damageDealt raised, its finisher threshold drops: it goes for the finish much earlier', () => {
+test('its finisher threshold follows the real numbers: its own hits as authored at every Venture level, a Brave Soldier finished later', () => {
   const plain = finisherThreshold(lookingAt());
-  const level20 = finisherThreshold(lookingAt({ cpuMods: ventureModifiers(20) }));
-  const level30 = finisherThreshold(lookingAt({ cpuMods: ventureModifiers(30) }));
   assert.ok(Number.isFinite(plain), 'a finish exists at all');
-  assert.ok(level20 < plain, `Level 20 (${level20}) sooner than its authored hits (${plain})`);
-  assert.ok(level30 < level20, `Level 30 (${level30}) sooner still`);
-  // And against a Brave Soldier its hits do less: the finish comes later.
+  // Venture's hits are its fighter's own at every level: it sees the
+  // finish where any CPU would, never sooner.
+  for (const level of [1, 20, 30]) {
+    assert.equal(finisherThreshold(lookingAt({ cpuLevel: ventureSpec(level) })), plain, `Level ${level}: its authored hits`);
+  }
+  // Against a Brave Soldier its hits do less: the finish comes later.
   const brave = finisherThreshold(lookingAt({ foeMods: perquisiteModifiers({ braveSoldier: 5 }) }));
   assert.ok(brave > plain, `Brave Soldier V (${brave}) survives longer than ${plain}`);
 });
@@ -155,8 +164,10 @@ test('the helpers are the engine\'s own rules: recovery, Energy and damage as th
   assert.ok(recoveryRelief(quick) > 2, 'its Launch Point drains more than twice as fast');
   assert.equal(recoveryRelief(IDENTITY_MODIFIERS), 1);
   assert.ok(Math.abs(effectiveEnergyCost(perquisiteModifiers({ maximumEnergy: 1 }), 15) - 13.8) < 1e-12);
-  assert.equal(effectiveEnergyCost(ventureModifiers(30), 15), 15, 'Venture has no Perquisite: full costs');
-  assert.equal(effectiveDamage(ventureModifiers(2), IDENTITY_MODIFIERS, 10), 10.5);
+  assert.equal(effectiveEnergyCost(IDENTITY_MODIFIERS, 15), 15, 'a CPU has no Perquisite: full costs');
+  assert.equal(effectiveDamage(IDENTITY_MODIFIERS, IDENTITY_MODIFIERS, 10), 10, 'and its hits as authored');
+  assert.ok(Math.abs(effectiveDamage(perquisiteModifiers({ redoutableStrength: 1 }), IDENTITY_MODIFIERS, 10) - 10.8) < 1e-12);
+  assert.ok(Math.abs(effectiveDamage(IDENTITY_MODIFIERS, perquisiteModifiers({ braveSoldier: 1 }), 10) - 9.2) < 1e-12);
 });
 
 test('a Venture CPU in a real Adventure battle plays: it attacks, scores and is never stuck', () => {
@@ -164,7 +175,7 @@ test('a Venture CPU in a real Adventure battle plays: it attacks, scores and is 
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'quick-battle', seed: 12,
     p1Def: def, p2Def: getCharacter('0002'), p1Sprites: fakeSpritesOf(def), p2Sprites: fakeSpritesOf(getCharacter('0002')), input,
-    cpuLevel: ventureSpec(25), modifiers: { p1: perquisiteModifiers({ braveSoldier: 2, nearlyImmortal: 2 }), p2: ventureModifiers(25) },
+    cpuLevel: ventureSpec(25), modifiers: adventureModifiers({ braveSoldier: 2, nearlyImmortal: 2 }),
   });
   battle.p1.controller = controllerFor('ref:balanced', 113);
   battle.setPhase('fight');

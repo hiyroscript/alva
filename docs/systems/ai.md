@@ -35,7 +35,7 @@ Jump, made with the same chord).
 | [`cpu-intelligence/plans.js`](../../js/game/ai/cpu-intelligence/plans.js) | 8. plans | `makePlan`: each plan kind as a small state machine over steps, with a lifetime, an explicit end and its intent (a plan that stands still on purpose says so); footwork with a dead band; `hold` (a deliberate wait and what ends it) and `retreat`; `CONTINUED`, the plans a reassessment carries on rather than restarts. |
 | [`cpu-intelligence/executor.js`](../../js/game/ai/cpu-intelligence/executor.js) | 9. execution | `Executor`: the plan's wishes turned into one legal `FighterInput` snapshot (press edges, jump holds, the Mouvement request, no Shield in the air but the Deflect), with the ledge guard. |
 | [`cpu-intelligence/telemetry.js`](../../js/game/ai/cpu-intelligence/telemetry.js) | 11. telemetry | `Telemetry`: counters, move usage, waits with their reasons and ends, time per objective, inactivity by cause, the debug trace and its events, `STILL_LIMIT`, `WAIT_LIMIT`. |
-| [`cpu-intelligence/effective.js`](../../js/game/ai/cpu-intelligence/effective.js) | the match's numbers | `effectiveDamage`, `effectiveRecovery`, `effectiveEnergyCost`, `recoveryRelief`: damage, recovery and costs as each fighter's modifiers make them (the identity but in Adventure; see [Venture](#adventures-venture)). |
+| [`cpu-intelligence/effective.js`](../../js/game/ai/cpu-intelligence/effective.js) | the match's numbers | `effectiveDamage`, `effectiveRecovery`, `effectiveEnergyCost`, `recoveryRelief`: damage, recovery and costs as each fighter's modifiers make them (the identity but for the Adventure player's Perquisites; see [Venture](#adventures-venture)). |
 | [`js/data/difficulty.js`](../../js/data/difficulty.js) | 10. humanization | The four profiles and `CAPABILITY` (which way each trait improves); Adventure's Venture through `getDifficultyProfile({ venture })`. |
 | [`celebration.js`](../../js/game/ai/celebration.js) | after the match | `CelebrationController`: what a CPU does once its match is over (see below); never part of CPU Intelligence. |
 
@@ -559,14 +559,14 @@ A profile (`js/data/difficulty.js`) holds only how well the CPU thinks:
 
 | Trait | Effect |
 | --- | --- |
-| `react` | Perception latency window (Easy 0.30–0.46 s, Medium 0.19–0.30, Hard 0.15–0.22, Brutal 0.07–0.105; never zero). |
+| `react` | Perception latency window (Easy 0.38–0.58 s, Medium 0.24–0.38, Hard 0.16–0.24, Brutal 0.08–0.12; never zero). |
 | `lapse` | Chance a new opponent action is not recognized. |
-| `think` | Seconds between reassessments and fresh decisions (Easy 0.22–0.36 s, Medium 0.08–0.14, Hard 0.04–0.07, Brutal 0.034–0.056); an opening it sees, a threat and a combo are looked at at once. |
+| `think` | Seconds between reassessments and fresh decisions (Easy 0.26–0.42 s, Medium 0.10–0.18, Hard 0.045–0.078, Brutal 0.038–0.063); an opening it sees, a threat and a combo are looked at at once. |
 | `noise` | Jitter on every option's utility. |
-| `rangeError`, `predictError` | Spacing misjudgement (Easy 34 units, Medium 15, Hard 7, Brutal 2), applied to the whole projected path of the opponent, so it misjudges whether its own moves connect; error on the projected motion. |
+| `rangeError`, `predictError` | Spacing misjudgement (Easy 45 units, Medium 20, Hard 8, Brutal 2.3), applied to the whole projected path of the opponent, so it misjudges whether its own moves connect; error on the projected motion. |
 | `timing` | Execution error on a timed press. |
 | `lookahead`, `planDepth` | How far motion is projected; which Dash lengths, jump arcs and targets are weighed. |
-| `comboReliability` | Chance a found follow-up is executed in time (Easy 0.32, Medium 0.64, Hard 0.86, Brutal 0.98), and how quickly it confirms its hit before following up. |
+| `comboReliability` | Chance a found follow-up is executed in time (Easy 0.22, Medium 0.46, Hard 0.77, Brutal 0.90), and how quickly it confirms its hit before following up. |
 | `guard`, `perfectShield` | How fully threats are answered; how often a Shield is perfect. |
 | `punish`, `opportunity` | How often an opening, or a finisher, is recognized. |
 | `adapt` | How fast and far observed habits are trusted; how deliberately it varies its moves. |
@@ -577,24 +577,32 @@ A profile (`js/data/difficulty.js`) holds only how well the CPU thinks:
 | `discipline` | How reliably it does what its objective asks (breaking off to recover, not chasing damage while protecting a lead), how firmly it holds an objective, how few blocks it Shields before moving. |
 | `awareness` | How fully it reads the match: the score, the clock, overtime's tiebreak, each fighter's exposure. |
 
-Every trait is ordered Easy → Brutal (`CAPABILITY`). No level changes
+Every trait is ordered Easy → Brutal (`CAPABILITY`): a higher level is
+smarter, and that is all it is. No level, and no mode, changes
 damage, launch, hitstun, blockstun, timing, speed, jumps, gravity, the
 Dash, the Shield, Energy or its costs, cooldowns, hitboxes, physics,
 scoring or respawns: no module of the fighter, the combat engine or the
-physics reads a difficulty.
+physics reads a difficulty, and a CPU's fighter always fights with the
+identity's modifiers (Adventure's Venture included).
+
+The profiles were last retuned to make every level less smart (Easy and
+Medium by about a quarter to two fifths of each trait toward worse, Hard
+and Brutal by about a tenth; see [UPDATES.md](../../UPDATES.md#cpu-difficulty-smarter-only-every-level-less-smart)).
+The benchmark below was measured before that retune.
 
 The same intelligence runs on every level (no feature is switched off
 for a lower one); what changes is how well each part of it works:
 
 - **Easy**, a casual player: sees things late and decides slowly (a fresh
-  idea every quarter to third of a second), misjudges ranges (it whiffs,
+  idea every quarter to two fifths of a second), misjudges ranges (it whiffs,
   and walks into hits), confirms and finishes combos unreliably, often
   misses openings and finishers, half reads the score and the clock, often
   keeps trading when it should break off, and waits only briefly before it
   goes back in. It plays to win, uses its whole kit, and is beatable.
-- **Medium**, a regular player: combos, adapts to habits, recovers
-  reliably, breaks off and comes back more often than not, reads the match
-  most of the time.
+- **Medium**, a regular player: combos, adapts to habits, recovers more
+  often than not, breaks off and comes back, and reads the match, though
+  later than Hard (it sits on a one-point lead only from about 17 s left,
+  and misses more of the finishes an exposed opponent offers).
 - **Hard**, tournament level: reads the slower moves, punishes whiffs,
   edge-guards, manages Energy, plays the score and the clock, and is
   patient when patience pays.
@@ -614,16 +622,14 @@ is Easy's profile exactly; each level every trait's distance from perfect
 play (its physical limit: reactions and reassessments of at least two
 steps, no lapse or error, plan depth 4, probabilities 1) is divided by 1.5,
 no trait ever getting worse. It is the same intelligence with the same
-capabilities. Its strength (1.05 a level in damage dealt) is no profile
-trait: it reaches its fighter through the battle's modifiers, and the CPU
-reasons with it, and with the player's Perquisites, as the match really
-applies them (`effective.js`):
+capabilities, and it only ever gets smarter: Venture never scales a hit.
+Its fighter plays with the identity's modifiers at every level, so it
+deals exactly what any other CPU's does. The CPU reasons with the
+player's Perquisites as the match really applies them (`effective.js`):
 
 - its kill-confirms and finisher estimates (`LaunchJudge.strikes`,
-  `Strategy.koThreat`) add each strike's real damage, so a Level 30
-  Venture sees a finish about 16 Launch Points sooner than its authored
-  hits would show it;
-- against Brave Soldier its hits add less; against Redoutable Strength
+  `Strategy.koThreat`) add each strike's real damage, so against Brave
+  Soldier its hits add less and it sees a finish later; against Redoutable Strength
   the player's hits weigh more in its guard and risk (`foePunish`, threat
   severity);
 - against Nearly Immortal and Velocious Immune System it knows the
@@ -636,9 +642,10 @@ applies them (`effective.js`):
   possibly fractional, Launch Points compared.
 
 The modifiers are rules of the match, read like the clock; perception is
-unchanged. With the identity's (every other mode) every number is the
-same bit for bit: two seeded matches play step for step as before the
-update (`tests/systems/adventure-cpu.test.mjs`).
+unchanged. With the identity's (every other mode, and the CPU's own side
+in Adventure) every number is the same bit for bit: two seeded matches
+play step for step whether the identity is left out or spelled out
+(`tests/systems/adventure-cpu.test.mjs`).
 
 ## After the match: the celebration
 

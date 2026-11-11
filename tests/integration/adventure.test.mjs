@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { boot, memoryStorage, settleAll, current, stepNames } from '../helpers/adventure-app.mjs';
 
 const { ADVENTURE_KEY } = await import('../../js/core/adventure-progress.js');
-const { ventureProfile, ventureStrength } = await import('../../js/data/adventure.js');
+const { ventureProfile } = await import('../../js/data/adventure.js');
 const { MAPS } = await import('../../js/data/maps.js');
 const { playableCharacters } = await import('../../js/data/characters.js');
 const { BATTLE_MODES } = await import('../../js/game/battle.js');
@@ -85,7 +85,7 @@ test('the full flow: a level, a fighter, the cards at Level 5, then the battle w
   assert.ok(MAPS.some((m) => m.id === battle.map.id), 'the stage drawn among the stages');
   assert.equal(battle.seed, app.selection.adventure.seed, 'the battle plays on the seed its draw came from');
   assert.equal(battle.p2.controller.profile, ventureProfile(5));
-  assert.equal(battle.p2.modifiers.damageDealt, ventureStrength(5));
+  assert.equal(battle.p2.modifiers, IDENTITY_MODIFIERS, 'Venture deals what any CPU deals: no modifier at any level');
   assert.notEqual(battle.p1.modifiers, IDENTITY_MODIFIERS, 'the Perquisite picked is on');
   // Standard match rules.
   assert.equal(battle.pointsToWin, CONFIG.battle.pointsToWin);
@@ -98,7 +98,7 @@ test('the full flow: a level, a fighter, the cards at Level 5, then the battle w
   // The intro announces the level and Venture at it.
   screen.updateBanner();
   assert.equal(screen.bannerMain.textContent, 'LEVEL 05');
-  assert.equal(screen.bannerSub.textContent, 'Venture · ×5.06 smarter · ×1.22 damage');
+  assert.equal(screen.bannerSub.textContent, 'Venture · ×5.06 smarter');
 });
 
 test('a claimed milestone shows no cards again, and a lost milestone stays claimed', async () => {

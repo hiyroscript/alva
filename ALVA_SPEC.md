@@ -646,8 +646,8 @@ no header, build label, eyebrow or keyboard hint bar.
   heading, 12–13 px paragraphs, `clamp()` sizes): its heading and hairline,
   then two sections, each with a moderately emphasized heading and two
   muted paragraphs. **Adventure** first: its overview ("Clear 30 levels in
-  order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits
-  5% harder. Every 5 levels, choose one Perquisite to keep.") and its rules
+  order. Each level, Venture — the CPU — becomes 1.5 times smarter. Every 5
+  levels, choose one Perquisite to keep.") and its rules
   ("Your opponent's fighter and the stage are drawn at random. Standard
   match rules: first to 3 points, 5 minutes, then overtime."). Then **Quick
   Battle**: the overview (face a CPU, knock the opponent into the Void to
@@ -750,8 +750,8 @@ a **Perquisite** to pick every five levels. Explained in
   carry a small card mark in a corner, hollow until that milestone's
   Perquisite is claimed, filled after. Under the grid a wide row,
   information only (never focused): "Venture · Level NN" and a muted line
-  with Venture at the level focused ("×11.39 smarter · ×1.34 damage vs
-  Level 1" at Level 7), and the Perquisites owned as compact chips ("Brave
+  with Venture at the level focused ("×11.39 smarter vs Level 1" at
+  Level 7), and the Perquisites owned as compact chips ("Brave
   Soldier II"), or "—". At the bottom **Reset progress** (« Réinitialiser
   la progression »), outlined and danger-tinted: the first press turns it
   into "Confirm reset" (« Confirmer ») for 3.2 s, then it disarms; a second
@@ -773,7 +773,7 @@ a **Perquisite** to pick every five levels. Explained in
   result toast and Match Results; the CPU plays Venture at the level. The
   HUD shows "Lv 07 · Venture" under the timer and pause, part of the top
   HUD (the touch controls keep below it); the intro announces "LEVEL 07"
-  over "Venture · ×11.39 smarter · ×1.34 damage". A **win**, if this was
+  over "Venture · ×11.39 smarter". A **win**, if this was
   the highest unlocked level, unlocks the next one; the level is marked
   cleared and saved at once (the progress survives the tab closing in the
   celebration). A **loss or a draw** unlocks nothing, and nothing won is
@@ -796,13 +796,16 @@ a **Perquisite** to pick every five levels. Explained in
   1.5^(L−1)`, perfect play being each trait's physical limit, not Brutal (a
   reaction and a reassessment of at least two simulation steps, no lapse,
   noise or error, a lookahead of 1 s, a plan depth of 4, rounded, and every
-  probability 1). No trait gets worse from a level to the next. Its
-  fighter's real hits deal `ventureStrength(L)` = `VENTURE_STRENGTH_GROWTH`
-  (1.05) `^ (L−1)` times their damage (×1.55 at 10, ×2.53 at 20, ×4.12 at
-  30), gentler than the smarts on purpose (damage has no bound). Its profile
-  goes through `getDifficultyProfile({ venture: level })`; its strength
-  through the battle's modifiers (7.2.8). `ventureProfile` and
-  `ventureStrength` are the one place each is computed.
+  probability 1). No trait gets worse from a level to the next. By Level 6
+  it reacts faster than Brutal and plans as deep, by Level 9 it matches or
+  passes Brutal on 22 of its 24 traits, and from Level 11 it is past Brutal
+  on every trait but plan depth (4 for both). Its profile goes through
+  `getDifficultyProfile({ venture: level })`; `ventureProfile` is the one
+  place it is computed. Venture only ever gets smarter: it never scales a
+  hit. Its fighter is the same at every level as at any difficulty (the same
+  damage, launch, speed, Energy and every other mechanic), with the
+  identity's modifiers (7.2.8; a CPU's side never has any other), so a
+  Level 30 hit adds exactly what the same hit from Easy adds.
 - **Perquisites**: five, each with five levels (I–V), level n worth its
   base × (1 + 0.5 × (n − 1)): **Brave Soldier** (« Brave Soldat », damage
   received −8 % at I to −24 % at V), **Nearly Immortal** (« Presque
@@ -4700,8 +4703,8 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
     spot near where its opponent will come back, at a safe distance, waits
     there and never attacks nobody.
   - **Difficulty** (`js/data/difficulty.js`) sets only how well it thinks:
-    reaction window (`react`: Easy 0.30–0.46 s, Medium 0.19–0.30, Hard
-    0.15–0.22, Brutal 0.07–0.105), lapse chance, reassessment interval,
+    reaction window (`react`: Easy 0.38–0.58 s, Medium 0.24–0.38, Hard
+    0.16–0.24, Brutal 0.08–0.12), lapse chance, reassessment interval,
     decision noise, range and prediction error, timing error, lookahead,
     plan depth, combo reliability, guard, perfect Shield timing, punish and
     opportunity recognition, adaptation, Energy, risk and stage sense,
@@ -4722,11 +4725,13 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
     anything costs in it, cooldowns, hitboxes, physics, invulnerability,
     score or respawns: a profile holds those traits and nothing else, no
     module of the fighter or the combat engine reads it, and the same hit
-    resolves identically on every level and for a player.
-  - **The one exception: Venture, only in Adventure** (6.3b, the Adventure
-    update). Its profile is a level of its own (`getDifficultyProfile({
-    venture: level })`, the same shape and traits); and its strength, and
-    the player's Perquisites, reach the fighters as each side's
+    resolves identically on every level and for a player. A higher level is
+    smarter, and only that. There is no exception: no difficulty and no
+    mode scales a CPU's hit, Adventure's Venture included.
+  - **Venture, only in Adventure** (6.3b, the Adventure update). Its
+    profile is a level of its own (`getDifficultyProfile({ venture: level
+    })`, the same shape and traits); it changes nothing else. The player's
+    Perquisites reach the player's fighter as that side's
     **modifiers** for the battle (`js/game/combat/modifiers.js`:
     `damageDealt`, `damageTaken`, `recoveryAmountBonus`,
     `recoveryIntervalScale`, `energyCostScale`), built once by the Battle
@@ -4740,13 +4745,15 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
     is × `energyCostScale`. Fractional Launch Points stay fractional (the
     HUD and Match Results round them; the tiebreak compares the real
     values). The engine reads only the object it is handed, never a mode,
-    a fighter id or Adventure state. Every other mode gives both sides the
-    identity, which changes nothing bit for bit (Quick Battle, Watch Mode,
-    Local Play, Online Play and its lockstep and state hash, Practice
-    Ground). CPU Intelligence predicts with the modified numbers
-    (`js/game/ai/cpu-intelligence/effective.js`): its own and its
-    opponent's damage, the opponent's recovery and its costs, read as rules
-    of the match like the clock, never perception.
+    a fighter id or Adventure state. A CPU's side always has the identity
+    (the Battle refuses anything else for it), Venture's at every level
+    included, and every other mode gives both sides the identity, which
+    changes nothing bit for bit (Quick Battle, Watch Mode, Local Play,
+    Online Play and its lockstep and state hash, Practice Ground). CPU
+    Intelligence predicts with the modified numbers
+    (`js/game/ai/cpu-intelligence/effective.js`): its opponent's damage,
+    recovery and costs, read as rules of the match like the clock, never
+    perception.
   - **Benchmark.** Brutal's target is a 95% match win rate against a
     defined, varied benchmark (Hard, Medium and five scripted reference
     styles; `tests/benchmarks/cpu-benchmark.mjs`), tracked separately

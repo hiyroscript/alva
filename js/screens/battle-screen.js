@@ -532,11 +532,12 @@ export class BattleScreen extends Screen {
       reducedMotion: app.device.reducedMotion,
       difficulty,
       automaticTurnAround: app.settings.automaticTurnAround,
-      // Adventure's alone: Venture at the level for the CPU, each side's
-      // modifiers (the player's Perquisites, Venture's strength), and the
-      // seed the battle's draw came from. Every other mode leaves them out.
+      // Adventure's alone: Venture at the level for the CPU (how well it
+      // thinks, never how hard it hits), the player's modifiers (their
+      // Perquisites; the CPU's are the identity's), and the seed the
+      // battle's draw came from. Every other mode leaves them out.
       ...(adventure ? {
-        cpuLevel: ventureSpec(level), modifiers: app.adventure.modifiersFor(level), seed: pick('seed') ?? undefined,
+        cpuLevel: ventureSpec(level), modifiers: app.adventure.modifiersFor(), seed: pick('seed') ?? undefined,
       } : {}),
     });
     this.sound.attach(this.battle, { stage: map.id, mode });
@@ -776,8 +777,8 @@ export class BattleScreen extends Screen {
   // 07) over Venture at it, in place of ROUND 1 and READY.
   bannerConfig(state) {
     if (state === 'round' && this.mode === 'adventure' && this.level) {
-      const { smarts, strength } = ventureNumbers(this.level);
-      return { sub: ['banner.venture', { smarts, strength }], main: ['banner.level', { level: levelLabel(this.level) }] };
+      const { smarts } = ventureNumbers(this.level);
+      return { sub: ['banner.venture', { smarts }], main: ['banner.level', { level: levelLabel(this.level) }] };
     }
     return BANNERS[state];
   }
