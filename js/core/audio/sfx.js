@@ -223,7 +223,7 @@ export const SFX_RECIPES = Object.freeze({
   'sfx.deflect'(ctx, out, t, o, bank) {
     const k = o.pitch;
     const dir = o.direction || 1;
-    const s = strip(ctx, out, o.reverb, t, { level: o.level, pan: o.pan * 0.5, send: 0.28 });
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 2, pan: o.pan * 0.5, send: 0.28 });
     s.pan.pan.setValueAtTime(Math.max(-1, Math.min(1, o.pan * 0.5 - 0.15 * dir)), t);
     s.pan.pan.linearRampToValueAtTime(Math.max(-1, Math.min(1, o.pan * 0.5 + 0.75 * dir)), t + 0.28);
     const whoosh = noiseSource(ctx, bank, t);
@@ -253,7 +253,7 @@ export const SFX_RECIPES = Object.freeze({
   // premium version of the block.
   'sfx.perfectShield'(ctx, out, t, o, bank) {
     const k = o.pitch;
-    const s = strip(ctx, out, o.reverb, t, { level: o.level, pan: o.pan * 0.5, send: 0.45 });
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 2.4, pan: o.pan * 0.5, send: 0.45 });
     return max(
       boom(ctx, s.input, t, { from: 200 * k, to: 110 * k, bend: 0.02, decay: 0.05, level: 0.4 }),
       burst(ctx, s.input, t, bank, { kind: 'highpass', freq: 5000, level: 0.25, d: 0.004 }),
@@ -271,7 +271,7 @@ export const SFX_RECIPES = Object.freeze({
   // A Shield blocking a hit: a solid, muted thump of energy, understated.
   'sfx.block'(ctx, out, t, o, bank) {
     const k = o.pitch;
-    const s = strip(ctx, out, o.reverb, t, { level: o.level, pan: o.pan * 0.5, send: 0.12 });
+    const s = strip(ctx, out, o.reverb, t, { level: o.level * 0.7, pan: o.pan * 0.5, send: 0.12 });
     const buzz = node(ctx, 'osc', { wave: 'square', freq: 110 * k, t });
     const bf = node(ctx, 'filter', { kind: 'bandpass', freq: 1300, q: 1.4, t });
     const bg = node(ctx, 'gain', { value: 0 });
@@ -320,7 +320,7 @@ export class ShieldHum {
     }
     lp.connect(body).connect(this.gain);
     for (const s of this.sources) s.start(t);
-    this.level = 0.11;
+    this.level = 0.045;
     this.on = false;
     this.stopped = false;
   }

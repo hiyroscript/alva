@@ -266,22 +266,27 @@ export const SYNTHS = Object.freeze({
       ? adsr(amp.gain, t, Math.min(dur, 0.09), { a: 0.006, d: 0.08, s: 0.3, r: 0.07, peak })
       : adsr(amp.gain, t, dur, { a: params.attack ?? 0.18, d: 0.3, s: 0.9, r: params.release ?? 0.4, peak });
     const nodes = [];
-    const vib = osc(ctx, 'sine', 5.2, t);
-    const depth = gain(ctx, staccato ? 0 : 9);
-    vib.connect(depth);
+    // A short ostinato note needs no vibrato and no spread of its own (the
+    // channel places it): half the nodes, for overtime's busiest layer.
+    const vib = staccato ? null : osc(ctx, 'sine', 5.2, t);
+    const depth = vib ? gain(ctx, 9) : null;
+    if (vib) vib.connect(depth);
     for (const f of notes) {
       for (const side of [-1, 1]) {
         const o = osc(ctx, 'sawtooth', f, t, side * 6 + (params.cents ?? 0));
-        depth.connect(o.detune);
-        const p = ctx.createStereoPanner();
-        p.pan.setValueAtTime(side * 0.45, t);
-        o.connect(p).connect(bp);
+        if (depth) {
+          depth.connect(o.detune);
+          const p = ctx.createStereoPanner();
+          p.pan.setValueAtTime(side * 0.45, t);
+          o.connect(p).connect(bp);
+        } else o.connect(bp);
         nodes.push(o);
       }
     }
     bp.connect(amp).connect(out);
-    for (const o of [...nodes, vib]) o.start(t);
-    stopAll([...nodes, vib], end);
+    const sources = vib ? [...nodes, vib] : nodes;
+    for (const o of sources) o.start(t);
+    stopAll(sources, end);
     return end;
   },
 
