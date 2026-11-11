@@ -1,270 +1,152 @@
-# Alva — the Adventure update
+# Prompt: the Sound update for Alva
 
-Add a new single-player game mode to Alva, **Adventure**: a 30-level progression mode. It has its own difficulty, **Venture**, which gets stronger with every level. Every 5 levels it also offers **Perquisites**, permanent upgrades the player picks from cards. This prompt is the whole specification. Read all of it before you write any code.
+You are working on **Alva** (`hiyroscript/alva`), a 2D platform fighter for the browser. It is plain HTML, CSS and JavaScript with Canvas 2D. There are no frameworks, no build step and no WebGL. Before you change anything, read `CLAUDE.md`, `ALVA_SPEC.md`, `UPDATES.md`, `docs/README.md`, `docs/gameplay/stages.md`, `docs/gameplay/battle.md`, `docs/gameplay/local-play.md`, `docs/gameplay/practice.md`, `docs/gameplay/watch-mode.md`, `docs/gameplay/online-play.md` and `docs/systems/defense.md`, and follow every rule in them. The owner calls this work **the Sound update**. When you finish, add an entry for it to `UPDATES.md` and a line for it to `CLAUDE.md`'s list of named updates.
 
-## 0. Before you start
+Alva has no sound today. `js/core/audio-manager.js` is an empty foundation: it creates an `AudioContext` on the first pointer or key gesture, keeps a register/load/play map, and holds nothing. A few menu components already call `this.app.audio.play('move')`. **Those calls must stay silent.** Never register a `move` sound or any other sound this prompt does not name.
 
-1. Read `CLAUDE.md`, then `UPDATES.md`. Then read these sections of `ALVA_SPEC.md`: §6 (Screens and flow), §6.3 Select Mode, §6.3a Select Difficulty, §6.4 Select Fighter, §7.2.4 Combat, §7.2.5 Defense and Energy, §7.2.7 Launch, §7.2.8 Matches and the combat AI and §7.2.10 The match's end. Also read `docs/systems/ai.md`, `docs/systems/launch.md`, `docs/systems/energy.md` and `docs/architecture/character-system.md`.
-2. Read these files before you change them:
-   - `js/screens/mode-select-screen.js`
-   - `js/screens/difficulty-select-screen.js`
-   - `js/screens/character-select-screen.js`
-   - `js/screens/battle-screen.js`
-   - `js/game/battle.js`
-   - `js/data/difficulty.js`
-   - `js/game/ai/combat-ai.js`
-   - `js/game/ai/cpu-intelligence/brain.js` and its sibling modules, especially `evaluator.js`, `objective.js`, `situation.js` and `values.js`
-   - `js/game/combat/combat.js`, especially `CombatSystem.applyHit`
-   - `js/game/combat/combat-state.js`, especially `updateLaunchRecovery`, `heal` and `spendEnergy`
-   - `js/data/launch.js` and `js/data/energy.js`
-   - `js/core/app.js`, especially `initialSelection` and screen registration
-   - `js/core/settings.js`, for the versioned localStorage pattern
-   - `js/ui/components.js`, especially `screenHeader`, `refreshSteps` and `quickBattleSetup`
-   - `js/localization/strings/en.js` and `fr.js`
-   - `css/setup.css` and `css/responsive.css`
-3. The level-selector reference is the owner's **vl** repo (`hiyroscript/vl`, one file, `index.html`). Look at:
-   - the `/* levels */` CSS block, which contains `.grid`, `.cell`, `.cell.locked`, `.cell.done`, `.cell.next` and the wide `.echo-cell` row
-   - the `#levels` section markup (a panel head with a title and close button, a grid, then one wide cell)
-   - `paintLevels()` and the `#lvGrid` click handler
-   - the progress reset in the settings handler, a two-step "Reset" → "Confirm" button that disarms after 3.2 s
+---
 
-   Rebuild that look and behaviour **in Alva's own design language**: charcoal, off-white and the green accent, Alva's type, 3 px radii on the setup screens and its focus ring. Do not copy vl's colours or fonts.
-4. Run `node --test` before you start, so you know the baseline, and again at the end. Everything must pass.
+## 1. Scope: only these sounds, nothing more
 
-The whole project rules still apply: one character system, never special-casing a fighter's id in shared code, the comfort rules, the Void rules, English **and** French for every string, and keyboard, mouse, touch and gamepad navigation on every new screen through the shared menu navigator.
+Add **exactly** these audio pieces and no others. Do not add menu, hit, jump, footstep, announcer, UI-click, countdown, Energy, hazard or character sounds. Do not add a menu or title theme.
 
-## 1. Where Adventure is available
+| # | Sound | Where it plays |
+|---|---|---|
+| 1 | Stage theme, **Main Battle** version (×5 stages) | Regular clock of a battle on that stage |
+| 2 | Stage theme, **Overtime** version (×5) | Overtime on that stage |
+| 3 | Stage theme, **Post-match Victory** version (×5) | After the match, when the side the player cares about wins |
+| 4 | Stage theme, **Post-match Defeat** version (×5) | After the match, when that side loses |
+| 4b | Stage theme, **Post-match Draw** version (×5) | After any match that ends in a draw (no winner), in every mode |
+| 5 | **Practice Ground ambience** | The whole time on Practice Ground. It is a factory ambience, not music |
+| 6 | **Opponent ejected**: very satisfying | The player's opponent is taken by the Void or ejected |
+| 7 | **Player ejected**: negative, but still satisfying | The player's own fighter is taken by the Void or ejected |
+| 8 | **Universal ejection** (one neutral sound for both sides) | Every ejection in Local Play |
+| 9 | **Successful Deflect**: very satisfying | Only when a Deflect actually turns a projectile back |
+| 10 | **Perfect Shield** | A perfect block (`perfect: true` on the block event) |
+| 11 | **Shield block** | An ordinary blocked hit (not a perfect one) |
+| 12 | **Shield hold** | A sustained loop while the Shield is raised and held |
 
-- **Only** under Home → **Play** → Select Mode.
-- **Not** in Local Play, Online Play, Watch Mode or Practice Ground. None of their screens, rails or rules may list it, link to it or read its state. Add tests that confirm this (§10).
+The five battle stages are **Yerma** (`desert`), **Sol-Noir** (`city`), **Asperitas**, **Adamaris** and **Jökull**. Practice Ground has no theme, only the ambience. The owner asked for "post match: victorious or defeating", so every stage gets a victory ending and a defeat ending of its theme, plus its own **draw** ending. That is 5 pieces per stage and 25 music pieces in all.
 
-## 2. Select Mode changes
+"Ejection" means every way a fighter leaves play to the Void: a fall or launch into the Void (`Arena.checkVoid` / `StageCollision.inVoid`, the closing overtime Void included) **and** the end-of-match `Battle.ejectLoser`. A fighter must never trigger two ejection sounds for one exit. The code already makes sure "a loser the Void already took does not burst twice", so hook the sound to that same single event, ideally the place where `HitEffects.addElimination` fires.
 
-- The rail now holds two cards, in this order:
-  - **01 Adventure** — description: "Thirty levels against an ever-sharper CPU. Earn Perquisites as you climb." French: « Trente niveaux face à un CPU toujours plus redoutable. Gagnez des Perquisites en progressant. »
-  - **02 Quick Battle** — it was 01 and is now 02. Its name, description, play-type dialog and flow are otherwise unchanged.
-- Adventure is the default card (`data-nav-default`) and the first focus. Arrow keys and the D-pad move between the two cards, then to the details panel's content if it scrolls.
-- **Make the Mode details panel smaller to give the rail more room.**
-  - Change `.mode-layout` in `css/setup.css` so the rail clearly dominates, for example `minmax(0, 2.4fr) minmax(200px, 0.85fr)`.
-  - Reduce the panel's padding, heading and paragraph sizes by one step: the heading about 13–14 px and the paragraphs about 12–13 px, keeping the `clamp()` style.
-  - Keep internal scrolling.
-  - On the stacked layout (`css/responsive.css`, ≤ 720 px and tall/narrow screens), the panel takes `auto` height capped at roughly 32 vh and scrolls internally, so both cards stay fully visible.
-  - Check it on desktop, a phone held sideways (the reference is the attached 2000×924 screenshot) and a tall/narrow window.
-- The details panel now has **two sections**: Adventure first, then Quick Battle, each with the existing section styling.
-  - Adventure's overview: "Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits 5% harder. Every 5 levels, choose one Perquisite to keep." Translate it into French.
-  - Adventure's rules: "Your opponent's fighter and the stage are drawn at random. Standard match rules: first to 3 points, 5 minutes, then overtime." Translate it into French.
-- Selecting Adventure does **not** open the play-type dialog. It sets `app.selection.mode = 'adventure'` and goes straight to the Adventure level selector.
-- Select Mode's setup steps follow the focused or selected mode. Adventure's steps are **Mode · Level · Fighter**; Quick Battle's are unchanged. Add an `adventureSetup()` next to `quickBattleSetup()` in `js/ui/components.js`.
+---
 
-## 3. The Adventure level selector (new screen `adventure-levels`)
+## 2. How the audio is made: author it, don't download it
 
-New file: `js/screens/adventure-level-screen.js`, registered in `js/core/app.js`.
+The workspace can't fetch audio from the web, and Alva ships no audio assets. Create every piece **yourself**, using one of these two routes. Pick one and justify the choice in `docs/systems/audio.md`.
 
-- **Header:** use the standard `screenHeader`, with kicker "Adventure", title "Select Level" (French « Choisir le niveau ») and the steps Mode ✓ · **Level** (current) · Fighter. Back returns to Select Mode, with focus on the Adventure card.
-- **Grid:** 30 square cells numbered `01`–`30`, mono figures, modelled on vl's `.grid` / `.cell`.
-  - Use `repeat(auto-fill, minmax(54px, 1fr))` on wide screens. In short landscape, use 10 per row so all 30 fit without scrolling where possible. Otherwise the grid scrolls internally and Back stays reachable.
-  - **Locked** cells (level > highest unlocked) are dimmed, with a faint border, `disabled` and `aria-disabled`. Their name is "Level 07, locked".
-  - **Cleared** cells (level < highest unlocked) use a green-tinted fill and border with green text and a small check. Their name is "Level 03, cleared".
-  - **Next** cell (the highest unlocked level) uses a solid off-white fill with charcoal text. It is the default focus. Its name is "Level 08, next".
-  - **Milestone** cells (5, 10, 15, 20, 25, 30) carry a small card glyph in a corner, so the player can see where Perquisites are offered. Show the glyph as a filled mark once that milestone's Perquisite has been claimed, and as a hollow mark before.
-- **Wide row under the grid**, modelled on vl's `.echo-cell`:
-  - Left side: "Venture · Level NN" and a muted line with Venture's multiplier for the focused level, e.g. "×11.39 smarter · ×1.22 damage vs Level 1" (Level 7).
-  - Right side: the player's current Perquisites as compact chips, e.g. "Brave Soldier II", or "—" if they have none.
-  - This row is informational and not focusable.
-- **Progression reset button**, outlined and danger-tinted, at the bottom of the screen and labelled "Reset progress" (French « Réinitialiser la progression »). It uses vl's two-step pattern:
-  - The first press turns it into "Confirm reset" (French « Confirmer ») for 3.2 s, then it disarms.
-  - The second press within that time resets the unlocked level to 1, the cleared set, every Perquisite level and every milestone claim. It then repaints the grid and moves focus back to cell 01.
-  - It works with click, Enter/J and gamepad A, never on hover.
-  - It is disabled when there is nothing to reset.
-- Choosing an unlocked cell sets `app.selection.adventureLevel` and opens **Select Fighter** in Adventure mode. Replaying a cleared level is allowed.
+- **Route A (preferred): composed in code, synthesized live with Web Audio.** Write each theme as data: tempo, key, sections, and patterns for each instrument (notes, rhythms, velocities). A small sequencer in `js/core/audio/` schedules them ahead with `AudioContext.currentTime` and a look-ahead timer. Build the instruments from oscillators, noise, filters, envelopes, waveshaping, convolution or feedback-delay reverb, and compression. SFX are synthesized the same way. There are no binary assets, the download stays tiny, and versions can switch on exact beat or bar boundaries because the sequencer knows the musical clock.
+- **Route B: rendered offline to files.** Write a Node script under `tools/audio/` that renders each piece to `.ogg` (Opus or Vorbis), with an `.m4a`/AAC fallback for Safari, in `assets/audio/`. Then make sure the itch release (`.github/workflows/itch-release.yml`, `tools/itch`) bundles them and checks for them. If you choose this route, every music piece needs loop points that are exact to the sample, plus authored intro, loop and outro segments.
 
-## 4. Adventure flow
+Either way, the result must sound **produced**, not like a chiptune demo of beeps. Layer the instruments, give them stereo width, use reverb and delay sends, sidechain-style pumping on the pads under the kick, use a master bus compressor and limiter, and keep levels consistent. The owner's word is **addictive**: memorable hooks you'd hum after a match, strong grooves and real payoffs.
 
-```
-Home → Play → Select Mode → Adventure → Select Level → Select Fighter
-     → [levels 5, 10, 15, 20, 25, 30 with that milestone unclaimed: the Perquisite cards]
-     → Battle (the CPU's fighter and the stage drawn at random, Venture at that level)
-```
+---
 
-- **Select Fighter** reuses `character-select-screen.js`. The kicker is "Adventure", the steps are Mode ✓ · Level ✓ · **Fighter**, and Back returns to Select Level. There is **no** difficulty step and no CPU or stage step.
-- **CPU and stage:** draw them at random exactly as Regular Play does (reuse its draw from `quick-battle-setup.js`; do not duplicate it), seeded per battle.
-- **Match rules:** these are the normal Quick Battle rules: 3 points, 5:00, overtime with the closing Void, the Launch Point tiebreak, the celebration, the result toast and Match Results.
-- **Win:** if this was the highest unlocked level, unlock the next one. Mark the level cleared and save immediately, so progress survives closing the tab mid-celebration.
-- **Loss or draw:** nothing unlocks. Progress already made is kept.
-- **Match Results in Adventure:**
-  - **Next level** (green, primary) appears only after a win when the next level exists. It goes to that level's Perquisite cards if it is an unclaimed milestone, otherwise straight into battle with the same fighter and a fresh random CPU and stage.
-  - **Retry level** replays the same level with a new random draw.
-  - **Change fighter** goes to Adventure's Select Fighter.
-  - **Level select** goes to the Adventure level selector.
-  - **Return to Home Screen** stays as it is.
-  - **Change stage** is **not** offered.
-  - The results header shows "Adventure · Level NN".
-- **Clearing Level 30** shows a completion line on the toast: "Adventure complete!" (French « Aventure terminée ! »). On the selector, all 30 cells show as cleared and the cleared state persists.
-- **Pause menu:** Restart Battle restarts the same level. Every other option behaves as in Quick Battle.
-- **Battle HUD:** next to the timer, or in the existing place the difficulty would otherwise show, add a small tag such as "LV 07 · VENTURE" so the player always knows where they are. It must respect the "nothing past the top HUD" touch rule.
+## 3. The music: one unique theme for each stage, in 5 versions
 
-## 5. Venture: the Adventure difficulty
+### 3.1 Rules for every theme
 
-Venture replaces Easy, Medium, Hard and Brutal inside Adventure. It is one difficulty that grows with the level. **The key rule: at Level 1 Venture is easy, and every level it is exactly 1.5× smarter and 1.05× stronger than the level before.** Smarter and stronger grow at different rates on purpose, each from its own constant in `js/data/adventure.js` so they can be tuned separately:
+- **Unique.** Each stage has its own melody, its own harmony, key and tempo, and its own instrument palette. No two stages share a hook or a chord loop.
+- **Matches the stage.** Read each stage's theme file (`js/stages/*-theme.js`), its map and its hazards in `js/data/maps.js` and `js/data/stage-hazards.js`, and its description in `docs/gameplay/stages.md`. The instruments and mood must sound like that place.
+- **One theme, five versions.** All five versions of a stage come from the **same** motif, key centre and instrument set, so they're clearly the same piece in different states. The versions don't sound like four different songs.
+- **Main Battle is epic.** It's a driving, heroic, high-energy fight track. It has an intro, an A section with the main hook, a B section that builds, and a climax, and it loops seamlessly for the whole 5-minute clock. It shouldn't wear thin: at least 90–120 s of material before it repeats, with variations on each pass.
+- **Overtime is epic and makes you anxious.** It uses the same hook, but faster (+10–20 % tempo, or double-time drums), shifted up a step or into a darker mode. It adds ticking or clock-like percussion, rising risers, dissonant string ostinatos, a pulsing sub, and a filter that slowly opens. **Its intensity follows `Battle.overtimeVoidPressure` (0 → 1)** as the Void closes. Layers come in, the high-pass and filter sweep, the percussion gets denser and the pitch tension rises, so the last 10 seconds feel frantic. This is the musical mirror of the Void waves speeding up to 6×. Read the pressure from the battle and don't keep a second clock.
+- **Victory and Defeat (post-match).** Each is a short sting (about 3–5 s) followed by a calm loop that plays under the celebration and Match Results until the player leaves. Victory restates the hook in a triumphant major setting with a big final hit. Defeat restates it in a broken, minor or slowed version, with a falling cadence. It should feel heavy but still sound good. Draw is its own distinct ending: the hook left unresolved, as in a standoff. It hangs on a suspended or ambiguous chord (sus2/sus4, or the theme's mode with no tonic resolution), with tense but dignified percussion that stops on an open, ringing final hit. It is neither triumphant nor crushing. It is unique to each stage and is never a re-use of the Victory or Defeat ending. All three endings must stay in that stage's instrument palette.
 
-- `VENTURE_SMARTS_GROWTH = 1.5`: the intelligence factor at level L is `1.5 ** (L − 1)`. It is bounded by perfect play (§5.1).
-- `VENTURE_STRENGTH_GROWTH = 1.05`: the damage factor at level L is `1.05 ** (L − 1)`. That is ×1 at L1, about ×1.55 at L10, about ×2.53 at L20 and about ×4.12 at L30.
+### 3.2 Direction for each stage (follow it, then refine it by ear)
 
-Strength grows more gently because damage is unbounded. At 1.5× per level the damage would reach about ×128,000 by Level 30 and turn the late game into one-hit knockouts. At 1.05× Level 30 is brutal but still winnable, and the Perquisites still matter.
+| Stage | Setting (from the code) | Musical identity |
+|---|---|---|
+| **Yerma** (`desert`) | Sandstone mesa over open desert air, far rock needles, gold-lit wisps | Phrygian-dominant / double-harmonic scale, oud- or plucked-string-like lead, frame-drum and darbuka groove, a wide wind drone, a heroic brass-like synth answer. Around 128–140 BPM. |
+| **Sol-Noir** (`city`) | Rooftop block over a street canyon at night, supertall towers, aviation lights | Dark synthwave / cyber-noir with gated drums, a driving arpeggiated bass, a neon lead, and a sax- or brass-stab hook. Around 120–128 BPM. Overtime adds siren-like sweeps. |
+| **Asperitas** | One great cloud adrift above the cloud sea, drifting cloud platforms | Soaring orchestral-electronic: airy choir pads, bell or celesta arpeggios, big taiko-style hits, a high flying lead. Lydian brightness in Main Battle; Overtime moves it to a darker mode. |
+| **Adamaris** | Tropical beach under a volcano that throws rocks | Island-epic: steel-drum or marimba hook, tribal toms, a bright surf-rock-style lead over a rumbling volcanic low end. Overtime brings the volcano forward: sub rumbles and erupting percussion. |
+| **Jökull** | Glacier over a frozen abyss, sections that break away, sudden blizzards, aurora | Nordic-epic: icy glass bells, a deep drone, war drums, a throat-chant-like or horn lead, cold wide reverb. Overtime adds cracking-ice transients and blizzard noise swells. |
 
-Create `js/data/adventure.js` for all Adventure data: the level count (30), the milestone levels, Venture, and the Perquisite table (§6).
+### 3.3 Clean transitions between versions
 
-### 5.1 Smarter
+- **Battle → Overtime.** When `startOvertime` fires, wait for the next bar line (or beat, if a bar is longer than about 1.5 s) and switch to Overtime with a short pickup or riser. Don't hard-cut in the middle of a phrase or drop out into silence. Line this up with the 1.4 s **OVERTIME** banner.
+- **Battle/Overtime → Post-match.** When the match ends (`matchOver` or the result is set, ejection included), cut on the downbeat into the Victory, Defeat or Draw sting with a tail of no more than about 1 beat. The sting then flows into its post-match loop.
+- **Restart / Rematch.** Return cleanly to Main Battle from its intro, and set overtime intensity back to 0.
+- **Pause.** Duck the music (about −10 dB with a gentle low-pass) and freeze the Shield-hold loop. Restore both smoothly on resume. Overtime intensity must not move while the game is paused. Online Play has no pause, so leave it unaffected.
+- **Leaving the battle** (Home, Change Stage, Change fighters, Leave room). Fade out over about 0.4–0.8 s. Nothing may keep playing on menus.
+- Crossfades use equal-power gain curves. Version changes never click, gap or double up. Keep one music bus with a single active voice, and keep the version state in one small state machine: `idle → battle → overtime → postVictory | postDefeat | postDraw`.
 
-CPU Intelligence must stay the same engine with the same capabilities. Venture is a **profile**, the same shape as the profiles in `js/data/difficulty.js`, generated per level by `ventureProfile(level)`:
+---
 
-- **Start point:** Level 1 is the `easy` profile exactly.
-- **Each level, every trait's distance from perfect play is divided by `VENTURE_SMARTS_GROWTH` (1.5).** For a trait where lower is better (`react`, `lapse`, `think`, `noise`, `rangeError`, `predictError`, `timing`), compute `value(L) = floor + (easy − floor) / 1.5^(L−1)`. For a trait where higher is better, compute `value(L) = ceil − (ceil − easy) / 1.5^(L−1)`.
-- **Bounds:** the floor and ceil are the physical limits of play, not Brutal. Never make reaction zero: keep the react floor at least 2 simulation frames, matching the spirit of "never on the frame it starts". `planDepth` is an integer from 1 to 4, so round it. Probabilities stay within 0–1.
-- **Result:** the CPU really is 1.5× closer to perfect every level. By about Level 6 it matches Brutal on most traits, and from there it keeps closing in on perfect play.
-- **Ordering:** honour the `CAPABILITY` ordering. No trait may get worse from one level to the next. Write a test for this across all 30 levels.
-- **Wiring:** expose the profile through the same path the brain already uses (`getDifficultyProfile`). Let `CombatAIController` and `Brain` accept a `profile` (or `{ venture: level }`) as well as a difficulty id. Do not add a fifth entry to `DIFFICULTIES`: the Difficulty screen and Watch Mode must still list only Easy to Brutal.
+## 4. Practice Ground: factory ambience, no music
 
-### 5.2 Stronger
+Practice Ground plays a **looping factory ambience** instead of a theme. Build it from layered, evolving elements: low machine hum and room tone, distant rhythmic pistons or presses, conveyor rattle, occasional steam hiss, metallic clanks and chain movement, and a faint electrical buzz from the gridded wall's lights. It must loop without seams, never become rhythmic enough to feel like music, stay low in the mix, and randomise its one-shots so it never sounds like a 10-second loop. It fades in when Practice starts and fades out when Practice ends. Practice never plays any version of a theme.
 
-This is the one deliberate exception to the "no difficulty ever scales a hit" rule in the header of `js/data/difficulty.js`. Update that comment and §7.2.8 of the spec to say so: **only in Adventure**, and only through the battle-level modifier described in §7.
+The ejection, Deflect and Shield SFX **do** play in Practice. The Practice Void scores nothing, but the player's dummy is still "the opponent" and the player's own fighter is still "the player".
 
-- Venture's fighter deals `damage × ventureStrength(L)`, where `ventureStrength(L) = VENTURE_STRENGTH_GROWTH ** (L − 1)`, on every real (unblocked) hit. That covers its attacks, strikes, projectiles, summons, techniques and backstabs: everything that goes through `CombatSystem.applyHit` with the Venture fighter as the credited attacker, including hits credited through a projectile, summon or technique owner.
-- The authored tiers (`ALLOWED_DAMAGE_VALUES`: 1, 3, 5, 10) are still validated on the **definition**. The multiplier applies at **resolution time**, in `applyHit`, to the amount added to the target's Launch Point and Limit gauge. So the launch strength (Base Launch × new Launch Point) grows with it, which is the point.
-- Blocked hits still deal 0 and still cost the normal Energy. Shield, Deflect, Energy, speed, cooldowns, hitboxes and stun are untouched. "Stronger" means damage dealt.
-- Keep fractional Launch Points internally if a multiplier produces them. The HUD and Match Results display whole numbers (rounded), and the overtime Launch Point tiebreak compares the real values.
-- **Show it to the player, honestly:** before the battle, show a brief line on the loading or versus transition, e.g. "Venture · ×11.39 smarter · ×1.22 damage". On the level selector, show it in the wide row.
+---
 
-> Keep `VENTURE_STRENGTH_GROWTH` and the single `ventureStrength(level)` function as the only places to change if strength is retuned later. Do the same for `VENTURE_SMARTS_GROWTH` and `ventureProfile(level)`.
+## 5. Sound effects
 
-## 6. Perquisites
+Every SFX must feel **very satisfying**: tight transients, a weighty low end, a bright and crisp top, and a short sparkle or tail. Add slight random pitch and volume variation (±3–5 %) so repeats never sound robotic. Duck the music a little (−3 to −5 dB for about 150–300 ms) under the ejection, Deflect and Perfect Shield sounds so they punch through.
 
-### 6.1 When the cards appear
+- **Opponent ejected:** a huge, rewarding knockout. It has a deep boom, a rising bright shimmer or "shing", and a crowd-roar-like noise burst or a short triumphant brass-synth hit. It should make the player want to do it again.
+- **Player ejected:** clearly negative but still satisfying to hear. It has a falling pitch sweep, a muffled low boom, and a hollow, minor-key or detuned tail, like a heavy "you got sent" thud. It is not annoying or ear-piercing.
+- **Universal ejection (Local Play):** one neutral, punchy, impressive burst that doesn't read as "good" or "bad", so neither player is confused about who it belongs to. It plays for every ejection in Local Play, both players' included.
+- **Successful Deflect:** a sharp, metallic, ringing *parry* with a whoosh reversal, with a brief stereo sweep in the direction the projectile is sent back. Hook it **only** where `CombatSystem.deflectProjectiles` actually turns a projectile back (the same moment the 15 Energy is paid, once per Deflect). Starting a Deflect, or one that whiffs, makes no sound.
+- **Perfect Shield:** a crystalline, high-value "ting" with a short shimmer bloom. It is clearly a premium version of the block sound. It **replaces** the block sound for that hit and never stacks on it.
+- **Shield block:** a solid, muted energy-barrier impact, satisfying but understated, so the Perfect Shield clearly stands above it. One sound per blocked event. A multi-hit string that is blocked stops at its first block, as the engine already handles.
+- **Shield hold:** a soft, low, humming energy-field loop that matches the Shield's black-and-red wavering circle. It fades in quickly (about 60–100 ms) when the Shield is raised, loops while it's held, and fades out on release. It respects blockstun and pause, and stays well under the music.
 
-- **Before** the battle of levels **5, 10, 15, 20, 25 and 30**, the first time the player starts that level (the milestone is not yet claimed), after Select Fighter.
-- Replaying a level whose milestone is already claimed shows no cards.
-- **Losing does not unclaim it.** The choice is made when picked, not when the level is won.
-- That makes six picks in a full run.
+Play these sounds for **any fighter on screen**: the player's, the CPU's, or Player 2's. They come from the shared systems (`fighter.js`, `combat.js`, `battle.js` / `arena.js`), never from a character file. Never special-case a fighter's id. Character files gain nothing for this update. Use subtle stereo panning by on-screen position so two simultaneous Shield holds can be told apart.
 
-### 6.2 The overlay (new: `js/ui/perquisite-cards.js`)
+---
 
-- Use a modal `role="dialog"` over the dimmed screen, like `ChoiceDialog`. Kicker: "Level NN". Title: "Choose a Perquisite" (French « Choisissez une Perquisite »).
-- **Exactly two cards** pop in side by side, with a short scale and fade entrance. Respect reduced motion: no scale, just a fade. On a narrow portrait screen, stack them.
-- Each card shows:
-  - an original icon, drawn as an SVG in `js/ui/icons.js`
-  - the name
-  - the level badge in Roman numerals I–V, plus "NEW" when it is level I
-  - the effect at that level in plain numbers, e.g. "Take 15% less damage"
-  - if it is an upgrade, a muted "was 10%"
-- The player **must** pick one. There is no close button, and Esc or Back does nothing on this dialog. Arrow keys and the D-pad move between the cards. Click, Enter/J or gamepad A picks. Hover previews only.
-- Picking saves at once (level +1 for that Perquisite, milestone marked claimed), then the battle starts.
+## 6. Whose point of view decides the sound
 
-### 6.3 Which two cards
+Each mode needs a clear "point-of-view side". Put that logic in **one** helper (for example `audioPerspective(battle)`) and cover it with tests.
 
-- Each of the five Perquisites has five levels (I–V). An offer is always the **next** level of a Perquisite: level I if the player doesn't have it, or one above what they own. Once a Perquisite reaches level V it never appears again.
-- **A level the player already owns never comes back.** After picking Brave Soldier I, Brave Soldier I is gone forever, and only Brave Soldier II can be offered.
-- Draw the two cards from the Perquisites that are not yet at level V, with a seeded RNG: the run seed plus the milestone level. The two cards are always two **different** Perquisites. Save the drawn pair with the milestone, so reloading the page mid-choice shows the same two cards rather than a reroll.
-- With 5 × 5 = 25 levels available and only 6 picks, there is always at least two Perquisites available. Assert this in a test anyway.
+| Mode | Opponent / Player ejection | Post-match music |
+|---|---|---|
+| **Quick Battle** (Regular and Custom) | Player 1's fighter is the player; the CPU is the opponent | Victory if Player 1 wins, Defeat if Player 1 loses |
+| **Online Play** | This device's player is the player | From this player's side, as the result is already shown |
+| **Local Play** | **Universal ejection** for both, always | **Always Victory**, whoever wins, to avoid confusion |
+| **Watch Mode** (CPU vs CPU, nobody is the protagonist) | **Universal ejection** | **Victory** (the same reasoning as Local Play) |
+| **Practice Ground** | The player's fighter is the player; the dummy is the opponent | No music, only ambience |
+| **Any draw** (no winner, nobody ejected), in every mode, Local and Watch included | — | That stage's own **Draw** version |
 
-### 6.4 The five Perquisites and their scaling
+---
 
-"Every level amplifies the Perquisite by 0.5×": level n's effect is `base × (1 + 0.5 × (n − 1))`. That gives I = ×1, II = ×1.5, III = ×2, IV = ×2.5, V = ×3 the base. Put every base value in `js/data/adventure.js`.
+## 7. The new Audio settings
 
-| id | Name (EN / FR) | Effect | Base (I) | II | III | IV | V |
-|---|---|---|---|---|---|---|---|
-| `braveSoldier` | Brave Soldier / Brave Soldat | Damage **received** reduced (the amount added to the player's Launch Point by real hits) | 8% | 12% | 16% | 20% | 24% |
-| `nearlyImmortal` | Nearly Immortal / Presque Immortel | Launch Points recovered **per recovery tick** increased (`LAUNCH_RECOVERY_AMOUNT`, normally 2) | +0.5 | +0.75 | +1 | +1.25 | +1.5 |
-| `velociousImmuneSystem` | Velocious Immune System / Système Immunitaire Véloce | **Recovery ticks come faster**: `LAUNCH_RECOVERY_INTERVAL` (0.5 s) shortened. This is NOT the 2 s `LAUNCH_RECOVERY_DELAY` before recovery starts, which stays untouched | −8% interval | −12% | −16% | −20% | −24% |
-| `maximumEnergy` | Maximum Energy / Énergie Maximale | Energy **cost** of everything that costs Energy reduced (Dash, air dash, Shield block, Deflect, constructs, any move's own cost) | 8% | 12% | 16% | 20% | 24% |
-| `redoutableStrength` | Redoutable Strength / Force Redoutable | Damage **dealt** increased (on real hits, the same resolution point as Venture's strength) | 8% | 12% | 16% | 20% | 24% |
+Add an **Audio** section to Settings (`js/ui/settings-dialog.js`, `SETTINGS_SECTIONS`) with its own tab, alongside Language, Controls and Combat.
 
-Fix the spellings in the UI: "Brave Soldier", "Maximum Energy", "Redoutable Strength" and "Velocious Immune System". The ids above are final.
+- Controls: **Master volume**, **Music volume** and **Sound effects volume** (0–100 % sliders, each with its live percentage), plus a **Mute all** toggle. Optional, only if it stays tidy: an **Ambience** volume for Practice Ground.
+- Changes apply **live**, including while the pause menu is open over a battle. Moving the SFX slider plays a short preview using the Shield block sound, which is one of the allowed sounds. No new sound is added for this.
+- Persist the settings through `js/core/settings.js`: bump `SETTINGS_VERSION` to **11**, add `audio: { master, music, sfx, muted }` with sensible defaults (for example master 80, music 70, sfx 85, not muted), migrate every older version to those defaults while keeping everything else, and update the long comment at the top of the file the same way the earlier versions are documented. Sanitise each value on its own: clamp to 0–100, and fall back to the default if a value isn't a number.
+- Fully navigable by keyboard, gamepad (the shared menu navigator, so left and right adjust a focused slider) and touch, with proper `role="slider"` / `aria-valuenow`, matching `css/settings.css`.
+- Add every label in **English and French** (`js/localization/strings/en.js`, `fr.js`).
+- Audio routing: `master → (music bus, sfx bus, ambience bus) → compressor/limiter → destination`. Volume changes use short gain ramps, never jumps that make zipper noise.
 
-Each card states its effect in plain words and real numbers. For example, for Velocious Immune System: "Launch Point recovers every 0.44 s instead of 0.5 s (recovery still starts after 2 s)".
+---
 
-## 7. How modifiers reach the fighters (architecture)
+## 8. Engineering requirements
 
-- Add a per-fighter **`modifiers`** object to the Battle, built once at battle creation. Default to identity for every mode: `damageDealt: 1, damageTaken: 1, recoveryAmountBonus: 0, recoveryIntervalScale: 1, energyCostScale: 1`.
-  - Only Adventure builds non-identity values: the player's from their Perquisites, and the CPU's from Venture's strength.
-  - Quick Battle, Watch, Local, Online and Practice must be byte-for-byte the same in behaviour. Online lockstep must not change at all, and the state hash must be unaffected when modifiers are identity.
-- **Never** read a fighter id, a mode string or Adventure state inside the combat engine. The engine reads only the modifiers object it is handed (`fighter.combat.modifiers` or similar). That keeps the character-system rule intact.
-- **Hooks:**
-  - `CombatSystem.applyHit`: `damage = base × attacker.damageDealt × target.damageTaken`, applied to the Launch Point increase and to `fillLimit`. A hit with a base of 0 stays 0.
-  - `CombatState.updateLaunchRecovery`: amount `LAUNCH_RECOVERY_AMOUNT + recoveryAmountBonus`, interval `LAUNCH_RECOVERY_INTERVAL × recoveryIntervalScale`. The delay is unchanged.
-  - `spendEnergy` callers, or better the fighter's `energySpec` built per battle: every cost × `energyCostScale`.
-- **CPUs have no Perquisites.** The Venture CPU's modifiers are identity except `damageDealt`.
-- **Match statistics** (`js/game/match-stats.js`) report the real, modified numbers.
+- Rework `js/core/audio-manager.js` into a proper engine: the buses above, a music director (the version state machine, beat/bar clock, overtime intensity input), an SFX player with voice limits (no more than about 2 concurrent copies of one SFX and a global cap) and the looping ambience. Keep the existing "nothing plays before a user gesture" unlock, and resume a suspended context on later gestures (iOS/Safari). If Web Audio is missing, the game stays fully silent and fully playable.
+- Battle screens and Practice drive the audio through events, such as `battleStarted(stageId, mode)`, `overtimeStarted`, `overtimePressure(p)`, `matchEnded(outcome)`, `fighterEjected(fighter)`, `deflected(fighter)`, `blocked(fighter, { perfect })`, `shieldHeld(fighter, on)`, `paused` / `resumed` and `left`. The simulation must stay deterministic: audio only listens and never feeds back into gameplay, timing or online lockstep. Online rollback or resimulation must not replay ejection or block sounds twice. Fire them only for confirmed events.
+- Pause the audio when the page is hidden (`visibilitychange`), and resume it when the page is shown again.
+- Respect the mute setting completely: when muted, no sound may leak through, including during the unlock.
+- Performance: no audible stutter on mid-range phones. Schedule ahead, reuse nodes where you can, and keep CPU use low. If you use Route B, keep each music file under about 1.5 MB.
+- Tests (`node --test`): the perspective table above; the version state machine (battle → overtime → post-match victory, defeat and draw, restart, pause, leave); one ejection event per exit, `ejectLoser` after a Void fall included; Deflect sound only on a real turn-back; perfect versus normal block exclusivity; Shield-hold start and stop; settings migration from 10 to 11 and sanitising; and a guard test that fails if any sound outside the twelve allowed ones is ever registered. Mock `AudioContext` for Node.
+- Documentation: a new `docs/systems/audio.md` (the architecture, every piece and where it fires, the per-stage musical identity, how to add a stage's theme later) linked from `docs/README.md`, plus short updates to `ALVA_SPEC.md`, `docs/gameplay/stages.md`, `battle.md`, `local-play.md`, `watch-mode.md`, `practice.md` and `docs/systems/defense.md`.
+- Respect every strict rule in `CLAUDE.md`: no fighter special-cases, no change to stage geometry or the Void, no change to controller or touch comfort, and never touch `character_rule`.
 
-## 8. CPUs must acknowledge this update
+---
 
-The CPU Intelligence must reason with the **real, modified** numbers in Adventure, not the authored ones. Otherwise its finisher, risk and objective reasoning will be wrong. Audit every place the brain predicts damage, launch strength, recovery or Energy. Start with `evaluator.js`, `situation.js`, `objective.js`, `strategy.js`, `plans.js`, `defense.js`, `values.js` and `opponent-model.js`. Route those predictions through helpers that take the modifiers, e.g. `effectiveDamage(attacker, target, def)`, `effectiveRecovery(fighter)` and `effectiveEnergyCost(fighter, cost)`. Specifically:
+## 9. Definition of done
 
-- **Its own hits:** it knows each hit lands `× damageDealt`, so it recognises a kill-confirm at the level-scaled launch strength. At high levels it should go for finishers much earlier.
-- **The player's Perquisites:**
-  - Against Brave Soldier, it knows its hits do less and the player survives longer.
-  - Against Nearly Immortal and Velocious Immune System, it knows the player's Launch Point drains faster, so pressure that lets up is worth less. It should keep momentum instead of waiting.
-  - Against Redoutable Strength, it respects the player's hits more in its risk and guard weighting.
-  - Against Maximum Energy, its read of "the opponent is about to run dry" uses the player's reduced costs.
-- **Its own Energy reads** still use full costs, since it has no Perquisites.
-- **Overtime and the tiebreak:** its awareness of the Launch Point tiebreak uses the real, possibly fractional, values.
-- **The CPU's perception rules are unchanged:** it still sees only what has been on screen for its reaction window. The modifiers are known rules of the match, like the clock, not perception.
-- **Celebration AI** (`js/game/ai/celebration.js`) and the Watch Mode CPUs are unaffected.
-- **Tests (in `tests/systems/`):**
-  - With identity modifiers the brain's decisions are identical to before, using the same seeded scenario.
-  - With `damageDealt` raised, its evaluated finisher threshold drops.
-  - With the player's `damageTaken` lowered, the brain predicts the lower Launch Point.
-
-## 9. Saved progress
-
-- Save it in its own versioned localStorage key, `alva.adventure`, following `js/core/settings.js` exactly: one object, a `version`, `MIGRATIONS`, every field validated on read, and a storage that refuses or is missing keeps progress for this visit only and never throws. Shape:
-  ```js
-  { version: 1, unlocked: 1..31 /* 31 = all cleared */, cleared: [levels], perquisites: { braveSoldier: 0..5, ... }, milestones: { "5": { offer: ["idA","idB"], picked: "idA" | null }, ... }, seed }
-  ```
-- Corrupt or unknown data means fresh progress. Clamp everything (vl's `clamp(out.unlocked | 0 || 1, …)` pattern).
-- Only the reset button (§3) clears it. Clearing site data obviously also does.
-
-## 10. Localization, docs and tests
-
-- **Strings:** add every new string to `en.js` **and** `fr.js` (mode card, details, level selector, cell names, reset, Perquisite names, effects and card lines, Venture labels, results actions and the completion line). The language must switch live without a reload, as everywhere else.
-- **Docs:**
-  - Add a **§6.3b Adventure** to `ALVA_SPEC.md` covering the selector, flow, Venture and Perquisites. Update §6's flow block, §6.3 (two cards, renumbering, the smaller details panel) and §7.2.8 (the Venture exception).
-  - Add `docs/gameplay/adventure.md` and link it from `docs/README.md`.
-  - Add an **"Adventure update"** entry to `UPDATES.md` and add the name to the list of named updates in `CLAUDE.md`.
-- **Tests** (`node --test`), including at least:
-  - `tests/interface/adventure.test.mjs` (Select Mode and selector):
-    - Select Mode lists Adventure 01 then Quick Battle 02, Adventure focused by default.
-    - Adventure opens the selector with no play-type dialog.
-    - Locked, cleared and next states; locked cells can't be chosen.
-    - The two-step reset arms, disarms after 3.2 s and resets.
-    - Back paths.
-    - French strings.
-    - The details panel is narrower than before, and both cards stay fully visible at 2000×924, a phone in landscape and a tall/narrow window.
-  - `tests/systems/venture.test.mjs`:
-    - Level 1 equals the Easy profile.
-    - Each trait's distance from perfect divides by exactly 1.5 per level, within bounds.
-    - No trait regresses across 30 levels.
-    - `ventureStrength(L) === 1.05 ** (L−1)` (Level 30 ≈ 4.12), kept separate from the 1.5 smarts growth.
-    - A Venture hit adds the scaled damage.
-    - Blocked hits still add 0.
-  - `tests/systems/perquisites.test.mjs`:
-    - Scaling I to V equals base × (1, 1.5, 2, 2.5, 3).
-    - An offer is always two different Perquisites, each the next level of one not yet at V.
-    - An owned level never reappears.
-    - A same-seed reload gives the same offer.
-    - Each effect hooks in at exactly its place (damage taken, recovery amount, recovery interval but **not** delay, Energy costs, damage dealt).
-  - `tests/integration/adventure.test.mjs`:
-    - The full flow: level → fighter → cards at 5 → battle.
-    - A win unlocks the next level; a loss doesn't.
-    - Next level, Retry and Level select.
-    - Clearing 30.
-    - Persistence across a fresh `App`.
-  - Regression:
-    - Quick Battle, Watch, Local, Online (lockstep hash) and Practice behave identically with identity modifiers.
-    - Adventure appears nowhere in Local, Online or Watch.
-- Update any existing tests that assumed Quick Battle is `'01'` or the only mode card.
-
-## 11. Definition of done
-
-- Every item above is done, `node --test` passes in full, and no existing behaviour outside Adventure has changed.
-- Screenshots of the Select Mode screen, the level selector (fresh, mid-run and complete), the Perquisite cards and the in-battle "LV · VENTURE" tag, at the 2000×924 landscape size and on a desktop window, in both English and French.
-- One commit per logical step on a feature branch, then a pull request titled **"The Adventure update"** whose description summarises the mode, Venture's maths and the Perquisite table.
+1. Each of the 5 stages plays its own epic Main Battle theme that loops seamlessly. Overtime switches on a bar line to an anxious version that escalates with the closing Void. The match ends on the beat into a Victory, Defeat or Draw ending of the same theme.
+2. Practice Ground plays only a factory ambience.
+3. The opponent-ejected, player-ejected and Local/Watch universal ejection sounds, Deflect (on a real turn-back only), Perfect Shield, Shield block and Shield hold all play correctly for every fighter, every mode and every point of view.
+4. Local Play always uses the universal ejection sound and the Victory version, except on a draw, where every mode plays the stage's Draw version.
+5. No other sound exists anywhere in the game, and menus stay silent.
+6. Settings › Audio works with mouse, touch, keyboard and gamepad, persists as version 11 and applies live.
+7. `node --test` passes, the docs and `UPDATES.md` are updated, and the itch release still builds.
+8. Before you finish, actually listen through each stage's 5 versions and every transition, using a headless render or an offline `OfflineAudioContext` dump to WAV if you can't play audio directly. Fix any clicks, level jumps, clashing keys or transitions that miss the beat.
