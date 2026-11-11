@@ -84,6 +84,24 @@
 // go), a repelling one turns back one that does neither (two repelling
 // ones, both go), and two that do neither pass each other by.
 //
+// One field bounds how many a thrower keeps in play:
+//
+//   maxInPlay: 1              its thrower never has more than this many
+//                             of its move's projectiles in play at once
+//                             (a whole number; 0 is no bound): one more released
+//                             takes the place of the oldest still there,
+//                             which is gone that step without striking.
+//                             The move is its attack family, by codename
+//                             (moveFamily: a ground move's and its mid-air
+//                             version's count together, attack3_object
+//                             and midair_attack3_object both attack3's),
+//                             and only those it threw itself count: one
+//                             another fighter has turned back is that
+//                             fighter's. Without it (0, the default) there
+//                             is no bound. #0015's Gift, a present left
+//                             where it was set until someone sets it off:
+//                             one at a time, wherever it was set.
+//
 // A fighter's attack with `deflectProjectiles` (every fighter's Deflect, see
 // js/game/combat/deflect.js) turns a projectile back the same way, by the
 // same turnBack, whatever the projectile is: being repelling, piercing or
@@ -133,7 +151,16 @@ const PROJECTILE_DEFAULTS = {
   repel: false,   // turns back the projectiles it meets (see above)
   erase: false,   // erases the projectiles it meets and flies on through fighters (see above)
   rotationSpeed: 0, // degrees per second its art spins (see above): rendering only
+  maxInPlay: 0,   // the most of its move's projectiles its thrower keeps in play (see above); 0: no bound
 };
+
+// The attack family projectile `id` belongs to, by codename (see
+// codename_rule): the move that throws it, its mid-air version counted
+// with the ground one. attack3_object and midair_attack3_object are both
+// attack3's; extra_attack_object is extra_attack's.
+export function moveFamily(id) {
+  return String(id).replace(/^midair_/, '').replace(/_object.*$/, '');
+}
 
 // What a finisher takes from its projectile when it does not say.
 const FINISHER_INHERITS = Object.freeze([
@@ -155,6 +182,9 @@ export function createProjectileDefinition(spec) {
   def.repel = !!def.repel;
   def.erase = !!def.erase;
   if (!Number.isFinite(def.rotationSpeed)) throw new Error(`[Alva] Projectile "${spec.id}"'s rotationSpeed must be a number (degrees per second)`);
+  if (!(Number.isInteger(def.maxInPlay) && def.maxInPlay >= 0)) {
+    throw new Error(`[Alva] Projectile "${spec.id}"'s maxInPlay must be a whole number (0: no bound)`);
+  }
   if (def.pierce) {
     const { hits, interval } = def.pierce;
     if (!(Number.isInteger(hits) && hits >= 2) || !(interval > 0)) {
@@ -403,15 +433,28 @@ export function clashProjectiles(list) {
 }
 
 // Turns every projectile the fighters released this step into a live
-// Projectile in `list`. Each release is consumed exactly once.
+// Projectile in `list`. Each release is consumed exactly once. One whose
+// move bounds how many its thrower keeps in play (`maxInPlay`) first
+// retires the oldest of them, as many as it takes to make room.
 export function spawnProjectiles(fighters, list) {
   for (const f of fighters) {
     for (const release of f.releases) {
       const p = Projectile.release(f, release);
-      if (p) list.push(p);
+      if (!p) continue;
+      if (p.def.maxInPlay > 0) makeRoomFor(p, list);
+      list.push(p);
     }
     f.releases.length = 0;
   }
+}
+
+// Retires the oldest of `p`'s thrower's projectiles of its move still in
+// play (`list` is in release order) until one more keeps within its
+// `maxInPlay` (see above). Gone, it strikes nothing more.
+function makeRoomFor(p, list) {
+  const family = moveFamily(p.def.id);
+  const mine = list.filter((q) => q.alive && q.owner === p.owner && !q.redirected && moveFamily(q.def.id) === family);
+  for (let i = 0; i <= mine.length - p.def.maxInPlay; i++) mine[i].alive = false;
 }
 
 // Drops spent projectiles from `list`, in place, keeping the order.

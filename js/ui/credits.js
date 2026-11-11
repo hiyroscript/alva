@@ -7,7 +7,8 @@
 // Misse-the-cat, xxalexsmashxx, degue-1297, Alejo & Grim, gameinvader247,
 // GameInvader, prodijiu, Dittron, Illmatic, yondy-hokage, xelectromanx10,
 // Soulfire, thekrillmaster, mestreax, Redballbomb, lk-sixtyfour,
-// Dantewrecker999, Neimad, Hyperlon, Biometalneo) stay as they are
+// Dantewrecker999, Neimad, Hyperlon, Biometalneo, QuadFactor, SEGA,
+// Sonic Team) stay as they are
 // in every language. A line may also link to
 // its source: { label: key or [key, params], href }, the label still
 // translated and the address never.
@@ -71,6 +72,10 @@ const SPRITES_0013 = 'https://www.deviantart.com/prodijiu/art/826586119';
 // the deviation's number alone (the page's title is left out of the
 // address: the character behind #0014 is never named).
 const SPRITES_0014 = 'https://www.deviantart.com/xelectromanx10/art/1138904217';
+// Where #0015's sprite sheet was published: its page on The Spriters
+// Resource, found by the asset's number alone (the address names the game
+// it comes from, never the character behind #0015).
+const SPRITES_0015 = 'https://www.spriters-resource.com/game_boy_advance/sonicbattle/asset/10042/';
 
 export const CREDITS = [
   { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
@@ -157,6 +162,12 @@ export const CREDITS = [
   {
     title: 'credits.sprites0014.title',
     lines: [{ label: 'credits.sprites0014.sheet', href: SPRITES_0014 }, 'credits.sprites0014.sheetCredits'],
+  },
+  // #0015's sheet, linked to where it was published, with who ripped it and
+  // whose sprites they are, as the sheet itself says.
+  {
+    title: 'credits.sprites0015.title',
+    lines: [{ label: 'credits.sprites0015.sheet', href: SPRITES_0015 }, 'credits.sprites0015.sheetCredits'],
   },
   {
     title: 'credits.rights.title',

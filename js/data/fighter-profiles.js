@@ -200,6 +200,18 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0014.playStyle',
     reviewedSourceHash: '1eba4853e9c67ac1720436508451db2864d1de609afe4ef8639fb484ad6c58ff',
   }),
+  // A small hammer bruiser with a trap: plain strings up close, a heavy
+  // smash, a dive whose landing shakes the floor, a tornado that draws in
+  // and carries, and a present left on the stage that waits for its
+  // victim, one at a time. Approachable: its strikes are plain; mastery in
+  // placing its presents where an opponent must go, spending its Energy
+  // between presents, tornadoes, Dashes and blocks, and not overcommitting
+  // its heavy swings and dive.
+  '0015': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0015.playStyle',
+    reviewedSourceHash: '7f0db0b82f3bda161998b51f245827352f1fa837bb69c0f6c63adbeeab3f344c',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

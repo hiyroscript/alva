@@ -114,7 +114,7 @@ test('#0010 is a real CHARACTERS entry: available, in roster slot 10, after #000
   assert.equal(DEF.available, true);
   assert.equal(DEF.rosterSlot, 9);
   assert.deepEqual(playableCharacters().map((c) => c.id), [
-    '0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014',
+    '0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015',
   ]);
   assert.equal(new Set(CHARACTERS.map((c) => c.rosterSlot)).size, CHARACTERS.length, 'one fighter per slot');
   assert.equal(DEF.movement, undefined, 'no movement of its own');
@@ -272,8 +272,10 @@ test('the real art normalizes at one art pixel per file pixel, the roster\'s siz
   assert.equal(REAL.refArtHeight, 27);
   assert.ok(near(REAL.worldPerArt, 88 / 52), 'the same world size per art pixel as the rest of the roster');
   assert.ok(near(DEF.visual.height, 27 * 88 / 52), 'about 46 units tall');
+  // Every other fighter stands a good head taller (#0015, the next
+  // smallest, by about 12 units).
   for (const c of playableCharacters().filter((x) => x !== DEF)) {
-    assert.ok(c.visual.height > DEF.visual.height + 15, `#${c.id} stands taller`);
+    assert.ok(c.visual.height > DEF.visual.height + 10, `#${c.id} stands taller`);
   }
   for (const [key, anim] of Object.entries(REAL.animations)) {
     assert.ok(near(anim.maxArtH, HEIGHTS[key]), `${key}: tallest frame ${anim.maxArtH}`);

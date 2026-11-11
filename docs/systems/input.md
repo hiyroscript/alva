@@ -390,8 +390,8 @@ interface, and nothing about them changes.
   fighter is in the danger it needs (`danger`: its Launch Point under the
   technique's `minLaunchPoint`, [combat](combat.md#techniques); #0009's
   Air Sphere), a Limit Break held back until its fighter's Limit gauge is
-  full (`limit`: the gauge under the technique's `limit`; #0014's Final
-  Heaven: its sweep shows the gauge filling, `abilityStatus`'s
+  full (`limit`: the gauge under the technique's `limit`; #0014's Sunburst
+  Fist: its sweep shows the gauge filling, `abilityStatus`'s
   `limitFill`, never seconds, and a brief highlight marks it full), or
   missing art: muted, no countdown; `data-restriction` says which) or
   `ready`. There is no repeat-delay
@@ -608,7 +608,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0011](../characters/0011.md#controller-layout),
 [#0012](../characters/0012.md#controller-layout),
 [#0013](../characters/0013.md#controller-layout),
-[#0014](../characters/0014.md#controller-layout).
+[#0014](../characters/0014.md#controller-layout),
+[#0015](../characters/0015.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -640,6 +641,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0013 air | Air Palm | | | | | down: Falling Palm |
 | #0014 ground | Beat Rush | Whirling Uppercut | Meteodrive | Waterkick | Sunburst Fist | up: Meteor Strike |
 | #0014 air | Air Combo | | | | | up: Somersault; down: Divekick |
+| #0015 ground | Girl Combo | Girl Swing | Girl Crush | Pink Typhoon | Gift | |
+| #0015 air | Air Girl Crush | | | Air Pink Typhoon | Air Gift | down: Girl Dunk |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -674,8 +677,8 @@ Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
 Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
 Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
 #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's
-Twin Lion Fists and Sixty-Four Palms and #0014's Sunburst Fist, each
-tagged Ground or Air. Every other move, a
+Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist and #0015's
+Gift and Air Gift, each tagged Ground or Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

@@ -31,7 +31,7 @@ blocks every attack.
 
 ## What's in it
 
-- **Fourteen playable fighters** on a 48-slot roster:
+- **Fifteen playable fighters** on a 48-slot roster:
   [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
   away and turning projectiles back, Maximum Blue dragging its target in,
   a paralyzing Unlimited Void, Hollow Purple erasing every projectile in
@@ -109,25 +109,33 @@ blocks every attack.
   back, a dive palm-first, lions of chakra on its hands that surge out and
   drain half the bar, and a flurry of sixty-four palms, its eyes woken and
   its field spread round it, that seals its opponent's power completely),
-  and [#0014](docs/characters/0014.md), the long-haired martial artist
+  [#0014](docs/characters/0014.md), the long-haired martial artist
   who fights bare-handed and grows stronger the more it is beaten (rushes
   of blows and a whirling uppercut, a grab that suplexes its opponent into
   the floor and another that leaps carrying it up to hurl it down, each
   letting go at once if it seizes nobody, a dive heel-first, a rising
   somersault kick, a wave along the ground that only the grounded meet,
   and the Sunburst Fist, a punch that explodes, open only once its Limit gauge,
-  filled by every hit it takes, is full).
-  All fourteen Shield
+  filled by every hit it takes, is full), and
+  [#0015](docs/characters/0015.md), the small pink hedgehog girl with a
+  huge hammer (a jab, a straight and an uppercut in boxing gloves, its
+  hammer swung up from the floor, round in a full turn into a smash,
+  brought down from overhead and dived with into the floor so the landing
+  shakes it, a whirl that tears loose as a pink tornado that draws its
+  opponent in, carries it along and throws it up, and a present, left with
+  a blown kiss on the floor or hanging in the air, that waits for the
+  first opponent to touch it, one present at a time).
+  All fifteen Shield
   on the ground and Deflect in the air (a strike that knocks projectiles
-  back at their thrower), and all fourteen Dash on the ground and air dash. Each fighter
+  back at their thrower), and all fifteen Dash on the ground and air dash. Each fighter
   marks its own **Special abilities**, its few truly game-changing moves
   (#0001's Unlimited Void and Hollow Purple, #0003's Mystical Palm
   Technique, #0004's World is Mine, #0005's Deadlights and Red Balloon,
   #0006's Ice Breath, #0007's Rocket Launcher, #0008's Feast and Gum-Gum
   Giant Pistol, #0009's Freezing Splash and Air Sphere, #0010's Kill, Vent
   and Emergency Meeting, #0011's Camouflage and Venom Punch, #0012's
-  Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's Final
-  Heaven): an orange
+  Dragonblade, #0013's Twin Lion Fists and Sixty-Four Palms, #0014's
+  Sunburst Fist, #0015's Gift and Air Gift): an orange
   exclamation
   mark floats over
   a fighter while it performs one.
@@ -237,7 +245,7 @@ entry point and every path is relative, so the game works under any
 sub-path; `.nojekyll` keeps Jekyll out. More in
 [running and deploying](docs/development/setup.md).
 
-itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,593):
+itch.io (at most 1,000 files in an HTML5 game; the repository serves 1,775):
 `npm install` once, then `npm run build:itch` makes `dist/alva-itch.zip`,
 the same game in 14 files (the modules bundled into one script, the
 stylesheet parts joined into one stylesheet, every fighter's frames packed
@@ -410,6 +418,10 @@ effects).
 sheet's own credits: Soulfire, thekrillmaster, mestreax, Redballbomb,
 lk-sixtyfour, Dantewrecker999, Neimad, Hyperlon and Biometalneo; all the
 editing by xelectromanx10.
+
+**#0015 sprite source.** Sprite sheet ripped by QuadFactor on
+[The Spriters Resource](https://www.spriters-resource.com/game_boy_advance/sonicbattle/asset/10042/);
+the sheet's own credit: original sprites by SEGA and Sonic Team.
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

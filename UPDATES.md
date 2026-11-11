@@ -6580,3 +6580,138 @@ Venture (its label hidden) so all thirty cells fit without scrolling.
   (Level, Venture, Perquisite) and the Perquisites' own names; the
   French-is-French list allows Adventure's dash.
 
+
+## #0015, the small hammer-swinging hedgehog girl
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0015 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon, no move the
+character cannot perform in canon, the sheet's page on The Spriters
+Resource credited and the character named nowhere. `character_rule` was
+not touched.
+
+**What it added**
+
+- **The fighter.** #0015 in roster slot 15, playable: 174 frames cut from
+  the sheet into `assets/characters/0015/`, read at 1× (one file pixel per
+  art pixel), each frame cut whole from its row (its hammer's arcs and its
+  tornadoes' sparks included, never a neighbour), the flat teal background
+  (0, 112, 112) made transparent, nothing redrawn, recoloured or laid over
+  anything, every file `0015_<codename>_<frame>.png`: 138 of the fighter, 7
+  of its present and 29 of its two tornadoes (projectiles). A drawing a row
+  repeats (the whirl's turns, the kiss sent) is cut once and played again;
+  where two rows draw the same picture each clip plays its own codename's
+  file. The hearts of its blown kiss, drawn apart beside the body, are not
+  cut. Drawn at the roster's art-pixel size (a 34-pixel stance, about 58
+  units: the roster's second smallest, after #0010); every clip authors
+  its own `anchorX` on its head (its hammer's arcs would pull the
+  automatic anchor off its body). Movement is the universal one; its
+  Energy refills at the shared 12 a second.
+- **Its moves**, from its canon (a girl of great strength with a huge
+  hammer pulled out of nowhere, who in the fighting game the sheet comes
+  from boxes in gloves, smashes and dunks with its hammer, whirls it into a
+  pink tornado that catches its foe, and leaves a present that goes off on
+  whoever touches it), each with a mechanic: the **Girl Combo** (a jab and
+  a straight in boxing gloves, 1, 1, then an uppercut, 3 at Base Launch 2
+  straight up) and the **Girl Swing** (its hammer swung up from the floor
+  over its head, 3 straight up; on the ground only), its Mash Combo pair;
+  the **Girl Crush** (a sweep that holds, 1, through a full turn into a
+  smash, 5 at Base Launch 3 sideways, a blocking Shield driven back); in
+  the air the **Air Girl Crush** (its hammer brought down from overhead, 3
+  sideways) and the **Girl Dunk** (a dive hammer-first, `motion: slam`, 3
+  at Base Launch 2 straight down, whose landing's `impact` is a `quake`
+  shockwave along the floor, 3 straight up, passing over anyone in the
+  air; once per airtime); the **Pink Typhoon** and the **Air Pink
+  Typhoon** (its hammer whirled round, holding whoever it catches with
+  `carry`, until the whirl tears loose as a pink tornado that draws
+  opponents in, `pull`, strikes again and again carrying them along,
+  `pierce` and `carry`, and throws them, its `finisher`; 15 Energy); and
+  the **Gift** and the **Air Gift**, its Specials (a kiss blown, and a
+  present appears on the floor or hanging in the air: a projectile with no
+  speed that waits six seconds for the first opponent to touch it, 5 at
+  Base Launch 2 straight up; one present at a time; 15 Energy). Its guard
+  is its palm thrust out; its Deflect, in the air, a flying knee; its Dash
+  its sprint, its air dash a lunge. It heals nobody (the sheet's healing
+  pose is the source game's, every fighter's there), summons nobody, makes
+  no clone, throws no hammer and never homes in.
+- **A shared capability.** A projectile's **`maxInPlay`**
+  (`js/game/combat/projectile.js`): its thrower never has more than that
+  many of its move's projectiles in play at once; releasing one more first
+  retires the oldest still there (`spawnProjectiles`, `makeRoomFor`), gone
+  that step without striking, so a new one is never refused. The move is
+  its attack family by codename (`moveFamily`: `attack3_object` and
+  `midair_attack3_object` are both `attack3`'s), and only those it threw
+  itself count (one turned back is its deflector's). A whole number from 0
+  (no bound), validated as the definition is built; routine for the
+  cooldown policy (`maxInPlay` in `ROUTINE_EFFECTS`).
+- **A fix to the Mash Combo's lock.** Nothing pressed while a Mash Combo
+  ran was kept for after it, but a press made while it was *armed*
+  (recognized, waiting for the move its first press started to end) was:
+  a jump buffered then, with the Shield held on the step the move ended,
+  took off ahead of the first turn and broke the series. #0015's Girl
+  Combo, longer than most first moves, met it in `mash-combo`'s "nothing
+  the player asks for cancels it". The buffers are now emptied every step
+  the combo is engaged, armed or running (`Fighter.dropRequests`).
+- **Its controller layout** by the comfort rules (Square the Girl Combo /
+  the Air Girl Crush, Triangle the Girl Swing, Circle the Girl Crush, the
+  right stick down the Girl Dunk, R2 the Pink Typhoon on the ground and in
+  the air, L2 the Gift on the ground and in the air), touch buttons, names
+  and descriptions in English and French, a Discover profile (3/5) and its
+  credits (the sheet ripped by QuadFactor on The Spriters Resource, linked
+  by the asset's number, and the credit the sheet itself gives: original
+  sprites by SEGA and Sonic Team).
+- **Leftovers of #0014's rename.** Four places still wrote #0014's Limit
+  Break by its old two-word name where the text wrapped between its words
+  (the README, adding a fighter, input, and #0014's own specification and
+  one of its anchors): they now say the Sunburst Fist. The served file
+  count (1,775) and the release's module count (177) are brought up to
+  date.
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 336 matches a level): #0015 wins 0.53 at
+Medium, 0.51 at Hard and 0.56 at Brutal, inside the roster's usual range;
+weakest against #0006 (6 of 24 at Hard). Its first tuning won 0.69 at
+Brutal, its opponents finished above all by its two aerial finishers, the
+Air Girl Crush and the Air Pink Typhoon's tornado, both at Base Launch 2:
+both are now Base Launch 1 (neither alone, nor anything else tried, moved
+it). Details in [#0015's specification](docs/characters/0015.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0015.js`: the
+moves' phases are whole frames of their clips at `FPS_0015` (the orders
+`GIRL_COMBO_0015`, `GIRL_CRUSH_0015`, `PINK_TYPHOON_0015` and the rest);
+reaches are the attacks' `hitbox`es and strikes; the presents and the
+tornadoes are `projectiles` (`GIFT_WAIT_0015` how long a present waits);
+the Girl Dunk's hang and plunge are `DUNK_HANG_0015` and
+`DUNK_PLUNGE_0015`, its shockwave its `motion.impact`; the anchors
+`ANCHORS_0015`. `maxInPlay`'s rule is in `js/game/combat/projectile.js`
+(`moveFamily`, `spawnProjectiles`, `makeRoomFor`).
+
+**Code:** `js/data/characters/0015.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings, `js/game/combat/projectile.js` (`maxInPlay`, `moveFamily`),
+`js/data/cooldowns.js` (`maxInPlay` routine), `js/game/fighters/fighter.js`
+(the Mash Combo's lock while armed); the specification and guides
+(`ALVA_SPEC.md`, `README.md`, `docs/characters/0015.md` (new), the roster,
+adding a fighter, the character system, module responsibilities, combat,
+defense, Energy, input, launch, rendering, testing, the served file
+count).
+
+**Tests:** new `tests/fighters/0015/fighter-0015.test.mjs` (registration
+and kit; its costs and cooldowns; its two Specials; its Mash Combo; its
+names, touch buttons and controller layout; the 174 files, clean and
+tight, no copy within a codename, at one scale, anchored on its head, its
+projectiles centred; every move: the Girl Combo, the Girl Swing, the Girl
+Crush and its block, the Air Girl Crush, the Girl Dunk's spike and its
+shockwave passing over a fighter in the air, the Gift waiting six seconds,
+set off by an opponent walking in, one present at a time across the
+ground and the air, a Shield popping it, the Air Gift, the Pink Typhoon's
+whirl and tornado carrying its target, its pull, the Air Pink Typhoon,
+its Deflect; the CPU playing its whole kit; its source named nowhere) and
+`tests/systems/max-in-play.test.mjs` (the shared capability on test-only
+throwers); the roster-wide tables (`cooldown-policy`,
+`special-abilities`: twenty-three Specials, `strict-combat-rules`,
+`mash-combo`), `empty-roster`, `discover`, `practice-ground`,
+`watch-mode`, `settings` (its credits) and each fighter's roster list;
+#0010's "the roster's smallest" now asks every other fighter to stand 10
+units taller (it was 15: #0015 is 12 taller).

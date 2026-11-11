@@ -245,6 +245,9 @@ export const EN = {
   'credits.sprites0014.title': '#0014 sprite source',
   'credits.sprites0014.sheet': 'Sprite sheet by xelectromanx10 on DeviantArt',
   'credits.sprites0014.sheetCredits': 'Sheet credits: Soulfire, thekrillmaster, mestreax, Redballbomb, lk-sixtyfour, Dantewrecker999, Neimad, Hyperlon and Biometalneo; all the editing by xelectromanx10',
+  'credits.sprites0015.title': '#0015 sprite source',
+  'credits.sprites0015.sheet': 'Sprite sheet ripped by QuadFactor on The Spriters Resource',
+  'credits.sprites0015.sheetCredits': 'Original sprites by SEGA and Sonic Team',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -552,6 +555,7 @@ export const EN = {
   'discover.fighter.0012.playStyle': 'A swift duelist that pokes from afar with thrown blades, darts through opponents to strike and turns their shots back on them before closing in to cut. Its plain blows are light and its mightiest cut takes a long moment to ready, so a patient opponent who keeps its guard can wear it down.',
   'discover.fighter.0013.playStyle': 'A graceful close-range fighter whose every palm saps the opponent\'s power, stripping the guard, dash or recovery it was counting on, while a spinning dome of chakra sends shots back. It is light and short of reach, and its strongest techniques need a breakable moment to gather.',
   'discover.fighter.0014.playStyle': 'A bare-fisted brawler who rushes in with quick blows, seizes opponents to hurl them into the floor and sends a wave along the ground to catch those standing on it. The more punishment it takes, the closer it comes to a devastating comeback blow, but its throws and leaps leave it exposed when they miss.',
+  'discover.fighter.0015.playStyle': 'A small, hammer-wielding scrapper that boxes up close, smashes and dives with heavy swings and whirls up tornadoes that drag opponents along, while traps left in their path punish careless approaches. Its big swings leave it wide open when they miss, and an opponent who keeps its guard up defuses its traps.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

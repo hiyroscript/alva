@@ -218,6 +218,13 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, extra_attack: 0,
       attack4: 0, attack5: 5, deflect: 0,
     },
+    // Nothing: no move of it deals 10, heals or holds. Its presents wait on
+    // the stage, one at a time (`maxInPlay`), and its tornadoes draw in and
+    // carry their targets: all routine, none earns anything of its own.
+    '0015': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 0,
+      midair_attack4: 0, extra_attack: 0, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

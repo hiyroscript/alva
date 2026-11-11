@@ -16,7 +16,7 @@ The steps below use `0027` as the new fighter's id.
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
   of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4, 5, 6, 7,
-  8, 9, 10, 11, 12 and 13 are taken.
+  8, 9, 10, 11, 12, 13 and 14 are taken.
 
 ## 2. Add the art
 
@@ -301,7 +301,10 @@ and its art in `projectileAnimations`
 back (`repel`) or erase them and fly through fighters (`erase`); the
 attack may throw several in a row, `volley: { count, interval }` on its
 `projectile` entry (one press, one Energy cost; #0012's Shuriken). With no
-`speed` it stays where it appears: an obstacle (#0004's dancing double).
+`speed` it stays where it appears: an obstacle (#0004's dancing double),
+or a trap that waits for whoever touches it (#0015's present); with
+`maxInPlay` its thrower keeps at most that many of its move's in play, a
+new one taking the oldest's place (#0015's one present at a time).
 Keep its box clear of the floor where it appears (its `offset` up at least
 half its box's height): a shot that meets a solid block, the main floor
 included, is gone (#0006's Sonic Scream, a wave as tall as a fighter,
@@ -332,8 +335,8 @@ Hollow Purple, #0003's Cherry Blossom Impact and Mystical Palm Technique,
 #0004's Ievan Polkka and World is Mine, #0011's Camouflage). It may open
 only in danger (`minLaunchPoint`, #0009's Air Sphere) or only once its
 fighter's Limit gauge, filled by the damage it takes, holds enough
-(`limit`, a Limit Break that spends the gauge as it lets go: #0014's Final
-Heaven).
+(`limit`, a Limit Break that spends the gauge as it lets go: #0014's Sunburst
+Fist).
 A technique that only heals or cloaks is no attack. A technique of a different
 shape needs a new form in the runtime first.
 
@@ -619,8 +622,9 @@ Then:
    [#0004](0004.md#controller-layout), [#0005](0005.md#controller-layout),
    [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout),
    [#0010](0010.md#controller-layout), [#0011](0011.md#controller-layout),
-   [#0012](0012.md#controller-layout), [#0013](0013.md#controller-layout) and
-   [#0014](0014.md#controller-layout) do.
+   [#0012](0012.md#controller-layout), [#0013](0013.md#controller-layout),
+   [#0014](0014.md#controller-layout) and
+   [#0015](0015.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (the comfortable inputs in order, one input a
