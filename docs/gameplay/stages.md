@@ -509,6 +509,18 @@ draw it in its theme from the live platforms the Arena hands over
 (`opts.platforms`: each one's `renderX`, `renderY`, `opacity` and
 `state`).
 
+**Its sound.** Every battle stage has its own theme in five versions (the
+Sound update): a stage added here has none until one is written for it, and
+plays silently meanwhile. Write it as
+[audio: adding a stage's theme](../systems/audio.md#adding-a-stages-theme)
+says, from the stage's own art and hazards. Yerma's is a heroic desert
+march (an oud, brass, darbuka), Sol-Noir's dark synthwave (gated drums, a
+neon lead, brass stabs), Asperitas's soaring orchestral-electronic (choir,
+celesta, taiko, Lydian), Adamaris's an island epic (steel pans, surf
+guitar, tribal toms, a volcanic low end), Jökull's a Nordic epic (horns,
+throat chant, glass bells, war drums); Practice Ground has a factory
+ambience instead. Overtime's version escalates with the closing Void.
+
 ## Tests
 
 [`tests/systems/platform-stage.test.mjs`](../../tests/systems/platform-stage.test.mjs)

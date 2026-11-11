@@ -245,11 +245,13 @@ export class CombatSystem {
     // fighter's hit on its charmer is recorded as `charmed` (see applyHit):
     // `damage` 0, `heal` the Launch Point it took off the charmer instead.
     this.events = [];
-    // { fighter, projectile, from, direction, energyCost }: the projectiles
-    // turned back this step (see deflectProjectiles), `from` the owner each
-    // one had and `energyCost` what turning it back cost its fighter
-    // (DEFLECT_ENERGY_COST for the first one a Deflect turns back, 0 for
-    // every later one).
+    // { fighter, projectile, from, direction, energyCost, first }: the
+    // projectiles turned back this step (see deflectProjectiles), `from`
+    // the owner each one had, `energyCost` what turning it back cost its
+    // fighter (DEFLECT_ENERGY_COST for the first one a Deflect turns back,
+    // 0 for every later one) and `first` whether it is the first its
+    // Deflect turned back (the one it pays for, whatever that cost: the
+    // Deflect's sound, once per Deflect).
     this.deflections = [];
   }
 
@@ -373,13 +375,14 @@ export class CombatSystem {
         const direction = Math.sign(p.x - f.body.x) || f.facing;
         p.turnBack(f, direction);
         let energyCost = 0;
-        if (!atk.paid) {
+        const first = !atk.paid;
+        if (first) {
           atk.paid = true;
           const spent = f.combat.energySpent;
           f.payEnergy?.(f.energyDef?.deflectCost ?? DEFLECT_ENERGY_COST);
           energyCost = f.combat.energySpent - spent;
         }
-        this.deflections.push({ fighter: f, projectile: p, from, direction, energyCost });
+        this.deflections.push({ fighter: f, projectile: p, from, direction, energyCost, first });
       }
     }
   }

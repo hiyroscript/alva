@@ -29,6 +29,7 @@ import { FighterRoster } from '../ui/fighter-roster.js';
 import { isPlayable, playableCharacters } from '../data/characters.js';
 import { PRACTICE_MAP } from '../data/practice-map.js';
 import { PracticeSession } from '../game/practice.js';
+import { BattleAudio } from '../core/audio/battle-audio.js';
 import { PracticeHUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
 import { TouchControls, hudCeiling } from '../ui/touch-controls.js';
@@ -73,6 +74,9 @@ export class PracticeGroundScreen extends Screen {
     );
 
     this.session = null;
+    // Practice Ground's sound (the Sound update): its factory ambience and
+    // the effects, no music.
+    this.sound = new BattleAudio(app.audio);
     // The practice fighter's id: null until a session starts with one.
     this.characterId = null;
     this.menuOpen = false;
@@ -272,6 +276,7 @@ export class PracticeGroundScreen extends Screen {
     // set (one load for both), at the CPU spawn facing Player 1, paired
     // with it and framed with it.
     this.session.setCPU(def, sprites);
+    this.sound.attach(this.session, { mode: 'practice' });
     this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
     this.syncAbilityHud();
@@ -301,6 +306,7 @@ export class PracticeGroundScreen extends Screen {
     this.padHint.sync(false);
     this.app.loading.hide();
     this.abilityHud.clear();
+    this.sound.detach();
     this.session?.destroy();
     this.session = null;
   }
@@ -343,6 +349,7 @@ export class PracticeGroundScreen extends Screen {
     if (this.cpuRosterOpen) this.cpuRoster.update(dt);
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     session.frame(dt);
+    this.sound.sync();
     this.touch.setAirborne(!!session.player && !session.player.grounded);
     this.touch.showStatus(session.player);
     this.hud.update(session);
@@ -412,6 +419,7 @@ export class PracticeGroundScreen extends Screen {
   openMenu() {
     if (!this.session || this.menuOpen) return;
     this.menuOpen = true;
+    this.sound.setPaused(true);
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);
     this.padHint.sync(false);
@@ -441,6 +449,7 @@ export class PracticeGroundScreen extends Screen {
   }
 
   hideMenu() {
+    if (this.menuOpen) this.sound.setPaused(false);
     this.menuOpen = false;
     this.menuOverlay.hidden = true;
     this.el.classList.remove('is-menu-open');

@@ -193,6 +193,17 @@ short burst plays where it went in, in the fighter's own colours (see
 [rendering](../systems/rendering.md#hit-effects)): paint only, nothing in
 play changes.
 
+**The music** (the Sound update, [audio](../systems/audio.md)). The stage's
+Main Battle version plays from the intro; overtime switches on the next
+bar line (or beat) to its Overtime version, whose intensity follows the
+closing Void's pressure; the match's end cuts on the beat into the Victory,
+Defeat or Draw version, from Player 1's point of view (Adventure's too;
+Online Play's from this player's), then a calm loop under the celebration
+and the Match Results. Rematch and Restart start the Main Battle again from
+its intro; the pause menu ducks it; leaving fades it out. Every way a
+fighter leaves play to the Void (a fall, overtime's closing Void, the
+loser's ejection) sounds once: the opponent's ejection, or the player's own.
+
 ## Difficulty
 
 **Play → Quick Battle** shows the setup steps of the play type chosen in

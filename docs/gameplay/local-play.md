@@ -98,6 +98,11 @@ with the player's Automatic turn-around setting; neither is ever a CPU.
   (blue) or DRAW; "Player 2 wins!"; PLAYER 2 — WINNER. Rematch keeps both
   fighters, the stage and the controllers; Change fighters returns to
   Player 1's fighter and Change stage to Local Play's Select Stage.
+- **Sound** ([audio](../systems/audio.md)): the stage's theme; every
+  ejection, either player's, is the universal ejection, and the match always
+  ends on the Victory version whoever wins (Draw on a draw), so neither
+  player is ever told a sound is theirs. A lost controller's pause ducks the
+  music like any pause.
 
 ## Tests
 

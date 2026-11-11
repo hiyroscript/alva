@@ -185,7 +185,8 @@ behave, and how it must look.
   [`docs/architecture/module-responsibilities.md`](docs/architecture/module-responsibilities.md)):
   `js/core/` (asset loader, input for keyboard, touch and game
   controllers with their connection manager and binding resolver (7.4a),
-  menu navigator, device detection, audio stub, the player's settings
+  menu navigator, device detection, the audio engine
+  (`js/core/audio-manager.js` and `js/core/audio/`, 7.5), the player's settings
   `js/core/settings.js` (6.10), touch-layout geometry, utilities);
   `js/localization/` (the interface language, 6.11, which `App` owns and
   applies to the whole page, with one string table per language);
@@ -1003,6 +1004,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   (CPU 1) and **Team II** (CPU 2) wherever the result names them ("Team II
   wins!"); the pause dialog's kicker is "Watch Mode"; the canvas is
   labelled "Watch mode battle: CPU 1, #0001, against CPU 2, #0001".
+- **Sound** (7.5): the stage's theme as in Quick Battle; nobody is the
+  protagonist, so every ejection is the universal one and the match ends on
+  the Victory version (the Draw version on a draw).
 
 ### 6.5b Local Play
 
@@ -1089,6 +1093,10 @@ Battle. A real two-player battle: no CPU anywhere.
   fighters returns to Player 1's fighter, then Player 2's and the stage;
   Change stage to Local Play's Select Stage; Return to home ends Local
   Play.
+- **Sound** (7.5): the stage's theme; every ejection, either player's, is
+  the universal one, and the match always ends on the Victory version,
+  whoever wins (the Draw version on a draw), so neither player is told the
+  sound is theirs.
 
 ### 6.5c Online Play
 
@@ -1205,6 +1213,9 @@ neither player learns the other's address.
   after they are sampled that cover it, 3 to 12 (50 to 200 ms; 50 ms for
   nearby players; 7 when nothing could be measured), the same on both
   (docs/gameplay/online-play.md, Transport and Privacy).
+- **Sound** (7.5): from this player's side (their fighter's ejection is the
+  player's, the other's the opponent's; Victory or Defeat as the result
+  shows it). There is no pause, so the music never ducks for one.
 
 ### 6.6 Credits
 
@@ -1485,6 +1496,10 @@ A training room, entered straight from Home.
   summoned at it, opponent links, its damage numbers) and its HUD card, closes the
   dialog and leaves practice paused in the menu with focus on Enable CPU.
   A failed load keeps the current CPU (or none) and the dialog.
+- **Sound** (7.5): Practice Ground plays its factory ambience from start
+  to end, never a theme; the ejection, Deflect and Shield effects play as in
+  a battle, the player's fighter the player and the dummy the opponent. The
+  menu ducks it like a pause.
 
 ### 6.9 Discover
 
@@ -1667,9 +1682,9 @@ Home's Settings gear. Home stays visible behind a light dim, blurred where
 backdrop blur is supported, in the same glass as the pause and Practice
 panels (`.glass--panel`); the header holds the kicker "ALVA", the title
 "Settings" and a labelled close button. It holds the player's settings,
-saved on this device, in exactly three sections selected by horizontal tabs
-immediately beneath the header: **Language | Controls | Combat** (French:
-**Langue | Commandes | Combat**). Exactly one panel is visible; inactive
+saved on this device, in exactly four sections selected by horizontal tabs
+immediately beneath the header: **Language | Controls | Combat | Audio**
+(French: **Langue | Commandes | Combat | Audio**). Exactly one panel is visible; inactive
 panels are hidden from rendering, assistive technology and input navigation.
 The selected tab has stronger text, a subtle accent fill and a green bottom
 indicator. Each section keeps its existing settings, in this order:
@@ -1732,6 +1747,21 @@ indicator. Each section keeps its existing settings, in this order:
   **Activé** / **Désactivé** (**Par défaut**). Nothing else is in the
   section: the former Combat Assist and Combo Assist are gone from the game
   (7.2.4b), not hidden.
+- **Audio** (the Sound update, 7.5) — **Master volume**, **Music volume**
+  and **Sound effects volume** (French **Volume général**, **Volume de la
+  musique**, **Volume des effets sonores**), three sliders from 0 to 100 %,
+  80, 70 and 85 by default, each showing its percentage ("80%", French
+  "80 %"), then **Mute all** (**Tout couper**), a switch, off by default,
+  under the line "Silences every sound at once, music and sound effects
+  alike." The section's note: "The volume of the music and the sound effects.
+  Changes apply at once, even over a paused match." Each slider is a range
+  with `role="slider"`, `aria-valuenow` and `aria-valuetext`; ← / → (keys and
+  D-pad) move a focused slider by 5 %, Home / End to 0 / 100 %, Page Up /
+  Page Down by 10 %, a press or a drag sets it; Up and Down move between the
+  rows. Every change saves at once and the sound follows it at once, over a
+  battle paused under the dialog included; moving the effects slider plays
+  the Shield block's sound to try it. While everything is muted the sliders
+  dim and still move; the switch is ticked and outlined in green.
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
@@ -1777,14 +1807,24 @@ indicator. Each section keeps its existing settings, in this order:
   each change —
 
   ```
-  { "version": 10,
+  { "version": 12,
     "language": "en" | "fr" | null,
-    "mobileControls": "joystick" | "classic",
-    "touchLayouts": { "joystick": { … }, "classic": { … } },
+    "mobileControls": "screenpad" | "joystick" | "classic",
+    "mobileControlsChosen": true | false,
+    "touchLayouts": { "screenpad": { … }, "joystick": { … }, "classic": { … } },
+    "screenPadHintSeen": true | false,
     "automaticTurnAround": true | false,
     "controllerProfiles": { "<fighter id>": { "<action id>": binding, … }, … },
-    "onlineName": "<name>" | null }
+    "onlineName": "<name>" | null,
+    "audio": { "master": 0-100, "music": 0-100, "sfx": 0-100, "muted": true | false } }
   ```
+
+  `audio` (version 12, the Sound update) holds Settings › Audio: each volume
+  a whole percentage clamped to 0–100, its default (80, 70, 85) when it is
+  not a finite number, and `muted` a real boolean (off otherwise), each
+  checked on its own. No version before 12 had it: every older object
+  starts on its defaults, whatever it holds under that name, with everything
+  else kept as before.
 
   `language` is null until the player picks one (English is used meanwhile,
   but the first-launch chooser still asks: a default is never mistaken for a
@@ -6058,6 +6098,54 @@ codename is sent, never what an action does.
   the old recommended ones give way to today's wherever that conflicts with
   nothing (else the whole layout stays as it was); a fighter never
   customized plays with today's recommended layout.
+
+### 7.5 Sound
+
+Alva's sound is exactly the twelve kinds the owner asked for and nothing
+else (the Sound update; the architecture, every piece and the themes:
+[`docs/systems/audio.md`](docs/systems/audio.md)). Every sound is
+synthesized live on Web Audio from code; no audio file is shipped. No menu,
+hit, jump, footstep, announcer, click, countdown, Energy, hazard or
+character sound exists, and the menus stay silent.
+
+- **Stage themes.** Each battle stage (Yerma, Sol-Noir, Asperitas, Adamaris,
+  Jökull) has its own theme, its own hook, key, tempo and instruments, in
+  five versions of the same hook: **Main Battle** (the regular clock: an
+  intro, then a loop of 100–130 s that changes on every pass), **Overtime**
+  (15 % faster, a step up and darker, its layers, filter and pitch tension
+  following the closing Void's pressure, `Battle.overtimeVoidPressure`, so
+  its last seconds are frantic), and **Victory**, **Defeat** and **Draw**
+  (a 4–6 s sting, then a calm loop under the celebration and the Match
+  Results). Practice Ground has no theme: a factory ambience (hum, buzz,
+  conveyor, presses, steam, clanks, chains, never rhythmic enough to be
+  music), from its start to its end.
+- **Changes of version.** Overtime comes in on the next bar line (the next
+  beat when a bar is longer than 1.5 s) with a pickup; the match's end cuts
+  on the next beat into its sting with a tail of under a beat; a restart or
+  rematch starts the Main Battle cleanly from its intro; pause ducks the
+  music about 10 dB under a gentle low-pass (Online Play has no pause);
+  leaving fades everything out in 0.6 s. Crossfades are equal-power; a change
+  never clicks, gaps or doubles up.
+- **Effects.** Opponent ejected (very satisfying), player ejected (negative
+  but satisfying), the universal ejection (Local Play and Watch Mode), the
+  successful Deflect (only when a Deflect turns a projectile back, once per
+  Deflect), the Perfect Shield (in place of the block's sound), the Shield
+  block, and the Shield held (a hum while it is up). An ejection is every
+  way a fighter leaves play to the Void (a fall, a launch, overtime's
+  closing Void, the loser's ejection at the match's end), one sound per exit.
+  They play for every fighter on screen, from the shared systems alone,
+  panned a little by where it is, varied ±4 % each play, the music ducking
+  about 4 dB under an ejection, a Deflect and a Perfect Shield.
+- **Point of view.** Quick Battle and Adventure: Player 1 is the player;
+  Online Play: this device's player; Local Play and Watch Mode: the
+  universal ejection and always Victory; Practice Ground: the player's
+  fighter and the dummy; any draw: the stage's Draw.
+- **Behaviour.** Nothing plays before a user gesture; a suspended context
+  resumes on the next one; a hidden page suspends everything. Mute (6.10)
+  silences everything, from the unlock on. Without Web Audio the game is
+  silent and fully playable. Sound only listens: it never feeds back into
+  the simulation, its timing or Online Play's lockstep, and every event is
+  heard once.
 
 ## 8. Accessibility
 

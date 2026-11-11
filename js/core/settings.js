@@ -8,7 +8,7 @@
 //
 // Stored as
 //
-//   { version: 11,
+//   { version: 12,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'screenpad' | 'joystick' | 'classic',
 //     mobileControlsChosen: true | false,
@@ -16,7 +16,8 @@
 //     screenPadHintSeen: true | false,
 //     automaticTurnAround: true | false,
 //     controllerProfiles: { '<fighter id>': { '<action id>': binding, ... }, ... },
-//     onlineName: '<name>' | null }
+//     onlineName: '<name>' | null,
+//     audio: { master: 0-100, music: 0-100, sfx: 0-100, muted: true | false } }
 //
 // `language` stays null until the player picks one: the game then speaks
 // English, but the first-launch chooser still asks (languageChosen), so a
@@ -50,6 +51,14 @@
 // only ever shown to the players of a room they join, and the name screen
 // asks every time. A stored name the rules refuse is dropped (null).
 //
+// `audio` is Settings › Audio (the Sound update, js/core/audio-manager.js):
+// the master, music and sound effects volumes, each a whole percentage
+// from 0 to 100 (80, 70 and 85 by default), and whether everything is
+// muted (false by default). Each is checked on its own (sanitizeAudio): a
+// number is rounded and clamped to 0-100, anything else falls back to its
+// default, and a mute that is not a real boolean is off; one bad value
+// never costs the others.
+//
 // Older objects are migrated: version 1 ({ version: 1, mobileControls })
 // keeps its Mobile Controls choice, with no language chosen yet and no
 // custom layout; versions 2 and 3 keep their language, Mobile Controls and
@@ -79,7 +88,9 @@
 // held no valid scheme at all. Every older object keeps its scheme as
 // before (Classic Buttons where it held none valid), also counted as
 // chosen. No version before 11 had the Screen Pad hint: not seen yet.
-// Missing, blocked or unreadable
+// Version 11 keeps everything as it is. No version before 12 had the
+// Audio settings: every older object starts on their defaults, whatever it
+// may hold under that name. Missing, blocked or unreadable
 // storage, a stored object of any other version, and every value that is
 // not one of its setting's choices fall back to the defaults, value by
 // value, so the game always starts with a valid set.
@@ -111,7 +122,26 @@ export const SETTINGS_BEFORE_10_SCHEME = 'classic';
 export const DEFAULT_AUTOMATIC_TURN_AROUND = true;
 
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 11;
+export const SETTINGS_VERSION = 12;
+
+// Settings › Audio's defaults (the Sound update): master 80 %, music 70 %,
+// sound effects 85 %, not muted.
+export const DEFAULT_AUDIO = Object.freeze({ master: 80, music: 70, sfx: 85, muted: false });
+export const AUDIO_VOLUMES = Object.freeze(['master', 'music', 'sfx']);
+
+// `value`'s Audio settings, each checked on its own: a volume is a whole
+// percentage clamped to 0-100 (its default when it is not a finite
+// number), the mute a real boolean (off otherwise).
+export function sanitizeAudio(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const out = {};
+  for (const name of AUDIO_VOLUMES) {
+    const v = source[name];
+    out[name] = typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(100, Math.max(0, v))) : DEFAULT_AUDIO[name];
+  }
+  out.muted = typeof source.muted === 'boolean' ? source.muted : DEFAULT_AUDIO.muted;
+  return out;
+}
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
@@ -122,6 +152,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   controllerProfiles: Object.freeze({}),
   onlineName: null,
   screenPadHintSeen: false,
+  audio: DEFAULT_AUDIO,
 });
 
 // The settings that are one choice from a list, and their allowed values.
@@ -182,6 +213,7 @@ function readCurrent(stored, profiles = sanitizeStoredProfiles, scheme = readSch
     controllerProfiles: profiles(stored.controllerProfiles),
     onlineName: readOnlineName(stored.onlineName),
     screenPadHintSeen: resolveSetting('screenPadHintSeen', stored.screenPadHintSeen),
+    audio: sanitizeAudio(stored.audio),
   };
 }
 
@@ -218,7 +250,11 @@ const keepScheme = (stored) => readCurrent({ ...stored, screenPadHintSeen: false
 // only one that held no valid scheme (it never chose) starts on Screen Pad.
 const keep10 = (stored) => readCurrent({ ...stored, screenPadHintSeen: false }, undefined, (value) => keptScheme(value));
 
-// Older versions, each read into the current settings.
+// Version 11: everything kept as it is; the Audio settings are new.
+const keep11 = (stored) => readCurrent(stored);
+
+// Older versions, each read into the current settings (and then given the
+// Audio settings' defaults, see readSettings).
 const MIGRATIONS = Object.freeze({
   // Version 1 held Mobile Controls only: kept, and the language still to be
   // chosen, so the chooser shows once after the update.
@@ -245,6 +281,7 @@ const MIGRATIONS = Object.freeze({
   8: keep,
   9: keepScheme,
   10: keep10,
+  11: keep11,
 });
 
 // The settings a stored value holds: checked if it is the current version,
@@ -253,7 +290,11 @@ export function readSettings(stored) {
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return readCurrent({});
   if (stored.version === SETTINGS_VERSION) return readCurrent(stored);
   // A real version number only: '3' is no version at all.
-  if (Number.isInteger(stored.version) && Object.hasOwn(MIGRATIONS, stored.version)) return MIGRATIONS[stored.version](stored);
+  // No version before 12 had the Audio settings: their defaults, whatever
+  // an older object holds under that name.
+  if (Number.isInteger(stored.version) && Object.hasOwn(MIGRATIONS, stored.version)) {
+    return { ...MIGRATIONS[stored.version](stored), audio: { ...DEFAULT_AUDIO } };
+  }
   return readCurrent({});
 }
 
@@ -435,6 +476,31 @@ export class Settings {
   // Puts fighter `id` back on its recommended controller layout.
   resetControllerProfile(id) {
     return this.setControllerProfile(id, null);
+  }
+
+  // Settings › Audio: a copy of { master, music, sfx, muted }.
+  get audio() {
+    return { ...this.values.audio };
+  }
+
+  // Changes some of the Audio settings (`patch`: any of master, music,
+  // sfx, muted), each checked on its own (sanitizeAudio, a bad value
+  // keeping the one in force), and saves. Listeners hear ('audio',
+  // { master, music, sfx, muted }) on a real change.
+  setAudio(patch) {
+    if (!patch || typeof patch !== 'object') return false;
+    const current = this.values.audio;
+    const merged = { ...current };
+    for (const name of AUDIO_VOLUMES) {
+      if (typeof patch[name] === 'number' && Number.isFinite(patch[name])) merged[name] = patch[name];
+    }
+    if (typeof patch.muted === 'boolean') merged.muted = patch.muted;
+    const next = sanitizeAudio(merged);
+    if (AUDIO_VOLUMES.every((n) => next[n] === current[n]) && next.muted === current.muted) return true;
+    this.values.audio = next;
+    this.save();
+    this.emit('audio', { ...next });
+    return true;
   }
 
   // The last name chosen for Online Play, or null.

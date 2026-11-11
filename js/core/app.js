@@ -142,7 +142,10 @@ export class App {
     this.i18n = i18n;
     followSettings(this.settings);
     onLanguageChange(() => this.localize());
-    this.audio = new AudioManager();
+    // Alva's sound (the Sound update): the stage themes, Practice
+    // Ground's ambience and the effects, at the levels of Settings › Audio
+    // (followed live). Silent until the first press or key.
+    this.audio = new AudioManager({ settings: this.settings });
     // Online Play (js/online/online-session.js): whether the device is
     // online (Home's Online play follows it), and the player's time in
     // Online Play, from their name to the room they are in.
