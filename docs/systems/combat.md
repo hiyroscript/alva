@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0015 use them between them
+is built, and usable by any fighter (#0001 to #0016 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -440,6 +440,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0013 | `['attack3', 'attack4']` | the Twin Lion Fists (lions of chakra that surge out and drain half the target's Energy), the Sixty-Four Palms (a 10-damage flurry that seals the target's chakra: its whole bar drained) | the Protective Palms (a dome that turns shots back), its draining palms |
 | #0014 | `['attack5']` | Sunburst Fist (its Limit Break: a 10-damage punch that only a Limit gauge filled by the damage it takes opens) | Meteodrive and Meteor Strike (grabs), Waterkick (a ground wave), its rushes |
 | #0015 | `['attack3', 'midair_attack3']` | the Gift and the Air Gift (a present left on the floor or in the air that waits for the first opponent to touch it, one at a time) | the Pink Typhoon's tornado (it pulls, carries and throws), the Girl Dunk's shockwave, its hammer and its gloves |
+| #0016 | `['attack5']` | the Medipack (a kneel any blow breaks that heals her) | the Silent Arrow (a technique: an arrow with a backstab), the Twin Pistols (a volley), the Grapple (a lift that pulls), her kicks |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -834,7 +835,7 @@ Freezing Splash 3 s (a freeze, its paralysis) and Air Sphere 5 s (its 10);
 #0011's Web Shot 3 s (its webbing's hold), Camouflage 3 s (a cloak) and
 Venom Punch 3 s (its hold); #0012's Dragonblade 5 s (its cleave's 10);
 #0013's Sixty-Four Palms 5 s (its flurry's 10); #0014's Sunburst Fist 5 s
-(its punch's 10).
+(its punch's 10); #0016's Medipack 3 s (its heal).
 Everything else, Red, Blue and Maximum Blue (a pull earns
 nothing), Cherry Blossom Impact and the Heavenly Foot of Pain (a quake, a
 slam and a launch earn nothing), Dark Tendrils (a pull) and #0006's Tornado
@@ -853,12 +854,15 @@ of Meteor Strike, the Divekick's slam and Waterkick's ground wave earn
 nothing; its Limit is a start condition, never a mechanic of the hit), and
 every move of #0015's (its presents waiting on the stage one at a time,
 its tornadoes' pulls, strikes and carries, the Girl Dunk's slam and
-shockwave earn nothing), and every Deflect none.
+shockwave earn nothing), and of #0016's but the Medipack (the Twin
+Pistols' four shots add up to 4, the Silent Arrow's backstab of 5 is no
+10, the Grapple is a lift that pulls), and every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
 Earth Pillar, Shuriken: once for its volley of three, the Twin Lion
-Fists, Waterkick, #0015's presents and tornadoes) cost 15 Energy
+Fists, Waterkick, #0015's presents and tornadoes, #0016's Twin Pistols:
+once for a volley, and Silent Arrow) cost 15 Energy
 instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and

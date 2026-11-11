@@ -16,7 +16,7 @@ The steps below use `0027` as the new fighter's id.
   definition module, and the HUD shows it as `#0027` (`displayName`).
 - **Roster slot:** `rosterSlot` is 0-based (slot 01 is 0); pick a free one
   of the 48 (`CONFIG.roster.totalSlots`). Today 0, 1, 2, 3, 4, 5, 6, 7,
-  8, 9, 10, 11, 12, 13 and 14 are taken.
+  8, 9, 10, 11, 12, 13, 14 and 15 are taken.
 
 ## 2. Add the art
 
@@ -623,8 +623,8 @@ Then:
    [#0008](0008.md#controller-layout), [#0009](0009.md#controller-layout),
    [#0010](0010.md#controller-layout), [#0011](0011.md#controller-layout),
    [#0012](0012.md#controller-layout), [#0013](0013.md#controller-layout),
-   [#0014](0014.md#controller-layout) and
-   [#0015](0015.md#controller-layout) do.
+   [#0014](0014.md#controller-layout), [#0015](0015.md#controller-layout)
+   and [#0016](0016.md#controller-layout) do.
 
 A fighter registered with no layout still works: it gets a safe,
 conflict-free fallback (the comfortable inputs in order, one input a

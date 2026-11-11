@@ -3,9 +3,9 @@
 The repository is the site: `index.html`, its stylesheet parts in `css/`
 and its modules in `js/` run as they are, with no build, on GitHub Pages or
 any static server ([running and deploying](setup.md)). Served that way the
-game is 1,775 files (over a thousand of them fighter frames), and itch.io
+game is 1,905 files (over a thousand of them fighter frames), and itch.io
 accepts at most 1,000 in an HTML5 game's ZIP. The **release** is an
-optional, generated copy of the same game in 14 files: the 177 modules
+optional, generated copy of the same game in 14 files: the 195 modules
 bundled into one `game.js`, the 16 stylesheet parts joined into one
 `game.css`, every fighter's frames packed byte for byte into one
 `game-assets.js`, and everything else copied unchanged. However many
