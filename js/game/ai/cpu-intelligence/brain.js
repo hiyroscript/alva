@@ -77,10 +77,17 @@ const MASH_MEMORY = 12;
 const THREAT_HORIZON = 0.9;
 
 export class CpuIntelligence {
-  constructor({ difficulty = DEFAULT_DIFFICULTY, rng = Math.random, debug = false } = {}) {
+  // `difficulty` is a difficulty id (anything unknown is Medium) or, in
+  // Adventure only, Venture's spec ({ venture: level }, js/data/adventure.js),
+  // read through the same getDifficultyProfile; `profile`, a profile of the
+  // same shape given outright, takes the place of either. The engine and
+  // its capabilities are the same whatever it is: only how well it thinks
+  // changes.
+  constructor({ difficulty = DEFAULT_DIFFICULTY, profile = null, rng = Math.random, debug = false } = {}) {
     this.kind = 'cpu';
-    this.difficulty = resolveDifficulty(difficulty);
-    this.profile = getDifficultyProfile(this.difficulty);
+    const venture = !!difficulty && typeof difficulty === 'object' && Object.hasOwn(difficulty, 'venture');
+    this.difficulty = venture ? 'venture' : resolveDifficulty(difficulty);
+    this.profile = profile ?? getDifficultyProfile(venture ? difficulty : this.difficulty);
     this.rng = rng;
     this.perception = new Perception(rng, this.profile);
     this.opponent = new OpponentModel(this.profile);
