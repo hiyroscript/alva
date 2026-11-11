@@ -6585,7 +6585,8 @@ Venture (its label hidden) so all thirty cells fit without scrolling.
 
 ### Later: Venture only gets smarter
 
-On 2026-11-11 Venture's damage growth was removed ([CPU difficulty:
+On 2026-11-11 Venture's damage growth was removed (pull request
+[#189](https://github.com/hiyroscript/alva/pull/189), [CPU difficulty:
 smarter only, every level less smart](#cpu-difficulty-smarter-only-every-level-less-smart)).
 Its fighter's real hits no longer deal 1.05^(L−1) times their damage (×4.12
 at Level 30): the growth's constant, the function that computed it and
@@ -6969,8 +6970,9 @@ twenty-four Specials, `strict-combat-rules`, `mash-combo`),
 
 ## CPU difficulty: smarter only, every level less smart
 
-Not a named update (it can become one if the owner names it). Asked for in
-the `max` prompt: three changes to CPU difficulty, made on 2026-11-11.
+Pull request [#189](https://github.com/hiyroscript/alva/pull/189). Not a
+named update (it can become one if the owner names it). Asked for in the
+`max` prompt: three changes to CPU difficulty, made on 2026-11-11.
 
 **1. No difficulty scales a hit, Venture included.** Every difficulty
 (Easy, Medium, Hard, Brutal, and Adventure's Venture at every level) plays
