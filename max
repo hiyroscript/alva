@@ -1,152 +1,49 @@
-# Prompt: the Sound update for Alva
+In the alva repo (read CLAUDE.md first and follow it), make three changes to CPU difficulty. Run `node --test` at the end and make sure everything passes.
 
-You are working on **Alva** (`hiyroscript/alva`), a 2D platform fighter for the browser. It is plain HTML, CSS and JavaScript with Canvas 2D. There are no frameworks, no build step and no WebGL. Before you change anything, read `CLAUDE.md`, `ALVA_SPEC.md`, `UPDATES.md`, `docs/README.md`, `docs/gameplay/stages.md`, `docs/gameplay/battle.md`, `docs/gameplay/local-play.md`, `docs/gameplay/practice.md`, `docs/gameplay/watch-mode.md`, `docs/gameplay/online-play.md` and `docs/systems/defense.md`, and follow every rule in them. The owner calls this work **the Sound update**. When you finish, add an entry for it to `UPDATES.md` and a line for it to `CLAUDE.md`'s list of named updates.
+## 1. The CPU must never deal more damage because of difficulty. No exceptions, Venture included.
 
-Alva has no sound today. `js/core/audio-manager.js` is an empty foundation: it creates an `AudioContext` on the first pointer or key gesture, keeps a register/load/play map, and holds nothing. A few menu components already call `this.app.audio.play('move')`. **Those calls must stay silent.** Never register a `move` sound or any other sound this prompt does not name.
+Today every difficulty plays with the same fighter, except Venture in Adventure mode, whose real hits deal 1.05^(L−1) times their damage (×4.12 at Level 30). Remove that completely. From now on every difficulty (Easy, Medium, Hard, Brutal and Venture at every level) uses exactly the same fighter, with the same damage, launch, speed, Energy and every other mechanic. Difficulty only changes how well the CPU thinks.
 
----
+Code:
+- `js/data/adventure.js`: delete `VENTURE_STRENGTH_GROWTH` and `ventureStrength`. `ventureModifiers(level)` must no longer return `damageDealt`. If nothing is left in it, remove it and its callers, or have it return no modifiers. Your call, but keep `adventureModifiers` working for the player's Perquisites. `ventureSpec` (around line 276) must return only `smarts`. Rewrite the header comment (lines ~8–41) so it describes only the smarts growth and says Venture never scales a hit.
+- `js/data/difficulty.js`: the header (lines ~19–25) calls Venture's strength "the one deliberate exception". Remove that exception and say plainly that no difficulty and no mode scales a hit, Venture included.
+- `js/game/combat/modifiers.js` stays as it is: `damageDealt` is still needed by the player's Redoutable Strength Perquisite. Only make sure no CPU or difficulty path feeds it anymore, and update any comment that mentions Venture using it.
+- Find every other caller with: `grep -rn "ventureStrength\|VENTURE_STRENGTH\|ventureModifiers\|strength:" js tests`.
 
-## 1. Scope: only these sounds, nothing more
+Interface text (English and French):
+- `js/localization/strings/en.js` lines ~288, 302, 327:
+  - `mode.adventure.overview` → "…Each level, Venture — the CPU — becomes 1.5 times smarter. Every 5 levels, choose one Perquisite to keep." (no "hits 5% harder").
+  - `adventure.venture.line` → `×${fixed2(smarts)} smarter vs Level 1`.
+  - `banner.venture` → `Venture · ×${fixed2(smarts)} smarter`.
+- Make the same changes in `js/localization/strings/fr.js` (lines ~612, 637 and the matching overview), with no damage text.
+- Update whichever screens pass `strength` into those strings (`js/screens/adventure-level-screen.js` and the battle banner).
 
-Add **exactly** these audio pieces and no others. Do not add menu, hit, jump, footstep, announcer, UI-click, countdown, Energy, hazard or character sounds. Do not add a menu or title theme.
+## 2. The only word for "this CPU plays better" is "smarter". Never "stronger".
 
-| # | Sound | Where it plays |
-|---|---|---|
-| 1 | Stage theme, **Main Battle** version (×5 stages) | Regular clock of a battle on that stage |
-| 2 | Stage theme, **Overtime** version (×5) | Overtime on that stage |
-| 3 | Stage theme, **Post-match Victory** version (×5) | After the match, when the side the player cares about wins |
-| 4 | Stage theme, **Post-match Defeat** version (×5) | After the match, when that side loses |
-| 4b | Stage theme, **Post-match Draw** version (×5) | After any match that ends in a draw (no winner), in every mode |
-| 5 | **Practice Ground ambience** | The whole time on Practice Ground. It is a factory ambience, not music |
-| 6 | **Opponent ejected**: very satisfying | The player's opponent is taken by the Void or ejected |
-| 7 | **Player ejected**: negative, but still satisfying | The player's own fighter is taken by the Void or ejected |
-| 8 | **Universal ejection** (one neutral sound for both sides) | Every ejection in Local Play |
-| 9 | **Successful Deflect**: very satisfying | Only when a Deflect actually turns a projectile back |
-| 10 | **Perfect Shield** | A perfect block (`perfect: true` on the block event) |
-| 11 | **Shield block** | An ordinary blocked hit (not a perfect one) |
-| 12 | **Shield hold** | A sustained loop while the Shield is raised and held |
+When talking about difficulty, CPU Intelligence, Venture or one difficulty being better than another, use "smarter" (meaning it plays better) or a neutral word like "harder" / "higher level". Never use "stronger", "strength" or "hits harder" for this, in code comments, identifiers, docs, interface text or test names. In French, use "plus intelligent".
 
-The five battle stages are **Yerma** (`desert`), **Sol-Noir** (`city`), **Asperitas**, **Adamaris** and **Jökull**. Practice Ground has no theme, only the ambience. The owner asked for "post match: victorious or defeating", so every stage gets a victory ending and a defeat ending of its theme, plus its own **draw** ending. That is 5 pieces per stage and 25 music pieces in all.
+Places to fix (search `grep -rni "stronger\|strength" js tests docs *.md` and go through each hit):
+- `js/data/difficulty.js:88` ("a larger value is the stronger CPU") → "the smarter CPU".
+- `js/game/ai/cpu-intelligence/brain.js:1378` ("A stronger player") → reword.
+- `js/game/ai/cpu-intelligence/objective.js`: the field `this.strength` (from awareness). Rename it to something like `this.weight` or `this.influence`, and update all its uses.
+- Test names in `tests/systems/cpu-intelligence.test.mjs` (~647 "the stronger levels", ~700 "the stronger level takes more points") → "smarter".
+- `tests/systems/venture.test.mjs` (header lines ~5–6, the "---- Stronger ----" section from ~159, the import on line 15): delete the strength tests and replace them with one test asserting that Venture deals the same damage as any other CPU at every level 1–30 (no `damageDealt` from Venture).
+- Docs: `docs/gameplay/adventure.md` (intro line 5 "grows stronger", the "Stronger" bullet at ~111–117, and the example "×11.39 smarter · ×1.34 damage" at ~56), `docs/systems/ai.md`, `ALVA_SPEC.md` (~649, 753, 776 and anything else about Venture or difficulty), `README.md`, `docs/characters/0004.md:424` (where the CPU playing "stronger" means difficulty), and the Adventure row in `UPDATES.md` (line ~27 "1.05 times stronger"). Don't rewrite history in older UPDATES.md entries. Instead, add a short note that the Venture damage growth was removed and when.
 
-"Ejection" means every way a fighter leaves play to the Void: a fall or launch into the Void (`Arena.checkVoid` / `StageCollision.inVoid`, the closing overtime Void included) **and** the end-of-match `Battle.ejectLoser`. A fighter must never trigger two ejection sounds for one exit. The code already makes sure "a loser the Void already took does not burst twice", so hook the sound to that same single event, ideally the place where `HitEffects.addElimination` fires.
+Do NOT change "stronger" or "strength" where they mean something unrelated: launch strength, the "stronger lines" grid in `js/stages/practice-theme.js`, the `stronger()` stick helper in `js/core/input-manager.js`, stage art and wind strength, a character's in-story strength (`js/data/characters/*`, `docs/characters/*` lore), "stronger tier" in `js/data/launch.js`, the Base Launch help text, the player Perquisite "Redoutable Strength", or a fighter that "grows stronger the more it is beaten" (that's a move mechanic, not difficulty).
 
----
+## 3. Make the CPUs less smart
 
-## 2. How the audio is made: author it, don't download it
+In `js/data/difficulty.js` (`PROFILES`):
+- **Easy and Medium: noticeably less smart.** Slower reactions, more lapses, more noise, bigger range/predict/timing errors, and lower guard, perfectShield, punish, comboReliability, adapt, the senses, diSkill, recoverySkill, discipline and awareness. Lower `lookahead`. As a guide, push each trait about 25–40% of the way toward "worse" (for example, Easy react around [0.38, 0.58], lapse around 0.45, noise around 0.85, punish around 0.18; Medium react around [0.24, 0.38], lapse around 0.22, punish around 0.45). Keep `planDepth` at least 1 and every probability in [0, 1].
+- **Hard and Brutal: slightly less smart**, about 8–15% toward worse on each trait (for example, Brutal react around [0.08, 0.12], noise around 0.06, punish around 0.95; Hard react around [0.16, 0.24], punish around 0.8). Brutal can drop below a perfect 1 on stageSense, diSkill and recoverySkill if that fits.
+- Keep the ordering rule: every trait must stay ordered Easy < Medium < Hard < Brutal by `CAPABILITY` (the existing tests check this). Keep the reaction-window comment above `PROFILES` (lines ~97–104) accurate. Rewrite it if the new numbers change what each level can react to.
+- Venture: Level 1 is built from Easy's profile, so it will now start weaker. Leave `VENTURE_SMARTS_GROWTH` (1.5) and `VENTURE_LIMITS` alone, then recompute and update the milestones in `docs/gameplay/adventure.md` ("by Level 6 it reacts faster than Brutal…", "by Level 9 … 18 of its 24 traits", "from about Level 15…") and the expected numbers in `tests/systems/venture.test.mjs`, `tests/interface/adventure.test.mjs` (~181) and `tests/integration/adventure.test.mjs` (~101). Those expected strings should now be smarts only, for example "×11.39 smarter vs Level 1".
+- Re-run the head-to-head and difficulty tests in `tests/systems/cpu-intelligence.test.mjs`. If a threshold depended on the old numbers (for example "the higher level takes more points"), check the ordering still holds and only adjust the margin, never the direction. Update any difficulty numbers quoted in `docs/systems/ai.md` and `ALVA_SPEC.md`.
 
-The workspace can't fetch audio from the web, and Alva ships no audio assets. Create every piece **yourself**, using one of these two routes. Pick one and justify the choice in `docs/systems/audio.md`.
-
-- **Route A (preferred): composed in code, synthesized live with Web Audio.** Write each theme as data: tempo, key, sections, and patterns for each instrument (notes, rhythms, velocities). A small sequencer in `js/core/audio/` schedules them ahead with `AudioContext.currentTime` and a look-ahead timer. Build the instruments from oscillators, noise, filters, envelopes, waveshaping, convolution or feedback-delay reverb, and compression. SFX are synthesized the same way. There are no binary assets, the download stays tiny, and versions can switch on exact beat or bar boundaries because the sequencer knows the musical clock.
-- **Route B: rendered offline to files.** Write a Node script under `tools/audio/` that renders each piece to `.ogg` (Opus or Vorbis), with an `.m4a`/AAC fallback for Safari, in `assets/audio/`. Then make sure the itch release (`.github/workflows/itch-release.yml`, `tools/itch`) bundles them and checks for them. If you choose this route, every music piece needs loop points that are exact to the sample, plus authored intro, loop and outro segments.
-
-Either way, the result must sound **produced**, not like a chiptune demo of beeps. Layer the instruments, give them stereo width, use reverb and delay sends, sidechain-style pumping on the pads under the kick, use a master bus compressor and limiter, and keep levels consistent. The owner's word is **addictive**: memorable hooks you'd hum after a match, strong grooves and real payoffs.
-
----
-
-## 3. The music: one unique theme for each stage, in 5 versions
-
-### 3.1 Rules for every theme
-
-- **Unique.** Each stage has its own melody, its own harmony, key and tempo, and its own instrument palette. No two stages share a hook or a chord loop.
-- **Matches the stage.** Read each stage's theme file (`js/stages/*-theme.js`), its map and its hazards in `js/data/maps.js` and `js/data/stage-hazards.js`, and its description in `docs/gameplay/stages.md`. The instruments and mood must sound like that place.
-- **One theme, five versions.** All five versions of a stage come from the **same** motif, key centre and instrument set, so they're clearly the same piece in different states. The versions don't sound like four different songs.
-- **Main Battle is epic.** It's a driving, heroic, high-energy fight track. It has an intro, an A section with the main hook, a B section that builds, and a climax, and it loops seamlessly for the whole 5-minute clock. It shouldn't wear thin: at least 90–120 s of material before it repeats, with variations on each pass.
-- **Overtime is epic and makes you anxious.** It uses the same hook, but faster (+10–20 % tempo, or double-time drums), shifted up a step or into a darker mode. It adds ticking or clock-like percussion, rising risers, dissonant string ostinatos, a pulsing sub, and a filter that slowly opens. **Its intensity follows `Battle.overtimeVoidPressure` (0 → 1)** as the Void closes. Layers come in, the high-pass and filter sweep, the percussion gets denser and the pitch tension rises, so the last 10 seconds feel frantic. This is the musical mirror of the Void waves speeding up to 6×. Read the pressure from the battle and don't keep a second clock.
-- **Victory and Defeat (post-match).** Each is a short sting (about 3–5 s) followed by a calm loop that plays under the celebration and Match Results until the player leaves. Victory restates the hook in a triumphant major setting with a big final hit. Defeat restates it in a broken, minor or slowed version, with a falling cadence. It should feel heavy but still sound good. Draw is its own distinct ending: the hook left unresolved, as in a standoff. It hangs on a suspended or ambiguous chord (sus2/sus4, or the theme's mode with no tonic resolution), with tense but dignified percussion that stops on an open, ringing final hit. It is neither triumphant nor crushing. It is unique to each stage and is never a re-use of the Victory or Defeat ending. All three endings must stay in that stage's instrument palette.
-
-### 3.2 Direction for each stage (follow it, then refine it by ear)
-
-| Stage | Setting (from the code) | Musical identity |
-|---|---|---|
-| **Yerma** (`desert`) | Sandstone mesa over open desert air, far rock needles, gold-lit wisps | Phrygian-dominant / double-harmonic scale, oud- or plucked-string-like lead, frame-drum and darbuka groove, a wide wind drone, a heroic brass-like synth answer. Around 128–140 BPM. |
-| **Sol-Noir** (`city`) | Rooftop block over a street canyon at night, supertall towers, aviation lights | Dark synthwave / cyber-noir with gated drums, a driving arpeggiated bass, a neon lead, and a sax- or brass-stab hook. Around 120–128 BPM. Overtime adds siren-like sweeps. |
-| **Asperitas** | One great cloud adrift above the cloud sea, drifting cloud platforms | Soaring orchestral-electronic: airy choir pads, bell or celesta arpeggios, big taiko-style hits, a high flying lead. Lydian brightness in Main Battle; Overtime moves it to a darker mode. |
-| **Adamaris** | Tropical beach under a volcano that throws rocks | Island-epic: steel-drum or marimba hook, tribal toms, a bright surf-rock-style lead over a rumbling volcanic low end. Overtime brings the volcano forward: sub rumbles and erupting percussion. |
-| **Jökull** | Glacier over a frozen abyss, sections that break away, sudden blizzards, aurora | Nordic-epic: icy glass bells, a deep drone, war drums, a throat-chant-like or horn lead, cold wide reverb. Overtime adds cracking-ice transients and blizzard noise swells. |
-
-### 3.3 Clean transitions between versions
-
-- **Battle → Overtime.** When `startOvertime` fires, wait for the next bar line (or beat, if a bar is longer than about 1.5 s) and switch to Overtime with a short pickup or riser. Don't hard-cut in the middle of a phrase or drop out into silence. Line this up with the 1.4 s **OVERTIME** banner.
-- **Battle/Overtime → Post-match.** When the match ends (`matchOver` or the result is set, ejection included), cut on the downbeat into the Victory, Defeat or Draw sting with a tail of no more than about 1 beat. The sting then flows into its post-match loop.
-- **Restart / Rematch.** Return cleanly to Main Battle from its intro, and set overtime intensity back to 0.
-- **Pause.** Duck the music (about −10 dB with a gentle low-pass) and freeze the Shield-hold loop. Restore both smoothly on resume. Overtime intensity must not move while the game is paused. Online Play has no pause, so leave it unaffected.
-- **Leaving the battle** (Home, Change Stage, Change fighters, Leave room). Fade out over about 0.4–0.8 s. Nothing may keep playing on menus.
-- Crossfades use equal-power gain curves. Version changes never click, gap or double up. Keep one music bus with a single active voice, and keep the version state in one small state machine: `idle → battle → overtime → postVictory | postDefeat | postDraw`.
-
----
-
-## 4. Practice Ground: factory ambience, no music
-
-Practice Ground plays a **looping factory ambience** instead of a theme. Build it from layered, evolving elements: low machine hum and room tone, distant rhythmic pistons or presses, conveyor rattle, occasional steam hiss, metallic clanks and chain movement, and a faint electrical buzz from the gridded wall's lights. It must loop without seams, never become rhythmic enough to feel like music, stay low in the mix, and randomise its one-shots so it never sounds like a 10-second loop. It fades in when Practice starts and fades out when Practice ends. Practice never plays any version of a theme.
-
-The ejection, Deflect and Shield SFX **do** play in Practice. The Practice Void scores nothing, but the player's dummy is still "the opponent" and the player's own fighter is still "the player".
-
----
-
-## 5. Sound effects
-
-Every SFX must feel **very satisfying**: tight transients, a weighty low end, a bright and crisp top, and a short sparkle or tail. Add slight random pitch and volume variation (±3–5 %) so repeats never sound robotic. Duck the music a little (−3 to −5 dB for about 150–300 ms) under the ejection, Deflect and Perfect Shield sounds so they punch through.
-
-- **Opponent ejected:** a huge, rewarding knockout. It has a deep boom, a rising bright shimmer or "shing", and a crowd-roar-like noise burst or a short triumphant brass-synth hit. It should make the player want to do it again.
-- **Player ejected:** clearly negative but still satisfying to hear. It has a falling pitch sweep, a muffled low boom, and a hollow, minor-key or detuned tail, like a heavy "you got sent" thud. It is not annoying or ear-piercing.
-- **Universal ejection (Local Play):** one neutral, punchy, impressive burst that doesn't read as "good" or "bad", so neither player is confused about who it belongs to. It plays for every ejection in Local Play, both players' included.
-- **Successful Deflect:** a sharp, metallic, ringing *parry* with a whoosh reversal, with a brief stereo sweep in the direction the projectile is sent back. Hook it **only** where `CombatSystem.deflectProjectiles` actually turns a projectile back (the same moment the 15 Energy is paid, once per Deflect). Starting a Deflect, or one that whiffs, makes no sound.
-- **Perfect Shield:** a crystalline, high-value "ting" with a short shimmer bloom. It is clearly a premium version of the block sound. It **replaces** the block sound for that hit and never stacks on it.
-- **Shield block:** a solid, muted energy-barrier impact, satisfying but understated, so the Perfect Shield clearly stands above it. One sound per blocked event. A multi-hit string that is blocked stops at its first block, as the engine already handles.
-- **Shield hold:** a soft, low, humming energy-field loop that matches the Shield's black-and-red wavering circle. It fades in quickly (about 60–100 ms) when the Shield is raised, loops while it's held, and fades out on release. It respects blockstun and pause, and stays well under the music.
-
-Play these sounds for **any fighter on screen**: the player's, the CPU's, or Player 2's. They come from the shared systems (`fighter.js`, `combat.js`, `battle.js` / `arena.js`), never from a character file. Never special-case a fighter's id. Character files gain nothing for this update. Use subtle stereo panning by on-screen position so two simultaneous Shield holds can be told apart.
-
----
-
-## 6. Whose point of view decides the sound
-
-Each mode needs a clear "point-of-view side". Put that logic in **one** helper (for example `audioPerspective(battle)`) and cover it with tests.
-
-| Mode | Opponent / Player ejection | Post-match music |
-|---|---|---|
-| **Quick Battle** (Regular and Custom) | Player 1's fighter is the player; the CPU is the opponent | Victory if Player 1 wins, Defeat if Player 1 loses |
-| **Online Play** | This device's player is the player | From this player's side, as the result is already shown |
-| **Local Play** | **Universal ejection** for both, always | **Always Victory**, whoever wins, to avoid confusion |
-| **Watch Mode** (CPU vs CPU, nobody is the protagonist) | **Universal ejection** | **Victory** (the same reasoning as Local Play) |
-| **Practice Ground** | The player's fighter is the player; the dummy is the opponent | No music, only ambience |
-| **Any draw** (no winner, nobody ejected), in every mode, Local and Watch included | — | That stage's own **Draw** version |
-
----
-
-## 7. The new Audio settings
-
-Add an **Audio** section to Settings (`js/ui/settings-dialog.js`, `SETTINGS_SECTIONS`) with its own tab, alongside Language, Controls and Combat.
-
-- Controls: **Master volume**, **Music volume** and **Sound effects volume** (0–100 % sliders, each with its live percentage), plus a **Mute all** toggle. Optional, only if it stays tidy: an **Ambience** volume for Practice Ground.
-- Changes apply **live**, including while the pause menu is open over a battle. Moving the SFX slider plays a short preview using the Shield block sound, which is one of the allowed sounds. No new sound is added for this.
-- Persist the settings through `js/core/settings.js`: bump `SETTINGS_VERSION` to **11**, add `audio: { master, music, sfx, muted }` with sensible defaults (for example master 80, music 70, sfx 85, not muted), migrate every older version to those defaults while keeping everything else, and update the long comment at the top of the file the same way the earlier versions are documented. Sanitise each value on its own: clamp to 0–100, and fall back to the default if a value isn't a number.
-- Fully navigable by keyboard, gamepad (the shared menu navigator, so left and right adjust a focused slider) and touch, with proper `role="slider"` / `aria-valuenow`, matching `css/settings.css`.
-- Add every label in **English and French** (`js/localization/strings/en.js`, `fr.js`).
-- Audio routing: `master → (music bus, sfx bus, ambience bus) → compressor/limiter → destination`. Volume changes use short gain ramps, never jumps that make zipper noise.
-
----
-
-## 8. Engineering requirements
-
-- Rework `js/core/audio-manager.js` into a proper engine: the buses above, a music director (the version state machine, beat/bar clock, overtime intensity input), an SFX player with voice limits (no more than about 2 concurrent copies of one SFX and a global cap) and the looping ambience. Keep the existing "nothing plays before a user gesture" unlock, and resume a suspended context on later gestures (iOS/Safari). If Web Audio is missing, the game stays fully silent and fully playable.
-- Battle screens and Practice drive the audio through events, such as `battleStarted(stageId, mode)`, `overtimeStarted`, `overtimePressure(p)`, `matchEnded(outcome)`, `fighterEjected(fighter)`, `deflected(fighter)`, `blocked(fighter, { perfect })`, `shieldHeld(fighter, on)`, `paused` / `resumed` and `left`. The simulation must stay deterministic: audio only listens and never feeds back into gameplay, timing or online lockstep. Online rollback or resimulation must not replay ejection or block sounds twice. Fire them only for confirmed events.
-- Pause the audio when the page is hidden (`visibilitychange`), and resume it when the page is shown again.
-- Respect the mute setting completely: when muted, no sound may leak through, including during the unlock.
-- Performance: no audible stutter on mid-range phones. Schedule ahead, reuse nodes where you can, and keep CPU use low. If you use Route B, keep each music file under about 1.5 MB.
-- Tests (`node --test`): the perspective table above; the version state machine (battle → overtime → post-match victory, defeat and draw, restart, pause, leave); one ejection event per exit, `ejectLoser` after a Void fall included; Deflect sound only on a real turn-back; perfect versus normal block exclusivity; Shield-hold start and stop; settings migration from 10 to 11 and sanitising; and a guard test that fails if any sound outside the twelve allowed ones is ever registered. Mock `AudioContext` for Node.
-- Documentation: a new `docs/systems/audio.md` (the architecture, every piece and where it fires, the per-stage musical identity, how to add a stage's theme later) linked from `docs/README.md`, plus short updates to `ALVA_SPEC.md`, `docs/gameplay/stages.md`, `battle.md`, `local-play.md`, `watch-mode.md`, `practice.md` and `docs/systems/defense.md`.
-- Respect every strict rule in `CLAUDE.md`: no fighter special-cases, no change to stage geometry or the Void, no change to controller or touch comfort, and never touch `character_rule`.
-
----
-
-## 9. Definition of done
-
-1. Each of the 5 stages plays its own epic Main Battle theme that loops seamlessly. Overtime switches on a bar line to an anxious version that escalates with the closing Void. The match ends on the beat into a Victory, Defeat or Draw ending of the same theme.
-2. Practice Ground plays only a factory ambience.
-3. The opponent-ejected, player-ejected and Local/Watch universal ejection sounds, Deflect (on a real turn-back only), Perfect Shield, Shield block and Shield hold all play correctly for every fighter, every mode and every point of view.
-4. Local Play always uses the universal ejection sound and the Victory version, except on a draw, where every mode plays the stage's Draw version.
-5. No other sound exists anywhere in the game, and menus stay silent.
-6. Settings › Audio works with mouse, touch, keyboard and gamepad, persists as version 11 and applies live.
-7. `node --test` passes, the docs and `UPDATES.md` are updated, and the itch release still builds.
-8. Before you finish, actually listen through each stage's 5 versions and every transition, using a headless render or an offline `OfflineAudioContext` dump to WAV if you can't play audio directly. Fix any clicks, level jumps, clashing keys or transitions that miss the beat.
+## Done when
+- No difficulty or mode changes the CPU's damage, and a test proves it for Venture at Levels 1–30.
+- `grep -rni "stronger\|strength"` finds nothing about CPU, difficulty or Venture.
+- English and French interface text mention only "smarter" / "plus intelligent".
+- Easy and Medium are clearly easier, Hard and Brutal slightly easier, and the ordering is intact.
+- `node --test` passes. Give a short summary of the old → new profile values.
