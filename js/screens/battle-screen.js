@@ -55,6 +55,7 @@ import { menuButton, dialogControls } from '../ui/components.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
 import { Battle, BATTLE_MODES } from '../game/battle.js';
+import { BattleAudio } from '../core/audio/battle-audio.js';
 import { STAT_KEYS } from '../game/match-stats.js';
 import { HUD } from '../ui/hud.js';
 import { AbilityHUD } from '../ui/ability-hud.js';
@@ -205,6 +206,9 @@ export class BattleScreen extends Screen {
     );
 
     this.battle = null;
+    // What the battle sounds like (the Sound update): its stage's theme and
+    // the effects, from this mode's point of view.
+    this.sound = new BattleAudio(app.audio);
     // 'quick-battle', 'watch', 'local' or 'adventure', set as each battle
     // is entered; in Adventure, the level played (else null).
     this.mode = 'quick-battle';
@@ -535,6 +539,7 @@ export class BattleScreen extends Screen {
         cpuLevel: ventureSpec(level), modifiers: app.adventure.modifiersFor(level), seed: pick('seed') ?? undefined,
       } : {}),
     });
+    this.sound.attach(this.battle, { stage: map.id, mode });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.abilityHud.bind(watch ? null : this.battle.p1);
     this.abilityHud2.bind(local ? this.battle.p2 : null);
@@ -617,6 +622,7 @@ export class BattleScreen extends Screen {
     this.app.loading.hide();
     this.abilityHud.clear();
     this.abilityHud2.clear();
+    this.sound.detach();
     this.battle?.destroy();
     this.battle = null;
     this.el.classList.remove('is-live', 'is-local');
@@ -667,6 +673,7 @@ export class BattleScreen extends Screen {
     }
     if (!this.isRunning || this.holdsForPortrait) return;
     battle.frame(dt);
+    this.sound.sync();
     const own = this.playerFighter;
     this.touch.setAirborne(!!own && !own.grounded);
     this.touch.showStatus(own);
@@ -794,6 +801,7 @@ export class BattleScreen extends Screen {
   pause() {
     if (!this.battle || this.paused) return;
     this.paused = true;
+    this.sound.setPaused(true);
     this.setPlayActive(false);
     this.el.classList.add('is-paused');
     this.pauseOverlay.hidden = false;
@@ -831,6 +839,7 @@ export class BattleScreen extends Screen {
     this.hideConnection();
     this.hidePause();
     this.paused = false;
+    this.sound.setPaused(false);
     // The Match Results, when they were open beneath the pause menu, keep
     // the player's controls off.
     this.setPlayActive(!this.resultsOpen);
@@ -1127,6 +1136,7 @@ export class BattleScreen extends Screen {
     this.setBanner(null);
     this.syncAbilityHud();
     this.paused = false;
+    this.sound.setPaused(false);
     this.setPlayActive(true);
     document.activeElement?.blur?.();
   }

@@ -6,7 +6,8 @@ The owner refers to past work by name: the **movement update**, the
 **effect update**, the **bounce update**, the **Mash Combo update**, the
 **online update**, the **camera & mobile layout update**, the **spawn &
 landscape update**, the **launch & energy update**, the **Void
-update**, the **Screen Pad update** and the **Adventure update**. [`UPDATES.md`](./UPDATES.md)
+update**, the **Screen Pad update**, the **Adventure update** and the
+**Sound update**. [`UPDATES.md`](./UPDATES.md)
 says what each one is, which pull request and commit it was, where its
 tuning lives and which tests cover it. Read it whenever an update is named,
 and add an entry there when the owner names a new one.
@@ -69,5 +70,11 @@ and add an entry there when the owner names a new one.
   never one stage; after any change to them re-derive the HUD fire
   (`tests/benchmarks/launch-thresholds.mjs`) and check the stage art at the
   camera's edges ([stages](./docs/gameplay/stages.md)).
+- **Sound is a closed list** (the Sound update): the five stage themes in
+  their five versions, Practice Ground's ambience and seven effects, all
+  synthesized live, no audio file. Never add another sound (no menu, hit,
+  jump or character sound): the registry refuses it (`ALLOWED_SOUNDS` in
+  `js/core/audio/sounds.js`). Sound only listens to the game, never feeds
+  back, and never names a fighter ([audio](./docs/systems/audio.md)).
 - Run the tests with `node --test`
   ([testing](./docs/development/testing.md)).

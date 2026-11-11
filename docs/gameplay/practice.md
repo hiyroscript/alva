@@ -74,6 +74,11 @@ unavailable, with Back to Home.
   name and Launch Point, rebound whenever it changes.
 - Every new visit starts with the default fighter and CPU again, at 0 Launch
   Point, whatever the last visit changed or disabled.
+- **Sound** ([audio](../systems/audio.md)): Practice Ground plays its
+  factory ambience (a hum, the lights' buzz, a conveyor, presses, steam,
+  clanks, chains, never a beat) from start to end, never a theme. The
+  ejection, Deflect and Shield sounds play as in a battle: your fighter is
+  the player, the dummy the opponent. The menu ducks it.
 
 The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.8.
 

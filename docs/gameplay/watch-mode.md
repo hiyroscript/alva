@@ -45,6 +45,9 @@ retraces them to Home, landing on each choice.
   choices, even in a mirror match. Unseeded, every match differs. Each
   side's celebration after the match draws from a further stream of its
   own, so it never moves the CPUs' combat randomness.
+- **Sound** ([audio](../systems/audio.md)): nobody is the protagonist, so
+  every ejection is the universal one and the match ends on the Victory
+  version (Draw on a draw).
 
 The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.5a and
 §7.2.8.

@@ -594,6 +594,17 @@ export const EN = {
   'settings.automaticTurnAroundOn': 'On',
   'settings.automaticTurnAroundOff': 'Off',
 
+  'settings.audio': 'Audio',
+  'settings.audioNote': 'The volume of the music and the sound effects. Changes apply at once, even over a paused match.',
+  'settings.masterVolume': 'Master volume',
+  'settings.musicVolume': 'Music volume',
+  'settings.sfxVolume': 'Sound effects volume',
+  'settings.volumeValue': '{percent}%',
+  'settings.muteAll': 'Mute all',
+  'settings.muteAllDesc': 'Silences every sound at once, music and sound effects alike.',
+  'settings.muteOn': 'On',
+  'settings.muteOff': 'Off',
+
   'editor.label': 'Touch control editor',
   'editor.layout': '{scheme} layout',
   'editor.hint': 'Drag a control to move it. Select one to resize it.',

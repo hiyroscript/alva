@@ -25,6 +25,7 @@ for where they moved). The game as it is now is specified in
 | **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
 | **Screen Pad update** | [#180](https://github.com/hiyroscript/alva/pull/180) | `92592dc` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
 | **Adventure update** | [#185](https://github.com/hiyroscript/alva/pull/185) | `48efc0a` (modifiers), `a708c97` (Venture, Perquisites, progress), `dd2dc29` (screens), `7afbb9a` (the CPU) | Select Mode's new first mode: thirty levels against Venture, a CPU 1.5 times smarter and 1.05 times stronger every level, with a Perquisite picked from two cards every five levels; per-fighter modifiers in the combat engine, identity everywhere else |
+| **Sound update** | [#187](https://github.com/hiyroscript/alva/pull/187) | `cba16c8` (the engine, themes, effects, settings), `658e752` (the effects rebalanced), `85c66db` (the mix) | Alva's first sound, all of it synthesized live from code: each battle stage's own theme in five versions (Main Battle, Overtime following the closing Void, Victory, Defeat, Draw), Practice Ground's factory ambience, seven effects (three ejections, the Deflect, the Perfect Shield, the block, the Shield held), and Settings › Audio (settings version 12) |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -6715,3 +6716,118 @@ throwers); the roster-wide tables (`cooldown-policy`,
 `watch-mode`, `settings` (its credits) and each fighter's roster list;
 #0010's "the roster's smallest" now asks every other fighter to stand 10
 units taller (it was 15: #0015 is 12 taller).
+
+## Sound update
+
+Pull request [#187](https://github.com/hiyroscript/alva/pull/187), commits `cba16c8` (the engine,
+themes, effects and settings), `658e752` (the effects rebalanced) and
+`85c66db` (the themes mixed from measurements). Asked for in the `max`
+prompt and named there. Alva had no sound: the
+audio module was an empty foundation and the menus' `play('move')` calls
+played nothing (they still do). The update adds exactly the twelve kinds
+of sound the owner listed and nothing else, every one synthesized live on
+Web Audio from code: no audio file is shipped, downloaded or decoded
+(why: [audio](./docs/systems/audio.md#route-a-composed-in-code-synthesized-live)).
+
+### What it added
+
+- **Five stage themes, five versions each.** Yerma (D Phrygian dominant,
+  134 BPM: an oud hook, a brass answer, darbuka and frame drums on a
+  maqsum, a wind drone), Sol-Noir (F minor, 124: gated drums, an
+  arpeggiated bass, a neon lead, brass stabs), Asperitas (D Lydian, 140:
+  choir, celesta, harp, taiko, a flying lead), Adamaris (A Mixolydian, 126,
+  swung: a steel-pan tresillo hook, marimba, tremolo surf guitar, tribal
+  toms, an overdriven volcanic low end), Jökull (E Dorian, 112: horns, a
+  throat chant, glass bells, war drums, a cold hall). Each Main Battle is an
+  intro then a loop of 103–129 s in eight sections that changes on every
+  pass; Overtime is the same hook 15 % faster, a step up and (but for Yerma)
+  in a darker mode, its ticking, pulsing sub, risers, bending strings,
+  dissonant ostinatos, the stage's own layers and an opening filter all
+  following `Battle.overtimeVoidPressure`; Victory, Defeat and Draw are a
+  4–6 s sting of the hook (major with a big hit; slowed, minor, a falling
+  cadence; suspended and unresolved) then a calm loop.
+- **Transitions.** One active version on the music bus, a state machine
+  (`idle → battle → overtime → postVictory | postDefeat | postDraw`):
+  overtime on the next bar line or beat with a pickup, the ending on the next
+  beat with a tail under a beat, a restart clean from the intro, pause
+  ducking about 10 dB under a low-pass, leaving fading out in 0.6 s; equal-
+  power crossfades, never a gap or a double.
+- **Practice Ground's ambience**: a factory (hum, buzz, conveyor, presses,
+  steam, clanks, chains), randomized so it never loops or turns into music.
+- **Seven effects**: opponent ejected, player ejected, the universal
+  ejection (Local Play, Watch Mode), the successful Deflect (only for a real
+  turn-back, once per Deflect), the Perfect Shield (in place of the block's),
+  the Shield block, the Shield held (a hum). Varied ±4 % each play, panned by
+  where the fighter is, the music ducking under the big ones, at most two of
+  one and ten in all at once.
+- **Whose point of view**: one helper (`audioPerspective`): Quick Battle and
+  Adventure from Player 1, Online Play from this device's player, Local
+  Play and Watch Mode the universal ejection and always Victory, Practice
+  Ground the player's fighter and the dummy, any draw the stage's Draw.
+- **Settings › Audio**: Master, Music and Sound effects volumes (80 / 70 /
+  85 %) and Mute all, by keyboard, gamepad and touch, applied live; settings
+  **version 12** (the prompt asked for 11, but the Screen Pad update had
+  already taken it), every older version migrated to the defaults.
+- **Listening only.** The Arena tells a listener (`Arena.cue`) what
+  happens inside a step; nothing it does is read back, so a match steps
+  identically with or without sound and Online Play's lockstep is
+  untouched. No fighter is special-cased and no character file changed.
+
+### Where to tune it
+
+- Each theme: [`js/core/audio/themes/`](./js/core/audio/themes/) (tempo,
+  key, mode, every channel's level, pan and sends, the parts, sections and
+  versions); what they share: `common.js` (overtime's channels and layers).
+- The mix: `MIX` in [`js/core/audio-manager.js`](./js/core/audio-manager.js)
+  (each bus, the ducks, the pause), `SFX_LIMITS`, `SFX_VARIATION`; the
+  glue compressor and limiter in `build`.
+- The transitions: `FADES` and `BAR_QUANTUM_LIMIT` in
+  [`js/core/audio/director.js`](./js/core/audio/director.js); `LOOKAHEAD`
+  in [`js/core/audio/sequencer.js`](./js/core/audio/sequencer.js).
+- Overtime's layers: `overtimeLayers` in the sequencer (their intensity
+  thresholds).
+- The effects: [`js/core/audio/sfx.js`](./js/core/audio/sfx.js); the
+  ambience: [`js/core/audio/ambience.js`](./js/core/audio/ambience.js).
+- The defaults: `DEFAULT_AUDIO` in [`js/core/settings.js`](./js/core/settings.js).
+
+### Code
+
+- [`js/core/audio-manager.js`](./js/core/audio-manager.js) (the engine) and
+  [`js/core/audio/`](./js/core/audio/) (`sounds.js`, `perspective.js`,
+  `director.js`, `sequencer.js`, `theory.js`, `instruments.js`, `dsp.js`,
+  `sfx.js`, `ambience.js`, `battle-audio.js`, `themes/`).
+- [`js/game/arena.js`](./js/game/arena.js) (`cue`, `cueCombat`, the
+  ejection's cue in `checkVoid`), [`js/game/battle.js`](./js/game/battle.js)
+  (the cues of `ejectLoser`, `startOvertime`, `finishMatch`, `restart`),
+  [`js/game/combat/combat.js`](./js/game/combat/combat.js) (a deflection's
+  `first`).
+- The screens: [`battle-screen.js`](./js/screens/battle-screen.js),
+  [`online-battle-screen.js`](./js/screens/online-battle-screen.js),
+  [`practice-screen.js`](./js/screens/practice-screen.js) (`BattleAudio`);
+  [`js/core/app.js`](./js/core/app.js) (the engine with the settings).
+- [`js/core/settings.js`](./js/core/settings.js) (version 12, `audio`,
+  `sanitizeAudio`, `setAudio`),
+  [`js/ui/settings-dialog.js`](./js/ui/settings-dialog.js) (the Audio tab),
+  [`css/settings.css`](./css/settings.css), the strings in both languages.
+- The guides: [`docs/systems/audio.md`](./docs/systems/audio.md) (new),
+  `ALVA_SPEC.md` (§7.5, §6.10 and the modes), stages, battle, Local Play,
+  Watch Mode, Practice Ground, defense, module responsibilities, testing.
+
+### Tests
+
+- `tests/systems/audio.test.mjs` (new): the point-of-view table; the state
+  machine; the guard (exactly the 33 sounds, nothing else registrable, no
+  audio file anywhere, `play('move')` silent, no fighter named); the engine
+  on a mocked AudioContext (`tests/helpers/fake-audio.mjs`, new): nothing
+  before a gesture, mute from the unlock, live levels by ramps, changes on
+  the beat or bar with equal-power fades, pause, the effects' limits and
+  ducks, visibility, Practice's ambience; real Battles through `BattleAudio`:
+  one ejection a exit (`ejectLoser` after a Void fall included), the Deflect
+  only for a real turn-back, a perfect block never stacked on a block, the
+  Shield's hum, overtime's intensity the battle's own, every mode's endings,
+  Practice Ground, and a match stepping identically with or without a
+  listener; version 12's migration and sanitizing; the themes.
+- `tests/interface/settings.test.mjs` (the Audio tab by gamepad, keyboard
+  and pointer, its ARIA, Mute all, the preview, French; version 12's stored
+  shape; four sections), `i18n` (Audio the same word in French),
+  `install` (reads `js/core/`'s files, its audio folder included).

@@ -883,6 +883,17 @@ export const FR = {
   'settings.automaticTurnAroundOn': 'Activé',
   'settings.automaticTurnAroundOff': 'Désactivé',
 
+  'settings.audio': 'Audio',
+  'settings.audioNote': 'Le volume de la musique et des effets sonores. Les changements s’appliquent aussitôt, même pendant une pause.',
+  'settings.masterVolume': 'Volume général',
+  'settings.musicVolume': 'Volume de la musique',
+  'settings.sfxVolume': 'Volume des effets sonores',
+  'settings.volumeValue': '{percent} %',
+  'settings.muteAll': 'Tout couper',
+  'settings.muteAllDesc': 'Coupe tous les sons d’un coup, la musique comme les effets sonores.',
+  'settings.muteOn': 'Activé',
+  'settings.muteOff': 'Désactivé',
+
   'editor.label': 'Éditeur des commandes tactiles',
   'editor.layout': 'Disposition : {scheme}',
   'editor.hint': 'Faites glisser une commande pour la déplacer. Sélectionnez-en une pour la redimensionner.',

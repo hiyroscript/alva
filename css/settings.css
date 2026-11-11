@@ -3,8 +3,8 @@
    order (css/base.css first; see docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
-   Settings — a translucent glass dialog over Home: Language, Controls
-   and Combat
+   Settings — a translucent glass dialog over Home: Language, Controls,
+   Combat and Audio
    --------------------------------------------------------------------- */
 
 /* Home stays visible under the shared dim; the glass panel blurs it where
@@ -273,8 +273,37 @@
 .settings-customize-text { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
 .settings-custom-tag[hidden] { display: none; }
 
+/* Audio: each volume a row (its name, its slider, its value), then Mute
+   all, a switch in the choices' style, outlined and ticked while on. The
+   volumes dim while everything is muted (they still move). */
+.settings-volumes { display: grid; gap: clamp(6px, 1.2vh, 10px); }
+.settings-volume {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(120px, 2fr) 4.4em;
+  align-items: center;
+  gap: 8px 14px;
+  min-height: clamp(44px, 7.4vh, 56px);
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+  background: rgba(255, 255, 255, 0.03);
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, opacity var(--dur-fast) ease;
+}
+:where(html:not(.is-touch-input)) .settings-volume:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .settings-volume:focus-within { box-shadow: var(--focus-ring); }
+.settings-volume-label { min-width: 0; font-weight: 700; font-size: clamp(14px, 2.4vh, 16px); color: var(--text); }
+.settings-volume-slider { width: 100%; min-width: 0; height: 36px; margin: 0; accent-color: var(--accent); touch-action: none; cursor: pointer; }
+.settings-volume-slider:focus { outline: none; }
+.settings-volume-value { justify-self: end; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-secondary); }
+.settings-volumes.is-muted .settings-volume { opacity: 0.55; }
+.settings-mute-end { display: flex; align-items: center; gap: 10px; }
+.settings-mute-state { font-weight: 600; font-size: clamp(13px, 2.2vh, 15px); color: var(--text-secondary); }
+.settings-mute.is-current .settings-language-check { display: grid; }
+
 @media (max-width: 620px) {
   .settings-options { grid-template-columns: 1fr; }
+  .settings-volume { grid-template-columns: minmax(0, 1fr) 4.4em; padding-block: 6px; }
+  .settings-volume-slider { grid-column: 1 / -1; grid-row: 2; }
   .settings-option-name { flex-wrap: wrap; }
   .settings-tab { padding-inline: 10px; }
 }

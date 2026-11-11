@@ -290,6 +290,8 @@ export class OnlineBattleScreen extends BattleScreen {
       labels: setup.labels,
     });
     this.lockstep.attach(this.battle);
+    // Its sound from this player's side (the battle has no pause online).
+    this.sound.attach(this.battle, { stage: setup.map.id, mode: 'online', localSlot: this.localSlot });
     this.unsubLockstep = this.lockstep.on((type, detail) => this.onLockstep(type, detail));
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.abilityHud.bind(this.playerFighter);
@@ -441,6 +443,7 @@ export class OnlineBattleScreen extends BattleScreen {
     this.unsubLockstep = null;
     this.lockstep?.dispose();
     this.lockstep = null;
+    this.sound.detach();
     this.battle?.destroy?.();
     this.battle = null;
     this.hideFinal();

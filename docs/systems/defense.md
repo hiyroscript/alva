@@ -204,6 +204,18 @@ or `groundOnly`.
   blockable: its new target's raised Shield blocks it and stops it. Only
   an attack that says so turns projectiles back.
 
+## Their sound
+
+The Sound update ([audio](audio.md)) gives the defense four sounds, for any
+fighter, from the shared systems alone: the **Shield held** (a low hum
+wavering like the Shield's circle, up in about 80 ms while `shielding`,
+blockstun included, down in about 120 ms, held silent while paused), the
+**Shield block** for each `block` event, the **Perfect Shield** in its place
+for a perfect one (never both), and the **successful Deflect**, heard only
+when `CombatSystem.deflectProjectiles` turns a projectile back, once per
+Deflect (its deflection record's `first`, where its 15 Energy is paid):
+starting one, or one that whiffs or only strikes a fighter, is silent.
+
 ## Each fighter's defense
 
 | Fighter | `defense` (on the ground) | `deflect` (in the air) |

@@ -120,6 +120,27 @@ export class Arena {
     // fighter performing it (`fighter.technique`), not here: that fighter
     // updates and ends it, and a reset ends it. What it releases is a
     // projectile here like any other.
+    // Who hears this arena's sound cues (the Sound update): the screen's
+    // BattleAudio (js/core/audio/battle-audio.js), or nobody. See cue.
+    this.cueListener = null;
+  }
+
+  // Tells the listener (if any) that `type` happened this step: 'ejected'
+  // ({ fighter }), 'deflected' (a deflection record), 'blocked' (a block
+  // event), and a Battle's 'overtime', 'matchEnded' ({ winner }) and
+  // 'restart'. Listening only: nothing the listener does is read back, it
+  // never runs when nobody listens, and a listener that throws never stops
+  // the step, so sound can never change what a match does (Online Play's
+  // lockstep, which runs every step exactly once and never rewinds, hears
+  // each cue once).
+  cue(type, detail = null) {
+    const listener = this.cueListener;
+    if (!listener) return;
+    try {
+      listener(type, detail);
+    } catch (err) {
+      console.error(`[Alva] The "${type}" sound cue failed`, err);
+    }
   }
 
   // Player 1: the fighter the camera keeps in view and the view is scaled
@@ -294,9 +315,19 @@ export class Arena {
     }
     this.stageHazards.resolve(fighters, this.combat);
     this.fx.take(this.combat.events, this);
+    if (this.cueListener) this.cueCombat();
     removeDeadProjectiles(this.projectiles);
     removeDeadClones(this.clones);
     this.checkVoid(fighters);
+  }
+
+  // This step's sound cues from combat: each Deflect's first projectile
+  // turned back (once per Deflect, as its Energy is paid; one that whiffs or
+  // only starts makes none) and every hit a Shield blocked (a perfect one
+  // marked `perfect`), each once.
+  cueCombat() {
+    for (const d of this.combat.deflections) if (d.first) this.cue('deflected', d);
+    for (const e of this.combat.events) if (e.type === 'block') this.cue('blocked', e);
   }
 
   // A technique's burst let go of `effect` (see Technique.takeEffect): its
@@ -342,6 +373,8 @@ export class Arena {
     for (const f of taken) {
       this.fx.addVoidRipple(voidCrossing(f.body, this.stage.void), f);
       this.fx.addElimination(f);
+      // Its ejection's sound, with its burst: once, as it leaves play.
+      this.cue('ejected', { fighter: f });
       f.lostToVoid = true;
       // A Mash Combo armed or running ends with its fighter's life.
       f.endMashCombo?.('void');

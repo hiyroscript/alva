@@ -45,6 +45,10 @@ reads, what a fighter may leave out, and its tests.
 - [Rendering](systems/rendering.md): sprites, the camera, effects, the
   status drawn with each fighter, and a fighter drawn as several members
   (an ensemble).
+- [Audio](systems/audio.md): the Sound update's stage themes (five
+  versions each), Practice Ground's ambience, the seven effects, the
+  engine, whose point of view decides them, Settings › Audio, and adding a
+  stage's theme.
 - [Localization](systems/localization.md): English and French.
 
 ## Characters

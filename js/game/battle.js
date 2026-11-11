@@ -214,6 +214,9 @@ export class Battle extends Arena {
     this.setPhase(PHASES.intro);
     this.input.flush();
     if (this.view.pxW) this.camera.snap(this.p1, this.p2);
+    // The music starts over from its intro (heard only once a screen
+    // listens: never for the first match, built before it does).
+    this.cue('restart');
   }
 
   // Inputs are locked through the intro only: the fight and the
@@ -323,6 +326,7 @@ export class Battle extends Arena {
   startOvertime() {
     this.period = PERIODS.overtime;
     this.timeLeft = this.overtimeSeconds;
+    this.cue('overtime');
   }
 
   // A fighter fell into the Void (Arena.checkVoid already took it out of
@@ -380,6 +384,7 @@ export class Battle extends Arena {
     this.ejectLoser();
     this.setPhase(PHASES.celebration);
     this.startCelebration();
+    this.cue('matchEnded', { winner: this.final.winner });
     // Ended from outside a step: nothing of this step is left to count.
     if (!this.stepping) this.sealFinal();
     return this.final;
@@ -405,6 +410,9 @@ export class Battle extends Arena {
     const loser = this.fighters.find((f) => f.slot !== winner);
     if (!loser || loser.lostToVoid) return;
     this.fx.addElimination(loser);
+    // Its ejection's sound, with its burst, once (never for a loser the
+    // Void already took: that fall had its own).
+    this.cue('ejected', { fighter: loser });
     loser.lostToVoid = true;
     loser.ejected = true;
     loser.endMashCombo?.('void');

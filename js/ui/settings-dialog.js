@@ -20,6 +20,13 @@
 //             Fighter.turnAroundFacing); off, it faces the way it moves.
 //             Read as each Quick Battle or Practice Ground session starts;
 //             no CPU ever has it.
+//   Audio     Master volume, Music volume and Sound effects volume, three
+//             sliders from 0 to 100 % each showing its value, and Mute all,
+//             a switch (the Sound update, js/core/audio-manager.js). Every
+//             change applies at once, over a paused battle too; moving the
+//             effects slider plays the Shield block's sound to try it. ← / →
+//             (keys, D-pad) move a focused slider by 5 %, Home / End to 0 /
+//             100 %, Page Up / Page Down by 10 %; a press or a drag sets it.
 //
 // Every choice saves on this device at once through app.settings
 // (js/core/settings.js). The dialog is modal: role="dialog" with
@@ -31,8 +38,8 @@
 
 import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
-import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_AUTOMATIC_TURN_AROUND } from '../core/settings.js';
+import { tx, tattr, iconLabel, setText, setAttr, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
+import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_AUTOMATIC_TURN_AROUND, DEFAULT_AUDIO } from '../core/settings.js';
 import { ICONS } from './icons.js';
 
 // A small picture of each layout's lower-left corner (Screen Pad's: the
@@ -86,7 +93,19 @@ export const SETTINGS_SECTIONS = [
   { id: 'language', label: 'settings.language', note: 'settings.languageNote', build: (dialog) => dialog.buildLanguage() },
   { id: 'controls', label: 'settings.controls', note: 'settings.controlsNote', build: (dialog) => dialog.buildControls() },
   { id: 'combat', label: 'settings.combat', build: (dialog) => dialog.buildCombat() },
+  { id: 'audio', label: 'settings.audio', note: 'settings.audioNote', build: (dialog) => dialog.buildAudio() },
 ];
+
+// Settings › Audio's three volumes, in order, each with its label.
+const VOLUMES = Object.freeze([
+  ['master', 'settings.masterVolume'],
+  ['music', 'settings.musicVolume'],
+  ['sfx', 'settings.sfxVolume'],
+]);
+
+// How far one press moves a volume: ← / →, and Page Up / Page Down.
+export const VOLUME_STEP = 5;
+export const VOLUME_PAGE = 10;
 
 export class SettingsDialog {
   constructor(root, app) {
@@ -259,6 +278,93 @@ export class SettingsDialog {
     return [turnAroundGroup];
   }
 
+  buildAudio() {
+    this.volumeRows = VOLUMES.map(([name, label]) => {
+      const labelId = `settings-volume-${name}-label`;
+      const slider = el('input', {
+        class: 'settings-volume-slider', type: 'range', role: 'slider', min: '0', max: '100', step: '1', value: String(DEFAULT_AUDIO[name]),
+        'data-nav': true, 'data-volume': name, 'aria-labelledby': labelId, 'aria-valuemin': '0', 'aria-valuemax': '100',
+      });
+      const value = el('output', { class: 'settings-volume-value', 'aria-hidden': 'true' });
+      // Pressing or dragging along it (and anything else that moves a
+      // native range) sets the volume as it goes.
+      slider.addEventListener('input', () => this.setVolume(name, Number(slider.value)));
+      // The slider's own keys beyond ← / → (those are the navigator's).
+      slider.addEventListener('keydown', (e) => {
+        const now = this.app.settings.audio?.[name] ?? DEFAULT_AUDIO[name];
+        const to = { Home: 0, End: 100, PageUp: now + VOLUME_PAGE, PageDown: now - VOLUME_PAGE }[e.key];
+        if (to === undefined) return;
+        e.preventDefault();
+        this.setVolume(name, to);
+      });
+      const row = el('div', { class: 'settings-volume', 'data-volume-row': name }, [
+        el('span', { class: 'settings-volume-label', id: labelId, ...tx(label) }),
+        slider,
+        value,
+      ]);
+      return { name, slider, value, row };
+    });
+    this.volumeGroup = el('div', { class: 'settings-volumes', role: 'group', 'aria-labelledby': 'settings-audio-title' }, this.volumeRows.map((r) => r.row));
+    this.muteState = el('span', { class: 'settings-mute-state', 'aria-hidden': 'true' });
+    this.muteButton = el('button', {
+      class: 'settings-choice settings-mute', type: 'button', role: 'switch', 'aria-checked': 'false',
+      'data-nav': true, 'aria-describedby': 'settings-mute-desc',
+    }, [
+      el('span', { class: 'settings-choice-name' }, [el('span', tx('settings.muteAll'))]),
+      el('span', { class: 'settings-mute-end' }, [
+        this.muteState,
+        el('span', { class: 'settings-language-check', 'aria-hidden': 'true', html: ICONS.check }),
+      ]),
+    ]);
+    this.muteButton.addEventListener('click', () => this.toggleMute());
+    const muteGroup = el('div', { class: 'settings-subgroup' }, [
+      el('p', { class: 'settings-group-note', id: 'settings-mute-desc', ...tx('settings.muteAllDesc') }),
+      this.muteButton,
+    ]);
+    return [this.volumeGroup, muteGroup];
+  }
+
+  // Sets volume `name` to `value` (rounded and clamped by the settings) and
+  // saves it: the sound follows at once. The effects' volume plays the
+  // Shield block's sound to try it.
+  setVolume(name, value) {
+    this.app.settings.setAudio?.({ [name]: value });
+    this.markAudio();
+    if (name === 'sfx') this.app.audio?.previewSfx?.();
+  }
+
+  // ← / → on a focused volume.
+  stepVolume(slider, dir) {
+    const name = slider.getAttribute('data-volume');
+    const now = this.app.settings.audio?.[name] ?? DEFAULT_AUDIO[name];
+    this.setVolume(name, now + dir * VOLUME_STEP);
+  }
+
+  toggleMute() {
+    const muted = !!this.app.settings.audio?.muted;
+    this.app.settings.setAudio?.({ muted: !muted });
+    this.markAudio();
+  }
+
+  // The Audio section as saved: each slider, its value and the switch.
+  markAudio() {
+    if (!this.volumeRows) return;
+    const audio = this.app.settings.audio ?? DEFAULT_AUDIO;
+    for (const { name, slider, value, row } of this.volumeRows) {
+      const n = audio[name] ?? DEFAULT_AUDIO[name];
+      slider.value = String(n);
+      slider.setAttribute('aria-valuenow', String(n));
+      setAttr(slider, 'aria-valuetext', 'settings.volumeValue', { percent: n });
+      setText(value, 'settings.volumeValue', { percent: n });
+      row.style?.setProperty?.('--volume', `${n}%`);
+    }
+    const muted = !!audio.muted;
+    this.muteButton.setAttribute('aria-checked', muted ? 'true' : 'false');
+    this.muteButton.classList.toggle('is-current', muted);
+    setText(this.muteState, muted ? 'settings.muteOn' : 'settings.muteOff');
+    this.volumeGroup.classList.toggle('is-muted', muted);
+  }
+
   get currentSection() {
     return this.categories.find(({ id }) => id === this.activeSection);
   }
@@ -297,10 +403,14 @@ export class SettingsDialog {
         target = this.closeButton;
       } else if (dir === 'down') {
         const items = this.app.nav.candidates(current.panel);
-        target = items.find((item) => item.getAttribute('aria-checked') === 'true') ?? items[0];
+        target = items.find((item) => item.getAttribute('role') === 'radio' && item.getAttribute('aria-checked') === 'true') ?? items[0];
       }
     } else if (active === this.closeButton) {
       if (dir === 'down') target = current.tab;
+    } else if (current.panel.contains(active) && (dir === 'left' || dir === 'right') && active.getAttribute?.('role') === 'slider') {
+      // A focused volume: ← / → move it, never the focus.
+      this.stepVolume(active, dir === 'right' ? 1 : -1);
+      return true;
     } else if (current.panel.contains(active)) {
       target = findNeighbor(active, this.app.nav.candidates(current.panel), dir);
       if (!target && dir === 'up') target = current.tab;
@@ -380,6 +490,7 @@ export class SettingsDialog {
     }
     setText(this.customizeNote, 'settings.customizeNote', { scheme: { t: schemeName(mobileControls) } });
     this.customTag.hidden = Object.keys(this.app.settings.touchLayout(mobileControls)).length === 0;
+    this.markAudio();
   }
 
   // Saves `language`; the interface follows at once and the dialog stays.
