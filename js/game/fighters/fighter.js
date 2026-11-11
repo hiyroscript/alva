@@ -40,6 +40,7 @@ import { attackPhase, createAttackDefinition } from '../combat/attacks.js';
 import { createDefenseDefinition } from '../combat/defense.js';
 import { createDeflectDefinition } from '../combat/deflect.js';
 import { CombatState, resolveEnergy } from '../combat/combat-state.js';
+import { resolveModifiers } from '../combat/modifiers.js';
 import { FLOAT_RISE_SPEED } from '../combat/hit-effects.js';
 import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
@@ -118,12 +119,16 @@ export function separateFighters(a, b, stage) {
 }
 
 export class Fighter {
-  constructor({ def, sprites, spawn, stage, slot, controller, label }) {
+  constructor({ def, sprites, spawn, stage, slot, controller, label, modifiers = null }) {
     this.def = def;
     this.sprites = sprites;
     this.slot = slot;
     this.label = label;
     this.controller = controller;
+    // Its modifiers for the match (js/game/combat/modifiers.js): the
+    // identity unless the Battle hands it others (only Adventure does), kept
+    // through every reset and respawn and given to each fresh combat state.
+    this.modifiers = resolveModifiers(modifiers, `Character "${def.id}"`);
     // Its clips' player: one animator, or for a fighter drawn as several
     // members (an `ensemble`, js/data/ensemble.js) every member's at once,
     // still one fighter (see js/game/rendering/ensemble.js).
@@ -324,7 +329,7 @@ export class Fighter {
     this.shieldPerfectReady = false;
     // A fresh combat state: 0 Launch Point, full Energy, Shield down and
     // every cooldown ready.
-    this.combat = new CombatState(this.energyDef);
+    this.combat = new CombatState(this.energyDef, this.modifiers);
     // Its Mash Combo (js/game/combat/mash-combo.js): no press counted, no
     // series armed or running. A fresh life never carries one on.
     this.mash = new MashCombo(this.mashPair);
@@ -1489,6 +1494,8 @@ export class Fighter {
   // fighter does pays Energy, and one activation pays once.
   payEnergy(cost) {
     if (!(cost > 0)) return true;
+    // What it costs this fighter (its modifiers' Energy scale).
+    cost = this.combat.costOf(cost);
     if (!this.combat.canUseEnergy()) return false;
     if (this.energyRefilledAt === this.steps && this.energyRefilled > 0) {
       this.combat.setEnergy(this.combat.energy - this.energyRefilled);

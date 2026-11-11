@@ -38,6 +38,8 @@
 // estimates: danger, dangerSoon, finish, finishSoon; dangerAt).
 
 import { limitReady } from '../../combat/technique.js';
+import { ENERGY_COST } from '../../../data/energy.js';
+import { effectiveDamage, effectiveEnergyCost } from './effective.js';
 
 const MODES = ['rushdown', 'controlledOffense', 'neutral', 'counterplay', 'zoning', 'trapControl', 'survival', 'finisherHunt', 'recovery'];
 
@@ -97,13 +99,19 @@ export class Strategy {
     // A launch sends its target away from whoever strikes it.
     const face = Math.sign(pos.x - from.x) || (target === 'foe' ? 1 : -1);
     const attacker = target === 'foe' ? s.self : s.foe;
+    // What the attacker's hits really add to this target (effective.js: the
+    // match's modifiers), "another hit or two" (`extra`) included: a CPU
+    // that hits harder sees a finish sooner, an opponent that takes less
+    // lasts longer.
+    const by = from.mods;
+    const more = effectiveDamage(by, who.mods, extra);
     let best = 0;
     for (const m of attackerCaps.moves) {
       if (m.kind === 'technique' && !limitReady(attacker, m.def)) continue;
-      let lp = who.lp + extra;
+      let lp = who.lp + more;
       const list = m.projectile ? m.projectile.strikes : m.strikes;
       for (const st of list) {
-        lp += st.damage;
+        lp += effectiveDamage(by, who.mods, st.damage);
         if (!st.dir || !(st.baseLaunch > 0)) continue;
         const l = judge.launch(s, target, pos, lp, st, face);
         // A quick move is a more credible threat than a long cast.
@@ -156,7 +164,11 @@ export class Strategy {
     const trapTools = caps.roles.get('trap').length + caps.roles.get('areaDenial').length;
     const sc = this.scores;
     const energyLow = s.me.exhausted ? 1 : Math.max(0, (35 - s.me.energy) / 35);
-    const foeTired = s.op.exhausted ? 1 : Math.max(0, (30 - s.op.energy) / 30) * 0.5;
+    // The opponent about to run dry: two of its own payments left or fewer
+    // (what each really costs it: effective.js, the match's modifiers; 30
+    // with the universal 15).
+    const dry = 2 * effectiveEnergyCost(s.op.mods, ENERGY_COST);
+    const foeTired = s.op.exhausted ? 1 : Math.max(0, (dry - s.op.energy) / dry) * 0.5;
     const cornered = Math.max(0, 1 - s.myEdge / 260);
     const foeCornered = Math.max(0, 1 - s.foeEdge / 260);
     sc.recovery = s.me.offstage ? 10 : -10;

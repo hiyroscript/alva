@@ -80,4 +80,22 @@ export const ICONS = {
     '<circle cx="24" cy="15" r="7"/><path d="M11 46c0-10 5.5-18 13-18s13 8 13 18z"/>',
     { fill: true, vb: 48 },
   ),
+  // Adventure's level selector: the card marking a level that offers a
+  // Perquisite (hollow until it is picked, filled after, by its CSS).
+  perquisiteCard: svg('<rect x="6.5" y="3.5" width="11" height="17" rx="1.6"/><path d="M9.5 8.5h5"/>'),
 };
+
+// Adventure's Perquisites (js/data/adventure.js), one original glyph each,
+// drawn on its card (js/ui/perquisite-cards.js):
+//   braveSoldier           a shield with two rank chevrons: hits land softer
+//   nearlyImmortal         a heart with a plus: more Launch Point back a tick
+//   velociousImmuneSystem  a clock with speed lines: the ticks come faster
+//   maximumEnergy          a lightning bolt: everything costs less Energy
+//   redoutableStrength     an impact burst: hits land harder
+export const PERQUISITE_ICONS = Object.freeze({
+  braveSoldier: svg('<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8 7.5 9.5 4.3-1.5 7.5-4.9 7.5-9.5V6Z"/><path d="M8.5 9.5 12 12l3.5-2.5"/><path d="M8.5 13.5 12 16l3.5-2.5"/>'),
+  nearlyImmortal: svg('<path d="M12 20s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 7.4a4.1 4.1 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20Z"/><path d="M12 10v5.5M9.25 12.75h5.5"/>'),
+  velociousImmuneSystem: svg('<circle cx="14.5" cy="12" r="6.5"/><path d="M14.5 8.5V12l2.5 1.8"/><path d="M2.5 8.5h3.5M1.5 12h3M2.5 15.5h3.5"/>'),
+  maximumEnergy: svg('<path d="M13.5 2.5 5.5 13.5h6l-1 8 8-11h-6l1-8Z"/>'),
+  redoutableStrength: svg('<circle cx="12" cy="12" r="3.4"/><path d="M12 2.8v3.4M12 17.8v3.4M2.8 12h3.4M17.8 12h3.4M5.5 5.5l2.4 2.4M16.1 16.1l2.4 2.4M5.5 18.5l2.4-2.4M16.1 7.9l2.4-2.4"/>'),
+});

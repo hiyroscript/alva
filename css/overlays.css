@@ -264,3 +264,70 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
 .screen-block-steps-title { margin: 0; font-size: 15px; font-weight: 700; color: #fff; }
 .screen-block-step-list { margin: 0; padding-left: 1.4em; }
 .screen-block-steps-body p { margin: 0; }
+
+/* The Perquisite cards (Adventure): the level and the title, then two
+   cards side by side that pop in (a short scale and fade; reduced motion,
+   a fade alone, css/responsive.css), stacked on a narrow portrait screen.
+   No close button: a Perquisite must be picked. */
+.perquisite-panel { width: min(620px, 100%); gap: clamp(10px, 2.2vh, 18px); }
+.perquisite-heading { gap: 2px; }
+.perquisite-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 14px); }
+.perquisite-card {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: clamp(6px, 1.2vh, 10px);
+  min-width: 0;
+  padding: clamp(12px, 2.4vh, 20px) clamp(12px, 1.6vw, 18px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-menu);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  animation: perquisite-pop 0.28s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
+}
+@keyframes perquisite-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes perquisite-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+:where(html:not(.is-touch-input)) .perquisite-card:hover, .perquisite-card.is-cursor-target { background: var(--surface-subtle); border-color: var(--border-hover); }
+:where(html:not(.is-pointer-input)) .perquisite-card:focus { box-shadow: var(--focus-ring); border-color: rgba(47, 191, 99, 0.55); }
+.perquisite-card:active { transform: scale(0.985); }
+.perquisite-card-icon {
+  display: grid;
+  place-items: center;
+  width: clamp(36px, 7vh, 48px);
+  height: clamp(36px, 7vh, 48px);
+  border: 1px solid rgba(47, 191, 99, 0.4);
+  border-radius: var(--radius-menu);
+  background: var(--accent-wash);
+  color: var(--accent-hi);
+  font-size: clamp(20px, 4vh, 28px);
+}
+.perquisite-card-icon .icon { stroke-width: 1.8; }
+.perquisite-card-badges { display: flex; align-items: center; gap: 6px; }
+.perquisite-card-level,
+.perquisite-card-new {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.perquisite-card-level { color: var(--text-secondary); }
+.perquisite-card-new { padding: 1px 6px 2px; border-radius: var(--radius-pill); background: var(--accent); color: var(--black); }
+.perquisite-card-name { font-weight: 700; font-size: clamp(16px, 3vh, 20px); line-height: 1.15; letter-spacing: -0.01em; color: var(--text-strong); }
+.perquisite-card-effect { color: var(--text); font-size: clamp(12.5px, 2vh, 14px); line-height: 1.4; }
+.perquisite-card-was { color: var(--text-muted); font-size: 12px; }
+@media (max-width: 520px) and (orientation: portrait) {
+  .perquisite-options { grid-template-columns: 1fr; }
+}
+@media (max-height: 420px) {
+  .perquisite-card { gap: 4px; padding: 10px 12px; }
+  .perquisite-card-effect { font-size: 12px; line-height: 1.3; }
+}

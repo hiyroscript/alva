@@ -47,6 +47,7 @@ import { CelebrationController, CELEBRATIONS, LOSER_CELEBRATIONS, DRAW_CELEBRATI
 import { MatchStats } from './match-stats.js';
 import { overtimePressure } from './physics.js';
 import { resolveDifficulty } from '../data/difficulty.js';
+import { resolveModifiers } from './combat/modifiers.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 
 // Who plays each side, by mode, and the tag it is shown under (HUD cards,
@@ -114,9 +115,18 @@ export class Battle extends Arena {
   // { p1, p2 }, each side's on unless given false. `labels` ({ p1, p2 },
   // either optional) names the sides in place of their mode's tags (Online
   // Play's player names).
+  //
+  // Two more, Adventure's alone (js/data/adventure.js; every other mode
+  // leaves them out): `cpuLevel`, a CPU level spec in place of the
+  // difficulty, read by the CPUs' controllers through getDifficultyProfile
+  // (Venture's, { venture: level }); and `modifiers` ({ p1, p2 }, either
+  // optional), each side's fighter's modifiers for the whole battle
+  // (js/game/combat/modifiers.js), built once here and kept through every
+  // restart, rematch and respawn. Left out, a side's are the identity's,
+  // which change nothing, so every other mode plays exactly as ever.
   constructor({
     canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
-    automaticTurnAround = true, labels = null,
+    automaticTurnAround = true, labels = null, cpuLevel = null, modifiers = null,
   }) {
     // One seed for the battle's randomness: each CPU's and each stage
     // hazard's its own stream of it.
@@ -126,6 +136,8 @@ export class Battle extends Arena {
     // Kept for the whole battle: restarts, rematches and respawns keep them.
     this.mode = Object.keys(BATTLE_MODES).includes(mode) ? mode : 'quick-battle';
     this.difficulty = resolveDifficulty(difficulty);
+    this.cpuLevel = cpuLevel ?? null;
+    this.modifiers = Object.freeze({ p1: resolveModifiers(modifiers?.p1, 'Side p1'), p2: resolveModifiers(modifiers?.p2, 'Side p2') });
     this.seed = battleSeed;
 
     const sides = BATTLE_MODES[this.mode];
@@ -133,16 +145,16 @@ export class Battle extends Arena {
       ? automaticTurnAround[slot] !== false
       : automaticTurnAround);
     const controllerFor = (side, slot) => (side.cpu
-      ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
+      ? new CombatAIController({ difficulty: this.cpuLevel ?? this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
       : new PlayerController(side.player ? input.player?.(side.player) ?? input : input, { automaticTurnAround: turnAround(slot) }));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
       def: p1Def, sprites: p1Sprites, spawn: s1, stage: this.stage,
-      slot: 'p1', label: labels?.p1 ?? sides.p1.label, controller: controllerFor(sides.p1, 'p1'),
+      slot: 'p1', label: labels?.p1 ?? sides.p1.label, controller: controllerFor(sides.p1, 'p1'), modifiers: this.modifiers.p1,
     });
     this.p2 = new Fighter({
       def: p2Def, sprites: p2Sprites, spawn: s2, stage: this.stage,
-      slot: 'p2', label: labels?.p2 ?? sides.p2.label, controller: controllerFor(sides.p2, 'p2'),
+      slot: 'p2', label: labels?.p2 ?? sides.p2.label, controller: controllerFor(sides.p2, 'p2'), modifiers: this.modifiers.p2,
     });
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;

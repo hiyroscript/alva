@@ -35,7 +35,8 @@ Jump, made with the same chord).
 | [`cpu-intelligence/plans.js`](../../js/game/ai/cpu-intelligence/plans.js) | 8. plans | `makePlan`: each plan kind as a small state machine over steps, with a lifetime, an explicit end and its intent (a plan that stands still on purpose says so); footwork with a dead band; `hold` (a deliberate wait and what ends it) and `retreat`; `CONTINUED`, the plans a reassessment carries on rather than restarts. |
 | [`cpu-intelligence/executor.js`](../../js/game/ai/cpu-intelligence/executor.js) | 9. execution | `Executor`: the plan's wishes turned into one legal `FighterInput` snapshot (press edges, jump holds, the Mouvement request, no Shield in the air but the Deflect), with the ledge guard. |
 | [`cpu-intelligence/telemetry.js`](../../js/game/ai/cpu-intelligence/telemetry.js) | 11. telemetry | `Telemetry`: counters, move usage, waits with their reasons and ends, time per objective, inactivity by cause, the debug trace and its events, `STILL_LIMIT`, `WAIT_LIMIT`. |
-| [`js/data/difficulty.js`](../../js/data/difficulty.js) | 10. humanization | The four profiles and `CAPABILITY` (which way each trait improves). |
+| [`cpu-intelligence/effective.js`](../../js/game/ai/cpu-intelligence/effective.js) | the match's numbers | `effectiveDamage`, `effectiveRecovery`, `effectiveEnergyCost`, `recoveryRelief`: damage, recovery and costs as each fighter's modifiers make them (the identity but in Adventure; see [Venture](#adventures-venture)). |
+| [`js/data/difficulty.js`](../../js/data/difficulty.js) | 10. humanization | The four profiles and `CAPABILITY` (which way each trait improves); Adventure's Venture through `getDifficultyProfile({ venture })`. |
 | [`celebration.js`](../../js/game/ai/celebration.js) | after the match | `CelebrationController`: what a CPU does once its match is over (see below); never part of CPU Intelligence. |
 
 `js/game/ai/moveset.js` (`readMoveset`, `hurtExtent`) is the raw reading
@@ -600,6 +601,44 @@ for a lower one); what changes is how well each part of it works:
 - **Brutal**, elite: fast (never instant) reactions and consistent
   judgement, deep jump and Dash searches, precise punishes and recoveries,
   quick adaptation, and disciplined match play.
+
+### Adventure's Venture
+
+Adventure (the [Adventure update](../../UPDATES.md#adventure-update),
+[docs/gameplay/adventure.md](../gameplay/adventure.md)) has one difficulty
+of its own, never a fifth beside Easy to Brutal: **Venture**,
+`ventureProfile(level)` in `js/data/adventure.js`, read through the same
+`getDifficultyProfile` (`{ venture: level }`; `CombatAIController({
+difficulty: { venture: level } })`, or a `profile` given outright). Level 1
+is Easy's profile exactly; each level every trait's distance from perfect
+play (its physical limit: reactions and reassessments of at least two
+steps, no lapse or error, plan depth 4, probabilities 1) is divided by 1.5,
+no trait ever getting worse. It is the same intelligence with the same
+capabilities. Its strength (1.05 a level in damage dealt) is no profile
+trait: it reaches its fighter through the battle's modifiers, and the CPU
+reasons with it, and with the player's Perquisites, as the match really
+applies them (`effective.js`):
+
+- its kill-confirms and finisher estimates (`LaunchJudge.strikes`,
+  `Strategy.koThreat`) add each strike's real damage, so a Level 30
+  Venture sees a finish about 16 Launch Points sooner than its authored
+  hits would show it;
+- against Brave Soldier its hits add less; against Redoutable Strength
+  the player's hits weigh more in its guard and risk (`foePunish`, threat
+  severity);
+- against Nearly Immortal and Velocious Immune System it knows the
+  player's Launch Point drains faster: waiting for a clearer chance is
+  worth that much less, and a finish now that much more, so it keeps its
+  momentum;
+- against Maximum Energy, "about to run dry" uses the player's real
+  costs; its own Energy reads use full costs (a CPU has no Perquisite);
+- overtime's tiebreak projects each fighter's own recovery, the real,
+  possibly fractional, Launch Points compared.
+
+The modifiers are rules of the match, read like the clock; perception is
+unchanged. With the identity's (every other mode) every number is the
+same bit for bit: two seeded matches play step for step as before the
+update (`tests/systems/adventure-cpu.test.mjs`).
 
 ## After the match: the celebration
 

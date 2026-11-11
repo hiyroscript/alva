@@ -11,3 +11,15 @@ export function formatList(items, language) {
     return items.join(language === 'fr' ? ' et ' : ' and ');
   }
 }
+
+// `value` as `language` writes a number: up to `digits` decimals (0.44 in
+// English, 0,44 in French), `fixed` keeping exactly that many (11.39).
+export function formatNumber(value, language, { digits = 2, fixed = false } = {}) {
+  const n = Number(value) || 0;
+  try {
+    return new Intl.NumberFormat(language, { minimumFractionDigits: fixed ? digits : 0, maximumFractionDigits: digits }).format(n);
+  } catch {
+    const text = fixed ? n.toFixed(digits) : String(Number(n.toFixed(digits)));
+    return language === 'fr' ? text.replace('.', ',') : text;
+  }
+}

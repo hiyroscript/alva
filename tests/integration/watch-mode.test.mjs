@@ -316,7 +316,7 @@ async function startWatch(booted, opts) {
 // CPU.
 async function startQuickBattle({ app, screens }, { difficulty = 'easy', fighter = TEST_A, cpu = fighter } = {}) {
   screens.home.actions.play.click();
-  screens.mode.el.querySelector('.mode-card').click();
+  screens.mode.cardFor('quick-battle').click();
   app.choiceDialog.buttonFor('custom').click();
   await settle();
   cardOf(screens.difficulty, difficulty).click();
@@ -499,7 +499,9 @@ test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode
     assert.equal(screen.el.querySelector('.screen-title').tagName, 'H1', 'one heading per screen');
     assert.equal(screen.el.querySelector('.btn-back').getAttribute('aria-label'), 'Back');
   }
-  // Quick Battle's Custom Play (the play type this app was booted on).
+  // Quick Battle's Custom Play (the play type this app was booted on), its
+  // card focused on Select Mode (Adventure's, the first, shows its own).
+  screens.mode.follow('quick-battle');
   const quick = [
     [screens.mode, 0, 'Play'], [screens.difficulty, 1, 'Quick battle'], [screens.character, 2, 'Quick battle'],
     [screens.quickCpu, 3, 'Quick battle'], [screens.map, 4, 'Quick battle'],
@@ -684,7 +686,7 @@ test('Watch choices never touch Quick Battle\'s, and Quick Battle never touches 
 
   // A Quick Battle with other choices.
   screens.home.actions.play.click();
-  screens.mode.el.querySelector('.mode-card').click();
+  screens.mode.cardFor('quick-battle').click();
   app.choiceDialog.buttonFor('custom').click();
   await settle();
   cardOf(screens.difficulty, 'easy').click();

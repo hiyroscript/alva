@@ -20,6 +20,11 @@ import { MAPS, traitId } from '../../data/maps.js';
 import { abilityName } from '../../data/abilities.js';
 import { CHARACTERS } from '../../data/characters.js';
 import { MASH_PARTNER } from '../../data/mash-combo.js';
+import { formatNumber } from '../format.js';
+
+// Adventure's numbers as this language writes them (js/localization/format.js).
+const num = (n) => formatNumber(n, 'en');
+const fixed2 = (n) => formatNumber(n, 'en', { fixed: true });
 
 // A Directional Launch's key part: its id, or 'none'.
 const directionKey = (id) => id ?? 'none';
@@ -267,6 +272,59 @@ export const EN = {
   'mode.details': 'Mode details',
   'mode.quickBattle.overview': 'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
   'mode.quickBattle.rules.description': 'Quick battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
+  // Adventure (the Adventure update: js/screens/adventure-level-screen.js,
+  // js/screens/adventure-setup.js, js/ui/perquisite-cards.js).
+  'screen.adventureLevels': 'Adventure: select level',
+  'screen.adventureFighter': 'Adventure: select fighter',
+  'setup.adventure': 'Adventure',
+  'step.level': 'Level',
+  'mode.group': 'Game modes',
+  'mode.adventure.description': 'Thirty levels against an ever-sharper CPU. Earn Perquisites as you climb.',
+  'mode.adventure.overview': 'Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits 5% harder. Every 5 levels, choose one Perquisite to keep.',
+  'mode.adventure.rules.description': 'Your opponent’s fighter and the stage are drawn at random. Standard match rules: first to 3 points, 5 minutes, then overtime.',
+  'adventure.levels.title': 'Select level',
+  'adventure.levels.heading': 'Levels',
+  'adventure.levels.grid': 'Adventure levels',
+  'adventure.levels.progress': '{cleared} / {total} cleared',
+  'adventure.levels.perquisites': 'Your Perquisites',
+  'adventure.levels.none': '—',
+  'adventure.cell.locked': 'Level {level}, locked',
+  'adventure.cell.cleared': 'Level {level}, cleared',
+  'adventure.cell.next': 'Level {level}, next',
+  'adventure.cell.milestone': 'Offers a Perquisite',
+  'adventure.cell.claimed': 'Perquisite claimed',
+  'adventure.venture.title': 'Venture · Level {level}',
+  'adventure.venture.line': ({ smarts, strength }) => `×${fixed2(smarts)} smarter · ×${fixed2(strength)} damage vs Level 1`,
+  'adventure.reset': 'Reset progress',
+  'adventure.resetConfirm': 'Confirm reset',
+  'adventure.complete': 'Adventure complete!',
+  'perquisite.kicker': 'Level {level}',
+  'perquisite.title': 'Choose a Perquisite',
+  'perquisite.level': 'Level {roman}',
+  'perquisite.new': 'New',
+  'perquisite.braveSoldier.name': 'Brave Soldier',
+  'perquisite.nearlyImmortal.name': 'Nearly Immortal',
+  'perquisite.velociousImmuneSystem.name': 'Velocious Immune System',
+  'perquisite.maximumEnergy.name': 'Maximum Energy',
+  'perquisite.redoutableStrength.name': 'Redoutable Strength',
+  'perquisite.braveSoldier.effect': 'Take {percent}% less damage',
+  'perquisite.braveSoldier.was': 'was {percent}%',
+  'perquisite.nearlyImmortal.effect': ({ total, normal }) => `Recover ${num(total)} Launch Points each recovery tick instead of ${num(normal)}`,
+  'perquisite.nearlyImmortal.was': ({ total }) => `was ${num(total)}`,
+  'perquisite.velociousImmuneSystem.effect': ({ interval, normal, delay }) => `Launch Point recovers every ${num(interval)} s instead of ${num(normal)} s (recovery still starts after ${num(delay)} s)`,
+  'perquisite.velociousImmuneSystem.was': ({ interval }) => `was every ${num(interval)} s`,
+  'perquisite.maximumEnergy.effect': 'Everything that costs Energy costs {percent}% less',
+  'perquisite.maximumEnergy.was': 'was {percent}%',
+  'perquisite.redoutableStrength.effect': 'Deal {percent}% more damage',
+  'perquisite.redoutableStrength.was': 'was {percent}%',
+  'hud.adventureLevel': 'Lv {level} · Venture',
+  'banner.level': 'LEVEL {level}',
+  'banner.venture': ({ smarts, strength }) => `Venture · ×${fixed2(smarts)} smarter · ×${fixed2(strength)} damage`,
+  'results.adventureKicker': 'Adventure · Level {level}',
+  'results.nextLevel': 'Next level',
+  'results.retryLevel': 'Retry level',
+  'results.changeFighter': 'Change fighter',
+  'results.levelSelect': 'Level select',
   'localMode.title': 'Select local mode',
   'localMode.kicker': 'Local play',
   'localMode.quickBattle.description': 'Two players, two controllers: each chooses a fighter, then pick a stage and battle.',

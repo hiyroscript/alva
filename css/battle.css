@@ -244,6 +244,23 @@
 .hud-time:active, .hud-pause:active { background: rgba(255, 255, 255, 0.12); }
 :where(html:not(.is-pointer-input)) .hud-time:focus, :where(html:not(.is-pointer-input)) .hud-pause:focus { box-shadow: var(--focus-ring-inset); }
 .hud-round { font-family: var(--font-mono); font-size: 9px; font-weight: 600; line-height: 1.3; letter-spacing: 0.06em; color: var(--scrim-text-muted); }
+/* Adventure's level tag (LV 07 · VENTURE), the centre control's last row:
+   information only, never a press. */
+.hud-level {
+  display: block;
+  padding: 3px 6px 4px;
+  border-top: 1px solid var(--glass-seam);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--accent-hi);
+  pointer-events: none;
+}
+.hud-level[hidden] { display: none; }
 .hud-round.is-overtime { color: var(--white); }
 .hud-timer {
   font-weight: 700;

@@ -45,6 +45,12 @@ combat rules](../../UPDATES.md#strict-combat-rules) make every price the
 same 15. From a full bar a fighter has about seven paid actions in a row
 before it runs dry, a few more with the refill.
 
+In Adventure alone, a player's Maximum Energy Perquisite lowers every cost
+they pay by a share (its modifiers' `energyCostScale`, through
+`CombatState.costOf`: the Dash, the air dash, a blocked hit, the Deflect,
+every move's own `energyCost`); the bar, the refill and every other
+fighter's costs are as here ([Adventure](../gameplay/adventure.md)).
+
 ## Construct moves
 
 A move **creates a construct** when its structured data says so

@@ -134,13 +134,16 @@ export const SIM_CTX = { stage: STAGE, gravity: CONFIG.sim.gravity };
 // One fighter on its own, stepped by hand. `character` is the definition it
 // is built from (the default fighter when left out) and `sprites` its art
 // (by default every clip `character` declares). `stage` swaps in another
-// StageCollision (ledges, walls).
-export function makeFighter({ character = DEFAULT_CHARACTER, sprites = fakeSpritesOf(character), x = 500, y, facing = 1, stage = STAGE } = {}) {
+// StageCollision (ledges, walls). `modifiers`: the fighter's for the match
+// (js/game/combat/modifiers.js; the identity's by default).
+export function makeFighter({
+  character = DEFAULT_CHARACTER, sprites = fakeSpritesOf(character), x = 500, y, facing = 1, stage = STAGE, modifiers = null,
+} = {}) {
   const input = {};
   const controller = { getInput: () => ({ ...input }) };
   const fighter = new Fighter({
     def: character, sprites, stage, slot: 0, label: 'P1', controller,
-    spawn: { x, y, facing },
+    spawn: { x, y, facing }, modifiers,
   });
   const ctx = stage === STAGE ? SIM_CTX : { stage, gravity: CONFIG.sim.gravity };
   const step = (held = {}) => {
@@ -213,11 +216,12 @@ export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !
 // bodies apart and out of solids, as Battle.update() does.
 export function duel({
   gap = 44, attackerFacing = 1, attackerSprites, attackerCharacter, targetSprites, targetCharacter, targetFacing = -attackerFacing,
-  stage = STAGE, x = 500, pushboxes = false,
+  stage = STAGE, x = 500, pushboxes = false, attackerModifiers = null, targetModifiers = null,
 } = {}) {
-  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites, character: attackerCharacter, stage });
+  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites, character: attackerCharacter, stage, modifiers: attackerModifiers });
   const b = makeFighter({
     x: x + gap * attackerFacing, facing: targetFacing, sprites: targetSprites, character: targetCharacter, stage,
+    modifiers: targetModifiers,
   });
   a.fighter.opponent = b.fighter;
   b.fighter.opponent = a.fighter;

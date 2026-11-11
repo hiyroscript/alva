@@ -21,6 +21,7 @@ import { analyzeCapabilities } from './capabilities.js';
 import { StageModel } from './stage-model.js';
 import { Track, predictTrack, recoverySim } from './prediction.js';
 import { riseOf } from './values.js';
+import { modsOf } from './effective.js';
 
 const STEP = 1 / 60;
 
@@ -106,6 +107,9 @@ export class Situation {
     me.inMotion = self.inMotion;
     me.offstage = this.model.offstage(b.x, b.y, b.halfW, b.grounded);
     me.lastGroundY = self.lastGroundY;
+    // Its own modifiers for the match (effective.js: the identity's but in
+    // Adventure).
+    me.mods = modsOf(self);
     this.match = this.readMatch(self, foe);
     // In overtime, the Void as it will be a moment from now (see
     // StageModel.forecast).
@@ -117,6 +121,9 @@ export class Situation {
     const op = (this.op = this.op ?? {});
     op.view = v;
     op.age = v.age ?? 0;
+    // Its opponent's modifiers: a rule of the match, known as the clock is
+    // (never perception), so what its hits, recovery and costs really are.
+    op.mods = modsOf(foe);
     // Seconds the opponent is still frightened of the CPU, as it saw it:
     // every hit it lands meanwhile feeds it.
     op.frightened = v.fear > 0 && v.fearedBy === self ? Math.max(0, v.fear - op.age) : 0;

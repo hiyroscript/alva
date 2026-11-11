@@ -7,9 +7,10 @@
    Mode select
    --------------------------------------------------------------------- */
 
-/* A compact Quick Battle card at the top; Mode details keeps its full height. */
-.mode-layout { grid-template-columns: minmax(0, 1.75fr) minmax(220px, 1fr); }
-.mode-rail { display: flex; align-self: start; }
+/* The rail of mode cards (01 Adventure over 02 Quick Battle) clearly
+   dominates; the narrower Mode details panel keeps its full height. */
+.mode-layout { grid-template-columns: minmax(0, 2.4fr) minmax(200px, 0.85fr); }
+.mode-rail { display: flex; flex-direction: column; gap: clamp(8px, 1.6vh, 12px); align-self: start; min-width: 0; }
 /* Hover is a neutral preview. The focus ring is for keyboard/gamepad focus,
    so it stays off while the last menu input was a pointer. */
 .mode-card {
@@ -54,20 +55,25 @@
 }
 :where(html:not(.is-touch-input)) .mode-card:hover .mode-cta, .mode-card.is-cursor-target .mode-cta { background: var(--action-hover); }
 
-/* Same vertical padding as the card so both mono labels share a top line. */
+/* A step smaller than the cards: padding, heading and text. */
 .mode-info {
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  padding: clamp(12px, 2.6vh, 24px) clamp(14px, 1.8vw, 24px);
+  padding: clamp(10px, 2vh, 18px) clamp(12px, 1.4vw, 18px);
 }
-.mode-info .panel-title { flex: none; padding-bottom: clamp(8px, 1.6vh, 12px); border-bottom: 1px solid var(--border); }
-/* Only the descriptions scroll on short screens; the heading and Back stay put. */
-.mode-info-content { min-height: 0; margin-top: clamp(10px, 2.2vh, 20px); overflow-y: auto; overflow-wrap: anywhere; }
-.mode-info-description + .mode-info-description { margin-top: clamp(10px, 2.2vh, 20px); }
-.mode-info-heading { color: var(--text); font-size: clamp(14px, 2.2vh, 16px); font-weight: 600; }
-.mode-info-description { margin-top: 4px; color: var(--text-secondary); font-size: clamp(13px, 2vh, 14px); line-height: 1.45; }
+.mode-info .panel-title { flex: none; padding-bottom: clamp(6px, 1.3vh, 10px); border-bottom: 1px solid var(--border); }
+/* Only the descriptions scroll on short screens; the heading and Back stay
+   put. Once they scroll they take focus too (the arrows reach them), with
+   the ring inside so it is never clipped. */
+.mode-info-content { min-height: 0; margin-top: clamp(8px, 1.8vh, 16px); overflow-y: auto; overflow-wrap: anywhere; border-radius: var(--radius-menu); }
+.mode-info-content:focus { outline: none; }
+:where(html:not(.is-pointer-input)) .mode-info-content:focus { box-shadow: var(--focus-ring-inset); }
+.mode-info-section + .mode-info-section { margin-top: clamp(10px, 2vh, 18px); padding-top: clamp(10px, 2vh, 18px); border-top: 1px solid var(--border); }
+.mode-info-description + .mode-info-description { margin-top: clamp(8px, 1.6vh, 14px); }
+.mode-info-heading { color: var(--text); font-size: clamp(13px, 2vh, 14px); font-weight: 600; }
+.mode-info-description { margin-top: 4px; color: var(--text-secondary); font-size: clamp(12px, 1.8vh, 13px); line-height: 1.45; }
 
 /* ---------------------------------------------------------------------
    Difficulty select
@@ -559,3 +565,122 @@
 .local-device { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .local-device-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 13px; }
 .local-device-name.is-missing { color: #f08c1a; }
+
+/* ---------------------------------------------------------------------
+   Adventure: select level (the Adventure update)
+   --------------------------------------------------------------------- */
+
+/* One panel: its head, the thirty-cell grid (scrolling on its own when a
+   window is too short, so Back stays put), then the wide row; Reset
+   progress under it. */
+/* The panel as tall as its content, shrinking (its grid scrolling) when
+   the window is too short; Reset progress at the bottom of the screen. */
+.adventure-layout { grid-template-rows: minmax(0, max-content) minmax(max-content, 1fr); gap: clamp(8px, 1.6vh, 14px); }
+.adventure-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: clamp(10px, 2vh, 18px) clamp(12px, 1.6vw, 20px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+}
+.adventure-panel-head { flex: none; padding-bottom: clamp(6px, 1.3vh, 10px); border-bottom: 1px solid var(--border); }
+.adventure-grid-wrap { flex: 0 1 auto; min-height: 0; margin-top: clamp(8px, 1.6vh, 14px); overflow-y: auto; }
+.adventure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+  gap: clamp(5px, 0.8vw, 8px);
+  padding: 4px; /* room for the focus ring inside the scroll area */
+}
+/* A cell: its two-digit level in mono figures. Hover previews (pointer
+   only); the ring is keyboard and controller focus. */
+.adventure-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-menu);
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: clamp(14px, 2.6vh, 19px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
+}
+:where(html:not(.is-touch-input)) .adventure-cell:enabled:hover, .adventure-cell.is-cursor-target:enabled { border-color: var(--border-hover); background: var(--surface-muted); }
+:where(html:not(.is-pointer-input)) .adventure-cell:focus { box-shadow: var(--focus-ring); }
+.adventure-cell:enabled:active { transform: scale(0.97); }
+/* Locked: dimmed, a faint border, out of reach. */
+.adventure-cell.is-locked { background: var(--surface-sunken); border-color: var(--border); color: var(--text-faint); cursor: default; }
+/* Cleared: a green tint, green figures and a small check. */
+.adventure-cell.is-cleared { background: var(--accent-wash); border-color: rgba(47, 191, 99, 0.45); color: var(--accent-hi); }
+:where(html:not(.is-touch-input)) .adventure-cell.is-cleared:enabled:hover, .adventure-cell.is-cleared.is-cursor-target:enabled { background: rgba(47, 191, 99, 0.22); border-color: rgba(47, 191, 99, 0.7); }
+/* Next: solid off-white, charcoal figures. */
+.adventure-cell.is-next { background: var(--text); border-color: var(--text); color: var(--black); }
+:where(html:not(.is-touch-input)) .adventure-cell.is-next:enabled:hover, .adventure-cell.is-next.is-cursor-target:enabled { background: var(--white); border-color: var(--white); }
+.adventure-cell-check { position: absolute; top: 4px; right: 5px; display: none; font-size: clamp(9px, 1.5vh, 11px); color: var(--accent); }
+.adventure-cell-check .icon { stroke-width: 3.4; }
+.adventure-cell.is-cleared .adventure-cell-check { display: grid; }
+/* A milestone's card mark, bottom right: hollow until its Perquisite is
+   picked, filled after. */
+.adventure-cell-card { position: absolute; bottom: 4px; right: 5px; display: grid; font-size: clamp(10px, 1.7vh, 13px); color: currentColor; opacity: 0.85; }
+.adventure-cell-card .icon { stroke-width: 2; }
+.adventure-cell.is-claimed .adventure-cell-card .icon { fill: currentColor; }
+.adventure-cell.is-claimed .adventure-cell-card .icon path { stroke: var(--surface); }
+.adventure-cell.is-next.is-claimed .adventure-cell-card .icon path { stroke: var(--text); }
+.adventure-cell.is-locked .adventure-cell-card { opacity: 0.7; }
+/* The wide row under the grid: Venture at the level focused, then the
+   Perquisites owned. Information only. */
+.adventure-wide {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  margin-top: clamp(8px, 1.6vh, 14px);
+  padding: clamp(8px, 1.6vh, 12px) clamp(10px, 1.4vw, 16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+  background: var(--surface-subtle);
+}
+.adventure-wide-venture { display: grid; gap: 2px; min-width: 0; }
+.adventure-wide-title { color: var(--text-strong); font-weight: 600; font-size: clamp(13px, 2vh, 15px); }
+.adventure-wide-line { color: var(--text-muted); font-family: var(--font-mono); font-size: clamp(10.5px, 1.6vh, 12px); letter-spacing: 0.02em; }
+.adventure-wide-perquisites { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+.adventure-wide-label { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+.adventure-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.adventure-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px 4px;
+  border: 1px solid rgba(47, 191, 99, 0.4);
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.adventure-chip-level { color: var(--accent-hi); font-family: var(--font-mono); font-size: 11px; }
+.adventure-chip.is-empty { border-color: var(--border); background: none; color: var(--text-muted); }
+.adventure-footer { display: flex; align-items: flex-end; justify-content: flex-end; }
+/* Reset progress: outlined and danger-tinted; armed (the first press, for
+   3.2 s), filled with the warning. */
+.btn.adventure-reset {
+  min-height: clamp(34px, 5.4vh, 42px);
+  padding: 0 16px;
+  border-color: var(--danger-edge);
+  background: transparent;
+  color: var(--danger-edge-strong);
+  font-size: clamp(12px, 1.8vh, 14px);
+}
+:where(html:not(.is-touch-input)) .btn.adventure-reset:enabled:hover, .btn.adventure-reset.is-cursor-target:enabled { background: color-mix(in srgb, var(--danger-edge) 14%, transparent); border-color: var(--danger-edge-strong); }
+.btn.adventure-reset.is-armed { background: color-mix(in srgb, var(--danger-edge) 30%, transparent); border-color: var(--danger-edge-strong); color: var(--white); }
+.btn.adventure-reset:active { background: color-mix(in srgb, var(--danger-edge) 40%, transparent); }

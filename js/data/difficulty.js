@@ -16,6 +16,14 @@
 // (CAPABILITY): no multiplier for any of those exists, so none can scale a
 // hit.
 //
+// The one deliberate exception is Adventure's own difficulty, Venture
+// (js/data/adventure.js, the Adventure update), and only in Adventure: its
+// profile is built from Easy's here (getDifficultyProfile({ venture })), and
+// its strength scales the damage of its fighter's real hits, never through
+// a profile but through the battle's per-fighter modifiers
+// (js/game/combat/modifiers.js), the one thing the combat engine reads.
+// Every other difficulty, and every other mode, scales nothing.
+//
 // Profile traits (seconds and world units are simulation time and space):
 //
 //   react         [min, max] perception latency: how old the CPU's picture
@@ -72,6 +80,8 @@
 // a slower reaction, a lapse more often or a noisier judgement than a lower
 // one. Randomness (seeded) still lets an Easy CPU make a good call now and
 // then.
+
+import { ventureProfile } from './adventure.js';
 
 export const DEFAULT_DIFFICULTY = 'medium';
 
@@ -148,6 +158,13 @@ export function getDifficulty(id) {
   return DIFFICULTIES.find((d) => d.id === resolved);
 }
 
+// The profile the CPU plays with: a difficulty's (an id; anything unknown is
+// Medium's), or, only in Adventure, Venture's at a level ({ venture: level },
+// js/data/adventure.js ventureProfile), the same shape and the same traits.
+// The four difficulties stay the only ones listed (DIFFICULTIES): Venture
+// is no fifth choice, and neither the Difficulty screen nor Watch Mode
+// offers it.
 export function getDifficultyProfile(id) {
+  if (id && typeof id === 'object' && Object.hasOwn(id, 'venture')) return ventureProfile(id.venture);
   return getDifficulty(id).profile;
 }

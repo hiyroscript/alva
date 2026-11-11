@@ -258,8 +258,10 @@ export function readSettings(stored) {
 }
 
 // The browser's localStorage, or null where there is none or reading it
-// throws (some privacy modes block it outright).
-function browserStorage() {
+// throws (some privacy modes block it outright). The one place the game
+// reaches storage: Adventure's saved progress (js/core/adventure-progress.js)
+// is kept through it too, under its own key.
+export function browserStorage() {
   try {
     return globalThis.localStorage ?? null;
   } catch {
