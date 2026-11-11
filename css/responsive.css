@@ -38,7 +38,15 @@
   .adventure-cell { aspect-ratio: 16 / 9; font-size: 14px; }
   .adventure-cell-check { top: 2px; right: 3px; }
   .adventure-cell-card { bottom: 2px; right: 3px; font-size: 10px; }
-  .adventure-wide { padding: 6px 10px; margin-top: 6px; }
+  .adventure-wide { flex-wrap: nowrap; padding: 6px 10px; margin-top: 6px; }
+  .adventure-wide-venture { flex: none; }
+  /* The chips beside Venture, never a line of their own (the list keeps
+     its spoken name). */
+  .adventure-wide-label { display: none; }
+  .adventure-wide-perquisites { flex: 1; }
+  .adventure-chips { justify-content: flex-end; gap: 4px; }
+  .adventure-chip { padding: 2px 7px 3px; font-size: 10.5px; }
+  .adventure-chip-level { font-size: 10px; }
   .adventure-grid-wrap { margin-top: 6px; }
   .adventure-panel { padding: 8px 12px; }
 }

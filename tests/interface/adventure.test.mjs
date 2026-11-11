@@ -324,7 +324,7 @@ test('the cards follow the language: French names, effects and badges', () => {
     assert.equal(nearly.querySelector('.perquisite-card-name').textContent, 'Presque Immortel');
     assert.equal(nearly.querySelector('.perquisite-card-level').textContent, 'Niveau III');
     assert.equal(nearly.querySelector('.perquisite-card-effect').textContent, 'Récupérez 3 points d’éjection à chaque palier de récupération au lieu de 2');
-    assert.equal(nearly.querySelector('.perquisite-card-was').textContent, 'avant : 2,75');
+    assert.equal(nearly.querySelector('.perquisite-card-was').textContent, 'avant : 2,75');
     assert.equal(energy.querySelector('.perquisite-card-name').textContent, 'Énergie Maximale');
     assert.equal(energy.querySelector('.perquisite-card-new').textContent, 'Nouveau');
   } finally {

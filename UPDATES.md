@@ -6559,6 +6559,15 @@ tiebreak).
   `js/localization/format.js` (`formatNumber`), both string tables,
   `index.html`.
 
+### Screenshots
+
+[`docs/screenshots/adventure-update/`](./docs/screenshots/adventure-update/):
+Select Mode, the level selector (fresh, mid-run, complete), the Perquisite
+cards, the intro and the HUD's tag, on a desktop window and a phone held
+sideways (2000 × 924), in English and French; Select Mode on a tall,
+narrow window. In short landscape the wide row keeps the chips beside
+Venture (its label hidden) so all thirty cells fit without scrolling.
+
 ### Tests
 
 - New: `tests/interface/adventure.test.mjs`,

@@ -204,6 +204,15 @@ anything corrupt or of an unknown version is fresh progress. A storage that
 refuses or is missing keeps the progress for this visit only and never
 throws. Only Reset progress clears it (and clearing the site's data).
 
+## Screenshots
+
+In [`docs/screenshots/adventure-update/`](../screenshots/adventure-update/),
+English and French, on a desktop window and a phone held sideways (2000 ×
+924 device pixels): Select Mode (`01-…`), the level selector fresh,
+mid-run and complete (`02-…` to `04-…`), the Perquisite cards (`05-…`), the
+intro's level and Venture (`06-…`) and the HUD's tag (`07-…`); and Select
+Mode stacked on a tall, narrow window (`08-…`).
+
 ## Tests
 
 - [`tests/interface/adventure.test.mjs`](../../tests/interface/adventure.test.mjs):
