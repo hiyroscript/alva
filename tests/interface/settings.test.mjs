@@ -1984,7 +1984,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     CONFIG.title, 'Original work', '#0001 sprite source', '#0002 sprite source', '#0003 sprite source', '#0004 sprite source',
     '#0005 sprite source', '#0006 sprite source', '#0007 sprite source', '#0008 sprite source', '#0009 sprite source',
     '#0010 sprite source', '#0011 sprite source', '#0012 sprite source', '#0013 sprite source', '#0014 sprite source',
-    '#0015 sprite source', 'Rights', 'Project',
+    '#0015 sprite source', '#0016 sprite source', 'Rights', 'Project',
   ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, ['Sprite sheet by Finhj on DeviantArt', 'Sheet credits: ZetrasBlack, R0B4N']);
@@ -2011,6 +2011,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
   assert.deepEqual(credits[16].lines, [
     'Sprite sheet ripped by QuadFactor on The Spriters Resource', 'Original sprites by SEGA and Sonic Team',
   ]);
+  assert.deepEqual(credits[17].lines, ['Sprite sheet by xxalexsmashxx on DeviantArt']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
 
@@ -2081,7 +2082,9 @@ test('in French the credits translate but proper names stay', () => {
     assert.equal(credits[16].title, 'Source des sprites de #0015');
     assert.ok(credits[16].lines[0].includes('QuadFactor') && credits[16].lines[0].includes('The Spriters Resource'));
     assert.equal(credits[16].lines[1], 'Sprites originaux de SEGA et Sonic Team', 'proper names stay');
-    assert.equal(credits[17].title, 'Droits');
+    assert.equal(credits[17].title, 'Source des sprites de #0016');
+    assert.equal(credits[17].lines[0], 'Planche de sprites de xxalexsmashxx sur DeviantArt', 'proper names stay');
+    assert.equal(credits[18].title, 'Droits');
     assert.equal(getLanguage(), 'fr');
   } finally {
     setLanguage('en');
@@ -2123,18 +2126,18 @@ test('the credits name only fighters that exist: a sprite group for each, #0001\
     'credits.sprites0004.title', 'credits.sprites0005.title', 'credits.sprites0006.title', 'credits.sprites0007.title',
     'credits.sprites0008.title', 'credits.sprites0009.title', 'credits.sprites0010.title', 'credits.sprites0011.title',
     'credits.sprites0012.title', 'credits.sprites0013.title', 'credits.sprites0014.title', 'credits.sprites0015.title',
-    'credits.rights.title', 'credits.project.title',
+    'credits.sprites0016.title', 'credits.rights.title', 'credits.project.title',
   ]);
-  // Fifteen linked lines: #0001's, #0002's, #0004's, #0005's, #0007's,
-  // #0008's, #0009's, #0010's, #0011's, #0012's, #0013's and #0014's sheets,
-  // each on its DeviantArt page (#0001's, #0004's, #0005's, #0007's,
-  // #0008's, #0009's, #0010's, #0011's, #0012's, #0013's and #0014's by the
-  // deviation's number alone, naming nothing), #0003's and #0015's on The
+  // Sixteen linked lines: #0001's, #0002's, #0004's, #0005's, #0007's,
+  // #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's and
+  // #0016's sheets, each on its DeviantArt page (#0001's, #0004's, #0005's,
+  // #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's
+  // and #0016's by the deviation's number alone, naming nothing), #0003's and #0015's on The
   // Spriters Resource (by the asset's number alone: the address names the
   // game a sheet comes from, never its character) and #0006's share link
   // (naming nothing).
   const links = CREDITS.flatMap((g) => g.lines || []).filter((line) => line?.href);
-  assert.equal(links.length, 15);
+  assert.equal(links.length, 16);
   assert.equal(links[0].href, 'https://www.deviantart.com/finhj/art/1084627848');
   assert.match(links[1].href, /^https:\/\/www\.deviantart\.com\/thespriteanimations\/art\/[\w-]*1350194762$/);
   assert.equal(links[2].href, 'https://www.spriters-resource.com/ds_dsi/jus/asset/20891/');
@@ -2150,6 +2153,7 @@ test('the credits name only fighters that exist: a sprite group for each, #0001\
   assert.equal(links[12].href, 'https://www.deviantart.com/prodijiu/art/826586119');
   assert.equal(links[13].href, 'https://www.deviantart.com/xelectromanx10/art/1138904217');
   assert.equal(links[14].href, 'https://www.spriters-resource.com/game_boy_advance/sonicbattle/asset/10042/');
+  assert.equal(links[15].href, 'https://www.deviantart.com/xxalexsmashxx/art/1262877085');
   assert.doesNotMatch(read('js/ui/credits.js'), /slender|credits\.sprites\./i);
   for (const file of ['js/localization/i18n.js', 'js/localization/strings/en.js', 'js/localization/strings/fr.js']) {
     assert.doesNotMatch(read(file), /credits\.\d|credits\.sprites\.|slender/i, file);
@@ -2162,7 +2166,8 @@ test('the credits name only fighters that exist: a sprite group for each, #0001\
   assert.deepEqual(credits.slice(at + 1).map((g) => g.title), [
     '#0002 sprite source', '#0003 sprite source', '#0004 sprite source', '#0005 sprite source', '#0006 sprite source',
     '#0007 sprite source', '#0008 sprite source', '#0009 sprite source', '#0010 sprite source', '#0011 sprite source',
-    '#0012 sprite source', '#0013 sprite source', '#0014 sprite source', '#0015 sprite source', 'Rights', 'Project',
+    '#0012 sprite source', '#0013 sprite source', '#0014 sprite source', '#0015 sprite source', '#0016 sprite source',
+    'Rights', 'Project',
   ]);
   // #0006's: its sheet's maker, and the credits the sheet gives.
   assert.deepEqual(credits.find((g) => g.title === '#0006 sprite source').lines, [

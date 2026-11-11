@@ -609,7 +609,8 @@ fighter faces. Each fighter's specification has the full table and why:
 [#0012](../characters/0012.md#controller-layout),
 [#0013](../characters/0013.md#controller-layout),
 [#0014](../characters/0014.md#controller-layout),
-[#0015](../characters/0015.md#controller-layout).
+[#0015](../characters/0015.md#controller-layout),
+[#0016](../characters/0016.md#controller-layout).
 
 | | Square / X | Triangle / Y | Circle / B | R2 / RT | L2 / LT | Right stick |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -643,6 +644,8 @@ fighter faces. Each fighter's specification has the full table and why:
 | #0014 air | Air Combo | | | | | up: Somersault; down: Divekick |
 | #0015 ground | Girl Combo | Girl Swing | Girl Crush | Pink Typhoon | Gift | |
 | #0015 air | Air Girl Crush | | | Air Pink Typhoon | Air Gift | down: Girl Dunk |
+| #0016 ground | Kick Combo | Leg Sweep | | Twin Pistols | Medipack | forward: Silent Arrow; up: Flip Kick |
+| #0016 air | Air Kick | | | Air Twin Pistols | | up: Grapple |
 
 A fighter with no authored layout gets a safe, conflict-free fallback (the
 comfortable inputs in order, one input a move), flagged in the editor as
@@ -677,8 +680,8 @@ Deadlights and Red Balloon, #0006's Ice Breath, #0007's Rocket
 Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
 Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
 #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's
-Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist and #0015's
-Gift and Air Gift, each tagged Ground or Air. Every other move, a
+Twin Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's
+Gift and Air Gift and #0016's Medipack, each tagged Ground or Air. Every other move, a
 projectile, a technique or the Whirlwind's tornado included, sits under
 Ground attacks or Aerial attacks where it is played. A row's category
 never changes its action id, so no binding moves with it.

@@ -212,6 +212,18 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0015.playStyle',
     reviewedSourceHash: '7f0db0b82f3bda161998b51f245827352f1fa837bb69c0f6c63adbeeab3f344c',
   }),
+  // An all-round adventurer: plain kicks and a backflip up close, paired
+  // pistol shots for chip and pressure, an arrow from afar that punishes a
+  // turned back, a grapple that is her way back, and a kneeling heal.
+  // Approachable: every tool is plain to use; mastery in spending her
+  // Energy between shots, arrows, Dashes and blocks, reading when a back is
+  // turned for the arrow, and finding the room for her long draw and her
+  // heal.
+  '0016': Object.freeze({
+    difficulty: 3,
+    descriptionKey: 'discover.fighter.0016.playStyle',
+    reviewedSourceHash: '79a33002921e34e5db273bc732c02c061c1c535c48dab78d9dc2d4e9edce3f61',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

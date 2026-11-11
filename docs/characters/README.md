@@ -25,8 +25,9 @@ pages are part of the product specification
 | #0013 | 13 | yes | 4: Gentle Fist / Air Palm, Sweep Kick / Falling Palm (a dive palm-first), Twin Lion Fists (technique: lions of chakra that surge out and drain half the target's Energy), Sixty-Four Palms (technique: a 10-damage flurry that seals the target's chakra, its whole bar drained); extra attack: the Protective Palms, a dome that turns shots back, on the ground only; every palm it lands drains its target's Energy | [0013.md](0013.md) |
 | #0014 | 14 | yes | 5: Beat Rush / Air Combo, Meteodrive (a grab: a suplex into the floor) / Divekick (a dive heel-first), Meteor Strike (a grab that leaps carrying its target, then hurls it down) / Somersault (a rising kick, its recovery), Waterkick (technique: a wave along the ground that only the grounded meet), the Sunburst Fist (technique: its Limit Break, a 10-damage punch open only once its Limit gauge, filled by the damage it takes, is full); extra attack: the Whirling Uppercut, on the ground only; its grabs let go at once when they seize nobody | [0014.md](0014.md) |
 | #0015 | 15 | yes | 4: Girl Combo / Air Girl Crush, Girl Crush (a sweep that holds, a full turn, then a smash) / Girl Dunk (a dive hammer-first whose landing sends a shockwave along the floor), Gift / Air Gift (a present left on the floor or hanging in the air that waits six seconds for the first opponent to touch it, one at a time: `maxInPlay`), Pink Typhoon / Air Pink Typhoon (a whirl that tears loose as a pink tornado that draws in, carries and throws); extra attack: the Girl Swing, on the ground only; the roster's second smallest | [0015.md](0015.md) |
+| #0016 | 16 | yes | 5: Kick Combo / Air Kick, Twin Pistols / Air Twin Pistols (a `volley` of four shots, three in the air), Silent Arrow (a technique: a long breakable draw, then an arrow far across the stage that lands far harder in a back turned to it: `backstab`), Flip Kick / Grapple (her line fired straight up from mid-air, hauling her after it and drawing in whoever is near its hook: `rise`, `pull`, once per airtime), Medipack (a technique: a heal); extra attack: the Leg Sweep, on the ground only | [0016.md](0016.md) |
 
-The other 33 of the 48 roster slots are locked placeholders. #0001 is the
+The other 32 of the 48 roster slots are locked placeholders. #0001 is the
 first playable fighter, so it is what
 startup preloads first, Quick Battle's initial pick, both Watch Mode CPUs
 and the Practice Ground default; that is an ordering, not a special role:
@@ -39,7 +40,7 @@ Where things are:
 | | |
 | --- | --- |
 | Definitions | [`js/data/characters/<id>.js`](../../js/data/characters/), registered in [`js/data/characters.js`](../../js/data/characters.js) |
-| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5, #0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5, #0015 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
+| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5, #0003 3/5, #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5, #0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5, #0015 3/5, #0016 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
 | Art | [`assets/characters/<id>/`](../../assets/characters/) |
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | A fighter drawn as several members (#0006) | its `ensemble` ([the character system](../architecture/character-system.md#ensembles-one-fighter-several-members), [adding a fighter](adding-characters.md#a-fighter-of-several-members)) |

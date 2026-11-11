@@ -85,6 +85,7 @@ as `energyCost` (derived; one that declares it must agree, or
 | #0013 | the Twin Lion Fists (attack3: its lions, a projectile) | the Sixty-Four Palms (5 s) |
 | #0014 | Waterkick (attack4: its wave, a projectile) | Sunburst Fist (5 s) |
 | #0015 | the Gift and the Air Gift (attack3: its present, a projectile that never moves), the Pink Typhoon and the Air Pink Typhoon (attack4: its tornadoes) | — |
+| #0016 | the Twin Pistols and the Air Twin Pistols (attack2: a volley of shots, 15 for the whole volley), the Silent Arrow (attack3, a technique: her arrow) | the Medipack (3 s) |
 
 **One activation, one payment.** It is paid once, as the move starts
 (`payEnergy`, after every other check: a refused press costs nothing):
@@ -103,7 +104,7 @@ A fighter's `energy` entry sets one thing, its refill rate:
 
 #0001 declares `regen` 14, #0002 `regen` 12, #0003 `regen` 15, #0004
 `regen` 14, #0005 `regen` 14, #0006 `regen` 14, #0007 `regen` 14; #0008,
-#0009, #0010, #0011, #0012, #0013, #0014 and #0015 leave it out (12). Nothing
+#0009, #0010, #0011, #0012, #0013, #0014, #0015 and #0016 leave it out (12). Nothing
 else in the entry is a fighter's own: `max`, `dashCost`, `dashCancelCost`,
 `shieldHitCost`, `deflectCost` and `constructCost` may be left out (and
 are, by every fighter), and declaring any of them with another value than

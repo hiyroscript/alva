@@ -6831,3 +6831,121 @@ Web Audio from code: no audio file is shipped, downloaded or decoded
   and pointer, its ARIA, Mute all, the preview, French; version 12's stored
   shape; four sections), `i18n` (Audio the same word in French),
   `install` (reads `js/core/`'s files, its audio folder included).
+
+## #0016, the adventurer with two pistols and a bow
+
+Not a named update (it can become one if the owner names it). Asked for
+as: study the repository, read `character_rule` and add 0016 from a
+supplied sprite sheet, then open a pull request. `character_rule` asks for
+abilities with real mechanics from the character's canon, no move the
+character cannot perform in canon, a moveset with melee, a gun and a bow
+and arrow, the sheet's page on DeviantArt credited and the character named
+nowhere. `character_rule` was not touched.
+
+**What it added**
+
+- **The fighter.** #0016 in roster slot 16, playable: 112 frames cut from
+  the sheet into `assets/characters/0016/`, read at 1× (one file pixel per
+  art pixel), each frame cut whole from its row (her pistols, her bow, her
+  braid, her kicks' arcs and her grapple's line included, never a
+  neighbour or one of the sheet's labels), the flat green background (34,
+  177, 76) made transparent, nothing redrawn, recoloured or laid over
+  anything, every file `0016_<codename>_<frame>.png`: 106 of the fighter, 5
+  of her pistols' shot and 1 of her arrow (projectiles). A drawing a row
+  repeats is cut once and played again; where two rows draw the same
+  picture each clip plays its own codename's file. Drawn at the roster's
+  art-pixel size (a 55-pixel stance, about 93 units); every clip authors
+  its own `anchorX` on her tank top (her pistols, bow and line would pull
+  the automatic anchor off her body; a frame lit by a pistol's flash is
+  anchored where its unlit twin's body is), and the flips and kicks that
+  leave the floor or reach under her feet keep the sheet's ground line
+  (`anchorY`). Movement is the universal one; her Energy refills at the
+  shared 12 a second.
+- **Her moves**, from her canon (an archaeologist and adventurer who
+  fights with two pistols fired in turn, a hunting bow that is her quiet
+  weapon, kicks and acrobatic flips, a grappling line fired from a gun to
+  climb and to drag enemies to her, and medipacks that heal her). Melee,
+  her pistols and her bow, as `character_rule` asks:
+  - The Kick Combo (a high kick that holds, 1, then a kick driven out off
+    her hands, 3 sideways) and the Leg Sweep (her leg swept out along the
+    floor, 3, a small pop up): her Mash Combo pair. The Air Kick (3
+    sideways) in the air.
+  - The Flip Kick: a backflip whose kick sweeps up before her and over her
+    (3 straight up), her launcher and her answer to a fighter coming down.
+  - The Twin Pistols: four shots fired in turn from one press (a `volley`,
+    each 1, about 300 units), three in the air; one Energy cost (15) for
+    the volley, and a Shield that blocks one stops the rest.
+  - The Silent Arrow, a technique: two fifths of a second drawing her bow
+    (a hit breaks it), then an arrow far across the stage (about 470
+    units, 3 at Base Launch 1 sideways) that lands as the hunter's shot, 5
+    at Base Launch 3, in the back of an opponent turned away from it
+    (`backstab`, as #0010's Kill uses it, here on a projectile). 15 Energy.
+  - The Grapple: from mid-air, her grapple gun fired straight up and her
+    line hauling her after it (`motion: rise`, once per airtime), drawing
+    in anyone near its hook (`pull`) and striking them up (3): her way back
+    to the stage.
+  - The Medipack, her Special, a technique: a full second knelt,
+    any blow breaking it, then 10 Launch Points healed; the policy's 3 s.
+  Her Shield is her pistols crossed before her face; her Deflect a
+  somersault kick; her Dash a sprint, her air dash a somersault. She
+  summons nobody, makes no clone, never homes in and heals only herself.
+  What of the sheet is no move (her side, upward and two-way pistol shots,
+  her flips firing down, the bear trap, the rope arrow and its rope, her
+  falls, intro, taunts, wins and losses, the motorcycle, the recoloured
+  palettes and the rest) is listed in her specification.
+- **Its controller layout** by the comfort rules (Square the Kick Combo /
+  the Air Kick, Triangle the Leg Sweep, R2 the Twin Pistols on the ground
+  and in the air, the right stick forward the Silent Arrow, the right stick
+  up the Flip Kick and in the air the Grapple, L2 the Medipack), touch
+  buttons, names and descriptions in English and French, a Discover profile
+  (3/5) and her credit (the sheet by xxalexsmashxx on DeviantArt, linked by
+  the deviation's number alone).
+- **The served file count** (1,905) and the release's module count (195)
+  are brought up to date (they had not been since before the Sound
+  update).
+
+**Balance** (seeded CPU-vs-CPU Watch Mode battles at equal levels, Desert
+and City, both sides, six seeds: 360 matches a level): #0016 wins 0.47 at
+Medium, 0.54 at Hard and 0.61 at Brutal, inside the roster's usual range;
+weakest against #0007, #0009 and #0012 (8 of 24 at Hard). Her first
+tuning won 0.65 at Brutal, a Brutal CPU sniping with an arrow at Base
+Launch 2 over 700 units and healing at its leisure: the arrow now strikes
+at Base Launch 1 (its backstab still 5 at Base Launch 3) over about 470
+units, and the Medipack takes a full second. A smaller Deflect and a
+launch reaction like most of the roster's were tried and dropped: each
+cost the lower levels far more than Brutal (0.37 at Medium). Details in
+[#0016's specification](docs/characters/0016.md#balance).
+
+**Where to tune it.** Every value is in `js/data/characters/0016.js`: the
+moves' phases are whole frames of their clips at `FPS_0016` (the orders
+`KICK_COMBO_0016`, `TWIN_PISTOLS_0016`, `SILENT_ARROW_CAST_0016`,
+`GRAPPLE_0016`, `MEDIPACK_CAST_0016` and the rest); reaches are the
+attacks' `hitbox`es and strikes; the shots and the arrow are `projectiles`
+(the arrow's `backstab`); the volleys are the attacks' `projectile.volley`;
+the heal is `MEDIPACK_HEAL_0016`; the anchors `ANCHORS_0016` and
+`FEET_0016`.
+
+**Code:** `js/data/characters/0016.js` (new), `js/data/characters.js`,
+`js/data/fighter-profiles.js`, `js/ui/credits.js`, the English and French
+strings; the specification and guides (`ALVA_SPEC.md`, `README.md`,
+`docs/characters/0016.md` (new), the roster, adding a fighter, the
+character system, module responsibilities, testing, the served file and
+module counts). No shared code changed: every mechanic she uses (the
+volley, the backstab, the rise, the pull, the heal) was already a
+capability any fighter may opt into.
+
+**Tests:** new `tests/fighters/0016/fighter-0016.test.mjs` (registration
+and kit; her costs and cooldowns; her Special; her Mash Combo; her names,
+touch buttons and controller layout; the 112 files, clean and tight, no
+copy within a codename, at one scale, anchored on her tank top and the
+sheet's ground line, her projectiles centred; every move: the Kick
+Combo's hold and its block, the Leg Sweep passing under a fighter off the
+floor, the Flip Kick, the Air Kick, the Twin Pistols' volley, cost, range
+and the Shield that stops it, the Air Twin Pistols, the Silent Arrow's
+draw, range, backstab, block and broken cast, the Grapple's lift, once
+per airtime, and its pull, the Medipack's heal, cooldown and broken cast,
+her Deflect; the CPU playing her whole kit; her source named nowhere);
+the roster-wide tables (`cooldown-policy`, `special-abilities`:
+twenty-four Specials, `strict-combat-rules`, `mash-combo`),
+`empty-roster`, `discover`, `practice-ground`, `watch-mode`, `settings`
+(her credit) and each fighter's roster list.

@@ -225,6 +225,12 @@ test('the roster: every move\'s cooldown, reclassified from its mechanics', () =
       attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, midair_attack3: 0, attack4: 0,
       midair_attack4: 0, extra_attack: 0, deflect: 0,
     },
+    // The Medipack: a heal. Her shots, her arrow (its backstab's 5 is no
+    // 10), her shot up and her grapple are all routine.
+    '0016': {
+      attack1: 0, midair_attack1: 0, attack2: 0, midair_attack2: 0, attack3: 0, attack4: 0, midair_attack4: 0,
+      attack5: 3, extra_attack: 0, deflect: 0,
+    },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;
