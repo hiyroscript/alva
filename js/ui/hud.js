@@ -48,7 +48,7 @@
 import { CONFIG } from '../config.js';
 import { LAUNCH_POINT_FIRE, LAUNCH_POINT_FIRE_OUT, LAUNCH_POINT_INFERNO, LAUNCH_POINT_INFERNO_OUT } from '../data/launch.js';
 import { el } from '../core/utils.js';
-import { t, tattr, plural, slotLabel, setAttr, setPlainAttr } from '../localization/i18n.js';
+import { t, tattr, plural, slotLabel, setAttr, setPlainAttr, setText } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { paintPortrait, portraitSourceFacing } from './sprite-art.js';
 import { PLAYER_NAMES } from './local-play.js';
@@ -219,11 +219,23 @@ export class HUD {
       this.timeButton.addEventListener('click', onPause);
       this.pauseButton.addEventListener('click', onPause);
     }
-    const center = el('div', { class: 'hud-center glass' }, [this.timeButton, this.pauseButton]);
+    // Adventure's tag under the timer and pause (LV 07 · VENTURE: where the
+    // player is in the run), hidden in every other mode (setLevelTag). Part
+    // of the centre control, so the touch controls' ceiling (hudCeiling)
+    // keeps clear of it as of the rest of the top HUD.
+    this.levelTag = el('span', { class: 'hud-level', hidden: true });
+    const center = el('div', { class: 'hud-center glass' }, [this.timeButton, this.pauseButton, this.levelTag]);
     root.replaceChildren(this.left.wrap, center, this.right.wrap);
     this.shownTime = null;
     this.shownRound = null;
     this.shownOvertime = null;
+  }
+
+  // Adventure's level tag: `level` as written ("07"), or null to hide it.
+  setLevelTag(level) {
+    this.levelTag.hidden = level == null;
+    if (level == null) return;
+    setText(this.levelTag, 'hud.adventureLevel', { level });
   }
 
   // Local Play names each side for its player (Player 1, Player 2) rather

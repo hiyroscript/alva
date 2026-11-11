@@ -152,6 +152,10 @@
   to { opacity: 1; transform: none; }
 }
 .match-toast-text { font-weight: 700; font-size: clamp(14px, 2.4vh, 18px); line-height: 1.25; min-width: 0; }
+/* Adventure's completion line under the outcome, in the accent. */
+.match-toast-lines { display: grid; gap: 2px; min-width: 0; }
+.match-toast-note { color: var(--accent-hi); font-weight: 700; font-size: clamp(12px, 2vh, 14px); letter-spacing: 0.02em; }
+.match-toast-note[hidden] { display: none; }
 .match-toast-action { flex: none; padding: 0 18px; }
 /* Out of the way while the pause menu is up, back with it gone. */
 .is-paused .match-toast { visibility: hidden; }
@@ -182,6 +186,9 @@
   padding: clamp(10px, 2.2vh, 18px) clamp(14px, 2.2vw, 22px) clamp(8px, 1.4vh, 12px);
   border-bottom: 1px solid var(--glass-seam);
 }
+/* Adventure names the level over the title (Adventure · Level 07). */
+.results-heading { display: grid; gap: 2px; min-width: 0; }
+.results-kicker[hidden] { display: none; }
 .results-title {
   font-weight: 800;
   font-size: clamp(18px, 3.6vh, 26px);
@@ -262,6 +269,11 @@
   .results-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .results-actions .pause-btn-item { height: 36px; font-size: 12px; }
   .results-table th, .results-table td { padding: 4px 8px; }
+}
+/* Adventure's five actions after a win (Next level first): one row of five
+   where the four fit, two a row on narrow screens. */
+@media (min-width: 641px) {
+  .results-actions[data-count="5"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
 /* Local Play's announcement: the winner in their own tone (PLAYER 1 WINS!

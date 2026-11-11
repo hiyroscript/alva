@@ -63,6 +63,8 @@ import { ScreenPadHint } from '../ui/screen-pad-hint.js';
 import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
 import { deviceName } from '../ui/controller-dialog.js';
 import { PLAYER_NAMES, playerNumber } from '../ui/local-play.js';
+import { isAdventureLevel, levelLabel, ventureSpec, ventureNumbers, ADVENTURE_LEVELS } from '../data/adventure.js';
+import { continueAdventure, nextAdventureLevel } from './adventure-setup.js';
 
 // Banner lines by state, as translation keys (with params). The final ones
 // announce the result: the player's VICTORY! or DEFEAT., a draw's GAME.,
@@ -80,6 +82,8 @@ const BANNERS = {
   'wins.p1': { sub: null, main: ['banner.playerWins', { n: 1 }], final: true },
   'wins.p2': { sub: null, main: ['banner.playerWins', { n: 2 }], final: true },
   draw: { sub: null, main: ['banner.draw'], final: true },
+  // Adventure's intro: the level, and Venture at it (see bannerConfig).
+  level: { sub: ['banner.venture'], main: ['banner.level'] },
 };
 
 // How long the OVERTIME banner shows once overtime starts (seconds of
@@ -112,15 +116,19 @@ const DRAW_REASON_TEXT = { time: 'results.reason.drawTime', overtimeLaunchPoint:
 const STAT_ROWS = Object.freeze([...STAT_KEYS, 'finalLaunchPoint']);
 
 // Each mode's own Select Stage, where Change Stage goes, and its first
-// fighter selection, where Change fighters goes.
+// fighter selection, where Change fighters goes. Adventure has no Select
+// Stage (every battle draws its stage).
 const STAGE_SCREEN = { 'quick-battle': 'map', watch: 'watch-map', local: 'local-map' };
-const FIGHTER_SCREEN = { 'quick-battle': 'character', watch: 'watch-cpu1', local: 'local-character-p1' };
+const FIGHTER_SCREEN = {
+  'quick-battle': 'character', watch: 'watch-cpu1', local: 'local-character-p1', adventure: 'adventure-character',
+};
 
 // The pause dialog's kicker, by mode.
 const MODE_TEXT = {
   'quick-battle': { kicker: 'setup.quickBattle' },
   watch: { kicker: 'setup.watch' },
   local: { kicker: 'setup.localQuickBattle' },
+  adventure: { kicker: 'setup.adventure' },
 };
 
 // Where each mode's choices live (app.selection, or its own part of it)
@@ -129,7 +137,14 @@ const MODE_SELECTION = {
   'quick-battle': { selection: (app) => app.selection, p1: 'characterId', p2: 'cpuCharacterId' },
   watch: { selection: (app) => app.selection.watch, p1: 'cpu1CharacterId', p2: 'cpu2CharacterId' },
   local: { selection: (app) => app.selection.local, p1: 'p1CharacterId', p2: 'p2CharacterId' },
+  adventure: { selection: (app) => app.selection.adventure, p1: 'characterId', p2: 'cpuCharacterId' },
 };
+
+// The Battle mode each screen mode plays (BATTLE_MODES, js/game/battle.js):
+// its own, but Adventure's, which is Player 1 against the CPU as Quick
+// Battle's is, with Venture's level and each side's modifiers on top.
+const BATTLE_MODE = { adventure: 'quick-battle' };
+const battleModeOf = (mode) => BATTLE_MODE[mode] ?? mode;
 
 // Each side's name in the Match Results: its team, or in Local Play its
 // player.
@@ -190,8 +205,10 @@ export class BattleScreen extends Screen {
     );
 
     this.battle = null;
-    // 'quick-battle', 'watch' or 'local', set as each battle is entered.
+    // 'quick-battle', 'watch', 'local' or 'adventure', set as each battle
+    // is entered; in Adventure, the level played (else null).
     this.mode = 'quick-battle';
+    this.level = null;
     this.paused = false;
     // Local Play: whether the pause panel shows a lost controller (see
     // syncControllers), and the unsubscribe from the controllers.
@@ -304,12 +321,16 @@ export class BattleScreen extends Screen {
   // takes a press, and it never takes focus by itself.
   buildToast() {
     this.toastText = el('p', { class: 'match-toast-text', id: this.domId('match-toast-text') });
+    // Adventure's completion line, under the outcome once Level 30 is won.
+    this.toastNote = el('p', { class: 'match-toast-note', hidden: true, ...tx('adventure.complete') });
     this.toastButton = el('button', {
       class: 'btn btn--primary match-toast-action', type: 'button', 'aria-haspopup': 'dialog', ...tx('toast.view'),
     });
     this.toastButton.addEventListener('click', () => this.openResults());
     this.toast = el('div', { class: 'match-toast', role: 'status', 'aria-live': 'polite', hidden: true }, [
-      el('div', { class: 'match-toast-panel glass' }, [this.toastText, this.toastButton]),
+      el('div', { class: 'match-toast-panel glass' }, [
+        el('div', { class: 'match-toast-lines' }, [this.toastText, this.toastNote]), this.toastButton,
+      ]),
     ]);
   }
 
@@ -347,13 +368,31 @@ export class BattleScreen extends Screen {
     stage.addEventListener('click', () => this.leave(() => this.changeStage()));
     home.addEventListener('click', () => this.leave(() => this.app.screens.go('home', {}, { reset: true })));
     this.resultsActions = [rematch, fighters, stage, home];
+    // Adventure's: Next level (only after a win with a level after it),
+    // Retry level, Change fighter, Level select and Return to home screen.
+    // No Rematch (Retry draws afresh) and no Change stage (none is chosen).
+    const next = menuButton('results.nextLevel', { primary: true });
+    const retry = menuButton('results.retryLevel');
+    const adventureFighter = menuButton('results.changeFighter');
+    const levels = menuButton('results.levelSelect');
+    const adventureHome = menuButton('results.home');
+    next.addEventListener('click', () => this.playLevel(nextAdventureLevel(this.level)));
+    retry.addEventListener('click', () => this.playLevel(this.level));
+    adventureFighter.addEventListener('click', () => this.leave(() => this.changeFighters()));
+    levels.addEventListener('click', () => this.leave(() => this.app.screens.backTo('adventure-levels')));
+    adventureHome.addEventListener('click', () => this.leave(() => this.app.screens.go('home', {}, { reset: true })));
+    this.adventureActions = { next, retry, fighter: adventureFighter, levels, home: adventureHome };
+    this.resultsKicker = el('span', { class: 'kicker results-kicker', hidden: true });
 
     this.resultsOverlay = el('div', {
       class: 'overlay results-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true',
       'aria-labelledby': this.domId('results-title'), 'aria-describedby': this.domId('results-line'),
     }, [el('div', { class: 'results-panel glass glass--panel' }, [
       el('header', { class: 'results-header' }, [
-        el('h2', { class: 'results-title', id: this.domId('results-title'), ...tx('results.title') }),
+        el('div', { class: 'results-heading' }, [
+          this.resultsKicker,
+          el('h2', { class: 'results-title', id: this.domId('results-title'), ...tx('results.title') }),
+        ]),
         this.resultsControls.root,
       ]),
       el('div', { class: 'results-body' }, [
@@ -362,7 +401,7 @@ export class BattleScreen extends Screen {
         this.resultsMeta,
         el('div', { class: 'results-table-wrap' }, [this.statsTable]),
       ]),
-      el('div', { class: 'results-actions' }, this.resultsActions),
+      this.resultsActionsRoot = el('div', { class: 'results-actions' }, this.resultsActions),
     ])]);
     // Back closes it; so does Start, which never starts anything here.
     this.resultsScope = {
@@ -380,12 +419,20 @@ export class BattleScreen extends Screen {
     // Quick Battle's, the main one); params from the stage screen come
     // first. No mode is Quick Battle; a mode nobody knows starts nothing.
     const mode = params?.mode ?? 'quick-battle';
-    if (!Object.hasOwn(BATTLE_MODES, mode) || !Object.hasOwn(MODE_SELECTION, mode)) {
+    if (!Object.hasOwn(BATTLE_MODES, battleModeOf(mode)) || !Object.hasOwn(MODE_SELECTION, mode)) {
       this.refuse('battle.unknownMode', 'battle.unavailable');
       return;
     }
     const watch = mode === 'watch';
     const local = mode === 'local';
+    const adventure = mode === 'adventure';
+    // Adventure plays one of its thirty levels, an open one: any other is
+    // refused, never played as another.
+    const level = adventure ? params?.level ?? app.selection.adventureLevel : null;
+    if (adventure && (!isAdventureLevel(level) || !app.adventure?.isOpen(level))) {
+      this.refuse('battle.unknownMode', 'battle.unavailable');
+      return;
+    }
     const sides = MODE_SELECTION[mode];
     const selection = sides.selection(app);
     const pick = (key) => params?.[key] || selection[key];
@@ -409,6 +456,7 @@ export class BattleScreen extends Screen {
     // value is Medium).
     const difficulty = params?.difficulty ?? selection.difficulty;
     this.mode = mode;
+    this.level = level;
     this.def = p1Def;
     this.p2Def = p2Def;
     this.map = map;
@@ -427,6 +475,9 @@ export class BattleScreen extends Screen {
     this.touchRoot.hidden = watch || local;
     this.el.classList.toggle('is-watch', watch);
     this.el.classList.toggle('is-local', local);
+    this.el.classList.toggle('is-adventure', adventure);
+    // Adventure's tag beside the timer (LV 07 · VENTURE); none elsewhere.
+    this.hud.setLevelTag(adventure ? levelLabel(level) : null);
     this.el.dataset.map = map.id;
     this.hud.setLocal(local);
     // Player 1's move HUD is that player's own in Local Play (their
@@ -468,7 +519,7 @@ export class BattleScreen extends Screen {
     this.battle = new Battle({
       canvas: this.canvas,
       map,
-      mode,
+      mode: battleModeOf(mode),
       p1Def,
       p2Def,
       p1Sprites: sprites.get(p1Def.id),
@@ -477,6 +528,12 @@ export class BattleScreen extends Screen {
       reducedMotion: app.device.reducedMotion,
       difficulty,
       automaticTurnAround: app.settings.automaticTurnAround,
+      // Adventure's alone: Venture at the level for the CPU, each side's
+      // modifiers (the player's Perquisites, Venture's strength), and the
+      // seed the battle's draw came from. Every other mode leaves them out.
+      ...(adventure ? {
+        cpuLevel: ventureSpec(level), modifiers: app.adventure.modifiersFor(level), seed: pick('seed') ?? undefined,
+      } : {}),
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.abilityHud.bind(watch ? null : this.battle.p1);
@@ -708,10 +765,20 @@ export class BattleScreen extends Screen {
     return final.winner === 'p1' ? 'victory' : 'defeat';
   }
 
+  // A banner state's lines. Adventure's intro announces its level (LEVEL
+  // 07) over Venture at it, in place of ROUND 1 and READY.
+  bannerConfig(state) {
+    if (state === 'round' && this.mode === 'adventure' && this.level) {
+      const { smarts, strength } = ventureNumbers(this.level);
+      return { sub: ['banner.venture', { smarts, strength }], main: ['banner.level', { level: levelLabel(this.level) }] };
+    }
+    return BANNERS[state];
+  }
+
   setBanner(state) {
     if (state === this.bannerState) return;
     this.bannerState = state;
-    const cfg = BANNERS[state];
+    const cfg = this.bannerConfig(state);
     this.banner.classList.remove('is-shown');
     if (!cfg) return;
     this.bannerSub.textContent = cfg.sub ? t(...cfg.sub) : '';
@@ -876,9 +943,15 @@ export class BattleScreen extends Screen {
   showFinal() {
     const final = this.battle.final;
     this.shownFinal = final;
+    // Adventure: a win clears the level (and unlocks the next when it was
+    // the next one), saved at once, before anything else is shown, so the
+    // progress survives the tab closing in the celebration.
+    this.adventureWin = null;
+    if (this.mode === 'adventure' && final.winner === 'p1') this.adventureWin = this.app.adventure.recordWin(this.level);
     this.fillResults(final);
     const toasts = this.mode === 'local' ? LOCAL_TOAST_TEXT : TOAST_TEXT;
     setText(this.toastText, toasts[final.winner ?? 'draw']);
+    this.toastNote.hidden = !(this.adventureWin && this.level === ADVENTURE_LEVELS);
     this.toast.dataset.outcome = final.winner ?? 'draw';
     this.toast.hidden = this.resultsOpen;
   }
@@ -964,6 +1037,7 @@ export class BattleScreen extends Screen {
         cell.classList.toggle('is-winner', winner === slot);
       }
     }
+    this.fillActions(final);
     const reason = winner ? REASON_TEXT[final.reason] : DRAW_REASON_TEXT[final.reason];
     const meta = [
       el('li', { ...tx(reason ?? 'results.reason.time') }),
@@ -971,6 +1045,53 @@ export class BattleScreen extends Screen {
       final.overtime ? el('li', { ...tx('results.overtimePlayed') }) : null,
     ];
     this.resultsMeta.replaceChildren(...meta.filter(Boolean));
+  }
+
+  // The Match Results' actions for this mode: Adventure's (Next level only
+  // after a win with a level after it, then Retry level the default) and
+  // its kicker (Adventure · Level 07), or every other mode's.
+  fillActions(final) {
+    const adventure = this.mode === 'adventure';
+    this.resultsKicker.hidden = !adventure;
+    if (!adventure) {
+      this.resultsActionsRoot.replaceChildren(...this.resultsActions);
+      this.resultsActionsRoot.dataset.count = String(this.resultsActions.length);
+      return;
+    }
+    setText(this.resultsKicker, 'results.adventureKicker', { level: levelLabel(this.level) });
+    const a = this.adventureActions;
+    const next = final.winner === 'p1' && nextAdventureLevel(this.level) != null;
+    a.retry.classList.toggle('is-primary', !next);
+    if (next) a.retry.removeAttribute('data-nav-default');
+    else a.retry.setAttribute('data-nav-default', '');
+    const actions = [next ? a.next : null, a.retry, a.fighter, a.levels, a.home].filter(Boolean);
+    this.resultsActionsRoot.replaceChildren(...actions);
+    this.resultsActionsRoot.dataset.count = String(actions.length);
+  }
+
+  // Adventure's Next level and Retry level: level `level` (the next one,
+  // or this one again) with the same fighter, a fresh draw of the CPU's
+  // fighter and the stage, and Venture at that level; first the Perquisite
+  // cards when it is a milestone still unclaimed. The Match Results close
+  // first; the new battle replaces this one on this screen.
+  async playLevel(level) {
+    const app = this.app;
+    if (!isAdventureLevel(level) || !app.adventure.isOpen(level)) return;
+    this.hideResults();
+    this.toast.hidden = true;
+    this.setPlayActive(false);
+    app.selection.adventureLevel = level;
+    await continueAdventure(app, { start: (params) => this.replay(params) });
+  }
+
+  // A new battle on this screen in place of the one shown (Adventure's
+  // Next level and Retry level): this one ends as leaving the screen ends
+  // it, and the next is entered as if just arrived.
+  replay(params) {
+    this.leave(() => {
+      this.exit();
+      this.enter(params);
+    });
   }
 
   // Change Stage: the mode's own Select Stage, every other choice kept. It

@@ -268,7 +268,8 @@ function boot() {
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 const current = (app) => app.screens.current.id;
-const card = (screens) => screens.mode.el.querySelector('.mode-card');
+// Select Mode's Quick Battle card (02, after Adventure's).
+const card = (screens) => screens.mode.cardFor('quick-battle');
 const cardOf = (screen, id) => screen.cards.find((c) => c.getAttribute('data-difficulty') === id);
 const slotOf = (screen, id) => screen.roster.slots.find((s) => s._def?.id === id);
 // A stage's tile on Select Stage's roster.
@@ -368,20 +369,23 @@ test('Home Play shows all Mode details immediately and keeps them through dismis
   const { app, screens } = booted;
   screens.home.actions.play.click();
   const info = screens.mode.el.querySelector('.mode-info');
-  const headings = ['Quick battle'];
+  const headings = ['Adventure', 'Quick battle'];
   const descriptions = [
+    'Clear 30 levels in order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits 5% harder. Every 5 levels, choose one Perquisite to keep.',
+    'Your opponent’s fighter and the stage are drawn at random. Standard match rules: first to 3 points, 5 minutes, then overtime.',
     'Face a CPU-controlled opponent in battle. Knock your opponent into the Void to score points. The first to reach 3 points wins.',
     'Quick battle matches last up to 5 minutes. If the score is tied when time runs out, a 1-minute overtime begins as the Void closes in.',
   ];
-  const checkDetails = () => {
+  const checkDetails = (focused = card(screens)) => {
     assert.equal(current(app), 'mode');
     assert.deepEqual(info.querySelectorAll('h3').map((node) => node.textContent), headings);
     assert.deepEqual(info.querySelectorAll('p').map((node) => node.textContent), descriptions);
-    assert.equal(info.querySelectorAll('[data-nav]').length, 0, 'details introduce no navigation targets');
-    assert.equal(document.activeElement, card(screens), 'the card retains default focus');
+    assert.equal(info.querySelectorAll('[data-nav]').length, 0, 'details that fit introduce no navigation targets');
+    assert.equal(document.activeElement, focused, 'the card keeps focus');
   };
   assert.equal(app.choiceDialog.isOpen, false, 'no card click needed to read the details');
-  checkDetails();
+  // A fresh visit focuses Adventure, the first card.
+  checkDetails(screens.mode.cardFor('adventure'));
   card(screens).click();
   app.input.key('Escape');
   await settle();

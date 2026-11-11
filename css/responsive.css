@@ -31,6 +31,25 @@
   .difficulty-card { min-height: 0; }
 }
 
+/* Adventure's level grid in short landscape: ten a row, flatter cells,
+   so all thirty fit without scrolling where they can. */
+@media (max-height: 560px) {
+  .adventure-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+  .adventure-cell { aspect-ratio: 16 / 9; font-size: 14px; }
+  .adventure-cell-check { top: 2px; right: 3px; }
+  .adventure-cell-card { bottom: 2px; right: 3px; font-size: 10px; }
+  .adventure-wide { padding: 6px 10px; margin-top: 6px; }
+  .adventure-grid-wrap { margin-top: 6px; }
+  .adventure-panel { padding: 8px 12px; }
+}
+
+/* Select Mode stacked (narrow windows): both cards in full, then the
+   details at their own height, capped and scrolling. */
+@media (max-width: 720px) {
+  .mode-layout { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: start; }
+  .mode-info { max-height: 32vh; }
+}
+
 @media (max-height: 420px) {
   .screen-heading .kicker { display: none; }
   .mode-desc { display: none; }
@@ -74,7 +93,8 @@
   .char-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
   .map-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 0.8fr) minmax(0, 1.2fr); }
   .stage-grid { --stage-cols: 6; }
-  .mode-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .mode-layout { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: start; }
+  .mode-info { max-height: 32vh; }
   .difficulty-scale { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -89,4 +109,6 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+  /* The Perquisite cards still come in, faded and never scaled. */
+  .perquisite-card { animation: perquisite-fade 0.2s ease both !important; }
 }

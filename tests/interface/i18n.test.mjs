@@ -206,6 +206,7 @@ test('French is really French: only proper names, codes and shared words read th
     'ability.0011.attack4', // Camouflage, the same word
     'ability.0012.extra_attack', // Shuriken, the same word
     'binding.direction', // Direction, the same word
+    'adventure.levels.none', // —, a dash: no Perquisite yet
     'brand.title', // ALVA
     'control.pause', // Pause
     'difficulty.brutal.name', // Brutal
@@ -426,9 +427,11 @@ test('Mode details translate every section immediately in place and also render 
   const checkFrench = (panel) => {
     assert.equal(panel.getAttribute('aria-label'), 'Détails du mode');
     assert.deepEqual(panel.querySelectorAll('h3').map((node) => node.textContent), [
-      'Combat rapide',
+      'Aventure', 'Combat rapide',
     ]);
     assert.deepEqual(panel.querySelectorAll('p').map((node) => node.textContent), [
+      'Franchissez les 30 niveaux dans l’ordre. À chaque niveau, Venture — le CPU — devient 1,5 fois plus intelligent et frappe 5 % plus fort. Tous les 5 niveaux, choisissez une Perquisite à conserver.',
+      'Le combattant de votre adversaire et l’arène sont tirés au sort. Règles de match habituelles : le premier à 3 points, 5 minutes, puis la prolongation.',
       'Affrontez un adversaire contrôlé par le CPU. Projetez-le dans le Vide pour marquer des points. Le premier à atteindre 3 points gagne.',
       'En combat rapide, les matchs durent jusqu’à 5 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',
     ]);
@@ -441,7 +444,7 @@ test('Mode details translate every section immediately in place and also render 
     setLanguage('en');
     assert.deepEqual(paragraphs.map((node) => node.textContent), english);
     assert.deepEqual(info.querySelectorAll('h3').map((node) => node.textContent), [
-      'Quick battle',
+      'Adventure', 'Quick battle',
     ]);
     setLanguage('fr');
     checkFrench(new ModeSelectScreen(fakeApp()).el.querySelector('.mode-info'));
@@ -469,8 +472,8 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     steps: names(mode),
     stepsLabel: mode.el.querySelector('.steps').getAttribute('aria-label'),
   };
-  // Regular Play, the default play type: its three steps.
-  assert.deepEqual(english, { title: 'Select mode', steps: ['Mode', 'Difficulty', 'Fighter'], stepsLabel: 'Quick battle setup' });
+  // Adventure, the card focused first: its three steps.
+  assert.deepEqual(english, { title: 'Select mode', steps: ['Mode', 'Level', 'Fighter'], stepsLabel: 'Adventure setup' });
 
   const off = onLanguageChange(() => localizeTree(body));
   setLanguage('fr');
@@ -479,9 +482,14 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     // Select Mode.
     assert.equal(mode.el.querySelector('.screen-title').textContent, 'Choisir le mode');
     assert.equal(mode.el.querySelector('.kicker').textContent, 'Jouer');
+    assert.deepEqual(names(mode), ['Mode', 'Niveau', 'Combattant']);
+    assert.equal(mode.el.querySelector('.steps').getAttribute('aria-label'), 'Étapes : Aventure');
+    assert.deepEqual(mode.el.querySelectorAll('.mode-name').map((n) => n.textContent), ['Aventure', 'Combat rapide']);
+    // Quick Battle focused: Regular Play's three steps, the default play type.
+    mode.follow('quick-battle');
     assert.deepEqual(names(mode), ['Mode', 'Difficulté', 'Combattant']);
     assert.equal(mode.el.querySelector('.steps').getAttribute('aria-label'), 'Étapes : Combat rapide');
-    assert.equal(mode.el.querySelector('.mode-name').textContent, 'Combat rapide');
+    mode.follow('adventure');
     assert.equal(mode.el.querySelector('.btn-back').getAttribute('aria-label'), 'Retour');
     // Difficulty cards: names, lines and spoken labels.
     assert.deepEqual(difficulty.cards.map((c) => c.querySelector('.difficulty-name').textContent), ['Facile', 'Moyen', 'Difficile', 'Brutal']);

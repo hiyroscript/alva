@@ -40,6 +40,14 @@ export const LOCAL_SETUP = Object.freeze({
   steps: Object.freeze([['step.playerFighter', { n: 1 }], ['step.playerFighter', { n: 2 }], 'step.stage']),
 });
 
+// Adventure's (js/data/adventure.js): Mode, then the level, then the
+// fighter. No difficulty (Venture grows with the level), no CPU and no
+// stage (both drawn at random for every battle).
+export const ADVENTURE_SETUP = Object.freeze({
+  name: 'setup.adventure',
+  steps: Object.freeze([QUICK_STEPS.mode, 'step.level', QUICK_STEPS.fighter]),
+});
+
 // Quick Battle's play types; anything else (a fresh or stale value) is
 // Regular Play, the default.
 export const PLAY_TYPES = Object.freeze(['regular', 'custom']);
@@ -51,6 +59,12 @@ export const resolvePlayType = (type) => (PLAY_TYPES.includes(type) ? type : PLA
 export function quickBattleSetup(selection, { stage = false } = {}) {
   if (resolvePlayType(selection?.playType) === 'custom') return QUICK_BATTLE_CUSTOM_SETUP;
   return stage ? QUICK_BATTLE_REGULAR_STAGE_SETUP : QUICK_BATTLE_REGULAR_SETUP;
+}
+
+// Adventure's setup, as a setup screen shows its steps (beside
+// quickBattleSetup: one path, whatever was chosen before).
+export function adventureSetup() {
+  return ADVENTURE_SETUP;
 }
 
 // A label given as a key, or as [key, params].

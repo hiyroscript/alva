@@ -18,6 +18,7 @@ import { Connectivity } from './connectivity.js';
 import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
 import { Settings } from './settings.js';
+import { AdventureProgress } from './adventure-progress.js';
 import { i18n, followSettings, onLanguageChange, localizeTree } from '../localization/i18n.js';
 import { LoadingOverlay, ConfirmDialog, ChoiceDialog, InfoDialog } from '../ui/overlays.js';
 import { InstallDialog } from '../ui/install-dialog.js';
@@ -27,6 +28,7 @@ import { SettingsDialog } from '../ui/settings-dialog.js';
 import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
 import { ControllerDialog } from '../ui/controller-dialog.js';
 import { ControllerControls } from '../ui/controller-editor.js';
+import { PerquisiteCards } from '../ui/perquisite-cards.js';
 import { getCharacter, getPlayableCharacter, playableCharacters, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
@@ -38,6 +40,9 @@ import { HomeScreen } from '../screens/home-screen.js';
 import { ModeSelectScreen } from '../screens/mode-select-screen.js';
 import { DifficultySelectScreen } from '../screens/difficulty-select-screen.js';
 import { CharacterSelectScreen } from '../screens/character-select-screen.js';
+import { AdventureLevelScreen } from '../screens/adventure-level-screen.js';
+import { continueAdventure } from '../screens/adventure-setup.js';
+import { adventureSetup } from '../ui/components.js';
 import { QuickCpuScreen } from '../screens/quick-cpu-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../screens/watch-screens.js';
@@ -61,11 +66,21 @@ import { OnlineBattleScreen } from '../screens/online-battle-screen.js';
 // CPU's fighter and the stage into it. Practice Ground keeps its own
 // fighter, and its training-dummy CPU never reads the difficulty. Every
 // fighter is the first playable one, or null while there is none: never a
-// disabled one.
+// disabled one. Adventure's are its own too (js/screens/adventure-setup.js):
+// the level chosen on its level selector, Player 1's fighter, and each
+// battle's draw (the CPU's fighter, the stage, the seed); nothing outside
+// Adventure reads them.
 export function initialSelection() {
   const firstFighter = playableCharacters()[0]?.id ?? null;
   return {
     mode: 'quick-battle',
+    adventureLevel: 1,
+    adventure: {
+      characterId: firstFighter,
+      cpuCharacterId: firstFighter,
+      mapId: MAPS[0].id,
+      seed: null,
+    },
     playType: 'regular',
     difficulty: DEFAULT_DIFFICULTY,
     characterId: firstFighter,
@@ -107,6 +122,9 @@ export class App {
     // language follows every change of the setting, and the whole page
     // follows the language.
     this.settings = new Settings();
+    // Adventure's progress on this device (js/core/adventure-progress.js),
+    // under its own key: read once here, saved on every change.
+    this.adventure = new AdventureProgress();
     // Game controllers: up to four connected PlayStation / Xbox pads, one
     // of them Player 1's (and in Local Play another Player 2's). Their
     // gameplay buttons follow the fighter played, through that fighter's
@@ -148,6 +166,7 @@ export class App {
     this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
     this.controllerDialog = new ControllerDialog(document.getElementById('controller-dialog'), this);
     this.createRoomDialog = new CreateRoomDialog(document.getElementById('online-room-dialog'), this);
+    this.perquisiteCards = new PerquisiteCards(document.getElementById('perquisite-dialog'), this);
     this.controllerControls = new ControllerControls(this, {
       roster: document.getElementById('controller-roster'),
       editor: document.getElementById('controller-editor'),
@@ -168,6 +187,13 @@ export class App {
     s.register(new SplashScreen(this));
     s.register(new HomeScreen(this));
     s.register(new ModeSelectScreen(this));
+    // Adventure's setup: Mode → Level → Fighter (then, at a milestone, the
+    // Perquisite cards, and the Battle).
+    s.register(new AdventureLevelScreen(this));
+    s.register(new CharacterSelectScreen(this, {
+      id: 'adventure-character', setup: adventureSetup, step: 2, selection: () => this.selection.adventure,
+      next: () => continueAdventure(this), previewId: 'adventure-preview-name',
+    }));
     s.register(new DifficultySelectScreen(this));
     // Quick Battle's setup: Mode → Difficulty → Fighter, then (Custom Play)
     // CPU → Stage.

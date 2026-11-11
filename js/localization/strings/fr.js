@@ -5,7 +5,11 @@
 // English; tests/interface/i18n.test.mjs fails if one is.
 
 import { CONFIG } from '../../config.js';
-import { formatList } from '../format.js';
+import { formatList, formatNumber } from '../format.js';
+// Adventure's numbers as this language writes them (js/localization/format.js).
+const num = (n) => formatNumber(n, 'fr');
+const fixed2 = (n) => formatNumber(n, 'fr', { fixed: true });
+
 
 export const FR = {
   'brand.title': CONFIG.title,
@@ -543,6 +547,58 @@ export const FR = {
   'mode.details': 'Détails du mode',
   'mode.quickBattle.overview': 'Affrontez un adversaire contrôlé par le CPU. Projetez-le dans le Vide pour marquer des points. Le premier à atteindre 3 points gagne.',
   'mode.quickBattle.rules.description': 'En combat rapide, les matchs durent jusqu’à 5 minutes. En cas d’égalité au score à la fin du temps réglementaire, une prolongation d’une minute commence tandis que le Vide se resserre.',
+  // Aventure (la mise à jour Aventure).
+  'screen.adventureLevels': 'Aventure : choix du niveau',
+  'screen.adventureFighter': 'Aventure : choix du combattant',
+  'setup.adventure': 'Aventure',
+  'step.level': 'Niveau',
+  'mode.group': 'Modes de jeu',
+  'mode.adventure.description': 'Trente niveaux face à un CPU toujours plus redoutable. Gagnez des Perquisites en progressant.',
+  'mode.adventure.overview': 'Franchissez les 30 niveaux dans l’ordre. À chaque niveau, Venture — le CPU — devient 1,5 fois plus intelligent et frappe 5 % plus fort. Tous les 5 niveaux, choisissez une Perquisite à conserver.',
+  'mode.adventure.rules.description': 'Le combattant de votre adversaire et l’arène sont tirés au sort. Règles de match habituelles : le premier à 3 points, 5 minutes, puis la prolongation.',
+  'adventure.levels.title': 'Choisir le niveau',
+  'adventure.levels.heading': 'Niveaux',
+  'adventure.levels.grid': 'Niveaux de l’aventure',
+  'adventure.levels.progress': '{cleared} / {total} terminés',
+  'adventure.levels.perquisites': 'Vos Perquisites',
+  'adventure.levels.none': '—',
+  'adventure.cell.locked': 'Niveau {level}, verrouillé',
+  'adventure.cell.cleared': 'Niveau {level}, terminé',
+  'adventure.cell.next': 'Niveau {level}, suivant',
+  'adventure.cell.milestone': 'Offre une Perquisite',
+  'adventure.cell.claimed': 'Perquisite obtenue',
+  'adventure.venture.title': 'Venture · Niveau {level}',
+  'adventure.venture.line': ({ smarts, strength }) => `×${fixed2(smarts)} plus intelligent · ×${fixed2(strength)} de dégâts par rapport au niveau 1`,
+  'adventure.reset': 'Réinitialiser la progression',
+  'adventure.resetConfirm': 'Confirmer',
+  'adventure.complete': 'Aventure terminée !',
+  'perquisite.kicker': 'Niveau {level}',
+  'perquisite.title': 'Choisissez une Perquisite',
+  'perquisite.level': 'Niveau {roman}',
+  'perquisite.new': 'Nouveau',
+  'perquisite.braveSoldier.name': 'Brave Soldat',
+  'perquisite.nearlyImmortal.name': 'Presque Immortel',
+  'perquisite.velociousImmuneSystem.name': 'Système Immunitaire Véloce',
+  'perquisite.maximumEnergy.name': 'Énergie Maximale',
+  'perquisite.redoutableStrength.name': 'Force Redoutable',
+  'perquisite.braveSoldier.effect': 'Subissez {percent} % de dégâts en moins',
+  'perquisite.braveSoldier.was': 'avant : {percent} %',
+  'perquisite.nearlyImmortal.effect': ({ total, normal }) => `Récupérez ${num(total)} points d’éjection à chaque palier de récupération au lieu de ${num(normal)}`,
+  'perquisite.nearlyImmortal.was': ({ total }) => `avant : ${num(total)}`,
+  'perquisite.velociousImmuneSystem.effect': ({ interval, normal, delay }) => `Le point d’éjection baisse toutes les ${num(interval)} s au lieu de ${num(normal)} s (la récupération commence toujours après ${num(delay)} s)`,
+  'perquisite.velociousImmuneSystem.was': ({ interval }) => `avant : toutes les ${num(interval)} s`,
+  'perquisite.maximumEnergy.effect': 'Tout ce qui coûte de l’Énergie coûte {percent} % de moins',
+  'perquisite.maximumEnergy.was': 'avant : {percent} %',
+  'perquisite.redoutableStrength.effect': 'Infligez {percent} % de dégâts en plus',
+  'perquisite.redoutableStrength.was': 'avant : {percent} %',
+  'hud.adventureLevel': 'Niv. {level} · Venture',
+  'banner.level': 'NIVEAU {level}',
+  'banner.venture': ({ smarts, strength }) => `Venture · ×${fixed2(smarts)} plus intelligent · ×${fixed2(strength)} de dégâts`,
+  'results.adventureKicker': 'Aventure · Niveau {level}',
+  'results.nextLevel': 'Niveau suivant',
+  'results.retryLevel': 'Rejouer le niveau',
+  'results.changeFighter': 'Changer de combattant',
+  'results.levelSelect': 'Choix du niveau',
   'localMode.title': 'Choisir le mode local',
   'localMode.kicker': 'Jeu local',
   'localMode.quickBattle.description': 'Deux joueurs, deux manettes : chacun choisit son combattant, puis choisissez une arène et combattez.',

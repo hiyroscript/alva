@@ -256,7 +256,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 // Select Mode's Quick Battle card, then `type` (Custom Play or Regular
 // Play) in its choice dialog.
 async function openQuickBattle({ app, screens }, type = 'custom') {
-  screens.mode.el.querySelector('.mode-card').click();
+  screens.mode.cardFor('quick-battle').click();
   app.choiceDialog.buttonFor(type).click();
   await settle();
 }

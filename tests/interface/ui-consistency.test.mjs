@@ -202,9 +202,15 @@ test('menu labels, titles and buttons are in sentence case', () => {
     'Mash', 'Combo', 'Jump',
     // The teams' Roman numerals (Team I, Team II), and game terms counted in
     // the Match Results (Perfect Shields, Successful Deflects).
-    'I', 'II', 'Shields', 'Deflects']);
+    'I', 'II', 'Shields', 'Deflects',
+    // Adventure's game terms (the Adventure update): a level by its number
+    // (Level 07), its CPU, Venture, and its Perquisites.
+    'Level', 'Venture', 'Perquisite', 'Perquisites']);
   for (const [key, value] of Object.entries(EN)) {
-    if (typeof value !== 'string' || UPPERCASE_ALLOWED(key, value) || key.startsWith('ability.') || key.startsWith('credits.')) continue;
+    // Fighters' own ability names, the credits and the Perquisites' own names
+    // (Brave Soldier, Velocious Immune System) keep their capitals.
+    if (typeof value !== 'string' || UPPERCASE_ALLOWED(key, value) || key.startsWith('ability.') || key.startsWith('credits.')
+      || /^perquisite\.\w+\.name$/.test(key)) continue;
     if (/[.!?…:]/.test(value) || value.split(' ').length > 5) continue; // sentences and prose
     const later = value.replace(/\{[^}]*\}/g, '').split(/\s+/).slice(1).filter((w) => /^\p{Lu}/u.test(w));
     for (const word of later) {
