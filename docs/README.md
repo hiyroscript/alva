@@ -8,7 +8,7 @@ Which document answers what, and which one decides.
 | [`ALVA_SPEC.md`](../ALVA_SPEC.md) | **The product specification.** What the game must do and look like, and every shared rule. Authoritative: where a guide below disagrees with it, the guide is wrong. |
 | [`docs/characters/`](characters/README.md) | Each fighter's own specification (part of `ALVA_SPEC.md`), and how to add one. |
 | [`docs/architecture/`](architecture/overview.md), [`docs/systems/`](systems/), [`docs/gameplay/`](gameplay/), [`docs/development/`](development/) | How the code carries the specification out: modules, data fields, extension points, tests. |
-| [`UPDATES.md`](../UPDATES.md) | History: the named updates (movement, effect, bounce, Mash Combo, online) and other large changes, with their pull requests, commits, tuning and tests. |
+| [`UPDATES.md`](../UPDATES.md) | History: the named updates (movement, effect, bounce, Mash Combo, online, Adventure and the rest) and other large changes, with their pull requests, commits, tuning and tests. |
 | [`codename_rule`](../codename_rule) | The naming contract for controls, moves, animations and files. |
 | [`character_rule`](../character_rule) | The owner's direction for fighters' abilities. Protected: never edited. |
 
@@ -55,6 +55,8 @@ reads, what a fighter may leave out, and its tests.
 
 ## Gameplay
 
+- [Adventure](gameplay/adventure.md) (thirty levels, Venture, the
+  Perquisites, saved progress)
 - [Quick Battle](gameplay/battle.md) (and difficulty)
 - [Watch Mode](gameplay/watch-mode.md)
 - [Local Play](gameplay/local-play.md) (two players, two controllers)

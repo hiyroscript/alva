@@ -359,6 +359,9 @@ fit the palette.
 
 ```
 First launch (no language chosen yet) → Splash → Home + Language chooser (6.11)
+Splash → Home → Select Mode → Adventure → Select Level → Select Fighter → (levels 5, 10, 15, 20, 25, 30, that milestone unclaimed) the Perquisite cards → Battle (the CPU's fighter and the stage drawn at random, Venture at that level) (6.3b)
+Select Level → Back → Select Mode (the Adventure card focused); Select Fighter (Adventure) → Back → Select Level
+Battle (Adventure) → Match Results → Next level (after a win) / Retry level / Change fighter / Level select / Return to Home Screen
 Splash → Home → Select Mode → Quick Battle → Regular Play → Select Difficulty → Select Fighter → Battle (the CPU's fighter and the stage drawn at random)
 Splash → Home → Select Mode → Quick Battle → Custom Play → Select Difficulty → Select Fighter → Select CPU → Select Stage → Battle
 Select Mode → Quick Battle → play-type dialog → Esc / Back / close → Select Mode (nothing chosen)
@@ -622,31 +625,49 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 6.3 Select Mode
 
-- Header "Select Mode" with the setup steps of the play type in force
-  (Regular Play, the default: Mode · Difficulty · Fighter; Custom Play:
-  Mode · Difficulty · Fighter · CPU · Stage).
-- A compact Quick Battle card and a full-height Mode details panel, top-aligned.
-  No artwork and no keyboard hint bar.
-- Quick Battle card (Mode 01, name, description "Regular Play or Custom Play:
-  choose a difficulty and your fighter, then enter battle.", green Select
-  action) in a rail built for future modes.
-- Mode details panel: its heading and hairline, followed immediately by one
-  **Quick Battle** section with a moderately emphasized heading and two muted
-  paragraphs: the overview (face a CPU, knock the opponent into the Void to
-  score, first to 3 points wins), then its match rules (up to 5 minutes;
-  a tied score when time runs out starts 1 minute of overtime as the Void
+- Header "Select Mode" with the setup steps of the mode focused (or, coming
+  Back, selected): Adventure's Mode · Level · Fighter; Quick Battle's those
+  of its play type in force (Regular Play, the default: Mode · Difficulty ·
+  Fighter; Custom Play: Mode · Difficulty · Fighter · CPU · Stage).
+- A rail of two mode cards, top-aligned, and a Mode details panel. The rail
+  clearly dominates (`.mode-layout`: `minmax(0, 2.4fr) minmax(200px,
+  0.85fr)`, the Adventure update; it was 1.75 to 1). No artwork and no
+  keyboard hint bar.
+- The cards, in order: **01 Adventure** ("Thirty levels against an
+  ever-sharper CPU. Earn Perquisites as you climb.", 6.3b), the default card
+  (`data-nav-default`) and the first focus on a fresh visit; **02 Quick
+  Battle** (description "Regular Play or Custom Play: choose a difficulty
+  and your fighter, then enter battle."). Each has its index, name,
+  description and green Select action. Arrows / D-pad move between the two
+  cards (and on to the details when they scroll, up and down then scrolling
+  them).
+- Mode details panel, a step smaller than the cards (padding, a 13–14 px
+  heading, 12–13 px paragraphs, `clamp()` sizes): its heading and hairline,
+  then two sections, each with a moderately emphasized heading and two
+  muted paragraphs. **Adventure** first: its overview ("Clear 30 levels in
+  order. Each level, Venture — the CPU — becomes 1.5 times smarter and hits
+  5% harder. Every 5 levels, choose one Perquisite to keep.") and its rules
+  ("Your opponent's fighter and the stage are drawn at random. Standard
+  match rules: first to 3 points, 5 minutes, then overtime."). Then **Quick
+  Battle**: the overview (face a CPU, knock the opponent into the Void to
+  score, first to 3 points wins), then its match rules (up to 5 minutes; a
+  tied score when time runs out starts 1 minute of overtime as the Void
   closes in). No separate Regular Play, Custom Play or Match Rules sections.
   Regular Play and Custom Play explanations remain in the play-type dialog below.
   All content follows the active English or French language without a reload,
-  appears without selecting or hovering the card, and remains when returning
+  appears without selecting or hovering a card, and remains when returning
   here or dismissing the play-type dialog. No additional controls. The panel
-  keeps its existing surface, padding and two-column placement (stacked on
-  tall/narrow displays); descriptions scroll internally when height is limited.
-- Mouse hover only previews the card (lighter surface and border) and does not
-  move focus. A click, Enter or gamepad confirm selects Quick Battle and opens
-  its **play-type dialog** (below); nothing advances until a play type is
-  chosen. Keyboard/gamepad focus shows the standard focus ring, which
-  stays hidden while the last menu input was a pointer press.
+  keeps its surface and two-column placement; stacked (≤ 720 px, and
+  tall/narrow displays) it takes its own height, capped at 32 vh, so both
+  cards stay fully visible; its text scrolls internally when height is
+  limited.
+- Mouse hover only previews a card (lighter surface and border) and does not
+  move focus. A click, Enter or gamepad confirm selects the card: Adventure
+  sets `app.selection.mode` to `'adventure'` and opens its level selector at
+  once (no dialog); Quick Battle opens its **play-type dialog** (below),
+  nothing advancing until a play type is chosen. Keyboard/gamepad focus
+  shows the standard focus ring, which stays hidden while the last menu
+  input was a pointer press.
 - **Play-type dialog** (`ChoiceDialog`, `js/ui/overlays.js`, on its own
   `#choice-dialog` root): a modal `role="dialog"` glass panel over the dimmed
   screen (which is inert meanwhile), kicker "Quick Battle", title "How do you
@@ -664,7 +685,9 @@ no header, build label, eyebrow or keyboard hint bar.
   player can switch play type.
 - No fake modes. Online Play (6.5c) is rooms that players create and join
   by name or code: no matchmaking, no accounts, no chat, and Quick Battle
-  its one mode for now.
+  its one mode for now. Adventure is Select Mode's alone: Local Play, Online
+  Play, Watch Mode and Practice Ground never list it, link to it or read its
+  state.
 
 ### 6.3a Select Difficulty
 
@@ -701,6 +724,115 @@ no header, build label, eyebrow or keyboard hint bar.
   steps keep only the current step's name, so up to five steps fit; completed
   steps keep their check.
 - Watch Mode's first step is another instance of this screen (6.5a).
+
+### 6.3b Adventure
+
+The Adventure update. A single-player progression of thirty levels against
+**Venture**, a CPU difficulty of its own that grows with every level, with
+a **Perquisite** to pick every five levels. Explained in
+`docs/gameplay/adventure.md`; its data in `js/data/adventure.js`.
+
+- **Select Level** (`js/screens/adventure-level-screen.js`, screen id
+  `adventure-levels`): the standard header (kicker "Adventure", title
+  "Select Level", steps Mode ✓ · **Level** · Fighter); Back returns to
+  Select Mode, focus on the Adventure card. Thirty square cells numbered
+  `01`–`30` in mono figures (`repeat(auto-fill, minmax(54px, 1fr))`; ten
+  a row in short landscape, so all thirty fit where they can, else the grid
+  scrolls on its own and Back stays reachable), in Alva's charcoal,
+  off-white and green with the setup screens' 3 px corners and focus ring:
+  **locked** cells (above the highest unlocked level) dimmed with a faint
+  border, `disabled` and `aria-disabled`, named "Level 07, locked";
+  **cleared** cells (below it) a green-tinted fill and border, green
+  figures and a small check, "Level 03, cleared"; the **next** cell (the
+  highest unlocked level) a solid off-white fill with charcoal figures,
+  the default focus, "Level 08, next". Levels 5, 10, 15, 20, 25 and 30
+  carry a small card mark in a corner, hollow until that milestone's
+  Perquisite is claimed, filled after. Under the grid a wide row,
+  information only (never focused): "Venture · Level NN" and a muted line
+  with Venture at the level focused ("×11.39 smarter · ×1.34 damage vs
+  Level 1" at Level 7), and the Perquisites owned as compact chips ("Brave
+  Soldier II"), or "—". At the bottom **Reset progress** (« Réinitialiser
+  la progression »), outlined and danger-tinted: the first press turns it
+  into "Confirm reset" (« Confirmer ») for 3.2 s, then it disarms; a second
+  press within that time resets the unlocked level to 1, the cleared set,
+  every Perquisite level and every milestone claim, repaints the grid and
+  moves focus to cell 01. Click, Enter / J and gamepad A, never hover;
+  disabled when there is nothing to reset. Choosing an unlocked cell
+  (a cleared one is replayed) sets `app.selection.adventureLevel` and opens
+  Select Fighter.
+- **Select Fighter** is the shared screen (6.4, screen id
+  `adventure-character`): kicker "Adventure", steps Mode ✓ · Level ✓ ·
+  **Fighter**, no difficulty, CPU or stage step; Back returns to Select
+  Level. Confirming a fighter shows the Perquisite cards first when the
+  level is a milestone not yet claimed, then draws the CPU's fighter and the
+  stage exactly as Regular Play does (6.4), seeded per battle (the seed the
+  Battle plays on), and starts the Battle.
+- **The match** is Quick Battle's (7.2.8, 7.2.10): 3 points, 5:00, overtime
+  with the closing Void, the Launch Point tiebreak, the celebration, the
+  result toast and Match Results; the CPU plays Venture at the level. The
+  HUD shows "Lv 07 · Venture" under the timer and pause, part of the top
+  HUD (the touch controls keep below it); the intro announces "LEVEL 07"
+  over "Venture · ×11.39 smarter · ×1.34 damage". A **win**, if this was
+  the highest unlocked level, unlocks the next one; the level is marked
+  cleared and saved at once (the progress survives the tab closing in the
+  celebration). A **loss or a draw** unlocks nothing, and nothing won is
+  lost. The **Match Results** show "Adventure · Level NN" over their title,
+  then **Next level** (green, primary, only after a win when the next level
+  exists: that level's Perquisite cards if it is an unclaimed milestone,
+  else straight into its battle with the same fighter and a fresh random
+  CPU and stage), **Retry level** (the same level, a new random draw),
+  **Change fighter** (Adventure's Select Fighter), **Level select** and
+  **Return to Home Screen**; no Rematch and no Change stage. Winning Level
+  30 adds "Adventure complete!" (« Aventure terminée ! ») under the toast's
+  line; from then on all thirty cells show cleared. The pause menu's Restart
+  Battle restarts the same level (the same draw); the rest is Quick
+  Battle's.
+- **Venture** replaces Easy to Brutal inside Adventure, one difficulty that
+  grows with the level, never a fifth entry of `DIFFICULTIES` (the
+  Difficulty screen and Watch Mode list four). Level 1 is Easy's profile
+  exactly; every level, every trait's distance from perfect play is divided
+  by `VENTURE_SMARTS_GROWTH` (1.5): `value(L) = limit + (easy − limit) /
+  1.5^(L−1)`, perfect play being each trait's physical limit, not Brutal (a
+  reaction and a reassessment of at least two simulation steps, no lapse,
+  noise or error, a lookahead of 1 s, a plan depth of 4, rounded, and every
+  probability 1). No trait gets worse from a level to the next. Its
+  fighter's real hits deal `ventureStrength(L)` = `VENTURE_STRENGTH_GROWTH`
+  (1.05) `^ (L−1)` times their damage (×1.55 at 10, ×2.53 at 20, ×4.12 at
+  30), gentler than the smarts on purpose (damage has no bound). Its profile
+  goes through `getDifficultyProfile({ venture: level })`; its strength
+  through the battle's modifiers (7.2.8). `ventureProfile` and
+  `ventureStrength` are the one place each is computed.
+- **Perquisites**: five, each with five levels (I–V), level n worth its
+  base × (1 + 0.5 × (n − 1)): **Brave Soldier** (« Brave Soldat », damage
+  received −8 % at I to −24 % at V), **Nearly Immortal** (« Presque
+  Immortel », +0.5 to +1.5 Launch Points a recovery tick), **Velocious
+  Immune System** (« Système Immunitaire Véloce », the recovery interval
+  −8 % to −24 %, never the 2 s delay), **Maximum Energy** (« Énergie
+  Maximale », every Energy cost −8 % to −24 %) and **Redoutable Strength**
+  (« Force Redoutable », damage dealt +8 % to +24 %). Before the battle of
+  levels 5, 10, 15, 20, 25 and 30 the first time each is started, a modal
+  `role="dialog"` over the dimmed screen (`js/ui/perquisite-cards.js`):
+  kicker "Level NN", title "Choose a Perquisite", exactly two cards side by
+  side (stacked on a narrow portrait screen) popping in (a short scale and
+  fade; a fade alone with reduced motion), each an original icon, the name,
+  the level in Roman numerals with "NEW" at I, the effect at that level in
+  plain numbers and, for an upgrade, a muted "was …". The two are different
+  Perquisites, each at the next level the player does not own (one at V
+  never comes up again; a level once owned never does), drawn with the run's
+  seed and the milestone's level and saved with the milestone, so a reload
+  mid-choice shows the same two. The player must pick: no close button, Esc
+  or Back does nothing; arrows / D-pad move between the cards; click, Enter
+  / J or gamepad A picks; hover previews only. Picking saves at once (that
+  Perquisite a level up, the milestone claimed: losing never unclaims it),
+  then the battle starts. Six picks in a full run.
+- **Saved progress**: its own versioned key, `alva.adventure`, following
+  the settings' pattern (6.10): `{ version: 1, unlocked: 1..31 (31: all
+  cleared), cleared, perquisites, milestones: { "5": { offer, picked } },
+  seed }`, every field checked on reading, anything corrupt or unknown fresh
+  progress, a storage that refuses or is missing keeping it for this visit
+  only and never throwing. Only Reset progress clears it.
+- Every string in English and French, switching live; keyboard, mouse,
+  touch and gamepad on every new screen through the shared menu navigator.
 
 ### 6.4 Select Fighter
 
@@ -4504,6 +4636,30 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
     score or respawns: a profile holds those traits and nothing else, no
     module of the fighter or the combat engine reads it, and the same hit
     resolves identically on every level and for a player.
+  - **The one exception: Venture, only in Adventure** (6.3b, the Adventure
+    update). Its profile is a level of its own (`getDifficultyProfile({
+    venture: level })`, the same shape and traits); and its strength, and
+    the player's Perquisites, reach the fighters as each side's
+    **modifiers** for the battle (`js/game/combat/modifiers.js`:
+    `damageDealt`, `damageTaken`, `recoveryAmountBonus`,
+    `recoveryIntervalScale`, `energyCostScale`), built once by the Battle
+    and kept through restarts, rematches and respawns. `CombatSystem.applyHit`
+    adds a real hit's damage × the attacker's `damageDealt` × the target's
+    `damageTaken` to its Launch Point and Limit gauge (so the launch grows
+    with it; a blocked hit still deals 0 and costs the block, a hit of 0
+    stays 0); the recovery tick takes `LAUNCH_RECOVERY_AMOUNT +
+    recoveryAmountBonus` every `LAUNCH_RECOVERY_INTERVAL ×
+    recoveryIntervalScale` (the delay never changes); every Energy payment
+    is × `energyCostScale`. Fractional Launch Points stay fractional (the
+    HUD and Match Results round them; the tiebreak compares the real
+    values). The engine reads only the object it is handed, never a mode,
+    a fighter id or Adventure state. Every other mode gives both sides the
+    identity, which changes nothing bit for bit (Quick Battle, Watch Mode,
+    Local Play, Online Play and its lockstep and state hash, Practice
+    Ground). CPU Intelligence predicts with the modified numbers
+    (`js/game/ai/cpu-intelligence/effective.js`): its own and its
+    opponent's damage, the opponent's recovery and its costs, read as rules
+    of the match like the clock, never perception.
   - **Benchmark.** Brutal's target is a 95% match win rate against a
     defined, varied benchmark (Hard, Medium and five scripted reference
     styles; `tests/benchmarks/cpu-benchmark.mjs`), tracked separately

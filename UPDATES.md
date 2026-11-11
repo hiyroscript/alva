@@ -24,6 +24,7 @@ for where they moved). The game as it is now is specified in
 | **Launch & energy update** | [#176](https://github.com/hiyroscript/alva/pull/176) | `b4889f0` | The joystick pushed down is Down, launches at 7 units/s a point (was 10), recovery 2 a tick, a perfect Shield heals 5, the HUD's green heal glow and fire, Energy only when the Shield blocks or the Deflect turns a projectile back, and the CPUs playing by it |
 | **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
 | **Screen Pad update** | [#180](https://github.com/hiyroscript/alva/pull/180) | `92592dc` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
+| **Adventure update** | the pull request "The Adventure update" | `48efc0a` (modifiers), `a708c97` (Venture, Perquisites, progress), `dd2dc29` (screens), `7afbb9a` (the CPU) | Select Mode's new first mode: thirty levels against Venture, a CPU 1.5 times smarter and 1.05 times stronger every level, with a Perquisite picked from two cards every five levels; per-fighter modifiers in the combat engine, identity everywhere else |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -6438,3 +6439,135 @@ and `grab.test.mjs` (the shared capabilities on test-only fighters);
 `practice-ground`, `watch-mode`, `settings` (its credits), each fighter's
 roster list, `cpu-intelligence` (an opportunity for a Limit Break gives it
 its gauge), `move-cancel` and `cpu-behaviour` (above).
+
+
+## Adventure update
+
+The pull request "The Adventure update", commits `48efc0a` (the per-fighter
+modifiers), `a708c97` (Venture, the Perquisites and the saved progress),
+`dd2dc29` (the screens) and `7afbb9a` (the CPU). Asked for in the `max`
+prompt and named there: a new single-player mode, **Adventure**, the
+first card of Select Mode (Home → Play), and nowhere else (Local Play,
+Online Play, Watch Mode and Practice Ground never list it, link to it or
+read its state). Explained in [docs/gameplay/adventure.md](./docs/gameplay/adventure.md);
+specified in [`ALVA_SPEC.md`](./ALVA_SPEC.md) §6.3b.
+
+### Select Mode
+
+Two cards: **01 Adventure** (the default card and first focus) and **02
+Quick Battle** (it was 01; its name, description, play-type dialog and
+flow unchanged). The rail now clearly dominates (`.mode-layout` `minmax(0,
+2.4fr) minmax(200px, 0.85fr)`, it was `minmax(0, 1.75fr) minmax(220px,
+1fr)`), the Mode details panel a step smaller (padding, a 13–14 px heading,
+12–13 px paragraphs) and in two sections, Adventure first. Stacked (≤ 720 px
+and tall/narrow windows) the panel takes its own height capped at 32 vh, so
+both cards stay in full. The header's steps follow the card focused
+(`adventureSetup()`: Mode · Level · Fighter). Adventure opens no dialog.
+
+### The level selector and the flow
+
+Select Level (`adventure-levels`): thirty cells, locked, cleared or next,
+a card mark on the milestones (filled once claimed), a wide row with Venture
+at the level focused and the Perquisites owned, and a two-step Reset
+progress that disarms after 3.2 s. The owner's `vl` level selector was the
+reference for its look and behaviour, rebuilt in Alva's own design
+language from the prompt's description (the `vl` repository itself was not
+reachable from the session that built it). Then Adventure's Select Fighter
+(`adventure-character`), the Perquisite cards at an unclaimed milestone,
+and the Battle: the CPU's fighter and the stage drawn as Regular Play draws
+them, on a seed of the battle's own, Quick Battle's match rules, "Lv 07 ·
+Venture" in the HUD and Venture's line in the intro. A win clears the level
+and unlocks the next, saved at once; the Match Results offer Next level,
+Retry level, Change fighter, Level select and Return to home screen;
+winning Level 30 says "Adventure complete!".
+
+### Venture
+
+Level 1 is Easy exactly. Each level every trait's distance from perfect
+play (each trait's physical limit: `VENTURE_LIMITS`) is divided by
+`VENTURE_SMARTS_GROWTH` (1.5), and its fighter's real hits deal
+`VENTURE_STRENGTH_GROWTH` (1.05) `^ (L−1)` times their damage (×4.12 at
+Level 30). By the formula, Level 6 reacts faster than Brutal and plans as
+deep (6 of its 24 traits at or past Brutal's), Level 9 matches or passes
+Brutal on 18, and from about Level 15 it is past Brutal on everything
+Brutal has not already maxed out. (The prompt expected "most traits by
+about Level 6"; the formula it gives reaches that around Level 9, because
+Brutal is already within a few hundredths of perfect on many traits.) Its
+example line "×1.22 damage vs Level 1" for Level 7 is Level 5's figure:
+Level 7's is 1.05^6, ×1.34, which is what the game shows.
+
+### Perquisites
+
+| id | Name | Effect | I | II | III | IV | V |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `braveSoldier` | Brave Soldier | damage received down | 8 % | 12 % | 16 % | 20 % | 24 % |
+| `nearlyImmortal` | Nearly Immortal | Launch Points a recovery tick up | +0.5 | +0.75 | +1 | +1.25 | +1.5 |
+| `velociousImmuneSystem` | Velocious Immune System | recovery interval down (never the delay) | 8 % | 12 % | 16 % | 20 % | 24 % |
+| `maximumEnergy` | Maximum Energy | every Energy cost down | 8 % | 12 % | 16 % | 20 % | 24 % |
+| `redoutableStrength` | Redoutable Strength | damage dealt up | 8 % | 12 % | 16 % | 20 % | 24 % |
+
+Two different ones offered at each milestone, each at its next level, drawn
+from the run's seed and saved with the milestone.
+
+### The engine and the CPU
+
+Each fighter carries a **modifiers** object for the battle
+([`js/game/combat/modifiers.js`](./js/game/combat/modifiers.js)), the
+identity in every mode but Adventure, read by `CombatSystem.applyHit` (damage
+dealt and taken), `CombatState.updateLaunchRecovery` (the tick's amount and
+interval) and every Energy payment. The identity changes nothing bit for
+bit: two seeded matches fingerprinted with the online state hash play
+step for step as on the commit before the update. CPU Intelligence predicts
+with the modified numbers through
+[`js/game/ai/cpu-intelligence/effective.js`](./js/game/ai/cpu-intelligence/effective.js)
+(its kill-confirms, its opponent's hits, recovery and costs, overtime's
+tiebreak).
+
+### Where to tune it
+
+- [`js/data/adventure.js`](./js/data/adventure.js): `ADVENTURE_LEVELS`
+  (30), `PERQUISITE_MILESTONES`, `VENTURE_SMARTS_GROWTH` (1.5),
+  `VENTURE_STRENGTH_GROWTH` (1.05), `VENTURE_LIMITS`, `PERQUISITES` (each
+  base), `PERQUISITE_LEVEL_STEP` (0.5), `PERQUISITE_MAX_LEVEL` (5).
+- [`js/screens/adventure-level-screen.js`](./js/screens/adventure-level-screen.js):
+  `RESET_ARM_SECONDS` (3.2).
+- The look: the Adventure block of [`css/setup.css`](./css/setup.css), the
+  Perquisite cards in [`css/overlays.css`](./css/overlays.css), `.hud-level`
+  in [`css/battle.css`](./css/battle.css), the short-landscape and stacked
+  rules in [`css/responsive.css`](./css/responsive.css).
+
+### Code
+
+- New: [`js/data/adventure.js`](./js/data/adventure.js),
+  [`js/core/adventure-progress.js`](./js/core/adventure-progress.js)
+  (`alva.adventure`, version 1),
+  [`js/game/combat/modifiers.js`](./js/game/combat/modifiers.js),
+  [`js/game/ai/cpu-intelligence/effective.js`](./js/game/ai/cpu-intelligence/effective.js),
+  [`js/screens/adventure-level-screen.js`](./js/screens/adventure-level-screen.js),
+  [`js/screens/adventure-setup.js`](./js/screens/adventure-setup.js),
+  [`js/ui/perquisite-cards.js`](./js/ui/perquisite-cards.js).
+- Changed: `js/data/difficulty.js` (`getDifficultyProfile({ venture })`, its
+  header's exception), `js/game/battle.js` (`cpuLevel`, `modifiers`),
+  `js/game/fighters/fighter.js`, `js/game/combat/combat.js`,
+  `js/game/combat/combat-state.js`, the brain's `situation.js`, `values.js`,
+  `strategy.js`, `objective.js`, `evaluator.js`, `defense.js` and
+  `brain.js`, `js/screens/mode-select-screen.js`,
+  `js/screens/battle-screen.js`, `js/ui/hud.js`, `js/ui/components.js`
+  (`adventureSetup`), `js/ui/icons.js` (`PERQUISITE_ICONS`,
+  `ICONS.perquisiteCard`), `js/core/app.js`, `js/core/settings.js`
+  (`browserStorage` exported, still the one place storage is reached),
+  `js/localization/format.js` (`formatNumber`), both string tables,
+  `index.html`.
+
+### Tests
+
+- New: `tests/interface/adventure.test.mjs`,
+  `tests/integration/adventure.test.mjs`, `tests/systems/venture.test.mjs`,
+  `tests/systems/perquisites.test.mjs`, `tests/systems/adventure-cpu.test.mjs`
+  and their helper `tests/helpers/adventure-app.mjs`.
+- Updated: the Quick Battle, Difficulty and Watch Mode integration tests and
+  the i18n test pick Quick Battle's card by id (it is 02 now, Adventure
+  focused first); the sentence-case rule knows Adventure's game terms
+  (Level, Venture, Perquisite) and the Perquisites' own names; the
+  French-is-French list allows Adventure's dash.
+
