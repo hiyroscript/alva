@@ -41,8 +41,7 @@ import { ModeSelectScreen } from '../screens/mode-select-screen.js';
 import { DifficultySelectScreen } from '../screens/difficulty-select-screen.js';
 import { CharacterSelectScreen } from '../screens/character-select-screen.js';
 import { AdventureLevelScreen } from '../screens/adventure-level-screen.js';
-import { continueAdventure } from '../screens/adventure-setup.js';
-import { adventureSetup } from '../ui/components.js';
+import { adventureFighterScreen } from '../screens/adventure-setup.js';
 import { QuickCpuScreen } from '../screens/quick-cpu-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../screens/watch-screens.js';
@@ -190,10 +189,7 @@ export class App {
     // Adventure's setup: Mode → Level → Fighter (then, at a milestone, the
     // Perquisite cards, and the Battle).
     s.register(new AdventureLevelScreen(this));
-    s.register(new CharacterSelectScreen(this, {
-      id: 'adventure-character', setup: adventureSetup, step: 2, selection: () => this.selection.adventure,
-      next: () => continueAdventure(this), previewId: 'adventure-preview-name',
-    }));
+    s.register(adventureFighterScreen(this));
     s.register(new DifficultySelectScreen(this));
     // Quick Battle's setup: Mode → Difficulty → Fighter, then (Custom Play)
     // CPU → Stage.

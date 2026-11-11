@@ -14,6 +14,8 @@
 // Restart Battle replays that draw; Next level and Retry level draw again.
 
 import { drawRegularPlay } from './quick-battle-setup.js';
+import { CharacterSelectScreen } from './character-select-screen.js';
+import { adventureSetup } from '../ui/components.js';
 import { newSeed } from '../core/adventure-progress.js';
 import { mulberry32 } from '../core/utils.js';
 import { isAdventureLevel, ADVENTURE_LEVELS } from '../data/adventure.js';
@@ -67,4 +69,15 @@ export async function continueAdventure(app, { random = Math.random, start = nul
   if (start) start(params);
   else app.screens.go('battle', params);
   return true;
+}
+
+// Adventure's Select Fighter (screen id `adventure-character`): the shared
+// roster, its kicker Adventure and its steps Mode · Level · Fighter, its
+// choice kept in app.selection.adventure; confirming goes on to the cards
+// (when due) and the Battle. Back returns to Select Level.
+export function adventureFighterScreen(app) {
+  return new CharacterSelectScreen(app, {
+    id: 'adventure-character', setup: adventureSetup, step: 2, selection: () => app.selection.adventure,
+    next: () => continueAdventure(app), previewId: 'adventure-preview-name',
+  });
 }
