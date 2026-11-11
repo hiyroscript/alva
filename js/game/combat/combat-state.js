@@ -46,7 +46,8 @@
 // successful block or Deflect) ever touches it: no defense gives any back.
 
 import { PHASE_EPSILON, attackPhase } from './attacks.js';
-import { LAUNCH_RECOVERY_DELAY, LAUNCH_RECOVERY_INTERVAL, LAUNCH_RECOVERY_AMOUNT } from '../../data/launch.js';
+import { LAUNCH_RECOVERY_DELAY } from '../../data/launch.js';
+import { IDENTITY_MODIFIERS, recoveryAmount, recoveryInterval, energyCost } from './modifiers.js';
 
 import {
   MAX_ENERGY, ENERGY_COST, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST, CONSTRUCT_ENERGY_COST,
@@ -177,9 +178,13 @@ export function attackEndsAt(a) {
   return a.whiffAt ?? a.def.total;
 }
 
-// Per-fighter combat state.
+// Per-fighter combat state. `modifiers` are its fighter's for the match
+// (js/game/combat/modifiers.js: the identity in every mode but Adventure),
+// read by the recovery clock, the Energy it pays (costOf) and, through
+// CombatSystem.applyHit, the damage it deals and takes.
 export class CombatState {
-  constructor(energy = resolveEnergy()) {
+  constructor(energy = resolveEnergy(), modifiers = IDENTITY_MODIFIERS) {
+    this.modifiers = modifiers ?? IDENTITY_MODIFIERS;
     // Launch Point: each real hit adds its damage and restarts passive
     // recovery (see CombatSystem.applyHit); a technique's heal takes some
     // off (see heal). Never negative, no maximum, and it never stops the
@@ -441,23 +446,29 @@ export class CombatState {
   // ---- Launch Point recovery ---------------------------------------------------
 
   // A real hit discards all progress, including a partial recovery tick.
+  // The wait is the delay (LAUNCH_RECOVERY_DELAY, the same for everyone)
+  // plus one interval (the fighter's: see recoveryInterval).
   resetLaunchRecovery() {
-    this.launchRecoveryRemaining = LAUNCH_RECOVERY_DELAY + LAUNCH_RECOVERY_INTERVAL;
+    this.launchRecoveryRemaining = LAUNCH_RECOVERY_DELAY + recoveryInterval(this.modifiers);
   }
 
   // Seconds until the next whole point: grace + interval after a hit,
   // then just interval. Consume every elapsed tick, retaining the fraction.
-  // At zero discard spare time so no overdue recovery can be banked.
+  // At zero discard spare time so no overdue recovery can be banked. Each
+  // tick takes off LAUNCH_RECOVERY_AMOUNT and each interval is
+  // LAUNCH_RECOVERY_INTERVAL, both through the fighter's modifiers
+  // (recoveryAmount, recoveryInterval: unchanged with the identity's).
   updateLaunchRecovery(dt) {
     if (this.launchPoint > 0) {
       this.launchRecoveryRemaining -= dt;
       if (this.launchRecoveryRemaining <= PHASE_EPSILON) {
-        const ticks = 1 + Math.floor((PHASE_EPSILON - this.launchRecoveryRemaining) / LAUNCH_RECOVERY_INTERVAL);
+        const interval = recoveryInterval(this.modifiers);
+        const ticks = 1 + Math.floor((PHASE_EPSILON - this.launchRecoveryRemaining) / interval);
         const before = this.launchPoint;
-        this.launchPoint = Math.max(0, before - ticks * LAUNCH_RECOVERY_AMOUNT);
+        this.launchPoint = Math.max(0, before - ticks * recoveryAmount(this.modifiers));
         this.launchPointRecovered += before - this.launchPoint;
         if (this.launchPoint < before) this.launchPointHeals++;
-        this.launchRecoveryRemaining += ticks * LAUNCH_RECOVERY_INTERVAL;
+        this.launchRecoveryRemaining += ticks * interval;
       }
     }
     if (this.launchPoint <= 0) {
@@ -510,6 +521,14 @@ export class CombatState {
   // fully pay for still stands; it empties the bar (see CombatSystem.applyHit).
   canShield() {
     return this.canUseEnergy();
+  }
+
+  // What a cost of `cost` Energy really costs this fighter: its modifiers'
+  // energyCostScale times it (the same with the identity's). Every payment
+  // goes through it (Fighter.payEnergy, a blocked hit in
+  // CombatSystem.applyHit).
+  costOf(cost) {
+    return energyCost(cost, this.modifiers);
   }
 
   // Pays `cost` at once, if canUseEnergy allows it. True when paid. With

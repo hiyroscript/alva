@@ -65,6 +65,7 @@ import { resolveLaunchStrength, resolveDirectionalLaunch, PERFECT_SHIELD_HEAL } 
 import { DEFLECT_ENERGY_COST } from '../../data/energy.js';
 import { attackPhase, strikeLive } from './attacks.js';
 import { backTurned, hitReaches } from './hit-effects.js';
+import { hitDamage } from './modifiers.js';
 
 // How a fighter responds to being launched (the character's
 // `launchReaction`, every field optional; the defaults change nothing):
@@ -560,8 +561,11 @@ export class CombatSystem {
     const perfect = blocked && !!target.perfectShield;
     let energyCost = 0;
     if (blocked) {
-      energyCost = Math.min(tc.energySpec.shieldHitCost, tc.energy);
-      tc.spendEnergy(tc.energySpec.shieldHitCost);
+      // What the block costs this fighter (its modifiers' Energy scale: the
+      // same with the identity's).
+      const cost = tc.costOf?.(tc.energySpec.shieldHitCost) ?? tc.energySpec.shieldHitCost;
+      energyCost = Math.min(cost, tc.energy);
+      tc.spendEnergy(cost);
       if (!tc.canShield()) tc.shielding = false;
     }
     if (!blocked && attacker?.combat?.charmedTo?.(target)) return this.charmed(attacker, target, def, { projectile, summon, technique, point });
@@ -569,7 +573,11 @@ export class CombatSystem {
     const feeds = !blocked && !!attacker && tc.frightenedOf?.(attacker);
     // Its back turned to the hit: a backstab's own damage, launch and stuns.
     const stab = !blocked && def.backstab && backTurned(target, fromX, facing) ? def.backstab : null;
-    const damage = blocked ? 0 : stab ? stab.damage : def.damage;
+    // A real hit's damage is its own (or its backstab's) through both
+    // fighters' modifiers (js/game/combat/modifiers.js hitDamage: the
+    // attacker's damageDealt, the target's damageTaken; the identity's
+    // change nothing, and a hazard has no attacker). A block deals 0.
+    const damage = blocked ? 0 : hitDamage(stab ? stab.damage : def.damage, attacker?.combat?.modifiers, tc.modifiers);
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
     // ...and fills its Limit gauge by as much (CombatState.fillLimit): a
