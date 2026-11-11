@@ -288,6 +288,10 @@ test('the roster: every move\'s Energy cost, from what it creates and its cooldo
     // Its presents and its tornadoes, ordinary constructs: 15 each, on the
     // ground and in the air. Every other move is its gloves and its hammer.
     '0015': { attack3: 15, midair_attack3: 15, attack4: 15, midair_attack4: 15 },
+    // Her pistols' shots and her arrow, ordinary constructs: 15 each. Her
+    // heal costs nothing; every other move is her own kicks, a shot from
+    // her hand and her line.
+    '0016': { attack2: 15, midair_attack2: 15, 'tech:attack3': 15, 'tech:attack5': 0 },
   };
   for (const c of CHARACTERS) {
     const f = makeFighter({ character: c }).fighter;

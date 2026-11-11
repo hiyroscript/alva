@@ -248,6 +248,8 @@ export const EN = {
   'credits.sprites0015.title': '#0015 sprite source',
   'credits.sprites0015.sheet': 'Sprite sheet ripped by QuadFactor on The Spriters Resource',
   'credits.sprites0015.sheetCredits': 'Original sprites by SEGA and Sonic Team',
+  'credits.sprites0016.title': '#0016 sprite source',
+  'credits.sprites0016.sheet': 'Sprite sheet by xxalexsmashxx on DeviantArt',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -556,6 +558,7 @@ export const EN = {
   'discover.fighter.0013.playStyle': 'A graceful close-range fighter whose every palm saps the opponent\'s power, stripping the guard, dash or recovery it was counting on, while a spinning dome of chakra sends shots back. It is light and short of reach, and its strongest techniques need a breakable moment to gather.',
   'discover.fighter.0014.playStyle': 'A bare-fisted brawler who rushes in with quick blows, seizes opponents to hurl them into the floor and sends a wave along the ground to catch those standing on it. The more punishment it takes, the closer it comes to a devastating comeback blow, but its throws and leaps leave it exposed when they miss.',
   'discover.fighter.0015.playStyle': 'A small, hammer-wielding scrapper that boxes up close, smashes and dives with heavy swings and whirls up tornadoes that drag opponents along, while traps left in their path punish careless approaches. Its big swings leave it wide open when they miss, and an opponent who keeps its guard up defuses its traps.',
+  'discover.fighter.0016.playStyle': 'A nimble adventurer who kicks and flips up close, peppers opponents with paired pistol shots and picks them off from afar with an arrow that punishes any back turned to her. Her draws and her kneeling heal are long, breakable moments, so an opponent who rushes her down denies her the room she needs.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',
