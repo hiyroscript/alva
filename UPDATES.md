@@ -25,7 +25,7 @@ for where they moved). The game as it is now is specified in
 | **Void update** | [#177](https://github.com/hiyroscript/alva/pull/177) | `fc2c114` (geometry and overtime), `982b009` (the loser ejected, the fire), `8685674` (the CPUs), `75d153d` (the art) | One main-stage length (1400) and one Void (468 / 1040 / 400) on every stage, overtime closing from every side on an accelerating curve with frantic waves, the match's loser ejected, the fire re-derived by simulation (70 / 110), and the CPUs reading it all, overtime's Void a second ahead |
 | **Screen Pad update** | [#180](https://github.com/hiyroscript/alva/pull/180) | `92592dc` | A third Mobile Controls scheme, now the default: the left half of the screen an invisible gesture pad (tap: Jump, swipe: Dash, hold and drag: Run and Down, swipe up: the Super Jump), the right-hand buttons as ever; every player's chosen scheme and layouts kept |
 | **Adventure update** | [#185](https://github.com/hiyroscript/alva/pull/185) | `48efc0a` (modifiers), `a708c97` (Venture, Perquisites, progress), `dd2dc29` (screens), `7afbb9a` (the CPU) | Select Mode's new first mode: thirty levels against Venture, a CPU 1.5 times smarter and 1.05 times stronger every level, with a Perquisite picked from two cards every five levels; per-fighter modifiers in the combat engine, identity everywhere else |
-| **Sound update** | (pull request to come) | (commits to come) | Alva's first sound, all of it synthesized live from code: each battle stage's own theme in five versions (Main Battle, Overtime following the closing Void, Victory, Defeat, Draw), Practice Ground's factory ambience, seven effects (three ejections, the Deflect, the Perfect Shield, the block, the Shield held), and Settings › Audio (settings version 12) |
+| **Sound update** | [#187](https://github.com/hiyroscript/alva/pull/187) | `cba16c8` (the engine, themes, effects, settings), `658e752` (the effects rebalanced), `85c66db` (the mix) | Alva's first sound, all of it synthesized live from code: each battle stage's own theme in five versions (Main Battle, Overtime following the closing Void, Victory, Defeat, Draw), Practice Ground's factory ambience, seven effects (three ejections, the Deflect, the Perfect Shield, the block, the Shield held), and Settings › Audio (settings version 12) |
 
 They were made in that order and build on each other: the effect update
 assumes the movement update, and the bounce update assumes both. The Mash
@@ -6719,7 +6719,10 @@ units taller (it was 15: #0015 is 12 taller).
 
 ## Sound update
 
-Asked for in the `max` prompt and named there. Alva had no sound: the
+Pull request [#187](https://github.com/hiyroscript/alva/pull/187), commits `cba16c8` (the engine,
+themes, effects and settings), `658e752` (the effects rebalanced) and
+`85c66db` (the themes mixed from measurements). Asked for in the `max`
+prompt and named there. Alva had no sound: the
 audio module was an empty foundation and the menus' `play('move')` calls
 played nothing (they still do). The update adds exactly the twelve kinds
 of sound the owner listed and nothing else, every one synthesized live on
