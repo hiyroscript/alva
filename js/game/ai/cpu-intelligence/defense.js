@@ -33,6 +33,7 @@
 import { STEP, Track, arcTrack, boxAt } from './prediction.js';
 import { moveReady } from './capabilities.js';
 import { perfectShieldValue } from './values.js';
+import { effectiveDamage } from './effective.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 import { attackPhase, strikeLive } from '../../combat/attacks.js';
 
@@ -432,7 +433,7 @@ export class Defense {
         // hit on its thrower if it still reaches, most of all one still
         // recovering from the throw.
         const flight = Math.max(0, threat.def.lifetime - (threat.age ?? 0) - threat.contact) * threat.def.speed;
-        const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + (threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
+        const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + effectiveDamage(me.mods, s.op.mods, threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
         options.push({
           score: 0.4 + back - (deflect.turnBackCost / 25) * p.energySense - (left <= 0 ? 5 * p.energySense : 0),
           plan: { kind: 'deflect', jump: d.jump, jumpAt: brain.clock + d.jumpAt, startAt: d.jump ? brain.clock + d.jumpAt : null, pressAt: brain.clock + d.press, why: 'Deflects it back' }, why: 'Deflect',
@@ -474,7 +475,7 @@ export class Defense {
         if (!m.deflectProjectiles || m.kind === 'deflect' || m.air === me.grounded || !moveReady(self, m)) continue;
         if (m.startup + STEP > threat.contact || m.startup + m.active < threat.contact + STEP) continue;
         const flight = Math.max(0, (threat.def.lifetime ?? 0) - (threat.age ?? 0) - threat.contact) * (threat.def.speed ?? 0);
-        const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + (threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
+        const back = Math.abs(s.op.x - me.x) < flight ? (0.6 + effectiveDamage(me.mods, s.op.mods, threat.def.damage ?? 0) * 0.12) * (s.op.busy > 0.15 ? 1.3 : 0.7) : 0;
         options.push({ score: 0.3 + back, plan: { kind: 'press', move: m, why: 'turns it back' }, why: 'turns it back' });
       }
     }

@@ -17,6 +17,7 @@
 import { launchOutcome } from './prediction.js';
 import { LAUNCH_UNIT_SPEED, PERFECT_SHIELD_HEAL, LAUNCH_POINT_INFERNO } from '../../../data/launch.js';
 import { backTurned } from '../../combat/hit-effects.js';
+import { effectiveDamage } from './effective.js';
 
 export const KO_VALUE = 70;
 
@@ -105,8 +106,12 @@ export class LaunchJudge {
   // What landing the first `n` of `strikes` on a target is worth (see the
   // header): `target` 'foe' (the CPU's hit) or 'me' (the opponent's on the
   // CPU), at `pos`, travelling toward `face`. { value, ko, lp, offstage }.
+  // Each strike adds what it really adds (effective.js effectiveDamage:
+  // the attacker's damage dealt and the target's damage taken, the match's
+  // modifiers), so the launch it gives is the real one too.
   strikes(s, target, strikes, n, pos, face, out = {}) {
     const who = target === 'foe' ? s.op : s.me;
+    const by = target === 'foe' ? s.me.mods : s.op?.mods;
     let lp = who.lp;
     let value = 0;
     let ko = 0;
@@ -117,8 +122,9 @@ export class LaunchJudge {
     const fromX = target === 'foe' ? s.me.x : s.op.x;
     for (let i = 0; i < Math.min(n, strikes.length); i++) {
       const st = stabbed(strikes[i], who, pos, fromX, face);
-      lp += st.damage;
-      value += st.damage * (1 + lp / LP_WORTH);
+      const damage = effectiveDamage(by, who.mods, st.damage);
+      lp += damage;
+      value += damage * (1 + lp / LP_WORTH);
       if (st.dir && st.baseLaunch > 0) {
         const l = this.launch(s, target, pos, lp, st, face);
         if (l.ko > ko) ko = l.ko;

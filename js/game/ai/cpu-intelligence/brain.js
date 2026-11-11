@@ -65,6 +65,7 @@ import { MatchObjective } from './objective.js';
 import { STEP, Track, arcTrack, predictTrack, recoverySim } from './prediction.js';
 import { riseOf, KO_VALUE } from './values.js';
 import { analyzeCapabilities, moveReady } from './capabilities.js';
+import { recoveryRelief } from './effective.js';
 import { StageModel } from './stage-model.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
 import { MASH_COMBO } from '../../../data/mash-combo.js';
@@ -745,7 +746,13 @@ export class CpuIntelligence {
     // Shield, less the more it turtles or holds back.
     const model = this.opponent;
     const commits = s.present ? (s.op.shielding ? 0.35 : 1) * (1 - 0.6 * model.turtling) * Math.min(1, 0.4 + model.aggressive) : 1;
-    const wait = (0.4 + p.patience * 1.6) * o.select * (1 - o.impatience * 0.6) * commits;
+    // An opponent that recovers faster than the universal rate (an
+    // Adventure player's Nearly Immortal or Velocious Immune System:
+    // effective.js) makes pressure that lets up worth less: while it has
+    // Launch Point to recover, waiting is worth that much less, so it keeps
+    // its momentum. 1 (nothing changes) for everyone else.
+    const relief = s.present && s.op.lp > 0 ? recoveryRelief(s.op.mods) : 1;
+    const wait = ((0.4 + p.patience * 1.6) * o.select * (1 - o.impatience * 0.6) * commits) / relief;
     // Keeping out of the fight (recovering, protecting a lead), even an
     // opening must be a clear one, and is worth part of the wait.
     const guarded = o.wait >= 0.8;

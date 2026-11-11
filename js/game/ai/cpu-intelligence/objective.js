@@ -54,10 +54,8 @@
 // clock and Launch Points, the stage, the fighters); bounded work, a few
 // times a second.
 
-import {
-  LAUNCH_RECOVERY_AMOUNT, LAUNCH_RECOVERY_DELAY, LAUNCH_RECOVERY_INTERVAL,
-} from '../../../data/launch.js';
 import { LAUNCH_POINT_SCALE } from './values.js';
+import { effectiveRecovery, BASE_RECOVERY_RATE } from './effective.js';
 
 export const OBJECTIVES = Object.freeze(['build', 'finish', 'stabilize', 'protect', 'survive', 'force', 'regroup']);
 
@@ -94,12 +92,14 @@ const BIAS = Object.freeze({
 
 // Seconds a point takes before the match has shown its own pace.
 const PACE_PRIOR = 45;
-// Launch Point recovered per second once recovery is running (4 since the
-// launch & energy update's 2 points a tick; it was 2).
-const RECOVERY_RATE = LAUNCH_RECOVERY_AMOUNT / LAUNCH_RECOVERY_INTERVAL;
+// Launch Point recovered per second once recovery is running is each
+// fighter's own rate (effective.js effectiveRecovery: 4 with the universal
+// 2 points a tick every 0.5 s, the launch & energy update's; it was 2;
+// faster for an Adventure player with Nearly Immortal or Velocious Immune
+// System), after LAUNCH_RECOVERY_DELAY (2 s) unhit.
 // The Launch Points a break-off is fully worth making for: with time on
 // the clock to take back this many it is worth all it can be, with less a
-// share. In seconds of recovery that is RECOVERABLE_POINTS / RECOVERY_RATE
+// share. In seconds of recovery that is RECOVERABLE_POINTS / its rate
 // (20 s at the old rate, 10 now): recovery paying back twice as fast makes
 // a short break-off worth more.
 const RECOVERABLE_POINTS = 40;
@@ -230,14 +230,16 @@ export class MatchObjective {
     const pace = clamp((this.elapsed + PACE_PRIOR * 2) / (this.points + 2), 20, 90);
     const timeLeft = Number.isFinite(m.timeLeft) ? m.timeLeft : Infinity;
     const lead = m.lead;
+    // Each fighter's recovery as the match really runs it (effective.js).
+    const myRec = effectiveRecovery(me.mods);
+    const foeRec = effectiveRecovery(op.mods);
     // Overtime level on points: the lower Launch Point when the clock runs
-    // out, both recovering as it runs (LAUNCH_RECOVERY_AMOUNT by 0.5 s once
-    // 2 s pass unhit).
+    // out (the real values, fractions and all), both recovering as it runs
+    // (each at its own rate once 2 s pass unhit).
     let tiebreak = 0;
     if (m.overtime && lead === 0) {
-      const back = Math.max(0, timeLeft - LAUNCH_RECOVERY_DELAY) * RECOVERY_RATE;
-      const mine = Math.max(0, me.lp - back);
-      const theirs = Math.max(0, op.lp - back);
+      const mine = Math.max(0, me.lp - Math.max(0, timeLeft - myRec.delay) * myRec.rate);
+      const theirs = Math.max(0, op.lp - Math.max(0, timeLeft - foeRec.delay) * foeRec.rate);
       tiebreak = Math.abs(mine - theirs) < 1e-6 ? 0 : mine < theirs ? 1 : -1;
     }
     this.tiebreak = tiebreak;
@@ -268,11 +270,16 @@ export class MatchObjective {
     // The scores.
     sc.regroup = -10;
     sc.build = 0.45 + this.impatience * 0.4;
-    sc.finish = foeExp * 1.4 - myExp * 0.3 + (op.offstage ? 0.3 : 0) + (m.mine >= m.toWin - 1 ? 0.08 : 0) + this.temper.boldness;
+    // An opponent that recovers faster than the universal rate (an
+    // Adventure player's Perquisites) makes a finish now worth more than
+    // one later: what it would take back meanwhile counts against waiting.
+    const foeRelief = foeRec.rate / BASE_RECOVERY_RATE - 1;
+    sc.finish = foeExp * 1.4 - myExp * 0.3 + (op.offstage ? 0.3 : 0) + (m.mine >= m.toWin - 1 ? 0.08 : 0) + this.temper.boldness +
+      foeRelief * 0.3 * foeExp;
     // Breaking off pays only with the time to recover something (2 s
-    // unhit, then RECOVERY_RATE a second) and no comeback to make. A
+    // unhit, then its own rate a second) and no comeback to make. A
     // Launch Point lead counts at the launch scale (LAUNCH_POINT_SCALE).
-    const recoverable = clamp((Math.min(timeLeft, 60) - LAUNCH_RECOVERY_DELAY) / (RECOVERABLE_POINTS / RECOVERY_RATE));
+    const recoverable = clamp((Math.min(timeLeft, 60) - myRec.delay) / (RECOVERABLE_POINTS / myRec.rate));
     sc.stabilize = ((myExp - foeExp * 0.6) * 1.5 + clamp((me.lp - op.lp) / (150 * LAUNCH_POINT_SCALE), -0.2, 0.3)) * recoverable -
       this.impatience * 0.6 - (failing ? 0.6 : 0) - (this.stalled ? 0.35 : 0);
     // A break-off under way sees itself through until the Launch Point has

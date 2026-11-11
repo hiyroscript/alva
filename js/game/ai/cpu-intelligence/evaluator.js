@@ -39,6 +39,7 @@ import {
   STEP, Track, moveContact, projectileContact, arcTrack, recoverySim, boxAt, bodyFrom,
 } from './prediction.js';
 import { LaunchJudge, KO_VALUE, LAUNCH_POINT_SCALE, riseOf } from './values.js';
+import { effectiveEnergyCost } from './effective.js';
 import { stepBody } from '../../physics.js';
 import { attackPhase } from '../../combat/attacks.js';
 import { BASE_FIGHTER_MOVEMENT as MV } from '../../../data/movement.js';
@@ -607,7 +608,8 @@ export class Evaluator {
       const stall = !c.projectile && !c.detached ? s.foeCaps.shield?.stall ?? 0 : 0;
       const minus = stall + (m.total - tC + c.k0 * STEP) - (lastStrike?.blockstun ?? 0);
       vBlock = minus > this.foeFast ? -this.foePunish * 0.7 : -0.5;
-      if (op.energy <= (s.foeCaps.shield?.blockCost ?? 15)) vBlock += 6;
+      // What a block really costs it (effective.js: the match's modifiers).
+      if (op.energy <= effectiveEnergyCost(op.mods, s.foeCaps.shield?.blockCost ?? 15)) vBlock += 6;
       else vBlock += 0.6;
     }
     // What a whiff costs: the window it leaves the opponent.
