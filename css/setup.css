@@ -681,6 +681,6 @@
   color: var(--danger-edge-strong);
   font-size: clamp(12px, 1.8vh, 14px);
 }
-:where(html:not(.is-touch-input)) .btn.adventure-reset:enabled:hover, .btn.adventure-reset.is-cursor-target:enabled { background: rgba(255, 90, 79, 0.08); border-color: var(--danger-edge-strong); }
-.btn.adventure-reset.is-armed { background: rgba(255, 90, 79, 0.18); border-color: var(--danger-edge-strong); color: var(--white); }
-.btn.adventure-reset:active { background: rgba(255, 90, 79, 0.24); }
+:where(html:not(.is-touch-input)) .btn.adventure-reset:enabled:hover, .btn.adventure-reset.is-cursor-target:enabled { background: color-mix(in srgb, var(--danger-edge) 14%, transparent); border-color: var(--danger-edge-strong); }
+.btn.adventure-reset.is-armed { background: color-mix(in srgb, var(--danger-edge) 30%, transparent); border-color: var(--danger-edge-strong); color: var(--white); }
+.btn.adventure-reset:active { background: color-mix(in srgb, var(--danger-edge) 40%, transparent); }
