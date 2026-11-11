@@ -177,7 +177,7 @@ freeze holds the body's velocity, never loses it.
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0001 to #0014 use them between them
+is built, and usable by any fighter (#0001 to #0015 use them between them
 today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
@@ -439,6 +439,7 @@ in its own definition, by move codename (`specialAbilities`, read through
 | #0012 | `['attack5']` | Dragonblade (a 10-damage cleave all round it, the dragon spirit coiling round it, after half a second's breakable stance) | Shuriken (a volley), the Deflect Stance (it turns shots back), Swift Strike and the Rising Strike (dashes through) |
 | #0013 | `['attack3', 'attack4']` | the Twin Lion Fists (lions of chakra that surge out and drain half the target's Energy), the Sixty-Four Palms (a 10-damage flurry that seals the target's chakra: its whole bar drained) | the Protective Palms (a dome that turns shots back), its draining palms |
 | #0014 | `['attack5']` | Sunburst Fist (its Limit Break: a 10-damage punch that only a Limit gauge filled by the damage it takes opens) | Meteodrive and Meteor Strike (grabs), Waterkick (a ground wave), its rushes |
+| #0015 | `['attack3', 'midair_attack3']` | the Gift and the Air Gift (a present left on the floor or in the air that waits for the first opponent to touch it, one at a time) | the Pink Typhoon's tornado (it pulls, carries and throws), the Girl Dunk's shockwave, its hammer and its gloves |
 
 Nothing infers it: a projectile, a pull, a tornado, a ground eruption, a
 technique or a summon is not Special because of what it is, and no name,
@@ -545,10 +546,10 @@ entry (once, or `count` times in a row for a
 `finisher` (its last strike), `pull: { radius, speed, front }`, `repel`, `erase`
 and the hit effects, and `rotationSpeed` (degrees per second its art
 spins as it flies, clockwise; 0, the default, is none: art only, see
-[rendering](rendering.md#projectile-spin)). A projectile flies straight
+[rendering](rendering.md#projectile-spin)), and `maxInPlay` (below). A projectile flies straight
 in the direction its
 thrower faced at the release (one with no `speed` stays where it appears,
-an obstacle: #0004's dancing double), never turns, hits once by default (a
+an obstacle: #0004's dancing double, #0015's present), never turns, hits once by default (a
 piercing one up to its `hits`, an erasing one each fighter it hits once,
 flying on through), and is gone on a block (any projectile, an erasing or
 piercing one included: a Shield stops it), at the end of its lifetime, in
@@ -561,6 +562,19 @@ rank that act both go; two that do neither pass each other by. A live
 Deflect turns one back the same way (`Projectile.turnBack`), whatever it
 is: away from the deflecting fighter, its strikes starting over, the rest
 of its lifetime kept.
+
+**One at a time** (`maxInPlay`, a whole number; 0, the default, is no
+bound): its thrower never has more than that many of its move's
+projectiles in play at once. Releasing one more first retires the oldest
+of them still there (`spawnProjectiles`, `makeRoomFor`: the list is in
+release order), gone that step without striking, as many as it takes; a
+new one is never refused. The move is its attack family by codename
+(`moveFamily`: `attack3_object` and `midair_attack3_object` are both
+`attack3`'s), so a ground move's and its mid-air version's count
+together, and only those it threw itself count: one another fighter has
+turned back is that fighter's. Routine for the cooldown policy. #0015's
+Gift and Air Gift (`maxInPlay: 1`): one present at a time, wherever it was
+left.
 
 ## Summons
 
@@ -837,12 +851,14 @@ nothing: the Twin Lion Fists' lions and every palm drain and stay
 ordinary), and of #0014's but the Sunburst Fist (its grabs, the carry and lift
 of Meteor Strike, the Divekick's slam and Waterkick's ground wave earn
 nothing; its Limit is a start condition, never a mechanic of the hit), and
-every Deflect none.
+every move of #0015's (its presents waiting on the stage one at a time,
+its tornadoes' pulls, strikes and carries, the Girl Dunk's slam and
+shockwave earn nothing), and every Deflect none.
 The ordinary ones that create a construct (Red, Maximum Blue, the
 Melody, Cherry Blossom Impact, Heat Vision, the Sonic Scream, the Pistol,
 the Molotov Cocktail, the Sawn-Offs, the Air Blast, the Air Gust, the
 Earth Pillar, Shuriken: once for its volley of three, the Twin Lion
-Fists, Waterkick) cost 15 Energy
+Fists, Waterkick, #0015's presents and tornadoes) cost 15 Energy
 instead ([energy](energy.md#construct-moves)).
 
 **Reading cooldowns.** `CombatState.cooldowns` and
@@ -1003,8 +1019,11 @@ and the turn (`mash`). Out of a series the same move launches as authored.
 **The lock.** While it runs nothing the fighter's controls ask for cancels
 it: `canAct`, `canFollowUp` and `moveYields` are false, `cutAttack` cuts
 nothing, the jump is not free, and every combat press is the combo's
-(dropped). Nothing pressed during it, or on the step it ends, is kept for
-after it: the attack, Dash and jump buffers are emptied.
+(dropped). Nothing pressed while it is armed (waiting for the move its
+first press started to end) or while it runs, or on the step it ends, is
+kept for after it: the attack, Dash and jump buffers are emptied
+(`Fighter.dropRequests`, every step the combo is `engaged`), so a jump
+pressed during that wait never takes off ahead of the first turn.
 
 **What ends it** (`mashBroken`, `endMashCombo`, then `lastEnd.reason`): a
 stun (any hit that stuns), a paralysis, a launch, losing the ground (a

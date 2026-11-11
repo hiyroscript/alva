@@ -122,7 +122,7 @@ behave, and how it must look.
   `assets/characters/0004/`, `assets/characters/0005/`,
   `assets/characters/0006/` (its three members' frames),
   `assets/characters/0007/`, `assets/characters/0008/`,
-  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/`, `assets/characters/0012/`, `assets/characters/0013/` and `assets/characters/0014/` are the only fighter art in the repository today, and any future fighter's frames go
+  `assets/characters/0009/`, `assets/characters/0010/`, `assets/characters/0011/`, `assets/characters/0012/`, `assets/characters/0013/`, `assets/characters/0014/` and `assets/characters/0015/` are the only fighter art in the repository today, and any future fighter's frames go
   in a folder of its own id.
   Every file, its size and the clips it makes are listed in the fighter's
   character specification (7.2.9).
@@ -159,8 +159,8 @@ behave, and how it must look.
   Projectile art travels its own `sourceFacing` way and is mirrored when
   thrown the other way; `sourceFacing: 0` marks direction-neutral art,
   never mirrored. (All of #0001's, #0002's, #0003's, #0004's, #0005's,
-  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's and #0014's art faces right; #0001's three orbs, #0004's note,
-  #0005's balloons, #0007's molotov fire, #0010's meeting call, #0012's shuriken and #0014's explosion are direction-neutral.)
+  #0006's, #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's and #0015's art faces right; #0001's three orbs, #0004's note,
+  #0005's balloons, #0007's molotov fire, #0010's meeting call, #0012's shuriken, #0014's explosion and #0015's present and tornadoes are direction-neutral.)
 - Projectile and effect art (a character's `projectileAnimations` and
   `effectAnimations`) is normalized apart from the fighter's poses: the
   same grid detection, a centre anchor instead of bottom-centre, and the
@@ -171,7 +171,7 @@ behave, and how it must look.
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate a fighter's supplied
   artwork** (#0001's, #0002's, #0003's, #0004's, #0005's, #0006's,
-  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's or any later fighter's). Do not download
+  #0007's, #0008's, #0009's, #0010's, #0011's, #0012's, #0013's, #0014's, #0015's or any later fighter's). Do not download
   third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -852,7 +852,7 @@ a **Perquisite** to pick every five levels. Explained in
   focused by default, as the first playable fighter), `#0002` in slot 02,
   `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05, `#0006` in
   slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in slot 09,
-  `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12, `#0013` in slot 13 and `#0014` in slot 14; the other 34 are locked. A fighter that is not
+  `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12, `#0013` in slot 13, `#0014` in slot 14 and `#0015` in slot 15; the other 33 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -1271,6 +1271,11 @@ neither player learns the other's address.
     Soulfire, thekrillmaster, mestreax, Redballbomb, lk-sixtyfour,
     Dantewrecker999, Neimad, Hyperlon and Biometalneo; all the editing by
     xelectromanx10.
+  - **#0015 sprite source** — sprite sheet ripped by QuadFactor on The
+    Spriters Resource, the line linked to the sheet's page (by the asset's
+    number: the address names the game the sheet comes from, never the
+    character), and the credit the sheet itself gives: original sprites by
+    SEGA and Sonic Team.
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -1282,10 +1287,10 @@ neither player learns the other's address.
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
 - The UI does not name the character behind #0001, #0002, #0003, #0004,
-  #0005, #0006, #0007, #0008, #0009, #0010, #0011, #0012, #0013 or #0014
-  (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` /
+  #0005, #0006, #0007, #0008, #0009, #0010, #0011, #0012, #0013, #0014 or
+  #0015 (or any fighter): each stays `#0001` / `#0002` / `#0003` / `#0004` /
   `#0005` / `#0006` / `#0007` / `#0008` / `#0009` / `#0010` / `#0011` /
-  `#0012` / `#0013` / `#0014` in
+  `#0012` / `#0013` / `#0014` / `#0015` in
   game, and
   neither the code, the data, the file names nor the documentation name
   any of them. Never imply ownership of
@@ -1921,8 +1926,8 @@ English and French.
   Launcher, #0008's Feast and Gum-Gum Giant Pistol, #0009's Freezing
   Splash and Air Sphere, #0010's Kill, Emergency Meeting and Vent,
   #0011's Camouflage and Venom Punch, #0012's Dragonblade, #0013's Twin
-  Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, marked Ground
-  or Air;
+  Lion Fists and Sixty-Four Palms, #0014's Sunburst Fist, #0015's Gift
+  and Air Gift, marked Ground or Air;
   every other move, a projectile, technique or summon included, sits
   under Ground or Aerial attacks where it is played; a category with
   nothing in it is left out, so #0002 shows none), **Other** (Pause) —
@@ -2375,12 +2380,12 @@ each fighter's own values are in its character specification (7.2.9).
   `js/data/characters.js`) holds ten definitions today, each in a module
   of its own (`js/data/characters/0001.js`, `0002.js`, `0003.js`,
   `0004.js`, `0005.js`, `0006.js`, `0007.js`, `0008.js`, `0009.js`,
-  `0010.js`, `0011.js`, `0012.js`, `0013.js`, `0014.js`): `#0001` in roster slot 01, `#0002` in
+  `0010.js`, `0011.js`, `0012.js`, `0013.js`, `0014.js`, `0015.js`): `#0001` in roster slot 01, `#0002` in
   slot 02, `#0003` in slot 03, `#0004` in slot 04, `#0005` in slot 05,
   `#0006` in slot 06, `#0007` in slot 07, `#0008` in slot 08, `#0009` in
   slot 09, `#0010` in slot 10, `#0011` in slot 11, `#0012` in slot 12,
-  `#0013` in slot 13 and `#0014` in slot 14, each fully implemented
-  (7.2.9) and playable: `available: true`. All fourteen are
+  `#0013` in slot 13, `#0014` in slot 14 and `#0015` in slot 15, each fully
+  implemented (7.2.9) and playable: `available: true`. All fifteen are
   preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -2555,6 +2560,12 @@ each fighter's own values are in its character specification (7.2.9).
   Somersault) are ordinary attacks, `attack4` (Waterkick) and `attack5`
   (the Sunburst Fist, its Limit Break) techniques, and `extra_attack` is its
   Whirling Uppercut, on the ground only (the sheet draws it standing).
+  #0015 has four, every one an ordinary attack: `attack1` (the Girl Combo;
+  `midair_attack1`, the Air Girl Crush), `attack2` (the Girl Crush;
+  `midair_attack2`, the Girl Dunk), `attack3` (the Gift; `midair_attack3`,
+  the Air Gift) and `attack4` (the Pink Typhoon; `midair_attack4`, the Air
+  Pink Typhoon), and `extra_attack` is its Girl Swing, on the ground only
+  (the sheet draws it standing).
 - **Special abilities** are a player-facing label, apart from how a move
   is executed and from its cooldown: each fighter names its own in its
   definition by move codename (`specialAbilities`, read through
@@ -2570,14 +2581,15 @@ each fighter's own values are in its character specification (7.2.9).
   Freezing Splash and the Air Sphere; #0010: the Kill, the Vent and the
   Emergency Meeting; #0011: Camouflage and the Venom Punch; #0012:
   Dragonblade; #0013: the Twin Lion Fists and the Sixty-Four Palms; #0014:
-  the Sunburst Fist: twenty-one across the roster. Red, Maximum Blue, the
+  the Sunburst Fist; #0015: the Gift and the Air Gift: twenty-three across
+  the roster. Red, Maximum Blue, the
   Whirlwind, Cherry Blossom Impact, Ievan Polkka, Dark Tendrils, Heat
   Vision, the Sonic Scream, the Triple Strike, the Molotov Cocktail, the
   Sawn-Offs, the Pistol, the Gum-Gum Balloon, the Gum-Gum Rocket, the Air
   Blast, the Air Gust, the Earth Pillar, the Tongue Lash, the Web Shot, Web
   Lines, the Venom Jump, Shuriken, the Deflect Stance, Swift Strike, the
-  Rising Strike, the Protective Palms, Meteodrive, Meteor Strike and
-  Waterkick are ordinary. The
+  Rising Strike, the Protective Palms, Meteodrive, Meteor Strike,
+  Waterkick, the Pink Typhoon and the Girl Dunk are ordinary. The
   list may name only moves the fighter really performs where it lists
   them, each once, or the registry refuses it (`assertSpecialAbilities`).
   Only presentation reads it (the controller editor's Special abilities
@@ -3047,7 +3059,7 @@ each fighter's own values are in its character specification (7.2.9).
     webbing's hold), Camouflage 3 s (its cloak) and the Venom Punch 3 s
     (its hold), #0012 Dragonblade 5 s (its 10-damage cleave), #0013 the
     Sixty-Four Palms 5 s (its 10-damage flurry), #0014 Sunburst Fist 5 s (its
-    10-damage punch); every other move of the fourteen, Red,
+    10-damage punch); every other move of the fifteen, Red,
     Blue, Maximum Blue, Cherry Blossom Impact, the Heavenly Foot of Pain,
     the Stage Dive, Dark Tendrils, the Tornado Spin, Heat Vision, the Sonic
     Scream, the Molotov Cocktail, the Sawn-Offs, #0008's Gatling (8 at the
@@ -3059,7 +3071,9 @@ each fighter's own values are in its character specification (7.2.9).
     Rising Strike (a lift) and #0013's palms and Twin Lion Fists (a drain,
     however much), Protective Palms (a turn-back) and Falling Palm (a slam)
     and #0014's grabs (Meteodrive, Meteor Strike's carry and lift), Divekick
-    (a slam) and Waterkick (a ground wave) included, none at all (the ordinary ones
+    (a slam) and Waterkick (a ground wave) and every move of #0015's (its
+    presents, one at a time, its tornadoes' pulls and carries, the Girl
+    Dunk's slam and shockwave) included, none at all (the ordinary ones
     that create a construct cost 15 Energy instead, 7.2.5). The player, the
     CPU and the ability HUD all read the same built definitions and combat
     state (`js/game/combat/move-status.js` for presentation).
@@ -3484,6 +3498,15 @@ each fighter's own values are in its character specification (7.2.9).
     more than one block, as a blocked strike stops a string; a shot turned
     back is no longer part of it. A technique that declares one is refused
     (#0012's Shuriken).
+  - **One at a time** (`maxInPlay`, a projectile's whole number; 0, the
+    default, is no bound): its thrower never has more than that many of
+    its move's projectiles in play at once; one more released takes the
+    place of the oldest still there, gone that step without striking (a
+    new one is never refused). The move is its attack family by codename
+    (a ground move's and its mid-air version's count together), and only
+    those it threw itself count (one turned back is its deflector's).
+    Routine for the cooldown policy (#0015's Gift and Air Gift: one present
+    at a time).
   - **Projectiles that act on each other** (`clashProjectiles`): `repel:
     true` turns another fighter's projectile it meets back the way it
     flies, that projectile its owner's from then on (as if thrown by it, its
@@ -3704,7 +3727,9 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
 - **Non-cancellable.** Nothing the fighter's own controls ask for cuts it
   short: no attack, Special, projectile, summon, technique, jump, Dash, air
   dash, Shield, Deflect, hit-cancel or buffered press; and nothing pressed
-  during it (or on the step it ends) comes out after it.
+  while it is armed (waiting for the move its first press started to end)
+  or runs (or on the step it ends) comes out after it: a jump pressed
+  during the wait never takes off ahead of its first turn.
 - **Interruptible.** It has no armour, invincibility or Shield bypass. A
   hit that stuns, a paralysis, a launch, losing the ground, the Void, a
   reset or a respawn ends it at once: the turn in progress with it, no
@@ -3979,8 +4004,10 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
   every move its own body; nor has #0010: its one construct, the
   Emergency Meeting's call, has its 3 s; nor has #0011: its one
   projectile, the Web Shot's webbing, has its 3 s), #0012 Shuriken and
-  #0013 the Twin Lion Fists (its lions, a projectile) and #0014 Waterkick
-  (its wave, a projectile). One
+  #0013 the Twin Lion Fists (its lions, a projectile), #0014 Waterkick
+  (its wave, a projectile) and #0015 the Gift, the Air Gift (its present,
+  a projectile that never moves), the Pink Typhoon and the Air Pink
+  Typhoon (its tornadoes). One
   activation pays once: never per projectile update, per hit (a piercing
   orb's several strikes), per shot of a volley (#0012's three shuriken:
   one 15), per frame a construct lives, per clone strike,
@@ -3990,7 +4017,7 @@ Every rule here is strict. Rules: `js/data/mash-combo.js`; runtime:
 
   A fighter's `energy` entry sets only its own refill rate (`regen`, per
   second; 12 when left out; #0001 14, #0002 12, #0003 15, #0004 14, #0005
-  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12, #0013 12, #0014 12). The maximum and every
+  14, #0006 14, #0007 14, #0008 12, #0009 12, #0010 12, #0011 12, #0012 12, #0013 12, #0014 12, #0015 12). The maximum and every
   cost are universal (a move's own `energyCost` too: one it declares must
   agree with the policy): a definition may leave each out, and declaring one
   with any other value (or a field the schema does not know) is refused as
@@ -4943,6 +4970,21 @@ there, and nothing in one is a rule for another fighter.
   damage it takes, is full (a technique's `limit`, a capability any
   fighter may now use); its fists raised for its guard and a high kick
   through a red arc for its Deflect).
+- **#0015**: [docs/characters/0015.md](docs/characters/0015.md) (the
+  small pink hedgehog girl in a red dress, with a huge hammer: the Girl
+  Combo (a jab, a straight and an uppercut in boxing gloves) and the Girl
+  Swing (its hammer swung up from the floor over its head) up close, its
+  Mash Combo; the Girl Crush, a sweep that holds through a full turn into
+  a smash that drives a Shield back; the Air Girl Crush, its hammer
+  brought down from overhead, and the Girl Dunk, a dive hammer-first whose
+  landing sends a shockwave along the floor, in the air; the Pink Typhoon,
+  a whirl that holds whoever it catches and tears loose as a pink tornado
+  that draws opponents in, carries them along and throws them up, on the
+  ground and in the air; and the Gift, its Special, a present left with a
+  blown kiss on the floor or hanging in the air that waits six seconds for
+  the first opponent to touch it, one present at a time (a projectile's
+  `maxInPlay`, a capability any fighter may now use); its palm thrust out
+  for its guard and a flying knee for its Deflect).
 
 Each playable fighter also has a **Discover profile**
 (`js/data/fighter-profiles.js`, 6.9): its one 1–5 difficulty rating, the
@@ -4959,7 +5001,7 @@ reviewedSourceHash"), and whenever a playable fighter has no valid profile
 or description in both languages, so every change to a fighter brings its
 profile back for review. Current profiles: #0001 5/5, #0002 3/5, #0003 3/5,
 #0004 4/5, #0005 4/5, #0006 3/5, #0007 3/5, #0008 3/5, #0009 4/5,
-#0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5.
+#0010 4/5, #0011 3/5, #0012 3/5, #0013 3/5, #0014 3/5, #0015 3/5.
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -5128,7 +5170,10 @@ Adding one is described in
     Fist, the Sweep Kick, the Protective Palms, the Twin Lion Fists and the
     Sixty-Four Palms, air the Air Palm and the Falling Palm; #0014: ground
     Beat Rush, Meteodrive, Meteor Strike, Waterkick, the Sunburst Fist and the
-    Whirling Uppercut, air the Air Combo, the Divekick and the Somersault.
+    Whirling Uppercut, air the Air Combo, the Divekick and the Somersault;
+    #0015: ground the Girl Combo, the Girl Crush, the Gift, the Pink
+    Typhoon and the Girl Swing, air the Air Girl Crush, the Girl Dunk, the
+    Air Gift and the Air Pink Typhoon.
   - *Ground and air wheel.* Two rows on two fixed positions: on top, full
     size and opacity, the moves of where the fighter is now
     (`Fighter.grounded`); beneath, about 70% the size, about half opacity
@@ -5422,7 +5467,10 @@ Adding one is described in
   Twin Lion Fists, M the Sixty-Four Palms, `,` nothing and J the
   Protective Palms (on the ground only); for #0014, O is Meteor Strike (the
   Somersault in the air), M Waterkick, `,` Sunburst Fist and J the Whirling
-  Uppercut (on the ground only). The
+  Uppercut (on the ground only); for #0015, I is the Girl Crush (the Girl
+  Dunk in the air), O the Gift (the Air Gift in the air), M the Pink
+  Typhoon (the Air Pink Typhoon in the air), `,` nothing and J the Girl
+  Swing (on the ground only). The
   input
   snapshot (`InputManager.sample(context)`, the fighter as it is at that
   step) carries held controls and their press edges from keys (never
@@ -5650,8 +5698,9 @@ Adding one is described in
   #0011: the Web Shot in slot 3, Camouflage in slot 4 and the Venom Punch
   in slot 5; #0012: the Deflect Stance in slot 3, Swift Strike in slot 4
   and Dragonblade in slot 5), 4 again for #0013 (the Twin Lion Fists in
-  slot 3 and the Sixty-Four Palms in slot 4) and 5 for #0014 (Meteor Strike
-  in slot 3, Waterkick in slot 4 and the Sunburst Fist in slot 5). A summon or technique button is
+  slot 3 and the Sixty-Four Palms in slot 4), 5 for #0014 (Meteor Strike
+  in slot 3, Waterkick in slot 4 and the Sunburst Fist in slot 5) and 4 for
+  #0015 (the Gift in slot 3 and the Pink Typhoon in slot 4). A summon or technique button is
   pressed exactly like an attack button. The saved custom layout (6.10a) keys every one of them by its
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
@@ -5982,7 +6031,9 @@ codename is sent, never what an action does.
   #0014: Beat Rush Square, Whirling Uppercut Triangle, Meteodrive Circle,
   Meteor Strike the right stick up, Waterkick R2, the Sunburst Fist L2; in the
   air Air Combo Square, Divekick the right stick down, Somersault the right
-  stick up. A
+  stick up. #0015: Girl Combo Square, Girl Swing Triangle, Girl Crush
+  Circle, Pink Typhoon R2, Gift L2; in the air Air Girl Crush Square, Girl
+  Dunk the right stick down, Air Pink Typhoon R2, Air Gift L2. A
   fighter without a
   layout gets a safe,
   conflict-free fallback, shown as not designed yet; every playable fighter
