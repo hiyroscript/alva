@@ -7063,8 +7063,19 @@ What it does, measured on the tests' seeded scenarios:
   but plan depth (4 for both). `VENTURE_SMARTS_GROWTH` (1.5) and
   `VENTURE_LIMITS` are unchanged.
 
-The benchmark in `docs/systems/ai.md` was measured before this change and
-was not re-run (`node tests/benchmarks/cpu-benchmark.mjs --suite all`).
+**Benchmark** (`node tests/benchmarks/cpu-benchmark.mjs --suite all
+--seeds 1`, one process per matchup: 1,024 matches each over the sixteen
+fighters, 19,456 in all, the profiles before measured the same way; full
+tables in [docs/systems/ai.md](./docs/systems/ai.md#benchmark)). Against
+the competent reference Easy now wins 79.3% (92.2% before) and takes 331
+Launch Point a match from it (212); Medium wins 99.6% (100%) and takes 86
+(48); Hard 30 (26) and Brutal 14 (14), who beat every scripted style as
+before. Easy against the balanced reference: 90.6% (95.8%). The order
+holds: Brutal beats Hard 88.5% (88.9%), Hard beats Medium 97.3% (89.5%,
+Medium having lost more), Medium beats Easy 99.7% (99.6%). Brutal against
+the benchmark composition: 98.3% (98.3%); against Hard alone still short
+of 95%. Every move is still used at every level; no stuck navigation in
+any match.
 
 **Where to tune it.** `PROFILES` in [`js/data/difficulty.js`](./js/data/difficulty.js);
 Venture's growth and limits in [`js/data/adventure.js`](./js/data/adventure.js).

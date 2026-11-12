@@ -587,8 +587,8 @@ identity's modifiers (Adventure's Venture included).
 
 The profiles were last retuned to make every level less smart (Easy and
 Medium by about a quarter to two fifths of each trait toward worse, Hard
-and Brutal by about a tenth; see [UPDATES.md](../../UPDATES.md#cpu-difficulty-smarter-only-every-level-less-smart)).
-The benchmark below was measured before that retune.
+and Brutal by about a tenth; see [UPDATES.md](../../UPDATES.md#cpu-difficulty-smarter-only-every-level-less-smart));
+the [benchmark](#benchmark) below compares them with the profiles before.
 
 The same intelligence runs on every level (no feature is switched off
 for a lower one); what changes is how well each part of it works:
@@ -795,33 +795,36 @@ the same inputs (`{ press }`, `{ jump, dir }`, `{ dash }`,
   air dash).
 - [`tests/benchmarks/cpu-benchmark.mjs`](../../tests/benchmarks/cpu-benchmark.mjs),
   run by hand (`node tests/benchmarks/cpu-benchmark.mjs --suite all
-  --seeds 4`): the benchmark below.
+  --seeds 1`, one process per matchup with `--only`): the benchmark below.
 
 ## Benchmark
 
 Measured with `node tests/benchmarks/cpu-benchmark.mjs --suite all
---seeds 4` (run as four processes, `--from 1` to `--from 4 --seeds 1`):
-256 deterministic matches per matchup (every pairing of the four fighters
-both ways round and mirrored, Yerma and Sol-Noir, both starting sides,
-seeds 1 to 4), first to 3 points under the full clock and overtime. Win
-rates are the first side's, with their 95% Wilson interval. "Before" is the
-previous CPU (commit `65fadc1`) measured by the same harness and recorder.
+--seeds 1` (run as one process per matchup, `--only`), after every level
+was made less smart: 1,024 deterministic matches per matchup (every
+pairing of the sixteen playable fighters both ways round and mirrored,
+Yerma and Sol-Noir, both starting sides, seed 1), first to 3 points under
+the full clock and overtime. Win rates are the first side's, with their
+95% Wilson interval. "Before" is the profiles just before that change
+(commit `561785e`), measured by the same harness on the same roster. (The
+measurement before it, with four fighters, is in
+[UPDATES.md](../../UPDATES.md#cpu-match-play-objectives-deliberate-waiting-breaking-off).)
 
 ### Standard suite
 
-| Matchup | Win rate before | Win rate now | Points now | Launch Point dealt : taken now |
+| Matchup | Win rate before | Win rate now | Points before → now | Launch Point dealt : taken before → now |
 | --- | --- | --- | --- | --- |
-| Brutal v Hard | 91.8% [87.8–94.6] | **94.5%** (242–14) [91.0–96.7] | 2.93 : 0.83 | 245 : 143 |
-| Brutal v Medium | 97.7% | 100% (256–0) | 3.00 : 0.20 | 219 : 72 |
-| Brutal v aggressive reference | 100% | 100% | 3.00 : 0.04 | 213 : 46 |
-| Brutal v defensive reference | 100% | 100% | 3.00 : 0.07 | 160 : 1 |
-| Brutal v projectile reference | 100% | 100% | 3.00 : 0.05 | 142 : 4 |
-| Brutal v jump-heavy reference | 100% | 100% | 3.00 : 0.09 | 203 : 62 |
-| Brutal v balanced reference | 100% | 100% | 3.00 : 0.06 | 176 : 27 |
-| Hard v Medium | 86.3% | 94.1% (241–15) | 2.91 : 0.84 | 243 : 148 |
-| Hard v Easy | 99.6% (Easy 0.28 points) | 100% (Easy 0.05 points) | 3.00 : 0.05 | 218 : 50 |
-| Medium v Easy | 93.0% (Easy 0.86 points) | 99.2% (Easy 0.23 points) | 2.98 : 0.23 | 239 : 98 |
-| Easy v balanced reference | 99.6% (LP 184 : 100) | 92.2% (236–20) | 2.82 : 0.78 | 183 : 182 |
+| Brutal v Hard | 88.9% [86.8–90.7] | **88.5%** (906–118) [86.4–90.3] | 2.82 : 1.01 → 2.81 : 0.98 | 471 : 345 → 466 : 333 |
+| Brutal v Medium | 99.1% | 99.6% (1020–4) | 2.98 : 0.33 → 3.00 : 0.18 | 417 : 200 → 401 : 138 |
+| Brutal v aggressive reference | 100% | 99.9% (1023–1) | 3.00 : 0.04 → 3.00 : 0.06 | 373 : 88 → 388 : 97 |
+| Brutal v defensive reference | 100% | 99.9% (1023–1) | 2.99 : 0.06 → 2.99 : 0.06 | 280 : 1 → 281 : 1 |
+| Brutal v projectile reference | 100% | 100% | 3.00 : 0.05 → 3.00 : 0.06 | 244 : 4 → 246 : 4 |
+| Brutal v jump-heavy reference | 100% | 100% | 3.00 : 0.04 → 3.00 : 0.06 | 348 : 80 → 359 : 88 |
+| Brutal v balanced reference | 100% | 100% | 3.00 : 0.05 → 3.00 : 0.05 | 298 : 33 → 305 : 36 |
+| Hard v Medium | 89.5% [87.4–91.2] | **97.3%** (996–28) [96.1–98.1] | 2.82 : 1.00 → 2.95 : 0.53 | 484 : 337 → 460 : 241 |
+| Hard v Easy | 100% | 100% (1024–0) | 3.00 : 0.07 → 3.00 : 0.04 | 413 : 95 → 414 : 59 |
+| Medium v Easy | 99.6% | 99.7% (1021–3) | 2.98 : 0.20 → 2.97 : 0.14 | 453 : 161 → 476 : 151 |
+| Easy v balanced reference | 95.8% [94.4–96.9] | **90.6%** (928–95–1) [88.7–92.3] | 2.85 : 0.40 → 2.69 : 0.61 | 270 : 229 → 227 : 281 |
 
 ### Behaviour suite: how each level plays
 
@@ -830,90 +833,82 @@ unless stated; "still" is the share of its time free on the ground spent
 standing still, "meant" how much of that was a deliberate wait; ground
 reversals are changes of running direction while free to act.
 
-| Level | Win rate (LP taken) before → now | Attack presses | Ground reversals | Still (meant) | Longest still | Shield s/match | Energy run out |
+| Level | Win rate (LP taken a match) before → now | Attack presses | Ground reversals | Still (meant) | Longest still | Shield s/match | Energy run out (per 100 matches) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Easy | 100% (56) → 96.9% (144) | 101.8 → 65.9 | 48.2 → 43.5 | 0% → 21% (100%) | 0.3 → 10.0 s | 0.1 → 2.4 | 64 → 7 |
-| Medium | 100% (33) → 100% (48) | 105.5 → 91.0 | 33.3 → 25.0 | 1% → 14% (96%) | 0.6 → 10.0 s | 0.1 → 0.1 | 65 → 19 |
-| Hard | 100% (24) → 100% (31) | 105.8 → 98.4 | 26.0 → 16.8 | 2% → 14% (82%) | 0.3 → 9.2 s | 0.1 → 0.1 | 36 → 37 |
-| Brutal | 100% (13) → 100% (14) | 106.8 → 101.5 | 20.1 → 11.7 | 4% → 13% (74%) | 0.3 → 1.5 s | 0.1 → 0.1 | 17 → 21 |
+| Easy | 92.2% (212) → **79.3% (331)** | 66.6 → 58.4 | 33.2 → 38.5 | 25% (100%) → 25% (100%) | 10.0 → 10.0 s | 3.5 → 5.9 | 2.0 → 3.1 |
+| Medium | 100% (48) → **99.6% (86)** | 90.6 → 85.3 | 18.0 → 23.0 | 20% (95%) → 20% (99%) | 10.0 → 10.0 s | 0.2 → 0.5 | 0.6 → 1.6 |
+| Hard | 100% (26) → 100% (30) | 97.6 → 95.2 | 11.4 → 12.5 | 19% (84%) → 18% (88%) | 9.6 → 10.0 s | 0.1 → 0.1 | 1.6 → 1.3 |
+| Brutal | 100% (14) → 100% (14) | 105.5 → 98.3 | 8.8 → 9.0 | 19% (75%) → 20% (78%) | 5.2 → 4.0 s | 0.1 → 0.1 | 1.9 → 2.5 |
 
 Each level against itself (Watch Mode):
 
-| Mirror | Match length | Attack presses | Shield s/match | Longest lull (no attack by either) | Objectives (share of time in play) |
+| Mirror | Match length | Attack presses | Shield s/match | Longest lull (no attack by either) | Objectives now (share of time in play) |
 | --- | --- | --- | --- | --- | --- |
-| Easy | 111 → 186 s | 77.8 → 53.7 | 0.1 → 6.8 | 3.4 → 5.5 s | build 54%, finish 21%, stabilize 20%, force 4% |
-| Medium | 94 → 118 s | 75.6 → 63.1 | 0.1 → 3.6 | 3.9 → 4.6 s | build 52%, finish 25%, stabilize 22% |
-| Hard | 86 → 105 s | 73.2 → 65.8 | 0.2 → 2.8 | 3.5 → 4.7 s | build 48%, finish 28%, stabilize 24% |
-| Brutal | 82 → 98 s | 68.8 → 63.2 | 0.2 → 2.3 | 4.5 → 5.1 s | build 42%, finish 31%, stabilize 26% |
-
-**New level against old level** (both CPUs in one match, the same game
-code; 48 matches each: twelve pairings of the fighters, both stages, both
-sides, seed 1):
-
-| Level | New wins | Points new : old |
-| --- | --- | --- |
-| Easy | 4% | 0.52 : 2.88 |
-| Medium | 23% | 1.54 : 2.60 |
-| Hard | 27% | 1.60 : 2.60 |
-| Brutal | 50% | 2.17 : 2.19 |
+| Easy | 233 → 283 s | 55.8 → 53.4 | 6.3 → 7.1 | 4.5 → 4.5 s | build 62%, stabilize 13%, finish 12%, force 10%, protect 4% |
+| Medium | 161 → 176 s | 64.2 → 63.5 | 3.7 → 4.3 | 4.4 → 4.2 s | build 60%, stabilize 18%, finish 16%, force 5%, protect 1% |
+| Hard | 152 → 149 s | 66.4 → 65.5 | 3.3 → 3.3 | 4.3 → 4.3 s | build 56%, finish 20%, stabilize 19%, force 5% |
+| Brutal | 147 → 146 s | 69.0 → 66.7 | 3.2 → 3.2 | 4.4 → 4.4 s | build 54%, stabilize 20%, finish 20%, force 5% |
 
 ### What the numbers say
 
-- **The old CPU's hyperactivity beat patience at the middle levels.** The
-  new Medium and Hard lose to the old ones (23% and 27%): the old CPU
-  decided again the moment an action ended and pressed about 100 times a
-  minute at every level, and that relentless pressure beats a patient
-  player of the same reactions. Brutal, which reassesses fast enough for
-  either, is as strong as before (50%). The new middle levels are meant to
-  be regular and tournament players rather than relentless machines; if
-  they should be as strong as before, `patience` and `think` for Medium and
-  Hard are where to tune.
-- **Easy is no longer a weaker Brutal.** Before, every level pressed about
-  100 times a minute against the competent reference and Easy took 56
-  Launch Point a match from it; now Easy presses 66 times a minute, takes
-  144, and scores against Medium almost never (0.23 points a match, from
-  0.86). The levels are further apart: Hard beats Medium 94% (from 86%),
-  Medium beats Easy 99% (from 93%). That gap is steep; whether Easy is now
-  right for a newcomer is for playtesting.
-- **Brutal's 95% target**, against the benchmark composition (Hard, Medium
-  and the five reference styles, 1,792 matches): **99.2%** (1,778–14)
-  [98.7–99.5], from 98.5%: met. **Against Hard alone it is not met: 94.5%**
-  [91.0–96.7], from 91.8%. Review of the target: the composition is mostly
-  scripted styles every level beats, so meeting it says little; the number
-  that matters is Brutal against Hard, the same intelligence with slower
-  reactions and judgement, which the specification does not allow to be won
-  by mechanical precision alone. A target against Hard (or the competent
+- **Easy and Medium are clearly easier to beat.** Against the competent
+  reference, a scripted regular player, Easy now loses about one match in
+  five (79.3%, from 92.2%) and takes 331 Launch Point a match from it
+  (212 before); Medium still wins nearly every match but takes almost
+  twice as much (86, from 48). Easy against the balanced reference wins
+  90.6% (95.8%) and takes more than it deals (227 : 281). Easy mirrors
+  run longer (283 s, from 233): both sides land less.
+- **Hard and Brutal are a little easier, which the scripts cannot show.**
+  The reference opponents have no strategy, and Hard and Brutal beat
+  every one of them as before (Hard takes 30 Launch Point a match from
+  the competent one, 26 before; Brutal 14 either way). Their cuts show in
+  what they do: Brutal presses less (98 attacks a minute, from 106),
+  Shields a cast less often (`tests/systems/combat-ai.test.mjs`: Hollow
+  Purple 7 times in 16, from 12) and eliminates itself by accident a
+  little more (56 times in its 2,048 matches against Hard and Medium,
+  from 41).
+- **The levels keep their order, and their distances.** Brutal beats Hard
+  88.5% (88.9% before): the two lost about as much. Hard beats Medium
+  more surely, 97.3% (89.5%), since Medium lost more; Medium beats Easy
+  99.7% (99.6%), and Hard beats Easy every time.
+- **Brutal's 95% target**, against the benchmark composition (Hard,
+  Medium and the five reference styles, 7,168 matches): **98.3%**
+  (7,044–124) [97.9–98.5], as before (98.3%): met. **Against Hard alone it
+  is not: 88.5%** [86.4–90.3], as before (88.9%; the 94.5% measured with
+  four fighters does not hold across sixteen). The composition is mostly
+  scripted styles every level beats, so meeting it says little; Brutal
+  against Hard, the same intelligence with slower reactions and judgement,
+  is the number that matters, and a target against Hard (or the competent
   reference) would be the more honest one to keep.
-- **It waits, and means it.** A level now spends 13–21% of its free time on
-  the ground standing still, most of it (71–100% by matchup) a deliberate
-  wait with a reason; the rest is brief settles of footwork. No stillness ran past `WAIT_LIMIT` (10 s), and the longest
-  lull between two CPUs in any matchup is 8.4 s (5.5 s in the mirrors).
-- **Less twitching.** Ground reversals fell at every level (Brutal from 20
-  to 12 a minute).
-- **Clean execution:** no inactivity incident or stuck navigation in any of
-  the 4,864 matches; five refused presses in all of them (three before).
-  Accidental self-eliminations stay rare (Brutal 5 in 512 matches against
-  Hard and Medium, as before).
-- **Every move is used at every level.** The rarest is #0004's Ievan
-  Polkka, cast 5 times in Easy's 32,232 presses (13 in 20,620 before): a
-  heal that needs a safe moment, which a casual player seldom makes.
-- **Performance** (Node, one process, Easy and Brutal mirrors on both
-  stages, every CPU step timed): 108 µs a step on average (99 µs before),
-  1.4 ms at the 99th percentile (1.2 ms), 3.0 ms at the 99.9th (3.2 ms);
-  the rare spikes past a frame (16.7 ms) are there before and after
-  (garbage collection). The debug trace and its events cost nothing with
-  `debug` off. A browser on a phone is slower than Node: check Watch Mode
-  there (see the checklist below).
+- **It waits, and means it.** A level spends 18–25% of its free time on
+  the ground standing still, most of it (78–100% by matchup) a deliberate
+  wait with a reason; no stillness ran past `WAIT_LIMIT` (10 s), and the
+  longest lull between two CPUs in a mirror averages 4.2–4.5 s a match.
+- **Clean execution:** no stuck navigation in any of the 19,456 matches,
+  3 inactivity incidents (5 before), 29 refused presses (23 before).
+- **Every move is used at every level.** The rarest is #0004's
+  `attack4`, cast 5 times in Easy's 676,803 presses (14 in 622,039
+  before): a technique that needs a safe moment, which a casual player
+  now makes even less often.
+- **Performance** was not measured again for this retune (a profile's
+  values change how well the CPU thinks, not what it computes a step). Last
+  measured with four fighters (Node, one process, Easy and Brutal mirrors
+  on both stages, every CPU step timed): 108 µs a step on average, 1.4 ms
+  at the 99th percentile, 3.0 ms at the 99.9th; the rare spikes past a
+  frame (16.7 ms) were garbage collection. The debug trace and its events
+  cost nothing with `debug` off. A browser on a phone is slower than Node:
+  check Watch Mode there (see the checklist below).
 
 **Limitations.** The reference opponents, the competent one included, are
-scripts with no strategy: every level beats them, so they measure
-robustness against styles and how the CPU plays, not human skill. Against
-the defensive reference, which never attacks, a CPU ahead on points may let
-the clock run: 5 of its 256 matches had a stretch of more than 20 s with no
-attack by either side (the longest 186 s), the CPU stepping in for a moment
-after each 10-second wait but finding nothing worth committing to. Easy's
-casual misreads mean it sometimes trades when it should not (it heeds a
-call to break off about half the time). No result here is a claim about play
+scripts with no strategy: every level from Medium up beats them, so they
+measure robustness against styles and how the CPU plays, not human skill.
+Against the defensive reference, which never attacks, a CPU ahead on points
+may let the clock run: 5 of Brutal's 1,024 matches against it had a stretch
+of more than 20 s with no attack by either side (the longest 214 s), the
+CPU stepping in for a moment after each 10-second wait but finding nothing
+worth committing to; 53 matches in all had one (43 before), most of them
+Easy's against the scripted references. Easy's casual misreads mean it
+sometimes trades when it should not. No result here is a claim about play
 against people.
 
 ## Human playtesting
