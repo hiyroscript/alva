@@ -97,4 +97,6 @@ Make a new branch from the updated main, then:
 - The browser/itch version must behave exactly as before.
 - When a choice is genuinely mine (app ID, landscape lock, a paid option), pick a sensible default, write it in the PR, and keep going instead of blocking.
 - Keep your messages to me short and plain. Save technical detail for PR descriptions and docs.
-After PR #2 is merged, whenever I say "release X.Y.Z", do the whole release yourself (bump version, tag, push, wait for CI, verify every file) and reply with just the Releases link.
+After PR #2 is merged, do the whole release yourself (bump version, tag, push, wait for CI, verify every file) and reply with just the Releases link.
+Also make releases automatic: whenever a push to main adds a new entry to UPDATES.md, bump the patch version, tag it, build everything and publish the Release with those notes. Pushes that don't touch UPDATES.md don't release.
+
