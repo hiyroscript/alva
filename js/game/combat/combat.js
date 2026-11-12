@@ -66,6 +66,7 @@ import { DEFLECT_ENERGY_COST } from '../../data/energy.js';
 import { attackPhase, strikeLive } from './attacks.js';
 import { backTurned, hitReaches } from './hit-effects.js';
 import { hitDamage } from './modifiers.js';
+import { mimicFrom } from './mimic.js';
 
 // How a fighter responds to being launched (the character's
 // `launchReaction`, every field optional; the defaults change nothing):
@@ -209,7 +210,8 @@ export class CombatSystem {
     //   heal, energyCost, launchPointBefore, launchPointAfter, baseLaunch,
     //   directionalLaunch, launchStrength, finalLaunch, launchSpeed, hitstun,
     //   perfect, point, paralysis, float, charm, fear, fed, drained, stall,
-    //   projectile, summon, technique, attack, source, ability, redirected }
+    //   copied, siphoned, projectile, summon, technique, attack, source,
+    //   ability, redirected }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: BLOCK_ENERGY_COST,
@@ -231,7 +233,10 @@ export class CombatSystem {
     // each, 0 for none), `fed` the Launch Point the hit took off its
     // attacker because the target was frightened of it (0 for none),
     // `drained` the Energy the hit's `drain` took off the target (0 for
-    // none: a block drains nothing) and `stall` how long a melee blow
+    // none: a block drains nothing), `copied` the id of the projectile a
+    // mimic's real hit copied off its target (null for none) and
+    // `siphoned` the Energy it took off a target with nothing to copy, its
+    // attacker's now (0 for none; see js/game/combat/mimic.js), and `stall` how long a melee blow
     // the target's Shield blocked froze its attacker (0 for none). `attacker`
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee. `attack` is always
@@ -283,6 +288,10 @@ export class CombatSystem {
         const event = this.applyHit(attacker, target, atk.def, {
           point, velocity: bodyVelocity(attacker), suppressLaunch: launchSuppressed(atk), mash: atk.mash ?? null, fromX: attacker.body.x,
         });
+        // A mimic's real hit takes what its target fights with: a copy of
+        // its strongest projectile, or its Energy (js/game/combat/mimic.js).
+        // A block takes nothing.
+        if (event.type === 'hit' && atk.def.mimic) Object.assign(event, mimicFrom(attacker, target, atk.def));
         atk.confirmed = event.type === 'hit';
         atk.confirmedAt = atk.time;
         if (event.type === 'block') atk.blocked = true;
@@ -668,7 +677,7 @@ export class CombatSystem {
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || launched ? 0 : Math.max(def.paralyze ?? 0, def.float ?? 0),
       float: blocked || launched ? 0 : def.float ?? 0, charm: blocked ? 0 : def.charm ?? 0,
-      fear: blocked ? 0 : def.fear ?? 0, fed, drained, stall,
+      fear: blocked ? 0 : def.fear ?? 0, fed, drained, stall, copied: null, siphoned: 0,
       projectile, summon, technique, hazard, attack: !hazard,
       source: sourceOf(def, projectile, summon, technique, hazard), ability: hazard ? def.id ?? null : abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,
@@ -696,6 +705,7 @@ export class CombatSystem {
       damage: 0, heal, energyCost: 0, launchPointBefore, launchPointAfter: tc.launchPoint,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength: 0, finalLaunch: NO_LAUNCH,
       launchSpeed: 0, hitstun: 0, perfect: false, point, paralysis: 0, float: 0, charm: 0, fear: 0, fed: 0, drained: 0, stall: 0,
+      copied: null, siphoned: 0,
       projectile, summon, technique, attack: true,
       source: sourceOf(def, projectile, summon, technique), ability: abilityOf(def, projectile, summon, technique),
       redirected: !!projectile?.redirected,

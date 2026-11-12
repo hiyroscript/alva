@@ -224,6 +224,20 @@ export const FIGHTER_PROFILES = Object.freeze({
     descriptionKey: 'discover.fighter.0016.playStyle',
     reviewedSourceHash: '79a33002921e34e5db273bc732c02c061c1c535c48dab78d9dc2d4e9edce3f61',
   }),
+  // A cartoon powerhouse whose kit changes with her opponent: a touch that
+  // copies the opponent's strongest shot for her to throw back (or takes
+  // all its Energy when it has none), a ground-splitting punch after a long,
+  // breakable wind-up, a supersonic run, headbutts forward, up and down
+  // into the ground. Hard to pilot and to master: the touch is slow and
+  // short and must land unblocked, the same button then throws, what it
+  // yields (and the cooldown its throw earns) differs for every opponent,
+  // the exhaustion it leaves is a window to cash in with the quake, and her
+  // heaviest moves are long commitments a sharp opponent punishes.
+  '0017': Object.freeze({
+    difficulty: 5,
+    descriptionKey: 'discover.fighter.0017.playStyle',
+    reviewedSourceHash: 'e2eb78b69b8547c4d8540e41726bdce2c071d73021fe8903d5a7a77b7fa0611a',
+  }),
 });
 
 for (const [id, profile] of Object.entries(FIGHTER_PROFILES)) assertFighterProfile(id, profile);

@@ -321,6 +321,31 @@
 //     hits: [{ at: 2 / 15, active: 1 / 15, damage: 1, ... }, ...],
 //     motion: { type: 'rise', speed: 450 } },
 //
+// A mimic (`mimic: { spawnAt, offset, siphon }`, a single melee strike's)
+// takes what its target fights with. A real hit of it (never a block)
+// copies the strongest projectile the target throws, the most damage one
+// throw of it deals one target, then its launch (see strongestProjectile
+// in js/game/combat/mimic.js: only one that flies, never the one its
+// thrower holds), into its fighter's hands (CombatState.copy, one at a
+// time); the next use of a mimic of that fighter's, on the ground or in
+// the air, strikes nothing but throws that copy instead, as `spawnAt`
+// crosses, from `offset` (facing right from its origin, mirrored): the
+// projectile alone, never what threw it, drawn in its own art and its
+// thrower's art-pixel size, now this fighter's. A target that throws
+// nothing gives up `siphon` of its Energy instead (a whole number from 0 to
+// the bar's 100, taken off at once as a `drain` takes it), and it all goes
+// to the mimic's fighter (never past its bar). The throw is a projectile
+// attack of its own (see mimicThrow): its cooldown and its Energy are the
+// policies' for the copy it throws (15 for an ordinary one; none and its 3
+// s or 5 s for one that paralyzes or deals 10), and it is the same move,
+// so its cooldown keeps the touch waiting too. A throw cut short before
+// `spawnAt` keeps the copy. Only one strike of its fighter's own body
+// mimics: a projectile, a string, a motion, a grab, a pull and a Deflect
+// are refused.
+//
+//   attack5: { ..., hitbox: { x: 4, y: -46, w: 34, h: 28 }, damage: 1,
+//     mimic: { spawnAt: 3 / 15, offset: { x: 30, y: -27 }, siphon: 100 } },
+//
 // A pending attack (`pending: true`) is one whose art is in but whose
 // combat attributes are not authored yet: it plays its clip once, first
 // frame to last, and strikes nothing. It has no hitbox, projectile, damage
@@ -338,7 +363,7 @@
 
 import { CONFIG } from '../../config.js';
 import { cooldownClass, resolveCooldown } from '../../data/cooldowns.js';
-import { resolveMoveEnergy } from '../../data/energy.js';
+import { MAX_ENERGY, resolveMoveEnergy } from '../../data/energy.js';
 import { resolveAttackCarry, resolveStepIn } from '../../data/attack-movement.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { createHit, resolveHitEffects } from './hit-effects.js';
@@ -382,6 +407,7 @@ const ATTACK_DEFAULTS = {
   gaze: false,
   backstab: null,
   drain: 0,
+  mimic: null,       // { spawnAt, offset, siphon }: a touch that copies its target's strongest projectile (see above)
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -467,6 +493,34 @@ function resolveImpact(spec, owner, id) {
     hit: createHit(id, spec.hit, who),
     animation: spec.animation ?? null,
   });
+}
+
+// A mimic's frozen settings (see `mimic` above) from its `mimic` entry, or
+// null: when its throw lets the copy go (`spawnAt`, seconds into the
+// attack, before it is over), where from (`offset`), and the Energy a
+// target with nothing to copy gives up (`siphon`, a whole number from 0 to
+// MAX_ENERGY). Only a single strike of the fighter's own body touches: one
+// that throws, strikes in a string, moves on its own, grabs, pulls or
+// turns projectiles back is refused.
+function resolveMimic(spec, def, owner) {
+  if (spec == null) return null;
+  if (typeof spec !== 'object') throw new Error(`[Alva] ${owner}'s mimic must be { spawnAt, offset, siphon }`);
+  const refused = [
+    !def.hitbox && 'it has no hitbox', def.projectile && 'it throws a projectile', def.hits && 'it strikes in a string',
+    def.motion && 'it moves on its own', def.grab && 'it grabs', def.pull && 'it pulls', def.deflectProjectiles && 'it turns projectiles back',
+  ].filter(Boolean);
+  if (refused.length) throw new Error(`[Alva] ${owner} mimics but ${refused.join(', ')}: only one touch of its own body takes what its target fights with`);
+  const { spawnAt } = spec;
+  if (!(typeof spawnAt === 'number' && spawnAt >= 0 && spawnAt < def.total - PHASE_EPSILON)) {
+    throw new Error(`[Alva] ${owner}'s mimic needs a spawnAt from 0, before the attack is over`);
+  }
+  const siphon = spec.siphon ?? 0;
+  if (!(Number.isInteger(siphon) && siphon >= 0 && siphon <= MAX_ENERGY)) {
+    throw new Error(`[Alva] ${owner}'s mimic siphon must be a whole number of Energy from 0 to ${MAX_ENERGY}`);
+  }
+  const o = spec.offset ?? {};
+  if (!Number.isFinite(o.x ?? 0) || !Number.isFinite(o.y ?? 0)) throw new Error(`[Alva] ${owner}'s mimic offset must be { x, y } in world units`);
+  return Object.freeze({ spawnAt, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }), siphon });
 }
 
 // The frozen pull (see `pull` above) of `owner` from its `pull` entry, or
@@ -659,6 +713,7 @@ const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'grab', 'carry', 'motion', 'pull',
   'deflectProjectiles', 'paralyze', 'blockPush', 'quake', 'charm', 'float', 'fear', 'gaze', 'backstab', 'drain', 'energyCost', 'step',
+  'mimic',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -717,6 +772,7 @@ export function createAttackDefinition(spec, { clipDuration = 0, projectiles = n
   if (def.motion?.type === 'tunnel' && def.motion.show > def.total + PHASE_EPSILON) {
     throw new Error(`[Alva] ${owner}'s tunnel comes out after the attack is over`);
   }
+  def.mimic = resolveMimic(spec.mimic, def, owner);
   def.releaseAt = attackReleaseAt(def);
   Object.assign(def, resolveStepIn(spec, def, owner));
   def.offense = resolveOffense(spec, attackOffense(def), owner);

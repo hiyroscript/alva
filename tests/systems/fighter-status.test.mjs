@@ -15,6 +15,7 @@ import { getMap } from '../../js/data/maps.js';
 import {
   cooldownIndicators, energyBarState, formatCooldown, drawCooldownIndicators, drawEnergyBar, statusOnScreen,
   drawSpecialMark, specialMarkBob, specialMarkRect, COOLDOWN_STYLE, ENERGY_STYLE, SPECIAL_MARK_STYLE,
+  copyMarkRect, drawCopyMark, COPY_MARK_STYLE,
 } from '../../js/game/rendering/fighter-status.js';
 import { getCharacter } from '../../js/data/characters.js';
 import { previewFrame } from '../../js/data/ability-preview.js';
@@ -481,6 +482,36 @@ test('the mark is an orange exclamation mark with a dark outline, scaled with th
   const bobs = [0, 0.2, 0.4, 0.55, 0.7, 0.9].map((t) => specialMarkBob(t, 1, false));
   assert.ok(Math.max(...bobs) > 0 && Math.max(...bobs) <= 2, 'a subtle float of at most 2 CSS px');
   assert.equal(specialMarkBob(0, 1, false), 0);
+});
+
+test('the held-copy mark: the copy a fighter holds, its own art in a white ring, above every other mark, for exactly as long as it is held', () => {
+  // A badge sized with the world, within its bounds.
+  const rect = copyMarkRect(400, 200, 1.2, 1);
+  assert.equal(rect.w, rect.h, 'round');
+  assert.ok(rect.y + rect.h <= 196 && Math.abs(rect.x + rect.w / 2 - 400) <= 1, 'centred, a gap above the column');
+  assert.equal(copyMarkRect(400, 200, 0.3, 1).w, 18, 'never below 18 CSS px');
+  assert.equal(copyMarkRect(400, 200, 9, 1).w, 34, 'never above 34 CSS px');
+  // Drawn: the dark badge, its outline and white ring, and the copy's
+  // first frame inside, never mirrored; nothing without a frame.
+  const frame = { canvas: {}, artW: 8, artH: 6, anchorArtX: 0, anchorArtY: 0, unit: 1 };
+  const { ctx, calls } = recorder();
+  assert.equal(drawCopyMark(ctx, rect, { anim: { frames: [frame] } }, 1), true);
+  assert.ok(calls.some((c) => c.fn === 'fill' && c.fill === COPY_MARK_STYLE.back));
+  assert.deepEqual(calls.filter((c) => c.fn === 'stroke').map((c) => c.stroke), [COPY_MARK_STYLE.outline, COPY_MARK_STYLE.ring]);
+  assert.ok(calls.some((c) => c.fn === 'drawImage'), 'its art');
+  assert.equal(drawCopyMark(recorder().ctx, rect, null, 1), false);
+  // In a battle: none until a copy is held, then over the fighter, the top
+  // of its status column, gone once thrown.
+  const { battle } = renderedBattle();
+  const { p1 } = battle;
+  assert.equal(battle.copyMarkRect(p1), null);
+  p1.combat.holdCopy({ id: 'x', anim: { frames: [frame] } });
+  const mark = battle.copyMarkRect(p1);
+  const [x] = battle.markerAnchor(p1);
+  assert.ok(Math.abs(mark.x + mark.w / 2 - x) <= 1 && mark.y + mark.h < battle.markerTop(p1), 'centred over the tag');
+  assert.equal(battle.statusTop(p1), mark.y - 1, 'the top of the status column now');
+  p1.combat.copy = null;
+  assert.equal(battle.copyMarkRect(p1), null);
 });
 
 test('the rings and bar are canvas-drawn, never DOM in a HUD card', () => {

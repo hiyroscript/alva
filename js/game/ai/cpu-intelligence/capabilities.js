@@ -218,6 +218,9 @@ function attackMove(kind, action, air, id, atk, proj, energyCost = 0) {
     momentum: atk.momentum, airMomentum: atk.airMomentum, friction: atk.friction,
     step: air ? null : atk.step, stepIn: atk.stepIn, lunge: air ? 0 : stepTravel(atk),
     passThrough: !!atk.passThrough, deflectProjectiles: !!atk.deflectProjectiles, carry: atk.carry,
+    // A touch that takes what its target fights with (see `mimic` in
+    // js/game/combat/attacks.js), weighed by the evaluator.
+    mimic: atk.mimic ?? null,
   };
 }
 
@@ -311,7 +314,9 @@ function mashModel(f, moves) {
 // Everything fighter `f` can do, cached (see the header).
 export function analyzeCapabilities(f) {
   const cached = CACHE.get(f);
-  if (cached && cached.def === f.def && cached.sprites === f.sprites) return cached;
+  // Analyzed again whenever a copy it holds changes (a mimic's move is then
+  // a throw of it: see readMoveset).
+  if (cached && cached.def === f.def && cached.sprites === f.sprites && cached.copy === (f.combat?.copy ?? null)) return cached;
   const ms = readMoveset(f);
   const moves = [];
   for (const m of ms.melee) moves.push(attackMove('melee', m.action, m.air, m.id, m.atk, null, m.atk.energyCost));
@@ -349,7 +354,7 @@ export function analyzeCapabilities(f) {
     : null;
   const roles = new Map(MOVE_ROLES.map((role) => [role, moves.filter((m) => m.roles.has(role))]));
   const caps = {
-    def: f.def, sprites: f.sprites, moveset: ms, moves, deflect, shield, roles,
+    def: f.def, sprites: f.sprites, copy: ms.copy, moveset: ms, moves, deflect, shield, roles,
     ground: moves.filter((m) => !m.air), aerial: moves.filter((m) => m.air),
     hurt: ms.hurt, height, halfW: f.def.collider.width / 2,
     fastest: {

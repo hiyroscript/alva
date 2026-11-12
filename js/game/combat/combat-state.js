@@ -270,6 +270,17 @@ export class CombatState {
     // (`cloak`, see js/game/combat/technique.js and cloakFor below): near
     // invisible on screen, and out of a CPU's sight. 0 when it is not.
     this.cloak = 0;
+    // The projectile a mimic of this fighter's copied off another and holds
+    // until a mimic throws it (see `mimic` in js/game/combat/attacks.js and
+    // js/game/combat/mimic.js: { id, def, anim, sprites, from, throws }), or
+    // null. One at a time; a fresh state (a respawn) holds none.
+    this.copy = null;
+  }
+
+  // A mimic took `copy` (js/game/combat/mimic.js): this fighter holds it,
+  // in place of any it held, until a mimic of its own throws it.
+  holdCopy(copy) {
+    this.copy = copy;
   }
 
   get attacking() {
@@ -556,6 +567,16 @@ export class CombatState {
     return before - this.energy;
   }
 
+  // A mimic's `siphon` (js/game/combat/mimic.js): `amount` Energy taken off
+  // another fighter comes to this one, never past its bar; reaching it full
+  // ends an exhaustion, as any full bar does. No refill and no payment.
+  // Returns what it gained.
+  gainEnergy(amount) {
+    const before = this.energy;
+    this.setEnergy(before + Math.max(0, amount));
+    return this.energy - before;
+  }
+
   // One step of passive recovery: regen per second.
   updateEnergy(dt) {
     this.regenEnergy(dt * this.energySpec.regen);
@@ -643,7 +664,12 @@ export class CombatState {
         // Whatever releases it, the attack that threw it is its ability; a
         // volley's shots also carry the throw they belong to (`volleyOf`,
         // this activation).
-        if (this.stun <= 0) this.release = { ...proj, ability: a.def.id, volleyOf: proj.volley ? a : null };
+        if (this.stun <= 0) {
+          this.release = { ...proj, ability: a.def.id, volleyOf: proj.volley ? a : null };
+          // A mimic's throw lets its copy go: it is out of this fighter's
+          // hands (see js/game/combat/mimic.js).
+          if (proj.borrowed) this.copy = null;
+        }
       }
       // Released once its time reaches its release point (a slam with an
       // impact is released by the impact itself: Fighter.landSlam).

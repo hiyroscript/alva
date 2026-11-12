@@ -68,7 +68,11 @@ const MOVESETS = new WeakMap();
 // button that cannot do anything.
 export function readMoveset(f) {
   const cached = MOVESETS.get(f);
-  if (cached && cached.def === f.def && cached.sprites === f.sprites) return cached;
+  // A copy a mimic holds turns that move into a throw of it (see
+  // Fighter.attackDef and js/game/combat/mimic.js): read again whenever the
+  // copy changes.
+  const copy = f.combat?.copy ?? null;
+  if (cached && cached.def === f.def && cached.sprites === f.sprites && cached.copy === copy) return cached;
   const { def, sprites } = f;
   const melee = [];
   const ranged = [];
@@ -77,11 +81,14 @@ export function readMoveset(f) {
     if (!mapping || specialAction(def, action)) continue;
     const pairs = typeof mapping === 'string' ? [[mapping, false], [mapping, true]] : [[mapping.ground, false], [mapping.air, true]];
     for (const [id, air] of pairs) {
-      const atk = id ? f.attacks[id] : null;
+      const atk = id ? f.attackDef?.(id) ?? f.attacks[id] : null;
       if (!atk || (air && atk.groundOnly) || !atk.animation || !sprites.has(atk.animation)) continue;
       if (isRangedAttack(atk)) {
-        const proj = f.projectileDefs[atk.projectile.id];
-        if (!proj?.animation || !sprites.projectile(proj.animation) || !(proj.speed >= 0)) continue;
+        // A held copy's throw lets go of another fighter's projectile, with
+        // its own art.
+        const borrowed = atk.projectile.borrowed;
+        const proj = borrowed ? borrowed.def : f.projectileDefs[atk.projectile.id];
+        if (!proj?.animation || !(borrowed ? borrowed.anim : sprites.projectile(proj.animation)) || !(proj.speed >= 0)) continue;
         ranged.push({ action, air, id, atk, proj });
       } else if (isMeleeAttack(atk)) {
         melee.push({ action, air, id, atk, reach: attackReach(atk), motion: atk.motion?.type ?? null });
@@ -129,7 +136,7 @@ export function readMoveset(f) {
   const guard = f.defense?.type === 'shield' ? f.defense.groundAnimation : null;
   const deflect = f.deflect && sprites.has(f.deflect.animation) ? f.deflect : null;
   const moveset = {
-    def, sprites, melee, ranged, specials,
+    def, sprites, copy, melee, ranged, specials,
     groundShield: !!guard && sprites.has(guard),
     // Pressed on `shield` in the air, an aerial strike like any other, that
     // may also turn projectiles back while it is live. Starting it costs

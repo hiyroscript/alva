@@ -46,6 +46,7 @@ import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, inDanger, limitReady, techniqueProblem } from '../combat/technique.js';
+import { mimicThrow } from '../combat/mimic.js';
 import { MashCombo, resolveMashPair } from '../combat/mash-combo.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
@@ -462,6 +463,9 @@ export class Fighter {
       const release = { id: combat.release.id, offset: combat.release.offset, direction: this.facing, ability: combat.release.ability };
       // A volley's shot also carries the throw it is one of.
       if (combat.release.volleyOf) release.volleyOf = combat.release.volleyOf;
+      // A mimic's throw carries the copy it lets go of: another fighter's
+      // projectile, its own definition and art (js/game/combat/mimic.js).
+      if (combat.release.borrowed) release.borrowed = combat.release.borrowed;
       this.releases.push(release);
       combat.release = null;
     }
@@ -1707,7 +1711,7 @@ export class Fighter {
     if (special) return this.trySpecial(action, special, dir, at);
     const attackId = this.attackFor(action);
     if (!attackId) return false; // reserved: wired, but no attack mapped
-    const atk = this.attacks[attackId];
+    const atk = this.attackDef(attackId);
     if (!atk || !this.canFollowUp(at) || combat.cooldowns.has(attackId)) return false;
     if (combat.attack?.def.id === attackId) return false;
     if (!this.attackStartable(atk, this.body.grounded, { warn: true })) return false;
@@ -1731,8 +1735,10 @@ export class Fighter {
       return false;
     }
     if (atk.projectile) {
-      const proj = this.projectileDefs[atk.projectile.id];
-      if (!proj?.animation || !this.sprites.projectile(proj.animation)) {
+      // A mimic's throw lets go of a copy, which brings its own art.
+      const borrowed = atk.projectile.borrowed;
+      const proj = borrowed ? borrowed.def : this.projectileDefs[atk.projectile.id];
+      if (!proj?.animation || !(borrowed ? borrowed.anim : this.sprites.projectile(proj.animation))) {
         if (warn) console.warn(`[Alva] Attack "${atk.id}" throws "${atk.projectile.id}", which has no animation frames; ignoring.`);
         return false;
       }
@@ -2051,12 +2057,22 @@ export class Fighter {
   // start there at all (see attackMayStart).
   attackStartsWhere(action, grounded) {
     const attackId = this.attackFor(action, grounded);
-    const atk = attackId ? this.attacks[attackId] : null;
+    const atk = attackId ? this.attackDef(attackId) : null;
     if (!atk || (atk.groundOnly && !grounded)) return false;
     // Energy refusals are never kept: exhaustion lasts until a full refill.
     if (atk.energyCost > 0 && !this.combat.canUseEnergy()) return false;
     if (!grounded && this.airStartBlocked(atk)) return false;
     return !!atk.animation && this.sprites.has(atk.animation);
+  }
+
+  // The attack `id` is for this fighter right now: its own definition, or,
+  // for a mimic while the fighter holds a copy (see `mimic` in
+  // js/game/combat/attacks.js), the throw of that copy (mimicThrow in
+  // js/game/combat/mimic.js), the same move. Null for none.
+  attackDef(id) {
+    const atk = this.attacks[id] ?? null;
+    const copy = this.combat?.copy;
+    return atk?.mimic && copy ? mimicThrow(atk, copy) : atk;
   }
 
   // Attack id for a controller action. The character's `actions` entry is a
