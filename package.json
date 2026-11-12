@@ -21,7 +21,6 @@
   "build": {
     "appId": "com.hiyroscript.alva",
     "productName": "Alva",
-    "electronVersion": "latest",
     "directories": {
       "output": "dist/installers"
     },
