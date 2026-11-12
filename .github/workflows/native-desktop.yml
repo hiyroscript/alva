@@ -37,6 +37,8 @@ jobs:
           cache: npm
       - name: Install the existing game build tools
         run: npm ci
+      - name: Run the game and server tests
+        run: node --test
       - name: Install Electron packaging tools
         run: npm install --no-save --package-lock=false electron@latest electron-builder@latest
       - name: Build the self-contained game
